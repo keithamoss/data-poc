@@ -2389,7 +2389,7 @@ exist.
     red) also amends REQ-PIPE-115 criterion 9 and can be built ahead of the
     file checks themselves. The decisions are on the three requirements.
 
-28. **[blocked, 2026-09-29]** **[Pipeline & publishing]** **"Inherited": a dataset
+28. **[in-progress, 2026-10-19]** **[Pipeline & publishing]** **"Inherited": a dataset
     that does not participate in a period at all.** A view created when a
     period schema is born, pointing at the supply that is still current, for
     the datasets the schedule says owe nothing that period - plus inherit and
@@ -3668,6 +3668,10 @@ rows differ (each re-pulled an hour later) - both before due; a clean
 cp_clients.csv follows alone on 29 November at 10:00, after due and before
 2020-Q1's window opens, built green (REQ-GEN-184) after one green lead-in
 quarter (2019-Q3) and before a green one (2020-Q1).*
+**Expect** (bootstrap of 2026-10-19): on 1 November 2019 cp-clients reads
+"Two files for one table — nothing is checked for this dataset until a
+person resolves it", naming cp_clients.csv (received 8:30am) and
+cp_clients_v2.csv, and the gate refuses its promotion.
 **Breaks as**: one of the two files taken as the quarter's supply, or the
 three readers' cross-table checks evaluated against either.
 
@@ -3675,6 +3679,11 @@ three readers' cross-table checks evaluated against either.
 resolved by a later file.** TS-42a's placement; this link opens on the later
 file's asset day.
 *Config: as TS-42a.*
+**Expect** (bootstrap of 2026-10-19): the 29 November cp_clients.csv files
+to 2019-Q4, late, and supersedes the pair: "Two files for one table —
+superseded by the supply received 10:00am Friday, 29 November 2019". It is
+promoted on 5 December, and the three readers are re-evaluated by the
+knock-on at the same instant.
 **Breaks as**: the pair still contested after the later file, or the later
 file filed as a resupply rather than ending the contest.
 
@@ -3693,6 +3702,16 @@ real extract built green. A scripted person settles the pair at 11:00 the
 next day (contract/scripted_decisions.yaml, "TS-80 settle"): file one by
 receipt, the test file, rejected; file two, the real extract, the quarter's
 supply.*
+**Expect** (bootstrap of 2026-10-19): on 1 November 2020 cp-clients reads
+"Two files for one table"; from 2 November, "Settled · Two files for one
+table — settled by Robin Hale, 11:00am Monday, 2 November 2020",
+cp_clients_TEST.csv rejected and cp_clients.csv the quarter's supply. The
+re-check it owed runs at 11:00 and the gate promotes it; the knock-on
+re-evaluates the three readers and promotes them at the same instant
+(post-build-review #251). NOT YET ON THE PAGE: the readers' cross-table
+column still reads red until 2021-Q1's supply, because the re-checked
+relationship results are recorded under cp-clients' re-check run - noted
+for Keith.
 **Breaks as**: the test rows checked as the quarter's supply, the readers
 left contested after the settlement, or the file named by sorted name
 rather than by receipt position.
@@ -3835,14 +3854,12 @@ PLANTED by REQ-GEN-205 (2026-10-19). TS-57 to TS-61 are in Emergency
 Department (REQ-GEN-237), whose quarters are one correction's subject: a
 single declared correction, REQ-GEN-205, dated 1 September 2026, edits five
 of its early quarters' dates in the 2013 quarterly version, and the replay
-confirms it after every arrival (REQ-PIPE-170). Child Protection writes no
+confirms it once every stream has finished (REQ-PIPE-170, REQ-PIPE-262). Child Protection writes no
 routine supply in the quarters the edits alter, so the correction moves only
-what each scenario built. TS-62 is Birth Registrations' own and NOT PLANTED:
-REQ-GEN-205 criteria 11, 24 and 25 want its version after 2026-09-08 and
-near the history's end, and no two days there are free (a question for
-Keith, morning report 6). TS-63 is Child Protection's. Each a/b pair shares one placement (REQ-GEN-201): `a` opens
-while the correction awaits confirmation, `b` on the history's last day,
-after it.
+what each scenario built. TS-62 is Birth Registrations' own, planted 2026-10-19 on the last day of a history grown to 2026-09-25, its correction REQ-GEN-205-WINDOW dated the day before and left pending (REQ-GEN-205 criteria 11, 24, 25). TS-63 is Child Protection's. Each a/b pair shares one placement (REQ-GEN-201): `a` opens
+on a date before the correction is confirmed, showing the quarter as filed
+before it, and `b` on the history's last day, after the replay's
+confirmation (post-build-review #252).
 
 Unless stated, *Config: Emergency Department, quarterly Feb/May/Aug/Nov,
 due 09:00 on the 1st, 8 hours' grace, claim window 14 days.*
@@ -3852,9 +3869,8 @@ confirmed.**
 *Config: 2015-Q1's date is corrected from 1 to 2 February 2015; its one
 supply arrives at 12:00 on 2 February - late against the old date, on time
 against the corrected one.*
-**Expect**: the quarter reads late, and the correction awaits confirmation
-with one verdict change (late -> on time) and no moves (REQ-PIPE-168
-criteria 3-6).
+**Expect**: the quarter reads late. Nothing on the page names the correction on this date: the replay confirms it only at the end of the history, and the page never shows a past correction as awaiting (Keith, 2026-10-19). Before confirmation, `mothman supply corrections --reference REQ-GEN-205` previews one verdict change (late -> on
+time) and no moves (REQ-PIPE-168 criteria 3-6).
 **Breaks as**: applied on merge with nobody confirming because there were
 no moves.
 
@@ -3871,8 +3887,8 @@ confirmed.**
 *Config: 2013-Q4's date is corrected from 1 November to 20 October 2013. Its
 supply arrives on 10 October, before the old window opened, so it is filed
 as a resupply of 2013-Q3; the corrected window covers it.*
-**Expect**: the correction proposes moving it 2013-Q3 -> 2013-Q4 with its
-re-judged verdict, and awaits confirmation.
+**Expect**: the supply reads filed to 2013-Q3, as a resupply. Nothing on the page names the correction on this date: the replay confirms it only at the end of the history, and the page never shows a past correction as awaiting (Keith, 2026-10-19). Before confirmation, `mothman supply corrections --reference REQ-GEN-205` previews the
+move 2013-Q3 -> 2013-Q4 with its re-judged verdict.
 **Breaks as**: moved on merge, or proposed with the verdict computed
 against 2013-Q3.
 
@@ -3889,7 +3905,8 @@ correction is confirmed.**
 supply arrives on 10 July, filed as a resupply of 2014-Q2, which the
 corrected agreement would move. A scripted confirmation keeps it
 (contract/scripted_decisions.yaml).*
-**Expect**: the move is proposed like TS-58a's.
+**Expect**: the supply reads filed to 2014-Q2, as a resupply. Nothing on the page names the correction on this date: the replay confirms it only at the end of the history, and the page never shows a past correction as awaiting (Keith, 2026-10-19). Before confirmation, `mothman supply corrections --reference REQ-GEN-205` previews the
+move like TS-58a's.
 **Breaks as**: kept or moved before anyone confirmed.
 
 **TS-59b `[INJECT]` A supply the asset manager kept.**
@@ -3898,7 +3915,9 @@ TS-59a's placement.
 **Expect**: the supply stays filed where it is, with a KEPT decision-log
 entry naming it, its period, the change reference, the actor and the
 reason, and its verdict judged against the period it stays in (REQ-PIPE-170
-criteria 5, 6, 22).
+criteria 5, 6, 22). 2014-Q3, which the kept supply leaves empty, reads red
+"No supply" for good - the scenario's own consequence, left red (Keith,
+2026-10-19).
 **Breaks as**: moved anyway, kept silently with no reason, or re-judged
 against the period it did not go to.
 
@@ -3908,13 +3927,17 @@ before it is confirmed.**
 corrected from 1 to 11 February 2013. Its supply arrived on 22 January,
 inside the old window, before the corrected one opens and with no quarter
 before it.*
-**Expect**: proposed as "would be held".
+**Expect**: the supply reads filed to 2013-Q1. Nothing on the page names the correction on this date: the replay confirms it only at the end of the history, and the page never shows a past correction as awaiting (Keith, 2026-10-19). Before confirmation, `mothman supply corrections --reference REQ-GEN-205` previews it as "would be
+held".
 **Breaks as**: held, or dropped, before confirmation.
 
 **TS-60b `[INJECT]` A supply left with no period, once confirmed.**
 TS-60a's placement.
 *Config: as TS-60a.*
-**Expect**: held (REQ-PIPE-064), the hold's reason naming the correction.
+**Expect**: held (REQ-PIPE-064), the hold's reason naming the correction:
+"Held when correction REQ-GEN-205 was confirmed: the corrected calendar
+offers it no period". 2013-Q1 reads red "No supply" for good - the
+scenario's own consequence, left red (Keith, 2026-10-19).
 **Breaks as**: left filed in a period the corrected agreement does not give
 it, or dropped.
 
@@ -3923,7 +3946,8 @@ confirmed.**
 *Config: 2015-Q3's date is corrected from 1 to 11 August 2015. Its supply
 arrived on 22 July, which the corrected agreement files to 2015-Q2 - a move
 blocked because 2015-Q4, the participation gap (REQ-GEN-251), stands on it.*
-**Expect**: the move is proposed, naming the period that stands on it.
+**Expect**: the supply reads filed to 2015-Q3. Nothing on the page names the correction on this date: the replay confirms it only at the end of the history, and the page never shows a past correction as awaiting (Keith, 2026-10-19). Before confirmation, `mothman supply corrections --reference REQ-GEN-205` previews the move, naming the
+period that stands on it.
 **Breaks as**: moved out from under the inheriting period.
 
 **TS-61b `[INJECT]` A move that is blocked, once confirmed.**
@@ -3938,11 +3962,20 @@ silently left.
 **TS-62 `[INJECT]` A correction merged and not yet confirmed.**
 The correction is merged and a new supply arrives before anyone
 confirms it.
-**Expect**: affected datasets read awaiting confirmation and the
-correction is listed as needing action; the new arrival is judged
-against the corrected configuration; REQ-PIPE-173's backstop does NOT
-go red, because a declared but unapplied correction accounts for the
-difference (REQ-PIPE-170 criteria 20-21).
+*Config: Birth Registrations, daily, due 14:00. Correction
+REQ-GEN-205-WINDOW, dated 24 September 2026, widens the daily claim window
+from four hours to six from 25 September (a version-level change), and its
+scripted confirmation is pending. The 25 September supply arrives at 09:00,
+inside the six-hour window and outside the four-hour one.*
+**Expect** (bootstrap of 2026-10-19): the 09:00 supply files to 2026-09-25,
+its own day, early, and is promoted. Birth Registrations' page says "A
+calendar correction to this dataset's delivery agreement -
+REQ-GEN-205-WINDOW - is awaiting the data asset's manager to confirm it",
+and `mothman supply corrections` lists it as pending. `mothman schedule
+check-agreement` exits 0: REQ-PIPE-173's backstop does NOT go red, because
+a declared but unapplied correction accounts for the difference
+(REQ-PIPE-170 criteria 20-21). The queue does not list the pending
+correction as needing action - noted for Keith.
 **Breaks as**: the backstop's "configuration problem on our side" red;
 or the arrival judged against the old date.
 
@@ -3953,8 +3986,14 @@ PLANTED by REQ-GEN-218 (2026-10-18) in Child Protection's grown history.
 correction REQ-GEN-218 dated 15 December 2021, and owed again from 2022-Q3.
 2021-Q4's delivery leaves cp_carers out; cp_carers follows on 5 January
 2022, after the turn-off but while 2021-Q4's slot is open.*
-**Expect**: the late cp_carers files to 2021-Q4, late; 2021-Q4 stays owed
-until its slot closes (REQ-PIPE-179, REQ-DASH-180).
+**Expect** (bootstrap of 2026-10-19): from the correction's date the page
+reads "Turning off after Friday, 31 December 2021" (REQ-DASH-180 criterion
+27). The 5 January cp_carers files to 2021-Q4, late, and is promoted;
+2021-Q4 stays owed until its slot closes (REQ-PIPE-179, REQ-DASH-180). The
+correction itself shows on the page only once confirmed, at the end of the
+history - an earlier in-place-on date shows the turn-off as configured,
+with no correction awaiting (REQ-GEN-218 criterion 5, as amended
+2026-10-19).
 **Breaks as**: the 5 January supply held instead of filed late, or 2021-Q4
 going quiet before its slot closes.
 
@@ -3964,9 +4003,14 @@ end of the history.
 *Config: as TS-63a, with a further cp_carers arriving on 15 March 2022, in
 the gap. The ordinary deliveries inside the gap still carry the dataset's
 file, as a supplier still sending files would (REQ-GEN-218 criterion 5).*
-**Expect**: the 15 March supply, and each ordinary gap delivery's
-cp_carers, finds no open owed slot and is held as turned off; 2022-Q1 and 2022-Q2 read owed-nothing and inherit the last
-promoted supply; from 2022-Q3 it reads as any dataset between deliveries.
+**Expect** (bootstrap of 2026-10-19): the 15 March supply, and each
+ordinary gap delivery's cp_carers (1 February and 1 May 2022), finds no
+open owed slot and is held as turned off. 2022-Q1 and 2022-Q2 read
+owed-nothing and inherit the 5 January supply: "Turned off since Saturday,
+1 January 2022 · Inherited from 2021-Q4", with "2 received while turned
+off, earliest Tuesday, 1 February 2022 · 2 still held" on 20 March 2022 and
+3 by the end of the history. From 2022-Q3 it reads as any dataset between
+deliveries.
 **Breaks as**: the gap read as missed supplies, or a gap arrival filed into
 a gap period.
 

@@ -10764,3 +10764,70 @@ twice. It deliberately did not re-find the `TypeError`.
        quarters, TS-62's last days, and two cp-carers supplies in TS-63's
        turned-off quarters now unfiled. No arrival in both captures changed
        its instant, and only those two changed their verdict.
+
+251. **[done, 2026-10-19]** **[Pipeline & publishing]** **A replayed
+     knock-on waited for its collection's next arrival, for up to eighteen
+     months.** Found by the evidence pass over the 2026-10-19 bootstrap
+     (REQ-GEN-203 criterion 13). TS-80's scripted settlement was recorded at
+     11:00 on 2 November 2020, but its readers' re-evaluation (owed run 262)
+     cleared only on 5 February 2021, Child Protection's next arrival. The
+     readers' cross-table checks read red for three months. A query found 14
+     such re-evaluations in the history, two causes. A significant defect;
+     Keith chose "Fix now" (2026-10-19).
+     - CAUSE 1: a scripted decision ran the re-check it owed
+       (post-build-review #161) but never the knock-on, which a person's
+       route always follows up (`cli/filing_tui._follow_up`).
+     - CAUSE 2: a promotion that opens a period makes every owe-nothing
+       dataset on that calendar inherit, so the knock-on can belong to
+       another collection. The replay followed up only the promoting
+       arrival's own collection, so CP's re-evaluations of a quarter ED
+       opened waited for CP's next arrival (cp-case-workers 2014-Q2 to
+       2015-Q2, all cleared 2015-11-10), and the reverse. The live pass was
+       never affected: it runs every collection's owed runs.
+     - TEST FIRST: `TestAKnockOnRunsAcrossItsStream` (tests/test_knock_on.py)
+       checks that a follow-up covers every collection on the calendar and
+       that no re-evaluation in the bootstrapped history waits more than a
+       week. `TestAScriptedDecisionsKnockOnRunsAtItsInstant`
+       (tests/test_scripted_decisions.py) checks that playback follows up at
+       the decision's instant. All failed before the fix.
+     - FIX: `knock_on.follow_up_stream` follows up every collection in the
+       decision's stream (from `bootstrap.streams`, configuration only). The
+       per-arrival step and scripted playback both call it.
+     - WHAT IT DID NOT FIX: on the page the readers still read red until
+       their next arrival, because a re-evaluation's results never reach
+       the page (#253, Keith's call).
+
+252. **[done, 2026-10-19]** **[Data generation]** **TS-57b to TS-61b opened
+     three days before the state they show.** Found by the same evidence
+     pass. Their links counted 21 days from REQ-GEN-205's correction, which
+     was the history's last day until the anchor moved to 2026-09-25 for
+     TS-62. The replay confirms the correction at the end, so on 2026-09-22
+     ed-presentations showed none of the moved, kept, held or parked
+     outcomes the links exist for. Minor bug, fixed without asking.
+     - TEST FIRST: `TestALinkCanStandOnTheHistorysLastDay`
+       (tests/test_scenario_links.py) checks that `days=LAST_DAY` lands on
+       the day before the second event, and that the five b links resolve to
+       the anchor date on the real calendar. Both failed before the fix.
+     - FIX: `scenario_injection.LAST_DAY`, used by the five b links, so they
+       follow the anchor wherever it moves.
+
+253. **[todo, 2026-10-19]** **[Dashboard]** **A knock-on re-evaluation never
+     reaches the page: readers stay red until their own next arrival -
+     KEITH'S CALL.** Found by the evidence pass after #251's fix. TS-80's
+     readers (cp-notifications, cp-investigations, cp-placements) are
+     re-evaluated and promoted at the 11:00 settlement on 2 November 2020
+     (owed runs 262-265, cleared 03:00:04 UTC). But the page keeps their
+     cross-table column red through 15 January 2021 and turns green only on
+     2021-02-11, their next arrival. TS-42's readers behave the same (red
+     from 6 December 2019 to 3 February 2020), so this is older than #251
+     and not a regression of it.
+     - CAUSE, as far as read: the re-checked relationship results are stored
+       under cp-clients' own re-check run
+       (`cp_clients__202011010820000800__1__r1`). A reader's `knock-on/N`
+       run records the decision but no check results of its own, and the
+       page shows each reader its own latest arrival run, which holds the
+       contested fails.
+     - NOT FIXED: whether the page should show a reader the re-evaluation's
+       outcome, or the knock-on should record results under the reader, is
+       a design question (REQ-PIPE-121, REQ-DASH-126). Recorded as
+       REQ-GEN-203 criterion 13, unmet.

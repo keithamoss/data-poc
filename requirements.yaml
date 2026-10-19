@@ -27698,12 +27698,6 @@ requirements:
     - 'THE APPLIED SUMMARY SAYS WHAT WAS DONE (D8): report(applied=True) words the preview''s own layout in the past tense.'
     - 'A CORRECTION''S MOVES ARE THE RULE''S (Keith, 2026-10-11, (o)): the manager approved the correction, not that one filing. Before, a later correction treated each as a person''s and would never propose moving it again. The decision log now accepts a rule re-file that only leaves a period (a hold).'
     - 'DECIDED Keith, 2026-10-13: the fictional past corrections that plant TS-57 to TS-62 are declared in contract/calendar.yaml itself, in each owner''s corrections: list - ''this asset is a synthetic data asset for demo purposes, so that is fine'' - NOT in a synthetic-only overlay file. TS-63 moves to REQ-PIPE-179 criterion 39 (Keith, the same day), planted in the change that builds the turn-off and itself declared as a correction; this requirement keeps TS-57 to TS-62.'
-    unmet_criteria:
-    - criterion: 'Criterion 23, first half - TS-57 to TS-62 GENERATED INTO THE SYNTHETIC HISTORY. Each has a unit test (TestScenarioRegister; TS-64 in tests/test_correction_trial.py), TS-63 moved to REQ-PIPE-179 criterion 39 (Keith, 2026-10-13) and from there to REQ-GEN-218 (Keith, 2026-10-14).'
-      why: 'THE MECHANISM IS BUILT (Keith, 2026-10-11, (n); criteria 30 and 31): a replay files each arrival against the agreement as it stood at its receipt and confirms each due correction once both collections are replayed. What remains is the scenarios themselves - corrections declared in the committed configuration, dated inside the synthetic history, whose shapes give a kept, a moved, a held, a blocked and a re-judged supply. That puts fictional past corrections into the asset''s real calendar file, which is a configuration choice for Keith rather than a builder''s.'
-      owner: 'the calendar-group close-out (Keith, 2026-10-13) - how the corrections are declared is answered (in contract/calendar.yaml), so this is generator work waiting to be scheduled'
-      blocked_by:
-        unowned: true
     linked_tests:
     - tests/test_correction_apply.py
     - tests/test_processing_pass.py
@@ -27734,6 +27728,7 @@ requirements:
     - cli/supply.py::keep_parked_moves
     - cli/filing_tui.py::parked_flow
     evidence:
+    - "2026-10-19 bootstrap from empty (scratch database, 1464s): TS-57 to TS-62 generated into the synthetic history and observed - TS-57 re-judged, TS-58 moved, TS-59 kept, TS-60 held, TS-61 parked by REQ-GEN-205's confirmation, and TS-62's supply filed under the pending REQ-GEN-205-WINDOW (REQ-GEN-205 criterion 17)."
     - '2026-10-11 (Keith''s answer (p)): tests/test_correction_apply.py 52 and test_processing_pass.py 46 passed - a blocked move is parked and the rest confirmed, the correction no longer pending (c25, c19); a rejected supply''s parked move waits while still rejected and moves to the period confirmed, as the rule naming the confirmer, once the rejection is reversed (c26); a refused dataset''s is left parked (c26); the manager keeps one with a reason, refused without one, refused to anyone else, refused twice (c28); it is an outstanding item naming the blocker and the keep command (c29); `mothman supply corrections` lists it, confirm-correction --keep on the confirmed reference keeps it, the filing menu offers it (c28, c29); the pass drains before arrivals and skips refused datasets (c26). tests-js/corrections.test.js gives its kind a label. Each failed before its change.'
     - 'Keith''s answer (o), 2026-10-11: tests/test_correction_apply.py TestKeithsAnswerO (2, each failing first) and the renamed test_a_move_is_the_rules_re_file_naming_the_correction; 42 apply tests passed after the change.'
     - 'tests/test_correction_apply.py (40 tests, run 2026-10-11, ten of them the critic''s findings, each failing first): pending until applied, once; the agreement before rebuilt from its own old values; only the asset manager confirms, refused before anything is worked out; a move is a person''s re-file naming the correction with an owed re-check; kept supplies stay with a KEEP entry and need a reason; a blocked move must be cleared or kept; a supply with no period is held naming the correction; a verdict re-judged in place naming it; a changed list refused; the summary in the preview''s form with what was kept; the two commands (list, one in full summary first, refusal naming who may, --yes needs the key, applied with the key and told to attach it, an unknown keep refused); the filing menu offering corrections above the collections, view-only for anyone else, keep-one-confirm-the-rest; the pass and needs-action noting it; and TS-57 to TS-62 each. tests/test_correction_revert.py (12): revert round-trips every kind of item.'
@@ -30195,15 +30190,6 @@ requirements:
     moscow: must
     status: built
     unmet_criteria:
-    - criterion: Criterion 3 - a contested same-arrival pair of one Child Protection
-        table (TS-42).
-      why: Child Protection's arrival patterns are exact filenames, so two files
-        in one directory can never both match one table - the same finding TS-34
-        records. Planting it means widening a pattern, which is a behaviour change
-        with a gate of its own.
-      owner: Keith - whether to widen a pattern (morning report question).
-      blocked_by:
-        unowned: true
     - criterion: Criteria 4 and 5 - a single-table correction promoted, or still
         failing, after its partner's promotion re-checks it (TS-48, TS-49).
       why: 'The ARRIVAL shape - a quarter whose siblings arrive after one of its
@@ -30241,6 +30227,7 @@ requirements:
       blocked_by:
         unowned: true
     evidence:
+    - "2026-10-19 bootstrap from empty (scratch database, 1464s): TS-42 planted by REQ-GEN-203 after REQ-PIPE-202 widened cp_clients' pattern - cp_clients.csv and cp_clients_v2.csv contest 2019-Q4 (promotion refused, 348) until the later file supersedes them (356) (criterion 3)."
     - '2026-10-05 (sprint 11), against a full rebuild from empty (26m22s, exit
       0): TS-41 rides on TS-1 - on 2026-09-15 the red 14:00 supply was superseded
       by the supersession rule when the 16:00 file came, and the 16:00 one promoted
@@ -34585,12 +34572,13 @@ requirements:
       - "generator/scenario_injection.py::INJECTIONS"
       - "contract/scripted_decisions.yaml"
     evidence:
+      - "2026-10-19: TS-42a, TS-42b and TS-80's Expect lines written in plans/supply-model.md from the bootstrap of that day, and REQ-GEN-136's unmet entry for criterion 3 cleared naming TS-42 (criterion 9)."
       - "Selected suites: tests/test_emergency_department.py, test_collections_registry.py, test_generator_providers.py, test_correction_claims.py, test_scripted_corrections.py, test_participation_gap.py, test_scenario_links.py, test_scenario_injection.py, test_generate_cp_runs.py, test_turn_off.py, test_agreement_freeze.py, test_bootstrap.py, test_correction_replay.py, test_correction_apply.py, test_evidently_reads_its_entry.py, test_hierarchy.py, test_validate_schedule.py, test_inheritance.py and test_generate_to_target.py: '4 failed, 714 passed, 316 warnings in 145.32s' with -m 'not needs_deployment', on branch ed-build at 7da8773 plus an uncommitted SCENARIOS.md and plans/morning-reports.md, 2026-10-19 (Perth). The four failures: test_scenario_injection.py::TestTheInjectedSetItself::test_every_injection_names_a_scenario_the_register_marks_for_injection (TS-57a is not in the register), test_generator_providers.py::TestOneDriverForEveryCollection::test_a_third_collections_history_is_written_by_the_shared_driver and ::test_a_regeneration_overwrites_rather_than_accumulates (correction_claims.check_written raises ScheduleConfigError on the fake collection's calendar-less dataset), and test_bootstrap.py::TestItDoesNotRebuildWhatIsAlreadyThere::test_force_rebuilds_anyway (the real scripted keep of TS-59a refused over an empty history). tests/test_cp_pair.py, test_runway.py, test_target_agreement.py, test_calendar_move_pin.py, test_census.py, test_delivery_boundary.py, test_collection_defaults.py, test_cli_pipeline.py, test_collection_cli.py, test_cli_at_thirty_collections.py, test_common_helpers.py, test_cli_dashboard.py, test_run_evidently_cp_real.py, test_bootstrap_equivalence.py, test_publish.py, test_embed_dashboard_data.py, test_build_dashboard_data.py, test_check_lifecycle.py and test_validate_requirements.py: '409 passed, 393 warnings in 121.21s' with -m 'not needs_deployment', the same tree, 2026-10-19 (Perth). TestTheContestedClientRegisterPairs, TestAScenarioInAGrownQuarter, TestRefusals156 and tests/test_cp_pair.py passed."
-      - "Criteria 11 and 13 on the final bootstrap - TS-80's settlement at 11:00 the next day, its QA run and gate in the replay, and the page on TS-42's and TS-80's link dates: BOOTSTRAP-EVIDENCE-PENDING."
+      - "2026-10-19 bootstrap from empty (scratch database, 1464s): TS-80's pair was settled by the scripted person at 11:00 AWST on 2 November 2020 (choose-file 401, cp_clients_TEST.csv rejected 402, cp_clients.csv the supply). The re-check it owed, cp_clients__202011010820000800__1__r1, ran at that instant and the gate promoted the supply (403, 03:00:03 UTC). The knock-on re-evaluated the three readers and promoted them at the same instant (owed runs 262 to 265, cleared by 03:00:04; decisions 404 to 406), after post-build-review #251's fix. The page reads 'Two files for one table' on 1 November 2020 and 'Settled · Two files for one table — settled by Robin Hale, 11:00am Monday, 2 November 2020' from the next day; TS-42's later file supersedes its pair on 29 November 2019 (356) and is promoted on 5 December (359), the readers re-evaluated then (owed runs 224 to 227)."
     unmet_criteria:
-      - criterion: "Criterion 9 - TS-42's register entry with what it expects, and REQ-GEN-136's unmet entry for criterion 3 cleared naming this requirement."
-        why: "TS-42a, TS-42b and TS-80's entries in plans/supply-model.md carry Config and Breaks as but no Expect (6355a29: 'Expect left for the bootstrapped build'), and REQ-GEN-136 still lists criterion 3 (TS-42) as unmet."
-        owner: "the main session, from the final Emergency Department bootstrap"
+      - criterion: "Criterion 13, on the page - the readers re-checked by the knock-on from the settlement's asset day."
+        why: "On the 2026-10-19 bootstrap the decision log meets it - the knock-on re-evaluated and promoted the three readers at the settlement (owed runs 263 to 265, decisions 404 to 406) - but the page does not: the readers' cross-table column still reads red from 2 November 2020 until 2021-Q1's supply, because the re-checked relationship results are recorded under cp-clients' re-check run (cp_clients__202011010820000800__1__r1) and the page shows each reader's own arrival run (3 contested fails). For Keith."
+        owner: "nobody yet - Keith to decide"
         blocked_by:
           unowned: true
   - id: REQ-PIPE-163
@@ -35647,27 +35635,13 @@ requirements:
       - "contract/calendar.yaml"
       - "contract/scripted_decisions.yaml"
     evidence:
+      - "2026-10-19: TS-57a to TS-62's register entries in plans/supply-model.md rewritten to the quarterly and daily calendars' real values and to what the page shows (criteria 13 to 15), the 'a' entries per Keith's ruling that the page never shows a past correction as awaiting; REQ-PIPE-170's unmet entry for criterion 23 cleared naming this requirement (criterion 17)."
       - "Selected suites: tests/test_emergency_department.py, test_collections_registry.py, test_generator_providers.py, test_correction_claims.py, test_scripted_corrections.py, test_participation_gap.py, test_scenario_links.py, test_scenario_injection.py, test_generate_cp_runs.py, test_turn_off.py, test_agreement_freeze.py, test_bootstrap.py, test_correction_replay.py, test_correction_apply.py, test_evidently_reads_its_entry.py, test_hierarchy.py, test_validate_schedule.py, test_inheritance.py and test_generate_to_target.py: '4 failed, 714 passed, 316 warnings in 145.32s' with -m 'not needs_deployment', on branch ed-build at 7da8773 plus an uncommitted SCENARIOS.md and plans/morning-reports.md, 2026-10-19 (Perth). The four failures: test_scenario_injection.py::TestTheInjectedSetItself::test_every_injection_names_a_scenario_the_register_marks_for_injection (TS-57a is not in the register), test_generator_providers.py::TestOneDriverForEveryCollection::test_a_third_collections_history_is_written_by_the_shared_driver and ::test_a_regeneration_overwrites_rather_than_accumulates (correction_claims.check_written raises ScheduleConfigError on the fake collection's calendar-less dataset), and test_bootstrap.py::TestItDoesNotRebuildWhatIsAlreadyThere::test_force_rebuilds_anyway (the real scripted keep of TS-59a refused over an empty history). Two of the four failures are this requirement's: the register test (TS-57a to TS-61a not in plans/supply-model.md - see the unmet entry for criteria 13 to 15) and test_force_rebuilds_anyway."
       - "The overlap gate (criterion 27): `mothman check --only schedule`, same tree, 2026-10-19, 'passed, with a warning' (runway only)."
-      - "On the final bootstrap - TS-57 to TS-61's shapes after confirmation (moved, kept, held, parked, re-judged), TS-62's 09:00 supply claiming its day only under the pending correction, and the confirmation's owed runs: BOOTSTRAP-EVIDENCE-PENDING. The bootstrap of plans/morning-reports.md #6 (1303s) showed TS-57 to TS-61 but predates 880b6ec, TS-62's arrival fix."
+      - "2026-10-19 bootstrap from empty (scratch database, 1464s): REQ-GEN-205 confirmed at the end of the replay - 1 moved, 1 held, 1 parked, 1 re-judged, 1 kept: TS-58's supply re-filed 2013-Q3 to 2013-Q4 (645), TS-60's held in 2013-Q1 ('Held when correction REQ-GEN-205 was confirmed: the corrected calendar offers it no period'; refile 644), TS-59's kept in 2014-Q2 (646), TS-61's parked 2015-Q3 to 2015-Q2 because 2015-Q4 stands on it (one correction_parked row; the queue lists 'Correction move waiting'), TS-57's 2015-Q1 verdict re-judged late to on time. The confirmation's owed runs ran. TS-62: birth-registrations@202609250900000800 filed to 2026-09-25, its own day, early, under the pending six-hour version, and was promoted (384); REQ-GEN-205-WINDOW was left pending as scripted, `mothman supply corrections` lists it, Birth Registrations' page names it as awaiting the data asset's manager, and `mothman schedule check-agreement` exits 0. TS-57b to TS-61b open on 2026-09-25, the history's last day (post-build-review #252)."
     unmet_criteria:
       - criterion: "Criterion 10, in part - the claim checked against every post-generation placement (TS-52, TS-79a, TS-79b)."
         why: "generator/correction_claims.check compares a correction's claim with INJECTIONS only; nothing there or in the driver reads scenario_injection.inheritance_placements() or the providers' extra_placements() (searched 2026-10-19). Injections and TS-63's correction are checked."
-        owner: "the main session"
-        blocked_by:
-          unowned: true
-      - criterion: "Criteria 11, 21 and 24, on the bootstrapped history - TS-62's 09:00 supply on 2026-09-25 claiming its day only under the pending correction, judged against the merged configuration while it waits."
-        why: "TS-62 IS PLANTED (2026-10-19, after Birth Registrations grew three end days) and criterion 25's refusal is built, but no bootstrap has run on this tree: the Emergency Department bootstrap waits on REQ-PIPE-261 (post-build-review #245), unsigned."
-        owner: "the main session, from the final Emergency Department bootstrap"
-        blocked_by:
-          unowned: true
-      - criterion: "Criteria 13, 14 and 15 - the register entries of TS-57 to TS-62 rewritten to the quarterly calendar's real values and their corrections, with Config, Expect from the first bootstrapped build and Breaks as; TS-61's Expect to the parking; what each leaves standing."
-        why: "TS-57a to TS-61b are rewritten to Emergency Department's calendar and the correction (plans/supply-model.md, Calendar corrections); TS-62's entry is to be written from the bootstrapped build, the scenario now planted (criteria 11, 24 and 25). Their Expect lines are to be re-read against the final bootstrapped build."
-        owner: "the main session, from the final Emergency Department bootstrap"
-        blocked_by:
-          unowned: true
-      - criterion: "Criterion 17 - REQ-PIPE-170's unmet entry for criterion 23 cleared, naming this requirement."
-        why: "REQ-PIPE-170 still carries it. Left for the change that settles criteria 11 to 15, since the entry says what the history shows."
         owner: "the main session"
         blocked_by:
           unowned: true
@@ -35711,9 +35685,8 @@ requirements:
     - THE SYSTEM SHALL rewrite TS-63's register entry in plans/supply-model.md to the Child Protection calendar's real dates
       and the marker wording REQ-DASH-180 now uses, in place of the 15th-of-the-month configuration and the wording from before
       Keith's T8, saying that the ordinary deliveries inside the gap still carry the dataset's file, which is received, held
-      as turned off and counted in REQ-DASH-180's quiet line; that cp-carers reads 'awaiting confirmation' from the correction's
-      date to the end of the history, because a replay confirms a correction only at its end; and quoting the 'Turning off after
-      <effective_to>' marker REQ-DASH-180 criterion 27 shows from the correction's date (REQ-PIPE-179 criterion 41).
+      as turned off and counted in REQ-DASH-180's quiet line; that the correction shows on the page only once confirmed, at the end of the history - an earlier in-place-on date shows the turn-off as configured, with no correction awaiting; and quoting the 'Turning off after
+      <effective_to>' marker REQ-DASH-180 criterion 27 shows from the correction's date (REQ-PIPE-179 criterion 41). AMENDED 2026-10-19 by Keith - a replay never shows a past correction as awaiting.
     - THE SYSTEM SHALL give TS-63 a unit test in the scenario register's tests (TestScenarioRegister), as REQ-PIPE-170 criterion
       23 asks of TS-57 to TS-64.
     - THE SYSTEM SHALL amend, in the change that adds this requirement to requirements.yaml, REQ-PIPE-170 criterion 23 and its
@@ -35866,14 +35839,9 @@ requirements:
       - "generator/scenario_injection.py::INJECTIONS"
       - "generator/correction_claims.py::check_written"
     evidence:
+      - "2026-10-19: TS-63a and TS-63b's register entries in plans/supply-model.md rewritten to the Child Protection calendar's real dates, REQ-DASH-180's marker wording and the amended criterion 5 (criterion 5)."
       - "Selected suites: tests/test_emergency_department.py, test_collections_registry.py, test_generator_providers.py, test_correction_claims.py, test_scripted_corrections.py, test_participation_gap.py, test_scenario_links.py, test_scenario_injection.py, test_generate_cp_runs.py, test_turn_off.py, test_agreement_freeze.py, test_bootstrap.py, test_correction_replay.py, test_correction_apply.py, test_evidently_reads_its_entry.py, test_hierarchy.py, test_validate_schedule.py, test_inheritance.py and test_generate_to_target.py: '4 failed, 714 passed, 316 warnings in 145.32s' with -m 'not needs_deployment', on branch ed-build at 7da8773 plus an uncommitted SCENARIOS.md and plans/morning-reports.md, 2026-10-19 (Perth). The four failures: test_scenario_injection.py::TestTheInjectedSetItself::test_every_injection_names_a_scenario_the_register_marks_for_injection (TS-57a is not in the register), test_generator_providers.py::TestOneDriverForEveryCollection::test_a_third_collections_history_is_written_by_the_shared_driver and ::test_a_regeneration_overwrites_rather_than_accumulates (correction_claims.check_written raises ScheduleConfigError on the fake collection's calendar-less dataset), and test_bootstrap.py::TestItDoesNotRebuildWhatIsAlreadyThere::test_force_rebuilds_anyway (the real scripted keep of TS-59a refused over an empty history). TestScenarioRegister's TS-63 test, tests/test_turn_off.py and the turned-off-delivery test passed in it."
-      - "On the final bootstrap: the January cp_carers supply filed late to 2021-Q4, the March one held as turned off, cp-carers 'awaiting confirmation' from 2021-12-15 and the 'Turning off after' marker on link TS-63a's date: BOOTSTRAP-EVIDENCE-PENDING."
-    unmet_criteria:
-      - criterion: "Criterion 5 - TS-63's register entry in plans/supply-model.md rewritten to the Child Protection calendar's real dates and REQ-DASH-180's marker wording."
-        why: "Rewritten as TS-63a and TS-63b to the Child Protection calendar's real dates, saying the ordinary gap deliveries still carry the file and are held as turned off; the marker wording and the quiet line's count are to be quoted from the final bootstrapped build."
-        owner: "the main session, from the final Emergency Department bootstrap"
-        blocked_by:
-          unowned: true
+      - "2026-10-19 bootstrap from empty (scratch database, 1464s): cp-carers@202201051000000800 filed to 2021-Q4, late, and was promoted (436); the 1 February, 15 March and 1 May 2022 cp_carers files were held as turned off (held-no-open-slot); 2022-Q1 and 2022-Q2 inherit the 5 January supply (437, 448) and 2022-Q3 is promoted (456). The page reads 'Turning off after Friday, 31 December 2021' on 2021-12-20, 'Turned off since Saturday, 1 January 2022 · Inherited from 2021-Q4' and '2 received while turned off, earliest Tuesday, 1 February 2022 · 2 still held' on 2022-03-20, and 3 at the end of the history. No correction is shown as awaiting on any past date, as criterion 5 now says (amended 2026-10-19)."
   - id: REQ-DASH-209
     title: A period-composition view shows, for one period of a collection, what each dataset holds there and how it got there
       - promoted, inherited or substituted
@@ -37989,7 +37957,7 @@ requirements:
     open_questions: []
     unmet_criteria:
       - criterion: "Criterion 10 - the Emergency Department collection's own diff shows it added only its own files."
-        why: "Met by the Emergency Department build itself (Keith's 'Both' decision above), which has no requirement of its own yet."
+        why: "The Emergency Department work landed interleaved with REQ-GEN-205, REQ-GEN-237 and REQ-PIPE-262 on one branch, so no single change's own diff exists. ED's own files are all in the allowed places: contract/department-of-health/ (its contract and check files), dbt_project/models/emergency-department/, qa_tools/collections/emergency_department.py and generator/collections/emergency_department.py; it is also named in shared configuration (contract/presentation.yaml, contract/scripted_decisions.yaml, generator/scenario_injection.py)."
         owner: the Emergency Department dataset (plans/data-generation.md)
         blocked_by:
           unowned: true
@@ -38871,7 +38839,7 @@ requirements:
       - "Selected suites: tests/test_emergency_department.py, test_collections_registry.py, test_generator_providers.py, test_correction_claims.py, test_scripted_corrections.py, test_participation_gap.py, test_scenario_links.py, test_scenario_injection.py, test_generate_cp_runs.py, test_turn_off.py, test_agreement_freeze.py, test_bootstrap.py, test_correction_replay.py, test_correction_apply.py, test_evidently_reads_its_entry.py, test_hierarchy.py, test_validate_schedule.py, test_inheritance.py and test_generate_to_target.py: '4 failed, 714 passed, 316 warnings in 145.32s' with -m 'not needs_deployment', on branch ed-build at 7da8773 plus an uncommitted SCENARIOS.md and plans/morning-reports.md, 2026-10-19 (Perth). The four failures: test_scenario_injection.py::TestTheInjectedSetItself::test_every_injection_names_a_scenario_the_register_marks_for_injection (TS-57a is not in the register), test_generator_providers.py::TestOneDriverForEveryCollection::test_a_third_collections_history_is_written_by_the_shared_driver and ::test_a_regeneration_overwrites_rather_than_accumulates (correction_claims.check_written raises ScheduleConfigError on the fake collection's calendar-less dataset), and test_bootstrap.py::TestItDoesNotRebuildWhatIsAlreadyThere::test_force_rebuilds_anyway (the real scripted keep of TS-59a refused over an empty history). tests/test_emergency_department.py's own seven tests all passed in it."
       - "The providers gate (`mothman check --only providers`, same tree, 2026-10-19): 'passed' - seeds 60000-70000 disjoint from Birth Registrations' and Child Protection's."
       - "generated_periods() on this tree, 2026-10-19: 54 owed quarters, 2013-Q1 (dated 2013-02-11, the corrected date) to 2026-Q3 - 2015-Q4, the participation gap, not among them."
-      - "Per-supply bootstrap cost and REQ-TEST-239's S4 compare of Birth Registrations and Child Protection (NFRs 1 and 2): BOOTSTRAP-EVIDENCE-PENDING."
+      - "2026-10-19 bootstrap from empty (scratch database, 1464s): Birth Registrations 506s for 114 dataset runs (about 4.4s each); Child Protection and Emergency Department, one stream since REQ-PIPE-262, 1342s for 342 dataset runs (287 and 55, about 3.9s each); in total 1460s. ED's own cost cannot be separated inside the merged stream. REQ-TEST-239's S4 compare of Birth Registrations and Child Protection is run by the main session after the final gate."
     unmet_criteria:
       - criterion: "Criterion 4 - the history sized by a dry run of REQ-GEN-044's collision refusal over every Emergency Department scenario, adding the fewest whole years that leave it with no refusal, with the count and output in evidence."
         why: "Not done that way. The history runs 2013-Q1 to 2026-Q3 because REQ-GEN-205's five corrected quarters were put in the quarterly calendar's existing 2013 version (PROVISIONAL, plans/morning-reports.md #6 - the freeze gate compares a correction's old values against the push base), not because a dry run asked for 14 years; no dry run's count or output is recorded. It ends at Child Protection's newest quarter as the criterion asks. Whether to accept the 2013 start and amend the criterion, or re-size, is Keith's call."
@@ -38892,7 +38860,7 @@ requirements:
     acceptance_criteria:
       - "THE SYSTEM SHALL provide Emergency Department's QA adapter at qa_tools/collections/emergency_department.py, carrying no legacy flag and no temporary pointer, with its logic reported against REQ-TEST-249's 150-line soft budget."
       - "WHEN an Emergency Department supply arrives, THE SYSTEM SHALL file, stage, check with all four tools, record and gate it through the shared modules, with no Emergency Department name in any file outside its configuration, check files, adapter and provider."
-      - "WHEN `mothman pipeline bootstrap` runs over an empty database, THE SYSTEM SHALL generate and replay all three collections, each in its own process, and log each collection's time in CLAUDE.md's running log."
+      - "WHEN `mothman pipeline bootstrap` runs over an empty database, THE SYSTEM SHALL generate and replay all three collections, grouped into streams by shared calendar (REQ-PIPE-262), each stream in its own process, and log each collection's time in CLAUDE.md's running log. AMENDED 2026-10-19 by REQ-PIPE-262 (Keith)."
       - "WHEN a replay of every collection finishes, THE SYSTEM SHALL confirm the due corrections across all three, as REQ-PIPE-170 criterion 31 does (amended 2026-10-16 by REQ-PIPE-240)."
       - "THE SYSTEM SHALL run CI's deployment half of .github/workflows/test.yml against a bootstrap holding all three collections, and record its duration."
     non_functional_requirements:
@@ -38927,7 +38895,7 @@ requirements:
       - "Criterion 1: `python -m qa_tools.common.validate_collections` (REQ-TEST-249's report), same tree, 2026-10-19: 'emergency-department: adapter 16 lines of logic against a budget of 150; its generator provider 170.' (civil-registration 71 and 441, child-protection 63 and 493)."
       - "The collections gate (criterion 2's 'no Emergency Department name outside its configuration, check files, adapter and provider'): `mothman check --only collections`, same tree, 2026-10-19, 'passed', reporting '0 file(s) still wait on the requirement that rewires them'."
       - "Selected suites: tests/test_cp_pair.py, test_runway.py, test_target_agreement.py, test_calendar_move_pin.py, test_census.py, test_delivery_boundary.py, test_collection_defaults.py, test_cli_pipeline.py, test_collection_cli.py, test_cli_at_thirty_collections.py, test_common_helpers.py, test_cli_dashboard.py, test_run_evidently_cp_real.py, test_bootstrap_equivalence.py, test_publish.py, test_embed_dashboard_data.py, test_build_dashboard_data.py, test_check_lifecycle.py and test_validate_requirements.py: '409 passed, 393 warnings in 121.21s' with -m 'not needs_deployment', the same tree, 2026-10-19 (Perth)."
-      - "Criteria 2 to 4 on a bootstrap from empty holding all three collections - each collection's time, Emergency Department filed, staged, checked, recorded and gated, and the corrections confirmed across all three: BOOTSTRAP-EVIDENCE-PENDING."
+      - "2026-10-19 bootstrap from empty (scratch database, 1464s): all three collections generated and replayed, Birth Registrations alone and Child Protection with Emergency Department as one stream (criterion 3 as amended 2026-10-19): Birth Registrations 506s, Child Protection and Emergency Department 1342s. Emergency Department filed 57 supplies over 56 runs, each staged and checked by datacontract-cli (280 results), dbt (168), Soda (168) and Evidently (112) plus file checks (330), recorded and gated (51 promotions, 5 refusals). The corrections were confirmed across all three collections after every stream finished: REQ-GEN-218 (cp-carers), REQ-GEN-205 (ED's quarters) and REQ-PIPE-181."
     unmet_criteria:
       - criterion: "Criterion 3, in part - each collection's bootstrap time logged in CLAUDE.md's running log."
         why: "No entry naming Emergency Department is in CLAUDE.md's running log on this tree. The bootstrap reported in plans/morning-reports.md #6 (1303s; Birth Registrations 613s, Child Protection 1184s, Emergency Department 222s) predates 880b6ec and 45c3347, so the figure to log is the final bootstrap's."
@@ -38980,8 +38948,8 @@ requirements:
       - "contract/presentation.yaml"
     evidence:
       - "Selected suites: tests/test_cp_pair.py, test_runway.py, test_target_agreement.py, test_calendar_move_pin.py, test_census.py, test_delivery_boundary.py, test_collection_defaults.py, test_cli_pipeline.py, test_collection_cli.py, test_cli_at_thirty_collections.py, test_common_helpers.py, test_cli_dashboard.py, test_run_evidently_cp_real.py, test_bootstrap_equivalence.py, test_publish.py, test_embed_dashboard_data.py, test_build_dashboard_data.py, test_check_lifecycle.py and test_validate_requirements.py: '409 passed, 393 warnings in 121.21s' with -m 'not needs_deployment', the same tree, 2026-10-19 (Perth). npm test on the same tree, 2026-10-19 (Perth): 'Test Files 61 passed (61)', 'Tests 835 passed (835)'."
-      - "Criteria 1, 2 and 4 on a dashboard built from a bootstrap holding Emergency Department - tests/test_dashboard_e2e.py, which needs the bootstrapped deployment database and was not run in this pass: BOOTSTRAP-EVIDENCE-PENDING."
-      - "Render budget (NFR 1) - page size and tests/test_dashboard_e2e.py's duration before and after: BOOTSTRAP-EVIDENCE-PENDING."
+      - "2026-10-19 bootstrap from empty (scratch database, 1464s): the dashboard built from it carries three agency cards (registry-services, child-protection-family-support, department-of-health) and ED's dataset page; tests/test_dashboard_e2e.py's 37 tests that had failed on the grown history (exhausted schedule, per-dataset arrivals, file checks, scenario jumps and as-at chips) passed against the first 2026-10-19 bootstrap (37 passed in 479s); the full module runs in the main session's final gate."
+      - "2026-10-19: the built page is 14,831,317 bytes. The e2e module's duration before and after is the final gate's figure, recorded by the main session."
 
   - id: REQ-GEN-235
     title: "The built early-arrival scenarios TS-9, TS-65, TS-66 and TS-67 move to Emergency Department, keeping their TS numbers and quarters"
@@ -39055,7 +39023,7 @@ requirements:
       - "plans/supply-model.md"
     evidence:
       - "Selected suites: tests/test_emergency_department.py, test_collections_registry.py, test_generator_providers.py, test_correction_claims.py, test_scripted_corrections.py, test_participation_gap.py, test_scenario_links.py, test_scenario_injection.py, test_generate_cp_runs.py, test_turn_off.py, test_agreement_freeze.py, test_bootstrap.py, test_correction_replay.py, test_correction_apply.py, test_evidently_reads_its_entry.py, test_hierarchy.py, test_validate_schedule.py, test_inheritance.py and test_generate_to_target.py: '4 failed, 714 passed, 316 warnings in 145.32s' with -m 'not needs_deployment', on branch ed-build at 7da8773 plus an uncommitted SCENARIOS.md and plans/morning-reports.md, 2026-10-19 (Perth). The four failures: test_scenario_injection.py::TestTheInjectedSetItself::test_every_injection_names_a_scenario_the_register_marks_for_injection (TS-57a is not in the register), test_generator_providers.py::TestOneDriverForEveryCollection::test_a_third_collections_history_is_written_by_the_shared_driver and ::test_a_regeneration_overwrites_rather_than_accumulates (correction_claims.check_written raises ScheduleConfigError on the fake collection's calendar-less dataset), and test_bootstrap.py::TestItDoesNotRebuildWhatIsAlreadyThere::test_force_rebuilds_anyway (the real scripted keep of TS-59a refused over an empty history). The three TS-3a/TS-3b tests passed in it."
-      - "The Expect lines in plans/supply-model.md's TS-3a and TS-3b entries, quoted from the first bootstrapped build of 2026-10-18, re-checked against the final bootstrap: BOOTSTRAP-EVIDENCE-PENDING."
+      - "2026-10-19 bootstrap from empty (scratch database, 1464s): TS-3a's ed-presentations@202504161000000800 filed to 2025-Q1 as a resupply, late, promotion refused (572), and 2025-Q2 has no supply; TS-3b's ed-presentations@202604161000000800 filed to 2026-Q1, late, promoted (608), and 2026-Q2 has no supply. Both Expect lines hold as written."
 
   - id: REQ-GEN-251
     title: "Emergency Department has a participation gap, so a later quarter inherits an earlier supply as Child Protection's case workers do"
@@ -39097,7 +39065,7 @@ requirements:
       - "qa_tools/common/inheritance.py::_does_not_participate"
     evidence:
       - "Selected suites: tests/test_emergency_department.py, test_collections_registry.py, test_generator_providers.py, test_correction_claims.py, test_scripted_corrections.py, test_participation_gap.py, test_scenario_links.py, test_scenario_injection.py, test_generate_cp_runs.py, test_turn_off.py, test_agreement_freeze.py, test_bootstrap.py, test_correction_replay.py, test_correction_apply.py, test_evidently_reads_its_entry.py, test_hierarchy.py, test_validate_schedule.py, test_inheritance.py and test_generate_to_target.py: '4 failed, 714 passed, 316 warnings in 145.32s' with -m 'not needs_deployment', on branch ed-build at 7da8773 plus an uncommitted SCENARIOS.md and plans/morning-reports.md, 2026-10-19 (Perth). The four failures: test_scenario_injection.py::TestTheInjectedSetItself::test_every_injection_names_a_scenario_the_register_marks_for_injection (TS-57a is not in the register), test_generator_providers.py::TestOneDriverForEveryCollection::test_a_third_collections_history_is_written_by_the_shared_driver and ::test_a_regeneration_overwrites_rather_than_accumulates (correction_claims.check_written raises ScheduleConfigError on the fake collection's calendar-less dataset), and test_bootstrap.py::TestItDoesNotRebuildWhatIsAlreadyThere::test_force_rebuilds_anyway (the real scripted keep of TS-59a refused over an empty history). tests/test_participation_gap.py (2) and tests/test_inheritance.py passed in it."
-      - "Criterion 3 on the final bootstrap - which quarter records the inheritance, and of which supply: BOOTSTRAP-EVIDENCE-PENDING."
+      - "2026-10-19 bootstrap from empty (scratch database, 1464s): the inheritance rule records 2015-Q4 inheriting ed-presentations@201507221000000800, 2015-Q3's supply (decision 117), when 2015-Q4 opened at 2015-11-01 01:02:15 UTC; the page on 2015-12-01 reads 'Inherited from 2015-Q3'."
     unmet_criteria:
       - criterion: "Criterion 4 - the gap placed through REQ-GEN-232's dry run, and generation refusing, naming both, where the gap meets a period another scenario claims."
         why: "The gap is placed by hand at 2015-Q4, after TS-61a's 2015-Q3 supply, and no code compares a participation gap with other scenarios' claims: correction_claims and scenario_injection.no_two_scenarios_share_a_period check injections and corrections only (searched generator/ on 2026-10-19). 2015-Q4 lies inside REQ-GEN-205's own claim, which TS-61 rides, so nothing collides today; the refusal is what is missing."
@@ -39173,7 +39141,7 @@ requirements:
       - "Criterion 1: 'AMENDED 2026-10-18 by REQ-GEN-237' counted in requirements.yaml on 2026-10-19 on REQ-GEN-044's appended decision and REQ-GEN-205 criteria 6, 8, 9, 10, 11, 13, 22 and 23."
     unmet_criteria:
       - criterion: "Criterion 4 - generation refusing, naming the change reference and the supply, where the correction's impact preview (REQ-PIPE-169) over every collection on the calendar shows a move or re-judgement of a supply no scenario names."
-        why: "Not built for the confirmed date-level correction, and not yet checked: correction_claims.check_written runs the filing rule over written ordinary arrivals for VERSION-LEVEL corrections only (TS-62's), and the date-level REQ-GEN-205 relies on criterion 3's emptied quarters instead. Whether the impact preview over the final bootstrap shows any unnamed move is to be checked once that bootstrap exists."
+        why: "The outcome is checked on the 2026-10-19 bootstrap: every supply REQ-GEN-205's confirmation moved, kept, held, parked or re-judged is a TS-57 to TS-61 placement supply, and REQ-GEN-218 and REQ-PIPE-181 moved nothing. The refusal itself is not built for a date-level correction: correction_claims.check_written runs the filing rule over written arrivals for version-level corrections only."
         owner: "the main session, after the final Emergency Department bootstrap"
         blocked_by:
           unowned: true
@@ -39429,12 +39397,14 @@ requirements:
     - tests/test_bootstrap_equivalence.py::TestParallelRecordsTheSameHistory::test_identical_apart_from_the_named_exclusions
     - tests/test_inheritance.py::TestAPeriodIsOpenedWholeOrNotAtAll::test_a_failure_partway_leaves_it_unopened_and_nothing_inherited
     implemented_by:
-    - qa_tools/common/bootstrap.py (streams, StreamRefused, _run_stream, bootstrap)
-    - qa_tools/tools/orchestrate.py (merged_arrivals, StreamPlayer, run_stream, _begin/_end)
-    - qa_tools/common/arrival_lifecycle.py (process_stream)
-    - qa_tools/common/period_schema.py (open_period in one decision transaction, post-build-review #246)
-    - cli/pipeline.py (run and bootstrap group by stream; --sequential help)
-    - tests/equiv_support.py and tests/test_bootstrap_equivalence.py (KEEP corpus with ED deliveries)
+    - qa_tools/common/bootstrap.py::streams
+    - qa_tools/common/bootstrap.py::bootstrap
+    - qa_tools/tools/orchestrate.py::merged_arrivals
+    - qa_tools/tools/orchestrate.py::run_stream
+    - qa_tools/common/arrival_lifecycle.py::process_stream
+    - qa_tools/common/period_schema.py::open_period
+    - qa_tools/common/knock_on.py::follow_up_stream
+    - cli/pipeline.py::_run_stream
     evidence:
     - >-
       2026-10-19, a fresh bootstrap from empty into a scratch database (225 deliveries, all three collections, exit 0):
