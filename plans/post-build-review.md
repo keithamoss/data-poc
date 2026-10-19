@@ -10778,3 +10778,50 @@ twice. It deliberately did not re-find the `TypeError`.
      - THE CLASS: the same as #247 - a default that is silently empty
        (`amber_dataset = None`) goes unnoticed when a collection is added.
        A refusal makes the next one loud.
+
+249. **[done, 2026-10-19]** **[Data generation]** **Child Protection's
+     emptied quarters made every CP dataset red, for good.** Found triaging
+     the grown-history scouting run: five e2e failures had one cause.
+     REQ-GEN-237 criterion 3 suppresses Child Protection's routine supply in
+     the nine 2013-2015 quarters Emergency Department's correction alters
+     (four for cp-case-workers, which takes only February and August). The
+     page read each as a closed quarter with no supply, so all six CP
+     datasets were red at every in-place-on date from 2016 on. Every CP page
+     also carried a "No supply" notice and three Needs action items, which
+     pushed TS-76's and TS-77's subjects too far below the page head to fit
+     in one window. The PROVISIONAL choice in plans/morning-reports.md #6
+     recorded the suppression but not this effect. A product decision, so
+     Keith's: **"Scripted not-supplied"** (2026-10-19), over leaving them
+     red, declaring CP not participating there, or shrinking CP now.
+     - TEST FIRST: tests/test_scripted_decisions.py's
+       `TestAnEmptiedQuarterIsMarkedNotSupplied` covers four things. A chain
+       entry may be `mark-not-supplied` with no supply, and refuses one. One
+       entry may list `periods:`. It is timed after the slot closes, because
+       a mark refuses an open period. And the committed marks equal exactly
+       each CP dataset's owed periods among `foreign_altered`, derived from
+       configuration so they cannot go stale when REQ-GEN-238 shrinks CP.
+       All five failed before the change.
+     - BUILT: `qa_tools/common/scripted_decisions.py` (CHAIN_MARK,
+       `_expanded`, `_timed_mark`) and six entries in
+       contract/scripted_decisions.yaml, 49 marks a day after each slot
+       closes. Recorded as a decision on REQ-GEN-237.
+     - ALSO FIXED ON THE WAY, test-only: TestPerDatasetArrivals clicked "the
+       second agency card", which is no longer Child Protection now a third
+       agency exists. It finds the card by `data-agency`. The exhausted-schedule
+       count is derived from configuration (seven quarterly datasets, not six).
+
+250. **[done, 2026-10-19]** **[Testing & dev tooling]** **The arrival
+     golden never compared Emergency Department.**
+     tests/test_asset_time_semantics.py read two dashboard reports, named in
+     the test, so once the golden was re-captured with ED's 55 arrivals the
+     test reported them as datasets that do not exist. This is the class
+     behind #247 and REQ-TEST-249. Minor, test-only, fixed without asking.
+     - FIX: `_reports()` reads every registered collection's dashboard file
+       and asserts more than one exists.
+     - RE-CAPTURED from the fresh 2026-10-19 bootstrap (225 deliveries, zero
+       `handfiled-*`, `mothman dashboard rebuild` first), 453 -> 457
+       arrivals. Every move is accounted for in the distribution test's own
+       history: ED in, the emptied 2013-2015 CP quarters out, TS-42/80/63's
+       quarters, TS-62's last days, and two cp-carers supplies in TS-63's
+       turned-off quarters now unfiled. No arrival in both captures changed
+       its instant, and only those two changed their verdict.

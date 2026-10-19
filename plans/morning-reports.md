@@ -2185,6 +2185,9 @@ one or more component tags, and a date.
         mattering. A drawn red in grown quarter 2013-Q3 goes with the emptied
         quarter, and so does its scripted resend promote. The planner moves
         ambers only.
+        **Keith, 2026-10-19:** the emptied quarters read red on every CP
+        page, which this note never said. They are now scripted as not
+        supplied (post-build-review #249).
       - **Child Protection is not shrunk tonight (REQ-GEN-238).** Its dry run
         includes REQ-GEN-206's TS-50, TS-55 and TS-81, which are still
         unsigned drafts, so the fewest years cannot be sized yet.

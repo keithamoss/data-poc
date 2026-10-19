@@ -92,10 +92,15 @@ def _instant_as_written_before_048(value) -> datetime | None:
 ROOT = Path(__file__).resolve().parent.parent
 GOLDEN = Path(__file__).parent / "fixtures" / "arrival_semantics_golden.json"
 
-_REPORTS = {
-    "rs_civil-registration_dashboard.json": None,
-    "cpfs_child-protection_dashboard.json": None,
-}
+def _reports():
+    """Every registered collection's dashboard file, from the registry - it
+    named two, so Emergency Department's arrivals were never compared
+    (post-build-review #250, the same class as #247)."""
+    from qa_tools import collections
+
+    names = [c.dashboard_file for c in collections.all_collections()]
+    assert len(names) > 1
+    return names
 
 
 def _built_datasets():
@@ -105,7 +110,7 @@ def _built_datasets():
     gitignored build output, and a fresh clone has not built them yet.
     """
     out = {}
-    for name in _REPORTS:
+    for name in _reports():
         path = ROOT / "reports" / name
         if not path.exists():
             pytest.skip(f"{name} not built - run `mothman dashboard build-data`")
@@ -471,8 +476,19 @@ class TestEveryCommittedArrivalKeepsItsVerdict:
         # TS-10a and TS-10b at 22:00 exactly, on time; TS-3c's 17:00 resupply
         # and TS-3d's 19-hours-late supply, late. No arrival in both captures
         # changed its verdict.
-        assert counts == {"on_time": 356, "early": 46, "late": 43, "unfiled": 8}
-        assert sum(counts.values()) == 453
+        # 342 / 59 / 44 / 12 over 457 FOR EMERGENCY DEPARTMENT (2026-10-19),
+        # each move accounted for by hand. In: ED's 55 (47 / 2 / 5 / 1) - the
+        # registry now reads its report (post-build-review #250). Out: the 56
+        # Child Protection arrivals in the nine 2013-2015 quarters REQ-GEN-237
+        # empties (50 on time, 6 late), and the 15 routine supplies TS-42, TS-80
+        # and TS-63 replaced in 2019-Q4, 2020-Q4 and 2021-Q4 (on time). In from
+        # those three scenarios: 10 early, 4 on time, 2 late, 1 unfiled. Birth
+        # Registrations' three new last days for TS-62: 2 on time, 1 early. And
+        # two cp-carers supplies in TS-63's turned-off quarters, 2022-Q1 and
+        # 2022-Q2, went on time -> unfiled (REQ-GEN-218: received while turned
+        # off). No other arrival in both captures changed its verdict or instant.
+        assert counts == {"on_time": 342, "early": 59, "late": 44, "unfiled": 12}
+        assert sum(counts.values()) == 457
 
 
 class TestTheClassificationBoundaries:
