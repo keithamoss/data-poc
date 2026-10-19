@@ -10951,5 +10951,72 @@ twice. It deliberately did not re-find the `TypeError`.
          where the page counted 11. Such a result now counts on the
          dataset's own run it follows (test failing first). The trend test's
          precondition failed for the same reason.
-     - Criteria 7-9 built, with criterion 7 narrowed to another table's
-       RE-CHECK run - PROVISIONAL, for Keith (REQ-DASH-264's decisions).
+     - Criteria 7-9 built. Criterion 7 was first narrowed to another table's
+       RE-CHECK run; Keith widened it the same night to arrivals too, in his
+       own words ("Checked <time>, when the <table> supply arrived."), shown
+       every time.
+
+258. **[in-progress, 2026-10-19]** **[Dashboard UI]** **REQ-DASH-264's two
+     post-build critics: what "Checked" may claim, and what waits on Keith.**
+     The UX critic found that on TS-80's 1 November every cross-table result
+     on the Client Register's page is "could not run - two files claim
+     cp_clients for this period", not a finding. So the banner's "The
+     cross-table checks did run ... and show what they found" and the row's
+     "Checked 8:20am ..., when the Notifications supply arrived." were both
+     untrue there - and the session had told Keith those readers "ran and
+     failed", which was wrong. The functional critic (delivery-critic)
+     confirmed it across 90 date/check cases.
+     - FIXED OVERNIGHT, PROVISIONAL pending Keith (test-first, in
+       tests-js/cross-table-elsewhere.test.js and the TS-80 e2e test): a
+       not-evaluated result still shows red on its row (criterion 3), but
+       gets no "Checked"/"Re-checked" sentence and does not count toward the
+       banner's "did run" sentence. The TS-80 e2e test now asserts both are
+       absent on 1 November.
+     - FIXED, minor (failing first): D1 the section pill followed the
+       evaluated count, so it read No data over red rows - it now follows
+       the rows shown. D2 a row blocked as No data could still carry a
+       "Checked" note citing an earlier supply - now blank. P1 an unreadable
+       held-receipt time showed every older result - now fails closed.
+       Also: row aria-label names its tables and tool; dark-mode tool
+       colour contrast.
+     - FOR KEITH (recorded as REQ-DASH-264 open_questions):
+       - Q1: a could-not-run result on a held table's page - (a) red with
+         its own sentence, e.g. "Could not be checked <time>, when the
+         <table> supply arrived.", or (b) no result, reading No data? (b)
+         changes criterion 6's expected red on 1 November. Its panel also
+         says "Current run" for another table's run today (G1).
+       - Q2: does criterion 2's "<declared on> → <reads>" label cover the
+         collection page? Today that page names the wrong declaring table
+         for "Closed-case hygiene" (Client Register, should be
+         Investigations) - a pre-existing `crossTableSource` fault with a
+         key that has no dataset prefix (G2).
+       - Q3: every ordinary delivery puts two entries in a reader's
+         history (its own and the other table's), so the panel's default
+         "previous run" compares a delivery with itself and "47 runs"
+         counts both. Skip same-delivery entries, or label them (G3)?
+       - Q4 (G4): unitCounts colours an own run's sparkline point with a
+         result recorded months later (1,086 cases, 360 of a different
+         status) - as the decision says, but at odds with criterion 9's
+         "dated by when it was recorded". Confirm or change.
+       - UX critic, smaller: chart points doubled within a delivery (as
+         Q3); row order on cp-clients; phone-width wrapping of the note -
+         state it once per section instead?; the compare card defaults to
+         "Not evaluated"; the clipped axis label and "this run" wording.
+     - NOTED, not fixed: the build's `_merged_by_time` would raise on an
+       entry with no `recorded_at` (none exist today); the build's and the
+       page's "current" agree on every clipped date, and only the disabled
+       ticket sync reads the build's.
+
+259. **[done, 2026-10-20]** **[Dashboard UI]** **TS-78a's jump still crossed
+     the fold on CI after a cold reload.** db4b11e's test run (39281759556,
+     the deployment half) failed one test: after the reload, TS-78a's
+     promotion split spanned 656.78-799.28px against #255's whole-pixel line
+     at 799. The first landing passed; locally both read 798.03, and delaying
+     the fonts locally did not reproduce it. So something laid out after the
+     jump moved the subject down 1.25px on the runner. The page now checks
+     again once `document.fonts.ready` resolves and a frame has passed, and
+     scrolls a subject that has crossed the fold back inside it
+     (`keepSubjectInsideFold`, two tests in tests-js/scenario-jump.test.js,
+     failing first). The e2e test measures after that point. The cause on the
+     runner is inferred, not reproduced, so if it goes red again the next
+     step is to log the subject's box on the runner rather than guess again.

@@ -5209,6 +5209,10 @@ class TestTheAsAtScenarioChips:
         assert f"scenario={sid.lower()}" in clean_page.url
 
         def on_screen():
+            # After the fonts and two frames, when the page has made its last
+            # adjustment (post-build-review #259).
+            clean_page.evaluate("() => document.fonts.ready.then(() => new Promise("
+                                "r => requestAnimationFrame(() => requestAnimationFrame(r))))")
             found = clean_page.locator(where).filter(has_text=text)
             assert found.count() >= 1, f"{sid}: {text!r} is not in {where}"
             el = found.first
@@ -5634,8 +5638,13 @@ class TestACrossTableCheckOnTS80:
         }""")
         assert own == ["nodata"], own
         text = " ".join(clean_page.locator("#view").inner_text().split())
-        assert ("The cross-table checks did run, on the tables that read this one, "
-                "and show what they found.") in text
+        # On 1 November the readers' results are "could not run" - two files
+        # claimed the Client Register - so nothing was checked and neither the
+        # banner nor a row may say it was (post-build-review #258, PROVISIONAL
+        # pending Keith). The rows still show what was recorded (criterion 3).
+        assert "The cross-table checks did run" not in text
+        assert "when the Notifications supply arrived." not in text
+        assert "own supply is not checked" in text
         # Criterion 5: the section's own pill follows its rows.
         head = clean_page.locator('.scope-section[data-scope="cross-table"] .head .pill')
         assert "Red" in head.inner_text(), head.inner_text()

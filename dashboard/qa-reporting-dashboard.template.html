@@ -716,6 +716,9 @@ span.scenario-subject-label{display:inline-block; margin:0 6px 0 0;}
 .scope-check .label{min-width:0;}
 .scope-check .label .nm{font-weight:600; font-size:13px;}
 .scope-check .label .tr{font-size:11px; color:var(--ink-faint); font-family:"IBM Plex Mono",monospace; margin-left:8px;}
+/* #258 finding 6: the tool name tells three rows apart, so it meets AA in dark mode too. */
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .scope-check .label .tr{color:var(--ink-muted);} }
+:root[data-theme="dark"] .scope-check .label .tr{color:var(--ink-muted);}
 /* #253: the tables a cross-table check is between, after its name. */
 .scope-check .label .bt{font-size:12.5px; color:var(--ink-muted); margin-left:8px;}
 .scope-check .label .bt:empty{display:none;}
@@ -5019,19 +5022,26 @@ function crossTableSource(col, entry){
 // received - but one that ran since, on a reading table's supply, shows what it
 // found. Never an earlier supply's result. Returns how many it shows.
 function blockChecksWhileHeld(ds, heldSince){
-  const since = Date.parse(heldSince || "") || 0;
-  let shown = 0;
+  // FAILS CLOSED (post-build-review #258 P1): with no readable receipt time
+  // nothing can be shown to have run since it, so everything is blocked.
+  const since = Date.parse(heldSince || "");
+  let shown = 0, rows = 0;
   (ds.columns||[]).forEach(c=>{
     c.checks = (c.checks||[]).map(ck=>{
       const last = (ck.history||[])[(ck.history||[]).length - 1];
       const ranSince = c.scope === "cross-table" && last && last.recorded_at
-        && Date.parse(last.recorded_at) >= since;
-      if(ranSince){ shown += 1; return ck; }
+        && !Number.isNaN(since) && Date.parse(last.recorded_at) >= since;
+      // SHOWN EITHER WAY, BUT COUNTED ONLY IF IT WAS EVALUATED (post-build-
+      // review #258): the banner says these checks "did run ... and show what
+      // they found", and one that could not be evaluated found nothing.
+      // The section's pill follows the rows shown, evaluated or not (#258 D1).
+      if(ranSince){ rows += 1; if(!last.not_evaluated) shown += 1; return ck; }
       return {...ck, blockedThisPeriod:true};
     });
     const live = c.checks.filter(ck=> !ck.blockedThisPeriod);
     c.status = live.length ? rollupStatuses(live.map(checkStatus)) : "nodata";
   });
+  ds.crossTableRowsWhileHeld = rows;
   return shown;
 }
 // THE TABLES A CROSS-TABLE CHECK IS BETWEEN (post-build-review #253, Keith
@@ -5044,15 +5054,26 @@ function crossTableBetween(col, check){
   const nameOf = id=> ((col.datasets || []).find(d=> d.id === id) || {}).name || id;
   return `${nameOf(b.declared_on)} → ${(b.reads || []).map(nameOf).join(", ")}`;
 }
-// WHERE A RESULT CAME FROM ANOTHER TABLE'S RE-CHECK (REQ-DASH-264 criteria 7
-// and 8, Keith 2026-10-19, approved as worded): said on its row and in its
-// panel, so a page that changed with no new supply of its own says why. A
-// result from another table's ARRIVAL is the ordinary "counts against both"
-// case and says nothing. Empty where it does not apply.
+// WHERE A RESULT CAME FROM ANOTHER TABLE'S RUN (REQ-DASH-264 criteria 7 and 8,
+// Keith 2026-10-19, both sentences approved as worded): said on its row and in
+// its panel, so a page that changed with no new supply of its own says why -
+// a re-check as a re-check, an arrival as an arrival, every time. Empty for
+// the dataset's own run.
+// A ROW'S NOTE: none while the row reads No data, or it would cite an earlier
+// supply's result under a pill saying there is none (#258 D2).
+function rowRecheckNote(col, check){
+  if(check.blockedThisPeriod) return "";
+  return recheckNote(col, (check.history || [])[(check.history || []).length - 1]);
+}
 function recheckNote(col, point){
-  if(!point || !point.recorded_by || point.recorded_in !== "re-check" || !point.recorded_at) return "";
+  // NOTHING WAS CHECKED where the result could not be evaluated (post-build-
+  // review #258): it says so in its own panel, and "Checked" would be untrue.
+  if(!point || !point.recorded_by || !point.recorded_at || point.not_evaluated) return "";
   const ds = (col.datasets || []).find(d=> d.id === point.recorded_by);
-  return `Re-checked ${fmtInstant(point.recorded_at)}, when the ${ds ? ds.name : point.recorded_by} was re-checked.`;
+  const name = ds ? ds.name : point.recorded_by;
+  return point.recorded_in === "re-check"
+    ? `Re-checked ${fmtInstant(point.recorded_at)}, when the ${name} was re-checked.`
+    : `Checked ${fmtInstant(point.recorded_at)}, when the ${name} supply arrived.`;
 }
 function collectionCrossTableSection(ag, col){
   const entries = collectionCrossTableChecks(col);
@@ -7713,7 +7734,7 @@ function renderDataset(view, agencyId, collectionId, datasetId){
     // EXCEPT A HELD TABLE'S CROSS-TABLE SECTION (REQ-DASH-264 criterion 5):
     // rows that ran since the held receipt carry their own verdicts, and the
     // head follows them.
-    const quiet = ds.noDataInPlaceOn && !(sc.scope === "cross-table" && ds.crossTableShownWhileHeld);
+    const quiet = ds.noDataInPlaceOn && !(sc.scope === "cross-table" && ds.crossTableRowsWhileHeld);
     const worst = quiet ? "nodata" : rollupStatuses(checks.map(checkStatus));
     const rows = columns.flatMap(c=> (c.checks||[]).filter(ck=> !ck.retired).map(ck=> `
       <button class="scope-check" data-col="${columnKey(c)}" data-check="${ck.key}">
@@ -7762,9 +7783,12 @@ function renderDataset(view, agencyId, collectionId, datasetId){
     // it is the tool_ref line that tells them apart. Same job here.
     btn.querySelector(".tr").textContent = check.tool_ref || "";
     btn.querySelector(".bt").textContent = crossTableBetween(col, check);
-    btn.querySelector(".rc").textContent = recheckNote(col, (check.history || [])[(check.history || []).length - 1]);
+    btn.querySelector(".rc").textContent = rowRecheckNote(col, check);
     btn.querySelector(".ds").textContent = check.description || "";
-    btn.setAttribute("aria-label", `${check.name} — view current and historical run detail`);
+    // THE RELATIONSHIP AND THE TOOL IN THE ACCESSIBLE NAME TOO (#258 finding
+    // 2): without them nine "Client reference" rows read identically.
+    const between = crossTableBetween(col, check);
+    btn.setAttribute("aria-label", `${[check.name, between, check.tool_ref].filter(Boolean).join(", ")} — view current and historical run detail`);
     btn.addEventListener("click", ()=>{
       STATE = {...STATE, columnName: columnKey(column)};
       openCheckPanel(ag, col, ds, column, check);
@@ -9252,6 +9276,13 @@ function landOnScenarioSubject(entry, on){
     const back = Math.min(-headTop, room);
     if(headTop < 0 && back > 0) window.scrollBy({top: -back, behavior: "instant"});
   }
+  // AND IT STAYS INSIDE ONCE THE FONTS ARE IN (post-build-review #259): on a
+  // GitHub runner TS-78a's subject ended 0.28px past the fold after a cold
+  // reload, though the jump had left a pixel to spare - something laid out
+  // after the jump pushed it down.
+  if(!tall && document.fonts && document.fonts.ready){
+    document.fonts.ready.then(()=> requestAnimationFrame(()=> keepSubjectInsideFold(el, window.innerHeight)));
+  }
   // AN OPEN PANEL OR DRAWER KEEPS FOCUS (post-build-review #202 F3): a reload
   // with one open marks the subject beneath it but leaves the reader in it.
   if(!(STATE && (STATE.panel || STATE.columnName || STATE.checkKey))){
@@ -9259,6 +9290,12 @@ function landOnScenarioSubject(entry, on){
     el.focus({preventScroll: true});
   }
   return true;
+}
+// Brings a subject that has crossed the fold back a whole pixel inside it.
+function keepSubjectInsideFold(el, height){
+  const r = el.getBoundingClientRect();
+  if(r.height >= height || r.bottom <= height - 1) return;
+  window.scrollBy({top: -Math.ceil(r.bottom - (height - 1)), behavior: "instant"});
 }
 // ONE LINE IN THE STALE-LINK NOTICE (criteria 7 and 9). An id is named only
 // once it has matched the panel's own (criterion 11).

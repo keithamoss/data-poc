@@ -159,12 +159,17 @@ describe("a result from another table's re-check says so", () => {
     })).toBe("Re-checked 11:00am Monday, 2 November 2020, when the Client Register was re-checked.");
   });
 
-  it("says nothing for the dataset's own run or another table's arrival", () => {
+  it("says nothing for the dataset's own run", () => {
     dashboard = loadDashboard();
     expect(dashboard.window.recheckNote(col, { recorded_by: null, recorded_at: "2020-11-01T08:20:00+08:00" })).toBe("");
+  });
+
+  // Keith, 2026-10-19 night: arrivals too, every time, in these words.
+  it("names when and which table's supply arrived, for another table's arrival", () => {
+    dashboard = loadDashboard();
     expect(dashboard.window.recheckNote(col, {
       recorded_by: "cp-notifications", recorded_in: "arrival", recorded_at: "2020-11-01T08:20:00+08:00",
-    })).toBe("");
+    })).toBe("Checked 8:20am Sunday, 1 November 2020, when the Notifications supply arrived.");
   });
 
   it("dates its point on the chart by when it was recorded", () => {
@@ -174,5 +179,56 @@ describe("a result from another table's re-check says so", () => {
     const built = dashboard.window.buildRealDataset(dashboard.window.clipDatasetToInPlaceOn(ds, "2020-11-03"));
     const last = built.columns[0].checks[0].history.at(-1);
     expect(dashboard.window.assetDateStrOf(last.date.toISOString())).toBe("2020-11-02");
+  });
+});
+
+// UX critic on REQ-DASH-264 (post-build-review #258, finding 1): a result that
+// could not be evaluated checked nothing, so neither sentence may say it did.
+describe("a result that could not be evaluated", () => {
+  it("gets no 'Checked' or 'Re-checked' sentence", () => {
+    dashboard = loadDashboard();
+    const col = { datasets: [{ id: "cp-notifications", name: "Notifications" }] };
+    expect(dashboard.window.recheckNote(col, {
+      recorded_by: "cp-notifications", recorded_in: "arrival", recorded_at: "2020-11-01T08:20:00+08:00",
+      status: "red", not_evaluated: "could not run - two files claim cp_clients for this period",
+    })).toBe("");
+  });
+
+  it("does not count toward the banner's 'did run' sentence", () => {
+    dashboard = loadDashboard();
+    const ds = { columns: [{ name: "Cross-table", scope: "cross-table", checks: [{ key: "ref", history: [
+      { run_id: "r", run_date: "2020-11-01", status: "red", value: null, recorded_by: "cp-notifications",
+        recorded_at: "2020-11-01T08:20:00+08:00", not_evaluated: "could not run" }] }] }] };
+    expect(dashboard.window.blockChecksWhileHeld(ds, "2020-11-01T08:20:00+08:00")).toBe(0);
+    // ...but the row still shows what was recorded (criterion 3).
+    expect(dashboard.window.checkStatus(ds.columns[0].checks[0])).not.toBe("nodata");
+    // ...and the section's pill follows the rows it shows, not the banner's
+    // count (post-build-review #258 D1): a red row under a No data head is a
+    // contradiction on screen.
+    expect(ds.crossTableRowsWhileHeld).toBe(1);
+  });
+});
+
+// post-build-review #258, the functional critic's D2 and P1.
+describe("a held table's cross-table row", () => {
+  const held = (recordedAt) => ({ columns: [{ name: "Cross-table", scope: "cross-table", checks: [{ key: "ref", history: [
+    { run_id: "r", run_date: "2020-11-01", status: "green", value: 0, recorded_by: "cp-notifications",
+      recorded_in: "arrival", recorded_at: recordedAt }] }] }] });
+  const col = { datasets: [{ id: "cp-notifications", name: "Notifications" }] };
+
+  it("says nothing about when it was checked while it reads No data", () => {
+    dashboard = loadDashboard();
+    const ds = held("2020-08-01T08:20:00+08:00");
+    dashboard.window.blockChecksWhileHeld(ds, "2020-11-01T08:20:00+08:00");
+    const ck = ds.columns[0].checks[0];
+    expect(ck.blockedThisPeriod).toBe(true);
+    expect(dashboard.window.rowRecheckNote(col, ck)).toBe("");
+  });
+
+  it("is blocked when the held receipt's time is unknown, rather than shown", () => {
+    dashboard = loadDashboard();
+    const ds = held("2020-08-01T08:20:00+08:00");
+    expect(dashboard.window.blockChecksWhileHeld(ds, null)).toBe(0);
+    expect(ds.columns[0].checks[0].blockedThisPeriod).toBe(true);
   });
 });

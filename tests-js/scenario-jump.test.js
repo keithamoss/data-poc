@@ -229,3 +229,28 @@ describe("#202 F1 - a pair nobody checked lands on its blocker row", () => {
     expect(w.scenarioSubjectEl(entry)).toBe(view.querySelector("tr"));
   });
 });
+
+// post-build-review #259: on CI, TS-78a's subject ended 0.28px past the fold
+// after a cold reload, though the jump had left a pixel to spare - something
+// laid out after the jump (the fonts are the likely one) pushed it down. Once
+// the fonts are in, a subject that has crossed the fold is brought back inside.
+describe("a subject pushed past the fold after the jump", () => {
+  it("is scrolled back a whole pixel inside it", () => {
+    page = loadDashboard();
+    const w = page.window;
+    const calls = [];
+    w.scrollBy = (o) => calls.push(o.top);
+    const el = { getBoundingClientRect: () => ({ top: 656.78, bottom: 799.28, height: 142.5 }) };
+    w.keepSubjectInsideFold(el, 800);
+    expect(calls).toEqual([-1]);
+  });
+
+  it("is left alone when it is already inside", () => {
+    page = loadDashboard();
+    const w = page.window;
+    const calls = [];
+    w.scrollBy = (o) => calls.push(o.top);
+    w.keepSubjectInsideFold({ getBoundingClientRect: () => ({ top: 655.5, bottom: 798.03, height: 142.5 }) }, 800);
+    expect(calls).toEqual([]);
+  });
+});

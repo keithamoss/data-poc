@@ -331,6 +331,29 @@ def filing_changes(reference: str, dataset_id: str, instants, *, docs=None,
     return out
 
 
+def re_judges(reference: str, dataset_id: str, at, *, docs=None) -> str | None:
+    """The period whose verdict the correction would change for an arrival at
+    `at` that it files to the same period either side - by the filing rule's
+    own slot (assignment.open_slot) and the verdict rule's own function
+    (arrival_classification.classify), as REQ-PIPE-168's re-judgement does -
+    or None (REQ-GEN-237 criterion 4)."""
+    from qa_tools.common import agreement, arrival_classification, assignment, slots
+
+    p, before, after = _docs_either_side(reference, docs)
+    if p is None:
+        raise CannotPlace(f"{reference!r} is not a declared correction")
+    horizon = at.date() + timedelta(days=2)
+    was = assignment.open_slot(slots.slots_for_dataset(
+        dataset_id, until=horizon, agreement=agreement.from_doc(before[0])), at)
+    now = assignment.open_slot(slots.slots_for_dataset(
+        dataset_id, until=horizon, agreement=agreement.from_doc(after[0])), at)
+    if was is None or now is None or was.name != now.name:
+        return None
+    if arrival_classification.classify(at, was) == arrival_classification.classify(at, now):
+        return None
+    return was.name
+
+
 def _injected_instants(injections, generated) -> dict[str, list]:
     """Each dataset's injected arrival instants, from configuration."""
     from generator import scenario_injection as si
@@ -372,10 +395,12 @@ def _on_a_calendar(dataset_id: str) -> bool:
 
 
 def check_written(dataset_ids, entries, injected_periods=frozenset(), *, docs=None) -> None:
-    """After the deliveries are written: no ORDINARY arrival's filing may be
-    changed by a version-level correction (REQ-GEN-205 criterion 10, REQ-GEN-237
+    """After the deliveries are written: no ORDINARY arrival may be moved or
+    re-judged by a declared correction (REQ-GEN-205 criterion 10, REQ-GEN-237
     criterion 4) - only a scenario's may, and those are its riders' own,
-    already checked from configuration. Refused naming the run.
+    already checked from configuration. Refused naming the change and the run.
+    A DATE-LEVEL CORRECTION IS ASKED TOO (REQ-GEN-237 criterion 4, Keith
+    2026-10-19): it used to be skipped, the claim check standing in for it.
 
     ONLY AN ARRIVAL RECEIVED BEFORE THE CORRECTION'S DATE is asked
     (post-build-review #244): one received on or after it was filed under the
@@ -389,8 +414,6 @@ def check_written(dataset_ids, entries, injected_periods=frozenset(), *, docs=No
         if inj.correction:
             riders.setdefault(inj.correction, set()).add(inj.dataset_id)
     for reference, datasets in riders.items():
-        if not is_version_level(reference, docs=docs):
-            continue
         p, _before, _after = _docs_either_side(reference, docs)
         merged = asset_time.wall_clock(date.fromisoformat(p.date[:10]), "00:00")
         for e in entries:
@@ -409,3 +432,9 @@ def check_written(dataset_ids, entries, injected_periods=frozenset(), *, docs=No
                         f"({dataset_id}, an ordinary supply no scenario names) is filed - "
                         f"{', '.join(sorted(moved))}; move the correction's effective date "
                         f"or the change")
+                period = re_judges(reference, dataset_id, at, docs=docs)
+                if period:
+                    raise CannotPlace(
+                        f"correction {reference} would re-judge {e['run_id']} ({dataset_id}, "
+                        f"an ordinary supply no scenario names) in {period}; move the "
+                        f"correction's effective date or the change")

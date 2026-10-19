@@ -266,3 +266,45 @@ class TestAWrittenArrivalIsAskedOnlyWhatAConfirmationCouldMove:
         later = _declare(_docs(), _widen_daily, "CAB-W", "2026-09-19")
         cc.check_written(["birth-registrations"], [self._br("2026-09-20T09:00:00+08:00")],
                          docs=later)
+
+
+class TestADateLevelCorrectionIsAskedToo:
+    """REQ-GEN-237 criterion 4 (Keith, 2026-10-19: build it): generation
+    refuses where a correction - a period's DATE moved, not only a version's
+    window - would move OR RE-JUDGE an ordinary supply no scenario names,
+    naming the change and the run. Moves by assignment.open_slot and verdicts
+    by arrival_classification.classify, the rules the impact preview uses.
+    Before this, check_written skipped every date-level correction."""
+
+    @pytest.fixture
+    def rider(self, monkeypatch):
+        import dataclasses
+
+        monkeypatch.setattr(si, "INJECTIONS",
+                            [dataclasses.replace(si.INJECTIONS[0], correction="CAB-1")])
+
+    def _docs(self, to):
+        return _declare(_docs(), lambda cal, asset: _move_q3(cal, asset, to), "CAB-1",
+                        "2026-01-10")
+
+    def _cp(self, at):
+        return {"run_id": "cp_run_x", "period": "2023-Q3", "received_at": at,
+                "row_counts": {"cp_clients": 10}}
+
+    def test_an_ordinary_supply_it_would_move_is_refused(self, rider):
+        with pytest.raises(si.CannotPlace, match=r"CAB-1.*cp_run_x"):
+            cc.check_written(["cp-clients"], [self._cp("2023-08-01T08:30:00+08:00")],
+                             docs=self._docs("2023-10-20"))
+
+    def test_an_ordinary_supply_it_would_only_re_judge_is_refused(self, rider):
+        with pytest.raises(si.CannotPlace, match=r"CAB-1 would re-judge cp_run_x"):
+            cc.check_written(["cp-clients"], [self._cp("2023-08-01T10:00:00+08:00")],
+                             docs=self._docs("2023-08-03"))
+
+    def test_a_supply_it_leaves_alone_is_not(self, rider):
+        cc.check_written(["cp-clients"], [self._cp("2024-02-01T08:30:00+08:00")],
+                         docs=self._docs("2023-10-20"))
+
+    def test_a_scenario_s_own_supply_is_not_asked(self, rider):
+        cc.check_written(["cp-clients"], [self._cp("2023-08-01T08:30:00+08:00")],
+                         frozenset({"2023-Q3"}), docs=self._docs("2023-10-20"))

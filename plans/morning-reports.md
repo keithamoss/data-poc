@@ -2353,3 +2353,77 @@ one or more component tags, and a date.
         running-thoughts #109 (what a period schema is - a release, or a
         cadence; a monthly dataset in a quarterly asset; a weekly dataset in
         a daily asset; maybe two asset configurations) and #110.
+
+7. **[in-progress, 2026-10-20]** **[Docs & process]** **Overnight 2026-10-19 to
+   2026-10-20: REQ-DASH-264 finished, REQ-GEN-237 criterion 4, two audits.**
+   - **YOUR TERMS FOR THE NIGHT**: "Feel free to build it tonight", "Also
+     build 264 ... tonight", a check-in every ten minutes, and your
+     answers before bed. Those answers were: the arrival note reads
+     "Checked <time>, when the <table> supply arrived." and appears every
+     time; build REQ-GEN-237 criterion 4; REQ-TEST-249 criterion 10 is met
+     by a file-location audit; REQ-PIPE-098 criterion 4 waits until it is
+     needed.
+   - **PUSHED**:
+     - db4b11e: REQ-DASH-264 built (criteria 1-9), with #253, #255, #256
+       and #257 done. The full gate passed on that tree.
+     - A second push, carrying the work below.
+     - CI on db4b11e: config validation, the fast test half, the JS suite
+       and the on-demand tests all passed. The deployment half failed one
+       test: TS-78a's scenario jump, which crossed the fold by 0.28px after
+       a cold reload (#259). It is fixed in the second push. Check that
+       push's run first thing.
+   - **BUILT TONIGHT**:
+     - REQ-DASH-264 criterion 7, widened to arrivals in your wording.
+     - REQ-GEN-237 criterion 4: `correction_claims.check_written` now asks
+       about date-level corrections too. It names the run a correction
+       would move or re-judge, and the period it would affect
+       (tests/test_correction_claims.py, four new tests).
+     - REQ-TEST-249 criterion 10: amended as you said, and met by the
+       file-location audit. One exception is flagged in its evidence:
+       `dashboard_check_labels`.
+     - REQ-PIPE-098 criterion 4: your "leave until needed" is recorded.
+   - **A MISTAKE OF MINE, which you should know about first.** Last
+     night I told you the readers' cross-table checks on TS-80's 1 November
+     "ran and failed". They did not run. The Client Register was contested
+     (two files claimed it), so all twelve results are "could not run -
+     two files claim cp_clients for this period". The UX critic caught
+     this. It means the approved banner's last sentence ("The cross-table
+     checks did run ... and show what they found") was untrue on the very
+     page you approved it for. So was the arrival note on those rows.
+   - **PROVISIONAL, for you to keep or reverse** (REQ-DASH-264's
+     decisions, #258):
+     - A result that could not be evaluated still shows red on its row, as
+       criterion 3 asks. It gets no "Checked" sentence, though, and it
+       does not count towards the banner's "did run" sentence.
+     - On TS-80's 1 November the page therefore shows the headline and the
+       body without that last sentence, and the twelve rows show red with
+       no note. Criteria 4 and 7's examples still hold on dates whose
+       results were actually evaluated.
+   - **CRITIC FIXES, minor, each failing first** (#258, and #259 for CI): the section pill now
+     follows the rows it shows, so it no longer reads No data above red
+     rows. A row that reads No data no longer carries a "Checked" note.
+     An unreadable receipt time now blocks every row instead of showing
+     older ones. Each row's screen-reader label names its tables and its
+     tool. The dark-mode tool label has better contrast.
+   - **QUESTIONS FOR YOU** (#258, and REQ-DASH-264's open_questions):
+     1. A result that could not run on a held table's page: (a) keep it
+        red and give it its own sentence, e.g. "Could not be checked
+        <time>, when the <table> supply arrived."; or (b) count it as no
+        result, so the row reads No data. Choosing (b) changes criterion
+        6's expected red on 1 November.
+     2. Should criterion 2's "<declared on> → <reads>" label apply to the
+        collection page too? That page currently names the wrong table for
+        "Closed-case hygiene": it says Client Register where it should say
+        Investigations. That fault predates 264.
+     3. Each delivery records two results for a reader, its own and the
+        other table's. So the panel's default "previous run" compares a
+        delivery with itself, and its run count includes both. Should
+        those pairs be skipped, or labelled?
+     4. A sparkline point takes its colour from a result recorded months
+        later (as the decision says). Is that right next to criterion 9's
+        "dated by when it was recorded"?
+     5. The UX critic's smaller points: row order on the Client Register;
+        whether to state the note once per section at phone width; the
+        compare card defaulting to "Not evaluated"; a clipped axis label.
+   - **LEFT FOR YOU, as before**: running-thoughts #109, and profiling the
+     gate (56 minutes on this sandbox).
