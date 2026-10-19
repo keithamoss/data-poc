@@ -554,6 +554,10 @@ class StreamPlayer:
         return sum(p.finish() or 0 for p in self.players)
 
 
+# ON THE REPLAY CLOCK, as run_pipeline is: without it a stream's arrivals were
+# filed under the corrected agreement and stamped with the wall clock, so a
+# correction found nothing to move (REQ-PIPE-262; found by a full bootstrap).
+@replay_clock.on_replay_clock
 def run_stream(collection_ids: list[str], sequential: bool = False,
                record_deliveries: bool = True) -> list[dict]:
     """Collections that share a calendar, replayed as ONE stream in receipt

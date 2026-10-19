@@ -132,3 +132,31 @@ class TestAStreamIsProcessedInTheLivePassesOrder:
         both.finish()
         assert played == [("cp", "ed_run_1"), ("ed", "ed_run_1"),
                           ("cp", "finish"), ("ed", "finish")]
+
+
+class TestAStreamRunsOnTheReplayClock:
+    """A stream is a replay like a one-collection run (REQ-PIPE-262 criterion
+    3): on a synthetic asset it runs on the replay clock, so each arrival is
+    filed under the agreement as it stood at its receipt (REQ-PIPE-170
+    criterion 23) and stamped then. Found when a full bootstrap's correction
+    proposed no moves: every merged arrival had been filed under the
+    corrected calendar, on the wall clock."""
+
+    def test_the_replay_clock_is_running_while_a_stream_is_processed(self, monkeypatch):
+        from qa_tools.common import arrival_lifecycle, replay_clock
+        from qa_tools.tools import orchestrate
+
+        seen = []
+        monkeypatch.setattr(replay_clock, "_is_synthetic", lambda: True)
+        monkeypatch.setattr(orchestrate, "_begin",
+                            lambda cid, player=None: orchestrate._CollectionRun(
+                                coll=cid, arrivals=[], manifest=[], steps=None,
+                                prepare=None, player=type("P", (), {
+                                    "before": lambda s, a: 0, "finish": lambda s: 0})(),
+                                run_by="t", run_timestamp="t"))
+        monkeypatch.setattr(orchestrate, "_end", lambda run, results, record_deliveries: {})
+        monkeypatch.setattr(arrival_lifecycle, "process_stream",
+                            lambda *a, **k: seen.append(replay_clock.active()))
+        orchestrate.run_stream(["child-protection", "emergency-department"],
+                               record_deliveries=False)
+        assert seen == [True]

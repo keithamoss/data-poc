@@ -39334,6 +39334,12 @@ requirements:
     - REQ-GEN-251
     - REQ-PIPE-250
     decisions:
+    - 'A DEFECT OF THIS BUILD, CAUGHT BEFORE THE PUSH (main session, 2026-10-19): orchestrate.run_stream first ran without
+      the replay clock that run_pipeline''s @on_replay_clock gives a one-collection run, so a merged stream''s arrivals were
+      filed under the already-corrected agreement and stamped with the wall clock - and the first full bootstrap''s scripted
+      confirmation of REQ-GEN-205 found no moves to make. The equivalence test could not see it: its cut-down corpus carries
+      no scripted decisions, and both its modes went through the same stream. Fixed test-first
+      (tests/test_bootstrap_streams.py TestAStreamRunsOnTheReplayClock).'
     - 'BUILT IN, BUILDER''S CALLS (main session, 2026-10-19): (1) `mothman pipeline run` on an empty database replays by stream
       too (cli/pipeline.py _run_stream) - it is the same batch replay, and left per collection it would leave ED''s 2015-Q4 gap
       empty exactly as the old --sequential did. (2) The third-collection test fixture (tests/third_collection.py) now declares
