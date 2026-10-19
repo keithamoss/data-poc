@@ -10811,7 +10811,7 @@ twice. It deliberately did not re-find the `TypeError`.
      - FIX: `scenario_injection.LAST_DAY`, used by the five b links, so they
        follow the anchor wherever it moves.
 
-253. **[parked, 2026-10-19]** **[Dashboard]** **A knock-on re-evaluation never
+253. **[done, 2026-10-19]** **[Dashboard UI]** **A knock-on re-evaluation never
      reaches the page: readers stay red until their own next arrival -
      KEITH'S CALL.** Found by the evidence pass after #251's fix. TS-80's
      readers (cp-notifications, cp-investigations, cp-placements) are
@@ -10836,16 +10836,21 @@ twice. It deliberately did not re-find the `TypeError`.
        the page disagree about the same records. It is hidden in an
        ordinary delivery because every table's own run follows at the same
        instant; a lone re-check or resupply exposes it.
-     - THE FIX'S SHAPE, not built: a re-evaluation entry in a check's
-       history, recorded under another table's run, which counts for the
-       checks it re-ran but is not an arrival. Five consumers read that
-       history: the in-place-on picker, the trend charts, per-run row
-       counts, the Python status mirror (dataset_status.py), and the e2e
-       status-versus-verdict test.
-     - PARKED BY KEITH until after the Emergency Department push (2026-10-19):
-       he wants a proper conversation first, a scenario walked through and
-       screenshots of how it looks now. REQ-DASH-263 is built in the same
-       piece of work. Recorded as REQ-GEN-203 criterion 13, unmet.
+     - DECIDED BY KEITH after the walkthrough with screenshots, 2026-10-19,
+       and built as REQ-DASH-264: option (a) - a cross-table check stays on
+       the page of every table it reads ("counts against both", not each
+       page showing only its own side), each row is labelled "<declared on>
+       → <reads>" (the Client Register's nine "Client reference" rows were
+       three checks by three tools, never duplicates), and a page shows each
+       check's newest result whichever run recorded it, as the gate does.
+       Then option 2 for a held table: its cross-table rows show what they
+       found since the held receipt, with the banner reworded as he approved
+       it. REQ-GEN-203 criterion 13 is met; REQ-PIPE-115 criterion 11 is
+       amended. The five consumers the earlier note listed: the picker and
+       trend charts read the merged history; per-run row counts and per-run
+       statuses stay keyed by the dataset's own runs, so a supply's own
+       verdict is unchanged; the e2e status-versus-verdict test holds the
+       page to the recorded verdicts.
 
 254. **[done, 2026-10-19]** **[Testing & dev tooling]** **`mothman supply
      queue` with no `--collection` crashes with a traceback.** Found
@@ -10864,3 +10869,62 @@ twice. It deliberately did not re-find the `TypeError`.
        and no code run. It failed before the fix on
        `mothman debug build-warehouses`.
      - FIX: no default on a required option (`_default_unless_required`).
+
+255. **[done, 2026-10-19]** **[Dashboard UI]** **A scenario jump can leave
+     its subject a fraction of a pixel past the fold.** Found by CI on the
+     Emergency Department push (d4b95a1): TS-78a's as-at panel spanned
+     657.78-800.28px in the 800px window. Locally it was 657.28-799.78px,
+     green by 0.22px. The code is older than that push; the push changed
+     the content above the panel. Minor bug, fixed without asking.
+     - CAUSE: after centring, the jump scrolls back by the room left below
+       the subject (to show the page head), rounded down to whole pixels.
+       That leaves the subject's bottom edge flush with the fold, and the
+       browser's pixel snapping puts it either side depending on the
+       machine's fonts.
+     - TEST FIRST: `TestTheAsAtScenarioChips` now asks for the subject a
+       whole pixel inside the fold (bottom at most 799px). Before the fix it
+       failed locally for TS-75a, TS-77b and TS-78a.
+     - FIX: the scroll-back leaves one pixel spare
+       (`landOnScenarioSubject`).
+
+256. **[done, 2026-10-19]** **[Testing & dev tooling]** **The checkpoint
+     resume test took its checkpoint inside a delivery.** Found by CI's
+     on-demand job on the Emergency Department push (d4b95a1):
+     `TestAResumeRecordsWhatAFullReplayDoes[cp-7]` reported a resume that
+     left 2023-Q1's first five tables staged. Bisected to ecb6a06, which
+     added a 2015-Q4 Client Register delivery to the equivalence corpus for
+     REQ-PIPE-262. That delivery is received first, so every Child
+     Protection arrival moved up one, and arrival 7 became the last file of
+     the 2023-Q1 zip instead of the first of the next delivery. A real
+     checkpoint is never taken there: `bootstrap._checkpoint_hook` snaps
+     back to where its delivery begins, and this test calls
+     `taking_checkpoint` directly. A test defect, not a product one.
+     - FIX: the test checkpoints before arrival 8, and now asserts its
+       position is one `checkpoints.snapped` leaves alone, so the next
+       corpus change fails with that message rather than as a diff.
+
+257. **[todo, 2026-10-19]** **[Dashboard UI]** **REQ-DASH-264 built but not
+     pushed: four browser tests disagree with it.** The full gate on the
+     REQ-DASH-264 tree was stopped by the 30-minute background limit with two
+     failures showing; `tests/test_dashboard_e2e.py` run alone (serially,
+     31m49s) then gave 4 failed, 296 passed. Everything else in that gate had
+     passed (npm test 845, every docs gate). Not yet diagnosed:
+     - `TestStatusMatchesEachToolsOwnVerdict::test_on_every_past_date_too`:
+       compares each rendered status with "the run it shows". On cp-clients
+       2020-11-01 the cross-table rows now render red (REQ-DASH-264 criterion
+       3, intended) where the test expects its own run's verdict; but on
+       2015-11-01 three cp-placements Client reference rows render GREEN where
+       the tool recorded no result (`nodata`) - check whether an older
+       result is standing in, which criterion 1 does not allow for a check
+       whose newest result is "not evaluated".
+     - `TestColumnsNotGreenMatchesTheDatasetPage` (default date and
+       2025-06-15): the dataset list says 1 unit counted, the dataset page 11
+       (cp-clients) and 10 (cp-notifications). Find which of the two paths
+       reads the merged history.
+     - `TestTheDatasetPageSaysWhatItsTrendPlots`: its precondition, "a Child
+       Protection dataset has a unit that is not green", no longer holds on
+       the default date - check whether a later re-check result is turning
+       an own red green where it should not, before touching the test.
+     NEXT: diagnose each against the requirement, fix test-first where the
+     code is wrong, then one full gate with a long timeout (it now takes over
+     30 minutes), then one push.

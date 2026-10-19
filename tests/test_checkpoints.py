@@ -298,12 +298,22 @@ import equiv_support  # noqa: E402
 @pytest.mark.on_demand
 class TestAResumeRecordsWhatAFullReplayDoes:
 
-    @pytest.mark.parametrize("short,before", [("bdm", 3), ("cp", 7)])
+    @pytest.mark.parametrize("short,before", [("bdm", 3), ("cp", 8)])
     def test_identical(self, corpus, worker_id, short, before):  # noqa: F811
         collection_id = collections.by_short(short).id
         taken = []
 
         def full():
+            from qa_tools.common import arrivals
+
+            # WHERE A REAL CHECKPOINT CAN BE (post-build-review #256): the
+            # bootstrap snaps one back to the start of its delivery, and this
+            # test calls taking_checkpoint directly, so it says so itself. Its
+            # corpus gained an arrival ahead of these and 7 landed inside the
+            # 2023-Q1 zip, a place no real checkpoint is taken.
+            found = arrivals.arrivals_for(collection_id, "")
+            assert checkpoints.snapped(found, before) == before, (
+                f"{short}: arrival {before} is inside a delivery - pick where one begins")
             bootstrap._run_collection(
                 short, True, record_deliveries=True,
                 after_each=checkpoints.taking_checkpoint(

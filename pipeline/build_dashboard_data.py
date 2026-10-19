@@ -226,6 +226,45 @@ def _cross_table_check_ids() -> set[str]:
     return set(tables_read.declared_by_check_id(collect_checks(None)))
 
 
+def _between(check_id: str, reads_by_check_id: dict) -> dict | None:
+    """The tables a cross-table check is between, by dataset id (post-build-
+    review #253, Keith 2026-10-19): "Client reference" on the Client
+    Register's page is three checks, one per table that reads it, and the
+    row names which. None for a check that reads only its own table."""
+    reads = reads_by_check_id.get(check_id)
+    if not reads:
+        return None
+    # A check id names its declaring dataset: asset.agency.collection.dataset...
+    return {"declared_on": check_id.split(".")[3],
+            "reads": [hierarchy.dataset_for_table(t).dataset_id for t in reads]}
+
+
+def _instant(text: str | None):
+    """A recorded time as an instant, for ordering - receipts and runs carry
+    different UTC offsets, so text does not sort them. None stays None."""
+    from datetime import datetime
+
+    return datetime.fromisoformat(text) if text else None
+
+
+def _merged_by_time(own: list[dict], elsewhere: list[dict]) -> list[dict]:
+    """This dataset's own entries in receipt order, with each result recorded
+    under ANOTHER table's run placed after the last own entry recorded no
+    later than it (post-build-review #253): the newest result is the last
+    entry, whichever run recorded it, as the promotion gate reads it. Own
+    entries keep their order - a re-check of the dataset's own supply is
+    where its receipt puts it, as before."""
+    merged = list(own)
+    for entry in sorted(elsewhere, key=lambda h: _instant(h["recorded_at"])):
+        at = _instant(entry["recorded_at"])
+        place = 0
+        for i, h in enumerate(merged):
+            if h["recorded_at"] and _instant(h["recorded_at"]) <= at:
+                place = i + 1
+        merged.insert(place, entry)
+    return merged
+
+
 def _not_evaluated_reason(record: dict) -> str | None:
     """Why a record's check could not be evaluated, or None for a real
     verdict. Read from the reason each pseudo-tool writes -
@@ -303,7 +342,14 @@ def share_cross_table_results(results: list[dict], by_table: dict[str, list[dict
 # ---- one dataset ------------------------------------------------------------
 
 def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], dataset_stats: dict,
-                    lifecycle_by_id: dict) -> dict:
+                    lifecycle_by_id: dict, *, all_runs: list[dict] | None = None) -> dict:
+    """One dataset's page. `manifest` is its own runs; `all_runs` is every
+    run in the collection, so a result recorded under another table's run -
+    a re-check re-running this table's cross-table checks - is placed in
+    time and named (post-build-review #253)."""
+    from qa_tools.common import tables_read
+    from qa_tools.common.qa_results_writer import run_owner
+
     table, dataset_id = dataset.table, dataset.dataset_id
     meta = column_meta(coll, dataset)
     all_columns = list(meta)
@@ -312,6 +358,7 @@ def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], da
     value_count_cols = {col for (t, col) in stats_spec.value_counts if t == table}
 
     cross_table_ids = _cross_table_check_ids()
+    reads_by_check_id = tables_read.declared_by_check_id(collect_checks(None))
     by_column: dict[str, dict[str, dict]] = {}
     # A CHECK THAT COULD NOT BE EVALUATED (post-build-review #77) arrives
     # under a pseudo-tool with a check_name of its own, so keying it like
@@ -341,8 +388,9 @@ def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], da
             "unit": r["unit"], "warn": r["warn_threshold"], "fail": r["fail_threshold"],
             "dimension": r["dimension"], "label": r.get("label"), "check_id": r["check_id"],
             "by_run": {}, "row_count_total": {}, "row_count_invalid": {}, "failing_sample_keys": {},
-            "status_by_run": {}, "reference": {}, "not_evaluated": {},
+            "status_by_run": {}, "reference": {}, "not_evaluated": {}, "at": {},
         })
+        slot["at"][r["run_id"]] = r.get("run_timestamp")
         slot["not_evaluated"][r["run_id"]] = _not_evaluated_reason(r)
         slot["by_run"][r["run_id"]] = r["metric_value"]
         # item 74 Bug A: the tool's own verdict, carried through rather than
@@ -356,7 +404,11 @@ def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], da
         slot["failing_sample_keys"][r["run_id"]] = r.get("failing_sample_keys") or []
 
     run_ids_in_order = [m["run_id"] for m in manifest]
-    run_date_by_id = {m["run_id"]: _run_date(m) for m in manifest}
+    own_ids = set(run_ids_in_order)
+    # EVERY RUN'S DATE, the dataset's own and the rest (#253).
+    all_runs = manifest if all_runs is None else all_runs
+    run_date_by_id = {m["run_id"]: _run_date(m) for m in all_runs}
+    other_run_ids = [m["run_id"] for m in all_runs if m["run_id"] not in own_ids]
     # THE NEWEST RUNS THAT MEASURED THIS TABLE, not simply the newest runs
     # (REQ-PIPE-105): a run whose table was contested or held has nothing of
     # its own to show. None for a dataset never supplied (criterion 6).
@@ -380,10 +432,11 @@ def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], da
         for slot in checks_for_col.values():
             engine, check_name = slot["engine"], slot["check_name"]
             attach_aggregate = agg_spec is not None and check_name in agg_spec["check_names"]
-            history = []
-            for run_id in run_ids_in_order:
+            history, elsewhere = [], []
+            for run_id in run_ids_in_order + other_run_ids:
                 if run_id not in slot["by_run"]:
                     continue
+                own = run_id in own_ids
                 aggregate_values = None
                 if attach_aggregate:
                     aggregate_values = (dataset_stats.get(run_id) or {}).get(
@@ -391,8 +444,12 @@ def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], da
                 # Why this run's check could NOT be evaluated, or None for a
                 # real verdict - never a value or a pass.
                 not_evaluated = slot["not_evaluated"].get(run_id)
-                history.append({
+                (history if own else elsewhere).append({
                     "run_id": run_id, "run_date": run_date_by_id[run_id],
+                    # WHEN IT WAS RECORDED, AND UNDER WHOSE RUN where that is
+                    # another table's (post-build-review #253).
+                    "recorded_at": slot["at"].get(run_id),
+                    "recorded_by": None if own else (run_owner(run_id) or (None,))[0],
                     "value": slot["by_run"][run_id],
                     "row_count_total": slot["row_count_total"].get(run_id),
                     "row_count_invalid": slot["row_count_invalid"].get(run_id),
@@ -402,8 +459,20 @@ def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], da
                     "reference": slot["reference"].get(run_id),
                     "not_evaluated": not_evaluated,
                 })
+            history = _merged_by_time(history, elsewhere)
             if not history:
                 continue
+            # THE NEWEST RESULT IS CURRENT, whichever run recorded it (#253):
+            # the dataset's newest measured run unless a result recorded
+            # under another table's run is newer.
+            current_value = slot["by_run"].get(latest_run, 0)
+            current_status = slot["status_by_run"].get(latest_run)
+            own_at = _instant(slot["at"].get(latest_run))
+            newer = [h for h in elsewhere
+                     if own_at is None or _instant(h["recorded_at"]) > own_at]
+            if newer:
+                newest = max(newer, key=lambda h: _instant(h["recorded_at"]))
+                current_value, current_status = newest["value"], newest["status"]
             engine_short = ENGINE_SHORT.get(engine, engine)
             lifecycle = lifecycle_by_id.get(slot["check_id"])
             checks_out.append({
@@ -426,8 +495,10 @@ def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], da
                 # bound of that kind", NOT "zero tolerance".
                 "warn": slot["warn"],
                 "fail": slot["fail"],
-                "current": slot["by_run"].get(latest_run, 0),
-                "current_status": slot["status_by_run"].get(latest_run),
+                "current": current_value,
+                "current_status": current_status,
+                "between": (_between(slot["check_id"], reads_by_check_id)
+                            if col == CROSS_TABLE_PSEUDO_COLUMN else None),
                 "previous": slot["by_run"].get(prev_run, 0),
                 "history": history,
                 "note": f"Computed by {engine} against this run's real data — not a fabricated figure.",
@@ -651,7 +722,7 @@ def build_datasets(collection_id: str) -> list[dict]:
                 for d in coll.datasets}
     share_cross_table_results(results, by_table)
     return [build_one_table(coll, d, by_table[d.table], own_runs(manifest, d.table), dataset_stats,
-                            lifecycle_by_id)
+                            lifecycle_by_id, all_runs=manifest)
             for d in coll.datasets]
 
 

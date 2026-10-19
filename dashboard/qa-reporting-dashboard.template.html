@@ -716,6 +716,9 @@ span.scenario-subject-label{display:inline-block; margin:0 6px 0 0;}
 .scope-check .label{min-width:0;}
 .scope-check .label .nm{font-weight:600; font-size:13px;}
 .scope-check .label .tr{font-size:11px; color:var(--ink-faint); font-family:"IBM Plex Mono",monospace; margin-left:8px;}
+/* #253: the tables a cross-table check is between, after its name. */
+.scope-check .label .bt{font-size:12.5px; color:var(--ink-muted); margin-left:8px;}
+.scope-check .label .bt:empty{display:none;}
 .red-promoted{display:inline-flex; flex-direction:column; align-items:flex-start; gap:2px; vertical-align:top; max-width:46ch;}
 .red-promoted .rp-why{font-size:11.5px; color:var(--ink-muted); white-space:normal; line-height:1.35;}
 .scope-check .label .ds{display:block; font-size:12px; color:var(--ink-muted); margin-top:2px;}
@@ -2871,7 +2874,13 @@ function clipDatasetToInPlaceOn(d, inPlaceOnDateStr){
     // with a misleading zero/blank value.
     const checks = col.checks
       .map(ck => {
-        const history = ck.history.filter(h => eligibleRunIds.has(h.run_id));
+        // THE NEWEST RESULT, WHICHEVER RUN RECORDED IT (post-build-review
+        // #253, Keith 2026-10-19): a re-check of another table re-runs this
+        // one's cross-table checks under its own run, and the promotion
+        // gate reads that result. It counts here from the day it was
+        // recorded; the build has already placed it in time.
+        const history = ck.history.filter(h => eligibleRunIds.has(h.run_id)
+          || (h.recorded_by && h.recorded_at && assetDateStrOf(h.recorded_at) <= inPlaceOnDateStr));
         if(!history.length) return null;
         const last = history[history.length-1], prev = history.length>1 ? history[history.length-2] : last;
         // THE STATUS OF THE RUN ON SHOW, not the newest run's (dashboard UX
@@ -3467,10 +3476,7 @@ function buildDatasetsOn(inPlaceOnDateStr){
           // supply is the one that could not be read.
           ds.blocked = blanking;
           ds.status = "red";
-          (ds.columns||[]).forEach(c=>{
-            c.status = "nodata";
-            c.checks = (c.checks||[]).map(ck=> ({...ck, blockedThisPeriod:true}));
-          });
+          ds.crossTableShownWhileHeld = blockChecksWhileHeld(ds, blanking.openedAt);
         } else if(ds.noSupply){
           ds.status = "red";
         } else if(ended){
@@ -4988,6 +4994,37 @@ function crossTableSource(col, entry){
   const column = parts.length >= 3 ? parts.slice(1, -1).join(".") : null;
   const tool = String(entry.check.tool_ref || "").split(":")[0];
   return [declared && declared.name, column, tool].filter(Boolean).join(" · ");
+}
+// WHILE A TABLE'S OWN SUPPLY IS HELD (REQ-PIPE-115 criterion 11, as REQ-DASH-264
+// criterion 3 amends it, Keith 2026-10-19): its own checks read not run, and so
+// does a cross-table check with nothing recorded since the held supply was
+// received - but one that ran since, on a reading table's supply, shows what it
+// found. Never an earlier supply's result. Returns how many it shows.
+function blockChecksWhileHeld(ds, heldSince){
+  const since = Date.parse(heldSince || "") || 0;
+  let shown = 0;
+  (ds.columns||[]).forEach(c=>{
+    c.checks = (c.checks||[]).map(ck=>{
+      const last = (ck.history||[])[(ck.history||[]).length - 1];
+      const ranSince = c.scope === "cross-table" && last && last.recorded_at
+        && Date.parse(last.recorded_at) >= since;
+      if(ranSince){ shown += 1; return ck; }
+      return {...ck, blockedThisPeriod:true};
+    });
+    const live = c.checks.filter(ck=> !ck.blockedThisPeriod);
+    c.status = live.length ? rollupStatuses(live.map(checkStatus)) : "nodata";
+  });
+  return shown;
+}
+// THE TABLES A CROSS-TABLE CHECK IS BETWEEN (post-build-review #253, Keith
+// 2026-10-19): the table it is declared on, then the ones it reads -
+// "Notifications → Clients" - so the Client Register's three "Client
+// reference" checks read as three, not as one listed three times.
+function crossTableBetween(col, check){
+  const b = check && check.between;
+  if(!b) return "";
+  const nameOf = id=> ((col.datasets || []).find(d=> d.id === id) || {}).name || id;
+  return `${nameOf(b.declared_on)} → ${(b.reads || []).map(nameOf).join(", ")}`;
 }
 function collectionCrossTableSection(ag, col){
   const entries = collectionCrossTableChecks(col);
@@ -7423,12 +7460,13 @@ function renderDataset(view, agencyId, collectionId, datasetId){
   // supply's figures shown as this period's.
   const blockedBanner = ds.blocked ? `
       <div class="notice-exhausted" role="status" data-blocked="${ds.blocked.kind}">
-        <b>${escHtml(blockerLabel(ds.blocked))} — nothing is checked for this dataset ${blockerUntil(ds.blocked)}.</b>
+        <b>${escHtml(blockerLabel(ds.blocked))} — this dataset's own supply is not checked ${blockerUntil(ds.blocked)}.</b>
         <div style="color:var(--ink-muted); font-size:13.5px; margin-top:6px; max-width:70ch;">
           ${withCode(ds.blocked.reason)}<br><br>
           ${ds.blocked.kind === "agreement-refused" ? "New supplies are held and not checked" : ds.blocked.count > 1 ? `${ds.blocked.count} supplies are waiting - ${escHtml(blockerReceivedText(ds.blocked))}` : `Received <b style="display:inline">${fmtInstant(ds.blocked.openedAt)}</b>`}. Every
-          check below reads <b style="display:inline">No data</b> for this period: none of
-          them ran, and no earlier supply's result stands in for it.
+          check on this dataset's own data reads <b style="display:inline">No data</b> for this
+          period: none of them ran, and no earlier supply's result stands in for it.${ds.crossTableShownWhileHeld
+            ? " The cross-table checks did run, on the tables that read this one, and show what they found." : ""}
         </div>
       </div>` : "";
   // WAITING, BUT NOT THIS PERIOD'S OWN SUPPLY (REQ-PIPE-115 criteria 10
@@ -7644,10 +7682,14 @@ function renderDataset(view, agencyId, collectionId, datasetId){
     // nothing in the current period the column tiles roll up to "No data"
     // (Phase 5g), and a section head is a rolled-up pill like a tile. Its
     // rows keep each check's own last verdict, as a column's panel does.
-    const worst = ds.noDataInPlaceOn ? "nodata" : rollupStatuses(checks.map(checkStatus));
+    // EXCEPT A HELD TABLE'S CROSS-TABLE SECTION (REQ-DASH-264 criterion 5):
+    // rows that ran since the held receipt carry their own verdicts, and the
+    // head follows them.
+    const quiet = ds.noDataInPlaceOn && !(sc.scope === "cross-table" && ds.crossTableShownWhileHeld);
+    const worst = quiet ? "nodata" : rollupStatuses(checks.map(checkStatus));
     const rows = columns.flatMap(c=> (c.checks||[]).filter(ck=> !ck.retired).map(ck=> `
       <button class="scope-check" data-col="${columnKey(c)}" data-check="${ck.key}">
-        <span class="label"><span class="nm"></span><span class="tr"></span><span class="ds"></span></span>
+        <span class="label"><span class="nm"></span><span class="bt"></span><span class="tr"></span><span class="ds"></span></span>
         ${pill(checkStatus(ck),"sm")}
       </button>`)).join("");
     return `<div class="scope-section" data-scope="${sc.scope}">
@@ -7691,6 +7733,7 @@ function renderDataset(view, agencyId, collectionId, datasetId){
     // (rule 19 of docs/check-authoring-rules.md), and on a check card
     // it is the tool_ref line that tells them apart. Same job here.
     btn.querySelector(".tr").textContent = check.tool_ref || "";
+    btn.querySelector(".bt").textContent = crossTableBetween(col, check);
     btn.querySelector(".ds").textContent = check.description || "";
     btn.setAttribute("aria-label", `${check.name} — view current and historical run detail`);
     btn.addEventListener("click", ()=>{
@@ -9164,9 +9207,11 @@ function landOnScenarioSubject(entry, on){
   const head = !tall && el.getBoundingClientRect && document.querySelector("#view .view-head");
   if(head){
     const headTop = head.getBoundingClientRect().top;
-    // WHOLE PIXELS: a fractional height left the subject 0.375px past the
-    // fold, as TS-77b's did once.
-    const room = Math.floor(window.innerHeight - el.getBoundingClientRect().bottom);
+    // WHOLE PIXELS, AND ONE TO SPARE: a fractional height left the subject
+    // 0.375px past the fold, as TS-77b's did once, and an edge flush with the
+    // fold rounds either way with the machine's fonts - TS-78a's landed 0.28px
+    // past it on CI's (post-build-review #255).
+    const room = Math.floor(window.innerHeight - el.getBoundingClientRect().bottom) - 1;
     const back = Math.min(-headTop, room);
     if(headTop < 0 && back > 0) window.scrollBy({top: -back, behavior: "instant"});
   }

@@ -28134,7 +28134,7 @@ requirements:
     - WHERE a run's own table cannot be read because two files claim it (REQ-PIPE-105 criterion 6), THE SYSTEM SHALL raise a REQ-DASH-070 outstanding item scoped to that dataset, blocking, worded to say the table is contested, waiting for a person to choose a file, and naming both files - from recorded qa metadata only.
     - IF a run's own table cannot be read for any reason other than a hold, a contest, or a load that refused the file (REQ-DASH-148), THEN THE SYSTEM SHALL treat it as a failed run naming the table, rather than recording nothing.
     - WHILE a 'held-supply' or contested outstanding item is open for a dataset as at the instant on show, THE SYSTEM SHALL count that dataset's status as RED for the period on show, stating the item's reason in words, and SHALL roll that red up to the collection and the agency like any other red, as REQ-DASH-133 criterion 4 does for a closed period with no supply.
-    - 'WHILE criterion 10 applies, THE SYSTEM SHALL show each of that dataset''s own checks for the period on show with that period''s OWN recorded result where it has one, SHALL show them as not run - the existing grey ''No data'' - where the period has no run of its own (as for a contested table of that period), and SHALL NOT carry an earlier period''s verdict forward as that period''s result. AMENDED 2026-10-05 (Keith): an open hold no longer blanks later periods'' real, checked results; the dataset stays red with the hold''s reason under criterion 10.'
+    - 'WHILE criterion 10 applies, THE SYSTEM SHALL show each of that dataset''s own checks for the period on show with that period''s OWN recorded result where it has one, SHALL show them as not run - the existing grey ''No data'' - where the period has no run of its own (as for a contested table of that period), and SHALL NOT carry an earlier period''s verdict forward as that period''s result. AMENDED 2026-10-05 (Keith): an open hold no longer blanks later periods'' real, checked results; the dataset stays red with the hold''s reason under criterion 10. AMENDED 2026-10-19 (Keith) by REQ-DASH-264 criterion 3: a cross-table check that ran since the held supply''s receipt, on a reading table''s supply, shows what it found; the dataset''s own checks still read ''No data''.'
     - THE SYSTEM SHALL judge whether such an item is open as at the instant on show - open from the held or contested supply's own receipt instant, not from the instant the hold was recorded or the wall clock, until it is resolved - so that the in-place-on view reproduces what a reader saw then.
     - THE SYSTEM SHALL have a real-browser test, against the built dashboard, in which one dataset has a held supply and another a contested table, asserting that each dataset reads red with its reason, that the red rolls up to its collection and agency, and that none of its own checks reads as passing for that period.
     - WHERE a cross-table check reads a table whose supply is held or contested, and the run reading it is of an arrival received with that supply (same delivery or same receipt instant) or finds that table contested for its own period, THE SYSTEM SHALL record that check as not evaluated, red, in the run of the dataset the check belongs to, giving held or contested as the reason and naming the supply.
@@ -34575,12 +34575,7 @@ requirements:
       - "2026-10-19: TS-42a, TS-42b and TS-80's Expect lines written in plans/supply-model.md from the bootstrap of that day, and REQ-GEN-136's unmet entry for criterion 3 cleared naming TS-42 (criterion 9)."
       - "Selected suites: tests/test_emergency_department.py, test_collections_registry.py, test_generator_providers.py, test_correction_claims.py, test_scripted_corrections.py, test_participation_gap.py, test_scenario_links.py, test_scenario_injection.py, test_generate_cp_runs.py, test_turn_off.py, test_agreement_freeze.py, test_bootstrap.py, test_correction_replay.py, test_correction_apply.py, test_evidently_reads_its_entry.py, test_hierarchy.py, test_validate_schedule.py, test_inheritance.py and test_generate_to_target.py: '4 failed, 714 passed, 316 warnings in 145.32s' with -m 'not needs_deployment', on branch ed-build at 7da8773 plus an uncommitted SCENARIOS.md and plans/morning-reports.md, 2026-10-19 (Perth). The four failures: test_scenario_injection.py::TestTheInjectedSetItself::test_every_injection_names_a_scenario_the_register_marks_for_injection (TS-57a is not in the register), test_generator_providers.py::TestOneDriverForEveryCollection::test_a_third_collections_history_is_written_by_the_shared_driver and ::test_a_regeneration_overwrites_rather_than_accumulates (correction_claims.check_written raises ScheduleConfigError on the fake collection's calendar-less dataset), and test_bootstrap.py::TestItDoesNotRebuildWhatIsAlreadyThere::test_force_rebuilds_anyway (the real scripted keep of TS-59a refused over an empty history). tests/test_cp_pair.py, test_runway.py, test_target_agreement.py, test_calendar_move_pin.py, test_census.py, test_delivery_boundary.py, test_collection_defaults.py, test_cli_pipeline.py, test_collection_cli.py, test_cli_at_thirty_collections.py, test_common_helpers.py, test_cli_dashboard.py, test_run_evidently_cp_real.py, test_bootstrap_equivalence.py, test_publish.py, test_embed_dashboard_data.py, test_build_dashboard_data.py, test_check_lifecycle.py and test_validate_requirements.py: '409 passed, 393 warnings in 121.21s' with -m 'not needs_deployment', the same tree, 2026-10-19 (Perth). TestTheContestedClientRegisterPairs, TestAScenarioInAGrownQuarter, TestRefusals156 and tests/test_cp_pair.py passed."
       - "2026-10-19 bootstrap from empty (scratch database, 1464s): TS-80's pair was settled by the scripted person at 11:00 AWST on 2 November 2020 (choose-file 401, cp_clients_TEST.csv rejected 402, cp_clients.csv the supply). The re-check it owed, cp_clients__202011010820000800__1__r1, ran at that instant and the gate promoted the supply (403, 03:00:03 UTC). The knock-on re-evaluated the three readers and promoted them at the same instant (owed runs 262 to 265, cleared by 03:00:04; decisions 404 to 406), after post-build-review #251's fix. The page reads 'Two files for one table' on 1 November 2020 and 'Settled · Two files for one table — settled by Robin Hale, 11:00am Monday, 2 November 2020' from the next day; TS-42's later file supersedes its pair on 29 November 2019 (356) and is promoted on 5 December (359), the readers re-evaluated then (owed runs 224 to 227)."
-    unmet_criteria:
-      - criterion: "Criterion 13, on the page - the readers re-checked by the knock-on from the settlement's asset day."
-        why: "On the 2026-10-19 bootstrap the decision log meets it - the knock-on re-evaluated and promoted the three readers at the settlement (owed runs 263 to 265, decisions 404 to 406) - but the page does not: the readers' cross-table column still reads red from 2 November 2020 until 2021-Q1's supply, because the re-checked relationship results are recorded under cp-clients' re-check run (cp_clients__202011010820000800__1__r1) and the page shows each reader's own arrival run (3 contested fails). For Keith."
-        owner: "nobody yet - Keith to decide"
-        blocked_by:
-          unowned: true
+      - "2026-10-19: criterion 13 met on the page by REQ-DASH-264 (post-build-review #253, Keith's option (a)) - on the bootstrap of that day the three readers' Client reference reads green from the settlement (Notifications on 3 November 2020), the re-check's result shown though recorded under cp-clients' run; tests/test_dashboard_e2e.py::TestACrossTableCheckOnTS80 (2 passed)."
   - id: REQ-PIPE-163
     title: A person can place a held supply into a period, from the terminal
     date_written: '2026-10-07'
@@ -39484,3 +39479,87 @@ requirements:
       `mothman supply corrections`. The asset-level queue had shown the raw dates all along - no test looked there.'
     - 'REJECTED: adding the correction to `mothman supply queue` - Keith named the page''s list only; the terminal
       already has the TUI''s "Calendar corrections awaiting confirmation" menu and `mothman supply corrections`.'
+  - id: REQ-DASH-264
+    title: A cross-table check shows its newest result, names its tables, and shows on a held table's page
+    date_written: '2026-10-19'
+    story: As someone reading a dataset's page, I want each cross-table check to show the newest result anyone
+      recorded for it, to say which two tables it is between, and to show what it found even while this table's
+      own supply is waiting on a person, so that the page agrees with the promotion gate and tells me which
+      relationship is at fault.
+    moscow: must
+    status: in_progress
+    source: 'Keith, 2026-10-19, walking TS-80 through post-build-review #253 with screenshots: option (a) - keep a
+      cross-table check on the page of every table it reads (REQ-QAC-037 criteria 6 and 7, "counts against both"),
+      label each row with its tables, and show each check''s latest result "whether it was run by its own arrival or
+      by some other arrival"; then option 2 for a held table, with the banner wording approved as drafted. Drafted
+      in the main session.'
+    signed_off:
+      by: Keith
+      date: '2026-10-19'
+    acceptance_criteria:
+    - THE SYSTEM SHALL show on a dataset page, for each check, the newest result recorded for that dataset on or
+      before the in-place-on date, whichever table's run recorded it - the result the promotion gate reads - so a
+      re-check of one table that re-runs another's cross-table checks changes the other table's page from the day it
+      was recorded.
+    - THE SYSTEM SHALL name on every cross-table row the dataset the check is declared on and the datasets it reads,
+      as "<declared on> → <reads>", so a table read by several others shows each relationship as its own check.
+    - WHILE REQ-PIPE-115 criterion 10 applies to a dataset, THE SYSTEM SHALL show each cross-table check on that
+      dataset's page with its result where one was recorded at or after the held supply's receipt, and as not run
+      (the existing grey 'No data') where none was - never an earlier supply's result. Its own column and table checks
+      keep reading 'No data' (REQ-PIPE-115 criterion 11).
+    - 'WHILE criterion 3 shows at least one cross-table result, THE SYSTEM SHALL word the held banner "<reason> —
+      this dataset''s own supply is not checked <until>." and end its body "Every check on this dataset''s own data
+      reads No data for this period: none of them ran, and no earlier supply''s result stands in for it. The
+      cross-table checks did run, on the tables that read this one, and show what they found."; where it shows none,
+      the banner keeps its first sentence''s new wording and leaves the last sentence out.'
+    - THE SYSTEM SHALL leave the held dataset's own status red by REQ-PIPE-115 criterion 10, the cross-table results
+      changing only the cross-table section's own pill.
+    - THE SYSTEM SHALL be tested in a real browser on the bootstrapped history with TS-80 - cp-notifications' Client
+      reference reading green on 3 November 2020, and cp-clients' cross-table rows reading red and its own column
+      checks 'No data' on 1 November 2020.
+    non_functional_requirements:
+    - The build carries each result's recording time and recording run's dataset, never supply rows (CLAUDE.md, a
+      build reads recorded QA results only).
+    - At thirty collections a table read by many others lists one labelled row per relationship per tool; the label
+      is what keeps that list readable.
+    dependencies:
+    - REQ-QAC-037
+    - REQ-PIPE-115
+    - REQ-PIPE-105
+    - REQ-GEN-203
+    linked_tests:
+    - tests/test_build_dashboard_child_protection.py::TestACrossTableResultFromAnotherTablesRunReachesThePage
+    - tests-js/cross-table-elsewhere.test.js
+    - tests/test_dashboard_e2e.py::TestACrossTableCheckOnTS80
+    - tests/test_dashboard_e2e.py::TestAHeldOrContestedDatasetReadsRed::test_none_of_its_own_checks_reads_as_passing
+    implemented_by:
+    - pipeline/build_dashboard_data.py::build_one_table
+    - pipeline/build_dashboard_data.py::_merged_by_time
+    - pipeline/build_dashboard_data.py::_between
+    - dashboard/qa-reporting-dashboard.template.html::clipDatasetToInPlaceOn
+    - dashboard/qa-reporting-dashboard.template.html::crossTableBetween
+    - dashboard/qa-reporting-dashboard.template.html::blockChecksWhileHeld
+    evidence:
+    - >-
+      2026-10-19, on a scratch database bootstrapped that day: TS-80 on the built page - cp-notifications' three
+      Client reference rows read "Notifications → Client Register" and green on 3 November 2020; cp-clients on 1
+      November reads red with the new banner, its own checks 'No data', its nine Client reference rows labelled by
+      reader and red, and its cross-table section pill red (tests/test_dashboard_e2e.py, TestACrossTableCheckOnTS80
+      and test_none_of_its_own_checks_reads_as_passing, 3 passed). tests/test_build_dashboard_child_protection.py (10
+      passed); tests-js/cross-table-elsewhere.test.js with blocked-dataset and agreement-refusal (42 passed).
+    decisions:
+    - 'Option (a) over (b), Keith 2026-10-19: under (b), each page showing only the checks declared on its own table,
+      the Client Register''s page would have no cross-table section and a broken Client Register would never turn
+      it red - only its readers - though in TS-80 the fault was entirely in the Client Register file.'
+    - 'The nine "Client reference" rows on the Client Register''s page were never duplicates: they are three
+      checks (Notifications, Investigations, Placements -> Client Register), each run by three tools. Labelling was
+      the fault, not double display (#121 D7 had already labelled the collection page''s section, not the dataset
+      page''s).'
+    - 'A result recorded under another table''s run is placed in a check''s history by the time it was recorded,
+      after the last of the dataset''s own entries recorded no later; the dataset''s own entries keep their receipt
+      order. Per-run statuses (supply history rows) stay keyed by run, so a supply''s own verdict is not changed by
+      a later re-check of a neighbour.'
+    - 'Option 2 for a held table, Keith 2026-10-19: the cross-table checks did run that day, on the readers'' own
+      supplies, so "No data" understated them and "none of them ran" was untrue. The guard against an earlier
+      supply''s result standing in is kept by counting only results recorded at or after the held receipt.'
+    open_questions: []

@@ -190,3 +190,57 @@ class TestTwoChecksThatShareANameStayTwoCards:
         keys = {c["check_id"]: c["key"] for c in self._cards(monkeypatch)}
         assert len(set(keys.values())) == 2
         assert "cp-placements" in keys[self._PLA]
+
+
+class TestACrossTableResultFromAnotherTablesRunReachesThePage:
+    """post-build-review #253, Keith's call 2026-10-19 (option a): a page
+    shows each check's newest result whichever run recorded it, as the
+    promotion gate already reads it. TS-80's re-check of the Client
+    Register re-ran Notifications' "Client reference" under cp-clients'
+    own run; Notifications' page left that result out and read red for
+    three months after the gate had promoted on it."""
+
+    _REF = ("data-asset-1.child-protection-family-support.child-protection."
+            "cp-notifications.cp_client_id.relationships_dbt")
+    _OWN = "cp_notifications__202011010820000800"
+    _RECHECK = "cp_clients__202011010830000800__1__r1"
+    _RUNS = [
+        {"run_id": _OWN, "run_index": 1, "delivery": "Data Extract 01 Nov 2020",
+         "received_at": "2020-11-01T08:20:00+08:00"},
+        {"run_id": _RECHECK, "run_index": 2, "delivery": "Data Extract 01 Nov 2020",
+         "received_at": "2020-11-01T08:30:00+08:00"},
+    ]
+    _STATS = {_OWN: {"row_counts": {"cp_notifications": 987}, "value_counts": {},
+                     "check_aggregates": {}}}
+
+    def _card(self):
+        results = [
+            _check(self._OWN, "cp_client_id", 40, status="fail", check_id=self._REF,
+                   check_name="dbt:relationships", run_timestamp="2020-11-01T08:20:00+08:00"),
+            _check(self._RECHECK, "cp_client_id", 0, check_id=self._REF,
+                   check_name="dbt:relationships", run_timestamp="2020-11-02T11:00:00+08:00"),
+        ]
+        table = bcd.build_one_table(
+            _CP, hierarchy.dataset_for_table("cp_notifications"), results,
+            bcd.own_runs(self._RUNS, "cp_notifications"), self._STATS, {},
+            all_runs=self._RUNS)
+        return next(c for col in table["columns"] for c in col["checks"]
+                    if c.get("check_id") == self._REF)
+
+    def test_the_result_is_in_the_checks_history_saying_where_and_when_it_was_recorded(self):
+        by_run = {h["run_id"]: h for h in self._card()["history"]}
+        assert set(by_run) == {self._OWN, self._RECHECK}
+        assert by_run[self._RECHECK]["recorded_by"] == "cp-clients"
+        assert by_run[self._RECHECK]["recorded_at"] == "2020-11-02T11:00:00+08:00"
+        assert by_run[self._OWN]["recorded_by"] is None
+        assert by_run[self._OWN]["recorded_at"] == "2020-11-01T08:20:00+08:00"
+
+    def test_the_newest_result_is_the_current_one(self):
+        card = self._card()
+        assert card["current_status"] == "green"
+        assert card["current"] == 0
+        assert card["history"][-1]["run_id"] == self._RECHECK
+
+    def test_the_card_names_the_tables_the_check_is_between(self):
+        assert self._card()["between"] == {"declared_on": "cp-notifications",
+                                           "reads": ["cp-clients"]}

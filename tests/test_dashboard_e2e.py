@@ -3967,14 +3967,18 @@ class TestAHeldOrContestedDatasetReadsRed:
         got = page.evaluate(f"""() => {{
             const ds = DATA.agencies.flatMap(a => a.collections).flatMap(c => c.datasets)
                            .find(d => d.id === "{dataset_id}");
+            // ITS OWN checks (REQ-DASH-264 criterion 3): a cross-table row
+            // that ran since, on a reading table's supply, shows what it found.
+            const own = ds.columns.filter(c => c.scope !== "cross-table");
             return {{status: ds.status,
-                     checks: [...new Set(ds.columns.flatMap(c => c.checks).map(checkStatus))],
-                     columns: [...new Set(ds.columns.map(c => c.status))]}};
+                     checks: [...new Set(own.flatMap(c => c.checks).map(checkStatus))],
+                     columns: [...new Set(own.map(c => c.status))]}};
         }}""")
         assert got["status"] == "red"
         assert got["checks"] in ([], ["nodata"]) and got["columns"] in ([], ["nodata"])
         text = " ".join(page.locator("#view").inner_text().split())
-        assert "nothing is checked for this dataset until a person resolves it" in text
+        assert "this dataset's own supply is not checked until a person resolves it" in text
+        assert "Every check on this dataset's own data reads No data for this period" in text
         assert page.locator("#col-grid .pill.green").count() == 0
 
     def test_a_held_supply_keeps_the_latest_checked_results(self, page,
@@ -5195,7 +5199,10 @@ class TestTheAsAtScenarioChips:
             assert text in " ".join(el.text_content().split())
             box = el.bounding_box()
             span = f"{box and int(box['y'])}-{box and int(box['y'] + box['height'])}px"
-            assert box and box["y"] >= 0 and box["y"] + box["height"] <= 800, (
+            # A WHOLE PIXEL INSIDE THE FOLD (post-build-review #255): an edge
+            # within a pixel of it rounds either way with the machine's fonts,
+            # and TS-78a's landed 0.28px past it on CI's.
+            assert box and box["y"] >= 0 and box["y"] + box["height"] <= 799, (
                 f"{sid}: {where} spans {span}, outside the viewport after the jump")
 
         on_screen()
@@ -5550,3 +5557,51 @@ class TestAPendingCorrectionIsANeedsActionItem:
 
     def test_not_listed_before_it(self, clean_page, built_dashboard_html):
         assert self._items(clean_page, built_dashboard_html, "2026-09-23") == []
+
+
+class TestACrossTableCheckOnTS80:
+    """REQ-DASH-264 criterion 6, on the bootstrapped history (post-build-review
+    #253, Keith 2026-10-19). TS-80: two Client Registers on 1 November 2020,
+    settled at 11:00 on 2 November, the settlement's re-check re-running the
+    readers' Client reference under the Client Register's own run."""
+
+    AG, COL = "child-protection-family-support", "child-protection"
+
+    def _rows(self, page, html, dataset_id, on):
+        _goto(page, html, in_place_on=on, state={
+            "tier": "dataset", "agencyId": self.AG, "collectionId": self.COL,
+            "datasetId": dataset_id})
+        section = page.locator('.scope-section[data-scope="cross-table"]')
+        return [" ".join(t.split()) for t in section.locator(".scope-check").all_inner_texts()]
+
+    def test_the_readers_client_reference_is_green_after_the_settlement(
+            self, clean_page, built_dashboard_html):
+        rows = [r for r in self._rows(clean_page, built_dashboard_html, "cp-notifications",
+                                      "2020-11-03")
+                if r.startswith("Client reference")]
+        assert len(rows) == 3, rows
+        assert all("Notifications → Client Register" in r and "Green" in r for r in rows), rows
+
+    def test_the_held_register_shows_its_cross_table_rows_red_and_its_own_checks_not_run(
+            self, clean_page, built_dashboard_html):
+        rows = self._rows(clean_page, built_dashboard_html, "cp-clients", "2020-11-01")
+        client_refs = [r for r in rows if r.startswith("Client reference")]
+        assert len(client_refs) == 9, rows
+        assert any("Red" in r for r in client_refs), client_refs
+        labels = clean_page.locator('.scope-section[data-scope="cross-table"] .scope-check .bt')
+        assert {t for t in labels.all_inner_texts() if t.startswith(("Notif", "Invest", "Place"))} == {
+            "Notifications → Client Register", "Investigations → Client Register",
+            "Placements → Client Register"}
+        own = clean_page.evaluate("""() => {
+            const ds = DATA.agencies.flatMap(a => a.collections).flatMap(c => c.datasets)
+                           .find(d => d.id === "cp-clients");
+            return [...new Set(ds.columns.filter(c => c.scope !== "cross-table")
+                                .flatMap(c => c.checks).map(checkStatus))];
+        }""")
+        assert own == ["nodata"], own
+        text = " ".join(clean_page.locator("#view").inner_text().split())
+        assert ("The cross-table checks did run, on the tables that read this one, "
+                "and show what they found.") in text
+        # Criterion 5: the section's own pill follows its rows.
+        head = clean_page.locator('.scope-section[data-scope="cross-table"] .head .pill')
+        assert "Red" in head.inner_text(), head.inner_text()

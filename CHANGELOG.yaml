@@ -159,6 +159,14 @@ releases:
               A mothman command that needs --collection now says so and
               stops, where `mothman supply queue` and eight others used to
               run without one and end in a traceback.
+          - headline: A re-check of one table now reaches the tables that read it
+            components: ["Dashboard UI"]
+            description: >
+              A page shows each check's newest result, whichever table's run
+              recorded it, so a reader turns green the day a fixed table is
+              re-checked rather than at its own next supply. While a table's
+              own supply waits on a person, its cross-table checks show what
+              they found on the tables that read it.
       - category: Improved
         items:
           - headline: Corrections to confirm are on the dataset's page
@@ -168,6 +176,12 @@ releases:
               one of the things waiting for a person on each dataset it
               affects, counted once in its collection and agency, from the
               day it is dated.
+          - headline: Cross-table checks say which tables they are between
+            components: ["Dashboard UI"]
+            description: >
+              Each cross-table row names the table it is checked on and the
+              one it reads, so a table read by three others shows three
+              relationships rather than one check listed three times.
   - date: "2026-10-18"
     summary: >
       Every collection's supplies are now generated, run, summarised and

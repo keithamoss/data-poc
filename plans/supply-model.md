@@ -3669,8 +3669,8 @@ cp_clients.csv follows alone on 29 November at 10:00, after due and before
 2020-Q1's window opens, built green (REQ-GEN-184) after one green lead-in
 quarter (2019-Q3) and before a green one (2020-Q1).*
 **Expect** (bootstrap of 2026-10-19): on 1 November 2019 cp-clients reads
-"Two files for one table — nothing is checked for this dataset until a
-person resolves it", naming cp_clients.csv (received 8:30am) and
+"Two files for one table — this dataset's own supply is not checked until
+a person resolves it" (REQ-DASH-264), naming cp_clients.csv (received 8:30am) and
 cp_clients_v2.csv, and the gate refuses its promotion.
 **Breaks as**: one of the two files taken as the quarter's supply, or the
 three readers' cross-table checks evaluated against either.
@@ -3708,10 +3708,11 @@ table — settled by Robin Hale, 11:00am Monday, 2 November 2020",
 cp_clients_TEST.csv rejected and cp_clients.csv the quarter's supply. The
 re-check it owed runs at 11:00 and the gate promotes it; the knock-on
 re-evaluates the three readers and promotes them at the same instant
-(post-build-review #251). NOT YET ON THE PAGE: the readers' cross-table
-column still reads red until 2021-Q1's supply, because the re-checked
-relationship results are recorded under cp-clients' re-check run - noted
-for Keith.
+(post-build-review #251). On the page (REQ-DASH-264): on 1 November
+cp-clients' own checks read "No data" and its cross-table rows red, each
+named "<reader> → Client Register", with the banner saying the cross-table
+checks did run; from 2 November the readers' Client reference reads green,
+the re-check's result shown though it was recorded under cp-clients' run.
 **Breaks as**: the test rows checked as the quarter's supply, the readers
 left contested after the settlement, or the file named by sorted name
 rather than by receipt position.
