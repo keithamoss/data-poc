@@ -256,22 +256,30 @@ class TestTheCorpusIsWorthComparing:
 
 class TestASharedCalendarIsReplayedInReceiptOrder:
     """REQ-PIPE-262 criteria 12 and 14, in both modes: Emergency Department's
-    2015-Q4 gap inherits its 2015-Q3 supply, because that supply was promoted
-    before Child Protection's 2015-Q4 delivery opened the quarter."""
+    2015-Q4 gap inherits ED's own newest supply, because that supply was
+    promoted before Child Protection's 2015-Q4 delivery opened the quarter.
+    WHICH PERIOD it sits in is the cut-down corpus's business - without ED's
+    earlier quarters its 22 July supply files into 2015-Q2's open slot - so
+    the test names the supply, not the period."""
 
     @staticmethod
-    def _gap(history):
+    def _rows(history):
         cols, rows = history["qa.decision"]
-        at = {c: cols.index(c) for c in ("dataset_id", "to_slot", "action", "stands_on")}
+        at = {c: cols.index(c) for c in ("dataset_id", "to_slot", "action", "supply")}
         return [{c: json.loads(row[i]) for c, i in at.items()} for row in rows
-                if json.loads(row[at["dataset_id"]]) == "ed-presentations"
-                and json.loads(row[at["to_slot"]]) == "2015-Q4"]
+                if json.loads(row[at["dataset_id"]]) == "ed-presentations"]
 
     @pytest.mark.parametrize("mode", ["sequential", "parallel"])
-    def test_eds_gap_inherits_its_2015_q3_supply(self, both, mode):
+    def test_eds_gap_inherits_its_newest_supply(self, both, mode):
         history = dict(zip(("sequential", "parallel"), both))[mode]
-        found = self._gap(history)
-        assert [(e["action"], e["stands_on"]) for e in found] == [("inherit", "2015-Q3")], found
+        rows = self._rows(history)
+        promoted = [r for r in rows if r["action"] == "promote"]
+        assert promoted, "the corpus promoted no ED supply - the test would prove nothing"
+        # BY ITS ID, which embeds the receipt instant: the comparison snapshot
+        # blanks a rule's effective_at (qa_tools/common/equivalence.py).
+        newest = max(r["supply"] for r in promoted)
+        gap = [(r["action"], r["supply"]) for r in rows if r["to_slot"] == "2015-Q4"]
+        assert gap == [("inherit", newest)], (gap, newest)
 
 
 class TestParallelRecordsTheSameHistory:
