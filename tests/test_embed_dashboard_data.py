@@ -326,12 +326,19 @@ def test_a_dataset_with_no_calendar_is_recorded_as_having_none(monkeypatch, tmp_
 def test_the_embedded_dates_come_from_the_authored_calendar_rather_than_a_rule(
         monkeypatch, tmp_path):
     """Criterion 2, positively. The quarterly calendar's own anchor is
-    February, so its periods must be Feb/May/Aug/Nov - a rule producing
+    February, so its periods are Feb/May/Aug/Nov - a rule producing
     calendar quarters would give Jan/Apr/Jul/Oct, which is the exact
-    mistake this replaces."""
+    mistake this replaces. AUTHORED DATES ARE THE REFERENCE, not a month
+    set: REQ-GEN-205's correction authors 2013-Q4 and 2014-Q3 in October
+    and July, and the embedded dates must be exactly those."""
+    from qa_tools.common import schedule
+
     sequences = _run_embed_and_extract_period_sequences(monkeypatch, tmp_path)
-    months = {int(p["date"][5:7]) for p in sequences["calendars"]["quarterly"]}
-    assert months <= {2, 5, 8, 11}, f"quarterly periods fell outside the authored months: {months}"
+    embedded = {(p["period"], p["date"][:10]) for p in sequences["calendars"]["quarterly"]}
+    authored = {(p.name, p.date.isoformat())
+                for v in schedule.calendar("quarterly").versions for p in v.periods}
+    assert embedded and embedded <= authored, sorted(embedded - authored)[:5]
+    assert {int(d[5:7]) for _n, d in embedded} >= {2, 5, 8, 11}
 
 
 def test_nothing_that_has_not_begun_is_embedded(monkeypatch, tmp_path):

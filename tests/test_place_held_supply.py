@@ -500,8 +500,13 @@ class TestThePeriodChooser:
         earlier = placing.period_choices("cp-carers", at, {}, page=-1)
         later = placing.period_choices("cp-carers", at, {}, page=1)
         assert first.has_earlier and first.has_later
-        assert min(r.period for r in earlier.rows) < min(r.period for r in first.rows)
-        assert max(r.period for r in later.rows) > max(r.period for r in first.rows)
+
+        # A RUN OF QUARTERS OWED NOTHING is one row with no period to choose
+        # (cp-carers' 2022-Q1 and Q2 turn-off, TS-63), so it is not compared.
+        def periods(choices):
+            return [r.period for r in choices.rows if r.period is not None]
+        assert min(periods(earlier)) < min(periods(first))
+        assert max(periods(later)) > max(periods(first))
 
 
 class TestAHeldSupplyCanBeRejected:

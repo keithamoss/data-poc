@@ -1753,7 +1753,7 @@ INJECTIONS: tuple[Injection, ...] = (
         dataset_id="birth-registrations",
         anchor=-1,
         config="daily, due 14:00 with 1 hour's grace; the claim window widens from 4 "
-               "to 6 hours from 2026-09-25 by correction REQ-GEN-205-TS62, dated "
+               "to 6 hours from 2026-09-25 by correction REQ-GEN-205-WINDOW, dated "
                "2026-09-24 and left awaiting confirmation. That day's supply arrives "
                "at 09:00 - inside the corrected window, which opens at 08:00, and "
                "outside the old one, which opened at 10:00.",
@@ -1761,8 +1761,8 @@ INJECTIONS: tuple[Injection, ...] = (
             ExtraArrival(0, "09:00", None,
                          "2026-09-25's supply, inside the six-hour window only"),
         ),
-        correction="REQ-GEN-205-TS62",
-        links=(Link("TS-62", 1, correction_event("REQ-GEN-205-TS62"), HISTORY_END),),
+        correction="REQ-GEN-205-WINDOW",
+        links=(Link("TS-62", 1, correction_event("REQ-GEN-205-WINDOW"), HISTORY_END),),
     ),
     # TWO FILES FOR ONE TABLE (REQ-GEN-196), one pair per way a person can
     # settle it (REQ-PIPE-193's choose-file). Each is ONE delivery whose two

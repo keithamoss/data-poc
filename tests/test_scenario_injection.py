@@ -339,15 +339,22 @@ class TestNothingSaysScenarioOnTheDashboard:
 
         from qa_tools.common import scenarios
 
+        from qa_tools import collections
+
         ids = {s.id for s in scenarios.parse_register()}
-        pattern = re.compile(r"\bTS-[0-9]+[a-z]?\b")
+        # WITH OR WITHOUT ITS HYPHEN: a change reference spelt "...-TS62"
+        # names the scenario as surely as "TS-62" does.
+        pattern = re.compile(r"\bTS-?([0-9]+[a-z]?)\b")
         root = Path(__file__).resolve().parent.parent
-        for name in ("rs_civil-registration_dashboard.json",
-                     "cpfs_child-protection_dashboard.json"):
+        # EVERY REGISTERED COLLECTION'S FILE (REQ-PIPE-240): two names written
+        # here left Emergency Department's unread, and it carried two.
+        names = [c.dashboard_file for c in collections.all_collections()]
+        assert len(names) >= 3, names
+        for name in names:
             path = root / "reports" / name
             if not path.is_file():
                 pytest.skip(f"{name} not built - run `mothman dashboard build-data`")
-            found = {m for m in pattern.findall(path.read_text()) if m in ids}
+            found = {f"TS-{m}" for m in pattern.findall(path.read_text())} & ids
             assert not found, (
                 f"{name} carries scenario id(s) {sorted(found)} - an injected "
                 f"scenario must not be marked as one in what the dashboard renders")

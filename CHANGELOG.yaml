@@ -143,6 +143,16 @@ releases:
               Child Protection's carers are turned off for two quarters, so you
               can see a late supply still counted, a supply in the gap held,
               and the quarters between owing nothing.
+      - category: Fixed
+        items:
+          - headline: Owed-nothing quarters stand on the right supply
+            components: ["Pipeline & publishing", "Data generation"]
+            description: >
+              In the synthetic history, a Child Protection dataset that owes
+              nothing in a quarter now stands on its own latest supply, not an
+              older one picked because Emergency Department was processed
+              first. Collections that share a calendar are now replayed
+              together, in the order their files arrived.
   - date: "2026-10-18"
     summary: >
       Every collection's supplies are now generated, run, summarised and

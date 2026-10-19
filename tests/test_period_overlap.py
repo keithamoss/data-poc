@@ -72,7 +72,13 @@ class TestEveryCalendarPeriodCounts:
         owed = [p for p in schedule.periods_for_dataset("cp-case-workers") if p.expected]
         all_periods = schedule.periods_for_calendar(calendar.name)
         assert len(all_periods) > len(owed), "precondition: it skips some quarters"
+        # A WINDOW WIDER THAN THE CALENDAR'S WIDEST GAP, so every pair overlaps:
+        # REQ-GEN-205's corrected dates leave 104 days between 2013-Q4 and
+        # 2014-Q1, which a fixed 100 days no longer covered.
+        dates = sorted(p.date for p in all_periods)
+        widest = max(b - a for a, b in zip(dates, dates[1:]))
         monkeypatch.setattr(schedule, "claim_window",
-                            lambda dataset_id, override=None, on=None, agreement=None: timedelta(days=100))
+                            lambda dataset_id, override=None, on=None, agreement=None:
+                            widest + timedelta(days=1))
         pairs = {(o.earlier, o.later) for o in period_overlap.overlaps_for("cp-case-workers")}
         assert len(pairs) == len(all_periods) - 1

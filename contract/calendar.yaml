@@ -237,7 +237,7 @@ calendars:
         approver: fpycnkgvmt@privaterelay.appleid.com
         reason: >-
           A fictional correction made to demonstrate the correction route on this
-          synthetic asset (TS-57 to TS-61): five of Emergency Department's 2013-2015
+          synthetic asset: five of Emergency Department's 2013-2015
           quarter dates were recorded wrongly, and each correction shows a
           different consequence for the supplies already filed.
         changes:
@@ -340,13 +340,13 @@ calendars:
         cadence:
           rule: daily
     corrections:
-      - change_reference: REQ-GEN-205-TS62
+      - change_reference: REQ-GEN-205-WINDOW
         date: "2026-09-24"
         author: Claude (for Keith)
         approver: fpycnkgvmt@privaterelay.appleid.com
         reason: >-
           A fictional correction made to demonstrate a correction merged and left
-          awaiting confirmation on this synthetic asset (TS-62): Birth
+          awaiting confirmation on this synthetic asset: Birth
           Registrations' claim window widens from four hours to six from
           2026-09-25.
         changes:
@@ -593,7 +593,7 @@ datasets:
           effective_to: "2021-12-31"
           turned_off_reason: >-
             A fictional pause, made to demonstrate a dataset turned off and back on
-            in this synthetic asset (TS-63): the supplier stops sending the Carer
+            in this synthetic asset: the supplier stops sending the Carer
             Register for two quarters while it replaces its carer system.
           changelog:
             - date: "2026-10-15"
@@ -632,7 +632,7 @@ datasets:
         approver: fpycnkgvmt@privaterelay.appleid.com
         reason: >-
           A fictional correction made to demonstrate turning a dataset off and back
-          on in this synthetic asset (TS-63): Carer Register is not owed for 2022-Q1
+          on in this synthetic asset: Carer Register is not owed for 2022-Q1
           or 2022-Q2.
         changes:
           - item: dataset cp-carers participation 2013-01-01 effective_to
@@ -641,7 +641,7 @@ datasets:
               effective_to: "2021-12-31"
               turned_off_reason: >-
                 A fictional pause, made to demonstrate a dataset turned off and back on
-                in this synthetic asset (TS-63): the supplier stops sending the Carer
+                in this synthetic asset: the supplier stops sending the Carer
                 Register for two quarters while it replaces its carer system.
   - id: cp-case-workers
     participation:

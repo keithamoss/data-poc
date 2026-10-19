@@ -2225,7 +2225,7 @@ one or more component tags, and a date.
       take those. Nothing in the last month of the Birth Registrations
       history has two free days. It now sits at 2026-07-25 under a
       **one-day** version (6h on 07-25, 4h again from 07-26, both changes in
-      the one correction REQ-GEN-205-TS62). Late July lies outside the
+      the one correction REQ-GEN-205-WINDOW). Late July lies outside the
       ordinary reds' and ambers' days, and with a one-day version no other
       scenario's day falls under a window it was not built for. What it
       loses: the correction no longer governs "every supply after it", so
@@ -2268,7 +2268,7 @@ one or more component tags, and a date.
       standing on it), 1 re-judged (TS-57: late, then on time, both
       verdicts kept), and TS-59 kept by a person with its reason. TS-63:
       the January cp_carers filed late to 2021-Q4, the March one held as
-      turned off. REQ-GEN-205-TS62 left pending, as scripted.
+      turned off. REQ-GEN-205-WINDOW left pending, as scripted.
     - **THE EMERGENCY DEPARTMENT PUSH IS HELD - A DEFECT THAT NEEDS YOUR
       CALL (post-build-review #245).** With a third collection on the
       quarterly calendar, the parallel bootstrap is no longer deterministic.

@@ -29,8 +29,18 @@ def _cp_periods():
     from generator.collections import child_protection as cp_provider
 
     # THE ORIGINAL FIFTEEN (REQ-GEN-207): what TS-79 and the as-at scenarios
-    # are placed over; the grown quarters before them carry no scenario.
+    # are placed over; the grown quarters before them carry no scenario of
+    # theirs.
     return cp_provider.original_periods()
+
+
+def _cp_all_periods():
+    """EVERY GENERATED QUARTER, which the provider plans over: TS-63
+    (REQ-GEN-218) sits in the grown quarters, so planning over the original
+    fifteen alone refuses it."""
+    from generator.collections import child_protection as cp_provider
+
+    return cp_provider.generated_periods()
 
 
 def _bdm_periods():
@@ -90,8 +100,10 @@ class TestAKeptSeverityIsOnlyEverAnAmber:
     def test_a_drawn_red_on_such_a_quarter_is_refused(self, monkeypatch):
         from generator.collections import child_protection as cp_provider
 
-        periods = _cp_periods()
-        index = [p.name for p in periods].index(si.resolve(_injection("TS-76"), periods).period)
+        periods = _cp_all_periods()
+        # RUN_PLAN IS THE ORIGINAL FIFTEEN'S, so the index is into those.
+        original = [p.name for p in cp_provider.original_periods()]
+        index = original.index(si.resolve(_injection("TS-76"), periods).period)
         plan = list(cp_provider.RUN_PLAN)
         plan[index] = (plan[index][0], "red")
         monkeypatch.setattr(cp_provider, "run_plan", lambda: plan)
@@ -112,7 +124,10 @@ class TestOnePlacementCoversSeveralDays:
 
     def test_another_scenario_on_a_covered_day_is_refused(self):
         periods = _bdm_periods()
-        other = si.Injection("TS-x", "birth-registrations", -23, "cfg")  # 31 August
+        # 31 AUGUST, counted from the history's end rather than written as a
+        # number, so the history growing at its end does not move it.
+        anchor = [p.name for p in periods].index("2026-08-31") - len(periods)
+        other = si.Injection("TS-x", "birth-registrations", anchor, "cfg")
         with pytest.raises(si.CannotPlace, match="TS-x and TS-78a|TS-78a and TS-x"):
             si.no_two_scenarios_share_a_period([_injection("TS-78a"), other],
                                                {"birth-registrations": periods})
@@ -177,7 +192,7 @@ class TestWhereTheNewChildProtectionScenariosSit:
     def test_every_one_is_planned_through_the_per_delivery_check(self):
         from generator.collections import child_protection as cp_provider
 
-        resolved, _ = cp_provider._plan_injections(_cp_periods())
+        resolved, _ = cp_provider._plan_injections(_cp_all_periods())
         assert {"TS-75a", "TS-76", "TS-77a"} <= {i.scenario_id for i, _p in resolved}
 
     def test_ts_75_dirties_clients_alone(self):

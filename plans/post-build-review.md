@@ -10735,3 +10735,25 @@ twice. It deliberately did not re-find the `TypeError`.
        inheritance's own transaction is now a savepoint inside it. The insert
        uses RETURNING, so a concurrent opener that lost the race returns
        without inheriting, as before.
+
+247. **[done, 2026-10-19]** **[Testing & dev tooling]** **Scenario ids
+     reached Emergency Department's dashboard, and the test that forbids it
+     never read that file.** Found triaging the grown-history scouting run.
+     tests/test_scenario_injection.py's TestNothingSaysScenarioOnTheDashboard
+     read two dashboard files named in the test, so ED's - added since -
+     was never checked. It carried "TS-57" and "TS-61", from REQ-GEN-205's
+     correction reason ("this synthetic asset (TS-57 to TS-61)"). The same
+     wording put TS-62 on Birth Registrations' file (its correction reason)
+     and TS-63 in cp-carers' turn-off reason. The change reference
+     `REQ-GEN-205-TS62` named the scenario too, without the hyphen the test
+     looked for. Minor bug, fixed without asking.
+     - TEST FIRST: the test now reads every registered collection's
+       dashboard file (`Collection.dashboard_file`) and matches `TS-?` with
+       or without the hyphen. It failed on the tree before the fix.
+     - FIX: the scenario ids are out of the three correction or turn-off
+       reasons in contract/calendar.yaml (changelog lines, which the
+       dashboard does not render, keep theirs). The reference is renamed
+       `REQ-GEN-205-WINDOW` throughout.
+     - THE CLASS, for next time: a test listing collections by name rather
+       than reading the registry goes quietly blind when a collection is
+       added - the same lesson as REQ-TEST-249.
