@@ -3,7 +3,7 @@ same decision path a person uses (REQ-GEN-135)."""
 from __future__ import annotations
 
 import re
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -324,7 +324,9 @@ class TestAPeriodScopedScriptIsValidated:
         being used, not a regression."""
         loaded = sd.load()
         assert loaded, "precondition: the committed script has entries"
-        assert all(s.supply_index is not None for s in loaded if s.scope is None)
+        # A mark on an emptied quarter has no supply to name (Keith, 2026-10-19).
+        assert all(s.supply_index is not None for s in loaded
+                   if s.scope is None and s.operation != sd.CHAIN_MARK)
         assert all(s.supply_index is None for s in loaded if s.scope == sd.PERIOD)
 
 
@@ -599,3 +601,67 @@ class TestAnOrdinaryChainIsSettledByPeriod:
         chains = [s for s in sd.load() if s.period is not None]
         assert chains, "no chain entries in contract/scripted_decisions.yaml"
         assert all(s.period < "2023-Q1" for s in chains)
+
+
+class TestAnEmptiedQuarterIsMarkedNotSupplied:
+    """Keith, 2026-10-19: the quarters REQ-GEN-237 criterion 3 empties in
+    Child Protection are scripted as not supplied, so they read as accepted
+    gaps rather than red, with a Needs action item on every CP page. A chain
+    entry for a quarter with nothing in it: no supply, timed from when the
+    period's slot closed (a mark refuses an open period)."""
+
+    @staticmethod
+    def _mark(period, **kw):
+        return _script(**{"scenario": "", "period": period, "supply_index": None,
+                          "operation": "mark-not-supplied", "after_hours": 24, **kw})
+
+    def test_a_mark_entry_validates_without_a_supply(self):
+        assert sd.problems([self._mark("2013-Q1", dataset_id="cp-clients")],
+                           registered=set()) == []
+
+    def test_a_mark_entry_names_no_supply(self):
+        found = sd.problems([self._mark("2013-Q1", dataset_id="cp-clients", supply_index=0)],
+                            registered=set())
+        assert any("names no supply" in f for f in found), found
+
+    def test_one_entry_lists_its_periods(self, tmp_path):
+        path = tmp_path / "s.yaml"
+        path.write_text(
+            "decisions:\n"
+            "  - periods: [2013-Q1, 2013-Q3]\n"
+            "    operation: mark-not-supplied\n"
+            "    dataset: cp-clients\n"
+            "    after_hours: 24\n"
+            "    reason: \"Nothing was supplied.\"\n")
+        got = sd.load(path)
+        assert [(s.period, s.dataset_id, s.operation) for s in got] == [
+            ("2013-Q1", "cp-clients", "mark-not-supplied"),
+            ("2013-Q3", "cp-clients", "mark-not-supplied")]
+
+    def test_it_is_timed_after_the_slot_closes(self):
+        from qa_tools.common import slots
+
+        timed, why = sd._timed_chain(self._mark("2013-Q1", dataset_id="cp-clients"))
+        assert timed is not None, why
+        slot = next(s for s in slots.slots_for_dataset("cp-clients", until=date(2014, 1, 1))
+                    if s.name == "2013-Q1")
+        assert timed.at == slot.closes_at + timedelta(hours=24)
+        assert timed.supply is None and timed.period == "2013-Q1"
+
+    def test_the_committed_marks_are_exactly_the_emptied_quarters(self):
+        """From configuration alone, so they cannot go stale: every Child
+        Protection dataset's owed periods among those a correction ridden only
+        by another collection alters, and nothing else."""
+        from generator import correction_claims
+        from qa_tools.common import hierarchy, schedule
+
+        emptied = correction_claims.foreign_altered("child-protection")
+        assert emptied, "no quarter is emptied - the test proves nothing"
+        expected = set()
+        for ds in hierarchy.datasets_in_collection("child-protection"):
+            owed = {p.name for p in schedule.periods_for_dataset(ds.dataset_id,
+                                                                 until=date(2016, 1, 1))}
+            expected |= {(ds.dataset_id, p) for p in owed & emptied}
+        marks = {(s.dataset_id, s.period) for s in sd.load()
+                 if s.period is not None and s.operation == "mark-not-supplied"}
+        assert marks == expected

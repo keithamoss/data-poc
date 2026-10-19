@@ -69,6 +69,10 @@ PERIOD = "period"
 PERIOD_SCOPED_OPERATIONS = ("substitute", "de-substitute", "mark-not-supplied")
 #: What an ordinary chain's entry may decide (REQ-GEN-207): settle it.
 CHAIN_OPERATIONS = ("promote", "reject")
+#: A chain entry about a period with NOTHING filed to it (Keith, 2026-10-19):
+#: Child Protection's quarters emptied by REQ-GEN-237 criterion 3, accepted
+#: as not supplied. It names no supply and is timed from the slot's close.
+CHAIN_MARK = "mark-not-supplied"
 
 
 def label(s) -> str:
@@ -132,7 +136,7 @@ def load(path: Path | str | None = None) -> list[Script]:
         return []
     doc = config_yaml.parse(p.read_text()) or {}
     out = []
-    for raw in doc.get("decisions") or []:
+    for raw in _expanded(doc.get("decisions") or []):
         out.append(Script(
             scenario=str(raw.get("scenario") or ""), operation=str(raw.get("operation") or ""),
             dataset_id=str(raw.get("dataset") or ""), reason=str(raw.get("reason") or ""),
@@ -152,6 +156,20 @@ def load(path: Path | str | None = None) -> list[Script]:
             day_offset=int(raw.get("day_offset", 0)),
             after_hours_given="after_hours" in raw,
             period=(str(raw["period"]) if raw.get("period") is not None else None)))
+    return out
+
+
+def _expanded(entries: list[dict]) -> list[dict]:
+    """A chain entry may list `periods:` - one entry per period, in order -
+    rather than repeating itself for each (Keith, 2026-10-19)."""
+    out = []
+    for raw in entries:
+        periods = raw.get("periods")
+        if periods is None:
+            out.append(raw)
+            continue
+        rest = {k: v for k, v in raw.items() if k != "periods"}
+        out += [{**rest, "period": p} for p in periods]
     return out
 
 
@@ -274,12 +292,16 @@ def _chain_problems(s: Script, where: str) -> list[str]:
     if s.scenario:
         out.append(f"{where}: names scenario {s.scenario!r} and `period:` - an entry is about "
                    f"a scenario or an ordinary chain's period, not both")
-    if s.supply_index is None:
+    if s.operation == CHAIN_MARK:
+        if s.supply_index is not None:
+            out.append(f"{where}: a mark-not-supplied entry names no supply - its period has "
+                       f"none - drop `supply:`")
+    elif s.supply_index is None:
         out.append(f"{where}: a chain entry needs `supply: <index>` - which of the period's "
                    f"supplies, in receipt order")
-    if s.operation not in CHAIN_OPERATIONS:
-        out.append(f"{where}: an ordinary chain is settled by promote or reject, not "
-                   f"{s.operation!r}")
+    if s.operation not in CHAIN_OPERATIONS and s.operation != CHAIN_MARK:
+        out.append(f"{where}: an ordinary chain is settled by promote or reject, or an empty "
+                   f"period marked not supplied, not {s.operation!r}")
     for field_name, is_set in (("scope", s.scope is not None),
                                ("to_period", s.to_period is not None),
                                ("period_from", s.period_from != "filed"),
@@ -468,9 +490,12 @@ class Player:
 def _timed_chain(s: Script) -> tuple[Timed | None, str]:
     """An ordinary chain's instant (REQ-GEN-207): `after_hours` after the
     `supply`-th supply filed to its period, in receipt order - or None and
-    why, while that supply has not arrived."""
+    why, while that supply has not arrived. A mark-not-supplied entry's is
+    `after_hours` after its period's slot closes, from configuration alone."""
     from qa_tools.common import filing
 
+    if s.operation == CHAIN_MARK:
+        return _timed_mark(s)
     with _connect() as conn:
         rows = conn.execute(
             f"SELECT supply_id FROM {filing.CURRENT} WHERE dataset_id = ? AND slot = ?",
@@ -482,6 +507,20 @@ def _timed_chain(s: Script) -> tuple[Timed | None, str]:
                       f"{len(received)} filed so far")
     at, supply = received[s.supply_index]
     return Timed(s, at + timedelta(hours=s.after_hours), supply, s.period), ""
+
+
+def _timed_mark(s: Script) -> tuple[Timed | None, str]:
+    from qa_tools.common import schedule, slots
+
+    on = schedule.date_of(s.period, s.dataset_id)
+    if on is None:
+        return None, f"{s.dataset_id} has no period {s.period} to mark"
+    # FAR ENOUGH ON FOR THE NEXT PERIOD TO EXIST, which is what closes it.
+    slot = next((x for x in slots.slots_for_dataset(s.dataset_id, until=on + timedelta(days=400))
+                 if x.name == s.period), None)
+    if slot is None or slot.closes_at is None:
+        return None, f"{s.dataset_id}'s {s.period} slot has no closing instant yet"
+    return Timed(s, slot.closes_at + timedelta(hours=s.after_hours), None, s.period), ""
 
 
 def _timed_by_period(s: Script, placement) -> tuple[Timed | None, str]:

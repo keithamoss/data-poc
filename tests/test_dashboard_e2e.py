@@ -1930,7 +1930,18 @@ class TestAnExhaustedScheduleIsLoud:
     def test_the_count_tracks_the_in_place_on_date(self, page, dashboard_html_without_blockers):
         _goto(page, dashboard_html_without_blockers, in_place_on=self.ALL_EXHAUSTED)
         text = " ".join(page.locator(".notice-exhausted").inner_text().split())
-        assert "6 datasets cannot be filed" in text
+        # Every dataset on the quarterly calendar, from configuration, so a
+        # new quarterly collection (Emergency Department) is counted.
+        from qa_tools.common import hierarchy, schedule
+        quarterly = []
+        for ds in hierarchy.all_datasets():
+            try:
+                if schedule.calendar_for_dataset(ds.dataset_id).name == "quarterly":
+                    quarterly.append(ds.dataset_id)
+            except schedule.NoCalendarAgreed:
+                pass
+        assert len(quarterly) > 1
+        assert f"{len(quarterly)} datasets cannot be filed" in text
 
     def test_the_notice_names_the_file_to_edit(self, page, dashboard_html_without_blockers):
         _goto(page, dashboard_html_without_blockers, in_place_on=self.ONE_EXHAUSTED)
@@ -3190,7 +3201,7 @@ class TestPerDatasetArrivals:
 
     def _open_cp(self, page, html):
         _goto(page, html)
-        page.locator("#agency-grid .card").nth(1).click()
+        page.locator('#agency-grid a.card[data-agency="child-protection-family-support"]').click()
         page.wait_for_timeout(500)
 
     def test_a_collection_arriving_on_six_schedules_renders_without_console_errors(
@@ -3227,7 +3238,7 @@ class TestPerDatasetArrivals:
         the page must say so in the state it already has rather than
         rendering an empty panel."""
         _goto(clean_page, dashboard_html_with_divergent_arrivals, in_place_on="2023-01-01")
-        clean_page.locator("#agency-grid .card").nth(1).click()
+        clean_page.locator('#agency-grid a.card[data-agency="child-protection-family-support"]').click()
         clean_page.wait_for_timeout(500)
         text = clean_page.locator("#view").inner_text().lower()
         assert "no qa run within tolerance" in text or "no data" in text, text[:400]
@@ -3241,7 +3252,7 @@ class TestPerDatasetArrivals:
         before = clean_page.locator(".dataset-table tbody tr td:nth-child(5)").all_inner_texts()
 
         _goto(clean_page, dashboard_html_with_divergent_arrivals, in_place_on="2024-06-01")
-        clean_page.locator("#agency-grid .card").nth(1).click()
+        clean_page.locator('#agency-grid a.card[data-agency="child-protection-family-support"]').click()
         clean_page.wait_for_timeout(500)
         after = clean_page.locator(".dataset-table tbody tr td:nth-child(5)").all_inner_texts()
 
