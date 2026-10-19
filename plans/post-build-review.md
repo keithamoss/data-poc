@@ -10925,6 +10925,14 @@ twice. It deliberately did not re-find the `TypeError`.
        Protection dataset has a unit that is not green", no longer holds on
        the default date - check whether a later re-check result is turning
        an own red green where it should not, before touching the test.
+     - ALSO TO BUILD, Keith 2026-10-19 ("approved as worded, build it as you
+       fix the issues noted in 257"): REQ-DASH-264 criteria 7-9 - a row and
+       its panel say "Re-checked <time>, when the <table> was re-checked."
+       where the result came from another table's run, the panel says
+       "Latest result" not "Current run", and the chart dates such a point by
+       when it was recorded. Found walking TS-80: on Notifications' 3 November
+       panel nothing said where the green came from, and the chart put it on
+       1 November, the day it was red.
      NEXT: diagnose each against the requirement, fix test-first where the
-     code is wrong, then one full gate with a long timeout (it now takes over
-     30 minutes), then one push.
+     code is wrong, build criteria 7-9, then one full gate with a long
+     timeout (it now takes over 30 minutes), then one push.

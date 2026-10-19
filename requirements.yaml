@@ -39517,6 +39517,14 @@ requirements:
     - THE SYSTEM SHALL be tested in a real browser on the bootstrapped history with TS-80 - cp-notifications' Client
       reference reading green on 3 November 2020, and cp-clients' cross-table rows reading red and its own column
       checks 'No data' on 1 November 2020.
+    - 'WHERE the result a row shows was recorded under another table''s run, THE SYSTEM SHALL say so on the row, after
+      the tool name, as "Re-checked <time and day>, when the <table> was re-checked." - e.g. "Re-checked 11:00am
+      Monday, 2 November 2020, when the Client Register was re-checked." - the table named from the data. ADDED
+      2026-10-19 (Keith, approved as worded).'
+    - 'WHERE criterion 7 applies, THE SYSTEM SHALL show the same sentence in the check''s panel under its current
+      result, and SHALL label that result "Latest result" rather than "Current run". ADDED 2026-10-19 (Keith).'
+    - THE SYSTEM SHALL date a result recorded under another table's run, on the check's chart and in its table, by
+      when it was recorded, not by when that table's supply was received. ADDED 2026-10-19 (Keith).
     non_functional_requirements:
     - The build carries each result's recording time and recording run's dataset, never supply rows (CLAUDE.md, a
       build reads recorded QA results only).
