@@ -874,6 +874,7 @@ table.file-history th, table.file-history td{text-align:left; padding:6px 6px; b
 .link-btn{background:none; border:none; text-decoration:underline; text-underline-offset:2px; font-size:12px; color:var(--accent); cursor:pointer; padding:2px;}
 .trend-table{width:100%; border-collapse:collapse; font-size:12px; margin-top:10px;}
 .trend-table th,.trend-table td{padding:5px 8px; border-bottom:1px solid var(--line); text-align:left;}
+.trend-table .trend-src{font-size:11px; color:var(--ink-muted);}
 .trend-table td.num{font-family:"IBM Plex Mono",monospace; text-align:right;}
 .trend-scroll{max-height:220px; overflow-y:auto; border:1px solid var(--line); border-radius:var(--radius-sm);}
 
@@ -3609,28 +3610,59 @@ function statusColorVar(s){
 // amber come back separately because they are drawn as two lines.
 // historyStatus() refuses a status it does not recognise (criterion 9).
 function unitCounts(units){
-  const byRun = new Map();
+  // A RESULT RECORDED UNDER ANOTHER TABLE'S RUN (REQ-DASH-264; post-build-
+  // review #258 Q4, Keith 2026-10-20): recorded the same day as this
+  // dataset's own run - the same delivery - it counts on that run and
+  // replaces its verdict for the check. Recorded on a later day - a re-check -
+  // it is a point of its own on the day it was recorded, never re-dating the
+  // earlier one, and every other check carries its verdict into that point
+  // from the run before it, so the newest point still agrees with the page.
+  const extras = new Map();     // key -> {own run, date}
+  const perCheck = [];
   (units || []).forEach(u=>{
-    const worst = new Map();
     (u.checks || []).forEach(ck=>{
       if(ck.retired) return;
-      // A RESULT RECORDED UNDER ANOTHER TABLE'S RUN (REQ-DASH-264) counts on
-      // this dataset's own run it follows and replaces that run's verdict for
-      // the check, as the page shows it; it is never a run of its own.
-      const perRun = new Map(), dateOf = new Map();
-      let ownRun = null;
+      const perRun = new Map();
+      let ownRun = null, ownDay = null;
       ck.history.forEach(h=>{
-        if(!h.recorded_by){ ownRun = h.run_id; dateOf.set(h.run_id, h.date); }
-        const runId = h.recorded_by ? ownRun : h.run_id;
-        if(runId != null) perRun.set(runId, historyStatus(h, ck));
+        let key;
+        if(!h.recorded_by){
+          ownRun = h.run_id; ownDay = recordedDayOf(h); key = h.run_id;
+          if(!extras.has(key)) extras.set(key, {own: key, date: h.date, base: true});
+        } else {
+          if(ownRun == null) return;
+          const day = recordedDayOf(h);
+          key = day === ownDay ? ownRun : `${ownRun}@${day}`;
+          if(!extras.has(key)) extras.set(key, {own: ownRun, date: h.date, base: false});
+        }
+        perRun.set(key, historyStatus(h, ck));
       });
-      perRun.forEach((s, runId)=>{
-        if(s !== "red" && s !== "amber" && s !== "green") return;
-        if(!byRun.has(runId)) byRun.set(runId, {runId, date:dateOf.get(runId), counted:0, red:0, amber:0, sectionNames:[]});
-        const was = worst.get(runId);
-        if(!was || STATUS_ORDER[s] > STATUS_ORDER[was]) worst.set(runId, s);
-      });
+      perCheck.push({unit: u, perRun});
     });
+  });
+  // Each own run's later points, in date order, each carrying from the one before.
+  const chains = new Map();
+  extras.forEach((e, key)=>{ if(!e.base){ if(!chains.has(e.own)) chains.set(e.own, []); chains.get(e.own).push(key); } });
+  chains.forEach(keys=> keys.sort((a,b)=> extras.get(a).date - extras.get(b).date));
+  perCheck.forEach(({perRun})=>{
+    chains.forEach((keys, own)=>{
+      let prev = own;
+      keys.forEach(k=>{ if(!perRun.has(k) && perRun.has(prev)) perRun.set(k, perRun.get(prev)); prev = k; });
+    });
+  });
+  const byRun = new Map();
+  const worstByUnit = new Map();
+  perCheck.forEach(({unit, perRun})=>{
+    if(!worstByUnit.has(unit)) worstByUnit.set(unit, new Map());
+    const worst = worstByUnit.get(unit);
+    perRun.forEach((s, runId)=>{
+      if(s !== "red" && s !== "amber" && s !== "green") return;
+      if(!byRun.has(runId)) byRun.set(runId, {runId, date: extras.get(runId).date, counted:0, red:0, amber:0, sectionNames:[]});
+      const was = worst.get(runId);
+      if(!was || STATUS_ORDER[s] > STATUS_ORDER[was]) worst.set(runId, s);
+    });
+  });
+  worstByUnit.forEach((worst, u)=>{
     worst.forEach((s, runId)=>{
       const e = byRun.get(runId);
       e.counted++;
@@ -3981,7 +4013,7 @@ function computeChangeMarkers(history, changelog){
   return markers;
 }
 
-function trendChart(check, compareIdx, onPointClick, datasetRuns){
+function trendChart(check, compareIdx, onPointClick, datasetRuns, sourceOf){
   const id = "chart"+(chartSeq++);
   const history = check.history, warn=check.warn, fail=check.fail, unit=check.unit;
   // REQ-DASH-228: what the line measures, in words, on the axis and in the
@@ -4148,7 +4180,8 @@ function trendChart(check, compareIdx, onPointClick, datasetRuns){
       <tbody>
         ${history.slice().reverse().map(r=>{
           const st=historyStatus(r, {warn, fail});
-          return `<tr><td>${fmtDate(r.date)}</td><td class="num">${notEvaluated(r) ? "Not evaluated" : fmtMetric(r.value,unit)}</td><td>${pill(st,"sm")}</td></tr>`;
+          const src = sourceOf ? sourceOf(r) : "";
+          return `<tr><td>${fmtDate(r.date)}${src ? `<div class="trend-src">${escHtml(src)}</div>` : ""}</td><td class="num">${notEvaluated(r) ? "Not evaluated" : fmtMetric(r.value,unit)}</td><td>${pill(st,"sm")}</td></tr>`;
         }).join("")}
       </tbody>
     </table>
@@ -4998,7 +5031,12 @@ function collectionCrossTableChecks(col){
     for(const c of (ds.columns||[])){
       if(c.scope !== "cross-table") continue;
       for(const ck of (c.checks||[])){
-        if(ck.retired || seen.has(ck.check_id)) continue;
+        if(ck.retired) continue;
+        // THE DECLARING TABLE'S COPY (post-build-review #258 Q2): another
+        // holder's can be blocked while its own supply is held.
+        const was = seen.get(ck.check_id);
+        const declaring = ck.between && ck.between.declared_on === ds.id;
+        if(was && !(declaring && !(was.check.between && was.check.between.declared_on === was.dataset.id))) continue;
         seen.set(ck.check_id, {check: ck, column: c, dataset: ds});
       }
     }
@@ -5010,6 +5048,10 @@ function collectionCrossTableChecks(col){
 // said nothing about which pair of tables or which tool. The check's key
 // names the dataset it is declared on and its column; tool_ref names the tool.
 function crossTableSource(col, entry){
+  // "<declared on> → <reads>" where the build says so (post-build-review #258
+  // Q2): the key alone can lack the declaring table, and named the wrong one.
+  const between = crossTableBetween(col, entry.check);
+  if(between) return [between, String(entry.check.tool_ref || "").split(":")[0]].filter(Boolean).join(" · ");
   const parts = String(entry.check.key || "").split(".");
   const declared = (col.datasets || []).find(d=> d.id === parts[0]) || entry.dataset;
   const column = parts.length >= 3 ? parts.slice(1, -1).join(".") : null;
@@ -5044,6 +5086,14 @@ function blockChecksWhileHeld(ds, heldSince){
   ds.crossTableRowsWhileHeld = rows;
   return shown;
 }
+// THE HELD BANNER'S LAST SENTENCE (REQ-DASH-264 criterion 4; the second form
+// post-build-review #258 Q1, Keith 2026-10-20): what the cross-table rows
+// shown on a held table's page found, or that they could not run either.
+function heldCrossTableSentence(ds){
+  if(ds.crossTableShownWhileHeld) return " The cross-table checks did run, on the tables that read this one, and show what they found.";
+  if(ds.crossTableRowsWhileHeld) return " The cross-table checks could not run either: the tables that read this one need its supply first.";
+  return "";
+}
 // THE TABLES A CROSS-TABLE CHECK IS BETWEEN (post-build-review #253, Keith
 // 2026-10-19): the table it is declared on, then the ones it reads -
 // "Notifications → Clients" - so the Client Register's three "Client
@@ -5053,6 +5103,31 @@ function crossTableBetween(col, check){
   if(!b) return "";
   const nameOf = id=> ((col.datasets || []).find(d=> d.id === id) || {}).name || id;
   return `${nameOf(b.declared_on)} → ${(b.reads || []).map(nameOf).join(", ")}`;
+}
+// ONE DELIVERY, TWO COPIES (post-build-review #258 Q3, Keith 2026-10-20): a
+// cross-table check is run when either of its tables gets a supply, so a
+// delivery of both records it twice, minutes apart - and the first can be
+// "not supplied yet" where the second is the verdict. Two entries on the same
+// day where either came from another table's run are one delivery; the newer
+// is its result. A same-day resupply of the dataset's own stays two runs.
+function recordedDayOf(h){ return h.recorded_at ? assetDateStrOf(h.recorded_at) : h.run_date; }
+function sameDelivery(a, b){ return !!(a && b && (a.recorded_by || b.recorded_by) && recordedDayOf(a) === recordedDayOf(b)); }
+function deliveryCount(history){
+  return (history || []).filter((h, i, all)=> !sameDelivery(h, all[i+1])).length;
+}
+// The default "previous run": the newest result of the delivery before the
+// current one, or -1 when there is none.
+function defaultCompareIndex(history){
+  const n = (history || []).length;
+  for(let i = n - 2; i >= 0; i--) if(!sameDelivery(history[i], history[n-1])) return i;
+  return -1;
+}
+// A history row's source, where it was another table's run.
+function historySource(col, h){
+  if(!h || !h.recorded_by) return "";
+  const ds = (col.datasets || []).find(d=> d.id === h.recorded_by);
+  const name = ds ? ds.name : h.recorded_by;
+  return h.recorded_in === "re-check" ? `from the ${name}'s re-check` : `from the ${name}'s run`;
 }
 // WHERE A RESULT CAME FROM ANOTHER TABLE'S RUN (REQ-DASH-264 criteria 7 and 8,
 // Keith 2026-10-19, both sentences approved as worded): said on its row and in
@@ -5066,14 +5141,16 @@ function rowRecheckNote(col, check){
   return recheckNote(col, (check.history || [])[(check.history || []).length - 1]);
 }
 function recheckNote(col, point){
-  // NOTHING WAS CHECKED where the result could not be evaluated (post-build-
-  // review #258): it says so in its own panel, and "Checked" would be untrue.
-  if(!point || !point.recorded_by || !point.recorded_at || point.not_evaluated) return "";
+  if(!point || !point.recorded_by || !point.recorded_at) return "";
   const ds = (col.datasets || []).find(d=> d.id === point.recorded_by);
   const name = ds ? ds.name : point.recorded_by;
+  const when = point.recorded_in === "re-check" ? `when the ${name} was re-checked` : `when the ${name} supply arrived`;
+  // A RESULT THAT COULD NOT BE EVALUATED says so (post-build-review #258 Q1,
+  // Keith 2026-10-20, option a): nothing was checked, but something tried.
+  if(notEvaluated(point)) return `Could not be checked ${fmtInstant(point.recorded_at)}, ${when}.`;
   return point.recorded_in === "re-check"
-    ? `Re-checked ${fmtInstant(point.recorded_at)}, when the ${name} was re-checked.`
-    : `Checked ${fmtInstant(point.recorded_at)}, when the ${name} supply arrived.`;
+    ? `Re-checked ${fmtInstant(point.recorded_at)}, ${when}.`
+    : `Checked ${fmtInstant(point.recorded_at)}, ${when}.`;
 }
 function collectionCrossTableSection(ag, col){
   const entries = collectionCrossTableChecks(col);
@@ -7514,8 +7591,7 @@ function renderDataset(view, agencyId, collectionId, datasetId){
           ${withCode(ds.blocked.reason)}<br><br>
           ${ds.blocked.kind === "agreement-refused" ? "New supplies are held and not checked" : ds.blocked.count > 1 ? `${ds.blocked.count} supplies are waiting - ${escHtml(blockerReceivedText(ds.blocked))}` : `Received <b style="display:inline">${fmtInstant(ds.blocked.openedAt)}</b>`}. Every
           check on this dataset's own data reads <b style="display:inline">No data</b> for this
-          period: none of them ran, and no earlier supply's result stands in for it.${ds.crossTableShownWhileHeld
-            ? " The cross-table checks did run, on the tables that read this one, and show what they found." : ""}
+          period: none of them ran, and no earlier supply's result stands in for it.${heldCrossTableSentence(ds)}
         </div>
       </div>` : "";
   // WAITING, BUT NOT THIS PERIOD'S OWN SUPPLY (REQ-PIPE-115 criteria 10
@@ -8213,7 +8289,8 @@ function openCheckPanel(ag, col, ds, column, check, opts){
   // ANOTHER TABLE'S RE-CHECK (REQ-DASH-264 criterion 8): the result is the
   // latest, not this table's run, and the panel says where it came from.
   const recheckLine = recheckNote(col, currentPoint);
-  const currentLabel = recheckLine ? "Latest result" : "Current run";
+  // Keyed on where it came from, not on the sentence (#258 G1).
+  const currentLabel = currentPoint && currentPoint.recorded_by ? "Latest result" : "Current run";
   const recheckHtml = recheckLine ? `<div class="recheck-note" data-recheck-note>${escHtml(recheckLine)}</div>` : "";
   // #45 follow-up (2026-09-15, Keith's question): what does this look
   // like for a check's very first run ever - a brand new column or
@@ -8225,8 +8302,8 @@ function openCheckPanel(ag, col, ds, column, check, opts){
   // any real fixture ever hit it (every run in this project's own data
   // has 10+ history points), but a brand new onboarded dataset would
   // hit it on day one.
-  const hasCompareRun = n >= 2;
-  const defaultCompareIdx = Math.max(0, n-2);
+  const defaultCompareIdx = defaultCompareIndex(check.history);
+  const hasCompareRun = defaultCompareIdx >= 0;
   const compareIdx = (STATE.compareIdx!=null && STATE.compareIdx>=0 && STATE.compareIdx<n-1) ? STATE.compareIdx : defaultCompareIdx;
   const comparePoint = hasCompareRun ? check.history[compareIdx] : null;
   const isDefaultCompare = compareIdx === defaultCompareIdx;
@@ -8287,7 +8364,7 @@ function openCheckPanel(ag, col, ds, column, check, opts){
     const deltaWord = deltaClass==="flat" ? "No material change" : (deltaClass==="up" ? `Worse than the ${compareWord}` : `Better than the ${compareWord}`);
     const deltaUnitTag = check.unit==="%" ? "pt" : (check.unit==="hrs" ? "h" : "");
     const runOptions = check.history.slice(0, n-1).map((h,i)=>
-      `<option value="${i}" ${i===compareIdx?"selected":""}>${fmtDate(h.date)}${i===defaultCompareIdx?" (previous)":""}</option>`
+      `<option value="${i}" ${i===compareIdx?"selected":""}>${fmtDate(h.date)}${historySource(col, h) ? ` · ${escHtml(historySource(col, h))}` : ""}${i===defaultCompareIdx?" (previous)":""}</option>`
     ).join("");
     compareBlock = `
     <div class="drawer-section">
@@ -8372,8 +8449,8 @@ function openCheckPanel(ag, col, ds, column, check, opts){
 
   const trendBlock = `
     <div class="drawer-section">
-      <h4>Over time — every QA run (${n} ${pluralize(n,"run")})</h4>
-      ${trendChart(check, hasCompareRun ? compareIdx : null, n>2 ? (idx)=>setCompareIdx(ag, col, ds, column, check, idx) : null, ds.runs)}
+      <h4>Over time — every QA run (${deliveryCount(check.history)} ${pluralize(deliveryCount(check.history),"run")})</h4>
+      ${trendChart(check, hasCompareRun ? compareIdx : null, n>2 ? (idx)=>setCompareIdx(ag, col, ds, column, check, idx) : null, ds.runs, (r)=> historySource(col, r))}
     </div>`;
 
   const descBlock = `<div style="font-size:13px; color:var(--ink-muted); margin-bottom:18px;">

@@ -10956,7 +10956,7 @@ twice. It deliberately did not re-find the `TypeError`.
        own words ("Checked <time>, when the <table> supply arrived."), shown
        every time.
 
-258. **[in-progress, 2026-10-19]** **[Dashboard UI]** **REQ-DASH-264's two
+258. **[done, 2026-10-20]** **[Dashboard UI]** **REQ-DASH-264's two
      post-build critics: what "Checked" may claim, and what waits on Keith.**
      The UX critic found that on TS-80's 1 November every cross-table result
      on the Client Register's page is "could not run - two files claim
@@ -11002,6 +11002,28 @@ twice. It deliberately did not re-find the `TypeError`.
          Q3); row order on cp-clients; phone-width wrapping of the note -
          state it once per section instead?; the compare card defaults to
          "Not evaluated"; the clipped axis label and "this run" wording.
+     - KEITH'S ANSWERS, 2026-10-20 - option (a) on Q1-Q4 ("A on all three,
+       then build it all"; Q1 "Go with a, with the banner sentence"). Built,
+       test-first (eight tests in tests-js/cross-table-elsewhere.test.js, all
+       failing before), and recorded as REQ-DASH-264 criteria 4 and 7
+       (amended) and 10-12 (added):
+       - Q1: a could-not-run row reads "Could not be checked <time>, when the
+         <table> supply arrived."; when every shown result is one, the banner
+         ends "The cross-table checks could not run either: the tables that
+         read this one need its supply first." The panel's "Latest result"
+         is keyed on where the result came from (G1).
+       - Q2: the collection page's rows read "<declared on> → <reads> ·
+         tool" and take the declaring table's copy (G2).
+       - Q3: the run count and the default comparison treat two same-day
+         results, either from another table's run, as one delivery, newest
+         first; rows in the history table and compare list say where they
+         came from. Asked why there are two: a cross-table check runs when
+         either of its tables gets a supply, and the files arrive minutes
+         apart - in 312 of 2,508 same-day pairs the first was "not yet
+         supplied" and the second the verdict.
+       - Q4: another table's result counts on the dataset's own run only on
+         the same day; a later one is its own point, other checks carried
+         forward into it so the newest point still matches the page.
      - NOTED, not fixed: the build's `_merged_by_time` would raise on an
        entry with no `recorded_at` (none exist today); the build's and the
        page's "current" agree on every clipped date, and only the disabled

@@ -132,7 +132,9 @@ describe("an own re-check recorded after the date on show", () => {
 // table's run counts against the dataset's own run it follows, so the list's
 // latest count and the page agree.
 describe("unitCounts with a result from another table's run", () => {
-  it("counts it on the dataset's own run it follows, replacing that run's verdict", () => {
+  // A NEXT-DAY result is a point of its own since Keith's #258 Q4 (2026-10-20);
+  // it used to replace the earlier run's verdict.
+  it("counts a next-day result as its own point, carrying the other units forward", () => {
     dashboard = loadDashboard();
     const own = { run_id: "own_1", run_date: "2020-11-01", status: "red", recorded_at: "2020-11-01T08:20:00+08:00",
                   recorded_by: null };
@@ -143,8 +145,9 @@ describe("unitCounts with a result from another table's run", () => {
       { name: "Cross-table", scope: "cross-table", checks: [{ history: [own, later] }] },
     ];
     const counts = dashboard.window.unitCounts(units);
-    expect(counts.map((c) => c.runId)).toEqual(["own_1"]);
-    expect(counts[0]).toMatchObject({ counted: 2, red: 0, amber: 0 });
+    expect(counts.map((c) => c.runId)).toEqual(["own_1", "own_1@2020-11-02"]);
+    expect(counts[0]).toMatchObject({ counted: 2, red: 1, amber: 0 });
+    expect(counts[1]).toMatchObject({ counted: 2, red: 0, amber: 0 });
   });
 });
 
@@ -185,15 +188,6 @@ describe("a result from another table's re-check says so", () => {
 // UX critic on REQ-DASH-264 (post-build-review #258, finding 1): a result that
 // could not be evaluated checked nothing, so neither sentence may say it did.
 describe("a result that could not be evaluated", () => {
-  it("gets no 'Checked' or 'Re-checked' sentence", () => {
-    dashboard = loadDashboard();
-    const col = { datasets: [{ id: "cp-notifications", name: "Notifications" }] };
-    expect(dashboard.window.recheckNote(col, {
-      recorded_by: "cp-notifications", recorded_in: "arrival", recorded_at: "2020-11-01T08:20:00+08:00",
-      status: "red", not_evaluated: "could not run - two files claim cp_clients for this period",
-    })).toBe("");
-  });
-
   it("does not count toward the banner's 'did run' sentence", () => {
     dashboard = loadDashboard();
     const ds = { columns: [{ name: "Cross-table", scope: "cross-table", checks: [{ key: "ref", history: [
@@ -230,5 +224,105 @@ describe("a held table's cross-table row", () => {
     const ds = held("2020-08-01T08:20:00+08:00");
     expect(dashboard.window.blockChecksWhileHeld(ds, null)).toBe(0);
     expect(ds.columns[0].checks[0].blockedThisPeriod).toBe(true);
+  });
+});
+
+// Keith's four answers on post-build-review #258, 2026-10-20 - (a) on each.
+describe("Q1: a result that could not run, on a held table's page", () => {
+  const col = { datasets: [{ id: "cp-notifications", name: "Notifications" }, { id: "cp-clients", name: "Client Register" }] };
+  it("says it could not be checked, and when", () => {
+    dashboard = loadDashboard();
+    expect(dashboard.window.recheckNote(col, {
+      recorded_by: "cp-notifications", recorded_in: "arrival", recorded_at: "2020-11-01T08:20:00+08:00",
+      status: "red", not_evaluated: "could not run - two files claim cp_clients for this period",
+    })).toBe("Could not be checked 8:20am Sunday, 1 November 2020, when the Notifications supply arrived.");
+    expect(dashboard.window.recheckNote(col, {
+      recorded_by: "cp-clients", recorded_in: "re-check", recorded_at: "2020-11-02T11:00:00+08:00",
+      status: "red", not_evaluated: "could not run",
+    })).toBe("Could not be checked 11:00am Monday, 2 November 2020, when the Client Register was re-checked.");
+  });
+
+  it("gives the banner its own sentence when none of the shown checks ran", () => {
+    dashboard = loadDashboard();
+    const w = dashboard.window;
+    expect(w.heldCrossTableSentence({ crossTableRowsWhileHeld: 12, crossTableShownWhileHeld: 0 }))
+      .toBe(" The cross-table checks could not run either: the tables that read this one need its supply first.");
+    expect(w.heldCrossTableSentence({ crossTableRowsWhileHeld: 3, crossTableShownWhileHeld: 3 }))
+      .toBe(" The cross-table checks did run, on the tables that read this one, and show what they found.");
+    expect(w.heldCrossTableSentence({ crossTableRowsWhileHeld: 0, crossTableShownWhileHeld: 0 })).toBe("");
+  });
+});
+
+describe("Q2: the collection page's cross-table row", () => {
+  it("names the declaring table and what it reads, and takes the declaring table's copy", () => {
+    dashboard = loadDashboard();
+    const check = (status) => ({ check_id: "x1", key: "investigation_id.closed_case_investigation_hygiene_dbt",
+      name: "Closed-case hygiene", tool_ref: "dbt:expression", status, history: [{ run_id: "r", status }],
+      between: { declared_on: "cp-investigations", reads: ["cp-clients"] } });
+    const col = { datasets: [
+      { id: "cp-clients", name: "Client Register", columns: [{ scope: "cross-table", checks: [check("nodata")] }] },
+      { id: "cp-investigations", name: "Investigations", columns: [{ scope: "cross-table", checks: [check("red")] }] },
+    ] };
+    const [entry] = dashboard.window.collectionCrossTableChecks(col);
+    expect(entry.dataset.id).toBe("cp-investigations");
+    expect(dashboard.window.crossTableSource(col, entry)).toBe("Investigations → Client Register · dbt");
+  });
+});
+
+describe("Q3: one result per delivery for the comparison and the run count", () => {
+  const own = (d, t, s) => ({ run_id: `own_${d}`, run_date: d, status: s, recorded_by: null, recorded_at: `${d}T${t}+08:00` });
+  const other = (d, t, s, by = "cp-clients", inn = "arrival") => ({ run_id: `oth_${d}_${t}`, run_date: d, status: s,
+    recorded_by: by, recorded_in: inn, recorded_at: `${d}T${t}+08:00` });
+  const history = [own("2020-05-01", "01:00:00", "green"), other("2020-05-01", "01:08:00", "green"),
+                   own("2020-08-01", "01:00:00", "red"), other("2020-08-01", "01:05:00", "red")];
+
+  it("compares with the previous delivery's newest result, not the same delivery's other copy", () => {
+    dashboard = loadDashboard();
+    expect(dashboard.window.defaultCompareIndex(history)).toBe(1);
+  });
+
+  it("counts deliveries, not copies", () => {
+    dashboard = loadDashboard();
+    expect(dashboard.window.deliveryCount(history)).toBe(2);
+  });
+
+  it("keeps a same-day resupply of the dataset's own as two runs", () => {
+    dashboard = loadDashboard();
+    const resupplied = [own("2020-05-01", "01:00:00", "red"), { ...own("2020-05-01", "09:00:00", "green"), run_id: "own_b" }];
+    expect(dashboard.window.deliveryCount(resupplied)).toBe(2);
+    expect(dashboard.window.defaultCompareIndex(resupplied)).toBe(0);
+  });
+
+  it("labels a row that came from another table's run", () => {
+    dashboard = loadDashboard();
+    const col = { datasets: [{ id: "cp-clients", name: "Client Register" }] };
+    expect(dashboard.window.historySource(col, history[1])).toBe("from the Client Register's run");
+    expect(dashboard.window.historySource(col, other("2020-11-02", "11:00:00", "green", "cp-clients", "re-check")))
+      .toBe("from the Client Register's re-check");
+    expect(dashboard.window.historySource(col, history[0])).toBe("");
+  });
+});
+
+describe("Q4: a sparkline point is dated by when its result was recorded", () => {
+  it("counts a same-day result on the dataset's own run, and a later one as a point of its own", () => {
+    dashboard = loadDashboard();
+    const own = { run_id: "own_1", run_date: "2020-11-01", date: new Date("2020-11-01T00:00:00Z"), status: "red",
+                  recorded_by: null, recorded_at: "2020-11-01T08:20:00+08:00" };
+    const sameDay = { run_id: "oth_a", run_date: "2020-11-01", date: new Date("2020-11-01T00:00:00Z"), status: "amber",
+                      recorded_by: "cp-clients", recorded_at: "2020-11-01T08:30:00+08:00" };
+    const later = { run_id: "oth_r1", run_date: "2020-11-01", date: new Date("2020-11-02T00:00:00Z"), status: "green",
+                    recorded_by: "cp-clients", recorded_at: "2020-11-02T11:00:00+08:00" };
+    const units = [
+      { name: "a_column", checks: [{ history: [{ ...own, status: "green" }] }] },
+      { name: "Cross-table", scope: "cross-table", checks: [{ history: [own, sameDay, later] }] },
+    ];
+    const counts = dashboard.window.unitCounts(units);
+    expect(counts).toHaveLength(2);
+    // 1 November: the same-day result replaces the own run's verdict.
+    expect(counts[0]).toMatchObject({ counted: 2, red: 0, amber: 1 });
+    // 2 November: its own point, every other unit carried from the own run,
+    // so the newest point still agrees with the page.
+    expect(counts[1].date.toISOString().slice(0, 10)).toBe("2020-11-02");
+    expect(counts[1]).toMatchObject({ counted: 2, red: 0, amber: 0 });
   });
 });

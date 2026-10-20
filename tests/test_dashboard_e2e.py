@@ -5639,12 +5639,15 @@ class TestACrossTableCheckOnTS80:
         assert own == ["nodata"], own
         text = " ".join(clean_page.locator("#view").inner_text().split())
         # On 1 November the readers' results are "could not run" - two files
-        # claimed the Client Register - so nothing was checked and neither the
-        # banner nor a row may say it was (post-build-review #258, PROVISIONAL
-        # pending Keith). The rows still show what was recorded (criterion 3).
+        # claimed the Client Register. The rows say so and when, and the banner
+        # says they could not run either (post-build-review #258 Q1, Keith
+        # 2026-10-20, option a). Never "did run" or "Checked".
         assert "The cross-table checks did run" not in text
-        assert "when the Notifications supply arrived." not in text
-        assert "own supply is not checked" in text
+        assert ("The cross-table checks could not run either: the tables that read this one "
+                "need its supply first.") in text
+        assert ("Could not be checked 8:20am Sunday, 1 November 2020, when the Notifications "
+                "supply arrived.") in text
+        assert "Checked 8:20am" not in text
         # Criterion 5: the section's own pill follows its rows.
         head = clean_page.locator('.scope-section[data-scope="cross-table"] .head .pill')
         assert "Red" in head.inner_text(), head.inner_text()

@@ -39501,8 +39501,11 @@ requirements:
     - 'WHILE criterion 3 shows at least one cross-table result, THE SYSTEM SHALL word the held banner "<reason> —
       this dataset''s own supply is not checked <until>." and end its body "Every check on this dataset''s own data
       reads No data for this period: none of them ran, and no earlier supply''s result stands in for it. The
-      cross-table checks did run, on the tables that read this one, and show what they found."; where it shows none,
-      the banner keeps its first sentence''s new wording and leaves the last sentence out.'
+      cross-table checks did run, on the tables that read this one, and show what they found."; where every result it
+      shows could not be evaluated, the body ends instead "... stands in for it. The cross-table checks could not run
+      either: the tables that read this one need its supply first."; where it shows none, the banner keeps its first
+      sentence''s new wording and leaves the last sentence out. The could-not-run form AMENDED 2026-10-20 (Keith,
+      post-build-review #258 Q1, option a, "with the banner sentence").'
     - THE SYSTEM SHALL leave the held dataset's own status red by REQ-PIPE-115 criterion 10, the cross-table results
       changing only the cross-table section's own pill.
     - THE SYSTEM SHALL be tested in a real browser on the bootstrapped history with TS-80 - cp-notifications' Client
@@ -39514,11 +39517,26 @@ requirements:
       ARRIVAL as "Checked <time and day>, when the <table> supply arrived." (e.g. "Checked 8:20am Sunday, 1 November
       2020, when the Notifications supply arrived.") - the table named from the data. ADDED 2026-10-19 (Keith,
       approved as worded); the arrival sentence ADDED the same night (Keith: "Arrivals too", "Checked ... when ...
-      arrived", "Every time").'
+      arrived", "Every time"). WHERE that result could not be evaluated, the row says instead "Could not be checked
+      <time and day>, when the <table> supply arrived." (or "..., when the <table> was re-checked.") - AMENDED
+      2026-10-20 (Keith, post-build-review #258 Q1, option a).'
     - 'WHERE criterion 7 applies, THE SYSTEM SHALL show the same sentence in the check''s panel under its current
       result, and SHALL label that result "Latest result" rather than "Current run". ADDED 2026-10-19 (Keith).'
     - THE SYSTEM SHALL date a result recorded under another table's run, on the check's chart and in its table, by
       when it was recorded, not by when that table's supply was received. ADDED 2026-10-19 (Keith).
+    - 'THE SYSTEM SHALL label each cross-table row on the collection page as criterion 2 does, "<declared on> →
+      <reads>", and take its status from the copy on the table the check is declared on. ADDED 2026-10-20 (Keith,
+      post-build-review #258 Q2, option a) - the page named the wrong table where a check''s key has no table in it.'
+    - 'WHERE two results in a check''s history were recorded on the same day and either came from another table''s
+      run - one delivery checked once by each table - THE SYSTEM SHALL count them as one run in the panel''s run count,
+      compare by default against the newest result of the delivery before, and label each such row in the history
+      table and the compare list with where it came from ("from the <table>''s run", "from the <table>''s
+      re-check"). A same-day resupply of the dataset''s own stays two runs. ADDED 2026-10-20 (Keith,
+      post-build-review #258 Q3, option a).'
+    - 'THE SYSTEM SHALL count a result recorded under another table''s run, in the dataset list''s counts and
+      sparklines, on the dataset''s own run only where it was recorded the same day; one recorded on a later day is a
+      point of its own on that day, every other check carrying its verdict into it from the point before. ADDED
+      2026-10-20 (Keith, post-build-review #258 Q4, option a).'
     non_functional_requirements:
     - The build carries each result's recording time and recording run's dataset, never supply rows (CLAUDE.md, a
       build reads recorded QA results only).
@@ -39566,6 +39584,12 @@ requirements:
       Client Register's page reads "Checked 8:20am Sunday, 1 November 2020, when the Notifications supply arrived."
       (TestACrossTableCheckOnTS80, 3 passed); tests-js/cross-table-elsewhere.test.js and the whole JS suite (851
       passed).
+    - 'Criteria 4, 7 (could-not-run forms) and 10-12, Keith''s #258 answers 2026-10-20: eight tests in
+      tests-js/cross-table-elsewhere.test.js written first and failing (8 failed, 15 passed), then the JS suite 864
+      passed; tests/test_dashboard_e2e.py -k "CrossTable or TS80 or ColumnsNotGreen or Trend or Sparkline or Count or
+      Compare or Panel" 63 passed on the bootstrapped history, TS-80''s 1 November rows reading "Could not be checked
+      8:20am Sunday, 1 November 2020, when the Notifications supply arrived." under the could-not-run banner
+      sentence.'
     decisions:
     - 'Option (a) over (b), Keith 2026-10-19: under (b), each page showing only the checks declared on its own table,
       the Client Register''s page would have no cross-table section and a broken Client Register would never turn
@@ -39592,17 +39616,14 @@ requirements:
     - 'A result from another table''s run counts, in the list''s unit counts and sparkline, on the dataset''s own run
       it follows, replacing that run''s verdict for the check - so the list and the page agree (REQ-DASH-225
       criterion 18). Counted as a run of its own, it made a one-unit "run" the list''s latest.'
-    - 'PROVISIONAL, built overnight 2026-10-19 pending Keith (post-build-review #258): a result that could not be
-      evaluated still shows on its row with its recorded red (criterion 3), but gets neither criterion 7''s
-      "Checked"/"Re-checked" sentence nor counts toward criterion 4''s "did run" sentence - nothing was checked.
-      On TS-80''s 1 November every reader result is "could not run" (two files claimed the Client Register), so
-      that page shows neither; the criterion 4 and 7 examples hold on dates with evaluated results. The section
-      pill follows the rows shown, a row reading No data carries no note, and an unreadable held receipt time
-      blocks every row rather than showing older ones.'
-    open_questions:
-    - 'Keith (#258 Q1): should a could-not-run result on a held table''s page (a) show as red with its own
-      sentence, e.g. "Could not be checked <time>, when the <table> supply arrived.", or (b) count as no result
-      and read No data?'
-    - 'Keith (#258 Q2): does criterion 2''s label cover the collection page''s cross-table rows too?'
-    - 'Keith (#258 Q3): should the panel''s default "previous run" comparison and run count skip another
-      table''s result from the same delivery?'
+    - 'Keith''s four answers on post-build-review #258, 2026-10-20 - option (a) on each. Q1: a result that could not
+      be evaluated is a real outcome, not an absence - it is why the readers cannot promote either - so it shows red
+      with "Could not be checked ..." rather than reading No data, which would look like nothing having looked. The
+      overnight PROVISIONAL choice (no sentence at all) is superseded. Q3: a delivery of both tables records a
+      cross-table check twice, and in 312 of 2,508 same-day pairs on the bootstrapped history the first is "not yet
+      supplied" where the second is the verdict (the files arrive minutes apart), so the day''s newest is the one
+      compared against. Q4: carrying the other checks forward into a later point is what keeps the list''s newest
+      point agreeing with the page (#257''s defect, a one-unit "run").'
+    - 'The trend chart still plots every entry, both copies of a delivery included - only the run count, the
+      default comparison and the labels changed (Keith''s answer named those).'
+    open_questions: []
