@@ -245,10 +245,16 @@ def _scope_to_run(verified: list[dict], run_id: str) -> None:
         # column checks, which would be duplicate results that look like news.
         keep = _readers_of(moved, dataset_id, run_id)
         readers, contested = frozenset(keep), True
+    # WHAT THIS RUN CARRIES IS NOT ITS OWN (REQ-PIPE-265): the sibling that
+    # evaluated it holds the one record.
+    from qa_tools.common import carried as carried_mod
+
+    carried = carried_mod.carried_for(run_id)
     verified[:] = [
         r for r in verified
-        if (r.get("dataset_id") == dataset_id and not contested)
-        or r.get("check_id") in readers]
+        if ((r.get("dataset_id") == dataset_id and not contested)
+            or r.get("check_id") in readers)
+        and r.get("check_id") not in carried]
     # A RE-EVALUATION NAMES ITS CAUSE (criterion 7). A check belonging to
     # ANOTHER dataset is here only because it reads this run's table, so
     # this arrival is why it was evaluated again - "this went red when
@@ -286,7 +292,23 @@ def scope_of_run(run_id: str):
     """`_scope_to_run()`'s rule as a predicate on a check id - what the
     left-out reconciliation (REQ-PIPE-115 criterion 17) compares within,
     so the two cannot disagree about which checks are this run's.
-    Everything is in scope for a run id that names no table."""
+    Everything is in scope for a run id that names no table.
+
+    LESS WHAT IT CARRIES (REQ-PIPE-265): a cross-table check an earlier
+    sibling of the same zip evaluated over the same supplies is that
+    sibling's, and this run's gate reads its verdict from there."""
+    from qa_tools.common import carried as carried_mod
+
+    base = base_scope_of_run(run_id)
+    carried = carried_mod.carried_for(run_id)
+    if not carried:
+        return base
+    return lambda check: check not in carried and base(check)
+
+
+def base_scope_of_run(run_id: str):
+    """The scope before anything is carried - what carried.decide() picks
+    from. Everything else asks scope_of_run()."""
     from qa_tools.common import check_id as check_id_mod
     from qa_tools.common import reevaluation, supply_db
 

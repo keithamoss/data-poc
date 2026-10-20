@@ -155,6 +155,15 @@ def _run_one_inner(collection_id: str, entry: dict, run_id: str, run_timestamp: 
     readable = why is None
     if not readable:
         print(own_table.describe(run_id, own[1], why))
+    # A CROSS-TABLE CHECK A SIBLING OF THIS ZIP ALREADY EVALUATED over the
+    # same supplies is carried, not run again (REQ-PIPE-265) - decided and
+    # recorded here, before any tool is asked for anything.
+    if own is not None:
+        from qa_tools.common import carried as carried_mod
+
+        carried_now = carried_mod.decide_and_record(run_id, readable=readable)
+        if carried_now:
+            print(carried_mod.describe(run_id, carried_now))
     run_step = _run_step if readable else (lambda collection, tool, rid, call: [])
 
     def _dbt() -> list[dict]:

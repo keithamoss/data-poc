@@ -39627,3 +39627,87 @@ requirements:
     - 'The trend chart still plots every entry, both copies of a delivery included - only the run count, the
       default comparison and the labels changed (Keith''s answer named those).'
     open_questions: []
+  - id: REQ-PIPE-265
+    title: A cross-table check is evaluated once for tables that arrive together, and every sibling's gate reads that one verdict
+    date_written: '2026-10-20'
+    story: As the data asset's QA owner, I want a cross-table check that reads several tables of one delivery evaluated
+      once when those tables arrive at the same instant, rather than once by each table's run, so that one supply is
+      not QA'd twice for the same reason and the recorded history says what was actually evaluated.
+    moscow: should
+    status: in_progress
+    source: 'Keith, 2026-10-20 ("Let''s build that change now"; "Option b, build now"), after a measurement on the
+      bootstrapped Child Protection history - 2,196 same-instant pairs recording the same cross-table verdict twice,
+      none differing, and 312 staggered pairs all differing. Drafted by delivery-scoper, reviewed by
+      delivery-architect, both 2026-10-20; the architect''s corrections folded in before sign-off.'
+    signed_off:
+      by: Keith
+      date: '2026-10-20'
+    acceptance_criteria:
+    - THE SYSTEM SHALL treat as SIBLINGS the arrival runs of one collection whose run ids share one receipt instant (the
+      run id after its table name, REQ-PIPE-105 criterion 1) - files filed together before the first of them is checked
+      (REQ-PIPE-105 criterion 5) - reading that from the record, and SHALL treat no other pair of runs as siblings.
+      A re-check, readers-only or knock-on run has no siblings.
+    - WHEN a cross-table check is in a run's scope and an earlier sibling run recorded an evaluated verdict for it, THE
+      SYSTEM SHALL record before any tool is invoked that the check is CARRIED from that sibling, leave it out of what
+      every scoped tool is asked for and of the run's scope, and SHALL NOT evaluate it again.
+    - THE SYSTEM SHALL give a run's promotion gate - at its arrival and when a checked-but-ungated arrival is gated
+      later - the carried checks' recorded verdicts from the sibling runs they were carried from, alongside its own
+      results, so that every sibling table's gate reads a verdict for every cross-table check that reads it, red ones
+      included.
+    - THE SYSTEM SHALL record each carried check, the run it was carried into and the run that evaluated it in the qa
+      schema, so that a reader of the history can tell which run evaluated a verdict and which runs relied on it
+      without the orchestration logs.
+    - IF any table a cross-table check reads resolves in the later run to a different supply than it did in the sibling
+      run that evaluated it, or is absent, held or contested in either, THEN THE SYSTEM SHALL evaluate the check afresh
+      in the later run. The comparison is by supply, not by physical name, so a table promoted out of staging between
+      the two runs is the same supply.
+    - IF the sibling runs recorded no evaluated verdict for a cross-table check - nothing recorded at all (its own table
+      held, contested or refused), a not-evaluated record, or a carried one - THEN THE SYSTEM SHALL evaluate it in the
+      later run rather than carry a missing or not-evaluated result.
+    - THE SYSTEM SHALL count a carried check as accounted for, so it raises no MissingCheck (REQ-PIPE-188 criterion 6)
+      and is not reported as left out by a tool (REQ-PIPE-115 criterion 17).
+    - WHILE arrivals of one collection do not share a receipt instant, THE SYSTEM SHALL evaluate each cross-table check
+      in every run whose scope includes it, exactly as before - including a staggered delivery's earlier run recording
+      its not-evaluated result.
+    - WHEN the bootstrapped history is captured before and after this change (REQ-TEST-239), THE SYSTEM SHALL produce
+      the same promotion and refusal decisions and filings, and the comparison SHALL name every difference it finds,
+      each explained by criteria 2 to 4.
+    non_functional_requirements:
+    - NO FALSE GREEN. A sibling table's gate must never promote without the verdict of a cross-table check that reads
+      it, and never on a verdict about different data - criterion 3 and criterion 5 together. A failing-first test drives
+      a red carried verdict through the gate of the table that did not evaluate it.
+    - THE SAVING IS QUERY TIME, NOT WHOLE TOOL RUNS. Each sibling run still invokes dbt, Soda and datacontract-cli for its
+      own checks; what goes is the cross-table checks' own queries (about 207 to 177 check evaluations for a full
+      Child Protection zip, the architect's count). Measured with the per-collection bootstrap time before and after,
+      the figure going into evidence rather than an estimate.
+    - SCALE. In a delivery of k tables, a check reading j of them (plus its own) is evaluated by each of those runs
+      today and once after; the number of checks carried grows with how many checks read a hub table, not k.
+    - AUDITABILITY is criterion 4, answerable from the qa schema alone.
+    - NO NEW DEPENDENCY AND NO NEW COMMAND.
+    - CI never touches live data - the change is in the orchestrator's run step and the promotion gate only.
+    dependencies:
+    - REQ-PIPE-105
+    - REQ-QAC-037
+    - REQ-PIPE-188
+    - REQ-TEST-239
+    decisions:
+    - 'Option (b), Keith 2026-10-20: ONE RECORD, the later sibling''s gate reading the earlier run''s verdict - so
+      REQ-QAC-037 criterion 2 ("SHALL NOT be duplicated") stands as written. Rejected - (a), a marked copy recorded under
+      the later run: lower risk, but two rows per check, which is the duplication this exists to end.'
+    - Scoped to SAME-INSTANT arrivals only. Rejected - evaluating only on the LAST table of a delivery - which is last is
+      not knowable when files land minutes apart, REQ-PIPE-105 criteria 1 and 2 forbid waiting for or inferring delivery
+      completeness, and each arrival is filed, run and gated before the next exists.
+    - Staggered arrivals are left alone - their two results genuinely differ (the first could not see the second
+      table), so neither is a duplicate.
+    - The EARLIER sibling evaluates. Rejected - the later - the earlier sibling's gate is decided before any later run
+      exists.
+    - Reuse is guarded by WHAT WAS READ, by supply, not by the instant alone - the knock-on and scripted decisions run
+      between two siblings' runs, so the same instant does not guarantee the same data. Rejected - comparing physical
+      table names, which change when a table is promoted out of staging (the architect, 2026-10-20).
+    - Rejected - sharing a verdict across re-check or knock-on runs - those exist because something changed.
+    - Siblings are read from the run ids on record rather than passed through the run step, because a gate can run
+      later in another process (the UNGATED path) and must find the same answer (the architect's finding 1).
+    - The other gate paths - re-checks, the knock-on gate, the status at promotion - already read the newest result
+      across every run about a supply (supply_status.latest_results), which includes the evaluating sibling; only the
+      arrival gate read run by run (the architect, 2026-10-20).
+    open_questions: []

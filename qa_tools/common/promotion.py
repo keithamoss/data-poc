@@ -1142,7 +1142,7 @@ def after_runs(found_arrivals, results: Sequence[dict], *,
     the subset carrying its own run_id. A result with no run_id belongs
     to no run and is left out rather than counted everywhere.
     """
-    from qa_tools.common import filing
+    from qa_tools.common import carried, filing
 
     merged = AfterRun(promoted=(), refused={}, failed={})
     promoted: list[str] = []
@@ -1158,7 +1158,11 @@ def after_runs(found_arrivals, results: Sequence[dict], *,
             outcome = after_run(
                 conn, agency_id=agency_id, collection_id=collection_id,
                 supplies=filing.supplies_of(conn, arrival),
-                results=by_run.get(arrival.run_id, []),
+                # AND WHAT IT CARRIED (REQ-PIPE-265 criterion 3): a cross-table
+                # check a sibling of its zip evaluated is that sibling's record,
+                # and this gate reads it - red ones included.
+                results=[*by_run.get(arrival.run_id, []),
+                         *carried.records_for(conn, arrival.run_id)],
                 reads=reads, actor=actor, actor_kind=actor_kind,
                 effective_at=effective_at)
             promoted.extend(outcome.promoted)

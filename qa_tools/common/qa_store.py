@@ -144,7 +144,7 @@ _KEY_COLUMNS = ("agency_id", "collection_id", "tool", "scope", "supply_state")
 #: Bumped whenever the DDL below changes shape. `ensure_schema` reads
 #: it and does nothing when it already matches, which is what keeps
 #: migration DDL off the hot write path - see that function.
-SCHEMA_VERSION = 44
+SCHEMA_VERSION = 45
 
 #: The version at which REQ-PIPE-144 RESHAPED qa.filing and qa.delivery
 #: (a column removed, a column replaced by a foreign key). `CREATE TABLE
@@ -352,6 +352,20 @@ CREATE TABLE IF NOT EXISTS "{SCHEMA}".asked_check (
 
 CREATE INDEX IF NOT EXISTS asked_check_by_check
     ON "{SCHEMA}".asked_check (check_id);
+
+-- A CROSS-TABLE CHECK A RUN CARRIED FROM A SIBLING (REQ-PIPE-265, schema
+-- 45): files sharing one receipt instant are one zip, and a check reading
+-- two of its tables is evaluated by the first of their runs only. This is
+-- the later run's record that it did not evaluate the check and whose
+-- verdict its gate read - decided before its tools ran, so a gate applied
+-- later, in another process, reads the same answer. Check ids and run keys
+-- only, never a supply value.
+CREATE TABLE IF NOT EXISTS "{SCHEMA}".carried_check (
+    run_key      text NOT NULL REFERENCES "{SCHEMA}".run ON DELETE CASCADE,
+    check_id     text NOT NULL,
+    from_run_key text NOT NULL REFERENCES "{SCHEMA}".run ON DELETE CASCADE,
+    PRIMARY KEY (run_key, check_id)
+);
 
 -- ONE RECORD PER LOAD ATTEMPT, append-only (REQ-PIPE-089 criterion 14,
 -- carrying REQ-PIPE-060's criteria 13-20 across unchanged). It is not a
