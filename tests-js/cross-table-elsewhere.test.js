@@ -326,3 +326,33 @@ describe("Q4: a sparkline point is dated by when its result was recorded", () =>
     expect(counts[1]).toMatchObject({ counted: 2, red: 0, amber: 0 });
   });
 });
+
+// post-build-review #258's UX points (minor polish, 2026-10-20).
+describe("the cross-table rows on a dataset page", () => {
+  it("keep each relationship's three tools together, dbt first", () => {
+    dashboard = loadDashboard();
+    const col = { datasets: [{ id: "cp-clients", name: "Client Register" },
+                             { id: "cp-investigations", name: "Investigations" },
+                             { id: "cp-notifications", name: "Notifications" }] };
+    const row = (tool, from, name) => ({ ck: { name, tool_ref: `${tool}:x`,
+      between: { declared_on: from, reads: ["cp-clients"] } } });
+    const rows = [row("dbt", "cp-investigations", "Client reference"), row("dbt", "cp-notifications", "Client reference"),
+                  row("soda", "cp-investigations", "Client reference"), row("soda", "cp-notifications", "Client reference"),
+                  row("datacontract", "cp-investigations", "Client reference"), row("datacontract", "cp-notifications", "Client reference")];
+    const got = dashboard.window.crossTableRowOrder(col, rows)
+      .map((r) => `${r.ck.between.declared_on}/${r.ck.tool_ref.split(":")[0]}`);
+    expect(got).toEqual(["cp-investigations/dbt", "cp-investigations/soda", "cp-investigations/datacontract",
+                         "cp-notifications/dbt", "cp-notifications/soda", "cp-notifications/datacontract"]);
+  });
+});
+
+describe("the panel's default comparison", () => {
+  it("skips a result that could not be evaluated", () => {
+    dashboard = loadDashboard();
+    const h = (d, s, extra = {}) => ({ run_id: `own_${d}`, run_date: d, status: s, recorded_by: null,
+                                       recorded_at: `${d}T01:00:00+08:00`, ...extra });
+    const history = [h("2020-05-01", "green"), h("2020-08-01", "red", { not_evaluated: "not yet supplied" }),
+                     h("2020-11-01", "green")];
+    expect(dashboard.window.defaultCompareIndex(history)).toBe(0);
+  });
+});

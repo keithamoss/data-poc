@@ -363,3 +363,34 @@ REQ-PIPE-121: with self-promotion the case for amending "a file landing in
 staging stays outside this mechanism" (architect A1) mostly falls away.
 Recommended: keep it, and have the architect confirm no deadlock remains once
 self-promotion is in.
+
+## Keith's answer on the shape, 2026-10-20
+
+- **Q1: shape 1, its own Incomplete status** ("Go with 1, its own Incomplete
+  status"). Between amber and red in every rollup - its own red wins, it beats
+  green and amber; the pill reads "Incomplete: no promoted <table>" and links to
+  the table, whose page gives the cause; it promotes itself as "Incomplete
+  promoted" (Q2 = B, 2026-10-14); re-checked when the table is promoted,
+  substituted or inherited. Settles REQ-QAC-212 criterion 2 (PROVISIONAL until
+  now). Put to him in the context of REQ-DASH-264's Q1 answer the same morning:
+  a could-not-run cross-table row now reads red with "Could not be checked ...";
+  once this lands its pill reads Incomplete and the sentence stays.
+- **The remaining questions, 2026-10-20** ("A on all but Q9, which is B"),
+  put to him reworded for self-promotion:
+  - **Q3 = A**: re-checked only when something moves (the missing table is
+    promoted, substituted or inherited, or a staged table it read is rejected
+    or superseded), never on the clock.
+  - **Q5 = A**: when the missing table's slot is accepted as "not supplied",
+    the reader stays Incomplete for that period; a person can still act.
+  - **Q6 = A**: no "still failing, a person decides" record for a reader that
+    is only Incomplete - the status is the shout (answers close-out R2).
+  - **Q7 = A**: no ticket for Incomplete alone; the missing table's own ticket
+    carries it.
+  - **Q8 = A**: the other side of a check reads Incomplete too, one rule
+    (REQ-QAC-037 criterion 7).
+  - **Q9 = B**: REQ-PIPE-211 stays a must, as drafted.
+  - **Q10 = A**: REQ-DASH-204's line has one wording, "No promoted <dataset>
+    for <period>", linked, the cause read on that dataset's page.
+  Every question in this draft is now answered; next is folding the answers
+  into the six requirements (and REQ-DASH-204, REQ-PIPE-210, REQ-PIPE-211)
+  and the architect confirming no deadlock remains with self-promotion.

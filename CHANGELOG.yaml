@@ -109,6 +109,25 @@ intro: >
   all three.
 
 releases:
+  - date: "2026-10-20"
+    summary: >
+      Cross-table checks are checked once per delivery, and their history
+      reads one delivery at a time.
+    changes:
+      - category: Improved
+        items:
+          - headline: One check for two tables that arrive together
+            components: ["Pipeline & publishing"]
+            description: >
+              When a delivery brings two tables at the same moment, a check
+              between them now runs once rather than once for each table.
+              Both tables are still judged on its result.
+          - headline: A delivery counts once in a check's history
+            components: ["Dashboard UI"]
+            description: >
+              A check's panel compares against the delivery before rather
+              than the same delivery's other copy, counts deliveries rather
+              than copies, and says which rows came from another table.
   - date: "2026-10-19"
     summary: >
       A third collection, Emergency Department, joins the asset with its own

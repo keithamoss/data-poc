@@ -5381,6 +5381,13 @@ could never have computed it), and it belongs with batch 5's check work.
     mis-reading found on the way (a held dependency, one red and never
     promoted, one promoted later, re-filed or superseded) - each with a
     criterion and a test that reproduces today's wrong reading first.
+    **SCOPED 2026-10-14** into `docs/drafts/unjudged-cross-table/` as
+    REQ-QAC-212 to REQ-PIPE-217 (unsigned). **SHAPE SETTLED 2026-10-20**
+    (Keith: "Go with 1, its own Incomplete status") - with Q2 (promotes itself
+    as "Incomplete promoted") and Q4 (a staged dependency counts as checked)
+    from 2026-10-14. The rest of the draft's questions are being walked with
+    him; answers in that folder's summary.md. Related, built the same day:
+    REQ-PIPE-265's 312 staggered pairs are this item's false-green case.
 
 
 96. **[todo, 2026-10-14]** **[Dashboard UI]** **[QA checks & contract]**

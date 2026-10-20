@@ -720,7 +720,9 @@ span.scenario-subject-label{display:inline-block; margin:0 6px 0 0;}
 @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .scope-check .label .tr{color:var(--ink-muted);} }
 :root[data-theme="dark"] .scope-check .label .tr{color:var(--ink-muted);}
 /* #253: the tables a cross-table check is between, after its name. */
-.scope-check .label .bt{font-size:12.5px; color:var(--ink-muted); margin-left:8px;}
+.scope-check .label .bt{font-size:12.5px; color:var(--ink-muted); margin-left:8px; white-space:nowrap;}
+/* A long tool reference breaks rather than running under the pill (#258 M5). */
+.scope-check .label .tr{overflow-wrap:anywhere;}
 .scope-check .label .bt:empty{display:none;}
 .scope-check .label .rc{font-size:12px; color:var(--ink-muted); margin-left:8px;}
 .scope-check .label .rc:empty{display:none;}
@@ -4124,7 +4126,11 @@ function trendChart(check, compareIdx, onPointClick, datasetRuns, sourceOf){
   const failY = fail==null ? null : ys(fail).toFixed(1);
   // sparse x labels: first, mid, last
   const tickIdx = [0, Math.floor((n-1)/2), n-1].filter((v,i,a)=>a.indexOf(v)===i);
-  const xlabels = tickIdx.map(i=> `<text x="${xs(i).toFixed(1)}" y="${H-6}" font-size="9.5" text-anchor="middle" fill="var(--ink-faint)" font-family="IBM Plex Mono, monospace">${fmtDateShort(history[i].date)}</text>`).join("");
+  // THE ENDS ANCHOR INWARD (#258 L8): a long date centred on the first or last
+  // point ran off the chart's edge.
+  const anchorOf = i=> i === tickIdx[0] && tickIdx.length > 1 ? "start"
+    : i === tickIdx[tickIdx.length - 1] && tickIdx.length > 1 ? "end" : "middle";
+  const xlabels = tickIdx.map(i=> `<text x="${xs(i).toFixed(1)}" y="${H-6}" font-size="9.5" text-anchor="${anchorOf(i)}" fill="var(--ink-faint)" font-family="IBM Plex Mono, monospace">${fmtDateShort(history[i].date)}</text>`).join("");
   const yTicks=[0,warn,fail].filter(v=>v!=null).filter((v,i,a)=>a.indexOf(v)===i);
   const ylabels = yTicks.map(v=> `<text x="${padL-6}" y="${(ys(v)+3).toFixed(1)}" font-size="9.5" text-anchor="end" fill="var(--ink-faint)" font-family="IBM Plex Mono, monospace">${fmtMetric(v,unit)}</text>`).join("");
   const last = history[n-1];
@@ -5119,8 +5125,26 @@ function deliveryCount(history){
 // current one, or -1 when there is none.
 function defaultCompareIndex(history){
   const n = (history || []).length;
-  for(let i = n - 2; i >= 0; i--) if(!sameDelivery(history[i], history[n-1])) return i;
+  // NEVER A NON-ANSWER (#258 L7): comparing against a result that could not
+  // be evaluated shows nothing and asks the reader to pick again.
+  for(let i = n - 2; i >= 0; i--){
+    if(!sameDelivery(history[i], history[n-1]) && !notEvaluated(history[i])) return i;
+  }
   return -1;
+}
+// CROSS-TABLE ROWS, ONE RELATIONSHIP AT A TIME (#258 M4): grouped by the
+// tables the check is between, then its name, then dbt, Soda and
+// datacontract-cli in that order - rather than every dbt row, then every Soda
+// row, which scattered one relationship's three verdicts down the section.
+const _TOOL_RANK = {dbt: 0, soda: 1, datacontract: 2};
+function crossTableRowOrder(col, rows){
+  const tool = r=> String(r.ck.tool_ref || "").split(":")[0];
+  const key = r=> [crossTableBetween(col, r.ck), r.ck.name || r.ck.key || ""];
+  return [...rows].sort((a, b)=>{
+    const [ka, kb] = [key(a), key(b)];
+    for(let i = 0; i < ka.length; i++) if(ka[i] !== kb[i]) return ka[i] < kb[i] ? -1 : 1;
+    return (_TOOL_RANK[tool(a)] ?? 9) - (_TOOL_RANK[tool(b)] ?? 9);
+  });
 }
 // A history row's source, where it was another table's run.
 function historySource(col, h){
@@ -7812,11 +7836,13 @@ function renderDataset(view, agencyId, collectionId, datasetId){
     // head follows them.
     const quiet = ds.noDataInPlaceOn && !(sc.scope === "cross-table" && ds.crossTableRowsWhileHeld);
     const worst = quiet ? "nodata" : rollupStatuses(checks.map(checkStatus));
-    const rows = columns.flatMap(c=> (c.checks||[]).filter(ck=> !ck.retired).map(ck=> `
+    const listed = columns.flatMap(c=> (c.checks||[]).filter(ck=> !ck.retired).map(ck=> ({c, ck})));
+    const ordered = sc.scope === "cross-table" ? crossTableRowOrder(col, listed) : listed;
+    const rows = ordered.map(({c, ck})=> `
       <button class="scope-check" data-col="${columnKey(c)}" data-check="${ck.key}">
         <span class="label"><span class="nm"></span><span class="bt"></span><span class="tr"></span><span class="rc"></span><span class="ds"></span></span>
         ${pill(checkStatus(ck),"sm")}
-      </button>`)).join("");
+      </button>`).join("");
     return `<div class="scope-section" data-scope="${sc.scope}">
       <div class="head"><h3>${sc.title}</h3>${pill(worst,"sm")}</div>
       <div class="blurb">${sc.blurb}</div>
@@ -8334,7 +8360,7 @@ function openCheckPanel(ag, col, ds, column, check, opts){
   } else if(!hasCompareRun){
     compareBlock = `
     <div class="drawer-section">
-      <h4>This run vs. a chosen run</h4>
+      <h4>${currentLabel === "Latest result" ? "Latest result" : "This run"} vs. a chosen run</h4>
       <div class="compare-grid">
         <div class="compare-col">
           <div class="k">Compared run</div>
@@ -8348,7 +8374,7 @@ function openCheckPanel(ag, col, ds, column, check, opts){
   } else if(notEvaluated(comparePoint)){
     compareBlock = `
     <div class="drawer-section">
-      <h4>This run vs. a chosen run</h4>
+      <h4>${currentLabel === "Latest result" ? "Latest result" : "This run"} vs. a chosen run</h4>
       <div class="compare-grid">
         <div class="compare-col"><div class="k">Compared run</div><div class="v not-evaluated-tag" style="font-size:14px;">Not evaluated</div></div>
         <div class="compare-col"><div class="k">${currentLabel}</div><div class="v">${fmtMetric(currentPoint.value, check.unit)}</div></div>
@@ -8368,7 +8394,7 @@ function openCheckPanel(ag, col, ds, column, check, opts){
     ).join("");
     compareBlock = `
     <div class="drawer-section">
-      <h4>This run vs. a chosen run</h4>
+      <h4>${currentLabel === "Latest result" ? "Latest result" : "This run"} vs. a chosen run</h4>
       <div class="compare-grid">
         <div class="compare-col">
           <div class="k"><label for="check-compare-select">Compared run</label></div>

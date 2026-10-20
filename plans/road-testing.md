@@ -1720,6 +1720,16 @@ Still to settle by driving the page: #8 and #17 - both since closed
 - **What we heard:** Whether the history should stop at the date on show, mark later rows, or stay as it is, is still open.
 - **Evidence:** [Client Register on 5 Aug 2023](?in-place-on=2023-08-05#/agency/child-protection-family-support/collection/child-protection/dataset/cp-clients)
 
+20. **[todo, 2026-10-20]** **[Dashboard UI]** **The "awaiting a correction"
+    line's border ignores the theme.** Seen by delivery-dashboard-ux while
+    reviewing #95 v2: `awaitingCorrectionLine` styles its border
+    `var(--amber, #b7791f)`, and `--amber` is not a token, so the hard-coded
+    fallback always applies in both themes. The same slip as the `var(--red)`
+    recorded in post-build-review #121. A sighting; not checked in a browser yet.
+
+- **We noticed:** The "awaiting a correction" line's border colour is the same in light and dark themes.
+- **What we heard:** Every colour on the page should come from the theme's own tokens.
+
 ## Landed entries, kept as feedback cards (REQ-DOCS-219)
 
 Card-only entries: what was raised and what came of it. #1 and #2 landed
