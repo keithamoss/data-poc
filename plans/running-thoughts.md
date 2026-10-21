@@ -5746,3 +5746,53 @@ could never have computed it), and it belongs with batch 5's check work.
      alternative was widening them to the whole stream (`--collection cp`
      replays ED too, and checkpoint numbers count the merged stream). Not
      scoped.
+
+112. **[todo, 2026-10-20]** **[Docs & process]** **The scale is about 30
+     datasets and 10-15 teams, not 30 teams.** Keith, 2026-10-20, while
+     talking through #95: "They won't be 30 different teams... It's more like
+     15 or so. Some teams own the same data set... realistically it could be
+     10 to 15 teams. Like 30 data set asset." CLAUDE.md's scale paragraph
+     says "roughly 30 collections on the quarterly asset" and doesn't mention
+     teams, so advice phrased as "30 teams" (as in this conversation) has been
+     overstating how many groups of people learn and act on each status.
+     Ask Keith whether CLAUDE.md should say so.
+
+113. **[todo, 2026-10-20]** **[Pipeline & publishing]** **No flickering
+     reds: a red has to be worth notifying someone about.** Keith,
+     2026-10-20, while settling #95's shape: "I don't want red flickering. So
+     I don't want false positives on reds, because ultimately I think I want
+     to automate send notifications on red... I don't want a boy who cried
+     wolf scenario." A standing design test for anything that can turn
+     something red. Would a person notified on this red have needed to act,
+     or would it have cleared by itself minutes later? The early-arrival red
+     in #95 (a table held until its partner's file arrives) is the case that
+     prompted it. Automated notification on red is not scoped. It relates to
+     the ticketing work (#53) and to REQ-GHUB tickets.
+
+114. **[todo, 2026-10-20]** **[Pipeline & publishing]** **"Zip" is a
+     stand-in for "a package of files".** Keith, 2026-10-20: "zip is just a
+     stand-in for like a package of files. We might find other ways to say
+     mark the start and end of a batch of files that aren't a zip container,
+     but let's just go with the zip container as the current concept... and we
+     can extend that later." Today "arrived together" means the same receipt
+     instant (REQ-PIPE-105 c5, REQ-PIPE-265). Other ways to mark a batch's
+     start and end belong with the transport layer (plans/supply-thoughts.md).
+     Not scoped.
+
+115. **[todo, 2026-10-21]** **[Docs & process]** **Semantic search over the
+     project's own memory, alongside the agents.** Keith, 2026-10-21, after
+     asking how RAG differs from this project's scoper/architect/reviewer/
+     critic workflow: retrieval "as the input to or alongside this set of
+     agents functioning as kind of a team". The motivating failure is the
+     recurring one where a decision exists but nobody knew to look for it.
+     Grep finds only what you already know to ask; semantic search over
+     `requirements.yaml` `decisions:`/`open_questions:` and `plans/*.md`
+     would answer "have we decided anything like this before?". What the
+     environment allows, checked 2026-10-21:
+     - PyPI is reachable.
+     - huggingface.co (local embedding models), api.openai.com and
+       api.voyageai.com are refused by the egress proxy.
+     - pgvector is not installed; pg_trgm is.
+     So lexical ranking (PostgreSQL full-text search, or BM25) is buildable
+     now. Semantic embeddings need an allow-listed model host, or Bedrock in
+     an AWS deployment. Not scoped.

@@ -394,3 +394,105 @@ self-promotion is in.
   Every question in this draft is now answered; next is folding the answers
   into the six requirements (and REQ-DASH-204, REQ-PIPE-210, REQ-PIPE-211)
   and the architect confirming no deadlock remains with self-promotion.
+
+## Shape REOPENED, 2026-10-20 ~11:30
+
+Keith was asked Q11 (Incomplete under amber "hold") and answered: "Hmm I'm
+rethinking adding this new 'incomplete' status... red 'feels' right
+somehow". Asked to choose between keeping Incomplete, red that promotes
+itself, and red that holds, he chose "talk it through more". The v2 draft and
+its three reviews stand, but the shape (Q1, 2026-10-20 morning) is open
+again. Hold the remaining questions until it settles.
+
+## Talking it through, 2026-10-20 late morning
+
+Keith's position so far: no new status vocabulary, and no red that follows
+different rules from other reds. His goal: "the promoted view reflects what's
+actually in the warehouse across rechecks". Re-checks of OTHER tables should
+still be triggered by promotion, not by an arrival.
+
+**Facts established, from the code (asked by Keith):**
+- Each cross-table check asks ONE question, in ONE direction, and is declared
+  on one dataset. Notifications' "Client reference" asks whether every
+  notification's client exists in Clients. Clients declares no cross-table
+  check at all. Notifications <-> Investigations is two DIFFERENT one-way
+  questions: Notifications' "Escalation completeness" and Investigations'
+  "Notification reference".
+- A check is evaluated in the run of EITHER table it reads: the declaring
+  table's own checks, plus the readers' checks that read the arriving table
+  (`qa_results_writer.base_scope_of_run`, `check in readers`). It reads
+  staged over promoted, and its verdict counts against every table it reads
+  (REQ-QAC-037). So the arriving table's own run already tells the truth
+  about the shared question, for that table's own gate.
+- LIVE ISSUE, from before #95: `supply_status.runs_about` /
+  `latest_results` count, toward a PROMOTED supply's status, any run that
+  read that supply - including an arrival run of a partner that was then
+  HELD. Keith's scenario: Notifications promoted green; a new Clients file
+  arrives, red for its own reasons, and is held. Notifications' in-place
+  status and page then show the cross-table verdict against the unpromoted
+  Clients, not against what is in the warehouse.
+- Correction to the earlier explanation: in the simple staggered case there
+  is NO deadlock under red that holds. Clients' run evaluates the shared
+  check against staged Notifications; if Clients promotes, the knock-on
+  re-checks Notifications. What remains is (a) a waiting reader is not
+  re-gated when its partner is staged but held, which Keith says is right,
+  and (b) owe-nothing quarters, where inheritance waits for a first
+  promotion that every reader is waiting on. (b) is a real deadlock.
+
+**Keith on (b), 2026-10-20:** inherit when the quarter is filed, not when it is
+first promoted. "That would align with the idea we have of having a command to
+open a quarter that's separate to any checks." That command is REQ-PIPE-098
+criterion 4, unmet and unowned ("Leave until needed", 2026-10-19). This now
+needs it, or at least needs the period to open on filing. To go to the scoper,
+architect and reviewers with the rest of the model once the other open point
+is settled.
+
+## Shape settled in principle, 2026-10-20 evening to 2026-10-21 morning (Keith)
+
+- Red only: no Incomplete, and no red that follows different rules.
+- **Two principles.** (1) No half-and-half view: a result is either the
+  warehouse view (the table and its dependencies as they are in the
+  warehouse) or the staging view (the file, read against what is staged for
+  its dependencies, or the warehouse version where nothing is staged). Never
+  mixed. (2) No flickering reds (running-thoughts #113), because red will
+  drive notifications.
+- **A package of files** is gated together, after every file in it has been
+  checked. A zip stands in for "package" (running-thoughts #114). When a file
+  in the package is held, the others' cross-table checks re-run against the
+  warehouse partner before any of them can promote. The worked example is the
+  Clients v2 / Notifications v2 zip over v1 + v1.
+- Other tables are re-checked only on promotion.
+- A warehouse view counts a cross-table verdict only when every supply it read
+  is the one in place, judged by supply.
+- Inherit on filing.
+- **Staggered files minutes apart flicker, accepted:** "I guess that's just
+  going to have to flicker at that point. And we need to say, if you want to
+  avoid a flicker, make sure you send us a package of files... I don't think
+  we can really design around that." This needs supplier guidance, not a
+  design.
+- **Open (Keith raising it):** with a staged v2 awaiting a decision, the page
+  and its pill show the v2 (staging) verdict. That is today's REQ-PIPE-081 c1
+  ("the results below are the newest supply ... not in place yet"). How does
+  someone see that the warehouse is still green? Keith's guess: supply history.
+- **Keith, 2026-10-21 morning:**
+  - Rejecting the staged reds puts the page back on the warehouse supply's
+    verdict. That is today's behaviour: `clipDatasetToInPlaceOn` drops a
+    withdrawn (turned-down) run.
+  - Warehouse view: option 2. The awaiting line gains a clause giving the
+    in-place supply's status ("The supply in place is the one received
+    <date>, and is green").
+  - Re-checks cascade within a package until nothing changes.
+  - First-time zip with a held partner: the re-check of Clients against "no
+    Notifications" is a could-not-run, which is red, so Clients is held too.
+    Promoting the partner clears it through the knock-on. No special display
+    case remains, apart from a person promoting by hand, which shows as red
+    promoted.
+- **Keith, 2026-10-21: STRICT, not relaxed.** An absent partner stays
+  could-not-run, which is red; "not supplied = empty" was considered and
+  rejected. In his words: "things that depend on each other don't promote
+  until they're all happy... A human can always overrule that using the
+  terminal... It's the strictest rule. It's probably the easiest to sort of
+  think about and understand." REQ-PIPE-265 stands, with the rule that a
+  carried verdict stops counting once a file it read is held. To the scoper,
+  then the architect, 2026-10-21 morning. Keith wants their view on any other
+  tensions, gaps or deadlocks.

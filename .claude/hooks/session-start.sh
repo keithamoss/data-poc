@@ -68,6 +68,18 @@ if [ -n "${CLAUDE_ENV_FILE:-}" ]; then
   } >> "$CLAUDE_ENV_FILE"
 fi
 
+# --- Leftover test databases: tidied, never the supply database --------
+# Keith, 2026-10-20: "setup something to automatically tidy up old leftover
+# test databases". A tagged test session's databases are never reused, so
+# they pile up (about 130 in one sandbox). Only the suite's own names, with
+# nobody connected, created over 12 hours ago - a live session's are always
+# younger, because it recreates them when it starts.
+if [ -n "${PG_UP:-}" ]; then
+  tidied=$(MOTHMAN_TEST_DSN="postgresql://${PGUSER_NAME}:${PGPASS}@localhost:5432/postgres" \
+    uv run mothman env tidy-test-databases 2>/dev/null | grep -oE '^Dropped [0-9]+' | grep -oE '[0-9]+')
+  [ -n "${tidied:-}" ] && [ "$tidied" != "0" ] && say "Dropped ${tidied} leftover test database(s)."
+fi
+
 # --- dbt_utils: without it 8 real dbt tests fail ----------------------
 if [ ! -d dbt_project/dbt_packages ]; then
   uv run dbt deps --project-dir dbt_project --profiles-dir qa_tools/dbt_profiles \

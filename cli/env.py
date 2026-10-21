@@ -179,3 +179,76 @@ def mark_command(typed: str | None) -> None:
                                            "nothing was marked.")
         db_identity.mark(conn, want)
     console.print(f"Marked this database as {want}.", style="green")
+
+
+#: The names the test suite gives its databases (tests/conftest.py): one per
+#: xdist worker, optionally tagged per session, its `_scratch` sibling, and
+#: one per solo test. Nothing else is ever touched.
+_TEST_DATABASE = r"^mothman_(test|solo)_[A-Za-z0-9_]+$"
+
+
+def leftover_test_databases(admin_dsn: str, older_than_hours: float,
+                            prefix: str = "") -> list[str]:
+    """The test databases safe to drop: each one named as the suite names
+    them, with nobody connected to it, created more than `older_than_hours`
+    ago. A test session recreates its own databases
+    when it starts, so a live session's are always younger than any sensible
+    threshold, and a connected one is skipped whatever its age."""
+    import psycopg
+
+    with psycopg.connect(admin_dsn, autocommit=True) as conn:
+        rows = conn.execute(
+            "SELECT d.datname, "
+            "       (SELECT count(*) FROM pg_stat_activity a WHERE a.datname = d.datname), "
+            "       EXTRACT(EPOCH FROM now() - (pg_stat_file('base/' || d.oid || '/PG_VERSION')).modification) / 3600 "
+            "FROM pg_database d WHERE d.datname ~ %s ORDER BY d.datname",
+            [_TEST_DATABASE]).fetchall()
+    return [name for name, connected, age in rows
+            if name.startswith(prefix) and connected == 0 and age is not None
+            and age >= older_than_hours]
+
+
+@env_group.command("tidy-test-databases")
+@click.option("--older-than-hours", default=12.0, show_default=True,
+              help="Only drop test databases created at least this long ago.")
+@click.option("--dry-run", is_flag=True, help="List what would be dropped, drop nothing.")
+@click.option("--prefix", default="", metavar="TEXT",
+              help="Only test databases whose names start with this, e.g. one tag's.")
+def tidy_test_databases_command(older_than_hours: float, dry_run: bool, prefix: str) -> None:
+    """Drop test databases earlier test sessions left behind.
+
+    The suite gives every session's workers their own databases and leaves
+    them for inspection after a run; a tagged session's names are never
+    reused, so they accumulate (about 130 in one sandbox, 2026-10-20).
+    Only databases named as the suite names them, with nobody connected,
+    and older than --older-than-hours are dropped - never the supply
+    database or anything else. Reads MOTHMAN_TEST_DSN.
+    """
+    import os
+
+    import psycopg
+
+    admin = os.environ.get("MOTHMAN_TEST_DSN")
+    if not admin:
+        raise click.ClickException("MOTHMAN_TEST_DSN is not set, so there is no test "
+                                   "server to tidy.")
+    try:
+        names = leftover_test_databases(admin, older_than_hours, prefix)
+    except psycopg.Error as exc:
+        raise click.ClickException(f"could not list the test databases: {exc}") from None
+    if dry_run:
+        for name in names:
+            console.print(name)
+        console.print(f"{len(names)} test database(s) would be dropped.", style="yellow")
+        return
+    dropped = 0
+    with psycopg.connect(admin, autocommit=True) as conn:
+        for name in names:
+            # NOT WITH (FORCE): a connection that arrived since the listing
+            # means somebody is using it after all, and the drop should fail.
+            try:
+                conn.execute(f'DROP DATABASE IF EXISTS "{name}"')
+                dropped += 1
+            except psycopg.Error:
+                console.print(f"Kept {name}: somebody connected to it.", style="dim")
+    console.print(f"Dropped {dropped} leftover test database(s).", style="green")
