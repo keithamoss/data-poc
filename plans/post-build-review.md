@@ -11073,3 +11073,16 @@ twice. It deliberately did not re-find the `TypeError`.
      defect - it resets to the default, which is what it says - and is left
      alone. Whether the DEFAULT should itself be the newest covered date is a
      behaviour question for the period-clarity requirement, not this fix.
+
+261. **[todo, 2026-10-22]** **[Dashboard UI]** **A check panel's "Latest result"
+     half is pushed out of the panel by a long compared-run label.** Found
+     2026-10-22 while screenshotting the compare card for Keith (REQ-PIPE-279
+     N1): on cp-notifications' Client reference panel the dropdown's label
+     "Wednesday, 27 May 2026 · from the Client Register's run (previous)"
+     (REQ-DASH-264's "from the <table>'s run" suffix) widens the "Compared
+     run" column to 538px, putting "Latest result" at x=1113 in a panel that
+     ends at 1100 - the card shows only one side of the comparison, with no
+     scroll hint. Measured with getBoundingClientRect on the built page.
+     `min-width:0` on `.compare-col` plus `max-width:100%` on its select puts
+     both columns back in view (252px each). A defect, so a failing test
+     first (e2e: both compare columns inside the panel's box), then the fix.
