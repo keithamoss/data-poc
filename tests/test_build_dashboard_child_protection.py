@@ -247,3 +247,33 @@ class TestACrossTableResultFromAnotherTablesRunReachesThePage:
     def test_the_card_names_the_tables_the_check_is_between(self):
         assert self._card()["between"] == {"declared_on": "cp-notifications",
                                            "reads": ["cp-clients"]}
+
+
+class TestAResultFromAnotherTablesRunSaysWhichOwnRunItRead:
+    """REQ-PIPE-265 meeting the dataset list's count (found by the gate,
+    2026-10-22): a result recorded under another table's run is placed by the
+    supply it READ, never by the day it was recorded - a held arrival recorded
+    the same day can be a different supply from the one read."""
+
+    _OWN = {"cp_case_workers__202502010900000800", "cp_case_workers__202505010900000800"}
+
+    def test_a_check_that_reads_this_table_names_the_run_it_read(self):
+        record = {"run_id": "cp_investigations__202505010900000800", "dataset_id": "cp-investigations",
+                  "tables_read": {"cp_case_workers": "cp_case_workers__202502010900000800"}}
+        assert bcd.read_run(record, "cp_case_workers", "cp-case-workers", self._OWN) \
+            == "cp_case_workers__202502010900000800"
+
+    def test_a_check_carried_from_a_sibling_read_this_tables_run_of_that_instant(self):
+        own = {"cp_notifications__202608010900000800"}
+        record = {"run_id": "cp_clients__202608010900000800", "dataset_id": "cp-notifications",
+                  "tables_read": {"cp_clients": "cp_clients__202608010900000800"}}
+        assert bcd.read_run(record, "cp_notifications", "cp-notifications", own) \
+            == "cp_notifications__202608010900000800"
+
+    def test_a_re_check_run_or_an_unknown_read_names_nothing(self):
+        own = {"cp_notifications__202608010900000800"}
+        rerun = {"run_id": "cp_clients__202608010900000800__r1", "dataset_id": "cp-notifications"}
+        assert bcd.read_run(rerun, "cp_notifications", "cp-notifications", own) is None
+        elsewhere = {"run_id": "cp_investigations__202505010900000800", "dataset_id": "cp-investigations",
+                     "tables_read": {"cp_case_workers": None}}
+        assert bcd.read_run(elsewhere, "cp_case_workers", "cp-case-workers", self._OWN) is None

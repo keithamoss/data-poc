@@ -265,6 +265,30 @@ def _merged_by_time(own: list[dict], elsewhere: list[dict]) -> list[dict]:
     return merged
 
 
+def read_run(record: dict, table: str, dataset_id: str, own_ids) -> str | None:
+    """Which of this dataset's own runs a result recorded under ANOTHER
+    table's run is about - the run of the supply of `table` it read - or
+    None when that cannot be said.
+
+    A check that reads this table names the run it read in its own
+    `tables_read`. A check declared ON this table and carried by a sibling
+    of the same delivery (REQ-PIPE-265) records no read of its own table:
+    only a same-instant sibling's arrival run carries one, so it read this
+    table's run of that instant. Keyed by what was read rather than by the
+    day it was recorded, because a held arrival recorded the same day can
+    be a different supply from the one read."""
+    from qa_tools.common import supply_db, tables_read
+
+    read = (record.get(tables_read.RESULT_FIELD) or {}).get(table)
+    if read in own_ids:
+        return read
+    if record.get("dataset_id") == dataset_id:
+        parts = supply_db.split_staged(record.get("run_id") or "")
+        if parts and not parts[2] and f"{table}__{parts[1]}" in own_ids:
+            return f"{table}__{parts[1]}"
+    return None
+
+
 def _not_evaluated_reason(record: dict) -> str | None:
     """Why a record's check could not be evaluated, or None for a real
     verdict. Read from the reason each pseudo-tool writes -
@@ -388,8 +412,9 @@ def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], da
             "unit": r["unit"], "warn": r["warn_threshold"], "fail": r["fail_threshold"],
             "dimension": r["dimension"], "label": r.get("label"), "check_id": r["check_id"],
             "by_run": {}, "row_count_total": {}, "row_count_invalid": {}, "failing_sample_keys": {},
-            "status_by_run": {}, "reference": {}, "not_evaluated": {}, "at": {},
+            "status_by_run": {}, "reference": {}, "not_evaluated": {}, "at": {}, "read": {},
         })
+        slot["read"][r["run_id"]] = r
         slot["at"][r["run_id"]] = r.get("run_timestamp")
         slot["not_evaluated"][r["run_id"]] = _not_evaluated_reason(r)
         slot["by_run"][r["run_id"]] = r["metric_value"]
@@ -450,6 +475,8 @@ def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], da
                     # another table's (post-build-review #253).
                     "recorded_at": slot["at"].get(run_id),
                     "recorded_by": None if own else (run_owner(run_id) or (None,))[0],
+                    # WHICH OWN RUN IT IS ABOUT, by what it read (REQ-PIPE-265).
+                    "read_run": None if own else read_run(slot["read"][run_id], table, dataset_id, own_ids),
                     # WHICH KIND OF RUN (REQ-DASH-264 criterion 7): only a
                     # re-check is said to be one on the page.
                     "recorded_in": None if own else (

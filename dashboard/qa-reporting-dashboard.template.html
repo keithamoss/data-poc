@@ -3621,6 +3621,17 @@ function unitCounts(units){
   // from the run before it, so the newest point still agrees with the page.
   const extras = new Map();     // key -> {own run, date}
   const perCheck = [];
+  // EACH OWN RUN'S DAY, from every check (REQ-PIPE-265): a result recorded
+  // under another table's run says which of this dataset's runs it read
+  // (read_run), and a check carried from a sibling of the same delivery has
+  // no result under this dataset's run at all, only the sibling's.
+  const ownRuns = new Map();     // run_id -> {day, date}
+  (units || []).forEach(u=> (u.checks || []).forEach(ck=>{
+    if(ck.retired) return;
+    ck.history.forEach(h=>{
+      if(!h.recorded_by && !ownRuns.has(h.run_id)) ownRuns.set(h.run_id, {day: recordedDayOf(h), date: h.date, at: recordedAtOf(h)});
+    });
+  }));
   (units || []).forEach(u=>{
     (u.checks || []).forEach(ck=>{
       if(ck.retired) return;
@@ -3630,12 +3641,20 @@ function unitCounts(units){
         let key;
         if(!h.recorded_by){
           ownRun = h.run_id; ownDay = recordedDayOf(h); key = h.run_id;
-          if(!extras.has(key)) extras.set(key, {own: key, date: h.date, base: true});
+          if(!extras.has(key)) extras.set(key, {own: key, date: h.date, at: recordedAtOf(h), base: true});
         } else {
-          if(ownRun == null) return;
           const day = recordedDayOf(h);
-          key = day === ownDay ? ownRun : `${ownRun}@${day}`;
-          if(!extras.has(key)) extras.set(key, {own: ownRun, date: h.date, base: false});
+          // About the run whose supply it read: recorded the day that run was,
+          // it is the same delivery; later, a re-check of that run. Without a
+          // read, this check's last own run stands in for it.
+          const read = h.read_run && ownRuns.has(h.read_run) ? h.read_run : null;
+          const about = read || ownRun;
+          if(about == null) return;
+          const aboutDay = read ? ownRuns.get(read).day : ownDay;
+          key = day === aboutDay ? about : `${about}@${day}`;
+          if(!extras.has(key)) extras.set(key, key === about
+            ? {own: about, date: ownRuns.get(about).date, at: ownRuns.get(about).at, base: true}
+            : {own: about, date: h.date, at: recordedAtOf(h), base: false});
         }
         perRun.set(key, historyStatus(h, ck));
       });
@@ -3645,7 +3664,7 @@ function unitCounts(units){
   // Each own run's later points, in date order, each carrying from the one before.
   const chains = new Map();
   extras.forEach((e, key)=>{ if(!e.base){ if(!chains.has(e.own)) chains.set(e.own, []); chains.get(e.own).push(key); } });
-  chains.forEach(keys=> keys.sort((a,b)=> extras.get(a).date - extras.get(b).date));
+  chains.forEach(keys=> keys.sort((a,b)=> (extras.get(a).date - extras.get(b).date) || (extras.get(a).at - extras.get(b).at)));
   perCheck.forEach(({perRun})=>{
     chains.forEach((keys, own)=>{
       let prev = own;
@@ -3659,7 +3678,7 @@ function unitCounts(units){
     const worst = worstByUnit.get(unit);
     perRun.forEach((s, runId)=>{
       if(s !== "red" && s !== "amber" && s !== "green") return;
-      if(!byRun.has(runId)) byRun.set(runId, {runId, date: extras.get(runId).date, counted:0, red:0, amber:0, sectionNames:[]});
+      if(!byRun.has(runId)) byRun.set(runId, {runId, date: extras.get(runId).date, at: extras.get(runId).at, counted:0, red:0, amber:0, sectionNames:[]});
       const was = worst.get(runId);
       if(!was || STATUS_ORDER[s] > STATUS_ORDER[was]) worst.set(runId, s);
     });
@@ -3674,7 +3693,8 @@ function unitCounts(units){
     });
   });
   return [...byRun.values()]
-    .sort((a,b)=> (a.date - b.date) || (a.runId < b.runId ? -1 : a.runId > b.runId ? 1 : 0));
+    // Same day: in the order they were recorded, then by id (REQ-PIPE-265).
+    .sort((a,b)=> (a.date - b.date) || (a.at - b.at) || (a.runId < b.runId ? -1 : a.runId > b.runId ? 1 : 0));
 }
 // One check as its own unit, for the tiers that count checks rather than
 // columns (a column's panel and tile, REQ-DASH-227).
@@ -5116,6 +5136,12 @@ function crossTableBetween(col, check){
 // "not supplied yet" where the second is the verdict. Two entries on the same
 // day where either came from another table's run are one delivery; the newer
 // is its result. A same-day resupply of the dataset's own stays two runs.
+// When a history entry was recorded, as a number to order by - 0 when unknown,
+// so an entry without a time never sorts after one that has it.
+function recordedAtOf(h){
+  const t = h && h.recorded_at ? Date.parse(h.recorded_at) : NaN;
+  return Number.isNaN(t) ? 0 : t;
+}
 function recordedDayOf(h){ return h.recorded_at ? assetDateStrOf(h.recorded_at) : h.run_date; }
 function sameDelivery(a, b){ return !!(a && b && (a.recorded_by || b.recorded_by) && recordedDayOf(a) === recordedDayOf(b)); }
 function deliveryCount(history){
@@ -8405,7 +8431,7 @@ function openCheckPanel(ag, col, ds, column, check, opts){
       </div>
       ${recheckHtml}
       <div class="delta ${deltaClass}">${deltaClass==="up"?"↑":deltaClass==="down"?"↓":"–"} ${Math.abs(delta).toFixed(2)}${deltaUnitTag} — ${deltaWord}</div>
-      ${n>2 ? `<div style="font-size:11px; color:var(--ink-faint); margin-top:8px;">Pick any past run above, or click a point on the trend chart below, to compare it against the current run.</div>` : ""}
+      ${n>2 ? `<div style="font-size:11px; color:var(--ink-faint); margin-top:8px;">Pick any past run above, or click a point on the trend chart below, to compare it against ${currentLabel === "Latest result" ? "the latest result" : "this run"}.</div>` : ""}
     </div>`;
   }
 

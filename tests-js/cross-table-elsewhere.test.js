@@ -327,6 +327,66 @@ describe("Q4: a sparkline point is dated by when its result was recorded", () =>
   });
 });
 
+// REQ-PIPE-265: a check carried from a sibling of the same delivery has no
+// result under this dataset's own run at all - only the sibling's. Found by the
+// gate (TestColumnsNotGreenMatchesTheDatasetPage, Notifications 9 of 10): the
+// row skipped it, while the page showed it.
+describe("REQ-PIPE-265: a check with only a carried result", () => {
+  const at = (run_id, day, status, recorded_by, read_run, time) => ({ run_id, run_date: day, date: new Date(`${day}T00:00:00Z`),
+    status, recorded_by, read_run: read_run || null, recorded_at: `${day}T${time || "09:00:00"}+08:00` });
+  it("still counts on the dataset's own run of that delivery", () => {
+    dashboard = loadDashboard();
+    const own = { run_id: "own_1", run_date: "2020-11-01", date: new Date("2020-11-01T00:00:00Z"), status: "green",
+                  recorded_by: null, recorded_at: "2020-11-01T08:20:00+08:00" };
+    const carried = { run_id: "cp_clients__1", run_date: "2020-11-01", date: new Date("2020-11-01T00:00:00Z"),
+                      status: "red", recorded_by: "cp-clients", recorded_at: "2020-11-01T08:20:00+08:00",
+                      read_run: "own_1" };
+    const units = [
+      { name: "a_column", checks: [{ history: [own] }] },
+      { name: "Cross-table", scope: "cross-table", checks: [{ history: [carried] }] },
+    ];
+    const counts = dashboard.window.unitCounts(units);
+    expect(counts).toHaveLength(1);
+    expect(counts[0]).toMatchObject({ counted: 2, red: 1, amber: 0 });
+  });
+
+  // The real shape: the check was judged under this dataset's own run of an
+  // earlier delivery, then carried on the next one. The carried result is that
+  // later delivery's, not a re-check of the earlier run.
+  it("counts on the later delivery's run when an earlier one judged it itself", () => {
+    dashboard = loadDashboard();
+    const units = [
+      { name: "a_column", checks: [{ history: [at("own_may", "2026-05-27", "green", null), at("own_aug", "2026-08-01", "green", null)] }] },
+      { name: "Cross-table", scope: "cross-table",
+        checks: [{ history: [at("own_may", "2026-05-27", "green", null),
+                             at("cp_clients__aug", "2026-08-01", "red", "cp-clients", "own_aug")] }] },
+    ];
+    const counts = dashboard.window.unitCounts(units);
+    expect(counts.map(c => c.runId)).toEqual(["own_may", "own_aug"]);
+    expect(counts[1]).toMatchObject({ counted: 2, red: 1, amber: 0 });
+  });
+
+  // The real shape behind the opposite mistake (Case Workers, 15 May 2025): a
+  // held arrival judged only its file checks the day another table's check
+  // read the EARLIER supply. That result is a re-check of the earlier run,
+  // carrying every other check's verdict, not a point on the held arrival.
+  it("goes with the run it read, not with an own run of the same day", () => {
+    dashboard = loadDashboard();
+    const units = [
+      { name: "a_column", checks: [{ history: [at("own_feb", "2025-02-01", "green", null)] }] },
+      { name: "b_column", checks: [{ history: [at("own_feb", "2025-02-01", "green", null)] }] },
+      { name: "Table-level checks", scope: "table",
+        checks: [{ history: [at("own_feb", "2025-02-01", "green", null), at("own_may_held", "2025-05-01", "green", null)] }] },
+      { name: "Cross-table", scope: "cross-table",
+        checks: [{ history: [at("cp_investigations__may", "2025-05-01", "green", "cp-investigations", "own_feb", "09:00:05")] }] },
+    ];
+    const counts = dashboard.window.unitCounts(units);
+    const newest = counts[counts.length - 1];
+    expect(newest.runId).toBe("own_feb@2025-05-01");
+    expect(newest.counted).toBe(4);
+  });
+});
+
 // post-build-review #258's UX points (minor polish, 2026-10-20).
 describe("the cross-table rows on a dataset page", () => {
   it("keep each relationship's three tools together, dbt first", () => {

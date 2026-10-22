@@ -496,3 +496,180 @@ is settled.
   carried verdict stops counting once a file it read is held. To the scoper,
   then the architect, 2026-10-21 morning. Keith wants their view on any other
   tensions, gaps or deadlocks.
+
+## Keith's answers on v3, 2026-10-22 (Perth)
+
+- **N1 (architect): a transitive group gate.** A gate application is the
+  arrival plus every waiting supply in the period connected to it through
+  recorded cross-table verdicts, settled by REQ-PIPE-267's fixed point and
+  never running a check for a waiting supply. This applies at every gate
+  entry. Put to Keith as a clarification of his "things that depend on each
+  other don't promote until they're all good"; no objection. It folds
+  REQ-PIPE-268 and 267 c14 into one rule, and with them the scoper's Q1 and
+  Q2 (both become A).
+- **Q13 = B.** A check that could not run counts only against the table
+  asking the question (the declaring table). Where the declaring table
+  (e.g. Placements) is absent or held back, its record counts toward
+  nothing. Where the referenced table (e.g. Clients) is absent, it counts
+  toward the declaring table only. One bad or late Placements file no
+  longer holds back the whole quarter. This reverses v2's Q8 (given for
+  Incomplete). Strict red still holds for the table that asks.
+- **Q9 = A, "B later".** Packages are zip-only for now. On the cloud (S3)
+  path every file stands alone and gets the accepted flicker; this is
+  recorded as a known limitation, and REQ-DOCS-274's guidance says to upload
+  a zip. A cloud package boundary (a manifest or an end marker) comes later,
+  as transport-layer work: running-thoughts #114, plans/supply-thoughts.md.
+- **Q3 = A.** A crash keeps the package waiting (it is checked, waiting for
+  its package, owed and not a failure); the next pass re-runs the crashed
+  file and gates the package together. A refusal by the agreement backstop
+  counts as held back, so the siblings are re-checked against the warehouse
+  partner and go ahead if green. That matches the backstop's own "holding
+  back nothing else".
+- **Q4 = B, plus a warning.** "Carry forward once" stands for both cases; no
+  automatic retry and no automatic re-pointing. Keith: "B, but include the
+  warning on the dashboard et cetera when it goes stale." So when an earlier
+  supply is promoted after a quarter opened, the quarter shows a warning on
+  the dashboard and in the terminal (the queue and the door) saying a newer
+  supply could be carried forward, and a person re-points it by hand
+  (REQ-PIPE-099's un_inherit / inherit_one). Taken to cover the refused case
+  too (the architect's S9, where the readers are red with nothing carried
+  forward), so S9 is cleared by a person acting on the warning, not by a
+  retry. To confirm with Keith at sign-off.
+  **Confirmed by Keith, 2026-10-22:** "Happy with the wording you used and
+  your interpretation." The warning covers both the stale and the refused
+  case.
+- **Q5 = A.** While an owed re-check hasn't run, the supply reads red,
+  worded "Not yet re-checked against the <dataset> promoted <instant>; the
+  re-check runs on the next processing pass." No notification is sent for
+  that red unless the re-check itself fails (running-thoughts #113, no
+  flickering reds). Option B, showing the old verdict against the previous
+  partner, was rejected as a half-and-half view.
+- **Q7 = A, "with a few scenario that explicitly exercise B".** A target
+  describes the file itself: it is compared against the file's own checks,
+  leaving out could-not-run results and re-checks a package-mate caused.
+  Separately, a FEW scripted scenarios declare the expected GATE outcome
+  (held back because of a package-mate, a re-check against the warehouse
+  partner, both branches of S1) and are checked against it, so the package
+  gate itself is pinned by the test history. REQ-GEN-273 gains a criterion
+  for these; which scenarios is for the scoper (suggested: S1 green, S1 red,
+  S2, the S10 three-file chain, and Q13's Placements case).
+- **Q8 = A (the scoper's draft, not the CLI reviewer's A').** A supply held
+  back only because of a package-mate is listed beneath that package-mate in
+  the queue, is not counted, and reads that nothing needs deciding on it. It
+  is not offered as a pickable decision from the queue line; a hand override
+  is still available by naming it (`mothman supply decide --dataset
+  cp-clients ...`). Once the package-mate is rejected, it becomes its own
+  counted row. (A' was offered and not taken; Keith told he can switch.)
+- **Agreed batch, "All four as recommended", 2026-10-22:**
+  - Q10 = A: a rejected sibling is not re-run; the other file's reason is
+    reworded from the decision log ("The <dataset> file received with it was
+    turned down; this supply now needs its own decision"), and no surface
+    keeps a stale "waiting for".
+  - Q6 = A: one ticket and one "still failing" record per root cause, naming
+    everything it holds back.
+  - A decision on a supply whose package is still being checked or gated is
+    refused: "The delivery received <instant> is still being checked (n of m
+    files checked); decide once it is gated." `promote()` re-confirms the
+    read holders under the slot locks (architect).
+  - The supply-history row shows the joint promotion: "Promoted <time> with
+    the <dataset> supply received <instant>, by the rule" (this replaces the
+    S5 "cleared minutes later" note, Q-F).
+- **Q11 = A.** The collection, agency and exec cards follow each dataset's
+  newest supply (the staging view while it awaits a decision), plus one card
+  line per held-back delivery: "[Red] Held back together: <names> (one
+  delivery, received <instant>)", with the first two names then "and n more"
+  past three. Red keeps meaning "a person is needed".
+- **Q12 = A** (confirmed after the mechanism was explained). Every
+  cross-table row, on both views, says what it read: "Read against the
+  <dataset> in place, received <instant>", "...supply received <instant>,
+  not in place yet", or "Read against: no <dataset> in place for <period>".
+  Two kinds of row are excepted because their own sentence already names the
+  partner: a package re-check against the warehouse, and could-not-be-checked
+  for want of a partner. Decided in the Python build from structured fields
+  (qa.tables_read, the run's from_warehouse marker, the structured reason
+  code), never from text. "In place" is judged as at the date on show, using
+  the as-at promotion timeline.
+- **S1-red top line = A.** A notice at the top of the page, in the existing
+  `.notice-exhausted role=status` structure: "**Held back with the
+  Notifications received with it.** That file (received <instant>) was held
+  back, so this supply was re-checked against the Notifications in place in
+  the warehouse, and <n> cross-table check(s) fail against it. It is checked
+  again by itself once a Notifications supply is promoted." It has no "not a
+  fault" clause.
+- **S2 wording = yes** (REQ-DASH-204 c2): "**No promoted Notifications for
+  2024-Q3.** The Notifications received with this supply (<instant>) was held
+  back, so <n> of this supply's checks could not run. That is not a fault in
+  this supply's own data. They run again by themselves once a 2024-Q3
+  Notifications supply is promoted." This amends Keith's single wording from
+  Q10 = A (2026-10-14).
+- **General wording change (Keith, 2026-10-22): "in place" becomes "in place
+  in the warehouse"** wherever the phrase is shown to a person, here and
+  everywhere else it is already exposed (about 33 uses in the dashboard
+  template and 12 in the CLI). This is a change to built, signed wording, so
+  it needs its own small requirement, outside #95's batch but landing with it.
+  Open for sign-off: the date picker's label "In place on" (REQ-PIPE-081
+  c6), where "In place in the warehouse on" is long. Candidate: "In the
+  warehouse on".
+- **S6 row display = A** ("definitely option A", after seeing a mock-up on
+  the real page: mockup-s6-top.png and mockup-s6-cross-table.png in this
+  folder). A cross-table row whose staging verdict and warehouse re-check
+  differ shows both: the staging result (read against the staged partner) as
+  the main line, and the re-check against the warehouse partner as a second
+  line saying it is why the supply is held back. The row's status is the
+  gate's. In S6 that means Escalation completeness: Pass against
+  Investigations v2, Fail against Investigations v1.
+  **Keith's concern, for the dashboard UX reviewer:** the density. "I think
+  we could do something better here than just layering in lots of text, but
+  I think having the longer descriptions there is useful to explain it to a
+  sort of wider audience of engineers." The mock-up shows the dual lines
+  repeated per tool (x3) and long "Read against..." labels wrapping. The
+  reviewer is to propose a presentation that keeps the full explanation
+  available without stacking text.
+- **S6 root naming (A or B) is NOT yet answered.** It was interrupted by the
+  row question and is to be asked next.
+- **S6 root naming = A.** Every name in these sentences is a real link (built
+  via `navHref`/`affectsLinks`, keeping in-place-on). Where the chain is
+  longer than one step, the held-back line names the root as well: "Held back
+  with its delivery: the Investigations file was held back, and the
+  Notifications with it." The root's page lists every supply its hold is
+  holding back, directly or through the chain.
+- **Row density = Option C, "with stacked results on phone"** (Keith,
+  2026-10-22, after seeing mock-ups of B and C on the real page:
+  mockup-density-option-b.png, -option-c.png, -option-c-phone.png). The
+  cross-table section is a grid with one row per check (not per tool),
+  columns "Against what's staged" and "Against what's in the warehouse".
+  Each cell shows the verdict, the tools as marks (dbt, Soda,
+  datacontract-cli) and which supply was read ("Investigations received 2
+  Oct"); a dash where that view has no result. The dual case shows both
+  cells, the warehouse one ending "why it is held back". The row's status pill
+  is the gate's. A key line explains the marks. Selecting a check opens each
+  tool's full result, where the full sentences live (the long "Read against
+  ..." and re-check sentences, with "in place in the warehouse"); the
+  accessible name carries them too. At phone width each check's two results
+  stack under its name, with the status pill kept visible. (Keith's earlier
+  "A" was for N1 only; Option A was not chosen.) Amends REQ-DASH-264 c2, c7,
+  M4 and NFR 2, and REQ-DASH-272 c4-c6.
+- **N1 (a partner not due yet) = A.** The partner's page shows a muted line in
+  `noSupplyNote()`'s `.late-open-note` shape: "Not due until <instant> — the
+  <reader> is waiting on it", with the reader names built by `affectsLinks`.
+  The reader's red is unchanged. For #113 (notifications on red): a red that
+  lasts days because a partner isn't due yet is legitimate, but should not
+  page anyone.
+
+## How Keith will sign v4 off (2026-10-22)
+
+Sequence: the scoper writes v4, then the architect, then both UX reviewers
+(dashboard and CLI), then the whole package goes to Keith. His terms: "I don't
+feel I need to sign off on exact wording, but as long as what I've decided
+hasn't changed or there's been no new questions, I'm happy to take these as
+kind of as read. But yeah, do one last check-in with me." That last check-in is
+a walk-through of the original scenario (S1: Clients v1 and Notifications v1
+in the warehouse, a zip brings v2 of both) as it now works end to end, given
+only once everything has settled and any new questions from the scoper,
+architect or reviewers have been answered. Sign-off is recorded only after
+that walk-through, and only if no decision moved; anything that did move is put
+to him first.
+Keith added (2026-10-22): the final check-in also walks through an alternate
+version beside S1, the staggered arrival. The same v1/v2 files arrive as
+separate files a few minutes apart, not as a zip, so the accepted flicker and
+the transitive group gate are shown end to end.
