@@ -5881,3 +5881,15 @@ could never have computed it), and it belongs with batch 5's check work.
      that genuinely alter behaviour are proved by their own tests, not by a
      zero-difference comparison. Retiring it touches REQ-TEST-239's own
      record (a requirement claim), so the wording goes to Keith first.
+
+123. **[todo, 2026-10-22]** **[Dashboard UI]** **[Pipeline & publishing]** **Make
+     publishing the dashboard part of a routine, so the site cannot silently
+     fall weeks behind.** Keith, 2026-10-22, on finding the published site
+     still showed 28 September: since REQ-PIPE-092 publishing is one
+     deliberate command (`mothman dashboard publish`, from an environment that
+     holds the database), no push runs it, and nobody had run it in 24 days.
+     His words: "making publishing part of each push's routine, or at least
+     something we do at an agreed point where I give you an instruction,
+     maybe." Republished from the sandbox the same day (his option A). Not
+     scoped: when (every finished, pushed piece of work; or on his word),
+     from which environment, and how a stale site would say so.
