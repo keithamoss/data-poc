@@ -5778,6 +5778,8 @@ could never have computed it), and it belongs with batch 5's check work.
      instant (REQ-PIPE-105 c5, REQ-PIPE-265). Other ways to mark a batch's
      start and end belong with the transport layer (plans/supply-thoughts.md).
      Not scoped.
+     **Keith, 2026-10-22 (#95's Q9): "A, B later"** - zip-only for now; a
+     cloud (S3) package boundary, such as a manifest or an end marker, is to come.
 
 115. **[todo, 2026-10-21]** **[Docs & process]** **Semantic search over the
      project's own memory, alongside the agents.** Keith, 2026-10-21, after
@@ -5796,3 +5798,86 @@ could never have computed it), and it belongs with batch 5's check work.
      So lexical ranking (PostgreSQL full-text search, or BM25) is buildable
      now. Semantic embeddings need an allow-listed model host, or Bedrock in
      an AWS deployment. Not scoped.
+
+116. **[todo, 2026-10-22]** **[Dashboard UI]** **Say "in place in the
+     warehouse", not just "in place".** Keith, 2026-10-22, settling #95's
+     wording: "when we say 'in place', let's say 'in place in the warehouse',
+     here and anywhere else we actually expose that wording." About 33 uses
+     in the dashboard template and 12 in the CLI (counted 2026-10-22). It
+     changes built, signed wording (REQ-PIPE-081 among others), so it needs a
+     small requirement of its own. Open: the "In place on" date picker label,
+     where "In the warehouse on" is the candidate.
+
+117. **[todo, 2026-10-22]** **[QA Pipeline]** **[Dashboard UI]** **Deterministic
+     matching of a result to the supply it is about - no ties, no guessing.**
+     Keith, 2026-10-22, after the REQ-PIPE-265 display fix placed results
+     recorded under another table's run by run-id stamps, calendar days and
+     recording-time tie-breaks: "I don't want ties and guessing, I want
+     deterministic matching - even if it means changing the metadata we
+     capture." Chose to scope it as its own requirement (option A), built
+     before REQ-PIPE-265 is flipped, rather than folding it into #95 v5. The
+     candidate facts to record: each check result's supply id for EVERY
+     table its check read (own table included), a delivery id on `qa.run`
+     shared by one delivery's arrival runs, and a recorded sequence that
+     cannot tie. Same per-check fact the architect's #95 v4 B2 needs.
+
+118. **[investigate, 2026-10-22]** **[Dashboard UI]** **Is it obvious which
+     period a page is talking about?** Keith, 2026-10-22, answering REQ-PIPE-279
+     K2 (a result that read no Clients supply shows only on Notifications'
+     page, and Clients' page keeps showing its Q2 supply): "this opens up an
+     interesting question around how we show [the] period that a page is
+     talking about, whether that is clear enough in the UI ... is it obvious,
+     or is it clear enough to the user when they're looking at a page?
+     Particularly for the quarterly asset, but also for the daily, which
+     period is being discussed, which period we are showing information for."
+     Sent to the dashboard UX critic against the built dashboard the same day.
+     **The critic's answer, same day: no.** Full report:
+     docs/drafts/period-clarity/review-ux-critic.md. No tier names the period
+     (only the picker and an ED-only block do; pages name the supply by its
+     receipt instant); a cross-table red caused by the OTHER table's missing
+     period gives no sign of it on the reading table's row or collection row;
+     "2026-Q3" is the 1 Aug-31 Oct delivery slot, which readers will take as
+     Jul-Sep or the financial-year Q3; an empty current period hides how old
+     the shown results are. Also a REAL DEFECT found on the way: the
+     "outside the dates" notice's "View <today> instead" and the picker's
+     "Reset to default" do nothing when the default date is itself past the
+     data (every morning after a build) - needs a failing test first. Three
+     questions for Keith in the report.
+
+119. **[todo, 2026-10-22]** **[Dashboard UI]** **Show a check's start time or its
+     end time?** Keith, 2026-10-22, answering REQ-PIPE-279 K3 (every
+     evaluation its own point, ordered by when it began): "there's also a
+     running thought here around whether you show the start time of the
+     checks or the end time of the checks". Today pages show receipt and
+     recording instants; 279 orders by evaluation start (`run_seq`). Not
+     scoped.
+
+120. **[todo, 2026-10-22]** **[QA Pipeline]** **[Dashboard UI]** **How long
+     the checks took - and noticing when that grows.** Keith, 2026-10-22,
+     same conversation: "showing how long the checks took, and maybe
+     alerting, monitoring, something around that. So the check starts at 5
+     minutes, 10 minutes, 3 minutes, 3 hours. At some point that becomes
+     visually obvious, so you can go and look into it and try and address
+     it." `qa.run` already records `created_at` and `completed_at`. Related
+     to the pipeline-observability item in plans/wider.md. Not scoped.
+
+121. **[todo, 2026-10-22]** **[Dashboard UI]** **[QA Pipeline]** **Make it
+     obvious when a run timed out or crashed before it succeeded.** Keith,
+     2026-10-22, answering REQ-PIPE-279 K5 (a retried run takes a fresh place
+     in the order): "it should also be obvious somewhere that it did time out
+     or crash. Maybe that one for the UX review." Today a retry leaves no
+     trace of the failed attempt (`reopen_run` clears `completed_at`;
+     results are replaced), so recording attempts would have to come first.
+     Display for the UX review alongside #118-#120.
+
+122. **[todo, 2026-10-22]** **[Testing]** **Pause and retire the equivalence
+     harness - but do not delete it yet.** Keith, 2026-10-22, answering
+     REQ-PIPE-279 K6: "The equivalence check is all about the refactor ...
+     to have a single set of registration stuff. Like, this is about genuine
+     changes, so we don't need to run the equivalence check. That was a point
+     in time thing and can be paused and retired ... But not yet deleted."
+     REQ-TEST-239 (`mothman debug equivalence capture/compare`) served the
+     collection-registry refactor (REQ-PIPE-240 to 248). From here, changes
+     that genuinely alter behaviour are proved by their own tests, not by a
+     zero-difference comparison. Retiring it touches REQ-TEST-239's own
+     record (a requirement claim), so the wording goes to Keith first.
