@@ -11050,3 +11050,26 @@ twice. It deliberately did not re-find the `TypeError`.
        (the test now expects a downward scroll and failed against the code),
        and checked in a real Chromium: a subject pushed to 801.03px comes back
        to 798.03px. CI's reload case should land at 798.28px.
+
+260. **[done, 2026-10-22]** **[Dashboard UI]** **The "outside the dates" notice
+     offered a date it was already on, and did nothing.** Found by the
+     dashboard UX critic answering plans/running-thoughts.md #118 (full report
+     docs/drafts/period-clarity/review-ux-critic.md, S4), verified in the
+     template: `renderInPlaceOnRangeNotice()` offered "View
+     <DEFAULT_IN_PLACE_ON> instead", and the default is today on the asset
+     clock while the covered range ends at the period the BUILD's day fell
+     in. So every morning after a build the page opened on a date past the
+     range, said so, and offered that same date - a dead button on every
+     page. REQ-DASH-054 criteria 9-10 ask for a one-click reset; the
+     criterion's intent was a way back into the covered dates, which the
+     default only is when it lies inside them. Minor (a polish defect under
+     the 2026-09-25 standing rule), so fixed without sign-off: the button now
+     offers the nearest covered date when the default itself is outside,
+     saying which ("..., the newest date this dashboard has periods for").
+     Failing test first: tests-js/in-place-on-range.test.js "offers the
+     newest covered date when the default itself is past the range"
+     (confirmed red against the old code, green after). The critic also
+     called the picker's "Reset to default" the same no-op; it is not a
+     defect - it resets to the default, which is what it says - and is left
+     alone. Whether the DEFAULT should itself be the newest covered date is a
+     behaviour question for the period-clarity requirement, not this fix.

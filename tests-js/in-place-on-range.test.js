@@ -13,7 +13,7 @@
 // tests/test_dashboard_e2e.py's own as-of coverage - because a correct
 // lookup says nothing about a template with its own transform.
 import { afterEach, describe, expect, it } from "vitest";
-import { loadDashboard } from "./support/loadDashboard.js";
+import { loadDashboard, PERIOD_SEQUENCES_DEFAULT } from "./support/loadDashboard.js";
 
 let dashboard;
 
@@ -129,6 +129,25 @@ describe("a date outside the covered range, arriving by URL (criteria 9 and 10)"
     // Back to the default, the notice gone, and the page still rendered.
     expect(w.document.getElementById("in-place-on-range-notice").hidden).toBe(true);
     expect(inPlaceOn(w, "CURRENT_IN_PLACE_ON")).toBe(inPlaceOn(w, "DEFAULT_IN_PLACE_ON"));
+  });
+
+  // THE MORNING AFTER A BUILD (period-clarity critique S4, 2026-10-22): the
+  // default is today on the asset clock, and the covered range ends at the
+  // period the BUILD's day fell in - so the default itself can be outside it.
+  // Offering the default then offered the date already on show, and the
+  // button did nothing. The nearest covered date is what is offered instead.
+  it("offers the newest covered date when the default itself is past the range", () => {
+    const ended = { ...PERIOD_SEQUENCES_DEFAULT,
+      calendars: { daily: PERIOD_SEQUENCES_DEFAULT.calendars.daily.filter(e => e.date <= "2025-12-01"),
+                   quarterly: PERIOD_SEQUENCES_DEFAULT.calendars.quarterly.filter(e => e.date <= "2025-12-01") } };
+    const w = load({ periodSequences: ended });
+    const notice = w.document.getElementById("in-place-on-range-notice");
+    expect(notice.hidden).toBe(false);
+    const reset = w.document.getElementById("in-place-on-range-reset");
+    expect(reset.textContent).toContain("1 December 2025");
+    reset.click();
+    expect(inPlaceOn(w, "CURRENT_IN_PLACE_ON")).toBe("2025-12-01");
+    expect(w.document.getElementById("in-place-on-range-notice").hidden).toBe(true);
   });
 
   it("does not replace the page - the rest of it is still a real answer", () => {

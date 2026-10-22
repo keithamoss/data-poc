@@ -10286,14 +10286,22 @@ function renderInPlaceOnRangeNotice(){
     && (CURRENT_IN_PLACE_ON < range.first || CURRENT_IN_PLACE_ON > range.last);
   if(!outside){ notice.hidden = true; notice.innerHTML = ""; return; }
   notice.hidden = false;
+  // THE DEFAULT CAN BE OUTSIDE THE RANGE TOO - the morning after a build, when
+  // today has moved past the build's last period (period-clarity critique S4,
+  // 2026-10-22). Offering it then offered the date already on show and did
+  // nothing, so the nearest covered date is offered instead.
+  const offer = DEFAULT_IN_PLACE_ON < range.first ? range.first
+    : DEFAULT_IN_PLACE_ON > range.last ? range.last : DEFAULT_IN_PLACE_ON;
+  const why = offer === DEFAULT_IN_PLACE_ON ? "" : offer === range.last
+    ? ", the newest date this dashboard has periods for" : ", the earliest date this dashboard has periods for";
   notice.innerHTML = `You are viewing what was in place on
     <b>${fmtDay(CURRENT_IN_PLACE_ON)}</b>, which is outside the dates this
     dashboard has delivery periods for — it covers
     <b>${fmtDay(range.first)}</b> to <b>${fmtDay(range.last)}</b>.
     <button class="link-btn" id="in-place-on-range-reset" type="button">View
-    ${fmtDay(DEFAULT_IN_PLACE_ON)} instead</button>`;
+    ${fmtDay(offer)}${why} instead</button>`;
   const reset = document.getElementById("in-place-on-range-reset");
-  if(reset) reset.addEventListener("click", ()=> applyInPlaceOn(DEFAULT_IN_PLACE_ON));
+  if(reset) reset.addEventListener("click", ()=> applyInPlaceOn(offer));
 }
 function applyInPlaceOn(dateStr){
   // A date the reader chose themselves is not an arrival from anywhere,
