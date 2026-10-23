@@ -2646,3 +2646,8 @@ one or more component tags, and a date.
      whose ONLY result on the pair's page is a contested read gets no card
      there - doesn't arise in today's data. Next: register flip, changelog,
      one full gate, push.
+   - **REGISTER FLIPPED (~02:50, checkpoint c84e8cc)**: REQ-PIPE-279 and
+     REQ-PIPE-265 marked built, with every provisional call recorded in their
+     `decisions` as "PROVISIONAL, pending Keith"; running-thoughts #117
+     deleted (279 covers it); changelog entry for today. Full gate on the
+     final tree next, then the push.
