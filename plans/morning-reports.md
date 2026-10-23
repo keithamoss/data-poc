@@ -2637,3 +2637,12 @@ one or more component tags, and a date.
      signed). The alternative (b) was to accept "No data" for contested pairs
      and amend TS-80's assertion - a change to signed behaviour, so not taken.
      Reverse if you meant c14 to cover this.
+   - **TS-80 FIX BUILT (~02:35, checkpoint aeb996b)**: provisional #21 in code. A
+     contested pair's matching reads sit in a separate list on each check,
+     never in its history or any count, so c14's "not shown or counted" holds
+     everywhere except the blocked row while that pair blocks it. Builder's runs
+     on that tree: e2e 302 passed (TS-80 included, its assertion unchanged), 13
+     modules 295 passed, npm test 882, ruff clean. PROVISIONAL (#22): a check
+     whose ONLY result on the pair's page is a contested read gets no card
+     there - doesn't arise in today's data. Next: register flip, changelog,
+     one full gate, push.
