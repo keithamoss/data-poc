@@ -2659,3 +2659,11 @@ one or more component tags, and a date.
      claude/qac-024-explanations-qx8hx8, head 98b67fc - REQ-PIPE-279 and
      REQ-PIPE-265 built, the #261 fix, the signed register batch, the period
      clarity drafts. CI running; post-build critic on 279 running.
+   - **CI on 98b67fc (~03:50)**: validate-config green, js-tests green, the two
+     pytest halves still running. ON-DEMAND RED, 3 tests the local gate does
+     not run - the resume-vs-replay and parallel-vs-sequential comparators had
+     not been taught 279's new tables: qa.run_attempt's wall-clock begin/end
+     times, check_read keyed by surrogate result id, and run_seq (opening
+     order, which a parallel bootstrap legitimately changes). A comparator
+     gap, not a determinism defect - the records match on what they mean. Being
+     fixed in the comparators without weakening them.
