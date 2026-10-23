@@ -2717,3 +2717,11 @@ one or more component tags, and a date.
      running an empty lookup (20d0d98). The isolation fix is cherry-picked
      (8be17f3). Pushed after the affected modules and the non-pytest gates
      passed on the final tree; CI runs the full suite.
+   - **CI on ee6381a (~06:35)**: on-demand GREEN (the comparator fix holds),
+     js-tests, config and test-deployment green; the no-deployment half 5553
+     passed / 2 failed - tests/test_orchestrate_reference_run.py's fake
+     connection had no `fetchone`, which 20d0d98's "does the table exist"
+     question now asks (the old code caught the fake's error). A test-double
+     gap, not a product defect: the fake now answers "no such table", as its
+     empty catalogue implies. Seen failing first (2 failed), then 2 passed;
+     with test_cli_cp's own fake 35 passed; ruff clean.

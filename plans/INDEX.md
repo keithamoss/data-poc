@@ -555,7 +555,7 @@ one when this line suggests it matters.
 - **#7** `in-progress` 2026-10-20 - Overnight 2026-10-19 to 2026-10-20: REQ-DASH-264 finished, REQ-GEN-237 criterion 4, two audits. - YOUR TERMS FOR THE...
   - *touches:* `tests/test_correction_claims.py`
 - **#8** `in-progress` 2026-10-23 - Overnight 2026-10-23 to 24: REQ-PIPE-279 (deterministic matching), then REQ-PIPE-265's flip. - THE PLAN, approved...
-  - *touches:* `tests/test_no_guessing_in_placement.py`
+  - *touches:* `tests/test_no_guessing_in_placement.py`, `tests/test_orchestrate_reference_run.py`
 
 ## plans/post-build-review.md
 

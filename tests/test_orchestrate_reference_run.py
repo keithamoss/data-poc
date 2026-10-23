@@ -70,6 +70,12 @@ class _FakeConn:
     def fetchall(self):
         return []
 
+    # The catalogue is empty, so asking whether a table exists says no.
+    # `resolution_for` asks first since post-build-review #262 D2's gate
+    # fix, where it used to catch a failed SELECT.
+    def fetchone(self):
+        return (None,)
+
     def close(self):
         pass
 
