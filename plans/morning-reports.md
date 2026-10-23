@@ -2707,3 +2707,13 @@ one or more component tags, and a date.
      the same worker database. The same interference chunk B's builder saw and
      I could not reproduce locally - now seen twice, so a real test-isolation
      defect, not a flake. Being fixed in a separate worktree, failing first.
+   - **GATE ON ae2f74f (~05:30, after a bootstrap from empty, 25m30s - every
+     scripted verdict as built, so D2 changed no promotion)**: 5967 passed, 3
+     failed. (1) my own #262 entry's status tag was malformed - fixed
+     (e866a7e). (2) two test_processing_pass failures, a REAL regression from
+     D2: a lookup of a not-yet-created staging table raised and was caught,
+     leaving open_run's transaction aborted for the next query - fixed by
+     checking the table exists instead of catching the error, and by not
+     running an empty lookup (20d0d98). The isolation fix is cherry-picked
+     (8be17f3). Pushed after the affected modules and the non-pytest gates
+     passed on the final tree; CI runs the full suite.
