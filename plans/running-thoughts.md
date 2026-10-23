@@ -5897,3 +5897,13 @@ could never have computed it), and it belongs with batch 5's check work.
      related to #120 (check durations) and #121 (showing a timed-out or
      crashed run), which REQ-PIPE-279's run-attempt record and per-attempt
      lock will feed. Not scoped.
+     **Added 2026-10-24 (Keith: "leave until AWS")**: the run lock's own
+     weakness belongs here too (post-build-review #262 R3). The lock rides
+     one idle connection with no TCP keepalive, so a dead host holds it
+     ~2h (every retry refused meanwhile), and a dropped lock connection -
+     an AWS NAT gateway cuts idle TCP after ~350s - lets a second attempt
+     close the live one and both write, the first's end updating no row
+     silently. Options weighed: keepalives on the lock connection plus a
+     refusal when an attempt's end updates no row (small); a heartbeat
+     column the next attempt checks (bigger, also covers a hung process).
+     Decide when the AWS build is scoped.

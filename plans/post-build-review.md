@@ -11115,12 +11115,15 @@ twice. It deliberately did not re-find the `TypeError`.
        checks never count toward a status) but it is exactly the guessing
        279 removed elsewhere. A defect: failing test first, supply from the
        record.
-     - **R3 (risk, not reproduced).** The attempt lock rides one idle
+     - **R3 (risk, not reproduced) - Keith 2026-10-24: leave until the AWS
+       build; carried to running-thoughts #124.** The attempt lock rides one idle
        connection with no TCP keepalive: a dead host holds it ~2h (retries
        refused), and a dropped lock connection lets a second attempt close the
        live one and both write, with the first `end_attempt` updating 0 rows
        silently. Matters for the AWS direction. Fix for Keith to choose.
-     - **R4 (risk, code-read; does not occur on ed_probe).** The as-of clip
+     - **R4 (risk, code-read; does not occur on ed_probe) - Keith 2026-10-24:
+       fix with #95's sprint 1, which reworks the same cross-table rows; a
+       test of this exact case goes in with it.** The as-of clip
        keeps every other-table result whatever supply it read, so a late
        reader of an older supply can show as current on the partner's page
        while the gate would not use it.
@@ -11135,5 +11138,7 @@ twice. It deliberately did not re-find the `TypeError`.
        writer branches untested; ed_probe has no HELD or contested-READ rows,
        so c15 and c1's contested-READ case are unit-tested only.
      - c13 partly met: a dataset's OWN re-check entry names no cause.
+     Keith 2026-10-24: F5 items 1-5, T6's guard strengthening and the c13
+     own-entry gap all to be fixed now (defects test-first).
      Plan: D1 and D2 now, test-first; T6's test-23/26 strengthening with them;
      R3, R4, F5 and the c13 gap to Keith (morning report #8).
