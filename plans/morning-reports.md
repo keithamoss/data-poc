@@ -2466,3 +2466,19 @@ one or more component tags, and a date.
      One push per finished, gate-green chunk (REQ-TEST-260's cadence); the
      first push also carries the local checkpoints since 2026-10-22
      (REQ-PIPE-265's build, #258 polish, the signed drafts and register).
+   - **DRAFTED FOR SIGN-OFF (item 5-7, ~21:15)**: docs/drafts/small-2026-10-23/
+     - REQ-TEST-281 (#88 A: e2e tests spread across workers, each building
+       into its own output), REQ-TEST-282 (#88 B: a loaded page reused per
+       test class), REQ-TEST-283 (the built test-database tidy command, for
+       a retroactive sign-off), and the REQ-TEST-239 amendment (paused and
+       retired from use, kept, not deleted; status stays `built` so its
+       links keep being checked). Each has open questions with
+       recommendations in summary.md - for the morning, not acted on.
+   - **PROVISIONAL (#1)**: the scoper flagged that REQ-PIPE-265 criterion 9
+     (a REQ-TEST-239 before/after comparison) cannot be met usefully once
+     279's schema bump lands. My reading: it is ALREADY met. The comparison
+     ran on 2026-10-21/22 on schema 45 (before-265 vs after-265: 1,128
+     carried records removed, every status identical, decisions and
+     promotions identical, bootstrap -9%), and that is the evidence 265's
+     flip will cite. Nothing re-runs it across the schema bump. Reverse if
+     you want it re-captured on schema 46.
