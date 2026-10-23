@@ -68,42 +68,50 @@ describe("a cross-table row names the tables it is between", () => {
 });
 
 // REQ-DASH-264 criteria 3 and 5 (Keith 2026-10-19, option 2): while a table's
-// own supply is held, its cross-table rows show what they found since the held
-// supply's receipt; its own checks, and any cross-table row with nothing since,
-// read not run.
+// own supply is held, its cross-table rows show what they found of the held
+// supply (criterion 3 as REQ-PIPE-279 amended it); its own checks, and any
+// cross-table row that met none, read not run.
 describe("a held table's page", () => {
+  // REQ-PIPE-279 criterion 15, amending REQ-DASH-264 criterion 3: a row shows
+  // the result that met the held supply - its recorded read of this table HELD
+  // with that supply's id - never one picked by being recorded after the
+  // receipt, which could be about another supply.
+  const HELD = "cp-notifications@held";
   function held() {
-    const entry = (at, status) => ({ run_id: `r_${at}`, run_date: at.slice(0, 10), value: status === "red" ? 40 : 0,
-                                     status, recorded_at: at, recorded_by: "cp-notifications" });
+    const entry = (at, status, read_state, supply) => ({ run_id: `r_${at}`, run_date: at.slice(0, 10),
+      value: status === "red" ? 40 : 0, status, recorded_at: at, recorded_by: "cp-clients",
+      read_state, supply_id: supply, cause: `arrival:${at}` });
     return {
       columns: [
         { name: "cp_client_id", checks: [{ key: "not_null", history: [entry("2020-08-01T09:00:00+08:00", "green")],
                                            current_status: "green" }] },
         { name: "Cross-table", scope: "cross-table", checks: [
-          { key: "client_reference", history: [entry("2020-08-01T09:00:00+08:00", "green"),
-                                               entry("2020-11-01T08:20:00+08:00", "red")], current_status: "red" },
-          { key: "closed_case", history: [entry("2020-08-01T09:00:00+08:00", "green")], current_status: "green" },
+          { key: "client_reference", history: [entry("2020-08-01T09:00:00+08:00", "green", "READ", "cp-notifications@aug"),
+                                               entry("2020-11-01T08:20:00+08:00", "red", "HELD", HELD)], current_status: "red" },
+          { key: "closed_case", history: [entry("2020-12-01T09:00:00+08:00", "green", "READ", "cp-notifications@aug")],
+            current_status: "green" },
         ] },
       ],
     };
   }
 
-  it("shows a cross-table result recorded since the held receipt, and nothing older", () => {
+  it("shows a cross-table result that met the held supply, and none that did not", () => {
     dashboard = loadDashboard();
     const ds = held();
-    const shown = dashboard.window.blockChecksWhileHeld(ds, "2020-11-01T08:20:00+08:00");
+    const shown = dashboard.window.blockChecksWhileHeld(ds, { supply: HELD, openedAt: "2020-11-01T08:20:00+08:00" });
     const [own, cross] = ds.columns;
     expect(shown).toBe(1);
     expect(dashboard.window.checkStatus(own.checks[0])).toBe("nodata");
     expect(dashboard.window.checkStatus(cross.checks[0])).toBe("red");
+    // Recorded after the receipt, but about another supply.
     expect(dashboard.window.checkStatus(cross.checks[1])).toBe("nodata");
     expect(own.status).toBe("nodata");
   });
 
-  it("shows none when nothing was recorded since", () => {
+  it("shows none when no result met the held supply", () => {
     dashboard = loadDashboard();
     const ds = held();
-    expect(dashboard.window.blockChecksWhileHeld(ds, "2020-11-02T00:00:00+08:00")).toBe(0);
+    expect(dashboard.window.blockChecksWhileHeld(ds, { supply: "cp-notifications@another" })).toBe(0);
     expect(ds.columns[1].checks.every((ck) => dashboard.window.checkStatus(ck) === "nodata")).toBe(true);
   });
 });
@@ -132,20 +140,23 @@ describe("an own re-check recorded after the date on show", () => {
 // table's run counts against the dataset's own run it follows, so the list's
 // latest count and the page agree.
 describe("unitCounts with a result from another table's run", () => {
-  // A NEXT-DAY result is a point of its own since Keith's #258 Q4 (2026-10-20);
-  // it used to replace the earlier run's verdict.
-  it("counts a next-day result as its own point, carrying the other units forward", () => {
+  // A RE-CHECK of the supply is a point of its own (REQ-PIPE-279 criterion 10,
+  // its cause a decision), carrying every other unit from that supply's point
+  // before. It was a point of its own for being recorded on a later DAY (#258
+  // Q4), a rule the point key retired.
+  it("counts a re-check as its own point, carrying the other units forward", () => {
     dashboard = loadDashboard();
     const own = { run_id: "own_1", run_date: "2020-11-01", status: "red", recorded_at: "2020-11-01T08:20:00+08:00",
-                  recorded_by: null };
-    const later = { run_id: "other_r1", run_date: "2020-11-01", status: "green",
-                    recorded_at: "2020-11-02T11:00:00+08:00", recorded_by: "cp-clients" };
+                  recorded_by: null, rank: 1, supply_id: "cp-notifications@1", cause: "arrival:d@1" };
+    const later = { run_id: "other_r1", run_date: "2020-11-01", status: "green", rank: 2,
+                    recorded_at: "2020-11-02T11:00:00+08:00", recorded_by: "cp-clients",
+                    supply_id: "cp-notifications@1", cause: "decision:7" };
     const units = [
       { name: "a_column", checks: [{ history: [{ ...own, status: "green" }] }] },
       { name: "Cross-table", scope: "cross-table", checks: [{ history: [own, later] }] },
     ];
     const counts = dashboard.window.unitCounts(units);
-    expect(counts.map((c) => c.runId)).toEqual(["own_1", "own_1@2020-11-02"]);
+    expect(counts.map((c) => c.runId)).toEqual(["own_1", "cp-notifications@1 | decision:7"]);
     expect(counts[0]).toMatchObject({ counted: 2, red: 1, amber: 0 });
     expect(counts[1]).toMatchObject({ counted: 2, red: 0, amber: 0 });
   });
@@ -192,8 +203,9 @@ describe("a result that could not be evaluated", () => {
     dashboard = loadDashboard();
     const ds = { columns: [{ name: "Cross-table", scope: "cross-table", checks: [{ key: "ref", history: [
       { run_id: "r", run_date: "2020-11-01", status: "red", value: null, recorded_by: "cp-notifications",
-        recorded_at: "2020-11-01T08:20:00+08:00", not_evaluated: "could not run" }] }] }] };
-    expect(dashboard.window.blockChecksWhileHeld(ds, "2020-11-01T08:20:00+08:00")).toBe(0);
+        recorded_at: "2020-11-01T08:20:00+08:00", not_evaluated: "could not run",
+        read_state: "HELD", supply_id: "cp-clients@held", cause: "arrival:r" }] }] }] };
+    expect(dashboard.window.blockChecksWhileHeld(ds, { supply: "cp-clients@held" })).toBe(0);
     // ...but the row still shows what was recorded (criterion 3).
     expect(dashboard.window.checkStatus(ds.columns[0].checks[0])).not.toBe("nodata");
     // ...and the section's pill follows the rows it shows, not the banner's
@@ -219,7 +231,7 @@ describe("a held table's cross-table row", () => {
     expect(dashboard.window.rowRecheckNote(col, ck)).toBe("");
   });
 
-  it("is blocked when the held receipt's time is unknown, rather than shown", () => {
+  it("is blocked when the held supply is unknown, rather than shown", () => {
     dashboard = loadDashboard();
     const ds = held("2020-08-01T08:20:00+08:00");
     expect(dashboard.window.blockChecksWhileHeld(ds, null)).toBe(0);
@@ -269,21 +281,26 @@ describe("Q2: the collection page's cross-table row", () => {
   });
 });
 
-describe("Q3: one result per delivery for the comparison and the run count", () => {
-  const own = (d, t, s) => ({ run_id: `own_${d}`, run_date: d, status: s, recorded_by: null, recorded_at: `${d}T${t}+08:00` });
+describe("Q3, as K3 = C left it: every evaluation is a point for the comparison and the run count", () => {
+  // REQ-PIPE-279 (Keith, K3 = C): a delivery whose files were checked at two
+  // instants is two points, so the panel counts four here where #258 Q3's
+  // same-day rule counted two, and compares with the newest earlier point.
+  const own = (d, t, s) => ({ run_id: `own_${d}`, run_date: d, status: s, recorded_by: null,
+    recorded_at: `${d}T${t}+08:00`, supply_id: `n@${d}`, cause: `arrival:${d}@${t}` });
   const other = (d, t, s, by = "cp-clients", inn = "arrival") => ({ run_id: `oth_${d}_${t}`, run_date: d, status: s,
-    recorded_by: by, recorded_in: inn, recorded_at: `${d}T${t}+08:00` });
+    recorded_by: by, recorded_in: inn, recorded_at: `${d}T${t}+08:00`, supply_id: `n@${d}`,
+    cause: inn === "re-check" ? `decision:${d}` : `arrival:${d}@${t}` });
   const history = [own("2020-05-01", "01:00:00", "green"), other("2020-05-01", "01:08:00", "green"),
                    own("2020-08-01", "01:00:00", "red"), other("2020-08-01", "01:05:00", "red")];
 
-  it("compares with the previous delivery's newest result, not the same delivery's other copy", () => {
+  it("compares with the newest earlier point, the same delivery's other evaluation included", () => {
     dashboard = loadDashboard();
-    expect(dashboard.window.defaultCompareIndex(history)).toBe(1);
+    expect(dashboard.window.defaultCompareIndex(history)).toBe(2);
   });
 
-  it("counts deliveries, not copies", () => {
+  it("counts every point", () => {
     dashboard = loadDashboard();
-    expect(dashboard.window.deliveryCount(history)).toBe(2);
+    expect(dashboard.window.deliveryCount(history)).toBe(4);
   });
 
   it("keeps a same-day resupply of the dataset's own as two runs", () => {
@@ -293,37 +310,39 @@ describe("Q3: one result per delivery for the comparison and the run count", () 
     expect(dashboard.window.defaultCompareIndex(resupplied)).toBe(0);
   });
 
-  it("labels a row that came from another table's run", () => {
+  it("labels a row that came from another table's run with its cause and when", () => {
     dashboard = loadDashboard();
     const col = { datasets: [{ id: "cp-clients", name: "Client Register" }] };
-    expect(dashboard.window.historySource(col, history[1])).toBe("from the Client Register's run");
+    expect(dashboard.window.historySource(col, history[1]))
+      .toBe("from the Client Register's run, 1:08am Friday, 1 May 2020");
     expect(dashboard.window.historySource(col, other("2020-11-02", "11:00:00", "green", "cp-clients", "re-check")))
-      .toBe("from the Client Register's re-check");
+      .toBe("from the Client Register's re-check, 11:00am Monday, 2 November 2020");
     expect(dashboard.window.historySource(col, history[0])).toBe("");
   });
 });
 
 describe("Q4: a sparkline point is dated by when its result was recorded", () => {
-  it("counts a same-day result on the dataset's own run, and a later one as a point of its own", () => {
+  // REQ-PIPE-279 criteria 10 and 12: each cause its own point, dated by its
+  // lowest-ranked result. The same-day result no longer replaces the own run's
+  // verdict (REQ-DASH-264 criterion 12, retired): it is another arrival's.
+  it("gives a same-day result of another cause a point of its own, and a later one too", () => {
     dashboard = loadDashboard();
-    const own = { run_id: "own_1", run_date: "2020-11-01", date: new Date("2020-11-01T00:00:00Z"), status: "red",
-                  recorded_by: null, recorded_at: "2020-11-01T08:20:00+08:00" };
-    const sameDay = { run_id: "oth_a", run_date: "2020-11-01", date: new Date("2020-11-01T00:00:00Z"), status: "amber",
-                      recorded_by: "cp-clients", recorded_at: "2020-11-01T08:30:00+08:00" };
-    const later = { run_id: "oth_r1", run_date: "2020-11-01", date: new Date("2020-11-02T00:00:00Z"), status: "green",
-                    recorded_by: "cp-clients", recorded_at: "2020-11-02T11:00:00+08:00" };
+    const at = (run_id, day, status, recorded_by, cause, rank, time) => ({ run_id, run_date: "2020-11-01",
+      date: new Date(`${day}T00:00:00Z`), status, recorded_by, recorded_at: `${day}T${time}+08:00`,
+      supply_id: "n@1", cause, rank });
+    const own = at("own_1", "2020-11-01", "red", null, "arrival:a", 1, "08:20:00");
+    const sameDay = at("oth_a", "2020-11-01", "amber", "cp-clients", "arrival:b", 2, "08:30:00");
+    const later = at("oth_r1", "2020-11-02", "green", "cp-clients", "decision:1", 3, "11:00:00");
     const units = [
       { name: "a_column", checks: [{ history: [{ ...own, status: "green" }] }] },
       { name: "Cross-table", scope: "cross-table", checks: [{ history: [own, sameDay, later] }] },
     ];
     const counts = dashboard.window.unitCounts(units);
-    expect(counts).toHaveLength(2);
-    // 1 November: the same-day result replaces the own run's verdict.
-    expect(counts[0]).toMatchObject({ counted: 2, red: 0, amber: 1 });
-    // 2 November: its own point, every other unit carried from the own run,
-    // so the newest point still agrees with the page.
-    expect(counts[1].date.toISOString().slice(0, 10)).toBe("2020-11-02");
-    expect(counts[1]).toMatchObject({ counted: 2, red: 0, amber: 0 });
+    expect(counts).toHaveLength(3);
+    expect(counts[0]).toMatchObject({ counted: 2, red: 1, amber: 0 });
+    expect(counts[1]).toMatchObject({ counted: 2, red: 0, amber: 1 });
+    expect(counts[2].date.toISOString().slice(0, 10)).toBe("2020-11-02");
+    expect(counts[2]).toMatchObject({ counted: 2, red: 0, amber: 0 });
   });
 });
 
@@ -332,58 +351,37 @@ describe("Q4: a sparkline point is dated by when its result was recorded", () =>
 // gate (TestColumnsNotGreenMatchesTheDatasetPage, Notifications 9 of 10): the
 // row skipped it, while the page showed it.
 describe("REQ-PIPE-265: a check with only a carried result", () => {
-  const at = (run_id, day, status, recorded_by, read_run, time) => ({ run_id, run_date: day, date: new Date(`${day}T00:00:00Z`),
-    status, recorded_by, read_run: read_run || null, recorded_at: `${day}T${time || "09:00:00"}+08:00` });
-  it("still counts on the dataset's own run of that delivery", () => {
+  // The point is the supply and the cause it was recorded under (REQ-PIPE-279
+  // criterion 10) - a carried result is the zip's, so it is the supply's own
+  // point. These keyed it by a read_run and the day until then.
+  const at = (run_id, day, status, recorded_by, supply, cause, rank) => ({ run_id, run_date: day,
+    date: new Date(`${day}T00:00:00Z`), status, recorded_by, recorded_at: `${day}T09:00:00+08:00`,
+    supply_id: supply, cause, rank });
+  it("still counts on the dataset's own point of that delivery", () => {
     dashboard = loadDashboard();
-    const own = { run_id: "own_1", run_date: "2020-11-01", date: new Date("2020-11-01T00:00:00Z"), status: "green",
-                  recorded_by: null, recorded_at: "2020-11-01T08:20:00+08:00" };
-    const carried = { run_id: "cp_clients__1", run_date: "2020-11-01", date: new Date("2020-11-01T00:00:00Z"),
-                      status: "red", recorded_by: "cp-clients", recorded_at: "2020-11-01T08:20:00+08:00",
-                      read_run: "own_1" };
+    const own = at("own_1", "2020-11-01", "green", null, "n@1", "arrival:zip", 1);
+    const carried = at("cp_clients__1", "2020-11-01", "red", "cp-clients", "n@1", "arrival:zip", 2);
     const units = [
       { name: "a_column", checks: [{ history: [own] }] },
       { name: "Cross-table", scope: "cross-table", checks: [{ history: [carried] }] },
     ];
     const counts = dashboard.window.unitCounts(units);
     expect(counts).toHaveLength(1);
-    expect(counts[0]).toMatchObject({ counted: 2, red: 1, amber: 0 });
+    expect(counts[0]).toMatchObject({ runId: "own_1", counted: 2, red: 1, amber: 0 });
   });
 
-  // The real shape: the check was judged under this dataset's own run of an
-  // earlier delivery, then carried on the next one. The carried result is that
-  // later delivery's, not a re-check of the earlier run.
-  it("counts on the later delivery's run when an earlier one judged it itself", () => {
+  it("counts on the later delivery's point when an earlier one judged it itself", () => {
     dashboard = loadDashboard();
     const units = [
-      { name: "a_column", checks: [{ history: [at("own_may", "2026-05-27", "green", null), at("own_aug", "2026-08-01", "green", null)] }] },
+      { name: "a_column", checks: [{ history: [at("own_may", "2026-05-27", "green", null, "n@may", "arrival:may", 1),
+                                               at("own_aug", "2026-08-01", "green", null, "n@aug", "arrival:aug", 2)] }] },
       { name: "Cross-table", scope: "cross-table",
-        checks: [{ history: [at("own_may", "2026-05-27", "green", null),
-                             at("cp_clients__aug", "2026-08-01", "red", "cp-clients", "own_aug")] }] },
+        checks: [{ history: [at("own_may", "2026-05-27", "green", null, "n@may", "arrival:may", 1),
+                             at("cp_clients__aug", "2026-08-01", "red", "cp-clients", "n@aug", "arrival:aug", 3)] }] },
     ];
     const counts = dashboard.window.unitCounts(units);
     expect(counts.map(c => c.runId)).toEqual(["own_may", "own_aug"]);
     expect(counts[1]).toMatchObject({ counted: 2, red: 1, amber: 0 });
-  });
-
-  // The real shape behind the opposite mistake (Case Workers, 15 May 2025): a
-  // held arrival judged only its file checks the day another table's check
-  // read the EARLIER supply. That result is a re-check of the earlier run,
-  // carrying every other check's verdict, not a point on the held arrival.
-  it("goes with the run it read, not with an own run of the same day", () => {
-    dashboard = loadDashboard();
-    const units = [
-      { name: "a_column", checks: [{ history: [at("own_feb", "2025-02-01", "green", null)] }] },
-      { name: "b_column", checks: [{ history: [at("own_feb", "2025-02-01", "green", null)] }] },
-      { name: "Table-level checks", scope: "table",
-        checks: [{ history: [at("own_feb", "2025-02-01", "green", null), at("own_may_held", "2025-05-01", "green", null)] }] },
-      { name: "Cross-table", scope: "cross-table",
-        checks: [{ history: [at("cp_investigations__may", "2025-05-01", "green", "cp-investigations", "own_feb", "09:00:05")] }] },
-    ];
-    const counts = dashboard.window.unitCounts(units);
-    const newest = counts[counts.length - 1];
-    expect(newest.runId).toBe("own_feb@2025-05-01");
-    expect(newest.counted).toBe(4);
   });
 });
 

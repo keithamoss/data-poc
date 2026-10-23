@@ -49,16 +49,20 @@ def _record(check_id: str, dataset_id: str, status: str = "pass", **extra) -> di
 
 
 def _run(run_id: str, *, dataset_id, supply, scope="arrival", decision=None, results=(),
-         reads=None, received_at="2099-01-01T01:00:00+00:00", collection=CP, agency=AGENCY):
+         reads=None, absent=(), held=None, received_at="2099-01-01T01:00:00+00:00",
+         collection=CP, agency=AGENCY):
     """One run opened, recorded and finished through the writer - a resolution
-    first where it records a cross-table result, as the overlay does."""
+    first where it records a cross-table result, as the overlay does: `reads`
+    the tables it read, `absent` those it had none of, `held` {table: supply}."""
     if reads is not None:
         with supply_db.connect(label="test-build-record") as conn:
             supply_db.ensure_schemas(conn)
             supply_db.record_resolution(conn, supply_db.Resolution(
                 run_id=run_id, schema=supply_db.run_schema(run_id),
                 resolved={t: f"{t}__x" for t in reads},
-                supply_of=dict(reads), source={t: "staging" for t in reads}))
+                supply_of=dict(reads), source={t: "staging" for t in reads},
+                absent=list(absent), held={t: f"{t}__held" for t in (held or {})},
+                held_supply=dict(held or {})))
     purpose = {"dataset_id": dataset_id, "supply_id": supply, "scope": scope,
                **({"caused_by_decision": decision} if decision else {})}
     qa_results_writer.open_run(agency, collection, run_id, WHEN, BY, purpose=purpose)
@@ -240,6 +244,33 @@ class TestSharedToTheTablesItRecordedReading:
         assert run_id in {h["run_id"] for h in _history_of(pages["cp-case-workers"], WORKER_REF)}
         assert not [c for col in pages["cp-clients"]["columns"] for c in col["checks"]
                     if c.get("check_id") == WORKER_REF]
+
+
+class TestAResultThatReadNoSupplyOfATableIsNotOnItsPage:
+    """Criterion 14 (K2 = A), decided where a result is shared to a page."""
+
+    def test_absent_clients_keeps_it_off_the_client_registers_page(self, history):
+        notifications = f"cp-notifications@{_key()}"
+        run_id = _run(f"cp_notifications__{_key()}", dataset_id="cp-notifications",
+                      supply=notifications, results=[_record(CLIENT_REF, "cp-notifications", "fail")],
+                      reads={"cp_notifications": notifications}, absent=("cp_clients",))
+        pages = history.datasets()
+        assert run_id in {h["run_id"] for h in _history_of(pages["cp-notifications"], CLIENT_REF)}
+        assert not [c for col in pages["cp-clients"]["columns"] for c in col["checks"]
+                    if c.get("check_id") == CLIENT_REF]
+
+
+class TestAHeldReadNamesTheHeldSupply:
+    """Criterion 15: the page matches a held table's rows on the held supply."""
+
+    def test_the_entry_carries_the_held_supply_and_its_state(self, history):
+        held, notifications = f"cp-clients@{_key()}", f"cp-notifications@{_key()}"
+        run_id = _run(f"cp_notifications__{_key()}", dataset_id="cp-notifications",
+                      supply=notifications, results=[_record(CLIENT_REF, "cp-notifications", "fail")],
+                      reads={"cp_notifications": notifications}, held={"cp_clients": held})
+        (entry,) = [h for h in _history_of(history.datasets()["cp-clients"], CLIENT_REF)
+                    if h["run_id"] == run_id]
+        assert (entry["supply_id"], entry["read_state"]) == (held, qa_store.HELD)
 
 
 class TestTheSameHistoryBuildsTheSameBytes:

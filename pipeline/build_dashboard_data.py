@@ -234,11 +234,16 @@ def _between(check_id: str, reads: dict | None) -> dict | None:
 
 
 def _supply_read(record: dict, table: str) -> str | None:
-    """The supply of `table` a cross-table result recorded READING (qa.check_read,
-    REQ-PIPE-279 criterion 1), or None where it read none - held, absent, or
-    a table that belongs to no supply."""
+    """The supply of `table` a cross-table result is about (qa.check_read,
+    REQ-PIPE-279 criterion 1): the one it READ, or the HELD one it was refused
+    (criterion 15) - None where it had none, absent or no supply at all."""
     read = (record.get("reads") or {}).get(table) or {}
-    return read.get("supply_id") if read.get("state") == qa_store.READ else None
+    return read.get("supply_id") if read.get("state") in (qa_store.READ, qa_store.HELD) else None
+
+
+#: The recorded states a cross-table result is shown under on a page that is
+#: not its declaring dataset's (REQ-PIPE-279 criteria 14 and 15, K2 = A).
+_SHOWN_ELSEWHERE = (qa_store.READ, qa_store.HELD)
 
 
 def _not_evaluated_reason(record: dict) -> str | None:
@@ -296,10 +301,15 @@ def share_cross_table_results(results: list[dict], by_table: dict[str, list[dict
 
     THE TABLES IT RECORDED READING (REQ-PIPE-279 criterion 18), never the
     checkout's current declarations - so editing what a check declares it
-    reads re-places nothing already recorded.
+    reads re-places nothing already recorded. AND ONLY THOSE IT READ OR WAS
+    HELD FROM (criterion 14, K2 = A): a result that read no supply of a table
+    - ABSENT or NO-SUPPLY - is not about that table, so it stays on the page
+    of the dataset it is declared on and goes nowhere else.
     """
     for r in results:
-        for other in sorted(r.get("reads") or ()):
+        for other, read in sorted((r.get("reads") or {}).items()):
+            if read.get("state") not in _SHOWN_ELSEWHERE:
+                continue
             if other not in by_table or r in by_table[other]:
                 continue
             # BUT AN IN-DEVELOPMENT RESULT IS NOT SHARED WITH AN AGREED
@@ -440,6 +450,10 @@ def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], da
                     "supply_id": fact["supply_id"] if own else read,
                     "cause": fact["cause"],
                     "reads": slot["reads"].get(run_id),
+                    # THIS TABLE'S STATE IN IT, for a held table's page to show
+                    # the rows that met its held supply (criterion 15).
+                    "read_state": None if own else (
+                        (slot["reads"].get(run_id) or {}).get(table) or {}).get("state"),
                     # WHEN IT WAS RECORDED - for its date, never its order -
                     # AND UNDER WHOSE RUN where that is another table's
                     # (post-build-review #253): qa.run's dataset (criterion 17).

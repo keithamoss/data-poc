@@ -540,13 +540,29 @@ class TestTheDashboardReportsItAgainstTheRightDataset:
     """
 
     @staticmethod
-    def _reading(record: dict, tables: list[str]) -> dict:
+    def _reading(record: dict, tables: list[str], state: str = "READ") -> dict:
         """The record as recorded with what it read - where a cross-table
         result is shared since REQ-PIPE-279 criterion 18, never the
-        checkout's declarations."""
-        record["reads"] = {t: {"state": "NO-SUPPLY", "supply_id": None, "contested": False}
-                           for t in tables}
+        checkout's declarations. READ here, so these test the in-development
+        rule alone: a real sample table records NO-SUPPLY, which criterion 14
+        keeps off every page but the declaring one (the last test below)."""
+        record["reads"] = {t: {"state": state, "supply_id": f"{t}@1" if state == "READ" else None,
+                               "contested": False} for t in tables}
         return record
+
+    def test_a_table_it_read_no_supply_of_is_not_shared_to(self, tmp_path, monkeypatch):
+        """REQ-PIPE-279 criterion 14: NO-SUPPLY - a sample's table - is about
+        no supply of that table, so the result stays on its declaring page."""
+        from pipeline import build_dashboard_data as build_cp
+
+        _asset_with([AGREED, SAMPLE, SECOND_SAMPLE], tmp_path, monkeypatch)
+        record = self._reading(_result("cp-referrals", "referrals_match_outcomes",
+                                       supply_state=qa_store.IN_DEVELOPMENT),
+                               ["cp_referrals", "cp_outcomes"], state="NO-SUPPLY")
+        by_table = {"cp_referrals": [], "cp_outcomes": []}
+        build_cp.share_cross_table_results([record], by_table)
+
+        assert by_table["cp_outcomes"] == []
 
     def test_a_mixed_result_reaches_the_calendar_less_table_only(
             self, tmp_path, monkeypatch):

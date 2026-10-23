@@ -3495,7 +3495,7 @@ function buildDatasetsOn(inPlaceOnDateStr){
           // supply is the one that could not be read.
           ds.blocked = blanking;
           ds.status = "red";
-          ds.crossTableShownWhileHeld = blockChecksWhileHeld(ds, blanking.openedAt);
+          ds.crossTableShownWhileHeld = blockChecksWhileHeld(ds, blanking);
         } else if(ds.noSupply){
           ds.status = "red";
         } else if(ended){
@@ -3616,89 +3616,83 @@ function statusColorVar(s){
 // amber come back separately because they are drawn as two lines.
 // historyStatus() refuses a status it does not recognise (criterion 9).
 function unitCounts(units){
-  // A RESULT RECORDED UNDER ANOTHER TABLE'S RUN (REQ-DASH-264; post-build-
-  // review #258 Q4, Keith 2026-10-20): recorded the same day as this
-  // dataset's own run - the same delivery - it counts on that run and
-  // replaces its verdict for the check. Recorded on a later day - a re-check -
-  // it is a point of its own on the day it was recorded, never re-dating the
-  // earlier one, and every other check carries its verdict into that point
-  // from the run before it, so the newest point still agrees with the page.
-  const extras = new Map();     // key -> {own run, date}
+  // ONE POINT PER SUPPLY AND CAUSE, EACH COUNTED ONCE (REQ-PIPE-279 criteria
+  // 10 to 12): every result goes on the point of the supply it is about and
+  // its run's cause (pointKey), whichever table's run recorded it. Within a
+  // point a check's verdict is its highest-ranked result (criterion 11) - so
+  // of a zip's two runs the later one's verdict outranks the earlier one's
+  // not-evaluated record. A point that is not a supply's own - another
+  // arrival's or a re-check's - carries every other check's verdict into it
+  // from that supply's point before, so the newest point still agrees with
+  // the page. Points are ordered by the build's rank alone (criterion 16):
+  // no day, recording time or run id, and a later point never re-dates,
+  // merges into or overwrites an earlier one. ONE FUNCTION for the dataset
+  // list's counts, its sparklines and the panel's trends (criterion 12).
+  const points = new Map();   // key -> {key, supply, rank, date, runId, own, seen}
   const perCheck = [];
-  // EACH OWN RUN'S DAY, from every check (REQ-PIPE-265): a result recorded
-  // under another table's run says which of this dataset's runs it read
-  // (read_run), and a check carried from a sibling of the same delivery has
-  // no result under this dataset's run at all, only the sibling's.
-  const ownRuns = new Map();     // run_id -> {day, date}
-  (units || []).forEach(u=> (u.checks || []).forEach(ck=>{
-    if(ck.retired) return;
-    ck.history.forEach(h=>{
-      if(!h.recorded_by && !ownRuns.has(h.run_id)) ownRuns.set(h.run_id, {day: recordedDayOf(h), date: h.date, at: recordedAtOf(h)});
-    });
-  }));
   (units || []).forEach(u=>{
     (u.checks || []).forEach(ck=>{
       if(ck.retired) return;
-      const perRun = new Map();
-      let ownRun = null, ownDay = null;
-      ck.history.forEach(h=>{
-        let key;
-        if(!h.recorded_by){
-          ownRun = h.run_id; ownDay = recordedDayOf(h); key = h.run_id;
-          if(!extras.has(key)) extras.set(key, {own: key, date: h.date, at: recordedAtOf(h), base: true});
-        } else {
-          const day = recordedDayOf(h);
-          // About the run whose supply it read: recorded the day that run was,
-          // it is the same delivery; later, a re-check of that run. Without a
-          // read, this check's last own run stands in for it.
-          const read = h.read_run && ownRuns.has(h.read_run) ? h.read_run : null;
-          const about = read || ownRun;
-          if(about == null) return;
-          const aboutDay = read ? ownRuns.get(read).day : ownDay;
-          key = day === aboutDay ? about : `${about}@${day}`;
-          if(!extras.has(key)) extras.set(key, key === about
-            ? {own: about, date: ownRuns.get(about).date, at: ownRuns.get(about).at, base: true}
-            : {own: about, date: h.date, at: recordedAtOf(h), base: false});
+      const perPoint = new Map();   // key -> {rank, status}
+      (ck.history || []).forEach(h=>{
+        const key = pointKey(h), rank = rankOf(h);
+        let p = points.get(key);
+        if(!p){
+          p = {key, supply: h.supply_id && h.cause ? h.supply_id : null, rank, date: h.date,
+               runId: key, own: false, seen: points.size};
+          points.set(key, p);
+        } else if(rank != null && (p.rank == null || rank < p.rank)){
+          // DATED BY ITS LOWEST-RANKED RESULT (criterion 16).
+          p.rank = rank; p.date = h.date;
         }
-        perRun.set(key, historyStatus(h, ck));
+        if(!h.recorded_by && !p.own){ p.own = true; p.runId = h.run_id; }
+        const was = perPoint.get(key);
+        if(!was || was.rank == null || rank == null || rank > was.rank){
+          perPoint.set(key, {rank, status: historyStatus(h, ck)});
+        }
       });
-      perCheck.push({unit: u, perRun});
+      perCheck.push({unit: u, perPoint});
     });
   });
-  // Each own run's later points, in date order, each carrying from the one before.
-  const chains = new Map();
-  extras.forEach((e, key)=>{ if(!e.base){ if(!chains.has(e.own)) chains.set(e.own, []); chains.get(e.own).push(key); } });
-  chains.forEach(keys=> keys.sort((a,b)=> (extras.get(a).date - extras.get(b).date) || (extras.get(a).at - extras.get(b).at)));
-  perCheck.forEach(({perRun})=>{
-    chains.forEach((keys, own)=>{
-      let prev = own;
-      keys.forEach(k=>{ if(!perRun.has(k) && perRun.has(prev)) perRun.set(k, perRun.get(prev)); prev = k; });
+  const ordered = [...points.values()].sort((a, b)=>
+    (a.rank != null && b.rank != null) ? a.rank - b.rank : a.seen - b.seen);
+  // Each check's verdict carried into a point that is not a supply's own, from
+  // the newest earlier point of the same supply that has one.
+  perCheck.forEach(({perPoint})=>{
+    const lastBySupply = new Map();
+    ordered.forEach(p=>{
+      const here = perPoint.get(p.key);
+      if(here){ if(p.supply) lastBySupply.set(p.supply, here); return; }
+      if(!p.own && p.supply && lastBySupply.has(p.supply)) perPoint.set(p.key, lastBySupply.get(p.supply));
     });
   });
-  const byRun = new Map();
+  const byPoint = new Map();
   const worstByUnit = new Map();
-  perCheck.forEach(({unit, perRun})=>{
+  perCheck.forEach(({unit, perPoint})=>{
     if(!worstByUnit.has(unit)) worstByUnit.set(unit, new Map());
     const worst = worstByUnit.get(unit);
-    perRun.forEach((s, runId)=>{
+    perPoint.forEach(({status: s}, key)=>{
       if(s !== "red" && s !== "amber" && s !== "green") return;
-      if(!byRun.has(runId)) byRun.set(runId, {runId, date: extras.get(runId).date, at: extras.get(runId).at, counted:0, red:0, amber:0, sectionNames:[]});
-      const was = worst.get(runId);
-      if(!was || STATUS_ORDER[s] > STATUS_ORDER[was]) worst.set(runId, s);
+      const p = points.get(key);
+      if(!byPoint.has(key)) byPoint.set(key, {runId: p.runId, rank: p.rank, date: p.date, own: p.own,
+                                             counted:0, red:0, amber:0, sectionNames:[], order: p});
+      const was = worst.get(key);
+      if(!was || STATUS_ORDER[s] > STATUS_ORDER[was]) worst.set(key, s);
     });
   });
   worstByUnit.forEach((worst, u)=>{
-    worst.forEach((s, runId)=>{
-      const e = byRun.get(runId);
+    worst.forEach((s, key)=>{
+      const e = byPoint.get(key);
       e.counted++;
       if(s === "red") e.red++;
       if(s === "amber") e.amber++;
       if(u.scope && (s === "red" || s === "amber")) e.sectionNames.push(u.name);
     });
   });
-  return [...byRun.values()]
-    // Same day: in the order they were recorded, then by id (REQ-PIPE-265).
-    .sort((a,b)=> (a.date - b.date) || (a.at - b.at) || (a.runId < b.runId ? -1 : a.runId > b.runId ? 1 : 0));
+  const position = new Map(ordered.map((p, i)=> [p, i]));
+  return [...byPoint.values()]
+    .sort((a, b)=> position.get(a.order) - position.get(b.order))
+    .map(({order, ...e})=> e);
 }
 // One check as its own unit, for the tiers that count checks rather than
 // columns (a column's panel and tile, REQ-DASH-227).
@@ -5093,21 +5087,31 @@ function crossTableSource(col, entry){
 // does a cross-table check with nothing recorded since the held supply was
 // received - but one that ran since, on a reading table's supply, shows what it
 // found. Never an earlier supply's result. Returns how many it shows.
-function blockChecksWhileHeld(ds, heldSince){
-  // FAILS CLOSED (post-build-review #258 P1): with no readable receipt time
-  // nothing can be shown to have run since it, so everything is blocked.
-  const since = Date.parse(heldSince || "");
+function blockChecksWhileHeld(ds, blocker){
+  // THE RESULTS THAT MET THE HELD SUPPLY (REQ-PIPE-279 criterion 15): a
+  // cross-table row shows its newest result whose recorded read of this table
+  // is HELD with the held supply's id - never one picked by being recorded
+  // after the receipt (REQ-DASH-264 criterion 3 as amended), which could be
+  // about another supply. FAILS CLOSED (post-build-review #258 P1): with no
+  // held supply named, nothing is shown.
+  const held = blocker && blocker.supply;
   let shown = 0, rows = 0;
   (ds.columns||[]).forEach(c=>{
     c.checks = (c.checks||[]).map(ck=>{
-      const last = (ck.history||[])[(ck.history||[]).length - 1];
-      const ranSince = c.scope === "cross-table" && last && last.recorded_at
-        && !Number.isNaN(since) && Date.parse(last.recorded_at) >= since;
+      const met = c.scope === "cross-table" && held
+        ? (ck.history||[]).filter(h=> h.read_state === "HELD" && h.supply_id === held) : [];
+      const last = met[met.length - 1];
       // SHOWN EITHER WAY, BUT COUNTED ONLY IF IT WAS EVALUATED (post-build-
       // review #258): the banner says these checks "did run ... and show what
       // they found", and one that could not be evaluated found nothing.
       // The section's pill follows the rows shown, evaluated or not (#258 D1).
-      if(ranSince){ rows += 1; if(!last.not_evaluated) shown += 1; return ck; }
+      if(last){
+        rows += 1;
+        if(!last.not_evaluated) shown += 1;
+        const out = {...ck, history: met, current: last.value};
+        if(last.status) out.current_status = last.status; else delete out.current_status;
+        return out;
+      }
       return {...ck, blockedThisPeriod:true};
     });
     const live = c.checks.filter(ck=> !ck.blockedThisPeriod);
@@ -5134,33 +5138,60 @@ function crossTableBetween(col, check){
   const nameOf = id=> ((col.datasets || []).find(d=> d.id === id) || {}).name || id;
   return `${nameOf(b.declared_on)} → ${(b.reads || []).map(nameOf).join(", ")}`;
 }
-// ONE DELIVERY, TWO COPIES (post-build-review #258 Q3, Keith 2026-10-20): a
-// cross-table check is run when either of its tables gets a supply, so a
-// delivery of both records it twice, minutes apart - and the first can be
-// "not supplied yet" where the second is the verdict. Two entries on the same
-// day where either came from another table's run are one delivery; the newer
-// is its result. A same-day resupply of the dataset's own stays two runs.
-// When a history entry was recorded, as a number to order by - 0 when unknown,
-// so an entry without a time never sorts after one that has it.
-function recordedAtOf(h){
-  const t = h && h.recorded_at ? Date.parse(h.recorded_at) : NaN;
-  return Number.isNaN(t) ? 0 : t;
+// ONE POINT PER SUPPLY AND CAUSE (REQ-PIPE-279 criteria 10 to 13): a result is
+// about the supply its table was read as and was recorded because of its run's
+// cause - an arrival (a delivery's files received at one instant), a decision
+// or a load - both as the build emits them. Every evaluation is its own point
+// (K3 = C): a delivery whose files were checked at two instants is two points,
+// whatever the day. A run that belongs to no supply has no cause and is no
+// point of either kind: it stands alone, keyed by its run, as before.
+//
+// NEVER BY A DAY OR A RECORDING TIME (criterion 19): the same-day rule this
+// replaced (REQ-DASH-264 criterion 12, retired) merged a 15:00 re-check into a
+// 09:00 delivery, and recordedAtOf/recordedDayOf, which ordered by them, went.
+function pointKey(h){
+  if(!h) return null;
+  return h.supply_id && h.cause ? `${h.supply_id} | ${h.cause}` : h.run_id;
 }
-function recordedDayOf(h){ return h.recorded_at ? assetDateStrOf(h.recorded_at) : h.run_date; }
-function sameDelivery(a, b){ return !!(a && b && (a.recorded_by || b.recorded_by) && recordedDayOf(a) === recordedDayOf(b)); }
-function deliveryCount(history){
-  return (history || []).filter((h, i, all)=> !sameDelivery(h, all[i+1])).length;
+// The build's rank, or null for an entry with none (illustrative mock data):
+// then the order the entries came in, which the build emits in rank order.
+function rankOf(h){ return h && typeof h.rank === "number" ? h.rank : null; }
+// One check's history as its points, oldest first: each point's result is its
+// highest-ranked entry (criterion 11), `last` that entry's index.
+function historyPoints(history){
+  const points = [], byKey = new Map();
+  (history || []).forEach((h, i)=>{
+    const key = pointKey(h);
+    const p = byKey.get(key);
+    if(!p){ const q = {key, first: i, last: i}; byKey.set(key, q); points.push(q); return; }
+    const was = rankOf(history[p.last]), now = rankOf(h);
+    if(was == null || now == null || now > was) p.last = i;
+  });
+  return points;
 }
-// The default "previous run": the newest result of the delivery before the
-// current one, or -1 when there is none.
+function sameDelivery(a, b){ return !!(a && b && pointKey(a) === pointKey(b)); }
+// The panel's run count: its points, each counted once (criterion 12).
+function deliveryCount(history){ return historyPoints(history).length; }
+// The default comparison (N1 = B, criterion 13): the newest EARLIER point whose
+// result for this check was evaluated, or -1 when there is none - an earlier
+// point whose result could not be evaluated is skipped whole, never compared
+// through to an older entry of the same point.
 function defaultCompareIndex(history){
+  const points = historyPoints(history);
   const n = (history || []).length;
-  // NEVER A NON-ANSWER (#258 L7): comparing against a result that could not
-  // be evaluated shows nothing and asks the reader to pick again.
-  for(let i = n - 2; i >= 0; i--){
-    if(!sameDelivery(history[i], history[n-1]) && !notEvaluated(history[i])) return i;
+  if(!n) return -1;
+  const current = pointKey(history[n - 1]);
+  for(let i = points.length - 1; i >= 0; i--){
+    if(points[i].key === current) continue;
+    if(!notEvaluated(history[points[i].last])) return points[i].last;
   }
   return -1;
+}
+// THE ?cmp= RULE, FROM THE SAME FUNCTION (criterion 13; test 26): the default
+// comparison writes nothing to the URL and any other writes its index, so a
+// copied link opens the comparison that was on screen.
+function compareParamFor(history, idx){
+  return idx === defaultCompareIndex(history) ? null : String(idx);
 }
 // CROSS-TABLE ROWS, ONE RELATIONSHIP AT A TIME (#258 M4): grouped by the
 // tables the check is between, then its name, then dbt, Soda and
@@ -5177,11 +5208,19 @@ function crossTableRowOrder(col, rows){
   });
 }
 // A history row's source, where it was another table's run.
+// Its cause, as words (criterion 13): an arrival's run, or a re-check - a
+// decision's or a load's. A run with no cause (no supply) says what qa.run's
+// scope said, as before.
+function causeKind(h){
+  if(h && h.cause) return String(h.cause).startsWith("arrival:") ? "arrival" : "re-check";
+  return h && h.recorded_in === "re-check" ? "re-check" : "arrival";
+}
 function historySource(col, h){
   if(!h || !h.recorded_by) return "";
   const ds = (col.datasets || []).find(d=> d.id === h.recorded_by);
   const name = ds ? ds.name : h.recorded_by;
-  return h.recorded_in === "re-check" ? `from the ${name}'s re-check` : `from the ${name}'s run`;
+  const when = h.recorded_at ? `, ${fmtInstant(h.recorded_at)}` : "";
+  return causeKind(h) === "re-check" ? `from the ${name}'s re-check${when}` : `from the ${name}'s run${when}`;
 }
 // WHERE A RESULT CAME FROM ANOTHER TABLE'S RUN (REQ-DASH-264 criteria 7 and 8,
 // Keith 2026-10-19, both sentences approved as worded): said on its row and in
@@ -5198,11 +5237,12 @@ function recheckNote(col, point){
   if(!point || !point.recorded_by || !point.recorded_at) return "";
   const ds = (col.datasets || []).find(d=> d.id === point.recorded_by);
   const name = ds ? ds.name : point.recorded_by;
-  const when = point.recorded_in === "re-check" ? `when the ${name} was re-checked` : `when the ${name} supply arrived`;
+  const recheck = causeKind(point) === "re-check";
+  const when = recheck ? `when the ${name} was re-checked` : `when the ${name} supply arrived`;
   // A RESULT THAT COULD NOT BE EVALUATED says so (post-build-review #258 Q1,
   // Keith 2026-10-20, option a): nothing was checked, but something tried.
   if(notEvaluated(point)) return `Could not be checked ${fmtInstant(point.recorded_at)}, ${when}.`;
-  return point.recorded_in === "re-check"
+  return recheck
     ? `Re-checked ${fmtInstant(point.recorded_at)}, ${when}.`
     : `Checked ${fmtInstant(point.recorded_at)}, ${when}.`;
 }
@@ -8649,10 +8689,10 @@ function openCheckPanel(ag, col, ds, column, check, opts){
 // established, recomputed here rather than threaded through as an arg.
 function setCompareIdx(ag, col, ds, column, check, idx){
   STATE = {...STATE, compareIdx: idx};
-  const defaultCompareIdx = Math.max(0, check.history.length-2);
   const url = new URL(location.href);
-  if(idx === defaultCompareIdx) url.searchParams.delete("cmp");
-  else url.searchParams.set("cmp", String(idx));
+  const cmp = compareParamFor(check.history, idx);
+  if(cmp == null) url.searchParams.delete("cmp");
+  else url.searchParams.set("cmp", cmp);
   history.replaceState(STATE, "", url.pathname + url.search + location.hash);
   openCheckPanel(ag, col, ds, column, check, {pushHistory:false});
 }
