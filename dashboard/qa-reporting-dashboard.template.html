@@ -3654,8 +3654,14 @@ function unitCounts(units){
       perCheck.push({unit: u, perPoint});
     });
   });
+  // A TOTAL ORDER: ranked points by rank, then any unranked (illustrative
+  // mock data) in the order they came. Comparing a ranked point with an
+  // unranked one by arrival order was no order at all, and scrambled the
+  // series whenever a column's placeholder history sat between two others.
   const ordered = [...points.values()].sort((a, b)=>
-    (a.rank != null && b.rank != null) ? a.rank - b.rank : a.seen - b.seen);
+    (a.rank != null && b.rank != null) ? a.rank - b.rank
+      : (a.rank != null) !== (b.rank != null) ? (a.rank != null ? -1 : 1)
+      : a.seen - b.seen);
   // Each check's verdict carried into a point that is not a supply's own, from
   // the newest earlier point of the same supply that has one.
   perCheck.forEach(({perPoint})=>{

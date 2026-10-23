@@ -246,6 +246,25 @@ class TestSharedToTheTablesItRecordedReading:
                     if c.get("check_id") == WORKER_REF]
 
 
+class TestEveryHistoryEntryHasARank:
+    """Criterion 16: "a dense rank for every point and every history entry" -
+    the placeholder history of a column with no rule included. Found by the
+    gate (TestColumnsNotGreenMatchesTheDatasetPage, 2026-10-23): unranked
+    placeholder entries among ranked ones scrambled the page's point order."""
+
+    def test_a_column_with_no_rule_has_ranked_entries_too(self, history):
+        _run(f"cp_notifications__{_key()}", dataset_id="cp-notifications",
+             supply=f"cp-notifications@{_key()}",
+             results=[_record(f"{CHECK}.cp-notifications.notification_id.not_null_dbt",
+                              "cp-notifications", column_name="notification_id")])
+        page = history.datasets()["cp-notifications"]
+        placeholders = [h for col in page["columns"] for c in col["checks"]
+                        if c["key"] == "no_rule_defined" for h in c["history"]]
+        assert placeholders, "precondition: a column of Notifications has no rule"
+        assert all(isinstance(h.get("rank"), int) and h.get("supply_id") and h.get("cause")
+                   for h in placeholders), placeholders[:2]
+
+
 class TestAResultThatReadNoSupplyOfATableIsNotOnItsPage:
     """Criterion 14 (K2 = A), decided where a result is shared to a page."""
 

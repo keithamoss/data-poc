@@ -52,6 +52,9 @@ class TestItIsRecordedInItsOwnScope:
         self.finish = finish_runs
 
     def _write(self, verified, raw=None):
+        # WHAT THE RUN READ, which a cross-table result is recorded with or not
+        # at all (REQ-PIPE-279 criterion 4).
+        rebuild_support.record_reads("run_1", [r["check_id"] for r in verified])
         writer.write_qa_result(
             AGENCY, COLLECTION, "run_1", "2026-09-26T09:00:00+08:00", "dbt", raw or {},
             verified=verified, run_by="a@b.c")

@@ -548,8 +548,14 @@ def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], da
                 # check is synthesized here, not produced by any real tool.
                 "dimension": "", "unit": "count", "warn": None, "fail": None,
                 "current": 0, "current_status": "inactive", "previous": 0,
+                # RANKED LIKE EVERY OTHER ENTRY (REQ-PIPE-279 criterion 16), on
+                # its run's own point - an unranked entry among ranked ones
+                # leaves the page's points in no order at all.
                 "history": [{"run_id": m["run_id"], "run_date": _run_date(m), "value": 0,
-                             "status": "inactive"} for m in manifest],
+                             "status": "inactive", "rank": rank(m["run_id"]),
+                             "supply_id": facts[m["run_id"]]["supply_id"],
+                             "cause": facts[m["run_id"]]["cause"]}
+                            for m in sorted(manifest, key=lambda m: rank(m["run_id"]))],
                 "note": "Neither the ODCS contract nor the Soda/dbt check files define a rule for this "
                         "column today — this is a real gap, not a hidden failure.",
             }]

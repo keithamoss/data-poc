@@ -171,3 +171,28 @@ describe("a held table's cross-table row reads the held supply (criterion 15)", 
     expect(w.checkStatus(ds.columns[0].checks[0])).toBe("nodata");
   });
 });
+
+// The gate's TestColumnsNotGreenMatchesTheDatasetPage on cp-notifications
+// (2026-10-23): a column with no rule defined has history entries with no
+// rank, and comparing ranked points with unranked ones by insertion order is
+// no order at all - the sort scrambled the series, so the list's "latest"
+// point was an old one and disagreed with the page.
+describe("points are in rank order whatever unranked entries sit among them", () => {
+  it("orders a later column's lower-ranked points before an earlier column's, across placeholders", () => {
+    const w = load();
+    const at = "2026-03-02T09:00:00+08:00";
+    const placeholder = (run) => ({ run_id: run, run_date: "2026-03-02", value: 0, status: "inactive" });
+    const own = (rank) => entry({ run: `n${rank}`, rank, supply: `s@${rank}`, cause: `arrival:${rank}`, at });
+    const elsewhere = (rank) => entry({ run: `c${rank}`, rank, supply: `s@${rank}`, cause: `arrival:c${rank}`,
+                                        at, by: "cp-clients", status: "red" });
+    // The real page's shape: own columns first, the no-rule placeholder
+    // column, then the cross-table section's results from other tables'
+    // runs - seen last, though most rank earlier.
+    const counts = w.unitCounts([
+      column("a", [own(10), own(20), own(30)]),
+      { name: "no_rule", checks: [{ history: [placeholder("p1"), placeholder("p2"), placeholder("p3")] }] },
+      cross([elsewhere(5), elsewhere(15), elsewhere(25)]),
+    ]);
+    expect(counts.map((p) => p.rank)).toEqual([5, 10, 15, 20, 25, 30]);
+  });
+});

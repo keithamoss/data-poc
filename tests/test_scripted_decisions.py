@@ -252,19 +252,22 @@ class TestAScriptedDecisionsReCheckIsRun:
         assert owed == [], f"scripted decisions left these re-checks owed: {owed}"
 
     def test_every_run_records_its_place_in_the_history(self, deployment_history):
-        """post-build-review #161: a re-check run was recorded without the
-        run_index its arrival carries, and the results rebuild sorts every
-        current run by it - so the first history holding a re-check that
-        ran crashed the Child Protection build (KeyError: 'run_index')."""
+        """post-build-review #161 asked that a re-check carry its arrival's
+        run_index, because the results rebuild sorted every current run by it.
+        REQ-PIPE-279 criterion 19 CHANGES THAT DELIBERATELY: the rebuild orders
+        runs by qa.run.run_seq, the order they were opened, and the run_index
+        stamp went with the sort. So a run's place in the history is its
+        run_seq, and every completed run has one."""
         from qa_tools.common import supply_db
 
         with supply_db.connect(read_only=True, label="test-161") as conn:
             rows = conn.execute(
-                "SELECT run_key FROM qa.dataset_stats "
-                "WHERE NOT (stats -> 'arrival_record') ? 'run_index'").fetchall()
-            total = conn.execute("SELECT count(*) FROM qa.dataset_stats").fetchone()[0]
-        assert total, "the history records no run"
-        assert rows == [], f"runs recorded without run_index: {[r[0] for r in rows]}"
+                "SELECT run_key FROM qa.run WHERE completed_at IS NOT NULL "
+                "AND run_seq IS NULL").fetchall()
+            total = conn.execute(
+                "SELECT count(*) FROM qa.run WHERE completed_at IS NOT NULL").fetchone()[0]
+        assert total, "the history records no completed run"
+        assert rows == [], f"completed runs with no run_seq: {[r[0] for r in rows]}"
 
 
 # ---------------------------------------------------------------------------
