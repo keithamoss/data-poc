@@ -2686,3 +2686,17 @@ one or more component tags, and a date.
      dots keyed by day, supply history sorted by run-id text - fix as polish
      under the standing rule unless you say otherwise. (c13 gap) a dataset's
      OWN re-check entry names no cause on the page.
+   - **#262 FIXES BUILT (~04:40, checkpoints c1f6b25 + f7b6c9e)**: the two
+     comparators now match check_read by its result's natural key, leave out
+     attempt wall-clock times, and compare run_seq per collection in the
+     parallel-vs-sequential test (still exact in the resume test) - the
+     on-demand tests 10 passed on that tree. D1: a refused attempt now leaves
+     the live attempt's schemas and a trial's rows alone. D2: an arrival run's
+     supply comes from its recorded resolution, and a settled pair's file
+     checks are matched to each supply by the file they name - so a pair's #2
+     now sees its own file checks, which the GATE reads. Builder's runs on
+     f7b6c9e: 57 modules 967 passed, npm 884, ruff clean. PROVISIONAL (#23): an
+     arrival run's DATASET is still taken from its run id in one small helper,
+     because nothing recorded earlier says which dataset an arrival run is for -
+     the guard skips it by name, with the reason. Bootstrap from empty + full
+     gate running before the push, because a pair's promotion could now differ.
