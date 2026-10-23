@@ -217,76 +217,28 @@ def _disambiguate_pooled_keys(cards: list[dict]) -> None:
                 card["key"] = f"{parsed.dataset}.{card['key']}"
 
 
-def _cross_table_check_ids() -> set[str]:
-    """Every check that reads a table other than its own, read from the
-    check definitions rather than the results, so a check absent from one
-    run is still known to be cross-table."""
-    from qa_tools.common import tables_read
-
-    return set(tables_read.declared_by_check_id(collect_checks(None)))
-
-
-def _between(check_id: str, reads_by_check_id: dict) -> dict | None:
+def _between(check_id: str, reads: dict | None) -> dict | None:
     """The tables a cross-table check is between, by dataset id (post-build-
     review #253, Keith 2026-10-19): "Client reference" on the Client
     Register's page is three checks, one per table that reads it, and the
-    row names which. None for a check that reads only its own table."""
-    reads = reads_by_check_id.get(check_id)
+    row names which. From the tables its results RECORDED reading
+    (REQ-PIPE-279 criterion 18), less the declaring dataset's own. None for a
+    check that read only its own table."""
     if not reads:
         return None
     # A check id names its declaring dataset: asset.agency.collection.dataset...
-    return {"declared_on": check_id.split(".")[3],
-            "reads": [hierarchy.dataset_for_table(t).dataset_id for t in reads]}
+    declared_on = check_id.split(".")[3]
+    others = sorted({hierarchy.dataset_for_table(t).dataset_id for t in reads}
+                    - {declared_on})
+    return {"declared_on": declared_on, "reads": others} if others else None
 
 
-def _instant(text: str | None):
-    """A recorded time as an instant, for ordering - receipts and runs carry
-    different UTC offsets, so text does not sort them. None stays None."""
-    from datetime import datetime
-
-    return datetime.fromisoformat(text) if text else None
-
-
-def _merged_by_time(own: list[dict], elsewhere: list[dict]) -> list[dict]:
-    """This dataset's own entries in receipt order, with each result recorded
-    under ANOTHER table's run placed after the last own entry recorded no
-    later than it (post-build-review #253): the newest result is the last
-    entry, whichever run recorded it, as the promotion gate reads it. Own
-    entries keep their order - a re-check of the dataset's own supply is
-    where its receipt puts it, as before."""
-    merged = list(own)
-    for entry in sorted(elsewhere, key=lambda h: _instant(h["recorded_at"])):
-        at = _instant(entry["recorded_at"])
-        place = 0
-        for i, h in enumerate(merged):
-            if h["recorded_at"] and _instant(h["recorded_at"]) <= at:
-                place = i + 1
-        merged.insert(place, entry)
-    return merged
-
-
-def read_run(record: dict, table: str, dataset_id: str, own_ids) -> str | None:
-    """Which of this dataset's own runs a result recorded under ANOTHER
-    table's run is about - the run of the supply of `table` it read - or
-    None when that cannot be said.
-
-    A check that reads this table names the run it read in its own
-    `tables_read`. A check declared ON this table and carried by a sibling
-    of the same delivery (REQ-PIPE-265) records no read of its own table:
-    only a same-instant sibling's arrival run carries one, so it read this
-    table's run of that instant. Keyed by what was read rather than by the
-    day it was recorded, because a held arrival recorded the same day can
-    be a different supply from the one read."""
-    from qa_tools.common import supply_db, tables_read
-
-    read = (record.get(tables_read.RESULT_FIELD) or {}).get(table)
-    if read in own_ids:
-        return read
-    if record.get("dataset_id") == dataset_id:
-        parts = supply_db.split_staged(record.get("run_id") or "")
-        if parts and not parts[2] and f"{table}__{parts[1]}" in own_ids:
-            return f"{table}__{parts[1]}"
-    return None
+def _supply_read(record: dict, table: str) -> str | None:
+    """The supply of `table` a cross-table result recorded READING (qa.check_read,
+    REQ-PIPE-279 criterion 1), or None where it read none - held, absent, or
+    a table that belongs to no supply."""
+    read = (record.get("reads") or {}).get(table) or {}
+    return read.get("supply_id") if read.get("state") == qa_store.READ else None
 
 
 def _not_evaluated_reason(record: dict) -> str | None:
@@ -306,18 +258,15 @@ def _not_evaluated_reason(record: dict) -> str | None:
             or None)
 
 
-def own_runs(manifest: list[dict], table: str) -> list[dict]:
-    """The runs that are FOR this table (REQ-PIPE-105).
-
-    One file is one arrival and a run id is its staged table's spelling,
-    so a six-table delivery is six runs and each belongs to one table. A
-    run whose id names no table (a fixture's, a trial's) belongs to every
-    table, as every run did before.
+def own_runs(manifest: list[dict], dataset_id: str, facts: dict[str, dict]) -> list[dict]:
+    """The runs that are FOR this dataset (REQ-PIPE-105): one file is one
+    arrival, so a six-table delivery is six runs and each belongs to one
+    dataset - the one qa.run records it for (REQ-PIPE-279 criterion 17),
+    never the one its id happens to spell. A run recorded for no dataset (a
+    fixture's, a trial's) belongs to every dataset, as every run did before.
     """
-    from qa_tools.common.qa_results_writer import run_owner
-
     return [m for m in manifest
-            if (owner := run_owner(m["run_id"])) is None or owner[1] == table]
+            if facts[m["run_id"]]["dataset_id"] in (None, dataset_id)]
 
 
 def _schedule_not_agreed(dataset_id: str) -> str | None:
@@ -344,12 +293,13 @@ def share_cross_table_results(results: list[dict], by_table: dict[str, list[dict
     table it reads, not only to the one it happened to be declared on. THE
     RESULT IS SHARED, NOT COPIED: the same record object is added to each
     participant's list, and it is recorded once under the reserved scope.
-    """
-    from qa_tools.common import tables_read
 
-    reads = tables_read.declared_by_check_id(collect_checks(None))
+    THE TABLES IT RECORDED READING (REQ-PIPE-279 criterion 18), never the
+    checkout's current declarations - so editing what a check declares it
+    reads re-places nothing already recorded.
+    """
     for r in results:
-        for other in reads.get(r.get("check_id")) or ():
+        for other in sorted(r.get("reads") or ()):
             if other not in by_table or r in by_table[other]:
                 continue
             # BUT AN IN-DEVELOPMENT RESULT IS NOT SHARED WITH AN AGREED
@@ -366,13 +316,16 @@ def share_cross_table_results(results: list[dict], by_table: dict[str, list[dict
 # ---- one dataset ------------------------------------------------------------
 
 def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], dataset_stats: dict,
-                    lifecycle_by_id: dict, *, all_runs: list[dict] | None = None) -> dict:
+                    lifecycle_by_id: dict, *, facts: dict[str, dict],
+                    all_runs: list[dict] | None = None) -> dict:
     """One dataset's page. `manifest` is its own runs; `all_runs` is every
     run in the collection, so a result recorded under another table's run -
-    a re-check re-running this table's cross-table checks - is placed in
-    time and named (post-build-review #253)."""
-    from qa_tools.common import supply_db, tables_read
-    from qa_tools.common.qa_results_writer import run_owner
+    a re-check re-running this table's cross-table checks - is placed and
+    named (post-build-review #253). `facts` is the results file's run_facts:
+    each run's dataset, scope, supply, cause and rank, from qa.run
+    (REQ-PIPE-279 criteria 16 and 17) - what every placement and ordering
+    below reads, never a run id, a day or a recording time (criterion 19).
+    """
 
     table, dataset_id = dataset.table, dataset.dataset_id
     meta = column_meta(coll, dataset)
@@ -381,8 +334,6 @@ def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], da
     aggregates = stats_spec.aggregates
     value_count_cols = {col for (t, col) in stats_spec.value_counts if t == table}
 
-    cross_table_ids = _cross_table_check_ids()
-    reads_by_check_id = tables_read.declared_by_check_id(collect_checks(None))
     by_column: dict[str, dict[str, dict]] = {}
     # A CHECK THAT COULD NOT BE EVALUATED (post-build-review #77) arrives
     # under a pseudo-tool with a check_name of its own, so keying it like
@@ -392,7 +343,7 @@ def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], da
     results = ([r for r in results if not _not_evaluated_reason(r)]
                + [r for r in results if _not_evaluated_reason(r)])
     for r in results:
-        if r["check_id"] in cross_table_ids:
+        if r.get("reads"):
             # Ahead of the column_name branches below, deliberately: a
             # cross-table check has a column name of its own and it means
             # nothing on the tables it READS.
@@ -412,9 +363,9 @@ def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], da
             "unit": r["unit"], "warn": r["warn_threshold"], "fail": r["fail_threshold"],
             "dimension": r["dimension"], "label": r.get("label"), "check_id": r["check_id"],
             "by_run": {}, "row_count_total": {}, "row_count_invalid": {}, "failing_sample_keys": {},
-            "status_by_run": {}, "reference": {}, "not_evaluated": {}, "at": {}, "read": {},
+            "status_by_run": {}, "reference": {}, "not_evaluated": {}, "at": {}, "reads": {},
         })
-        slot["read"][r["run_id"]] = r
+        slot["reads"][r["run_id"]] = r.get("reads")
         slot["at"][r["run_id"]] = r.get("run_timestamp")
         slot["not_evaluated"][r["run_id"]] = _not_evaluated_reason(r)
         slot["by_run"][r["run_id"]] = r["metric_value"]
@@ -428,9 +379,18 @@ def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], da
         slot["row_count_invalid"][r["run_id"]] = r["row_count_invalid"]
         slot["failing_sample_keys"][r["run_id"]] = r.get("failing_sample_keys") or []
 
-    run_ids_in_order = [m["run_id"] for m in manifest]
+    def rank(run_id: str) -> int:
+        return facts[run_id]["rank"]
+
+    # IN RANK ORDER, the order the runs were opened (REQ-PIPE-279 criteria 16
+    # and 19) - it was the receipt date, then run_index, then the run id.
+    run_ids_in_order = sorted((m["run_id"] for m in manifest), key=rank)
     own_ids = set(run_ids_in_order)
-    # EVERY RUN'S DATE, the dataset's own and the rest (#253).
+    # THE OWN RUN OF EACH SUPPLY, so a result recorded under another table's
+    # run is placed on the run of the supply it read.
+    own_by_supply = {facts[r]["supply_id"]: r for r in run_ids_in_order
+                     if facts[r]["supply_id"] is not None}
+    # EVERY RUN'S DATE, the dataset's own and the rest (#253), for display.
     all_runs = manifest if all_runs is None else all_runs
     run_date_by_id = {m["run_id"]: _run_date(m) for m in all_runs}
     other_run_ids = [m["run_id"] for m in all_runs if m["run_id"] not in own_ids]
@@ -469,18 +429,29 @@ def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], da
                 # Why this run's check could NOT be evaluated, or None for a
                 # real verdict - never a value or a pass.
                 not_evaluated = slot["not_evaluated"].get(run_id)
+                fact = facts[run_id]
+                read = _supply_read({"reads": slot["reads"].get(run_id)}, table)
                 (history if own else elsewhere).append({
                     "run_id": run_id, "run_date": run_date_by_id[run_id],
-                    # WHEN IT WAS RECORDED, AND UNDER WHOSE RUN where that is
-                    # another table's (post-build-review #253).
+                    # ITS PLACE, ITS SUPPLY, ITS CAUSE AND WHAT IT READ, from the
+                    # record (REQ-PIPE-279 criterion 16): the rank orders, the
+                    # supply is this dataset's that the result is about.
+                    "rank": fact["rank"],
+                    "supply_id": fact["supply_id"] if own else read,
+                    "cause": fact["cause"],
+                    "reads": slot["reads"].get(run_id),
+                    # WHEN IT WAS RECORDED - for its date, never its order -
+                    # AND UNDER WHOSE RUN where that is another table's
+                    # (post-build-review #253): qa.run's dataset (criterion 17).
                     "recorded_at": slot["at"].get(run_id),
-                    "recorded_by": None if own else (run_owner(run_id) or (None,))[0],
-                    # WHICH OWN RUN IT IS ABOUT, by what it read (REQ-PIPE-265).
-                    "read_run": None if own else read_run(slot["read"][run_id], table, dataset_id, own_ids),
-                    # WHICH KIND OF RUN (REQ-DASH-264 criterion 7): only a
-                    # re-check is said to be one on the page.
+                    "recorded_by": None if own else fact["dataset_id"],
+                    # WHICH OWN RUN IT IS ABOUT: the run of the supply it
+                    # recorded reading (REQ-PIPE-279 criterion 19).
+                    "read_run": None if own else own_by_supply.get(read),
+                    # WHICH KIND OF RUN (REQ-DASH-264 criterion 7), by qa.run's
+                    # scope: only a re-check is said to be one on the page.
                     "recorded_in": None if own else (
-                        "re-check" if supply_db.RERUN_MARK in run_id else "arrival"),
+                        "arrival" if fact["scope"] == "arrival" else "re-check"),
                     "value": slot["by_run"][run_id],
                     "row_count_total": slot["row_count_total"].get(run_id),
                     "row_count_invalid": slot["row_count_invalid"].get(run_id),
@@ -490,19 +461,18 @@ def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], da
                     "reference": slot["reference"].get(run_id),
                     "not_evaluated": not_evaluated,
                 })
-            history = _merged_by_time(history, elsewhere)
+            history = sorted(history + elsewhere, key=lambda h: h["rank"])
             if not history:
                 continue
             # THE NEWEST RESULT IS CURRENT, whichever run recorded it (#253):
             # the dataset's newest measured run unless a result recorded
-            # under another table's run is newer.
+            # under another table's run is newer - by rank (REQ-PIPE-279).
             current_value = slot["by_run"].get(latest_run, 0)
             current_status = slot["status_by_run"].get(latest_run)
-            own_at = _instant(slot["at"].get(latest_run))
-            newer = [h for h in elsewhere
-                     if own_at is None or _instant(h["recorded_at"]) > own_at]
+            own_rank = rank(latest_run) if latest_run in slot["by_run"] else None
+            newer = [h for h in elsewhere if own_rank is None or h["rank"] > own_rank]
             if newer:
-                newest = max(newer, key=lambda h: _instant(h["recorded_at"]))
+                newest = max(newer, key=lambda h: h["rank"])
                 current_value, current_status = newest["value"], newest["status"]
             engine_short = ENGINE_SHORT.get(engine, engine)
             lifecycle = lifecycle_by_id.get(slot["check_id"])
@@ -528,7 +498,8 @@ def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], da
                 "fail": slot["fail"],
                 "current": current_value,
                 "current_status": current_status,
-                "between": (_between(slot["check_id"], reads_by_check_id)
+                "between": (_between(slot["check_id"],
+                                     {t for got in slot["reads"].values() for t in (got or ())})
                             if col == CROSS_TABLE_PSEUDO_COLUMN else None),
                 "previous": slot["by_run"].get(prev_run, 0),
                 "history": history,
@@ -732,7 +703,14 @@ def build_datasets(collection_id: str) -> list[dict]:
     """Every dataset the hierarchy declares for the collection, in order."""
     coll = collections.by_id(collection_id)
     payload = _payload(collection_id)
-    manifest = sorted(payload["runs"], key=_run_date)
+    # WHAT EACH RUN IS (REQ-PIPE-279 criteria 16 and 17), refused where the
+    # file predates it rather than read as runs that are nothing.
+    if "run_facts" not in payload:
+        raise ValueError(
+            f"{coll.id}: the results file has no run_facts - written before REQ-PIPE-279. "
+            f"Rebuild it: `mothman dashboard rebuild-results`.")
+    facts = payload["run_facts"]
+    manifest = sorted(payload["runs"], key=lambda m: facts[m["run_id"]]["rank"])
     results = payload["results"]
     dataset_stats = payload["dataset_stats"]
     # ONE RECORDED SHAPE (REQ-PIPE-248): a record without `row_counts` was
@@ -752,8 +730,8 @@ def build_datasets(collection_id: str) -> list[dict]:
     by_table = {d.table: [r for r in results if r["dataset_id"] == d.dataset_id]
                 for d in coll.datasets}
     share_cross_table_results(results, by_table)
-    return [build_one_table(coll, d, by_table[d.table], own_runs(manifest, d.table), dataset_stats,
-                            lifecycle_by_id, all_runs=manifest)
+    return [build_one_table(coll, d, by_table[d.table], own_runs(manifest, d.dataset_id, facts),
+                            dataset_stats, lifecycle_by_id, facts=facts, all_runs=manifest)
             for d in coll.datasets]
 
 

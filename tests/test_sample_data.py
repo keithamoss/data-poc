@@ -540,20 +540,22 @@ class TestTheDashboardReportsItAgainstTheRightDataset:
     """
 
     @staticmethod
-    def _sharing(monkeypatch, reads: dict[str, list[str]]):
-        from qa_tools.common import tables_read
-
-        monkeypatch.setattr(tables_read, "declared_by_check_id", lambda checks: reads)
+    def _reading(record: dict, tables: list[str]) -> dict:
+        """The record as recorded with what it read - where a cross-table
+        result is shared since REQ-PIPE-279 criterion 18, never the
+        checkout's declarations."""
+        record["reads"] = {t: {"state": "NO-SUPPLY", "supply_id": None, "contested": False}
+                           for t in tables}
+        return record
 
     def test_a_mixed_result_reaches_the_calendar_less_table_only(
             self, tmp_path, monkeypatch):
         from pipeline import build_dashboard_data as build_cp
 
         _asset_with([AGREED, SAMPLE], tmp_path, monkeypatch)
-        self._sharing(monkeypatch,
-                      {"births_match_referrals": ["birth_registrations", "cp_referrals"]})
-        record = _result("cp-referrals", "births_match_referrals",
-                         supply_state=qa_store.IN_DEVELOPMENT)
+        record = self._reading(_result("cp-referrals", "births_match_referrals",
+                                       supply_state=qa_store.IN_DEVELOPMENT),
+                               ["birth_registrations", "cp_referrals"])
         by_table = {"birth_registrations": [], "cp_referrals": []}
         build_cp.share_cross_table_results([record], by_table)
 
@@ -567,9 +569,8 @@ class TestTheDashboardReportsItAgainstTheRightDataset:
         from pipeline import build_dashboard_data as build_cp
 
         _asset_with([AGREED, SAMPLE], tmp_path, monkeypatch)
-        self._sharing(monkeypatch,
-                      {"births_and_more": ["birth_registrations", "cp_referrals"]})
-        record = _result("birth-registrations", "births_and_more")
+        record = self._reading(_result("birth-registrations", "births_and_more"),
+                               ["birth_registrations", "cp_referrals"])
         by_table = {"birth_registrations": [], "cp_referrals": []}
         build_cp.share_cross_table_results([record], by_table)
 
@@ -583,10 +584,9 @@ class TestTheDashboardReportsItAgainstTheRightDataset:
         from pipeline import build_dashboard_data as build_cp
 
         _asset_with([AGREED, SAMPLE, SECOND_SAMPLE], tmp_path, monkeypatch)
-        self._sharing(monkeypatch,
-                      {"referrals_match_outcomes": ["cp_referrals", "cp_outcomes"]})
-        record = _result("cp-referrals", "referrals_match_outcomes",
-                         supply_state=qa_store.IN_DEVELOPMENT)
+        record = self._reading(_result("cp-referrals", "referrals_match_outcomes",
+                                       supply_state=qa_store.IN_DEVELOPMENT),
+                               ["cp_referrals", "cp_outcomes"])
         by_table = {"cp_referrals": [], "cp_outcomes": []}
         build_cp.share_cross_table_results([record], by_table)
 

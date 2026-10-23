@@ -34,7 +34,6 @@ from qa_tools.common import (
     ticket_reconciler, trial, unrunnable,
 )
 from qa_tools.common.git_identity import get_run_by
-from qa_tools.common.qa_results_reader import read_dataset_stats
 from qa_tools.common.qa_results_writer import (
     close_attempt, finish_run, open_run, run_owner, scope_of_run, write_qa_result,
 )
@@ -475,10 +474,10 @@ def run_pipeline(collection_id: str, sequential: bool = False,
     # lifecycle; SCRIPTED PERSON DECISIONS played back between arrivals
     # (REQ-GEN-135), refused unless the asset declares itself synthetic; EACH
     # ARRIVAL STAGED AS IT COMES (REQ-TEST-159).
-    all_results = arrival_lifecycle.process_all(
+    arrival_lifecycle.process_all(
         run.arrivals, steps=run.steps, run_by=run.run_by, run_timestamp=run.run_timestamp,
         player=run.player, prepare=run.prepare, start_at=start_at, after_each=after_each)
-    return _end(run, all_results, record_deliveries)
+    return _end(run, record_deliveries)
 
 
 @dataclass
@@ -523,7 +522,7 @@ def _begin(collection_id: str, player=None) -> _CollectionRun:
         run_by=get_run_by())
 
 
-def _end(run: _CollectionRun, all_results: list, record_deliveries: bool) -> dict:
+def _end(run: _CollectionRun, record_deliveries: bool) -> dict:
     coll = run.coll
     # A DELIVERY NO ARRIVAL CLAIMED is recorded once the arrivals are done.
     if record_deliveries:
@@ -533,16 +532,12 @@ def _end(run: _CollectionRun, all_results: list, record_deliveries: bool) -> dic
     # configured.
     ticket_reconciler.report(ticket_reconciler.after_runs(coll.id))
 
-    # Read back rather than threaded through - the same path the rebuild from
-    # history uses, so the two cannot drift on how statistics are assembled.
-    stats_by_run = {}
-    for arrival in run.arrivals:
-        stats = read_dataset_stats(coll.agency_id, coll.id, arrival.run_id)
-        if stats is not None:
-            stats_by_run[arrival.run_id] = stats
-    return results_history.write_results_file(
-        coll.id, runs=run.manifest, dataset_stats=stats_by_run, results=all_results,
-        generated_at=run.run_timestamp)
+    # THE REBUILD FROM HISTORY, not the results held in memory (REQ-PIPE-279):
+    # what the build places and orders by - each run's facts, each cross-table
+    # result's recorded reads - is in the record, so the live batch's file and
+    # the rebuild's are one path rather than two that could drift.
+    return results_history.build_results_from_history(coll.id, generated_at=run.run_timestamp,
+                                                      source="")
 
 
 def merged_arrivals(by_collection: dict) -> list[tuple[str, object]]:
@@ -595,7 +590,7 @@ def run_stream(collection_ids: list[str], sequential: bool = False,
          for cid, run in runs.items()},
         player=player, results=results)
     # ONE DELIVERY RECORD for the stream, after its last arrival (criterion 5).
-    out = [_end(runs[cid], results[cid], record_deliveries=False) for cid in collection_ids]
+    out = [_end(runs[cid], record_deliveries=False) for cid in collection_ids]
     if record_deliveries:
         delivery_log.record_all()
     return out

@@ -19,9 +19,10 @@ def test_bdm_rebuilds_from_real_committed_history(tmp_path, monkeypatch, deploym
     assert results_path.exists(), "should write reports/results_rs_civil-registration.json (redirected to tmp here)"
     assert output["runs"], "the real committed qa_results/registry-services/civil-registration/ history is empty"
     assert output["results"], "no real check results found across committed history"
-    # run_index, not run_date - a resupply's own run_date sorts away from its parent delivery (see module docstring)
-    run_indexes = [r["run_index"] for r in output["runs"]]
-    assert run_indexes == sorted(run_indexes)
+    # IN THE ORDER THE RUNS WERE OPENED (REQ-PIPE-279 criterion 19) - it was
+    # run_index, which a re-check had to be stamped with to sort at all.
+    ranks = [output["run_facts"][r["run_id"]]["rank"] for r in output["runs"]]
+    assert ranks == sorted(ranks)
 
     summary = output["summary"]
     assert summary["total_checks"] == len(output["results"])
@@ -51,8 +52,10 @@ def test_cp_rebuilds_from_real_committed_history(tmp_path, monkeypatch, deployme
     assert results_path.exists()
     assert output["runs"], "the real committed qa_results/child-protection-family-support/child-protection/ history is empty"
     assert output["results"]
-    run_indexes = [r["run_index"] for r in output["runs"]]
-    assert run_indexes == sorted(run_indexes)
+    # IN THE ORDER THE RUNS WERE OPENED (REQ-PIPE-279 criterion 19) - it was
+    # run_index, which a re-check had to be stamped with to sort at all.
+    ranks = [output["run_facts"][r["run_id"]]["rank"] for r in output["runs"]]
+    assert ranks == sorted(ranks)
 
     summary = output["summary"]
     assert summary["total_checks"] == len(output["results"])

@@ -160,19 +160,19 @@ def run_for(conn: supply_db.SupplyConnection, dataset_id: str,
     own = list(found.own) if found else []
     if not own:
         return None
-    arrival = supply_files.staging_key_of(supply)
 
     rows = conn.execute(
         f'SELECT t.run_key FROM "{qa_store.SCHEMA}".tables_read t '
         f'JOIN "{qa_store.SCHEMA}".run r ON r.run_key = t.run_key '
         "WHERE t.logical_table = ? AND t.physical_table = ANY(?) "
-        # THE RUN NAMED FOR THIS TABLE FIRST (dashboard UX critic on
-        # 8a942e7, H1): a Child Protection run reads every sibling's table
+        # THE DATASET'S OWN RUN FIRST, then the first opened (REQ-PIPE-279
+        # criterion 19): a Child Protection run reads every sibling's table
         # for its cross-table checks, all at one instant, so the earliest
-        # reader tied and the alphabetical tie-break named cp_carers' run
-        # for every dataset's supply.
-        "ORDER BY (t.run_key NOT LIKE ?), r.run_instant, t.run_key LIMIT 1",
-        [logical, own, f"{logical}__{arrival}%"]).fetchall()
+        # reader tied (dashboard UX critic on 8a942e7, H1). It was a LIKE on
+        # the run id's text and then the run instant and the key; qa.run says
+        # whose run it is, and run_seq which came first.
+        "ORDER BY (r.dataset_id IS DISTINCT FROM ?), r.run_seq LIMIT 1",
+        [logical, own, dataset_id]).fetchall()
     return rows[0][0] if rows else None
 
 

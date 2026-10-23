@@ -107,14 +107,13 @@ def test_read_qa_results_returns_empty_list_for_an_unknown_dataset(tmp_path):
     assert read_qa_results("no-such-agency", "no-such-dataset") == []
 
 
-def test_list_run_ids_and_read_qa_results_sort_numerically_not_lexicographically(tmp_path):
-    # Real bug, 2026-09-17: both functions used to sort run_id directory
-    # names as plain strings, which is only correct as long as every
-    # run number has the same digit width - "run_100" < "run_20" <
-    # "run_3" lexicographically, wrong once BDM's real run count grew
-    # past a fixed zero-padding width (see generator/collections/civil_registration.py's
-    # own comment on the same bug). Written deliberately out of numeric
-    # order so a no-op "sort" couldn't accidentally still pass.
+def test_list_run_ids_and_read_qa_results_follow_the_order_runs_were_opened(tmp_path):
+    """REQ-PIPE-279 criterion 19, a deliberate change: these sorted run ids
+    NUMERICALLY (a real bug, 2026-09-17, was sorting them as plain strings,
+    "run_100" < "run_20" < "run_3"). Both were orders of run-id text, which
+    REQ-PIPE-279 rules out; the order is now the one the runs were opened in
+    (qa.run.run_seq), whatever their ids spell - so these are opened in an
+    order that neither sort would give."""
     write_qa_result("agency", "dataset", "run_100", "2026-04-10T00:00:00Z", "dbt", {},
                      verified=[{"check_id": "dbt:hundred", "check_name": "dbt:hundred", "status": "pass"}])
     write_qa_result("agency", "dataset", "run_3", "2026-01-03T00:00:00Z", "dbt", {},
@@ -124,10 +123,10 @@ def test_list_run_ids_and_read_qa_results_sort_numerically_not_lexicographically
 
     _done("run_100", "run_3", "run_20")
 
-    assert list_run_ids("agency", "dataset") == ["run_3", "run_20", "run_100"]
+    assert list_run_ids("agency", "dataset") == ["run_100", "run_3", "run_20"]
 
     results = read_qa_results("agency", "dataset")
-    assert [r["check_name"] for r in results] == ["dbt:three", "dbt:twenty", "dbt:hundred"]
+    assert [r["check_name"] for r in results] == ["dbt:hundred", "dbt:three", "dbt:twenty"]
 
 
 def test_read_qa_results_skips_a_tool_with_no_committed_file_for_a_run(tmp_path):

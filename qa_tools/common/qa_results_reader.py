@@ -323,7 +323,10 @@ def read_raw(agency: str, collection: str, run_id: str, tool: str,
 
 def list_run_ids(agency: str, collection: str,
                  conn=None) -> list[str]:
-    """Every COMPLETE run recorded under this agency/collection, sorted.
+    """Every COMPLETE run recorded under this agency/collection, in the
+    order they were opened (qa.run.run_seq, REQ-PIPE-279 criterion 19) - it
+    was a natural sort of the run ids, which put `__r10` before `__r9`'s
+    later runs and a sibling table's run before its own by name.
 
     Only complete ones, which is criterion 13 and is a change: the file
     version listed whatever had a directory, so a run that died halfway
@@ -331,12 +334,77 @@ def list_run_ids(agency: str, collection: str,
     """
     conn, mine = _conn(conn)
     try:
-        return sorted(
-            (row["run_key"] for row in qa_store.runs_for(conn, agency, collection)),
-            key=_natural_sort_key)
+        return [row["run_key"] for row in qa_store.runs_for(conn, agency, collection)]
     finally:
         if mine:
             conn.close()
+
+
+def run_facts(agency: str, collection: str, conn=None) -> dict[str, dict]:
+    """{run id: what qa.run says the run is} for every complete run of the
+    collection (REQ-PIPE-279 criteria 16 and 17): its dataset, its scope, the
+    supply it belongs to, its CAUSE, and its RANK - dense, from run_seq
+    within the collection, so run_seq itself, which another collection's
+    runs interleave, never leaves the database.
+
+    THE CAUSE is what made the run happen: an arrival's is its arrival - the
+    supplies filed from one delivery at one receipt instant, REQ-PIPE-265's
+    siblings (`arrival:<delivery>@<instant>`; a supply with no recorded
+    receipt is an arrival of its own, `arrival:<run id>`); a re-check's,
+    readers-only or knock-on run's the decision or load it records. A run
+    that belongs to no supply has none."""
+    conn, mine = _conn(conn)
+    try:
+        rows = conn.execute(
+            f'SELECT r.run_key, r.dataset_id, r.scope, r.supply_id, r.caused_by_decision, '
+            f'r.caused_by_load, rc.delivery, rc.received_instant '
+            f'FROM "{qa_store.SCHEMA}".run_visible r '
+            f'LEFT JOIN "{qa_store.SCHEMA}".supply_receipt rc '
+            "ON rc.dataset_id = r.dataset_id AND rc.supply_id = r.supply_id "
+            "WHERE r.agency_id = ? AND r.collection_id = ? ORDER BY r.run_seq",
+            [agency, collection]).fetchall()
+    finally:
+        if mine:
+            conn.close()
+    out = {}
+    for rank, (key, dataset_id, scope, supply, decision, load, delivery, instant) in enumerate(
+            rows, start=1):
+        if supply is None:
+            cause = None
+        elif decision is not None:
+            cause = f"decision:{decision}"
+        elif load is not None:
+            cause = f"load:{load}"
+        elif delivery is not None:
+            cause = f"arrival:{delivery}@{instant.isoformat()}"
+        else:
+            cause = f"arrival:{key}"
+        out[key] = {"dataset_id": dataset_id, "scope": scope, "supply_id": supply,
+                    "rank": rank, "cause": cause}
+    return out
+
+
+def read_check_reads(agency: str, collection: str, conn=None) -> dict[tuple[str, str], dict]:
+    """{(run id, check id): {table: {state, supply_id, contested}}} - what each
+    complete cross-table result recorded reading (qa.check_read, REQ-PIPE-279
+    criterion 1), for the build to place it by (criteria 16 and 18). One run
+    records one result per check, so the pair is a key."""
+    conn, mine = _conn(conn)
+    try:
+        rows = conn.execute(
+            f'SELECT c.run_key, c.check_id, k.logical_table, k.state, k.supply_id, k.contested '
+            f'FROM "{qa_store.SCHEMA}".check_read_visible k '
+            f'JOIN "{qa_store.SCHEMA}".check_result c ON c.id = k.check_result_id '
+            "WHERE c.agency_id = ? AND c.collection_id = ? "
+            "ORDER BY c.run_key, c.check_id, k.logical_table", [agency, collection]).fetchall()
+    finally:
+        if mine:
+            conn.close()
+    out: dict[tuple[str, str], dict] = {}
+    for run_key, check_id, table, state, supply, contested in rows:
+        out.setdefault((run_key, check_id), {})[table] = {
+            "state": state, "supply_id": supply, "contested": bool(contested)}
+    return out
 
 
 def current_runs_only(run_ids: list[str], conn=None) -> list[str]:

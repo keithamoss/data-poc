@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import pytest
 
+from build_support import facts_for
 from pipeline import build_dashboard_data as bcd
 from qa_tools import collections
 from qa_tools.common import hierarchy
@@ -16,7 +17,16 @@ _CP = collections.by_id("child-protection")
 
 
 def _table(table, *args):
-    return bcd.build_one_table(_CP, hierarchy.dataset_for_table(table), *args)
+    """build_one_table with each run's facts as a fixture's runs have them:
+    ranked in order, belonging to no supply (REQ-PIPE-279)."""
+    return bcd.build_one_table(_CP, hierarchy.dataset_for_table(table), *args,
+                               facts=facts_for(args[1]))
+
+
+def _reads(**supplies) -> dict:
+    """A cross-table result's recorded reads, `table=supply` (None: absent)."""
+    return {t: {"state": "READ" if s else "ABSENT", "supply_id": s, "contested": False}
+            for t, s in supplies.items()}
 
 # ARRIVAL RECORDS, not manifest entries (REQ-GEN-043) - and row counts
 # now sit in dataset_stats, MEASURED from the data that landed, rather
@@ -89,7 +99,13 @@ def test_each_dataset_shows_its_own_runs():
     page listed all 108 runs as its own arrival history."""
     manifest = [{"run_id": "cp_clients__1"}, {"run_id": "cp_placements__1"},
                 {"run_id": "cp_clients__2"}, {"run_id": "cp_run_001"}]
-    assert [m["run_id"] for m in bcd.own_runs(manifest, "cp_clients")] == [
+    # WHOSE A RUN IS, FROM qa.run (REQ-PIPE-279 criterion 17) - the same
+    # answer here as the ids spell; tests/test_build_from_the_record.py has
+    # a run whose id and record disagree.
+    facts = facts_for(manifest, datasets={"cp_clients__1": "cp-clients",
+                                          "cp_placements__1": "cp-placements",
+                                          "cp_clients__2": "cp-clients"})
+    assert [m["run_id"] for m in bcd.own_runs(manifest, "cp-clients", facts)] == [
         "cp_clients__1", "cp_clients__2", "cp_run_001"]
 
 
@@ -110,14 +126,16 @@ class TestACheckThatCouldNotRunStaysOnItsOwnCard:
 
     def _results(self, pseudo):
         real = _check("cp_run_001", "assigned_worker_id", 0, check_id=_XT,
-                      check_name="relationships_cp_notifications_assigned_worker_id")
+                      check_name="relationships_cp_notifications_assigned_worker_id",
+                      reads=_reads(cp_notifications="n@1", cp_case_workers="w@1"))
         return [real, pseudo]
 
     @pytest.mark.parametrize("reason_key", ["unrunnable_reason", "held_reason"])
     def test_it_joins_the_real_checks_card_as_a_red_run_with_its_reason(self, reason_key):
         pseudo = _check("cp_run_002", "cp_case_workers", None, status="fail", check_id=_XT,
                         check_name="Every notification's worker exists",
-                        label="Not evaluated", **{reason_key: "cp_case_workers is held"})
+                        label="Not evaluated", **{reason_key: "cp_case_workers is held"},
+                        reads=_reads(cp_notifications="n@2", cp_case_workers=None))
         table = _table("cp_notifications", self._results(pseudo), FIXTURE_RUNS,
                                     FIXTURE_DATASET_STATS, {})
         cards = [c for col in table["columns"] for c in col["checks"] if c.get("check_id") == _XT]
@@ -137,9 +155,11 @@ class TestACheckATheToolCouldNotEvaluateSaysWhy:
     def test_the_reason_reaches_the_card(self):
         failed = _check("cp_run_002", "assigned_worker_id", None, status="error", check_id=_XT,
                         check_name="relationships_cp_notifications_assigned_worker_id",
-                        not_evaluated_reason="Soda could not evaluate it - needs Soda Cloud")
+                        not_evaluated_reason="Soda could not evaluate it - needs Soda Cloud",
+                        reads=_reads(cp_notifications="n@2", cp_case_workers="w@2"))
         real = _check("cp_run_001", "assigned_worker_id", 0, check_id=_XT,
-                      check_name="relationships_cp_notifications_assigned_worker_id")
+                      check_name="relationships_cp_notifications_assigned_worker_id",
+                      reads=_reads(cp_notifications="n@1", cp_case_workers="w@1"))
         table = _table("cp_notifications", [real, failed], FIXTURE_RUNS,
                                     FIXTURE_DATASET_STATS, {})
         card = next(c for col in table["columns"] for c in col["checks"]
@@ -168,12 +188,13 @@ class TestTwoChecksThatShareANameStayTwoCards:
             "cp-placements.cp_client_id.relationships_dbt")
 
     def _cards(self, monkeypatch):
-        monkeypatch.setattr(bcd, "_cross_table_check_ids", lambda: {self._INV, self._PLA})
         results = [
             _check("cp_run_001", "cp_client_id", 0, check_id=self._INV,
-                   check_name="relationships_cp_investigations_cp_client_id"),
+                   check_name="relationships_cp_investigations_cp_client_id",
+                   reads=_reads(cp_investigations="i@1", cp_clients="c@1")),
             _check("cp_run_001", "cp_client_id", 3, status="fail", check_id=self._PLA,
-                   check_name="relationships_cp_investigations_cp_client_id"),
+                   check_name="relationships_cp_investigations_cp_client_id",
+                   reads=_reads(cp_placements="p@1", cp_clients="c@1")),
         ]
         table = _table("cp_clients", results, FIXTURE_RUNS,
                                     FIXTURE_DATASET_STATS, {})
@@ -214,16 +235,24 @@ class TestACrossTableResultFromAnotherTablesRunReachesThePage:
                      "check_aggregates": {}}}
 
     def _card(self):
+        reads = _reads(cp_notifications="cp-notifications@n", cp_clients="cp-clients@c")
         results = [
             _check(self._OWN, "cp_client_id", 40, status="fail", check_id=self._REF,
-                   check_name="dbt:relationships", run_timestamp="2020-11-01T08:20:00+08:00"),
+                   check_name="dbt:relationships", run_timestamp="2020-11-01T08:20:00+08:00",
+                   reads=reads),
             _check(self._RECHECK, "cp_client_id", 0, check_id=self._REF,
-                   check_name="dbt:relationships", run_timestamp="2020-11-02T11:00:00+08:00"),
+                   check_name="dbt:relationships", run_timestamp="2020-11-02T11:00:00+08:00",
+                   reads=reads),
         ]
+        facts = facts_for(self._RUNS,
+                          datasets={self._OWN: "cp-notifications", self._RECHECK: "cp-clients"},
+                          supplies={self._OWN: "cp-notifications@n",
+                                    self._RECHECK: "cp-clients@c"},
+                          scopes={self._RECHECK: "full"})
         table = bcd.build_one_table(
             _CP, hierarchy.dataset_for_table("cp_notifications"), results,
-            bcd.own_runs(self._RUNS, "cp_notifications"), self._STATS, {},
-            all_runs=self._RUNS)
+            bcd.own_runs(self._RUNS, "cp-notifications", facts), self._STATS, {},
+            facts=facts, all_runs=self._RUNS)
         return next(c for col in table["columns"] for c in col["checks"]
                     if c.get("check_id") == self._REF)
 
@@ -253,27 +282,42 @@ class TestAResultFromAnotherTablesRunSaysWhichOwnRunItRead:
     """REQ-PIPE-265 meeting the dataset list's count (found by the gate,
     2026-10-22): a result recorded under another table's run is placed by the
     supply it READ, never by the day it was recorded - a held arrival recorded
-    the same day can be a different supply from the one read."""
+    the same day can be a different supply from the one read.
 
-    _OWN = {"cp_case_workers__202502010900000800", "cp_case_workers__202505010900000800"}
+    BY THE SUPPLY qa.check_read RECORDED (REQ-PIPE-279 criterion 19). These
+    tested read_run(), which took it from a physical name or, for a check
+    carried from a sibling, from the instant in the run id; the record says
+    it for every case now, the carried one included, because a result's
+    reads name its own table too."""
 
-    def test_a_check_that_reads_this_table_names_the_run_it_read(self):
-        record = {"run_id": "cp_investigations__202505010900000800", "dataset_id": "cp-investigations",
-                  "tables_read": {"cp_case_workers": "cp_case_workers__202502010900000800"}}
-        assert bcd.read_run(record, "cp_case_workers", "cp-case-workers", self._OWN) \
-            == "cp_case_workers__202502010900000800"
+    _REF = ("data-asset-1.child-protection-family-support.child-protection."
+            "cp-investigations.lead_worker_id.relationships_dbt")
+    _OWN = ["cp_case_workers__202502010900000800", "cp_case_workers__202505010900000800"]
+    _ELSEWHERE = "cp_investigations__202505010900000800"
 
-    def test_a_check_carried_from_a_sibling_read_this_tables_run_of_that_instant(self):
-        own = {"cp_notifications__202608010900000800"}
-        record = {"run_id": "cp_clients__202608010900000800", "dataset_id": "cp-notifications",
-                  "tables_read": {"cp_clients": "cp_clients__202608010900000800"}}
-        assert bcd.read_run(record, "cp_notifications", "cp-notifications", own) \
-            == "cp_notifications__202608010900000800"
+    def _read_run(self, read: str | None) -> str | None:
+        runs = [{"run_id": r, "received_at": "2025-05-01T09:00:00+08:00"}
+                for r in (*self._OWN, self._ELSEWHERE)]
+        facts = facts_for(runs, datasets={self._OWN[0]: "cp-case-workers",
+                                          self._OWN[1]: "cp-case-workers",
+                                          self._ELSEWHERE: "cp-investigations"},
+                          supplies={self._OWN[0]: "cp-case-workers@feb",
+                                    self._OWN[1]: "cp-case-workers@may",
+                                    self._ELSEWHERE: "cp-investigations@may"})
+        record = _check(self._ELSEWHERE, "lead_worker_id", 0, check_id=self._REF,
+                        dataset_id="cp-investigations",
+                        reads=_reads(cp_investigations="cp-investigations@may",
+                                     cp_case_workers=read))
+        table = bcd.build_one_table(
+            _CP, hierarchy.dataset_for_table("cp_case_workers"), [record],
+            bcd.own_runs(runs, "cp-case-workers", facts), {}, {}, facts=facts, all_runs=runs)
+        (card,) = [c for col in table["columns"] for c in col["checks"]
+                   if c.get("check_id") == self._REF]
+        (entry,) = [h for h in card["history"] if h["run_id"] == self._ELSEWHERE]
+        return entry["read_run"]
 
-    def test_a_re_check_run_or_an_unknown_read_names_nothing(self):
-        own = {"cp_notifications__202608010900000800"}
-        rerun = {"run_id": "cp_clients__202608010900000800__r1", "dataset_id": "cp-notifications"}
-        assert bcd.read_run(rerun, "cp_notifications", "cp-notifications", own) is None
-        elsewhere = {"run_id": "cp_investigations__202505010900000800", "dataset_id": "cp-investigations",
-                     "tables_read": {"cp_case_workers": None}}
-        assert bcd.read_run(elsewhere, "cp_case_workers", "cp-case-workers", self._OWN) is None
+    def test_it_names_the_run_of_the_supply_it_read_not_the_same_days(self):
+        assert self._read_run("cp-case-workers@feb") == self._OWN[0]
+
+    def test_a_table_it_read_no_supply_of_names_nothing(self):
+        assert self._read_run(None) is None

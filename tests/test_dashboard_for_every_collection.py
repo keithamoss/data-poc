@@ -65,7 +65,7 @@ def described(third_collection, tmp_path, monkeypatch, supply_dsn):
     # no recorded runs - a MISSING file is refused (Keith, 2026-10-18; see
     # TestAMissingResultsFileIsRefused below), not read as no runs.
     results = tmp_path / f"results-{FAKE_ID}.json"
-    results.write_text(json.dumps({"runs": [], "results": [], "dataset_stats": {}}))
+    results.write_text(json.dumps({"runs": [], "run_facts": {}, "results": [], "dataset_stats": {}}))
     monkeypatch.setattr(bdd, "results_path", lambda cid: str(results))
     # The recorded history the build reads, empty for the fake collection.
     from qa_tools.common import qa_store, supply_db

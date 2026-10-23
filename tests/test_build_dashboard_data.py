@@ -15,6 +15,7 @@ import json
 import pytest
 
 from qa_tools.common.check_lifecycle import CheckMetadata
+from build_support import facts_for
 from pipeline import build_dashboard_data as bdd
 from qa_tools import collections
 
@@ -79,7 +80,7 @@ FIXTURE_RESULTS = [
 def _write_results(tmp_path):
     results_path = tmp_path / "results_rs_civil-registration.json"
     results_path.write_text(json.dumps({
-        "runs": FIXTURE_RUNS, "results": FIXTURE_RESULTS, "dataset_stats": FIXTURE_DATASET_STATS,
+        "runs": FIXTURE_RUNS, "run_facts": facts_for(FIXTURE_RUNS), "results": FIXTURE_RESULTS, "dataset_stats": FIXTURE_DATASET_STATS,
     }))
     return results_path
 
@@ -263,7 +264,7 @@ def _rowcount_results():
 def _write_rowcount_results(tmp_path):
     results_path = tmp_path / "results_rs_civil-registration.json"
     results_path.write_text(json.dumps({
-        "runs": FIXTURE_RUNS, "results": _rowcount_results(),
+        "runs": FIXTURE_RUNS, "run_facts": facts_for(FIXTURE_RUNS), "results": _rowcount_results(),
         "dataset_stats": FIXTURE_DATASET_STATS,
     }))
     return results_path
@@ -314,7 +315,7 @@ def test_a_violation_count_checks_zero_tolerance_is_not_regressed(tmp_path, monk
     _no_retired_checks(monkeypatch)
     results_path = tmp_path / "results_rs_civil-registration.json"
     results_path.write_text(json.dumps({
-        "runs": FIXTURE_RUNS,
+        "runs": FIXTURE_RUNS, "run_facts": facts_for(FIXTURE_RUNS),
         "results": [
             _check("run_001", "sex", 0, status="pass",
                    check_name="dbt:not_null", warn_threshold=None, fail_threshold=None),
@@ -347,7 +348,7 @@ def _build_with_authored_check(tmp_path, monkeypatch, **authored):
     monkeypatch.setattr(bdd, "collect_checks", lambda ref: [meta])
     results_path = tmp_path / "results_rs_civil-registration.json"
     results_path.write_text(json.dumps({
-        "runs": FIXTURE_RUNS,
+        "runs": FIXTURE_RUNS, "run_facts": facts_for(FIXTURE_RUNS),
         "results": [_check("run_002", "sex", 0, status="pass",
                            check_id=check_id)],
         "dataset_stats": FIXTURE_DATASET_STATS,
@@ -436,7 +437,7 @@ def test_two_checks_sharing_a_display_name_stay_separate(tmp_path, monkeypatch):
     _no_retired_checks(monkeypatch)
     results_path = tmp_path / "results_rs_civil-registration.json"
     results_path.write_text(json.dumps({
-        "runs": FIXTURE_RUNS,
+        "runs": FIXTURE_RUNS, "run_facts": facts_for(FIXTURE_RUNS),
         "results": [
             _custom_sql("run_001", 5, "fail", RANGE_ID),
             _custom_sql("run_001", 0, "pass", FRESH_ID),
@@ -475,7 +476,7 @@ def test_a_table_level_check_lands_in_a_pseudo_column(tmp_path, monkeypatch):
     _no_retired_checks(monkeypatch)
     results_path = tmp_path / "results_rs_civil-registration.json"
     results_path.write_text(json.dumps({
-        "runs": FIXTURE_RUNS,
+        "runs": FIXTURE_RUNS, "run_facts": facts_for(FIXTURE_RUNS),
         "results": [
             _check("run_001", "(table)", 3, check_name="datacontract:row_count",
                    engine="datacontract-cli 1.2.0", check_id="a.b.c.d.rowCount_datacontract"),
@@ -513,7 +514,8 @@ def test_a_run_that_measured_nothing_is_not_current(tmp_path, monkeypatch):
                  "received_at": "2026-09-02T14:00:00+00:00"}
     path = tmp_path / "results_rs_civil-registration.json"
     path.write_text(json.dumps({
-        "runs": [*FIXTURE_RUNS, contested], "results": FIXTURE_RESULTS,
+        "runs": [*FIXTURE_RUNS, contested],
+        "run_facts": facts_for([*FIXTURE_RUNS, contested]), "results": FIXTURE_RESULTS,
         "dataset_stats": {**FIXTURE_DATASET_STATS, "run_003": {
             "arrival_record": contested, "row_counts": {}, "value_counts": {},
             "check_aggregates": {}}},
@@ -536,7 +538,7 @@ def test_a_headline_check_with_no_value_for_a_run_does_not_crash_the_build(tmp_p
     results = [_check("run_001", "sex", None, status="nodata"),
                _check("run_002", "sex", 1, status="fail")]
     path = tmp_path / "results_rs_civil-registration.json"
-    path.write_text(json.dumps({"runs": FIXTURE_RUNS, "results": results,
+    path.write_text(json.dumps({"runs": FIXTURE_RUNS, "run_facts": facts_for(FIXTURE_RUNS), "results": results,
                                 "dataset_stats": FIXTURE_DATASET_STATS}))
     monkeypatch.setattr(bdd, "results_path", lambda _cid: str(path))
     data = bdd.build(_BDM)["datasets"][0]
@@ -553,7 +555,7 @@ def test_a_check_soda_could_not_evaluate_says_why(tmp_path, monkeypatch):
                _check("run_002", "sex", None, status="error",
                       not_evaluated_reason="Soda could not evaluate it - needs Soda Cloud")]
     path = tmp_path / "results_rs_civil-registration.json"
-    path.write_text(json.dumps({"runs": FIXTURE_RUNS, "results": results,
+    path.write_text(json.dumps({"runs": FIXTURE_RUNS, "run_facts": facts_for(FIXTURE_RUNS), "results": results,
                                 "dataset_stats": FIXTURE_DATASET_STATS}))
     monkeypatch.setattr(bdd, "results_path", lambda _cid: str(path))
     check = next(c for c in bdd.build(_BDM)["datasets"][0]["columns"] if c["name"] == "sex")["checks"][0]
@@ -574,7 +576,7 @@ def test_a_stats_record_in_the_old_single_table_shape_is_refused(tmp_path, monke
     old.pop("row_counts")
     old["row_count"] = 4
     path = tmp_path / "results_rs_civil-registration.json"
-    path.write_text(json.dumps({"runs": FIXTURE_RUNS, "results": FIXTURE_RESULTS,
+    path.write_text(json.dumps({"runs": FIXTURE_RUNS, "run_facts": facts_for(FIXTURE_RUNS), "results": FIXTURE_RESULTS,
                                 "dataset_stats": {**FIXTURE_DATASET_STATS, "run_002": old}}))
     monkeypatch.setattr(bdd, "results_path", lambda _cid: str(path))
 

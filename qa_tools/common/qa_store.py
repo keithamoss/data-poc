@@ -2307,7 +2307,9 @@ def runs_for(conn: supply_db.SupplyConnection, agency_id: str,
              collection_id: str) -> list[dict]:
     return _dicts(conn.execute(
         f'SELECT * FROM "{SCHEMA}".run_visible WHERE agency_id = ? AND collection_id = ? '
-        "ORDER BY run_instant, run_key", [agency_id, collection_id]))
+        # THE ORDER THEY WERE OPENED (REQ-PIPE-279 criterion 19): it was run
+        # instant then run key, a time and a text that 62 groups of runs tie on.
+        "ORDER BY run_seq", [agency_id, collection_id]))
 
 
 def incomplete_runs(conn: supply_db.SupplyConnection) -> list[str]:

@@ -154,7 +154,7 @@ class TestAStreamRunsOnTheReplayClock:
                                 prepare=None, player=type("P", (), {
                                     "before": lambda s, a: 0, "finish": lambda s: 0})(),
                                 run_by="t", run_timestamp="t"))
-        monkeypatch.setattr(orchestrate, "_end", lambda run, results, record_deliveries: {})
+        monkeypatch.setattr(orchestrate, "_end", lambda run, record_deliveries: {})
         monkeypatch.setattr(arrival_lifecycle, "process_stream",
                             lambda *a, **k: seen.append(replay_clock.active()))
         orchestrate.run_stream(["child-protection", "emergency-department"],

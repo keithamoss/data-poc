@@ -178,6 +178,8 @@ class TestWhichRunCheckedASupply:
     """
 
     def _run_reading(self, conn, run_key, logical, physical, when):
+        """A run that read `physical`, opened when this is called."""
+        import attempt_support
         from qa_tools.common import qa_store
         conn.execute(
             f'INSERT INTO "{qa_store.SCHEMA}".run '
@@ -188,6 +190,7 @@ class TestWhichRunCheckedASupply:
             f'INSERT INTO "{qa_store.SCHEMA}".tables_read '
             "(run_key, logical_table, physical_table) VALUES (?, ?, ?)",
             [run_key, logical, physical])
+        attempt_support.opened(conn, run_key)
 
     def test_it_finds_the_run_by_the_arrival_key_in_the_table_name(self, conn):
         self._run_reading(conn, f"r_{uuid.uuid4().hex[:8]}", "cp_carers",
@@ -212,16 +215,19 @@ class TestWhichRunCheckedASupply:
         assert drift_reference.run_for(
             conn, "not-a-dataset", "not-a-dataset@209901010100000000") is None
 
-    def test_the_EARLIEST_run_wins_where_several_read_it(self, conn):
+    def test_the_first_OPENED_run_wins_where_several_read_it(self, conn):
         """A run reads a table it did not stage when it BORROWS one, and
         a borrow always happens after the staging - so the first run to
-        read a physical table is the one that brought it."""
+        read a physical table is the one that brought it. FIRST BY OPENING
+        ORDER (REQ-PIPE-279 criterion 19), a deliberate change: it was the
+        earliest run instant, so here the run opened first carries the
+        LATER instant and still wins."""
         arrival = "209902020100000000"
         physical = f"cp_carers__{arrival}"
         first, second = f"r_{uuid.uuid4().hex[:8]}", f"r_{uuid.uuid4().hex[:8]}"
-        self._run_reading(conn, second, "cp_carers", physical,
-                           "2099-02-05T09:00:00+08:00")
         self._run_reading(conn, first, "cp_carers", physical,
+                           "2099-02-05T09:00:00+08:00")
+        self._run_reading(conn, second, "cp_carers", physical,
                            "2099-02-02T09:00:00+08:00")
         assert drift_reference.run_for(
             conn, "cp-carers", f"cp-carers@{arrival}") == first
@@ -322,19 +328,26 @@ class TestASupplysRunIsItsOwnDatasetsRun:
     nothing was in place for five of six datasets, and a drift reference
     could be taken from the wrong run."""
 
-    def test_the_run_named_for_the_table_wins_a_tie(self, supply_dsn):
+    def test_the_datasets_own_run_wins_a_tie(self, supply_dsn):
+        """By qa.run's dataset_id (REQ-PIPE-279 criteria 17 and 19), a
+        deliberate change: it was a LIKE on the run id's text, so here the
+        Client Register's run is opened second and named for no table."""
         import uuid
 
+        import attempt_support
         from qa_tools.common import drift_reference, qa_store, supply_db
 
         key = "2090" + uuid.uuid4().hex[:14]
         physical = f"cp_clients__{key}"
+        own = f"pytest_own_{uuid.uuid4().hex[:8]}"
         with supply_db.connect(label="test-run-for") as conn:
             qa_store.ensure_schema(conn)
-            for run in (f"cp_carers__{key}", f"cp_clients__{key}"):
+            for run, dataset_id in ((f"cp_carers__{key}", "cp-carers"), (own, "cp-clients")):
                 conn.execute(
                     'INSERT INTO qa.run (run_key, agency_id, collection_id, run_timestamp, '
-                    "run_instant) VALUES (?, 'a', 'c', 't', '2026-08-01T01:00:00+00:00')", [run])
+                    "run_instant, dataset_id) VALUES (?, 'a', 'c', 't', "
+                    "'2026-08-01T01:00:00+00:00', ?)", [run, dataset_id])
                 conn.execute("INSERT INTO qa.tables_read (run_key, logical_table, physical_table) "
                              "VALUES (?, 'cp_clients', ?)", [run, physical])
-            assert drift_reference.run_for(conn, "cp-clients", f"cp-clients@{key}") == physical
+                attempt_support.opened(conn, run)
+            assert drift_reference.run_for(conn, "cp-clients", f"cp-clients@{key}") == own

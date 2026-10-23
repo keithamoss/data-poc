@@ -131,16 +131,6 @@ def first_run_id(dataset_id: str, supply_id: str) -> str:
     return supply_files.run_id_of(dataset_id, supply_id)
 
 
-def _run_index_of(first: str) -> int:
-    """The run_index the supply's own arrival recorded - 0 where its first
-    run recorded none, which sorts it first rather than failing."""
-    with supply_db.connect(label="mothman:recheck") as conn:
-        rows = conn.execute(
-            f'SELECT stats -> \'arrival_record\' ->> \'run_index\' FROM "{qa_store.SCHEMA}".dataset_stats '
-            "WHERE run_key = ? LIMIT 1", [first]).fetchall()
-    return int(rows[0][0]) if rows and rows[0][0] is not None else 0
-
-
 def _next_run_id(conn, first: str) -> str:
     """The next unused `__r<N>` - counting the ids an owed run has already
     taken as well as the runs recorded. An attempt that broke before its
@@ -210,7 +200,6 @@ def execute(*, dataset_id: str, supply_id: str, run_key: str, purpose: dict,
     # criterion 6): a collection with no adapter raises NoAdapterError here.
     collections.adapter(coll)
     tables = [d.table for d in coll.datasets]
-    from qa_tools.common import supply_files
 
     arrival = SimpleNamespace(
         run_id=run_key, received_at=received_at, sequence=0, delivery_name=delivery,
@@ -220,16 +209,11 @@ def execute(*, dataset_id: str, supply_id: str, run_key: str, purpose: dict,
         # whose key names no table, so nothing downstream may rebuild the
         # supply, its period or its table from `received_at`.
         supply_ids={dataset_id: supply_id})
-    # ITS ARRIVAL'S RUN - the one its rows were staged under and whose
-    # run_index it carries (criterion 14). A pair's two supplies share it.
-    first = supply_files.arrival_run_id_of(dataset_id, supply_id)
+    # NO run_index (REQ-PIPE-279 criterion 19): the results rebuild orders runs
+    # by run_seq, and a re-check was stamped with its arrival's run_index only
+    # so the old order had something to sort it by (post-build-review #161).
     entry = {
         "run_id": run_key, "received_at": received_at.isoformat(), "delivery": delivery,
-        # ITS PLACE IN THE HISTORY IS ITS ARRIVAL'S (post-build-review #161):
-        # the results rebuild orders every current run by run_index, and a
-        # re-check recorded without one crashed it the first time a history
-        # held a re-check that ran.
-        "run_index": _run_index_of(first),
         "csv_path": "",
         # WHAT THIS RUN IS FOR, AND WHY (criteria 3 and 4).
         "purpose": {"dataset_id": dataset_id, "supply_id": supply_id, "period": period,

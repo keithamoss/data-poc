@@ -17,6 +17,11 @@ legacy flags (qa_tools/tools/legacy.py).
 ONE AGREED ORDERING down both paths (REQ-PIPE-038): a live run emits a
 collection's tables interleaved and a rebuild reads them one after another,
 so canonical_order() is what keeps a diff between the two a real check.
+
+AND ONE PATH SINCE REQ-PIPE-279: the live batch writes the file by this
+rebuild too, because what the build places and orders results by - each
+run's facts and each cross-table result's recorded reads - is in the
+record, not in a tool's in-memory results (criteria 16 to 18).
 """
 from __future__ import annotations
 
@@ -25,8 +30,8 @@ import os
 from qa_tools import collections
 from qa_tools.common import asset_time, atomic_file
 from qa_tools.common.qa_results_reader import (
-    RESULT_TOOLS, canonical_order, current_runs_only, list_run_ids, read_cross_table_results,
-    read_dataset_stats, read_one,
+    RESULT_TOOLS, canonical_order, current_runs_only, list_run_ids, read_check_reads,
+    read_cross_table_results, read_dataset_stats, read_one, run_facts,
 )
 
 __all__ = ["build_results_from_history", "results_path", "write_results_file"]
@@ -42,7 +47,8 @@ def results_path(collection_id: str) -> str:
 
 
 def write_results_file(collection_id: str, *, runs: list[dict], dataset_stats: dict,
-                       results: list[dict], generated_at: str, source: str = "") -> dict:
+                       results: list[dict], generated_at: str, source: str = "",
+                       facts: dict[str, dict] | None = None) -> dict:
     """The results file, whole or not at all (another process may be reading
     it), with its summary - and THE FIFTH VERDICT (REQ-QAC-108 criterion 5):
     a check with no reference measured nothing, so it is counted as `nodata`
@@ -58,6 +64,9 @@ def write_results_file(collection_id: str, *, runs: list[dict], dataset_stats: d
         "generated_at": generated_at,
         **header,
         "runs": runs,
+        # WHAT EACH RUN IS, from qa.run (REQ-PIPE-279 criteria 16 and 17) -
+        # its rank, never its run_seq.
+        "run_facts": facts or {},
         "dataset_stats": dataset_stats,
         "results": results,
         "summary": {"total_checks": len(results), **counts,
@@ -74,10 +83,12 @@ def write_results_file(collection_id: str, *, runs: list[dict], dataset_stats: d
     return output
 
 
-def build_results_from_history(collection_id: str) -> dict:
+def build_results_from_history(collection_id: str, *, generated_at: str | None = None,
+                               source: str = ", from recorded history") -> dict:
     """Rebuild the collection's results file from the recorded `qa` schema
     alone - the dashboard build's source, no tool re-run, no supply rows."""
     coll = collections.by_id(collection_id)
+    facts = run_facts(coll.agency_id, coll.id)
     run_ids = current_runs_only(list_run_ids(coll.agency_id, coll.id))
     manifest, stats_by_run = [], {}
     for run_id in run_ids:
@@ -86,9 +97,10 @@ def build_results_from_history(collection_id: str) -> dict:
             continue
         manifest.append(stats["arrival_record"])
         stats_by_run[run_id] = stats
-    # run_index (not run_date) matches the original generation order - a
-    # resupply's own run_date sorts it away from its parent delivery.
-    manifest.sort(key=lambda m: m["run_index"])
+    # IN THE ORDER THE RUNS WERE OPENED (REQ-PIPE-279 criterion 19): it was
+    # run_index, an arrival enumeration a re-check had to be stamped with to
+    # sort at all (post-build-review #161), and a settled pair shares one.
+    manifest.sort(key=lambda m: facts[m["run_id"]]["rank"])
 
     # AND THE IN-DEVELOPMENT ONES (REQ-PIPE-106 criterion 7): `None` is every
     # supply_state, asked for explicitly because the dashboard is the one
@@ -96,7 +108,12 @@ def build_results_from_history(collection_id: str) -> dict:
     results = [r for entry in manifest for tool in RESULT_TOOLS
                for r in read_one(coll.agency_id, coll.id, entry["run_id"], tool,
                                  supply_state=None)]
-    results += read_cross_table_results(coll.agency_id, coll.id, supply_state=None)
+    # EACH WITH WHAT IT READ (REQ-PIPE-279 criteria 16 and 18), the build's
+    # one source for where a cross-table result is placed and shared.
+    reads = read_check_reads(coll.agency_id, coll.id)
+    results += [{**r, "reads": reads[(r["run_id"], r["check_id"])]}
+                for r in read_cross_table_results(coll.agency_id, coll.id, supply_state=None)]
     return write_results_file(collection_id, runs=manifest, dataset_stats=stats_by_run,
-                              results=results, generated_at=asset_time.now().isoformat(),
-                              source=", from recorded history")
+                              results=results,
+                              generated_at=generated_at or asset_time.now().isoformat(),
+                              source=source, facts=facts)

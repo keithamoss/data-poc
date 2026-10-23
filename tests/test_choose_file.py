@@ -354,9 +354,11 @@ def test_the_contest_closes_at_the_settlements_instant(conn, actor, day):
 
 class TestASettledSupplysRuns:
     """Criterion 14: each supply's runs are its own, distinct from the other
-    file's, and carry the run_index the pair's arrival recorded - never 0."""
+    file's. (They also carried the run_index the pair's arrival recorded,
+    for the results rebuild's sort by run_index; REQ-PIPE-279 criterion 19
+    orders by run_seq and removed both the sort and the stamp.)"""
 
-    def test_distinct_run_ids_and_the_arrivals_run_index(self, conn, actor, day):
+    def test_distinct_run_ids(self, conn, actor, day):
         nxt = day + timedelta(days=1)
         p = Pair(conn, day, [(f"birth_registrations_{day}.csv", _at(day, "13:30")),
                               (f"birth_registrations_{nxt}.csv", _at(day, "13:45"))])
@@ -366,15 +368,7 @@ class TestASettledSupplysRuns:
         second = recheck.mint_run_id(conn, DS, p.second, owed_id=out.owed[1])
         assert first != second
         assert first.startswith(f"birth_registrations__{p.key}__1__r")
-        arrival = supply_files.arrival_run_id_of(DS, p.second)
-        assert arrival == f"birth_registrations__{p.key}"
-        conn.execute(f'INSERT INTO "{qa_store.SCHEMA}".run (run_key, agency_id, collection_id, '
-                     "run_timestamp, run_instant) VALUES (?, 'a', 'c', ?, now()) "
-                     "ON CONFLICT DO NOTHING", [arrival, _at(day, "13:30").isoformat()])
-        conn.execute(f'INSERT INTO "{qa_store.SCHEMA}".dataset_stats (run_key, dataset_id, '
-                     "stats) VALUES (?, ?, ?::jsonb)",
-                     [arrival, DS, '{"arrival_record": {"run_index": 41}}'])
-        assert recheck._run_index_of(arrival) == 41
+        assert supply_files.arrival_run_id_of(DS, p.second) == f"birth_registrations__{p.key}"
 
 
 class TestTheRunsAfterASettlement:
