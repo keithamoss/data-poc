@@ -30,7 +30,7 @@ from qa_tools import collections
 from qa_tools.common import (
     arrival_lifecycle, arrivals, asked_for, asset_time, decision_log, delivery, delivery_log,
     drift_reference, filing, held_blast_radius, in_flight_log, left_out, own_table,
-    parallel_orchestrate, period_overlay, promotion, replay_clock, supply_db,
+    parallel_orchestrate, period_overlay, promotion, qa_store, replay_clock, supply_db,
     ticket_reconciler, trial, unrunnable,
 )
 from qa_tools.common.git_identity import get_run_by
@@ -82,9 +82,17 @@ def run_one(collection_id: str, entry: dict, run_timestamp: str, run_by: str,
     check results."""
     run_id = entry["run_id"]
     print(f"--- {run_id} ---")
+    refused = False
     try:
         return _run_one_inner(collection_id, entry, run_id, run_timestamp, run_by,
                               reference_run_id, on_step)
+    except qa_store.AttemptInProgress:
+        # REFUSED BEFORE THIS PROCESS OPENED ANYTHING: the run's schemas, its
+        # dbt target and a trial's record are the live attempt's, in another
+        # session, so there is nothing here to give back (post-build-review
+        # #262 D1).
+        refused = True
+        raise
     except BaseException as exc:
         # HOW THE ATTEMPT ENDED (REQ-PIPE-279 criterion 6), for every way out
         # but the one finish_run already recorded - a Ctrl-C and a SIGTERM
@@ -92,10 +100,11 @@ def run_one(collection_id: str, entry: dict, run_timestamp: str, run_by: str,
         close_attempt(run_id, exc)
         raise
     finally:
-        close_attempt(run_id, None)
-        # IN A finally, so a run that raised does not leave its schemas
-        # behind for a later sweep to guess about.
-        discard_run_schemas(run_id)
+        if not refused:
+            close_attempt(run_id, None)
+            # IN A finally, so a run that raised does not leave its schemas
+            # behind for a later sweep to guess about.
+            discard_run_schemas(run_id)
 
 
 def discard_run_schemas(run_id: str) -> None:

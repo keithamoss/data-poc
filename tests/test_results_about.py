@@ -344,3 +344,60 @@ class TestACheckIsCarriedOnlyOverTheSuppliesItRecordedReading:
     def test_a_held_table_never_does(self, conn, instant):
         here, _ = self._pair(conn, instant, clients_state=qa_store.HELD)
         assert self._decide(conn, here) == {}
+
+
+class TestAPairsFileChecksAreAboutTheFileEachSupplyIs:
+    """post-build-review #262 D2. A pair's arrival run is shared by both its
+    supplies, and its file checks - one set per file - are recorded under
+    it, with the file each is about. Which supply a file IS changes when
+    the pair is settled (qa.decision_file), so a file check is about the
+    supply whose file it names, read from that record - never the one
+    supply the shared run happens to carry."""
+
+    def _pair(self, conn, received, *, settle: bool):
+        import test_supply_files as sf
+
+        key = sf._key(received)
+        delivery = sf._delivery(conn, received, [(sf.LATER, received),
+                                                 (sf.EARLIER, received + timedelta(minutes=10))])
+        one, two = f"{sf.DATASET}@{key}#1", f"{sf.DATASET}@{key}#2"
+        sf.filing_support.place(conn, sf.DATASET, one, "2031-Q2", delivery)
+        if settle:
+            sf.filing_support.place(conn, sf.DATASET, two, "2031-Q2", delivery)
+            sf._settle(conn, "2031-Q2", [(sf.LATER, one, "supply", None),
+                                         (sf.EARLIER, two, "superseded", None)])
+        run = f"{sf.LOGICAL}__{key}"
+        qa_store.record_run(conn, run_key=run, run_timestamp=received.isoformat(),
+                            run_by="t@x", environment="test", **KEYS)
+        for n, filename in enumerate((sf.LATER, sf.EARLIER)):
+            qa_store.record_file_results(
+                conn, run, [_result(f"{CHECK}.{sf.DATASET}.{filename.rsplit('.', 1)[0]}.encoding_file",
+                                    sf.DATASET, "pass")],
+                **KEYS, supply_state=qa_store.AGREED, load_attempt=-n - 1,
+                delivery=delivery, filename=filename)
+        # As the pipeline records it at the arrival: the open pair's #1.
+        qa_store.set_run_purpose(conn, run, dataset_id=sf.DATASET, supply_id=one,
+                                 scope="arrival")
+        attempt_support.opened(conn, run)
+        qa_store.complete_run(conn, run)
+        return sf, one, two
+
+    @staticmethod
+    def _files(conn, dataset_id, supply):
+        return sorted(r["check_id"].rsplit(".", 2)[-2]
+                      for r in supply_status.results_about(conn, dataset_id, supply))
+
+    @pytest.fixture
+    def received(self):
+        return datetime(2031, 5, 6, tzinfo=timezone.utc) + timedelta(
+            seconds=uuid.uuid4().int % 10_000_000)
+
+    def test_a_settled_pairs_supplies_each_have_their_own_files_checks(self, conn, received):
+        sf, one, two = self._pair(conn, received, settle=True)
+        assert self._files(conn, sf.DATASET, two) == [sf.EARLIER.rsplit(".", 1)[0]]
+        assert self._files(conn, sf.DATASET, one) == [sf.LATER.rsplit(".", 1)[0]]
+
+    def test_an_open_pairs_first_supply_has_both(self, conn, received):
+        sf, one, _two = self._pair(conn, received, settle=False)
+        assert self._files(conn, sf.DATASET, one) == sorted(
+            f.rsplit(".", 1)[0] for f in (sf.LATER, sf.EARLIER))

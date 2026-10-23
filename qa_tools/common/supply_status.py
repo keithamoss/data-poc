@@ -29,10 +29,16 @@ def results_about(conn, dataset_id: str, supply: str) -> list[dict]:
 
     A RESULT IS ABOUT A SUPPLY BY WHAT IT RECORDED, in one of five states:
 
-      its run's own   a single-table result (or a file check's) recorded
-                      under a run whose qa.run.supply_id is this supply -
-                      such a result reads only its run's own supply
-                      (criterion 3), so the run's supply is its supply
+      its run's own   a single-table result recorded under a run whose
+                      qa.run.supply_id is this supply - such a result reads
+                      only its run's own supply (criterion 3), so the run's
+                      supply is its supply
+      its file        a file check's, whose recorded delivery and file are
+                      one of this supply's files (supply_files.resolve): a
+                      pair's arrival run is shared by both its supplies, and
+                      which file each one IS is settled later
+                      (post-build-review #262 D2). A supply never filed has
+                      no recorded file, so its run's own rule applies
       READ            a cross-table result whose qa.check_read for this
                       dataset's table names this supply - a contested
                       table's included, read as the supply it fell through to
@@ -52,18 +58,31 @@ def results_about(conn, dataset_id: str, supply: str) -> list[dict]:
     from qa_tools.common import hierarchy
     from qa_tools.common import qa_results_reader as reader
 
+    from qa_tools.common import supply_files
+
     table = hierarchy.dataset(dataset_id).table
     s = qa_store.SCHEMA
+    own = "(r.dataset_id = ? AND r.supply_id = ?)"
+    found = supply_files.resolve(conn, dataset_id, supply)
+    if found is not None and found.delivery is not None:
+        files = ([found.filename] if found.filename
+                 else supply_files.files_in_order(conn, dataset_id, found.delivery)
+                 if len(found.own) > 1 else [])
+        by_file = "(c.dataset_id = ? AND c.delivery = ? AND c.filename = ANY(?))"
+        by_file_params = [dataset_id, found.delivery, files]
+    else:
+        by_file, by_file_params = own, [dataset_id, supply]
     cursor = conn.execute(
         f'SELECT c.* FROM "{s}".check_result_visible c '
         f'JOIN "{s}".run_visible r ON r.run_key = c.run_key '
         "WHERE c.supply_state = ? AND ("
-        "(c.scope <> ? AND r.dataset_id = ? AND r.supply_id = ?) "
+        f"(c.scope NOT IN (?, ?) AND {own}) "
+        f"OR (c.scope = ? AND {by_file}) "
         f'OR EXISTS (SELECT 1 FROM "{s}".check_read k WHERE k.check_result_id = c.id '
         "AND k.logical_table = ? AND k.state = ? AND k.supply_id = ?)) "
         "ORDER BY r.run_seq, c.id",
-        [qa_store.AGREED, qa_store.CROSS_TABLE_SCOPE, dataset_id, supply,
-         table, qa_store.READ, supply])
+        [qa_store.AGREED, qa_store.CROSS_TABLE_SCOPE, qa_store.FILE_SCOPE, dataset_id, supply,
+         qa_store.FILE_SCOPE, *by_file_params, table, qa_store.READ, supply])
     return reader.records_from(cursor.description, cursor.fetchall())
 
 

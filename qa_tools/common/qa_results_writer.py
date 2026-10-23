@@ -864,22 +864,62 @@ def close_attempt(run_id: str, exc: BaseException | None) -> None:
               f"({type(failure).__name__}: {failure}); the next attempt will close it.")
 
 
-def _arrival_purpose(conn, run_id: str) -> dict:
-    """An arrival run's own supply and period, from its id and its
-    current filing - none for a trial's or a fixture's run."""
-    from qa_tools.common import filing, supply_db
-
+def _arrival_dataset(run_id: str) -> tuple[str, str, str] | None:
+    """(dataset id, logical table, staged name) of an arrival run - the one
+    place qa.run.dataset_id is first written for one, and so the one place
+    it can come from nothing but the run id: the pipeline names an
+    arrival's run after its own staged table (REQ-PIPE-105), and no earlier
+    record says which dataset the run is for. Every READER takes it from
+    qa.run (REQ-PIPE-279 criterion 17)."""
     owner = run_owner(run_id)
-    parts = supply_db.split_staged(run_id)
-    if owner is None or parts is None:
+    return None if owner is None else (*owner, run_id)
+
+
+def _arrival_purpose(conn, run_id: str) -> dict:
+    """An arrival run's own dataset, supply and period - none for a trial's
+    or a fixture's run.
+
+    THE SUPPLY IS THE ONE ITS RESOLUTION RECORDS for its own table
+    (post-build-review #262 D2), recorded by the overlay before this is
+    called: the staged supply it read, the held supply it withheld, or - an
+    open pair, contested - the one supply both its files are, each file's
+    supply read from the filing and settlement records (supply_files). It
+    used to be the first filed supply id matching the run id's stamp, which
+    named a pair's `#1` whichever of the two the run was about.
+
+    AN ABSENT OWN TABLE - a file the load refused, so nothing was staged -
+    is still its supply's arrival: the filed supply whose file that staged
+    name was (supply_files, which keeps a refused file's name). NONE where
+    none of this records one - a supply never filed, a table read from the
+    period rather than staged, or files that are now two supplies (a
+    settled pair): such a run is about no ONE supply, and its file checks
+    are placed by the file each names (supply_status). The dataset comes
+    from _arrival_dataset.
+    """
+    from qa_tools.common import filing, period_schema, supply_db, supply_files
+
+    owner = _arrival_dataset(run_id)
+    if owner is None:
         return {"dataset_id": None, "supply_id": None}
+    dataset_id, table, staged = owner
+    res = supply_db.resolution_for(conn, run_id)
+    if res.source.get(table) == period_schema.FROM_STAGING and table in res.supply_of:
+        found = {res.supply_of[table]}
+    elif table in res.held_supply:
+        found = {res.held_supply[table]}
+    elif table in res.ambiguous:
+        found = {supply_files.supply_for_table(conn, dataset_id, physical)
+                 for physical in res.ambiguous[table]}
+    elif table in res.absent:
+        found = {supply_files.supply_for_table(conn, dataset_id, staged)}
+    else:
+        found = set()
     rows = conn.execute(
         f"SELECT supply_id, slot FROM {filing.CURRENT} WHERE dataset_id = ? "
-        "AND (supply_id = ? OR supply_id LIKE ?) ORDER BY supply_id LIMIT 1",
-        [owner[0], f"{owner[0]}@{parts[1]}", f"{owner[0]}@{parts[1]}#%"]).fetchall()
-    if not rows:
-        return {"dataset_id": owner[0], "supply_id": None}
-    return {"dataset_id": owner[0], "supply_id": rows[0][0], "period": rows[0][1]}
+        "AND supply_id = ANY(?)", [dataset_id, [s for s in found if s]]).fetchall()
+    if len(found) != 1 or len(rows) != 1:
+        return {"dataset_id": dataset_id, "supply_id": None}
+    return {"dataset_id": dataset_id, "supply_id": rows[0][0], "period": rows[0][1]}
 
 
 def finish_run(run_id: str) -> None:

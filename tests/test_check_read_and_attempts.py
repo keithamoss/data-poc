@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import os
 import random
+import shutil
 import signal
 import subprocess
 import sys
@@ -310,6 +311,60 @@ def _run(monkeypatch, run_id: str, then=None):
     return orchestrate.run_one(COLLECTION, {"run_id": run_id}, WHEN, BY)
 
 
+class TestAnArrivalRunsSupplyIsTheOneItsResolutionRecords:
+    """post-build-review #262 D2: open_run states an arrival run's supply
+    from the run's recorded resolution - the supply its own table held -
+    never by matching the run id's stamp against filed supply ids, which
+    picked a pair's `#1` for whichever of the two the run was about."""
+
+    def test_the_resolved_supply_is_recorded_not_the_first_by_name(self, conn):
+        import filing_support
+
+        key = _key()
+        run_id = f"cp_notifications__{key}"
+        one, two = f"cp-notifications@{key}#1", f"cp-notifications@{key}#2"
+        delivery = f"pytest-d2-{key}"
+        conn.execute(f'INSERT INTO "{qa_store.SCHEMA}".delivery (name, received_at, '
+                     "received_instant) VALUES (?, ?, ?)", [delivery, WHEN, WHEN])
+        for supply in (one, two):
+            filing_support.place(conn, "cp-notifications", supply, "2099-Q1", delivery)
+        _resolve(conn, run_id, resolved={"cp_notifications": f"{run_id}__2"},
+                 supply_of={"cp_notifications": two}, source={"cp_notifications": "staging"})
+        qa_results_writer.open_run(AGENCY, COLLECTION, run_id, WHEN, BY)
+        qa_results_writer.close_attempt(run_id, None)
+        assert conn.execute(f'SELECT dataset_id, supply_id FROM "{qa_store.SCHEMA}".run '
+                            "WHERE run_key = ?", [run_id]).fetchone() == ("cp-notifications", two)
+
+    def test_a_refused_files_arrival_is_its_filed_supplys(self, conn):
+        """The load refused the file, so nothing was staged and the own table
+        is absent - but the supply was filed, and this is its arrival."""
+        import filing_support
+
+        key = _key()
+        run_id = f"cp_notifications__{key}"
+        delivery = f"pytest-d2-{key}"
+        conn.execute(f'INSERT INTO "{qa_store.SCHEMA}".delivery (name, received_at, '
+                     "received_instant) VALUES (?, ?, ?)", [delivery, WHEN, WHEN])
+        filing_support.place(conn, "cp-notifications", f"cp-notifications@{key}", "2099-Q1",
+                             delivery)
+        _resolve(conn, run_id, absent=["cp_notifications"])
+        qa_results_writer.open_run(AGENCY, COLLECTION, run_id, WHEN, BY)
+        qa_results_writer.close_attempt(run_id, None)
+        assert conn.execute(f'SELECT supply_id, period FROM "{qa_store.SCHEMA}".run '
+                            "WHERE run_key = ?", [run_id]).fetchone() == (
+            f"cp-notifications@{key}", "2099-Q1")
+
+    def test_a_run_whose_own_table_resolved_to_no_supply_records_none(self, conn):
+        """An absent own table never filed: the run is for its dataset, about
+        no supply."""
+        run_id = _run_id()
+        _resolve(conn, run_id, absent=["cp_notifications"])
+        qa_results_writer.open_run(AGENCY, COLLECTION, run_id, WHEN, BY)
+        qa_results_writer.close_attempt(run_id, None)
+        assert conn.execute(f'SELECT dataset_id, supply_id FROM "{qa_store.SCHEMA}".run '
+                            "WHERE run_key = ?", [run_id]).fetchone() == ("cp-notifications", None)
+
+
 class TestRunSeqIsDrawnWhenARunIsOpened:
     """Criterion 5."""
 
@@ -510,6 +565,47 @@ class TestAStopFromOutside:
                 _run(monkeypatch, run_id)
             (still,) = _attempts(conn, run_id)
             assert (still["outcome"], still["ended_at"]) == (None, None)
+        finally:
+            proc.kill()
+            proc.wait(timeout=60)
+
+    def test_a_refused_attempt_leaves_the_live_attempts_schemas_and_scratch(
+            self, conn, monkeypatch):
+        """Test 23, and post-build-review #262 D1: the refused process gives
+        back only what IT opened. It used to discard the run's schemas and
+        dbt target in run_one's finally, which are the live attempt's."""
+        run_id = _run_id()
+        schema = supply_db.run_schema(run_id)
+        conn.execute(f'CREATE SCHEMA IF NOT EXISTS "{schema}"')
+        target = supply_db.dbt_target_path(run_id)
+        target.mkdir(parents=True, exist_ok=True)
+        proc = _child(run_id)
+        try:
+            with pytest.raises(qa_store.AttemptInProgress):
+                _run(monkeypatch, run_id)
+            assert conn.execute("SELECT 1 FROM pg_namespace WHERE nspname = ?",
+                                [schema]).fetchall(), "the live attempt's run schema went"
+            assert target.is_dir(), "the live attempt's dbt target went"
+            assert qa_store.attempt_running(conn, run_id)
+        finally:
+            proc.kill()
+            proc.wait(timeout=60)
+            conn.execute(f'DROP SCHEMA IF EXISTS "{schema}" CASCADE')
+            shutil.rmtree(target, ignore_errors=True)
+
+    def test_a_refused_attempt_leaves_a_live_trials_run_and_attempts(self, conn, monkeypatch):
+        """D1's trial half: trial.discard deletes the run and its attempts."""
+        from qa_tools.common import trial
+
+        run_id = trial.trial_run_id()
+        proc = _child(run_id)
+        try:
+            with pytest.raises(qa_store.AttemptInProgress):
+                _run(monkeypatch, run_id)
+            assert conn.execute(f'SELECT count(*) FROM "{qa_store.SCHEMA}".run WHERE run_key = ?',
+                                [run_id]).fetchone()[0] == 1
+            (still,) = _attempts(conn, run_id)
+            assert still["outcome"] is None and qa_store.attempt_running(conn, run_id)
         finally:
             proc.kill()
             proc.wait(timeout=60)

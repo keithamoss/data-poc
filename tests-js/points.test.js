@@ -146,6 +146,49 @@ describe("the panel's default comparison is the newest earlier evaluated point (
     w.setCompareIdx({}, {}, {}, {}, check, 1);
     expect(new URL(w.location.href).searchParams.get("cmp")).toBe("1");
   });
+
+  // The copied link, opened again: the URL read back through cmpFromUrl
+  // into STATE, and the real panel rendered from it, shows the comparison
+  // that was on screen when it was copied.
+  const panelCheck = () => ({
+    key: "k", name: "A check", dimension: "validity", unit: "count", warn: null, fail: null,
+    current: 0, current_status: "green", previous: 0, changelog: [], history,
+  });
+  const open = (w, check) => {
+    const column = { name: "c", checks: [check], stats: {} };
+    const ds = { name: "D", runs: [], columns: [column] };
+    w.openCheckPanel({ name: "A" }, { name: "C" }, ds, column, check, { pushHistory: false });
+    return w.document.querySelector("#check-panel-body select option[selected]");
+  };
+  const reopenAt = (w, href) => {
+    w.history.replaceState(null, "", href);
+    w.eval("STATE = stateFromLocation()");
+  };
+
+  it("opens a copied link at the comparison it was copied from", () => {
+    const w = load();
+    const check = panelCheck();
+    open(w, check);
+    w.setCompareIdx({ name: "A" }, { name: "C" }, { name: "D", runs: [], columns: [] },
+                    { name: "c", checks: [check], stats: {} }, check, 1);
+    const copied = w.location.href;
+    expect(new URL(copied).searchParams.get("cmp")).toBe("1");
+    reopenAt(w, copied);
+    expect(w.cmpFromUrl()).toBe(1);
+    expect(open(w, panelCheck()).value).toBe("1");
+  });
+
+  it("opens a link with no ?cmp= at the default comparison", () => {
+    const w = load();
+    const check = panelCheck();
+    open(w, check);
+    w.setCompareIdx({ name: "A" }, { name: "C" }, { name: "D", runs: [], columns: [] },
+                    { name: "c", checks: [check], stats: {} }, check, w.defaultCompareIndex(history));
+    const copied = w.location.href;
+    expect(new URL(copied).searchParams.get("cmp")).toBe(null);
+    reopenAt(w, copied);
+    expect(open(w, panelCheck()).value).toBe(String(w.defaultCompareIndex(history)));
+  });
 });
 
 describe("a held table's cross-table row reads the held supply (criterion 15)", () => {

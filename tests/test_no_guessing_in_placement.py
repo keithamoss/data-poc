@@ -21,6 +21,10 @@ DELIBERATELY NOT READ: qa_results_reader.canonical_order, which sorts a
 results FILE by run id so a live write and a rebuild produce the same bytes
 (REQ-PIPE-038). It decides nothing about which result is newer or where one
 is placed - the build re-orders by rank - so the rule has no claim on it.
+Nor qa_results_writer._arrival_dataset, where an arrival run's dataset is
+first written to qa.run from the run id the pipeline named after its own
+table: nothing earlier records it. The supply beside it, _arrival_purpose,
+is read whole (post-build-review #262 D2).
 """
 from __future__ import annotations
 
@@ -56,6 +60,7 @@ WHOLE = {
     "qa_tools.common.supply_status": ("results_about", "latest_results"),
     "qa_tools.common.drift_reference": ("run_for",),
     "qa_tools.common.carried": ("siblings", "decide", "_evaluated_reads", "_supply_read"),
+    "qa_tools.common.qa_results_writer": ("_arrival_purpose",),
 }
 
 #: Read only in their sort, max and min keys: they also date results for display.
