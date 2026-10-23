@@ -2548,3 +2548,18 @@ one or more component tags, and a date.
      - any other unrecorded read refuses the result; (#6) c3 compares the
      result's recorded dataset with qa.run.dataset_id; (#7) a run that ends
      with no exception but never completes is recorded CRASHED.
+   - **279 CHUNK B BUILT (~22:30, checkpoint 993b29f, not pushed)**: criteria
+     9, 21, 22 - one `supply_status.results_about` read by both the gate and
+     the build (`runs_about`, `_results_of` and the physical-name match
+     deleted); results ordered by `qa.run.run_seq`; REQ-PIPE-265's siblings
+     read from `qa.supply_receipt` + `qa.check_read`, the run-id parsing
+     removed. My re-run: 58 passed (the chunk's tests with the two modules
+     the builder saw interfere, in that order) - the one failure in its
+     wider sweep (test_cp_pair after test_recorded_arrival_classification on
+     one worker) did not reproduce; watching for it in chunk E's full gate.
+     PROVISIONAL: (#8) a check is carried from the EARLIEST-opened sibling
+     that evaluated it; (#9) a sibling not yet opened counts for nothing;
+     (#10) siblings are not filtered by dataset - a settled pair's two
+     supplies can be siblings, but nothing carries between them because
+     their own-table supplies differ; (#11) a file-check result under the
+     supply's own run still counts toward that supply, as before.
