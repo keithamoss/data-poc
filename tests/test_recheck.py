@@ -302,12 +302,23 @@ class TestALiveRecheckTakesEffectWhenItRan:
 
 
 class TestOneDefinitionOfASupplysCurrentRun:
-    """post-build-review #117 D6 (Keith, 2026-10-06): the current run is the
-    newest on the ASSET'S timeline - a re-run by when the decision that caused
-    it took effect - as supply_status.runs_about already orders them, never
-    by the wall clock a replay stamps years later in processing order."""
+    """A supply's current run is its newest by EVALUATION ORDER - the run
+    OPENED last, qa.run.run_seq (REQ-PIPE-279 criterion 9; Keith, K1 = A).
 
-    def test_the_later_cause_is_current_whatever_ran_last(self, supply_dsn):
+    THIS REPLACED THE ASSET'S TIMELINE, deliberately, not by loosening it.
+    post-build-review #117 D6 (2026-10-06) ordered a re-run by when its
+    decision took effect and an arrival's run by its receipt, so a replay's
+    wall clock could not decide; #122 D6 broke a tie by run instant. Both
+    were orders by time, and REQ-PIPE-279 rules out ordering by any time or
+    id: a re-check opened after another run saw everything that run saw, so
+    it is the newer result however early its cause took effect. #116 D1
+    still holds because a re-run is always opened after what it re-runs."""
+
+    def test_the_later_opened_run_is_current_whatever_its_cause_took_effect(
+            self, supply_dsn):
+        """Was "the later cause is current whatever ran last": August's
+        re-run took effect later and is opened FIRST, July's opened second.
+        July's is current now - it is the later evaluation."""
         import uuid
 
         from qa_tools.common.qa_results_writer import finish_run
@@ -326,7 +337,6 @@ class TestOneDefinitionOfASupplysCurrentRun:
                     pass
                 ids[name] = conn.execute(f"SELECT max(id) FROM {dl.TABLE} WHERE dataset_id = ?",
                                          [ds]).fetchone()[0]
-            # Processed in the other order: july's re-run has the later wall clock.
             for name, ran in (("august", "2026-10-06T10:00:00+08:00"),
                               ("july", "2026-10-06T10:05:00+08:00")):
                 key = f"recheck_{name}_{uuid.uuid4().hex[:6]}"
@@ -337,12 +347,13 @@ class TestOneDefinitionOfASupplysCurrentRun:
                 attempt_support.opened(conn, key)
                 finish_run(key)
                 ids[f"run_{name}"] = key
-            assert qa_store.current_run(conn, ds, supply) == ids["run_august"]
+            assert qa_store.current_run(conn, ds, supply) == ids["run_july"]
 
-    def test_a_tie_on_the_timeline_goes_to_the_later_run_not_the_later_key(self, supply_dsn):
-        """Keith, 2026-10-06 (post-build-review #122 D6): two runs about the
-        same supply with the same cause sorted by run key as TEXT, so
-        `__r10` lost to `__r9`. The run instant breaks the tie first."""
+    def test_of_one_cause_the_later_opened_run_wins_not_the_later_instant(self, supply_dsn):
+        """Was "a tie on the timeline goes to the later run, not the later
+        key", which broke the tie by run instant. Now there is no tie to
+        break: the run opened second is current, though its instant is the
+        earlier and its key sorts first."""
         import uuid
 
         from qa_tools.common.qa_results_writer import finish_run
@@ -359,8 +370,8 @@ class TestOneDefinitionOfASupplysCurrentRun:
                 pass
             cause = conn.execute(f"SELECT max(id) FROM {dl.TABLE} WHERE dataset_id = ?",
                                  [ds]).fetchone()[0]
-            for key, ran in ((f"z_first_{tag}", "2026-10-06T10:00:00+08:00"),
-                             (f"a_second_{tag}", "2026-10-06T10:05:00+08:00")):
+            for key, ran in ((f"z_first_{tag}", "2026-10-06T10:05:00+08:00"),
+                             (f"a_second_{tag}", "2026-10-06T10:00:00+08:00")):
                 qa_store.record_run(conn, run_key=key, agency_id="a", collection_id="c",
                                     run_timestamp=ran, run_by="t@x", environment="test")
                 qa_store.set_run_purpose(conn, key, dataset_id=ds, supply_id=supply,

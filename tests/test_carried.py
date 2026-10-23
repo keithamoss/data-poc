@@ -124,69 +124,12 @@ class TestTheLaterSiblingCarriesTheCheck:
 
 
 class TestWhatIsNeverCarried:
-    """Criteria 1, 5, 6 and 8, on the rule itself."""
-
-    def test_a_staggered_file_has_no_siblings(self):
-        assert carried.siblings("cp_notifications__202604010600000000") != \
-            carried.siblings("cp_notifications__202604010605000000")
-        assert "cp_clients__202604010600000000" not in \
-            carried.siblings("cp_notifications__202604010605000000")
-
-    def test_a_re_check_has_no_siblings(self):
-        assert carried.siblings(f"{NOTIFICATIONS}{supply_db.RERUN_MARK}1") == []
-
-    def test_a_run_naming_no_table_has_no_siblings(self):
-        assert carried.siblings("trial_20261002t010203") == []
-
-    def test_a_check_over_a_different_supply_is_evaluated_afresh(self, monkeypatch):
-        check = sorted(_reading_clients_from_notifications())[0]
-        here = supply_db.Resolution(run_id=NOTIFICATIONS, schema="s",
-                                    resolved={"cp_clients": "cp_clients__202604010600000000__2",
-                                              "cp_notifications": NOTIFICATIONS})
-        there = supply_db.Resolution(run_id=CLIENTS, schema="s",
-                                     resolved={"cp_clients": CLIENTS,
-                                               "cp_notifications": NOTIFICATIONS})
-        monkeypatch.setattr(supply_db, "resolution_for",
-                            lambda conn, run_id: here if run_id == NOTIFICATIONS else there)
-        monkeypatch.setattr(carried, "_evaluated_in",
-                            lambda conn, run, checks: set(checks) if run == CLIENTS else set())
-        got = carried.decide(None, NOTIFICATIONS, lambda c: True, promotion._declared_reads())
-        assert check not in got
-
-    def test_a_table_promoted_between_the_two_runs_is_the_same_supply(self, monkeypatch):
-        check = sorted(_reading_clients_from_notifications())[0]
-        supply = "cp-clients@202604010600000000"
-        here = supply_db.Resolution(run_id=NOTIFICATIONS, schema="s",
-                                    resolved={"cp_clients": "cp_clients",
-                                              "cp_notifications": NOTIFICATIONS},
-                                    supply_of={"cp_clients": supply})
-        there = supply_db.Resolution(run_id=CLIENTS, schema="s",
-                                     resolved={"cp_clients": CLIENTS,
-                                               "cp_notifications": NOTIFICATIONS})
-        from qa_tools.common import supply_status
-
-        monkeypatch.setattr(supply_db, "resolution_for",
-                            lambda conn, run_id: here if run_id == NOTIFICATIONS else there)
-        monkeypatch.setattr(supply_status, "_own_tables", lambda conn, ds, s: [CLIENTS])
-        monkeypatch.setattr(carried, "_evaluated_in",
-                            lambda conn, run, checks: set(checks) if run == CLIENTS else set())
-        got = carried.decide(None, NOTIFICATIONS, lambda c: True, promotion._declared_reads())
-        assert got.get(check) == CLIENTS
-
-    def test_a_held_table_is_never_carried_over(self, monkeypatch):
-        check = sorted(_reading_clients_from_notifications())[0]
-        here = supply_db.Resolution(run_id=NOTIFICATIONS, schema="s",
-                                    resolved={"cp_notifications": NOTIFICATIONS},
-                                    held={"cp_clients": CLIENTS})
-        there = supply_db.Resolution(run_id=CLIENTS, schema="s",
-                                     resolved={"cp_clients": CLIENTS,
-                                               "cp_notifications": NOTIFICATIONS})
-        monkeypatch.setattr(supply_db, "resolution_for",
-                            lambda conn, run_id: here if run_id == NOTIFICATIONS else there)
-        monkeypatch.setattr(carried, "_evaluated_in",
-                            lambda conn, run, checks: set(checks) if run == CLIENTS else set())
-        assert check not in carried.decide(None, NOTIFICATIONS, lambda c: True,
-                                           promotion._declared_reads())
+    """Criterion 6, on the rule itself. Criteria 1, 5 and 8 - who is a
+    sibling, and whether its result read the same supplies - are read from
+    the record since REQ-PIPE-279 criteria 21 and 22, and are tested there,
+    against recorded filings and reads (tests/test_results_about.py): the
+    tests that stood here parsed run ids and compared physical names, which
+    is the guess those criteria removed."""
 
     def test_a_not_evaluated_record_is_no_verdict(self):
         assert carried.not_evaluated_reason({"unrunnable_reason": "not yet due"})

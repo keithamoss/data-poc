@@ -570,6 +570,28 @@ def _records(cursor, run_id: str, run_timestamp=None) -> list[dict]:
     return out
 
 
+class _Fetched:
+    def __init__(self, description, rows):
+        self.description, self._rows = description, rows
+
+    def fetchall(self):
+        return self._rows
+
+
+def records_from(description, rows) -> list[dict]:
+    """Rows already fetched from qa.check_result, spanning any number of
+    runs, as _records() makes them - each run's rows in turn, in the order
+    given, so a caller that ordered them keeps its order."""
+    at = [d.name for d in description].index("run_key")
+    out: list[dict] = []
+    start = 0
+    for i in range(1, len(rows) + 1):
+        if i == len(rows) or rows[i][at] != rows[start][at]:
+            out.extend(_records(_Fetched(description, rows[start:i]), rows[start][at]))
+            start = i
+    return out
+
+
 def canonical_order(results: list[dict]) -> list[dict]:
     """One agreed ordering for a results list, so that a LIVE run and a
     rebuild from committed history produce the same file.

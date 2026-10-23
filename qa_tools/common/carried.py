@@ -21,17 +21,21 @@ it is in scope evaluates it, and a later sibling CARRIES that verdict:
 
 ONLY WHAT WAS READ DECIDES (criterion 5). The knock-on and scripted
 decisions run between two siblings' runs, so the shared instant does not by
-itself mean the same data: every table the check reads must resolve to the
-same SUPPLY in both runs. By supply, not by physical name - a table promoted
-out of staging between the two runs is read as `cp_clients` where it was
-read as `cp_clients__2020...`, and is the same supply.
+itself mean the same data: every table the check reads must be the same
+SUPPLY in both runs - this run's resolution against the qa.check_read the
+sibling's result recorded (REQ-PIPE-279 criterion 21). By recorded supply
+id, never by physical name, so a table promoted out of staging between the
+two runs is still the same supply.
 
 NEVER A NON-ANSWER (criterion 6): a sibling that recorded nothing for the
 check (its own table held, contested or refused), only a not-evaluated
 record, or itself carried it, has no verdict to carry.
 
-STAGGERED FILES ARE NOT SIBLINGS (criterion 8): their run ids carry
-different instants, and their two results genuinely differ.
+SIBLINGS ARE READ FROM THE RECORD (REQ-PIPE-279 criterion 22): the arrival
+runs whose supplies were filed from one delivery with one receipt instant
+(qa.supply_receipt, over qa.filing and qa.delivery_file), never parsed out of
+run ids. STAGGERED FILES ARE NOT SIBLINGS (criterion 8): one delivery, two
+receipt instants, and their two results genuinely differ.
 """
 from __future__ import annotations
 
@@ -58,25 +62,23 @@ def not_evaluated_reason(record: dict) -> str | None:
     return None
 
 
-def siblings(run_id: str) -> list[str]:
-    """The run ids sharing `run_id`'s receipt instant in its collection, one
-    per other table - a run's id is its table's name, `__`, then the instant.
-    None for a re-check, readers-only or knock-on run (`__r<N>`), or a run id
-    that names no table."""
-    from qa_tools.common import hierarchy, qa_results_writer, supply_db
-
-    if supply_db.split_run(run_id)[1]:
-        return []
-    owner = qa_results_writer.run_owner(run_id)
-    if owner is None:
-        return []
-    dataset_id, table = owner
-    instant = run_id[len(table) + 2:]
-    if not run_id.startswith(f"{table}__") or not instant:
-        return []
-    collection_id = hierarchy.dataset(dataset_id).collection_id
-    return [f"{d.table}__{instant}" for d in hierarchy.datasets_in_collection(collection_id)
-            if d.table != table]
+def siblings(conn, run_id: str) -> list[str]:
+    """The other arrival runs whose supplies were filed from `run_id`'s
+    supply's delivery at its receipt instant, in the order they were opened
+    (qa.run.run_seq) - none for a re-check, readers-only or knock-on run, a
+    run that belongs to no supply, or one no sibling has been opened beside.
+    An unopened sibling has evaluated nothing, so it is not one yet."""
+    s = qa_store.SCHEMA
+    return [row[0] for row in conn.execute(
+        f'SELECT o.run_key FROM "{s}".run r '
+        f'JOIN "{s}".supply_receipt me ON me.dataset_id = r.dataset_id '
+        "AND me.supply_id = r.supply_id "
+        f'JOIN "{s}".supply_receipt rc ON rc.delivery = me.delivery '
+        "AND rc.received_instant = me.received_instant "
+        f'JOIN "{s}".run o ON o.dataset_id = rc.dataset_id AND o.supply_id = rc.supply_id '
+        "WHERE r.run_key = ? AND r.scope = 'arrival' AND o.scope = 'arrival' "
+        "AND o.run_key <> r.run_key AND o.collection_id = r.collection_id "
+        "AND o.run_seq IS NOT NULL ORDER BY o.run_seq", [run_id]).fetchall()]
 
 
 def _reads_of(check_id: str, reads: dict[str, list[str]]) -> set[str] | None:
@@ -93,61 +95,56 @@ def _reads_of(check_id: str, reads: dict[str, list[str]]) -> set[str] | None:
     return {*declared, hierarchy.dataset(parsed.dataset).table}
 
 
-def _supply_names(conn, res, logical: str) -> set[str] | None:
-    """What `logical` was read as in a resolution, as the names its supply
-    goes by - the staged table it arrived as, and its supply id where it was
-    read from the period. None where it was not read at all, or not
-    unambiguously (absent, held or contested)."""
-    from qa_tools.common import reevaluation, supply_status
-
+def _supply_read(res, logical: str) -> str | None:
+    """The supply `logical` is read as in this run's resolution, or None
+    where it is not read unambiguously - absent, held or contested."""
     if (logical not in res.resolved or logical in res.held
             or logical in res.ambiguous or logical in res.absent):
         return None
-    supply = res.supply_of.get(logical)
-    if not supply:
-        return {res.resolved[logical]}
-    dataset_id = reevaluation._dataset_of_table(logical)
-    names = {supply}
-    if dataset_id is not None:
-        names.update(supply_status._own_tables(conn, dataset_id, supply))
-    return names
+    return res.supply_of.get(logical)
 
 
-def _same_supplies(conn, tables: set[str], here, there) -> bool:
-    for logical in tables:
-        a = _supply_names(conn, here, logical)
-        b = _supply_names(conn, there, logical)
-        if a is None or b is None or not (a & b):
-            return False
-    return True
-
-
-def _evaluated_in(conn, run_key: str, check_ids: set[str]) -> set[str]:
-    """Which of `check_ids` `run_key` recorded a VERDICT for, from a real
-    tool - not a not-evaluated record, not a carried one."""
+def _evaluated_reads(conn, run_key: str, check_ids: set[str]) -> dict[str, dict]:
+    """check id -> {table: the supply its result READ, or None} for each of
+    `check_ids` that `run_key` recorded a VERDICT for, from a real tool - not
+    a not-evaluated record, not a carried one. The newest result of a check
+    within the run, as one run's reader takes it."""
     from qa_tools.common import qa_results_reader as reader
 
     if not check_ids:
-        return set()
+        return {}
     cursor = conn.execute(
         f'SELECT * FROM "{qa_store.SCHEMA}".check_result_visible WHERE run_key = ? '
         "AND supply_state = ? AND tool = ANY(?) AND check_id = ANY(?) ORDER BY id",
         [run_key, qa_store.AGREED, list(CARRIED_TOOLS), sorted(check_ids)])
+    columns = [d.name for d in cursor.description]
+    rows = cursor.fetchall()
+    ids = {row[columns.index("check_id")]: row[columns.index("id")] for row in rows}
     latest: dict[str, dict] = {}
-    for record in reader._records(cursor, run_key):
+    for record in reader.records_from(cursor.description, rows):
         latest[record["check_id"]] = record
     already = set(carried_of(conn, run_key))
-    return {c for c, r in latest.items() if not_evaluated_reason(r) is None and c not in already}
+    out: dict[str, dict] = {}
+    for check, record in latest.items():
+        if not_evaluated_reason(record) is not None or check in already:
+            continue
+        out[check] = {table: (supply if state == qa_store.READ and not contested else None)
+                      for table, state, supply, contested in conn.execute(
+                          f'SELECT logical_table, state, supply_id, contested '
+                          f'FROM "{qa_store.SCHEMA}".check_read WHERE check_result_id = ?',
+                          [ids[check]]).fetchall()}
+    return out
 
 
 def decide(conn, run_id: str, in_scope, reads: dict[str, list[str]]) -> dict[str, str]:
     """check id -> the sibling run whose verdict `run_id` carries, for every
-    cross-table check in its scope that an earlier sibling evaluated over the
-    same supplies. Empty for a run with no siblings."""
+    cross-table check in its scope that a sibling evaluated over the same
+    supplies - the earliest-opened such sibling. Empty for a run with no
+    siblings."""
     from qa_tools.common import check_id as check_id_mod
     from qa_tools.common import supply_db
 
-    others = siblings(run_id)
+    others = siblings(conn, run_id)
     if not others:
         return {}
     candidates: dict[str, set[str]] = {}
@@ -162,16 +159,13 @@ def decide(conn, run_id: str, in_scope, reads: dict[str, list[str]]) -> dict[str
         return {}
     here = supply_db.resolution_for(conn, run_id)
     out: dict[str, str] = {}
-    for sibling in sorted(others):
+    for sibling in others:
         open_ = {c for c in candidates if c not in out}
         if not open_:
             break
-        evaluated = _evaluated_in(conn, sibling, open_)
-        if not evaluated:
-            continue
-        there = supply_db.resolution_for(conn, sibling)
-        for check in sorted(evaluated):
-            if _same_supplies(conn, candidates[check], here, there):
+        for check, there in sorted(_evaluated_reads(conn, sibling, open_).items()):
+            if all(_supply_read(here, t) is not None and _supply_read(here, t) == there.get(t)
+                   for t in candidates[check]):
                 out[check] = sibling
     return out
 

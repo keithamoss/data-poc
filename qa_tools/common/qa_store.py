@@ -313,9 +313,10 @@ CREATE TABLE IF NOT EXISTS "{SCHEMA}".run_attempt (
     CHECK ((outcome = 'CRASHED') = (error_type IS NOT NULL))
 );
 
---   "this supply's runs, newest first" - criterion 5's read
+--   "this supply's runs, newest first" - criterion 5's read, newest by
+--   run_seq since schema 46 (REQ-PIPE-279 criterion 9)
 CREATE INDEX IF NOT EXISTS run_supply
-    ON "{SCHEMA}".run (dataset_id, supply_id, run_instant) WHERE supply_id IS NOT NULL;
+    ON "{SCHEMA}".run (dataset_id, supply_id, run_seq) WHERE supply_id IS NOT NULL;
 
 -- Self-healing for a database created before run_by became nullable.
 -- Harmless where it already is; DROP NOT NULL does not error on a
@@ -1408,28 +1409,21 @@ CREATE OR REPLACE VIEW "{SCHEMA}".run_visible AS
 -- dashboard and the terminal read a supply's verdict from this run;
 -- every earlier run stays in qa.run as history.
 --
--- NEWEST ON THE ASSET'S TIMELINE (Keith, 2026-10-06, post-build-review #117
--- D6): a re-run by when the decision that caused it took effect, an
--- arrival's run by when its supply was received, the run's own instant only
--- where neither is known - the order supply_status.runs_about already used.
--- It was the wall clock, which a replay stamps in processing order, so the
--- two definitions named different runs current.
+-- NEWEST BY EVALUATION ORDER (REQ-PIPE-279 criterion 9; Keith, K1 = A): the
+-- run OPENED last, qa.run.run_seq - the order the gate and the page read
+-- results in (supply_status.results_about). It was the asset's timeline, a
+-- re-run by its decision's effective time and an arrival's by its receipt
+-- (#117 D6), with run instant and then run key breaking ties (#122 D6) -
+-- orders by time and text that named an earlier-opened run current
+-- whenever a decision was recorded after the fact. run_seq is unique, so
+-- there is no tie to break, and every completed run has one.
 -- DROP first: CREATE OR REPLACE VIEW cannot reorder a view's columns.
 DROP VIEW IF EXISTS "{SCHEMA}".supply_current_run;
 CREATE VIEW "{SCHEMA}".supply_current_run AS
 SELECT DISTINCT ON (r.dataset_id, r.supply_id) r.*
 FROM "{SCHEMA}".run_visible r
-LEFT JOIN "{SCHEMA}".decision d ON d.id = r.caused_by_decision
-LEFT JOIN "{SCHEMA}".supply_receipt rc
-    ON rc.dataset_id = r.dataset_id AND rc.supply_id = r.supply_id
 WHERE r.supply_id IS NOT NULL AND r.scope <> 'readers'
-ORDER BY r.dataset_id, r.supply_id,
-         COALESCE(d.effective_at, rc.received_instant, r.run_instant) DESC,
-         -- A TIE GOES TO THE LATER RUN, then the key (Keith, 2026-10-06,
-         -- post-build-review #122 D6): keys sort as text, `__r10` before
-         -- `__r9`. Schema 32.
-         r.run_instant DESC,
-         r.run_key DESC;
+ORDER BY r.dataset_id, r.supply_id, r.run_seq DESC;
 
 -- A RE-RUN THAT IS OWED (REQ-PIPE-140 criterion 7). Recorded in the
 -- transaction of the decision (or the load) that causes it, and cleared

@@ -45,10 +45,11 @@ class TestRedPromoted:
         # promote cp-carers supplies too, and mapping them all to one run let
         # whichever came last overwrite this one's entry.
         monkeypatch.setattr(slot_timeline, "_run_for", lambda c, d, s: "run-a" if s == a else None)
-        monkeypatch.setattr(supply_status, "runs_about", lambda c, d, s: ["arrival", "later"])
-        results = {"arrival": [{"dataset_id": DS, "check_id": "x", "status": "pass"}],
-                   "later": [{"dataset_id": DS, "check_id": "x", "status": "fail"}]}
-        monkeypatch.setattr(red_promoted, "_results_of", lambda c, k: results[k])
+        # THE GATE'S ONE ANSWER (REQ-PIPE-279 criterion 21), in opening order.
+        about = [{"run_id": "arrival", "dataset_id": DS, "check_id": "x", "status": "pass"},
+                 {"run_id": "later", "dataset_id": DS, "check_id": "x", "status": "fail"}]
+        monkeypatch.setattr(supply_status, "results_about",
+                            lambda c, d, s: about if s == a else [])
         causes = {"arrival": ("2026-05-01T01:00:00+00:00", "the arrival of Carers"),
                   "later": ("2026-06-01T01:00:00+00:00", "the promote of Client Register")}
         monkeypatch.setattr(red_promoted, "_cause", lambda c, k: causes[k])

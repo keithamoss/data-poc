@@ -11,7 +11,8 @@ promoted on - recorded on the promotion itself (REQ-PIPE-130 criterion 11)
 and the page picks the one in force on the date on show (criterion 6).
 
 ONE FUNCTION FOR THE STATUS (REQ-PIPE-121 NFR 4): each step is
-supply_status's newest-result-per-check, newest cause wins - never a second
+supply_status's newest-result-per-check over supply_status.results_about, the
+later-opened run winning (REQ-PIPE-279 criteria 9 and 21) - never a second
 derivation. RECORDED QA RESULTS AND THE DECISION LOG ONLY, never a supply
 row, so it is safe on the build's path.
 """
@@ -48,16 +49,6 @@ def _cause(conn, run_key: str) -> tuple[str, str]:
     return (run_at.isoformat() if run_at else ""), f"the arrival of {name(run_ds)}"
 
 
-def _results_of(conn, run_key: str) -> list[dict]:
-    """One run's agreed recorded results, as records."""
-    from qa_tools.common import qa_results_reader as reader
-
-    cursor = conn.execute(
-        f'SELECT * FROM "{qa_store.SCHEMA}".check_result_visible WHERE run_key = ? '
-        "AND supply_state = ? ORDER BY id", [run_key, qa_store.AGREED])
-    return reader._records(cursor, run_key)
-
-
 def for_dataset(dataset_id: str, conn=None) -> dict[str, dict]:
     """{run id: {promotedOn, promotedAt, timeline: [{at, status, cause}]}} for
     every supply of this dataset that was ever promoted, keyed by the run
@@ -81,9 +72,14 @@ def for_dataset(dataset_id: str, conn=None) -> dict[str, dict]:
             continue
         latest: dict[str, dict] = {}
         timeline: list[dict] = []
-        for run_key in supply_status.runs_about(conn, dataset_id, supply):
-            for record in _results_of(conn, run_key):
-                latest[record["check_id"]] = record
+        # THE GATE'S OWN ANSWER (REQ-PIPE-279 criterion 21): the results about
+        # this supply, in the order their runs were opened, a step per run.
+        about = supply_status.results_about(conn, dataset_id, supply)
+        for i, record in enumerate(about):
+            latest[record["check_id"]] = record
+            run_key = record["run_id"]
+            if i + 1 < len(about) and about[i + 1]["run_id"] == run_key:
+                continue
             try:
                 # FOR DISPLAY, the recorded verdict - never the gate's reading
                 # (post-build-review #132 A1).

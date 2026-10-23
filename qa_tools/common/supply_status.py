@@ -2,17 +2,17 @@
 one function (REQ-PIPE-121 NFR 4, shared with REQ-DASH-126 and the status
 REQ-PIPE-130 criterion 11 records at promotion).
 
-WHICH RESULTS ARE ABOUT A SUPPLY is answered from what each run READ, not
-from whose run it was. A cross-table check of cp-placements recorded in
-the run of a carers arrival is a verdict about the placements supply that
-run read (`qa.tables_read`), and it belongs in that supply's status just
-as the supply's own checks do. Reading only the supply's own runs would
-leave out exactly the refreshed cross-table result REQ-DASH-126 is about.
+WHICH RESULTS ARE ABOUT A SUPPLY is results_about's answer, the one
+function the promotion gate, the dashboard build (pipeline.red_promoted)
+and carried.decide all read (REQ-PIPE-279 criterion 21) - from what each
+RESULT recorded reading, never from whose run it was nor from a run's
+record of physical names.
 
-NEWEST CAUSE WINS (REQ-PIPE-121 criterion 10): where two runs recorded a
-result for one check, the one whose cause took effect later is current -
-a decision-triggered run by its decision's effective time, an arrival's by
-its own run instant - never whichever run happened to finish last.
+NEWEST IS THE LATER-OPENED RUN (REQ-PIPE-279 criterion 9; Keith, K1 = A):
+qa.run.run_seq, the order runs were opened for evaluation. It replaced the
+asset's timeline - a decision's effective time, a supply's receipt - which
+named an earlier-opened run newest whenever a decision was recorded after
+the fact, though only the later run had seen it.
 
 READ-ONLY, and only recorded QA results - never a supply row. So it is
 safe on the dashboard build's path as well as the gate's.
@@ -22,58 +22,59 @@ from __future__ import annotations
 from qa_tools.common import qa_store, supply_db
 
 
-def _own_tables(conn, dataset_id: str, supply: str) -> list[str]:
-    """The staged tables a supply arrived as, by the one resolver - a
-    settled pair's supply's own file, never `#N` read as `__N` (REQ-PIPE-193
-    criterion 13). A supply named by its table already (a hand-staged one)
-    is its own."""
-    from qa_tools.common import supply_files
+def results_about(conn, dataset_id: str, supply: str) -> list[dict]:
+    """Every completed, agreed result about `supply` of `dataset_id`, oldest
+    first by run_seq and then as each run recorded them - so the last
+    result per check is the newest.
 
-    if "@" not in supply:
-        return [supply]
-    found = supply_files.resolve(conn, dataset_id, supply)
-    if found is not None and found.own:
-        return list(found.own)
-    return [supply_files.run_id_of(dataset_id, supply)]
+    A RESULT IS ABOUT A SUPPLY BY WHAT IT RECORDED, in one of five states:
 
+      its run's own   a single-table result (or a file check's) recorded
+                      under a run whose qa.run.supply_id is this supply -
+                      such a result reads only its run's own supply
+                      (criterion 3), so the run's supply is its supply
+      READ            a cross-table result whose qa.check_read for this
+                      dataset's table names this supply - a contested
+                      table's included, read as the supply it fell through to
+      HELD            the supply was deliberately not read: NOT about it
+      ABSENT          nothing of the table was read: about no supply of it
+                      (K2 = A - it shows only where its check is declared)
+      NO-SUPPLY       a sample's or a trial's table: about no supply at all
 
-def runs_about(conn, dataset_id: str, supply: str) -> list[str]:
-    """Every completed run that read this supply's table AS this supply,
-    oldest cause first."""
+    Only the first two are about the supply, and that is the whole rule.
+    The run-level qa.tables_read is not consulted: it says what a RUN read,
+    and matching it by physical name was a guess about each result.
+
+    TIE-BREAK: none is needed. run_seq is unique per run; within a run, the
+    order the run recorded its results (qa.check_result.id), exactly as one
+    run's own reader reads them.
+    """
     from qa_tools.common import hierarchy
+    from qa_tools.common import qa_results_reader as reader
 
     table = hierarchy.dataset(dataset_id).table
-    # ON THE ASSET'S OWN TIMELINE (post-build-review #116, D1): a run
-    # caused by a decision is ordered by when the decision took effect, an
-    # arrival's run by when ITS supply was received - never by the batch's
-    # wall clock, which a replay stamps years after either, so a
-    # re-evaluation could never outrank the arrival it re-evaluated.
-    rows = conn.execute(
-        f'SELECT r.run_key, COALESCE(d.effective_at, rc.received_instant, r.run_instant) '
-        f'AS caused_at FROM "{qa_store.SCHEMA}".run_visible r '
-        f'JOIN "{qa_store.SCHEMA}".tables_read t ON t.run_key = r.run_key '
-        f'LEFT JOIN "{qa_store.SCHEMA}".decision d ON d.id = r.caused_by_decision '
-        f'LEFT JOIN "{qa_store.SCHEMA}".supply_receipt rc '
-        "ON rc.dataset_id = r.dataset_id AND rc.supply_id = r.supply_id "
-        "WHERE t.logical_table = ? AND (t.supply = ? OR (t.supply IS NULL "
-        "AND t.physical_table = ANY(?))) ORDER BY caused_at, r.run_key",
-        [table, supply, _own_tables(conn, dataset_id, supply)]).fetchall()
-    return [r[0] for r in rows]
+    s = qa_store.SCHEMA
+    cursor = conn.execute(
+        f'SELECT c.* FROM "{s}".check_result_visible c '
+        f'JOIN "{s}".run_visible r ON r.run_key = c.run_key '
+        "WHERE c.supply_state = ? AND ("
+        "(c.scope <> ? AND r.dataset_id = ? AND r.supply_id = ?) "
+        f'OR EXISTS (SELECT 1 FROM "{s}".check_read k WHERE k.check_result_id = c.id '
+        "AND k.logical_table = ? AND k.state = ? AND k.supply_id = ?)) "
+        "ORDER BY r.run_seq, c.id",
+        [qa_store.AGREED, qa_store.CROSS_TABLE_SCOPE, dataset_id, supply,
+         table, qa_store.READ, supply])
+    return reader.records_from(cursor.description, cursor.fetchall())
 
 
 def latest_results(conn, dataset_id: str, supply: str) -> list[dict]:
-    """The newest recorded result per check, across every run about this
-    supply. Includes other datasets' results; status() keeps only what
-    contributes to this dataset."""
-    from qa_tools.common import qa_results_reader as reader
-
+    """The newest recorded result per check about this supply
+    (results_about), the later-opened run's where two recorded one.
+    Includes other datasets' results; status() keeps only what contributes
+    to this dataset."""
     latest: dict[str, dict] = {}
-    for run_key in runs_about(conn, dataset_id, supply):
-        cursor = conn.execute(
-            f'SELECT * FROM "{qa_store.SCHEMA}".check_result_visible WHERE run_key = ? '
-            "AND supply_state = ? ORDER BY id", [run_key, qa_store.AGREED])
-        for record in reader._records(cursor, run_key):
-            latest[record["check_id"]] = record
+    for record in results_about(conn, dataset_id, supply):
+        latest[record["check_id"]] = record
     return list(latest.values())
 
 
