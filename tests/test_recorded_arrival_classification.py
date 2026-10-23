@@ -65,6 +65,22 @@ def clean(supply_dsn):
         yield conn
 
 
+@pytest.fixture
+def private(private_supply_dsn):
+    """A database of this test's own, for a test that writes to the DECISION
+    LOG. That log is append-only - no fixture can truncate it - so a
+    promotion written into the worker's shared database stays there: a real
+    dataset's real period held by a supply named "promoted-late", which a
+    later module on the same worker read back as the period's holder once
+    another module had cleared the filings that marked the quarter used (CI
+    on 98b67fc, tests/test_cp_pair.py)."""
+    from qa_tools.common import qa_store, supply_db
+
+    with supply_db.connect(label="test-recorded-classification-private") as conn:
+        qa_store.ensure_schema(conn)
+        yield conn
+
+
 def _file(slot=EARLY_SLOT, received_at=ARRIVED, supply_id="s"):
     return filing_support.file(assignment.Assignment(
         dataset_id=DATASET, supply_id=supply_id, slot=slot,
@@ -130,7 +146,7 @@ class TestItFollowsAReFile:
         _refile(DATASET, "s", LATE_SLOT)
         assert filing.recorded_arrival(DATASET, "s").received_at == ARRIVED
 
-    def test_it_is_never_recomputed_from_the_promotion_instant(self, clean):
+    def test_it_is_never_recomputed_from_the_promotion_instant(self, private):
         """Criterion 8's second half: a verdict taken from when somebody
         got round to promoting would make punctuality a property of OUR
         responsiveness rather than the supplier's. So the supply arrives
@@ -142,7 +158,7 @@ class TestItFollowsAReFile:
         cp = collections.by_id("child-protection")
         _file(supply_id="promoted-late")
         promoted = datetime(2024, 6, 3, 9, tzinfo=PERTH)
-        with decision_log.apply_decision(clean, decision_log.Decision(
+        with decision_log.apply_decision(private, decision_log.Decision(
                 agency_id=cp.agency_id, collection_id=cp.id,
                 dataset_id=DATASET, action=decision_log.PROMOTE, supply="promoted-late",
                 actor="somebody", actor_kind=decision_log.PERSON,
