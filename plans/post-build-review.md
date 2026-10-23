@@ -11094,3 +11094,46 @@ twice. It deliberately did not re-find the `TypeError`.
      test_both_sides_of_the_comparison_stay_inside_the_panel` - red before
      (Compared run 1197-1742px in a panel ending at 1734px), green after,
      with the class's other three tests (4 passed).
+
+262. **[in-progress]** **[Pipeline]** **REQ-PIPE-279 post-build critic,
+     2026-10-24 overnight.** delivery-critic on 98b67fc, read-only against
+     ed_probe, 98 core tests and a 130-test coverage subset run. Most of the
+     28 criteria met. Findings, verified against the code where marked:
+     - **D1 HIGH, reproduced (scratch database + script).** A refused second
+       attempt deletes the LIVE attempt's work: `orchestrate.run_one`'s
+       `finally` calls `discard_run_schemas` whether or not this process
+       ever held the attempt, so the live run loses its view and dbt schemas
+       (and ends CRASHED); for a trial, `trial.discard` also deletes its
+       `qa.run`/`qa.run_attempt` rows. Test 23 drives the path and checks
+       neither. A defect: failing test first, then clean up only what this
+       process opened.
+     - **D2 MEDIUM, reproduced on ed_probe.** `qa_results_writer.
+       _arrival_purpose` still picks an arrival run's `supply_id` from its
+       run-id text (`LIKE '<ds>@<stamp>#%' ORDER BY supply_id LIMIT 1`), so a
+       settled pair's arrival run is recorded as supply #1 and
+       `results_about(#2)` sees none of #2's file checks. Small today (file
+       checks never count toward a status) but it is exactly the guessing
+       279 removed elsewhere. A defect: failing test first, supply from the
+       record.
+     - **R3 (risk, not reproduced).** The attempt lock rides one idle
+       connection with no TCP keepalive: a dead host holds it ~2h (retries
+       refused), and a dropped lock connection lets a second attempt close the
+       live one and both write, with the first `end_attempt` updating 0 rows
+       silently. Matters for the AWS direction. Fix for Keith to choose.
+     - **R4 (risk, code-read; does not occur on ed_probe).** The as-of clip
+       keeps every other-table result whatever supply it read, so a late
+       reader of an older supply can show as current on the partner's page
+       while the gate would not use it.
+     - **F5 (minor).** Orderings and writes outside the guard: the column
+       drawer's dot row keyed by day; supply history sorted by run_date then
+       run-id text; `carried_for` swallowing every exception (duplicates, not
+       false greens); `record_file_results` not refused outside an attempt;
+       `mothman debug run-*` allowed into a run another process holds live.
+     - **T6 (tests).** The guard reads only `key=` arguments (misses bare
+       `sorted()`, SQL ORDER BY, helpers it does not name); its self-test runs
+       on made-up strings; test 23 and test 26 assert too little; four
+       writer branches untested; ed_probe has no HELD or contested-READ rows,
+       so c15 and c1's contested-READ case are unit-tested only.
+     - c13 partly met: a dataset's OWN re-check entry names no cause.
+     Plan: D1 and D2 now, test-first; T6's test-23/26 strengthening with them;
+     R3, R4, F5 and the c13 gap to Keith (morning report #8).
