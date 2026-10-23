@@ -2530,3 +2530,21 @@ one or more component tags, and a date.
      8. P-Q4 the could-not-run note: A "no Client Register in the warehouse
         for 2025-Q2" (#95's) / B "Client Register has no 2025-Q2 supply",
         false in the B2 case.
+   - **279 CHUNK A BUILT (~21:55, checkpoint f362e0d, not pushed)**: criteria
+     1-8 and 23 - schema 46, `qa.check_read` (READ/HELD/ABSENT/NO-SUPPLY by
+     supply id), `qa.run.run_seq` drawn per open, `qa.run_attempt` with the
+     session advisory lock, the swallowed exception gone, `mothman debug
+     run-*` refused against an evaluated run. Architect S2 fixed (a table's
+     name stamped only when its source is `period`). Its own tests 58 passed
+     and ruff clean on that tree (my re-run); the builder's wider sweep was
+     3533 passed, 1 timing flake in test_tools_beside under load, passing
+     alone. PROVISIONAL calls in it, for you to reverse:
+     (#2) a second attempt beside a live one is REFUSED, not waited for;
+     (#3) SIGTERM becomes an INTERRUPTED end only while an attempt is open in
+     the main thread with no other handler - elsewhere it dies as before and
+     the next attempt closes it INTERRUPTED with no end time;
+     (#4) outcome/state names stored uppercase exactly as the criterion
+     writes them; (#5) NO-SUPPLY allowed only for a trial's or sample's table
+     - any other unrecorded read refuses the result; (#6) c3 compares the
+     result's recorded dataset with qa.run.dataset_id; (#7) a run that ends
+     with no exception but never completes is recorded CRASHED.
