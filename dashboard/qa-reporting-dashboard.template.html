@@ -2908,6 +2908,10 @@ function clipDatasetToInPlaceOn(d, inPlaceOnDateStr){
         // verdict - a check red on that run read green. Without a status
         // of its own the point falls back to the threshold math.
         const inPlaceOn = {...ck, history, current: last.value, previous: prev.value};
+        // A CONTESTED PAIR'S READS (PROVISIONAL, REQ-PIPE-279), by the same
+        // recorded-by-then rule as the history, and nothing more.
+        if(ck.contested_reads) inPlaceOn.contested_reads = ck.contested_reads.filter(h =>
+          !h.recorded_at || assetDateStrOf(h.recorded_at) <= inPlaceOnDateStr);
         if(last.status) inPlaceOn.current_status = last.status; else delete inPlaceOn.current_status;
         return inPlaceOn;
       })
@@ -5100,12 +5104,23 @@ function blockChecksWhileHeld(ds, blocker){
   // after the receipt (REQ-DASH-264 criterion 3 as amended), which could be
   // about another supply. FAILS CLOSED (post-build-review #258 P1): with no
   // held supply named, nothing is shown.
-  const held = blocker && blocker.supply;
+  //
+  // AND A CONTESTED PAIR'S (PROVISIONAL, 2026-10-23, for Keith): REQ-DASH-264
+  // criterion 3 says "held or contested", and a pair is no held supply - its
+  // readers recorded the table ABSENT, contested, naming the files they found.
+  // A row shows its newest such read whose files ARE the blocking pair's own
+  // staged tables: keyed on the pair, never on a time.
+  const held = blocker && blocker.kind !== "contested" && blocker.supply;
+  const pair = blocker && blocker.kind === "contested" ? [...(blocker.tables || [])].sort() : null;
+  const isThePair = files=> !!(pair && pair.length && files
+    && files.length === pair.length && [...files].sort().every((f, i)=> f === pair[i]));
   let shown = 0, rows = 0;
   (ds.columns||[]).forEach(c=>{
     c.checks = (c.checks||[]).map(ck=>{
-      const met = c.scope === "cross-table" && held
-        ? (ck.history||[]).filter(h=> h.read_state === "HELD" && h.supply_id === held) : [];
+      const met = c.scope !== "cross-table" ? []
+        : held ? (ck.history||[]).filter(h=> h.read_state === "HELD" && h.supply_id === held)
+        : pair ? (ck.contested_reads||[]).filter(h=> isThePair(h.contested_files))
+        : [];
       const last = met[met.length - 1];
       // SHOWN EITHER WAY, BUT COUNTED ONLY IF IT WAS EVALUATED (post-build-
       // review #258): the banner says these checks "did run ... and show what

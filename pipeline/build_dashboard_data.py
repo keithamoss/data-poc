@@ -246,6 +246,16 @@ def _supply_read(record: dict, table: str) -> str | None:
 _SHOWN_ELSEWHERE = (qa_store.READ, qa_store.HELD)
 
 
+def _contested_read(read: dict | None) -> bool:
+    """An ABSENT read of a table two files claim, naming them - about that
+    contested pair, so it reaches the pair's page as REQ-DASH-264 criterion 3's
+    "held or contested" asks, which REQ-PIPE-279 criteria 14 and 15 left out
+    (PROVISIONAL, 2026-10-23, for Keith). Every other ABSENT read stays off."""
+    read = read or {}
+    return (read.get("state") == qa_store.ABSENT and bool(read.get("contested"))
+            and bool(read.get("contested_files")))
+
+
 def _not_evaluated_reason(record: dict) -> str | None:
     """Why a record's check could not be evaluated, or None for a real
     verdict. Read from the reason each pseudo-tool writes -
@@ -308,7 +318,7 @@ def share_cross_table_results(results: list[dict], by_table: dict[str, list[dict
     """
     for r in results:
         for other, read in sorted((r.get("reads") or {}).items()):
-            if read.get("state") not in _SHOWN_ELSEWHERE:
+            if read.get("state") not in _SHOWN_ELSEWHERE and not _contested_read(read):
                 continue
             if other not in by_table or r in by_table[other]:
                 continue
@@ -427,7 +437,7 @@ def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], da
         for slot in checks_for_col.values():
             engine, check_name = slot["engine"], slot["check_name"]
             attach_aggregate = agg_spec is not None and check_name in agg_spec["check_names"]
-            history, elsewhere = [], []
+            history, elsewhere, contested_reads = [], [], []
             for run_id in run_ids_in_order + other_run_ids:
                 if run_id not in slot["by_run"]:
                     continue
@@ -441,7 +451,14 @@ def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], da
                 not_evaluated = slot["not_evaluated"].get(run_id)
                 fact = facts[run_id]
                 read = _supply_read({"reads": slot["reads"].get(run_id)}, table)
-                (history if own else elsewhere).append({
+                this_read = (slot["reads"].get(run_id) or {}).get(table)
+                # A CONTESTED PAIR'S READ IS KEPT APART (PROVISIONAL, see
+                # _contested_read): never in the history or a count, which
+                # criterion 14 keeps for what read a supply of this table -
+                # only for the page to show while that pair blocks it.
+                into = (history if own else contested_reads if not own and
+                        _contested_read(this_read) else elsewhere)
+                into.append({
                     "run_id": run_id, "run_date": run_date_by_id[run_id],
                     # ITS PLACE, ITS SUPPLY, ITS CAUSE AND WHAT IT READ, from the
                     # record (REQ-PIPE-279 criterion 16): the rank orders, the
@@ -474,6 +491,8 @@ def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], da
                     "status": slot["status_by_run"].get(run_id),
                     "reference": slot["reference"].get(run_id),
                     "not_evaluated": not_evaluated,
+                    **({"contested_files": this_read["contested_files"]}
+                       if into is contested_reads else {}),
                 })
             history = sorted(history + elsewhere, key=lambda h: h["rank"])
             if not history:
@@ -517,6 +536,7 @@ def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], da
                             if col == CROSS_TABLE_PSEUDO_COLUMN else None),
                 "previous": slot["by_run"].get(prev_run, 0),
                 "history": history,
+                "contested_reads": sorted(contested_reads, key=lambda h: h["rank"]),
                 "note": f"Computed by {engine} against this run's real data — not a fabricated figure.",
                 "retired_as_of": lifecycle.retired_as_of if lifecycle else None,
                 "retired_reason": lifecycle.retired_reason if lifecycle else None,

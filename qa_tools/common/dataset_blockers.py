@@ -78,6 +78,10 @@ class Blocker:
     #: 2026-10-15): {"action", "actorKind", "actor", "at", "toPeriod",
     #: "reason"} - the page words it; None while open.
     ended: dict | None = None
+    #: A contested pair's own staged tables, in file-name order (REQ-PIPE-279,
+    #: PROVISIONAL 2026-10-23): what a reader's contested read names, so the
+    #: page keys a cross-table row on the pair rather than on a time.
+    tables: tuple[str, ...] = ()
 
     @property
     def is_open(self) -> bool:
@@ -104,7 +108,8 @@ class Blocker:
                 "ended": self.ended,
                 # WHERE IT IS SETTLED, for the page's own wording on any date
                 # (REQ-PIPE-194 criteria 1 and 14, #171).
-                "settleAt": _settle_at(self.dataset_id) if self.kind == CONTESTED else None}
+                "settleAt": _settle_at(self.dataset_id) if self.kind == CONTESTED else None,
+                "tables": list(self.tables)}
 
 
 def _settle_at(dataset_id: str) -> str:
@@ -309,8 +314,22 @@ def _contested(db) -> list[Blocker]:
             kind=CONTESTED, dataset_id=dataset_id, supply=pair,
             opened_at=received_at, resolved_at=ended["at"] if ended else None,
             reason=reason, files=files, load_failures=tuple(refused), delivery=delivery,
-            settlement=settlement, superseded_by=superseded_by))
+            settlement=settlement, superseded_by=superseded_by,
+            tables=_pair_tables(dataset_id, received_at, len(files))))
     return out
+
+
+def _pair_tables(dataset_id: str, received_at, n: int) -> tuple[str, ...]:
+    """The staged tables of a pair's `n` files - ordinal by name order, the
+    rule staging names them by (supply_db.staged_table) - or () for a dataset
+    the tree no longer knows."""
+    from qa_tools.common import hierarchy, supply_db
+
+    try:
+        table = hierarchy.dataset(dataset_id).table
+    except hierarchy.UnknownDatasetError:
+        return ()
+    return tuple(supply_db.staged_table(table, received_at, i) for i in range(1, n + 1))
 
 
 def _rejections(db) -> dict[tuple[str, str], dict]:

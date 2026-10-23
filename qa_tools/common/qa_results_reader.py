@@ -385,15 +385,15 @@ def run_facts(agency: str, collection: str, conn=None) -> dict[str, dict]:
 
 
 def read_check_reads(agency: str, collection: str, conn=None) -> dict[tuple[str, str], dict]:
-    """{(run id, check id): {table: {state, supply_id, contested}}} - what each
+    """{(run id, check id): {table: {state, supply_id, contested, contested_files}}} - what each
     complete cross-table result recorded reading (qa.check_read, REQ-PIPE-279
     criterion 1), for the build to place it by (criteria 16 and 18). One run
     records one result per check, so the pair is a key."""
     conn, mine = _conn(conn)
     try:
         rows = conn.execute(
-            f'SELECT c.run_key, c.check_id, k.logical_table, k.state, k.supply_id, k.contested '
-            f'FROM "{qa_store.SCHEMA}".check_read_visible k '
+            f'SELECT c.run_key, c.check_id, k.logical_table, k.state, k.supply_id, k.contested, '
+            f'k.contested_files FROM "{qa_store.SCHEMA}".check_read_visible k '
             f'JOIN "{qa_store.SCHEMA}".check_result c ON c.id = k.check_result_id '
             "WHERE c.agency_id = ? AND c.collection_id = ? "
             "ORDER BY c.run_key, c.check_id, k.logical_table", [agency, collection]).fetchall()
@@ -401,9 +401,10 @@ def read_check_reads(agency: str, collection: str, conn=None) -> dict[tuple[str,
         if mine:
             conn.close()
     out: dict[tuple[str, str], dict] = {}
-    for run_key, check_id, table, state, supply, contested in rows:
+    for run_key, check_id, table, state, supply, contested, files in rows:
         out.setdefault((run_key, check_id), {})[table] = {
-            "state": state, "supply_id": supply, "contested": bool(contested)}
+            "state": state, "supply_id": supply, "contested": bool(contested),
+            "contested_files": sorted(files or ())}
     return out
 
 

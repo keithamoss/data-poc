@@ -90,6 +90,15 @@ class TestATableTwoFilesClaimRaisesOneDatasetItem:
         assert display_time.format_instant(RECEIVED) in b.reason
         assert supply_files.where_to_settle(DATASET) in b.reason
 
+    def test_its_record_names_the_pairs_own_staged_tables(self, clean):
+        """REQ-PIPE-279 criterion 15's contested half (PROVISIONAL, 2026-10-23):
+        a reader's contested read names the files it found as staged tables,
+        so the page keys a row on the pair by those - never by a time."""
+        _pair()
+        (blocker,) = [b for b in dataset_blockers.all_blockers(clean) if b.kind == "contested"]
+        assert blocker.as_record()["tables"] == [f"cp_case_workers__{_key()}__1",
+                                                 f"cp_case_workers__{_key()}__2"]
+
     def test_it_is_not_the_contested_file_kind(self, clean):
         """The opposite case - one file claimed by several datasets - keeps
         its own label."""

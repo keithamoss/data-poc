@@ -196,3 +196,33 @@ describe("points are in rank order whatever unranked entries sit among them", ()
     expect(counts.map((p) => p.rank)).toEqual([5, 10, 15, 20, 25, 30]);
   });
 });
+
+// REQ-DASH-264 criterion 3's "held or contested", kept where REQ-PIPE-279
+// criteria 14 and 15 left a gap (PROVISIONAL, 2026-10-23, for Keith): TS-80's
+// Client Register was a contested pair, and its readers recorded it ABSENT,
+// contested, naming both files. Keyed on the pair, never on a time.
+describe("a contested table's cross-table row reads the pair", () => {
+  const pair = ["cp_clients__k__1", "cp_clients__k__2"];
+  const blocker = { kind: "contested", supply: "cp-clients@k#1", tables: pair };
+  const page = (files) => ({ columns: [{ name: "Cross-table", scope: "cross-table", checks: [{
+    key: "ref", history: [entry({ run: "old", rank: 1, supply: "cp-clients@q3", cause: "arrival:q3",
+                                   at: "2020-08-01T09:00:00+08:00", by: "cp-notifications" })],
+    current_status: "green",
+    contested_reads: [entry({ run: "n", rank: 5, supply: null, cause: "arrival:n", status: "red",
+                              at: "2020-11-01T08:20:00+08:00", by: "cp-notifications",
+                              read_state: "ABSENT", contested_files: files })] }] }] });
+
+  it("shows a reader's result that found the blocking pair's own files", () => {
+    const w = load();
+    const ds = page([...pair].reverse());
+    expect(w.blockChecksWhileHeld(ds, blocker)).toBe(1);
+    expect(w.checkStatus(ds.columns[0].checks[0])).toBe("red");
+  });
+
+  it("does not show one that found another pair", () => {
+    const w = load();
+    const ds = page(["cp_clients__other__1", "cp_clients__other__2"]);
+    expect(w.blockChecksWhileHeld(ds, blocker)).toBe(0);
+    expect(w.checkStatus(ds.columns[0].checks[0])).toBe("nodata");
+  });
+});

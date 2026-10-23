@@ -49,8 +49,8 @@ def _record(check_id: str, dataset_id: str, status: str = "pass", **extra) -> di
 
 
 def _run(run_id: str, *, dataset_id, supply, scope="arrival", decision=None, results=(),
-         reads=None, absent=(), held=None, received_at="2099-01-01T01:00:00+00:00",
-         collection=CP, agency=AGENCY):
+         reads=None, absent=(), held=None, contested=None,
+         received_at="2099-01-01T01:00:00+00:00", collection=CP, agency=AGENCY):
     """One run opened, recorded and finished through the writer - a resolution
     first where it records a cross-table result, as the overlay does: `reads`
     the tables it read, `absent` those it had none of, `held` {table: supply}."""
@@ -61,7 +61,9 @@ def _run(run_id: str, *, dataset_id, supply, scope="arrival", decision=None, res
                 run_id=run_id, schema=supply_db.run_schema(run_id),
                 resolved={t: f"{t}__x" for t in reads},
                 supply_of=dict(reads), source={t: "staging" for t in reads},
-                absent=list(absent), held={t: f"{t}__held" for t in (held or {})},
+                absent=[*absent, *(contested or {})],
+                ambiguous={t: list(files) for t, files in (contested or {}).items()},
+                held={t: f"{t}__held" for t in (held or {})},
                 held_supply=dict(held or {})))
     purpose = {"dataset_id": dataset_id, "supply_id": supply, "scope": scope,
                **({"caused_by_decision": decision} if decision else {})}
@@ -126,9 +128,10 @@ class TestTheResultsFileCarriesTheRecord:
                       reads={"cp_clients": clients, "cp_notifications": notifications})
         (got,) = [r for r in history.rebuild()["results"] if r["run_id"] == run_id]
         assert got["reads"] == {
-            "cp_clients": {"state": qa_store.READ, "supply_id": clients, "contested": False},
+            "cp_clients": {"state": qa_store.READ, "supply_id": clients, "contested": False,
+                           "contested_files": []},
             "cp_notifications": {"state": qa_store.READ, "supply_id": notifications,
-                                 "contested": False}}
+                                 "contested": False, "contested_files": []}}
 
     def test_the_runs_come_in_rank_order_not_run_index(self, history):
         first = _run(f"pytest_z_{uuid.uuid4().hex[:8]}", dataset_id="cp-clients",
@@ -277,6 +280,33 @@ class TestAResultThatReadNoSupplyOfATableIsNotOnItsPage:
         assert run_id in {h["run_id"] for h in _history_of(pages["cp-notifications"], CLIENT_REF)}
         assert not [c for col in pages["cp-clients"]["columns"] for c in col["checks"]
                     if c.get("check_id") == CLIENT_REF]
+
+
+class TestAContestedPairsReadsReachItsPage:
+    """REQ-DASH-264 criterion 3's "held or contested", kept where REQ-PIPE-279
+    criteria 14 and 15 left a gap (PROVISIONAL, 2026-10-23, for Keith): a
+    reader's ABSENT read of a table two files claim is about that pair, so it
+    reaches the pair's page - apart from the history, for the page to show
+    only while that pair blocks it. Every other ABSENT read stays off."""
+
+    def test_it_is_on_the_tables_page_as_a_contested_read_not_in_the_history(self, history):
+        notifications = f"cp-notifications@{_key()}"
+        pair = [f"cp_clients__{_key()}__1", f"cp_clients__{_key()}__2"]
+        # AN EARLIER QUARTER'S READ, as TS-80's rows have: the card is there.
+        earlier = _run(f"cp_notifications__{_key()}", dataset_id="cp-notifications",
+                       supply=f"cp-notifications@{_key()}",
+                       results=[_record(CLIENT_REF, "cp-notifications")],
+                       reads={"cp_notifications": f"cp-notifications@{_key()}",
+                              "cp_clients": f"cp-clients@{_key()}"})
+        run_id = _run(f"cp_notifications__{_key()}", dataset_id="cp-notifications",
+                      supply=notifications, results=[_record(CLIENT_REF, "cp-notifications", "fail")],
+                      reads={"cp_notifications": notifications}, contested={"cp_clients": pair})
+        (card,) = [c for col in history.datasets()["cp-clients"]["columns"] for c in col["checks"]
+                   if c.get("check_id") == CLIENT_REF]
+        assert [h["run_id"] for h in card["history"]] == [earlier]
+        (read,) = card["contested_reads"]
+        assert (read["run_id"], read["contested_files"], read["status"]) == (
+            run_id, sorted(pair), "red")
 
 
 class TestAHeldReadNamesTheHeldSupply:
