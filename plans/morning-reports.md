@@ -2563,3 +2563,18 @@ one or more component tags, and a date.
      supplies can be siblings, but nothing carries between them because
      their own-table supplies differ; (#11) a file-check result under the
      supply's own run still counts toward that supply, as before.
+   - **279 CHUNK C BUILT (~22:50, checkpoint 3d0e988, not pushed)**: criteria
+     16-19 and 24, build side. The results file carries a `run_facts` map
+     (dataset, scope, supply, dense rank from run_seq, cause) and each
+     cross-table result its `reads`; placement, sharing and ordering come
+     from the record; `read_run()`, the slot inference, recorded_at ordering
+     and run_index sorts removed. A results file without run_facts is refused
+     with a rebuild instruction. My re-run: 40 passed (the new record tests
+     and both build modules), ruff clean. PROVISIONAL: (#12) the live batch
+     writes its results file by rebuilding from history rather than from
+     memory - one path, one history read per batch; (#13) an arrival's cause
+     is `arrival:<delivery>@<receipt instant>`, the same grouping the sibling
+     rule uses, and every non-arrival run (re-check, readers-only, knock-on)
+     reads as a re-check in its cause sentence; (#14) `canonical_order` still
+     sorts the results FILE by run id, for stable bytes only - it decides
+     nothing on the page.
