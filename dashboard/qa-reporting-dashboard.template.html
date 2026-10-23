@@ -840,8 +840,12 @@ table.file-history th, table.file-history td{text-align:left; padding:6px 6px; b
 .snapshot-row a{background:var(--accent); color:var(--surface); border-radius:var(--radius-sm); padding:6px 12px; font:600 12px "Public Sans",sans-serif; text-decoration:none; white-space:nowrap;}
 .snapshot-row a:hover{opacity:.88;}
 
-.compare-grid{display:grid; grid-template-columns:1fr 1fr; gap:12px;}
-.compare-col{background:var(--surface-alt); border-radius:var(--radius-md); padding:12px 14px;}
+/* minmax(0,1fr), not 1fr: a 1fr track never shrinks below its content, so a
+   long compared-run label pushed "Latest result" out of the panel
+   (post-build-review #261). The select then fits its column. */
+.compare-grid{display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:12px;}
+.compare-col{background:var(--surface-alt); border-radius:var(--radius-md); padding:12px 14px; min-width:0;}
+.compare-col select{max-width:100%;}
 .compare-col .k{font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--ink-faint); font-weight:700;}
 .compare-col .v{font-size:20px; font-family:"IBM Plex Mono",monospace; margin-top:4px;}
 .delta{font-size:12.5px; margin-top:8px; font-weight:600;}

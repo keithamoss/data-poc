@@ -11074,7 +11074,7 @@ twice. It deliberately did not re-find the `TypeError`.
      alone. Whether the DEFAULT should itself be the newest covered date is a
      behaviour question for the period-clarity requirement, not this fix.
 
-261. **[todo, 2026-10-22]** **[Dashboard UI]** **A check panel's "Latest result"
+261. **[done, 2026-10-23]** **[Dashboard UI]** **A check panel's "Latest result"
      half is pushed out of the panel by a long compared-run label.** Found
      2026-10-22 while screenshotting the compare card for Keith (REQ-PIPE-279
      N1): on cp-notifications' Client reference panel the dropdown's label
@@ -11086,3 +11086,11 @@ twice. It deliberately did not re-find the `TypeError`.
      `min-width:0` on `.compare-col` plus `max-width:100%` on its select puts
      both columns back in view (252px each). A defect, so a failing test
      first (e2e: both compare columns inside the panel's box), then the fix.
+     FIXED 2026-10-23 overnight (Keith's overnight item 2, minor under the
+     standing rule): the grid's tracks are `minmax(0,1fr)` instead of `1fr`
+     (a 1fr track never shrinks below its content), `.compare-col` has
+     `min-width:0`, and its select `max-width:100%`. Failing test first:
+     tests/test_dashboard_e2e.py `TestACrossTableCheckOnTS80::
+     test_both_sides_of_the_comparison_stay_inside_the_panel` - red before
+     (Compared run 1197-1742px in a panel ending at 1734px), green after,
+     with the class's other three tests (4 passed).

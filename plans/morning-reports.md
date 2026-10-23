@@ -2448,12 +2448,21 @@ one or more component tags, and a date.
      removed; D the page places points by (supply, cause); E the guard test,
      a bootstrap from empty, pins brought to Keith never re-pinned
      (criterion 25), register, changelog, critics; then REQ-PIPE-265 flips.
-     The #95 batch is NOT started tonight.
+     Keith ~21:00, "Yes, that order works, go ahead" - widened to: (1)
+     REQ-PIPE-279; (2) post-build-review #261, the compare card's
+     overflow, a minor defect fixed test-first; (3) the #95 batch from its
+     first sprint if 279 finishes. Alongside, as drafting only, ready for
+     sign-off in the morning: (4) period clarity (scoper, then architect and
+     both UX reviewers); (5) #88's e2e speed-up (A + B) with the measured
+     profile; (6) a requirement for the built test-database tidy command;
+     (7) REQ-TEST-239's retirement wording (running-thoughts #122).
    - **TERMS (the standing overnight policy)**: a check-in every ten
      minutes; take the recommended option on anything not already decided,
      marked PROVISIONAL here for Keith to keep or reverse; questions queued
      here for the morning, never acted on; defects failing-test first;
      critic fixes before the next item; real database writes only to the
-     scratch `ed_probe`, never `supply`. PUSHING: Keith said "don't push
-     yet" earlier on 2026-10-22 - asked at 20:52 whether tonight's terms
-     lift it; until he answers, everything stays as local commits.
+     scratch `ed_probe`, never `supply`. PUSHING: Keith, 20:5x: "Push finished
+     gate-green chunks, as usual" - lifting 2026-10-22's "don't push yet".
+     One push per finished, gate-green chunk (REQ-TEST-260's cadence); the
+     first push also carries the local checkpoints since 2026-10-22
+     (REQ-PIPE-265's build, #258 polish, the signed drafts and register).

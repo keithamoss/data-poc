@@ -5620,6 +5620,27 @@ class TestACrossTableCheckOnTS80:
         assert ("Re-checked 11:00am Monday, 2 November 2020, when the Client Register was "
                 "re-checked.") in panel
 
+    def test_both_sides_of_the_comparison_stay_inside_the_panel(self, clean_page, built_dashboard_html):
+        """post-build-review #261: a long compared-run label ("... · from the
+        Client Register's run (previous)") widened the "Compared run" column
+        until the "Latest result" box sat outside the panel, so the card showed
+        one side of a comparison with no hint of the other."""
+        self._rows(clean_page, built_dashboard_html, "cp-notifications", "2020-11-03")
+        clean_page.locator('.scope-section[data-scope="cross-table"] .scope-check',
+                           has_text="Client reference").filter(has_text="dbt:relationships").first.click()
+        clean_page.wait_for_selector(".check-panel .compare-col")
+        boxes = clean_page.evaluate("""() => {
+          const panel = document.querySelector('.check-panel').getBoundingClientRect();
+          return {panel: [panel.left, panel.right],
+                  cols: [...document.querySelectorAll('.check-panel .compare-col')].map(c => {
+                    const r = c.getBoundingClientRect();
+                    return [c.querySelector('.k').textContent.trim(), r.left, r.right]; })};
+        }""")
+        assert len(boxes["cols"]) == 2, boxes
+        left, right = boxes["panel"]
+        for name, l, r in boxes["cols"]:
+            assert left <= l and r <= right, (name, l, r, boxes["panel"])
+
     def test_the_held_register_shows_its_cross_table_rows_red_and_its_own_checks_not_run(
             self, clean_page, built_dashboard_html):
         rows = self._rows(clean_page, built_dashboard_html, "cp-clients", "2020-11-01")
