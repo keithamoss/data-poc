@@ -39630,7 +39630,7 @@ requirements:
     - tests/test_dashboard_e2e.py::TestTheDatasetPageSaysWhatItsTrendPlots
     implemented_by:
     - pipeline/build_dashboard_data.py::build_one_table
-    - pipeline/build_dashboard_data.py::_merged_by_time
+    - pipeline/build_dashboard_data.py::share_cross_table_results
     - pipeline/build_dashboard_data.py::_between
     - dashboard/qa-reporting-dashboard.template.html::clipDatasetToInPlaceOn
     - dashboard/qa-reporting-dashboard.template.html::crossTableBetween

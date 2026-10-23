@@ -2604,3 +2604,14 @@ one or more component tags, and a date.
      page; (#20) `received_instant` is allowed as a group's identity (the
      arrival cause key), not as an ordering. One e2e oracle moved: the
      in-place-on check takes the newest result by rank, not by recorded_at.
+   - **279 FULL GATE (~00:20, f8fdd68 + bootstrap from empty 26m30s)**: RED -
+     5945 passed, 10 failed, and two docs gates. Docs: plans/INDEX.md stale
+     (regenerated before the next gate) and REQ-DASH-264's implemented_by named
+     the removed `_merged_by_time` (repointed to `share_cross_table_results`).
+     Tests: (a) two REAL e2e findings - the dataset list and the dataset page
+     disagree on cp-notifications' counts (list counted 1, page 10), and TS-80's
+     held Client Register no longer shows its cross-table rows red; (b) five
+     test_cross_table_scope fixtures record cross-table results without
+     resolutions (now refused by c4), one of them tripping on a lock an earlier
+     test left held; (c) test_scripted_decisions still asserts the removed
+     run_index. All with the builder, test-first. Not pushed.
