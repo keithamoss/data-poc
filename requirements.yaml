@@ -40109,6 +40109,9 @@ requirements:
     - dashboard/qa-reporting-dashboard.template.html::historySource
     - dashboard/qa-reporting-dashboard.template.html::blockChecksWhileHeld
     evidence:
+    - '2026-10-24, FULL GATE ON THE FINAL CODE: mothman check on 43323cf, against ed_probe bootstrapped from empty at schema 46
+      - every gate passed; pytest 5958 passed, 1 xfailed in 42m28s; npm test 882 passed. The commit after it touches only
+      this evidence line and plans/, re-gated with mothman check --docs.'
     - '2026-10-24, BOOTSTRAP FROM EMPTY (criterion 23''s rebuild): mothman pipeline bootstrap on the scratch database ed_probe at schema
       46, tree f8fdd68 (chunks A-D and criterion 20''s guard), run by the main session: 26m30s, exit 0.'
     - '2026-10-24, CRITERION 25: no pinned golden moved. The full mothman check the main session ran on f8fdd68 over that bootstrap

@@ -2651,3 +2651,7 @@ one or more component tags, and a date.
      `decisions` as "PROVISIONAL, pending Keith"; running-thoughts #117
      deleted (279 covers it); changelog entry for today. Full gate on the
      final tree next, then the push.
+   - **FULL GATE GREEN (~03:25) on 43323cf**: every gate passed, pytest 5958
+     passed / 1 xfailed (42m28s), npm test 882. Pushed with the evidence line
+     added and `mothman check --docs` re-run. Next: CI, then the post-build
+     critics on 279.
