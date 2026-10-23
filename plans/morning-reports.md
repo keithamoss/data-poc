@@ -2501,3 +2501,32 @@ one or more component tags, and a date.
      P-Q2 the default date the morning after a build; P-Q3 period in supply
      names; P-Q4 the could-not-run wording). Architect and dashboard UX review
      running overnight.
+   - **PERIOD CLARITY v2 (~21:25)**: both reviews folded in (architect +
+     dashboard UX; every item mapped in docs/drafts/period-clarity/summary.md).
+     Merged copy validates, 276 requirements; requirements.yaml untouched.
+     NOT re-reviewed. TRANSITIVE BLOCK: REQ-DASH-285 and 289 depend on signed
+     REQ-DASH-204, which depends on unsigned REQ-PIPE-211 - neither can be
+     built until 211 is signed and built. Questions, ordered by how much they
+     change the build, recommendation A on each:
+     1. P-Q1 which quarter 22 Oct names: A the window holding the date
+        (2026-Q4, results "the 2026-Q3 supply"; departs from the mock-up) /
+        B the period's date, as mocked / C the supply on show.
+     2. AQ1 #95's supply-name helper returns structured parts now: A one-line
+        amendment to 272 c22 before 272 is built / B build flat, rework later.
+     3. AQ2 the covered-range defect (ends at the newest period START, so a
+        quarterly-only deployment is out of range every day): A fix now,
+        test first, on its own / B fold into 290, which becomes a must.
+     4. P-Q3 period in supply names: A only where it differs from the page's /
+        B always / C never.
+     5. P-Q2 default date the morning after a build: A the build's date when
+        today is past it / B today plus the notice (as now, #260) / C extend
+        coverage to today.
+     6. P-Q5 results' age: A only once the period is past its late instant
+        (and always in a daily gap) / B whenever results are from another
+        period ("82 days old" on a green feed not yet due).
+     7. P-Q6 amend signed 204 c2's lead "No promoted <dataset> for <period>."
+        to "No <dataset> in place in the warehouse for <period>.": A amend /
+        B keep, record why.
+     8. P-Q4 the could-not-run note: A "no Client Register in the warehouse
+        for 2025-Q2" (#95's) / B "Client Register has no 2025-Q2 supply",
+        false in the B2 case.
