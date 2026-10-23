@@ -2667,3 +2667,22 @@ one or more component tags, and a date.
      order, which a parallel bootstrap legitimately changes). A comparator
      gap, not a determinism defect - the records match on what they mean. Being
      fixed in the comparators without weakening them.
+   - **279 CRITIC (~04:05) - post-build-review #262.** Two DEFECTS, both
+     reproduced, being fixed test-first now: (D1, high) a refused second
+     attempt on a run deletes the LIVE attempt's working schemas, and for a
+     trial its run record - the clean-up ran whether or not this process held
+     the attempt; (D2, medium) an arrival run's supply is still picked from its
+     run-id text, so a settled pair's arrival run is credited to supply #1 only.
+     FOR YOU, not acted on:
+     (R3) the attempt lock rides one idle connection with no keepalive - a dead
+     host holds it ~2h (retries refused meanwhile), and a dropped connection
+     lets two attempts write at once. Options: (a) TCP keepalives on the lock
+     connection plus a refusal when an attempt's end updates no row
+     [recommended, small]; (b) a heartbeat column the next attempt checks;
+     (c) leave it until the AWS work. (R4) the as-of view can show a
+     partner's verdict about an OLDER supply as current on a page (doesn't
+     occur in today's data): fix now, or with #95's sprint 1 that reworks the
+     same rows? (F5) minor orderings outside the guard - the column drawer's
+     dots keyed by day, supply history sorted by run-id text - fix as polish
+     under the standing rule unless you say otherwise. (c13 gap) a dataset's
+     OWN re-check entry names no cause on the page.
