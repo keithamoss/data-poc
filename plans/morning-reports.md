@@ -2578,3 +2578,19 @@ one or more component tags, and a date.
      reads as a re-check in its cause sentence; (#14) `canonical_order` still
      sorts the results FILE by run id, for stable bytes only - it decides
      nothing on the page.
+   - **279 CHUNK D BUILT (~23:05, checkpoint a921749, not pushed)**: criteria
+     10-15 on the page. A point is (supply, cause), ordered by rank; one
+     point function behind the list's counts, sparklines and the panel's run
+     count; the default comparison is the newest earlier EVALUATED point, and
+     `?cmp=` asks the same function (fixes the old length-2 disagreement);
+     cause sentences from the recorded cause; a held table's row shows the
+     result HELD from the blocker's own supply. npm test 879 passed on that
+     tree (my re-run). PROVISIONAL: (#15) c14 (an ABSENT or NO-SUPPLY read
+     not shown on that table's page) is applied in the BUILD, which decides
+     which pages carry a result; (#16) a later point carries a check's verdict
+     from the SAME supply's newest earlier point, never just the previous
+     point overall; (#17) a held row with no blocker supply recorded fails
+     closed; (#18) the dataset list's small sparkline has no per-point
+     tooltips today, so c13's cause naming lands in the panel chart, compare
+     and history lists only. Bootstrap from empty on ed_probe (schema 46)
+     started ~23:05.
