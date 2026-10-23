@@ -2433,3 +2433,27 @@ one or more component tags, and a date.
         compare card defaulting to "Not evaluated"; a clipped axis label.
    - **LEFT FOR YOU, as before**: running-thoughts #109, and profiling the
      gate (56 minutes on this sandbox).
+
+8. **[in-progress, 2026-10-23]** **[Docs & process]** **Overnight 2026-10-23 to
+   24: REQ-PIPE-279 (deterministic matching), then REQ-PIPE-265's flip.**
+   - **THE PLAN, approved 2026-10-23 ~20:50 Perth** (Keith: "Go ahead and
+     start building 279 once the scoper returns"; "Set a 10 minute wake up
+     timer and apply the usual 'overnight build' policy"). Signed today
+     after the end-to-end walk-through: REQ-PIPE-279 v4 and the #95 batch
+     (v6 + C/D/E). Tonight builds 279 only, in five chunks, each test-first
+     (tasks #145-#149): A the record (schema 46, qa.check_read, run_seq,
+     qa.run_attempt and its run lock, staged supplies on tables_read); B one
+     results_about function, the gate on run_seq, siblings from the record;
+     C the build emits ranks, supplies, causes and reads, every guess
+     removed; D the page places points by (supply, cause); E the guard test,
+     a bootstrap from empty, pins brought to Keith never re-pinned
+     (criterion 25), register, changelog, critics; then REQ-PIPE-265 flips.
+     The #95 batch is NOT started tonight.
+   - **TERMS (the standing overnight policy)**: a check-in every ten
+     minutes; take the recommended option on anything not already decided,
+     marked PROVISIONAL here for Keith to keep or reverse; questions queued
+     here for the morning, never acted on; defects failing-test first;
+     critic fixes before the next item; real database writes only to the
+     scratch `ed_probe`, never `supply`. PUSHING: Keith said "don't push
+     yet" earlier on 2026-10-22 - asked at 20:52 whether tonight's terms
+     lift it; until he answers, everything stays as local commits.
