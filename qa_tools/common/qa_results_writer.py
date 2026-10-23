@@ -914,12 +914,15 @@ def _arrival_purpose(conn, run_id: str) -> dict:
         found = {supply_files.supply_for_table(conn, dataset_id, staged)}
     else:
         found = set()
-    rows = conn.execute(
-        f"SELECT supply_id, slot FROM {filing.CURRENT} WHERE dataset_id = ? "
-        "AND supply_id = ANY(?)", [dataset_id, [s for s in found if s]]).fetchall()
-    if len(found) != 1 or len(rows) != 1:
+    if len(found) != 1 or None in found:
         return {"dataset_id": dataset_id, "supply_id": None}
-    return {"dataset_id": dataset_id, "supply_id": rows[0][0], "period": rows[0][1]}
+    (supply,) = found
+    rows = conn.execute(
+        f"SELECT slot FROM {filing.CURRENT} WHERE dataset_id = ? AND supply_id = ?",
+        [dataset_id, supply]).fetchall()
+    if not rows:
+        return {"dataset_id": dataset_id, "supply_id": None}
+    return {"dataset_id": dataset_id, "supply_id": supply, "period": rows[0][0]}
 
 
 def finish_run(run_id: str) -> None:

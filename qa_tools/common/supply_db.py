@@ -1809,17 +1809,17 @@ def resolution_for(conn, run_id: str) -> Resolution:
     report that says "nothing recorded" is more useful than a
     traceback."""
     res = Resolution(run_id=run_id, schema=run_schema(run_id))
-    try:
-        rows = conn.execute(
-            f'SELECT logical, physical, state, supply, source '
-            f'FROM "{staging_schema_for(run_id)}"."{_RESOLUTIONS}" '
-            "WHERE run_id = ? ORDER BY logical, physical", [run_id]).fetchall()
-    except (psycopg.errors.UndefinedTable, psycopg.errors.InvalidSchemaName):
-        # Nothing has been staged in this database yet, so the carrier
-        # table does not exist. Same meaning as the retired engine's
-        # CatalogException, handled the same way - a caller asking is
-        # reporting, and "nothing recorded" beats a traceback.
+    carrier = f'"{staging_schema_for(run_id)}"."{_RESOLUTIONS}"'
+    # NOTHING STAGED IN THIS DATABASE YET, so the carrier table does not
+    # exist: "nothing recorded", as the retired engine's CatalogException
+    # was. ASKED FIRST rather than caught from a failed SELECT, because a
+    # caller inside a transaction - open_run's - cannot run another
+    # statement after one has failed (post-build-review #262 D2's gate).
+    if conn.execute("SELECT to_regclass(?)", [carrier]).fetchone()[0] is None:
         return res
+    rows = conn.execute(
+        f'SELECT logical, physical, state, supply, source FROM {carrier} '
+        "WHERE run_id = ? ORDER BY logical, physical", [run_id]).fetchall()
     for logical, physical, state, supply, source in rows:
         if state == "resolved":
             res.resolved[logical] = physical
