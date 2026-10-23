@@ -2482,3 +2482,22 @@ one or more component tags, and a date.
      promotions identical, bootstrap -9%), and that is the evidence 265's
      flip will cite. Nothing re-runs it across the schema bump. Reverse if
      you want it re-captured on schema 46.
+   - **REGISTER (~21:40)**: the signed batch is in requirements.yaml - REQ-PIPE-279
+     v4 and the 15 #95 v6 requirements (266, 267, 269-278, 280, plus 204 and
+     210), all not_started with your 2026-10-23 sign-off; 40 amendments across
+     19 existing requirements, each "AMENDED 2026-10-23 by REQ-..." with its old
+     wording kept. REQ-PIPE-211 and REQ-GEN-206 (the calendar close-out) are
+     added UNSIGNED, not_started, because signed REQ-DASH-204 depends on 211;
+     they need your sign-off before either is built. `mothman check --docs`
+     green on that tree (266 requirements).
+   - **READINGS of your E = B, for you to correct** (written into v6 by the
+     scoper): REQ-DASH-204 c16 no longer says "nothing needs deciding" for a
+     supply red only because its partner is overdue, so the page agrees with
+     the queue; REQ-PIPE-278's ticketing is unchanged - the overdue slot's own
+     ticket still names what it holds back.
+   - **PERIOD CLARITY drafted** (docs/drafts/period-clarity/): REQ-DASH-284..290
+     and four questions (P-Q1 which period 22 Oct is in - the scoper found the
+     mock-up's "2026-Q3" contradicts your open/close rule, Q3 closed 18 Oct;
+     P-Q2 the default date the morning after a build; P-Q3 period in supply
+     names; P-Q4 the could-not-run wording). Architect and dashboard UX review
+     running overnight.

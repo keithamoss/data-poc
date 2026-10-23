@@ -5893,3 +5893,20 @@ could never have computed it), and it belongs with batch 5's check work.
      maybe." Republished from the sandbox the same day (his option A). Not
      scoped: when (every finished, pushed piece of work; or on his word),
      from which environment, and how a stale site would say so.
+
+124. **[todo, 2026-10-23]** **[Pipeline & publishing]** **[Dashboard UI]**
+     **Pipeline observability alongside the AWS build - what is running, now.**
+     Keith, 2026-10-23, during the #95 sign-off walk-through (step 1, a zip
+     filed as one package): "this go[es] alongside the AWS stuff, how we get
+     observability of pipelines. I think that will just happen as part of how
+     we build the AWS bit, but I'd like some AWS infrastructure side
+     visibility of ... what pipelines are running. ... some sort of
+     observability UI. It can be basic, and maybe also that is just a pointer
+     to ... more observability into something that we're building here,
+     whether it's the TUI, whether it's a different view in the dashboard.
+     Maybe it becomes the dashboard integrates with AWS APIs and pulls
+     real-time information." Belongs with this file's Thread B (the AWS MVP,
+     AWS CDK in Python) and plans/wider.md's pipeline-observability item;
+     related to #120 (check durations) and #121 (showing a timed-out or
+     crashed run), which REQ-PIPE-279's run-attempt record and per-attempt
+     lock will feed. Not scoped.

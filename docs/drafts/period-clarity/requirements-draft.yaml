@@ -1,0 +1,264 @@
+# DRAFT v1 - PERIOD CLARITY (plans/running-thoughts.md #118), scoped by
+# delivery-scoper on 2026-10-23 (Perth) from the dashboard UX critic's report
+# and Keith's answers Q1-Q3 (docs/drafts/period-clarity/review-ux-critic.md),
+# the dashboard UX reviewer's P1-P6 hooks (docs/drafts/review-dashboard-ux-
+# 279v3-95v5.md section 5) and plans/post-build-review.md #260's open
+# behaviour question. A PROPOSAL for Keith's sign-off: nothing here is in
+# requirements.yaml and nothing is signed. summary.md beside this file is the
+# sign-off brief, holds the old/new wording of every signed criterion these
+# amend, and carries FOUR QUESTIONS FOR KEITH (P-Q1 to P-Q4). Criteria marked
+# PROVISIONAL ON P-Qn are written to the recommended answer.
+#
+# STANDS ON the signed #95 batch v6 (docs/drafts/unjudged-cross-table/
+# requirements-draft-v6.yaml - REQ-DASH-272, 275, 277, 204), REQ-PIPE-279
+# (docs/drafts/deterministic-matching/), and REQ-DASH-054, REQ-PIPE-081,
+# REQ-DASH-182 and REQ-DASH-264 in requirements.yaml.
+#
+# IDS: 284 to 290, the next free numbers on 2026-10-23 across requirements.yaml
+# and every docs/drafts/ file (281-283 went to REQ-TEST in docs/drafts/small-2026-10-23/). Check the
+# register again when this is applied.
+requirements:
+- id: REQ-DASH-284
+  title: "The build embeds each period's open and close, per dataset and as its calendar's default, and the page has one rule for which period a date is in"
+  date_written: "2026-10-23"
+  story: "As someone reading any page of the dashboard, I want the page to know when each delivery period opens and closes, for each dataset and as its calendar's default, so that every label it shows me for a period carries the real window that period is open for and not a guess."
+  moscow: must
+  status: not_started
+  source: "Keith, 2026-10-22 (Perth), period-clarity Q1: an authored-date calendar's period is shown with its OPEN-to-CLOSE range, opening when its claim window opens and closing when the next period's claim window opens (qa_tools/common/slots.py closes_at; 2026-Q3, due 1 Aug with a 14-day window, is open 18 Jul-18 Oct 2026); a cadence calendar's period is named by its day; windows are per dataset, with the calendar's default shown beside where they differ. Drafted by delivery-scoper 2026-10-23 as the foundation the other six period-clarity requirements read."
+  acceptance_criteria:
+  - "THE SYSTEM SHALL embed in the built dashboard, for each dataset on an AUTHORED-dates calendar, every slot's period name, open instant (claim_opens_at), close instant (closes_at) and due instant (due_at), taken from qa_tools/common/slots.py's slots_for_dataset - the one function filing uses - and SHALL NOT compute any of them in the page."
+  - "THE SYSTEM SHALL embed, for each authored-dates calendar, each period's DEFAULT open date, close date and due date on the asset's clock - the period's date less the claim window of the calendar version in force on that date, the next period's date less that period's claim window, and the period's date - with no dataset's participation override applied."
+  - "THE SYSTEM SHALL embed, against each dataset slot, whether that dataset's own open date or close date on the asset's clock differs from its calendar's default for that period, computed at build from configuration."
+  - "THE SYSTEM SHALL answer which period a date falls in through ONE function in the page, used by every requirement of this batch: for a dataset on an authored-dates calendar, the period whose open interval holds the END of that date on the asset's clock (open at or before it, close after it), from that dataset's own embedded window; for a page spanning datasets, the same rule on the calendar's default window; and for a cadence calendar, the day itself. PROVISIONAL ON P-Q1 = A."
+  - "THE SYSTEM SHALL end each embedded period sequence at the period whose default claim window has opened by the present moment on the asset's clock, and SHALL NOT embed a period whose window has not opened - amending REQ-DASH-054 criterion 3 with the wording in summary.md once Keith has approved it. PROVISIONAL ON P-Q1 = A."
+  - "THE SYSTEM SHALL NOT change any status, staleness, rollup, gap, lateness or 'Not owed' judgement because of this requirement: those keep reading the period by its date (owedPeriodStart, periodStartDate), and this rule decides only which period the page NAMES."
+  - "THE SYSTEM SHALL compute every embedded value from committed configuration alone and SHALL NOT read supply rows or recorded results for it."
+  - "THE SYSTEM SHALL have a Python test, tests/test_embed_period_windows.py, written first and seen to fail, asserting that cp-notifications' 2026-Q3 slot embeds open 2026-07-18T09:00+08:00, close 2026-10-18T09:00+08:00 and due 2026-08-01T09:00+08:00, that the quarterly calendar's 2026-Q3 default is open 2026-07-18 and close 2026-10-18, and that a dataset given a days_before of 3 in a test agreement is marked as differing; and a JS test, tests-js/period-of-date.test.js, written first and seen to fail, asserting that for cp-notifications 2026-10-17 is 2026-Q3, 2026-10-18 is 2026-Q4, 2026-07-17 is 2026-Q2 and 2026-07-18 is 2026-Q3, and that for birth-registrations 2026-10-22 is the day 2026-10-22."
+  - "THE SYSTEM SHALL have a real-browser REGRESSION GUARD, passing on today's page, that on 2026-10-22 - asserting first that the date lies inside 2026-Q4's embedded open interval and before 2026-Q4's date - cp-notifications keeps its 2026-Q3 supply's verdict and is not shown as 'No data' or stale."
+  non_functional_requirements:
+  - "THE BUILD RULE: a build may read recorded QA results, never actual data, and never anything else; this embed reads configuration only, as REQ-DASH-054's PERIOD_SEQUENCES does."
+  - "PERFORMANCE AND SIZE (a ~16MB page): windows are embedded only for authored-dates calendars - about 55 quarters x 7 Child Protection datasets plus Emergency Department's, roughly a thousand small entries - never for a daily calendar; the builder SHALL report the bytes added in its build output, and they are expected to stay under 1% of the page. Lookups are by index or binary search, never a walk of history per render."
+  - "SCALE (~30 collections on the quarterly asset): one entry per dataset per period, growing linearly; the difference flag is precomputed so no page compares windows across thirty datasets at render."
+  - "ONE RULE: membership lives in one page function and the windows in slots.py; a second implementation of either is the defect CLAUDE.md's shape-change bullet records (four status implementations where two were known)."
+  - "PRIVACY: configuration only - period names and instants, nothing about any supply's contents."
+  dependencies:
+  - REQ-DASH-054
+  - REQ-PIPE-131
+  decisions:
+  - "OPEN TO CLOSE, NOT CALENDAR DATES (Keith, 2026-10-22, Q1 option A as he amended it): the range is when the period's claim window opens to when the next period's opens. REJECTED the critic's '1 Aug-31 Oct' (the period's date to the day before the next date), option B (label by the reference period the data covers - the model has no such field) and option C for authored calendars (drop 'Qn')."
+  - "A CADENCE CALENDAR IS NAMED BY ITS DAY (Keith, 2026-10-22, Q1 option C for daily): no window is embedded or shown for a daily calendar - its window is hours wide and the day says it."
+  - "PER DATASET, WITH THE CALENDAR'S DEFAULT (Keith, 2026-10-22): a slot's open and close come from the dataset's own due time, claim-window override and days_before, so each dataset's window is embedded; the calendar default is the period dates and the calendar's claim window with no override."
+  - "'DIFFERS' IS JUDGED AT THE RESOLUTION SHOWN (delivery-scoper, PROPOSED): the range is shown as dates, so a dataset differs when its open or close falls on a different asset-clock DATE from the default; a due time of 14:00 against 09:00 on the same day is not a different window. Every Child Protection and Emergency Department dataset has 09:00 and 14 days today, so no note would show at present at either resolution."
+  - "A DATE BELONGS TO THE PERIOD OPEN AT THE END OF IT (delivery-scoper, PROPOSED): the same 'a bare date is the end of that day' rule ranOnOrBeforeInPlaceOn and REQ-PIPE-048 already use, so 18 October 2026 - Q4 opening at 09:00 - reads 2026-Q4."
+  - "NAMING ONLY, NEVER STATUS (delivery-scoper, 2026-10-23, from reading the template): staleness reads the supply's filed period against owedPeriodStart by period DATE. Moving that to the window would turn every quarterly dataset 'No data' from the day the next window opens (18 Oct) until a supply arrives, before it is even due. The window rule names; the date rule judges. Criterion 9 guards it."
+  - "EMBED, DON'T PORT (REQ-DASH-054 criterion 5's own rule): the page has no schedule logic of its own; slots.py's answers are shipped."
+  open_questions:
+  - "P-Q1 (in summary.md): which period does a date belong to - the one whose window is open (recommended A, so 22 October 2026 reads 2026-Q4), or the one whose DATE has passed, as the picker says today and the mock-up showed (so 22 October reads 2026-Q3 beside a range ending 18 October)? Criteria 4 and 5 are written to A; under B they go and the period line's range can exclude the date on show for about two weeks a quarter."
+- id: REQ-DASH-285
+  title: "Every supply the dashboard names is named through one helper that can carry its period"
+  date_written: "2026-10-23"
+  story: "As a data team leader reading a quarterly dataset in late October, I want a supply from an earlier period to be named by that period - 'the 2026-Q3 supply, received 9:00am Saturday, 1 August 2026' - wherever the page names it, so that I can tell at a glance that the results I am reading are from the period before the one now open."
+  moscow: must
+  status: not_started
+  source: "Dashboard UX critic, 2026-10-22 (review-ux-critic.md B1, B2, S2): pages name the supply by when it was received and never by its period. Dashboard UX reviewer, 2026-10-22 (review-dashboard-ux-279v3-95v5.md P1): REQ-DASH-272 criterion 22 names every supply through one Python helper 'so that the period-clarity work changes supply naming once'. Drafted by delivery-scoper 2026-10-23."
+  acceptance_criteria:
+  - "THE SYSTEM SHALL name every supply the dashboard shows a person - in the verdict line (REQ-PIPE-081 criterion 1, as REQ-DASH-277 and REQ-DASH-272 word it), REQ-DASH-272's clause, cell notes, panel sentences and history row, REQ-DASH-275's and REQ-DASH-204's notices, the collection list's Latest arrival cell, and the column and check panels - through REQ-DASH-272 criterion 22's one Python helper, extended to return the supply's period as a structured part beside its receipt instant."
+  - "WHERE the period a named supply was filed to is not the period the page names for the date on show (REQ-DASH-284 criterion 4), THE SYSTEM SHALL put that period in the name - long form 'the <period> supply, received <instant>' and short form '<dataset> <period>, received <day>' - and WHERE it is the same period, SHALL leave the name as REQ-DASH-272 and its neighbours word it. PROVISIONAL ON P-Q3 = A."
+  - "THE SYSTEM SHALL write <period> through fmtPeriodOrDay - '2026-Q3' for an authored calendar and the day, as fmtDay gives it, for a cadence calendar ('the 25 September 2026 supply') - and SHALL NOT put an open-to-close range in a supply's name, the range belonging to the period line (REQ-DASH-286)."
+  - "WHERE a supply on a cadence calendar was received on a different day from its own period's day (the evening-before era, days_before 1), THE SYSTEM SHALL name both - 'the 25 June 2026 supply, received 9:58pm Wednesday, 24 June 2026' - in place of the receipt alone."
+  - "WHERE a supply stands in for a period by inheritance or substitution, THE SYSTEM SHALL keep REQ-DASH-272 criterion 4's 'carried forward from <period>' form, which already names its period."
+  - "THE SYSTEM SHALL amend, in the same change, the quoted supply-naming forms of REQ-DASH-272 criteria 1, 8, 12 and 20, REQ-DASH-275 criteria 1, 4 and 6, REQ-DASH-204 criterion 2, and REQ-DASH-277 criterion 1, with the wording in summary.md once Keith has approved it, changing nothing else any of them requires."
+  - "THE SYSTEM SHALL render every name as text, never as markup."
+  - "THE SYSTEM SHALL have a Python test of the helper, written first and seen to fail, covering the authored long and short forms with and without a different period, the cadence form on its own day and the evening-before form; and a real-browser test, tests/test_dashboard_e2e.py::TestSupplyNamesCarryTheirPeriod, against a dashboard built from a fixture history, written first and seen to fail, in which cp-notifications on 2026-10-22 reads 'The results below are the 2026-Q3 supply in place in the warehouse, received 9:00am Saturday, 1 August 2026.' and on 2026-08-15 reads the same line with no period in it."
+  non_functional_requirements:
+  - "NO SECOND VOCABULARY (dashboard UX review P1, P2): the period reaches every sentence through the one helper; this is not a third rewording of REQ-PIPE-081 criterion 1, whose sentence structure REQ-DASH-277 and REQ-DASH-272 own."
+  - "LENGTH AND PHONE WIDTH: the period adds about 16 characters, and only where it is news (criterion 2); the verdict line already breaks its in-the-warehouse half onto its own line at phone width (REQ-DASH-272 criterion 3)."
+  - "PERFORMANCE: the helper runs at build; the page only chooses whether to show the period part, comparing two period names - no history walk."
+  - "MAINTAINABILITY: one helper, so a later change to supply naming is one edit; tests assert through the page's real text rather than re-implementing the forms."
+  - "ACCESSIBILITY: the period is plain text in the sentence and in every row's accessible name that carries that sentence."
+  dependencies:
+  - REQ-DASH-272
+  - REQ-DASH-275
+  - REQ-DASH-204
+  - REQ-DASH-277
+  - REQ-DASH-284
+  - REQ-PIPE-081
+  decisions:
+  - "THROUGH THE ONE HELPER (dashboard UX review P1, accepted 2026-10-22 into REQ-DASH-272 criterion 22): REJECTED adding a period sentence beside each existing sentence, which would be the second vocabulary the reviewer warned against."
+  - "THE PERIOD ONLY WHERE IT IS NEWS (delivery-scoper, PROPOSED, P-Q3): on a page whose period line already says 2026-Q3, 'the 2026-Q3 supply' in every notice and cell note repeats it a dozen times; on a page about 2026-Q4 showing 2026-Q3 results it is the one fact the critic's S2 found missing. REJECTED always (bloats REQ-DASH-275's and 204's already long notices) and never (leaves S2's four-week-old results unnamed by period)."
+  - "SHOWING A KNOWN PART IS NOT RE-DERIVING (delivery-scoper): REQ-DASH-272 criterion 22 forbids re-deriving names in the page. The helper returns the period as a field; the page's choice to print it depends on the date on show, which the build cannot know for every date. That is presentation of a computed value, not a second derivation."
+  - "PERIOD FORMATTED THROUGH fmtPeriodOrDay, NO RANGE (dashboard UX review P3)."
+  open_questions:
+  - "P-Q3 (in summary.md): put the period in a supply's name only where it differs from the page's period (recommended A), always (B), or never, leaving the period to the period line (C)."
+- id: REQ-DASH-286
+  title: "A dataset page names its period in one line under its name, with the period's window, what has arrived for it, and how old the results are"
+  date_written: "2026-10-23"
+  story: "As a data team leader opening a dataset's page, I want one line under its name saying which period I am looking at, when that period is open, and whether anything has arrived for it yet - and, if the results below are from an earlier period, how old they are - so that I never mistake last quarter's green for this quarter's."
+  moscow: must
+  status: not_started
+  source: "Dashboard UX critic, 2026-10-22 (review-ux-critic.md B1, S1, S2, N1). Keith, 2026-10-22 (Perth), Q1 (open-to-close range for authored calendars, the day for cadence calendars, the dataset's own window with the calendar default beside it where they differ) and Q2 = B (the period line under the dataset name and in the column and check panel subtitles, as well as on the header button), after the mock-ups quarterly-A/B and daily-A/B. Dashboard UX reviewer P2 (the line goes above REQ-DASH-275's and REQ-DASH-204's notices and the verdict line). Drafted by delivery-scoper 2026-10-23."
+  acceptance_criteria:
+  - "THE SYSTEM SHALL show on every dataset page, directly under the dataset's name and before its description, one period line marked data-period-line, naming the period the date on show falls in for that dataset (REQ-DASH-284 criterion 4), above every notice - REQ-DASH-275's, REQ-DASH-204's, the blocked and waiting banners - and above the verdict line."
+  - "THE SYSTEM SHALL word the period line's first line, for an authored-dates calendar, '<period> · open <open date> – <close date> · due <due instant>' from that dataset's own embedded window - for example '2026-Q4 · open 18 Oct 2026 – 18 Jan 2027 · due 9:00am Sunday, 1 November 2026' - writing the year once where both dates share it ('open 18 Jul – 18 Oct 2026'); and for a cadence calendar 'The <day> supply · due <time>' - for example 'The 22 October 2026 supply · due 2:00pm'."
+  - "WHERE the dataset's own open or close date for the period differs from its calendar's default (REQ-DASH-284 criterion 3), THE SYSTEM SHALL follow the range with muted text '(calendar default: open <date> – <date>)', and SHALL NOT show it where they agree."
+  - "WHERE the results below are not a supply of the period the line names, THE SYSTEM SHALL add a second line saying what that period holds, in the form that applies: 'Nothing received for <period> yet — due <instant>.' before its late instant; 'Nothing received for <period> — late since <instant>, open until <date>.' while REQ-DASH-133's late-but-open state holds; 'No supply for <period> — closed <date>.' once it has closed; or REQ-DASH-182's owed-nothing label from its one function ('Not owed — outside its agreed months (Feb, Aug)'); each followed, where results are shown, by 'The results below are <n> days old.', <n> being whole days on the asset's clock from the receipt of the supply shown to the date on show."
+  - "THE SYSTEM SHALL NOT add a second line where the results below are a supply of the period named - the verdict line names that supply - and SHALL NOT repeat the verdict line's or any notice's wording."
+  - "WHILE a dataset page shows no results - blocked, held, or blanked by the date on show - THE SYSTEM SHALL still show the period line."
+  - "THE SYSTEM SHALL end the subtitle of the column drawer and of the check panel with ' · <supply>', the supply whose results the panel shows, named through REQ-DASH-285's helper in its short form WITH its period whatever the page's period ('risk_rating · Notifications 2026-Q3, received 1 Aug 2026'), SHALL head the drawer's row counts 'Row counts — <supply>' in place of 'Current run — row counts', and SHALL name the supply under the check panel's 'Latest result' or 'Current run' label in the same short form."
+  - "THE SYSTEM SHALL head each supply-history cycle on an authored-dates calendar '<period> — due <day>' in place of 'Cycle starting <day>' (and a following-period dataset's '<period> — due <day> (period dated <day>)' in place of 'Cycle due <day> (period dated <day>)'), keep a cadence calendar's day heading, put the 'Current cycle' tag on the cycle of the period the period line names, and say 'Nothing received for <period> yet.' in place of 'No deliveries in the current cycle yet.' - amending REQ-DASH-182 criterion 10's quoted text with the wording in summary.md once Keith has approved it. The tag's placement is PROVISIONAL ON P-Q1 = A."
+  - "THE SYSTEM SHALL compute the line from the embedded windows (REQ-DASH-284), the embedded late slots and the results already embedded, looking each up rather than walking history, and SHALL render every name as text, never markup."
+  - "THE SYSTEM SHALL style the line with the page's existing colour tokens only - no hard-coded colour - so that it reads in light and dark mode alike, and SHALL say every state in words, never by colour alone."
+  - "AT PHONE WIDTH, THE SYSTEM SHALL wrap the period line within the viewport with no horizontal scroll, breaking between its '·'-separated parts rather than inside a date."
+  - "THE SYSTEM SHALL give the range an accessible text that reads the dates in full ('open from 18 October 2026 to 18 January 2027'), the en dash and abbreviations being for sight only."
+  - "THE SYSTEM SHALL have real-browser tests, tests/test_dashboard_e2e.py::TestPeriodLine, against a dashboard built from a fixture history, written first and seen to fail, in which: cp-notifications on 2026-10-22 reads '2026-Q4 · open 18 Oct 2026 – 18 Jan 2027 · due 9:00am Sunday, 1 November 2026' then 'Nothing received for 2026-Q4 yet — due 9:00am Sunday, 1 November 2026. The results below are 82 days old.'; on 2026-08-15 reads '2026-Q3 · open 18 Jul – 18 Oct 2026 · due 9:00am Saturday, 1 August 2026' with no second line; birth-registrations on 2026-10-22, with nothing received since 25 September, reads 'The 22 October 2026 supply · due 2:00pm' and 'The results below are 27 days old.'; a fixture dataset with its own days_before shows the calendar-default text and cp-notifications does not; cp-clients at 2025-05-15, whose supply could not be loaded, still shows its period line; the line precedes every notice and the verdict line in document order; the check panel's subtitle carries the supply; and at 375px wide the line has no part outside the viewport, in both light and dark mode."
+  non_functional_requirements:
+  - "RECOGNITION OVER RECALL (docs/hci-ux-psychology.md; critic B1): the period is read where the eye lands first, not recalled from the picker."
+  - "ABOVE THE FOLD ON A PHONE (critic: the verdict line sat at y=1030 at 390x844): the line goes before the description, so it is in the first screen at phone width."
+  - "ACCESSIBILITY: text, never colour alone; the range has a full-date accessible text; no new interactive element; the line is static text re-rendered with the page, not a live region - the past-date notice already announces a date change."
+  - "DARK MODE: existing tokens only (the mock-up's --surface-2 fallback colour is not to be copied)."
+  - "PERFORMANCE (~16MB page): a few index lookups per render; nothing per history entry."
+  - "SCALE: one line per page whatever the number of datasets."
+  - "COMPATIBILITY: no new asset; file:// and offline viewing unaffected; the date control's query parameter is unchanged."
+  - "PRIVACY: names the period and the dataset, never a file name."
+  dependencies:
+  - REQ-DASH-284
+  - REQ-DASH-285
+  - REQ-DASH-182
+  - REQ-DASH-133
+  - REQ-DASH-272
+  - REQ-DASH-275
+  - REQ-DASH-204
+  - REQ-DASH-264
+  decisions:
+  - "ONE LINE UNDER THE NAME, AND IN THE PANELS (Keith, 2026-10-22, Q2 = B, after the mock-ups). REJECTED Q2 = A, the line alone without the header button (the button half is REQ-DASH-287)."
+  - "A PERIOD LINE, NOT A THIRD REWORDING OF REQ-PIPE-081 CRITERION 1 (dashboard UX review P2): the verdict line keeps its job of naming the supply on show; the period line names the period and what it holds. The mock-up replaced the verdict line with 'Results below: ...' - REJECTED, because REQ-DASH-277 and REQ-DASH-272 own that sentence."
+  - "BEFORE THE DESCRIPTION, NOT AFTER (delivery-scoper, PROPOSED, departing from the mock-up): the critic asked for it 'directly under the dataset name' and found the verdict line below the fold on a phone; the description is three lines at phone width. To mention at the walk-through."
+  - "THE AGE OF THE RESULTS (critic S2): Birth Registrations' banner was honest about the 26-day gap but nothing said the checks were the 25 September supply's. The age is measured to the date on show, so a past date reads as it did then, and shown only where the results are not the named period's own."
+  - "THE PERIOD NAMED INSTEAD OF 'THE CURRENT CYCLE' (critic S2): 'No deliveries in the current cycle yet.' left the cycle unnamed beside a 'Periods with no supply' table that names periods precisely - two vocabularies on one panel."
+  - "THE PANELS ALWAYS CARRY THE PERIOD (Keith Q2 = B 'and in the column/check panel subtitles'): a panel is about one supply, often opened from a link without the page above it."
+  - "THE ED PROMOTION BLOCK IS THE PRECEDENT (critic N1): 'PROMOTED INTO 2026-Q3' already names a period where it matters."
+  open_questions: []
+- id: REQ-DASH-287
+  title: "The date control names the period the date on show is in, and the picker gives each calendar's window"
+  date_written: "2026-10-23"
+  story: "As anyone moving between pages and dates, I want the header's date control to say which period that date is in - '22 October 2026 · 2026-Q4' - and the picker to give each calendar's window, so that the date I chose and the period the page talks about are linked without opening anything."
+  moscow: must
+  status: not_started
+  source: "Dashboard UX critic, 2026-10-22 (review-ux-critic.md S3, N3). Keith, 2026-10-22 (Perth), Q2 = B: the period on the header 'In place on' button, both calendars on pages spanning them, after mock-ups quarterly-B, daily-B and overview-B ('phone width will need to wrap or abbreviate'); Q1's per-dataset answer for the picker (the calendar's default, and a note only where a dataset actually differs). Dashboard UX reviewer P4: the same narrow control as REQ-DASH-277's relabel. Drafted by delivery-scoper 2026-10-23."
+  acceptance_criteria:
+  - "THE SYSTEM SHALL end the date control's button label, after the date, with ' · <period>' for the period that date falls in (REQ-DASH-284 criterion 4): on a dataset page, that dataset's; on a collection, agency or asset-wide page, each distinct calendar among the datasets in its scope by the calendar's default, joined ' / ', authored-dates calendars first - an authored calendar as its period name and a cadence calendar as 'the <D Mon> supply' - for example 'In the warehouse on: Thursday, 22 October 2026 · 2026-Q4 / the 22 Oct supply'. PROVISIONAL ON P-Q1 = A for which quarter is named."
+  - "THE SYSTEM SHALL take the button's words before the date from REQ-DASH-277 criterion 3 and SHALL NOT change them, this requirement owning only the period suffix."
+  - "AT PHONE WIDTH, THE SYSTEM SHALL wrap the button so that the period sits on its own line, wholly inside the viewport, and SHALL NOT truncate the period with an ellipsis."
+  - "THE SYSTEM SHALL give the button an accessible name that spells the period out - 'In the warehouse on Thursday, 22 October 2026, period 2026-Q4' - and SHALL update the label, the accessible name and the document title on every date change and every navigation, without a reload."
+  - "THE SYSTEM SHALL set the document title to '<view name> · <D Mon YYYY> · <period(s) as on the button> · <site name>', so that two tabs on different dates or periods read differently."
+  - "WHEN a viewer opens the date panel, THE SYSTEM SHALL state for each named calendar the period the selected date falls in by the calendar's default and its window - '<period>, open <date> – <date>' for an authored-dates calendar, 'the <day> supply' for a cadence calendar - in place of '<period>, which began <day>', amending REQ-DASH-054 criterion 6 with the wording in summary.md once Keith has approved it."
+  - "WHERE at least one dataset of a calendar has a different open or close date from the default for that period (REQ-DASH-284 criterion 3), THE SYSTEM SHALL follow that calendar's line in the panel with 'Not every dataset has this window: <dataset> (open <date> – <date>)', naming up to three and, past three, the first two and 'and <n> more', each name a link to that dataset's page at the same date; and WHERE none differs, SHALL show no such note."
+  - "THE SYSTEM SHALL have real-browser tests, tests/test_dashboard_e2e.py::TestDateControlNamesThePeriod, against a dashboard built from a fixture history, written first and seen to fail: on 2026-10-22 cp-notifications' button ends '· 2026-Q4', birth-registrations' '· the 22 Oct supply', and the agency overview's '· 2026-Q4 / the 22 Oct supply'; the document titles of two dates differ; the panel's quarterly line reads '2026-Q4, open 18 Oct 2026 – 18 Jan 2027' and carries no difference note, and a fixture dataset with its own days_before brings the note naming it; and at 375px the button's period is wholly inside the viewport."
+  non_functional_requirements:
+  - "ONE NARROW CONTROL, TWO REQUIREMENTS (dashboard UX review P4): REQ-DASH-277 owns the label's words and this the suffix; whichever is built second carries the other's phone-width test, and the two should be built in one change or 277 first."
+  - "PHONE WIDTH (Keith: 'will need to wrap or abbreviate'): the date stays in full and the period wraps; the cadence form is abbreviated ('the 22 Oct supply') because it repeats the date."
+  - "ACCESSIBILITY: the accessible name carries the period; colour plays no part."
+  - "COMPATIBILITY: the in-place-on query parameter still carries a calendar date, never a period name (REQ-DASH-054 criterion 7)."
+  - "SCALE: one suffix per CALENDAR in scope, never per dataset, so an agency of thirty quarterly datasets still shows one period."
+  dependencies:
+  - REQ-DASH-284
+  - REQ-DASH-277
+  - REQ-DASH-054
+  decisions:
+  - "THE PERIOD ON THE BUTTON (Keith, 2026-10-22, Q2 = B, after the mock-ups; critic S3): the picker was the only place the period was named, and only after a click."
+  - "BOTH CALENDARS ON A PAGE SPANNING THEM (Keith, Q2 = B; overview-B mock-up)."
+  - "A DATASET PAGE USES ITS OWN WINDOW, A SPANNING PAGE THE DEFAULT (Keith, 2026-10-22, per-dataset answer as confirmed and refined)."
+  - "THE NOTE IS COMPUTED, NEVER A STANDING CAVEAT (Keith, 2026-10-22: 'ONLY when at least one dataset in that page's scope actually has a different window for that period')."
+  - "THE DOCUMENT TITLE (critic N3): taken in because it is the same label on a different surface; two tabs on different dates looked identical."
+  - "THE DATE INPUT'S OWN FORMAT IS LEFT ALONE (critic N5, '10/23/2026'): a native date input renders in the browser's locale and the page cannot set it; the full date is already written beside it. Out of scope."
+  open_questions: []
+- id: REQ-DASH-288
+  title: "Collection and agency pages name the period by the calendar's default window, and say so only where a dataset in them differs"
+  date_written: "2026-10-23"
+  story: "As someone reading a collection or an agency, I want the page to name the period it is about with its calendar's window, and to tell me only when one of its datasets keeps a different window, so that I read thirty datasets against one period without a standing caveat I learn to ignore."
+  moscow: should
+  status: not_started
+  source: "Keith, 2026-10-22 (Perth), period-clarity Q1, refined for pages spanning datasets: show the calendar's default, and a note that individual datasets differ ONLY when at least one dataset in the page's scope actually has a different window for that period - computed from the agreement, never a standing caveat. Dashboard UX critic B1 (a period on the collection list) and S2. Drafted by delivery-scoper 2026-10-23."
+  acceptance_criteria:
+  - "THE SYSTEM SHALL show under a collection's name and under an agency's name a period line in the shape of REQ-DASH-286 criterion 2's first line, from the calendar's default window, one line per distinct calendar among the datasets in scope, authored-dates calendars first."
+  - "WHERE at least one dataset in the page's scope has a different open or close date from the calendar's default for the period named (REQ-DASH-284 criterion 3), THE SYSTEM SHALL follow that line with 'Not every dataset here has this window: <dataset> (open <date> – <date>)', naming up to three and, past three, the first two and 'and <n> more', each a link to its page at the same date; and WHERE none differs, SHALL show no note."
+  - "THE SYSTEM SHALL name the supply in each collection-list row's Latest arrival cell through REQ-DASH-285's helper, so that a supply from an earlier period than the page's carries that period ('On time · 2026-Q3 supply, 9:00am Saturday, 1 August 2026'), and SHALL NOT add a Period column."
+  - "THE SYSTEM SHALL compute every part from the embedded windows and results, never from supply rows, and SHALL render every name as text."
+  - "THE SYSTEM SHALL have real-browser tests, against a dashboard built from a fixture history, written first and seen to fail: the Child Protection collection on 2026-10-22 shows '2026-Q4 · open 18 Oct 2026 – 18 Jan 2027 · ...' and no difference note; with one fixture dataset given its own days_before, the note names that dataset only; the Latest arrival cell of cp-notifications reads '2026-Q3 supply' on 2026-10-22 and carries no period on 2026-08-15; and an agency spanning both calendars, where the fixture has one, shows two lines."
+  non_functional_requirements:
+  - "SCALE (~30 collections on the quarterly asset): one line per calendar, not per dataset; the note names at most three; no new column on a table that already has six at phone width."
+  - "NO STANDING CAVEAT (Keith): a note shown on every page is noise, and noise gets ignored when it finally matters."
+  - "PERFORMANCE: the note's condition is a precomputed flag per dataset slot (REQ-DASH-284 criterion 3), checked for the datasets in scope."
+  - "ACCESSIBILITY, DARK MODE, PHONE WIDTH: as REQ-DASH-286."
+  dependencies:
+  - REQ-DASH-284
+  - REQ-DASH-285
+  - REQ-DASH-286
+  decisions:
+  - "THE CALENDAR'S DEFAULT ON A SPANNING PAGE, AND A NOTE ONLY WHERE ONE DIFFERS (Keith, 2026-10-22). REJECTED the scoper's first reading, a standing 'individual datasets may differ' caveat."
+  - "THE PERIOD IN THE LATEST ARRIVAL CELL, NOT A NEW COLUMN (delivery-scoper, PROPOSED; the critic proposed a Period column): the period that matters on a row is the supply's, and only where it is not the page's; a column would repeat the page's period thirty times. To mention at the walk-through."
+  - "THE AGENCY OVERVIEW'S SPARKLINE IS NOT BUCKETED BY PERIOD (dashboard UX review P6; REQ-PIPE-279, Keith K3 = C): critic N2 noted quarterly agencies' sparklines say 'each week'; bucketing by period would merge K3 = C's separate points. Out of scope; the label is true as it stands."
+  open_questions: []
+- id: REQ-DASH-289
+  title: "A cross-table check that could not run because the other table has nothing in the warehouse for the period says so on its row and on the collection list, naming the table and the period"
+  date_written: "2026-10-23"
+  story: "As a data team leader looking at Notifications in red, I want each cross-table row that could not run to say 'Not evaluated' and name the table and period it was missing, and the collection list to say the same in short, so that I go to the Client Register's 2025-Q2 supply instead of hunting through Notifications for a fault it does not have."
+  moscow: must
+  status: not_started
+  source: "Dashboard UX critic, 2026-10-22 (review-ux-critic.md B2), at in-place-on 2025-05-15: Notifications' three Client-reference rows showed only the rule and Red, and the collection list showed Notifications, Investigations and Placements red 'incl. Cross-table checks' with nothing pointing at the Client Register. Keith, 2026-10-22 (Perth), Q3 = A: it stays red and says why on the row with the period, and on the collection-list row in short. Dashboard UX reviewer section 4 and P1: extend REQ-DASH-272's cell notes and panel sentences through the one helper rather than add a second vocabulary. Drafted by delivery-scoper 2026-10-23."
+  acceptance_criteria:
+  - "WHERE the result REQ-PIPE-269 counts for a cross-table check on a dataset page was not evaluated because a table of another dataset had no supply in the warehouse for the period (REQ-PIPE-270), THE SYSTEM SHALL show that result's cell word as 'Not evaluated' - the page's existing word for such a result, not a new status - followed by REQ-DASH-272 criterion 8's note, worded 'no <dataset> in the warehouse for <period>', for example 'Not evaluated — no Client Register in the warehouse for 2025-Q2'. The note's wording is PROVISIONAL ON P-Q4 = A."
+  - "THE SYSTEM SHALL keep that row's status pill red (REQ-PIPE-270) and SHALL NOT show it amber, grey or as a new state."
+  - "THE SYSTEM SHALL carry the cell's full sentence, with the table and the period, in the row's accessible name (REQ-DASH-272 criterion 11)."
+  - "THE SYSTEM SHALL word REQ-DASH-204 criterion 19's quiet note under such a reader's status pill in the collection table 'Red because no <dataset> is in the warehouse for <period>', one note per causing table, the dataset a link to its page at the same date on show - amending REQ-DASH-204 criterion 19 with the wording in summary.md once Keith has approved it. The wording is PROVISIONAL ON P-Q4 = A."
+  - "THE SYSTEM SHALL head a check panel's could-not-run block 'Not evaluated for <supply>', the supply named through REQ-DASH-285's helper with its period, in place of 'Not evaluated in the current run', and SHALL state in it the other table and the period it was missing."
+  - "THE SYSTEM SHALL judge all of this as at the date on show from the counted results and the decision log, identify the table from structured fields through the one function REQ-DASH-204 criterion 10 names, never from a reason's prose, and SHALL NOT read supply rows."
+  - "THE SYSTEM SHALL have real-browser tests, tests/test_dashboard_e2e.py::TestNotEvaluatedNamesTheMissingPeriod, against a dashboard built from a fixture history of the 2025-05-15 shape - a Client Register 2025-Q2 supply received and not loaded - written first and seen to fail: cp-notifications' three Client-reference rows read 'Not evaluated — no Client Register in the warehouse for 2025-Q2' with a Red pill; their accessible names carry the same; the Notifications, Investigations and Placements rows of the collection list carry 'Red because no Client Register is in the warehouse for 2025-Q2'; the panel heading names the 2025-Q2 Notifications supply; and cp-clients' own page keeps REQ-DASH-264 criterion 4's could-not-run banner unchanged."
+  non_functional_requirements:
+  - "NO FALSE GREEN, NO NEW STATUS (Keith, #95: red only, strict): the words explain the red and never soften it."
+  - "ONE VOCABULARY (dashboard UX review section 4): the row note is REQ-DASH-272's, through the one helper; REQ-DASH-204's top-of-page line keeps its own wording ('No promoted <dataset> for <period>'), which this does not touch."
+  - "SCALE: one collection-list note per causing table, never per check."
+  - "ACCESSIBILITY: word and icon, never colour alone; the full sentence in the accessible name."
+  - "PERFORMANCE: computed at build per result; no per-render history walk."
+  - "PRIVACY: names the dataset and the period, never a file."
+  dependencies:
+  - REQ-DASH-272
+  - REQ-DASH-204
+  - REQ-PIPE-270
+  - REQ-PIPE-269
+  - REQ-DASH-285
+  - REQ-DASH-264
+  decisions:
+  - "STAYS RED AND SAYS WHY (Keith, 2026-10-22, Q3 = A). REJECTED Q3 = B, a distinct 'Not evaluated' status, which would change a status rule against #95's strict, red-only decision and Q13 = B."
+  - "'NOT EVALUATED' IS AN EXISTING WORD (the template already uses it on the trend chart and the panel's compare column): the cell uses it rather than REQ-DASH-272 criterion 8's 'worst of the marks', which has no word of its own for a check no tool could run."
+  - "THE NOTE IS REQ-DASH-272's, NOT A NEW ONE (dashboard UX review section 4, PROPOSED as P-Q4 = A): Keith's example wording 'Client Register has no 2025-Q2 supply' is false in the B2 case itself, where the Client Register's 2025-Q2 supply was received and could not be loaded; 'no Client Register in the warehouse for 2025-Q2' is true in every cause REQ-PIPE-270 lists."
+  - "THE PANEL NAMES THE SUPPLY, NOT 'THE CURRENT RUN' (critic B2: 'the current run' unnamed)."
+  - "THE SAMPLE COUNTS DISAGREE (critic N4: 41 runs in the header, 46 in the panel chart, ~52 table rows at 2025-05-15) is NOT TAKEN HERE: REQ-PIPE-279 criterion 10 already makes list counts, sparkline and panel count one function (dashboard UX review section 4), and it should be re-checked against the built page once 279 lands."
+  open_questions:
+  - "P-Q4 (in summary.md): the row note 'no Client Register in the warehouse for 2025-Q2' (recommended A, REQ-DASH-272's existing wording) or Keith's example 'Client Register has no 2025-Q2 supply' (B)."
+- id: REQ-DASH-290
+  title: "The dashboard opens on the newest date it covers when today is past it"
+  date_written: "2026-10-23"
+  story: "As someone opening the dashboard the morning after a build, I want it to open on the newest date it has periods for rather than on today with a warning, so that the first thing I see is an answer and not a notice telling me to click for one."
+  moscow: should
+  status: not_started
+  source: "plans/post-build-review.md #260 (fixed 2026-10-22): the 'outside the dates' notice offered the default date when the default itself was past the covered range - every morning after a build - and now offers the newest covered date instead; 'Whether the DEFAULT should itself be the newest covered date is a behaviour question for the period-clarity requirement, not this fix.' Dashboard UX critic S4. Drafted by delivery-scoper 2026-10-23 to the recommended answer of P-Q2, which is still Keith's."
+  acceptance_criteria:
+  - "THE SYSTEM SHALL default the date on show to today on the asset's clock where the embedded sequences cover it, and otherwise to the newest date they cover. PROVISIONAL ON P-Q2 = A."
+  - "THE SYSTEM SHALL reset to that same date from the picker's 'Reset to default (<date>)' and SHALL label it with that date."
+  - "WHEN the page opens with no date in its address, THE SYSTEM SHALL show neither the 'outside the dates' notice nor the past-date notice."
+  - "IF a date outside the covered range arrives by address, THEN THE SYSTEM SHALL keep REQ-DASH-054 criterion 9's notice, its one-click reset now always landing on a covered date."
+  - "THE SYSTEM SHALL keep the default date out of the address, as today, so that a plain link opened later shows the newest date of the build it opens."
+  - "THE SYSTEM SHALL have a JS test, written first and seen to fail, with the asset clock one day past the covered range, asserting the default is the range's last date and no range notice shows; and a real-browser test asserting the same on a dashboard whose build day is before today."
+  non_functional_requirements:
+  - "HONESTY: the build line already says when the page was built, so opening on that day is the truthful answer, not a hidden one."
+  - "COMPATIBILITY: no change to the query parameter or saved links; a link carrying an explicit date keeps it."
+  - "ACCESSIBILITY: one fewer status announcement on every morning load."
+  dependencies:
+  - REQ-DASH-054
+  - REQ-DASH-284
+  decisions:
+  - "#260 FIXED THE DEAD BUTTON, NOT THE DEFAULT (plans/post-build-review.md #260, 2026-10-22): the notice now offers the newest covered date; whether the default should be that date was left for here."
+  - "A STATIC PAGE ANSWERS UP TO ITS BUILD (REQ-DASH-054's own embed note: the newest pickable daily date is the build day; REQ-PIPE-092 rebuilds on every publish)."
+  open_questions:
+  - "P-Q2 (in summary.md): default to the newest covered date when today is past it (recommended A); keep today and the notice offering the newest covered date (B, today's behaviour since #260); or extend coverage to today so the page opens on today, saying nothing is known after the build (C)."
