@@ -2615,3 +2615,25 @@ one or more component tags, and a date.
      resolutions (now refused by c4), one of them tripping on a lock an earlier
      test left held; (c) test_scripted_decisions still asserts the removed
      run_index. All with the builder, test-first. Not pushed.
+   - **279 GATE FIXES (~01:30, checkpoint 2da6a46)**: three of the four fixed.
+     (1) the list/page count disagreement was a REAL defect - placeholder
+     history entries for a column with no rule carried no rank, and the
+     template's point sort was not a total order with them mixed in, so the
+     list's "latest" was an old point; both fixed test-first. (3) the scope
+     fixtures now record what each check read, and a fixture that left an
+     attempt open on a refused write now closes it. (4) the scripted-decisions
+     test asserts run_seq instead of the removed run_index. Builder's own runs:
+     e2e 301 passed, 1 failed (below); 13 neighbouring modules 328 passed; npm
+     test 880; ruff clean.
+   - **PROVISIONAL (#21) - TS-80's contested register, a gap between 279 c14
+     and c15**: on 1 Nov 2020 the Client Register is a CONTESTED PAIR, not a
+     held supply, so its readers recorded `cp_clients` as ABSENT (contested,
+     both pair files named) - correct per c1. c14 keeps ABSENT reads off the
+     page and c15 covers HELD only, so the nine Client reference rows read "No
+     data" where REQ-DASH-264 c3 (signed) has them red. I took (a): an ABSENT
+     read flagged contested whose files are the blocking pair's own counts as
+     meeting that pair - shared to its page and shown as c15 shows HELD, keyed
+     on the pair, never a time. Every other ABSENT read stays off (c14 as
+     signed). The alternative (b) was to accept "No data" for contested pairs
+     and amend TS-80's assertion - a change to signed behaviour, so not taken.
+     Reverse if you meant c14 to cover this.
