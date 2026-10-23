@@ -109,6 +109,33 @@ intro: >
   all three.
 
 releases:
+  - date: "2026-10-24"
+    summary: >
+      Every result now sits on the delivery it actually read, in the order it
+      ran, and a check that crashes or times out leaves a record.
+    changes:
+      - category: Improved
+        items:
+          - headline: Results placed by what they read
+            components: ["Dashboard UI", "Pipeline & publishing"]
+            description: >
+              A check between two tables now shows on the delivery it actually
+              read, ordered by when it ran rather than guessed from dates and
+              times, so the page and the promotion decision always agree.
+          - headline: A re-check is its own point
+            components: ["Dashboard UI"]
+            description: >
+              When a later file or a re-check is checked hours after the first,
+              it now appears as a new point in the check's history instead of
+              quietly changing an earlier one.
+      - category: New
+        items:
+          - headline: Crashes and timeouts are remembered
+            components: ["Pipeline & publishing"]
+            description: >
+              Every attempt at checking a supply is now recorded, including one
+              that crashes, times out or is stopped part way, so a failed
+              attempt no longer vanishes once it is retried.
   - date: "2026-10-20"
     summary: >
       Cross-table checks are checked once per delivery, and their history

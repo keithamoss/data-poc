@@ -5808,19 +5808,6 @@ could never have computed it), and it belongs with batch 5's check work.
      small requirement of its own. Open: the "In place on" date picker label,
      where "In the warehouse on" is the candidate.
 
-117. **[todo, 2026-10-22]** **[QA Pipeline]** **[Dashboard UI]** **Deterministic
-     matching of a result to the supply it is about - no ties, no guessing.**
-     Keith, 2026-10-22, after the REQ-PIPE-265 display fix placed results
-     recorded under another table's run by run-id stamps, calendar days and
-     recording-time tie-breaks: "I don't want ties and guessing, I want
-     deterministic matching - even if it means changing the metadata we
-     capture." Chose to scope it as its own requirement (option A), built
-     before REQ-PIPE-265 is flipped, rather than folding it into #95 v5. The
-     candidate facts to record: each check result's supply id for EVERY
-     table its check read (own table included), a delivery id on `qa.run`
-     shared by one delivery's arrival runs, and a recorded sequence that
-     cannot tie. Same per-check fact the architect's #95 v4 B2 needs.
-
 118. **[investigate, 2026-10-22]** **[Dashboard UI]** **Is it obvious which
      period a page is talking about?** Keith, 2026-10-22, answering REQ-PIPE-279
      K2 (a result that read no Clients supply shows only on Notifications'

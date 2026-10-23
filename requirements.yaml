@@ -39711,7 +39711,7 @@ requirements:
       once when those tables arrive at the same instant, rather than once by each table's run, so that one supply is
       not QA'd twice for the same reason and the recorded history says what was actually evaluated.
     moscow: should
-    status: in_progress
+    status: built
     source: 'Keith, 2026-10-20 ("Let''s build that change now"; "Option b, build now"), after a measurement on the
       bootstrapped Child Protection history - 2,196 same-instant pairs recording the same cross-table verdict twice,
       none differing, and 312 staggered pairs all differing. Drafted by delivery-scoper, reviewed by
@@ -39768,6 +39768,25 @@ requirements:
     - REQ-QAC-037
     - REQ-PIPE-188
     - REQ-TEST-239
+    linked_tests:
+    - tests/test_carried.py::TestTheLaterSiblingCarriesTheCheck
+    - tests/test_carried.py::TestWhatIsNeverCarried
+    - tests/test_results_about.py::TestSiblingsAreReadFromTheRecord
+    - tests/test_results_about.py::TestACheckIsCarriedOnlyOverTheSuppliesItRecordedReading
+    implemented_by:
+    - qa_tools/common/carried.py::siblings
+    - qa_tools/common/carried.py::decide
+    - qa_tools/common/carried.py::records_for
+    - qa_tools/common/carried.py::decide_and_record
+    evidence:
+    - '2026-10-21/22, CRITERION 9, not re-run by this flip: the REQ-TEST-239 comparison before-265 against after-265 on schema 45 -
+      1,128 carried records removed, every status identical, decisions and promotions identical, the bootstrap 9% faster (plans/morning-reports.md
+      #8, provisional #1). REQ-PIPE-279''s schema bump to 46 makes a later comparison meaningless, so that one is the evidence.'
+    - '2026-10-24, CRITERIA 1-8, on 7576a80: test_carried, test_results_about (siblings from qa.supply_receipt and qa.check_read, carried
+      only over the supplies the evaluating run recorded reading) and seven neighbouring modules, 154 passed. Criterion 1''s record-based
+      siblings were built under REQ-PIPE-279 chunk B (993b29f).'
+    - 2026-10-24, the bootstrap from empty on ed_probe at schema 46 (f8fdd68, 26m30s, exit 0) ran the carry over every same-instant
+      delivery; see REQ-PIPE-279's evidence.
     decisions:
     - 'Option (b), Keith 2026-10-20: ONE RECORD, the later sibling''s gate reading the earlier run''s verdict - so
       REQ-QAC-037 criterion 2 ("SHALL NOT be duplicated") stands as written. Rejected - (a), a marked copy recorded under
@@ -39789,6 +39808,8 @@ requirements:
     - The other gate paths - re-checks, the knock-on gate, the status at promotion - already read the newest result
       across every run about a supply (supply_status.latest_results), which includes the evaluating sibling; only the
       arrival gate read run by run (the architect, 2026-10-20).
+    - 'PROVISIONAL, pending Keith (morning report #8, #1): criterion 9 is taken as ALREADY MET by the 2026-10-21/22 comparison on schema
+      45, rather than re-captured on schema 46; reverse if a capture across the bump is wanted.'
     open_questions: []
   - id: REQ-PIPE-279
     title: A result recorded under another table's run is placed by the supplies it read and the cause of its run, never by
@@ -39799,7 +39820,7 @@ requirements:
       from recorded facts alone, so that the page, the list's counts and the promotion gate agree on what each result is about
       and which is newest, and no two people building from the same history can get a different answer.
     moscow: must
-    status: not_started
+    status: built
     signed_off:
       by: Keith
       date: '2026-10-23'
@@ -40012,6 +40033,99 @@ requirements:
     - REQ-PIPE-115
     - REQ-PIPE-103
     - REQ-PIPE-262
+    linked_tests:
+    - tests/test_check_read_and_attempts.py::TestEveryTableACrossTableCheckReadsIsRecorded
+    - tests/test_check_read_and_attempts.py::TestACrossTableResultWithNoReadIsRefused
+    - tests/test_check_read_and_attempts.py::TestAStagedTablesSupplyDoesNotRenameWhatWasRead
+    - tests/test_check_read_and_attempts.py::TestASingleTableResultIsAboutItsRunsOwnDataset
+    - tests/test_check_read_and_attempts.py::TestRunSeqIsDrawnWhenARunIsOpened
+    - tests/test_check_read_and_attempts.py::TestEveryAttemptIsRecorded
+    - tests/test_check_read_and_attempts.py::TestAStopFromOutside
+    - tests/test_check_read_and_attempts.py::TestADebugWriteIntoAnEvaluatedRunIsRefused
+    - tests/test_check_read_and_attempts.py::TestADiscardedTrialTakesItsAttempts
+    - tests/test_period_overlay.py::TestTheResolutionCarriesTheSupplyOfEveryTableItReads
+    - tests/test_results_about.py::TestNewerIsTheLaterOpenedRun
+    - tests/test_results_about.py::TestWhatIsAboutASupplyIsWhatItRecordedReading
+    - tests/test_results_about.py::TestTheBuildAndTheGateAgree
+    - tests/test_results_about.py::TestSiblingsAreReadFromTheRecord
+    - tests/test_results_about.py::TestACheckIsCarriedOnlyOverTheSuppliesItRecordedReading
+    - tests/test_recheck.py::TestOneDefinitionOfASupplysCurrentRun
+    - tests/test_supply_status.py::TestTheLaterOpenedRunIsNewer
+    - tests/test_build_from_the_record.py::TestTheResultsFileCarriesTheRecord
+    - tests/test_build_from_the_record.py::TestWhoseRunAndWhatKindComeFromTheRun
+    - tests/test_build_from_the_record.py::TestWhichOwnRunAResultReadIsItsRecordedSupply
+    - tests/test_build_from_the_record.py::TestTheNewestIsTheHighestRank
+    - tests/test_build_from_the_record.py::TestSharedToTheTablesItRecordedReading
+    - tests/test_build_from_the_record.py::TestEveryHistoryEntryHasARank
+    - tests/test_build_from_the_record.py::TestAResultThatReadNoSupplyOfATableIsNotOnItsPage
+    - tests/test_build_from_the_record.py::TestAContestedPairsReadsReachItsPage
+    - tests/test_build_from_the_record.py::TestAHeldReadNamesTheHeldSupply
+    - tests/test_build_from_the_record.py::TestTheSameHistoryBuildsTheSameBytes
+    - tests/test_dataset_blockers.py::TestATableTwoFilesClaimRaisesOneDatasetItem
+    - tests/test_no_guessing_in_placement.py::TestTheRuleIsKept
+    - tests/test_no_guessing_in_placement.py::TestTheGuardCanFail
+    - tests-js/points.test.js
+    - tests/test_dashboard_e2e.py::TestACrossTableCheckOnTS80
+    - tests/test_dashboard_e2e.py::TestColumnsNotGreenMatchesTheDatasetPage
+    implemented_by:
+    - qa_tools/common/qa_store.py::SCHEMA_VERSION
+    - qa_tools/common/qa_store.py::record_results
+    - qa_tools/common/qa_store.py::take_attempt_lock
+    - qa_tools/common/qa_store.py::attempt_running
+    - qa_tools/common/qa_store.py::refuse_outside_an_attempt
+    - qa_tools/common/qa_store.py::begin_attempt
+    - qa_tools/common/qa_store.py::set_run_seq
+    - qa_tools/common/qa_store.py::end_attempt
+    - qa_tools/common/qa_results_writer.py::_check_reads
+    - qa_tools/common/qa_results_writer.py::open_run
+    - qa_tools/common/qa_results_writer.py::Attempt
+    - qa_tools/common/qa_results_writer.py::_outcome
+    - qa_tools/common/qa_results_writer.py::close_attempt
+    - qa_tools/common/supply_db.py::Resolution
+    - qa_tools/common/supply_db.py::resolution_for
+    - qa_tools/common/period_overlay.py::filed_tables
+    - qa_tools/common/trial.py::discard
+    - cli/debug.py::_refuse_an_evaluated_run
+    - qa_tools/tools/orchestrate.py::run_one
+    - qa_tools/common/supply_status.py::results_about
+    - qa_tools/common/supply_status.py::latest_results
+    - qa_tools/common/carried.py::siblings
+    - qa_tools/common/carried.py::decide
+    - qa_tools/common/drift_reference.py::run_for
+    - qa_tools/common/qa_results_reader.py::run_facts
+    - qa_tools/common/qa_results_reader.py::read_check_reads
+    - qa_tools/tools/results_history.py::build_results_from_history
+    - pipeline/build_dashboard_data.py::own_runs
+    - pipeline/build_dashboard_data.py::share_cross_table_results
+    - pipeline/build_dashboard_data.py::_supply_read
+    - pipeline/build_dashboard_data.py::_contested_read
+    - pipeline/build_dashboard_data.py::build_one_table
+    - qa_tools/common/dataset_blockers.py::_pair_tables
+    - dashboard/qa-reporting-dashboard.template.html::pointKey
+    - dashboard/qa-reporting-dashboard.template.html::historyPoints
+    - dashboard/qa-reporting-dashboard.template.html::unitCounts
+    - dashboard/qa-reporting-dashboard.template.html::defaultCompareIndex
+    - dashboard/qa-reporting-dashboard.template.html::compareParamFor
+    - dashboard/qa-reporting-dashboard.template.html::historySource
+    - dashboard/qa-reporting-dashboard.template.html::blockChecksWhileHeld
+    evidence:
+    - '2026-10-24, BOOTSTRAP FROM EMPTY (criterion 23''s rebuild): mothman pipeline bootstrap on the scratch database ed_probe at schema
+      46, tree f8fdd68 (chunks A-D and criterion 20''s guard), run by the main session: 26m30s, exit 0.'
+    - '2026-10-24, CRITERION 25: no pinned golden moved. The full mothman check the main session ran on f8fdd68 over that bootstrap
+      was red (5945 passed, 10 failed, plus two docs gates; plans/morning-reports.md #8), and none of its failures was REQ-PIPE-262
+      criterion 12''s pinned inheritances, TS-63''s expectations or REQ-GEN-251 criterion 3''s; nothing was re-pinned, so nothing needed
+      bringing to Keith. Those ten were fixed test-first in 2da6a46 and aeb996b.'
+    - '2026-10-24, the builder''s runs on aeb996b (the last code change): tests/test_dashboard_e2e.py -n0, 302 passed (TS-80''s assertion
+      unchanged); thirteen neighbouring modules (test_build_from_the_record, test_build_dashboard_child_protection, test_build_dashboard_data,
+      test_dashboard_for_every_collection, test_sample_data, test_cross_table_scope, test_dataset_blockers, test_no_guessing_in_placement,
+      test_embed_dashboard_data, test_build_results_from_history, test_choose_file, test_filing_decisions, test_not_supplied), 295
+      passed; npm test, 882 passed; ruff check clean.'
+    - '2026-10-24, on 7576a80 (code identical to aeb996b), before this flip: test_check_read_and_attempts, test_results_about, test_carried,
+      test_period_overlay, test_recheck, test_supply_status, test_dataset_blockers, test_no_guessing_in_placement and test_build_from_the_record,
+      154 passed.'
+    - 'TEST-FIRST, criteria 26-28: each test was written and seen failing against the code before its chunk - A on f362e0d (criteria
+      1-8, 23), B on 993b29f (9, 21, 22), C on 3d0e988 (16-19, 24), D on a921749 (10-15), E on f8fdd68 (20), the gate fixes on 2da6a46
+      and the contested-pair read on aeb996b. No full gate is claimed on the final tree here.'
     decisions:
     - 'Scoped as its own requirement and built before REQ-PIPE-265 is flipped to built, rather than folded into #95 v5 (Keith,
       2026-10-22, option A).'
@@ -40184,6 +40298,50 @@ requirements:
     - 'The gate side (criteria 21 and 22) is in this requirement rather than left to #95 (first draft Q5, settled by the architect''s
       review): leaving it would keep carried.siblings parsing run ids and runs_about matching names, which is the guessing Keith
       ruled out, and criterion 2''s supply on qa.tables_read is needed by the gate anyway.'
+    - 'PROVISIONAL, pending Keith (morning report #8, #2): a second attempt of a run key beside a live one is REFUSED (AttemptInProgress,
+      a try-lock), not waited for.'
+    - 'PROVISIONAL, pending Keith (#3): SIGTERM becomes an INTERRUPTED end only while an attempt is open in the main thread with no
+      other handler installed; elsewhere it dies as before and the next attempt closes it INTERRUPTED with no end time. A ''stopped
+      pass'' is a SystemExit or KeyboardInterrupt.'
+    - 'PROVISIONAL, pending Keith (#4): outcome and read-state names are stored uppercase exactly as the criteria write them.'
+    - 'PROVISIONAL, pending Keith (#5): NO-SUPPLY is allowed only for a trial''s or sample''s table; any other read that cannot be
+      recorded refuses the result (criterion 4).'
+    - 'PROVISIONAL, pending Keith (#6): criterion 3 compares the result''s recorded dataset with qa.run.dataset_id.'
+    - 'PROVISIONAL, pending Keith (#7): an attempt that ends with no exception but never completes is recorded CRASHED, with no exception
+      type.'
+    - 'PROVISIONAL, pending Keith (#8): a check is carried from the EARLIEST-opened sibling that evaluated it.'
+    - 'PROVISIONAL, pending Keith (#9): a sibling not yet opened (no run_seq) counts for nothing.'
+    - 'PROVISIONAL, pending Keith (#10): siblings are not filtered by dataset - a settled pair''s two supplies can be siblings, but
+      nothing carries between them because their own-table supplies differ.'
+    - 'PROVISIONAL, pending Keith (#11): a file-check result under a supply''s own run still counts toward that supply.'
+    - 'PROVISIONAL, pending Keith (#12): the live batch writes its results file by rebuilding from the recorded history rather than
+      from memory - one path, one history read per batch.'
+    - 'PROVISIONAL, pending Keith (#13): an arrival''s cause is ''arrival:<delivery>@<receipt instant>'', the grouping the sibling
+      rule uses; every non-arrival run (re-check, readers-only, knock-on) reads as a re-check in its cause sentence. Readers'' and
+      replaced runs'' results are placed through the manifest only, and a single-table result with no reads stays out of the cross-table
+      column.'
+    - 'PROVISIONAL, pending Keith (#14, #19): canonical_order is ALLOWED by criterion 20''s guard - it sorts the results FILE by run
+      id so a live write and a rebuild give the same bytes, and decides nothing on the page.'
+    - 'PROVISIONAL, pending Keith (#20): received_instant is allowed as an arrival group''s identity (the cause key), never as an ordering.'
+    - 'PROVISIONAL, pending Keith (#15): criterion 14 (an ABSENT or NO-SUPPLY read not shown on that table''s page) is applied in the
+      BUILD, which decides which pages carry a result.'
+    - 'PROVISIONAL, pending Keith (#16): a later point carries a check''s verdict from the SAME supply''s newest earlier point, never
+      simply the previous point overall.'
+    - 'PROVISIONAL, pending Keith (#17): a held row whose blocker names no supply fails closed; it shows the newest HELD result about
+      the blocker''s supply.'
+    - 'PROVISIONAL, pending Keith (#18): the dataset list''s small sparkline has no per-point tooltips, so criterion 13''s cause naming
+      lands in the panel chart, compare and history lists only. A run with no supply falls back to the run it was recorded in.'
+    - 'PROVISIONAL, pending Keith (#21) - the CONTESTED-READ RULE, a gap between criteria 14 and 15: on TS-80''s 1 November 2020 the
+      Client Register is a contested pair, so its readers recorded it ABSENT, contested, with both pair files named. An ABSENT read
+      flagged contested whose files are the blocking pair''s own tables is taken as meeting that pair: kept in a separate contested_reads
+      list on the check, never in its history or any count, and shown on the pair''s page as criterion 15 shows HELD, keyed on the
+      pair, never a time. Every other ABSENT read stays off (criterion 14 as signed). Rejected - accepting ''No data'' for a contested
+      pair and amending TS-80''s assertion: a change to signed REQ-DASH-264 criterion 3.'
+    - 'PROVISIONAL, pending Keith (#22): a check whose ONLY result on the pair''s page is a contested read gets no card there; it does
+      not arise in today''s data.'
+    - 'plans/running-thoughts.md #117, the note this was scoped from, is deleted in the change that built it; its candidate facts are
+      all here - the supply of every table read (criterion 1), a delivery id on qa.run (rejected above for qa.filing and qa.delivery_file),
+      and a sequence that cannot tie (run_seq).'
   - id: REQ-PIPE-266
     title: Files that arrive together are gated together, once every one of them has been checked
     date_written: '2026-10-21'
