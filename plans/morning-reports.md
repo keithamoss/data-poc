@@ -2594,3 +2594,13 @@ one or more component tags, and a date.
      tooltips today, so c13's cause naming lands in the panel chart, compare
      and history lists only. Bootstrap from empty on ed_probe (schema 46)
      started ~23:05.
+   - **279 CHUNK E part 1 (~23:15, checkpoint f8fdd68)**: criterion 20's
+     guard, `tests/test_no_guessing_in_placement.py` (30 passed, its own
+     run) - reads the placement/ordering functions' source for recording
+     times, run-id text and calendar days, and asserts it has something to
+     read first. PROVISIONAL: (#19) `canonical_order` is ALLOWED, not
+     changed - it sorts the results file by run id only so a live write and a
+     rebuild produce the same bytes, and decides nothing about order on the
+     page; (#20) `received_instant` is allowed as a group's identity (the
+     arrival cause key), not as an ordering. One e2e oracle moved: the
+     in-place-on check takes the newest result by rank, not by recorded_at.
