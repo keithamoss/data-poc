@@ -354,3 +354,87 @@ def test_a_refiling_is_compared_as_the_decision_that_made_it(supply_dsn):
     i, s = cols.index("refiled_by*"), cols.index("supply_id")
     got = [json.loads(r[i]) for r in rows if json.loads(r[s]) == supply and r[i] != "null"]
     assert got == [ref]
+
+
+class TestTheRecordOfREQPIPE279IsComparedByWhatItSays:
+    """REQ-PIPE-279's three new records under the snapshot (CI run
+    40012232945's on-demand failures). An attempt's start and end are wall
+    clock, but whether it ended is not; a read belongs to a result, not to
+    that result's surrogate id; and run_seq is opening order, compared
+    within each collection, since collections replaying side by side
+    interleave the raw numbers while each collection's own order does not
+    (REQ-PIPE-279's rank NFR). Each test also shows the comparison still
+    catches the real difference beside the one it now ignores."""
+
+    @staticmethod
+    def _run(conn, key, collection="c1", seq=None):
+        conn.execute("INSERT INTO qa.run (run_key, agency_id, collection_id, run_timestamp, "
+                     "run_instant, run_seq) VALUES (?, 'a', ?, '2026-01-01T00:00:00+00:00', "
+                     "'2026-01-01T00:00:00+00:00', ?)", [key, collection, seq])
+
+    @staticmethod
+    def _snap(**kw):
+        return eq.snapshot(os.environ["MOTHMAN_SUPPLY_DSN"], **kw)
+
+    def test_an_attempts_clock_is_left_out_but_whether_it_ended_is_not(self, clean_qa_history):
+        conn = clean_qa_history
+        self._run(conn, "r1", seq=1)
+        conn.execute("INSERT INTO qa.run_attempt (run_key, run_seq, began_at, ended_at, outcome) "
+                     "VALUES ('r1', 1, '2026-01-01T00:00:00Z', '2026-01-01T00:01:00Z', "
+                     "'COMPLETED')")
+        before = self._snap()
+        conn.execute("UPDATE qa.run_attempt SET began_at = '2027-05-05T05:00:00Z', "
+                     "ended_at = '2027-05-05T05:09:00Z'")
+        assert eq.differences(before, self._snap()) == []
+        conn.execute("UPDATE qa.run_attempt SET outcome = 'INTERRUPTED', ended_at = NULL")
+        assert any(d.startswith("qa.run_attempt") for d in eq.differences(before, self._snap()))
+
+    def _result_reading(self, conn, supply):
+        [(rid,)] = conn.execute(
+            "INSERT INTO qa.check_result (run_key, agency_id, collection_id, dataset_id, tool, "
+            "check_id, status) VALUES ('r1', 'a', 'c1', 'd1', 'soda', 'x_ref', 'fail') "
+            "RETURNING id").fetchall()
+        conn.execute("INSERT INTO qa.check_read (check_result_id, logical_table, state, "
+                     "supply_id) VALUES (?, 'clients', 'READ', ?)", [rid, supply])
+
+    def test_a_read_is_compared_by_the_result_it_belongs_to(self, clean_qa_history):
+        conn = clean_qa_history
+        self._run(conn, "r1", seq=1)
+        self._result_reading(conn, "clients@1")
+        before = self._snap()
+        # The same result recorded again: a new surrogate id, the same read.
+        conn.execute("DELETE FROM qa.check_result")
+        self._result_reading(conn, "clients@1")
+        assert eq.differences(before, self._snap()) == []
+        conn.execute("UPDATE qa.check_read SET supply_id = 'clients@2'")
+        assert any(d.startswith("qa.check_read") for d in eq.differences(before, self._snap()))
+
+    def _two_collections(self, conn, order):
+        conn.execute("TRUNCATE qa.run, qa.run_attempt CASCADE")
+        for seq, key in enumerate(order, start=1):
+            self._run(conn, key, collection=key[:2], seq=seq)
+            conn.execute("INSERT INTO qa.run_attempt (run_key, run_seq, began_at) "
+                         "VALUES (?, ?, '2026-01-01T00:00:00Z')", [key, seq])
+
+    def test_opening_order_is_compared_within_each_collection(self, clean_qa_history):
+        conn = clean_qa_history
+        self._two_collections(conn, ["c1_a", "c2_a", "c1_b", "c2_b"])
+        before = self._snap(run_seq_within_collection=True)
+        # The two collections interleaved the other way: each one's own
+        # order unchanged.
+        self._two_collections(conn, ["c2_a", "c1_a", "c2_b", "c1_b"])
+        assert eq.differences(before, self._snap(run_seq_within_collection=True)) == []
+        # One collection's own order changed: a real difference, in both tables.
+        self._two_collections(conn, ["c1_b", "c2_a", "c1_a", "c2_b"])
+        diffs = eq.differences(before, self._snap(run_seq_within_collection=True))
+        assert any(d.startswith("qa.run:") for d in diffs), diffs
+        assert any(d.startswith("qa.run_attempt") for d in diffs), diffs
+
+    def test_by_default_the_raw_numbers_are_compared(self, clean_qa_history):
+        """A resume continues one collection from a copy of its own database,
+        so there the raw sequence is deterministic and compared as it is."""
+        conn = clean_qa_history
+        self._two_collections(conn, ["c1_a", "c2_a", "c1_b", "c2_b"])
+        before = self._snap()
+        self._two_collections(conn, ["c2_a", "c1_a", "c2_b", "c1_b"])
+        assert any(d.startswith("qa.run:") for d in eq.differences(before, self._snap()))

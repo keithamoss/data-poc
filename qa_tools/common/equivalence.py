@@ -54,7 +54,9 @@ HARNESS_VERSION = 2
 #: Bumped when a normalising rule below changes, for the same reason.
 #: 2 (2026-10-16): the rules the first self-check proved missing - decision
 #: references, rule-made decision times, S5's ids and clock instants.
-NORMALISER_VERSION = 2
+#: 3 (2026-10-24): REQ-PIPE-279's records - an attempt's clock, a read by
+#: the result it belongs to, opening order within each collection.
+NORMALISER_VERSION = 3
 
 #: THE INSTANT EVERY CAPTURE'S BOOTSTRAP AND BUILD TAKE AS "NOW" (criterion
 #: 17, Keith 2026-10-16). A build works out from now which slots have closed
@@ -135,6 +137,9 @@ CLOCK_COLUMNS = {
     # A confirmed correction's parked moves (Keith, 2026-10-11, (p)).
     "correction_parked": {"parked_at"},
     "correction_parked_resolved": {"resolved_at"},
+    # REQ-PIPE-279's attempts: when one began and ended is the wall clock;
+    # whether it ended is compared (DERIVED_COLUMNS), as a run's completion is.
+    "run_attempt": {"began_at", "ended_at"},
 }
 
 #: SURROGATE IDS WITH NO ORDER WORTH KEEPING, dropped outright. Rows that
@@ -175,15 +180,54 @@ _LOAD = ("(SELECT lo.dataset_id || '|' || lo.physical || '|' || lo.outcome "
 _DECISION = "(SELECT r.ref FROM equiv_decision_ref r WHERE r.id = t.{col})"
 #: The lookup, as a CTE in the one SELECT that needs it - a snapshot only
 #: ever reads.
-_DECISION_REF_CTE = (
-    "WITH equiv_decision_ref AS (SELECT id, collection_id || '#' || row_number() OVER "
-    "(PARTITION BY collection_id ORDER BY id) AS ref FROM qa.decision) ")
+#: A REFERENCE TO A CHECK RESULT is compared as WHICH result: its run, its
+#: tool, its check and its place among that run's results from that tool -
+#: the ordinal the result's own id becomes (ORDINAL_COLUMNS). The raw id is
+#: a bigserial, new each time a result is recorded again, and interleaves
+#: between collections replaying side by side.
+_RESULT = "(SELECT r.ref FROM equiv_result_ref r WHERE r.id = t.{col})"
+#: OPENING ORDER (REQ-PIPE-279's run_seq) as a run's place among its own
+#: collection's runs. Collections replaying side by side draw from one
+#: sequence, so the raw numbers interleave differently from one bootstrap to
+#: the next while each collection's own order does not - which is the order
+#: compared. An attempt's run_seq is placed the same way, by its run's
+#: collection. Applied only by snapshot(run_seq_within_collection=True);
+#: otherwise the raw numbers are compared.
+_RUN_RANK = "(SELECT r.rank FROM equiv_run_rank r WHERE r.run_seq = t.run_seq)"
+_ATTEMPT_RANK = ("(SELECT r.rank FROM equiv_attempt_rank r "
+                 "WHERE r.run_key = t.run_key AND r.run_seq = t.run_seq)")
+#: The lookups, as CTEs in the one SELECT that needs each - a snapshot only
+#: ever reads.
+_CTES = {
+    "equiv_decision_ref": (
+        "SELECT id, collection_id || '#' || row_number() OVER "
+        "(PARTITION BY collection_id ORDER BY id) AS ref FROM qa.decision"),
+    "equiv_result_ref": (
+        "SELECT id, run_key || '|' || tool || '|' || check_id || '|' || row_number() OVER "
+        "(PARTITION BY run_key, tool ORDER BY id) AS ref FROM qa.check_result"),
+    "equiv_run_rank": (
+        "SELECT run_seq, row_number() OVER (PARTITION BY collection_id ORDER BY run_seq) "
+        "AS rank FROM qa.run WHERE run_seq IS NOT NULL"),
+    "equiv_attempt_rank": (
+        "SELECT a.run_key, a.run_seq, row_number() OVER (PARTITION BY r.collection_id "
+        "ORDER BY a.run_seq) AS rank FROM qa.run_attempt a LEFT JOIN qa.run r "
+        "ON r.run_key = a.run_key"),
+}
+#: The derived columns that are opening order, derived only under
+#: snapshot(run_seq_within_collection=True).
+_OPENING_ORDER = {("run", "run_seq"), ("run_attempt", "run_seq")}
 
 DERIVED_COLUMNS = {
     # A completion stamp is clock time, but WHETHER a run completed is not.
     "run": {"completed_at": "completed_at IS NOT NULL",
             "caused_by_decision": _DECISION.format(col="caused_by_decision"),
-            "caused_by_load": _LOAD.format(col="caused_by_load")},
+            "caused_by_load": _LOAD.format(col="caused_by_load"),
+            "run_seq": _RUN_RANK},
+    "run_attempt": {"began_at": "began_at IS NOT NULL",
+                    "ended_at": "ended_at IS NOT NULL",
+                    "run_seq": _ATTEMPT_RANK},
+    # WHAT A RESULT READ, keyed by the result it belongs to.
+    "check_read": {"check_result_id": _RESULT.format(col="check_result_id")},
     # Ids pointing at another table's surrogate: compared as what they name.
     # extra carries one too - the decision a re-evaluation came after.
     "check_result": {"load_attempt": _LOAD.format(col="load_attempt"),
@@ -258,12 +302,14 @@ def _cols(conn, table: str) -> list[str]:
         [table]).fetchall()]
 
 
-def _qa_select(conn, table: str) -> tuple[list[str], str]:
+def _qa_select(conn, table: str, run_seq_within_collection: bool = False) -> tuple[list[str], str]:
     names, exprs = [], []
     for col in _cols(conn, table):
         if col in UNCOMPARABLE_COLUMNS.get(table, ()):
             continue
         derived = DERIVED_COLUMNS.get(table, {}).get(col)
+        if not run_seq_within_collection and (table, col) in _OPENING_ORDER:
+            derived = None
         if derived:
             names.append(col + "*")
             exprs.append(derived)
@@ -279,8 +325,9 @@ def _qa_select(conn, table: str) -> tuple[list[str], str]:
         names.append(col)
         exprs.append(f't."{col}"')
     sql = f'SELECT {", ".join(exprs)} FROM qa."{table}" t'
-    if "equiv_decision_ref" in sql:
-        sql = _DECISION_REF_CTE + sql
+    ctes = [f"{name} AS ({body})" for name, body in _CTES.items() if name in sql]
+    if ctes:
+        sql = "WITH " + ", ".join(ctes) + " " + sql
     return names, sql
 
 
@@ -288,7 +335,7 @@ def _canon(value) -> str:
     return json.dumps(value, sort_keys=True, default=str)
 
 
-def snapshot(dsn: str) -> dict:
+def snapshot(dsn: str, *, run_seq_within_collection: bool = False) -> dict:
     """Everything a bootstrap recorded, normalised to be comparable.
 
     - every BASE TABLE in the `qa` schema, every row, every column except
@@ -299,6 +346,14 @@ def snapshot(dsn: str) -> dict:
       period, or staged differently, shows;
     - the list of schemas, so a per-run schema one mode leaves behind
       shows too.
+
+    run_seq is compared as drawn unless `run_seq_within_collection`, which
+    compares each run's place among its own collection's runs instead - for
+    two histories whose collections may have been opened side by side in
+    different interleavings: a parallel bootstrap against a sequential one,
+    or two captures of a parallel bootstrap. A resume against its full
+    replay opens one collection in one order, so it compares the raw
+    numbers.
     """
     import psycopg
 
@@ -308,7 +363,7 @@ def snapshot(dsn: str) -> dict:
             "SELECT table_name FROM information_schema.tables "
             "WHERE table_schema = 'qa' AND table_type = 'BASE TABLE' ORDER BY 1")]
         for table in qa_tables:
-            names, sql = _qa_select(conn, table)
+            names, sql = _qa_select(conn, table, run_seq_within_collection)
             rows = Counter(tuple(_canon(v) for v in r) for r in conn.execute(sql))
             snap[f"qa.{table}"] = (tuple(names), rows)
 
@@ -719,7 +774,8 @@ def capture(ref: str, label: str, *, yes: bool = False, say=print) -> Path:
         run(stage, "dashboard", "rebuild-results")
         run(stage, "dashboard", "build-data")
         stage = "S1"
-        s1 = snapshot(scratch)
+        # Its bootstrap runs collections side by side (REQ-PIPE-279's rank NFR).
+        s1 = snapshot(scratch, run_seq_within_collection=True)
         baseline["surfaces"] = {"S1": {k: {"columns": list(cols),
                                            "rows": sorted([list(r), n] for r, n in rows.items())}
                                        for k, (cols, rows) in s1.items()

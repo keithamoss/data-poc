@@ -187,7 +187,12 @@ def _bootstrap_into(corpus: Path, db_name: str, *, sequential: bool) -> tuple[di
 
         result = boot.bootstrap(force=True, sequential=sequential)
         assert result.populated
-        return equiv_support.snapshot(dsn), result.timings
+        # OPENING ORDER WITHIN EACH COLLECTION, not the raw run_seq: the
+        # parallel mode opens collections side by side, so their draws from
+        # the one sequence interleave differently from the sequential mode's
+        # while each collection's own order is the same (REQ-PIPE-279's rank
+        # NFR). That order, and every row keyed on it, is still compared.
+        return equiv_support.snapshot(dsn, run_seq_within_collection=True), result.timings
     finally:
         # dbt's per-database scratch, keyed by a digest of the DSN: each run
         # empties its own target directory, but the skeleton would stay
