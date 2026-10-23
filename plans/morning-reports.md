@@ -2655,3 +2655,7 @@ one or more component tags, and a date.
      passed / 1 xfailed (42m28s), npm test 882. Pushed with the evidence line
      added and `mothman check --docs` re-run. Next: CI, then the post-build
      critics on 279.
+   - **PUSHED (~03:35)**: 32 commits fast-forwarded to
+     claude/qac-024-explanations-qx8hx8, head 98b67fc - REQ-PIPE-279 and
+     REQ-PIPE-265 built, the #261 fix, the signed register batch, the period
+     clarity drafts. CI running; post-build critic on 279 running.
