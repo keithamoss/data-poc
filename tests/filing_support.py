@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
+import attempt_support
 from qa_tools.common import filing, qa_store, supply_db
 
 _DEFAULT_RECEIPT = datetime(2020, 1, 1, tzinfo=timezone.utc)
@@ -97,5 +98,6 @@ def checked(conn, dataset_id: str, supply_id: str) -> str:
                         run_timestamp="2099-01-01T10:00:00+08:00", run_by="pytest",
                         environment="sandbox")
     qa_store.set_run_purpose(conn, run_key, dataset_id=dataset_id, supply_id=supply_id)
+    attempt_support.opened(conn, run_key)
     qa_store.complete_run(conn, run_key)
     return run_key

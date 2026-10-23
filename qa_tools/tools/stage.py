@@ -96,7 +96,7 @@ def _build_run_views(conn, collection_id: str, run_id: str, key: str,
     res = supply_db.create_run_views(conn, run_id, supply_db.candidates_in(
         conn, staging, agreed_tables, arrival=key,
         loaded=load_log.loaded_tables(trial_scope)), source_schema=staging,
-        held=supply_holds.held_tables(conn, arrival_key=key))
+        held=supply_holds.held_supplies(conn, arrival_key=key))
     if not sample_tables:
         return res
     # THE LOAD-RECORD GATE STILL APPLIES (REQ-PIPE-060 criterion 7).

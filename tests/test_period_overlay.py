@@ -324,3 +324,50 @@ class TestASettledPairsRunReadsItsOwnFile:
         out = world.build("cp_clients", key)
         assert set(out.resolution.ambiguous["cp_clients"]) == {
             f"cp_clients__{key}__1", f"cp_clients__{key}__2"}
+
+
+class TestTheResolutionCarriesTheSupplyOfEveryTableItReads:
+    """REQ-PIPE-279 criterion 2: a STAGED table's supply is carried too, from
+    the filing records the overlay already walks, and where each table was
+    read from is its own field - never inferred from a supply being there."""
+
+    def test_a_staged_sibling_and_the_own_table_carry_their_supplies(self, conn, world):
+        k1, k2 = _key(), _key()
+        world.stage("cp_clients", k1)
+        world.stage("cp_placements", k2)
+        res = world.build("cp_placements", k2).resolution
+        assert res.supply_of == {"cp_clients": f"cp-clients@{k1}",
+                                 "cp_placements": f"cp-placements@{k2}"}
+        assert res.source == {"cp_clients": period_schema.FROM_STAGING,
+                              "cp_placements": period_schema.FROM_STAGING}
+
+    def test_a_table_from_the_period_says_so(self, conn, world):
+        k1, k2 = _key(), _key()
+        world.promote(world.stage("cp_clients", k1))
+        world.stage("cp_placements", k2)
+        res = world.build("cp_placements", k2).resolution
+        assert res.source["cp_clients"] == period_schema.FROM_PERIOD
+
+    def test_both_survive_being_recorded_and_read_back(self, conn, world):
+        k1, k2 = _key(), _key()
+        world.stage("cp_clients", k1)
+        world.stage("cp_placements", k2)
+        res = world.build("cp_placements", k2).resolution
+        supply_db.record_resolution(conn, res)
+        back = supply_db.resolution_for(conn, res.run_id)
+        assert (back.supply_of, back.source) == (res.supply_of, res.source)
+
+    def test_a_held_sibling_is_named_by_its_supply_id(self, conn, monkeypatch):
+        from datetime import datetime, timezone
+        from types import SimpleNamespace
+
+        from qa_tools.common import supply_holds
+
+        at = datetime(2099, 3, 1, 1, tzinfo=timezone.utc)
+        key = supply_db.arrival_segment(at)
+        held = SimpleNamespace(supply_id=f"cp-clients@{key}", dataset_id="cp-clients",
+                               delivery="d")
+        monkeypatch.setattr(supply_holds, "outstanding", lambda conn, **kw: [held])
+        res = supply_db.Resolution(run_id="r", schema="s", absent=["cp_clients"])
+        period_overlay.name_held_siblings(conn, res, SimpleNamespace(received_at=at))
+        assert res.held_supply == {"cp_clients": f"cp-clients@{key}"}

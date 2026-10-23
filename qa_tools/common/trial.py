@@ -229,5 +229,9 @@ def discard(conn, run_id: str) -> list[str]:
         # output, tables read and stats cascade from it; a census names the
         # run without a foreign key, so it is removed by name.
         conn.execute(f'DELETE FROM "{qa_store.SCHEMA}".census WHERE run_key = ?', [run_id])
+        # AND ITS ATTEMPTS, the one removal qa.run_attempt allows (REQ-PIPE-279
+        # criterion 6) - also by name, since nothing cascades into them.
+        conn.execute(f'DELETE FROM "{qa_store.SCHEMA}".run_attempt WHERE run_key = ?',
+                     [run_id])
         conn.execute(f'DELETE FROM "{qa_store.SCHEMA}".run WHERE run_key = ?', [run_id])
     return mine

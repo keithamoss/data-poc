@@ -590,7 +590,8 @@ def clean_qa_history(supply_dsn):
 
     with supply_db.connect(label="test-clean-qa-history") as conn:
         qa_store.ensure_schema(conn)
-        conn.execute(f'TRUNCATE "{qa_store.SCHEMA}".run CASCADE')
+        # The attempts too, which nothing cascades into (REQ-PIPE-279).
+        conn.execute(f'TRUNCATE "{qa_store.SCHEMA}".run, "{qa_store.SCHEMA}".run_attempt CASCADE')
         yield conn
 
 
@@ -1007,8 +1008,13 @@ def clone_run_views(conn, source_run: str, new_run: str, *, held=(), contested=(
     source = supply_db.resolution_for(conn, source_run)
     res = supply_db.Resolution(run_id=new_run, schema=dst)
     for logical, physical in sorted(source.resolved.items()):
+        # WHICH SUPPLY IT WAS travels with the table (REQ-PIPE-279): a held
+        # table is held by its supply id, a read one read as its supply.
+        supply = source.supply_of.get(logical)
         if logical in held:
             res.held[logical] = physical
+            if supply:
+                res.held_supply[logical] = supply
             continue
         if logical in contested:
             res.ambiguous[logical] = [physical, f"{physical}_2"]
@@ -1018,6 +1024,10 @@ def clone_run_views(conn, source_run: str, new_run: str, *, held=(), contested=(
             continue
         conn.execute(f'CREATE VIEW "{dst}"."{logical}" AS SELECT * FROM "{src}"."{logical}"')
         res.resolved[logical] = physical
+        if supply:
+            res.supply_of[logical] = supply
+        if logical in source.source:
+            res.source[logical] = source.source[logical]
     supply_db.record_resolution(conn, res)
     return res
 

@@ -12,6 +12,7 @@ from pathlib import Path
 import pytest
 
 from fixture_ids import CP_DIRTY_RUN_ID
+import attempt_support
 from qa_tools.common import decision_log as dl, qa_store, recheck, supply_db
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -333,6 +334,7 @@ class TestOneDefinitionOfASupplysCurrentRun:
                                     run_timestamp=ran, run_by="t@x", environment="test")
                 qa_store.set_run_purpose(conn, key, dataset_id=ds, supply_id=supply,
                                          scope="full", caused_by_decision=ids[name])
+                attempt_support.opened(conn, key)
                 finish_run(key)
                 ids[f"run_{name}"] = key
             assert qa_store.current_run(conn, ds, supply) == ids["run_august"]
@@ -363,6 +365,7 @@ class TestOneDefinitionOfASupplysCurrentRun:
                                     run_timestamp=ran, run_by="t@x", environment="test")
                 qa_store.set_run_purpose(conn, key, dataset_id=ds, supply_id=supply,
                                          scope="full", caused_by_decision=cause)
+                attempt_support.opened(conn, key)
                 finish_run(key)
             assert qa_store.current_run(conn, ds, supply) == f"a_second_{tag}"
 

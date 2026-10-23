@@ -55,6 +55,22 @@ def _manifest_first_entry(short: str) -> dict:
     return of(short).load_manifest()[0]
 
 
+def _refuse_an_evaluated_run(run_id: str) -> None:
+    """Refuse, before any tool runs, a run the orchestrator already evaluated
+    (REQ-PIPE-279 criterion 8): writing into it would replace its recorded
+    results under its old run_seq with no attempt of its own. The writer
+    refuses the write too; this says so before a tool has spent its time."""
+    from qa_tools.common import qa_store, supply_db
+
+    with supply_db.connect(read_only=True, label="mothman:debug-guard") as conn:
+        if not conn.execute(f"SELECT to_regclass('{qa_store.SCHEMA}.run')").fetchall()[0][0]:
+            return
+        try:
+            qa_store.refuse_outside_an_attempt(conn, run_id)
+        except qa_store.NoOpenAttempt as exc:
+            raise click.ClickException(str(exc)) from exc
+
+
 def _print_results(results: list[dict], run_id: str, short: str) -> None:
     from .collection_cli import of
     console.print(of(short).report_table(results, run_id))
@@ -70,6 +86,7 @@ def debug_group() -> None:
 @click.option("--run-id", required=True, help="An existing manifest run_id already on disk.")
 def run_dbt_command(collection: str, run_id: str) -> None:
     """Run real dbt-core in isolation against one run already on disk."""
+    _refuse_an_evaluated_run(run_id)
     run_timestamp = asset_time.now().isoformat()
     from qa_tools import collections
     from qa_tools.tools import run_dbt
@@ -82,6 +99,7 @@ def run_dbt_command(collection: str, run_id: str) -> None:
 @click.option("--run-id", required=True, help="An existing manifest run_id already on disk.")
 def run_soda_command(collection: str, run_id: str) -> None:
     """Run real Soda Core in isolation against one run already on disk."""
+    _refuse_an_evaluated_run(run_id)
     run_timestamp = asset_time.now().isoformat()
     from qa_tools import collections
     from qa_tools.tools import run_soda
@@ -94,6 +112,7 @@ def run_soda_command(collection: str, run_id: str) -> None:
 @click.option("--run-id", required=True, help="An existing manifest run_id already on disk.")
 def run_datacontract_command(collection: str, run_id: str) -> None:
     """Run real datacontract-cli in isolation against one run already on disk."""
+    _refuse_an_evaluated_run(run_id)
     run_timestamp = asset_time.now().isoformat()
     from qa_tools import collections
     from qa_tools.tools import run_datacontract
@@ -118,6 +137,7 @@ def run_datacontract_command(collection: str, run_id: str) -> None:
               help="Defaults to the manifest's own first (clean-by-construction) entry.")
 def run_evidently_command(collection: str, run_id: str, reference_run_id: str | None) -> None:
     """Run real Evidently AI in isolation against one run already on disk."""
+    _refuse_an_evaluated_run(run_id)
     run_timestamp = asset_time.now().isoformat()
     from qa_tools import collections
     from qa_tools.tools import run_evidently

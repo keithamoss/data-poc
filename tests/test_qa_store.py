@@ -32,6 +32,7 @@ from conftest import drop_qa_schema
 
 import pytest
 
+import attempt_support
 from qa_tools.common import qa_store, supply_db
 
 
@@ -94,6 +95,7 @@ class TestARunIsNotObservableUntilItIsComplete:
     def test_completing_the_run_makes_them_observable(self, db):
         run_key = _run(db)
         qa_store.record_results(db, run_key, [_result("not_null_id")], tool="dbt", **_KEYS)
+        attempt_support.opened(db, run_key)
         qa_store.complete_run(db, run_key)
 
         assert len(qa_store.results_for_run(db, run_key)) == 1
@@ -103,6 +105,7 @@ class TestARunIsNotObservableUntilItIsComplete:
         completeness marker has to survive it rather than latch."""
         run_key = _run(db)
         qa_store.record_results(db, run_key, [_result("not_null_id")], tool="dbt", **_KEYS)
+        attempt_support.opened(db, run_key)
         qa_store.complete_run(db, run_key)
         qa_store.reopen_run(db, run_key)
 
@@ -115,6 +118,7 @@ class TestARunIsNotObservableUntilItIsComplete:
         qa_store.record_results(db, run_key, [_result("not_null_id")], tool="dbt", **_KEYS)
 
         assert run_key in qa_store.incomplete_runs(db)
+        attempt_support.opened(db, run_key)
         qa_store.complete_run(db, run_key)
         assert run_key not in qa_store.incomplete_runs(db)
 
@@ -128,6 +132,7 @@ class TestTwoToolsInOneRunDoNotDeleteEachOther:
         qa_store.record_results(db, run_key, [_result("dbt_not_null")], tool="dbt", **_KEYS)
         qa_store.record_results(db, run_key, [_result("soda_row_count", tool="soda", **_KEYS)],
                                 tool="soda", **_KEYS)
+        attempt_support.opened(db, run_key)
         qa_store.complete_run(db, run_key)
 
         tools = sorted(r["tool"] for r in qa_store.results_for_run(db, run_key))
@@ -140,6 +145,7 @@ class TestTwoToolsInOneRunDoNotDeleteEachOther:
         qa_store.record_results(db, run_key, [_result("a"), _result("b")], tool="dbt", **_KEYS)
         qa_store.record_results(db, run_key, [_result("soda_x", tool="soda", **_KEYS)], tool="soda", **_KEYS)
         qa_store.record_results(db, run_key, [_result("a")], tool="dbt", **_KEYS)
+        attempt_support.opened(db, run_key)
         qa_store.complete_run(db, run_key)
 
         rows = qa_store.results_for_run(db, run_key)
@@ -155,7 +161,9 @@ class TestRecordsThatSpanDatasetsStayDistinguishable:
         qa_store.record_results(db, run_key, [_result("own_check")], tool="dbt", **_KEYS)
         qa_store.record_results(
             db, run_key, [_result("spanning_check", dataset_id=None)],
-            tool="dbt", **_KEYS, scope=qa_store.CROSS_TABLE_SCOPE)
+            tool="dbt", **_KEYS, scope=qa_store.CROSS_TABLE_SCOPE,
+            reads=[(qa_store.CheckRead("births", qa_store.READ, "births@1"),)])
+        attempt_support.opened(db, run_key)
         qa_store.complete_run(db, run_key)
 
         own = qa_store.results_for_run(db, run_key, dataset_id="birth-registrations")
@@ -172,6 +180,7 @@ class TestADatasetStillInDevelopmentIsMarked:
     def test_results_default_to_an_agreed_supply(self, db):
         run_key = _run(db)
         qa_store.record_results(db, run_key, [_result("a")], tool="dbt", **_KEYS)
+        attempt_support.opened(db, run_key)
         qa_store.complete_run(db, run_key)
 
         assert qa_store.results_for_run(db, run_key)[0]["supply_state"] == qa_store.AGREED
@@ -181,6 +190,7 @@ class TestADatasetStillInDevelopmentIsMarked:
         qa_store.record_results(db, run_key, [_result("real_one")], tool="dbt", **_KEYS)
         qa_store.record_results(db, run_key, [_result("draft_one")], tool="dbt", **_KEYS,
                                 supply_state=qa_store.IN_DEVELOPMENT)
+        attempt_support.opened(db, run_key)
         qa_store.complete_run(db, run_key)
 
         assert [r["check_id"] for r in qa_store.results_for_run(db, run_key)] == ["real_one"]
@@ -191,6 +201,7 @@ class TestADatasetStillInDevelopmentIsMarked:
         run_key = _run(db)
         qa_store.record_results(db, run_key, [_result("draft_one")], tool="dbt", **_KEYS,
                                 supply_state=qa_store.IN_DEVELOPMENT)
+        attempt_support.opened(db, run_key)
         qa_store.complete_run(db, run_key)
 
         rows = qa_store.results_for_run(db, run_key, supply_state=qa_store.IN_DEVELOPMENT)
@@ -207,6 +218,7 @@ class TestTablesReadIsRowsRatherThanADocument:
             "births": "births__2026-09-01",
             "registrations": "registrations__2026-09-01",
         })
+        attempt_support.opened(db, run_key)
         qa_store.complete_run(db, run_key)
 
         assert qa_store.tables_read_for_run(db, run_key)["births"] == "births__2026-09-01"
@@ -220,6 +232,7 @@ class TestEachToolsOwnOutputIsKeptWholeAndApart:
         run_key = _run(db)
         qa_store.record_tool_output(db, run_key, "dbt", {"results": [{"unique_id": "x"}]})
         qa_store.record_tool_output(db, run_key, "soda", {"checks": []})
+        attempt_support.opened(db, run_key)
         qa_store.complete_run(db, run_key)
 
         assert qa_store.tool_output_for(db, run_key, "dbt") == {"results": [{"unique_id": "x"}]}
@@ -231,6 +244,7 @@ class TestEachToolsOwnOutputIsKeptWholeAndApart:
         run_key = _run(db)
         qa_store.record_results(db, run_key, [_result("a")], tool="dbt", **_KEYS)
         qa_store.record_tool_output(db, run_key, "dbt", {"big": "x" * 10_000})
+        attempt_support.opened(db, run_key)
         qa_store.complete_run(db, run_key)
 
         assert "raw_output" not in qa_store.results_for_run(db, run_key)[0]
@@ -254,6 +268,7 @@ class TestAFinishedRunSaysWhoRanIt:
         qa_store.record_results(db, "anon", [_result("a")], tool="dbt", **_KEYS)
 
         with pytest.raises(qa_store.UnattributedRun):
+            attempt_support.opened(db, "anon")
             qa_store.complete_run(db, "anon")
 
     def test_and_its_results_stay_invisible(self, db):
@@ -263,6 +278,7 @@ class TestAFinishedRunSaysWhoRanIt:
                             run_timestamp="2026-09-27T10:00:00+08:00")
         qa_store.record_results(db, "anon", [_result("a")], tool="dbt", **_KEYS)
         with pytest.raises(qa_store.UnattributedRun):
+            attempt_support.opened(db, "anon")
             qa_store.complete_run(db, "anon")
 
         assert qa_store.results_for_run(db, "anon") == []
@@ -270,6 +286,7 @@ class TestAFinishedRunSaysWhoRanIt:
 
     def test_completing_a_run_nobody_registered_refuses_too(self, db):
         with pytest.raises(qa_store.UnattributedRun):
+            attempt_support.opened(db, "never-registered")
             qa_store.complete_run(db, "never-registered")
 
     def test_a_tools_defensive_registration_does_not_erase_the_identity(self, db):
@@ -283,6 +300,7 @@ class TestAFinishedRunSaysWhoRanIt:
                             collection_id="birth-registrations",
                             run_timestamp="2026-09-27T10:00:00+08:00")
 
+        attempt_support.opened(db, run_key)
         qa_store.complete_run(db, run_key)
         assert qa_store.runs_for(db, "bdm", "birth-registrations")[0]["run_by"] \
             == "keith@example.gov.au"

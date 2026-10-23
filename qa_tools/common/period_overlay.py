@@ -56,27 +56,8 @@ def staged_for_period(conn, period: str, logical_names: Sequence[str], *,
     The load-record gate applies as it does everywhere a check's view is
     built (REQ-PIPE-060 criterion 7): `loaded=None` skips it.
     """
-    from qa_tools.common import filing, hierarchy, qa_store, supply_files
-
-    qa_store.ensure_schema(conn)
     wanted = set(logical_names)
-    # EACH FILED SUPPLY'S OWN TABLES, by the one resolver (REQ-PIPE-193
-    # criterion 13): a settled pair's two supplies filed to two periods
-    # each own one file, so matching on the arrival key alone gave both
-    # periods both files.
-    filed: set[str] = set()
-    for dataset_id, supply_id in conn.execute(
-            f"SELECT dataset_id, supply_id FROM {filing.CURRENT} WHERE slot = ?",
-            [period]).fetchall():
-        try:
-            logical = hierarchy.dataset(dataset_id).table
-        except hierarchy.UnknownDatasetError:
-            continue
-        if logical not in wanted or "@" not in supply_id:
-            continue
-        found_supply = supply_files.resolve(conn, dataset_id, supply_id)
-        filed.update(found_supply.tables if found_supply else ())
-
+    filed = filed_tables(conn, period, wanted)
     found: dict[str, list[str]] = {name: [] for name in wanted}
     for logical, physicals in supply_db.candidates_in(
             conn, staging, sorted(wanted), loaded=loaded).items():
@@ -84,6 +65,34 @@ def staged_for_period(conn, period: str, logical_names: Sequence[str], *,
             if physical in filed:
                 found[logical].append(physical)
     return found
+
+
+def filed_tables(conn, period: str, wanted: Collection[str] | None = None) -> dict[str, str]:
+    """Every staged physical table of a supply FILED to `period` -> that
+    supply's id, for the logical tables in `wanted` (every one where None).
+
+    EACH FILED SUPPLY'S OWN TABLES, by the one resolver (REQ-PIPE-193
+    criterion 13): a settled pair's two supplies filed to two periods each
+    own one file, so matching on the arrival key alone gave both periods
+    both files. The supply id is the same walk's, which is how a staged
+    table's supply reaches the resolution (REQ-PIPE-279 criterion 2)."""
+    from qa_tools.common import filing, hierarchy, qa_store, supply_files
+
+    qa_store.ensure_schema(conn)
+    filed: dict[str, str] = {}
+    for dataset_id, supply_id in conn.execute(
+            f"SELECT dataset_id, supply_id FROM {filing.CURRENT} WHERE slot = ? "
+            "ORDER BY dataset_id, supply_id", [period]).fetchall():
+        try:
+            logical = hierarchy.dataset(dataset_id).table
+        except hierarchy.UnknownDatasetError:
+            continue
+        if (wanted is not None and logical not in wanted) or "@" not in supply_id:
+            continue
+        found_supply = supply_files.resolve(conn, dataset_id, supply_id)
+        for physical in (found_supply.tables if found_supply else ()):
+            filed.setdefault(physical, supply_id)
+    return filed
 
 
 def build(conn, run_id: str, *, period: str, own_table: str, arrival_key: str,
@@ -141,6 +150,14 @@ def build(conn, run_id: str, *, period: str, own_table: str, arrival_key: str,
         promoted.pop(own_table, None)
     out = period_schema.create_overlay_views(conn, run_id, period, staged, promoted)
     out.resolution.supply_of.update(_supplies_held(conn, period, out))
+    # A STAGED TABLE'S SUPPLY TOO (REQ-PIPE-279 criterion 2), the run's own
+    # among them, from its filing - so every table a result read names a
+    # supply, wherever it was read from.
+    staged_supply = filed_tables(conn, period)
+    for logical, origin in out.source.items():
+        supply = staged_supply.get(out.resolution.resolved[logical])
+        if origin == period_schema.FROM_STAGING and supply:
+            out.resolution.supply_of[logical] = supply
     if withheld is not None:
         out.resolution.held[own_table] = withheld
         if own_table in out.resolution.absent:
@@ -207,6 +224,7 @@ def name_held_siblings(conn, res: supply_db.Resolution, arrival) -> list[str]:
         if table in res.absent:
             res.absent.remove(table)
             res.held[table] = held.supply_id
+            res.held_supply[table] = held.supply_id
             moved.append(table)
     return moved
 
@@ -246,8 +264,9 @@ def _withhold_if_held(arrival, dataset_id: str, own_table: str, *,
     key = supply_db.arrival_segment(arrival.received_at)
     conn = supply_db.connect(dsn=dsn, label="mothman:period-overlay")
     try:
-        if not any(supply_holds.arrival_key_of(h.supply_id) == key
-                   for h in supply_holds.outstanding(conn, dataset_id=dataset_id)):
+        holds = [h for h in supply_holds.outstanding(conn, dataset_id=dataset_id)
+                 if supply_holds.arrival_key_of(h.supply_id) == key]
+        if not holds:
             return
         res = supply_db.resolution_for(conn, arrival.run_id)
         physical = res.resolved.pop(own_table, None)
@@ -256,6 +275,7 @@ def _withhold_if_held(arrival, dataset_id: str, own_table: str, *,
         if own_table in res.absent:
             res.absent.remove(own_table)
         res.held[own_table] = physical
+        res.held_supply[own_table] = holds[0].supply_id
         conn.execute(f'DROP VIEW IF EXISTS "{supply_db.run_schema(arrival.run_id)}".'
                      f'"{own_table}"')
         supply_db.record_resolution(conn, res)
@@ -324,6 +344,13 @@ def rebuild_for_arrival(arrival, *, tables: Sequence[str],
             supply_db.add_run_views(conn, arrival.run_id, newest,
                                      sample_data.SCHEMA, out.resolution)
         name_held_siblings(conn, out.resolution, arrival)
+        # THE RUN'S OWN HELD TABLE BY ITS SUPPLY ID (REQ-PIPE-279 criterion 1),
+        # from the same holds that withheld it.
+        for table, supply in supply_holds.held_supplies(
+                conn, arrival_key=key,
+                supply=resolved.supply_id if resolved is not None else None).items():
+            if table in out.resolution.held:
+                out.resolution.held_supply.setdefault(table, supply)
         supply_db.record_resolution(conn, out.resolution)
     finally:
         conn.close()

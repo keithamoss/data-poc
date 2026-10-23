@@ -19,6 +19,7 @@ supply that really arrived and exactly wrong for one nobody accepted.
 """
 from __future__ import annotations
 
+import attempt_support
 from qa_tools.common import supply_db, trial
 from staging_support import stage_bdm
 
@@ -354,6 +355,8 @@ class TestARealTrialStagesAndVanishes:
                         [{"check_id": "x.y.civil-registration.birth-registrations.c.missing_soda",
                           "dataset_id": "birth-registrations", "run_id": run_id,
                           "status": "pass"}], run_by="trial:not-recorded")
+        with supply_db.connect(label="test-trial") as conn:
+            attempt_support.opened(conn, run_id)
         finish_run(run_id)
         with supply_db.connect(label="test-trial") as conn:
             conn.execute(f'INSERT INTO "{qa_store.SCHEMA}".census (trigger, run_key) '

@@ -321,9 +321,12 @@ class TestTheResolutionRemembersTheSupply:
     def test_the_per_result_record_names_the_supply(self, monkeypatch):
         from qa_tools.common import qa_results_writer as w
 
+        # READ FROM THE PERIOD, said by its source (REQ-PIPE-279 criterion 2):
+        # a supply alone no longer means a period table.
         res = supply_db.Resolution(run_id="r", schema="x",
                                    resolved={TABLE: TABLE},
-                                   supply_of={TABLE: f"{DS}@000000000000000007"})
+                                   supply_of={TABLE: f"{DS}@000000000000000007"},
+                                   source={TABLE: "period"})
 
         class Conn:
             def close(self):
@@ -331,7 +334,7 @@ class TestTheResolutionRemembersTheSupply:
         monkeypatch.setattr(supply_db, "connect", lambda **_k: Conn())
         monkeypatch.setattr(supply_db, "resolution_for", lambda conn, run_id: res)
         monkeypatch.setattr(w, "_declared_reads_tables", lambda: {"c1": [TABLE]})
-        out = w._with_tables_read([{"check_id": "c1", "dataset_id": "cp-clients"}], "r")
+        out, _reads = w._with_tables_read([{"check_id": "c1", "dataset_id": "cp-clients"}], "r")
         assert out[0]["tables_read"] == {TABLE: f"{TABLE}__000000000000000007"}
 
 

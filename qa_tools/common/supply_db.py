@@ -1127,11 +1127,21 @@ class Resolution:
     #: rather than dropped, because "which supply is the one nobody has
     #: placed" is exactly what resolving the hold needs.
     held: dict[str, str] = field(default_factory=dict)
-    #: logical table -> the supply a PERIOD table held when it was
-    #: resolved (REQ-PIPE-129 criterion 13): a period table carries its
-    #: plain base name, so its name no longer says which supply it was.
-    #: Taken from the decision log, never from a name (criterion 7).
+    #: logical table -> the supply each resolved table held when it was
+    #: read: a PERIOD table's from the decision log (REQ-PIPE-129 criteria 7
+    #: and 13), since its plain base name no longer says; a STAGED table's
+    #: from its filing (REQ-PIPE-279 criterion 2). Never from a name.
     supply_of: dict[str, str] = field(default_factory=dict)
+    #: logical table -> where it was read from, period_schema.FROM_STAGING
+    #: or FROM_PERIOD (REQ-PIPE-279 criterion 2) - its own field, because a
+    #: staged table carrying a supply means `supply_of` can no longer say
+    #: which. Absent for a table from neither (a sample's) and for a
+    #: resolution built at staging, before any period is known.
+    source: dict[str, str] = field(default_factory=dict)
+    #: logical table -> the HELD supply's id (REQ-PIPE-279 criterion 1).
+    #: `held` keeps the physical table being withheld, which is what
+    #: resolving a hold looks at; this is what a result reading it records.
+    held_supply: dict[str, str] = field(default_factory=dict)
 
     @property
     def readable(self) -> list[str]:
@@ -1164,7 +1174,10 @@ class Resolution:
                 "absent": sorted(self.absent),
                 "held": dict(sorted(self.held.items())),
                 **({"supply_of": dict(sorted(self.supply_of.items()))}
-                   if self.supply_of else {})}
+                   if self.supply_of else {}),
+                **({"source": dict(sorted(self.source.items()))} if self.source else {}),
+                **({"held_supply": dict(sorted(self.held_supply.items()))}
+                   if self.held_supply else {})}
 
 
 def split_staged(physical: str) -> tuple[str, str, str] | None:
@@ -1247,7 +1260,7 @@ def candidates_in(conn, schema: str, logical_names: Sequence[str],
 
 def create_run_views(conn, run_id: str, candidates: Mapping[str, Sequence[str]],
                      source_schema: str = STAGING_SCHEMA,
-                     held: Collection[str] = ()) -> Resolution:
+                     held: Collection[str] | Mapping[str, str] = ()) -> Resolution:
     """Build the run's view schema and report what it holds.
 
     A logical name becomes a view only where exactly one candidate
@@ -1270,6 +1283,9 @@ def create_run_views(conn, run_id: str, candidates: Mapping[str, Sequence[str]],
     period, but drift and previous-period comparison cannot, so a
     partial verdict has to be thrown away once the slot is known - or
     worse, a GREEN one sits in history against no period at all.
+
+    `held` may map each withheld table to its held supply's id, which is
+    then what a result reading it records (REQ-PIPE-279 criterion 1).
     """
     schema = run_schema(run_id)
     conn.execute(f'DROP SCHEMA IF EXISTS "{schema}" CASCADE')
@@ -1286,6 +1302,8 @@ def create_run_views(conn, run_id: str, candidates: Mapping[str, Sequence[str]],
             # something is: resolving the hold means somebody looking
             # at that supply.
             res.held[logical] = physical[0] if len(physical) == 1 else ""
+            if isinstance(held, Mapping) and held.get(logical):
+                res.held_supply[logical] = held[logical]
         elif len(physical) == 1:
             conn.execute(
                 f'CREATE VIEW "{schema}"."{_ident(logical, "table name")}" AS '
@@ -1389,7 +1407,8 @@ def borrow_views(conn, run_id: str, from_run_id: str, tables) -> list[str]:
     name invented for this one.
     """
     schema = run_schema(run_id)
-    earlier = resolution_for(conn, from_run_id).resolved
+    source = resolution_for(conn, from_run_id)
+    earlier = source.resolved
     mine = resolution_for(conn, run_id)
     borrowed = []
     for logical in sorted(set(tables)):
@@ -1400,6 +1419,12 @@ def borrow_views(conn, run_id: str, from_run_id: str, tables) -> list[str]:
             f'CREATE OR REPLACE VIEW "{schema}"."{_ident(logical, "table name")}" AS '
             f'SELECT * FROM "{staging_schema_for(from_run_id)}"."{physical}"')
         mine.resolved[logical] = physical
+        # AND THE SUPPLY IT WAS (REQ-PIPE-279 criterion 2): the same table of
+        # the same earlier run, so the same supply and the same origin.
+        for carried, into in ((source.supply_of, mine.supply_of),
+                              (source.source, mine.source)):
+            if logical in carried:
+                into[logical] = carried[logical]
         mine.ambiguous.pop(logical, None)
         if logical in mine.absent:
             mine.absent.remove(logical)
@@ -1756,22 +1781,26 @@ def record_resolution(conn, res: Resolution) -> None:
     eventually is not.
     """
     schema = staging_schema_for(res.run_id)
+    # `source` SINCE qa SCHEMA 46 (REQ-PIPE-279), whose bump rebuilds every
+    # database from empty - so no older carrier table survives to lack it.
     create_if_absent(
         conn, f'CREATE TABLE IF NOT EXISTS "{schema}"."{_RESOLUTIONS}" '
         "(run_id VARCHAR, logical VARCHAR, physical VARCHAR, state VARCHAR, "
-        "supply VARCHAR)")
+        "supply VARCHAR, source VARCHAR)")
     conn.execute(
         f'DELETE FROM "{schema}"."{_RESOLUTIONS}" WHERE run_id = ?', [res.run_id])
-    rows = ([(res.run_id, k, v, "resolved", res.supply_of.get(k))
+    rows = ([(res.run_id, k, v, "resolved", res.supply_of.get(k), res.source.get(k))
              for k, v in res.resolved.items()]
-            + [(res.run_id, k, p, "ambiguous", None)
+            + [(res.run_id, k, p, "ambiguous", None, None)
                for k, ps in res.ambiguous.items() for p in ps]
-            + [(res.run_id, k, None, "absent", None) for k in res.absent]
-            + [(res.run_id, k, v or None, "held", None) for k, v in res.held.items()])
+            + [(res.run_id, k, None, "absent", None, None) for k in res.absent]
+            + [(res.run_id, k, v or None, "held", res.held_supply.get(k), None)
+               for k, v in res.held.items()])
     for row in rows:
         conn.execute(
             f'INSERT INTO "{schema}"."{_RESOLUTIONS}" '
-            "(run_id, logical, physical, state, supply) VALUES (?, ?, ?, ?, ?)", list(row))
+            "(run_id, logical, physical, state, supply, source) VALUES (?, ?, ?, ?, ?, ?)",
+            list(row))
 
 
 def resolution_for(conn, run_id: str) -> Resolution:
@@ -1782,7 +1811,7 @@ def resolution_for(conn, run_id: str) -> Resolution:
     res = Resolution(run_id=run_id, schema=run_schema(run_id))
     try:
         rows = conn.execute(
-            f'SELECT logical, physical, state, supply '
+            f'SELECT logical, physical, state, supply, source '
             f'FROM "{staging_schema_for(run_id)}"."{_RESOLUTIONS}" '
             "WHERE run_id = ? ORDER BY logical, physical", [run_id]).fetchall()
     except (psycopg.errors.UndefinedTable, psycopg.errors.InvalidSchemaName):
@@ -1791,15 +1820,19 @@ def resolution_for(conn, run_id: str) -> Resolution:
         # CatalogException, handled the same way - a caller asking is
         # reporting, and "nothing recorded" beats a traceback.
         return res
-    for logical, physical, state, supply in rows:
+    for logical, physical, state, supply, source in rows:
         if state == "resolved":
             res.resolved[logical] = physical
             if supply:
                 res.supply_of[logical] = supply
+            if source:
+                res.source[logical] = source
         elif state == "ambiguous":
             res.ambiguous.setdefault(logical, []).append(physical)
         elif state == "held":
             res.held[logical] = physical or ""
+            if supply:
+                res.held_supply[logical] = supply
         else:
             res.absent.append(logical)
     return res

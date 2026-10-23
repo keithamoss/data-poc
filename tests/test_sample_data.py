@@ -368,6 +368,17 @@ class TestACrossTableCheckMaySpanThem:
 
         monkeypatch.setattr(qa_results_writer, "_declared_reads_tables", lambda: mapping)
 
+    @staticmethod
+    def _read(conn, *, agreed=(), sample=(), absent=()):
+        """What run_1 read, as its resolution records it - a cross-table
+        result is recorded with what it read or not at all (REQ-PIPE-279
+        criterion 4): an agreed table as its supply, a sample's as no supply."""
+        supply_db.ensure_schemas(conn)
+        supply_db.record_resolution(conn, supply_db.Resolution(
+            run_id="run_1", schema=supply_db.run_schema("run_1"),
+            resolved={t: f"{t}__1" for t in (*agreed, *sample)},
+            supply_of={t: f"{t}@1" for t in agreed}, absent=list(absent)))
+
     def test_a_check_among_two_calendar_less_datasets_is_in_development(
             self, tmp_path, monkeypatch, clean_qa_history, finish_runs):
         """Criterion 13: authored and run exactly as for datasets that have
@@ -375,6 +386,7 @@ class TestACrossTableCheckMaySpanThem:
         either participant."""
         _asset_with([AGREED, SAMPLE, SECOND_SAMPLE], tmp_path, monkeypatch)
         self._declaring(monkeypatch, {"referrals_match_outcomes": ["cp_referrals", "cp_outcomes"]})
+        self._read(clean_qa_history, sample=("cp_referrals", "cp_outcomes"))
         write_qa_result("a", "b", "run_1", "2026-01-01T00:00:00+00:00", "dbt-core",
                         {"raw": True},
                         [_result("cp-referrals", "referrals_match_outcomes")])
@@ -396,6 +408,7 @@ class TestACrossTableCheckMaySpanThem:
         _asset_with([AGREED, SAMPLE], tmp_path, monkeypatch)
         self._declaring(monkeypatch,
                         {"births_match_referrals": ["birth_registrations", "cp_referrals"]})
+        self._read(clean_qa_history, agreed=("birth_registrations",), sample=("cp_referrals",))
         write_qa_result("a", "b", "run_1", "2026-01-01T00:00:00+00:00", "dbt-core",
                         {"raw": True},
                         [_result("birth-registrations", "births_match_referrals")])
@@ -414,6 +427,7 @@ class TestACrossTableCheckMaySpanThem:
         cross-table check stays agreed."""
         _asset_with([AGREED, SAMPLE], tmp_path, monkeypatch)
         self._declaring(monkeypatch, {"births_self": ["birth_registrations"]})
+        self._read(clean_qa_history, agreed=("birth_registrations",))
         write_qa_result("a", "b", "run_1", "2026-01-01T00:00:00+00:00", "dbt-core",
                         {"raw": True}, [_result("birth-registrations", "births_self")])
         finish_runs("run_1", agency="a", collection="b")
@@ -430,6 +444,7 @@ class TestACrossTableCheckMaySpanThem:
         _asset_with([AGREED, SAMPLE], tmp_path, monkeypatch)
         self._declaring(monkeypatch,
                         {"births_self": ["birth_registrations", "no_such_table"]})
+        self._read(clean_qa_history, agreed=("birth_registrations",), absent=("no_such_table",))
         write_qa_result("a", "b", "run_1", "2026-01-01T00:00:00+00:00", "dbt-core",
                         {"raw": True}, [_result("birth-registrations", "births_self")])
         finish_runs("run_1", agency="a", collection="b")

@@ -464,7 +464,9 @@ def create_overlay_views(conn, run_id: str, period_name: str,
             f'CREATE VIEW "{schema}"."{logical}" AS '
             f'SELECT * FROM "{source_schema}"."{physical}"')
         res.resolved[logical] = physical
-        out.source[logical] = origin
+        # ON THE RESOLUTION TOO, which is what is recorded and read back
+        # (REQ-PIPE-279 criterion 2): this wrapper is gone once the run ends.
+        out.source[logical] = res.source[logical] = origin
     return out
 
 

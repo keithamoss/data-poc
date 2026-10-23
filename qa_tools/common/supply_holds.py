@@ -699,10 +699,17 @@ def held_tables(conn, *, arrival_key: str, supply: str | None = None) -> frozens
     pair's two files share an arrival, and one file's hold says nothing
     about the other. Other datasets' holds in the arrival still count.
     """
+    return frozenset(held_supplies(conn, arrival_key=arrival_key, supply=supply))
+
+
+def held_supplies(conn, *, arrival_key: str, supply: str | None = None) -> dict[str, str]:
+    """held_tables()' answer with each table's held SUPPLY ID - what a
+    result reading a held table records (REQ-PIPE-279 criterion 1), since a
+    held table's physical name says nothing a reader can match a supply on."""
     from qa_tools.common import hierarchy, supply_files
 
     own = supply_files.dataset_of(supply) if supply else None
-    tables = set()
+    tables: dict[str, str] = {}
     for held in outstanding(conn):
         if own is not None and held.dataset_id == own:
             if held.supply_id != supply:
@@ -710,7 +717,7 @@ def held_tables(conn, *, arrival_key: str, supply: str | None = None) -> frozens
         elif arrival_key_of(held.supply_id) != arrival_key:
             continue
         try:
-            tables.add(hierarchy.dataset(held.dataset_id).table)
+            tables.setdefault(hierarchy.dataset(held.dataset_id).table, held.supply_id)
         except Exception:
             continue
-    return frozenset(tables)
+    return tables

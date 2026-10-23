@@ -113,13 +113,21 @@ def test_an_unfinished_run_is_not_on_the_feed():
     """A run that never completed has not published anything, so it has
     no place on a "who published what" feed - which is criterion 13
     holding at one more reader rather than a special case here."""
+    from qa_tools.common.qa_results_writer import close_attempt
+
     open_run("agency-a", "dataset-a", "run_01", "2026-01-01T09:00:00+00:00",
              "keith@example.com")
-    write_qa_result("agency-a", "dataset-a", "run_01", "2026-01-01T09:00:00+00:00",
-                     "dataset_stats", {"arrival_record": {}},
-                     run_by="keith@example.com")
+    try:
+        write_qa_result("agency-a", "dataset-a", "run_01", "2026-01-01T09:00:00+00:00",
+                         "dataset_stats", {"arrival_record": {}},
+                         run_by="keith@example.com")
 
-    assert changelog.build_changelog("agency-a", "dataset-a") == []
+        assert changelog.build_changelog("agency-a", "dataset-a") == []
+    finally:
+        # ENDED AS A RUN THAT NEVER COMPLETED ENDS (REQ-PIPE-279): its
+        # attempt would otherwise hold run_01's lock for the rest of the
+        # process, and the next test opening run_01 is refused beside it.
+        close_attempt("run_01", RuntimeError("the test stopped here"))
 
 
 class TestNoCommitSurvivesInTheFEED:

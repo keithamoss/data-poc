@@ -106,9 +106,12 @@ from __future__ import annotations
 
 from typing import Any
 
-def _with_tables_read(verified: list[dict], run_id: str) -> list[dict]:
+def _with_tables_read(verified: list[dict], run_id: str) -> tuple[list[dict], dict]:
     """Record, on each cross-table check's own result, the physical
-    table name of every OTHER table it read (REQ-PIPE-036 criterion 10).
+    table name of every OTHER table it read (REQ-PIPE-036 criterion 10) -
+    and work out, for each, what it read of EVERY table, its own included
+    (REQ-PIPE-279 criterion 1). Returns the enriched records and
+    {index in `verified`: its qa_store.CheckRead rows}.
 
     HERE RATHER THAN IN EACH TOOL, because this is the one place all
     eight run_*.py callers already funnel through - and doing it in
@@ -118,42 +121,84 @@ def _with_tables_read(verified: list[dict], run_id: str) -> list[dict]:
 
     THE RESOLUTION IS READ ONLY WHERE SOMETHING DECLARES A DEPENDENCY.
     Birth Registrations has no cross-table check at all, so its four
-    writes never open a connection; Child Protection's do. A run with
-    no recorded resolution - a fixture, an ad hoc call - gets no
-    tables_read rather than an error, and that is safe to be quiet
-    about for one specific reason: the run-level tables_read.json
-    (REQ-PIPE-068 criterion 5) records the same resolution for the
-    whole run, so an absence here is visible against a file that is
-    always written.
+    writes never open a connection; Child Protection's do.
+
+    AND NEVER QUIETLY (REQ-PIPE-279 criterion 4). A failure to read the
+    resolution used to leave a cross-table result recorded with no
+    tables_read, on the grounds that the run-level record said the same;
+    now the result itself says which supply it read, and a result with no
+    read is one nobody can place, so it raises - as does a run with no
+    recorded resolution, whose reads cannot be recorded either.
     """
+    from qa_tools.common import period_schema, period_tables, supply_db
     from qa_tools.common import tables_read as tables_read_mod
 
     declared = _declared_reads_tables()
-    if not any(record.get("check_id") in declared for record in verified):
-        return verified
+    spanning = [i for i, record in enumerate(verified) if record.get("check_id") in declared]
+    if not spanning:
+        return verified, {}
+    conn = supply_db.connect(read_only=True, label="mothman:tables-read")
     try:
-        from qa_tools.common import supply_db
+        resolution = supply_db.resolution_for(conn, run_id)
+        # A PERIOD TABLE IS RECORDED BY THE SUPPLY IT HELD (REQ-PIPE-129
+        # criterion 13), as the stamped name that supply's table carries
+        # everywhere but a period - its plain name there says nothing. A
+        # settled pair's supply carries its own file's ordinal, which only
+        # the resolver knows (REQ-PIPE-193 criterion 13), hence the
+        # connection. WHETHER IT IS A PERIOD TABLE IS ITS RECORDED SOURCE
+        # (REQ-PIPE-279 criterion 2): a staged table carries its supply too
+        # now, and keeps the name it was read as.
+        resolved = {logical: (period_tables.stamped_name(
+                        logical, resolution.supply_of[logical], conn=conn)
+                              if resolution.source.get(logical) == period_schema.FROM_PERIOD
+                              and logical in resolution.supply_of else physical)
+                    for logical, physical in resolution.resolved.items()}
+    finally:
+        conn.close()
+    reads = {i: _check_reads(verified[i]["check_id"], declared, resolution, run_id)
+             for i in spanning}
+    return tables_read_mod.attach(verified, resolved, declared), reads
 
-        from qa_tools.common import period_tables
 
-        conn = supply_db.connect(read_only=True)
-        try:
-            resolution = supply_db.resolution_for(conn, run_id)
-            # A PERIOD TABLE IS RECORDED BY THE SUPPLY IT HELD (REQ-PIPE-129
-            # criterion 13), as the stamped name that supply's table carries
-            # everywhere but a period - its plain name there says nothing. A
-            # settled pair's supply carries its own file's ordinal, which only
-            # the resolver knows (REQ-PIPE-193 criterion 13), hence the
-            # connection.
-            resolved = {logical: (period_tables.stamped_name(
-                            logical, resolution.supply_of[logical], conn=conn)
-                                  if logical in resolution.supply_of else physical)
-                        for logical, physical in resolution.resolved.items()}
-        finally:
-            conn.close()
-    except Exception:  # noqa: BLE001 - see the docstring on why this is quiet
-        return verified
-    return tables_read_mod.attach(verified, resolved, declared)
+def _check_reads(check_id: str, declared: dict[str, list[str]], res, run_id: str) -> tuple:
+    """What `check_id` read of every table it reads, its own included, in
+    the run's recorded resolution (REQ-PIPE-279 criterion 1) - or
+    UnrecordableRead where any of them cannot be said (criterion 4).
+
+    NO-SUPPLY is a sample's or a trial's table and nothing else: a table
+    read with no supply recorded anywhere else is a resolution that did not
+    say which supply it was, and recording NO-SUPPLY for it would be a
+    guess with a tidier name."""
+    from qa_tools.common import carried, hierarchy, qa_store, sample_data, trial
+
+    tables = carried._reads_of(check_id, declared) or set(declared.get(check_id) or ())
+    no_supply_allowed = trial.is_trial(run_id)
+    samples = sample_data.sample_dataset_ids()
+    out, problems = [], []
+    for table in sorted(tables):
+        files = tuple(sorted(res.ambiguous.get(table, ())))
+        if table in res.resolved:
+            supply = res.supply_of.get(table)
+            if supply:
+                out.append(qa_store.CheckRead(table, qa_store.READ, supply, bool(files), files))
+            elif no_supply_allowed or hierarchy.dataset_for_table(table).dataset_id in samples:
+                out.append(qa_store.CheckRead(table, qa_store.NO_SUPPLY))
+            else:
+                problems.append(f"{table} was read and no supply is recorded for it")
+        elif table in res.held:
+            if res.held_supply.get(table):
+                out.append(qa_store.CheckRead(table, qa_store.HELD, res.held_supply[table]))
+            else:
+                problems.append(f"{table} is held and its supply is not recorded")
+        elif table in res.absent or files:
+            out.append(qa_store.CheckRead(table, qa_store.ABSENT, None, bool(files), files))
+        else:
+            problems.append(f"{table} is not in the run's recorded resolution")
+    if problems:
+        raise qa_store.UnrecordableRead(
+            f"run {run_id!r}: cannot record what {check_id} read - {'; '.join(problems)}. "
+            "Refusing to record the result with no read (REQ-PIPE-279 criterion 4).")
+    return tuple(out)
 
 
 def _declared_reads_tables() -> dict[str, list[str]]:
@@ -437,7 +482,7 @@ def write_qa_result(agency: str, collection: str, run_id: str, run_timestamp: st
     `_cross-table` (REQ-QAC-037)."""
     if verified:
         _scope_to_run(verified, run_id)
-    records = _with_tables_read(verified or [], run_id)
+    records, reads = _with_tables_read(verified or [], run_id)
     # THE CALLER'S OWN RECORDS ARE BROUGHT UP TO DATE, and that is not
     # tidiness. The orchestrator keeps the list it passed here and
     # writes it to reports/results_*.json, which is what a LOCAL
@@ -475,12 +520,14 @@ def write_qa_result(agency: str, collection: str, run_id: str, run_timestamp: st
 
     own_by_state: dict[str, list[dict]] = _empty_states()
     spanning_by_state: dict[str, list[dict]] = _empty_states()
+    reads_by_state: dict[str, list[tuple]] = _empty_states()
     sample_ids = sample_data.sample_dataset_ids()
     for index, record in enumerate(records):
         if record.get("check_id") in declared:
             state = sample_data.state_for_participants(
                 _participants(record.get("check_id"), declared), sample_ids=sample_ids)
             spanning_by_state[state].append(record)
+            reads_by_state[state].append(reads[index])
         else:
             state = sample_data.supply_state(record.get("dataset_id"),
                                              sample_ids=sample_ids)
@@ -521,7 +568,8 @@ def write_qa_result(agency: str, collection: str, run_id: str, run_timestamp: st
     # one-dataset collection is precisely where a special case would look
     # harmless.
     _record_in_database(agency, collection, run_id, run_timestamp, tool,
-                        raw_output, own_by_state, spanning_by_state, run_by)
+                        raw_output, own_by_state, spanning_by_state, run_by,
+                        reads_by_state)
 
 
 def _participants(check_id: str | None, declared: dict[str, list[str]]) -> list[str]:
@@ -580,7 +628,8 @@ RUN_LEVEL = ""
 def _record_in_database(agency: str, collection: str, run_id: str, run_timestamp: str,
                          tool: str, raw_output: Any, own_by_state: dict[str, list[dict]],
                          spanning_by_state: dict[str, list[dict]],
-                         run_by: str | None) -> None:
+                         run_by: str | None,
+                         reads_by_state: dict[str, list[tuple]] | None = None) -> None:
     """Record one tool's output for one run in the metadata schema.
 
     THE RUN KEY IS THE RUN ID, which is safe because this project
@@ -610,7 +659,8 @@ def _record_in_database(agency: str, collection: str, run_id: str, run_timestamp
             qa_store.record_dataset_stats(conn, run_id, RUN_LEVEL, raw_output)
         elif tool == TABLES_READ_TOOL:
             qa_store.record_tables_read(conn, run_id, (raw_output or {}).get("resolved", {}),
-                                        (raw_output or {}).get("supply_of", {}))
+                                        (raw_output or {}).get("supply_of", {}),
+                                        (raw_output or {}).get("source", {}))
         else:
             qa_store.record_tool_output(conn, run_id, tool, raw_output)
 
@@ -630,37 +680,188 @@ def _record_in_database(agency: str, collection: str, run_id: str, run_timestamp
         for state, group in spanning_by_state.items():
             qa_store.record_results(conn, run_id, group, **keys,
                                     scope=qa_store.CROSS_TABLE_SCOPE,
-                                    supply_state=state)
+                                    supply_state=state,
+                                    reads=(reads_by_state or {}).get(state))
 
 
 def open_run(agency: str, collection: str, run_id: str, run_timestamp: str,
-             run_by: str, purpose: dict | None = None) -> None:
+             run_by: str, purpose: dict | None = None) -> "Attempt":
     """Register a run before any of its tools write, with the identity
-    only the orchestrator knows (REQ-PIPE-089 criteria 6 and 13).
+    only the orchestrator knows (REQ-PIPE-089 criteria 6 and 13) - and
+    begin an ATTEMPT at it (REQ-PIPE-279 criteria 5 to 7).
 
     A tool's own write registers the run too, defensively, because
     `mothman debug run-dbt` invokes one tool with no orchestrator around
     it. The difference is that this call knows WHO is running it, and
     `record_run` coalesces so the defensive registrations cannot undo
     that.
+
+    THE ONLY PLACE run_seq IS DRAWN, and drawn again on every opening of
+    the run key - a reopen, or an owed re-check retried under its own key -
+    so a retry ranks after every run opened in between. The attempt, its
+    run_seq and the run's registration land in one transaction, on the
+    connection that holds the run key's lock for the attempt's whole life;
+    see Attempt. Called after the run's resolution is recorded and before
+    any tool, by orchestrate._run_one_inner.
     """
     from qa_tools.common import environments, qa_store, supply_db
 
-    with supply_db.connect(label="mothman:qa-run-open") as conn:
-        qa_store.ensure_schema(conn)
-        qa_store.record_run(conn, run_key=run_id, agency_id=agency,
-                            collection_id=collection, run_timestamp=run_timestamp,
-                            run_by=run_by, environment=environments.current().id)
-        # A RE-RUN STARTS INCOMPLETE AGAIN. Without this, re-running a
-        # run that finished once would leave its results observable
-        # while the new ones were still being written - a reader would
-        # see the old run's verdicts mixed with however much of the new
-        # one had landed, which is the partial-run problem wearing the
-        # one disguise the completeness marker does not catch.
-        qa_store.reopen_run(conn, run_id)
-        # WHAT THE RUN IS FOR (REQ-PIPE-140). A re-run's executor states
-        # it; an arrival's run is the supply its id names, where filed.
-        qa_store.set_run_purpose(conn, run_id, **(purpose or _arrival_purpose(conn, run_id)))
+    lock = supply_db.connect(reuse=False, label="mothman:qa-run-attempt")
+    try:
+        qa_store.ensure_schema(lock)
+        if not qa_store.take_attempt_lock(lock, run_id):
+            raise qa_store.AttemptInProgress(
+                f"run {run_id!r} is being evaluated by another session, which holds its "
+                "lock - not opening a second attempt beside it (REQ-PIPE-279 criterion 7).")
+        with lock.raw.transaction():
+            # THE ATTEMPT FIRST, so the registration below is a write inside
+            # an open attempt rather than one refused for having none.
+            run_seq = qa_store.begin_attempt(lock, run_id)
+            qa_store.record_run(lock, run_key=run_id, agency_id=agency,
+                                collection_id=collection, run_timestamp=run_timestamp,
+                                run_by=run_by, environment=environments.current().id)
+            # A RE-RUN STARTS INCOMPLETE AGAIN. Without this, re-running a
+            # run that finished once would leave its results observable
+            # while the new ones were still being written - a reader would
+            # see the old run's verdicts mixed with however much of the new
+            # one had landed, which is the partial-run problem wearing the
+            # one disguise the completeness marker does not catch.
+            qa_store.reopen_run(lock, run_id)
+            # WHAT THE RUN IS FOR (REQ-PIPE-140). A re-run's executor states
+            # it; an arrival's run is the supply its id names, where filed.
+            qa_store.set_run_purpose(lock, run_id, **(purpose or _arrival_purpose(lock, run_id)))
+            qa_store.set_run_seq(lock, run_id, run_seq)
+    except BaseException:
+        lock.close()
+        raise
+    attempt = Attempt(run_id, run_seq, lock)
+    _open_attempts[run_id] = attempt
+    return attempt
+
+
+#: The attempts this process has open, by run key - what finish_run and
+#: orchestrate.run_one's finally end.
+_open_attempts: dict[str, "Attempt"] = {}
+
+
+class Attempt:
+    """One attempt at a run (REQ-PIPE-279 criteria 6 and 7), from open_run
+    until it ends.
+
+    IT HOLDS THE RUN KEY'S SESSION ADVISORY LOCK FOR ITS WHOLE LIFE, on a
+    connection of its own (never a reused one, whose return to the pool
+    releases every advisory lock). So "is it still running?" is "is its lock
+    held?": PostgreSQL releases the lock when the connection dies - a crash,
+    a kill, a machine restart - and the next attempt of the run key, taking
+    it, closes the dead one (qa_store.begin_attempt). No clock decides it.
+
+    ITS END IS WRITTEN ONCE, ON A FRESH CONNECTION, because the attempt's
+    own transaction may be the thing that failed:
+
+      COMPLETED    complete_run succeeded - written by finish_run, before the
+                   census, which is not part of the attempt
+      TIMED-OUT    SQLSTATE 55P03 lock_not_available or 57014 query_canceled
+                   on one of THIS PROJECT'S connections, anywhere in the
+                   exception chain. Only psycopg's errors are ours: dbt and
+                   Soda connect through their own drivers, so a tool's own
+                   timeout arrives as QaRunFailure over an error this cannot
+                   see as one, and records CRASHED - never guessed from text.
+      INTERRUPTED  a stop seen from outside - KeyboardInterrupt, SystemExit,
+                   or SIGTERM, which raises SystemExit while an attempt is
+                   open in the main thread - with its end time
+      CRASHED      any other exception, with its type and its message cut to
+                   qa_store.ERROR_MESSAGE_LIMIT characters
+    """
+
+    def __init__(self, run_key: str, run_seq: int, lock) -> None:
+        self.run_key, self.run_seq, self._lock = run_key, run_seq, lock
+        self.ended = False
+        self._sigterm = _stop_on_sigterm()
+
+    def end(self, exc: BaseException | None, *, completed: bool = False) -> None:
+        if self.ended:
+            return
+        self.ended = True
+        from qa_tools.common import qa_store, supply_db
+
+        outcome, error_type, message = _outcome(exc, completed)
+        try:
+            with supply_db.connect(reuse=False, label="mothman:qa-run-attempt-end") as fresh:
+                qa_store.end_attempt(fresh, self.run_key, self.run_seq, outcome,
+                                     error_type=error_type, error_message=message)
+        finally:
+            _open_attempts.pop(self.run_key, None)
+            if self._sigterm is not None:
+                import signal
+
+                signal.signal(signal.SIGTERM, self._sigterm)
+            self._lock.close()
+
+
+def _stop_on_sigterm():
+    """Make SIGTERM raise SystemExit while an attempt is open, so it ends
+    INTERRUPTED with its end time rather than with none - and return the
+    handler to put back. Only where Python lets a handler be set (the main
+    thread) and nobody else has set one; elsewhere SIGTERM kills as before
+    and the next attempt finds the attempt dead."""
+    import signal
+    import threading
+
+    if threading.current_thread() is not threading.main_thread():
+        return None
+    previous = signal.getsignal(signal.SIGTERM)
+    if previous not in (signal.SIG_DFL, None):
+        return None
+
+    def stop(signum, frame):
+        raise SystemExit(128 + signum)
+
+    signal.signal(signal.SIGTERM, stop)
+    return previous
+
+
+#: The SQLSTATEs a timeout on our own connection raises (criterion 6).
+_TIMEOUT_STATES = ("55P03", "57014")
+
+
+def _outcome(exc: BaseException | None, completed: bool) -> tuple[str, str | None, str | None]:
+    """(outcome, error type, error message) for an attempt ending with `exc`."""
+    import psycopg
+
+    from qa_tools.common import qa_store
+
+    if completed:
+        return qa_store.COMPLETED, None, None
+    if isinstance(exc, (KeyboardInterrupt, SystemExit)):
+        return qa_store.INTERRUPTED, None, None
+    seen, link = set(), exc
+    while link is not None and id(link) not in seen:
+        seen.add(id(link))
+        if isinstance(link, psycopg.Error) and link.sqlstate in _TIMEOUT_STATES:
+            return qa_store.TIMED_OUT, None, None
+        link = link.__cause__ or link.__context__
+    if exc is None:
+        # Not a path the orchestrator has: its runs end in finish_run or raise.
+        return qa_store.CRASHED, "None", "the attempt ended without its run being completed"
+    return (qa_store.CRASHED, type(exc).__name__,
+            str(exc)[:qa_store.ERROR_MESSAGE_LIMIT])
+
+
+def close_attempt(run_id: str, exc: BaseException | None) -> None:
+    """End this process's open attempt at `run_id`, if it has one, with how
+    it ended - orchestrate.run_one's finally. A failure to write the end is
+    reported rather than raised over the exception that ended the attempt;
+    the attempt is then found dead by the next one."""
+    attempt = _open_attempts.get(run_id)
+    if attempt is None:
+        return
+    try:
+        attempt.end(exc)
+    except Exception as failure:  # noqa: BLE001 - never mask why the attempt ended
+        if exc is None:
+            raise
+        print(f"note: the end of {run_id}'s attempt could not be recorded "
+              f"({type(failure).__name__}: {failure}); the next attempt will close it.")
 
 
 def _arrival_purpose(conn, run_id: str) -> dict:
@@ -693,6 +894,11 @@ def finish_run(run_id: str) -> None:
 
     with supply_db.connect(label="mothman:qa-run-finish") as conn:
         qa_store.complete_run(conn, run_id)
+        # THE ATTEMPT IS COMPLETE (REQ-PIPE-279 criterion 6), and ends here:
+        # the census below is not part of it.
+        attempt = _open_attempts.get(run_id)
+        if attempt is not None:
+            attempt.end(None, completed=True)
         # THE CENSUS ON EVERY QA RUN (REQ-PIPE-081 criterion 12), where a
         # connection is legitimately open - never by the dashboard build.
         from qa_tools.common import census

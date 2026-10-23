@@ -19,6 +19,7 @@ from datetime import date, datetime, timezone
 import pytest
 
 import filing_support
+import attempt_support
 from qa_tools.common import (assignment, decision_log as dl, filing, filing_decisions as fd,
                               hierarchy, inheritance, people, qa_store, recheck, schedule,
                               supply_db)
@@ -78,6 +79,7 @@ def _checked(conn, dataset, supply):
                         run_timestamp="2099-01-01T10:00:00+08:00", run_by=REAL_PERSON,
                         environment="sandbox")
     qa_store.set_run_purpose(conn, run_key, dataset_id=dataset.dataset_id, supply_id=supply)
+    attempt_support.opened(conn, run_key)
     qa_store.complete_run(conn, run_key)
     return run_key
 

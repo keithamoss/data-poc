@@ -36,7 +36,7 @@ from qa_tools.common import (
 from qa_tools.common.git_identity import get_run_by
 from qa_tools.common.qa_results_reader import read_dataset_stats
 from qa_tools.common.qa_results_writer import (
-    finish_run, open_run, run_owner, scope_of_run, write_qa_result,
+    close_attempt, finish_run, open_run, run_owner, scope_of_run, write_qa_result,
 )
 from qa_tools.tools import (
     dataset_stats, results_history, run_datacontract, run_dbt, run_evidently, run_soda, stage,
@@ -86,7 +86,14 @@ def run_one(collection_id: str, entry: dict, run_timestamp: str, run_by: str,
     try:
         return _run_one_inner(collection_id, entry, run_id, run_timestamp, run_by,
                               reference_run_id, on_step)
+    except BaseException as exc:
+        # HOW THE ATTEMPT ENDED (REQ-PIPE-279 criterion 6), for every way out
+        # but the one finish_run already recorded - a Ctrl-C and a SIGTERM
+        # included, which is why BaseException.
+        close_attempt(run_id, exc)
+        raise
     finally:
+        close_attempt(run_id, None)
         # IN A finally, so a run that raised does not leave its schemas
         # behind for a later sweep to guess about.
         discard_run_schemas(run_id)

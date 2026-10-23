@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import pytest
 
+import attempt_support
 from qa_tools.common import qa_results_writer, qa_store, supply_db
 
 AGENCY = "registry-services"
@@ -61,12 +62,21 @@ def written(monkeypatch, supply_dsn):
     with supply_db.connect(label="test-fanout") as conn:
         qa_store.ensure_schema(conn)
         conn.execute(f'TRUNCATE "{qa_store.SCHEMA}".run CASCADE')
+        # WHAT THE RUN READ, which a spanning record is recorded with or not
+        # at all (REQ-PIPE-279 criterion 4).
+        supply_db.ensure_schemas(conn)
+        supply_db.record_resolution(conn, supply_db.Resolution(
+            run_id=RUN, schema=supply_db.run_schema(RUN),
+            resolved={"births": "births__1", "registrations": "registrations__1"},
+            supply_of={"births": "births@1", "registrations": "registrations@1"},
+            source={"births": "staging", "registrations": "staging"}))
 
     qa_results_writer.write_qa_result(
         AGENCY, COLLECTION, RUN, STAMP, "dbt", RAW,
         verified=[dict(r) for r in VERIFIED], run_by="keith@example.gov.au")
 
     with supply_db.connect(label="test-fanout") as conn:
+        attempt_support.opened(conn, RUN)
         qa_store.complete_run(conn, RUN)
         yield conn
 
@@ -140,10 +150,13 @@ def test_a_second_write_of_the_same_tool_replaces_rather_than_doubles(written):
     """Re-running one tool is idempotent, which is what overwriting a
     file used to give for free and what a naive append would lose."""
     conn = written
+    # A RE-RUN IS AN ATTEMPT OF ITS OWN (REQ-PIPE-279 criteria 5 and 8): a
+    # write into a completed run with none open is refused.
+    qa_results_writer.open_run(AGENCY, COLLECTION, RUN, STAMP, "keith@example.gov.au")
     qa_results_writer.write_qa_result(
         AGENCY, COLLECTION, RUN, STAMP, "dbt", RAW,
         verified=[dict(r) for r in VERIFIED], run_by="keith@example.gov.au")
-    qa_store.complete_run(conn, RUN)
+    qa_results_writer.finish_run(RUN)
 
     assert len(qa_store.results_for_run(conn, RUN)) == 3
     assert len(qa_store.results_for_run(conn, RUN, scope=qa_store.CROSS_TABLE_SCOPE)) == 1

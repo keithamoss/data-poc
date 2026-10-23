@@ -156,10 +156,16 @@ class TestItReachesTheRecordedResult:
         conn = supply_db.connect()
         try:
             supply_db.ensure_schemas(conn)
+            # WITH THE SUPPLIES IT READ (REQ-PIPE-279 criteria 1 and 4): a
+            # cross-table result is recorded with what it read or not at all,
+            # and a staged table's supply leaves its recorded name alone.
             supply_db.record_resolution(conn, supply_db.Resolution(
                 run_id="cp_run_001", schema=supply_db.run_schema("cp_run_001"),
                 resolved={"cp_placements": "cp_placements__20260801010000",
-                           "cp_carers": "cp_carers__20260801010000"}))
+                           "cp_carers": "cp_carers__20260801010000"},
+                supply_of={"cp_placements": "cp-placements@20260801010000",
+                           "cp_carers": "cp-carers@20260801010000"},
+                source={"cp_placements": "staging", "cp_carers": "staging"}))
         finally:
             conn.close()
 

@@ -85,6 +85,7 @@ already produced once, where json.dumps refused one on the way out.
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass
 from typing import Any, Iterable, Mapping, Sequence
 
 from qa_tools.common import supply_db
@@ -119,6 +120,61 @@ IN_DEVELOPMENT = "in-development"
 class UnattributedRun(Exception):
     """A run tried to finish without saying who ran it (criterion 6)."""
 
+
+class UnrecordableRead(RuntimeError):
+    """A cross-table result whose reads cannot be recorded with it
+    (REQ-PIPE-279 criterion 4). Refused rather than recorded with no read:
+    a result nobody can place is a result every reader would guess about."""
+
+
+class WrongDataset(RuntimeError):
+    """A single-table result offered under another dataset's run
+    (REQ-PIPE-279 criterion 3)."""
+
+
+class NoOpenAttempt(RuntimeError):
+    """A results write into a run that was evaluated and has no attempt open
+    (REQ-PIPE-279 criterion 8)."""
+
+
+class AttemptInProgress(RuntimeError):
+    """An attempt at a run whose lock another session holds - it is running
+    (REQ-PIPE-279 criterion 7)."""
+
+
+#: What a cross-table result read of each table (REQ-PIPE-279 criterion 1) -
+#: see qa.check_read in the DDL.
+READ = "READ"
+HELD = "HELD"
+ABSENT = "ABSENT"
+NO_SUPPLY = "NO-SUPPLY"
+
+#: How an attempt ended (criterion 6). An attempt with none is running, or
+#: dead and not yet found by the next attempt of its run key.
+COMPLETED = "COMPLETED"
+TIMED_OUT = "TIMED-OUT"
+INTERRUPTED = "INTERRUPTED"
+CRASHED = "CRASHED"
+
+#: The key space of an attempt's session advisory lock, beside the
+#: processing pass's (51510, 51511) and the owed-run claim's (51512); the
+#: second key is hashtext(run key).
+ATTEMPT_LOCK_SPACE = 51513
+
+#: How much of a crashed attempt's exception message is kept.
+ERROR_MESSAGE_LIMIT = 1000
+
+
+@dataclass(frozen=True)
+class CheckRead:
+    """One table a cross-table result read, as qa.check_read records it."""
+
+    table: str
+    state: str
+    supply_id: str | None = None
+    contested: bool = False
+    contested_files: tuple[str, ...] = ()
+
 #: Every column of `qa.check_result` that comes straight from a verified
 #: record, in order. Anything a record carries that is NOT here lands in
 #: `extra` - which is the behaviour that makes a new tool's own field
@@ -144,7 +200,7 @@ _KEY_COLUMNS = ("agency_id", "collection_id", "tool", "scope", "supply_state")
 #: Bumped whenever the DDL below changes shape. `ensure_schema` reads
 #: it and does nothing when it already matches, which is what keeps
 #: migration DDL off the hot write path - see that function.
-SCHEMA_VERSION = 45
+SCHEMA_VERSION = 46
 
 #: The version at which REQ-PIPE-144 RESHAPED qa.filing and qa.delivery
 #: (a column removed, a column replaced by a foreign key). `CREATE TABLE
@@ -215,7 +271,46 @@ CREATE TABLE IF NOT EXISTS "{SCHEMA}".run (
     caused_by_load     bigint,
     CHECK (scope = 'arrival'
            OR (caused_by_decision IS NULL) <> (caused_by_load IS NULL)),
-    CHECK (scope <> 'readers' OR (reads_table IS NOT NULL AND period IS NOT NULL))
+    CHECK (scope <> 'readers' OR (reads_table IS NOT NULL AND period IS NOT NULL)),
+    -- THE ORDER RUNS WERE OPENED (REQ-PIPE-279 criterion 5; schema 46), drawn
+    -- from qa.run_seq by qa_results_writer.open_run alone and drawn again
+    -- each time the run key is opened, so a retry ranks after everything
+    -- opened in between. NULL until then: a run is first inserted at staging
+    -- or by a tool's own write, and neither is an evaluation. It says which
+    -- of two results is newer and nothing about what a run saw - that is
+    -- qa.check_read.
+    run_seq        bigint UNIQUE
+);
+
+CREATE SEQUENCE IF NOT EXISTS "{SCHEMA}".run_seq;
+
+-- EVERY ATTEMPT AT A RUN (REQ-PIPE-279 criteria 6 and 7; schema 46), written
+-- once when it begins and once when it ends - or once by the next attempt of
+-- the run key that finds it dead. HISTORY, NEVER STATE TO TIDY: a reopen, a
+-- retry or a re-recording of results never touches it, so a timed-out or
+-- crashed attempt is still here once its retry has replaced the results.
+-- NO FOREIGN KEY TO qa.run, which is the point: nothing cascades into it.
+-- trial.discard is the one thing that removes rows, by run key, as it does
+-- the census (REQ-PIPE-103 criterion 6).
+--
+-- An attempt with no outcome is RUNNING while its session advisory lock is
+-- held (qa_results_writer.Attempt), and is otherwise dead and not yet found.
+-- INTERRUPTED with no ended_at is the one found dead: its end is unknown and
+-- is never invented.
+CREATE TABLE IF NOT EXISTS "{SCHEMA}".run_attempt (
+    run_key        text NOT NULL,
+    run_seq        bigint NOT NULL,
+    began_at       timestamptz NOT NULL,
+    ended_at       timestamptz,
+    outcome        text CHECK (outcome IN ('COMPLETED', 'TIMED-OUT', 'INTERRUPTED',
+                                           'CRASHED')),
+    -- CRASHED only: the exception's type, and its message truncated before it
+    -- is stored (the security NFR - a driver's message can repeat a DSN).
+    error_type     text,
+    error_message  text CHECK (length(error_message) <= 1000),
+    PRIMARY KEY (run_key, run_seq),
+    CHECK (outcome IS NOT NULL OR ended_at IS NULL),
+    CHECK ((outcome = 'CRASHED') = (error_type IS NOT NULL))
 );
 
 --   "this supply's runs, newest first" - criterion 5's read
@@ -300,6 +395,37 @@ CREATE INDEX IF NOT EXISTS check_result_not_passing
     ON "{SCHEMA}".check_result (dataset_id, check_id)
     WHERE status <> 'pass';
 
+-- WHAT A CROSS-TABLE RESULT READ (REQ-PIPE-279 criterion 1; schema 46): one
+-- row for EVERY table its check reads, its own included, in the recording
+-- run's own resolution. The supply, never a physical name - a period table
+-- carries its plain name and a held one was a name, an id or an empty string
+-- depending on the path, and only an id can be matched against a supply.
+--
+--   READ       the supply read; for a contested table, the period's supply it
+--              fell through to, with `contested` and the contested files
+--   HELD       the held supply, deliberately not read
+--   ABSENT     nothing to read
+--   NO-SUPPLY  a sample's or a trial's table, which belongs to no supply
+--
+-- ROWS KEYED TO THE RESULT, ON DELETE CASCADE, rather than jsonb in `extra`:
+-- the gate's SQL joins it, and record_results' delete-and-insert then
+-- replaces a result and its reads as one. Only cross-table results have any.
+CREATE TABLE IF NOT EXISTS "{SCHEMA}".check_read (
+    check_result_id bigint NOT NULL
+                    REFERENCES "{SCHEMA}".check_result ON DELETE CASCADE,
+    logical_table   text NOT NULL,
+    state           text NOT NULL CHECK (state IN ('READ', 'HELD', 'ABSENT', 'NO-SUPPLY')),
+    supply_id       text CHECK (supply_id <> ''),
+    contested       boolean NOT NULL DEFAULT false,
+    contested_files text[] NOT NULL DEFAULT '{{}}',
+    PRIMARY KEY (check_result_id, logical_table),
+    CHECK ((state IN ('READ', 'HELD')) = (supply_id IS NOT NULL))
+);
+
+--   "which results read this supply" - the one question asked of it
+CREATE INDEX IF NOT EXISTS check_read_supply
+    ON "{SCHEMA}".check_read (supply_id, logical_table) WHERE supply_id IS NOT NULL;
+
 CREATE TABLE IF NOT EXISTS "{SCHEMA}".tool_output (
     run_key    text NOT NULL REFERENCES "{SCHEMA}".run ON DELETE CASCADE,
     tool       text NOT NULL,
@@ -319,6 +445,11 @@ CREATE TABLE IF NOT EXISTS "{SCHEMA}".tables_read (
     supply         text,
     PRIMARY KEY (run_key, logical_table)
 );
+
+-- WHERE IT WAS READ FROM - 'staging' or 'period' (REQ-PIPE-279 criterion 2;
+-- schema 46), recorded rather than inferred from `supply`, which a staged
+-- table now carries too. NULL for a table from neither, a sample's.
+ALTER TABLE "{SCHEMA}".tables_read ADD COLUMN IF NOT EXISTS source text;
 
 --   "which runs read this table, in order" - the audit question
 CREATE INDEX IF NOT EXISTS tables_read_logical
@@ -1357,6 +1488,12 @@ CREATE OR REPLACE VIEW "{SCHEMA}".tables_read_visible AS
     JOIN "{SCHEMA}".run ON run.run_key = t.run_key
     WHERE run.completed_at IS NOT NULL;
 
+CREATE OR REPLACE VIEW "{SCHEMA}".check_read_visible AS
+    SELECT k.* FROM "{SCHEMA}".check_read k
+    JOIN "{SCHEMA}".check_result c ON c.id = k.check_result_id
+    JOIN "{SCHEMA}".run ON run.run_key = c.run_key
+    WHERE run.completed_at IS NOT NULL;
+
 CREATE OR REPLACE VIEW "{SCHEMA}".dataset_stats_visible AS
     SELECT d.* FROM "{SCHEMA}".dataset_stats d
     JOIN "{SCHEMA}".run ON run.run_key = d.run_key
@@ -1804,7 +1941,11 @@ def record_run(conn: supply_db.SupplyConnection, *, run_key: str, agency_id: str
     would make the last writer win, which here means the one with less
     information - so each field keeps what it had unless the caller
     actually supplies something.
+
+    REFUSED INTO A RUN ALREADY EVALUATED with no attempt open (REQ-PIPE-279
+    criterion 8) - see refuse_outside_an_attempt.
     """
+    refuse_outside_an_attempt(conn, run_key)
     conn.execute(
         f'INSERT INTO "{SCHEMA}".run '
         "(run_key, agency_id, collection_id, run_timestamp, run_instant, run_by, "
@@ -1843,7 +1984,18 @@ def complete_run(conn: supply_db.SupplyConnection, run_key: str) -> None:
     it and when, or it does not finish. Refusing here rather than at
     registration is what lets a bare single-tool invocation open a run
     without inventing an identity for it.
+
+    AND A RUN NOBODY OPENED DOES NOT FINISH (REQ-PIPE-279 criterion 5): a
+    completed run with no run_seq would be a result no reader can put in
+    order against another.
     """
+    unopened = conn.execute(
+        f'SELECT 1 FROM "{SCHEMA}".run WHERE run_key = ? AND run_seq IS NULL',
+        [run_key]).fetchall()
+    if unopened:
+        raise UnattributedRun(
+            f"run {run_key!r} cannot be completed: it has no run_seq, so it was never "
+            "opened for evaluation (qa_results_writer.open_run, REQ-PIPE-279 criterion 5).")
     rows = conn.execute(
         f'UPDATE "{SCHEMA}".run SET completed_at = ? '
         "WHERE run_key = ? AND run_by IS NOT NULL AND environment IS NOT NULL "
@@ -1870,14 +2022,58 @@ def record_results(conn: supply_db.SupplyConnection, run_key: str,
                    results: Sequence[Mapping[str, Any]], *, tool: str,
                    agency_id: str, collection_id: str,
                    scope: str = DATASET_SCOPE,
-                   supply_state: str = AGREED) -> int:
+                   supply_state: str = AGREED,
+                   reads: Sequence[Sequence[CheckRead]] | None = None) -> int:
     """Write one tool's resolved check results. Returns how many landed.
 
     REPLACES THIS (run, tool, scope, supply_state) rather than appending,
     so re-running one tool is idempotent - the same reasoning the retired
     writer had for overwriting a file rather than accumulating versions
     inside one, and the same key that file had.
+
+    A CROSS-TABLE RESULT IS RECORDED WITH WHAT IT READ OR NOT AT ALL
+    (REQ-PIPE-279 criteria 1 and 4): `reads` gives each result's
+    qa.check_read rows, in order, and the result and its reads land in one
+    transaction - the delete cascades to the old reads, so a re-recording
+    replaces both. A SINGLE-TABLE RESULT is about its run's own supply
+    (criterion 3), so one naming another dataset than the run's is refused;
+    a run with no dataset (a trial's, a fixture's) covers its collection.
     """
+    refuse_outside_an_attempt(conn, run_key)
+    if scope == CROSS_TABLE_SCOPE and results and (
+            reads is None or len(reads) != len(results) or not all(reads)):
+        raise UnrecordableRead(
+            f"run {run_key!r}: {len(results)} cross-table result(s) offered for {tool} "
+            "without what each read - refusing to record a result nobody can place "
+            "(REQ-PIPE-279 criterion 4).")
+    if scope == DATASET_SCOPE and results:
+        _refuse_another_datasets(conn, run_key, results)
+    with conn.raw.transaction():
+        return _replace_results(conn, run_key, results, tool=tool, agency_id=agency_id,
+                                collection_id=collection_id, scope=scope,
+                                supply_state=supply_state,
+                                reads=reads if scope == CROSS_TABLE_SCOPE else None)
+
+
+def _refuse_another_datasets(conn: supply_db.SupplyConnection, run_key: str,
+                             results: Sequence[Mapping[str, Any]]) -> None:
+    rows = conn.execute(f'SELECT dataset_id FROM "{SCHEMA}".run WHERE run_key = ?',
+                        [run_key]).fetchall()
+    own = rows[0][0] if rows else None
+    if own is None:
+        return
+    other = sorted({str(r.get("dataset_id")) for r in results if r.get("dataset_id") != own})
+    if other:
+        raise WrongDataset(
+            f"run {run_key!r} is {own}'s, and was offered single-table results about "
+            f"{', '.join(other)} - a single-table result is about its run's own supply "
+            "(REQ-PIPE-279 criterion 3), so these are refused.")
+
+
+def _replace_results(conn: supply_db.SupplyConnection, run_key: str,
+                     results: Sequence[Mapping[str, Any]], *, tool: str, agency_id: str,
+                     collection_id: str, scope: str, supply_state: str,
+                     reads: Sequence[Sequence[CheckRead]] | None) -> int:
     conn.execute(
         f'DELETE FROM "{SCHEMA}".check_result '
         "WHERE run_key = ? AND tool = ? AND scope = ? AND supply_state = ?",
@@ -1891,13 +2087,19 @@ def record_results(conn: supply_db.SupplyConnection, run_key: str,
     # the two come to disagree.
     ignored = set(_RESULT_COLUMNS) | set(_KEY_COLUMNS) | {"run_id", "run_timestamp"}
     rows = 0
-    for record in results:
+    for index, record in enumerate(results):
         values = [record.get(name) for name in _RESULT_COLUMNS]
         extra = {k: v for k, v in record.items() if k not in ignored}
-        conn.execute(
+        (result_id,) = conn.execute(
             f'INSERT INTO "{SCHEMA}".check_result ({", ".join(columns)}) '
-            f"VALUES ({placeholders})",
-            [run_key, *values, *keys, json.dumps(extra, default=str)])
+            f"VALUES ({placeholders}) RETURNING id",
+            [run_key, *values, *keys, json.dumps(extra, default=str)]).fetchone()
+        for read in (reads[index] if reads is not None else ()):
+            conn.execute(
+                f'INSERT INTO "{SCHEMA}".check_read (check_result_id, logical_table, state, '
+                "supply_id, contested, contested_files) VALUES (?, ?, ?, ?, ?, ?)",
+                [result_id, read.table, read.state, read.supply_id, read.contested,
+                 list(read.contested_files)])
         rows += 1
     return rows
 
@@ -1956,18 +2158,21 @@ def record_tool_output(conn: supply_db.SupplyConnection, run_key: str, tool: str
 
 def record_tables_read(conn: supply_db.SupplyConnection, run_key: str,
                        resolved: Mapping[str, str],
-                       supplies: Mapping[str, str] | None = None) -> None:
-    """Record which physical table each logical name resolved to, and -
-    for a period table - which supply it held (REQ-PIPE-129 criterion 13)."""
-    supplies = supplies or {}
+                       supplies: Mapping[str, str] | None = None,
+                       sources: Mapping[str, str] | None = None) -> None:
+    """Record which physical table each logical name resolved to, which
+    supply it held - a period table's (REQ-PIPE-129 criterion 13) and a
+    staged table's alike (REQ-PIPE-279 criterion 2) - and where it was read
+    from."""
+    supplies, sources = supplies or {}, sources or {}
     for logical, physical in sorted(resolved.items()):
         conn.execute(
             f'INSERT INTO "{SCHEMA}".tables_read '
-            "(run_key, logical_table, physical_table, supply) "
-            "VALUES (?, ?, ?, ?) ON CONFLICT (run_key, logical_table) "
+            "(run_key, logical_table, physical_table, supply, source) "
+            "VALUES (?, ?, ?, ?, ?) ON CONFLICT (run_key, logical_table) "
             "DO UPDATE SET physical_table = EXCLUDED.physical_table, "
-            "supply = EXCLUDED.supply",
-            [run_key, logical, physical, supplies.get(logical)])
+            "supply = EXCLUDED.supply, source = EXCLUDED.source",
+            [run_key, logical, physical, supplies.get(logical), sources.get(logical)])
 
 
 def record_dataset_stats(conn: supply_db.SupplyConnection, run_key: str,
@@ -1978,6 +2183,99 @@ def record_dataset_stats(conn: supply_db.SupplyConnection, run_key: str,
         "VALUES (?, ?, ?) ON CONFLICT (run_key, dataset_id) "
         "DO UPDATE SET stats = EXCLUDED.stats",
         [run_key, dataset_id, json.dumps(stats, default=str)])
+
+
+# ---------------------------------------------------------------------------
+# Attempts (REQ-PIPE-279 criteria 5 to 8)
+#
+# The lifecycle - the lock connection held for an attempt's whole life, the
+# end written in a finally - is qa_results_writer's Attempt. These are the
+# statements it makes, kept with the table they write.
+# ---------------------------------------------------------------------------
+
+def take_attempt_lock(conn: supply_db.SupplyConnection, run_key: str) -> bool:
+    """Take the run key's session advisory lock on `conn` - the connection
+    held for the whole attempt - or say another session holds it."""
+    return bool(conn.execute("SELECT pg_try_advisory_lock(?, hashtext(?))",
+                             [ATTEMPT_LOCK_SPACE, run_key]).fetchone()[0])
+
+
+def attempt_running(conn: supply_db.SupplyConnection, run_key: str) -> bool:
+    """Whether an attempt at `run_key` is running: one with no recorded end,
+    whose lock some session holds. A READER - it closes nothing, and a dead
+    attempt it finds is left for the next attempt of the run key (criterion 7)."""
+    if not conn.execute(f"SELECT to_regclass('{SCHEMA}.run_attempt')").fetchall()[0][0]:
+        return False
+    return bool(conn.execute(
+        f'SELECT EXISTS (SELECT 1 FROM "{SCHEMA}".run_attempt '
+        "WHERE run_key = ? AND outcome IS NULL) AND EXISTS (SELECT 1 FROM pg_locks "
+        "WHERE locktype = 'advisory' AND classid = ? AND objsubid = 2 AND granted "
+        # hashtext is a signed int4 and objid an oid, so compared as its bits.
+        "AND objid::bigint = (hashtext(?)::bigint & 4294967295) "
+        "AND database = (SELECT oid FROM pg_database WHERE datname = current_database()))",
+        [run_key, ATTEMPT_LOCK_SPACE, run_key]).fetchone()[0])
+
+
+def refuse_outside_an_attempt(conn: supply_db.SupplyConnection, run_key: str) -> None:
+    """Raise NoOpenAttempt where `run_key` has a run_seq and no attempt is
+    running (criterion 8). A run that was never opened is written freely -
+    file checks at staging, and a tool's own defensive registration, come
+    before the orchestrator opens it. What is refused is `mothman debug
+    run-*` into a run the orchestrator already evaluated, which would
+    replace its results and their reads under an old run_seq with no
+    attempt of its own recorded."""
+    rows = conn.execute(f'SELECT run_seq FROM "{SCHEMA}".run WHERE run_key = ?',
+                        [run_key]).fetchall()
+    if not rows or rows[0][0] is None or attempt_running(conn, run_key):
+        return
+    raise NoOpenAttempt(
+        f"run {run_key!r} was already evaluated (run_seq {rows[0][0]}) and no attempt "
+        "of it is open, so this write would replace its recorded results with no "
+        "attempt recorded for it - refused (REQ-PIPE-279 criterion 8). A debug "
+        "runner cannot re-record an evaluated run; a re-check of its supply opens "
+        "a new attempt.")
+
+
+def begin_attempt(conn: supply_db.SupplyConnection, run_key: str) -> int:
+    """Record a new attempt at `run_key` and return the run_seq it drew, its
+    caller holding the run key's lock and inside open_run's transaction.
+
+    AN EARLIER ATTEMPT WITH NO END IS DEAD, because the lock is held here: its
+    process died holding the lock and PostgreSQL released it with the
+    connection. It is closed INTERRUPTED with its end unknown - NULL, never
+    invented - and this is the only place that closes one (criterion 7)."""
+    conn.execute(f'UPDATE "{SCHEMA}".run_attempt SET outcome = ? '
+                 "WHERE run_key = ? AND outcome IS NULL", [INTERRUPTED, run_key])
+    (seq,) = conn.execute(f"SELECT nextval('\"{SCHEMA}\".run_seq')").fetchone()
+    conn.execute(f'INSERT INTO "{SCHEMA}".run_attempt (run_key, run_seq, began_at) '
+                 "VALUES (?, ?, ?)", [run_key, seq, _stamp()])
+    return seq
+
+
+def set_run_seq(conn: supply_db.SupplyConnection, run_key: str, run_seq: int) -> None:
+    """The run's place in opening order: its newest attempt's run_seq."""
+    conn.execute(f'UPDATE "{SCHEMA}".run SET run_seq = ? WHERE run_key = ?',
+                 [run_seq, run_key])
+
+
+def end_attempt(conn: supply_db.SupplyConnection, run_key: str, run_seq: int,
+                outcome: str, *, error_type: str | None = None,
+                error_message: str | None = None) -> None:
+    """Record how an attempt ended, once - an attempt that has ended is
+    never changed (criterion 6)."""
+    conn.execute(
+        f'UPDATE "{SCHEMA}".run_attempt SET ended_at = ?, outcome = ?, error_type = ?, '
+        "error_message = ? WHERE run_key = ? AND run_seq = ? AND outcome IS NULL",
+        [_stamp(), outcome, error_type,
+         error_message[:ERROR_MESSAGE_LIMIT] if error_message is not None else None,
+         run_key, run_seq])
+
+
+def attempts_of(conn: supply_db.SupplyConnection, run_key: str) -> list[dict]:
+    """Every attempt at `run_key`, in the order they were opened."""
+    return _dicts(conn.execute(
+        f'SELECT * FROM "{SCHEMA}".run_attempt WHERE run_key = ? ORDER BY run_seq',
+        [run_key]))
 
 
 # ---------------------------------------------------------------------------
