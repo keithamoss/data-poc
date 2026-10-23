@@ -1231,9 +1231,12 @@ class TestStatusMatchesEachToolsOwnVerdict:
             const clipped = clipDatasetToInPlaceOn(d, date);
             if (!clipped || !clipped.runs.length) continue;
             // THE NEWEST RESULT RECORDED BY THEN (REQ-DASH-264 criterion 1):
-            // from the dataset's own runs on show or any other table's run,
-            // by when it was recorded - worked out here from the raw history,
-            // not from the page's own filter.
+            // from the dataset's own runs on show or any other table's run -
+            // worked out here from the raw history, not from the page's own
+            // filter. NEWEST BY THE BUILD'S RANK (REQ-PIPE-279 criteria 9 and
+            // 16): this picked the latest recorded_at, an order the rule now
+            // forbids; recorded_at still decides only what is recorded BY the
+            // date on show, as the page's clip does.
             const own = new Set(clipped.runs.map(x => x.run_id));
             const raw = new Map(d.columns.flatMap(c => c.checks).map(ck => [ck.check_id || ck.key, ck]));
             const built = buildRealDataset(clipped);
@@ -1243,7 +1246,7 @@ class TestStatusMatchesEachToolsOwnVerdict:
               for (const x of (raw.get(ck.check_id || ck.key) || {history: []}).history) {
                 if (!(own.has(x.run_id) || x.recorded_by)) continue;
                 if (x.recorded_at && assetDateStrOf(x.recorded_at) > date) continue;
-                if (!h || !x.recorded_at || !h.recorded_at || Date.parse(x.recorded_at) >= Date.parse(h.recorded_at)) h = x;
+                if (!h || x.rank >= h.rank) h = x;
               }
               if (!h || !h.status) return;
               compared++;
