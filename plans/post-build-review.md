@@ -11095,7 +11095,7 @@ twice. It deliberately did not re-find the `TypeError`.
      (Compared run 1197-1742px in a panel ending at 1734px), green after,
      with the class's other three tests (4 passed).
 
-262. **[in-progress]** **[Pipeline]** **REQ-PIPE-279 post-build critic,
+262. **[in-progress, 2026-10-24]** **[Pipeline & publishing]** **REQ-PIPE-279 post-build critic,
      2026-10-24 overnight.** delivery-critic on 98b67fc, read-only against
      ed_probe, 98 core tests and a 130-test coverage subset run. Most of the
      28 criteria met. Findings, verified against the code where marked:
