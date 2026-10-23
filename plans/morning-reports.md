@@ -2700,3 +2700,10 @@ one or more component tags, and a date.
      because nothing recorded earlier says which dataset an arrival run is for -
      the guard skips it by name, with the reason. Bootstrap from empty + full
      gate running before the push, because a pair's promotion could now differ.
+   - **CI on 98b67fc FINISHED (~04:45)**: test-deployment green, js-tests
+     green, on-demand red (comparators, fixed in c1f6b25), and the no-deployment
+     half 5542 passed / 1 FAILED: test_cp_pair read the period's supply as
+     `promoted-late`, a supply another module promotes into the same period on
+     the same worker database. The same interference chunk B's builder saw and
+     I could not reproduce locally - now seen twice, so a real test-isolation
+     defect, not a flake. Being fixed in a separate worktree, failing first.
