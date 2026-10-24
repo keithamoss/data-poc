@@ -1069,24 +1069,6 @@ ALTER TABLE "{SCHEMA}".decision ADD CONSTRAINT decision_action_known
                       -- SCHEMA 47: a person's carry-forward (REQ-PIPE-280) and the
                       -- rule's warning that one is possible (REQ-PIPE-271).
                       'carry-forward', 'carry-forward-warning'));
--- A CARRY-FORWARD IS A PERSON'S, WITH A REASON, naming the period it fills
--- and the period whose promoted supply it now stands on (REQ-PIPE-280
--- criterion 3); `replaces` is the supply it stood on before, NULL where it
--- stood on nothing. Schema 47.
-ALTER TABLE "{SCHEMA}".decision DROP CONSTRAINT IF EXISTS decision_carry_forward_shape;
-ALTER TABLE "{SCHEMA}".decision ADD CONSTRAINT decision_carry_forward_shape
-    CHECK (action <> 'carry-forward'
-           OR (actor_kind = 'person' AND to_slot IS NOT NULL AND stands_on IS NOT NULL
-               AND reason IS NOT NULL));
--- A CARRY-FORWARD WARNING IS THE RULE'S, naming the later period, the newer
--- supply and the period it was promoted into, caused by that promotion
--- (REQ-PIPE-271 criterion 6). It changes nothing a period holds, so
--- qa.slot_holds ignores it by construction. Schema 47.
-ALTER TABLE "{SCHEMA}".decision DROP CONSTRAINT IF EXISTS decision_carry_forward_warning_shape;
-ALTER TABLE "{SCHEMA}".decision ADD CONSTRAINT decision_carry_forward_warning_shape
-    CHECK (action <> 'carry-forward-warning'
-           OR (actor_kind = 'rule' AND to_slot IS NOT NULL AND stands_on IS NOT NULL
-               AND caused_by_decision IS NOT NULL));
 -- A SETTLEMENT OF A CONTESTED PAIR (REQ-PIPE-193 criterion 8, schema 40):
 -- a person's, naming the pair's `#1` supply and the period it was filed
 -- to. What became of each file is on qa.decision_file below.
@@ -1145,6 +1127,24 @@ ALTER TABLE "{SCHEMA}".decision DROP CONSTRAINT IF EXISTS decision_still_failing
 ALTER TABLE "{SCHEMA}".decision ADD CONSTRAINT decision_still_failing_shape
     CHECK (action <> 'still-failing'
            OR (actor_kind = 'rule' AND caused_by_decision IS NOT NULL AND reason IS NOT NULL));
+-- A CARRY-FORWARD IS A PERSON'S, WITH A REASON, naming the period it fills
+-- and the period whose promoted supply it now stands on (REQ-PIPE-280
+-- criterion 3); `replaces` is the supply it stood on before, NULL where it
+-- stood on nothing. Schema 47.
+ALTER TABLE "{SCHEMA}".decision DROP CONSTRAINT IF EXISTS decision_carry_forward_shape;
+ALTER TABLE "{SCHEMA}".decision ADD CONSTRAINT decision_carry_forward_shape
+    CHECK (action <> 'carry-forward'
+           OR (actor_kind = 'person' AND to_slot IS NOT NULL AND stands_on IS NOT NULL
+               AND reason IS NOT NULL));
+-- A CARRY-FORWARD WARNING IS THE RULE'S, naming the later period, the newer
+-- supply and the period it was promoted into, caused by that promotion
+-- (REQ-PIPE-271 criterion 6). It changes nothing a period holds, so
+-- qa.slot_holds ignores it by construction. Schema 47.
+ALTER TABLE "{SCHEMA}".decision DROP CONSTRAINT IF EXISTS decision_carry_forward_warning_shape;
+ALTER TABLE "{SCHEMA}".decision ADD CONSTRAINT decision_carry_forward_warning_shape
+    CHECK (action <> 'carry-forward-warning'
+           OR (actor_kind = 'rule' AND to_slot IS NOT NULL AND stands_on IS NOT NULL
+               AND caused_by_decision IS NOT NULL));
 -- THE AMBER SETTING A RULE ACTED UNDER (REQ-PIPE-122 criteria 5, 11 and
 -- 19) - value, level and version - on every automatic promotion of an
 -- amber supply and on the withheld note under hold. Schema 21, additive.

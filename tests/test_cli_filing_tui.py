@@ -481,7 +481,7 @@ class TestEveryOperationIsReachableFromSomeDoor:
     """
 
     def _offered_by(self, flow, state, monkeypatch, excuse_offers=(), supersede_offers=(),
-                    acknowledgement_offers=()):
+                    acknowledgement_offers=(), owed_nothing=(), slots=None):
         """What this door would put in front of somebody, for this slot.
         `excuse_offers` stands in for the recorded punctuality the excuse
         offer reads (REQ-PIPE-161 criterion 10), which needs a database."""
@@ -495,11 +495,18 @@ class TestEveryOperationIsReachableFromSomeDoor:
         monkeypatch.setattr(filing_queue, "acknowledgement_offers",
                             lambda conn, s: acknowledgement_offers)
         monkeypatch.setattr(filing_queue, "awaiting", lambda *a, **k: [state])
-        monkeypatch.setattr(filing_queue, "slots_of", lambda *a, **k: [state])
+        monkeypatch.setattr(filing_queue, "slots_of",
+                            lambda *a, **k: [state] if slots is None else list(slots))
         # One supply or none: straight to its decisions (REQ-GHUB-229 c2).
         monkeypatch.setattr(filing_queue, "filed_counts", lambda *a, **k: {})
         monkeypatch.setattr(filing_queue, "closed_gaps", lambda *a, **k: [])
         monkeypatch.setattr(filing_queue, "held_in", lambda *a, **k: [])
+        # THE PERIODS IT OWES NOTHING FOR (REQ-PIPE-280 criterion 1), and the
+        # warnings standing for them, each a record the door reads.
+        from qa_tools.common import carry_forward
+        monkeypatch.setattr(carry_forward, "carried_periods",
+                            lambda conn, ds: list(owed_nothing))
+        monkeypatch.setattr(filing_tui, "carry_forward_warnings", lambda *a, **k: [])
         monkeypatch.setattr(filing_tui, "_pick_slot", lambda states, msg, counts=None: state)
         monkeypatch.setattr(filing_tui, "_decide_on",
                              lambda s, offer: seen.setdefault("offer", offer))
@@ -564,6 +571,11 @@ class TestEveryOperationIsReachableFromSomeDoor:
             acknowledgement_offers=(fd.WITHDRAW_ACKNOWLEDGEMENT,))
         # PLACE IS REACHED FROM A HELD SUPPLY'S ROW (REQ-PIPE-163 criterion 10).
         reachable |= self._held_offers(monkeypatch)
+        # CARRY-FORWARD FROM A PERIOD THE DATASET OWES NOTHING FOR (REQ-PIPE-280
+        # criterion 1), which the door lists beside its slots.
+        owed = _state(slot_state.INHERITED, supply="cp-carers@1")
+        reachable |= self._offered_by(filing_tui.period_flow, owed, monkeypatch,
+                                      owed_nothing=(owed,), slots=())
         assert reachable == set(fd.OPERATIONS)
 
     def _held_offers(self, monkeypatch):

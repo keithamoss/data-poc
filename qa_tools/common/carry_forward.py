@@ -175,19 +175,23 @@ def carry_forward(conn: supply_db.SupplyConnection, *, dataset_id: str, period: 
         dataset_id=dataset_id, action=decision_log.CARRY_FORWARD, supply=p.supply,
         actor=actor, actor_kind=decision_log.PERSON, effective_at=effective_at,
         to_slot=period, stands_on=p.stands_on, replaces=p.before_supply, reason=reason)
-    with decision_log.apply_decision(conn, decision):
-        # JUDGED AGAIN UNDER THE LOCK (#113): a promotion, an un-inherit or
-        # another carry-forward since the plan was made refuses this one.
+    with decision_log.decision_transaction(conn):
+        # JUDGED AGAIN UNDER THE LOCKS (#113), before the entry is written: a
+        # promotion, an un-inherit or another carry-forward since the plan was
+        # made refuses this one. Both slots, in a fixed order.
+        for slot in sorted({period, p.stands_on} | ({p.before_period} - {None})):
+            decision_log.lock_slot(conn, dataset_id, slot)
         if plan(conn, dataset_id, period) != p:
             raise CarryForwardRefused(
                 f"What carrying {dataset_id} forward into {period} would do has changed "
                 f"since it was worked out. Nothing was done; ask again.")
         physical = inheritance._still_stands_on(conn, dataset_id, p.stands_on, p.supply,
                                                 entry.table)
-        conn.execute(
-            f'CREATE OR REPLACE VIEW "{schema}".'
-            f'"{supply_db._ident(entry.table, "table name")}" AS SELECT * FROM '
-            f'"{period_schema.period_schema(p.stands_on)}"."{physical}"')
+        with decision_log.apply_decision(conn, decision):
+            conn.execute(
+                f'CREATE OR REPLACE VIEW "{schema}".'
+                f'"{supply_db._ident(entry.table, "table name")}" AS SELECT * FROM '
+                f'"{period_schema.period_schema(p.stands_on)}"."{physical}"')
     return p
 
 
@@ -210,6 +214,8 @@ def warn_after_promotion(conn: supply_db.SupplyConnection, *, dataset_id: str,
         f"SELECT DISTINCT to_slot FROM {decision_log.TABLE} WHERE dataset_id = ? "
         f"AND action IN ({', '.join('?' for _ in _INHERITING)}) AND to_slot IS NOT NULL",
         [dataset_id, *_INHERITING]).fetchall()
+    if not rows:
+        return []   # nothing inherits this dataset: the ordinary case, one query
     later = sorted(p for (p,) in rows if p != period and _newer(period, p, dataset_id))
     written: list[int] = []
     entry = hierarchy.dataset(dataset_id)
