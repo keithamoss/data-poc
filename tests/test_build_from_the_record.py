@@ -322,6 +322,26 @@ class TestAContestedPairsReadsReachItsPage:
             run_id, sorted(pair), "red")
 
 
+    def test_a_check_whose_only_result_there_is_a_contested_read_still_gets_a_card(self, history):
+        """Keith, 2026-10-24, reversing provisional #22: its red shows on the
+        blocked row rather than the card being dropped. The card sits in its
+        column's `contested_only`, never `checks`, so no count, status or
+        history ever holds it (criterion 14)."""
+        notifications = f"cp-notifications@{_key()}"
+        pair = [f"cp_clients__{_key()}__1", f"cp_clients__{_key()}__2"]
+        run_id = _run(f"cp_notifications__{_key()}", dataset_id="cp-notifications",
+                      supply=notifications, results=[_record(CLIENT_REF, "cp-notifications", "fail")],
+                      reads={"cp_notifications": notifications}, contested={"cp_clients": pair})
+        columns = history.datasets()["cp-clients"]["columns"]
+        assert not [c for col in columns for c in col["checks"] if c.get("check_id") == CLIENT_REF]
+        (card,) = [c for col in columns for c in col.get("contested_only", [])
+                   if c.get("check_id") == CLIENT_REF]
+        assert card["history"] == []
+        (read,) = card["contested_reads"]
+        assert (read["run_id"], read["contested_files"], read["status"]) == (
+            run_id, sorted(pair), "red")
+
+
 class TestAHeldReadNamesTheHeldSupply:
     """Criterion 15: the page matches a held table's rows on the held supply."""
 

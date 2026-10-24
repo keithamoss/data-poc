@@ -262,6 +262,47 @@ describe("a contested table's cross-table row reads the pair", () => {
     expect(w.checkStatus(ds.columns[0].checks[0])).toBe("red");
   });
 
+  // Keith, 2026-10-24, reversing provisional #22: a check whose only result
+  // on the pair's page is a contested read still has a card there, kept out of
+  // every count and history until the pair blocks the page.
+  const QUARTERLY = { type: "quarterly", anchor_months: [2, 5, 8, 11], day_of_month: 1,
+                      expected_time: "09:00" };
+  const onlyContested = (files) => {
+    const own = { run_id: "cp_clients__202008010900000800", run_date: "2020-08-01" };
+    return {
+      id: "cp-clients", name: "Client Register", sla: { cadence: QUARTERLY },
+      runs: [own], rowCount: 10, prevRowCount: 10,
+      arrivalHistory: [{ run_id: own.run_id, run_date: own.run_date, arrivalStatus: "onTime" }],
+      arrivalByRun: { [own.run_id]: { arrivedAt: "2020-08-01T09:00:00+08:00", arrivalStatus: "onTime" } },
+      lastArrival: { run_date: own.run_date, arrivedAt: "2020-08-01T09:00:00+08:00", arrivalStatus: "onTime" },
+      columns: [{ name: "Cross-table", scope: "cross-table", stats: { current: {}, previous: {}, byRun: {} },
+        checks: [],
+        // The build puts such a card BESIDE the column's checks (criterion 14).
+        contested_only: [{ key: "ref", name: "Client reference", history: [], warn: 0, fail: 0,
+          contested_reads: [entry({ run: "n", rank: 5, supply: null, cause: "arrival:n", status: "red",
+                                    at: "2020-11-01T08:20:00+08:00", by: "cp-notifications",
+                                    read_state: "ABSENT", contested_files: files })] }] }] };
+  };
+  const coll = { datasets: [{ id: "cp-notifications", name: "Notifications" }] };
+
+  it("gives a check whose only result is a contested read a red row while the pair blocks", () => {
+    const w = load();
+    const ds = w.clipDatasetToInPlaceOn(onlyContested([...pair]), "2020-11-02");
+    // Out of every count until the pair blocks the page (criterion 14).
+    expect(ds.columns[0].checks).toHaveLength(0);
+    expect(w.blockChecksWhileHeld(ds, blocker)).toBe(1);
+    const [ck] = ds.columns[0].checks;
+    expect(w.checkStatus(ck)).toBe("red");
+    expect(w.rowRecheckNote(coll, ck)).toMatch(/Notifications/);
+  });
+
+  it("keeps it off the page before it was recorded, by the as-of clip", () => {
+    const w = load();
+    const ds = w.clipDatasetToInPlaceOn(onlyContested([...pair]), "2020-10-31");
+    expect(w.blockChecksWhileHeld(ds, blocker)).toBe(0);
+    expect(ds.columns[0].checks).toHaveLength(0);
+  });
+
   it("does not show one that found another pair", () => {
     const w = load();
     const ds = page(["cp_clients__other__1", "cp_clients__other__2"]);

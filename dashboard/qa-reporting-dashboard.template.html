@@ -2897,7 +2897,18 @@ function clipDatasetToInPlaceOn(d, inPlaceOnDateStr){
     // A check with zero history entries at or before the as-of date
     // hasn't been introduced yet as of that date (or, same shape,
     // simply has no result for any eligible run) - dropped, not shown
-    // with a misleading zero/blank value.
+    // with a misleading zero/blank value. ONE WHOSE ONLY RESULTS HERE ARE A
+    // CONTESTED PAIR'S READS (Keith, 2026-10-24, reversing provisional #22) -
+    // the build's `contested_only` cards, and any check with no result yet
+    // by this date - is kept aside in `contestedOnly`, out of every count and
+    // status, for blockChecksWhileHeld to show while that pair blocks the page.
+    const recordedBy = h => !h.recorded_at || assetDateStrOf(h.recorded_at) <= inPlaceOnDateStr;
+    const contestedOnly = [];
+    const keepAside = ck => {
+      const reads = (ck.contested_reads || []).filter(recordedBy);
+      if(reads.length) contestedOnly.push({...ck, history: [], contested_reads: reads});
+    };
+    (col.contested_only || []).forEach(keepAside);
     const checks = col.checks
       .map(ck => {
         // THE NEWEST RESULT, WHICHEVER RUN RECORDED IT (post-build-review
@@ -2910,7 +2921,7 @@ function clipDatasetToInPlaceOn(d, inPlaceOnDateStr){
         // it re-checked, but its result exists only from when it ran.
         const history = ck.history.filter(h => (eligibleRunIds.has(h.run_id) || h.recorded_by)
           && (!h.recorded_at || assetDateStrOf(h.recorded_at) <= inPlaceOnDateStr));
-        if(!history.length) return null;
+        if(!history.length){ keepAside(ck); return null; }
         const last = history[history.length-1], prev = history.length>1 ? history[history.length-2] : last;
         // THE STATUS OF THE RUN ON SHOW, not the newest run's (dashboard UX
         // critic on 8a942e7, H2): checkStatus() reads current_status first,
@@ -2920,14 +2931,13 @@ function clipDatasetToInPlaceOn(d, inPlaceOnDateStr){
         const inPlaceOn = {...ck, history, current: last.value, previous: prev.value};
         // A CONTESTED PAIR'S READS (PROVISIONAL, REQ-PIPE-279), by the same
         // recorded-by-then rule as the history, and nothing more.
-        if(ck.contested_reads) inPlaceOn.contested_reads = ck.contested_reads.filter(h =>
-          !h.recorded_at || assetDateStrOf(h.recorded_at) <= inPlaceOnDateStr);
+        if(ck.contested_reads) inPlaceOn.contested_reads = ck.contested_reads.filter(recordedBy);
         if(last.status) inPlaceOn.current_status = last.status; else delete inPlaceOn.current_status;
         return inPlaceOn;
       })
       .filter(Boolean);
     const byRun = (col.stats && col.stats.byRun) || {};
-    return {...col, checks, stats: {
+    return {...col, checks, contestedOnly, stats: {
       current: byRun[effectiveRunId] || col.stats.current,
       previous: (prevRunId && byRun[prevRunId]) || byRun[effectiveRunId] || col.stats.previous,
     }};
@@ -5146,7 +5156,15 @@ function blockChecksWhileHeld(ds, blocker){
     && files.length === pair.length && [...files].sort().every((f, i)=> f === pair[i]));
   let shown = 0, rows = 0;
   (ds.columns||[]).forEach(c=>{
-    c.checks = (c.checks||[]).map(ck=>{
+    // A CHECK WHOSE ONLY RESULT HERE IS A CONTESTED READ (Keith, 2026-10-24,
+    // reversing provisional #22): its card joins the row list only when it
+    // met THIS pair, so its red shows on the blocked row.
+    const metOnly = pair && c.scope === "cross-table"
+      ? (c.contestedOnly || []).filter(ck=> (ck.contested_reads||[]).some(h=> isThePair(h.contested_files)))
+      : [];
+    // Beside a real rule's card the no-rule placeholder would say there is none.
+    const base = metOnly.length ? (c.checks||[]).filter(ck=> ck.key !== "no_rule_defined") : (c.checks||[]);
+    c.checks = [...base, ...metOnly].map(ck=>{
       const met = c.scope !== "cross-table" ? []
         : held ? (ck.history||[]).filter(h=> h.read_state === "HELD" && h.supply_id === held)
         : pair ? (ck.contested_reads||[]).filter(h=> isThePair(h.contested_files))

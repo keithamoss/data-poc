@@ -434,6 +434,12 @@ def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], da
         agg_spec = aggregates.get((table, col))
 
         checks_out = []
+        # A CHECK WHOSE ONLY RESULT HERE IS A CONTESTED READ STILL GETS ITS
+        # CARD (Keith, 2026-10-24, reversing provisional #22) - here, BESIDE
+        # the column's checks rather than among them, so no count, status,
+        # headline or column statistic ever reads it (criterion 14). The page
+        # shows it only while that pair blocks the table.
+        contested_only = []
         for slot in checks_for_col.values():
             engine, check_name = slot["engine"], slot["check_name"]
             attach_aggregate = agg_spec is not None and check_name in agg_spec["check_names"]
@@ -495,7 +501,7 @@ def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], da
                        if into is contested_reads else {}),
                 })
             history = sorted(history + elsewhere, key=lambda h: h["rank"])
-            if not history:
+            if not history and not contested_reads:
                 continue
             # THE NEWEST RESULT IS CURRENT, whichever run recorded it (#253):
             # the dataset's newest measured run unless a result recorded
@@ -509,7 +515,7 @@ def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], da
                 current_value, current_status = newest["value"], newest["status"]
             engine_short = ENGINE_SHORT.get(engine, engine)
             lifecycle = lifecycle_by_id.get(slot["check_id"])
-            checks_out.append({
+            (checks_out if history else contested_only).append({
                 "check_id": slot["check_id"],
                 # A hand-authored `name` in the check's own metadata wins
                 # over the derived label (REQ-DASH-026).
@@ -548,7 +554,7 @@ def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], da
                 "changelog": lifecycle.changelog if lifecycle else [],
             })
 
-        _disambiguate_pooled_keys(checks_out)
+        _disambiguate_pooled_keys(checks_out + contested_only)
         if not checks_out and col == CROSS_TABLE_PSEUDO_COLUMN and len(coll.datasets) == 1:
             # A ONE-TABLE COLLECTION HAS NO CROSS-TABLE GAP TO REPORT
             # (REQ-QAC-247, Keith 2026-10-18). Every other empty section says
@@ -629,6 +635,7 @@ def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], da
             "key": COLUMN_SCOPE_KEY.get(col, col),
             "scope": COLUMN_SCOPE_KEY.get(col),
             "checks": checks_out, "stats": stats,
+            **({"contested_only": contested_only} if contested_only else {}),
         })
 
     # From the dataset's participation in contract/calendar.yaml (REQ-PIPE-110).
