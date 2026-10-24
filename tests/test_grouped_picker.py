@@ -27,8 +27,14 @@ def _pick(keys: str, *, top=(), terms=None):
         # CTRL-C LAST, so a picker that ignores an Enter it should act on
         # raises here rather than waiting for input for ever.
         inp.send_text(keys + "\x03")
+        # IN A THREAD OF ITS OWN (post-build-review #271): a Playwright test on
+        # the same worker leaves pytest-playwright's session-scoped sync
+        # Playwright - and its running event loop - in the main thread for the
+        # rest of the session, and prompt_toolkit's run() is asyncio.run(),
+        # which refuses to start inside one. in_thread is prompt_toolkit's own
+        # option for exactly that case, and it behaves the same with no loop.
         try:
-            return question.application.run()
+            return question.application.run(in_thread=True)
         except KeyboardInterrupt:  # pytest would take it as its own and stop
             return CANCELLED
 

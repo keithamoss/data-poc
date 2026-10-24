@@ -43460,6 +43460,9 @@ requirements:
     - tests/test_dashboard_e2e.py::TestAPayloadPastTheBudgetIsWrittenInParts::test_the_page_reassembles_the_unsplit_payload
     - tests/test_embed_dashboard_data.py::TestABuildUnderAnOutDir::test_the_page_its_files_and_its_assets_land_in_the_out_dir
     - tests/test_embed_dashboard_data.py::TestABuildUnderAnOutDir::test_every_reports_path_of_the_chain_is_the_out_dirs
+    - tests/test_check_dashboard_renders.py::test_the_browser_check_fails_a_page_showing_its_data_file_error
+    - tests/test_grouped_picker.py::TestTheFilter::test_it_matches_a_group_heading
+    - tests/test_decision_words.py::test_the_terminal_listing_uses_the_words
     implemented_by:
     - qa_tools/common/build_output.py::out_dir
     - qa_tools/common/build_output.py::use
@@ -43468,6 +43471,7 @@ requirements:
     - dashboard/embed_dashboard_data.py::output_paths
     - dashboard/embed_dashboard_data.py::place_page_assets
     - dashboard/check_dashboard_renders.py::built_page
+    - dashboard/check_dashboard_renders.py::render_errors
     - pipeline/build_dashboard_data.py::out_path
     - qa_tools/tools/results_history.py::results_path
     - tests/conftest.py::_distribution_group
@@ -43501,6 +43505,7 @@ requirements:
     - "VARIANT PAGES READ THE WORKER'S BUILD, INCLUDING ITS ASSETS (criterion 6): the three that re-embed (ticket, divergent arrivals, the in-parts page) go through one helper, _embed_variant, whose DIR/reports links the worker build's files; the pages rewritten from the built HTML link fonts/, vendor/ and data/ from the worker build. One of those, _with_blockers, linked the REAL dashboard/data/, a real-tree read that would have served another build's data files to a worker's page."
     - "THE REAL-TREE GUARD IS A STAT COMPARISON OVER A FIXED LIST (criterion 4): every collection's two reports files, the built page and dashboard/data/, taken before the worker builds and compared in a test after. The list cannot be empty, and a file that did not exist and still does not compares equal, which is the honest answer on a fresh runner."
     - "THE @GROUP SUFFIX IS THE COST OF loadgroup, recorded rather than worked round: under xdist a node id is reported as `path::test@group`, and re-running it by id means dropping the suffix (pyproject.toml and CLAUDE.md say so). A custom scheduler through pytest_xdist_make_scheduler would avoid it, and was NOT built because the agreed mechanism is loadgroup."
+    - "SPREADING THE BROWSER TESTS SPREAD PLAYWRIGHT'S RUNNING EVENT LOOP TO EVERY WORKER (post-build-review #271, found by the first full gate): asyncio.run() in a later test on any worker now raises. Fixed where the loop is used - prompt_toolkit's run(in_thread=True) in the picker tests, and check_dashboard_renders.render_errors(), which runs the async check in its own thread only when a loop is already running. REJECTED tearing Playwright down per group: it overrides four pytest-playwright session fixtures with copies of plugin internals and relaunches Chromium at every module switch. The same gate found a test relying on an empty 2026-Q3 in its worker's shared database; it now holds either way."
     - "THE TEN-MINUTE MODULE TARGET'S MISS HAS ONE CAUSE, and the two remedies are Keith's call, not taken here: TestEveryScenarioJumpLands is about 400-500s on one worker and is scheduled late (xdist orders groups by test count). Splitting it into two one-test classes, or a scheduling hint that sends it first, would each take it off the critical path; the first changes the test module's shape and the second adds a mechanism nobody agreed."
   - id: REQ-TEST-282
     title: "A browser-test class loads the dashboard once and its tests share that page, except the tests that need a fresh load"

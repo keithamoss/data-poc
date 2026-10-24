@@ -11902,3 +11902,55 @@ twice. It deliberately did not re-find the `TypeError`.
      on any database and can still fail on a line past 80 columns. Minor
      under the standing rule (a test, no product change); no failing-first
      step applies, the CI run being the failure.
+
+271. **[done, 2026-10-25]** **[Testing & dev tooling]** **REQ-TEST-281's
+     loadgroup spread put two latent cross-module dependencies on workers
+     where they now fire: a running event loop left by Playwright, and a
+     2026-Q3 promotion left in the worker's database.** Found by the full
+     `mothman check` on 901b198 (10 failed, 6,233 passed, pytest 1225.58s,
+     gate 22m56s); every failing module passed alone. A defect of the build,
+     not of the product.
+     (1) Nine `tests/test_grouped_picker.py` tests failed with `asyncio.run()
+     cannot be called from a running event loop`. Confirmed rather than
+     assumed: with sync Playwright started, `asyncio.get_running_loop()` in
+     the main thread returns a running loop, and it stays until Playwright
+     stops - which for pytest-playwright's session-scoped fixture is the end
+     of the worker's session. Before, only the worker that ran the e2e
+     module (and the one that ran `test_a_collection_is_a_small_adapter`)
+     carried it, and - an inference, not measured - the e2e module, handed
+     out first as the largest file and the slowest, seldom had anything
+     scheduled after it; now every worker carries it. Reproduced on one
+     worker, `-n0`, with `test_raw_template_renders_with_zero_console_errors`
+     before the module: the same 9 failures, plus a tenth the gate had
+     missed by placement, `tests/test_check_dashboard_renders.py::
+     test_the_browser_check_fails_a_page_showing_its_data_file_error`, which
+     called `asyncio.run` itself. FIXED where the event loop is used rather
+     than by tearing Playwright down per group: the picker tests run the
+     prompt with prompt_toolkit's own `run(in_thread=True)`, its supported
+     option for this case, and `dashboard/check_dashboard_renders.py` gained
+     `render_errors()`, which runs the async check in a thread of its own
+     only when the caller already has a running loop - `main()` and the test
+     both use it. REJECTED per-group Playwright teardown: it means overriding
+     four pytest-playwright session fixtures (`playwright`, `browser_type`,
+     `launch_browser`, `browser`) at module scope, copying plugin internals
+     that change between versions, and relaunching Chromium at every module
+     switch on a worker. Those two were the only `asyncio.run`/prompt
+     run sites in tests; `cli/common.py`'s `.ask()` is never reached
+     unmocked. `tests/conftest.py` now says so next to the distribution
+     groups, so the next one is recognised. Same reproduction now 22 passed.
+     (2) `tests/test_decision_words.py::test_the_terminal_listing_uses_the_words`
+     was refused: "superseding 'cp-investigations@202607300903110800', which
+     is the supply currently promoted into 2026-Q3 needs a reason". The gate's
+     own leftover `mothman_test_gw0` showed it: the promotion rule of an
+     earlier module's real CP pipeline run on that worker had promoted that
+     supply into 2026-Q3 (decision 29), so the test's routine promotion was a
+     supersession. The log is append-only, and the listing accepts only
+     datasets the hierarchy declares, so the dataset cannot be made unique.
+     The test now gives its promotion a reason - valid whether the slot is
+     empty or filled, and it still reads "promoted" - and is parametrised
+     over both, the second case promoting into the slot first. That case
+     failed against the old test (the same refusal) and passes now.
+     Reproduced first with a stand-in module promoting into the same slot,
+     on one worker: the identical refusal. Minor under the standing rule: no
+     product behaviour changed beyond `render_errors()`, which keeps the
+     render check's result identical.

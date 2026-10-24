@@ -154,8 +154,6 @@ def test_the_browser_check_fails_a_page_showing_its_data_file_error(tmp_path):
     never written, exactly as embed() would leave it; the raw template
     beside it is the control, so a gate that failed everything would fail
     here too."""
-    import asyncio
-
     from dashboard import data_files
 
     [missing] = data_files.encode(data_files.collection_key("civil-registration"),
@@ -164,8 +162,8 @@ def test_the_browser_check_fails_a_page_showing_its_data_file_error(tmp_path):
     page = tmp_path / "page.html"
     page.write_text(data_files.embed_into_page(cdr.TEMPLATE_PATH.read_text(),
                                                data_files.manifest([missing])))
-    errors = asyncio.run(cdr._check_render(page, "built output"))
+    errors = cdr.render_errors(page, "built output")
     assert any("shows its data-file error" in e and missing.entry["name"] in e
                for e in errors), errors
-    control = asyncio.run(cdr._check_render(cdr.TEMPLATE_PATH, "template"))
+    control = cdr.render_errors(cdr.TEMPLATE_PATH, "template")
     assert not any("data-file error" in e for e in control), control

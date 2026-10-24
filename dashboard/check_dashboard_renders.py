@@ -172,6 +172,36 @@ async def _check_render(html_path: Path, label: str) -> list[str]:
     return [f"{label} render check: {e}" for e in console_errors]
 
 
+def render_errors(path: Path, label: str) -> list[str]:
+    """The real-browser render check of one page, run to completion.
+
+    IN A THREAD OF ITS OWN WHEN THE CALLER ALREADY HAS A RUNNING EVENT LOOP
+    (post-build-review #271), because asyncio.run() refuses to start inside
+    one. A terminal never has one; a test process does once a sync
+    Playwright session is open in it, as pytest-playwright's is for the rest
+    of a test worker's session."""
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:  # no loop running - the ordinary case
+        return asyncio.run(_check_render(path, label))
+    import threading
+
+    out: dict = {}
+
+    def _in_thread():
+        try:
+            out["errors"] = asyncio.run(_check_render(path, label))
+        except BaseException as exc:  # handed back to the caller below
+            out["raised"] = exc
+
+    thread = threading.Thread(target=_in_thread)
+    thread.start()
+    thread.join()
+    if "raised" in out:
+        raise out["raised"]
+    return out["errors"]
+
+
 def built_page() -> Path:
     """The page to check: the real build's, or under `--out-dir` that build's
     own (REQ-TEST-281)."""
@@ -191,8 +221,8 @@ def main() -> int:
         return 1
 
     errors = _check_embedded_json(page)
-    errors += asyncio.run(_check_render(page, "built output"))
-    errors += asyncio.run(_check_render(TEMPLATE_PATH, "template"))
+    errors += render_errors(page, "built output")
+    errors += render_errors(TEMPLATE_PATH, "template")
 
     if errors:
         print(f"dashboard render check FAILED ({len(errors)} error(s)):", file=sys.stderr)

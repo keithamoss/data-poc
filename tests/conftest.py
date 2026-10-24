@@ -954,6 +954,17 @@ def pytest_addoption(parser):
 #: whole on one worker, exactly as `--dist loadfile` kept it.
 SPREAD_BY_CLASS = frozenset({"test_dashboard_e2e.py"})
 
+# A CONSEQUENCE WORTH KNOWING (post-build-review #271): with the browser tests
+# on every worker, every worker carries pytest-playwright's session-scoped sync
+# Playwright from its first browser test to the end of its session - and with
+# it a RUNNING asyncio loop in the main thread. So `asyncio.run()` in any later
+# test on that worker raises "cannot be called from a running event loop".
+# Run such code in a thread of its own: prompt_toolkit's
+# `application.run(in_thread=True)`, or dashboard.check_dashboard_renders'
+# render_errors(), which does it for the render check. And since a worker's
+# database is shared by every module scheduled beside it, a test asserting on
+# a real dataset's slot must hold whether or not another module filled it.
+
 
 def _distribution_group(item) -> str:
     """The xdist_group `--dist loadgroup` schedules this test in.
