@@ -2760,6 +2760,32 @@ one or more component tags, and a date.
      dashboard rebuild gates passed; deployment tests 114 passed, 1 xfailed.
      So K6 (inherit as at receipt) and S5 (open after re-judgement) hold on a
      replayed history.
-   - **STILL TO DO**: E (the dashboard split) waits for you; the one push
-     waits for your permission and a full gate on the final tree. Next in the
-     agreed order after E: A3 (270+266+267+273+278, schema bump, bootstrap).
+   - **YOUR TERMS FOR THE NIGHT** (~23:10): once E's critics report back, fix,
+     run the full gate, push, make sure CI is green; then build anything small
+     that is waiting, under the usual overnight policy.
+   - **E BUILT (647b174, 9281e74), CRITICS' FIXES 3670465 (#268)**: the page is
+     split into content-named per-collection files under `dashboard/data/`,
+     Requirements and Plans load on demand, snapshots stay one self-contained
+     file. The worst finding was a 9-second first view - trends re-dating every
+     entry before the page painted, a cost that had been growing since
+     REQ-DASH-264 - now 278-390ms, with a guard test on the budget.
+   - **FIRST FULL GATE RED (3670465)**: 5 browser tests, a console error saying
+     the build counted a result the page's history did not hold. Not the page
+     and not the build: one test fixture cut results by RUN, and since
+     REQ-PIPE-265 a same-instant delivery's cross-table result is recorded only
+     under its sibling's run. Fixed test-first (#269, f9494a5). An earlier
+     claim of mine that f861ee4 had passed a full gate was wrong - that commit
+     ran eleven e2e classes, not the suite.
+   - **SECOND FULL GATE GREEN (f9494a5)**: 6,234 passed, 1 xfailed, every gate
+     passed, 24m12s. **PUSHED** e95f7de..f9494a5 to
+     `claude/qac-024-explanations-qx8hx8`; CI result below.
+   - **QUESTIONS FOR YOU (from #268)**: (a) REQ-DASH-291 c16 `waitedSeconds` -
+     measure against BUILT_AT? (b) a CORP `_headers` file before 255? (c) fonts
+     and vendor under `_site/snapshots`, keeping 292 c9? (d) blank the
+     GITHUB_LINKS SHAs? (e) amend 291's wording for the per-payload build id?
+     (f) error advice "Reload the page" first? (g) should one bad collection
+     file block the whole page? (h) hide the Demo button in snapshots? (i) the
+     load-error colour, `--bad` or neutral? Plus E2 (inline fonts/player in
+     snapshots?) and E3 (257's SameSite step waits for 257's build).
+   - **STILL TO DO**: A3 (270+266+267+273+278, schema bump, bootstrap) is next
+     in the agreed order - deliberately not started overnight, being large.
