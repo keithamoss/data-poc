@@ -1165,8 +1165,10 @@ to the exact right file/line/folder with zero console errors.
     a synthetic asset.** Priority: address in the next few days (Keith,
     2026-10-14 night, setting up overnight #5: "let's address number 89 and
     number 95 if we can in the next few days, given that they block some other
-    requirements" - it holds REQ-QAC-176, so REQ-PIPE-177, REQ-PIPE-178 and
-    REQ-DASH-221). Earlier priority: deal with it this week (Keith,
+    requirements" - it held REQ-QAC-176, so REQ-PIPE-177, REQ-PIPE-178 and
+    REQ-DASH-221, until Keith lifted that hold on 2026-10-24 by answering
+    REQ-QAC-176's question 2 with C, a plain schema bump using the existing
+    refusal; it blocks none of the four now). Earlier priority: deal with it this week (Keith,
     2026-10-13: "I'm quite concerned about that database schema thing.
     There's no way that approach of rewriting is viable. So that is a
     significant issue ... and we should deal with that this week.") Found answering Keith's question on REQ-PIPE-193 ("is that
@@ -5493,15 +5495,16 @@ could never have computed it), and it belongs with batch 5's check work.
 
 102. **[in-progress, 2026-10-16]** **[Pipeline & publishing]** **Key the
      configuration caches on file content.** Drafted by delivery-scoper as
-     REQ-PIPE-254 (a proposal, not signed); its open questions 1-4 are with
-     Keith. Remove this entry once REQ-PIPE-254 is built.
+     REQ-PIPE-254, signed off by Keith 2026-10-24 with every open question
+     answered. Remove this entry once REQ-PIPE-254 is built.
 
 103. **[todo, 2026-10-16]** **[Testing & dev tooling]** **Three copies of
      the asset file's path.** Found by delivery-scoper drafting REQ-PIPE-254:
      `hierarchy`, `asset_time` and `validate_schedule` each hold their own
      `DATA_ASSET_YAML` constant, so a test that patches one still reads the
      real file through the other two. Separate from REQ-PIPE-254, which it
-     does not change; not yet scoped or put to Keith.
+     does not change - Keith, 2026-10-24, answering 254's open question 5:
+     its own small item rather than folded in. Not yet scoped.
 
 104. **[in-progress, 2026-10-18]** **[Dashboard UI]** **[Pipeline & publishing]**
     **Private hosting for the dashboard, then a private repository -

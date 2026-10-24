@@ -11152,3 +11152,27 @@ twice. It deliberately did not re-find the `TypeError`.
      - F5: all five built test-first in 9585a14.
      - T6: the guard strengthened in 9585a14; test 26 in f7b6c9e.
      - c13: a dataset's own re-check names its cause, 9585a14.
+
+263. **[todo, 2026-10-24]** **[Pipeline & publishing]** **A settlement by
+     flags exits 0 when its own QA runs are left owed.** Found by the
+     delivery-cli-ux pre-build review of REQ-PIPE-211 (finding S5), a
+     pre-existing gap in REQ-PIPE-193's flag form rather than anything 211
+     adds. Verified against the code 2026-10-24: `mothman supply decide
+     --operation choose-file --dataset <id> --period <p> --file-outcome ...
+     --reason ... --yes` goes through `cli/supply.py`'s
+     `_settle_from_flags` into `settle_tui.settle`, whose
+     `_run_what_it_owed` marks a run that did not finish "not checked yet -
+     owed" and carries on; `decide_command`'s choose-file branch then
+     returns, exiting 0, and raises only `SystemExit(1)` when nothing was
+     recorded. Every other operation on the same command exits
+     `filing_tui.CHECKS_STILL_OWED_EXIT` (3) when `outcome.checks_finished`
+     is False, so a script cannot tell a complete settlement from one whose
+     runs are still owed - the case REQ-PIPE-177's decision 28 and
+     REQ-PIPE-163 criterion 28 give their own code for. Fix: exit
+     CHECKS_STILL_OWED_EXIT (3) from the flag form whenever any of the
+     settlement's own owed runs is left owed, and say in `--help` which of
+     the command's exits 3 means what (REQ-PIPE-211 criterion 15 adds a
+     second, for its readers' re-check). Keith asked for this entry and
+     named that fix on 2026-10-24, at REQ-PIPE-211's sign-off. A defect, so
+     a failing test first (a settlement by flags whose owed run fails exits
+     3), then the fix. Not yet built.

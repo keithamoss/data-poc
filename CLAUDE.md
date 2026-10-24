@@ -1899,6 +1899,18 @@ Rough layout:
   **Now reachable** (allow-listed by Keith; kept here rather than
   deleted so a future session reading an old `plans/*.md` reference to
   "the blocked X" can see it has since been resolved):
+  - **`developers.cloudflare.com`** - Cloudflare's own documentation, for
+    the Cloudflare Pages and Access hosting work (REQ-PIPE-255,
+    REQ-PIPE-257, REQ-DASH-291). A proxy 403 on 2026-10-24, allow-listed
+    by Keith the same day and re-verified with a real `curl` (200, after a
+    301: the authorization-cookie page now lives at
+    `/cloudflare-one/access-controls/applications/http-apps/authorization-cookie/`,
+    so an old link returns a redirect stub rather than the page). It
+    answered the question it was wanted for: the Access `CF_Authorization`
+    cookie's SameSite attribute is a per-application setting offering
+    None, Lax and Strict, with NO documented default, and the page warns
+    that Strict can cause `ERR_TOO_MANY_REDIRECTS` - which is why
+    REQ-PIPE-257 sets Lax explicitly rather than relying on a default.
   - **`www.postgresql.org`**, **`docs.aws.amazon.com`**,
     **`containers.dev`**, **`code.visualstudio.com`**,
     **`datacontract.com`**, **`extensions.duckdb.org`** - allow-listed
