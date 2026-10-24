@@ -15,7 +15,13 @@ KEPT NARROW, so it fails for the right reason only:
     `recorded_at`, REQ-DASH-264 criterion 9 and REQ-PIPE-279 criterion 16 say
     so - is read only in the keys of its sorts, max and min;
   - the view qa.supply_current_run is read in its ORDER BY;
-  - the template's point functions are read whole.
+  - the template's point functions are read whole;
+  - in a read-whole function, every SQL ORDER BY orders by a recorded key
+    (ORDER_KEYS) and every sort with no key is one named in BARE_SORTS, which
+    sort names rather than runs (post-build-review #262 T6) - a bare
+    sorted(run_ids) is the run-id text order this rule exists to remove;
+  - the template's supply history and column drawer are read in their sort
+    comparators, since they also date and name rows for display.
 
 DELIBERATELY NOT READ: qa_results_reader.canonical_order, which sorts a
 results FILE by run id so a live write and a rebuild produce the same bytes
@@ -63,6 +69,25 @@ WHOLE = {
     "qa_tools.common.qa_results_writer": ("_arrival_purpose",),
 }
 
+#: WHAT AN ORDER BY IN A READ-WHOLE FUNCTION MAY ORDER BY, each a recorded key
+#: and none a time or a run id's text: the opening order, a row's identity
+#: within one run's recording, a table's name, and drift_reference.run_for's
+#: preference for a run of the dataset itself.
+ORDER_KEYS = ("run_seq", "id", "logical_table", "(dataset_id IS DISTINCT FROM ?)")
+
+#: Sorts with no key in read-whole functions, each sorting NAMES - tables,
+#: datasets, checks, files - for stable output, never runs or results.
+BARE_SORTS = {
+    ("pipeline.build_dashboard_data", "share_cross_table_results"):
+        ('sorted((r.get("reads") or {}).items())',),
+    ("pipeline.build_dashboard_data", "_between"):
+        ("sorted({hierarchy.dataset_for_table(t).dataset_id for t in reads}",),
+    ("qa_tools.common.qa_results_reader", "read_check_reads"): ("sorted(files or ())",),
+    ("qa_tools.common.carried", "decide"):
+        ("sorted(_evaluated_reads(conn, sibling, open_).items())",),
+    ("qa_tools.common.carried", "_evaluated_reads"): ("sorted(check_ids)",),
+}
+
 #: Read only in their sort, max and min keys: they also date results for display.
 KEYS_ONLY = {
     "pipeline.build_dashboard_data": ("build_one_table", "build_datasets"),
@@ -74,6 +99,16 @@ JS_FUNCTIONS = ("unitCounts", "sameDelivery", "defaultCompareIndex", "historyPoi
                 "pointKey", "deliveryCount", "compareParamFor")
 JS_FORBIDDEN = ("recorded_at", "recordedAt", "Date.parse", "assetDateStrOf", "run_date",
                 "recordedDayOf", "localeCompare", "toISOString")
+
+#: The template's functions that also date and name rows for display, read in
+#: their sort comparators only - which may not order by a time, a day or a run
+#: id (post-build-review #262 T6). A chain of supplies is still ordered by its
+#: PERIOD's date, which is not a run order.
+JS_SORTED = ("buildSupplyHistory",)
+JS_SORT_FORBIDDEN = ("recorded_at", "recordedAt", "Date.parse", "assetDateStrOf", "run_date",
+                     "run_id", "runId", "toISOString", ".date")
+#: Read whole, beside JS_FUNCTIONS: the column drawer's run dots.
+JS_WHOLE_TOO = ("statusHistoryForColumn",)
 
 
 def _forbidden_in(text: str, forbidden=FORBIDDEN) -> list[str]:
@@ -114,6 +149,49 @@ def _ordering_keys(source: str) -> list[str]:
     return keys
 
 
+def _order_by_violations(source: str) -> list[str]:
+    """Each ORDER BY term not in ORDER_KEYS, a table alias dropped."""
+    bad = []
+    for clause in re.findall(r"ORDER BY (.*?)(?:LIMIT|\"|'|$)", source, re.S | re.M):
+        for term in clause.split(","):
+            term = re.sub(r"\b\w+\.(\w+)", r"\1", term.strip())
+            term = re.sub(r"\s+(DESC|ASC)$", "", term)
+            if term and term not in ORDER_KEYS:
+                bad.append(term)
+    return bad
+
+
+def _bare_sorts(source: str) -> list[str]:
+    """The source of every sorted, .sort, max or min given no key."""
+    out = []
+    for node in ast.walk(ast.parse(source)):
+        if not isinstance(node, ast.Call):
+            continue
+        name = node.func.attr if isinstance(node.func, ast.Attribute) else getattr(
+            node.func, "id", None)
+        if name in ("sorted", "sort") and not any(k.arg == "key" for k in node.keywords):
+            out.append(ast.get_source_segment(source, node))
+    return out
+
+
+def _unlisted_bare_sorts(module: str, name: str, source: str) -> list[str]:
+    allowed = BARE_SORTS.get((module, name), ())
+    return [s for s in _bare_sorts(source) if not any(s.startswith(a) for a in allowed)]
+
+
+def _js_sort_comparators(text: str) -> list[str]:
+    """The argument of every `.sort(` in a function, by parentheses."""
+    out, i = [], 0
+    while (i := text.find(".sort(", i)) != -1:
+        start = i = i + len(".sort(")
+        depth = 1
+        while depth:
+            depth += {"(": 1, ")": -1}.get(text[i], 0)
+            i += 1
+        out.append(text[start:i - 1])
+    return out
+
+
 def _js_function(name: str) -> str:
     """One top-level `function name(...){...}` of the template, by braces."""
     text = TEMPLATE.read_text()
@@ -132,6 +210,19 @@ class TestTheRuleIsKept:
     def test_placement_code_reads_no_time_run_id_or_day(self, module, name):
         assert _forbidden_in(_source_of(module, name)) == [], f"{module}.{name}"
 
+    @pytest.mark.parametrize("module, name", [(m, n) for m, ns in WHOLE.items() for n in ns])
+    def test_placement_code_orders_by_recorded_keys_alone(self, module, name):
+        source = _source_of(module, name)
+        assert _order_by_violations(source) == [], f"{module}.{name}"
+        assert _unlisted_bare_sorts(module, name, source) == [], f"{module}.{name}"
+
+    def test_every_listed_bare_sort_is_still_there(self):
+        """A BARE_SORTS entry whose sort has gone is a hole someone can walk a
+        new sort through unnoticed."""
+        for (module, name), sorts in BARE_SORTS.items():
+            found = _bare_sorts(_source_of(module, name))
+            assert all(any(s.startswith(a) for s in found) for a in sorts), (module, name)
+
     @pytest.mark.parametrize("module, name", [(m, n) for m, ns in KEYS_ONLY.items() for n in ns])
     def test_no_sort_orders_by_one(self, module, name):
         keys = _ordering_keys(_source_of(module, name))
@@ -146,9 +237,15 @@ class TestTheRuleIsKept:
         order = view[view.index("ORDER BY"):view.index(";")]
         assert _forbidden_in(order) == [] and "run_key" not in order, order
 
-    @pytest.mark.parametrize("name", JS_FUNCTIONS)
+    @pytest.mark.parametrize("name", JS_FUNCTIONS + JS_WHOLE_TOO)
     def test_the_templates_point_code_reads_no_time_or_day(self, name):
         assert _forbidden_in(_js_function(name), JS_FORBIDDEN) == [], name
+
+    @pytest.mark.parametrize("name", JS_SORTED)
+    def test_the_supply_history_sorts_by_no_time_day_or_run_id(self, name):
+        comparators = _js_sort_comparators(_js_function(name))
+        assert comparators, f"{name} sorts nothing - this reads nothing"
+        assert [c for c in comparators if _forbidden_in(c, JS_SORT_FORBIDDEN)] == [], comparators
 
     def test_the_points_are_sorted_by_rank_alone(self):
         comparators = re.findall(r"\.sort\(\(a, ?b\)\s*=>(.*?)\);", _js_function("unitCounts"), re.S)
@@ -157,11 +254,45 @@ class TestTheRuleIsKept:
 
 
 class TestTheGuardCanFail:
-    """Rule 3: a guard over source has to be shown to catch what it is for."""
+    """Rule 3: a guard over source has to be shown to catch what it is for -
+    each against a deliberately broken copy of a real function's source, so
+    a guard that stopped reading the real thing would fail here too (T6)."""
 
     def test_a_sort_by_recording_time_is_caught(self):
-        keys = _ordering_keys("def f(h):\n    return max(h, key=lambda x: x['recorded_at'])\n")
-        assert [k for k in keys if _forbidden_in(k)] == ["lambda x: x['recorded_at']"]
+        real = _source_of("pipeline.build_dashboard_data", "build_one_table")
+        keys = _ordering_keys(real)
+        assert keys and not [k for k in keys if _forbidden_in(k)], "test precondition"
+        assert f"key={keys[0]}" in real, "test precondition"
+        broken = real.replace(f"key={keys[0]}", "key=lambda x: x['recorded_at']", 1)
+        assert [k for k in _ordering_keys(broken) if _forbidden_in(k)]
 
     def test_a_run_id_parse_is_caught(self):
-        assert _forbidden_in("parts = supply_db.split_staged(run_id)") == ["split_staged"]
+        real = _source_of("qa_tools.common.qa_results_writer", "_arrival_purpose")
+        assert not _forbidden_in(real), "test precondition"
+        broken = real.replace("res = supply_db.resolution_for(conn, run_id)",
+                              "res = supply_db.resolution_for(conn, run_id)\n"
+                              "    parts = supply_db.split_staged(run_id)", 1)
+        assert broken != real and _forbidden_in(broken) == ["split_staged"]
+
+    def test_an_order_by_run_key_is_caught(self):
+        real = _source_of("qa_tools.common.supply_status", "results_about")
+        assert _order_by_violations(real) == [], "test precondition"
+        broken = real.replace("ORDER BY r.run_seq, c.id", "ORDER BY r.run_key, c.id")
+        assert broken != real and _order_by_violations(broken) == ["run_key"]
+
+    def test_a_bare_sort_of_run_ids_is_caught(self):
+        real = _source_of("qa_tools.common.carried", "siblings")
+        assert _unlisted_bare_sorts("qa_tools.common.carried", "siblings", real) == [], \
+            "test precondition"
+        assert real.count("return [row[0]") == 1 and real.rstrip().endswith("]"), \
+            "test precondition"
+        broken = real.replace("return [row[0]", "return sorted([row[0]", 1).rstrip() + ")"
+        assert _unlisted_bare_sorts("qa_tools.common.carried", "siblings", broken)
+
+    def test_a_supply_history_sorted_by_day_and_run_id_is_caught(self):
+        real = _js_function("buildSupplyHistory")
+        assert real.count("byRankThenSeen(") == 1, "test precondition"
+        broken = real.replace("byRankThenSeen(a.r, a.i, b.r, b.i)",
+                              "a.r.run_date.localeCompare(b.r.run_date) || "
+                              "a.r.run_id.localeCompare(b.r.run_id)")
+        assert [c for c in _js_sort_comparators(broken) if _forbidden_in(c, JS_SORT_FORBIDDEN)]

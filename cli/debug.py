@@ -59,12 +59,21 @@ def _refuse_an_evaluated_run(run_id: str) -> None:
     """Refuse, before any tool runs, a run the orchestrator already evaluated
     (REQ-PIPE-279 criterion 8): writing into it would replace its recorded
     results under its old run_seq with no attempt of its own. The writer
-    refuses the write too; this says so before a tool has spent its time."""
+    refuses the write too; this says so before a tool has spent its time.
+
+    AND A RUN BEING EVALUATED RIGHT NOW (post-build-review #262 F5): another
+    process holds its attempt lock, so the store would accept this write as
+    if it were that attempt's own."""
     from qa_tools.common import qa_store, supply_db
 
     with supply_db.connect(read_only=True, label="mothman:debug-guard") as conn:
         if not conn.execute(f"SELECT to_regclass('{qa_store.SCHEMA}.run')").fetchall()[0][0]:
             return
+        if qa_store.attempt_running(conn, run_id):
+            raise click.ClickException(
+                f"run {run_id!r} is being evaluated by another process, which holds its "
+                "attempt - a debug runner would write into that attempt's results. Run it "
+                "once that attempt has ended.")
         try:
             qa_store.refuse_outside_an_attempt(conn, run_id)
         except qa_store.NoOpenAttempt as exc:

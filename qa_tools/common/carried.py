@@ -192,14 +192,17 @@ def carried_of(conn, run_id: str) -> dict[str, str]:
 
 
 def carried_for(run_id: str) -> dict[str, str]:
-    """carried_of() on its own connection, for the scope rule."""
+    """carried_of() on its own connection, for the scope rule.
+
+    NOTHING IS CAUGHT (post-build-review #262 F5): it used to return {} on
+    any exception, so a database it could not reach read as "this run
+    carries nothing", and the run evaluated and recorded checks a sibling
+    owns. There is no expected failure to allow for - the scope rule runs
+    only where results are about to be written to the same database."""
     from qa_tools.common import supply_db
 
-    try:
-        with supply_db.connect(read_only=True, label="mothman:carried") as conn:
-            return carried_of(conn, run_id)
-    except Exception:  # noqa: BLE001 - no database means nothing carried
-        return {}
+    with supply_db.connect(read_only=True, label="mothman:carried") as conn:
+        return carried_of(conn, run_id)
 
 
 def records_for(conn, run_id: str) -> list[dict]:

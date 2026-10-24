@@ -2123,7 +2123,13 @@ def record_file_results(conn: supply_db.SupplyConnection, run_key: str,
     `load_attempt`. record_results() replaces by (run, tool, scope,
     state), which would quietly keep only the latest attempt - the
     alternative Keith rejected.
+
+    REFUSED INTO AN EVALUATED RUN with no attempt open, as record_run and
+    record_results are (REQ-PIPE-279 criterion 8; post-build-review #262
+    F5). At staging, before the run is opened, it has no run_seq and is
+    written freely.
     """
+    refuse_outside_an_attempt(conn, run_key)
     columns = ("run_key", *_RESULT_COLUMNS, *_KEY_COLUMNS, "load_attempt", "delivery",
                "filename", "extra")
     placeholders = ", ".join(["?"] * len(columns))

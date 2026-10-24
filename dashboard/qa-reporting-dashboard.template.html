@@ -2644,9 +2644,15 @@ function buildSupplyHistory(d){
   // criterion 13): each file that became a supply has its own, and the
   // pair's run would otherwise make the first of them read as a resupply.
   const settledArrivals = new Set(settledPairs(d.id).map(b=> b.settlement.arrivalRunId));
+  // IN THE ORDER THE RUNS WERE OPENED, the build's rank (REQ-PIPE-279
+  // criterion 16; post-build-review #262 F5) - never by day and then run-id
+  // text, which put `__r10` before `__r9`. A run with no rank (illustrative
+  // mock data) keeps the order it came in, after the ranked ones.
   const runsChronological = [...(d.runs || [])]
     .filter(r=> !settledArrivals.has(r.run_id))
-    .sort((a,b)=> a.run_date.localeCompare(b.run_date) || a.run_id.localeCompare(b.run_id));
+    .map((r, i)=> ({r, i}))
+    .sort((a, b)=> byRankThenSeen(a.r, a.i, b.r, b.i))
+    .map(({r})=> r);
 
   const chains = []; // {cycleStart, period, entries[], open}
   let current = null;
@@ -2727,14 +2733,18 @@ function buildSupplyHistory(d){
   // calendar that date is genuinely the only thing that orders one chain
   // against another, and a null in a localeCompare() is a TypeError that
   // takes the whole panel out.
-  const sortKey = chain => chain.cycleStart
-    || chain.entries.reduce((newest, e) => e.run_date > newest ? e.run_date : newest, "");
+  // A chain with no period sorts by its newest entry's place in the run
+  // order, which is all that orders it then; chains are built in that order.
+  const made = new Map(chains.map((chain, i)=> [chain, i]));
   return chains
+    .sort((a, b)=> (a.cycleStart && b.cycleStart)
+      ? b.cycleStart.localeCompare(a.cycleStart)
+      : made.get(b) - made.get(a))
     .map(chain => ({
       cycleStart: chain.cycleStart,
-      entries: chain.entries.sort((a,b)=> b.run_date.localeCompare(a.run_date) || b.run_id.localeCompare(a.run_id)),
-    }))
-    .sort((a,b)=> sortKey(b).localeCompare(sortKey(a)));
+      // Newest first: the reverse of the run order the entries were added in.
+      entries: [...chain.entries].reverse(),
+    }));
 }
 function cycleLabel(cadence, cycleStartStr, datasetId){
   // No period rather than an invented one (REQ-PIPE-106). The heading
@@ -5177,6 +5187,14 @@ function pointKey(h){
 // The build's rank, or null for an entry with none (illustrative mock data):
 // then the order the entries came in, which the build emits in rank order.
 function rankOf(h){ return h && typeof h.rank === "number" ? h.rank : null; }
+// A TOTAL ORDER over entries by rank: ranked ones by rank, then any unranked
+// in the order they came (`seen`), as unitCounts orders its points.
+function byRankThenSeen(a, seenA, b, seenB){
+  const ra = rankOf(a), rb = rankOf(b);
+  if(ra != null && rb != null) return ra - rb;
+  if((ra != null) !== (rb != null)) return ra != null ? -1 : 1;
+  return seenA - seenB;
+}
 // One check's history as its points, oldest first: each point's result is its
 // highest-ranked entry (criterion 11), `last` that entry's index.
 function historyPoints(history){
@@ -5236,8 +5254,16 @@ function causeKind(h){
   if(h && h.cause) return String(h.cause).startsWith("arrival:") ? "arrival" : "re-check";
   return h && h.recorded_in === "re-check" ? "re-check" : "arrival";
 }
-function historySource(col, h){
-  if(!h || !h.recorded_by) return "";
+// THE DATASET'S OWN RE-CHECK NAMES ITS CAUSE TOO (criterion 13; Keith,
+// 2026-10-24): `own` is the page's dataset, and only its arrival - the
+// default reading - says nothing.
+function historySource(col, h, own){
+  if(!h) return "";
+  if(!h.recorded_by){
+    if(!own || !h.cause || causeKind(h) !== "re-check") return "";
+    const when = h.recorded_at ? `, ${fmtInstant(h.recorded_at)}` : "";
+    return `from the ${own.name}'s re-check${when}`;
+  }
   const ds = (col.datasets || []).find(d=> d.id === h.recorded_by);
   const name = ds ? ds.name : h.recorded_by;
   const when = h.recorded_at ? `, ${fmtInstant(h.recorded_at)}` : "";
@@ -8268,24 +8294,15 @@ function stepUpInPlace(cleared){
    for every check on click instead of just the one arbitrarily promoted.
 ========================================================================= */
 function statusHistoryForColumn(column){
-  // Worst status per run-date across every check on this column, derived
-  // client-side from each check's own history + fixed warn/fail
-  // thresholds (checkStatus's own status_for logic - no separate
-  // "column status over time" field needed from the Python build step).
-  // A Map keyed by timestamp, not array index, since not every check
-  // necessarily has an entry for every run (e.g. the row-count-growth
-  // check has none for the very first run - there's no previous run to
-  // compare it against).
-  const byDate = new Map();
-  column.checks.forEach(ck=>{
-    ck.history.forEach(h=>{
-      const st = historyStatus(h, ck);
-      const key = h.date.getTime();
-      const existing = byDate.get(key);
-      if(!existing || STATUS_ORDER[st] > STATUS_ORDER[existing.worst]) byDate.set(key, {date:h.date, worst:st});
-    });
-  });
-  return [...byDate.values()].sort((a,b)=> a.date-b.date);
+  // Worst status across every check on this column, ONE DOT PER POINT - the
+  // page's own points (post-build-review #262 F5), counted by the one
+  // function the dataset list's counts and sparklines use, so the drawer
+  // cannot say a different number of runs from the rest of the page. It
+  // used to group by calendar day, which merged a 15:00 re-check into a
+  // 09:00 delivery. Retired checks are left out, as the counts above leave
+  // them out.
+  return unitCounts([column]).map(p=> ({date: p.date,
+    worst: p.red ? "red" : p.amber ? "amber" : "green"}));
 }
 
 // "Shape 2" - surfaces WHAT the actual bad values look like for a check
@@ -8481,7 +8498,7 @@ function openCheckPanel(ag, col, ds, column, check, opts){
     const deltaWord = deltaClass==="flat" ? "No material change" : (deltaClass==="up" ? `Worse than the ${compareWord}` : `Better than the ${compareWord}`);
     const deltaUnitTag = check.unit==="%" ? "pt" : (check.unit==="hrs" ? "h" : "");
     const runOptions = check.history.slice(0, n-1).map((h,i)=>
-      `<option value="${i}" ${i===compareIdx?"selected":""}>${fmtDate(h.date)}${historySource(col, h) ? ` · ${escHtml(historySource(col, h))}` : ""}${i===defaultCompareIdx?" (previous)":""}</option>`
+      `<option value="${i}" ${i===compareIdx?"selected":""}>${fmtDate(h.date)}${historySource(col, h, ds) ? ` · ${escHtml(historySource(col, h, ds))}` : ""}${i===defaultCompareIdx?" (previous)":""}</option>`
     ).join("");
     compareBlock = `
     <div class="drawer-section">
@@ -8567,7 +8584,7 @@ function openCheckPanel(ag, col, ds, column, check, opts){
   const trendBlock = `
     <div class="drawer-section">
       <h4>Over time — every QA run (${deliveryCount(check.history)} ${pluralize(deliveryCount(check.history),"run")})</h4>
-      ${trendChart(check, hasCompareRun ? compareIdx : null, n>2 ? (idx)=>setCompareIdx(ag, col, ds, column, check, idx) : null, ds.runs, (r)=> historySource(col, r))}
+      ${trendChart(check, hasCompareRun ? compareIdx : null, n>2 ? (idx)=>setCompareIdx(ag, col, ds, column, check, idx) : null, ds.runs, (r)=> historySource(col, r, ds))}
     </div>`;
 
   const descBlock = `<div style="font-size:13px; color:var(--ink-muted); margin-bottom:18px;">

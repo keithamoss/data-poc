@@ -396,7 +396,9 @@ def read_check_reads(agency: str, collection: str, conn=None) -> dict[tuple[str,
             f'k.contested_files FROM "{qa_store.SCHEMA}".check_read_visible k '
             f'JOIN "{qa_store.SCHEMA}".check_result c ON c.id = k.check_result_id '
             "WHERE c.agency_id = ? AND c.collection_id = ? "
-            "ORDER BY c.run_key, c.check_id, k.logical_table", [agency, collection]).fetchall()
+            # A RECORDED ORDER, never run-key text (post-build-review #262 T6):
+            # the results as recorded, each one's tables by name.
+            "ORDER BY c.id, k.logical_table", [agency, collection]).fetchall()
     finally:
         if mine:
             conn.close()

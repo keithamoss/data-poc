@@ -222,6 +222,19 @@ class TestTheNewestIsTheHighestRank:
         assert card["current_status"] == "green"
 
 
+class TestEachRunOnThePageCarriesItsRank:
+    """post-build-review #262 F5: the supply history orders a dataset's runs
+    by rank, so each run the page is given says its rank."""
+
+    def test_each_run_says_its_rank(self, history):
+        first = _run(f"cp_clients__{_key()}", dataset_id="cp-clients",
+                     supply=f"cp-clients@{_key()}")
+        second = _run(f"cp_clients__{_key()}", dataset_id="cp-clients",
+                      supply=f"cp-clients@{_key()}")
+        runs = {r["run_id"]: r for r in history.datasets()["cp-clients"]["runs"]}
+        assert runs[first]["rank"] < runs[second]["rank"]
+
+
 class TestSharedToTheTablesItRecordedReading:
     """Criterion 18: not the checkout's current declarations."""
 

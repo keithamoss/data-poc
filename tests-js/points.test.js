@@ -269,3 +269,54 @@ describe("a contested table's cross-table row reads the pair", () => {
     expect(w.checkStatus(ds.columns[0].checks[0])).toBe("nodata");
   });
 });
+
+// post-build-review #262 F5 and criterion 13 (Keith, 2026-10-24: fix now).
+describe("the column drawer's run dots are the page's points", () => {
+  it("counts two causes on one day as two points, in rank order", () => {
+    const w = load();
+    const ck = { warn: 1, fail: 2, history: [
+      entry({ run: "a", rank: 2, supply: "s@1", cause: "arrival:1", at: "2026-03-01T09:00:00+08:00" }),
+      entry({ run: "b", rank: 3, supply: "s@1", cause: "decision:7", at: "2026-03-01T15:00:00+08:00",
+              status: "red" }),
+      entry({ run: "z", rank: 1, supply: "s@0", cause: "arrival:0", at: "2026-02-01T09:00:00+08:00" }),
+    ] };
+    const dots = w.statusHistoryForColumn({ name: "c", checks: [ck] });
+    expect(dots.map((d) => d.worst)).toEqual(["green", "green", "red"]);
+  });
+});
+
+describe("a supply's history is in the order its runs were opened", () => {
+  it("orders one day's runs by rank, never by run id", () => {
+    const w = load();
+    // __r10 sorts before __r9 as text; the build's rank says r9 came first.
+    const runs = [
+      { run_id: "t__X__r10", run_date: "2026-01-01", rank: 2 },
+      { run_id: "t__X__r9", run_date: "2026-01-01", rank: 1 },
+    ];
+    const d = {
+      id: "birth-registrations", sla: { cadence: { type: "daily", expected_time: "14:00" } },
+      runs, arrivalByRun: { "t__X__r10": { slot: "2026-01-01" }, "t__X__r9": { slot: "2026-01-01" } },
+      columns: [{ checks: [{ warn: 1, fail: 2, history: [
+        { run_id: "t__X__r9", run_date: "2026-01-01", value: 3 },
+        { run_id: "t__X__r10", run_date: "2026-01-01", value: 0 },
+      ] }] }],
+    };
+    const [chain] = w.buildSupplyHistory(d);
+    // Newest first: r10 resupplies r9's red, so it is attempt 2.
+    expect(chain.entries.map((e) => [e.run_id, e.attemptNumber])).toEqual(
+      [["t__X__r10", 2], ["t__X__r9", 1]]);
+  });
+});
+
+describe("a dataset's own re-check names its cause (criterion 13)", () => {
+  it("says it came from the dataset's own re-check, as another table's does", () => {
+    const w = load();
+    const own = entry({ run: "r", rank: 4, supply: "s@1", cause: "decision:7",
+                        at: "2026-03-01T15:00:00+08:00" });
+    const said = w.historySource({ datasets: [] }, own, { name: "Client Register" });
+    expect(said).toMatch(/^from the Client Register's re-check, /);
+    const arrival = entry({ run: "a", rank: 3, supply: "s@1", cause: "arrival:1",
+                            at: "2026-03-01T09:00:00+08:00" });
+    expect(w.historySource({ datasets: [] }, arrival, { name: "Client Register" })).toBe("");
+  });
+});

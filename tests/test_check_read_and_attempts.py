@@ -651,6 +651,66 @@ class TestADebugWriteIntoAnEvaluatedRunIsRefused:
         assert self._results(conn, run_id) == before
 
 
+class TestTheOtherWritersAndReadersOfAnAttempt:
+    """post-build-review #262 F5: a file check's write is refused into an
+    evaluated run like any other, a debug runner is refused while another
+    process holds the run's attempt, and what a run carries is never
+    silently read as nothing."""
+
+    def test_a_file_check_write_into_an_evaluated_run_is_refused(self, conn, monkeypatch):
+        run_id = _run_id()
+        _run(monkeypatch, run_id)
+        with pytest.raises(qa_store.NoOpenAttempt, match="already evaluated"):
+            qa_store.record_file_results(
+                conn, run_id, [_result(f"{CHECK}.cp-notifications.x.encoding_file")],
+                agency_id=AGENCY, collection_id=COLLECTION, supply_state=qa_store.AGREED,
+                load_attempt=-1, delivery="d", filename="f.csv")
+
+    def test_a_file_check_write_before_the_run_is_opened_is_allowed(self, conn):
+        """At staging, as the pipeline writes them: no run_seq yet."""
+        run_id = _run_id()
+        qa_store.record_run(conn, run_key=run_id, agency_id=AGENCY, collection_id=COLLECTION,
+                            run_timestamp=WHEN, run_by=BY, environment="test")
+        assert qa_store.record_file_results(
+            conn, run_id, [_result(f"{CHECK}.cp-notifications.x.encoding_file")],
+            agency_id=AGENCY, collection_id=COLLECTION, supply_state=qa_store.AGREED,
+            load_attempt=-1, delivery="d", filename="f.csv") == 1
+
+    def test_a_debug_runner_is_refused_while_another_process_holds_the_attempt(
+            self, conn, monkeypatch):
+        from click.testing import CliRunner
+
+        import cli.debug as debug_cli
+        from qa_tools.tools import run_dbt
+
+        run_id = _run_id()
+        proc = _child(run_id)
+        try:
+            called = []
+            monkeypatch.setattr(run_dbt, "evaluate", lambda *a, **k: called.append(a) or [])
+            got = CliRunner().invoke(debug_cli.debug_group,
+                                     ["run-dbt", "--collection", "cp", "--run-id", run_id])
+            assert got.exit_code != 0
+            assert "being evaluated" in got.output
+            assert not called, "the tool ran before the refusal"
+        finally:
+            proc.kill()
+            proc.wait(timeout=60)
+
+    def test_what_a_run_carries_is_never_read_as_nothing_on_a_failure(self, monkeypatch):
+        """carried_for used to return {} on ANY exception, so an unreachable
+        database read as 'this run carries nothing' and the run evaluated
+        - and recorded - checks its sibling owns."""
+        from qa_tools.common import carried
+
+        def refuse(*a, **k):
+            raise psycopg.OperationalError("no database here")
+
+        monkeypatch.setattr(supply_db, "connect", refuse)
+        with pytest.raises(psycopg.OperationalError):
+            carried.carried_for(_run_id())
+
+
 class TestADiscardedTrialTakesItsAttempts:
     """Criterion 6's one exception, test 25."""
 

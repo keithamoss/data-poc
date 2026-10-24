@@ -707,8 +707,9 @@ def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], da
         # Each run as the PAGE sees it: the manifest entry plus a derived
         # `run_date`. Spread-then-add rather than a hand-listed copy: a
         # hand-maintained allowlist silently drops every field added later
-        # (CLAUDE.md's standing lesson from item 74).
-        "runs": [{**m, "run_date": _run_date(m)} for m in manifest],
+        # (CLAUDE.md's standing lesson from item 74). Its rank too, which the
+        # supply history orders by (post-build-review #262 F5).
+        "runs": [{**m, "run_date": _run_date(m), "rank": rank(m["run_id"])} for m in manifest],
         "columns": columns_out,
         "_provenance": presented["provenance"].format(
             table_description=table_description(coll, dataset)),
