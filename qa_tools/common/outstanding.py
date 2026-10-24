@@ -649,7 +649,7 @@ def _from_carry_forward_warnings() -> list[Item]:
         said = words[(w.dataset_id, w.period)]
         items.append(Item(
             kind=CARRY_FORWARD_POSSIBLE, severity=WARNING, blocking=False,
-            headline=said[0].split(". ")[0] + ".",
+            headline=carry_forward.headline(w),
             detail=" ".join(said),
             agency_id=dataset.agency_id, collection_id=dataset.collection_id,
             dataset_id=dataset.dataset_id,

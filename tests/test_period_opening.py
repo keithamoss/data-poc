@@ -258,9 +258,126 @@ class TestTheWarningIsShown:
                if w["period"] == warned.q4]
         assert got and got[0]["from"] == "2099-09-02" and got[0]["until"] is None
         assert got[0]["command"] == self._command(warned)
+        assert got[0]["headline"] == (f"A newer {CASE_WORKERS} could be carried forward into "
+                                      f"{warned.q4}.")
         carry_forward.carry_forward(conn, dataset_id=CASE_WORKERS, period=warned.q4,
                                     actor="Keith", reason="current",
                                     effective_at="2099-10-05T09:00:00+08:00")
         (after,) = [w for w in carry_forward.for_dashboard(CASE_WORKERS, conn)
                     if w["period"] == warned.q4]
         assert after["until"] == "2099-10-05"
+
+
+class TestOweNothingQuarter:
+    """S6, criteria 1, 2 and 10: a quarter Case Workers does not take part in,
+    and a package of the other five tables, all green. The quarter opens at
+    the package's filing, Case Workers is inherited before any run, the
+    readers' cross-table checks read the inherited table and pass, and all
+    five promote. The real tools run, over the fixture's clean population.
+
+    THE NO-DEADLOCK NFR is what this pins: under opening-at-first-promotion
+    the readers' checks ran with no Case Workers at all, could not pass, and
+    nothing could be the first promotion that would have brought it."""
+
+    def test_readers_of_case_workers_promote_in_a_quarter_it_sits_out(
+            self, cp_raw_dir, supply_dsn, monkeypatch, tmp_path):
+        import random
+        import uuid as _uuid
+        from datetime import date as _date
+        from datetime import timedelta
+        from pathlib import Path
+
+        from fixture_ids import CP_REF_RUN_ID
+        from qa_tools.common import (arrival_lifecycle, arrivals, delivery, delivery_log,
+                                     hierarchy, knock_on, qa_store, schedule, supply_db)
+        from qa_tools.tools import orchestrate, stage
+
+        tag = _uuid.uuid4().hex[:6]
+        q2, q4 = f"2099-{tag}-Q2", f"2099-{tag}-Q4"
+        order = {q2: _date(2099, 4, 1), q4: _date(2099, 10, 1)}
+        real_not_expected, real_date_of = schedule.not_expected_periods, schedule.date_of
+        monkeypatch.setattr(schedule, "not_expected_periods",
+                            lambda ds, *a, **k: ({q4: "delivered in Feb and Aug only"}
+                                                 if ds == CASE_WORKERS
+                                                 else real_not_expected(ds, *a, **k)))
+        monkeypatch.setattr(schedule, "date_of",
+                            lambda name, ds=None: order.get(name) or real_date_of(name, ds))
+
+        def assign(**kw):
+            slot = q2 if kw["dataset_id"] == CASE_WORKERS else q4
+            return assign_mod.Assignment(dataset_id=kw["dataset_id"],
+                                         supply_id=kw["supply_id"], slot=slot,
+                                         branch="pytest", considered=(slot,),
+                                         received_at=kw["at"])
+        monkeypatch.setattr(assign_mod, "assign", assign)
+        # THE KNOCK-ON IS NOT THIS TEST'S SUBJECT: the readers must pass in
+        # their own runs, which is what the opening makes possible.
+        monkeypatch.setattr(knock_on, "follow_up_stream", lambda *a, **k: [])
+
+        ref = Path(cp_raw_dir) / CP_REF_RUN_ID
+        deliveries, receipts = tmp_path / "deliveries", tmp_path / "receipts"
+        t1 = datetime(2026, 1, 3, 6, tzinfo=timezone.utc) + timedelta(
+            seconds=random.randrange(86000))
+        t2 = t1 + timedelta(days=40)
+        delivery.write_delivery(f"pytest-s6-cw-{tag}", {
+            "cp_case_workers.csv": (ref / "cp_case_workers.csv").read_text()},
+            received_at=t1, deliveries_dir=deliveries, receipts_dir=receipts)
+        five = [d for d in ("cp_clients", "cp_notifications", "cp_investigations",
+                            "cp_placements", "cp_carers")]
+        delivery.write_delivery(f"pytest-s6-five-{tag}", {
+            f"{t}.csv": (ref / f"{t}.csv").read_text() for t in five},
+            received_at=t2, deliveries_dir=deliveries, receipts_dir=receipts)
+        stage.build_all("child-protection", deliveries_dir=deliveries, receipts_dir=receipts)
+        for d in delivery.list_deliveries(deliveries, receipts):
+            delivery_log.record(d, arrivals.recognise(d))
+        found = sorted(arrivals.arrivals_for("child-protection", "cp_run_", deliveries,
+                                             receipts),
+                       key=lambda a: (a.sequence, a.run_index, a.run_id))
+        assert len(found) == 6
+
+        steps = orchestrate.steps("child-protection")
+        (cw,) = [a for a in found if CASE_WORKERS in a.files_by_dataset]
+        arrival_lifecycle.process_all([cw], steps=steps, run_by="pytest")
+        with supply_db.connect(label="pytest-s6") as conn:
+            # Q2's Case Workers in the warehouse: a person's promotion, since the
+            # fixture's small population is short of one of its own row floors
+            # - the readers in Q4 are this test's subject, not Q2.
+            (item,) = filing.supplies_of(conn, cw)
+            if dl.promoted_into(conn, CASE_WORKERS, q2) != item["supply"]:
+                from qa_tools.common import promotion
+                promotion.promote(conn, **KEYS, dataset_id=CASE_WORKERS, supply=item["supply"],
+                                  period=q2, physical_tables=item["physical_tables"],
+                                  actor="pytest", actor_kind=dl.PERSON, supply_is_red=True,
+                                  reason="the Q2 supply the test stands on",
+                                  effective_at=(t1 + timedelta(hours=2)).isoformat())
+            cw_supply = dl.promoted_into(conn, CASE_WORKERS, q2)
+            assert cw_supply == item["supply"]
+            assert not period_schema.opened(conn, q4)
+        rest = [a for a in found if a is not cw]
+        arrival_lifecycle.process_all(rest, steps=steps, run_by="pytest")
+
+        with supply_db.connect(label="pytest-s6") as conn:
+            (opened_by,) = conn.execute('SELECT opened_by FROM "qa".period WHERE name = ?',
+                                        [q4]).fetchone()
+            assert opened_by.startswith("the filing of ") and "child-protection" in opened_by
+            (inherit,) = [e for e in dl.decisions_for(conn, CASE_WORKERS)
+                          if e["to_slot"] == q4 and e["action"] == dl.INHERIT]
+            assert inherit["supply"] == cw_supply
+            supplies = [x["supply"] for a in rest for x in filing.supplies_of(conn, a)]
+            assert len(supplies) == 5
+            # INHERITED BEFORE ANY CHECK: every reader's check of Case Workers
+            # read the inherited supply, and passed.
+            reads = [tuple(r) for r in conn.execute(
+                f'SELECT c.check_id, c.status, k.supply_id FROM "{qa_store.SCHEMA}".check_result c '
+                f'JOIN "{qa_store.SCHEMA}".check_read k ON k.check_result_id = c.id '
+                f'JOIN "{qa_store.SCHEMA}".run r ON r.run_key = c.run_key '
+                "WHERE k.logical_table = 'cp_case_workers' AND r.supply_id = ANY(?)",
+                [supplies]).fetchall()]
+            assert reads, "the readers' checks of Case Workers ran"
+            assert {s for _c, _st, s in reads} == {cw_supply}
+            assert {st for _c, st, _s in reads} == {"pass"}, reads
+            # ALL FIVE PROMOTE.
+            for a in rest:
+                (ds,) = a.files_by_dataset
+                assert dl.promoted_into(conn, ds, q4), f"{ds} was not promoted into {q4}"
+        del hierarchy

@@ -385,6 +385,12 @@ def command(w: Warning) -> str:
             f"--period {w.period} --reason '<why>'")
 
 
+def headline(w: Warning) -> str:
+    """The warning's first sentence - the one line a collection card and the
+    outstanding queue show."""
+    return lines(w, voice="record")[0].split(". ")[0].rstrip(".") + "."
+
+
 def lines(w: Warning, *, voice: str = "page") -> list[str]:
     """The warning in Keith's approved wording (criterion 7): the sentences,
     then the command on a line of its own, then the door. `voice` is "page"
@@ -440,6 +446,6 @@ def for_dashboard(dataset_id: str, conn: supply_db.SupplyConnection | None = Non
         text = lines(w, voice="page")
         out.append({"id": w.id, "period": w.period, "supply": w.supply,
                     "promotedInto": w.promoted_into, "carried": w.carried,
-                    "from": start, "until": until,
+                    "from": start, "until": until, "headline": headline(w),
                     "sentences": text[:-2], "command": text[-2], "door": text[-1]})
     return out

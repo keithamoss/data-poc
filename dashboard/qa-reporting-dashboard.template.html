@@ -4591,7 +4591,7 @@ function collectionCarryForwardLines(col, dateStr){
   return ((col && col.datasets) || []).flatMap(d=>{
     const raw = rawRealDatasetById(d.id) || d;
     return carryForwardWarningsOn(raw, dateStr).map(w=>
-      `<div class="collection-carry-forward" data-collection-carry-forward="${escAttr(d.id)}" style="margin-top:6px; font-size:12px;">${escHtml((w.sentences || [])[0] || "")}</div>`);
+      `<div class="collection-carry-forward" data-collection-carry-forward="${escAttr(d.id)}" style="margin-top:6px; font-size:12px;">${escHtml(w.headline || "")}</div>`);
   }).join("");
 }
 // A COLLECTION'S OWN TURN-OFF on its card (REQ-DASH-180 criterion 2): the

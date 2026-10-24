@@ -452,10 +452,13 @@ def _failed_against(conn, reader, table: str, supply: str) -> bool:
     (qa.check_read), never the run's resolution."""
     from qa_tools.common import knock_on, supply_status
 
-    for r in supply_status.results_about(conn, reader.dataset_id, reader.supply).shown:
-        if knock_on.read_as(r, table) == supply and r.get("status") == "fail":
-            return True
-    return False
+    # SHOWN OLDEST FIRST (by run_seq), so the last one per check is its newest.
+    last: dict[str, str] = {}
+    for r in supply_status.results_about(conn, reader.dataset_id, reader.supply,
+                                         view=supply_status.View()).shown:
+        if knock_on.read_as(r, table) == supply:
+            last[r.get("check_id")] = r.get("status")
+    return "fail" in last.values()
 
 
 def _carry_forward_consequences(conn, request: Request) -> tuple[list[str], list[str]]:
