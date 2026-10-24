@@ -338,8 +338,7 @@ def share_cross_table_results(results: list[dict], by_table: dict[str, list[dict
 def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], dataset_stats: dict,
                     lifecycle_by_id: dict, *, facts: dict[str, dict],
                     all_runs: list[dict] | None = None,
-                    slot_timelines: dict[str, list[dict]] | None = None,
-                    owed=None) -> dict:
+                    warehouse_cache: dict | None = None) -> dict:
     """One dataset's page. `manifest` is its own runs; `all_runs` is every
     run in the collection, so a result recorded under another table's run -
     a re-check re-running this table's cross-table checks - is placed and
@@ -347,20 +346,28 @@ def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], da
     each run's dataset, scope, supply, cause and rank, from qa.run
     (REQ-PIPE-279 criteria 16 and 17) - what every placement and ordering
     below reads, never a run id, a day or a recording time (criterion 19).
-    `slot_timelines` is every dataset's slot timeline (slot_timeline.
-    for_dataset), read once per collection, and `owed` its owed
-    re-evaluations - what a cross-table card's counted points are worked out
-    from (REQ-PIPE-269, pipeline.warehouse_counts).
+    `warehouse_cache` is shared across the collection's pages: every
+    dataset's slot timeline and the owed re-evaluations, read once, the first
+    time a cross-table card needs its counted points (REQ-PIPE-269,
+    pipeline.warehouse_counts).
     """
 
     table, dataset_id = dataset.table, dataset.dataset_id
-    if slot_timelines is None:
-        slot_timelines = {d.dataset_id: slot_timeline.for_dataset(d.dataset_id)
-                          for d in coll.datasets}
-    if owed is None:
-        with supply_db.connect(read_only=True, label="mothman:warehouse-counts") as opened:
-            owed = supply_status.owing(opened)
-    warehouse = supply_status.HoldingsTimeline(slot_timelines)
+    view = {} if warehouse_cache is None else warehouse_cache
+    slot_timelines = view.setdefault("timelines", {})
+
+    def counted_points(check_id: str, history: list[dict]) -> dict:
+        """The card's counted points, the collection's warehouse read the
+        first time a card asks (a one-table collection never does)."""
+        if "warehouse" not in view:
+            for d in coll.datasets:
+                if d.dataset_id not in slot_timelines:
+                    slot_timelines[d.dataset_id] = slot_timeline.for_dataset(d.dataset_id)
+            view["warehouse"] = supply_status.HoldingsTimeline(slot_timelines)
+            with supply_db.connect(read_only=True, label="mothman:warehouse-counts") as conn:
+                view["owed"] = supply_status.owing(conn)
+        return warehouse_counts.points(dataset_id, check_id, history,
+                                       warehouse=view["warehouse"], owed=view["owed"])
     meta = column_meta(coll, dataset)
     all_columns = list(meta)
     stats_spec = collections.adapter(coll).stats
@@ -558,8 +565,7 @@ def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], da
                 # WHICH OF THEM COUNTS TOWARD THE SUPPLY ON SHOW, ON EACH DATE
                 # (REQ-PIPE-269; post-build-review #262 R4) - worked out here
                 # by the gate's own function, looked up by the page.
-                **({"counted": warehouse_counts.points(dataset_id, slot["check_id"], history,
-                                                       warehouse=warehouse, owed=owed)}
+                **({"counted": counted_points(slot["check_id"], history)}
                    if col == CROSS_TABLE_PSEUDO_COLUMN else {}),
                 "contested_reads": sorted(contested_reads, key=lambda h: h["rank"]),
                 "note": f"Computed by {engine} against this run's real data — not a fabricated figure.",
@@ -803,11 +809,9 @@ def build_datasets(collection_id: str) -> list[dict]:
                 for d in coll.datasets}
     share_cross_table_results(results, by_table)
     # WHAT EVERY PERIOD HELD, AND WHAT DECISIONS STILL OWE - read once for the
-    # collection, so each card's counted points are a walk in memory.
-    slot_timelines = {d.dataset_id: slot_timeline.for_dataset(d.dataset_id)
-                      for d in coll.datasets}
-    with supply_db.connect(read_only=True, label="mothman:warehouse-counts") as conn:
-        owed = supply_status.owing(conn)
+    # collection, the first time a card asks, so each card's counted points
+    # are a walk in memory.
+    cache: dict = {}
     # A READERS-ONLY RE-CHECK RECORDS NO dataset_stats (the knock-on's, REQ-PIPE-140
     # criterion 2), so it is not among the file's runs - and its results were
     # placed nowhere, leaving a page on the verdict it replaced (post-build-review
@@ -823,7 +827,7 @@ def build_datasets(collection_id: str) -> list[dict]:
                       key=lambda m: facts[m["run_id"]]["rank"])
     return [build_one_table(coll, d, by_table[d.table], own_runs(manifest, d.dataset_id, facts),
                             dataset_stats, lifecycle_by_id, facts=facts, all_runs=all_runs,
-                            slot_timelines=slot_timelines, owed=owed)
+                            warehouse_cache=cache)
             for d in coll.datasets]
 
 
