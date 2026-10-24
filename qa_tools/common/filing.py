@@ -525,10 +525,32 @@ def open_at_filing(conn, decided: Assignment, arrival) -> bool:
 
     collection = hierarchy.dataset(decided.dataset_id).collection_id
     at = getattr(arrival, "received_at", None) or decided.received_at
-    return period_schema.open_period(
+    opened = period_schema.open_period(
         conn, decided.slot, opened_by=f"the filing of {decided.supply_id} ({collection})",
         effective_at=at.isoformat() if at is not None else None,
         caused_by=decided.supply_id)
+    if opened:
+        _settle_the_openings_knock_on(conn, decided.slot)
+    return opened
+
+
+def _settle_the_openings_knock_on(conn, period: str) -> None:
+    """The re-evaluations the opening's inheritances owe (REQ-PIPE-121, by the
+    one period-move hook), completed now rather than left for the gate's
+    follow-up. A period opened at its first filing has no supply checked in
+    it yet, so there is nobody to re-check and each clears at once - left
+    owed, it waited for the arrival's promotion, days later on a replay's
+    clock (tests/test_knock_on.py's week bound, REQ-PIPE-262 / #251). A
+    reader that does exist is re-checked, as any knock-on would."""
+    from qa_tools.common import decision_log, knock_on, recheck
+
+    made = {r[0] for r in conn.execute(
+        f"SELECT id FROM {decision_log.TABLE} WHERE to_slot = ? AND action = ?",
+        [period, decision_log.INHERIT]).fetchall()}
+    for item in recheck.owed(conn):
+        if (item.kind == recheck.REEVALUATE and item.period == period
+                and item.caused_by_decision in made):
+            knock_on.complete(item)
 
 
 def _refused(dataset_ids) -> dict:

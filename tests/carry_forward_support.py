@@ -57,8 +57,12 @@ def world(monkeypatch) -> World:
         schedule, "not_expected_periods",
         lambda ds, *a, **k: ({w.q4: REASON} if ds == CASE_WORKERS
                              else real_not_expected(ds, *a, **k)))
+    # CASE WORKERS' OWN PERIODS ARE ONLY THESE THREE: a real one another module
+    # on this worker promoted into (2026-Q1, say) is no candidate to inherit,
+    # so "nothing earlier" is true whatever else the worker's log holds.
     monkeypatch.setattr(schedule, "date_of",
-                        lambda name, ds=None: order.get(name) or real_date_of(name, ds))
+                        lambda name, ds=None: order.get(name) if ds == CASE_WORKERS
+                        else order.get(name) or real_date_of(name, ds))
     # hierarchy.all_datasets is NOT narrowed, as test_inheritance.py narrows it:
     # it is read through caches the real run step keeps, and a narrowed list
     # leaked into a later real run's overlay. Every other dataset takes part

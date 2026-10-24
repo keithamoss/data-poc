@@ -74,6 +74,22 @@ class TestOpenedAtTheFirstFiling:
         assert out.source.get("cp_case_workers") == period_schema.FROM_PERIOD
         assert out.resolution.supply_of.get("cp_case_workers") == old
 
+    def test_the_openings_own_re_evaluation_is_settled_at_once(self, conn, world, monkeypatch):
+        """Nothing has been checked in a period at its first filing, so the
+        re-evaluation its inheritances owe has nobody to re-check: it clears
+        at the filing, never waiting for the arrival's promotion (the week
+        bound tests/test_knock_on.py holds a replayed history to)."""
+        from qa_tools.common import recheck
+
+        promote(conn, world.q2, "2099-04-02T09:00:00+08:00")
+        _file(monkeypatch, world, world.q4)
+        (made,) = entries(conn, world.q4, dl.INHERIT)
+        rows = conn.execute(
+            f"SELECT cleared_at FROM {recheck.TABLE} WHERE kind = ? AND period = ? "
+            "AND caused_by_decision = ?", [recheck.REEVALUATE, world.q4, made["id"]]).fetchall()
+        assert rows, "the inheritance owed its readers a re-evaluation, as any move does"
+        assert all(cleared is not None for (cleared,) in rows)
+
     def test_it_records_which_collections_filing_opened_it(self, conn, world, monkeypatch):
         """Criterion 4: a shared period names the collection whose filing
         opened it, and each inheritance the supply that caused it."""
