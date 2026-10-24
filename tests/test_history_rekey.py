@@ -402,12 +402,21 @@ class TestTheEvidentlyCheckRegistryAgreesWithTheHierarchy:
 
 
 def test_a_dataset_with_only_file_checks_is_not_missing_its_data_tools(
-        recorded, clean_qa_history):
+        clean_qa_history, finish_runs):
     """post-build-review #118 D-H: a refused file records file-check rows
     and nothing else, and the dataset was then reported as missing every
-    data tool - which is what refusing a file means, not a crashed run."""
+    data tool - which is what refusing a file means, not a crashed run.
+
+    THE FILE ROWS GO IN BEFORE THE RUN FINISHES (post-build-review #262 F5
+    item 4): writing them into a run already evaluated is refused, so
+    `recorded`'s finished run cannot be reused."""
     from qa_tools.common import qa_store
 
+    write_qa_result(AGENCY, COLLECTION, "r1", _WHEN, "soda",
+                     {"scanStartTimestamp": "2026-09-26T10:00:00", "hasErrors": False},
+                     [_verified("cp-clients", "missing_count_soda"),
+                      _verified("cp-carers", "missing_count_soda")],
+                     run_by="a@b.c")
     qa_store.record_file_results(
         clean_qa_history, "r1",
         [{"dataset_id": "cp-placements", "status": "fail",
@@ -415,5 +424,6 @@ def test_a_dataset_with_only_file_checks_is_not_missing_its_data_tools(
                       "cp-placements.fields_per_row_file"}],
         agency_id=AGENCY, collection_id=COLLECTION, supply_state="staged",
         load_attempt=1, delivery="d", filename="cp_placements.csv")
+    finish_runs("r1", agency=AGENCY, collection=COLLECTION, when=_WHEN, run_by="a@b.c")
     missing = reader.missing_tools(AGENCY, COLLECTION, "r1")
     assert not [m for m in missing if m.startswith("cp-placements/")], missing

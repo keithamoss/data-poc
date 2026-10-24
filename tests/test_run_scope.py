@@ -30,6 +30,13 @@ def scoped(monkeypatch):
         monkeypatch.setattr(supply_db, "resolution_for", lambda conn, run_id: res)
         monkeypatch.setattr(supply_db, "connect", lambda **kw: _Closeable())
 
+    # NOTHING IS CARRIED, said outright. carried_for used to swallow the
+    # fake connection's failure as "carries nothing"; since post-build-review
+    # #262 F5 it catches nothing, and this module is about own + readers,
+    # not about what a sibling carries (REQ-PIPE-265).
+    from qa_tools.common import carried
+    monkeypatch.setattr(carried, "carried_for", lambda run_id: {})
+
     contested({})
     return contested
 
