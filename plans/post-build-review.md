@@ -11227,3 +11227,153 @@ twice. It deliberately did not re-find the `TypeError`.
      (`test_register_text_is_shown_as_text_never_read_as_markup`) that every
      row renders and every criterion carrying a `<placeholder>` appears
      literally. It failed first (231 == 272).
+
+266. **[done, 2026-10-24]** **[Pipeline & publishing]** **[Dashboard UI]**
+     **REQ-PIPE-269 / REQ-DASH-277 post-build critics.** delivery-critic
+     (functional) and the dashboard UX critic on sprint A1 (325871b..b72d682,
+     plus e21a363), read-only against ed_probe. Every finding below was
+     checked against the code before it was acted on; the fixes are on
+     `ed-build`, test-first where they are defects.
+
+     **Fixed:**
+     - **D1 (defect).** `supply_status.results_about` with
+       `View(as_at=T)` clipped the warehouse to T but not the results, so a
+       run recorded after T counted: two supplies promoted green on 1 January
+       and a later run failing on 10 January read red as at 5 January.
+       Reproduced as a test first (`tests/test_warehouse_view.py::
+       TestAsAtTheView::test_a_result_recorded_after_the_instant_does_not_count`,
+       'red' == 'green'), then `_shown` keeps only runs whose `run_instant` is
+       at or before T - the dashboard clip's own 'recorded by' date. No product
+       reader passes an as-at view yet, so the defect was latent; criterion 9
+       says the terminal and the page agree, and now they would. The clip is
+       a dating helper, `supply_status.recorded_by`, outside `_shown`, which
+       REQ-PIPE-279 criterion 20's guard (`tests/test_no_guessing_in_placement.py`)
+       reads whole and rightly refused to see reading `run_instant`.
+     - **S2.** `filing_tui._supply_line` ran to 86 columns (amber) and 82
+       (red) once questionary's 3-column pointer is counted, with the real
+       re-checked-worse reason, and to 98 with 'verdict could not be read'.
+       The state words are now shortened with filing_tui's own `_short` where
+       the line would pass 80, never wrapped; the arrival and the verdict
+       always stay, and the table above the picker holds the words in full.
+       Test first: `tests/test_in_place_in_the_warehouse.py::
+       TestTheLineAPersonPicks` enumerates every state in `_LISTED_AS` plus
+       both re-checked-worse lines built by `filing_queue._rechecked_worse`
+       itself, against every verdict `_verdict` can return (the three colours,
+       the five quiet statuses and both 'no verdict' strings); it failed at 89
+       and 93 columns. The existing 80-column assertion had not allowed for
+       the pointer (78 + 3) and was corrected with it.
+     - **S3 (half of it).** TS-78b's **Expect** in plans/supply-model.md
+       re-quoted from the real built page (driven in Chromium at the
+       scenario's placement: "...which is not in place in the warehouse yet.
+       The supply in place in the warehouse is the one received 2:00pm
+       Sunday, 30 August 2026."), and SCENARIOS.md regenerated with `mothman
+       scenarios map`; `--check` reports current. The register-vocabulary uses
+       are Keith's (below).
+     - **S6.** `HoldingsTimeline.at` walked every change on each call, and
+       both `warehouse_counts.points` and `red_promoted.for_dataset` call it
+       per instant. It is now a bisect over the distinct instants, with a
+       snapshot made only for an instant asked about by replaying forward
+       from the last one made; `red_promoted` also shares one timeline per set
+       of datasets rather than building one per promoted supply. The Child
+       Protection dashboard build on ed_probe, timed in-process the same way
+       (`build_dashboard_data.write`): **53.3s** on the tree before these
+       fixes (the builder recorded 44s before A1 and 56s after), **37.2s and
+       37.6s** after. The S6 change alone left the output identical but for
+       the wall-clock `waitedSeconds` fields; the red-promoted cause fix below
+       then changed 12 Notifications timelines and no final status.
+     - **T1.** New tests, each confirmed to fail under a mutation of the line
+       it covers: a held or absent read stops counting once the period holds
+       the table (`TestTheRulesEdges`, both states); a no-supply read is
+       ignored; owed honours the cause's effective instant ('no current
+       result' before it, 'recheck-owed' from it); criterion 4 in the build
+       (`TestThePointsThemselves::test_a_could_not_run_counts_only_toward_the_table_that_asks`);
+       and `warehouse_counts.points` producing 'no-current-result' then
+       'recheck-owed' points.
+     - **T3.** `test_an_absent_clients_reddens_only_the_asker`'s Clients half
+       could never fail - the Clients supply it checked was read by nothing.
+       It now also records the check reading that Clients supply, not
+       evaluated for want of a Notifications, and asserts it is shown on
+       Clients and colours it green both waiting and promoted; removing
+       criterion 4's line fails it.
+     - **T4.** TestOwedRecheck also asserts no notification mark: the owed
+       item's `found_worse` is unset and the supply is not on
+       `rechecking.worse_than_promoted`'s list (the list that asks a person to
+       acknowledge). That is this session's reading of "notification mark";
+       nothing else in the pipeline marks a supply for notice today.
+     - **T6.** The build-side R4 test could fail only on grouping: the late
+       reader read the OLDER supply, so it never reached the newer one's
+       points whatever the counting did. A companion test
+       (`TestTheCountedPoints::test_a_late_reader_of_the_newer_supply_beside_a_waiting_partner_does_not_count`)
+       has a later result about the newer supply itself, beside a waiting
+       Notifications; replacing `count` with "the newest by rank" (the R4
+       behaviour) fails it, and leaves the original R4 test green.
+     - **Polish.** `supply_status.dataset_of` and `instant` are public (the
+       build modules called the underscored ones); `red_promoted._cause`'s
+       nested copy of `_name` is gone; `results_about` reads `qa.owed_run`
+       only for the supply's own periods; and the template, where the build
+       counts a rank its history on the date does not hold, now logs a
+       console.error and shows the card as No data ('not-shown') rather than
+       taking the newest result, which was R4 again
+       (`tests-js/warehouse-counts.test.js`, failed first). Driven over the
+       real ed_probe build at every run and counted-point date of all three
+       collections (403 collection-dates): no such case occurs.
+     - **The 'Red promoted' caption (UX critic).** Child Protection
+       Notifications, received 11 Feb 2014 and promoted 16 Feb, read "Went in
+       green, turned red 9:00am Tuesday, 11 February 2014 after the arrival of
+       Case Workers". Investigated against the pre-A1 code (aaaa9ba, same
+       database): there the timeline was green after Case Workers' run, then
+       red after **Notifications'** own arrival - its own Evidently
+       row-count-growth and concern-type drift failures. A1 keyed a step by
+       its instant alone, and a zip's four runs share their receipt's 01:00
+       instant, so the first run at that instant (Case Workers) lent its cause
+       to the red. A defect of A1; fixed test-first
+       (`tests/test_red_promoted.py::TestRedPromoted::test_runs_at_one_instant_each_keep_their_own_cause`,
+       failed with one red point blaming Case Workers): a step per run, in the
+       order the runs were opened, and a decision at the same instant after
+       them. On ed_probe the timeline is again green (Case Workers) then red
+       (the arrival of Notifications), as before A1. The missing 16 and 25
+       February points are not a defect: the timeline keeps only changes, and
+       it stays red throughout. What remains is not A1's and is Keith's: see
+       "the red before the promotion" below.
+     - **`mothman scenarios list`'s Where cell.** The printed table is within
+       80 columns (measured: widest line 80 cells, piped); the Where cell
+       wraps to three lines, exactly as "in place on" did before
+       REQ-DASH-277. The existing test checked the bare string only, so a new
+       one (`test_the_scenario_list_as_printed_stays_within_80_columns`)
+       checks the table as printed.
+
+     **For Keith (not changed):**
+     - **S1, criterion 7's "one rule".** The arrival gate
+       (`promotion.after_runs`) still reads its own run's results and what it
+       carried, not `results_about`'s counted view, until REQ-PIPE-267
+       criterion 1. Provisional call 1 was "share the count, not the query" -
+       `count` is shared, the queries are not. Whether 269's claim of one rule
+       stands with that caveat, or should say so in its criterion, is a
+       register claim and his.
+     - **D2, "judged from the clearing run's cause" on past dates.** Three
+       readers date the same history differently: `Owing.owing` treats a
+       cleared item as owed at no instant at all (so as at a moment between
+       the cause and its clearing run, the past reads 'no current result'
+       rather than 'recheck-owed'); `warehouse_counts._at` dates a result by
+       its run's `run_timestamp`; `red_promoted._cause` dates a re-check by
+       its cause's `effective_at`. Which instant a past date should use is a
+       semantic choice.
+     - **S4, the 516 red stand-ins.** The transient 'no current result' reds
+       before REQ-PIPE-267 (recorded on REQ-PIPE-269's decisions) - whether
+       they are exempt from tickets, and what the page should say about them
+       in the meantime.
+     - **S5, provisional call 2:** which period counts for an inherited
+       supply.
+     - **S3's register vocabulary**: "supersedes the one in place" and
+       "naming ... as in place" in the register's own prose are left as they
+       are (REQ-DASH-277 criterion 6 leaves the register's own term alone).
+     - **The red before the promotion** (found investigating the caption,
+       predates A1): a supply the gate promoted green whose RECORDED verdict
+       (the display reading, #132 A1) was already red at its arrival reads
+       "Went in green, turned red <its arrival> after the arrival of <itself>"
+       - a date before it went in. #116 D3 counts the points before a
+       promotion on purpose; the sentence's "went in green" is the gate's
+       reading and "turned red" the display's. How that case should read is a
+       wording and product choice.
+     - The functional critic's T2 and T5 were not in the brief this session
+       worked from, so they are not placed here.

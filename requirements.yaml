@@ -41203,6 +41203,10 @@ requirements:
     - "tests/test_warehouse_view.py::TestKnockOnStaleness"
     - "tests/test_warehouse_counts.py::TestTheCountedPoints"
     - "tests/test_warehouse_counts.py::TestAReadersOnlyReCheckIsPlaced"
+    - "tests/test_warehouse_counts.py::TestThePointsThemselves"
+    - "tests/test_warehouse_view.py::TestAsAtTheView"
+    - "tests/test_warehouse_view.py::TestTheRulesEdges"
+    - "tests/test_red_promoted.py::TestRedPromoted"
     - "tests-js/warehouse-counts.test.js"
     - "tests/test_dashboard_e2e.py::TestStatusMatchesEachToolsOwnVerdict::test_on_every_past_date_too"
     - "tests/test_dashboard_e2e.py::TestColumnsNotGreenMatchesTheDatasetPage"
@@ -41210,6 +41214,7 @@ requirements:
     - "tests/test_no_guessing_in_placement.py"
     implemented_by:
     - "qa_tools/common/supply_status.py::results_about"
+    - "qa_tools/common/supply_status.py::recorded_by"
     - "qa_tools/common/supply_status.py::count"
     - "qa_tools/common/supply_status.py::counts_toward"
     - "qa_tools/common/supply_status.py::stand_in"
@@ -41228,6 +41233,7 @@ requirements:
     - "dashboard/qa-reporting-dashboard.template.html::unitCounts"
     evidence:
     - "2026-10-24, TARGETED RUNS ON THE BUILT CODE (tree dcc33f8, against ed_probe at schema 46, bootstrapped earlier by the main session): 48 affected pytest modules - tests/test_warehouse_view.py, test_warehouse_counts.py, test_in_place_in_the_warehouse.py, test_results_about.py, test_supply_status.py, test_knock_on.py, test_red_promoted.py, test_no_guessing_in_placement.py, test_cp_pair.py and the build, CLI and scenario modules - 1351 passed, 1 xfailed in 4m50s; npm test 899 passed (65 files); tests/test_dashboard_e2e.py -n0 303 passed, 2 failed in 44m51s - the two are TestARequirementHasItsOwnAddress, which fail identically on the base commit aaaa9ba (run there the same day), so not this change. The full suite was not run here; the main session runs one full gate before the push."
+    - "2026-10-24, POST-BUILD-REVIEW #266 FIXES (see that entry's commit for the exact runs): D1 and the red-promoted cause each reproduced by a test that failed first ('red' == 'green'; one red point blaming Case Workers); T1, T3 and T6's new tests each confirmed to fail under a mutation of the line they cover."
     - "2026-10-24, TEST-FIRST: every test named in criteria 11 to 13 and 15 to 18 was run against the code before this change and failed for the reason it names (S4 'red' == 'green'; the other direction 'red' == 'green'; the owed re-check 'green' == 'red'; B1 at knock_on.readers, stale False); test_one_verdict_counts_toward_both and test_an_absent_clients_reddens_only_the_asker failed on the knock-on's physical-name read and passed on the asker's side respectively, neither criterion asking for a failure first. tests-js/warehouse-counts.test.js's R4 case failed 'red' to be 'green' before the template change."
     decisions:
     - 'WAREHOUSE VIEW BY SUPPLY (Keith, 2026-10-21): ''A warehouse view counts a cross-table verdict only when every supply
@@ -41299,7 +41305,10 @@ requirements:
     - "THE PAGE (REQ-DASH-264 criterion 1 as amended): a cross-table card carries `counted` - {supply: [{on, rank|reason}]} - and clipDatasetToInPlaceOn takes the current from the entry of that rank for the supply on show (countedOnShow). Where none counts, the card reads red with warehouseReason 'recheck-owed' or 'no-current-result', and No data where the reason is 'not-counted' (criteria 4 and 6). The history keeps every evaluation (AUDITABILITY). unitCounts' newest point carries the same verdicts (countedNow), so the dataset list's latest count and the page agree (REQ-DASH-225 criterion 18) - REQ-DASH-272 criterion 18 owns the rest of that (counts, rollups and grid cells), and criterion 10 the wording of an owed re-check."
     - "A READERS-ONLY RE-CHECK IS PLACED ON THE PAGE (post-build-review #264, a defect fixed test-first): it records no dataset_stats, so it was never among the results file's runs and its results reached no page - which would have read as false no-current-result reds once the page counted only results about the warehouse."
     - "THE KNOCK-ON'S STALENESS FROM THE CHECK'S OWN READ (criterion 8): knock_on.stale_for reads qa.check_read on the newest COUNTED result (read_as) - stale where it read the moved table as another supply, read nothing of it, was not evaluated, or is an owed stand-in. It read the run-level qa.tables_read by physical name, which said None == None for a reader that could not read a table and only re-gated it."
-    - "COST, MEASURED 2026-10-24 on ed_probe: the Child Protection dashboard build 44s -> 56s and its file 14.7 MB -> 15.8 MB (+7%), for 5,247 counted points across 2,847 (card, supply) pairs; Birth Registrations and Emergency Department have no cross-table cards, so nothing."
+    - "COST, MEASURED 2026-10-24 on ed_probe: the Child Protection dashboard build 44s -> 56s and its file 14.7 MB -> 15.8 MB (+7%), for 5,247 counted points across 2,847 (card, supply) pairs; Birth Registrations and Emergency Department have no cross-table cards, so nothing. AFTER post-build-review #266 S6 (HoldingsTimeline.at a bisect over its instants, a snapshot made only for an instant asked about, and red_promoted sharing one timeline per set of datasets), measured the same day the same way (pipeline.build_dashboard_data.write for Child Protection, timed in-process): 53.3s on the tree before the fixes, 37.2s and 37.6s after, output identical but for wall-clock waitedSeconds and the red-promoted causes #266 corrected."
+    - "AS AT T, ONLY WHAT EXISTED BY T (post-build-review #266 D1, a defect fixed test-first): results_about clips the results it shows to runs recorded by the view's instant (recorded_by, qa.run.run_instant - the dashboard clip's own 'recorded by' date), as well as judging the warehouse at it. It clipped only the warehouse, so a run recorded on 10 January counted as at 5 January. The clip is a dating helper outside _shown, which REQ-PIPE-279 criterion 20's guard reads whole for placement and ordering."
+    - "A STEP PER RUN IN THE RED-PROMOTED TIMELINE (post-build-review #266, the UX critic's Notifications caption, a defect of this build fixed test-first): runs at one instant - a zip's, dated by one receipt - each step in the order they were opened, with a decision at that instant after them. Keyed by the instant alone, the first run lent its cause to every status change at that instant, and the caption blamed Case Workers for Notifications' own red."
+    - "AN IMPOSSIBLE COUNTED RANK FAILS LOUDLY (post-build-review #266): where the build counts a rank the card's history on the date does not hold, the page logs a console.error and shows the card as No data ('not-shown'), never the newest result, which was R4's own behaviour. Driven over every run and counted-point date of ed_probe's three collections, it does not occur."
     unmet_criteria:
     - criterion: "Criterion 14 - S14's tests/test_warehouse_view.py::TestCouldNotRunCountsTowardTheAsker::test_a_red_placements_holds_back_only_placements and test_a_zip_without_placements_promotes_clients."
       why: "Both drive the package gate - a first-time zip of all six tables gated together, Placements alone held back and the other five promoted - which REQ-PIPE-266 builds; 267 criterion 6's re-check against no Placements is what makes Placements' checks count toward nothing. The counting rule they rest on is built and tested at the record (TestCountedPerCheck)."
@@ -42364,6 +42373,7 @@ requirements:
     - "tests/test_dashboard_e2e.py::TestInPlaceInTheWarehouse::test_no_visible_text_says_in_place_alone"
     - "tests/test_dashboard_e2e.py::TestTheAsAtScenarioChips"
     - "tests/test_in_place_in_the_warehouse.py::TestTheTerminalSaysWhere"
+    - "tests/test_in_place_in_the_warehouse.py::TestTheLineAPersonPicks"
     - "tests-js/scenario-jump.test.js"
     implemented_by:
     - "dashboard/qa-reporting-dashboard.template.html"
@@ -42374,6 +42384,7 @@ requirements:
     - "qa_tools/common/scenario_map.py::_entry"
     evidence:
     - "2026-10-24, TARGETED RUNS ON THE BUILT CODE (tree dcc33f8): tests/test_in_place_in_the_warehouse.py 7 passed within the 48-module run (1351 passed, 1 xfailed); npm test 899 passed; tests/test_dashboard_e2e.py -n0 303 passed, 2 failed (TestARequirementHasItsOwnAddress, failing identically on base aaaa9ba), TestInPlaceInTheWarehouse and the TS-78b chip among the passes; mothman scenarios map --check current."
+    - "2026-10-24, POST-BUILD-REVIEW #266 S2 (test-first): TestTheLineAPersonPicks, every state x verdict filing_queue gives with questionary's 3-column pointer counted, failed at 89 and 93 columns before _supply_line shortened its words with _short; the earlier 80-column assertion had not counted the pointer (78 + 3). test_the_scenario_list_as_printed_stays_within_80_columns checks mothman scenarios list as printed, not only its 'where' string."
     - "2026-10-24, TEST-FIRST (criterion 7): the TS-78b chip in tests/test_dashboard_e2e.py, tests-js/scenario-jump.test.js and the new TestInPlaceInTheWarehouse::test_no_visible_text_says_in_place_alone were each run against the old wording first and failed (the verdict line not found; the label did not match; 0 visible texts saying 'in place in the warehouse'), as did all six of tests/test_in_place_in_the_warehouse.py's original tests."
     unmet_criteria:
     - criterion: "Criterion 5 - 'in place in the warehouse' in every wording drafted for #95 (REQ-DASH-204, REQ-DASH-272, REQ-DASH-275, REQ-PIPE-267, REQ-PIPE-271, REQ-PIPE-276, REQ-PIPE-280)."
@@ -42382,6 +42393,7 @@ requirements:
       blocked_by:
         requirements: ["REQ-DASH-204", "REQ-DASH-272", "REQ-DASH-275", "REQ-PIPE-267", "REQ-PIPE-271", "REQ-PIPE-276", "REQ-PIPE-280"]
     decisions:
+    - "THE PICKER'S LINE IS SHORTENED, NEVER WRAPPED (post-build-review #266 S2, criterion 5): with questionary's 3-column pointer counted, 'in place in the warehouse, awaiting acknowledgement' and the re-checked-worse words pass 80 columns beside a long verdict. _supply_line shortens the state words with filing_tui's own _short where the line would pass 80, keeping the arrival and the verdict whole; the table printed above the picker holds the words in full. mothman scenarios list's Where cell wraps inside a table that fits 80 columns, as 'in place on' did before."
     - 'SAY WHERE (Keith, 2026-10-22): ''in place'' becomes ''in place in the warehouse'' wherever the phrase is shown to a person,
       here and everywhere else it is already exposed. Its own requirement because it changes built, signed wording outside #95.'
     - 'THE COUNTS, CHECKED (delivery-scoper, 2026-10-22): ''about 33 uses in the dashboard template and 12 in the CLI'' are

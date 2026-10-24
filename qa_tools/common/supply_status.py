@@ -191,7 +191,7 @@ def owing(conn, periods=None) -> Owing:
         f'FROM {recheck.TABLE} o JOIN "{qa_store.SCHEMA}".decision d '
         "ON d.id = o.caused_by_decision WHERE o.kind = ? "
         + ("AND o.period = ANY(?) " if scoped else "") + "ORDER BY o.id",
-        [recheck.REEVALUATE, *([sorted(periods)] if scoped else [])]).fetchall()
+        [recheck.REEVALUATE, *([list(periods)] if scoped else [])]).fetchall()
     return Owing([(p, frozenset(t or ()), int(d), instant(e), c) for p, t, d, e, c in rows])
 
 
@@ -302,13 +302,10 @@ def stand_in(record: dict, cause) -> dict:
 
 # ---- the one function -------------------------------------------------------------
 
-def _shown(conn, dataset_id: str, supply: str, as_at=None) -> list[dict]:
+def _shown(conn, dataset_id: str, supply: str) -> list[dict]:
     """Every completed, agreed result about `supply` of `dataset_id`, oldest
     first by run_seq and then as each run recorded them, each cross-table
-    one carrying what it recorded reading (`reads`) - and, as at an
-    instant, only those whose run was recorded by then (qa.run.run_instant,
-    the dashboard clip's own 'recorded by' date; post-build-review #266 D1:
-    a result that did not yet exist never counts as at the past).
+    one carrying what it recorded reading (`reads`).
 
     A RESULT IS ABOUT A SUPPLY BY WHAT IT RECORDED, in one of five states:
 
@@ -362,11 +359,9 @@ def _shown(conn, dataset_id: str, supply: str, as_at=None) -> list[dict]:
         f"OR (c.scope = ? AND {by_file}) "
         f'OR EXISTS (SELECT 1 FROM "{s}".check_read k WHERE k.check_result_id = c.id '
         "AND k.logical_table = ? AND k.state = ? AND k.supply_id = ?)) "
-        + ("AND r.run_instant <= ? " if as_at is not None else "")
-        + "ORDER BY r.run_seq, c.id",
+        "ORDER BY r.run_seq, c.id",
         [qa_store.AGREED, qa_store.CROSS_TABLE_SCOPE, qa_store.FILE_SCOPE, dataset_id, supply,
-         qa_store.FILE_SCOPE, *by_file_params, table, qa_store.READ, supply,
-         *([instant(as_at)] if as_at is not None else [])])
+         qa_store.FILE_SCOPE, *by_file_params, table, qa_store.READ, supply])
     records = reader.records_from(cursor.description, cursor.fetchall())
     ids = [r["result_row"] for r in records]
     reads: dict[int, dict] = {}
@@ -385,11 +380,27 @@ def _shown(conn, dataset_id: str, supply: str, as_at=None) -> list[dict]:
     return records
 
 
+def recorded_by(conn, records: list[dict], as_at) -> list[dict]:
+    """The records whose run had been recorded by `as_at` - qa.run.run_instant,
+    the dashboard clip's own 'recorded by' date (post-build-review #266 D1: a
+    result that did not yet exist never counts as at the past). DATING, not
+    placing: it keeps the order it is given (REQ-PIPE-279 criterion 20)."""
+    if as_at is None or not records:
+        return records
+    keys = list({r["run_id"] for r in records})
+    when = dict(conn.execute(
+        f'SELECT run_key, run_instant FROM "{qa_store.SCHEMA}".run WHERE run_key = ANY(?)',
+        [keys]).fetchall())
+    cut = instant(as_at)
+    return [r for r in records if when.get(r["run_id"]) is not None
+            and instant(when[r["run_id"]]) <= cut]
+
+
 def results_about(conn, dataset_id: str, supply: str, *, view: View) -> About:
     """The results SHOWN about `supply` of `dataset_id` and those COUNTED
     toward it in `view` (REQ-PIPE-279 criterion 21; REQ-PIPE-269 criterion
     7), both oldest first - so the last result per check is the newest."""
-    shown = _shown(conn, dataset_id, supply, view.as_at)
+    shown = recorded_by(conn, _shown(conn, dataset_id, supply), view.as_at)
     tables = {t for r in shown for t in (r.get("reads") or {})}
     datasets = {dataset_id, *(d for d in map(dataset_of, tables) if d)}
     holdings = holdings_at(conn, datasets, view.as_at)
