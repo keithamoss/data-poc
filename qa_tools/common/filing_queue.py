@@ -289,14 +289,17 @@ def filed_counts(conn: supply_db.SupplyConnection,
     return {(ds, slot): int(n) for ds, slot, n in rows}
 
 
-def _verdict(conn, dataset_id: str, supply: str, reads) -> str:
+def _verdict(conn, dataset_id: str, supply: str, reads, *, period: str | None = None) -> str:
     """green/amber/red from the recorded results, or said that there is
     none, or that they could not be read - never a verdict it did not read
-    (criterion 11)."""
+    (criterion 11). In a period's list, THAT period's reading
+    (post-build-review #266 S5, Keith Q3 = A): a supply standing in several
+    periods is read against the one listed."""
     from qa_tools.common import supply_status
 
     try:
-        got = supply_status.status(conn, dataset_id, supply, reads=reads)
+        got = supply_status.status(conn, dataset_id, supply, reads=reads,
+                                   view=supply_status.View(period=period))
     except Exception:  # noqa: BLE001 - criterion 11: said, and the supply still listed
         return VERDICT_UNREADABLE
     return got or NO_VERDICT
@@ -390,7 +393,7 @@ def supplies_in(conn: supply_db.SupplyConnection,
                 state=(slot_state.AMBER_WAITING
                        if slot_state._amber_waiting(conn, ds, supply)
                        else slot_state.AWAITING_DECISION))
-        out.append(FiledSupply(state=own, verdict=_verdict(conn, ds, supply, reads)))
+        out.append(FiledSupply(state=own, verdict=_verdict(conn, ds, supply, reads, period=period)))
     # THE DECIDED ONES LAST (Keith, 2026-10-15, signing off): rejected and
     # superseded supplies are listed with the rest, after those still in play.
     return sorted(out, key=lambda e: e.state.state in (slot_state.REJECTED, SUPERSEDED))

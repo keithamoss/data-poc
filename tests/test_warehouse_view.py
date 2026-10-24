@@ -554,3 +554,57 @@ class TestTheRulesEdges:
         (row,) = _counted(conn, "cp-clients", c2, CLIENT_REF)
         assert (row["warehouse_reason"], row["owed_by_decision"]) == (
             supply_status.RECHECK_OWED, promote)
+
+
+# ---------------------------------------------------------------------------
+# A supply in several periods (post-build-review #266 S5; Keith, Q3 = A)
+# ---------------------------------------------------------------------------
+
+class TestASupplyInSeveralPeriods:
+    """Counted per period: a supply's status is the WORST across the periods
+    it stands in, and a period's own reading is that period's result."""
+
+    def _two_periods(self, conn, period):
+        """Clients c1 promoted into Q1 and inherited into Q2; Notifications
+        n1 promoted into Q1 and n2 into Q2. n2's Client reference, reading c1
+        beside n2, is red; a LATER re-check of n1's, reading c1 beside n1, is
+        green."""
+        q1, q2 = f"{period}-a", period
+        c1, n1, n2 = _supply("cp-clients"), _supply("cp-notifications"), \
+            _supply("cp-notifications")
+        _own(conn, "cp-clients", c1, CLIENTS_OWN, "pass", "2099-12-01T09:00:00+08:00")
+        _own(conn, "cp-notifications", n1, NOTIFICATIONS_OWN, "pass", "2099-12-01T09:00:00+08:00")
+        _client_ref(conn, under="cp-notifications", supply=n1, clients=c1, notifications=n1,
+                    status="pass", at="2099-12-01T09:00:00+08:00")
+        _promote(conn, "cp-clients", c1, q1, "2099-12-01T10:00:00+08:00")
+        _promote(conn, "cp-notifications", n1, q1, "2099-12-01T10:00:00+08:00")
+        inherit = _decide(conn, dl.INHERIT, "cp-clients", c1, q2, "2099-12-02T08:00:00+08:00",
+                          stands_on=q1)
+        _own(conn, "cp-notifications", n2, NOTIFICATIONS_OWN, "pass", "2099-12-02T09:00:00+08:00")
+        _client_ref(conn, under="cp-notifications", supply=n2, clients=c1, notifications=n2,
+                    status="fail", at="2099-12-02T09:00:00+08:00")
+        _decide(conn, dl.PROMOTE, "cp-notifications", n2, q2, "2099-12-02T10:00:00+08:00",
+                kind=dl.PERSON, promoted_status="red", reason="looked at it")
+        _client_ref(conn, under="cp-notifications", supply=n1, clients=c1, notifications=n1,
+                    status="pass", at="2099-12-03T09:00:00+08:00", scope="full",
+                    decision=inherit)
+        return q1, q2, c1, n1, n2
+
+    def test_a_later_green_in_one_period_does_not_hide_a_red_in_another(self, conn, period):
+        q1, q2, c1, n1, n2 = self._two_periods(conn, period)
+        assert _status(conn, "cp-clients", c1) == "red"
+        assert _status(conn, "cp-clients", c1, supply_status.View(period=q2)) == "red"
+        assert _status(conn, "cp-clients", c1, supply_status.View(period=q1)) == "green"
+        assert _status(conn, "cp-notifications", n1) == "green"
+        assert _status(conn, "cp-notifications", n2) == "red"
+        (row,) = _counted(conn, "cp-clients", c1, CLIENT_REF)
+        assert row["status"] == "fail", "the worst across the periods is the check's reading"
+
+    def test_each_periods_list_in_the_terminal_reads_its_own_period(self, conn, period):
+        """filing_queue lists a period's supplies with their verdicts; the
+        verdict it gives is that period's."""
+        from qa_tools.common import filing_queue
+        q1, q2, c1, _n1, _n2 = self._two_periods(conn, period)
+        reads = promotion._declared_reads()
+        assert filing_queue._verdict(conn, "cp-clients", c1, reads, period=q1) == "green"
+        assert filing_queue._verdict(conn, "cp-clients", c1, reads, period=q2) == "red"

@@ -23,22 +23,27 @@ from qa_tools.common import decision_log, qa_store, supply_db
 
 def _cause(conn, run_key: str) -> tuple[str, str]:
     """(instant, words) for what caused a run - an arrival, or the decision
-    a re-evaluation followed (criterion 2)."""
-    # THE ASSET'S TIMELINE, as supply_status orders runs (#116, D1): an
-    # arrival's run is dated by its supply's receipt, never the batch clock.
+    a re-evaluation followed (criterion 2).
+
+    DATED BY THE RUN'S RECORDED INSTANT, whatever caused it (post-build-review
+    #266 D2, Keith Q4 = A - one clock everywhere): qa.run.run_instant, the
+    instant its results count from on the card (pipeline.warehouse_counts)
+    and as at a past date (supply_status.recorded_by). It used to date a
+    re-check by its cause's effective instant, so a re-check that failed and
+    was retried days later turned the badge on the decision's day while the
+    card stayed owed until the retry."""
     rows = conn.execute(
-        f'SELECT COALESCE(rc.received_instant, r.run_instant), r.dataset_id, d.action, '
-        f'd.dataset_id, d.effective_at FROM "{qa_store.SCHEMA}".run r '
+        f'SELECT r.run_instant, r.dataset_id, d.action, d.dataset_id '
+        f'FROM "{qa_store.SCHEMA}".run r '
         f'LEFT JOIN "{qa_store.SCHEMA}".decision d ON d.id = r.caused_by_decision '
-        f'LEFT JOIN "{qa_store.SCHEMA}".supply_receipt rc '
-        "ON rc.dataset_id = r.dataset_id AND rc.supply_id = r.supply_id "
         "WHERE r.run_key = ?", [run_key]).fetchall()
     if not rows:
         return "", ""
-    run_at, run_ds, action, cause_ds, cause_at = rows[0]
+    run_at, run_ds, action, cause_ds = rows[0]
+    at = run_at.isoformat() if run_at else ""
     if action:
-        return cause_at.isoformat(), f"the {action} of {_name(cause_ds)}"
-    return (run_at.isoformat() if run_at else ""), f"the arrival of {_name(run_ds)}"
+        return at, f"the {action} of {_name(cause_ds)}"
+    return at, f"the arrival of {_name(run_ds)}"
 
 
 def for_dataset(dataset_id: str, conn=None) -> dict[str, dict]:

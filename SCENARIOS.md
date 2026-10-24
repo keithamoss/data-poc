@@ -124,7 +124,7 @@ Reframed from daily during Keith's review: the original example (22:00 due, 21:5
 
 ### TS-4 - Arrival into an already-filled slot
 
-**What it demonstrates.** Does not auto-promote unless the replacement setting in force permits its status (REQ-PIPE-123 - `never` as shipped, so it waits); where it permits, it replaces the promoted supply, which is superseded, never rejected. Warns; the message names the context ("a supply arrived for Monday, which was already accepted at 16:00", plus the boundary detail where relevant); and the three genuinely different actions are reachable - **accept** as a correction (promoting it supersedes the one in place, REQ-PIPE-128), **re-file** to another slot, **reject** as a duplicate. *Used to expect* "never auto-promotes whatever its status" - REQ-PIPE-123 made that a setting (REQ-GEN-138).
+**What it demonstrates.** Does not auto-promote unless the replacement setting in force permits its status (REQ-PIPE-123 - `never` as shipped, so it waits); where it permits, it replaces the promoted supply, which is superseded, never rejected. Warns; the message names the context ("a supply arrived for Monday, which was already accepted at 16:00", plus the boundary detail where relevant); and the three genuinely different actions are reachable - **accept** as a correction (promoting it supersedes the one in place in the warehouse, REQ-PIPE-128), **re-file** to another slot, **reject** as a duplicate. *Used to expect* "never auto-promotes whatever its status" - REQ-PIPE-123 made that a setting (REQ-GEN-138).
 
 | Where to look | |
 |---|---|
@@ -1101,9 +1101,9 @@ Birth Registrations, 30 August to 2 September 2026, inside the hold era: D's sup
 
 ### TS-78b - A supply promoted after a newer one - the day after
 
-The same placement, on 1 September. **Expect** (REQ-DASH-197 criterion 13), the verdict line above the results: "Awaiting a decision — the results below are the newest supply, received 2:00pm Tuesday, 1 September 2026, which is not in place in the warehouse yet. The supply in place in the warehouse is the one received 2:00pm Sunday, 30 August 2026." - naming D's supply, not D+1's, which is newer by receipt. **Breaks as**: the verdict line naming 31 August's supply as in place.
+The same placement, on 1 September. **Expect** (REQ-DASH-197 criterion 13), the verdict line above the results: "Awaiting a decision — the results below are the newest supply, received 2:00pm Tuesday, 1 September 2026, which is not in place in the warehouse yet. The supply in place in the warehouse is the one received 2:00pm Sunday, 30 August 2026." - naming D's supply, not D+1's, which is newer by receipt. **Breaks as**: the verdict line naming 31 August's supply as in place in the warehouse.
 
-**What it would look like if the rule were wrong.** The verdict line naming 31 August's supply as in place.
+**What it would look like if the rule were wrong.** The verdict line naming 31 August's supply as in place in the warehouse.
 
 | Where to look | |
 |---|---|
@@ -1286,7 +1286,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "mode": "INJECT",
    "title": "Arrival into an already-filled slot",
    "section": "Slot assignment",
-   "demonstrates": "Does not auto-promote unless the replacement setting in force permits its status (REQ-PIPE-123 - `never` as shipped, so it waits); where it permits, it replaces the promoted supply, which is superseded, never rejected. Warns; the message names the context (\"a supply arrived for Monday, which was already accepted at 16:00\", plus the boundary detail where relevant); and the three genuinely different actions are reachable - **accept** as a correction (promoting it supersedes the one in place, REQ-PIPE-128), **re-file** to another slot, **reject** as a duplicate. *Used to expect* \"never auto-promotes whatever its status\" - REQ-PIPE-123 made that a setting (REQ-GEN-138).",
+   "demonstrates": "Does not auto-promote unless the replacement setting in force permits its status (REQ-PIPE-123 - `never` as shipped, so it waits); where it permits, it replaces the promoted supply, which is superseded, never rejected. Warns; the message names the context (\"a supply arrived for Monday, which was already accepted at 16:00\", plus the boundary detail where relevant); and the three genuinely different actions are reachable - **accept** as a correction (promoting it supersedes the one in place in the warehouse, REQ-PIPE-128), **re-file** to another slot, **reject** as a duplicate. *Used to expect* \"never auto-promotes whatever its status\" - REQ-PIPE-123 made that a setting (REQ-GEN-138).",
    "breaksAs": null,
    "config": null,
    "requirements": [
@@ -3128,8 +3128,8 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "mode": "INJECT",
    "title": "A supply promoted after a newer one - the day after",
    "section": "Calendar corrections",
-   "demonstrates": "The same placement, on 1 September. **Expect** (REQ-DASH-197 criterion 13), the verdict line above the results: \"Awaiting a decision \u2014 the results below are the newest supply, received 2:00pm Tuesday, 1 September 2026, which is not in place in the warehouse yet. The supply in place in the warehouse is the one received 2:00pm Sunday, 30 August 2026.\" - naming D's supply, not D+1's, which is newer by receipt. **Breaks as**: the verdict line naming 31 August's supply as in place.",
-   "breaksAs": "The verdict line naming 31 August's supply as in place.",
+   "demonstrates": "The same placement, on 1 September. **Expect** (REQ-DASH-197 criterion 13), the verdict line above the results: \"Awaiting a decision \u2014 the results below are the newest supply, received 2:00pm Tuesday, 1 September 2026, which is not in place in the warehouse yet. The supply in place in the warehouse is the one received 2:00pm Sunday, 30 August 2026.\" - naming D's supply, not D+1's, which is newer by receipt. **Breaks as**: the verdict line naming 31 August's supply as in place in the warehouse.",
+   "breaksAs": "The verdict line naming 31 August's supply as in place in the warehouse.",
    "config": null,
    "requirements": [
     "REQ-DASH-197"

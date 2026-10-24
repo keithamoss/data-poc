@@ -163,7 +163,12 @@ def readers(conn, period: str, tables: list[str], reads: dict[str, list[str]]) -
                 reader = found.setdefault((dataset_id, supply),
                                           Reader(dataset_id, supply, is_waiting))
                 reader.tables.add(table)
-                latest = [r for r in supply_status.latest_results(conn, dataset_id, supply)
+                # THIS PERIOD'S READING (post-build-review #266 S5): a reader
+                # standing in several periods is stale here by what it read
+                # beside this period's tables, not another's.
+                latest = [r for r in supply_status.latest_results(
+                              conn, dataset_id, supply,
+                              view=supply_status.View(period=period))
                           if r.get("check_id") in mine]
                 if stale_for(latest, table, holds):
                     reader.stale = True

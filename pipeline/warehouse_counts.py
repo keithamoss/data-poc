@@ -107,6 +107,9 @@ def _point(newest: dict | None) -> dict:
 
 
 def _at(entry: dict):
-    """When the result came to exist - the page's own 'recorded by' rule."""
+    """When the result came to exist - the page's own 'recorded by' rule: its
+    run's recorded instant (qa.run.run_timestamp, which run_instant is written
+    from), the one clock red_promoted and supply_status.recorded_by date by
+    too (post-build-review #266 D2, Keith Q4 = A)."""
     value = entry.get("recorded_at")
     return supply_status.instant(value) if value else None

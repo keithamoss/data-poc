@@ -219,8 +219,8 @@ def _entry(run_id, rank, *, supply, reads, at, status="pass", not_evaluated=None
                       for t, s in reads.items()}}
 
 
-def _held(slot, holder, at, ds):
-    return {"at": at, "slot": slot, "held_as": "promoted", "holder": holder, "_ds": ds}
+def _held(slot, holder, at, ds, held_as="promoted"):
+    return {"at": at, "slot": slot, "held_as": held_as, "holder": holder, "_ds": ds}
 
 
 def _timeline(*entries):
@@ -275,3 +275,87 @@ class TestThePointsThemselves:
              "owedSince": None, "on": "2099-03-02"},
             {"rank": None, "reason": supply_status.RECHECK_OWED, "owedBy": 99,
              "owedSince": cause_at.isoformat(), "on": "2099-03-04"}]}
+
+    def test_a_later_green_in_one_period_does_not_hide_a_red_in_another(self):
+        """Keith, Q3 = A (post-build-review #266 S5): Clients c1 is promoted
+        into Q1 and inherited into Q2. Q2's Notifications read it red; a later
+        result about Q1's Notifications reads it green. Counted per period,
+        the card takes the worst - Q2's red stays the card's current."""
+        from pipeline import warehouse_counts
+        c1, n1, n2 = "cp-clients@1", "cp-notifications@1", "cp-notifications@2"
+        history = [
+            _entry("r_red", 0, supply=c1, at="2099-04-02T09:00:00+08:00", status="fail",
+                   reads={"cp_clients": c1, "cp_notifications": n2}),
+            _entry("r_green", 1, supply=c1, at="2099-04-03T09:00:00+08:00",
+                   reads={"cp_clients": c1, "cp_notifications": n1})]
+        warehouse = _timeline(
+            _held("Q1", c1, "2099-04-01T10:00:00+08:00", "cp-clients"),
+            _held("Q1", n1, "2099-04-01T10:00:00+08:00", "cp-notifications"),
+            _held("Q2", c1, "2099-04-02T08:00:00+08:00", "cp-clients", held_as="inherited"),
+            _held("Q2", n2, "2099-04-02T10:00:00+08:00", "cp-notifications"))
+        got = warehouse_counts.points("cp-clients", CLIENT_REF, history,
+                                      warehouse=warehouse, owed=None)
+        assert got[c1][-1]["rank"] == 0, got
+
+
+class TestOneClockForTheCardAndTheBadge:
+    """Keith, Q4 = A (post-build-review #266 D2): a re-check's result counts
+    from its run's recorded instant, and a re-check owed by a decision is
+    owed from that decision until the run that cleared it - so a re-check
+    that fails and is retried later reads 'recheck-owed' in between, on the
+    card and on the red-promoted badge alike."""
+
+    def test_a_failed_recheck_retried_later_is_owed_in_between(self, build, period):
+        from pipeline import red_promoted
+        from qa_tools.common import recheck, supply_status
+
+        c1, c2, n1 = f"cp-clients@{_key()}", f"cp-clients@{_key()}", f"cp-notifications@{_key()}"
+        _run(_uid("c"), dataset_id="cp-clients", supply=c1, when="2099-06-01T09:00:00+08:00")
+        first = _run(_uid("n"), dataset_id="cp-notifications", supply=n1,
+                     when="2099-06-01T09:00:00+08:00",
+                     reads={"cp_clients": c1, "cp_notifications": n1},
+                     results=[_record(CLIENT_REF, "cp-notifications", "pass")])
+        _decide(dl.PROMOTE, "cp-clients", c1, period, "2099-06-01T10:00:00+08:00")
+        _decide(dl.PROMOTE, "cp-notifications", n1, period, "2099-06-01T10:00:00+08:00")
+        with supply_db.connect(label="test-warehouse-counts") as conn:
+            earlier = [o.id for o in recheck.owed(conn) if o.period == period]
+        for owed_id in earlier:
+            recheck.clear(owed_id, "pytest/earlier")
+        _run(_uid("c"), dataset_id="cp-clients", supply=c2, when="2099-06-03T09:00:00+08:00")
+        with supply_db.connect(label="test-warehouse-counts") as conn:
+            with dl.decision_transaction(conn):
+                with dl.apply_decision(conn, dl.Decision(
+                        **KEYS, dataset_id="cp-clients", action=dl.PROMOTE, supply=c2,
+                        actor="k@x", actor_kind=dl.PERSON,
+                        effective_at="2099-06-03T10:00:00+08:00", to_slot=period,
+                        reason="the newer one", promoted_status="green")):
+                    pass
+            cause = conn.execute(f"SELECT max(id) FROM {dl.TABLE}").fetchone()[0]
+            (owed,) = [o for o in recheck.owed(conn) if o.period == period]
+        recheck.fail(owed.id, "RuntimeError: made to fail")
+        retry = _run(_uid("r"), dataset_id="cp-notifications", supply=n1,
+                     when="2099-06-06T10:00:00+08:00", scope="readers", decision=cause,
+                     period=period, stats=False,
+                     reads={"cp_clients": c2, "cp_notifications": n1},
+                     results=[_record(CLIENT_REF, "cp-notifications", "pass")])
+        recheck.clear(owed.id, retry)
+
+        card = _card(build()["cp-notifications"], CLIENT_REF)
+        ranks = {h["run_id"]: h["rank"] for h in card["history"]}
+        points = card["counted"][n1]
+
+        def card_on(day):
+            p = [p for p in points if p["on"] <= day][-1]
+            if p["rank"] is None:
+                return p["reason"]
+            return {ranks[first]: "first", ranks[retry]: "retry"}[p["rank"]]
+
+        assert [card_on(f"2099-06-0{d}") for d in range(1, 8)] == [
+            "first", "first", supply_status.RECHECK_OWED, supply_status.RECHECK_OWED,
+            supply_status.RECHECK_OWED, "retry", "retry"]
+        health = red_promoted.for_dataset("cp-notifications")
+        (n1_run,) = [run for run in health if run == first]
+        badge = [red_promoted.status_on(health[n1_run], f"2099-06-0{d}") for d in range(1, 8)]
+        card = ["green" if c in ("first", "retry") else "red"
+                for c in (card_on(f"2099-06-0{d}") for d in range(1, 8))]
+        assert badge == card

@@ -2921,8 +2921,8 @@ where it permits, it replaces the promoted supply, which is superseded,
 never rejected. Warns; the message names the context ("a supply arrived
 for Monday, which was already accepted at 16:00", plus the boundary detail
 where relevant); and the three genuinely different actions are reachable
-- **accept** as a correction (promoting it supersedes the one in place,
-REQ-PIPE-128), **re-file** to another slot, **reject** as a duplicate.
+- **accept** as a correction (promoting it supersedes the one in place in
+the warehouse, REQ-PIPE-128), **re-file** to another slot, **reject** as a duplicate.
 *Used to expect* "never auto-promotes whatever its status" -
 REQ-PIPE-123 made that a setting (REQ-GEN-138).
 
@@ -4135,7 +4135,7 @@ which is not in place in the warehouse yet. The supply in place in the
 warehouse is the one received 2:00pm Sunday, 30 August 2026." - naming D's
 supply, not D+1's, which is newer by
 receipt. **Breaks as**: the verdict line naming 31 August's supply as in
-place.
+place in the warehouse.
 
 **TS-79a `[INJECT]` An inherited quarter - the newest.** cp-case-workers,
 the newest quarter before the build's own in which it is not delivered

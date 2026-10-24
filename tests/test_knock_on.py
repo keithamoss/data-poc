@@ -187,7 +187,7 @@ class TestASupplyOwedItsReCheckIsLeftToIt:
         monkeypatch.setattr(reevaluation, "counts_toward",
                             lambda cid, *, table, reads: {DS})
         monkeypatch.setattr(knock_on, "_now_holds", lambda c, t, p: None)
-        monkeypatch.setattr(supply_status, "latest_results", lambda c, ds, s: [])
+        monkeypatch.setattr(supply_status, "latest_results", lambda c, ds, s, **_kw: [])
         return supply
 
     def test_without_one_it_is_a_reader(self, monkeypatch, conn, period):
@@ -373,7 +373,7 @@ class TestEveryDatasetACheckCountsTowardIsAReader:
         monkeypatch.setattr(supersession, "waiting_in",
                             lambda c, ds, p: ["cp-clients@k"] if ds == "cp-clients" else [])
         monkeypatch.setattr(qa_store, "current_run", lambda c, ds, s: "run")
-        monkeypatch.setattr(supply_status, "latest_results", lambda c, ds, s: [])
+        monkeypatch.setattr(supply_status, "latest_results", lambda c, ds, s, **_kw: [])
         monkeypatch.setattr(knock_on, "_now_holds", lambda c, t, p: None)
 
         got = knock_on.readers(conn, "2023-Q4", ["cp_investigations"], reads)

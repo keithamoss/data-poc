@@ -56,8 +56,14 @@ class View:
     """The warehouse a status is judged against: as at `as_at` (an instant,
     ISO text or datetime), or as the decision log stands now where None. The
     effective time of each decision, never when it was recorded - the same
-    answer the dashboard's date on show and the terminal give (criterion 9)."""
+    answer the dashboard's date on show and the terminal give (criterion 9).
+
+    `period`, where given and the supply stands in it, reads that period
+    alone - what a period's own list shows (post-build-review #266 S5,
+    Keith Q3 = A). Without it a supply in several periods reads the WORST
+    across them."""
     as_at: object = None
+    period: str | None = None
 
 
 @dataclass
@@ -155,24 +161,28 @@ class HoldingsTimeline:
 @dataclass
 class Owing:
     """The re-evaluations decisions owe (REQ-PIPE-121), for 'owed at T':
-    from each cause's effective instant and whether it has cleared - never
-    the wall clock (criterion 5)."""
-    items: list[tuple[str, frozenset, int, datetime, object]] = field(default_factory=list)
+    from each cause's effective instant until the recorded instant of the
+    run that cleared it - never the wall clock (criterion 5). Each item is
+    (period, tables, decision id, effective, cleared_from), cleared_from
+    None while it is still owed."""
+    items: list[tuple[str, frozenset, int, datetime, datetime | None]] = field(
+        default_factory=list)
 
     def owing(self, periods, tables, at) -> tuple[int, datetime] | None:
         """The newest decision owing a re-evaluation of one of `tables` in
         one of `periods` that is still owed at `at`, as (id, effective)."""
         when = instant(at) if at is not None else None
         found = None
-        for period, owed_tables, decision_id, effective, cleared_at in self.items:
+        for period, owed_tables, decision_id, effective, cleared_from in self.items:
             if period not in periods or not owed_tables & set(tables):
                 continue
             if when is not None and effective > when:
                 continue
-            # CLEARED BY THE RUN IT CAUSED, which follows its cause on the
-            # asset's timeline (decision_log.follows): cleared, it is owed at
-            # no instant from its cause on.
-            if cleared_at is not None:
+            # OWED UNTIL THE RUN THAT CLEARED IT (post-build-review #266 D2,
+            # Keith Q4 = A - one clock): that run's result counts from its
+            # recorded instant, so the item is owed up to it and no further.
+            # A re-check that failed and was retried later is owed between.
+            if cleared_from is not None and (when is None or when >= cleared_from):
                 continue
             if found is None or (effective, decision_id) > (found[1], found[0]):
                 found = (decision_id, effective)
@@ -186,13 +196,21 @@ def owing(conn, periods=None) -> Owing:
     from qa_tools.common import recheck
 
     scoped = periods is not None
+    # CLEARED FROM THE CLEARING RUN'S RECORDED INSTANT (qa.run.run_instant,
+    # the instant its results count from). An item cleared with no recorded
+    # run - nothing to date it by - is owed at no instant, as before.
     rows = conn.execute(
-        f"SELECT o.period, o.tables, o.caused_by_decision, d.effective_at, o.cleared_at "
+        f"SELECT o.period, o.tables, o.caused_by_decision, d.effective_at, "
+        f"o.cleared_at IS NOT NULL, r.run_instant "
         f'FROM {recheck.TABLE} o JOIN "{qa_store.SCHEMA}".decision d '
-        "ON d.id = o.caused_by_decision WHERE o.kind = ? "
+        "ON d.id = o.caused_by_decision "
+        f'LEFT JOIN "{qa_store.SCHEMA}".run r ON r.run_key = o.cleared_by_run '
+        "WHERE o.kind = ? "
         + ("AND o.period = ANY(?) " if scoped else "") + "ORDER BY o.id",
         [recheck.REEVALUATE, *([list(periods)] if scoped else [])]).fetchall()
-    return Owing([(p, frozenset(t or ()), int(d), instant(e), c) for p, t, d, e, c in rows])
+    return Owing([(p, frozenset(t or ()), int(d), instant(e),
+                   (instant(r) if r is not None else instant(e)) if cleared else None)
+                  for p, t, d, e, cleared, r in rows])
 
 
 # ---- the rule ------------------------------------------------------------------
@@ -265,16 +283,46 @@ def _owed(record: dict, dataset_id: str, periods: list[str], holdings: Holdings)
 
 
 def count(dataset_id: str, supply: str, shown: list[dict], *, holdings: Holdings,
-          owed: Owing | None, at=None) -> list[dict]:
+          owed: Owing | None, at=None, period: str | None = None) -> list[dict]:
     """The results that COUNT toward `supply` in the warehouse `holdings`
-    describe, oldest first, then one red stand-in per owed check with none.
+    describe, oldest first, then one red stand-in per owed check with none -
+    so the last record per check is the one it reads.
     Pure: the gate (results_about) and the dashboard build
     (pipeline.warehouse_counts) both call it, so neither keeps a rule of its
-    own (criterion 7)."""
+    own (criterion 7).
+
+    COUNTED PER PERIOD (post-build-review #266 S5, Keith Q3 = A): a supply in
+    the warehouse in several periods - promoted into one, inherited or
+    substituted into others - is counted in each separately, and each check
+    reads the WORST of its periods' readings, so a later green beside one
+    period's partner never hides a red beside another's. `period`, where the
+    supply stands in it, reads that period alone."""
     periods = holdings.periods_of(dataset_id, supply)
-    counted = [r for r in shown if counts_toward(r, dataset_id, periods, holdings)]
+    if period is not None and period in periods:
+        periods = [period]
     if not periods:
-        return counted
+        return [r for r in shown if counts_toward(r, dataset_id, [], holdings)]
+    if len(periods) == 1:
+        return _count_in(dataset_id, shown, periods[0], holdings, owed, at)
+    readings = [_count_in(dataset_id, shown, p, holdings, owed, at) for p in periods]
+    position = {id(r): i for i, r in enumerate(shown)}
+    worst: dict[str, dict] = {}
+    for got in readings:
+        for r in newest_per_check(got):
+            held = worst.get(r["check_id"])
+            if held is None or _severity(r, position) > _severity(held, position):
+                worst[r["check_id"]] = r
+    chosen = {id(r) for r in worst.values()}
+    counted_ids = {id(r) for got in readings for r in got}
+    rest = [r for r in shown if id(r) in counted_ids and id(r) not in chosen]
+    return rest + sorted(worst.values(), key=lambda r: position.get(id(r), len(shown)))
+
+
+def _count_in(dataset_id: str, shown: list[dict], period: str, holdings: Holdings,
+              owed: Owing | None, at) -> list[dict]:
+    """count() for one period the supply stands in."""
+    periods = [period]
+    counted = [r for r in shown if counts_toward(r, dataset_id, periods, holdings)]
     have = {r["check_id"] for r in counted}
     newest: dict[str, dict] = {}
     for r in shown:
@@ -286,6 +334,20 @@ def count(dataset_id: str, supply: str, shown: list[dict], *, holdings: Holdings
         cause = owed.owing(periods, list(r.get("reads") or {}), at) if owed is not None else None
         counted.append(stand_in(r, cause))
     return counted
+
+
+def _severity(record: dict, position: dict[int, int]) -> tuple:
+    """How bad one reading is, for the worst across periods: red over amber
+    over green over a quiet status, an UNREADABLE verdict worst of all (so
+    promotion.status_of still refuses it rather than a green hiding it);
+    a recorded result over a stand-in of the same colour, then the newer."""
+    from qa_tools.common import dataset_status
+
+    colour = dataset_status.dashboard_status(record.get("status"))
+    rank = len(dataset_status.ORDERED_STATUSES) if colour is None else \
+        dataset_status.ORDERED_STATUSES.get(colour, -1)
+    real = id(record) in position
+    return rank, real, position.get(id(record), -1)
 
 
 def stand_in(record: dict, cause) -> dict:
@@ -407,7 +469,7 @@ def results_about(conn, dataset_id: str, supply: str, *, view: View) -> About:
     periods = holdings.periods_of(dataset_id, supply)
     owed = owing(conn, periods) if periods and tables else None
     return About(shown, count(dataset_id, supply, shown, holdings=holdings, owed=owed,
-                              at=view.as_at))
+                              at=view.as_at, period=view.period))
 
 
 def newest_per_check(records: list[dict]) -> list[dict]:
