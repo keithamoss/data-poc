@@ -347,17 +347,31 @@ def consequences(conn, request: Request) -> Consequences:
     if request.operation == UN_INHERIT and request.period:
         # THE WAY TO RE-POINT WITHOUT A GAP (REQ-PIPE-280 criterion 8), said
         # beside the warning but never keyed: it changes nothing un-inherit
-        # does, so a script's --acknowledge stays what it was.
-        notes.append(
-            f"To point {request.period} at a newer supply without leaving its readers "
-            f"with no table, carry it forward instead - one decision, no gap:\n"
-            f"mothman supply decide --operation carry-forward --dataset "
-            f"{request.dataset_id} --period {request.period} --reason '<why>'")
+        # does, so a script's --acknowledge stays what it was. ONLY WHERE
+        # SOMETHING NEWER COULD BE CARRIED FORWARD (CLI UX critic M3, #267):
+        # with nothing newer, carry-forward has nothing to offer.
+        from qa_tools.common import carry_forward
+
+        if carry_forward.standing(conn, dataset_id=request.dataset_id,
+                                  period=request.period):
+            notes.append(
+                f"A newer {carry_forward.name_of(request.dataset_id)} could be carried "
+                f"forward into {request.period}. To point it there without leaving its "
+                f"readers with no table, carry it forward instead - one decision, no gap:\n"
+                f"mothman supply decide --operation carry-forward --dataset "
+                f"{request.dataset_id} --period {request.period} --reason '<why>'")
     readers = _readers_rechecked(conn, request)
     if readers:
         lines += readers
         count = readers[0].count("\n")
-        done.append(f"{count} supply/supplies reading it owed a re-check.")
+        if request.operation == CARRY_FORWARD:
+            # RE-CHECKED NEXT, said as that (CLI UX critic minor, #267): "owed a
+            # re-check" read oddly straight before the re-check itself.
+            done.append(f"{count} {'supply reads' if count == 1 else 'supplies read'} "
+                        f"it, and {'is' if count == 1 else 'are'} re-checked next.")
+        else:
+            done.append(f"{count} {'supply' if count == 1 else 'supplies'} reading it "
+                        f"owed a re-check.")
     return Consequences(lines=tuple(lines), done=tuple(done), notes=tuple(notes))
 
 
@@ -470,18 +484,20 @@ def _carry_forward_consequences(conn, request: Request) -> tuple[list[str], list
     p = carry_forward.plan(conn, request.dataset_id, request.period)
     if p.already:
         return [], []
-    new = carry_forward.received(p.dataset_id, p.supply)
+    # DATASETS BY NAME (Keith, 2026-10-24, K1; REQ-GHUB-142 NFR 2).
+    name = carry_forward.name_of(p.dataset_id)
+    new = carry_forward.received(p.dataset_id, p.supply, conn)
     if p.before_supply:
-        what = (f"{p.period} stops carrying forward the {p.dataset_id} received "
-                f"{carry_forward.received(p.dataset_id, p.before_supply)} (promoted into "
+        what = (f"{p.period} stops carrying forward the {name} received "
+                f"{carry_forward.received(p.dataset_id, p.before_supply, conn)} (promoted into "
                 f"{p.before_period}), and carries forward the one received {new} (promoted "
                 f"into {p.stands_on}) instead.")
     else:
-        what = (f"{p.period} carries nothing forward for {p.dataset_id} now; from this "
+        what = (f"{p.period} carries nothing forward for {name} now; from this "
                 f"decision on it carries forward the one received {new} (promoted into "
                 f"{p.stands_on}).")
     return ([what, carry_forward.undo_line(p)],
-            [f"{p.period} now carries forward the {p.dataset_id} received {new}."])
+            [f"{p.period} now carries forward the {name} received {new}."])
 
 
 def _range_consequences(conn, request: Request) -> tuple[list[str], list[str]]:
@@ -803,8 +819,8 @@ def _already(conn, request: Request) -> str | None:
             warned = carry_forward.standing(conn, dataset_id=request.dataset_id,
                                             period=period)
             if warned:
-                said += (f"\nA newer {request.dataset_id} could be carried forward:\n"
-                         + carry_forward.command(warned[0]))
+                said += (f"\nA newer {carry_forward.name_of(request.dataset_id)} could be "
+                         f"carried forward:\n" + carry_forward.command(warned[0]))
             return said
     elif request.operation == CARRY_FORWARD:
         from qa_tools.common import carry_forward
@@ -1334,6 +1350,17 @@ def apply(request: Request, *, effective_at: str, conn=None) -> Outcome:
             terminal_only=request.operation in TERMINAL_ONLY)
 
     owed = _apply_one(conn, request, reason, effective_at=effective_at)
+    available = ""
+    if request.operation == PROMOTE and request.supply and request.period:
+        # A PROMOTION THAT RAISED WARNINGS SAYS SO (Keith, 2026-10-24, K4): the
+        # periods it could now be carried forward into, and how.
+        from qa_tools.common import carry_forward
+
+        said = carry_forward.made_available(
+            request.dataset_id, carry_forward.raised_by_promotion(
+                conn, dataset_id=request.dataset_id, supply=request.supply,
+                period=request.period))
+        available = f"\n{said}" if said else ""
     if request.operation == PLACE:
         # CALLED A PLACEMENT (criterion 41), never "re-file None -> period".
         from qa_tools.common import placing
@@ -1353,7 +1380,8 @@ def apply(request: Request, *, effective_at: str, conn=None) -> Outcome:
                  # for X 2026-Q3" read as though it went INTO Q3.
                  + (f" -> {request.to_period}" if request.operation == REFILE else "")
                  + f", by {request.actor_name}."
-                 + "".join(f" {line}" for line in found.done)))
+                 + "".join(f" {line}" for line in found.done)
+                 + available))
 
 
 def reconcile_after(outcome: Outcome, collection_id: str) -> None:

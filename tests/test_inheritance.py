@@ -60,7 +60,29 @@ def owes_nothing(monkeypatch, annual, periods):
     order = {periods[0]: date(2099, 1, 1), periods[1]: date(2099, 4, 1)}
     monkeypatch.setattr(inheritance.schedule, "date_of",
                         lambda name, ds: order.get(name))
-    monkeypatch.setattr(inheritance.hierarchy, "all_datasets", lambda: [annual])
+    narrow(monkeypatch, [annual])
+
+
+def narrow(monkeypatch, entries) -> None:
+    """The datasets the INHERITANCE RULE walks, narrowed for this module
+    alone (post-build-review #267, T7): `inheritance.hierarchy` is the
+    hierarchy module itself, so patching its `all_datasets` narrowed the
+    whole worker - and `qa_tools.collections._load` caches what it builds
+    from that function, so the first module to load the registry while it
+    was narrowed left every collection one dataset short for the worker's
+    life. A namespace of the module's own names, swapped in for
+    inheritance's reference alone, narrows nothing anyone else reads."""
+    import types
+
+    names = {k: getattr(hierarchy, k) for k in dir(hierarchy) if not k.startswith("__")}
+    monkeypatch.setattr(inheritance, "hierarchy", types.SimpleNamespace(
+        **{**names, "all_datasets": lambda: list(entries)}))
+
+
+def test_the_narrowing_is_the_rules_alone(owes_nothing, annual):
+    """T7: the worker's hierarchy is untouched while the rule's is narrowed."""
+    assert [d.dataset_id for d in inheritance.hierarchy.all_datasets()] == [annual.dataset_id]
+    assert len(hierarchy.all_datasets()) > 1
 
 
 def _promote_into(conn, dataset, period):
@@ -848,16 +870,16 @@ class TestAPeriodIsOpenedWholeOrNotAtAll:
         first, second = periods
         other = hierarchy.dataset("cp-case-workers")
         both = [annual, other]
-        monkeypatch.setattr(inheritance.hierarchy, "all_datasets", lambda: both)
+        narrow(monkeypatch, both)
         monkeypatch.setattr(inheritance.schedule, "not_expected_periods",
                             lambda ds: {second: REASON})
         _promote_into(conn, annual, first)
         real = inheritance._most_recent_promoted
 
-        def failing(c, dataset_id, period_name):
+        def failing(c, dataset_id, period_name, **kw):
             if dataset_id == other.dataset_id:
                 raise RuntimeError("the database went away mid-opening")
-            return real(c, dataset_id, period_name)
+            return real(c, dataset_id, period_name, **kw)
 
         monkeypatch.setattr(inheritance, "_most_recent_promoted", failing)
         with pytest.raises(RuntimeError, match="went away"):

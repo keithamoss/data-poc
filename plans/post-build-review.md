@@ -11452,3 +11452,170 @@ twice. It deliberately did not re-find the `TypeError`.
        page lists, and his.
      - The functional critic's T2 and T5 were not in the brief this session
        worked from, so they are not placed here.
+
+267. **[done, 2026-10-24]** **[Pipeline & publishing]** **[Dashboard UI]**
+     **[Testing & dev tooling]** **REQ-PIPE-271 / REQ-PIPE-280 post-build critics.**
+     delivery-critic (functional) and the CLI UX critic on sprint A2, read-only
+     against ed_probe, plus Keith's eight answers (K1 to K8, 2026-10-24, Perth).
+     Every finding was checked against the code before it was acted on; the
+     functional critic's four reproductions (scratchpad `test_probe_a2.py`)
+     were run on 2cfe68c and all four failed as reported. The tests are
+     `tests/test_carry_forward_review.py` unless named otherwise, and each
+     defect's test was run against 2cfe68c's product code (tests of this tree
+     in place) and seen to fail - 37 of its 55 then; the rest are coverage of
+     paths that already worked.
+
+     **Built, Keith's answers (all approved 2026-10-24):**
+     - **K1 (datasets by name).** Every carry-forward sentence - the warning,
+       the consequences, the follow-up, the queue and door lines, and the
+       refusals and the no-op, which REQ-GHUB-142 NFR 2 covers on the same
+       terms - names the dataset ("Case Workers"); the id is in the command
+       only (`carry_forward.name_of`). `test_k1_...`; the existing tests' words
+       updated with it.
+     - **K2.** The refused case's undo line reads "To carry nothing again,
+       un-inherit — its readers are left with no table." (`undo_line`,
+       `test_k2_...`).
+     - **K3.** The Filing decisions queue offers one selectable item, "Could be
+       carried forward (n)", which opens that period's door - choosing which
+       first where there are several - as "Received while turned off (n)" opens
+       its group (`filing_tui.carry_forward_flow`, `test_k3_...`). Recorded on
+       271 as going beyond criterion 7's letter, which asked only that the
+       warning be shown there.
+     - **K4.** A promotion that raises warnings adds "This makes a newer <Dataset>
+       available to carry forward into <P>, <P>. Carry it forward from the <P>
+       door, or:" and the command for each period, on lines of their own, to
+       its recorded output on both routes (`carry_forward.raised_by_promotion`,
+       `made_available`; the Recorded panel now goes through `_show`, so the
+       commands print below it). `test_k4_...`.
+     - **K5 (the critic's D2).** The warning is read as the later period
+       stands at the instant asked about (`carry_forward.as_now`, through
+       `standing`), not as it stood when raised. A period a person emptied
+       since reads "<P> carries nothing forward for <Dataset>. The one received
+       <instant>, promoted into <P'>, could be carried forward:" and the
+       command; the two approved sentences keep their own cases. The page's
+       runs of days break where the words change. `TestTheWordsAreWhatThePeriodHoldsNow`
+       (failed first: the stale sentence after the un-inherit).
+     - **K6 (the critic's S2).** An opening inherits as at its own instant -
+       a filing's receipt (`inheritance._most_recent_promoted(as_at=...)` in
+       `inherit_into`) - and where a newer supply is promoted already, raises
+       the ordinary warning, caused by that promotion and dated when it took
+       effect (`carry_forward.warn_at_opening`). A source no longer held at
+       all falls back to the newest held now. Amends PROVISIONAL call 3.
+       `test_k6_...` (failed first: the opening carried the later supply).
+       **The four pinned inheritances hold:** every rule-made inheritance on
+       ed_probe (30) recomputed as at its own effective instant gives the
+       supply it was made on (a read-only script), so no pin moves and none
+       was re-pinned; the probe database was not re-bootstrapped.
+     - **K7 (the critic's S3).** One headline for both cases, "A newer
+       <Dataset> could be carried forward into <P>." (`headline`, `test_k7_...`).
+     - **K8 (the critic's S4).** A substitution of the later period clears its
+       warning, and no warning is raised for a substituted period; criterion 8
+       amended. `test_k8_...`.
+
+     **Fixed, the functional critic:**
+     - **D1.** `for_dashboard` gave the page every recorded warning, so a
+       refused period warned twice showed two blocks and two card lines. It now
+       reads each day through `standing()` as at that day's end - the
+       terminal's one-per-period rule - and gives runs of days that never
+       overlap for one period (`TestOneWarningPerPeriodOnTheDashboard`, failed
+       2 == 1). The template needed nothing; a jsdom test shows one block on a
+       date with two runs.
+     - **D3.** A carry-forward into an unopened period opened it and reported
+       a change the opening had made. Refused instead: "<P> is not open yet, so
+       there is nothing to carry forward into: it inherits the newest promoted
+       <Dataset> when it opens, at its first filing. Nothing was recorded."
+       Chosen over reporting the opening as the outcome because a period opened
+       from here would be REQ-PIPE-098 criterion 4's explicit open command, which
+       Keith left unbuilt ("Leave until needed"), and the warning and the door
+       only ever name opened periods. `TestAnUnopenedPeriodIsRefused`.
+     - **D4.** `CREATE OR REPLACE VIEW` failed raw where a newer supply's column
+       changed type. Now DROP and CREATE in the entry's transaction, refused in
+       words where another view reads the period's view
+       (`carry_forward._views_reading`). `TestAViewIsReplacedWhateverItsColumns`.
+     - **S1.** An opening that failed after its filing committed was never
+       retried. The 'already filed' skip now opens the filed supply's period
+       (a no-op once open). `TestAFailedOpeningIsRetried`.
+     - **S5.** A re-file, a placement and a settlement opened the period
+       before the decision was judged again under its lock. Each now opens
+       inside its transaction after its entry, so a refused or rolled-back
+       decision opens nothing, and settles the opening's knock-on after commit
+       (`filing.settle_opening`). Tests for all three, including placement and
+       settlement, which had none (`TestADecisionThatDoesNotStandOpensNothing`).
+     - **S6.** The carry-forward follow-up blamed the first failure of the
+       whole collection's follow-up. It now blames only this period's owed
+       re-evaluations and shows any other failure in its own panel.
+     - **S7.** The warning's words opened a connection per receipt inside the
+       promotion's transaction. They now read through the promotion's own
+       connection (`filing.received_at_of(conn=)`), and a wording fault that is
+       not the database's falls back to a plain sentence rather than refusing
+       the promotion; a database error cannot be caught there, since the
+       transaction is lost to it either way. `TestAWarningNeverRefusesItsPromotion`.
+     - **T1-T6.** The queue showing the item uncounted and the dashboard data
+       carrying the words, for both cases (`TestTheWarningIsShownForBothCases`)
+       and the jsdom template for the refused case; the view and its entry
+       carry one creating transaction (`xmin`, T2); each schema-47 constraint
+       clause broken alone, for the carry-forward and its warning, beside an
+       unbroken record accepted (T3); a rendering test with real receipts (T4);
+       the uncovered lines - reason required, substituted, nothing earlier,
+       changed under the lock, already warned, a supply of its own clearing,
+       the as-at filter - and `_failed_against` (T5; line 167 is gone with D3);
+       a shared quarter opened by an Emergency Department filing (T6, 271 c4).
+     - **T7.** `tests/test_inheritance.py` narrowed the hierarchy module itself.
+       It now swaps a namespace in for `inheritance.hierarchy` alone
+       (`narrow()`), with a test that the worker's hierarchy stays whole. The
+       same pattern remains in test_arrival_patterns, test_delivery_boundary and
+       test_tables_read, which narrow modules the registry does not cache from
+       in their paths; not changed.
+     - **Polish.** `inheritance.refusals` lists a period a person emptied
+       again (`not (h and h.held_as)`). `promotion_state.standing_in` now reads
+       a carry-forward as standing in - fixed rather than deleted, though
+       `state_for` and `standing_in` are called by tests only, because
+       `test_promotion_timeline` uses `standing_in` as its independent oracle;
+       moving that oracle into tests/ is a larger change, noted here rather than
+       made. The template's STANDS set has "carry-forward" (jsdom test, failed
+       first). `_not_older` replaces `_newer` in the clearing rule, so an unknown
+       date no longer clears. `filing_tui.carry_forward_warnings` turns only
+       an unreachable database into LogUnreachable and lets anything else
+       raise; `outstanding` keeps every producer's own convention - a printed
+       note naming the error - so the queue never fails on one producer.
+     - **Noted, not changed:** a warning that stands past its later period's
+       end shows only on the collection card, since the dataset's page shows
+       a warning for the period on show.
+
+     **Fixed, the CLI UX critic:**
+     - **S4.** A period not on the calendar is refused "<P> is not a period on
+       the <calendar> calendar." for carry-forward and inherit alike
+       (`inheritance.not_a_period`), never the false "takes part in".
+     - **S5.** A mistyped `--dataset` prints the hierarchy's message and exits 1.
+     - **M2.** The door labels the choice "carry forward (nothing newer to carry
+       forward)" where nothing would change, and a carry-forward that would do
+       nothing says 'Already so' before any reason is asked for.
+     - **M3.** Un-inherit's note appears only while a newer supply could be
+       carried forward, under "Instead"; in the wizard it says to answer no and
+       choose carry forward from the door, with no command.
+     - **M4.** The prose word-wraps and only the command is soft-wrapped, in the
+       queue, `mothman supply queue` and the door.
+     - **M5.** The heading counts, "Could be carried forward (1) - a newer supply
+       was promoted after this period opened"; in the period's own door the
+       warning does not send the person to that door, and the door's first line
+       says what the period carries rather than "...is not one of these".
+     - **Minors.** The choice fits 80 columns with the pointer; an inherited
+       period's line says "carries forward the one received ..." and one that
+       carries nothing "owes nothing, carries nothing forward"; the follow-up
+       names readers by their receipt instant, as the consequences do (pickers
+       and tables keep the compact column form); the knock-on's own progress
+       lines are kept out of the follow-up; "N supplies read it, and are
+       re-checked next." for a carry-forward, and singular and plural said
+       properly elsewhere; every carry-forward refusal ends "Nothing was
+       recorded."; `supply queue --help` mentions the warnings.
+
+     **Runs.** The affected modules' fast half went green on the final tree
+     (2518 passed); two earlier runs each had one different failure -
+     test_manifest's promoted-table row, then test_one_version_per_period's
+     supersession - each passing alone and in three parallel re-runs beside
+     this change's modules. Not reproduced, so recorded here rather than
+     waived. No fresh bootstrap was run: what K6 and S5 do to a replayed
+     history is measured only by the read-only check of ed_probe's 30
+     inheritances, and the next cache-miss bootstrap is the real test.
+
+     **For Keith:** none new.

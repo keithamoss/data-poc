@@ -257,12 +257,14 @@ def standing_in(conn: supply_db.SupplyConnection, dataset_id: str, as_at=None,
     rows = conn.execute(
         f"SELECT action, to_slot, stands_on, supply, actor, reason, actor_kind "
         f"FROM {decision_log.TABLE} "
-        "WHERE dataset_id = ? AND action IN (?, ?) AND to_slot IS NOT NULL "
+        "WHERE dataset_id = ? AND action IN (?, ?, ?) AND to_slot IS NOT NULL "
         "AND (?::text IS NULL OR to_slot = ?::text) "
         "AND (?::timestamptz IS NULL OR effective_at <= ?::timestamptz) "
         "ORDER BY effective_at DESC, id DESC",
-        [dataset_id, decision_log.SUBSTITUTE, decision_log.INHERIT, period, period,
-         as_at, as_at]).fetchall()
+        # A CARRY-FORWARD STANDS IN AS AN INHERITANCE DOES (REQ-PIPE-280;
+        # post-build-review #267): qa.slot_holds reads it as one.
+        [dataset_id, decision_log.SUBSTITUTE, decision_log.INHERIT,
+         decision_log.CARRY_FORWARD, period, period, as_at, as_at]).fetchall()
     for action, slot, stands_on, supply, actor, reason, actor_kind in rows:
         h = decision_log.held(conn, dataset_id, slot, as_at)
         wanted = (decision_log.SUBSTITUTED if action == decision_log.SUBSTITUTE

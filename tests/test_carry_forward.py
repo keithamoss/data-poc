@@ -15,7 +15,7 @@ import pytest
 from click.testing import CliRunner
 
 import carry_forward_support
-from carry_forward_support import ASSIGNED_WORKER, CASE_WORKERS, KEYS, entries, promote, view_reads
+from carry_forward_support import ASSIGNED_WORKER, CASE_WORKERS, KEYS, NAME, entries, promote, view_reads
 
 conn = carry_forward_support.conn
 world = carry_forward_support.world
@@ -185,15 +185,15 @@ class TestTheFlagRoute:
             self, conn, world, keyboard):
         got = self._decide(world, period=world.q3)
         assert got.exit_code == 1, got.output
-        assert (f"{CASE_WORKERS} takes part in {world.q3}, so it is supplied there, not "
-                f"carried forward.") in _flat(got.output)
+        assert (f"{NAME} takes part in {world.q3}, so it is supplied there, not "
+                f"carried forward. Nothing was recorded.") in _flat(got.output)
         own = promote(conn, world.q4, "2099-10-02T09:00:00+08:00")
         assert dl.held(conn, CASE_WORKERS, world.q4).holder == own
         before = entries(conn, world.q4)
         got = self._decide(world)
         assert got.exit_code == 1, got.output
-        assert (f"{world.q4} holds a {CASE_WORKERS} supply of its own, so nothing is carried "
-                f"forward into it.") in _flat(got.output)
+        assert (f"{world.q4} holds a {NAME} supply of its own, so nothing is carried "
+                f"forward into it. Nothing was recorded.") in _flat(got.output)
         assert entries(conn, world.q4) == before, "recorded nothing"
 
     def test_a_second_carry_forward_is_a_no_op_exit_0(self, conn, world, actor, keyboard):
@@ -204,7 +204,7 @@ class TestTheFlagRoute:
         assert got.exit_code == 0, got.output
         flat = _flat(got.output)
         assert "Already so" in flat
-        assert (f"{world.q4} already carries forward the newest promoted {CASE_WORKERS} "
+        assert (f"{world.q4} already carries forward the newest promoted {NAME} "
                 f"(received ") in flat and "Nothing to do." in flat
         assert entries(conn, world.q4) == before
 
@@ -225,8 +225,13 @@ class TestTheWords:
                    for line in found.lines), "each reader whose checks re-run is named"
 
         # THE RE-EVALUATION COULD NOT RUN: said, with the command on its own line.
-        monkeypatch.setattr(knock_on, "follow_up", lambda *a, **k: [recheck.Outcome(
-            1, "", False, "made to fail")])
+        # The outcome is the carry-forward's own owed item's, as the real
+        # follow-up reports it (S6: another period's failure is not blamed).
+        def follow_up(*a, **k):
+            with carry_forward_support.supply_db.connect(label="t") as c:
+                return [recheck.Outcome(o.id, "", False, "made to fail")
+                        for o in recheck.owed(c) if o.period == world.q4]
+        monkeypatch.setattr(knock_on, "follow_up", follow_up)
         outcome = filing_tui.apply_decision(
             operation=fd.CARRY_FORWARD, dataset_id=CASE_WORKERS, period=world.q4,
             reason="current", actor=actor, yes=True, acknowledged=found.key)
@@ -247,7 +252,7 @@ class TestTheWords:
             operation=fd.CARRY_FORWARD, dataset_id=CASE_WORKERS, period=world.q4,
             reason="current", actor=actor, yes=True, acknowledged=found.key)
         out = _flat(capsys.readouterr().out)
-        assert f"Re-checked against the {CASE_WORKERS} carried forward into {world.q4}" in out
+        assert f"Re-checked against the {NAME} carried forward into {world.q4}" in out
         assert "Notification" in out
 
     def test_inherit_noop_names_carry_forward_while_the_warning_stands(
@@ -258,7 +263,7 @@ class TestTheWords:
         assert not outcome.changed
         lines = outcome.message.split("\n")
         assert lines[0] == f"{world.q4} already inherits. Nothing to do."
-        assert lines[1] == f"A newer {CASE_WORKERS} could be carried forward:"
+        assert lines[1] == f"A newer {NAME} could be carried forward:"
         assert lines[2] == (f"mothman supply decide --operation carry-forward --dataset "
                             f"{CASE_WORKERS} --period {world.q4} --reason '<why>'")
 

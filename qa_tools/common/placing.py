@@ -226,21 +226,27 @@ def place(conn, *, agency_id: str, collection_id: str, dataset_id: str, supply: 
     either file is checked (criterion 37)."""
     from qa_tools.common import filing, recheck
 
-    # THE PERIOD OPENS AT ITS FIRST FILING (REQ-PIPE-271), a placement's included.
-    filing.open_on_refile(conn, dataset_id, supply, to_period, how="placement",
-                          effective_at=effective_at)
-    with decision_log.apply_decision(conn, decision_log.Decision(
-            agency_id=agency_id, collection_id=collection_id, dataset_id=dataset_id,
-            action=decision_log.REFILE, supply=supply, actor=actor, actor_kind=actor_kind,
-            effective_at=effective_at, from_slot=None, to_slot=to_period,
-            reason=reason)) as entry_id:
-        if entry_out is not None:
-            entry_out.append(entry_id)
-        filing.refile(conn, dataset_id, supply, to_period, decision_id=entry_id)
-        if not owe:
-            return None
-        return recheck.owe(conn, dataset_id=dataset_id, supply_id=supply,
-                           decision_id=entry_id)
+    owed = None
+    with decision_log.decision_transaction(conn):
+        with decision_log.apply_decision(conn, decision_log.Decision(
+                agency_id=agency_id, collection_id=collection_id, dataset_id=dataset_id,
+                action=decision_log.REFILE, supply=supply, actor=actor,
+                actor_kind=actor_kind, effective_at=effective_at, from_slot=None,
+                to_slot=to_period, reason=reason)) as entry_id:
+            if entry_out is not None:
+                entry_out.append(entry_id)
+            filing.refile(conn, dataset_id, supply, to_period, decision_id=entry_id)
+            if owe:
+                owed = recheck.owe(conn, dataset_id=dataset_id, supply_id=supply,
+                                   decision_id=entry_id)
+        # THE PERIOD OPENS AT ITS FIRST FILING (REQ-PIPE-271), a placement's
+        # included - once the placement stands (post-build-review #267, S5).
+        opened = filing.open_on_refile(conn, dataset_id, supply, to_period,
+                                       how="placement", effective_at=effective_at)
+    # Settled where no caller's transaction is still open; otherwise the
+    # gate's follow-up or the processing pass runs the opening's knock-on.
+    filing.settle_opening(conn, to_period, opened)
+    return owed
 
 
 def apply(conn, p: Plan, *, agency_id: str, collection_id: str, actor: str, reason: str,
@@ -249,9 +255,6 @@ def apply(conn, p: Plan, *, agency_id: str, collection_id: str, actor: str, reas
     what they confirmed is what happens. Returns the owed re-checks."""
     from qa_tools.common import filing
 
-    # Before the transaction, where the opening's knock-on can settle at once.
-    filing.open_on_refile(conn, p.dataset_id, p.supply, p.to_period, how="placement",
-                          effective_at=effective_at)
     with decision_log.decision_transaction(conn):
         decision_log.lock_slot(conn, p.dataset_id, p.to_period)
         now = plan(conn, dataset_id=p.dataset_id, supply=p.supply, to_period=p.to_period)
@@ -264,7 +267,18 @@ def apply(conn, p: Plan, *, agency_id: str, collection_id: str, actor: str, reas
                      dataset_id=p.dataset_id, supply=p.supply, to_period=p.to_period,
                      actor=actor, actor_kind=decision_log.PERSON, reason=reason,
                      effective_at=effective_at, owe=not p.is_pair)
+    # THE OPENING'S KNOCK-ON, now the placement has committed (place() opened
+    # the period inside this transaction, so it could not settle there).
+    filing.settle_opening(conn, p.to_period, _opened_by(conn, p.to_period, p.supply))
     return (owed,) if owed is not None else ()
+
+
+def _opened_by(conn, period: str | None, supply: str) -> bool:
+    """Whether `supply`'s placement is what opened `period`."""
+    if not period:
+        return False
+    rows = conn.execute('SELECT opened_by FROM "qa".period WHERE name = ?', [period]).fetchall()
+    return bool(rows) and (rows[0][0] or "").startswith(f"the placement of {supply} ")
 
 
 # ---------------------------------------------------------------------------

@@ -837,7 +837,9 @@ def grant_publisher_command(role: str, password: str | None) -> None:
 @common.id_collection_option(required=True,
                help="Which collection's queue to show - {legend}.")
 def queue_command(collection_id: str) -> None:
-    """Supplies waiting on a person (REQ-GHUB-082 criterion 16).
+    """Supplies waiting on a person (REQ-GHUB-082 criterion 16) - and, above
+    them and not counted among them, each period a newer supply could be
+    carried forward into (REQ-PIPE-271), with the command that does it.
 
     THE SAME DEFINITION THE TICKET POLICY USES, never a second one -
     `slot_state.NEEDS_ACTION`, filtered to the states that hold a
@@ -1050,6 +1052,13 @@ def decide_command(operation: str, dataset_id: str, period: str | None,
     from qa_tools.common import filing_queue
 
     operation = operation.lower()
+    try:
+        hierarchy.dataset(dataset_id)
+    except hierarchy.UnknownDatasetError as exc:
+        # A MISTYPED --dataset IS SAID, never a traceback (CLI UX critic S5,
+        # post-build-review #267): the hierarchy's own message, exit 1.
+        console.print(str(exc), style="red", highlight=False, markup=False)
+        raise SystemExit(1) from None
     # --wait IS FOR A DECISION THAT OWES A QA RUN (REQ-PIPE-163 criteria 25 and
     # 27): a placement or a re-file.
     # UN-SUPERSEDE OWES ONE TOO (REQ-PIPE-120; #188 D1).

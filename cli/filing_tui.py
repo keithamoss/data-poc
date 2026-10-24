@@ -89,9 +89,9 @@ _WHAT_IT_DOES = {
     filing_decisions.INHERIT: "inherit - nothing was owed, so carry the last one forward",
     filing_decisions.UN_INHERIT: "un-inherit - remove the inheritance",
     # REQ-PIPE-280 criterion 8: the one description, shared with --help.
-    filing_decisions.CARRY_FORWARD: ("carry forward - inherit the newest promoted supply, "
-                                     "replacing what this period carries forward (or "
-                                     "giving it one)"),
+    # WITHIN 80 COLUMNS WITH THE POINTER (CLI UX critic minor, #267): the
+    # --help description in full wrapped mid-word in the choice list.
+    filing_decisions.CARRY_FORWARD: "carry forward - inherit the newest promoted supply",
     filing_decisions.MARK_NOT_SUPPLIED: ("mark as not supplied - accept that this closed "
                                          "period was missed, with a reason"),
     filing_decisions.ACKNOWLEDGE: ("acknowledge - say you have looked at this amber "
@@ -344,6 +344,22 @@ def apply_decision(*, operation: str, dataset_id: str, period: str | None,
     except decision_log.DecisionRefused as exc:
         _refused(exc, operation, flag_route=flag_route)
         return None
+    if operation == filing_decisions.CARRY_FORWARD and period:
+        # NOTHING TO DO IS SAID BEFORE A REASON IS ASKED FOR (CLI UX critic M2,
+        # #267) - in the 'Already so' panel, as criterion 6 has it.
+        from qa_tools.common import carry_forward
+
+        try:
+            with open_log() as conn:
+                p = carry_forward.plan(conn, dataset_id, period)
+        except filing_queue.LogUnreachable as exc:
+            say_unreachable(exc)
+            return None
+        if p.already:
+            _show(carry_forward.already_words(p), title="Already so", style="blue")
+            return filing_decisions.Outcome(operation=operation, dataset_id=dataset_id,
+                                            period=period, changed=False,
+                                            message=carry_forward.already_words(p))
 
     if reason is None:
         reason = common.text_prompt(
@@ -396,7 +412,18 @@ def apply_decision(*, operation: str, dataset_id: str, period: str | None,
         if shown.notes and not previous:
             # WHAT IT TAKES BACK AND WHAT FOLLOWS (REQ-PIPE-166 criterion 14) -
             # said before the one confirmation, never keyed.
-            _show("\n".join(shown.notes), title="What this does", style="blue")
+            notes, title = "\n".join(shown.notes), "What this does"
+            if operation == filing_decisions.UN_INHERIT:
+                # NOT WHAT UN-INHERIT DOES, but a better way to the same end
+                # (CLI UX critic M3, #267) - and in the wizard, the way there is
+                # the door, not a command to copy.
+                title = "Instead"
+                if not flag_route:
+                    notes = "\n".join(
+                        "Answer no here, and choose carry forward from the period's "
+                        "door instead." if line.startswith("mothman ") else line
+                        for line in notes.split("\n"))
+            _show(notes, title=title, style="blue")
         # THE FIRST CONFIRMATION OF THE FLOW is the one where a production
         # change is typed (REQ-PIPE-093 criterion 4); a second pass here only
         # re-confirms consequences that changed underneath it, and asking for
@@ -449,8 +476,9 @@ def apply_decision(*, operation: str, dataset_id: str, period: str | None,
         return None
 
     if outcome.changed:
-        console.print(Panel(Text(outcome.message, style="bold green"),
-                             title="Recorded", border_style="green", expand=False))
+        # THROUGH _show, so a command in it - a promotion's 'available to carry
+        # forward' line (K4) - prints below the panel, copyable.
+        _show(outcome.message, title="Recorded", style="green")
         carried = (_readers_of(dataset_id, period)
                    if operation == filing_decisions.CARRY_FORWARD else None)
         if outcome.owed and flag_route and not wait:
@@ -507,10 +535,18 @@ def _follow_up(collection_id: str, *, carried=None) -> None:
     (dataset, period, readers), and every reader re-checked is listed with
     its outcome - or, where the re-evaluation could not run, 'Re-evaluation
     owed' with the command that runs it on a line of its own."""
+    import contextlib
+    import io
+
     from qa_tools.common import knock_on
 
+    mine = _owed_for(carried[1]) if carried is not None else set()
     try:
-        done = knock_on.follow_up(collection_id)
+        # THE KNOCK-ON'S OWN PROGRESS LINES ('knock-on: ...', a run's '--- ...
+        # ---') are the pipeline's, not this follow-up's (CLI UX critic minor,
+        # #267): what happened is said below, in the person's terms.
+        with contextlib.redirect_stdout(io.StringIO()):
+            done = knock_on.follow_up(collection_id)
     except Exception as exc:  # noqa: BLE001 - the decision stands either way
         if carried is not None:
             _say_carry_forward_owed(carried, str(exc))
@@ -519,11 +555,18 @@ def _follow_up(collection_id: str, *, carried=None) -> None:
                       "it stays owed.", style="yellow")
         return
     if carried is not None:
-        failed = [o for o in done if not o.completed]
+        # ONLY THIS PERIOD'S RE-EVALUATION (functional critic S6, #267): the
+        # follow-up runs everything the collection owes, and another period's
+        # failure is not why this carry-forward's readers are owed.
+        failed = [o for o in done if not o.completed and o.owed_id in mine]
         if failed:
             _say_carry_forward_owed(carried, failed[0].message)
         else:
             _say_carry_forward_readers(carried)
+        others = [o for o in done if not o.completed and o.owed_id not in mine]
+        for outcome in others:
+            console.print(Panel(Text(outcome.message), title="Re-evaluation owed",
+                                border_style="yellow", expand=False))
         return
     for outcome in done:
         if not outcome.completed:
@@ -531,9 +574,25 @@ def _follow_up(collection_id: str, *, carried=None) -> None:
                                 border_style="yellow", expand=False))
 
 
+def _owed_for(period: str | None) -> set[int]:
+    """The ids of the re-evaluations owed for this period now - before the
+    follow-up runs them - so its outcomes can be told from other periods'."""
+    from qa_tools.common import recheck
+
+    if not period:
+        return set()
+    try:
+        with open_log() as conn:
+            return {o.id for o in recheck.owed(conn)
+                    if o.kind == recheck.REEVALUATE and o.period == period}
+    except filing_queue.LogUnreachable:
+        return set()
+
+
 def _say_carry_forward_owed(carried, why: str) -> None:
     dataset_id, period, _readers = carried
-    _show(f"The readers of {dataset_id} in {period} were not re-checked yet ({why}). "
+    name = hierarchy.dataset(dataset_id).dataset_name
+    _show(f"The readers of {name} in {period} were not re-checked yet ({why}). "
           f"Until they are, their checks of it read 'not yet re-checked', and nothing is "
           f"raised for them. The processing pass runs it:\nmothman pipeline process",
           title="Re-evaluation owed", style="yellow")
@@ -541,11 +600,12 @@ def _say_carry_forward_owed(carried, why: str) -> None:
 
 def _say_carry_forward_readers(carried) -> None:
     """Every reader re-checked, and what it reads now (criterion 8)."""
-    from qa_tools.common import supply_status
+    from qa_tools.common import carry_forward, supply_status
 
     dataset_id, period, readers = carried
+    name = hierarchy.dataset(dataset_id).dataset_name
     if not readers:
-        console.print(f"No other dataset's checks read {dataset_id} in {period}, so there "
+        console.print(f"No other dataset's checks read {name} in {period}, so there "
                       f"was nothing to re-check.", style="dim")
         return
     lines = []
@@ -553,11 +613,14 @@ def _say_carry_forward_readers(carried) -> None:
         with open_log() as conn:
             for r in readers:
                 status = supply_status.status(conn, r.dataset_id, r.supply) or "no verdict"
-                lines.append(f"- {hierarchy.dataset(r.dataset_id).dataset_name}, arrived "
-                             f"{arrived(r.supply)}: {status}")
+                # ONE DATE STYLE IN ONE FOLLOW-UP (CLI UX critic minor, #267):
+                # the instant as the consequences above it say one.
+                lines.append(f"- {hierarchy.dataset(r.dataset_id).dataset_name}, received "
+                             f"{carry_forward.received(r.dataset_id, r.supply, conn)}: "
+                             f"{status}")
     except Exception as exc:  # noqa: BLE001 - said, never a traceback
         lines.append(f"(their verdicts could not be read: {exc})")
-    _show(f"Re-checked against the {dataset_id} carried forward into {period}:\n"
+    _show(f"Re-checked against the {name} carried forward into {period}:\n"
           + "\n".join(lines), title="Readers re-checked", style="green")
 
 
@@ -755,6 +818,13 @@ def queue_table(states) -> Table:
 
 def _label(state: slot_state.SlotState, count: int = 0) -> str:
     where = f"arrived {arrived(state.supply)}" if state.supply else "nothing arrived"
+    # NOTHING ARRIVED INTO A PERIOD THAT CARRIES ONE FORWARD (CLI UX critic
+    # minors, #267): "arrived ... (inherited)" read as a supply filed there,
+    # and "nothing arrived (owes nothing...)" said the same thing twice.
+    if state.state == slot_state.INHERITED and state.supply:
+        where = f"carries forward the one received {arrived(state.supply)}"
+    elif state.state == filing_queue.CARRIES_NOTHING:
+        return f"{state.period}  {state.dataset_id}  owes nothing, carries nothing forward"
     # IN WORDS, as the table above it says it (CLI UX critic, #107): the
     # picker used to show the machine id - `awaiting-acknowledgement`.
     words = re.sub(r"\[/?[a-z ]+\]", "", _HOW_IT_READS.get(state.state, state.state))
@@ -848,6 +918,17 @@ def _offers(state: slot_state.SlotState, supply_scoped: tuple[str, ...]) -> tupl
     return supply_scoped + extra
 
 
+def _something_newer(state: slot_state.SlotState) -> bool:
+    """Whether a carry-forward here would change anything (M2)."""
+    from qa_tools.common import carry_forward
+
+    try:
+        with open_log() as conn:
+            return not carry_forward.plan(conn, state.dataset_id, state.period).already
+    except (decision_log.DecisionRefused, filing_queue.LogUnreachable):
+        return False
+
+
 def _decide_on(state: slot_state.SlotState, *, offer: tuple[str, ...]) -> None:
     """Offer this slot's operations and carry one out.
 
@@ -881,6 +962,11 @@ def _decide_on(state: slot_state.SlotState, *, offer: tuple[str, ...]) -> None:
             words[filing_decisions.UN_SUPERSEDE] = (
                 f"{words[filing_decisions.UN_SUPERSEDE]} ({n} earlier "
                 f"version{'s' if n != 1 else ''})")
+    if filing_decisions.CARRY_FORWARD in offer and not _something_newer(state):
+        # NOTHING NEWER, SAID ON THE CHOICE (CLI UX critic M2, #267), before
+        # anyone is asked for a reason for a decision that would do nothing.
+        words[filing_decisions.CARRY_FORWARD] = ("carry forward (nothing newer to carry "
+                                                 "forward)")
     by_label = {words[op]: op for op in offer}
     picked = common.select(f"{state.dataset_id} {state.period} - what are you "
                             f"recording?", list(by_label), flag_hint=_FLAG_HINT)
@@ -1026,7 +1112,7 @@ def queue_flow(collection_id: str) -> None:
         if not gaps:
             console.print(f"Nothing is waiting on a person in "
                            f"{_collection_name(collection_id)}.", style="green")
-        if not quiet:
+        if not quiet and not carry:
             return
     if waiting:
         console.print(f"[bold]{len(waiting)}[/bold] supply/supplies waiting on a "
@@ -1039,14 +1125,22 @@ def queue_flow(collection_id: str) -> None:
         for g in quiet:
             console.print(f"[dim]  {g.line}[/dim]", markup=True)
         console.print()
-    if held or quiet:
+    if held or quiet or carry:
         labels = {_held_label(h): h for h in held}
         labels.update({_label(s): s for s in waiting})
         labels.update({g.line: g for g in quiet})
+        # ONE SELECTABLE ITEM FOR THE WARNINGS (Keith, 2026-10-24, K3): it opens
+        # the period's door, as 'Received while turned off (n)' opens its own -
+        # still outside every count of what waits on a decision.
+        if carry:
+            labels[f"{CARRY_FORWARD_ITEM} ({len(carry)})"] = _CARRY
         picked = common.select("Which one?", list(labels), flag_hint=_FLAG_HINT)
         if picked is None:
             return
         chosen = labels[picked]
+        if chosen is _CARRY:
+            carry_forward_flow(collection_id, carry)
+            return
         if isinstance(chosen, filing_queue.TurnedOffGroup):
             turned_off_flow(chosen)
             return
@@ -1062,34 +1156,80 @@ def queue_flow(collection_id: str) -> None:
     _decide_on(state, offer=_offers(state, supply_scoped))
 
 
+#: The queue's one selectable item for the warnings (K3), and its marker.
+CARRY_FORWARD_ITEM = "Could be carried forward"
+_CARRY = object()
+
+
 def carry_forward_warnings(conn, collection_id: str, dataset_id: str | None = None,
                            period: str | None = None) -> list:
     """The carry-forward warnings standing for this collection (REQ-PIPE-271
-    criterion 7), one per dataset and period."""
+    criterion 7), one per dataset and period.
+
+    ONLY AN UNREACHABLE LOG IS LogUnreachable (post-build-review #267): a
+    defect in reading the warnings is a defect, and raising it is louder
+    than telling a person the database is down when it is not."""
+    import psycopg
+
     from qa_tools.common import carry_forward
 
     mine = {d.dataset_id for d in hierarchy.datasets_in_collection(collection_id)}
     try:
         found = carry_forward.standing(conn, dataset_id=dataset_id, period=period)
-    except Exception as exc:  # noqa: BLE001 - LogUnreachable's job, said by the caller
+    except (supply_db.SupplyDbError, psycopg.OperationalError) as exc:
         raise filing_queue.LogUnreachable(str(exc)) from exc
     return [w for w in found if w.dataset_id in mine]
 
 
-def say_carry_forward_warnings(warnings) -> None:
+def say_carry_forward_warnings(warnings, *, in_door: bool = False) -> None:
     """Each warning in the terminal's own voice, its command on a line of its
-    own below the prose - never inside a panel or a table cell (criterion 7,
-    _show's convention: soft-wrapped, no markup)."""
+    own below the prose - never inside a panel or a table cell (criterion 7).
+
+    THE PROSE WORD-WRAPS AND ONLY THE COMMAND IS SOFT-WRAPPED (CLI UX critic
+    M4, #267): soft-wrapped, the sentences broke mid-word at the terminal's
+    edge; a command must not be broken at all, so it is copied whole. Inside
+    the period's own door it does not send the person to that door (M5)."""
     from qa_tools.common import carry_forward
 
     if not warnings:
         return
-    console.print("[bold]Could be carried forward[/bold] - a newer supply has been "
-                  "promoted since these periods opened")
+    n = len(warnings)
+    console.print(f"[bold]{CARRY_FORWARD_ITEM} ({n})[/bold] - a newer supply was promoted "
+                  f"after {'this period' if n == 1 else 'these periods'} opened")
     for w in warnings:
-        for line in carry_forward.lines(w, voice="terminal"):
-            console.print(line, soft_wrap=True, highlight=False, markup=False)
+        for line in carry_forward.lines(w, voice="terminal", in_door=in_door):
+            if line.startswith("mothman "):
+                console.print(line, soft_wrap=True, highlight=False, markup=False)
+            else:
+                console.print(line, highlight=False, markup=False)
         console.print()
+
+
+def carry_forward_flow(collection_id: str, warnings) -> None:
+    """The queue's 'Could be carried forward (n)' item (K3): which one, where
+    there is more than one, then that period's door."""
+    from qa_tools.common import carry_forward
+
+    if len(warnings) == 1:
+        (w,) = warnings
+    else:
+        by_label = {carry_forward.headline(x): x for x in warnings}
+        picked = common.select("Which one?", list(by_label), flag_hint=_FLAG_HINT)
+        if picked is None:
+            return
+        w = by_label[picked]
+    try:
+        with open_log() as conn:
+            found = [s for s in carry_forward.carried_periods(conn, w.dataset_id)
+                     if s.period == w.period]
+    except filing_queue.LogUnreachable as exc:
+        say_unreachable(exc)
+        return
+    if not found:
+        console.print(f"{w.period} no longer carries anything forward that can be "
+                      f"changed here.", style="yellow")
+        return
+    _owed_nothing_door(collection_id, found[0])
 
 
 def turned_off_flow(group) -> None:
@@ -1364,16 +1504,27 @@ def _owed_nothing_door(collection_id: str, state: slot_state.SlotState) -> None:
     (REQ-PIPE-271 criterion 7), and carry-forward - with un-inherit where it
     inherits."""
 
-    if state.state == slot_state.INHERITED and state.stands_on:
-        console.print(stands_on_line(state), style="cyan")
+    from qa_tools.common import carry_forward
+
+    name = hierarchy.dataset(state.dataset_id).dataset_name
     try:
         with open_log() as conn:
             warned = carry_forward_warnings(conn, collection_id, dataset_id=state.dataset_id,
                                             period=state.period)
+            # WHAT IT CARRIES, IN ITS OWN WORDS (CLI UX critic M5, #267):
+            # stands_on_line() ends "...is not one of these", written for a
+            # list of filed supplies this door does not show.
+            if state.state == slot_state.INHERITED and state.stands_on:
+                console.print(f"{state.period} carries forward the {name} received "
+                              f"{carry_forward.received(state.dataset_id, state.supply, conn)}, "
+                              f"promoted into {state.stands_on}.", style="cyan")
+            else:
+                console.print(f"{state.period} carries nothing forward for {name}.",
+                              style="cyan")
     except filing_queue.LogUnreachable as exc:
         say_unreachable(exc)
         return
-    say_carry_forward_warnings(warned)
+    say_carry_forward_warnings(warned, in_door=True)
     _decide_on(state, offer=filing_queue.operations_for(state)[1])
 
 

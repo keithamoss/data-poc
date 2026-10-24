@@ -130,6 +130,22 @@ def _does_not_participate(dataset_id: str, period_name: str) -> tuple[bool, str]
     return False, ""
 
 
+def not_a_period(dataset_id: str, period_name: str) -> str | None:
+    """Why `period_name` is no period of this dataset's calendar, or None.
+
+    ASKED BEFORE PARTICIPATION (CLI UX critic S4, post-build-review #267):
+    a typo or another calendar's period is not one the dataset "takes part
+    in", and saying so sent a person to a supply that could never be owed.
+    One place, for inherit and carry-forward alike."""
+    try:
+        if schedule.date_of(period_name, dataset_id) is not None:
+            return None
+        calendar = schedule.calendar_for_dataset(dataset_id).name
+    except (schedule.ScheduleConfigError, hierarchy.UnknownDatasetError, KeyError, ValueError):
+        return None
+    return f"{period_name} is not a period on the {calendar} calendar."
+
+
 def _period_dates(dataset_id: str) -> dict:
     """Each period of this dataset's own calendar, by name, to its date."""
     try:
@@ -157,8 +173,8 @@ def _slot_names(dataset_id: str) -> frozenset[str]:
     return frozenset(s.name for s in slots_mod.slots_for_dataset(dataset_id))
 
 
-def _most_recent_promoted(conn, dataset_id: str,
-                          before: str) -> tuple[str, str] | None:
+def _most_recent_promoted(conn, dataset_id: str, before: str,
+                          as_at: str | None = None) -> tuple[str, str] | None:
     """`(period, supply)` of the newest PROMOTED table, or None.
 
     ONLY A PROMOTED ONE (criterion 14). A period that is itself
@@ -169,6 +185,10 @@ def _most_recent_promoted(conn, dataset_id: str,
     ORDERED BY THE PERIOD'S OWN DATE rather than by when the promotion
     happened, because "the supply that is still current" is a statement
     about the data's period, not about our paperwork.
+
+    AS AT `as_at` where given - what the decision log held at that instant
+    (an opening asks as at its receipt, Keith 2026-10-24, K6) - and as now
+    otherwise.
     """
     # WHAT EACH SLOT HOLDS COMES FROM qa.slot_holds (REQ-PIPE-130
     # criterion 9). This walked the log itself, newest-first, reading the
@@ -179,7 +199,7 @@ def _most_recent_promoted(conn, dataset_id: str,
     best: tuple[str, str] | None = None
     best_date = None
     before_date = schedule.date_of(before, dataset_id)
-    for slot, h in decision_log.held_all(conn, dataset_id).items():
+    for slot, h in decision_log.held_all(conn, dataset_id, as_at).items():
         if h.held_as != decision_log.PROMOTED:
             continue
         supply = h.holder
@@ -260,7 +280,18 @@ def inherit_into(conn: supply_db.SupplyConnection, period_name: str, *,
         if not skipped:
             continue
 
-        source = _most_recent_promoted(conn, entry.dataset_id, period_name)
+        # AS AT THE OPENING'S OWN INSTANT - its first filing's receipt (Keith,
+        # 2026-10-24, K6, amending PROVISIONAL call 3 of REQ-PIPE-271): not as
+        # at whenever the filing happens to be processed. A supply promoted in
+        # between is newer than what the period carries, and the opening
+        # raises the ordinary warning for it (carry_forward.warn_at_opening).
+        # A source no longer held at all - replaced in its own period since -
+        # cannot be stood on, so the newest held now is.
+        source = _most_recent_promoted(conn, entry.dataset_id, period_name,
+                                       as_at=effective_at)
+        if source is not None and decision_log.promoted_into(
+                conn, entry.dataset_id, source[0]) != source[1]:
+            source = _most_recent_promoted(conn, entry.dataset_id, period_name)
         if source is None:
             # CRITERION 9: no view, and nothing fabricated. An empty
             # table would be a lie with a schema on it.
@@ -272,6 +303,7 @@ def inherit_into(conn: supply_db.SupplyConnection, period_name: str, *,
             _record(conn, entry, action=decision_log.INHERIT_REFUSED, supply="",
                     period=period_name, stands_on=None,
                     reason=outcome.refused[-1].reason, effective_at=effective_at)
+            _warn_at_opening(conn, entry, period_name, None, effective_at)
             continue
 
         stands_on, supply = source
@@ -305,7 +337,17 @@ def inherit_into(conn: supply_db.SupplyConnection, period_name: str, *,
         outcome.inherited.append(Inherited(
             dataset_id=entry.dataset_id, period=period_name, stands_on=stands_on,
             supply=supply, reason=reason))
+        _warn_at_opening(conn, entry, period_name, (stands_on, supply), effective_at)
     return outcome
+
+
+def _warn_at_opening(conn, entry, period_name: str, carried, effective_at: str) -> None:
+    """K6's other half: where something newer than what the opening carries is
+    promoted already, the ordinary warning, in the opening's transaction."""
+    from qa_tools.common import carry_forward
+
+    carry_forward.warn_at_opening(conn, dataset_id=entry.dataset_id, period=period_name,
+                                  carried=carried, effective_at=effective_at)
 
 
 def _record(conn, entry, *, action: str, supply: str, period: str,
@@ -364,8 +406,11 @@ def refusals(conn: supply_db.SupplyConnection | None = None) -> list[Refused]:
     # ONLY WHILE THE PERIOD STILL CARRIES NOTHING (REQ-PIPE-280): a period a
     # person has since carried a supply forward into - or inherited into, or
     # promoted into - has a table, and "no table at all" would be false.
+    # A period a person EMPTIED since (an un-inherit after a carry-forward)
+    # carries nothing again, and is listed again: `held_as` None, not only no
+    # holding at all (post-build-review #267).
     return [Refused(dataset_id=d, period=p, reason=r or "") for d, p, r in rows
-            if decision_log.held(conn, d, p) is None]
+            if not ((h := decision_log.held(conn, d, p)) and h.held_as)]
 
 
 class InheritanceRefused(Exception):
@@ -383,6 +428,9 @@ def inherit_one_refusal(conn: supply_db.SupplyConnection, dataset_id: str,
     ONE place, so the decision's warning (REQ-PIPE-128 criterion 8) never
     promises a re-check for an inheritance the operation then refuses."""
     entry = hierarchy.dataset(dataset_id)
+    wrong = not_a_period(dataset_id, period)
+    if wrong:
+        return InheritanceRefused(f"{wrong} Nothing was recorded.")
     skipped, _ = _does_not_participate(dataset_id, period)
     if not skipped:
         return InheritanceRefused(

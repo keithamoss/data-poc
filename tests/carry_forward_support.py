@@ -21,6 +21,8 @@ from qa_tools.common import decision_log as dl
 from qa_tools.common import hierarchy, promotion, qa_store, schedule, supply_db
 
 CASE_WORKERS = "cp-case-workers"
+#: Its name, as every sentence says a dataset (Keith, 2026-10-24, K1).
+NAME = "Case Workers"
 REASON = "Case Workers is delivered in February and August only"
 #: The Notifications check that reads cp_case_workers - a real declared read.
 ASSIGNED_WORKER = ("data-asset-1.child-protection-family-support.child-protection."

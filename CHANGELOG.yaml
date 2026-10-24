@@ -159,6 +159,12 @@ releases:
               Hover over a point on a dataset's trend line in the list to see
               what caused it and when: the supply arriving, another table's
               delivery, or a re-check.
+          - headline: Carry forward from the queue
+            components: ["Testing & dev tooling", "Pipeline & publishing"]
+            description: >
+              A quarter that could carry a newer copy forward is now one item
+              in the decisions queue that opens its door, and a promotion that
+              makes one available tells you so.
       - category: Fixed
         items:
           - headline: Re-checks reach the page
@@ -185,6 +191,12 @@ releases:
               A re-check that failed and was retried later now reads as owed on
               every day in between, on the check and on the red promoted label
               alike.
+          - headline: Carry-forward warnings tell the truth
+            components: ["Pipeline & publishing", "Dashboard UI"]
+            description: >
+              A carry-forward warning now says what the quarter holds today and
+              shows once per quarter, and a quarter opens only when the decision
+              that files into it actually goes through.
       - category: New
         items:
           - headline: Carry the newer one forward

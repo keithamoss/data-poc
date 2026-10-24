@@ -10453,7 +10453,7 @@ function decisionsChangingDate(onDateStr, inView){
     const tl = raw.promotionTimeline || {points: [], standing: []};
     const about = new Set([st.promoted && st.promoted.supply, st.arrived && st.arrived.supply].filter(Boolean));
     const period = periodNameFor(raw.id, onDateStr);
-    const STANDS = new Set(["substitute", "de-substitute", "inherit", "un-inherit"]);
+    const STANDS = new Set(["substitute", "de-substitute", "inherit", "un-inherit", "carry-forward"]);
     const behind = [
       ...(tl.points || []).filter(p=> p.on <= onDateStr)
         .flatMap(p=> (p.decisions || []).filter(e=> about.has(e.supply))),

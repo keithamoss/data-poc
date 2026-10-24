@@ -151,10 +151,7 @@ def apply(conn, p: Plan, *, agency_id: str, collection_id: str, actor: str, reas
     the supply, which is the rule's (Keith, 2026-10-11, morning-report (o))."""
     from qa_tools.common import filing, period_tables, recheck, supersession
 
-    # THE TARGET OPENS AT ITS FIRST FILING (REQ-PIPE-271), a re-file's included,
-    # before this decision's transaction - so the re-check reads its inheritances.
-    filing.open_on_refile(conn, p.dataset_id, p.supply, p.to_period, how="re-file",
-                          effective_at=effective_at)
+    opened = False
     with decision_log.decision_transaction(conn):
         # JUDGED AGAIN UNDER THE LOCK (REQ-GHUB-142 criterion 4; post-build-
         # review #114, D4): the plan the person confirmed was worked out
@@ -191,6 +188,12 @@ def apply(conn, p: Plan, *, agency_id: str, collection_id: str, actor: str, reas
             filing.refile(conn, p.dataset_id, p.supply, p.to_period, decision_id=entry_id)
             owed_id = recheck.owe(conn, dataset_id=p.dataset_id, supply_id=p.supply,
                                   decision_id=entry_id)
+        # THE TARGET OPENS AT ITS FIRST FILING (REQ-PIPE-271), a re-file's
+        # included - ONCE THE RE-FILE STANDS, judged again under its lock and
+        # recorded (post-build-review #267, S5): a refused re-file opens
+        # nothing. Its owed re-check runs after commit, so it reads them.
+        opened = filing.open_on_refile(conn, p.dataset_id, p.supply, p.to_period,
+                                       how="re-file", effective_at=effective_at)
         # RE-FILE WINS over versions waiting in the target (criterion 6),
         # each its own rule-actor entry, in this same transaction.
         for d in p.displaced:
@@ -199,6 +202,7 @@ def apply(conn, p: Plan, *, agency_id: str, collection_id: str, actor: str, reas
                 dataset_id=p.dataset_id, supply=d.supply, period=p.to_period, by=p.supply,
                 effective_at=effective_at,
                 reason=f"{p.supply} was re-filed into {p.to_period} in its place")
+    filing.settle_opening(conn, p.to_period, opened)
     return owed_id
 
 

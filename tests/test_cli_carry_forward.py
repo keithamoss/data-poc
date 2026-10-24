@@ -11,7 +11,7 @@ import re
 from click.testing import CliRunner
 
 import carry_forward_support
-from carry_forward_support import CASE_WORKERS, entries
+from carry_forward_support import CASE_WORKERS, NAME, entries
 
 conn = carry_forward_support.conn
 world = carry_forward_support.world
@@ -55,7 +55,7 @@ def test_door_and_flags_offer_it_with_its_consequences(conn, world, monkeypatch,
     out = _flat(capsys.readouterr().out)
     assert any(c.startswith("un-inherit") for c in picked["offered"]), picked
     assert "This decision also does" in out
-    assert f"{world.q4} stops carrying forward the {CASE_WORKERS} received" in out
+    assert f"{world.q4} stops carrying forward the {NAME} received" in out
     assert asked, "one confirmation, after the consequences"
     assert not entries(conn, world.q4, dl.CARRY_FORWARD), "declined: nothing recorded"
 
@@ -71,7 +71,7 @@ def test_door_and_flags_offer_it_with_its_consequences(conn, world, monkeypatch,
     got = decide()
     assert got.exit_code == 1, got.output
     flat = _flat(got.output)
-    assert f"{world.q4} stops carrying forward the {CASE_WORKERS} received" in flat
+    assert f"{world.q4} stops carrying forward the {NAME} received" in flat
     assert "There is no step back to the supply received" in flat
     key = re.search(r"--acknowledge ([0-9a-f]{10})", flat).group(1)
     assert not entries(conn, world.q4, dl.CARRY_FORWARD), "nothing recorded without the key"

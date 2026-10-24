@@ -467,7 +467,17 @@ def file_arrivals(found_arrivals) -> list[Assignment]:
                           f"its supplies are still recorded as arrived.")
                     slots_by_dataset[horizon] = []
             supply_id = _supply_id_for(arrival, dataset_id)
-            if filing_for(dataset_id, supply_id) is not None:
+            already = filing_for(dataset_id, supply_id)
+            if already is not None:
+                # THE OPENING IS RETRIED WHERE IT DID NOT HAPPEN (functional
+                # critic S1, #267): it runs after the filing commits, so a
+                # failure between the two left a filed supply whose period
+                # never opened - and every later pass took this skip. Opening
+                # is a no-op once a period is open, so asking again is safe.
+                if already.get("slot"):
+                    with _connect("mothman:filing-open") as conn:
+                        open_at_filing(conn, dataset_id=dataset_id, supply_id=supply_id,
+                                       period=already["slot"], at=arrival.received_at)
                 continue
             decided = assign_mod.assign(
                 dataset_id=dataset_id, supply_id=supply_id,
@@ -501,7 +511,10 @@ def file_arrivals(found_arrivals) -> list[Assignment]:
                     # mechanism (REQ-PIPE-098 criterion 4), after the filing
                     # commits - it writes decisions of its own. A held supply
                     # has no period and opens none; a trial never files.
-                    open_at_filing(conn, decided, arrival)
+                    open_at_filing(conn, dataset_id=dataset_id, supply_id=supply_id,
+                                   period=decided.slot,
+                                   at=getattr(arrival, "received_at", None)
+                                   or decided.received_at)
             # AN ASSIGNMENT-RULE HOLD IS RECORDED TOO (criterion 3). Its
             # `filing` row above is evidence of what the rule saw and
             # stays write-once; the open work item is the hold, because
@@ -512,25 +525,27 @@ def file_arrivals(found_arrivals) -> list[Assignment]:
     return written
 
 
-def open_at_filing(conn, decided: Assignment, arrival) -> bool:
+def open_at_filing(conn, *, dataset_id: str, supply_id: str, period: str, at) -> bool:
     """Open the period a supply was just filed to, if nothing has (REQ-PIPE-271).
 
     WHICH COLLECTION'S FILING OPENED IT is recorded on the period (criterion
     4): a quarter Emergency Department and Child Protection share is opened
     by whichever of them files to it first, in receipt order across the
     stream (REQ-PIPE-262). Each inheritance it makes names the supply whose
-    filing caused it (REQ-TEST-150 criterion 6). Returns whether this call
-    opened it."""
+    filing caused it (REQ-TEST-150 criterion 6). `at` is the supply's
+    receipt, the instant the period opens as at (K6). Returns whether this
+    call opened it."""
     from qa_tools.common import hierarchy, period_schema
 
-    collection = hierarchy.dataset(decided.dataset_id).collection_id
-    at = getattr(arrival, "received_at", None) or decided.received_at
+    if period_schema.opened(conn, period):
+        return False
+    collection = hierarchy.dataset(dataset_id).collection_id
     opened = period_schema.open_period(
-        conn, decided.slot, opened_by=f"the filing of {decided.supply_id} ({collection})",
+        conn, period, opened_by=f"the filing of {supply_id} ({collection})",
         effective_at=at.isoformat() if at is not None else None,
-        caused_by=decided.supply_id)
+        caused_by=supply_id)
     if opened:
-        _settle_the_openings_knock_on(conn, decided.slot)
+        _settle_the_openings_knock_on(conn, period)
     return opened
 
 
@@ -538,9 +553,15 @@ def open_on_refile(conn, dataset_id: str, supply_id: str, period: str | None, *,
                    how: str, effective_at: str) -> bool:
     """Open a period a supply is RE-FILED, PLACED or SETTLED into, if nothing
     has (REQ-PIPE-271 criterion 1: the first supply filed to a period opens
-    it, whichever filing it is) - before the decision's own transaction where
-    the caller can, so its checks read the inherited tables. Returns whether
-    this call opened it."""
+    it, whichever filing it is) - so the checks the decision owes, which run
+    after it commits, read the inherited tables. Returns whether this call
+    opened it.
+
+    ONLY ONCE THE DECISION STANDS (functional critic S5, #267): callers open
+    inside their decision's transaction, after its judgement under the lock
+    and after its entry, so a decision refused there - or rolled back - opens
+    nothing. The opening's knock-on cannot settle inside that transaction;
+    the caller calls settle_opening() once it has committed."""
     from qa_tools.common import hierarchy, period_schema
 
     if not period or period_schema.opened(conn, period):
@@ -552,6 +573,15 @@ def open_on_refile(conn, dataset_id: str, supply_id: str, period: str | None, *,
     if opened and not _in_a_transaction(conn):
         _settle_the_openings_knock_on(conn, period)
     return opened
+
+
+def settle_opening(conn, period: str | None, opened: bool) -> None:
+    """After the decision that opened `period` has committed: its opening's
+    knock-on, as open_at_filing settles it (_settle_the_openings_knock_on).
+    Nothing where the call did not open it, or a caller's transaction is
+    still open - then the gate's follow-up or the processing pass runs it."""
+    if opened and period and not _in_a_transaction(conn):
+        _settle_the_openings_knock_on(conn, period)
 
 
 def _in_a_transaction(conn) -> bool:
@@ -826,7 +856,7 @@ class RecordedArrival:
         return (self.filled_at or asset_time.now()) - self.received_at
 
 
-def received_at_of(dataset_id: str, supply_id: str) -> datetime | None:
+def received_at_of(dataset_id: str, supply_id: str, conn=None) -> datetime | None:
     """Our receipt instant for this supply - from the one receipt view
     (REQ-PIPE-144 criterion 16), never a copy on the filing.
 
@@ -837,12 +867,18 @@ def received_at_of(dataset_id: str, supply_id: str) -> datetime | None:
     re-check of a Perth-time receipt found neither its table nor its
     period. The view keeps the writer's text for exactly this; the instant
     is the fallback for a row without it. Comparisons are unaffected - two
-    aware datetimes compare by instant."""
-    with _connect("mothman:filing-read") as conn:
-        rows = conn.execute(
-            f"SELECT received_at, received_instant FROM {RECEIPT} "
-            "WHERE dataset_id = ? AND supply_id = ?",
-            [dataset_id, supply_id]).fetchall()
+    aware datetimes compare by instant.
+
+    THROUGH `conn` WHERE ONE IS GIVEN (post-build-review #267, S7): a caller
+    inside a transaction - a promotion writing its warnings - reads through
+    its own connection rather than opening another."""
+    sql = (f"SELECT received_at, received_instant FROM {RECEIPT} "
+           "WHERE dataset_id = ? AND supply_id = ?")
+    if conn is not None:
+        rows = conn.execute(sql, [dataset_id, supply_id]).fetchall()
+    else:
+        with _connect("mothman:filing-read") as opened:
+            rows = opened.execute(sql, [dataset_id, supply_id]).fetchall()
     if not rows:
         return None
     text, instant = rows[0]

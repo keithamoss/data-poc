@@ -16,7 +16,7 @@ import pytest
 
 import filing_support
 import carry_forward_support
-from carry_forward_support import CASE_WORKERS, KEYS, entries, promote, view_reads
+from carry_forward_support import CASE_WORKERS, KEYS, NAME, entries, promote, view_reads
 
 conn = carry_forward_support.conn
 world = carry_forward_support.world
@@ -178,7 +178,7 @@ class TestCarryForwardWarning:
         (recorded,) = entries(conn, world.q4, dl.CARRY_FORWARD_WARNING)
         assert recorded["actor_kind"] == dl.RULE
         said = carry_forward.lines(w, voice="page")
-        assert said[0].startswith(f"A newer {CASE_WORKERS} could be carried forward into "
+        assert said[0].startswith(f"A newer {NAME} could be carried forward into "
                                   f"{world.q4}. {world.q4} carries forward the supply received ")
         assert said[1] == "A person can carry that one forward instead, in one step:"
         assert said[2] == (f"mothman supply decide --operation carry-forward --dataset "
@@ -204,7 +204,7 @@ class TestCarryForwardWarning:
         (w,) = carry_forward.standing(conn, dataset_id=CASE_WORKERS, period=world.q4)
         assert (w.supply, w.carried) == (q3, None)
         said = carry_forward.lines(w, voice="page")
-        assert said[0].startswith(f"{world.q4} carries nothing forward for {CASE_WORKERS}: "
+        assert said[0].startswith(f"{world.q4} carries nothing forward for {NAME}: "
                                   f"there was no earlier promoted supply when it opened. The "
                                   f"one received ")
         assert said[0].endswith(f"has been promoted into {world.q3} since, and a person can "
@@ -308,7 +308,7 @@ class TestTheWarningIsShown:
                if w["period"] == warned.q4]
         assert got and got[0]["from"] == "2099-09-02" and got[0]["until"] is None
         assert got[0]["command"] == self._command(warned)
-        assert got[0]["headline"] == (f"A newer {CASE_WORKERS} could be carried forward into "
+        assert got[0]["headline"] == (f"A newer {NAME} could be carried forward into "
                                       f"{warned.q4}.")
         carry_forward.carry_forward(conn, dataset_id=CASE_WORKERS, period=warned.q4,
                                     actor="Keith", reason="current",
