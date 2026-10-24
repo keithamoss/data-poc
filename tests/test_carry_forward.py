@@ -14,8 +14,11 @@ import uuid
 import pytest
 from click.testing import CliRunner
 
-from carry_forward_support import (ASSIGNED_WORKER, CASE_WORKERS, KEYS, conn,  # noqa: F401
-                                   entries, promote, view_reads, world)
+import carry_forward_support
+from carry_forward_support import ASSIGNED_WORKER, CASE_WORKERS, KEYS, entries, promote, view_reads
+
+conn = carry_forward_support.conn
+world = carry_forward_support.world
 from qa_tools.common import carry_forward, filing_decisions as fd, inheritance, knock_on
 from qa_tools.common import decision_log as dl
 from qa_tools.common import people, qa_store, recheck, supply_status

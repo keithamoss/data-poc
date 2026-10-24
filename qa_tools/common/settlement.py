@@ -341,8 +341,14 @@ def apply(conn, p: Plan, *, agency_id: str, collection_id: str, actor: str, reas
           effective_at: str, answers: list[Answer]) -> tuple[int, tuple[int, ...]]:
     """Carry a settlement out in one transaction. Returns (the choose-file
     entry's id, the owed QA runs' ids in receipt order)."""
-    from qa_tools.common import supersession
+    from qa_tools.common import filing, supersession
 
+    # EACH PERIOD A FILE IS SETTLED INTO OPENS AT ITS FIRST FILING (REQ-PIPE-271),
+    # before the settlement's transaction.
+    for f in p.files:
+        for period in (f.to_period, f.period_after):
+            filing.open_on_refile(conn, p.dataset_id, f.supply_id, period,
+                                  how="settlement", effective_at=effective_at)
     owed: list[int] = []
     with decision_log.decision_transaction(conn):
         slots_touched = {p.period, *(f.to_period for f in p.files if f.to_period),

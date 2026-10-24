@@ -534,6 +534,38 @@ def open_at_filing(conn, decided: Assignment, arrival) -> bool:
     return opened
 
 
+def open_on_refile(conn, dataset_id: str, supply_id: str, period: str | None, *,
+                   how: str, effective_at: str) -> bool:
+    """Open a period a supply is RE-FILED, PLACED or SETTLED into, if nothing
+    has (REQ-PIPE-271 criterion 1: the first supply filed to a period opens
+    it, whichever filing it is) - before the decision's own transaction where
+    the caller can, so its checks read the inherited tables. Returns whether
+    this call opened it."""
+    from qa_tools.common import hierarchy, period_schema
+
+    if not period or period_schema.opened(conn, period):
+        return False
+    collection = hierarchy.dataset(dataset_id).collection_id
+    opened = period_schema.open_period(
+        conn, period, opened_by=f"the {how} of {supply_id} ({collection})",
+        effective_at=effective_at, caused_by=supply_id)
+    if opened and not _in_a_transaction(conn):
+        _settle_the_openings_knock_on(conn, period)
+    return opened
+
+
+def _in_a_transaction(conn) -> bool:
+    """Whether the caller holds an open transaction - where the knock-on,
+    which reads and writes through connections of its own, must not run:
+    it would wait on this one's uncommitted rows. Left owed, the gate's
+    follow-up runs it."""
+    import psycopg
+
+    raw = getattr(conn, "raw", None)
+    return bool(raw is not None and raw.info.transaction_status
+                != psycopg.pq.TransactionStatus.IDLE)
+
+
 def _settle_the_openings_knock_on(conn, period: str) -> None:
     """The re-evaluations the opening's inheritances owe (REQ-PIPE-121, by the
     one period-move hook), completed now rather than left for the gate's

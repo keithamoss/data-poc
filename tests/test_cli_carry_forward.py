@@ -10,7 +10,11 @@ import re
 
 from click.testing import CliRunner
 
-from carry_forward_support import CASE_WORKERS, conn, entries, world  # noqa: F401
+import carry_forward_support
+from carry_forward_support import CASE_WORKERS, entries
+
+conn = carry_forward_support.conn
+world = carry_forward_support.world
 from qa_tools.common import decision_log as dl
 from qa_tools.common import knock_on, people
 from test_carry_forward import REAL_PERSON, _stale

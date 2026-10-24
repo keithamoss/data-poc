@@ -151,6 +151,10 @@ def apply(conn, p: Plan, *, agency_id: str, collection_id: str, actor: str, reas
     the supply, which is the rule's (Keith, 2026-10-11, morning-report (o))."""
     from qa_tools.common import filing, period_tables, recheck, supersession
 
+    # THE TARGET OPENS AT ITS FIRST FILING (REQ-PIPE-271), a re-file's included,
+    # before this decision's transaction - so the re-check reads its inheritances.
+    filing.open_on_refile(conn, p.dataset_id, p.supply, p.to_period, how="re-file",
+                          effective_at=effective_at)
     with decision_log.decision_transaction(conn):
         # JUDGED AGAIN UNDER THE LOCK (REQ-GHUB-142 criterion 4; post-build-
         # review #114, D4): the plan the person confirmed was worked out

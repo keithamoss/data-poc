@@ -15,8 +15,11 @@ from types import SimpleNamespace
 import pytest
 
 import filing_support
-from carry_forward_support import (CASE_WORKERS, KEYS, conn, entries, promote,  # noqa: F401
-                                   view_reads, world)
+import carry_forward_support
+from carry_forward_support import CASE_WORKERS, KEYS, entries, promote, view_reads
+
+conn = carry_forward_support.conn
+world = carry_forward_support.world
 from qa_tools.common import assignment as assign_mod
 from qa_tools.common import carry_forward, filing, inheritance, period_schema
 from qa_tools.common import decision_log as dl
@@ -103,6 +106,36 @@ class TestOpenedAtTheFirstFiling:
             f"SELECT caused_by_supply FROM {dl.TABLE} WHERE to_slot = ? AND action = ?",
             [world.q4, dl.INHERIT_REFUSED]).fetchall()
         assert rows, "nothing earlier was promoted, so the inheritance was refused"
+
+    def test_a_re_file_into_a_period_nothing_opened_opens_it(self, conn, world):
+        """Criterion 1 whichever filing it is: a supply re-filed into a period
+        not yet opened opens it, before the re-file's own decision."""
+        import uuid
+
+        import filing_support
+        from qa_tools.common import filing_decisions as fd
+        from qa_tools.common import people, supply_db
+
+        promote(conn, world.q2, "2099-04-02T09:00:00+08:00")
+        key = "2099" + str(uuid.uuid4().int)[:16]
+        supply = f"cp-notifications@{key}"
+        conn.execute(f'CREATE TABLE "{supply_db.STAGING_SCHEMA}"."cp_notifications__{key}" '
+                     "(id integer)")
+        filing_support.filed(conn, "cp-notifications", supply, world.q3)
+        assert not period_schema.opened(conn, world.q4)
+        request = fd.Request(operation=fd.REFILE, dataset_id="cp-notifications",
+                             actor=people.person_by_email("fpycnkgvmt@privaterelay.appleid.com"),
+                             reason="it is Q4's data", period=world.q3, to_period=world.q4,
+                             supply=supply, confirmed=True)
+        import dataclasses
+        key_ = fd.consequences(conn, request).key
+        fd.apply(dataclasses.replace(request, acknowledged=key_ or None),
+                 effective_at="2099-10-03T09:00:00+08:00", conn=conn)
+        assert period_schema.opened(conn, world.q4)
+        (opened_by,) = conn.execute('SELECT opened_by FROM "qa".period WHERE name = ?',
+                                    [world.q4]).fetchone()
+        assert opened_by.startswith(f"the re-file of {supply}")
+        assert inheritance.inherited(conn, CASE_WORKERS, world.q4) is not None
 
     def test_a_held_supply_opens_no_period(self, conn, world, monkeypatch):
         """Criterion 3: no period, nothing opened."""

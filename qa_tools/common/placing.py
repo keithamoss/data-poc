@@ -226,6 +226,9 @@ def place(conn, *, agency_id: str, collection_id: str, dataset_id: str, supply: 
     either file is checked (criterion 37)."""
     from qa_tools.common import filing, recheck
 
+    # THE PERIOD OPENS AT ITS FIRST FILING (REQ-PIPE-271), a placement's included.
+    filing.open_on_refile(conn, dataset_id, supply, to_period, how="placement",
+                          effective_at=effective_at)
     with decision_log.apply_decision(conn, decision_log.Decision(
             agency_id=agency_id, collection_id=collection_id, dataset_id=dataset_id,
             action=decision_log.REFILE, supply=supply, actor=actor, actor_kind=actor_kind,
@@ -244,6 +247,11 @@ def apply(conn, p: Plan, *, agency_id: str, collection_id: str, actor: str, reas
           effective_at: str) -> tuple[int, ...]:
     """A person's placement, judged again under the slot's lock so that
     what they confirmed is what happens. Returns the owed re-checks."""
+    from qa_tools.common import filing
+
+    # Before the transaction, where the opening's knock-on can settle at once.
+    filing.open_on_refile(conn, p.dataset_id, p.supply, p.to_period, how="placement",
+                          effective_at=effective_at)
     with decision_log.decision_transaction(conn):
         decision_log.lock_slot(conn, p.dataset_id, p.to_period)
         now = plan(conn, dataset_id=p.dataset_id, supply=p.supply, to_period=p.to_period)
