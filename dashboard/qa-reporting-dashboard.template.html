@@ -2840,6 +2840,26 @@ function countedOnShow(ck, run, dateStr){
   const point = newestOnOrBefore(ck.counted[run.supply_id], dateStr);
   return point || {rank: null, reason: "not-counted"};
 }
+// A CARD'S ENTRIES AS AT THE DATE ON SHOW, in rank order: each recorded by
+// then (REQ-DASH-264 criterion 1), the dataset's own eligible runs' and those
+// recorded under another table's run (#253) - AND A SUPERSEDED RUN'S, from when
+// it was recorded until the run that replaced it was (post-build-review #266,
+// Keith 2026-10-24, answer A). A page lists a supply by its current run, so
+// without them a supply re-checked in full had no result of its own between
+// its arrival and the re-check. One the build still counts toward the supply
+// on show - the gate falling back to it - stays after its replacement too.
+function currentEntriesOn(ck, eligibleRunIds, inPlaceOnDateStr, counted){
+  const recordedBy = h => !h.recorded_at || assetDateStrOf(h.recorded_at) <= inPlaceOnDateStr;
+  const history = ck.history.filter(h => (eligibleRunIds.has(h.run_id) || h.recorded_by)
+    && recordedBy(h));
+  const superseded = (ck.superseded || []).filter(h => recordedBy(h)
+    && (h.recorded_by || eligibleRunIds.has(h.supply_run)));
+  if(!superseded.length) return history;
+  const recorded = new Set([...ck.history, ...ck.superseded].filter(recordedBy).map(h => h.run_id));
+  const still = superseded.filter(h => !recorded.has(h.replaced_by)
+    || (counted && counted.rank === h.rank));
+  return [...history, ...still].sort((a, b) => a.rank - b.rank);
+}
 function clipDatasetToInPlaceOn(d, inPlaceOnDateStr){
   // THE NEWEST SUPPLY IN PLACE OR AWAITING A DECISION (criterion 1 as
   // amended): one withdrawn by the date on show - demoted, turned down,
@@ -2931,9 +2951,6 @@ function clipDatasetToInPlaceOn(d, inPlaceOnDateStr){
         // AND NEVER BEFORE IT WAS RECORDED, the dataset's own runs included
         // (REQ-DASH-264 criterion 1): a re-check's run is dated by the supply
         // it re-checked, but its result exists only from when it ran.
-        const history = ck.history.filter(h => (eligibleRunIds.has(h.run_id) || h.recorded_by)
-          && (!h.recorded_at || assetDateStrOf(h.recorded_at) <= inPlaceOnDateStr));
-        if(!history.length){ keepAside(ck); return null; }
         // WHICH RESULT COUNTS TOWARD THE SUPPLY ON SHOW (REQ-PIPE-269;
         // post-build-review #262 R4). A cross-table card carries the build's
         // answer per supply and date - the gate's own rule, worked out in
@@ -2941,6 +2958,8 @@ function clipDatasetToInPlaceOn(d, inPlaceOnDateStr){
         // late reader of an older supply, or a verdict about a partner that is
         // not in the warehouse, is shown in the history but never the current.
         const counted = countedOnShow(ck, effectiveRun, inPlaceOnDateStr);
+        const history = currentEntriesOn(ck, eligibleRunIds, inPlaceOnDateStr, counted);
+        if(!history.length){ keepAside(ck); return null; }
         if(counted && counted.rank == null){
           const ownLast = history[history.length-1];
           const status = counted.reason === "not-counted" ? "nodata" : "red";

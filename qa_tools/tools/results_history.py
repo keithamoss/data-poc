@@ -31,7 +31,7 @@ from qa_tools import collections
 from qa_tools.common import asset_time, atomic_file
 from qa_tools.common.qa_results_reader import (
     RESULT_TOOLS, canonical_order, current_runs_only, list_run_ids, read_check_reads,
-    read_cross_table_results, read_dataset_stats, read_one, run_facts,
+    read_cross_table_results, read_dataset_stats, read_one, replaced_runs, run_facts,
 )
 
 __all__ = ["build_results_from_history", "results_path", "write_results_file"]
@@ -89,7 +89,8 @@ def build_results_from_history(collection_id: str, *, generated_at: str | None =
     alone - the dashboard build's source, no tool re-run, no supply rows."""
     coll = collections.by_id(collection_id)
     facts = run_facts(coll.agency_id, coll.id)
-    run_ids = current_runs_only(list_run_ids(coll.agency_id, coll.id))
+    every_run = list_run_ids(coll.agency_id, coll.id)
+    run_ids = current_runs_only(every_run)
     manifest, stats_by_run = [], {}
     for run_id in run_ids:
         stats = read_dataset_stats(coll.agency_id, coll.id, run_id)
@@ -108,6 +109,12 @@ def build_results_from_history(collection_id: str, *, generated_at: str | None =
     results = [r for entry in manifest for tool in RESULT_TOOLS
                for r in read_one(coll.agency_id, coll.id, entry["run_id"], tool,
                                  supply_state=None)]
+    # AND EACH REPLACED RUN'S OWN RESULTS (post-build-review #266, Keith
+    # 2026-10-24, answer A): not among the runs - a supply is listed by its
+    # current run - but its results stay on the page for the dates they were
+    # current, as its cross-table results below always reached the file.
+    results += [r for run_id in replaced_runs(every_run) for tool in RESULT_TOOLS
+                for r in read_one(coll.agency_id, coll.id, run_id, tool, supply_state=None)]
     # EACH WITH WHAT IT READ (REQ-PIPE-279 criteria 16 and 18), the build's
     # one source for where a cross-table result is placed and shared.
     reads = read_check_reads(coll.agency_id, coll.id)

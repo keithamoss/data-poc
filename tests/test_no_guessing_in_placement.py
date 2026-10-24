@@ -58,9 +58,10 @@ FORBIDDEN = (
 #: Read whole: their job is to place or order.
 WHOLE = {
     "pipeline.build_dashboard_data": ("own_runs", "share_cross_table_results", "_supply_read",
-                                      "_between"),
+                                      "_between", "superseded_runs"),
     "qa_tools.common.qa_results_reader": ("list_run_ids", "run_facts", "read_check_reads",
-                                          "current_runs_only"),
+                                          "current_runs_only", "replaced_runs",
+                                          "_replaced_and_readers"),
     "qa_tools.common.qa_store": ("runs_for",),
     # And the warehouse view's rule over them (REQ-PIPE-269 criterion 7).
     "qa_tools.common.supply_status": ("_shown", "results_about", "latest_results",
@@ -110,7 +111,7 @@ JS_FORBIDDEN = ("recorded_at", "recordedAt", "Date.parse", "assetDateStrOf", "ru
 #: their sort comparators only - which may not order by a time, a day or a run
 #: id (post-build-review #262 T6). A chain of supplies is still ordered by its
 #: PERIOD's date, which is not a run order.
-JS_SORTED = ("buildSupplyHistory",)
+JS_SORTED = ("buildSupplyHistory", "currentEntriesOn")
 JS_SORT_FORBIDDEN = ("recorded_at", "recordedAt", "Date.parse", "assetDateStrOf", "run_date",
                      "run_id", "runId", "toISOString", ".date")
 #: Read whole, beside JS_FUNCTIONS: the column drawer's run dots.

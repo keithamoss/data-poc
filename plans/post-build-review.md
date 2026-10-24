@@ -11370,7 +11370,7 @@ twice. It deliberately did not re-find the `TypeError`.
          and both the card and the red-promoted badge ask at those. Re-run
          after the fix: none left.
        - **48 dates where results_about counts a result the page has no
-         run for** - for Keith, below ("the page forgets a re-checked
+         run for** - Keith's answer A, built (below: "the page forgets a re-checked
          supply's arrival run"). The agreement test leaves exactly that case
          out, counted (2 of 336 in its sample), and fails on anything else.
      - **Q3, S5 (a supply in several periods): A.** Counted per period;
@@ -11437,19 +11437,61 @@ twice. It deliberately did not re-find the `TypeError`.
 
      **For Keith (new, not changed):**
      - **The page forgets a re-checked supply's arrival run** (found by the
-       Q2 agreement test; predates A1). A supply's page carries its CURRENT
-       run only (`qa.supply_current_run`), so once a full re-check of it is
-       recorded its arrival run's own results are on no page. On the dates
+       Q2 agreement test; predates A1). A supply's page carried its CURRENT
+       run only (`qa.supply_current_run`), so once a full re-check of it was
+       recorded its arrival run's own results were on no page. On the dates
        between the arrival and the re-check, `results_about` as at that date
-       counts the arrival's result (and the gate used it), while the card
-       has no result at all. Example: Clients received 12 Oct 2023, re-checked
-       in full 21 Oct; Investigations' Client reference counts the arrival's
-       pass toward it on 12-20 October, and the Clients page shows nothing
-       for that check until the 21st. 48 of 7,983 comparisons on ed_probe,
-       all on supplies with a full re-check. Criterion 9 says the page and
-       the terminal agree as at T; whether the page should keep the arrival
-       run's results until the re-check is recorded is a change to what a
-       page lists, and his.
+       counted the arrival's result (and the gate used it), while the card
+       had no result about the supply on show. Example: Clients received 12
+       Oct 2023, re-checked in full 21 Oct; as at 15 Oct the Client reference
+       rows read No data, and - found while writing the test - the Client
+       Register's own column checks showed the PREVIOUS supply's results as
+       the newest. 48 of 7,983 comparisons on ed_probe.
+       **Keith's answer (2026-10-24): A - keep a superseded run's results for
+       the dates they were current, as the as-of view does everywhere else.
+       BUILT:** the results file now also carries each replaced run's own
+       results (`qa_results_reader.replaced_runs`; its cross-table results
+       always reached the file and were dropped by the build); each card
+       carries those runs' entries APART from its history, as `superseded`,
+       each naming the supply's next run (`replaced_by`) and the run the
+       page lists it by (`supply_run`) - found by qa.run's recorded supply
+       and rank alone (`build_dashboard_data.superseded_runs`, added to
+       REQ-PIPE-279 criterion 20's guard), never run-id text or a day. The
+       counted points are worked out from history and superseded together,
+       as `results_about` reads every run about a supply. The page
+       (`currentEntriesOn`) shows a superseded entry from when it was
+       recorded until the run that replaced it was - the existing
+       recorded-by clip - and past that only while the build still counts
+       it. Kept apart from `history` so nothing that reads a card's history
+       whole (supply history, run statuses, the chart on today's date)
+       counts a supply twice. Test first: `tests-js/superseded-run.test.js`
+       (4 of 6 failed: no result between arrival and re-check, no count),
+       `tests/test_build_from_the_record.py::TestASupersededRunIsKeptForTheDatesItWasCurrent`
+       (KeyError 'superseded'), and on the deployment
+       `tests/test_dashboard_e2e.py::TestASupersededRunOnTheDatesItWasCurrent`
+       (both failed: the previous supply shown on 15 Oct, the arrival never
+       shown) and the agreement test with its exclusion removed (failed on
+       the arrival's relationships_datacontract result toward the 12 Oct
+       supply on 20 Oct). `TestStatusMatchesEachToolsOwnVerdict::test_on_every_past_date_too`'s
+       independent oracle encoded the old rule - it went red on the change
+       (cp-clients postcode checks on 12 Oct 2023: the page now shows the
+       arrival's green, the oracle wanted the previous supply's amber) - and
+       now reads superseded entries by the same rule, written apart from the
+       page's function. Recorded on REQ-PIPE-269 and REQ-PIPE-140's
+       decisions.
+       **Verified on a fresh bootstrap** (ed_probe reset and bootstrapped on
+       this tree, 1610s wall: Birth Registrations 574s, Child Protection and
+       Emergency Department 1449s - the first since the A2 fixes K6 and S5):
+       REQ-PIPE-262 criterion 12's pins hold (cp-case-workers 2021-Q4 ->
+       @202108010104000000, cp-carers 2022-Q1 and 2022-Q2 ->
+       @202201051000000800, ed-presentations 2015-Q4 -> @201507221000000800,
+       all rule-made); every owed run cleared, the longest wait from its
+       decision to its clearing run 5s (14 re-checks, 419 re-evaluations);
+       `mothman dashboard rebuild` passed its gates in 108s;
+       `-m needs_deployment` outside the e2e module 114 passed, 1 xfailed;
+       eleven e2e classes 38 passed, 1 failed (the oracle above), and that
+       class re-run after its fix 3 passed. #267's two flaky tests did not
+       recur (their modules beside the build modules, three runs).
      - The functional critic's T2 and T5 were not in the brief this session
        worked from, so they are not placed here.
 

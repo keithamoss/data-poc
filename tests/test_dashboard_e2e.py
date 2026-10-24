@@ -1283,11 +1283,20 @@ class TestStatusMatchesEachToolsOwnVerdict:
                   }
                   return;
                 }
-                h = rawCk.history.find(x => x.rank === point.rank) || null;
+                h = [...rawCk.history, ...(rawCk.superseded || [])]
+                  .find(x => x.rank === point.rank) || null;
               } else {
-                for (const x of rawCk.history) {
-                  if (!(own.has(x.run_id) || x.recorded_by)) continue;
-                  if (x.recorded_at && assetDateStrOf(x.recorded_at) > date) continue;
+                // AND A SUPERSEDED RUN'S, while the run that replaced it is not
+                // yet recorded (post-build-review #266, Keith answer A).
+                const by = x => !x.recorded_at || assetDateStrOf(x.recorded_at) <= date;
+                const all = [...rawCk.history, ...(rawCk.superseded || [])];
+                for (const x of all) {
+                  const replacedBy = x.replaced_by;
+                  if (replacedBy) {
+                    if (!(own.has(x.supply_run) || x.recorded_by)) continue;
+                    if (all.some(y => y.run_id === replacedBy && by(y))) continue;
+                  } else if (!(own.has(x.run_id) || x.recorded_by)) continue;
+                  if (!by(x)) continue;
                   if (!h || x.rank >= h.rank) h = x;
                 }
               }
@@ -1313,7 +1322,9 @@ class TestStatusMatchesEachToolsOwnVerdict:
         REQ-DASH-264 the expected verdict is the newest one RECORDED by the
         date, whichever table's run recorded it - and since REQ-PIPE-269, for
         a cross-table check, the newest one COUNTED toward the supply on
-        show (REQ-DASH-264 criterion 1 as amended)."""
+        show (REQ-DASH-264 criterion 1 as amended). And since Keith's answer A
+        to post-build-review #266, a superseded run's result until the run
+        that replaced it was recorded."""
         _goto(clean_page, built_dashboard_html)
         result = clean_page.evaluate(self._IN_PLACE_ON_JS)
         assert result["compared"] > 100, result
@@ -5821,3 +5832,56 @@ class TestACrossTableCheckOnTS80:
         assert any("when the Notifications supply arrived: two Client Register files "
                    "(cp_clients.csv, cp_clients_TEST.csv) are waiting to be settled." in r
                    for r in rows), rows
+
+
+class TestASupersededRunOnTheDatesItWasCurrent:
+    """post-build-review #266, Keith 2026-10-24 (answer A), on the bootstrapped
+    history. Child Protection's 12 October 2023 delivery was re-checked in full
+    on 21 October. A page listed each supply by its current run only, so as at
+    15 October the Client Register had no result at all - its own checks and
+    its cross-table rows alike - while the gate counted the arrival's. The page
+    now keeps a superseded run's results for the dates they were current."""
+
+    AG, COL = "child-protection-family-support", "child-protection"
+    WHERE = {"tier": "dataset", "agencyId": AG, "collectionId": COL, "datasetId": "cp-clients"}
+    #: The Client Register received 10:00am 12 October 2023, re-checked in full
+    #: on 21 October with the rest of its delivery (the seeded history).
+    SUPPLY = "cp-clients@202310121000000800"
+
+    def _shown(self, page, html, on):
+        _goto(page, html, state=self.WHERE, in_place_on=on)
+        return page.evaluate("""() => {
+            const ds = DATA.agencies.flatMap(a => a.collections).flatMap(c => c.datasets)
+                           .find(d => d.id === "cp-clients");
+            // A section with no rule has a synthesized card, dated by nothing.
+            const of = c => c.checks.filter(ck => ck.key !== "no_rule_defined").map(ck => {
+              const last = (ck.history || []).at(-1) || {};
+              return {name: ck.name, status: checkStatus(ck),
+                      runs: (ck.history || []).map(h => h.run_id),
+                      supply: last.supply_id || null, recorded: last.recorded_at || null};
+            });
+            return {own: ds.columns.filter(c => c.scope !== "cross-table").flatMap(of),
+                    cross: ds.columns.filter(c => c.scope === "cross-table").flatMap(of)};
+        }""")
+
+    def test_between_the_arrival_and_the_recheck_the_arrivals_results_are_shown(
+            self, clean_page, built_dashboard_html):
+        """Before the fix the own checks showed the PREVIOUS supply's results
+        as the newest, and every Client reference row read No data."""
+        shown = self._shown(clean_page, built_dashboard_html, "2023-10-15")
+        assert shown["own"], shown
+        assert {c["supply"] for c in shown["own"]} == {self.SUPPLY}, shown["own"][:3]
+        refs = [c for c in shown["cross"] if c["name"] == "Client reference"]
+        assert refs, shown["cross"]
+        assert {c["supply"] for c in refs} == {self.SUPPLY}, refs
+        assert all(c["recorded"][:10] <= "2023-10-15" for c in refs), refs
+        assert "nodata" not in {c["status"] for c in refs}, refs
+
+    def test_after_the_recheck_only_its_results_are_shown(self, clean_page, built_dashboard_html):
+        before = self._shown(clean_page, built_dashboard_html, "2023-10-15")
+        after = self._shown(clean_page, built_dashboard_html, "2023-10-22")
+        assert {c["supply"] for c in after["own"]} == {self.SUPPLY}, after["own"][:3]
+        earlier = {r for c in before["own"] for r in c["runs"]}
+        later = {r for c in after["own"] for r in c["runs"]}
+        # The arrival is shown only before its re-check, the re-check only after.
+        assert earlier - later and later - earlier, (earlier ^ later)

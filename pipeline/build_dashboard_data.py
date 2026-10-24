@@ -284,6 +284,32 @@ def own_runs(manifest: list[dict], dataset_id: str, facts: dict[str, dict]) -> l
             if facts[m["run_id"]]["dataset_id"] in (None, dataset_id)]
 
 
+def superseded_runs(facts: dict[str, dict], manifest: list[dict]) -> dict[str, dict]:
+    """{run id: {replaced_by, supply_run}} for every run a newer run of the
+    same supply replaced (post-build-review #266, Keith 2026-10-24, answer
+    A): `replaced_by` the supply's next run, `supply_run` its current one -
+    the run the page lists it by. By the recorded supply (qa.run's dataset
+    and supply) and the opening order (rank) alone, never a run id's text or
+    a day (REQ-PIPE-279 criterion 19). A readers-only run is about other
+    supplies, so it replaces nothing and is replaced by nothing."""
+    listed = {m["run_id"] for m in manifest}
+    runs_of: dict[tuple[str, str], list[str]] = {}
+    for run_id, fact in sorted(facts.items(), key=lambda item: item[1]["rank"]):
+        if fact["supply_id"] is None or fact["scope"] == "readers":
+            continue
+        runs_of.setdefault((fact["dataset_id"], fact["supply_id"]), []).append(run_id)
+    out: dict[str, dict] = {}
+    for runs in runs_of.values():
+        current = [r for r in runs if r in listed]
+        if not current:
+            continue
+        for older, newer in zip(runs, runs[1:]):
+            if older in listed:
+                break
+            out[older] = {"replaced_by": newer, "supply_run": current[-1]}
+    return out
+
+
 def _schedule_not_agreed(dataset_id: str) -> str | None:
     """Whether this dataset has declared it has no delivery calendar, and
     which kind (REQ-PIPE-106 criteria 3, 8 and 9) - configuration, so safe
@@ -338,7 +364,8 @@ def share_cross_table_results(results: list[dict], by_table: dict[str, list[dict
 def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], dataset_stats: dict,
                     lifecycle_by_id: dict, *, facts: dict[str, dict],
                     all_runs: list[dict] | None = None,
-                    warehouse_cache: dict | None = None) -> dict:
+                    warehouse_cache: dict | None = None,
+                    superseded: dict[str, dict] | None = None) -> dict:
     """One dataset's page. `manifest` is its own runs; `all_runs` is every
     run in the collection, so a result recorded under another table's run -
     a re-check re-running this table's cross-table checks - is placed and
@@ -349,7 +376,9 @@ def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], da
     `warehouse_cache` is shared across the collection's pages: every
     dataset's slot timeline and the owed re-evaluations, read once, the first
     time a cross-table card needs its counted points (REQ-PIPE-269,
-    pipeline.warehouse_counts).
+    pipeline.warehouse_counts). `superseded` is superseded_runs(): each
+    card carries those runs' entries apart from its history, for the page to
+    show while they were current and for its counted points to count from.
     """
 
     table, dataset_id = dataset.table, dataset.dataset_id
@@ -434,6 +463,12 @@ def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], da
     all_runs = manifest if all_runs is None else all_runs
     run_date_by_id = {m["run_id"]: _run_date(m) for m in all_runs}
     other_run_ids = [m["run_id"] for m in all_runs if m["run_id"] not in own_ids]
+    # THE RUNS A NEWER RUN OF THE SAME SUPPLY REPLACED (post-build-review
+    # #266), in rank order, each dated as the run its supply is listed by.
+    superseded = superseded or {}
+    replaced_ids = sorted(superseded, key=rank)
+    for run_id in replaced_ids:
+        run_date_by_id.setdefault(run_id, run_date_by_id.get(superseded[run_id]["supply_run"]))
     # THE NEWEST RUNS THAT MEASURED THIS TABLE, not simply the newest runs
     # (REQ-PIPE-105): a run whose table was contested or held has nothing of
     # its own to show. None for a dataset never supplied (criterion 6).
@@ -463,11 +498,17 @@ def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], da
         for slot in checks_for_col.values():
             engine, check_name = slot["engine"], slot["check_name"]
             attach_aggregate = agg_spec is not None and check_name in agg_spec["check_names"]
-            history, elsewhere, contested_reads = [], [], []
-            for run_id in run_ids_in_order + other_run_ids:
+            history, elsewhere, contested_reads, replaced = [], [], [], []
+            for run_id in run_ids_in_order + other_run_ids + replaced_ids:
                 if run_id not in slot["by_run"]:
                     continue
-                own = run_id in own_ids
+                was = superseded.get(run_id)
+                own = (run_id in own_ids if was is None
+                       else facts[run_id]["dataset_id"] == dataset_id)
+                if was is not None and not own and (
+                        _contested_read((slot["reads"].get(run_id) or {}).get(table))
+                        or run_date_by_id.get(run_id) is None):
+                    continue
                 aggregate_values = None
                 if attach_aggregate:
                     aggregate_values = (dataset_stats.get(run_id) or {}).get(
@@ -482,9 +523,13 @@ def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], da
                 # _contested_read): never in the history or a count, which
                 # criterion 14 keeps for what read a supply of this table -
                 # only for the page to show while that pair blocks it.
-                into = (history if own else contested_reads if not own and
-                        _contested_read(this_read) else elsewhere)
+                into = (replaced if was is not None else history if own
+                        else contested_reads if _contested_read(this_read) else elsewhere)
                 into.append({
+                    # A REPLACED RUN'S ENTRY names what replaced it and the run
+                    # its supply is listed by (post-build-review #266).
+                    **({"replaced_by": was["replaced_by"], "supply_run": was["supply_run"]}
+                       if was is not None else {}),
                     "run_id": run_id, "run_date": run_date_by_id[run_id],
                     # ITS PLACE, ITS SUPPLY, ITS CAUSE AND WHAT IT READ, from the
                     # record (REQ-PIPE-279 criterion 16): the rank orders, the
@@ -521,7 +566,7 @@ def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], da
                        if into is contested_reads else {}),
                 })
             history = sorted(history + elsewhere, key=lambda h: h["rank"])
-            if not history and not contested_reads:
+            if not history and not contested_reads and not replaced:
                 continue
             # THE NEWEST RESULT IS CURRENT, whichever run recorded it (#253):
             # the dataset's newest measured run unless a result recorded
@@ -535,7 +580,7 @@ def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], da
                 current_value, current_status = newest["value"], newest["status"]
             engine_short = ENGINE_SHORT.get(engine, engine)
             lifecycle = lifecycle_by_id.get(slot["check_id"])
-            (checks_out if history else contested_only).append({
+            (checks_out if history or replaced else contested_only).append({
                 "check_id": slot["check_id"],
                 # A hand-authored `name` in the check's own metadata wins
                 # over the derived label (REQ-DASH-026).
@@ -562,10 +607,17 @@ def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], da
                             if col == CROSS_TABLE_PSEUDO_COLUMN else None),
                 "previous": slot["by_run"].get(prev_run, 0),
                 "history": history,
+                # THE REPLACED RUNS' ENTRIES, apart from the history so nothing
+                # that reads it whole counts a supply twice: the page shows one
+                # from when it was recorded until the run that replaced it was
+                # (post-build-review #266, Keith 2026-10-24, answer A).
+                **({"superseded": replaced} if replaced else {}),
                 # WHICH OF THEM COUNTS TOWARD THE SUPPLY ON SHOW, ON EACH DATE
                 # (REQ-PIPE-269; post-build-review #262 R4) - worked out here
-                # by the gate's own function, looked up by the page.
-                **({"counted": counted_points(slot["check_id"], history)}
+                # by the gate's own function, looked up by the page - from
+                # every run about it, as results_about reads them.
+                **({"counted": counted_points(
+                    slot["check_id"], sorted(history + replaced, key=lambda h: h["rank"]))}
                    if col == CROSS_TABLE_PSEUDO_COLUMN else {}),
                 "contested_reads": sorted(contested_reads, key=lambda h: h["rank"]),
                 "note": f"Computed by {engine} against this run's real data — not a fabricated figure.",
@@ -828,9 +880,10 @@ def build_datasets(collection_id: str) -> list[dict]:
             readers_runs[run_id] = {"run_id": run_id, "received_at": r["run_timestamp"]}
     all_runs = sorted([*manifest, *readers_runs.values()],
                       key=lambda m: facts[m["run_id"]]["rank"])
+    superseded = superseded_runs(facts, manifest)
     return [build_one_table(coll, d, by_table[d.table], own_runs(manifest, d.dataset_id, facts),
                             dataset_stats, lifecycle_by_id, facts=facts, all_runs=all_runs,
-                            warehouse_cache=cache)
+                            warehouse_cache=cache, superseded=superseded)
             for d in coll.datasets]
 
 

@@ -50,7 +50,7 @@ def _record(check_id: str, dataset_id: str, status: str = "pass", **extra) -> di
 
 def _run(run_id: str, *, dataset_id, supply, scope="arrival", decision=None, results=(),
          reads=None, absent=(), held=None, contested=None,
-         received_at="2099-01-01T01:00:00+00:00", collection=CP, agency=AGENCY):
+         received_at="2099-01-01T01:00:00+00:00", collection=CP, agency=AGENCY, when=WHEN):
     """One run opened, recorded and finished through the writer - a resolution
     first where it records a cross-table result, as the overlay does: `reads`
     the tables it read, `absent` those it had none of, `held` {table: supply}."""
@@ -67,13 +67,13 @@ def _run(run_id: str, *, dataset_id, supply, scope="arrival", decision=None, res
                 held_supply=dict(held or {})))
     purpose = {"dataset_id": dataset_id, "supply_id": supply, "scope": scope,
                **({"caused_by_decision": decision} if decision else {})}
-    qa_results_writer.open_run(agency, collection, run_id, WHEN, BY, purpose=purpose)
+    qa_results_writer.open_run(agency, collection, run_id, when, BY, purpose=purpose)
     qa_results_writer.write_qa_result(
-        agency, collection, run_id, WHEN, "dataset_stats",
+        agency, collection, run_id, when, "dataset_stats",
         {"arrival_record": {"run_id": run_id, "received_at": received_at, "delivery": "d"},
          "row_counts": {}, "value_counts": {}, "check_aggregates": {}}, run_by=BY)
     if results:
-        qa_results_writer.write_qa_result(agency, collection, run_id, WHEN, "dbt", {},
+        qa_results_writer.write_qa_result(agency, collection, run_id, when, "dbt", {},
                                           verified=[dict(r, run_id=run_id) for r in results])
     qa_results_writer.finish_run(run_id)
     return run_id
@@ -353,6 +353,55 @@ class TestAHeldReadNamesTheHeldSupply:
         (entry,) = [h for h in _history_of(history.datasets()["cp-clients"], CLIENT_REF)
                     if h["run_id"] == run_id]
         assert (entry["supply_id"], entry["read_state"]) == (held, qa_store.HELD)
+
+
+class TestASupersededRunIsKeptForTheDatesItWasCurrent:
+    """post-build-review #266, Keith 2026-10-24 (answer A): a page listed each
+    supply by its current run only, so once a full re-check was recorded the
+    arrival run's results were on no page - and between the two the card had
+    nothing while results_about counted the arrival's. Each card now carries
+    its superseded runs' entries apart from its history, each naming the run
+    that replaced it and its supply's current run, and counts from them."""
+
+    OWN = f"{CHECK}.cp-clients.cp_client_id.not_null_dbt"
+
+    def _arrival_and_recheck(self):
+        clients, notifications = f"cp-clients@{_key()}", f"cp-notifications@{_key()}"
+        reads = {"cp_clients": clients, "cp_notifications": notifications}
+        results = [_record(self.OWN, "cp-clients", "fail", column_name="cp_client_id"),
+                   _record(CLIENT_REF, "cp-notifications", "fail")]
+        arrival = _run(f"pytest_arrival_{uuid.uuid4().hex[:8]}", dataset_id="cp-clients",
+                       supply=clients, results=results, reads=reads,
+                       when="2099-10-12T10:00:00+08:00")
+        recheck = _run(f"pytest_recheck_{uuid.uuid4().hex[:8]}", dataset_id="cp-clients",
+                       supply=clients, scope="full", decision=7, reads=reads,
+                       results=[{**r, "status": "pass", "metric_value": 0.0} for r in results],
+                       when="2099-10-21T10:00:00+08:00")
+        return clients, arrival, recheck
+
+    def _card(self, page, check_id):
+        (card,) = [c for col in page["columns"] for c in col["checks"]
+                   if c.get("check_id") == check_id]
+        return card
+
+    def test_the_card_carries_the_superseded_entry_naming_what_replaced_it(self, history):
+        clients, arrival, recheck = self._arrival_and_recheck()
+        page = history.datasets()["cp-clients"]
+        assert [r["run_id"] for r in page["runs"]] == [recheck]
+        for check_id in (self.OWN, CLIENT_REF):
+            card = self._card(page, check_id)
+            assert [h["run_id"] for h in card["history"]] == [recheck]
+            (old,) = card["superseded"]
+            assert (old["run_id"], old["replaced_by"], old["supply_run"], old["supply_id"],
+                    old["status"]) == (arrival, recheck, recheck, clients, "red")
+            assert old["rank"] < card["history"][0]["rank"]
+
+    def test_the_counted_points_begin_at_the_arrival(self, history):
+        clients, arrival, recheck = self._arrival_and_recheck()
+        card = self._card(history.datasets()["cp-clients"], CLIENT_REF)
+        by_rank = {h["rank"]: h["run_id"] for h in [*card["history"], *card["superseded"]]}
+        assert [(p["on"], by_rank.get(p["rank"])) for p in card["counted"][clients]] == [
+            ("2099-10-12", arrival), ("2099-10-21", recheck)]
 
 
 class TestTheSameHistoryBuildsTheSameBytes:

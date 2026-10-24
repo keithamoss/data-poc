@@ -410,12 +410,9 @@ def read_check_reads(agency: str, collection: str, conn=None) -> dict[tuple[str,
     return out
 
 
-def current_runs_only(run_ids: list[str], conn=None) -> list[str]:
-    """These run ids less any a newer run of the same supply has replaced
-    (REQ-PIPE-140 criterion 5): the dashboard shows a supply by its
-    current run - on every date it is in place (Keith, 2026-10-05) - and
-    the earlier runs stay recorded, readable from the terminal. A run that
-    belongs to no supply (a trial's, a fixture's) is kept as it is."""
+def _replaced_and_readers(conn=None) -> tuple[set[str], set[str]]:
+    """The runs a newer run of the same supply has replaced, and the
+    readers-only runs - qa.supply_current_run's rule, read once."""
     conn, mine = _conn(conn)
     try:
         rows = conn.execute(
@@ -431,7 +428,26 @@ def current_runs_only(run_ids: list[str], conn=None) -> list[str]:
     finally:
         if mine:
             conn.close()
+    return replaced, readers
+
+
+def current_runs_only(run_ids: list[str], conn=None) -> list[str]:
+    """These run ids less any a newer run of the same supply has replaced
+    (REQ-PIPE-140 criterion 5): the dashboard lists a supply by its
+    current run - on every date it is in place (Keith, 2026-10-05) - and
+    the earlier runs stay recorded (replaced_runs). A run that belongs to
+    no supply (a trial's, a fixture's) is kept as it is."""
+    replaced, readers = _replaced_and_readers(conn)
     return [r for r in run_ids if r not in replaced and r not in readers]
+
+
+def replaced_runs(run_ids: list[str], conn=None) -> list[str]:
+    """These run ids that a newer run of the same supply has replaced - the
+    other half of current_runs_only. The page keeps their results for the
+    dates they were current, until the run that replaced each was recorded
+    (post-build-review #266, Keith 2026-10-24, answer A)."""
+    replaced, _readers = _replaced_and_readers(conn)
+    return [r for r in run_ids if r in replaced]
 
 
 def read_dataset_stats(agency: str, collection: str, run_id: str,

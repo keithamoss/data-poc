@@ -141,6 +141,12 @@ releases:
               A check between two tables now shows on the delivery it actually
               read, ordered by when it ran rather than guessed from dates and
               times, so the page and the promotion decision always agree.
+          - headline: Results before a re-check
+            components: ["Dashboard UI", "Pipeline & publishing"]
+            description: >
+              Looking back at a date before a delivery was re-checked now shows
+              what it was first checked as. It used to show the delivery before
+              it, or nothing at all.
           - headline: A re-check is its own point
             components: ["Dashboard UI"]
             description: >

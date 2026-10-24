@@ -369,13 +369,12 @@ class TestTheBuildAgreesWithResultsAboutOnTheDeployment:
     sample of Child Protection's cross-table cards and supplies, at each
     date the build says the answer changed and the day before the first.
 
-    ONE KNOWN GAP IS LEFT OUT, NAMED AND COUNTED, and is Keith's
-    (post-build-review #266, "the page forgets a re-checked supply's arrival
-    run"): a supply's page carries its CURRENT run only, so once a full
-    re-check of it is recorded, its arrival run's results are on no page -
-    and on the dates between the two, results_about counts the arrival's
-    result while the card has nothing. Only a result whose run the card's
-    history does not hold is left out; every other disagreement fails."""
+    WITH NO EXCEPTIONS. It left one case out until Keith's answer A
+    (post-build-review #266, 2026-10-24): a page carried each supply's
+    CURRENT run only, so between an arrival and its full re-check
+    results_about counted the arrival's result while the card had nothing.
+    The card now carries its superseded runs' entries (`superseded`), which
+    the build counts from and the page shows while they are current."""
 
     def test_a_sample_of_supplies_and_dates(self, deployment_history, tmp_path, monkeypatch):
         import random
@@ -393,11 +392,11 @@ class TestTheBuildAgreesWithResultsAboutOnTheDeployment:
                  for supply in sorted(card.get("counted") or {})]
         assert len(pairs) > 100, "precondition: the deployment has counted cross-table cards"
         sample = random.Random(266).sample(pairs, 120)
-        compared, not_on_the_page = 0, 0
+        compared = 0
         with supply_db.connect(read_only=True, label="test-warehouse-counts") as conn:
             for dataset_id, card, supply in sample:
                 points = card["counted"][supply]
-                by_rank = {h["rank"]: h for h in card["history"]}
+                by_rank = {h["rank"]: h for h in [*card["history"], *card.get("superseded", [])]}
                 days = [p["on"] for p in points]
                 days = sorted({(date.fromisoformat(days[0]) - timedelta(days=1)).isoformat(),
                                *random.Random(supply).sample(days, min(4, len(days)))})
@@ -409,10 +408,6 @@ class TestTheBuildAgreesWithResultsAboutOnTheDeployment:
                         conn, dataset_id, supply, view=view).counted
                         if r["check_id"] == card["check_id"]]
                     where = f"{card['check_id']} toward {supply} on {day}"
-                    if (mine and not mine[-1].get("warehouse_reason") and not built
-                            and mine[-1]["run_id"] not in {h["run_id"] for h in card["history"]}):
-                        not_on_the_page += 1
-                        continue
                     if not built or built[-1]["reason"] == warehouse_counts.NOT_COUNTED:
                         assert not mine, where
                     elif built[-1]["rank"] is None:
@@ -423,7 +418,7 @@ class TestTheBuildAgreesWithResultsAboutOnTheDeployment:
                         assert mine and not mine[-1].get("warehouse_reason"), where
                         assert mine[-1]["run_id"] == by_rank[built[-1]["rank"]]["run_id"], where
                     compared += 1
-        assert compared >= 250 and not_on_the_page < compared / 10, (compared, not_on_the_page)
+        assert compared >= 250, compared
 
 
 class TestOwedEndsAtTheClearingRun:
