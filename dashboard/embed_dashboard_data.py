@@ -165,6 +165,13 @@ collection: every registered collection's
 dashboard file, keyed by collection id, and `const AGENCY_BLURB` from
 contract/presentation.yaml. A collection with no file refuses the build.
 
+SINCE REQ-DASH-291 three of these are not inline any more. COLLECTION_DATA's
+entries, one per collection, and REQUIREMENTS with PLANS, together, are written
+as data files under data/ beside the page (dashboard/data_files.py), held to
+REQ-DASH-293's 10 MiB budget by parts; the page lists them in DATA_FILES and
+loads them by classic <script src>, REQUIREMENTS and PLANS only on demand.
+Everything else above stays inline, and every build prints each file's size.
+
 This only replaces those consts - the rest of the dashboard (its
 CSS, the rendering code, the other 14 illustrative datasets, and the
 separate SNAPSHOT_MANIFEST const dashboard/snapshot_dashboard.py owns)

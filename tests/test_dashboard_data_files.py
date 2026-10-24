@@ -226,3 +226,18 @@ def test_the_split_of_an_inlined_page_writes_every_file_back_byte_for_byte(tmp_p
     for name, content in written.items():
         (site / "snap.data" / name).write_bytes(content)
     assert data_files.read_page(split_html, site).problems == []
+
+
+def test_a_block_that_quotes_the_list_line_does_not_stand_in_for_it(tmp_path):
+    """Found 2026-10-24 by the real snapshot: the register quotes
+    `const DATA_FILES = null;`, the inlined Requirements and Plans block sits
+    before the main script, and the reader took the quote for the page's own
+    list."""
+    files = _files(_payload())
+    page = _built_page(tmp_path, files, requirements_plans={
+        "requirements": [{"id": "R", "text": "the template gains `const DATA_FILES = null;\n` here"}],
+        "plans": {}})
+    inlined = data_files.inline(page.read_text(), page.parent)
+    assert data_files.page_manifest(inlined) == data_files.page_manifest(page.read_text())
+    split_html, written = data_files.split(inlined, "snap.data")
+    assert len(written) == 2

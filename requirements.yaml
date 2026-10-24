@@ -38429,6 +38429,7 @@ requirements:
       this project's terms.
     - "THE 25 MIB CEILING IS OWNED BY REQ-DASH-291 TO 293 (Keith, 2026-10-24, option A). The warning fired at 20.62 MiB with three collections, as the 2026-10-18 open question anticipated; Keith chose one data file per collection plus one for Requirements and Plans, loaded by plain script src, rather than serving the page from somewhere without the limit."
     - "AMENDED 2026-10-24 (Keith, approving delivery-scoper's wording at the sign-off of REQ-DASH-291 to 293, dash-split amendments A1 to A7): criteria 1, 22, 24 and 26 and the scale NFR now speak of the split site - data files and parts, split snapshots, a per-file size print - the ceiling open question became the decision above, and REQ-DASH-291, 292 and 293 became dependencies. WAS criterion 1: THE SYSTEM SHALL deliver the published dashboard by uploading the whole tree prepare_deploy_site() builds - index.html, fonts/, vendor/, snapshots/ with every decompressed snapshot, and snapshots/manifest.json - to a Cloudflare Pages project by direct upload. WAS criterion 22: THE SYSTEM SHALL compute a content fingerprint for each build - a SHA-256 over the built index.html with its build-provenance stamp and every embedded generated_at value replaced by fixed placeholders, together with every file under fonts/ and vendor/ - and SHALL exclude snapshots/ from it, because the archive only changes as a result of publishing. WAS criterion 24: WHEN the fingerprint of a gated build equals the fingerprint of the newest archived snapshot in dashboard/snapshots/, computed the same way from that snapshot's decompressed page, THE SYSTEM SHALL archive no snapshot, upload nothing, print one line saying the dashboard is unchanged since that snapshot's publish and when it happened, and exit zero. WAS criterion 26: WHEN every dashboard build finishes (`mothman dashboard embed`, `mothman dashboard rebuild`, `mothman pipeline run` and the publish itself), THE SYSTEM SHALL print the built page's size, and WHEN it is 20 MiB or more THE SYSTEM SHALL warn, naming the size and the 25 MiB limit, so that the ceiling is watched during development and not first met at a publish (Keith, 2026-10-18). WAS NFR 14: SCALE - THE 25 MIB CEILING IS CLOSER THAN IT LOOKS. index.html is at 59% of Cloudflare Pages' 25 MiB per-file limit with two collections; at roughly thirty collections on the quarterly asset it will not fit. This requirement only refuses loudly and warns early; solving it is a separate piece of work (see open questions). WAS open question 1: THE 25 MIB CEILING, WATCHED RATHER THAN SOLVED (Keith, 2026-10-18): index.html is 14.7 MB with two collections and grows with the data embedded, so it will not fit at roughly thirty. Every build now prints the size and warns from 20 MiB; when the warning fires, Keith and the session talk about splitting the embedded data into sibling files or serving the page from somewhere without the limit. Not owned by any requirement yet, on purpose."
+    - "BUILT AHEAD IN SPRINT E, 2026-10-24, with REQ-DASH-291 to 293 (this requirement stays not_started): criterion 26's per-file size print and both warnings (dashboard/data_files.py::size_report, printed by every embed), and criterion 22's fingerprint as functions nothing calls yet (dashboard/data_files.py::fingerprint, dashboard/snapshot_dashboard.py::page_fingerprint and ::snapshot_fingerprint), proven equal between a build and the snapshot that archived it (tests/test_snapshot_dashboard.py::test_a_snapshot_fingerprints_the_same_as_the_page_it_archived). VOLATILE_CONSTS blanks BUILT_AT, BUILD_PROVENANCE and SNAPSHOT_MANIFEST - the last added because a snapshot carries the manifest as it stood before it. publish() still pushes to gh-pages. A FIELD THE FINGERPRINT CANNOT YET IGNORE: an open arrival's waitedSeconds changes on every build, so criterion 23 cannot hold until Keith decides where an open wait is measured (REQ-DASH-291's unmet criterion)."
     open_questions:
     - WHETHER DIRECT-UPLOAD DEPLOYMENTS COUNT AGAINST THE FREE PLAN'S 500 A MONTH. Not verifiable from this
       sandbox. Check in the Cloudflare dashboard after the first week of publishing.
@@ -43543,7 +43544,7 @@ requirements:
     date_written: "2026-10-24"
     story: "As Keith, publishing the dashboard to Cloudflare Pages, I want each collection's data and the project's Requirements and Plans data built as separate files that the page loads with a plain script tag, so that no single published file grows with the number of collections, while the page still opens straight from disk and never shows a quietly empty page when a file is missing."
     moscow: must
-    status: not_started
+    status: built
     signed_off:
       by: Keith
       date: "2026-10-24"
@@ -43596,13 +43597,56 @@ requirements:
       - "THE RAW TEMPLATE CARRIES NO DATA SCRIPT TAGS. The build adds them, so the jsdom loader and every test that loads the raw template are unaffected."
       - "THE OTHER CONSTS STAY INLINE. Everything except COLLECTION_DATA, REQUIREMENTS and PLANS is about 1 MiB in total, and moving it would add files without solving anything."
       - "THE CROSS-SITE INCLUSION RISK IS CLOSED BY THE ACCESS COOKIE, NOT BY THE FILES (Keith, 2026-10-24, Q5 option A). SameSite=Lax withholds CF_Authorization from a cross-site <script src> subresource request - the case that matters here - and sends it only on top-level navigations, so a hostile page gets the sign-in redirect rather than the data. The setting and its check belong to REQ-PIPE-257 (amended). REJECTED accepting the risk for synthetic data."
+      - "THE BUILD ID IS THE PAYLOAD'S (PROVISIONAL, not put to Keith). Each file registers the id of the payload it carries - the first 12 hex digits of the SHA-256 of that payload's whole JSON text, shared by its parts - and the page's list names the id it expects for each file; the list's own build id is derived from every file it lists. REJECTED one id for the whole build: any change to one collection would change every file's bytes and name, so a publish would re-send every collection, against the caching NFR. REJECTED a random or time-based id: two builds of the same content would write different bytes, against criterion 16. 'Registered under a build id other than the page's own' (criteria 5 and 8) is therefore read as 'other than the id the page's list gives that file'."
+      - "A FILE REGISTERS A SINGLE-QUOTED STRING WITH EVERY < ESCAPED, AS \\x3c. So a data file holds no < at all, and a snapshot inlines it inside a <script> element byte for byte - REQ-DASH-292's exact split back is then true by construction. The payload is ASCII JSON (ensure_ascii), so one byte is one character and the budget is a character count; escaping costs about 0.1% on today's collections."
+      - "THE PAGE ASSEMBLES IN THE TEMPLATE, THE BUILD ONLY POINTS AT IT. The template keeps `const COLLECTION_DATA = null;` (so the jsdom tests that substitute literal data still work) and gains `const DATA_FILES = null;` and the assembling functions; the build replaces the first with the manifest and the second with `assembleCollectionData()`, and inserts the script elements after a `<!-- mothman:data-files -->` marker before the main inline script. REQUIREMENTS and PLANS became `let`, assigned when their file registers."
+      - "A MISSING FILE IS AN EMPTY COLLECTION_DATA, NOT NULL. null is the raw template's own state, so a page whose file failed to load would have fallen back to it; {} plus the page-level error keeps the two apart."
+      - "THE ERROR SPEAKS TO BOTH READERS AT ONCE (PROVISIONAL, not put to Keith). The page cannot tell a local copy from a published one reliably (a snapshot opened from disk is both), so it says both: 'Opened from disk: run mothman dashboard embed' and 'On the published site: the publish is incomplete'."
+      - "A VOLATILE FIELD FOUND, 2026-10-24: `waitedSeconds` on an arrival nobody has promoted (pipeline/recorded_arrival.py, REQ-PIPE-080 criterion 10) is measured to the build's own now, so it changes on every build from unchanged results - 64 values across the three collections. It is the ONLY field that does (compared field by field across two full builds). Every collection file therefore gets a new name on every build, which leaves criterion 16 met only for the embed step and defeats the caching NFR and REQ-PIPE-255 criterion 23. Put to Keith rather than worked around - see unmet_criteria."
+    evidence:
+      - "2026-10-24, sprint E. Built page from ed_probe: qa-reporting-dashboard.html 1.12 MiB (was 20.62 MiB as one file when scoped, 21.41 MiB on the same database before this change), collection-civil-registration 5.19 MiB, collection-child-protection 8.11 MiB, collection-emergency-department 0.65 MiB, requirements-plans 6.40 MiB - every file under the 10 MiB budget, so the real build writes no parts today."
+      - "CRITERION 18, measured 2026-10-24 by tests/test_dashboard_e2e.py::TestTheDataFilesLoadFromDisk on the real built page from file://, three cold loads: navigation to assembled data 300ms, 248ms and 349ms; assembled data to the end of the Agencies tier's first render 148ms, 88ms and 108ms - inside REQ-DASH-226 criterion 13's 400ms."
+      - "Tests seen failing first: tests/test_dashboard_data_files.py (import error, no module), tests-js/data-files.test.js (11 of 12 failed; the raw-template case passed, as it describes behaviour the template already had), the TestTheDataFiles class and the size test in tests/test_embed_dashboard_data.py (7 failed), and the three new tests in tests/test_check_dashboard_renders.py. The browser tests in tests/test_dashboard_e2e.py were written after the template change and were not seen failing. test_dashboard_data_files.py::test_dashboard_data_is_gitignored passed before the explicit .gitignore line was added, because the unanchored data/ rule already matched dashboard/data/."
+    linked_tests:
+      - "tests/test_dashboard_data_files.py::TestEncoding"
+      - "tests/test_dashboard_data_files.py::TestTheManifest"
+      - "tests/test_dashboard_data_files.py::TestTheOneReader"
+      - "tests/test_dashboard_data_files.py::TestWriting"
+      - "tests/test_dashboard_data_files.py::test_dashboard_data_is_gitignored"
+      - "tests/test_embed_dashboard_data.py::TestTheDataFiles"
+      - "tests/test_check_dashboard_renders.py::test_check_embedded_json_reads_the_data_files"
+      - "tests/test_check_dashboard_renders.py::test_check_embedded_json_fails_a_missing_data_file"
+      - "tests/test_check_dashboard_renders.py::test_check_embedded_json_fails_a_data_file_whose_sha256_differs"
+      - "tests-js/data-files.test.js"
+      - "tests/test_dashboard_e2e.py::TestTheDataFilesLoadFromDisk"
+    implemented_by:
+      - "dashboard/data_files.py::encode"
+      - "dashboard/data_files.py::manifest"
+      - "dashboard/data_files.py::embed_into_page"
+      - "dashboard/data_files.py::read_page"
+      - "dashboard/data_files.py::write"
+      - "dashboard/data_files.py::prune"
+      - "dashboard/embed_dashboard_data.py::embed"
+      - "dashboard/embed_dashboard_data.py::data_dir_for"
+      - "dashboard/check_dashboard_renders.py::_check_embedded_json"
+      - "dashboard/qa-reporting-dashboard.template.html::assembleCollectionData"
+      - "dashboard/qa-reporting-dashboard.template.html::dataFileProblems"
+      - "dashboard/qa-reporting-dashboard.template.html::requirementsPlansData"
+      - "dashboard/qa-reporting-dashboard.template.html::renderDataFileProblems"
+      - ".gitignore"
+    unmet_criteria:
+      - criterion: "Criterion 16 across the whole build. Two builds from the same reports/ files write the same names and bytes (tests/test_embed_dashboard_data.py::TestTheDataFiles::test_two_builds_write_the_same_names_and_bytes); two builds from unchanged RECORDED RESULTS do not, because the reports step writes a different waitedSeconds each time."
+        why: "waitedSeconds for an arrival still awaiting promotion is measured to the build time (REQ-PIPE-080 criterion 10), so every collection with such an arrival changes on every build. Fixing it changes a built, signed requirement's output - for example the build writing no figure for an open wait and the page measuring it against BUILT_AT, which is inline and already blanked by the fingerprint - and that is a change to agreed behaviour, so it is Keith's call."
+        owner: "Keith - a decision on where an open wait is measured, needed before REQ-PIPE-255 criterion 23 can hold"
+        blocked_by:
+          unowned: true
     open_questions: []
   - id: REQ-DASH-292
     title: "An archived snapshot stays one self-contained file with every data file inlined, and the published site carries each snapshot split back into files"
     date_written: "2026-10-24"
     story: "As an auditor opening a dashboard snapshot years from now, I want it to be one file that opens with nothing but a browser, and as Keith publishing to Cloudflare Pages I want the site's copy of every snapshot to stay under the per-file limit, so that the time-travel archive keeps its purpose without blocking a publish."
     moscow: must
-    status: not_started
+    status: built
     signed_off:
       by: Keith
       date: "2026-10-24"
@@ -43634,13 +43678,44 @@ requirements:
       - "THE REQUIREMENTS AND PLANS DATA IS INLINED TOO. A snapshot is a record of what the page showed, and the Plans tab and Requirements panel were part of it, so on-demand loading does not mean on-demand archiving."
       - "MARKED INLINE BLOCKS, SO THE SPLIT IS MECHANICAL. Each inline block names its file, so the deploy step reverses the inlining without parsing the page's JavaScript."
       - "SNAPSHOT STORAGE GROWTH IS OUT OF SCOPE with total page weight (Keith, 2026-10-24, Q6 option A); snapshot_dashboard.py's 'keep everything for now' stands."
+      - "AN EXECUTING BLOCK FOR A COLLECTION, AN INERT ONE FOR REQUIREMENTS AND PLANS. A collection file becomes `<script data-mothman-key=... data-mothman-file=...>` in place of its script element, so it registers before the main script exactly as the file would; the on-demand file becomes `<script type=text/plain ...>`, which the browser does not run, and the page's loader runs its text when the Plans tab or Requirements panel first asks - the same moment it would insert the file (criterion 2)."
+      - "THE SPLIT SNAPSHOT'S FILES GO IN `snapshots/<name>.data/`, and its script elements point there. The page finds that directory for its on-demand file from its own static script elements, so the page's own list is unchanged by the split and REQ-DASH-291's checks apply to a published snapshot unaltered."
+      - "A BLOCK OVER THE BUDGET IS RE-CUT INTO PARTS AND THE SPLIT PAGE'S LIST REWRITTEN TO MATCH (criterion 6). Only possible if the budget is lowered after a snapshot was archived; the payload's build id is unchanged, because it is derived from the payload's text."
+      - "SNAPSHOTS CARRY DATA, NOT FONTS OR THE DEMO PLAYER (PROVISIONAL, not put to Keith). A snapshot copied alone to an empty directory loads its @font-face files and vendor/asciinema-player from beside it, finds nothing, falls back to a system font and logs each as a failed resource - as every snapshot already did before this requirement, and as the published site's snapshots/ already does, since fonts/ and vendor/ sit at the site root. Criterion 9's 'no console error' is tested as no console error other than those fonts/ and vendor/ resource failures. Inlining fonts and the player into every snapshot would close it and is not done."
+      - "THE FINGERPRINT READS A SNAPSHOT THROUGH THE SAME READER (REQ-PIPE-255 criteria 22 and 24): dashboard/data_files.py::fingerprint strips script elements and inline blocks alike, so a build and the snapshot it archived fingerprint identically - tested, and a one-byte change to a data file is refused rather than fingerprinted."
+      - "A DEFECT CAUGHT BEFORE COMMIT, 2026-10-24: page_manifest() searched the whole page for `const DATA_FILES = ...;`, and the inlined Requirements and Plans block - which sits before the main script - quotes that line in REQ-DASH-291's own decisions, so a real snapshot's split read the quote as the page's list and failed. It now searches with the inline blocks taken out. Found by tests/test_dashboard_e2e.py::TestASnapshotOpensAloneAndPublishesSplit on the real build; regression test tests/test_dashboard_data_files.py::test_a_block_that_quotes_the_list_line_does_not_stand_in_for_it, seen failing first."
+    evidence:
+      - "2026-10-24, sprint E. `mothman dashboard snapshot --prepare-site` over the real build and the eight committed snapshots: the live page's four data files under _site/data/, and every committed snapshot - all archived before this requirement - placed byte for byte as before, the newest 17.3 MB. A snapshot of the real built page (tests/test_dashboard_e2e.py::TestASnapshotOpensAloneAndPublishesSplit), decompressed alone into an empty directory, renders all three collections and the Plans tab and requests no data file; its split form loads each of its files from `<name>.data/`, all within the budget, and renders the same agencies tier, collections and Plans count."
+      - "Tests seen failing first: the six new tests in tests/test_snapshot_dashboard.py (the other two passed, describing behaviour that was already true: an old snapshot placed unchanged, a local copy decompressed whole), and tests/test_dashboard_data_files.py::test_the_split_of_an_inlined_page_writes_every_file_back_byte_for_byte (no module). The browser class was written after the code and was not seen failing."
+    linked_tests:
+      - "tests/test_dashboard_data_files.py::test_a_block_that_quotes_the_list_line_does_not_stand_in_for_it"
+      - "tests/test_snapshot_dashboard.py::test_a_snapshot_inlines_every_data_file_each_block_marked"
+      - "tests/test_snapshot_dashboard.py::test_a_snapshot_refuses_a_missing_or_altered_file_and_writes_nothing"
+      - "tests/test_snapshot_dashboard.py::test_the_site_carries_each_snapshot_split_back_byte_for_byte"
+      - "tests/test_snapshot_dashboard.py::test_a_snapshot_fingerprints_the_same_as_the_page_it_archived"
+      - "tests/test_snapshot_dashboard.py::test_a_block_over_the_budget_is_split_into_parts_within_it"
+      - "tests/test_snapshot_dashboard.py::test_a_snapshot_from_before_the_split_is_placed_as_it_is"
+      - "tests/test_snapshot_dashboard.py::test_a_local_snapshot_copy_is_still_decompressed_whole"
+      - "tests/test_dashboard_data_files.py::test_the_split_of_an_inlined_page_writes_every_file_back_byte_for_byte"
+      - "tests-js/data-files.test.js"
+      - "tests/test_dashboard_e2e.py::TestASnapshotOpensAloneAndPublishesSplit"
+    implemented_by:
+      - "dashboard/data_files.py::inline"
+      - "dashboard/data_files.py::split"
+      - "dashboard/data_files.py::fingerprint"
+      - "dashboard/snapshot_dashboard.py::take_snapshot"
+      - "dashboard/snapshot_dashboard.py::prepare_deploy_site"
+      - "dashboard/snapshot_dashboard.py::_place_snapshot"
+      - "dashboard/snapshot_dashboard.py::page_fingerprint"
+      - "dashboard/snapshot_dashboard.py::snapshot_fingerprint"
+      - "dashboard/qa-reporting-dashboard.template.html::loadDataFileScripts"
     open_questions: []
   - id: REQ-DASH-293
     title: "No dashboard data file exceeds a 10 MiB per-file budget, because a payload past it is written as numbered parts, and every build prints each file's size"
     date_written: "2026-10-24"
     story: "As Keith, I want any data payload larger than a 10 MiB budget written as numbered part files that the page joins, and every build to print each file's size, so that a collection's own history can grow for years without any published file reaching Cloudflare Pages' 25 MiB limit."
     moscow: must
-    status: not_started
+    status: built
     signed_off:
       by: Keith
       date: "2026-10-24"
@@ -43665,4 +43740,23 @@ requirements:
       - "A 10 MIB BUDGET (Keith, 2026-10-24, Q4 option A). REJECTED 20 MiB, using REQ-PIPE-255's warning as the budget, which leaves too little headroom; REJECTED 5 MiB, which makes more files for no gain."
       - "PARTS SPLIT THE PAYLOAD'S TEXT, NOT ITS DATASETS. A split by dataset would still leave one large dataset over the limit; a split by bytes cannot."
       - "THE ONE CONSTANT, NOT A SETTING IN contract/. The budget follows the hosting provider's limit, not a data asset's configuration."
+      - "PARTS ARE CUT FROM THE PAYLOAD'S RAW TEXT, SIZED BY THEIR ESCAPED BYTES. Each part is the longest run of the JSON text whose file - wrapper, build id and escaped string - fits the budget, found by binary search over the escaped length (C-speed str.count), so an escape sequence is never cut in half and every part is within the budget exactly rather than by a safety margin."
+      - "PART NAMES: `<key>.part<n>.<12 hex of its SHA-256>.js`, numbered from 1; a payload within the budget keeps the unnumbered `<key>.<hash>.js`. Every part of a payload carries the same build id, the payload's."
+      - "THE PAGE ITSELF IS WARNED ABOUT TOO. Criterion 4 says 'any of them', and the built page is one of them; at 1.12 MiB it is nowhere near."
+      - "TWO WARNINGS, ONE STEP. At or over the 10 MiB budget the build warns naming the budget; at or over 20 MiB it warns naming Cloudflare Pages' 25 MiB limit instead (REQ-PIPE-255 criterion 26). Both are lines from dashboard/data_files.py::size_report, printed by embed(), so `mothman dashboard embed`, `rebuild`, `pipeline run` and a publish all print them."
+    evidence:
+      - "2026-10-24, sprint E. The real build from ed_probe writes no parts - its largest file, collection-child-protection, is 8.11 MiB. With the budget lowered to 2 MiB (tests/test_dashboard_e2e.py::TestAPayloadPastTheBudgetIsWrittenInParts) the real collections are written as parts each within it, and the page from file:// reassembles data equal to the unsplit payload; deleting one part shows the page-level error naming that part and no other file."
+      - "Tests seen failing first: tests/test_dashboard_data_files.py (no module), the parts case in tests-js/data-files.test.js, and tests/test_embed_dashboard_data.py::test_every_build_prints_each_files_size_and_warns_at_the_budget. The browser class was written after the code and was not seen failing."
+    linked_tests:
+      - "tests/test_dashboard_data_files.py::TestEncoding"
+      - "tests/test_dashboard_data_files.py::TestSizes"
+      - "tests/test_embed_dashboard_data.py::test_every_build_prints_each_files_size_and_warns_at_the_budget"
+      - "tests-js/data-files.test.js"
+      - "tests/test_dashboard_e2e.py::TestAPayloadPastTheBudgetIsWrittenInParts"
+    implemented_by:
+      - "dashboard/data_files.py::BUDGET_BYTES"
+      - "dashboard/data_files.py::encode_text"
+      - "dashboard/data_files.py::size_report"
+      - "dashboard/qa-reporting-dashboard.template.html::assembleDataFiles"
+      - "dashboard/embed_dashboard_data.py::embed"
     open_questions: []

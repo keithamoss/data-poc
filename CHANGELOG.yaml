@@ -223,6 +223,36 @@ releases:
               Every attempt at checking a supply is now recorded, including one
               that crashes, times out or is stopped part way, so a failed
               attempt no longer vanishes once it is retried.
+          - headline: One file per collection
+            components: ["Dashboard UI", "Pipeline & publishing"]
+            description: >
+              Each collection's data now sits in its own file beside the page,
+              so no single file grows as collections are added. The page still
+              opens straight from disk.
+          - headline: Missing files are named
+            components: ["Dashboard UI"]
+            description: >
+              If one of those files is missing or from another build, the page
+              says which one and what to do, instead of quietly showing an
+              empty dashboard.
+          - headline: Plans load when opened
+            components: ["Dashboard UI"]
+            description: >
+              The Plans tab and the Requirements panel now load their data the
+              first time you open them, so the page is about six megabytes
+              lighter for everyone else.
+          - headline: No file past 10 MiB
+            components: ["Pipeline & publishing"]
+            description: >
+              A collection's data larger than 10 MiB is written as numbered
+              parts the page joins back together, and every build prints the
+              size of each file it writes.
+          - headline: Snapshots stay one file
+            components: ["Dashboard UI", "Pipeline & publishing"]
+            description: >
+              An archived snapshot still opens on its own with nothing but a
+              browser. The published site's copy is split back into files so
+              it fits the host's per-file limit.
   - date: "2026-10-20"
     summary: >
       Cross-table checks are checked once per delivery, and their history

@@ -620,6 +620,7 @@ class TestARequirementHasItsOwnAddress:
             _await_requirements_plans(page)
 
     def _ids(self, page):
+        _await_requirements_plans(page, start=True)
         ids = page.evaluate("() => REQUIREMENTS.map(r => [r.id, r.status])")
         assert ids, "precondition: the built dashboard embeds the register"
         return ids
@@ -6059,3 +6060,164 @@ class TestTheDataFilesLoadFromDisk:
             }"""))
         print(f"\nREQ-DASH-291 criterion 18: {timings}")
         assert all(t["rendered"] < 400 for t in timings), timings
+
+
+# --- REQ-DASH-293: a payload past the budget, in parts -------------------
+
+@pytest.fixture(scope="class")
+def a_page_built_in_parts(built_dashboard_html, tmp_path_factory):
+    """The real build again, with the budget lowered so the real collections
+    go past it - the same embed(), only the one constant changed."""
+    from dashboard import data_files
+    from dashboard import embed_dashboard_data as edd
+
+    work = tmp_path_factory.mktemp("parts")
+    for name in ("fonts", "vendor"):
+        (work / name).symlink_to((built_dashboard_html.parent / name).resolve())
+    out = work / "dashboard_in_parts.html"
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(data_files, "BUDGET_BYTES", 2 * data_files.MIB)
+        mp.setattr(edd, "DASHBOARD_HTML", str(out))
+        edd.embed()
+    return out
+
+
+class TestAPayloadPastTheBudgetIsWrittenInParts:
+    """REQ-DASH-293 criteria 2, 3, 5 and 6, in a real browser over file://."""
+
+    def test_the_page_reassembles_the_unsplit_payload(self, clean_page, a_page_built_in_parts):
+        from dashboard import data_files
+        from dashboard import embed_dashboard_data as edd
+
+        files = data_files.page_manifest(a_page_built_in_parts.read_text())["files"]
+        parted = {e["collection"] for e in files if e["kind"] == "collection" and e["parts"] > 1}
+        assert parted, "no collection is past a 2 MiB budget - this test proves nothing"
+        assert all((a_page_built_in_parts.parent / "data" / e["name"]).stat().st_size
+                   <= 2 * data_files.MIB for e in files)
+        clean_page.goto(f"file://{a_page_built_in_parts}")
+        _wait_rendered(clean_page)
+        unsplit = edd.collection_data()
+        for collection in sorted(parted):
+            got = clean_page.evaluate("(c) => COLLECTION_DATA[c]", collection)
+            assert got == unsplit[collection], collection
+        assert clean_page.locator('[data-testid="data-file-error"]').count() == 0
+
+    def test_deleting_one_part_is_named_on_the_page(self, page, a_page_built_in_parts, tmp_path):
+        from dashboard import data_files
+
+        copy = _copy_of_the_built_page(a_page_built_in_parts, tmp_path / "site")
+        files = data_files.page_manifest(copy.read_text())["files"]
+        part = next(e for e in files if e["kind"] == "collection" and e["parts"] > 1 and e["part"] == 2)
+        (copy.parent / "data" / part["name"]).unlink()
+        page.goto(f"file://{copy}")
+        _wait_rendered(page)
+        text = page.locator('[data-testid="data-file-error"]').inner_text()
+        assert part["name"] in text and "missing" in text
+        others = [e["name"] for e in files if e["name"] != part["name"]]
+        assert not any(name in text for name in others)
+
+
+# --- REQ-DASH-292: a snapshot alone, and the split form the site serves ----
+
+@pytest.fixture(scope="class")
+def a_snapshot_of_the_built_page(built_dashboard_html, tmp_path_factory):
+    """A real snapshot of the real built page, archived into a scratch
+    snapshots directory, and the site prepare_deploy_site() makes of it."""
+    import shutil
+
+    from dashboard import snapshot_dashboard
+
+    work = tmp_path_factory.mktemp("snapshot")
+    copy = _copy_of_the_built_page(built_dashboard_html, work / "dashboard")
+    archived = snapshot_dashboard.take_snapshot(html_path=copy, snapshots_dir=work / "snapshots")
+    alone = work / "alone"
+    alone.mkdir()
+    import gzip
+
+    with gzip.open(archived, "rb") as f:
+        (alone / "snapshot.html").write_bytes(f.read())
+    site = work / "_site"
+    snapshot_dashboard.prepare_deploy_site(site, html_path=copy, snapshots_dir=work / "snapshots",
+                                           fonts_dir=built_dashboard_html.parent / "fonts",
+                                           vendor_dir=built_dashboard_html.parent / "vendor")
+    split = site / "snapshots" / archived.with_suffix("").name
+    yield {"alone": alone / "snapshot.html", "split": split, "site": site}
+    shutil.rmtree(work, ignore_errors=True)
+
+
+def _agencies_and_plans(page, url) -> dict:
+    """What a reader sees of a snapshot: the agencies tier, the collections
+    it holds and the Plans tab - and every file it asked for, and every
+    console error, with any resource that failed named by its address."""
+    requests, errors = [], []
+    on_request = lambda r: requests.append(r.url)  # noqa: E731
+
+    def on_console(msg):
+        if msg.type == "error":
+            errors.append((msg.text, (msg.location or {}).get("url", "")))
+
+    page.on("request", on_request)
+    page.on("console", on_console)
+    page.on("pageerror", lambda exc: errors.append((str(exc), "")))
+    try:
+        page.goto("about:blank")
+        page.goto(url)
+        _wait_rendered(page)
+        agencies = page.locator("#view").inner_text()
+        collections = page.evaluate("() => Object.keys(COLLECTION_DATA)")
+        page.locator("#plans-btn").click()
+        page.wait_for_selector("#plans-list .plans-entry")
+        plans = page.locator("#plans-count").inner_text()
+    finally:
+        page.remove_listener("request", on_request)
+        page.remove_listener("console", on_console)
+    return {"agencies": agencies, "collections": collections, "plans": plans,
+            "data_requests": [u for u in requests if u.endswith(".js") and "/vendor/" not in u],
+            "errors": errors, "requests": requests}
+
+
+def _not_fonts_or_vendor(errors: list) -> list:
+    """A snapshot carries its DATA, never fonts/ or vendor/ (REQ-DASH-292 is
+    about the data files; PROVISIONAL, not put to Keith): alone in an empty
+    directory its @font-face files and the Demo tab's vendored player are not
+    there, the browser logs each as a failed resource, and the page falls back
+    to a system font. Those failures are told apart by the address that
+    failed; every other console error still fails the test."""
+    return [(text, url) for text, url in errors
+            if not (text.startswith("Failed to load resource")
+                    and re.search(r"/(fonts|vendor)/[^/]+$", url))]
+
+
+class TestASnapshotOpensAloneAndPublishesSplit:
+    """REQ-DASH-292 criteria 2, 9 and 10, in a real browser."""
+
+    def test_a_snapshot_alone_in_an_empty_directory_renders_everything(
+            self, page, a_snapshot_of_the_built_page):
+        alone = a_snapshot_of_the_built_page["alone"]
+        assert [p.name for p in alone.parent.iterdir()] == ["snapshot.html"]
+        got = _agencies_and_plans(page, f"file://{alone}")
+        assert got["collections"] == [c.id for c in _registry.all_collections()]
+        assert page.locator('[data-testid="data-file-error"]').count() == 0
+        assert re.search(r"of [1-9][\d,]* entries", got["plans"]), got["plans"]
+        assert got["data_requests"] == [], "a snapshot asked for a sibling data file"
+        assert any(u.startswith("file://") for u in got["requests"]), "requests were not seen at all"
+        assert _not_fonts_or_vendor(got["errors"]) == []
+
+    def test_the_split_form_renders_identically_within_the_budget(
+            self, page, a_snapshot_of_the_built_page):
+        from dashboard import data_files
+
+        split = a_snapshot_of_the_built_page["split"]
+        files = data_files.page_manifest(split.read_text())["files"]
+        folder = split.parent / (split.name[: -len(".html")] + ".data")
+        sizes = [(folder / e["name"]).stat().st_size for e in files]
+        assert sizes and all(s <= data_files.BUDGET_BYTES for s in sizes), sizes
+        alone = _agencies_and_plans(page, f"file://{a_snapshot_of_the_built_page['alone']}")
+        served = _agencies_and_plans(page, f"file://{split}")
+        assert sorted(u.rsplit("/", 1)[1] for u in served["data_requests"]) == \
+            sorted(e["name"] for e in files), "the split form loads each of its files"
+        keys = ("agencies", "collections", "plans")
+        assert {k: served[k] for k in keys} == {k: alone[k] for k in keys}
+        # The site carries fonts/ and vendor/ at its root, not beside a
+        # snapshot, so the same resources fail here as alone - nothing else.
+        assert _not_fonts_or_vendor(served["errors"]) == []

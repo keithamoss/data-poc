@@ -244,7 +244,10 @@ def embed_into_page(html: str, value: dict, prefix: str = DATA_DIR) -> str:
 
 
 def page_manifest(html: str) -> dict | None:
-    m = _MANIFEST_RE.search(html)
+    # Searched with the inline blocks taken out: a block is data, and the
+    # Requirements block quotes this very line (found 2026-10-24, when the
+    # register gained a decision naming it and the snapshot read the quote).
+    m = _MANIFEST_RE.search(_BLOCK_RE.sub("", html))
     return json.loads(m.group(1)) if m else None
 
 

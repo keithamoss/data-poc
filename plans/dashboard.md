@@ -1179,17 +1179,3 @@ common/check_lifecycle.py`'s own `check_id` convention.
     Keith: whether to darken the token, restrict where the faintest tier
     may be used, or accept it for non-essential text with a stated
     rationale. 3.03:1 in light mode is the more serious of the two.
-
-19. **[todo, 2026-10-24]** **[Dashboard UI]** **[Pipeline & publishing]**
-    The built dashboard outgrows one file - SCOPED 2026-10-24 as
-    REQ-DASH-291 (data file per collection, Requirements and Plans on demand,
-    named missing-file error), REQ-DASH-292 (snapshots committed self-contained,
-    published split) and REQ-DASH-293 (10 MiB per-file budget, numbered parts),
-    all SIGNED by Keith 2026-10-24, not yet built. The page reached 20.62 MiB
-    with three collections against Cloudflare Pages' 25 MiB per-file limit
-    (item 4). Keith took every scoper recommendation; total page weight at
-    thirty collections is deliberately left to a later requirement. Amends
-    REQ-PIPE-255 (criteria 1, 22, 24, 26, the scale NFR, the ceiling open
-    question) and REQ-PIPE-257 (criteria 6 and 14, SameSite=Lax), wording
-    approved and applied at sign-off. Remove this entry once all three are
-    built.
