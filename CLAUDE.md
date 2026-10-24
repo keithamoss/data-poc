@@ -537,7 +537,7 @@ Rough layout:
   confirmed already safe (their scratch dirs were already monkeypatched to per-worker
   `tmp_path_factory` dirs). **Parallel is now the DEFAULT** (2026-09-19,
   Keith's own call, reversing the earlier serial-by-default preference):
-  `pyproject.toml`'s `addopts = "-n auto --dist loadfile"` means a bare
+  `pyproject.toml`'s `addopts = "-n auto --dist loadgroup"` means a bare
   `uv run pytest` is already parallel, locally and in CI alike. The
   earlier reasoning for staying serial was debuggability, and the
   biggest part of it turned out not to hold - **pytest-xdist silently
@@ -548,11 +548,20 @@ Rough layout:
   pays a flat ~1s of worker startup (1.4s -> 2.2s). Use **`-n0`** to
   force serial - the one case genuinely worse in parallel is
   print-debugging several tests at once, where output interleaves.
-  `--dist loadfile` is load-bearing, not tuning: it keeps every test in
-  a file on one worker, without which `tests/test_dashboard_e2e.py`'s
-  session-scoped build fixture runs once per worker and several workers
-  race to rewrite the same real `reports/` files (`plans/tooling.md`
-  #10). CI
+  **`--dist loadgroup` plus `tests/conftest.py`'s distribution groups**
+  (REQ-TEST-281, 2026-10-24; it was `--dist loadfile`): every module
+  stays whole on one worker, as loadfile kept it, except
+  `tests/test_dashboard_e2e.py`, which spreads across every worker a
+  CLASS at a time. The conftest hook is load-bearing - bare loadgroup
+  would hand every other module out test by test. What keeps
+  `plans/tooling.md` #10's race closed is no longer the distribution:
+  the e2e build fixture runs once per worker and each worker builds
+  into a directory of its own (`mothman dashboard ... --out-dir`), so
+  no two builds share a file and the suite never writes the real
+  `reports/` or built page. A local dashboard is `mothman dashboard
+  rebuild` now, not a side effect of a test run. One cost: under xdist a
+  node id carries its group as an `@...` suffix in the report; drop it
+  to re-run that test by id. CI
   (`.github/workflows/
   test.yml`) runs the full suite with `pytest-cov` on every push and
   enforces `pyproject.toml`'s `[tool.coverage.report] fail_under` - a
@@ -940,6 +949,16 @@ Rough layout:
   caught by the gate before the push (a config slip read as `<unicode
   string>`); fixed and the affected modules re-run rather than the whole
   suite, under commit rule C.
+
+  -> **REQ-TEST-281 (2026-10-25): the browser-test module across every
+  worker.** `tests/test_dashboard_e2e.py` alone, default worker count:
+  **1283s -> 717s / 659s / 667s** (three runs, 322 -> 326 tests, zero
+  skips), each of four workers paying its own ~65-105s build. Its floor is
+  now one class, `TestEveryScenarioJumpLands` (two tests, ~400-500s on
+  one worker, scheduled late because xdist hands out bigger groups first),
+  so it misses the 10-minute module target by about a minute. The
+  last full gate before it was 24m12s, pytest 1309.8s; the full-gate
+  figure with it built is the next timed gate's to record here.
 
   Whenever a full local run happens anyway (not a reason to run one
   that selective testing above would otherwise skip), note the real

@@ -122,17 +122,22 @@ testpaths = ["tests"]
 # `-n0` to force serial when print-debugging several tests at once,
 # which is the one case genuinely worsened by interleaved output.
 #
-# --dist loadfile is load-bearing, not a tuning knob: it keeps every
-# test in a file on ONE worker. tests/test_dashboard_e2e.py's own
-# session-scoped built_dashboard_html fixture shells out to the real
-# build chain, which rewrites reports/*.json and the built dashboard
-# HTML in the real tree - under the default `load` distribution that
-# fixture runs once PER WORKER, so several workers race to rewrite the
-# same files. See plans/tooling.md #10 for the full account (the other
-# half of that fix is tests/test_embed_dashboard_data.py's own
-# _isolate_embed_data_targets fixture, which stops it reading those
-# same artifacts while another worker is mid-rewrite).
-addopts = "-n auto --dist loadfile"
+# --dist loadgroup, with tests/conftest.py giving EVERY test a group
+# (REQ-TEST-281): its file for every module, so each module still runs whole
+# on one worker as `--dist loadfile` used to keep it, and its file plus class
+# for tests/test_dashboard_e2e.py, so the browser tests spread across every
+# worker a class at a time. Bare loadgroup would hand ungrouped tests out one
+# by one, so the conftest hook is load-bearing.
+#
+# WHAT KEEPS THE OLD RACE CLOSED (plans/tooling.md #10, race 2): the e2e
+# module's session-scoped built_dashboard_html fixture runs once per worker,
+# and each worker builds into a directory of its own (`mothman dashboard
+# rebuild-results|build-data|embed --out-dir`), so no two builds share a file
+# and none writes the real reports/ or built page. That is a property of the
+# build, not of the distribution - loadfile used to be what prevented it.
+# The cost: a test's node id under xdist carries its group as an `@...`
+# suffix in the report; drop the suffix to re-run it by id.
+addopts = "-n auto --dist loadgroup"
 # Just the repo root - generator/, pipeline/, and synthetic_data_generator/
 # are real packages now (each has an __init__.py), same as qa_tools/ always
 # was (plans/qa-pipeline.md #84), so everything imports as e.g.

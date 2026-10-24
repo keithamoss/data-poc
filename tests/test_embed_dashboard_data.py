@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import json
 import re
+from pathlib import Path
 
 import pytest
 
@@ -39,6 +40,9 @@ def _isolate_embed_data_targets(monkeypatch, tmp_path):
     built_dashboard_html fixture - so under pytest-xdist the two modules
     land on different workers and this one reads a 6.5MB file mid-rewrite,
     getting a truncated JSON and a failure that vanishes on a re-run.
+    (Since REQ-TEST-281 that build writes a directory of each worker's
+    own, never the real reports/, so the race itself is gone; the stubs
+    stay because they are the honest input for what this module tests.)
 
     Nothing in this module asserts anything about those two files'
     CONTENTS - they're unit tests of embed()'s own wiring (changelog feed
@@ -616,3 +620,48 @@ def test_every_build_prints_each_files_size_and_warns_at_the_budget(monkeypatch,
     assert got.problems == [] and got.requirements == edd.parse_requirements(edd.REQUIREMENTS_YAML)
     # The page itself is far over a 300 KiB budget, so it is the one warned about.
     assert re.search(rf"WARNING: {re.escape(page.name)} is .* budget", out), out[-2000:]
+
+
+class TestABuildUnderAnOutDir:
+    """REQ-TEST-281: `--out-dir` sends a whole build to a directory of its own,
+    reading the reports an earlier step wrote there and writing nothing in the
+    real tree."""
+
+    def test_the_page_its_files_and_its_assets_land_in_the_out_dir(self, monkeypatch, tmp_path):
+        from qa_tools.common import build_output
+
+        real_page = tmp_path / "real" / "qa-reporting-dashboard.html"
+        monkeypatch.setattr(edd, "DASHBOARD_HTML", real_page)
+        out = tmp_path / "build"
+        (out / "reports").mkdir(parents=True)
+        (out / "reports" / "open_tickets.json").write_text(json.dumps([{
+            "number": 7, "title": "red", "url": "https://github.com/o/r/issues/7",
+            "labels": [{"name": "qa-ticket"}, {"name": "dataset:birth-registrations"}],
+            "updatedAt": "2026-10-24T00:00:00Z"}]))
+        monkeypatch.setenv(build_output.OUT_DIR_ENV, str(out))
+
+        edd.embed()
+
+        page = out / "qa-reporting-dashboard.html"
+        assert page.is_file() and not real_page.exists()
+        assert any((out / "data").iterdir())
+        for name in ("fonts", "vendor"):
+            shipped = sorted(p.name for p in (Path(edd.ROOT) / "dashboard" / name).iterdir())
+            assert shipped, name
+            assert sorted(p.name for p in (out / name).iterdir()) == shipped, name
+        status = json.loads(re.search(r"const TICKET_STATUS = (.*?);\n", page.read_text()).group(1))
+        assert status["birth-registrations"]["number"] == 7
+
+    def test_every_reports_path_of_the_chain_is_the_out_dirs(self, monkeypatch, tmp_path):
+        from pipeline import build_dashboard_data as bdd
+        from qa_tools import collections
+        from qa_tools.common import build_output
+        from qa_tools.tools import results_history
+
+        monkeypatch.setenv(build_output.OUT_DIR_ENV, str(tmp_path))
+        everything = collections.all_collections()
+        assert everything
+        for c in everything:
+            assert results_history.results_path(c.id) == str(tmp_path / "reports" / c.results_file)
+            assert bdd.results_path(c.id) == str(tmp_path / "reports" / c.results_file)
+            assert bdd.out_path(c.id) == str(tmp_path / "reports" / c.dashboard_file)

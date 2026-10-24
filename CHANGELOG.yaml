@@ -128,6 +128,15 @@ releases:
               When a data file is missing or from another build, the page now
               says which, and the published site no longer keeps files from
               earlier builds.
+      - category: Improved
+        items:
+          - headline: A build of your own
+            components: ["Testing & dev tooling", "Pipeline & publishing"]
+            description: >
+              The dashboard build commands take `--out-dir`, so you can build
+              a complete page somewhere else without touching your local
+              dashboard. The browser tests use it to run on every core at
+              once, and no longer overwrite your local dashboard when they run.
   - date: "2026-10-24"
     summary: >
       Every result now sits on the delivery it actually read, in the order it

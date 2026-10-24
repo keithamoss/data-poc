@@ -188,6 +188,7 @@ from dashboard.plans_md import feedback_data, parse_plans
 from qa_tools.common.sprint_state import dependency_data
 from dashboard.requirements_yaml import parse_requirements
 from qa_tools.common import asset_time
+from qa_tools.common import build_output
 from qa_tools.common import environments
 from qa_tools.common import hierarchy
 from qa_tools.common import outstanding
@@ -351,7 +352,42 @@ def _slot_due_dates(by_dataset: dict) -> dict:
     return out
 
 
+#: The static assets the page loads by a path relative to itself, copied
+#: beside a page built under `--out-dir` (REQ-TEST-281 criterion 5).
+PAGE_ASSET_DIRS = ("fonts", "vendor")
+
+
+def output_paths() -> tuple[str, str, str]:
+    """(the page, the open-tickets file, the ticket-resolutions file) this build
+    uses: the module's own constants, or under `--out-dir` the build's own
+    directory and its own `reports/` - never the real tree's (REQ-TEST-281)."""
+    out = build_output.out_dir()
+    if not out:
+        return DASHBOARD_HTML, OPEN_TICKETS_JSON, TICKET_RESOLUTIONS_JSON
+    reports = build_output.reports_dir(os.path.join(ROOT, "reports"))
+    return (os.path.join(out, build_output.PAGE_NAME),
+            os.path.join(reports, os.path.basename(OPEN_TICKETS_JSON)),
+            os.path.join(reports, os.path.basename(TICKET_RESOLUTIONS_JSON)))
+
+
+def place_page_assets(page_path) -> None:
+    """Copy fonts/ and vendor/ beside a page built under `--out-dir`, so it
+    renders from there exactly as the real build does - the self-hosted fonts
+    and the Demo tab's player (REQ-TEST-281 criterion 5). A COPY rather than a
+    link, so the directory is whole on its own; the two are under half a
+    megabyte together. Nothing to do for a page written into dashboard/ itself."""
+    import shutil
+
+    source = os.path.realpath(os.path.dirname(os.path.abspath(__file__)))
+    dest = os.path.realpath(os.path.dirname(os.path.abspath(os.fspath(page_path))))
+    if source == dest:
+        return
+    for name in PAGE_ASSET_DIRS:
+        shutil.copytree(os.path.join(source, name), os.path.join(dest, name), dirs_exist_ok=True)
+
+
 def embed() -> None:
+    page_path, open_tickets_json, ticket_resolutions_json = output_paths()
     with open(TEMPLATE_HTML) as f:
         html = f.read()
 
@@ -646,15 +682,15 @@ def embed() -> None:
     requirements = parse_requirements(REQUIREMENTS_YAML)
     print(f"Read REQUIREMENTS = {len(requirements)} requirements")
 
-    if os.path.exists(OPEN_TICKETS_JSON):
-        with open(OPEN_TICKETS_JSON) as f:
+    if os.path.exists(open_tickets_json):
+        with open(open_tickets_json) as f:
             raw_issues = json.load(f)
     else:
         raw_issues = []
     ticket_status = parse_open_tickets(raw_issues)
     html = _replace_const(html, "TICKET_STATUS", json.dumps(ticket_status, separators=(",", ":")))
     print(f"Re-embedded TICKET_STATUS = {len(ticket_status)} open ticket(s)"
-          + ("" if os.path.exists(OPEN_TICKETS_JSON) else " (no reports/open_tickets.json - local build, embedding empty)"))
+          + ("" if os.path.exists(open_tickets_json) else " (no reports/open_tickets.json - local build, embedding empty)"))
 
     sha = current_commit_sha()
     github_links = {"checks": build_check_source_links(sha=sha), **build_folder_links(sha=sha)}
@@ -677,15 +713,15 @@ def embed() -> None:
     html = _replace_const(html, "ASSIGNMENTS", json.dumps(assignments, separators=(",", ":")))
     print(f"Re-embedded ASSIGNMENTS = {len(assignments['agencies'])} agency/{len(assignments['datasets'])} dataset assignment(s)")
 
-    if os.path.exists(TICKET_RESOLUTIONS_JSON):
-        with open(TICKET_RESOLUTIONS_JSON) as f:
+    if os.path.exists(ticket_resolutions_json):
+        with open(ticket_resolutions_json) as f:
             raw_ticket_resolutions = json.load(f)
     else:
         raw_ticket_resolutions = []
     leaderboard_rows = build_leaderboard(raw_ticket_resolutions, people_config, DATASET_AGENCY)
     html = _replace_const(html, "LEADERBOARD", json.dumps(leaderboard_rows, separators=(",", ":")))
     print(f"Re-embedded LEADERBOARD = {len(leaderboard_rows)} real streak row(s)"
-          + ("" if os.path.exists(TICKET_RESOLUTIONS_JSON) else " (no reports/ticket_resolutions.json - local build, embedding empty)"))
+          + ("" if os.path.exists(ticket_resolutions_json) else " (no reports/ticket_resolutions.json - local build, embedding empty)"))
 
     plans = parse_plans(PLANS_DIR)
     print(f"Read PLANS = {len(plans['items'])} items, "
@@ -723,17 +759,19 @@ def embed() -> None:
     # page named goes only once the new page has replaced it.
     manifest = data_files.manifest(files)
     html = data_files.embed_into_page(html, manifest)
-    data_dir = data_dir_for(DASHBOARD_HTML)
+    data_dir = data_dir_for(page_path)
     written = data_files.write(files, data_dir)
-    with open(DASHBOARD_HTML, "w") as f:
+    with open(page_path, "w") as f:
         f.write(html)
     data_files.prune(data_dir, [f.entry["name"] for f in files])
+    if build_output.out_dir():
+        place_page_assets(page_path)
 
     # EVERY FILE'S SIZE, EVERY BUILD (REQ-DASH-293 criterion 4, REQ-PIPE-255
     # criterion 26), so growth is seen while developing rather than first met
     # at a publish. Warnings only: nothing here stops a build.
-    print(f"Wrote {DASHBOARD_HTML} and {len(written)} data file(s) under {data_dir}:")
-    for level, line in data_files.size_report(DASHBOARD_HTML, written):
+    print(f"Wrote {page_path} and {len(written)} data file(s) under {data_dir}:")
+    for level, line in data_files.size_report(page_path, written):
         print(("  " if level == "info" else "") + line)
 
 

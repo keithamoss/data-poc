@@ -43424,7 +43424,7 @@ requirements:
     date_written: "2026-10-23"
     story: "As whoever runs the full gate, I want tests/test_dashboard_e2e.py spread across all the test workers rather than pinned to one, with each worker building the dashboard into a place of its own, so that the gate's wall clock is no longer set by one 41-minute module running alone while the other workers sit idle."
     moscow: should
-    status: not_started
+    status: built
     signed_off:
       by: Keith
       date: "2026-10-24"
@@ -43447,7 +43447,45 @@ requirements:
     - "CI WALL CLOCK: the deployment half runs this module too, so its time is reported alongside the sandbox figure; no CI workflow is changed beyond what the new distribution needs."
     - "THE TARGETS, MEASURED BY THE TIMED FULL GATE ON THIS SANDBOX (Keith, 2026-10-24, Q1): the full local `uv run pytest` wall clock SHALL be at most 25 minutes with this requirement built, and at most 20 minutes with this requirement and REQ-TEST-282 both built; and tests/test_dashboard_e2e.py's own wall clock SHALL be at most 10 minutes. Missing any of the three is a finding for Keith, not a CI gate (his 2026-09-18 call that runtime is watched rather than enforced)."
     dependencies: []
+    linked_tests:
+    - tests/test_distribution_groups.py::test_every_collected_test_has_exactly_one_group
+    - tests/test_distribution_groups.py::test_a_module_outside_the_browser_tests_is_one_group
+    - tests/test_distribution_groups.py::test_under_loadgroup_the_scheduler_sees_the_group
+    - tests/test_dashboard_e2e.py::TestTheBuildIsTheWorkersOwn::test_the_page_is_built_into_a_directory_named_for_this_worker
+    - tests/test_dashboard_e2e.py::TestTheBuildIsTheWorkersOwn::test_the_build_did_not_write_the_real_tree
+    - tests/test_dashboard_e2e.py::TestTheBuildIsTheWorkersOwn::test_every_browser_test_is_grouped_by_its_class
+    - tests/test_dashboard_e2e.py::TestTheBuildIsTheWorkersOwn::test_the_self_hosted_fonts_load_from_beside_the_page
+    - tests/test_dashboard_e2e.py::TestDemoTab::test_opening_it_renders_the_real_player_with_zero_console_errors
+    - tests/test_dashboard_e2e.py::TestTicketBadge::test_an_open_ticket_shows_a_linked_badge_at_tier2_and_tier3
+    - tests/test_dashboard_e2e.py::TestAPayloadPastTheBudgetIsWrittenInParts::test_the_page_reassembles_the_unsplit_payload
+    - tests/test_embed_dashboard_data.py::TestABuildUnderAnOutDir::test_the_page_its_files_and_its_assets_land_in_the_out_dir
+    - tests/test_embed_dashboard_data.py::TestABuildUnderAnOutDir::test_every_reports_path_of_the_chain_is_the_out_dirs
+    implemented_by:
+    - qa_tools/common/build_output.py::out_dir
+    - qa_tools/common/build_output.py::use
+    - qa_tools/common/build_output.py::reports_dir
+    - cli/dashboard.py::_out_dir_option
+    - dashboard/embed_dashboard_data.py::output_paths
+    - dashboard/embed_dashboard_data.py::place_page_assets
+    - dashboard/check_dashboard_renders.py::built_page
+    - pipeline/build_dashboard_data.py::out_path
+    - qa_tools/tools/results_history.py::results_path
+    - tests/conftest.py::_distribution_group
+    - tests/test_dashboard_e2e.py::built_dashboard_html
+    - tests/test_dashboard_e2e.py::_embed_variant
+    - pyproject.toml
+    evidence:
+    - "2026-10-25 (Perth), tests/test_dashboard_e2e.py ALONE on this 4-core sandbox, default worker count, against the same bootstrapped deployment database (ed_probe, 482 recorded runs): BEFORE (HEAD 7e97cbe, --dist loadfile) 322 passed, 0 skipped, wall clock 1283s (21m23s), one worker. AFTER, three runs in a row (criterion 7): 326 passed, 0 skipped, 717s (11m57s); 326 passed, 0 skipped, 659s (10m59s); 326 passed, 0 skipped, 667s (11m07s) - all four workers used each time, and no test class ran on two workers in any of the three (checked from the -v worker tags of every passed test, 76 classes and module-level groups). The four extra tests are this requirement's own."
+    - "2026-10-25, BUILD COST PER WORKER (NFR 5), the session fixture's setup time on each worker's first test: 64-71s in runs 1 and 2, 100-105s in run 3, four builds running at once; the single build before was 66s. The chain run alone into an --out-dir: rebuild-results 8s, build-data 50s, embed 9s."
+    - "2026-10-25, THE REAL TREE WAS NOT WRITTEN (criterion 4): the mtime and size of every file under reports/, dashboard/data/ and dashboard/qa-reporting-dashboard.html, listed before the three after-runs and again after them, were identical. Before this change the module's own fixture rewrote all of them on every run."
+    - "2026-10-25, THE 10-MINUTE MODULE TARGET IS MISSED, by about one minute (a finding for Keith, per NFR 7): the module's floor is TestEveryScenarioJumpLands, two tests taking 400-503s together on one worker (420s even before, alone), which pytest-xdist schedules late because it hands out larger groups first and this class has two tests. The rest of the module finishes well before it."
     open_questions: []
+    unmet_criteria:
+    - criterion: "Criterion 8, and criterion 7's 'alongside the timed full gate': the full-gate pytest wall clock with this built, and the 25-minute full-suite target (NFR 7) and the CI deployment half's time (NFR 6) it is judged by."
+      why: "Built in a session told not to run the full mothman check or push; the orchestrating session runs the timed full gate on this tree and records its figure in CLAUDE.md's runtime log and here. CLAUDE.md's log carries the module figures already."
+      owner: "the orchestrating session's timed full gate, 2026-10-25"
+      blocked_by:
+        unowned: true
     decisions:
     - "PER-WORKER BUILD OUTPUT, NOT A SHARED BUILD UNDER A LOCK (Keith approved A as 'a per-worker build output path', 2026-10-23). REJECTED building once under a file lock and having every worker read it: it reintroduces exactly the shared-file read that plans/tooling.md #10 race 1 was, and it couples every worker to the first one's success. A per-worker build costs one build per worker and shares nothing."
     - "THE REAL TREE IS NO LONGER WRITTEN BY THE SUITE (criterion 4). Today the e2e fixture rewrites the real reports/ and built HTML as a side effect, which is also a live hazard to the other needs_deployment modules that read reports/ while it runs. A side effect any developer was relying on (a test run refreshing the local dashboard) goes with it; `mothman dashboard rebuild` is the way to get one."
@@ -43456,6 +43494,14 @@ requirements:
     - "REJECTED moving the e2e tests to Playwright's own JS runner (plans/tooling.md #24, 2026-09-26): the pytest plugin is the supported Python path and recommends xdist, and a split would lose the fixtures that build from recorded history."
     - "THE TARGETS ARE NUMBERS, NOT 'MEASURABLY FASTER' (Keith, 2026-10-24, Q1 as recommended, plus a third target of his own): 25 minutes of full local pytest with this requirement, 20 with REQ-TEST-282 as well, and at most 10 minutes for the browser-test module itself. A miss is a finding for Keith, not a CI gate. REJECTED 'measurably faster', which cannot fail."
     - "--dist loadgroup, WITH tests/conftest.py GIVING EVERY TEST A GROUP (Keith, 2026-10-24, Q2 as recommended): each test's group is its file, and for tests/test_dashboard_e2e.py its file plus class, so every other module keeps exactly today's one-file-per-worker behaviour; bare loadgroup would spread ungrouped tests one by one. REJECTED splitting the e2e module into several themed files under loadfile: simpler config, but the files must be balanced by hand as tests are added and each one pays its own build."
+    - "PROVISIONAL (built 2026-10-25): THE OUTPUT LOCATION IS ONE `--out-dir DIR` OPTION on mothman dashboard rebuild-results, build-data, embed, check-renders and rebuild, CARRIED BETWEEN STEPS BY AN ENVIRONMENT VARIABLE (MOTHMAN_DASHBOARD_OUT, read at call time by qa_tools/common/build_output.py). DIR is self-contained in both directions: DIR/reports/ is written and read by every step, the page is DIR/qa-reporting-dashboard.html with data/ beside it. REJECTED a parameter threaded through each module: the steps are separate commands, often separate processes, and the module constants tests redirect (results_history.ROOT, build_dashboard_data.REPORTS, embed's DASHBOARD_HTML) keep working unchanged when the option is absent."
+    - "PROVISIONAL: UNDER --out-dir THE TICKET FILES ARE READ FROM DIR/reports TOO (open_tickets.json, ticket_resolutions.json), not the real reports/, so a variant fixture writes its ticket where its own build reads it. A build without the option reads them exactly where it always did."
+    - "FONTS/ AND VENDOR/ ARE COPIED INTO DIR, NOT LINKED (criterion 5), and only under --out-dir: under half a megabyte, and DIR then opens on its own. A build into dashboard/ itself copies nothing."
+    - "THE FIXTURE NOW RUNS ALL THREE STEPS THROUGH mothman (it ran build-data and embed as bare `python -m` modules): the same functions, and it exercises the option a developer uses."
+    - "VARIANT PAGES READ THE WORKER'S BUILD, INCLUDING ITS ASSETS (criterion 6): the three that re-embed (ticket, divergent arrivals, the in-parts page) go through one helper, _embed_variant, whose DIR/reports links the worker build's files; the pages rewritten from the built HTML link fonts/, vendor/ and data/ from the worker build. One of those, _with_blockers, linked the REAL dashboard/data/, a real-tree read that would have served another build's data files to a worker's page."
+    - "THE REAL-TREE GUARD IS A STAT COMPARISON OVER A FIXED LIST (criterion 4): every collection's two reports files, the built page and dashboard/data/, taken before the worker builds and compared in a test after. The list cannot be empty, and a file that did not exist and still does not compares equal, which is the honest answer on a fresh runner."
+    - "THE @GROUP SUFFIX IS THE COST OF loadgroup, recorded rather than worked round: under xdist a node id is reported as `path::test@group`, and re-running it by id means dropping the suffix (pyproject.toml and CLAUDE.md say so). A custom scheduler through pytest_xdist_make_scheduler would avoid it, and was NOT built because the agreed mechanism is loadgroup."
+    - "THE TEN-MINUTE MODULE TARGET'S MISS HAS ONE CAUSE, and the two remedies are Keith's call, not taken here: TestEveryScenarioJumpLands is about 400-500s on one worker and is scheduled late (xdist orders groups by test count). Splitting it into two one-test classes, or a scheduling hint that sends it first, would each take it off the critical path; the first changes the test module's shape and the second adds a mechanism nobody agreed."
   - id: REQ-TEST-282
     title: "A browser-test class loads the dashboard once and its tests share that page, except the tests that need a fresh load"
     date_written: "2026-10-23"

@@ -72,7 +72,7 @@ def _resolve_chromium_path() -> str | None:
 _CHROMIUM_PATH = _resolve_chromium_path()
 
 
-def _check_embedded_json() -> list[str]:
+def _check_embedded_json(page: Path | None = None) -> list[str]:
     """The built page's COLLECTION_DATA is all there and is what its list
     says - read through dashboard/data_files.py's one reader
     (REQ-DASH-291 criteria 13 and 14), which takes the page's data from its
@@ -83,7 +83,8 @@ def _check_embedded_json() -> list[str]:
     from dashboard import data_files
     from qa_tools import collections
 
-    found = data_files.read_page(DASHBOARD_PATH.read_text(), DASHBOARD_PATH.parent)
+    page = page or DASHBOARD_PATH
+    found = data_files.read_page(page.read_text(), page.parent)
     if found.problems:
         return [f"COLLECTION_DATA: {p}" if not p.startswith("COLLECTION_DATA") else p
                 for p in found.problems]
@@ -171,16 +172,26 @@ async def _check_render(html_path: Path, label: str) -> list[str]:
     return [f"{label} render check: {e}" for e in console_errors]
 
 
+def built_page() -> Path:
+    """The page to check: the real build's, or under `--out-dir` that build's
+    own (REQ-TEST-281)."""
+    from qa_tools.common import build_output
+
+    out = build_output.out_dir()
+    return Path(out) / build_output.PAGE_NAME if out else DASHBOARD_PATH
+
+
 def main() -> int:
-    if not DASHBOARD_PATH.exists():
-        print(f"FAILED: {DASHBOARD_PATH} doesn't exist - run the build pipeline first.", file=sys.stderr)
+    page = built_page()
+    if not page.exists():
+        print(f"FAILED: {page} doesn't exist - run the build pipeline first.", file=sys.stderr)
         return 1
     if not TEMPLATE_PATH.exists():
         print(f"FAILED: {TEMPLATE_PATH} doesn't exist.", file=sys.stderr)
         return 1
 
-    errors = _check_embedded_json()
-    errors += asyncio.run(_check_render(DASHBOARD_PATH, "built output"))
+    errors = _check_embedded_json(page)
+    errors += asyncio.run(_check_render(page, "built output"))
     errors += asyncio.run(_check_render(TEMPLATE_PATH, "template"))
 
     if errors:

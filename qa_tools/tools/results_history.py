@@ -28,7 +28,7 @@ from __future__ import annotations
 import os
 
 from qa_tools import collections
-from qa_tools.common import asset_time, atomic_file
+from qa_tools.common import asset_time, atomic_file, build_output
 from qa_tools.common.qa_results_reader import (
     RESULT_TOOLS, canonical_order, current_runs_only, list_run_ids, read_check_reads,
     read_cross_table_results, read_dataset_stats, read_one, replaced_runs, run_facts,
@@ -42,8 +42,10 @@ ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 def results_path(collection_id: str) -> str:
     """`<ROOT>/reports/<the collection's results_file>` - the one file both the
     live batch and the rebuild write, named from its agency short and id
-    (REQ-PIPE-248 criterion 7)."""
-    return os.path.join(ROOT, "reports", collections.by_id(collection_id).results_file)
+    (REQ-PIPE-248 criterion 7). Under `--out-dir` the reports directory is the
+    build's own (REQ-TEST-281)."""
+    return os.path.join(build_output.reports_dir(os.path.join(ROOT, "reports")),
+                        collections.by_id(collection_id).results_file)
 
 
 def write_results_file(collection_id: str, *, runs: list[dict], dataset_stats: dict,

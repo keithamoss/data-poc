@@ -45,8 +45,8 @@ from pipeline import (acknowledgements, closed_slots, corrections, excuses, file
 from pipeline.dashboard_check_labels import (dashboard_status, display_name, measure, pooled_url_key,
                                              rank_for_headline, tool_ref, url_key)
 from qa_tools import collections
-from qa_tools.common import (agreement, amber_setting, asset_time, carry_forward, census, drift_reference, hierarchy,
-                             qa_store, schedule_ended, supply_db, supply_status, turned_off)
+from qa_tools.common import (agreement, amber_setting, asset_time, build_output, carry_forward, census,
+                             drift_reference, hierarchy, qa_store, schedule_ended, supply_db, supply_status, turned_off)
 from qa_tools.common.validate_check_lifecycle import collect_checks
 
 ROOT = os.path.join(os.path.dirname(__file__), "..")
@@ -54,11 +54,13 @@ REPORTS = os.path.join(ROOT, "reports")
 
 
 def results_path(collection_id: str) -> str:
-    return os.path.join(REPORTS, collections.by_id(collection_id).results_file)
+    return os.path.join(build_output.reports_dir(REPORTS), collections.by_id(collection_id).results_file)
 
 
 def out_path(collection_id: str) -> str:
-    return os.path.join(REPORTS, collections.by_id(collection_id).dashboard_file)
+    """The collection's dashboard file - in the real `reports/`, or under
+    `--out-dir` in the build's own (REQ-TEST-281)."""
+    return os.path.join(build_output.reports_dir(REPORTS), collections.by_id(collection_id).dashboard_file)
 
 
 def _run_date(entry: dict) -> str:

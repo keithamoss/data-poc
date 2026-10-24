@@ -19,6 +19,23 @@ def dashboard_group() -> None:
     """Dashboard rebuild chain - Tier 2 (CI/automation)."""
 
 
+def _out_dir_option(command):
+    """`--out-dir DIR`: write this build to DIR - `DIR/reports/`, the page at
+    `DIR/qa-reporting-dashboard.html` with its data/, fonts/ and vendor/ beside
+    it - reading the reports an earlier step wrote there, never touching the
+    real tree's (REQ-TEST-281). Every step of one build takes the same DIR."""
+    def _use(ctx, param, value):
+        if value:
+            from qa_tools.common import build_output
+            build_output.use(value)
+        return value
+
+    return click.option("--out-dir", type=click.Path(file_okay=False), default=None,
+                        expose_value=False, callback=_use, is_eager=True,
+                        help="Write this build to DIR instead of the real reports/ and dashboard/ "
+                             "(reports under DIR/reports, the page at DIR/qa-reporting-dashboard.html).")(command)
+
+
 def _rebuild_results() -> None:
     from qa_tools import collections
     from qa_tools.tools import results_history
@@ -28,6 +45,7 @@ def _rebuild_results() -> None:
 
 
 @dashboard_group.command("rebuild-results")
+@_out_dir_option
 def rebuild_results_command() -> None:
     """Rebuild every collection's results file under reports/ from its QA history recorded in the database."""
     _rebuild_results()
@@ -54,6 +72,7 @@ def _build_data() -> None:
 
 
 @dashboard_group.command("build-data")
+@_out_dir_option
 def build_data_command() -> None:
     """Reshape every collection's results file into the dashboard's own JSON shape."""
     _build_data()
@@ -65,6 +84,7 @@ def _embed() -> None:
 
 
 @dashboard_group.command("embed")
+@_out_dir_option
 def embed_command() -> None:
     """Embed real data (dashboard JSON, contract config, changelog/plans/requirements) into the built dashboard HTML."""
     _embed()
@@ -197,6 +217,7 @@ def _check_renders() -> None:
 
 
 @dashboard_group.command("check-renders")
+@_out_dir_option
 def check_renders_command() -> None:
     """Gate: the built dashboard HTML is structurally valid and renders with zero real browser console errors."""
     _check_renders()
@@ -231,6 +252,7 @@ def snapshot_command(site_dir: str | None) -> None:
 
 
 @dashboard_group.command("rebuild")
+@_out_dir_option
 def rebuild_command() -> None:
     """Human-facing convenience: rebuild-results -> build-data -> embed -> validate-check-lifecycle ->
     validate-requirements -> validate-changelog -> check-renders, in one go. CI calls the individual steps above instead, for
@@ -248,7 +270,8 @@ def rebuild_command() -> None:
     _validate_changelog()
     console.print("Gate - dashboard structural + real-browser render check...", style="dim")
     _check_renders()
-    console.print("Rebuilt -> dashboard/qa-reporting-dashboard.html", style="green")
+    from dashboard.check_dashboard_renders import built_page
+    console.print(f"Rebuilt -> {built_page()}", style="green")
 
 
 #: The branch GitHub Pages serves the published dashboard from

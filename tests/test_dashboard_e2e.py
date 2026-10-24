@@ -18,7 +18,9 @@ dashboard.embed_dashboard_data) - reading only committed qa_results/
 history, never data/ (CLAUDE.md's own hard rule) - via real subprocess
 calls, matching that workflow's own steps exactly rather than
 reimplementing their __main__ write-to-file logic here. Session-scoped:
-built once, reused by every test in this module.
+built once PER WORKER, into that worker's own directory, and reused by
+every test of this module the worker runs - the module spreads across
+workers a class at a time (REQ-TEST-281).
 """
 from __future__ import annotations
 
@@ -49,11 +51,9 @@ ROOT = Path(__file__).resolve().parent.parent
 DASHBOARD_HTML = ROOT / "dashboard" / "qa-reporting-dashboard.html"
 TEMPLATE_HTML = ROOT / "dashboard" / "qa-reporting-dashboard.template.html"
 
-_BUILD_STEPS = [
-    ["cli.app", "dashboard", "rebuild-results"],
-    ["pipeline.build_dashboard_data"],
-    ["dashboard.embed_dashboard_data"],
-]
+#: The build chain the fixture below runs, every step through mothman with
+#: the worker's own `--out-dir` (REQ-TEST-281).
+_BUILD_STEPS = ["rebuild-results", "build-data", "embed"]
 
 
 def _deployment_dsn():
@@ -89,9 +89,45 @@ def reads_the_deployments_history(supply_dsn, monkeypatch):
         conftest.use_deployment_environment(monkeypatch)
 
 
+#: The real tree's build outputs, which nothing in this module may write
+#: (REQ-TEST-281 criterion 4): each collection's results and dashboard files
+#: and the built page with its data files.
+def _real_build_outputs() -> list[Path]:
+    reports = ROOT / "reports"
+    files = [reports / name for c in _registry.all_collections()
+             for name in (c.results_file, c.dashboard_file)]
+    files.append(DASHBOARD_HTML)
+    data = ROOT / "dashboard" / "data"
+    files += sorted(data.iterdir()) if data.is_dir() else []
+    return files
+
+
+def _stat_of(paths: list[Path]) -> dict[str, tuple[int, int] | None]:
+    return {str(p): ((st := p.stat()).st_mtime_ns, st.st_size) if p.exists() else None
+            for p in paths}
+
+
 @pytest.fixture(scope="session")
-def built_dashboard_html(supply_dsn) -> Path:
-    """The real dashboard, built by the real chain.
+def real_tree_before_the_build() -> dict:
+    """The real tree's build outputs as they stood before this worker built."""
+    return _stat_of(_real_build_outputs())
+
+
+@pytest.fixture(scope="session")
+def built_dashboard_html(supply_dsn, worker_id, tmp_path_factory,
+                         real_tree_before_the_build) -> Path:
+    """The real dashboard, built by the real chain, ONCE PER WORKER, into a
+    directory named for that worker (REQ-TEST-281 criterion 3).
+
+    PER WORKER BECAUSE THIS MODULE NOW SPREADS ACROSS WORKERS a class at a
+    time (`--dist loadgroup`, tests/conftest.py's distribution groups), so a
+    session-scoped fixture runs once on each. It used to build into the real
+    `reports/` and `dashboard/`, and `--dist loadfile` kept the whole module
+    on one worker so two builds never rewrote the same files
+    (plans/tooling.md #10, race 2). Each build now has a directory of its own
+    - `mothman dashboard ... --out-dir` - so no two builds share a file, and
+    the real tree is never written at all (criterion 4). A developer wanting
+    a current local dashboard runs `mothman dashboard rebuild`.
 
     IT BUILDS AGAINST THE DEPLOYMENT'S DATABASE, NOT THE WORKER'S, and
     that is the point rather than a shortcut. This fixture's input is
@@ -100,12 +136,7 @@ def built_dashboard_html(supply_dsn) -> Path:
     saw the same thing for free; REQ-PIPE-089 made it a database, and a
     worker's database is empty by design, so building from one produces
     an empty dashboard and 147 errors that name a subprocess rather
-    than the cause.
-
-    NOTHING HERE WRITES TO IT. The five build steps read recorded
-    results and write `reports/` and the built HTML; `--dist loadfile`
-    keeps this file on one worker, so there is no concurrent build
-    either. Reading a shared corpus is what this always did.
+    than the cause. NOTHING HERE WRITES TO IT.
 
     It needs the deployment's database POPULATED, which is
     `mothman pipeline bootstrap` - see CLAUDE.md's setup section. That
@@ -120,14 +151,93 @@ def built_dashboard_html(supply_dsn) -> Path:
             "database rather than a committed tree, so a checkout alone is no "
             "longer enough.")
 
+    out = tmp_path_factory.mktemp(f"dashboard-build-{worker_id}", numbered=False)
     env = {**os.environ, "MOTHMAN_SUPPLY_DSN": dsn}
+    env.pop("MOTHMAN_DASHBOARD_OUT", None)
     # The environment the deployment's database is marked for (REQ-PIPE-107).
     if _deployment_environment():
         env["MOTHMAN_ENVIRONMENT"] = _deployment_environment()
-    for module in _BUILD_STEPS:
-        subprocess.run([sys.executable, "-m", *module], cwd=ROOT, check=True, env=env)
-    assert DASHBOARD_HTML.exists()
-    return DASHBOARD_HTML
+    for step in _BUILD_STEPS:
+        subprocess.run([sys.executable, "-m", "cli.app", "dashboard", step, "--out-dir", str(out)],
+                       cwd=ROOT, check=True, env=env)
+    page = out / "qa-reporting-dashboard.html"
+    assert page.exists()
+    return page
+
+
+def _reports_of(built: Path) -> Path:
+    """The `reports/` a built page was built from - its worker's own."""
+    return built.parent / "reports"
+
+
+def _embed_variant(built: Path, out: Path, *, reports: dict | None = None) -> Path:
+    """A second page, embedded in-process by the real embed() into `out`, from
+    THIS WORKER'S own built reports (REQ-TEST-281 criterion 6) - never the
+    real tree's. `out/reports/` links each of the worker build's reports
+    files, except those `reports` replaces ({file name: JSON value}); the page
+    lands at `out/qa-reporting-dashboard.html` with its data/, fonts/ and
+    vendor/ beside it, the same `--out-dir` shape the worker's build has."""
+    from dashboard import embed_dashboard_data as edd
+    from qa_tools.common import build_output
+
+    reports = reports or {}
+    (out / "reports").mkdir(parents=True, exist_ok=True)
+    for f in sorted(_reports_of(built).iterdir()):
+        if f.name not in reports:
+            (out / "reports" / f.name).symlink_to(f.resolve())
+    for name, value in reports.items():
+        (out / "reports" / name).write_text(json.dumps(value))
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setenv(build_output.OUT_DIR_ENV, str(out))
+        edd.embed()
+    return out / build_output.PAGE_NAME
+
+
+class TestTheBuildIsTheWorkersOwn:
+    """REQ-TEST-281 criteria 3 to 5: the page every test here reads was built
+    into this worker's own directory, the real tree was not written, and the
+    page's fonts and player load from beside it."""
+
+    def test_the_page_is_built_into_a_directory_named_for_this_worker(self, built_dashboard_html,
+                                                                       worker_id):
+        assert built_dashboard_html.parent.name == f"dashboard-build-{worker_id}"
+        assert ROOT not in built_dashboard_html.parents
+        reports = _reports_of(built_dashboard_html)
+        for c in _registry.all_collections():
+            assert (reports / c.results_file).is_file(), c.id
+            assert (reports / c.dashboard_file).is_file(), c.id
+
+    def test_the_build_did_not_write_the_real_tree(self, built_dashboard_html,
+                                                   real_tree_before_the_build):
+        assert real_tree_before_the_build, "no real-tree outputs listed - this test proves nothing"
+        now = _stat_of([Path(p) for p in real_tree_before_the_build])
+        changed = [p for p, before in real_tree_before_the_build.items() if now[p] != before]
+        assert changed == [], f"the browser-test build wrote the real tree: {changed}"
+        new_data = set(_stat_of(_real_build_outputs())) - set(real_tree_before_the_build)
+        assert not new_data, f"the browser-test build added files to the real tree: {new_data}"
+
+    def test_every_browser_test_is_grouped_by_its_class(self, request):
+        """Criterion 1: --dist loadgroup moves a CLASS between workers, never
+        part of one - the class-scoped variant pages assume it."""
+        mine = [i for i in request.session.items if i.path == request.node.path]
+        assert len(mine) > 1, "only this test collected - this test proves nothing"
+        for item in mine:
+            groups = [m.args[0] for m in item.iter_markers("xdist_group")]
+            path = item.nodeid.split("::", 1)[0]
+            expected = f"{path}::{item.cls.__name__}" if item.cls else path
+            assert groups == [expected], (item.nodeid, groups)
+
+    def test_the_self_hosted_fonts_load_from_beside_the_page(self, clean_page, built_dashboard_html):
+        fonts = []
+        clean_page.on("requestfinished",
+                      lambda r: fonts.append(r.url) if r.url.endswith(".woff2") else None)
+        _goto(clean_page, built_dashboard_html)
+        status = clean_page.evaluate(
+            "() => document.fonts.ready.then(() => [...document.fonts].map(f => f.status))")
+        assert "loaded" in status, status
+        assert "error" not in status, status
+        here = (built_dashboard_html.parent / "fonts").as_uri()
+        assert fonts and all(u.startswith(here) for u in fonts), fonts
 
 
 def _await_requirements_plans(page, *, start: bool = False) -> None:
@@ -879,35 +989,17 @@ def dashboard_html_with_ticket(built_dashboard_html, tmp_path_factory) -> Path:
     whole build chain - dashboard.embed_dashboard_data.embed() is the
     only step that actually needs to re-run.
 
-    Symlinks dashboard/fonts/ and dashboard/vendor/ alongside the output
-    file: the template loads its real local @font-face files and (Phase
-    6, 2026-09-19) the Demo tab's vendored asciinema-player.{css,min.js}
-    via paths relative to the HTML file's own directory, which only
-    resolve when something is actually there - built_dashboard_html
-    doesn't need this since it writes into the real dashboard/ directory
-    itself, alongside the real fonts//vendor/, but this fixture
-    deliberately writes to tmp_path instead (see OPEN_TICKETS_JSON's own
-    docstring on why isolating embed()'s real file targets matters
-    here)."""
-    from dashboard import embed_dashboard_data as edd
-
-    tmp_path = tmp_path_factory.mktemp("ticket")
-    (tmp_path / "fonts").symlink_to((Path(edd.ROOT) / "dashboard" / "fonts").resolve())
-    (tmp_path / "vendor").symlink_to((Path(edd.ROOT) / "dashboard" / "vendor").resolve())
-
-    tickets_path = tmp_path / "open_tickets.json"
-    tickets_path.write_text(json.dumps([{
-        "number": 999, "title": "Birth Registrations is red",
-        "url": "https://github.com/keithamoss/data-poc/issues/999",
-        "labels": [{"name": "qa-ticket"}, {"name": "dataset:birth-registrations"}],
-        "updatedAt": "2026-09-18T00:00:00Z",
-    }]))
-    out_html = tmp_path / "dashboard_with_ticket.html"
-    with pytest.MonkeyPatch.context() as mp:
-        mp.setattr(edd, "OPEN_TICKETS_JSON", tickets_path)
-        mp.setattr(edd, "DASHBOARD_HTML", out_html)
-        edd.embed()
-    return out_html
+    Built by _embed_variant from THIS WORKER'S own reports (REQ-TEST-281
+    criterion 6), with the ticket written to the variant's own
+    `reports/open_tickets.json` - where an `--out-dir` build reads it -
+    and fonts/ and vendor/ placed beside it by the build itself."""
+    return _embed_variant(built_dashboard_html, tmp_path_factory.mktemp("ticket"), reports={
+        "open_tickets.json": [{
+            "number": 999, "title": "Birth Registrations is red",
+            "url": "https://github.com/keithamoss/data-poc/issues/999",
+            "labels": [{"name": "qa-ticket"}, {"name": "dataset:birth-registrations"}],
+            "updatedAt": "2026-09-18T00:00:00Z",
+        }]})
 
 
 class TestTicketBadge:
@@ -1130,10 +1222,9 @@ class TestAcknowledgementBadge:
             "acknowledged": {"actor": "Keith Moss", "reason": "looked", "at": self.ACKNOWLEDGED},
             "lapsedAt": None, **({"acks": acks} if acks is not None else {})}}
         out = tmp_path / "ack.html"
-        root = Path(__file__).resolve().parent.parent / "dashboard"
         for name in ("fonts", "vendor"):
             if not (tmp_path / name).exists():
-                (tmp_path / name).symlink_to((root / name).resolve())
+                (tmp_path / name).symlink_to((built.parent / name).resolve())
         out.write_text(_with_collection_data_inline(built.read_text(), data))
         return out, run_id
 
@@ -1780,7 +1871,7 @@ class TestSupplyAndTableLevelSections:
         ends, and every section reads "No data" (CLAUDE.md's shelf-life note)."""
         from qa_tools import collections
 
-        built = json.loads((Path("reports") / collections.by_id(
+        built = json.loads((_reports_of(built_dashboard_html) / collections.by_id(
             "civil-registration").dashboard_file).read_text())
         newest = max(r["run_date"] for r in built["datasets"][0]["runs"])
         _goto(clean_page, built_dashboard_html, _BDM, in_place_on=newest)
@@ -3244,31 +3335,18 @@ def dashboard_html_with_divergent_arrivals(built_dashboard_html, tmp_path_factor
     longer has is a shape the real data can never produce, and a test
     built on one proves nothing about the real page.
     """
-    from dashboard import embed_dashboard_data as edd
+    from qa_tools import collections
 
-    tmp_path = tmp_path_factory.mktemp("divergent")
-    (tmp_path / "fonts").symlink_to((Path(edd.ROOT) / "dashboard" / "fonts").resolve())
-    (tmp_path / "vendor").symlink_to((Path(edd.ROOT) / "dashboard" / "vendor").resolve())
-
-    source = Path(edd.ROOT) / "reports" / "cpfs_child-protection_dashboard.json"
-    data = json.loads(source.read_text())
+    name = collections.by_id("child-protection").dashboard_file
+    data = json.loads((_reports_of(built_dashboard_html) / name).read_text())
 
     # How many of each dataset's own runs to keep. One is left whole,
     # so the collection genuinely does not line up.
     from tests.divergent_arrivals import cut_datasets_short
     cut_datasets_short(data, {"cp-carers": 9, "cp-case-workers": 1, "cp-investigations": 14})
 
-    doctored = tmp_path / "cpfs_child-protection_dashboard.json"
-    doctored.write_text(json.dumps(data))
-
-    out_html = tmp_path / "dashboard_divergent.html"
-    with pytest.MonkeyPatch.context() as mp:
-        real = edd.collection_targets
-        mp.setattr(edd, "collection_targets", lambda: [
-            (cid, str(doctored) if cid == "child-protection" else path) for cid, path in real()])
-        mp.setattr(edd, "DASHBOARD_HTML", out_html)
-        edd.embed()
-    return out_html
+    return _embed_variant(built_dashboard_html, tmp_path_factory.mktemp("divergent"),
+                          reports={name: data})
 
 
 class TestPerDatasetArrivals:
@@ -3965,10 +4043,9 @@ def _with_blockers(built: Path, out: Path, blockers: list,
     `closed_slots`, when given, replaces every real dataset's closed,
     unfilled periods (REQ-DASH-133) - the dataset ids it names get those
     slots, every other dataset none."""
-    root = Path(__file__).resolve().parent.parent / "dashboard"
     for name in ("fonts", "vendor", "data"):
         if not (out.parent / name).exists():
-            (out.parent / name).symlink_to((root / name).resolve())
+            (out.parent / name).symlink_to((built.parent / name).resolve())
     html = _rewrite_const(built.read_text(), "OUTSTANDING",
                           lambda record: record.__setitem__("blockers", blockers))
     if closed_slots is not None:
@@ -4972,7 +5049,6 @@ def dashboard_html_with_a_later_rejection(built_dashboard_html, supply_dsn,
     from datetime import datetime, timezone
 
     import filing_support
-    from dashboard import embed_dashboard_data as edd
     from pipeline import promotion_timeline, slot_timeline
     from qa_tools.common import assignment, promotion, qa_store, rejection, schedule, supply_db
     from qa_tools.common import decision_log as dl
@@ -5015,8 +5091,8 @@ def dashboard_html_with_a_later_rejection(built_dashboard_html, supply_dsn,
                 ds, slot_timeline.for_dataset(ds, conn=conn), conn=conn)
 
     tmp_path = tmp_path_factory.mktemp("later_rejection")
-    (tmp_path / "fonts").symlink_to((Path(edd.ROOT) / "dashboard" / "fonts").resolve())
-    (tmp_path / "vendor").symlink_to((Path(edd.ROOT) / "dashboard" / "vendor").resolve())
+    for name in ("fonts", "vendor"):
+        (tmp_path / name).symlink_to((built_dashboard_html.parent / name).resolve())
     out = tmp_path / "dashboard_later_rejection.html"
     html = built_dashboard_html.read_text()
 
@@ -6107,23 +6183,17 @@ def a_page_built_in_parts(built_dashboard_html, tmp_path_factory):
     """The real build again, with the budget lowered so the real collections
     go past it - the same embed(), only the one constant changed."""
     from dashboard import data_files
-    from dashboard import embed_dashboard_data as edd
 
-    work = tmp_path_factory.mktemp("parts")
-    for name in ("fonts", "vendor"):
-        (work / name).symlink_to((built_dashboard_html.parent / name).resolve())
-    out = work / "dashboard_in_parts.html"
     with pytest.MonkeyPatch.context() as mp:
         mp.setattr(data_files, "BUDGET_BYTES", 2 * data_files.MIB)
-        mp.setattr(edd, "DASHBOARD_HTML", str(out))
-        edd.embed()
-    return out
+        return _embed_variant(built_dashboard_html, tmp_path_factory.mktemp("parts"))
 
 
 class TestAPayloadPastTheBudgetIsWrittenInParts:
     """REQ-DASH-293 criteria 2, 3, 5 and 6, in a real browser over file://."""
 
-    def test_the_page_reassembles_the_unsplit_payload(self, clean_page, a_page_built_in_parts):
+    def test_the_page_reassembles_the_unsplit_payload(self, clean_page, a_page_built_in_parts,
+                                                      built_dashboard_html):
         from dashboard import data_files
         from dashboard import embed_dashboard_data as edd
 
@@ -6134,7 +6204,11 @@ class TestAPayloadPastTheBudgetIsWrittenInParts:
                    <= 2 * data_files.MIB for e in files)
         clean_page.goto(f"file://{a_page_built_in_parts}")
         _wait_rendered(clean_page)
-        unsplit = edd.collection_data()
+        from qa_tools.common import build_output
+
+        with pytest.MonkeyPatch.context() as mp:
+            mp.setenv(build_output.OUT_DIR_ENV, str(built_dashboard_html.parent))
+            unsplit = edd.collection_data()
         for collection in sorted(parted):
             got = clean_page.evaluate("(c) => COLLECTION_DATA[c]", collection)
             assert got == unsplit[collection], collection

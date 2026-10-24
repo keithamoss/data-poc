@@ -949,9 +949,44 @@ def pytest_addoption(parser):
                           "only when essential)")
 
 
+#: Modules whose tests are spread across pytest-xdist workers CLASS BY CLASS
+#: rather than kept on one worker (REQ-TEST-281). Every other module stays
+#: whole on one worker, exactly as `--dist loadfile` kept it.
+SPREAD_BY_CLASS = frozenset({"test_dashboard_e2e.py"})
+
+
+def _distribution_group(item) -> str:
+    """The xdist_group `--dist loadgroup` schedules this test in.
+
+    ITS FILE, for every module: bare loadgroup would hand ungrouped tests
+    out one at a time, which would silently undo what loadfile gave every
+    module - one worker per file, so a module's module- and class-scoped
+    fixtures run once (REQ-TEST-281 criterion 2).
+
+    ITS FILE AND CLASS, for a module in SPREAD_BY_CLASS: the browser tests'
+    class-scoped variant pages assume a class runs on one worker, so a class
+    is never split (criterion 1). Its module-level test functions share the
+    file's group.
+    """
+    path = item.nodeid.split("::", 1)[0]
+    if item.path.name in SPREAD_BY_CLASS and getattr(item, "cls", None) is not None:
+        return f"{path}::{item.cls.__name__}"
+    return path
+
+
+def _group_for_distribution(items):
+    for item in items:
+        item.add_marker(pytest.mark.xdist_group(_distribution_group(item)))
+
+
+# TRYFIRST because pytest-xdist's own hook on each worker turns the
+# xdist_group mark into the `@group` suffix the scheduler reads, and the mark
+# has to be there by then.
+@pytest.hookimpl(tryfirst=True)
 def pytest_collection_modifyitems(config, items):
-    """Mark every test that needs a bootstrapped deployment, and DESELECT
-    the on-demand ones unless asked for.
+    """Mark every test that needs a bootstrapped deployment, DESELECT
+    the on-demand ones unless asked for, and give every test the
+    distribution group `--dist loadgroup` schedules it in (REQ-TEST-281).
 
     DESELECTED, NOT SKIPPED: the fast half of CI watches its skip count,
     which should be zero, because a skip there is a test in the wrong
@@ -968,6 +1003,7 @@ def pytest_collection_modifyitems(config, items):
             config.hook.pytest_deselected(items=dropped)
             items[:] = kept
     _mark_deployment(items)
+    _group_for_distribution(items)
 
 
 def _mark_deployment(items):

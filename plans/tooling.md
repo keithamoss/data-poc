@@ -1165,14 +1165,13 @@ wider.md`/`plans/dashboard.md`/etc. already state for their own items).
        `embed()` only `json.load`s each target and substitutes it into a
        const. Real side benefit, not the goal: that module went from
        6.8s to 2.9s by not reading 7MB of JSON per test.
-    2. **A worker-vs-worker clobber, not in the original diagnosis.**
-       Under xdist's default `--dist load`, tests from one file are
-       spread across workers, so `built_dashboard_html` - session-scoped,
-       meaning once *per worker* - ran the whole build chain several
-       times concurrently, each writing the same real files. Fixed with
-       `--dist loadfile` (every test in a file stays on one worker),
-       which is why that flag is load-bearing in `pyproject.toml`'s
-       `addopts` rather than a tuning knob.
+    2. **A worker-vs-worker clobber, not in the original diagnosis** -
+       the session-scoped build fixture running once per worker, each
+       writing the same real files. Fixed then with `--dist loadfile`;
+       superseded 2026-10-24 by REQ-TEST-281, which builds once per worker
+       into a directory of each worker's own and never writes the real
+       tree, so the race is closed by the build rather than the
+       distribution (that requirement's decisions carry the why).
 
     Verified rather than assumed: the two modules run together 3/3 clean
     where they had failed reliably before, and the full suite is **649
@@ -2739,7 +2738,8 @@ testing before anyone treats it as the easy option.
     request. The profile after fix 1 showed exactly where it was going:
     ten setups at ~6.5s each, which is three now.
 
-    Fix 3 is REQ-TEST-281.
+    Fix 3 is REQ-TEST-281, built 2026-10-24. This entry goes whole when
+    REQ-TEST-282 lands, which still cites fix 1 above.
 
     **On the runner itself: keep pytest.** Playwright's Python docs
     document the pytest plugin as the supported path and recommend
