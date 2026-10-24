@@ -115,6 +115,15 @@ def for_dataset(dataset_id: str, conn=None) -> dict[str, dict]:
             for entry in timelines[ds]:
                 when = supply_status.instant(entry["at"])
                 steps.setdefault((when, last), (entry["at"], f"the {entry['action']} of {_name(ds)}"))
+        # AND WHERE AN OWED RE-CHECK CLEARS (post-build-review #266 D2): owed
+        # until the run that cleared it, which need record nothing about this
+        # supply - so the badge steps there as the card does.
+        tables_read = {t for r in shown for t in (r.get("reads") or {})}
+        for when, run_key in owed.changes(tables_read):
+            if run_key:
+                at, cause = _cause(conn, run_key)
+                if at:
+                    steps.setdefault((when, last), (at, cause))
         timeline: list[dict] = []
         for step in sorted(steps):
             when = step[0]

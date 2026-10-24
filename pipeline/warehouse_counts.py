@@ -74,8 +74,11 @@ def points(dataset_id: str, check_id: str, history: list[dict], *,
         tables = {t for e in entries for t in (e.get("reads") or {})}
         involved = {dataset_id, *(d for d in map(supply_status.dataset_of, tables) if d)}
         first = min((at for at, _r in records if at is not None), default=None)
+        # AND WHERE 'OWED' BEGINS OR ENDS (post-build-review #266 D2): the run
+        # that clears a re-check need record nothing on this card.
+        owed_at = {t for t, _run in (owed.changes(tables) if owed is not None else ())}
         instants = sorted({at for at, _r in records if at is not None}
-                          | {t for t in warehouse.instants(involved)
+                          | {t for t in {*warehouse.instants(involved), *owed_at}
                              if first is None or t >= first})
         found: list[dict] = []
         for when in instants:

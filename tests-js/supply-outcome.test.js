@@ -120,7 +120,41 @@ describe("a supply promoted while red", () => {
         timeline: [{at: "2026-01-10T01:00:00+00:00", status: "red", cause: "the arrival of X"}]}}});
     const html = w.redPromotedBadge("x", "r1", "2026-02-01");
     expect(html).toContain("data-red-promoted");
-    expect(html).toContain("Promoted while red");
+    // Keith, 2026-10-24 (post-build-review #266 Q6 = A): already red before
+    // its promotion reads "Went in red", naming when and after what.
+    expect(html).toContain(`Went in red. Red since the arrival of X, ${w.fmtInstant("2026-01-10T01:00:00+00:00")}; promoted ${w.fmtInstant("2026-01-20T01:00:00+00:00")}.`);
+  });
+});
+
+// post-build-review #266, Keith Q6 = A: Child Protection's Notifications,
+// received 11 Feb 2014 and promoted 16 Feb on the gate's reading (its two
+// Evidently checks red only for want of a reference, which by REQ-QAC-108
+// criteria 9 and 15 neither pass nor block), read "Went in green, turned red
+// 11 February after the arrival of Notifications" - a date before it went in.
+describe("a supply already red before its promotion", () => {
+  const raw = {id: "cp-notifications", runs: [{run_id: "n", run_date: "2014-02-11"}],
+    runStates: {n: [{at: "2014-02-16T04:52:10+00:00", state: "promoted", action: "promote"}]},
+    promotedHealth: {n: {promotedOn: "green", promotedAt: "2014-02-16T04:52:10+00:00",
+      timeline: [{at: "2014-02-11T01:00:00.000002+00:00", status: "green", cause: "the arrival of Case Workers"},
+                 {at: "2014-02-11T01:00:00.000003+00:00", status: "red", cause: "the arrival of Notifications"}]}}};
+
+  it("went in red, red since its own arrival, then promoted", () => {
+    const w = withRaw(raw);
+    const root = w.document.createElement("div");
+    root.innerHTML = w.redPromotedBadge("cp-notifications", "n", "2014-02-20");
+    const why = root.querySelector("[data-red-promoted-why]").textContent;
+    expect(why).toBe(`Went in red. Red since the arrival of Notifications, ${w.fmtInstant("2014-02-11T01:00:00.000003+00:00")}; promoted ${w.fmtInstant("2014-02-16T04:52:10+00:00")}.`);
+    expect(why).not.toContain("turned red");
+  });
+
+  it("a red that came after the promotion still went in green and turned", () => {
+    const w = withRaw({...raw, promotedHealth: {n: {...raw.promotedHealth.n, timeline: [
+      {at: "2014-02-11T01:00:00.000003+00:00", status: "green", cause: "the arrival of Notifications"},
+      {at: "2014-02-25T01:00:00+00:00", status: "red", cause: "the promote of Case Workers"}]}}});
+    const root = w.document.createElement("div");
+    root.innerHTML = w.redPromotedBadge("cp-notifications", "n", "2014-03-01");
+    const why = root.querySelector("[data-red-promoted-why]").textContent;
+    expect(why).toBe(`Went in green, turned red ${w.fmtInstant("2014-02-25T01:00:00+00:00")} after the promote of Case Workers.`);
   });
 });
 

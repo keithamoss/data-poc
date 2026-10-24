@@ -7149,14 +7149,22 @@ function redPromotedBadge(datasetId, runId, inPlaceOnDateStr){
     else if(!later && t.status === "red" && !(now && now.status === "red")) later = t;
   });
   if(now && now.status === "red"){
+    // ALREADY RED BEFORE ITS PROMOTION (post-build-review #266, Keith Q6 =
+    // A): the red began at or before the promotion - on the recorded verdict,
+    // whatever the gate read (#132 A1) - so it went in red, and the sentence
+    // says when it turned and when it was promoted. "Turned red ... after"
+    // is kept for a red that really came after the promotion.
+    const before = !!h.promotedAt && new Date(since.at) <= new Date(h.promotedAt);
     const wentRed = h.promotedOn === "red";
     const went = h.promotedOn ? `went in ${escHtml(h.promotedOn)}, ` : "";
-    const how = wentRed ? "promoted while red"
+    const how = before
+      ? `went in red. Red since ${escHtml(since.cause)}, ${fmtInstant(since.at)}; promoted ${fmtInstant(h.promotedAt)}`
+      : wentRed ? "promoted while red"
       : `turned red ${fmtInstant(since.at)} after ${escHtml(since.cause)}`;
     // A SHORT PILL WITH ITS SENTENCE BENEATH (#121 D1/D2, Keith 2026-10-06):
     // the whole sentence in one nowrap pill was 598px wide and coloured with
     // var(--red), which is not a token, so it had no red in it at all.
-    return `<span class="red-promoted" data-red-promoted><span class="pill red sm"><span class="ico"></span>Red promoted</span><span class="rp-why" data-red-promoted-why>${sentenceCase(`${wentRed ? "" : went}${how}`)}</span></span>`;
+    return `<span class="red-promoted" data-red-promoted><span class="pill red sm"><span class="ico"></span>Red promoted</span><span class="rp-why" data-red-promoted-why>${sentenceCase(`${wentRed || before ? "" : went}${how}`)}</span></span>`;
   }
   if(later){
     return `<span class="pill tag sm" data-turns-red-later style="color:var(--ink-muted);"><span class="ico"></span>Turned red later - ${fmtInstant(later.at)}, after ${escHtml(later.cause)}</span>`;

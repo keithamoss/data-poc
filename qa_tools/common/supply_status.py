@@ -167,6 +167,24 @@ class Owing:
     None while it is still owed."""
     items: list[tuple[str, frozenset, int, datetime, datetime | None]] = field(
         default_factory=list)
+    #: The run that cleared each item, aligned with `items` where known.
+    cleared_by: list[str | None] = field(default_factory=list)
+
+    def changes(self, tables) -> list[tuple[datetime, str | None]]:
+        """Every instant 'owed' changes for a reader of `tables` - each
+        cause's effective instant (run None) and each clearing run's
+        recorded instant (that run) - so a reader that asks at chosen
+        instants (warehouse_counts, red_promoted) asks at these too: a
+        clearing run need record nothing about a supply to end its owed red."""
+        wanted, out = set(tables), []
+        for i, (_p, owed_tables, _d, effective, cleared_from) in enumerate(self.items):
+            if not owed_tables & wanted:
+                continue
+            out.append((effective, None))
+            if cleared_from is not None and cleared_from > effective:
+                out.append((cleared_from, self.cleared_by[i] if i < len(self.cleared_by)
+                            else None))
+        return out
 
     def owing(self, periods, tables, at) -> tuple[int, datetime] | None:
         """The newest decision owing a re-evaluation of one of `tables` in
@@ -201,7 +219,7 @@ def owing(conn, periods=None) -> Owing:
     # run - nothing to date it by - is owed at no instant, as before.
     rows = conn.execute(
         f"SELECT o.period, o.tables, o.caused_by_decision, d.effective_at, "
-        f"o.cleared_at IS NOT NULL, r.run_instant "
+        f"o.cleared_at IS NOT NULL, r.run_instant, r.run_key "
         f'FROM {recheck.TABLE} o JOIN "{qa_store.SCHEMA}".decision d '
         "ON d.id = o.caused_by_decision "
         f'LEFT JOIN "{qa_store.SCHEMA}".run r ON r.run_key = o.cleared_by_run '
@@ -210,7 +228,8 @@ def owing(conn, periods=None) -> Owing:
         [recheck.REEVALUATE, *([list(periods)] if scoped else [])]).fetchall()
     return Owing([(p, frozenset(t or ()), int(d), instant(e),
                    (instant(r) if r is not None else instant(e)) if cleared else None)
-                  for p, t, d, e, cleared, r in rows])
+                  for p, t, d, e, cleared, r, _k in rows],
+                 [k for *_rest, k in rows])
 
 
 # ---- the rule ------------------------------------------------------------------

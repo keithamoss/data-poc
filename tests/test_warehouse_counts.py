@@ -359,3 +359,95 @@ class TestOneClockForTheCardAndTheBadge:
         card = ["green" if c in ("first", "retry") else "red"
                 for c in (card_on(f"2099-06-0{d}") for d in range(1, 8))]
         assert badge == card
+
+
+class TestTheBuildAgreesWithResultsAboutOnTheDeployment:
+    """REQ-PIPE-269 criterion 7 as Keith agreed it (post-build-review #266
+    S1, Q2 = A): the dashboard build shares the counting RULE
+    (supply_status.count), not results_about's query, so the two are held to
+    one answer here on the deployment's real history - a deterministic
+    sample of Child Protection's cross-table cards and supplies, at each
+    date the build says the answer changed and the day before the first.
+
+    ONE KNOWN GAP IS LEFT OUT, NAMED AND COUNTED, and is Keith's
+    (post-build-review #266, "the page forgets a re-checked supply's arrival
+    run"): a supply's page carries its CURRENT run only, so once a full
+    re-check of it is recorded, its arrival run's results are on no page -
+    and on the dates between the two, results_about counts the arrival's
+    result while the card has nothing. Only a result whose run the card's
+    history does not hold is left out; every other disagreement fails."""
+
+    def test_a_sample_of_supplies_and_dates(self, deployment_history, tmp_path, monkeypatch):
+        import random
+        from datetime import date, timedelta
+
+        from pipeline import warehouse_counts
+        from qa_tools.common import asset_time, supply_status
+
+        monkeypatch.setattr(results_history, "ROOT", str(tmp_path))
+        monkeypatch.setattr(bdd, "REPORTS", str(tmp_path / "reports"))
+        results_history.build_results_from_history(CP)
+        pages = bdd.build_datasets(CP)
+        pairs = [(page["id"], card, supply)
+                 for page in pages for col in page["columns"] for card in col["checks"]
+                 for supply in sorted(card.get("counted") or {})]
+        assert len(pairs) > 100, "precondition: the deployment has counted cross-table cards"
+        sample = random.Random(266).sample(pairs, 120)
+        compared, not_on_the_page = 0, 0
+        with supply_db.connect(read_only=True, label="test-warehouse-counts") as conn:
+            for dataset_id, card, supply in sample:
+                points = card["counted"][supply]
+                by_rank = {h["rank"]: h for h in card["history"]}
+                days = [p["on"] for p in points]
+                days = sorted({(date.fromisoformat(days[0]) - timedelta(days=1)).isoformat(),
+                               *random.Random(supply).sample(days, min(4, len(days)))})
+                for day in days:
+                    built = [p for p in points if p["on"] <= day]
+                    view = supply_status.View(
+                        as_at=asset_time.end_of_day(date.fromisoformat(day)))
+                    mine = [r for r in supply_status.results_about(
+                        conn, dataset_id, supply, view=view).counted
+                        if r["check_id"] == card["check_id"]]
+                    where = f"{card['check_id']} toward {supply} on {day}"
+                    if (mine and not mine[-1].get("warehouse_reason") and not built
+                            and mine[-1]["run_id"] not in {h["run_id"] for h in card["history"]}):
+                        not_on_the_page += 1
+                        continue
+                    if not built or built[-1]["reason"] == warehouse_counts.NOT_COUNTED:
+                        assert not mine, where
+                    elif built[-1]["rank"] is None:
+                        assert mine and (mine[-1].get("warehouse_reason"),
+                                         mine[-1].get("owed_by_decision")) == (
+                            built[-1]["reason"], built[-1].get("owedBy")), where
+                    else:
+                        assert mine and not mine[-1].get("warehouse_reason"), where
+                        assert mine[-1]["run_id"] == by_rank[built[-1]["rank"]]["run_id"], where
+                    compared += 1
+        assert compared >= 250 and not_on_the_page < compared / 10, (compared, not_on_the_page)
+
+
+class TestOwedEndsAtTheClearingRun:
+
+    def test_a_clearing_run_that_recorded_nothing_here_still_ends_the_owed_red(self):
+        """Found by the agreement test on the deployment (post-build-review
+        #266): the run that clears a re-check need record nothing on this
+        card, and the card asked only at results and warehouse changes - so
+        it read 'recheck-owed' past the clearing while results_about read
+        'no-current-result'."""
+        from pipeline import warehouse_counts
+        from qa_tools.common import supply_status
+        c2, n0, n1 = "cp-clients@2", "cp-notifications@0", "cp-notifications@1"
+        history = [_entry("r1", 0, supply=c2, at="2099-07-01T09:00:00+08:00",
+                          reads={"cp_clients": c2, "cp_notifications": n0})]
+        warehouse = _timeline(
+            _held("P", n1, "2099-06-01T10:00:00+08:00", "cp-notifications"),
+            _held("P", c2, "2099-07-02T10:00:00+08:00", "cp-clients"))
+        cause = supply_status.instant("2099-07-02T10:00:00+08:00")
+        cleared = supply_status.instant("2099-07-04T10:00:00+08:00")
+        owed = supply_status.Owing([("P", frozenset({"cp_clients"}), 7, cause, cleared)],
+                                   ["elsewhere"])
+        got = warehouse_counts.points("cp-clients", CLIENT_REF, history,
+                                      warehouse=warehouse, owed=owed)
+        assert [(p["on"], p["reason"]) for p in got[c2]] == [
+            ("2099-07-01", None), ("2099-07-02", supply_status.RECHECK_OWED),
+            ("2099-07-04", supply_status.NO_CURRENT_RESULT)]
