@@ -26775,7 +26775,7 @@ requirements:
     - 'tests/test_recheck_decision.py::TestThroughTheRealExecutor'
     - 'tests/test_recheck.py::TestTwoRunnersNeverRunOneOwedItem'
     - 'tests/test_door_flag_parity.py::test_the_door_offers_what_the_flags_would_record'
-    - 'tests/test_filing_decisions.py::TestTheEightAreOneList::test_there_are_nineteen_of_them'
+    - 'tests/test_filing_decisions.py::TestTheEightAreOneList::test_there_are_twenty_of_them'
     implemented_by:
     - 'qa_tools/common/rechecking.py::standing'
     - 'qa_tools/common/rechecking.py::refuse_a_backstopped_dataset'
@@ -27331,7 +27331,7 @@ requirements:
     - 'tests/test_withdrawal.py::TestCriticFindingsOn193'
     - 'tests/test_dashboard_e2e.py::TestAcknowledgementBadge::test_a_withdrawn_one_reads_as_at_the_date_on_show'
     - 'tests/test_door_flag_parity.py::test_the_door_offers_what_the_flags_would_record'
-    - 'tests/test_filing_decisions.py::TestTheEightAreOneList::test_there_are_nineteen_of_them'
+    - 'tests/test_filing_decisions.py::TestTheEightAreOneList::test_there_are_twenty_of_them'
     - 'tests-js/withdrawal.test.js'
     implemented_by:
     - 'qa_tools/common/decision_log.py::annotation_pairs'
@@ -41212,6 +41212,7 @@ requirements:
     - "tests/test_dashboard_e2e.py::TestColumnsNotGreenMatchesTheDatasetPage"
     - "tests/test_results_about.py::TestTheBuildAndTheGateAgree"
     - "tests/test_no_guessing_in_placement.py"
+    - "tests/test_carry_forward.py::TestCarryForward::test_no_reader_is_ever_red_for_want_of_the_table"
     implemented_by:
     - "qa_tools/common/supply_status.py::results_about"
     - "qa_tools/common/supply_status.py::recorded_by"
@@ -41309,6 +41310,7 @@ requirements:
     - "AS AT T, ONLY WHAT EXISTED BY T (post-build-review #266 D1, a defect fixed test-first): results_about clips the results it shows to runs recorded by the view's instant (recorded_by, qa.run.run_instant - the dashboard clip's own 'recorded by' date), as well as judging the warehouse at it. It clipped only the warehouse, so a run recorded on 10 January counted as at 5 January. The clip is a dating helper outside _shown, which REQ-PIPE-279 criterion 20's guard reads whole for placement and ordering."
     - "A STEP PER RUN IN THE RED-PROMOTED TIMELINE (post-build-review #266, the UX critic's Notifications caption, a defect of this build fixed test-first): runs at one instant - a zip's, dated by one receipt - each step in the order they were opened, with a decision at that instant after them. Keyed by the instant alone, the first run lent its cause to every status change at that instant, and the caption blamed Case Workers for Notifications' own red."
     - "AN IMPOSSIBLE COUNTED RANK FAILS LOUDLY (post-build-review #266): where the build counts a rank the card's history on the date does not hold, the page logs a console.error and shows the card as No data ('not-shown'), never the newest result, which was R4's own behaviour. Driven over every run and counted-point date of ed_probe's three collections, it does not occur."
+    - "CRITERION 5 FOR A CARRY-FORWARD, COVERED 2026-10-24 (plan #95 sprint A2, REQ-PIPE-280): a carry-forward is a period move through the same apply_decision hook, so it owes its readers' re-evaluation like every other table-moving decision; while that is owed an in-warehouse reader's check reads 'recheck-owed' naming the carry-forward decision, and once the one re-evaluation has run it counts the result read against the supply carried forward - tests/test_carry_forward.py::TestCarryForward::test_no_reader_is_ever_red_for_want_of_the_table asserts both."
     unmet_criteria:
     - criterion: "Criterion 14 - S14's tests/test_warehouse_view.py::TestCouldNotRunCountsTowardTheAsker::test_a_red_placements_holds_back_only_placements and test_a_zip_without_placements_promotes_clients."
       why: "Both drive the package gate - a first-time zip of all six tables gated together, Placements alone held back and the other five promoted - which REQ-PIPE-266 builds; 267 criterion 6's re-check against no Placements is what makes Placements' checks count toward nothing. The counting rule they rest on is built and tested at the record (TestCountedPerCheck)."
@@ -41426,7 +41428,7 @@ requirements:
       is filed to it, and to be told when a newer supply could be carried forward instead, so that a quarter in which a dataset
       owes nothing never waits for a first promotion every reader is waiting on, and nothing carried forward goes quietly stale.
     moscow: must
-    status: not_started
+    status: built
     signed_off:
       by: Keith
       date: '2026-10-23'
@@ -41512,6 +41514,46 @@ requirements:
     - REQ-PIPE-270
     - REQ-GHUB-229
     - REQ-PIPE-280
+    linked_tests:
+    - "tests/test_period_opening.py::TestOpenedAtTheFirstFiling"
+    - "tests/test_period_opening.py::TestCarryForwardWarning"
+    - "tests/test_period_opening.py::TestTheWarningIsShown"
+    - "tests/test_period_opening.py::TestOweNothingQuarter"
+    - "tests-js/carry-forward-warning.test.js"
+    - "tests/test_knock_on.py::TestAKnockOnRunsAcrossItsStream::test_no_knock_on_waits_in_a_replayed_history"
+    implemented_by:
+    - "qa_tools/common/filing.py::open_at_filing"
+    - "qa_tools/common/filing.py::open_on_refile"
+    - "qa_tools/common/filing.py::file_arrivals"
+    - "qa_tools/common/filing.py::_settle_the_openings_knock_on"
+    - "qa_tools/common/refiling.py::apply"
+    - "qa_tools/common/placing.py::place"
+    - "qa_tools/common/settlement.py::apply"
+    - "qa_tools/common/promotion.py::promote"
+    - "qa_tools/common/carry_forward.py::warn_after_promotion"
+    - "qa_tools/common/carry_forward.py::standing"
+    - "qa_tools/common/carry_forward.py::cleared_at"
+    - "qa_tools/common/carry_forward.py::lines"
+    - "qa_tools/common/carry_forward.py::headline"
+    - "qa_tools/common/carry_forward.py::for_dashboard"
+    - "qa_tools/common/carry_forward.py::carried_periods"
+    - "qa_tools/common/decision_log.py::CARRY_FORWARD_WARNING"
+    - "qa_tools/common/qa_store.py::SCHEMA_VERSION"
+    - "qa_tools/common/outstanding.py::_from_carry_forward_warnings"
+    - "qa_tools/common/inheritance.py::refusals"
+    - "cli/filing_tui.py::queue_flow"
+    - "cli/filing_tui.py::say_carry_forward_warnings"
+    - "cli/filing_tui.py::carry_forward_warnings"
+    - "cli/filing_tui.py::period_flow"
+    - "cli/supply.py::queue_command"
+    - "pipeline/build_dashboard_data.py::build_one_table"
+    - "dashboard/qa-reporting-dashboard.template.html::carryForwardWarningsOn"
+    - "dashboard/qa-reporting-dashboard.template.html::carryForwardWarningBlock"
+    - "dashboard/qa-reporting-dashboard.template.html::collectionCarryForwardLines"
+    evidence:
+    - "2026-10-24, TEST-FIRST BY MUTATION (the code was written alongside the tests, so each was run against the line it covers removed): with filing's open_at_filing call removed, TestOpenedAtTheFirstFiling's opening tests failed (period_schema.opened False) and S6 failed at the package's filing ('promotion rule'.startswith('the filing of ') - under the old rule the quarter was opened by a first promotion); with the opening restricted to Case Workers' own filing, S6 failed the same way; with promotion's warn_after_promotion call removed, every TestCarryForwardWarning and TestTheWarningIsShown test failed bar the absence test test_an_older_promotion_is_not_warned; with the re-file's open_on_refile removed, test_a_re_file_into_a_period_nothing_opened_opens_it failed; with _settle_the_openings_knock_on removed, test_the_openings_own_re_evaluation_is_settled_at_once failed. tests-js/carry-forward-warning.test.js has no pre-change form: the functions it drives did not exist."
+    - "2026-10-24, THE BOOTSTRAP (criterion 9 and the knock-on bound): ed_probe reset and bootstrapped from empty on the final code, 28m09s (33 staged tables). Before _settle_the_openings_knock_on, a first bootstrap of this change left twelve opening re-evaluations waiting 7 to 13 days, failing tests/test_knock_on.py::TestAKnockOnRunsAcrossItsStream::test_no_knock_on_waits_in_a_replayed_history; on the final history none waits a week. The pinned inheritances read as REQ-PIPE-262 criterion 12 pins them."
+    - "2026-10-24, TARGETED RUNS ON THE FINAL TREE (the main session runs the full gate): 104 affected modules needing no deployment, -m 'not needs_deployment' (filing, promotion, inheritance, decision log, filing decisions, door, queue, knock-on, warehouse view, results_about, refiling, placing, settlement, outstanding, corrections and this sprint's three new modules) - 2098 passed; the 21 deployment modules against ed_probe (as-at scenarios, scenario injection and map, asset-time semantics, knock-on, manifest, promotion timeline, publish, embed, status parity and the rest) - 627 passed, 1 xfailed; tests/test_dashboard_e2e.py -n0 -k 'TestBuiltDashboardRenders or TestOwedNothingPeriods or TestAPeriodStandingInOnAnEarlierOne or TestEveryDatasetPageSurvivesItsOwnDrillDown or TestOutstandingDecisions or TestDatasetsNotGreenOnCardsAndHeadings' - 35 passed; npm test and mothman check --no-pytest as the final commit records."
     decisions:
     - 'INHERIT WHEN THE QUARTER IS FILED (Keith, 2026-10-20): ''That would align with the idea we have of having a command to
       open a quarter that''s separate to any checks.'' The deadlock it removes: in an owe-nothing quarter every reader of Case
@@ -41557,6 +41599,20 @@ requirements:
     - 'T18 SETTLED (Keith, 2026-10-23, C = A): out of the run''s scope where a table a check reads is not part of the agreement
       for the period and was never supplied; REQ-PIPE-270 criterion 9 carries it. REJECTED keeping it red with a person promoting
       each such period.'
+    - "BUILT 2026-10-24 (plan #95 sprint A2), OPENED AT THE FIRST FILING: filing.file_arrivals opens the period a supply was just filed to, through period_schema.open_period (REQ-PIPE-098 criterion 4's one mechanism), after the filing commits and before orchestrate.file_and_overlay builds the run's overlay, so every check of the first package reads the inherited tables (criteria 1 and 2). A held supply has no period and opens none; a trial never files (criterion 3). qa.period.opened_by reads 'the filing of <supply> (<collection>)', so a shared quarter names the collection whose filing opened it, and each inheritance names that supply in caused_by_supply (criterion 4). A promotion and a substitution still call open_period, which is a no-op once a period is opened."
+    - "A RE-FILE, A PLACEMENT AND A SETTLEMENT OPEN TOO (PROVISIONAL, not put to Keith): criterion 1 says 'the first supply filed to a period', and a supply re-filed, placed or settled into a period nothing has opened is filed there - refiling.apply, placing.place / placing.apply and settlement.apply open the target before their own transaction (filing.open_on_refile), so the re-check reads the inheritances too. Read as the criterion's whole reach rather than the arrival path alone."
+    - "THE OPENING'S OWN KNOCK-ON IS SETTLED AT THE FILING (PROVISIONAL, not put to Keith; found by the bootstrap): the inheritances an opening makes are period moves, so the one hook (REQ-PIPE-121) owes their readers a re-evaluation. At a first filing nothing in the period has been checked, so there is nobody to re-check, but left owed the item waited for the arrival's promotion - up to its claim window later on a replay's clock - and twelve broke tests/test_knock_on.py's one-week bound (REQ-PIPE-262, #251). filing._settle_the_openings_knock_on completes those items at once, outside any transaction; a reader that did exist would be re-checked as by any knock-on."
+    - "WHAT IS CURRENT AT OPENING (PROVISIONAL, not put to Keith): the inheritance stands on the newest supply the decision log holds when the filing is PROCESSED, in the stream's receipt order (REQ-PIPE-262 criterion 11), as opening at a first promotion always did - not as at the receipt instant. Edge case recorded rather than designed away: a promotion whose invented replay lag (promotion.effective_at_for, up to its claim window) puts its effective instant after another dataset's receipt that opens a later period would be inherited by an inheritance dated before it. None occurs in the bootstrapped history (every inheritance's stands-on supply is promoted before the period opened, the criterion 11 query)."
+    - "THE WARNING IS RECORDED, ITS STANDING DERIVED (criteria 6 and 8): promotion.promote records, in the promotion's own transaction, one 'carry-forward-warning' entry (schema 47, the rule's, naming the later period in to_slot, the newer supply and the period it was promoted into in stands_on, what the later period carried in replaces, and the promotion in caused_by_decision) for every opened later period that inherits the dataset and carries an older supply - or whose inheritance was refused and that still carries nothing. Whether it stands is worked out from the log (carry_forward.standing / cleared_at), never a flag something has to remember to clear, so an as-at view reads the answer the terminal reads now. PROVISIONAL, not put to Keith: the action's name."
+    - "CLEARED FOR GOOD (criterion 8, PROVISIONAL reading, not put to Keith): the first instant after it at which the later period carries forward the warned supply - OR A NEWER ONE STILL, which is what 'carries forward the newer supply' is read to cover - holds a supply of its own, or the warned supply has left its period, clears it; nothing brings a cleared warning back, the converse of 'SHALL NOT clear it any other way'. A substitution of the later period is not read as a supply of its own."
+    - "ONE PER PERIOD AND DATASET (SCALE NFR, PROVISIONAL, not put to Keith): where two warnings stand for one later period - a refused period warned for Q1's supply and then Q3's - the one shown is the newest warned supply, which is also the one REQ-PIPE-280 carries forward."
+    - "THE WORDS (criterion 7): Keith's approved wording, in Python (carry_forward.lines), with the page's lead-in and the terminal's own ('To carry that one forward instead, in one step:', 'To carry it forward, in one step:'), the command on a line of its own with the real dataset and period, then 'or from the <period> door.' PROVISIONAL, not put to Keith: <dataset> is the dataset id on both surfaces, as summary-v6's approved terminal example has it; <instant> is display_time.format_instant on both ('9:00am Monday, 1 July 2024'), not the example's '1 Jul 09:00'; the collection card's one line is the warning's first sentence (carry_forward.headline)."
+    - "WHERE IT IS SHOWN (criterion 7): the terminal's Filing decisions queue prints the warnings as their own 'Could be carried forward' group above the slot rows and outside every count; `mothman supply queue` prints them above the supplies; the period door lists, beside a dataset's slots, every opened period it owes nothing for (carry_forward.carried_periods - inherited, or carrying nothing), and shows the warning there; the outstanding queue carries each as a WARNING item, 'carry-forward-possible', a refused inheritance's prominence; and the dashboard build gives each dataset `carryForwardWarnings` (the days each stood, its words), which the page shows on the dataset's page for the later period (carryForwardWarningBlock) and as one line on the collection card (collectionCarryForwardLines), as at the date on show."
+    - "A CURED REFUSAL LEAVES THE QUEUE (PROVISIONAL, not put to Keith): inheritance.refusals() lists a refused inheritance only while its period still holds nothing for the dataset. Once a person carries a supply forward into it (or inherits, or it is promoted into), 'has no table at all' would be false beside the cleared warning."
+    - "THE PINS DID NOT MOVE (criterion 9): bootstrapped from empty on the final tree, REQ-PIPE-262 criterion 12's inheritances read as pinned - cp-case-workers 2021-Q4 on cp-case-workers@202108010104000000, cp-carers 2022-Q1 and 2022-Q2 on cp-carers@202201051000000800, ed-presentations 2015-Q4 on its 2015-Q3 supply - and the TS-63 / REQ-GEN-251 tests pass (test_as_at_scenarios, test_scenario_injection, test_scenario_map, test_bootstrap_equivalence's ED-gap test is a full capture and was not run). Nothing re-pinned, so nothing to bring to Keith. The bootstrapped history raises no carry-forward warning: no later quarter opened before a newer Case Workers or Carers supply was promoted."
+    - "THE AMENDMENT (criterion 9): REQ-PIPE-098 criterion 4 already carries summary-v4.md's wording, 'AMENDED 2026-10-23 by REQ-PIPE-271', applied at sign-off; nothing further to amend."
+    - "NO PLANS PROSE DELETED: plans/running-thoughts.md #95 and docs/drafts/unjudged-cross-table/ still feed the unbuilt #95 requirements (REQ-PIPE-266, 267, 270, 273, 278, REQ-DASH-272 and the rest), so under the batch rule they go whole once the last is built."
+    - "A TEST-HYGIENE SIGHTING, NOT CHANGED: tests/test_inheritance.py narrows hierarchy.all_datasets with monkeypatch, and qa_tools.collections._load caches the collections it builds from that function - so the first module on a worker to load the registry while it is narrowed leaves every collection with one dataset for the worker's life. Hit building this (a real run's overlay left out cp_notifications); tests/carry_forward_support.py does not narrow it for that reason."
     open_questions: []
   - id: REQ-DASH-272
     title: A dataset page awaiting a decision also gives the warehouse's status, and its cross-table checks show each result
@@ -42526,7 +42582,7 @@ requirements:
       a stale-inheritance warning never leaves the period holding nothing for that table, and no reader turns red and raises
       a ticket for a gap I am about to close.
     moscow: must
-    status: not_started
+    status: built
     signed_off:
       by: Keith
       date: '2026-10-23'
@@ -42610,6 +42666,34 @@ requirements:
     - REQ-GHUB-082
     - REQ-GHUB-229
     - REQ-PIPE-098
+    linked_tests:
+    - "tests/test_carry_forward.py::TestCarryForward"
+    - "tests/test_carry_forward.py::TestTheFlagRoute"
+    - "tests/test_carry_forward.py::TestTheWords"
+    - "tests/test_carry_forward.py::test_the_record_shape_is_held_by_the_database_too"
+    - "tests/test_cli_carry_forward.py::test_door_and_flags_offer_it_with_its_consequences"
+    - "tests/test_door_flag_parity.py"
+    - "tests/test_filing_queue.py::TestWhatASlotOffers"
+    implemented_by:
+    - "qa_tools/common/carry_forward.py::carry_forward"
+    - "qa_tools/common/carry_forward.py::plan"
+    - "qa_tools/common/carry_forward.py::undo_line"
+    - "qa_tools/common/carry_forward.py::already_words"
+    - "qa_tools/common/decision_log.py::CARRY_FORWARD"
+    - "qa_tools/common/filing_decisions.py::CARRY_FORWARD"
+    - "qa_tools/common/filing_decisions.py::consequences"
+    - "qa_tools/common/filing_decisions.py::_carry_forward_consequences"
+    - "qa_tools/common/filing_decisions.py::_failed_against"
+    - "qa_tools/common/filing_decisions.py::_already"
+    - "qa_tools/common/filing_queue.py::operations_for"
+    - "qa_tools/common/filing_queue.py::CARRIES_NOTHING"
+    - "cli/filing_tui.py::apply_decision"
+    - "cli/filing_tui.py::_follow_up"
+    - "cli/filing_tui.py::_owed_nothing_door"
+    - "cli/supply.py::decide_command"
+    evidence:
+    - "2026-10-24, TEST-FIRST: on the base commit (3c69413) 'carry-forward' was no operation - not in filing_decisions.OPERATIONS, refused by the flag form's choice list, no decision-log action - so every test of tests/test_carry_forward.py and tests/test_cli_carry_forward.py had nothing to drive; they were written with the operation and run red against it as it grew (the knock-on half of test_no_reader_is_ever_red_for_want_of_the_table first failed on the readers-only run's shape, the view assertion on the plain promoted table name, the follow-up on a missing view argument), and pass on the final tree. test_the_record_shape_is_held_by_the_database_too holds the schema-47 constraint."
+    - "2026-10-24, RUNS: as REQ-PIPE-271's evidence records - the same targeted modules, the same bootstrap and the same e2e classes, on the same tree."
     decisions:
     - 'ONE STEP (Keith, 2026-10-22, V4-Q2 = A): un-inherit then inherit was two decisions with a knock-on each, and filing_decisions.py:728-730
       refuses an inherit over an inherit (''already inherits. Nothing to do.''), so re-pointing had to pass through a period
@@ -42631,6 +42715,20 @@ requirements:
       the warning stands, un-inherit''s consequence, and the --help text. The name ''carry-forward'' is confirmed by the CLI
       review (it matches mark-not-supplied, excuse-lateness, choose-file, un-inherit).'
     - IT TAKES THE PERIOD LOCK (Keith, 2026-10-22, V5-Q1 = A names carry-forward among the table-moving decisions).
+    - "BUILT 2026-10-24 (plan #95 sprint A2), ONE ENTRY, NO GAP (criteria 3 and 4): carry_forward.carry_forward records one 'carry-forward' entry (schema 47; a person's, with a reason, naming the period in to_slot, the newest earlier promoted supply and its period in supply / stands_on, and what the period stood on before in replaces, NULL where nothing) and replaces the period's view with CREATE OR REPLACE inside that entry's transaction - so no committed state holds nothing for the table. qa.slot_holds reads it as an inheritance; it stands on its supply as an inheritance does (decision_log.STANDS_ON_A_SUPPLY, _standing_on), so a demote of that supply is refused while the period stands on it. Judged again under both slots' locks before the entry is written."
+    - "ONE RE-EVALUATION, AFTER COMMIT (criterion 5): owed by the one period-move hook (decision_log.apply_decision's before/after holding, REQ-PIPE-121) - no second mechanism - and run by the route's follow-up straight after the commit, or left owed for `mothman pipeline process`. While owed, an in-warehouse reader's checks read 'recheck-owed' naming the carry-forward (REQ-PIPE-269 criterion 5, now covered for a carry-forward as its A1 builder noted it would be), and nothing is shouted: the knock-on shouts only for a waiting reader still failing after its re-check, and only once it has run (criterion 10)."
+    - "WHERE IT IS OFFERED (criterion 1): the flag form (`--operation carry-forward`, the GitHub route by the same OPERATIONS list - REQ-PIPE-099 criterion 8), and the period door, through filing_queue.operations_for: beside un-inherit on an inherited period, alone on a period carrying nothing (filing_queue.CARRIES_NOTHING). Those are not slots - the dataset owes nothing there - so the door now lists them beside the slots (carry_forward.carried_periods). PERIOD_SCOPED, never in the queue of supplies (REQ-PIPE-099 criterion 7). It needs an explicit confirmation on every route (NEEDS_CONFIRMATION, REQ-PIPE-099 criterion 10 as amended)."
+    - "REFUSALS AND THE NO-OP (criterion 6): refused, exit 1, nothing recorded, in Keith's wording, where the dataset takes part in the period or the period holds a promoted supply of its own; refused too where the period is substituted (de-substitute first) and where no earlier promoted supply exists. The newest already carried is a no-op in the 'Already so' panel, exit 0 - its panel now goes through _show, so a command in it prints below the panel, copyable."
+    - "THE CONSEQUENCES AND THE WORDS (criteria 7 and 8): the keyed consequences name the supply it stops carrying, the one it carries instead and each reader re-checked against it, marking one whose last check against that supply already failed (from qa.check_read, never the run's resolution); the undo line is Keith's wording; the follow-up lists every reader re-checked with its verdict, or 'Re-evaluation owed' with `mothman pipeline process` on its own line; inherit's no-op adds 'A newer <dataset> could be carried forward:' and the command while a warning stands; un-inherit names carry-forward as the way without a gap - as a NOTE beside its warning, never keyed (PROVISIONAL, not put to Keith: keyed, it would have changed the --acknowledge key every un-inherit script passes); and --help describes it in the criterion's words (carry_forward.DESCRIBED)."
+    - "THE DOOR HIDES TWO FLAG-ONLY OPERATIONS ON A PERIOD CARRYING NOTHING (PROVISIONAL, not put to Keith; tests/test_door_flag_parity.py's HIDDEN): inherit, which there makes the same view carry-forward does - the door offers the one the warning names - and substitute, which says a supply was owed when this period owes none, kept off as (inherited, substitute) already is."
+    - "A PERIOD NOT YET OPENED is opened first, through the one mechanism, and the plan judged after - in practice a carry-forward only ever targets an opened period, since the warning and the door name opened ones."
+    - "THE AMENDMENT (criterion 11): REQ-PIPE-099 criteria 1, 2 and 10 already carry summary-v5.md's wording, 'AMENDED 2026-10-23 by REQ-PIPE-280', applied at sign-off; nothing further to amend."
+    unmet_criteria:
+    - criterion: "Criterion 2 - the per-(collection, period) lock, refusing with exit 75 while a gate application holds it, and criterion 12's tests/test_carry_forward.py::test_refused_while_a_gate_holds_the_period."
+      why: "The lock and the gate application are REQ-PIPE-266 criterion 16's, which is not built: no gate application exists to hold a period, and no exit 75. A carry-forward takes the two slots' advisory locks today, as inherit and un-inherit do; when 266 builds the period lock, carry-forward is one of the table-moving decisions that try-lock it (V5-Q1 = A)."
+      owner: "the plan #95 sprint that builds REQ-PIPE-270, 266, 267, 273 and 278 in one push behind one bootstrap"
+      blocked_by:
+        requirements: ["REQ-PIPE-266"]
     open_questions: []
   - id: REQ-DASH-204
     title: A dataset turned red because another table it reads could not be read says so at the top of its page, naming that
