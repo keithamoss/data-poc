@@ -176,7 +176,18 @@ def _embed_variant(built: Path, out: Path, *, reports: dict | None = None) -> Pa
     real tree's. `out/reports/` links each of the worker build's reports
     files, except those `reports` replaces ({file name: JSON value}); the page
     lands at `out/qa-reporting-dashboard.html` with its data/, fonts/ and
-    vendor/ beside it, the same `--out-dir` shape the worker's build has."""
+    vendor/ beside it, the same `--out-dir` shape the worker's build has.
+
+    AGAINST THE DEPLOYMENT'S DATABASE, like the worker's build, never the
+    worker's own (post-build-review #272). embed() reads the database for
+    everything that is not in reports/ - the outstanding blockers, the
+    changelog feed, the build's provenance - and a class-scoped fixture runs
+    before this module's autouse `reads_the_deployments_history`, so it used
+    to read the worker's test database: empty on a fresh worker, and holding
+    whatever another module on the same worker left there otherwise. A
+    variant must differ from the worker's page only in what it replaces."""
+    import conftest
+
     from dashboard import embed_dashboard_data as edd
     from qa_tools.common import build_output
 
@@ -189,6 +200,9 @@ def _embed_variant(built: Path, out: Path, *, reports: dict | None = None) -> Pa
         (out / "reports" / name).write_text(json.dumps(value))
     with pytest.MonkeyPatch.context() as mp:
         mp.setenv(build_output.OUT_DIR_ENV, str(out))
+        if _deployment_dsn():
+            mp.setenv("MOTHMAN_SUPPLY_DSN", _deployment_dsn())
+            conftest.use_deployment_environment(mp)
         edd.embed()
     return out / build_output.PAGE_NAME
 
@@ -3345,8 +3359,16 @@ def dashboard_html_with_divergent_arrivals(built_dashboard_html, tmp_path_factor
     from tests.divergent_arrivals import cut_datasets_short
     cut_datasets_short(data, {"cp-carers": 9, "cp-case-workers": 1, "cp-investigations": 14})
 
-    return _embed_variant(built_dashboard_html, tmp_path_factory.mktemp("divergent"),
+    page = _embed_variant(built_dashboard_html, tmp_path_factory.mktemp("divergent"),
                           reports={name: data})
+    # WITH NOTHING HELD OR CONTESTED (post-build-review #272), for the reason
+    # dashboard_html_without_blockers gives: a held or contested dataset is
+    # RED, and red outranks the quiet state these tests are about. The
+    # deployment holds cp-case-workers' unplaceable supplies, so on its real
+    # blockers the cut-short cp-case-workers reads red rather than quiet.
+    page.write_text(_rewrite_const(page.read_text(), "OUTSTANDING",
+                                   lambda record: record.__setitem__("blockers", [])))
+    return page
 
 
 class TestPerDatasetArrivals:

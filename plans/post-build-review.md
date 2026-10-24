@@ -11954,3 +11954,39 @@ twice. It deliberately did not re-find the `TypeError`.
      on one worker: the identical refusal. Minor under the standing rule: no
      product behaviour changed beyond `render_errors()`, which keeps the
      render check's result identical.
+
+272. **[done, 2026-10-25]** **[Testing & dev tooling]** **The browser tests'
+     variant pages were embedded against the worker's own test database,
+     not the deployment, so what another module left on that worker
+     reached the page.** Found by the full `mothman check` on 5b60b50 (1
+     failed, 6,243 passed): `TestPerDatasetArrivals::test_each_dataset_
+     resolves_on_its_OWN_history_not_the_collections` on gw0, "expected the
+     three cut-short datasets to resolve quietly, got [2, 4]"; the class
+     passed alone. A different mechanism from #271, and REQ-TEST-281's to
+     own: the in-process re-embed was the same before it, but only the one
+     e2e worker ran it, whose database other modules seldom filled.
+     WHAT IT WAS, measured rather than guessed: `embed()` reads the database
+     for everything outside reports/ - the OUTSTANDING blockers, the
+     changelog feed, the provenance - and a class-scoped fixture runs before
+     the module's autouse `reads_the_deployments_history`, so it read
+     `MOTHMAN_SUPPLY_DSN` as conftest leaves it, the worker's test database.
+     The gate's own leftover page and its `mothman_test_gw0` showed it: that
+     page's OUTSTANDING carried two held and six contested cp-case-workers
+     supplies (qa.hold held 2) which an earlier module on gw0 had recorded,
+     and cp-case-workers, cut to one arrival, rendered "Held (2 supplies)",
+     red, instead of quiet. On a fresh worker the database is empty and the
+     test passes, which is why it passed alone. Reproduced deterministically
+     on one worker, `-n0`, with a stand-in test raising one assignment-rule
+     hold on cp-case-workers before the class: the identical "[2, 4]".
+     FIXED in two parts. `_embed_variant` now embeds against the deployment's
+     database and environment, as the worker's build does, so a variant
+     differs from the worker's page only in what it replaces - this covers
+     the ticket and in-parts variants too. That alone makes the divergence
+     test fail every time instead of sometimes, since the deployment holds
+     cp-case-workers' unplaceable supplies (eight, probed in a real browser
+     on a variant rebuilt against it: the same two quiet rows), so the
+     divergent page also drops its blockers, for the reason
+     `dashboard_html_without_blockers` already gives: a held dataset is red,
+     and red outranks the quiet state the class is about. Same reproduction,
+     with the ticket and in-parts classes beside it: 10 passed. Minor under
+     the standing rule: tests only, no product change.
