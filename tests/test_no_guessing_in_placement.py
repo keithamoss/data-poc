@@ -65,7 +65,8 @@ WHOLE = {
     # And the warehouse view's rule over them (REQ-PIPE-269 criterion 7).
     "qa_tools.common.supply_status": ("_shown", "results_about", "latest_results",
                                       "newest_per_check", "count", "counts_toward", "_matches",
-                                      "_owed", "holdings_at", "owing"),
+                                      "_owed", "holdings_at", "owing", "_count_in",
+                                      "_severity"),
     "qa_tools.common.drift_reference": ("run_for",),
     "qa_tools.common.carried": ("siblings", "decide", "_evaluated_reads", "_supply_read"),
     "qa_tools.common.qa_results_writer": ("_arrival_purpose",),

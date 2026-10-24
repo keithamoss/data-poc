@@ -214,22 +214,31 @@ def owing(conn, periods=None) -> Owing:
     from qa_tools.common import recheck
 
     scoped = periods is not None
-    # CLEARED FROM THE CLEARING RUN'S RECORDED INSTANT (qa.run.run_instant,
-    # the instant its results count from). An item cleared with no recorded
-    # run - nothing to date it by - is owed at no instant, as before.
     rows = conn.execute(
         f"SELECT o.period, o.tables, o.caused_by_decision, d.effective_at, "
-        f"o.cleared_at IS NOT NULL, r.run_instant, r.run_key "
+        f"o.cleared_at IS NOT NULL, o.cleared_by_run "
         f'FROM {recheck.TABLE} o JOIN "{qa_store.SCHEMA}".decision d '
-        "ON d.id = o.caused_by_decision "
-        f'LEFT JOIN "{qa_store.SCHEMA}".run r ON r.run_key = o.cleared_by_run '
-        "WHERE o.kind = ? "
+        "ON d.id = o.caused_by_decision WHERE o.kind = ? "
         + ("AND o.period = ANY(?) " if scoped else "") + "ORDER BY o.id",
         [recheck.REEVALUATE, *([list(periods)] if scoped else [])]).fetchall()
+    when = cleared_instants(conn, [k for *_rest, k in rows if k])
     return Owing([(p, frozenset(t or ()), int(d), instant(e),
-                   (instant(r) if r is not None else instant(e)) if cleared else None)
-                  for p, t, d, e, cleared, r, _k in rows],
+                   (when[k] if k in when else instant(e)) if cleared else None)
+                  for p, t, d, e, cleared, k in rows],
                  [k for *_rest, k in rows])
+
+
+def cleared_instants(conn, run_keys: list[str]) -> dict[str, datetime]:
+    """{run key: its recorded instant} for the runs that cleared owed items -
+    qa.run.run_instant, the instant their results count from (post-build-
+    review #266 D2, Keith Q4 = A: one clock). An item cleared with no
+    recorded run - nothing to date it by - is owed at no instant. DATING,
+    not placing, as recorded_by is (REQ-PIPE-279 criterion 20)."""
+    if not run_keys:
+        return {}
+    return {k: instant(v) for k, v in conn.execute(
+        f'SELECT run_key, run_instant FROM "{qa_store.SCHEMA}".run WHERE run_key = ANY(?)',
+        [list(set(run_keys))]).fetchall()}
 
 
 # ---- the rule ------------------------------------------------------------------
