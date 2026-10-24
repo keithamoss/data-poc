@@ -43483,11 +43483,12 @@ requirements:
     - "2026-10-25, BUILD COST PER WORKER (NFR 5), the session fixture's setup time on each worker's first test: 64-71s in runs 1 and 2, 100-105s in run 3, four builds running at once; the single build before was 66s. The chain run alone into an --out-dir: rebuild-results 8s, build-data 50s, embed 9s."
     - "2026-10-25, THE REAL TREE WAS NOT WRITTEN (criterion 4): the mtime and size of every file under reports/, dashboard/data/ and dashboard/qa-reporting-dashboard.html, listed before the three after-runs and again after them, were identical. Before this change the module's own fixture rewrote all of them on every run."
     - "2026-10-25, THE 10-MINUTE MODULE TARGET IS MISSED, by about one minute (a finding for Keith, per NFR 7): the module's floor is TestEveryScenarioJumpLands, two tests taking 400-503s together on one worker (420s even before, alone), which pytest-xdist schedules late because it hands out larger groups first and this class has two tests. The rest of the module finishes well before it."
+    - "2026-10-25, THE TIMED FULL GATE (criterion 8, NFR 7), `mothman check` on 7d7c828 against ed_probe: every gate passed; pytest 6244 passed, 1 xfailed, 1213.36s (1215.1s as the gate reports it), whole gate 22m37s - against 1309.8s / 24m12s on f9494a5 before this was built. Inside the 25-minute target. Two earlier full gates on this work were red, and are why #271 and #272 exist: 901b198 (10 failed - Playwright's running loop, decision-log state) and 5b60b50 (1 failed - variant pages embedded against the worker's database)."
     open_questions: []
     unmet_criteria:
-    - criterion: "Criterion 8, and criterion 7's 'alongside the timed full gate': the full-gate pytest wall clock with this built, and the 25-minute full-suite target (NFR 7) and the CI deployment half's time (NFR 6) it is judged by."
-      why: "Built in a session told not to run the full mothman check or push; the orchestrating session runs the timed full gate on this tree and records its figure in CLAUDE.md's runtime log and here. CLAUDE.md's log carries the module figures already."
-      owner: "the orchestrating session's timed full gate, 2026-10-25"
+    - criterion: "NFR 6: the CI deployment half's wall clock with this built."
+      why: "Needs a CI run of a commit carrying this; the timed local full gate (criterion 8) is recorded in evidence above."
+      owner: "the CI run of the push carrying REQ-TEST-281, 2026-10-25"
       blocked_by:
         unowned: true
     decisions:

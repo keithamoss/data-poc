@@ -957,8 +957,11 @@ Rough layout:
   now one class, `TestEveryScenarioJumpLands` (two tests, ~400-500s on
   one worker, scheduled late because xdist hands out bigger groups first),
   so it misses the 10-minute module target by about a minute. The
-  last full gate before it was 24m12s, pytest 1309.8s; the full-gate
-  figure with it built is the next timed gate's to record here.
+  last full gate before it was 24m12s, pytest 1309.8s. **With it built
+  (7d7c828, after #271/#272's fixes): pytest 1215s/6244 tests, full
+  `mothman check` 22m37s** - about 95s off the suite, less than the
+  module's own ~620s saving because the rest of the suite now shares the
+  workers with it rather than running beside one busy worker.
 
   Whenever a full local run happens anyway (not a reason to run one
   that selective testing above would otherwise skip), note the real

@@ -2787,5 +2787,25 @@ one or more component tags, and a date.
      file block the whole page? (h) hide the Demo button in snapshots? (i) the
      load-error colour, `--bad` or neutral? Plus E2 (inline fonts/player in
      snapshots?) and E3 (257's SameSite step waits for 257's build).
+   - **CI ON f9494a5 RED, ONE TEST (#270)**: the scenario-list width test
+     read its placement from the deployment, and CI's fast half has none.
+     Reproduced in a clean clone on an empty database, fixed, pushed 81dabe3;
+     **CI green on 81dabe3**.
+   - **REQ-TEST-281 BUILT** (signed, small, test infrastructure only): the
+     browser tests now run on every worker, each building its own dashboard
+     into its own directory, the real `reports/` never written. Module
+     1283s -> ~650s. It took three full gates: 901b198 red (10 - Playwright's
+     running event loop broke later `asyncio.run` users, and a decision-log
+     test inherited another module's promotion; #271), 5b60b50 red (1 -
+     variant pages embedded against the worker's test database; #272),
+     **7d7c828 green: pytest 1215s, gate 22m37s** (was 1309.8s / 24m12s).
+   - **QUESTIONS FOR YOU ON 281**: (j) the module misses its 10-minute target
+     by about a minute - its floor is `TestEveryScenarioJumpLands`, two tests
+     of ~400-500s that xdist schedules late. Split it into two classes, or
+     have it scheduled first? (k) two load-sensitive tests failed once in
+     six module runs (first-view 3s budget at 3799ms; dark-mode reload 10s
+     wait) and passed in every gate. Not loosened, because the 3s budget is
+     your #268 guard - if CI shows them, wait on a signal in the reload test
+     and give the budget class a quieter slot?
    - **STILL TO DO**: A3 (270+266+267+273+278, schema bump, bootstrap) is next
      in the agreed order - deliberately not started overnight, being large.
