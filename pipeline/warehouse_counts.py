@@ -72,7 +72,7 @@ def points(dataset_id: str, check_id: str, history: list[dict], *,
     for supply, entries in sorted(by_supply.items()):
         records = [(_at(e), _record(e, check_id, declared_on)) for e in entries]
         tables = {t for e in entries for t in (e.get("reads") or {})}
-        involved = {dataset_id, *(d for d in map(supply_status._dataset_of, tables) if d)}
+        involved = {dataset_id, *(d for d in map(supply_status.dataset_of, tables) if d)}
         first = min((at for at, _r in records if at is not None), default=None)
         instants = sorted({at for at, _r in records if at is not None}
                           | {t for t in warehouse.instants(involved)
@@ -109,4 +109,4 @@ def _point(newest: dict | None) -> dict:
 def _at(entry: dict):
     """When the result came to exist - the page's own 'recorded by' rule."""
     value = entry.get("recorded_at")
-    return supply_status._instant(value) if value else None
+    return supply_status.instant(value) if value else None

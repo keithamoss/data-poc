@@ -726,12 +726,22 @@ def listed_words(entry: "filing_queue.FiledSupply") -> str:
     return words
 
 
+#: The columns questionary's pointer takes before every choice it lists.
+_POINTER_WIDTH = 3
+
+
 def _supply_line(entry: "filing_queue.FiledSupply") -> str:
     """Arrived, state, verdict (criterion 4) - and the line a person picks.
     Under the table that heads those three columns, so it carries no labels
-    of its own: 'in place in the warehouse, awaiting acknowledgement' would
-    otherwise run past 80 columns (REQ-DASH-277 criterion 5)."""
-    return f"{arrived(entry.state.supply)}  {listed_words(entry)}  ({entry.verdict})"
+    of its own, and WITHIN 80 COLUMNS WITH THE POINTER BEFORE IT
+    (REQ-DASH-277 criterion 5; post-build-review #266 S2): the state words
+    are shortened with _short where the line would run past, never wrapped
+    - the arrival and the verdict always stay, and the table above holds
+    the words in full."""
+    head, tail = f"{arrived(entry.state.supply)}  ", f"  ({entry.verdict})"
+    words = listed_words(entry) or "-"
+    room = 80 - _POINTER_WIDTH - len(head) - len(tail)
+    return head + (words if len(words) <= room else _short(words, room)) + tail
 
 
 def _excuse_offers(state: slot_state.SlotState) -> tuple[str, ...]:

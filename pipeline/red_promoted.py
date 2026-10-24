@@ -70,6 +70,7 @@ def for_dataset(dataset_id: str, conn=None) -> dict[str, dict]:
     reads = promotion._declared_reads()
     out: dict[str, dict] = {}
     timelines: dict[str, list[dict]] = {}
+    warehouses: dict[frozenset, supply_status.HoldingsTimeline] = {}
     owed = None
     for supply, promoted_on, promoted_at in conn.execute(
             f"SELECT DISTINCT ON (supply) supply, promoted_status, effective_at "
@@ -84,31 +85,43 @@ def for_dataset(dataset_id: str, conn=None) -> dict[str, dict]:
         shown = supply_status.results_about(conn, dataset_id, supply,
                                             view=supply_status.View()).shown
         involved = {dataset_id, *(d for r in shown for d in map(
-            supply_status._dataset_of, r.get("reads") or {}) if d)}
+            supply_status.dataset_of, r.get("reads") or {}) if d)}
         for ds in involved:
             if ds not in timelines:
                 timelines[ds] = slot_timeline.for_dataset(ds, conn=conn)
-        warehouse = supply_status.HoldingsTimeline({ds: timelines[ds] for ds in involved})
+        tables = frozenset(involved)
+        if tables not in warehouses:  # one per set of tables, shared by its supplies
+            warehouses[tables] = supply_status.HoldingsTimeline(
+                {ds: timelines[ds] for ds in involved})
+        warehouse = warehouses[tables]
         if owed is None:
             owed = supply_status.owing(conn)
         # EACH STEP: a run that recorded a result about it, at its cause's
         # instant, and a decision that changed what a period beside it holds.
+        # A STEP PER RUN, NOT PER INSTANT (post-build-review #266): a zip's
+        # runs share their receipt's instant, and keying a step by the
+        # instant alone gave every one of them the first run's cause. Runs at
+        # one instant step in the order they were opened (shown's order), and
+        # a decision at that instant after them.
         steps: dict = {}
-        run_at: dict[str, object] = {}
-        for record in shown:
-            key = record["run_id"]
-            if key not in run_at:
-                at, cause = _cause(conn, key)
-                run_at[key] = supply_status._instant(at) if at else None
-                if run_at[key] is not None:
-                    steps.setdefault(run_at[key], (at, cause))
+        place: dict[str, tuple] = {}
+        last = len(shown)
+        for order, record in enumerate(shown):
+            run_key = record["run_id"]
+            if run_key not in place:
+                at, cause = _cause(conn, run_key)
+                when = supply_status.instant(at) if at else None
+                place[run_key] = (when, order) if when is not None else None
+                if when is not None:
+                    steps[(when, order)] = (at, cause)
         for ds in sorted(involved):
             for entry in timelines[ds]:
-                when = supply_status._instant(entry["at"])
-                steps.setdefault(when, (entry["at"], f"the {entry['action']} of {_name(ds)}"))
+                when = supply_status.instant(entry["at"])
+                steps.setdefault((when, last), (entry["at"], f"the {entry['action']} of {_name(ds)}"))
         timeline: list[dict] = []
-        for when in sorted(steps):
-            got = [r for r in shown if run_at[r["run_id"]] is None or run_at[r["run_id"]] <= when]
+        for step in sorted(steps):
+            when = step[0]
+            got = [r for r in shown if place[r["run_id"]] is None or place[r["run_id"]] <= step]
             if not got:
                 continue
             counted = supply_status.count(dataset_id, supply, got,
@@ -122,7 +135,7 @@ def for_dataset(dataset_id: str, conn=None) -> dict[str, dict]:
                 continue
             if timeline and timeline[-1]["status"] == status:
                 continue
-            at, cause = steps[when]
+            at, cause = steps[step]
             timeline.append({"at": at, "status": status, "cause": cause})
         out[run] = {"promotedOn": promoted_on,
                     "promotedAt": promoted_at.isoformat() if promoted_at else None,

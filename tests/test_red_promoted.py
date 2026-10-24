@@ -58,3 +58,28 @@ class TestRedPromoted:
         assert got["promotedOn"] == "green"
         assert [(t["status"], t["cause"]) for t in got["timeline"]] == [
             ("green", "the arrival of Carers"), ("red", "the promote of Client Register")]
+
+    def test_runs_at_one_instant_each_keep_their_own_cause(self, conn, period, monkeypatch):
+        """Post-build-review #266 (the UX critic's Notifications caption):
+        three runs dated by receipts at the same instant - a zip's - read the
+        supply, and only the third, its own arrival, turns it red. The red
+        is after THAT arrival. Sprint A1 keyed a step by its instant alone,
+        so the first run at the instant lent its cause to all three and the
+        caption blamed Case Workers for Notifications' own failure."""
+        a, a_table = _filed(conn, period, "2026-05-01T01:00:00+00:00")
+        _promote(conn, a, a_table, period, status="green")
+        monkeypatch.setattr(slot_timeline, "_run_for", lambda c, d, s: "run-a" if s == a else None)
+        about = [{"run_id": "workers", "dataset_id": DS, "check_id": "x", "status": "pass"},
+                 {"run_id": "clients", "dataset_id": DS, "check_id": "y", "status": "pass"},
+                 {"run_id": "own", "dataset_id": DS, "check_id": "z", "status": "fail"}]
+        monkeypatch.setattr(supply_status, "results_about",
+                            lambda c, d, s, view: supply_status.About(
+                                about if s == a else [], about if s == a else []))
+        at = "2026-04-30T01:00:00+00:00"
+        causes = {"workers": (at, "the arrival of Case Workers"),
+                  "clients": (at, "the arrival of Client Register"),
+                  "own": (at, "the arrival of Notifications")}
+        monkeypatch.setattr(red_promoted, "_cause", lambda c, k: causes[k])
+        got = red_promoted.for_dataset(DS, conn=conn)["run-a"]
+        assert [(t["status"], t["cause"]) for t in got["timeline"]] == [
+            ("green", "the arrival of Case Workers"), ("red", "the arrival of Notifications")]

@@ -35,6 +35,7 @@ supply row. So it is safe on the dashboard build's path as well as the gate's.
 """
 from __future__ import annotations
 
+import bisect
 from dataclasses import dataclass, field
 from datetime import datetime
 
@@ -107,21 +108,42 @@ class HoldingsTimeline:
     holdings_at does; tests/test_warehouse_view.py holds the two together."""
 
     def __init__(self, entries_by_dataset: dict[str, list[dict]]):
-        self._changes: list[tuple[datetime, str, str, str | None]] = []
+        changes: list[tuple[datetime, str, str, str | None]] = []
         for ds, entries in entries_by_dataset.items():
             for e in entries:
                 holder = e.get("holder") if e.get("held_as") in IN_THE_WAREHOUSE else None
-                self._changes.append((_instant(e["at"]), ds, e["slot"], holder))
-        self._changes.sort(key=lambda c: c[0])
+                changes.append((instant(e["at"]), ds, e["slot"], holder))
+        changes.sort(key=lambda c: c[0])
+        self._changes = changes
+        # A BISECT, NOT A WALK (post-build-review #266 S6): warehouse_counts
+        # and red_promoted ask at() once per instant, and a walk of every
+        # change on each call made that quadratic. `_ends[i]` is one past
+        # the last change at the i-th distinct instant; a snapshot is made
+        # only for an instant asked about, by replaying forward from the
+        # last one made - so asking in time order, as both readers do, is
+        # one pass over the changes in all.
+        self._instants: list[datetime] = []
+        self._ends: list[int] = []
+        for i, (at, *_rest) in enumerate(changes):
+            if i + 1 == len(changes) or changes[i + 1][0] != at:
+                self._instants.append(at)
+                self._ends.append(i + 1)
+        self._made: dict[int, Holdings] = {}
+        self._cursor, self._held = 0, {}
 
-    def at(self, instant) -> Holdings:
-        when = _instant(instant)
-        held: dict[tuple[str, str], str | None] = {}
-        for at, ds, slot, holder in self._changes:
-            if at > when:
-                break
-            held[(ds, slot)] = holder
-        return Holdings({k: v for k, v in held.items() if v})
+    def at(self, when) -> Holdings:
+        i = bisect.bisect_right(self._instants, instant(when)) - 1
+        if i < 0:
+            return Holdings({})
+        if i not in self._made:
+            end = self._ends[i]
+            if end < self._cursor:
+                self._cursor, self._held = 0, {}
+            for _at, ds, slot, holder in self._changes[self._cursor:end]:
+                self._held[(ds, slot)] = holder
+            self._cursor = end
+            self._made[i] = Holdings({k: v for k, v in self._held.items() if v})
+        return self._made[i]
 
     def instants(self, dataset_ids) -> list[datetime]:
         wanted = set(dataset_ids)
@@ -140,7 +162,7 @@ class Owing:
     def owing(self, periods, tables, at) -> tuple[int, datetime] | None:
         """The newest decision owing a re-evaluation of one of `tables` in
         one of `periods` that is still owed at `at`, as (id, effective)."""
-        when = _instant(at) if at is not None else None
+        when = instant(at) if at is not None else None
         found = None
         for period, owed_tables, decision_id, effective, cleared_at in self.items:
             if period not in periods or not owed_tables & set(tables):
@@ -157,16 +179,20 @@ class Owing:
         return found
 
 
-def owing(conn) -> Owing:
-    """Every re-evaluation a decision owes, from qa.owed_run and the log."""
+def owing(conn, periods=None) -> Owing:
+    """Every re-evaluation a decision owes, from qa.owed_run and the log -
+    only those in `periods` where given (one supply's, for results_about;
+    the dashboard build reads them all once)."""
     from qa_tools.common import recheck
 
+    scoped = periods is not None
     rows = conn.execute(
         f"SELECT o.period, o.tables, o.caused_by_decision, d.effective_at, o.cleared_at "
         f'FROM {recheck.TABLE} o JOIN "{qa_store.SCHEMA}".decision d '
-        "ON d.id = o.caused_by_decision WHERE o.kind = ? ORDER BY o.id",
-        [recheck.REEVALUATE]).fetchall()
-    return Owing([(p, frozenset(t or ()), int(d), _instant(e), c) for p, t, d, e, c in rows])
+        "ON d.id = o.caused_by_decision WHERE o.kind = ? "
+        + ("AND o.period = ANY(?) " if scoped else "") + "ORDER BY o.id",
+        [recheck.REEVALUATE, *([sorted(periods)] if scoped else [])]).fetchall()
+    return Owing([(p, frozenset(t or ()), int(d), instant(e), c) for p, t, d, e, c in rows])
 
 
 # ---- the rule ------------------------------------------------------------------
@@ -180,7 +206,9 @@ def declared_on(record: dict) -> str | None:
     return parsed.dataset if parsed else record.get("dataset_id")
 
 
-def _dataset_of(table: str) -> str | None:
+def dataset_of(table: str) -> str | None:
+    """The dataset a logical table belongs to, or None for one the hierarchy
+    does not know (a sample's or a trial's)."""
     from qa_tools.common import hierarchy
 
     try:
@@ -197,7 +225,7 @@ def _matches(holdings: Holdings, reads: dict, period: str) -> bool:
         state = read.get("state")
         if state == qa_store.NO_SUPPLY:
             continue
-        ds = _dataset_of(table)
+        ds = dataset_of(table)
         if ds is None:
             continue
         held = holdings.holder(ds, period)
@@ -232,8 +260,8 @@ def _owed(record: dict, dataset_id: str, periods: list[str], holdings: Holdings)
     if declared_on(record) == dataset_id:
         return True
     tables = [t for t, r in (record.get("reads") or {}).items()
-              if r.get("state") != qa_store.NO_SUPPLY and _dataset_of(t)]
-    return any(all(holdings.holder(_dataset_of(t), p) for t in tables) for p in periods)
+              if r.get("state") != qa_store.NO_SUPPLY and dataset_of(t)]
+    return any(all(holdings.holder(dataset_of(t), p) for t in tables) for p in periods)
 
 
 def count(dataset_id: str, supply: str, shown: list[dict], *, holdings: Holdings,
@@ -274,10 +302,13 @@ def stand_in(record: dict, cause) -> dict:
 
 # ---- the one function -------------------------------------------------------------
 
-def _shown(conn, dataset_id: str, supply: str) -> list[dict]:
+def _shown(conn, dataset_id: str, supply: str, as_at=None) -> list[dict]:
     """Every completed, agreed result about `supply` of `dataset_id`, oldest
     first by run_seq and then as each run recorded them, each cross-table
-    one carrying what it recorded reading (`reads`).
+    one carrying what it recorded reading (`reads`) - and, as at an
+    instant, only those whose run was recorded by then (qa.run.run_instant,
+    the dashboard clip's own 'recorded by' date; post-build-review #266 D1:
+    a result that did not yet exist never counts as at the past).
 
     A RESULT IS ABOUT A SUPPLY BY WHAT IT RECORDED, in one of five states:
 
@@ -331,9 +362,11 @@ def _shown(conn, dataset_id: str, supply: str) -> list[dict]:
         f"OR (c.scope = ? AND {by_file}) "
         f'OR EXISTS (SELECT 1 FROM "{s}".check_read k WHERE k.check_result_id = c.id '
         "AND k.logical_table = ? AND k.state = ? AND k.supply_id = ?)) "
-        "ORDER BY r.run_seq, c.id",
+        + ("AND r.run_instant <= ? " if as_at is not None else "")
+        + "ORDER BY r.run_seq, c.id",
         [qa_store.AGREED, qa_store.CROSS_TABLE_SCOPE, qa_store.FILE_SCOPE, dataset_id, supply,
-         qa_store.FILE_SCOPE, *by_file_params, table, qa_store.READ, supply])
+         qa_store.FILE_SCOPE, *by_file_params, table, qa_store.READ, supply,
+         *([instant(as_at)] if as_at is not None else [])])
     records = reader.records_from(cursor.description, cursor.fetchall())
     ids = [r["result_row"] for r in records]
     reads: dict[int, dict] = {}
@@ -356,11 +389,12 @@ def results_about(conn, dataset_id: str, supply: str, *, view: View) -> About:
     """The results SHOWN about `supply` of `dataset_id` and those COUNTED
     toward it in `view` (REQ-PIPE-279 criterion 21; REQ-PIPE-269 criterion
     7), both oldest first - so the last result per check is the newest."""
-    shown = _shown(conn, dataset_id, supply)
+    shown = _shown(conn, dataset_id, supply, view.as_at)
     tables = {t for r in shown for t in (r.get("reads") or {})}
-    datasets = {dataset_id, *(d for d in map(_dataset_of, tables) if d)}
+    datasets = {dataset_id, *(d for d in map(dataset_of, tables) if d)}
     holdings = holdings_at(conn, datasets, view.as_at)
-    owed = owing(conn) if holdings.periods_of(dataset_id, supply) and tables else None
+    periods = holdings.periods_of(dataset_id, supply)
+    owed = owing(conn, periods) if periods and tables else None
     return About(shown, count(dataset_id, supply, shown, holdings=holdings, owed=owed,
                               at=view.as_at))
 
@@ -394,7 +428,8 @@ def status(conn: supply_db.SupplyConnection, dataset_id: str, supply: str, *,
 
 # ---- small helpers ---------------------------------------------------------------
 
-def _instant(value) -> datetime:
+def instant(value) -> datetime:
+    """An instant from ISO text or a datetime, on the asset's terms."""
     from qa_tools.common import asset_time
 
     return value if isinstance(value, datetime) else asset_time.parse_instant(

@@ -411,3 +411,40 @@ class TestKnockOnStaleness:
                                                  promotion._declared_reads())
                      if r.supply == n2]
         assert reader.waiting and reader.stale
+
+
+# ---------------------------------------------------------------------------
+# The view's instant (criterion 9): only what was recorded by then
+# ---------------------------------------------------------------------------
+
+class TestAsAtTheView:
+
+    def test_a_result_recorded_after_the_instant_does_not_count(self, conn, period):
+        """Post-build-review #266 D1. Clients v1 and Notifications v1 are
+        promoted green on 1 January; a later run of the same two supplies,
+        recorded on 10 January, finds the Client reference failing. As at 5
+        January the status is green - the 10 January result did not exist
+        yet, which is how the dashboard's as-of clip reads it. Before the
+        fix results_about clipped the warehouse to the instant but not the
+        results, and read red."""
+        c1, n1 = _supply("cp-clients"), _supply("cp-notifications")
+        _own(conn, "cp-clients", c1, CLIENTS_OWN, "pass", "2099-01-01T09:00:00+08:00")
+        _own(conn, "cp-notifications", n1, NOTIFICATIONS_OWN, "pass", "2099-01-01T09:00:00+08:00")
+        first = _client_ref(conn, under="cp-notifications", supply=n1, clients=c1,
+                            notifications=n1, status="pass", at="2099-01-01T09:00:00+08:00")
+        _promote(conn, "cp-clients", c1, period, "2099-01-01T10:00:00+08:00")
+        _promote(conn, "cp-notifications", n1, period, "2099-01-01T10:00:00+08:00")
+        later = _client_ref(conn, under="cp-clients", supply=c1, clients=c1, notifications=n1,
+                            status="fail", at="2099-01-10T09:00:00+08:00")
+
+        on_5th = supply_status.View(as_at="2099-01-05T23:59:59+08:00")
+        assert _status(conn, "cp-clients", c1, on_5th) == "green"
+        assert _status(conn, "cp-notifications", n1, on_5th) == "green"
+        assert [r["run_id"] for r in _counted(conn, "cp-clients", c1, CLIENT_REF, on_5th)] == [
+            first]
+        about = supply_status.results_about(conn, "cp-clients", c1, view=on_5th)
+        assert later not in {r["run_id"] for r in about.shown}
+        # And from the 10th on, and now, the later result is the one counted.
+        on_10th = supply_status.View(as_at="2099-01-10T09:00:00+08:00")
+        assert _status(conn, "cp-clients", c1, on_10th) == "red"
+        assert _status(conn, "cp-clients", c1) == "red"
