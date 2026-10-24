@@ -2799,6 +2799,9 @@ one or more component tags, and a date.
      test inherited another module's promotion; #271), 5b60b50 red (1 -
      variant pages embedded against the worker's test database; #272),
      **7d7c828 green: pytest 1215s, gate 22m37s** (was 1309.8s / 24m12s).
+   - **PUSHED c1aafd1, CI GREEN** (all five jobs): the deployment half's
+     tests 6m37s against 14m33s before, so REQ-TEST-281 has no unmet
+     criteria left. The two load-sensitive tests passed there too.
    - **QUESTIONS FOR YOU ON 281**: (j) the module misses its 10-minute target
      by about a minute - its floor is `TestEveryScenarioJumpLands`, two tests
      of ~400-500s that xdist schedules late. Split it into two classes, or

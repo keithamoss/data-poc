@@ -43484,13 +43484,9 @@ requirements:
     - "2026-10-25, THE REAL TREE WAS NOT WRITTEN (criterion 4): the mtime and size of every file under reports/, dashboard/data/ and dashboard/qa-reporting-dashboard.html, listed before the three after-runs and again after them, were identical. Before this change the module's own fixture rewrote all of them on every run."
     - "2026-10-25, THE 10-MINUTE MODULE TARGET IS MISSED, by about one minute (a finding for Keith, per NFR 7): the module's floor is TestEveryScenarioJumpLands, two tests taking 400-503s together on one worker (420s even before, alone), which pytest-xdist schedules late because it hands out larger groups first and this class has two tests. The rest of the module finishes well before it."
     - "2026-10-25, THE TIMED FULL GATE (criterion 8, NFR 7), `mothman check` on 7d7c828 against ed_probe: every gate passed; pytest 6244 passed, 1 xfailed, 1213.36s (1215.1s as the gate reports it), whole gate 22m37s - against 1309.8s / 24m12s on f9494a5 before this was built. Inside the 25-minute target. Two earlier full gates on this work were red, and are why #271 and #272 exist: 901b198 (10 failed - Playwright's running loop, decision-log state) and 5b60b50 (1 failed - variant pages embedded against the worker's database)."
+    - "2026-10-25, CI's DEPLOYMENT HALF (NFR 6), test.yml run 40134013333 on c1aafd1, all five jobs green: the `test-deployment` job's 'Run the tests that need a deployment' step took 6m37s, against 14m33s on f9494a5 (run 40118365643) before this was built; the whole job 19m48s against 35m49s, both bootstrapping from a cache miss (11m38s and 19m29s, so part of the job's drop is the runner, not this). The fast half (`test`) took 14m16s for its tests."
     open_questions: []
-    unmet_criteria:
-    - criterion: "NFR 6: the CI deployment half's wall clock with this built."
-      why: "Needs a CI run of a commit carrying this; the timed local full gate (criterion 8) is recorded in evidence above."
-      owner: "the CI run of the push carrying REQ-TEST-281, 2026-10-25"
-      blocked_by:
-        unowned: true
+    unmet_criteria: []
     decisions:
     - "PER-WORKER BUILD OUTPUT, NOT A SHARED BUILD UNDER A LOCK (Keith approved A as 'a per-worker build output path', 2026-10-23). REJECTED building once under a file lock and having every worker read it: it reintroduces exactly the shared-file read that plans/tooling.md #10 race 1 was, and it couples every worker to the first one's success. A per-worker build costs one build per worker and shares nothing."
     - "THE REAL TREE IS NO LONGER WRITTEN BY THE SUITE (criterion 4). Today the e2e fixture rewrites the real reports/ and built HTML as a side effect, which is also a live hazard to the other needs_deployment modules that read reports/ while it runs. A side effect any developer was relying on (a test run refreshing the local dashboard) goes with it; `mothman dashboard rebuild` is the way to get one."
