@@ -103,6 +103,24 @@ INHERIT_REFUSED = "inherit-refused"
 #: that could undo its own inheritance would quietly remove the
 #: obstacle that exists to make somebody look.
 UN_INHERIT = "un-inherit"
+#: A PERSON CARRIES A NEWER SUPPLY FORWARD into a period that inherits - or
+#: whose inheritance was refused (REQ-PIPE-280): ONE entry naming the period
+#: (`to_slot`), the newest earlier promoted supply it now stands on
+#: (`supply`, `stands_on`) and what it stood on before (`replaces`, None
+#: where nothing). Never an un-inherit followed by an inherit, so the period
+#: never passes through a state holding nothing (criteria 3 and 4).
+#: qa.slot_holds reads it as an inheritance.
+CARRY_FORWARD = "carry-forward"
+#: THE RULE'S WARNING THAT A NEWER SUPPLY COULD BE CARRIED FORWARD
+#: (REQ-PIPE-271 criterion 6): recorded when a supply is promoted into a
+#: period earlier than an open period that inherits its dataset, or whose
+#: inheritance of it was refused, and is newer than what that period carries.
+#: `to_slot` is the later period, `supply` the newer supply, `stands_on` the
+#: period it was promoted into, `replaces` what the later period carries
+#: (None where nothing) and `caused_by_decision` the promotion. It ANNOTATES:
+#: qa.slot_holds ignores it, and whether it still stands is derived
+#: (carry_forward.standing), never recorded.
+CARRY_FORWARD_WARNING = "carry-forward-warning"
 
 #: A supply the off-cycle gate withheld from automatic promotion
 #: (REQ-PIPE-077 criterion 6). NOTHING WRITES IT ANY MORE: REQ-PIPE-131
@@ -205,7 +223,8 @@ ACTIONS = (PROMOTE, REJECT, DEMOTE, REFILE, SUBSTITUTE, DE_SUBSTITUTE,
            INHERIT, INHERIT_REFUSED, UN_INHERIT, PROMOTION_WITHHELD,
            MARK_NOT_SUPPLIED, ACKNOWLEDGE, SUPERSEDE, UN_SUPERSEDE, STILL_FAILING,
            PROMOTION_REFUSED, EXCUSE_LATENESS, WITHDRAW_EXCUSE, KEEP, CHOOSE_FILE, RECHECK,
-           WITHDRAW_ACKNOWLEDGEMENT, WITHDRAW_NOT_SUPPLIED)
+           WITHDRAW_ACKNOWLEDGEMENT, WITHDRAW_NOT_SUPPLIED, CARRY_FORWARD,
+           CARRY_FORWARD_WARNING)
 
 #: Actions that name no supply - each is about one that is not there, or
 #: (STILL_FAILING) about several.
@@ -215,7 +234,7 @@ NO_SUPPLY = (INHERIT_REFUSED, MARK_NOT_SUPPLIED, STILL_FAILING, WITHDRAW_NOT_SUP
 #: rejection.py and substitution.py enforce that by not offering an
 #: actor_kind at all.
 AUTOMATIC_ACTIONS = (PROMOTE, INHERIT, INHERIT_REFUSED, PROMOTION_WITHHELD, SUPERSEDE,
-                     STILL_FAILING, PROMOTION_REFUSED)
+                     STILL_FAILING, PROMOTION_REFUSED, CARRY_FORWARD_WARNING)
 
 #: The decisions that move a supply, and so are the ones criterion 11
 #: refuses while a later period stands on it.
@@ -231,7 +250,7 @@ RECORDS_A_REFUSAL = (PROMOTION_WITHHELD, INHERIT_REFUSED, PROMOTION_REFUSED)
 #: the supply and the inherited view points at a table that is no longer
 #: there. Found by the sprints gate noticing that REQ-PIPE-076's
 #: deferral had had its blockers shipped.
-STANDS_ON_A_SUPPLY = (SUBSTITUTE, INHERIT)
+STANDS_ON_A_SUPPLY = (SUBSTITUTE, INHERIT, CARRY_FORWARD)
 
 #: What kind of thing decided (REQ-PIPE-074 criteria 3 and 4).
 PERSON = "person"
@@ -445,7 +464,25 @@ def _check_shape(decision: Decision) -> None:
             "a withheld promotion needs a reason. It is the only record that "
             "the rule looked and declined, and a refusal with no explanation "
             "is indistinguishable from a rule that never ran.")
-    if decision.action not in (SUBSTITUTE, INHERIT) and decision.stands_on:
+    if decision.action == CARRY_FORWARD:
+        if decision.actor_kind != PERSON:
+            raise DecisionRefused(
+                "only a person carries a supply forward - the rule inherits once, when "
+                "a period opens, and never re-points it (REQ-PIPE-271 criterion 5).")
+        if not (decision.to_slot and decision.stands_on):
+            raise DecisionRefused(
+                "a carry-forward names the period being filled and the period it "
+                "takes the supply from.")
+        if not (decision.reason or "").strip():
+            raise DecisionRefused("a carry-forward needs a reason.")
+    if decision.action == CARRY_FORWARD_WARNING and not (
+            decision.actor_kind == RULE and decision.to_slot and decision.stands_on
+            and decision.caused_by_decision is not None):
+        raise DecisionRefused(
+            "a carry-forward warning is the rule's, naming the later period, the period "
+            "the newer supply was promoted into and the promotion that caused it.")
+    if decision.action not in (SUBSTITUTE, INHERIT, CARRY_FORWARD,
+                               CARRY_FORWARD_WARNING) and decision.stands_on:
         raise DecisionRefused(
             f"only a substitution or an inheritance stands on a period; "
             f"{decision.action!r} does not")
@@ -554,9 +591,9 @@ def _standing_on(conn: supply_db.SupplyConnection, dataset_id: str,
     """
     rows = conn.execute(
         f"SELECT DISTINCT to_slot FROM {TABLE} "
-        "WHERE dataset_id = ? AND supply = ? AND action IN (?, ?) "
+        "WHERE dataset_id = ? AND supply = ? AND action IN (?, ?, ?) "
         "AND to_slot IS NOT NULL",
-        [dataset_id, supply, SUBSTITUTE, INHERIT]).fetchall()
+        [dataset_id, supply, SUBSTITUTE, INHERIT, CARRY_FORWARD]).fetchall()
     standing = []
     how = {SUBSTITUTED: SUBSTITUTE, INHERITED: INHERIT}
     holds = held_all(conn, dataset_id)
@@ -1036,7 +1073,8 @@ def apply_decision(conn: supply_db.SupplyConnection,
         # with it would close the very thing it reports.
         # NOR A KEEP (delivery-critic on 170, D3): keeping a held supply where
         # it is keeps it held, which is the opposite of resolving its hold.
-        if decision.action not in RECORDS_A_REFUSAL and decision.action != KEEP:
+        if decision.action not in RECORDS_A_REFUSAL and decision.action not in (
+                KEEP, CARRY_FORWARD_WARNING):
             supply_holds.resolve_for_supply(
                 conn, dataset_id=decision.dataset_id, supply=decision.supply or "",
                 decision_id=entry_id)

@@ -851,9 +851,13 @@ def queue_command(collection_id: str) -> None:
         with filing_tui.open_log() as conn:
             waiting = filing_queue.awaiting(conn, collection_id)
             owed_now = _owed_in(conn, collection_id)
+            carry = filing_tui.carry_forward_warnings(conn, collection_id)
     except filing_queue.LogUnreachable as exc:
         filing_tui.say_unreachable(exc)
         raise SystemExit(1) from exc
+    # A NEWER SUPPLY THAT COULD BE CARRIED FORWARD (REQ-PIPE-271 criterion 7),
+    # above the supplies and not counted among them.
+    filing_tui.say_carry_forward_warnings(carry)
     if not waiting:
         console.print("Nothing is waiting on a person.", style="green")
     else:
@@ -1019,6 +1023,13 @@ def decide_command(operation: str, dataset_id: str, period: str | None,
     pipeline process` runs every owed QA run. --wait runs them now, for a
     place, a re-file, an un-supersede or a re-check, and exits 3 where the
     decision stands but its checks did not finish.
+
+    \b
+    carry-forward: inherit the newest promoted supply, replacing what this
+    period carries forward (or giving it one) - one decision, so its readers
+    never go without the table:
+      mothman supply decide --operation carry-forward --dataset cp-case-workers \\
+        --period 2024-Q4 --reason '<why>'
 
     \b
     A held supply - one the filing rule could not file to any period - is

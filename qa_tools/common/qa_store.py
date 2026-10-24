@@ -200,7 +200,7 @@ _KEY_COLUMNS = ("agency_id", "collection_id", "tool", "scope", "supply_state")
 #: Bumped whenever the DDL below changes shape. `ensure_schema` reads
 #: it and does nothing when it already matches, which is what keeps
 #: migration DDL off the hot write path - see that function.
-SCHEMA_VERSION = 46
+SCHEMA_VERSION = 47
 
 #: The version at which REQ-PIPE-144 RESHAPED qa.filing and qa.delivery
 #: (a column removed, a column replaced by a foreign key). `CREATE TABLE
@@ -1065,7 +1065,28 @@ ALTER TABLE "{SCHEMA}".decision ADD CONSTRAINT decision_action_known
                       -- withdrawal of an acknowledgement or of a mark as not
                       -- supplied (REQ-PIPE-166) - one version for the sprint.
                       're-check', 'withdraw-acknowledgement',
-                      'withdraw-not-supplied'));
+                      'withdraw-not-supplied',
+                      -- SCHEMA 47: a person's carry-forward (REQ-PIPE-280) and the
+                      -- rule's warning that one is possible (REQ-PIPE-271).
+                      'carry-forward', 'carry-forward-warning'));
+-- A CARRY-FORWARD IS A PERSON'S, WITH A REASON, naming the period it fills
+-- and the period whose promoted supply it now stands on (REQ-PIPE-280
+-- criterion 3); `replaces` is the supply it stood on before, NULL where it
+-- stood on nothing. Schema 47.
+ALTER TABLE "{SCHEMA}".decision DROP CONSTRAINT IF EXISTS decision_carry_forward_shape;
+ALTER TABLE "{SCHEMA}".decision ADD CONSTRAINT decision_carry_forward_shape
+    CHECK (action <> 'carry-forward'
+           OR (actor_kind = 'person' AND to_slot IS NOT NULL AND stands_on IS NOT NULL
+               AND reason IS NOT NULL));
+-- A CARRY-FORWARD WARNING IS THE RULE'S, naming the later period, the newer
+-- supply and the period it was promoted into, caused by that promotion
+-- (REQ-PIPE-271 criterion 6). It changes nothing a period holds, so
+-- qa.slot_holds ignores it by construction. Schema 47.
+ALTER TABLE "{SCHEMA}".decision DROP CONSTRAINT IF EXISTS decision_carry_forward_warning_shape;
+ALTER TABLE "{SCHEMA}".decision ADD CONSTRAINT decision_carry_forward_warning_shape
+    CHECK (action <> 'carry-forward-warning'
+           OR (actor_kind = 'rule' AND to_slot IS NOT NULL AND stands_on IS NOT NULL
+               AND caused_by_decision IS NOT NULL));
 -- A SETTLEMENT OF A CONTESTED PAIR (REQ-PIPE-193 criterion 8, schema 40):
 -- a person's, naming the pair's `#1` supply and the period it was filed
 -- to. What became of each file is on qa.decision_file below.
@@ -1543,7 +1564,9 @@ WITH RECURSIVE named AS (
       -- (REQ-PIPE-132's acknowledgements, a re-check record) is ignored
       -- until somebody decides it changes a slot - never read as one by
       -- default.
-      AND d.action IN ('promote', 'refile', 'substitute', 'inherit',
+      -- A CARRY-FORWARD (REQ-PIPE-280, schema 47) fills the slot as an
+      -- inheritance does, replacing what it stood on in the one entry.
+      AND d.action IN ('promote', 'refile', 'substitute', 'inherit', 'carry-forward',
                        'reject', 'demote', 'de-substitute', 'un-inherit')
       -- A RE-FILE NEVER FILLS THE SLOT IT GOES TO (REQ-PIPE-141 criteria
       -- 4 and 9): the supply waits in staging there, checked again, and
@@ -1567,6 +1590,7 @@ WITH RECURSIVE named AS (
            CASE WHEN n.into_slot THEN CASE n.action
                 WHEN 'promote' THEN 'promoted'
                 WHEN 'substitute' THEN 'substituted' WHEN 'inherit' THEN 'inherited'
+                WHEN 'carry-forward' THEN 'inherited'
                 END END AS held_as,
            CASE WHEN n.into_slot THEN n.supply END AS holder
     FROM step n WHERE n.rn = 1
@@ -1578,6 +1602,7 @@ WITH RECURSIVE named AS (
            CASE WHEN n.into_slot THEN CASE n.action
                 WHEN 'promote' THEN 'promoted'
                 WHEN 'substitute' THEN 'substituted' WHEN 'inherit' THEN 'inherited'
+                WHEN 'carry-forward' THEN 'inherited'
                 END
                 WHEN n.action IN ('reject', 'demote', 'refile')
                      AND w.holder IS NOT NULL AND n.supply <> w.holder

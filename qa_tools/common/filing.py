@@ -492,6 +492,16 @@ def file_arrivals(found_arrivals) -> list[Assignment]:
                     wrote = record(decided, arrival.delivery_name, conn=conn)
                     if wrote and decided.slot and not decided.is_held:
                         _supersede_earlier(conn, arrival, decided)
+                if wrote and decided.slot and not decided.is_held:
+                    # THE PERIOD OPENS AT ITS FIRST FILING (REQ-PIPE-271
+                    # criteria 1 to 4), before the overlay is built and so
+                    # before any check runs: what it owes nothing for is
+                    # inherited now, so every check of the first package filed
+                    # to it reads the inherited tables. Through the one opening
+                    # mechanism (REQ-PIPE-098 criterion 4), after the filing
+                    # commits - it writes decisions of its own. A held supply
+                    # has no period and opens none; a trial never files.
+                    open_at_filing(conn, decided, arrival)
             # AN ASSIGNMENT-RULE HOLD IS RECORDED TOO (criterion 3). Its
             # `filing` row above is evidence of what the rule saw and
             # stays write-once; the open work item is the hold, because
@@ -500,6 +510,25 @@ def file_arrivals(found_arrivals) -> list[Assignment]:
                 _raise_assignment_hold(arrival, decided)
             written.append(decided)
     return written
+
+
+def open_at_filing(conn, decided: Assignment, arrival) -> bool:
+    """Open the period a supply was just filed to, if nothing has (REQ-PIPE-271).
+
+    WHICH COLLECTION'S FILING OPENED IT is recorded on the period (criterion
+    4): a quarter Emergency Department and Child Protection share is opened
+    by whichever of them files to it first, in receipt order across the
+    stream (REQ-PIPE-262). Each inheritance it makes names the supply whose
+    filing caused it (REQ-TEST-150 criterion 6). Returns whether this call
+    opened it."""
+    from qa_tools.common import hierarchy, period_schema
+
+    collection = hierarchy.dataset(decided.dataset_id).collection_id
+    at = getattr(arrival, "received_at", None) or decided.received_at
+    return period_schema.open_period(
+        conn, decided.slot, opened_by=f"the filing of {decided.supply_id} ({collection})",
+        effective_at=at.isoformat() if at is not None else None,
+        caused_by=decided.supply_id)
 
 
 def _refused(dataset_ids) -> dict:

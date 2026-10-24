@@ -50,6 +50,9 @@ SUBSTITUTE = decision_log.SUBSTITUTE
 DE_SUBSTITUTE = decision_log.DE_SUBSTITUTE
 INHERIT = decision_log.INHERIT
 UN_INHERIT = decision_log.UN_INHERIT
+#: A newer supply carried forward into a period in one decision
+#: (REQ-PIPE-280) - period-scoped, beside inherit and un-inherit.
+CARRY_FORWARD = decision_log.CARRY_FORWARD
 #: The ninth (REQ-PIPE-132 criterion 4): accept that a closed period was
 #: not supplied. Period-scoped, person only, changes no data.
 MARK_NOT_SUPPLIED = decision_log.MARK_NOT_SUPPLIED
@@ -94,7 +97,7 @@ WITHDRAW_NOT_SUPPLIED = decision_log.WITHDRAW_NOT_SUPPLIED
 OPERATIONS = (PROMOTE, REJECT, DEMOTE, REFILE, SUBSTITUTE, DE_SUBSTITUTE,
               INHERIT, UN_INHERIT, MARK_NOT_SUPPLIED, ACKNOWLEDGE, SUPERSEDE, UN_SUPERSEDE,
               EXCUSE_LATENESS, WITHDRAW_EXCUSE, CHOOSE_FILE, PLACE, RECHECK,
-              WITHDRAW_ACKNOWLEDGEMENT, WITHDRAW_NOT_SUPPLIED)
+              WITHDRAW_ACKNOWLEDGEMENT, WITHDRAW_NOT_SUPPLIED, CARRY_FORWARD)
 
 #: Offered on the terminal and never on GitHub (REQ-PIPE-193 criteria 1 and
 #: 16; Keith, 2026-10-13: "given the complexity of this, the choices and the
@@ -113,14 +116,14 @@ SUPPLY_SCOPED = (PROMOTE, REJECT, DEMOTE, REFILE, ACKNOWLEDGE, SUPERSEDE, UN_SUP
 #: never came. None of them answers a question about an arriving supply,
 #: which is why criterion 31 puts them somewhere else entirely.
 PERIOD_SCOPED = (SUBSTITUTE, DE_SUBSTITUTE, INHERIT, UN_INHERIT, MARK_NOT_SUPPLIED,
-                 WITHDRAW_NOT_SUPPLIED)
+                 WITHDRAW_NOT_SUPPLIED, CARRY_FORWARD)
 
 #: Which operations destroy something a reader depends on, and so need
 #: an explicit confirmation on every route (criteria 9 and 28, and
 #: REQ-PIPE-099 criterion 10). The TUI confirms EVERYTHING (criterion
 #: 28); these are the ones the underlying operation refuses without it,
 #: so a route that forgot to ask is refused rather than obeyed.
-NEEDS_CONFIRMATION = (REFILE, DE_SUBSTITUTE, UN_INHERIT)
+NEEDS_CONFIRMATION = (REFILE, DE_SUBSTITUTE, UN_INHERIT, CARRY_FORWARD)
 
 
 #: WHICH DECISIONS REQUIRE A ROLE, and at which level (REQ-GHUB-171 criterion
@@ -339,6 +342,17 @@ def consequences(conn, request: Request) -> Consequences:
         lines, done, notes = _settlement_consequences(conn, request)
     if request.operation == EXCUSE_LATENESS and request.through_period:
         lines, done = _range_consequences(conn, request)
+    if request.operation == CARRY_FORWARD and request.period:
+        lines, done = _carry_forward_consequences(conn, request)
+    if request.operation == UN_INHERIT and request.period:
+        # THE WAY TO RE-POINT WITHOUT A GAP (REQ-PIPE-280 criterion 8), said
+        # beside the warning but never keyed: it changes nothing un-inherit
+        # does, so a script's --acknowledge stays what it was.
+        notes.append(
+            f"To point {request.period} at a newer supply without leaving its readers "
+            f"with no table, carry it forward instead - one decision, no gap:\n"
+            f"mothman supply decide --operation carry-forward --dataset "
+            f"{request.dataset_id} --period {request.period} --reason '<why>'")
     readers = _readers_rechecked(conn, request)
     if readers:
         lines += readers
@@ -378,6 +392,9 @@ def _readers_rechecked(conn, request: Request) -> list[str]:
         # an inheritance about to be refused (delivery-critic on 128 c8).
         from qa_tools.common import inheritance
         moves = inheritance.inherit_one_refusal(conn, ds, period) is None
+    elif op == CARRY_FORWARD:
+        from qa_tools.common import carry_forward
+        moves = not carry_forward.plan(conn, ds, period).already
     elif op == SUBSTITUTE and request.stands_on and request.supply:
         from qa_tools.common import substitution
         try:
@@ -402,18 +419,66 @@ def _readers_rechecked(conn, request: Request) -> list[str]:
     # each entry shows one bullet with its list rather than a bullet each.
     from qa_tools.common import asset_time, filing
 
+    against = None
+    if op == CARRY_FORWARD:
+        from qa_tools.common import carry_forward
+        against = carry_forward.plan(conn, ds, period).supply
+
     def described(r) -> str:
         received = filing.received_at_of(r.dataset_id, r.supply)
         day = (asset_time.local_date(received.isoformat()).strftime("%-d %B %Y")
                if received else "an unknown date")
         state = "waiting" if r.waiting else "accepted"
-        return f"    {hierarchy.dataset(r.dataset_id).dataset_name}, received {day} ({state})"
+        line = f"    {hierarchy.dataset(r.dataset_id).dataset_name}, received {day} ({state})"
+        if against and _failed_against(conn, r, table, against):
+            # NAMED WHERE ITS LAST CHECK AGAINST THE NEW SUPPLY ALREADY FAILED
+            # (REQ-PIPE-280 criterion 7): the re-check will not turn it green.
+            line += f" - its last check against that {name} supply failed"
+        return line
 
     name = hierarchy.dataset(ds).dataset_name
-    return ["\n".join(
-        [f"Checks in other datasets read {name} in {period}. Each of these supplies is "
-         f"owed a re-check by this decision, and may go red:"]
-        + [described(r) for r in found])]
+    head = (f"Checks in other datasets read {name} in {period}. Each of these supplies is "
+            f"owed a re-check by this decision, and may go red:")
+    if op == CARRY_FORWARD:
+        head = (f"Checks in other datasets read {name} in {period}. Each of these supplies "
+                f"is re-checked against the {name} carried forward, once, after this "
+                f"decision:")
+    return ["\n".join([head] + [described(r) for r in found])]
+
+
+def _failed_against(conn, reader, table: str, supply: str) -> bool:
+    """Whether this reader's newest result for a check reading `table` that
+    read it AS `supply` failed - from what each check recorded reading
+    (qa.check_read), never the run's resolution."""
+    from qa_tools.common import knock_on, supply_status
+
+    for r in supply_status.results_about(conn, reader.dataset_id, reader.supply).shown:
+        if knock_on.read_as(r, table) == supply and r.get("status") == "fail":
+            return True
+    return False
+
+
+def _carry_forward_consequences(conn, request: Request) -> tuple[list[str], list[str]]:
+    """What a carry-forward stops carrying and carries instead, and its undo
+    line (REQ-PIPE-280 criteria 7 and 8). Refused before anyone is asked,
+    where it cannot happen; nothing at all where it would change nothing."""
+    from qa_tools.common import carry_forward
+
+    p = carry_forward.plan(conn, request.dataset_id, request.period)
+    if p.already:
+        return [], []
+    new = carry_forward.received(p.dataset_id, p.supply)
+    if p.before_supply:
+        what = (f"{p.period} stops carrying forward the {p.dataset_id} received "
+                f"{carry_forward.received(p.dataset_id, p.before_supply)} (promoted into "
+                f"{p.before_period}), and carries forward the one received {new} (promoted "
+                f"into {p.stands_on}) instead.")
+    else:
+        what = (f"{p.period} carries nothing forward for {p.dataset_id} now; from this "
+                f"decision on it carries forward the one received {new} (promoted into "
+                f"{p.stands_on}).")
+    return ([what, carry_forward.undo_line(p)],
+            [f"{p.period} now carries forward the {p.dataset_id} received {new}."])
 
 
 def _range_consequences(conn, request: Request) -> tuple[list[str], list[str]]:
@@ -727,7 +792,23 @@ def _already(conn, request: Request) -> str | None:
                     f"substitution somebody already recorded. Nothing to do.")
     elif request.operation == INHERIT:
         if inheritance.inherited(conn, request.dataset_id, period) is not None:
-            return f"{period} already inherits. Nothing to do."
+            from qa_tools.common import carry_forward
+
+            said = f"{period} already inherits. Nothing to do."
+            # WHILE A NEWER ONE COULD BE CARRIED FORWARD (REQ-PIPE-280
+            # criterion 8), the way to it, its command on a line of its own.
+            warned = carry_forward.standing(conn, dataset_id=request.dataset_id,
+                                            period=period)
+            if warned:
+                said += (f"\nA newer {request.dataset_id} could be carried forward:\n"
+                         + carry_forward.command(warned[0]))
+            return said
+    elif request.operation == CARRY_FORWARD:
+        from qa_tools.common import carry_forward
+
+        p = carry_forward.plan(conn, request.dataset_id, period)
+        if p.already:
+            return carry_forward.already_words(p)
     elif request.operation == DE_SUBSTITUTE:
         if substitution.substituted(conn, request.dataset_id, period) is None:
             return (f"{period} holds no substitution for {request.dataset_id}. "
@@ -864,6 +945,14 @@ def _apply_one(conn, request: Request, reason: str, *, effective_at: str) -> tup
                    period=request.period, actor=request.actor_name, reason=reason,
                    effective_at=effective_at)
         return (owed,) if owed is not None else ()
+    elif request.operation == CARRY_FORWARD:
+        # REQ-PIPE-280: one entry, the view replaced in its transaction; the
+        # readers' one re-evaluation is owed by the period-move hook.
+        from qa_tools.common import carry_forward
+
+        carry_forward.carry_forward(
+            conn, dataset_id=request.dataset_id, period=request.period,
+            actor=request.actor_name, reason=reason, effective_at=effective_at)
     elif request.operation == UN_INHERIT:
         inheritance.un_inherit(
             conn, dataset_id=request.dataset_id, period=request.period,

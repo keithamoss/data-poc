@@ -361,7 +361,11 @@ def refusals(conn: supply_db.SupplyConnection | None = None) -> list[Refused]:
         f"SELECT dataset_id, to_slot, reason FROM {decision_log.TABLE} "
         "WHERE action = ? ORDER BY dataset_id, to_slot",
         [decision_log.INHERIT_REFUSED]).fetchall()
-    return [Refused(dataset_id=d, period=p, reason=r or "") for d, p, r in rows]
+    # ONLY WHILE THE PERIOD STILL CARRIES NOTHING (REQ-PIPE-280): a period a
+    # person has since carried a supply forward into - or inherited into, or
+    # promoted into - has a table, and "no table at all" would be false.
+    return [Refused(dataset_id=d, period=p, reason=r or "") for d, p, r in rows
+            if decision_log.held(conn, d, p) is None]
 
 
 class InheritanceRefused(Exception):

@@ -4564,6 +4564,36 @@ function stillOwedNote(d, runId){
   if(!t) return "";
   return `<div class="excuse-note" data-still-owed>${escHtml(t.lastOwed.period)} was still owed after the turn-off on ${fmtDay(t.effectiveTo)}</div>`;
 }
+// A NEWER SUPPLY THAT COULD BE CARRIED FORWARD (REQ-PIPE-271 criterion 7),
+// as at the date on show: standing from the asset day it was raised until the
+// day it cleared. The words are the build's (carry_forward.for_dashboard);
+// the page only chooses which stand.
+function carryForwardWarningsOn(raw, dateStr){
+  return ((raw && raw.carryForwardWarnings) || []).filter(w=>
+    w.from <= dateStr && (!w.until || dateStr < w.until));
+}
+// ON THE DATASET'S PAGE FOR THE LATER PERIOD: the sentences, then the
+// command on a line of its own, then the door - every word escaped.
+function carryForwardWarningBlock(ds, dateStr){
+  const raw = rawRealDatasetById(ds.id) || ds;
+  const period = periodNameFor(ds.id, dateStr);
+  const shown = carryForwardWarningsOn(raw, dateStr).filter(w=> w.period === period);
+  if(!shown.length) return "";
+  return shown.map(w=> `<div class="carry-forward-warning" data-carry-forward-warning="${escAttr(w.period)}" role="note" style="margin:0 0 14px; padding:10px 12px; border:1px solid var(--warn-fill); border-radius:6px; max-width:72ch; font-size:13px;">
+      <div>${eventSeverityPill("warning","sm")} ${(w.sentences || []).map(escHtml).join(" ")}</div>
+      <pre class="mono" data-carry-forward-command style="margin:8px 0 4px; white-space:pre-wrap; overflow-wrap:anywhere; font-size:12px;">${escHtml(w.command)}</pre>
+      <div style="color:var(--ink-muted);">${escHtml(w.door)}</div>
+    </div>`).join("");
+}
+// ONE LINE ON ITS COLLECTION CARD per warning standing on the date on show
+// (criterion 7; SCALE NFR: one per period and dataset, nothing per reader).
+function collectionCarryForwardLines(col, dateStr){
+  return ((col && col.datasets) || []).flatMap(d=>{
+    const raw = rawRealDatasetById(d.id) || d;
+    return carryForwardWarningsOn(raw, dateStr).map(w=>
+      `<div class="collection-carry-forward" data-collection-carry-forward="${escAttr(d.id)}" style="margin-top:6px; font-size:12px;">${escHtml((w.sentences || [])[0] || "")}</div>`);
+  }).join("");
+}
 // A COLLECTION'S OWN TURN-OFF on its card (REQ-DASH-180 criterion 2): the
 // collection's turned_off_reason, said once however many datasets share it.
 function collectionTurnOffLine(col){
@@ -5950,6 +5980,7 @@ const OUTSTANDING_KIND_LABEL = {
   "in-flight-delivery":"Still arriving",
   "closed-unfilled-slot":"No supply", "awaiting-decision":"Awaiting a decision",
   "inheritance-refused":"No earlier supply to stand on",
+  "carry-forward-possible":"A newer supply could be carried forward",
   "pending-correction":"Calendar correction to confirm",
   "parked-correction-move":"Correction move waiting"};
 function outstandingKindLabel(kind){ return OUTSTANDING_KIND_LABEL[kind] || kind; }
@@ -6769,7 +6800,7 @@ function renderAgency(view, agencyId){
   const wrap = document.getElementById("collections");
   wrap.innerHTML = ag.collections.map(col=>`
     <div class="collection-block">
-      <div class="collection-title"><h3>${col.name}</h3>${pill(col.status,"sm")}${exhaustedMarker(col.exhaustedCount, col.status)}${refusedMarker(col.refusedCount)}</div>${(ng => `<div class="collection-not-green" data-collection="${col.id}">${datasetsTrendSlot(col.datasets.map(d=>d.id), !ng)}${ng}</div>`)(datasetsNotGreenLine(col.datasets, col.status))}${notCountedMarker(col.status, col.datasets)}${collectionTurnOffLine(col)}
+      <div class="collection-title"><h3>${col.name}</h3>${pill(col.status,"sm")}${exhaustedMarker(col.exhaustedCount, col.status)}${refusedMarker(col.refusedCount)}</div>${(ng => `<div class="collection-not-green" data-collection="${col.id}">${datasetsTrendSlot(col.datasets.map(d=>d.id), !ng)}${ng}</div>`)(datasetsNotGreenLine(col.datasets, col.status))}${notCountedMarker(col.status, col.datasets)}${collectionTurnOffLine(col)}${collectionCarryForwardLines(col, CURRENT_IN_PLACE_ON)}
       ${outstandingMarker("collection", col.id, undefined, col.noSupplyCount)}
       ${redPromotedMarker(col)}
       ${acceptedGapsMarker(col.acceptedCount)}
@@ -7981,6 +8012,7 @@ function renderDataset(view, agencyId, collectionId, datasetId){
     </div>` : ""}
     ${outstandingQueue("dataset", ds.id)}
     ${standingInDetail(ds)}
+    ${carryForwardWarningBlock(ds, CURRENT_IN_PLACE_ON)}
     ${promotionSplit(ds)}
     <div class="sla-strip">
       ${slaTileHtml(rawRealDatasetById(ds.id) || ds, CURRENT_IN_PLACE_ON)}
@@ -10364,7 +10396,10 @@ const DECISION_DONE = {promote:"promoted", reject:"rejected", demote:"demoted",
   "withdraw-acknowledgement":"no longer acknowledged",
   "withdraw-not-supplied":"no longer marked not supplied",
   // REQ-PIPE-164: a person asked for its checks to run again where it is.
-  "re-check":"re-checked"};
+  "re-check":"re-checked",
+  // REQ-PIPE-280 and REQ-PIPE-271: a carry-forward and its warning.
+  "carry-forward":"carried forward instead",
+  "carry-forward-warning":"warned a newer supply could be carried forward"};
 // DECISIONS THAT CHANGED AN EARLIER DATE (REQ-PIPE-081 criterion 6): taking
 // effect on or before the date on show, recorded after it - so the page now
 // shows that date differently from how it could have looked then. The plain

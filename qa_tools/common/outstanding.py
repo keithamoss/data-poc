@@ -60,7 +60,8 @@ about records, and `supply_db.connect` can answer any question at all.
     the delivery record     held supplies, contested and unrecognised
                             files, receipt-time anomalies
     the load record         failed loads
-    the decision log        inheritances that could not complete
+    the decision log        inheritances that could not complete, and
+                            newer supplies a period could carry forward
     observations/in_flight/ a delivery still being written when we
                             looked
 
@@ -114,6 +115,10 @@ CLOSED_UNFILLED_SLOT = "closed-unfilled-slot"
 #: ours rather than the supplier's, which is exactly what somebody
 #: looking at an empty period needs told.
 INHERITANCE_REFUSED = "inheritance-refused"
+#: A newer supply a later period could carry forward (REQ-PIPE-271 criteria 6
+#: and 7) - at the prominence of a refused inheritance (WARNING), one item per
+#: period and dataset, standing until a clearing decision (criterion 8).
+CARRY_FORWARD_POSSIBLE = "carry-forward-possible"
 #: Supplies waiting on a person's decision - the terminal queue's list
 #: (filing_queue.awaiting), ONE ITEM PER DATASET counting them (Keith,
 #: 2026-10-06, post-build-review #123 B2). The dashboard used to leave
@@ -620,6 +625,38 @@ def _from_inheritance_refusals() -> list[Item]:
     return items
 
 
+def _from_carry_forward_warnings() -> list[Item]:
+    """REQ-PIPE-271 criterion 6: each standing warning that a newer supply
+    could be carried forward, at a refused inheritance's prominence."""
+    from qa_tools.common import carry_forward
+
+    items = []
+    try:
+        # THROUGH THE NARROW READER, as inheritance.refusals() is read - it
+        # opens its own read-only connection and answers about records only.
+        standing = carry_forward.standing()
+        words = {(w.dataset_id, w.period): carry_forward.lines(w, voice="page")
+                 for w in standing}
+    except Exception as exc:  # noqa: BLE001 - the queue never fails on one producer
+        print(f"note: could not read carry-forward warnings "
+              f"({type(exc).__name__}: {exc}) - the rest of the queue is unaffected.")
+        return items
+    for w in standing:
+        try:
+            dataset = hierarchy.dataset(w.dataset_id)
+        except hierarchy.UnknownDatasetError:
+            continue
+        said = words[(w.dataset_id, w.period)]
+        items.append(Item(
+            kind=CARRY_FORWARD_POSSIBLE, severity=WARNING, blocking=False,
+            headline=said[0].split(". ")[0] + ".",
+            detail=" ".join(said),
+            agency_id=dataset.agency_id, collection_id=dataset.collection_id,
+            dataset_id=dataset.dataset_id,
+            responses=(f"carry it forward: {carry_forward.command(w)}",)))
+    return items
+
+
 def _from_pending_corrections(conn=None) -> list[Item]:
     """REQ-PIPE-170 criterion 3 - each pending correction, needing action."""
     from qa_tools.common import correction_apply
@@ -736,6 +773,7 @@ def survey(conn=None, observations_dir: Path | None = None) -> Outstanding:
               + _from_contested_tables(blockers, conn)
               + _from_loads(dataset_blockers.refused_in_a_contest(conn))
               + _from_inheritance_refusals()
+              + _from_carry_forward_warnings()
               + _from_awaiting_decisions(conn)
               + _from_pending_corrections(conn)
               + _from_parked_corrections(conn)

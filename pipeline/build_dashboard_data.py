@@ -45,7 +45,7 @@ from pipeline import (acknowledgements, closed_slots, corrections, excuses, file
 from pipeline.dashboard_check_labels import (dashboard_status, display_name, measure, pooled_url_key,
                                              rank_for_headline, tool_ref, url_key)
 from qa_tools import collections
-from qa_tools.common import (agreement, amber_setting, asset_time, census, drift_reference, hierarchy,
+from qa_tools.common import (agreement, amber_setting, asset_time, carry_forward, census, drift_reference, hierarchy,
                              qa_store, schedule_ended, supply_db, supply_status, turned_off)
 from qa_tools.common.validate_check_lifecycle import collect_checks
 
@@ -734,6 +734,9 @@ def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], da
         # WHAT WAS PROMOTED AND WHAT HAD ARRIVED, AS AT EACH DATE (REQ-DASH-197,
         # REQ-DASH-198): change points, one walk of the slot timeline above.
         "promotionTimeline": promotion_timeline.for_dataset(dataset_id, slot_timeline_raw),
+        # A NEWER SUPPLY THAT COULD BE CARRIED FORWARD (REQ-PIPE-271 criterion
+        # 7): each warning with the days it stood, its words worked out here.
+        "carryForwardWarnings": carry_forward.for_dashboard(dataset_id),
         "arrivalHistory": arrival_history,
         "arrivalByRun": arrival_by_run,
         "rowCount": row_count_by_run.get(latest_run),

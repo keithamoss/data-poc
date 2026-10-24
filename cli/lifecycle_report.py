@@ -79,7 +79,8 @@ def outcome_of(conn, arrival) -> Outcome:
         extra.append(f"contested - {', '.join(sorted(names))} were staged for the same table "
                      f"and period; nothing chooses between them")
     gate = _gate_line(conn, dataset_id, supply)
-    # CRITERION 6: the inheritances THIS arrival's promotion caused, as the
+    # CRITERION 6: the inheritances THIS arrival caused - by its filing since
+    # REQ-PIPE-271, which opens the period (by its promotion before) - as the
     # rule's - read by the link each entry records (Keith, 2026-10-06, over
     # a recorded_at window, which would claim whatever a concurrent pass
     # inherited too). They are other datasets', into the period it opened.
@@ -88,7 +89,7 @@ def outcome_of(conn, arrival) -> Outcome:
             "WHERE action = ? AND caused_by_supply = ? ORDER BY id",
             [decision_log.INHERIT, supply]).fetchall():
         extra.append(f"the rule inherited {inherited}'s {stands_on} supply into {slot}, "
-                     f"which this promotion opened")
+                     f"which this arrival opened")
     return Outcome(arrival.run_id, dataset_id, filed, gate, tuple(extra))
 
 

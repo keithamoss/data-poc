@@ -179,8 +179,16 @@ def promote(conn: supply_db.SupplyConnection, *,
             import dataclasses
 
             decision = dataclasses.replace(decision, replaces=displaced)
-        with decision_log.apply_decision(conn, decision):
+        with decision_log.apply_decision(conn, decision) as entry_id:
             move()
+        # A NEWER SUPPLY A LATER PERIOD COULD CARRY FORWARD (REQ-PIPE-271
+        # criterion 6), warned in the promotion's own transaction - so a
+        # promotion never commits without the warnings it owes.
+        from qa_tools.common import carry_forward
+
+        carry_forward.warn_after_promotion(
+            conn, dataset_id=dataset_id, supply=supply, period=period,
+            effective_at=effective_at, promotion_id=entry_id)
     # CHECKED WHEN IT IS TAKEN (REQ-PIPE-081 criterion 13), after the
     # transaction - mid-way, a supersession is not a state to report.
     from qa_tools.common import census

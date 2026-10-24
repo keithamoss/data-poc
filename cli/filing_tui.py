@@ -88,6 +88,10 @@ _WHAT_IT_DOES = {
     filing_decisions.DE_SUBSTITUTE: "de-substitute - remove the substitution",
     filing_decisions.INHERIT: "inherit - nothing was owed, so carry the last one forward",
     filing_decisions.UN_INHERIT: "un-inherit - remove the inheritance",
+    # REQ-PIPE-280 criterion 8: the one description, shared with --help.
+    filing_decisions.CARRY_FORWARD: ("carry forward - inherit the newest promoted supply, "
+                                     "replacing what this period carries forward (or "
+                                     "giving it one)"),
     filing_decisions.MARK_NOT_SUPPLIED: ("mark as not supplied - accept that this closed "
                                          "period was missed, with a reason"),
     filing_decisions.ACKNOWLEDGE: ("acknowledge - say you have looked at this amber "
@@ -166,6 +170,8 @@ _HOW_IT_READS = {
     slot_state.REJECTED: "[red]rejected[/red]",
     slot_state.SUBSTITUTED: "[blue]substituted[/blue]",
     slot_state.INHERITED: "[blue]inherited[/blue]",
+    # REQ-PIPE-280 criterion 1: an opened period owing nothing, carrying nothing.
+    "carries-nothing-forward": "[yellow]owes nothing, carries nothing forward[/yellow]",
     slot_state.NOT_SUPPLIED_ACCEPTED: "[dim]not supplied (accepted)[/dim]",
     # REQ-PIPE-122 criteria 17 and 18: each distinguishable from a red
     # supply awaiting a decision, and the first never called "held".
@@ -445,6 +451,8 @@ def apply_decision(*, operation: str, dataset_id: str, period: str | None,
     if outcome.changed:
         console.print(Panel(Text(outcome.message, style="bold green"),
                              title="Recorded", border_style="green", expand=False))
+        carried = (_readers_of(dataset_id, period)
+                   if operation == filing_decisions.CARRY_FORWARD else None)
         if outcome.owed and flag_route and not wait:
             # THE FLAG ROUTE DOES NOT WAIT (REQ-PIPE-163 criteria 4 and 32):
             # the checks are owed, and the processing pass runs them.
@@ -458,34 +466,99 @@ def apply_decision(*, operation: str, dataset_id: str, period: str | None,
                                      to_period=to_period or period)
                            for owed_id in outcome.owed)
             outcome = dataclasses.replace(outcome, checks_finished=finished)
-        _follow_up(hierarchy.dataset(dataset_id).collection_id)
+        _follow_up(hierarchy.dataset(dataset_id).collection_id,
+                   carried=(dataset_id, period, carried) if carried is not None else None)
         filing_decisions.reconcile_after(
             outcome, hierarchy.dataset(dataset_id).collection_id)
     else:
         # CRITERION 26: a no-op is not a refusal, and must not look like
         # one. Two people working the same ticket arrive here constantly.
-        console.print(Panel(Text(outcome.message), title="Already so",
-                             border_style="blue", expand=False))
+        # Through _show, so a command in it (REQ-PIPE-280 criterion 8's
+        # carry-forward hint) prints below the panel, copyable.
+        _show(outcome.message, title="Already so", style="blue")
     return outcome
 
 
-def _follow_up(collection_id: str) -> None:
+def _readers_of(dataset_id: str, period: str | None) -> list:
+    """The other supplies whose cross-table checks read this dataset in this
+    period - the ones a carry-forward re-checks (REQ-PIPE-280 criterion 5).
+    Read after the decision, so they are the readers of what it carries now."""
+    from qa_tools.common import knock_on, promotion
+
+    if not period:
+        return []
+    try:
+        with open_log() as conn:
+            table = hierarchy.dataset(dataset_id).table
+            return [r for r in knock_on.readers(conn, period, [table],
+                                                promotion._declared_reads())
+                    if r.dataset_id != dataset_id]
+    except Exception:  # noqa: BLE001 - the follow-up says what it can
+        return []
+
+
+def _follow_up(collection_id: str, *, carried=None) -> None:
     """The knock-on of what the decision moved (REQ-PIPE-121): every period
     it moved a table into or out of re-evaluates its readers, and the gate
     looks at each waiting one again. Said only where something happened; a
-    failure stays owed for the processing pass (criterion 14)."""
+    failure stays owed for the processing pass (criterion 14).
+
+    A CARRY-FORWARD SAYS MORE (REQ-PIPE-280 criterion 8): `carried` is
+    (dataset, period, readers), and every reader re-checked is listed with
+    its outcome - or, where the re-evaluation could not run, 'Re-evaluation
+    owed' with the command that runs it on a line of its own."""
     from qa_tools.common import knock_on
 
     try:
         done = knock_on.follow_up(collection_id)
     except Exception as exc:  # noqa: BLE001 - the decision stands either way
+        if carried is not None:
+            _say_carry_forward_owed(carried, str(exc))
+            return
         console.print(f"The re-evaluation of the period's readers did not run ({exc}); "
                       "it stays owed.", style="yellow")
+        return
+    if carried is not None:
+        failed = [o for o in done if not o.completed]
+        if failed:
+            _say_carry_forward_owed(carried, failed[0].message)
+        else:
+            _say_carry_forward_readers(carried)
         return
     for outcome in done:
         if not outcome.completed:
             console.print(Panel(Text(outcome.message), title="Re-evaluation owed",
                                 border_style="yellow", expand=False))
+
+
+def _say_carry_forward_owed(carried, why: str) -> None:
+    dataset_id, period, _readers = carried
+    _show(f"The readers of {dataset_id} in {period} were not re-checked yet ({why}). "
+          f"Until they are, their checks of it read 'not yet re-checked', and nothing is "
+          f"raised for them. The processing pass runs it:\nmothman pipeline process",
+          title="Re-evaluation owed", style="yellow")
+
+
+def _say_carry_forward_readers(carried) -> None:
+    """Every reader re-checked, and what it reads now (criterion 8)."""
+    from qa_tools.common import supply_status
+
+    dataset_id, period, readers = carried
+    if not readers:
+        console.print(f"No other dataset's checks read {dataset_id} in {period}, so there "
+                      f"was nothing to re-check.", style="dim")
+        return
+    lines = []
+    try:
+        with open_log() as conn:
+            for r in readers:
+                status = supply_status.status(conn, r.dataset_id, r.supply) or "no verdict"
+                lines.append(f"- {hierarchy.dataset(r.dataset_id).dataset_name}, arrived "
+                             f"{arrived(r.supply)}: {status}")
+    except Exception as exc:  # noqa: BLE001 - said, never a traceback
+        lines.append(f"(their verdicts could not be read: {exc})")
+    _show(f"Re-checked against the {dataset_id} carried forward into {period}:\n"
+          + "\n".join(lines), title="Readers re-checked", style="green")
 
 
 #: decide --wait's exit code where the decision stands and its checks are
@@ -913,6 +986,7 @@ def queue_flow(collection_id: str) -> None:
             waiting = filing_queue.awaiting(conn, collection_id)
             gaps = filing_queue.closed_gaps(conn, collection_id)
             held = filing_queue.held_in(conn, collection_id)
+            carry = carry_forward_warnings(conn, collection_id)
     except filing_queue.LogUnreachable as exc:
         say_unreachable(exc)
         return
@@ -936,6 +1010,10 @@ def queue_flow(collection_id: str) -> None:
         console.print("[dim]Answer one from the period door, or `mothman supply decide "
                        "--operation mark-not-supplied --dataset <id> --period <p> "
                        "--reason <why>`.[/dim]\n")
+    # A NEWER SUPPLY THAT COULD BE CARRIED FORWARD (REQ-PIPE-271 criterion 7),
+    # in the period-items group above the slot rows, and NOT COUNTED: it is
+    # not a supply waiting on a decision.
+    say_carry_forward_warnings(carry)
     if held:
         # HELD SUPPLIES, THEIR OWN GROUP ABOVE THE SLOT ROWS (REQ-PIPE-163
         # criterion 17): a dataset and a receipt in place of a period, and why
@@ -982,6 +1060,36 @@ def queue_flow(collection_id: str) -> None:
         return
     supply_scoped, _period_scoped = filing_queue.operations_for(state)
     _decide_on(state, offer=_offers(state, supply_scoped))
+
+
+def carry_forward_warnings(conn, collection_id: str, dataset_id: str | None = None,
+                           period: str | None = None) -> list:
+    """The carry-forward warnings standing for this collection (REQ-PIPE-271
+    criterion 7), one per dataset and period."""
+    from qa_tools.common import carry_forward
+
+    mine = {d.dataset_id for d in hierarchy.datasets_in_collection(collection_id)}
+    try:
+        found = carry_forward.standing(conn, dataset_id=dataset_id, period=period)
+    except Exception as exc:  # noqa: BLE001 - LogUnreachable's job, said by the caller
+        raise filing_queue.LogUnreachable(str(exc)) from exc
+    return [w for w in found if w.dataset_id in mine]
+
+
+def say_carry_forward_warnings(warnings) -> None:
+    """Each warning in the terminal's own voice, its command on a line of its
+    own below the prose - never inside a panel or a table cell (criterion 7,
+    _show's convention: soft-wrapped, no markup)."""
+    from qa_tools.common import carry_forward
+
+    if not warnings:
+        return
+    console.print("[bold]Could be carried forward[/bold] - a newer supply has been "
+                  "promoted since these periods opened")
+    for w in warnings:
+        for line in carry_forward.lines(w, voice="terminal"):
+            console.print(line, soft_wrap=True, highlight=False, markup=False)
+        console.print()
 
 
 def turned_off_flow(group) -> None:
@@ -1201,18 +1309,30 @@ def period_flow(collection_id: str) -> None:
     dataset_id = common.select("Which dataset?", datasets, flag_hint=_FLAG_HINT)
     if dataset_id is None:
         return
+    from qa_tools.common import carry_forward
+
     try:
         with open_log() as conn:
             states = filing_queue.slots_of(conn, collection_id, dataset_id=dataset_id)
             counts = filing_queue.filed_counts(conn, dataset_id)
+            # THE PERIODS IT OWES NOTHING FOR (REQ-PIPE-280 criterion 1): not
+            # slots, so listed here or nowhere - where carry-forward and
+            # un-inherit are reached from the door.
+            owed_nothing = carry_forward.carried_periods(conn, dataset_id)
     except filing_queue.LogUnreachable as exc:
         say_unreachable(exc)
         return
+    owed_nothing = [s for s in owed_nothing if s.period not in {x.period for x in states}]
+    states = sorted(states + owed_nothing, key=lambda s: (s.period, s.dataset_id),
+                    reverse=True)
     if not states:
         console.print(f"{dataset_id} has no periods yet.", style="yellow")
         return
     state = _pick_slot(states, f"Which period of {dataset_id}?", counts)
     if state is None:
+        return
+    if state in owed_nothing:
+        _owed_nothing_door(collection_id, state)
         return
     supply_scoped, period_scoped = filing_queue.operations_for(state)
     if counts.get((state.dataset_id, state.period), 0) == 1:
@@ -1236,6 +1356,27 @@ def period_flow(collection_id: str) -> None:
         _decide_on(state, offer=_offers(state, supply_scoped) + period_scoped)
         return
     _choose_a_supply(state, period_scoped)
+
+
+def _owed_nothing_door(collection_id: str, state: slot_state.SlotState) -> None:
+    """A period the dataset owes nothing for (REQ-PIPE-280 criterion 1): what it
+    carries forward, the warning where a newer one could be carried forward
+    (REQ-PIPE-271 criterion 7), and carry-forward - with un-inherit where it
+    inherits."""
+
+    if state.state == slot_state.INHERITED and state.stands_on:
+        console.print(stands_on_line(state), style="cyan")
+    try:
+        with open_log() as conn:
+            warned = carry_forward_warnings(conn, collection_id, dataset_id=state.dataset_id,
+                                            period=state.period)
+    except filing_queue.LogUnreachable as exc:
+        say_unreachable(exc)
+        return
+    say_carry_forward_warnings(warned)
+    offer = ((filing_decisions.CARRY_FORWARD, filing_decisions.UN_INHERIT)
+             if state.state == slot_state.INHERITED else (filing_decisions.CARRY_FORWARD,))
+    _decide_on(state, offer=offer)
 
 
 #: The choice beside the listed supplies for the period's own decisions

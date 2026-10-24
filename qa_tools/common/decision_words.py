@@ -23,6 +23,9 @@ DONE: dict[str, str] = {
     "withdraw-acknowledgement": "no longer acknowledged",
     "withdraw-not-supplied": "no longer marked not supplied",
     "re-check": "re-checked",
+    # REQ-PIPE-280 and REQ-PIPE-271 (PROVISIONAL, not put to Keith).
+    "carry-forward": "carried forward instead",
+    "carry-forward-warning": "warned a newer supply could be carried forward",
 }
 
 
