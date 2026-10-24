@@ -986,7 +986,7 @@ one when this line suggests it matters.
 - **#265** `done` 2026-10-24 - The Requirements panel read register text as markup. Found running tests/test_dashboard_e2e.py after sprint A1:...
   - *touches:* `tests/test_dashboard_e2e.py`
 - **#266** `done` 2026-10-24 - REQ-PIPE-269 / REQ-DASH-277 post-build critics. delivery-critic (functional) and the dashboard UX critic on sprint A1...
-  - *touches:* `tests/test_warehouse_view.py`, `tests/test_no_guessing_in_placement.py`, `tests/test_in_place_in_the_warehouse.py`, `tests/test_red_promoted.py`
+  - *touches:* `tests/test_warehouse_view.py`, `tests/test_no_guessing_in_placement.py`, `tests/test_in_place_in_the_warehouse.py`, `tests/test_red_promoted.py`, `tests/test_warehouse_counts.py`
 
 ## plans/road-testing.md
 
