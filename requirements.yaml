@@ -36966,7 +36966,7 @@ requirements:
     non_functional_requirements:
       - "BASELINES ARE STATE, NOT CONFIGURATION (CLAUDE.md, Keith 2026-09-27): a baseline file lives in a scratch directory outside the repository and is never committed."
       - "NEVER THE REAL DATABASE, NEVER A REAL ASSET: criteria 10 and 11; the 2026-09-27 TRUNCATE incident is why."
-      - "COST, STATED SO IT IS PLANNED FOR, ACROSS THE WHOLE SET: captures are CHAINED - requirement N's 'after' is N+1's 'before' - so each full capture (a from-empty bootstrap, measured 31m52s on 2026-10-15, plus worktree setup) is taken once: one before REQ-PIPE-240 and one after each requirement in the set that changes code, with one end-to-end compare across the series (REQ-TEST-249) reusing the first and last. Every capture is a full one; there is no reduced or kept-database capture (lean sign-off, 2026-10-16). THE FIRST 'BEFORE' CAPTURE IS OF THE COMMIT THAT ADDS CRITERIA 16 AND 17, not 653911d: a commit before them cannot pin its clock, so its baseline cannot be compared with one that does."
+      - "HISTORICAL, THE SERIES IS FINISHED (2026-10-22): COST, STATED SO IT IS PLANNED FOR, ACROSS THE WHOLE SET: captures are CHAINED - requirement N's 'after' is N+1's 'before' - so each full capture (a from-empty bootstrap, measured 31m52s on 2026-10-15, plus worktree setup) is taken once: one before REQ-PIPE-240 and one after each requirement in the set that changes code, with one end-to-end compare across the series (REQ-TEST-249) reusing the first and last. Every capture is a full one; there is no reduced or kept-database capture (lean sign-off, 2026-10-16). THE FIRST 'BEFORE' CAPTURE IS OF THE COMMIT THAT ADDS CRITERIA 16 AND 17, not 653911d: a commit before them cannot pin its clock, so its baseline cannot be compared with one that does."
       - "BOOTSTRAP TIME, MEASURED NOT GUESSED: each requirement's before and after captures are timed back to back on the sandbox, and a difference is a finding for Keith only above a threshold set from the self-check's own measured noise. Keith's hard 12 minutes is separate work (plans/data-generation.md #12, Q5) and nothing in this set may make it harder."
       - "WORKTREE SETUP IS PART OF THE COST: a worktree needs the project environment and dbt_packages; reuse the main checkout's rather than installing per capture."
       - "ONLY THROUGH mothman: the snapshot code moves out of tests/equiv_support.py into a module the command imports, and the existing on-demand tests import it from there."
@@ -37015,6 +37015,8 @@ requirements:
       - "A REAL DEFECT IN THE INHERITED RULES: filing.refiled_by holds the DECISION that re-filed a supply, and the rule moved here from tests/equiv_support.py joined it to qa.filing.id - so every equivalence comparison since REQ-PIPE-141 compared an unrelated filing, agreeing only when ids happened to interleave alike. Fixed with the decision reference; post-build-review #211."
       - "THE SELF-CHECK RUNS ONLY WHEN ESSENTIAL, NEVER IN CI (Keith, 2026-10-16: 'Only run it when it's absolutely essential. The whole point of the work we're doing now is to get to a faster bootstrap run'). After full history went into CI, its on-demand job ran the self-check on every push, about 35 minutes each. Criterion 5's 'kept as an on-demand test' now means its own marker, full_capture, deselected unless --run-full-capture is given; tests/test_ci_on_demand.py fails if any workflow passes it. REJECTED leaving it marked on_demand, which post-build-review #128 runs on every push by design."
       - "LEAN, SIGNED (Keith, 2026-10-16: asked 'Why does it exist???', chose the lean version, then 'I'm happy to sign off on the lean harness now'): S1, S4, S5 and S7 only; S3 (raw tool output), S6 (the browser render) and the --reduced, --rebuild-from and --keep-database options dropped. Scripted decisions are always on. DEPENDENTS TO RE-DRAFT against it: REQ-PIPE-240 c12 and REQ-QAC-241 c12 (surface names), REQ-DASH-244 (--rebuild-from), REQ-GEN-246 (a kept capture), REQ-PIPE-248 (S6)."
+      - "PAUSED AND RETIRED FROM USE, KEPT, NOT DELETED (Keith, 2026-10-22, answering REQ-PIPE-279 K6, plans/running-thoughts.md #122: \"The equivalence check is all about the refactor ... to have a single set of registration stuff ... this is about genuine changes, so we don't need to run the equivalence check. That was a point in time thing and can be paused and retired ... But not yet deleted.\"). It served the collection-registry series, REQ-PIPE-240 to REQ-TEST-252, which is built. From 2026-10-22 no requirement is obliged to run a capture or a compare; REQ-PIPE-250 criterion 4 is the one exception, kept by Keith 2026-10-24: a pure speed-up is the 'change nothing' case only a whole-history compare proves; a change that genuinely alters behaviour is proved by its own tests and an ordinary bootstrap from empty. `mothman debug equivalence capture/compare`, qa_tools/common/equivalence.py and tests/test_equivalence.py stay; the fast tests keep running in the gate so the code does not rot unnoticed, and the full_capture self-check stays deselected. Nothing deletes any of it until Keith says so. Status stays built rather than retired, because retired would stop its links being checked while the code exists and would refuse the requirements that depend on it."
+      - "A COMPARE ACROSS A SCHEMA VERSION BUMP IS NOT A REGRESSION (CLI UX review of REQ-PIPE-279, 2026-10-23): a capture at qa schema 45 compared with one at 46 (REQ-PIPE-279) differs on S1 and S5 everywhere, because the recorded history's shape changed, not its meaning. A baseline records the harness and normaliser versions but not qa_store.SCHEMA_VERSION, so compare cannot say why. Not fixed while the harness is paused; if it is revived, recording the schema version and refusing a cross-version compare, as criterion 2 does for the harness version, is the first change."
 
   - id: REQ-PIPE-240
     title: "One collection registry, derived from the hierarchy, behind the dispatch sites whose code survives the series - with a gate, and an allowlist that hands every other site to the requirement that rewrites it"
@@ -39808,7 +39810,7 @@ requirements:
     - The other gate paths - re-checks, the knock-on gate, the status at promotion - already read the newest result
       across every run about a supply (supply_status.latest_results), which includes the evaluating sibling; only the
       arrival gate read run by run (the architect, 2026-10-20).
-    - 'PROVISIONAL, pending Keith (morning report #8, #1): criterion 9 is taken as ALREADY MET by the 2026-10-21/22 comparison on schema
+    - 'DECIDED by Keith 2026-10-24 (morning report #8, #1): criterion 9 is taken as ALREADY MET by the 2026-10-21/22 comparison on schema
       45, rather than re-captured on schema 46; reverse if a capture across the bump is wanted.'
     open_questions: []
   - id: REQ-PIPE-279
@@ -40108,6 +40110,14 @@ requirements:
     - dashboard/qa-reporting-dashboard.template.html::compareParamFor
     - dashboard/qa-reporting-dashboard.template.html::historySource
     - dashboard/qa-reporting-dashboard.template.html::blockChecksWhileHeld
+    - dashboard/qa-reporting-dashboard.template.html::clipDatasetToInPlaceOn
+    - dashboard/qa-reporting-dashboard.template.html::recheckNote
+    - dashboard/qa-reporting-dashboard.template.html::pointSourceTitle
+    - dashboard/qa-reporting-dashboard.template.html::byRankThenSeen
+    - qa_tools/common/arrivals.py::Arrival::dataset_id
+    - qa_tools/common/arrivals.py::Arrival::as_entry
+    - qa_tools/common/qa_results_writer.py::_arrival_purpose
+    - qa_tools/common/qa_store.py::record_file_results
     evidence:
     - '2026-10-24, FULL GATE ON THE FINAL CODE: mothman check on 43323cf, against ed_probe bootstrapped from empty at schema 46
       - every gate passed; pytest 5958 passed, 1 xfailed in 42m28s; npm test 882 passed. The commit after it touches only
@@ -40129,6 +40139,11 @@ requirements:
     - 'TEST-FIRST, criteria 26-28: each test was written and seen failing against the code before its chunk - A on f362e0d (criteria
       1-8, 23), B on 993b29f (9, 21, 22), C on 3d0e988 (16-19, 24), D on a921749 (10-15), E on f8fdd68 (20), the gate fixes on 2da6a46
       and the contested-pair read on aeb996b. No full gate is claimed on the final tree here.'
+    - '2026-10-24, KEITH''S CALLS ON THE PROVISIONALS AND #262, built after the flip, each run on its own tree as its commit says (no
+      full gate is claimed on any of them): 9585a14 (F5, T6, c13) 46 modules 550 passed, e2e -n0 302 passed, npm test 887; 0d86652
+      (#23) 93 modules 1587 passed; 00142f7 (#18) npm test 888, e2e -n0 303 passed, renderFromState() with the point tooltips 10ms,
+      15ms and 2ms on the three agency tiers against REQ-DASH-226 criterion 13''s 400ms; c3f8ccd (#22) test_build_from_the_record
+      16 passed, e2e -k TS80 4 passed, npm test 890; 2a092b5 (#21) e2e -k TS80 5 passed, npm test 893.'
     decisions:
     - 'Scoped as its own requirement and built before REQ-PIPE-265 is flipped to built, rather than folded into #95 v5 (Keith,
       2026-10-22, option A).'
@@ -40301,50 +40316,70 @@ requirements:
     - 'The gate side (criteria 21 and 22) is in this requirement rather than left to #95 (first draft Q5, settled by the architect''s
       review): leaving it would keep carried.siblings parsing run ids and runs_about matching names, which is the guessing Keith
       ruled out, and criterion 2''s supply on qa.tables_read is needed by the gate anyway.'
-    - 'PROVISIONAL, pending Keith (morning report #8, #2): a second attempt of a run key beside a live one is REFUSED (AttemptInProgress,
+    - 'DECIDED by Keith 2026-10-24 (morning report #8, #2): a second attempt of a run key beside a live one is REFUSED (AttemptInProgress,
       a try-lock), not waited for.'
-    - 'PROVISIONAL, pending Keith (#3): SIGTERM becomes an INTERRUPTED end only while an attempt is open in the main thread with no
+    - 'DECIDED by Keith 2026-10-24 (#3): SIGTERM becomes an INTERRUPTED end only while an attempt is open in the main thread with no
       other handler installed; elsewhere it dies as before and the next attempt closes it INTERRUPTED with no end time. A ''stopped
       pass'' is a SystemExit or KeyboardInterrupt.'
-    - 'PROVISIONAL, pending Keith (#4): outcome and read-state names are stored uppercase exactly as the criteria write them.'
-    - 'PROVISIONAL, pending Keith (#5): NO-SUPPLY is allowed only for a trial''s or sample''s table; any other read that cannot be
+    - 'DECIDED by Keith 2026-10-24 (#4): outcome and read-state names are stored uppercase exactly as the criteria write them.'
+    - 'DECIDED by Keith 2026-10-24 (#5): NO-SUPPLY is allowed only for a trial''s or sample''s table; any other read that cannot be
       recorded refuses the result (criterion 4).'
-    - 'PROVISIONAL, pending Keith (#6): criterion 3 compares the result''s recorded dataset with qa.run.dataset_id.'
-    - 'PROVISIONAL, pending Keith (#7): an attempt that ends with no exception but never completes is recorded CRASHED, with no exception
+    - 'DECIDED by Keith 2026-10-24 (#6): criterion 3 compares the result''s recorded dataset with qa.run.dataset_id.'
+    - 'DECIDED by Keith 2026-10-24 (#7): an attempt that ends with no exception but never completes is recorded CRASHED, with no exception
       type.'
-    - 'PROVISIONAL, pending Keith (#8): a check is carried from the EARLIEST-opened sibling that evaluated it.'
-    - 'PROVISIONAL, pending Keith (#9): a sibling not yet opened (no run_seq) counts for nothing.'
-    - 'PROVISIONAL, pending Keith (#10): siblings are not filtered by dataset - a settled pair''s two supplies can be siblings, but
+    - 'DECIDED by Keith 2026-10-24 (#8): a check is carried from the EARLIEST-opened sibling that evaluated it.'
+    - 'DECIDED by Keith 2026-10-24 (#9): a sibling not yet opened (no run_seq) counts for nothing.'
+    - 'DECIDED by Keith 2026-10-24 (#10): siblings are not filtered by dataset - a settled pair''s two supplies can be siblings, but
       nothing carries between them because their own-table supplies differ.'
-    - 'PROVISIONAL, pending Keith (#11): a file-check result under a supply''s own run still counts toward that supply.'
-    - 'PROVISIONAL, pending Keith (#12): the live batch writes its results file by rebuilding from the recorded history rather than
+    - 'DECIDED by Keith 2026-10-24 (#11): a file-check result under a supply''s own run still counts toward that supply.'
+    - 'DECIDED by Keith 2026-10-24 (#12): the live batch writes its results file by rebuilding from the recorded history rather than
       from memory - one path, one history read per batch.'
-    - 'PROVISIONAL, pending Keith (#13): an arrival''s cause is ''arrival:<delivery>@<receipt instant>'', the grouping the sibling
+    - 'DECIDED by Keith 2026-10-24 (#13): an arrival''s cause is ''arrival:<delivery>@<receipt instant>'', the grouping the sibling
       rule uses; every non-arrival run (re-check, readers-only, knock-on) reads as a re-check in its cause sentence. Readers'' and
       replaced runs'' results are placed through the manifest only, and a single-table result with no reads stays out of the cross-table
       column.'
-    - 'PROVISIONAL, pending Keith (#14, #19): canonical_order is ALLOWED by criterion 20''s guard - it sorts the results FILE by run
+    - 'DECIDED by Keith 2026-10-24 (#14, #19): canonical_order is ALLOWED by criterion 20''s guard - it sorts the results FILE by run
       id so a live write and a rebuild give the same bytes, and decides nothing on the page.'
-    - 'PROVISIONAL, pending Keith (#20): received_instant is allowed as an arrival group''s identity (the cause key), never as an ordering.'
-    - 'PROVISIONAL, pending Keith (#15): criterion 14 (an ABSENT or NO-SUPPLY read not shown on that table''s page) is applied in the
+    - 'DECIDED by Keith 2026-10-24 (#20): received_instant is allowed as an arrival group''s identity (the cause key), never as an ordering.'
+    - 'DECIDED by Keith 2026-10-24 (#15): criterion 14 (an ABSENT or NO-SUPPLY read not shown on that table''s page) is applied in the
       BUILD, which decides which pages carry a result.'
-    - 'PROVISIONAL, pending Keith (#16): a later point carries a check''s verdict from the SAME supply''s newest earlier point, never
+    - 'DECIDED by Keith 2026-10-24 (#16): a later point carries a check''s verdict from the SAME supply''s newest earlier point, never
       simply the previous point overall.'
-    - 'PROVISIONAL, pending Keith (#17): a held row whose blocker names no supply fails closed; it shows the newest HELD result about
+    - 'DECIDED by Keith 2026-10-24 (#17): a held row whose blocker names no supply fails closed; it shows the newest HELD result about
       the blocker''s supply.'
-    - 'PROVISIONAL, pending Keith (#18): the dataset list''s small sparkline has no per-point tooltips, so criterion 13''s cause naming
-      lands in the panel chart, compare and history lists only. A run with no supply falls back to the run it was recorded in.'
-    - 'PROVISIONAL, pending Keith (#21) - the CONTESTED-READ RULE, a gap between criteria 14 and 15: on TS-80''s 1 November 2020 the
+    - 'REVERSED by Keith 2026-10-24 (#18), which read: "the dataset list''s small sparkline has no per-point tooltips, so criterion
+      13''s cause naming lands in the panel chart, compare and history lists only". Each point of the list''s sparkline now has
+      its own tooltip naming what caused it and when, in the panel chart''s words (pointSourceTitle, commit 00142f7); the sparkline
+      keeps its one aria-label. A run with no supply falls back to the run it was recorded in (decided by Keith 2026-10-24).'
+    - 'DECIDED by Keith 2026-10-24 (#21) - the CONTESTED-READ RULE, a gap between criteria 14 and 15: on TS-80''s 1 November 2020 the
       Client Register is a contested pair, so its readers recorded it ABSENT, contested, with both pair files named. An ABSENT read
       flagged contested whose files are the blocking pair''s own tables is taken as meeting that pair: kept in a separate contested_reads
       list on the check, never in its history or any count, and shown on the pair''s page as criterion 15 shows HELD, keyed on the
       pair, never a time. Every other ABSENT read stays off (criterion 14 as signed). Rejected - accepting ''No data'' for a contested
-      pair and amending TS-80''s assertion: a change to signed REQ-DASH-264 criterion 3.'
-    - 'PROVISIONAL, pending Keith (#22): a check whose ONLY result on the pair''s page is a contested read gets no card there; it does
-      not arise in today''s data.'
+      pair and amending TS-80''s assertion: a change to signed REQ-DASH-264 criterion 3. EXTENDED by Keith 2026-10-24: each contested
+      or held cross-table row also says why it could not be checked - the pair''s own files waiting to be settled, or the held supply
+      - named from the blocker, never guessed (blockChecksWhileHeld''s whyNotChecked, recheckNote; commit 2a092b5).'
+    - 'REVERSED by Keith 2026-10-24 (#22), which read: "a check whose ONLY result on the pair''s page is a contested read gets no card
+      there; it does not arise in today''s data". Such a check keeps a card, in its column''s separate contested_only list beside
+      checks, so no count, status, headline or column statistic reads it (criterion 14); the page adds it to the blocked row only
+      when it met the blocking pair (build_one_table, clipDatasetToInPlaceOn, blockChecksWhileHeld; commit c3f8ccd).'
+    - 'REVERSED by Keith 2026-10-24 (morning report #8, #23), which kept an arrival run''s DATASET read off its run id in one named
+      helper, _arrival_dataset, because nothing recorded earlier said which dataset an arrival run is for. An arrival run''s dataset
+      is now passed to open_run from its arrival (Arrival.dataset_id, carried by as_entry), with its delivery and receipt instant,
+      and _arrival_purpose records it from there; _arrival_dataset is deleted and criterion 20''s guard has no named exception
+      for it. A trial''s or fixture''s run is given no dataset (commit 0d86652).'
     - 'plans/running-thoughts.md #117, the note this was scoped from, is deleted in the change that built it; its candidate facts are
       all here - the supply of every table read (criterion 1), a delivery id on qa.run (rejected above for qa.filing and qa.delivery_file),
       and a sequence that cannot tie (run_seq).'
+    - 'POST-BUILD-REVIEW #262 R3, the attempt lock riding one idle connection with no TCP keepalive (a dead host holds it ~2h, every
+      retry refused meanwhile; a dropped lock connection lets a second attempt close the live one and both write): LEFT UNTIL THE AWS
+      BUILD (Keith, 2026-10-24: "leave until AWS"), carried to plans/running-thoughts.md #124. Not chosen yet, to decide when the
+      AWS build is scoped - keepalives on the lock connection plus a refusal when an attempt''s end updates no row, or a heartbeat
+      column the next attempt checks.'
+    - 'POST-BUILD-REVIEW #262 R4, the as-of clip keeping every other-table result whatever supply it read, so a late reader of an
+      older supply can show as current on the partner''s page while the gate would not use it (does not occur on ed_probe): FIXED
+      WITH #95''s SPRINT 1, which reworks the same cross-table rows, with a test of this exact case (Keith, 2026-10-24), rather
+      than now.'
   - id: REQ-PIPE-266
     title: Files that arrive together are gated together, once every one of them has been checked
     date_written: '2026-10-21'
@@ -43108,3 +43143,123 @@ requirements:
     - 'CHECK AT BUILD (architect, not a question for Keith): REQ-PIPE-121 criteria 9 and 15 are worded for a decision and a
       promotion. Confirm that a contest ended by an arrival''s supersession needs no amendment to either beyond batch amendment
       27, or say where the supersession trigger belongs instead (REQ-PIPE-118).'
+  - id: REQ-TEST-281
+    title: "The browser-test module runs across every test worker, each worker building its own dashboard into its own output path"
+    date_written: "2026-10-23"
+    story: "As whoever runs the full gate, I want tests/test_dashboard_e2e.py spread across all the test workers rather than pinned to one, with each worker building the dashboard into a place of its own, so that the gate's wall clock is no longer set by one 41-minute module running alone while the other workers sit idle."
+    moscow: should
+    status: not_started
+    signed_off:
+      by: Keith
+      date: "2026-10-24"
+    source: "Keith, plans/running-thoughts.md #88 (2026-10-12: \"full gate takes 10 minutes now, it's a long time\") and plans/tooling.md #24 fix 3 (2026-09-26, still open); approved as option A of two ('A and B') for overnight 2026-10-23 drafting, with \"dig into what the 56 minutes of PyTest is about\". Drafted by delivery-scoper 2026-10-23 from the timed full gate of 2026-10-21/22 on this sandbox. Signed off by Keith 2026-10-24, with both open questions answered (see decisions)."
+    acceptance_criteria:
+    - "THE SYSTEM SHALL distribute the tests of tests/test_dashboard_e2e.py across every pytest-xdist worker of a run, with no test class split across two workers."
+    - "THE SYSTEM SHALL keep every other test module on one worker per file, exactly as `--dist loadfile` does today."
+    - "WHEN a worker first needs the built dashboard, THE SYSTEM SHALL build it once for that worker, by the same build chain as today (rebuild-results, build_dashboard_data, embed), into an output location named for that worker, and SHALL reuse that build for every later test on the same worker."
+    - "WHILE the browser-test module runs, THE SYSTEM SHALL NOT write to the real tree's reports/ files or to dashboard/qa-reporting-dashboard.html."
+    - "THE SYSTEM SHALL resolve the built page's fonts/ and vendor/ assets from each worker's output location, so a per-worker build renders the self-hosted fonts and the Demo tab's player exactly as the shared build does."
+    - "WHEN a class-scoped variant fixture (dashboard_html_with_ticket and its siblings) re-embeds a dashboard, THE SYSTEM SHALL read its worker's own built reports, never the real tree's."
+    - "WHEN the browser-test module is run three times in a row under the default worker count, THE SYSTEM SHALL pass every test each time with no new skips, and this SHALL be this requirement's evidence alongside the timed full gate."
+    - "WHEN the change lands, THE SYSTEM SHALL record in CLAUDE.md's test-suite runtime log the timed full-gate pytest wall clock and the per-module durations it was measured from."
+    non_functional_requirements:
+    - "THE RACE THAT MADE --dist loadfile NECESSARY STAYS CLOSED BY CONSTRUCTION (plans/tooling.md #10, race 2): several workers each ran the session-scoped build and rewrote the same real reports/ files and built HTML. A per-worker output location means no two builds share a file, rather than a lock or an ordering that could be lost later. pyproject.toml's loadfile comment and CLAUDE.md's \"--dist loadfile is load-bearing\" note are rewritten in the same change to say what now prevents it."
+    - "NO WEAKER SUITE: the same tests run and pass, the fast half's skip count stays zero (CLAUDE.md, CI halves), and no assertion is loosened to make a parallel run pass."
+    - "THE BUILD STILL READS RECORDED QA RESULTS ONLY (CLAUDE.md: a build may read recorded QA results, never actual data): a per-worker build reads the same deployment database as today, and nothing here gives a build a new reach."
+    - "ONLY THROUGH mothman, AND NO NEW DEPENDENCY: whatever output-location option the build gains is reachable through the existing mothman dashboard commands; pytest-xdist's own grouping is already installed."
+    - "COST PER WORKER IS MEASURED, NOT ASSUMED: each extra worker pays one dashboard build (12.9s when last measured, 2026-09-27, on a far smaller history); the evidence names the measured build time per worker on today's history."
+    - "CI WALL CLOCK: the deployment half runs this module too, so its time is reported alongside the sandbox figure; no CI workflow is changed beyond what the new distribution needs."
+    - "THE TARGETS, MEASURED BY THE TIMED FULL GATE ON THIS SANDBOX (Keith, 2026-10-24, Q1): the full local `uv run pytest` wall clock SHALL be at most 25 minutes with this requirement built, and at most 20 minutes with this requirement and REQ-TEST-282 both built; and tests/test_dashboard_e2e.py's own wall clock SHALL be at most 10 minutes. Missing any of the three is a finding for Keith, not a CI gate (his 2026-09-18 call that runtime is watched rather than enforced)."
+    dependencies: []
+    open_questions: []
+    decisions:
+    - "PER-WORKER BUILD OUTPUT, NOT A SHARED BUILD UNDER A LOCK (Keith approved A as 'a per-worker build output path', 2026-10-23). REJECTED building once under a file lock and having every worker read it: it reintroduces exactly the shared-file read that plans/tooling.md #10 race 1 was, and it couples every worker to the first one's success. A per-worker build costs one build per worker and shares nothing."
+    - "THE REAL TREE IS NO LONGER WRITTEN BY THE SUITE (criterion 4). Today the e2e fixture rewrites the real reports/ and built HTML as a side effect, which is also a live hazard to the other needs_deployment modules that read reports/ while it runs. A side effect any developer was relying on (a test run refreshing the local dashboard) goes with it; `mothman dashboard rebuild` is the way to get one."
+    - "NO TEST CLASS SPLIT ACROSS WORKERS (criterion 1): the class-scoped variant fixtures (2026-09-27) and REQ-TEST-282's class-scoped page both assume a class runs on one worker; per-test spreading would multiply their cost per worker."
+    - "THE MASTHEAD TEST'S 15s AND THE PER-WORKER BUILD ARE A FLOOR PARALLELISM CANNOT REMOVE (plans/tooling.md #24): the realistic gain is below the arithmetic, and the targets in non_functional_requirements allow for it."
+    - "REJECTED moving the e2e tests to Playwright's own JS runner (plans/tooling.md #24, 2026-09-26): the pytest plugin is the supported Python path and recommends xdist, and a split would lose the fixtures that build from recorded history."
+    - "THE TARGETS ARE NUMBERS, NOT 'MEASURABLY FASTER' (Keith, 2026-10-24, Q1 as recommended, plus a third target of his own): 25 minutes of full local pytest with this requirement, 20 with REQ-TEST-282 as well, and at most 10 minutes for the browser-test module itself. A miss is a finding for Keith, not a CI gate. REJECTED 'measurably faster', which cannot fail."
+    - "--dist loadgroup, WITH tests/conftest.py GIVING EVERY TEST A GROUP (Keith, 2026-10-24, Q2 as recommended): each test's group is its file, and for tests/test_dashboard_e2e.py its file plus class, so every other module keeps exactly today's one-file-per-worker behaviour; bare loadgroup would spread ungrouped tests one by one. REJECTED splitting the e2e module into several themed files under loadfile: simpler config, but the files must be balanced by hand as tests are added and each one pays its own build."
+  - id: REQ-TEST-282
+    title: "A browser-test class loads the dashboard once and its tests share that page, except the tests that need a fresh load"
+    date_written: "2026-10-23"
+    story: "As whoever runs the full gate, I want the tests of one browser-test class to share one loaded dashboard page rather than each opening and parsing the multi-megabyte page again, so that the module's time goes on what the tests check rather than on reloading the same page hundreds of times."
+    moscow: should
+    status: not_started
+    signed_off:
+      by: Keith
+      date: "2026-10-24"
+    source: "Keith, plans/running-thoughts.md #88 and the 'dig into the 56 minutes' ask; approved as option B of two ('A and B') for overnight 2026-10-23 drafting. Drafted by delivery-scoper 2026-10-23. Signed off by Keith 2026-10-24."
+    acceptance_criteria:
+    - "WHERE a browser-test class opts in to a shared page, THE SYSTEM SHALL open one browser context and page for that class, load the dashboard document in it at most once, and give every test in the class that page."
+    - "WHEN a test in a shared-page class starts, THE SYSTEM SHALL return the page to a known state - the class's starting route reached by a same-document navigation, local and session storage cleared, any open panel or drawer closed - before the test's own steps run."
+    - "THE SYSTEM SHALL let a test mark itself as needing a fresh document load, and WHEN a marked test runs in a shared-page class, THE SYSTEM SHALL reload the page for it."
+    - "THE SYSTEM SHALL mark as needing a fresh load every test that asserts on a reload, on persistence across a load, on the first render, on the clock ticking or not ticking, or that rewrites the page's embedded data or DOM in place (_rewrite_checks, _rewrite_const and their like)."
+    - "THE SYSTEM SHALL still fail each test on any console error or uncaught page exception raised during that test, attributing it to the test during which it was raised, as clean_page does today."
+    - "IF a shared page's document has been replaced by something other than a marked test's own reload, THEN THE SYSTEM SHALL fail the test that replaced it, naming it, rather than let later tests run on a page they did not expect."
+    - "WHEN the change lands, THE SYSTEM SHALL report in its evidence the number of document loads the module makes before and after, and the module's duration before and after, measured on the same history."
+    non_functional_requirements:
+    - "NO TEST BECOMES ORDER-DEPENDENT: each test in a shared-page class SHALL pass when run alone (`-k`) and when the class runs in reverse order (pytest's own ordering options, or a one-off reversed run recorded as evidence)."
+    - "NO WEAKER ASSERTION: the per-test console-error bar (Keith's own confirmed design for this suite) is kept per test, not relaxed to per class."
+    - "NO NEW DEPENDENCY: built on pytest-playwright's own session-scoped browser fixture; no plugin added for ordering or state."
+    - "THE TARGETS ARE REQ-TEST-281'S (Keith, 2026-10-24, Q1): with both built, the full local `uv run pytest` wall clock on this sandbox SHALL be at most 20 minutes, and tests/test_dashboard_e2e.py's own at most 10 minutes. Missing either is a finding for Keith, not a CI gate."
+    - "ROLLOUT IS ALLOWED TO BE PARTIAL: classes opt in, so a class that turns out to be state-heavy stays on a fresh page per test; the evidence names which classes opted in and which did not."
+    dependencies: []
+    open_questions: []
+    decisions:
+    - "OPT-IN PER CLASS, NOT A MODULE-WIDE SWITCH: the 2026-09-27 class-scoped variant fixtures proved the class is the natural unit of reuse here, and a class whose tests mutate shared state can stay as it is rather than be rewritten."
+    - "RESET BY SAME-DOCUMENT NAVIGATION, NOT A RELOAD: a reload is exactly the cost being removed. _goto already tells a hash change from a reload with window.__e2eMark and the data-render-count counter (plans/tooling.md #24, fix 1), so a reset can wait on a real render rather than a sleep."
+    - "A DOCUMENT REPLACED UNEXPECTEDLY IS A FAILURE, NOT A SILENT RECOVERY (criterion 6): silently reloading would hide the very order-dependence this change risks."
+    - "INDEPENDENT OF REQ-TEST-281 BUT COMPATIBLE: it assumes only that a class runs on one worker, which loadfile gives today and REQ-TEST-281 criterion 1 keeps."
+    - "ONE TARGET FOR A AND B TOGETHER (Keith, 2026-10-24, Q1): 20 minutes of full local pytest with REQ-TEST-281 and this requirement built, and 10 minutes for the browser-test module, both recorded on REQ-TEST-281 and repeated here; a miss is a finding for Keith, not a CI gate."
+  - id: REQ-TEST-283
+    title: "`mothman env tidy-test-databases` drops the test suite's own leftover databases, never anything else, and the session-start hook runs it"
+    date_written: "2026-10-23"
+    story: "As whoever runs the test suite on a shared PostgreSQL server, I want the databases earlier test sessions left behind dropped automatically once they are old and unused, so that tagged sessions' databases stop accumulating (about 130 in one sandbox) without any risk to the supply database, another server user's databases, or a session still running."
+    moscow: should
+    status: built
+    signed_off:
+      by: Keith
+      date: "2026-10-24"
+    source: "Keith, 2026-10-20: \"Feel free to setup something to automatically tidy up old leftover test databases.\" BUILT before any requirement existed (commit 8e6f745, 2026-10-22 Perth, a checkpoint with no test claims); drafted afterwards by delivery-scoper 2026-10-23 to describe what is built, so the register catches up with the code. Signed off by Keith 2026-10-24 and flipped to built the same day, with tests added for criteria 2, 7 and 8."
+    acceptance_criteria:
+    - "THE SYSTEM SHALL offer `mothman env tidy-test-databases` with `--older-than-hours` (default 12), `--dry-run` and `--prefix`, reading the server from MOTHMAN_TEST_DSN."
+    - "IF MOTHMAN_TEST_DSN is not set, THEN THE SYSTEM SHALL refuse, saying there is no test server to tidy, and drop nothing."
+    - "THE SYSTEM SHALL consider only databases whose names match ^mothman_(test|solo)_[A-Za-z0-9_]+$ - the names tests/conftest.py gives a worker's database, its tagged form, its _scratch sibling and a solo test's database - and SHALL never drop any other database on the server."
+    - "THE SYSTEM SHALL drop a matching database only when nobody is connected to it and it was created at least --older-than-hours ago, taking its creation time from the modification time of its PG_VERSION file."
+    - "WHERE --prefix is given, THE SYSTEM SHALL further restrict the candidates to names beginning with that prefix."
+    - "WHEN --dry-run is given, THE SYSTEM SHALL list each database it would drop and their count, and drop nothing."
+    - "THE SYSTEM SHALL drop each candidate with a plain DROP DATABASE, never WITH (FORCE), and IF a drop fails because somebody connected since the listing, THEN THE SYSTEM SHALL keep that database, say so by name, and carry on with the rest."
+    - "IF the test server cannot be listed, THEN THE SYSTEM SHALL exit non-zero naming the database error."
+    - "WHEN a session starts and PostgreSQL is up, THE SYSTEM SHALL run the command from .claude/hooks/session-start.sh with its defaults, and report the number dropped only when it is more than zero, without failing the session start if the command fails."
+    non_functional_requirements:
+    - "NEVER THE REAL DATABASE (CLAUDE.md, the 2026-09-27 TRUNCATE incident): the name pattern is the only selector, it cannot match the supply database, and criterion 3's test proves a database not named by the suite is never touched."
+    - "TESTS NARROW EVERY DROP TO THEIR OWN NAMES with --prefix, because with a zero threshold the command would otherwise drop any idle suite database on the server, including a concurrent session's."
+    - "PRIVILEGE: pg_stat_file needs a superuser or the pg_read_server_files role. The sandbox role is a superuser; on a least-privilege role the listing fails loudly (criterion 8) and the hook stays quiet, so the tidy simply does not happen there rather than doing something wrong."
+    - "OUT OF REACH OF A REAL DEPLOYMENT: it reads MOTHMAN_TEST_DSN only and touches only test-suite names, so it has nothing to act on in an environment with no test server."
+    dependencies: []
+    linked_tests:
+    - tests/test_tidy_test_databases.py::test_an_old_unused_test_database_is_dropped
+    - tests/test_tidy_test_databases.py::test_a_young_test_database_is_kept
+    - tests/test_tidy_test_databases.py::test_a_database_somebody_is_connected_to_is_kept
+    - tests/test_tidy_test_databases.py::test_a_database_not_named_by_the_suite_is_never_touched
+    - tests/test_tidy_test_databases.py::test_dry_run_drops_nothing
+    - tests/test_tidy_test_databases.py::test_with_no_test_server_it_refuses_and_drops_nothing
+    - tests/test_tidy_test_databases.py::test_a_database_somebody_connects_to_after_the_listing_is_kept
+    - tests/test_tidy_test_databases.py::test_a_test_server_that_cannot_be_listed_is_an_error
+    implemented_by:
+    - cli/env.py::leftover_test_databases
+    - cli/env.py::tidy_test_databases_command
+    - .claude/hooks/session-start.sh
+    evidence:
+    - "2026-10-24, TESTS: tests/test_tidy_test_databases.py, 8 passed in 10.63s (-n auto) against the sandbox test server, on the tree of the commit that flips this requirement - the five original tests and the three added for criteria 2, 7 and 8, the three passing at their first run against the code built in 8e6f745."
+    - "2026-10-24, CRITERION 9 BY INSPECTION of .claude/hooks/session-start.sh (the tidy block, lines 71-81): it runs only when PG_UP is set, with the command's defaults against MOTHMAN_TEST_DSN; it reports only a non-zero 'Dropped N'; and the script runs under set -uo pipefail without -e, with stderr discarded, so a failed tidy cannot stop the session starting."
+    open_questions: []
+    decisions:
+    - "PLAIN DROP DATABASE, NEVER WITH (FORCE): a connection that arrived after the listing means somebody is using that database after all, and the drop should fail rather than kill their session. This is the opposite of tests/conftest.py's own session-start drop, which FORCEs because it is dropping its OWN worker's database, and was the cause of the 2026-10-05 incident where a critic's run and the builder's gate killed each other's databases."
+    - "SKIP ANY DATABASE WITH A CONNECTION, WHATEVER ITS AGE: a long-running session or a person inspecting a leftover database after a failed run is exactly what the suite leaves them for; age alone cannot tell that from abandonment."
+    - "AGE FROM THE PG_VERSION FILE, NOT FROM A CATALOGUE COLUMN: PostgreSQL records no creation time for a database, and PG_VERSION is written once when the database is created and never again. A test session recreates its databases when it starts, so a live session's are always younger than any sensible threshold. REJECTED the age of the newest activity, which a database left idle for inspection does not have."
+    - "THE NAME PATTERN IS THE WHOLE SELECTOR, ANCHORED AND CHARACTER-CLASSED: it also makes the double-quoted name in the DROP statement safe, since nothing outside [A-Za-z0-9_] can reach it."
+    - "RUN FROM THE SESSION-START HOOK, QUIET UNLESS IT DID SOMETHING: Keith asked for it to happen automatically; a failure there must not stop a session starting, so it is reported only by its absence."
+    - "TWELVE HOURS BY DEFAULT: longer than any gate run measured on this sandbox (the longest, ~56 minutes) by a wide margin, short enough that a day's leftovers go by the next morning."
+    - "COVERAGE BEFORE THE FLIP (Keith, 2026-10-24, as recommended): small tests added for criterion 2 (MOTHMAN_TEST_DSN unset), criterion 7 (a database somebody connects to after the listing is kept, named, and the rest still dropped - the listing replaced by one that returns the connected database, the state a late connection leaves) and criterion 8 (a test server that cannot be listed exits non-zero naming the error); all three passed against the built code at the first run, so no defect. Criterion 9, the session-start hook, is VERIFIED BY READING the hook rather than by a test, since it is a shell script run at session start. Criterion 5's --prefix is exercised by every dropping test rather than a test of its own. REJECTED flipping with those criteria in unmet_criteria."

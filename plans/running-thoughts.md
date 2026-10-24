@@ -1150,26 +1150,12 @@ to the exact right file/line/folder with zero console errors.
     straight after a bootstrap - in REQ-GEN-195's case the golden and two
     e2e failures were all predictable from "the corpus changed" and turned
     up only in the full gate. CLAUDE.md's commit-cadence rule C already
-    says this; it was not followed. (2) THE GATE ITSELF: measure where the
-    ten minutes go now (CLAUDE.md's last recorded figure is 6m42s) and
-    propose cuts - the e2e module is the long pole, and #86's parked
-    test-pruning pass is the related item. Not scoped yet.
+    says this; it was not followed.
 
-    **MEASURED 2026-10-13** (`pytest --durations=0`, 4,666 tests; wall
-    clock not clean - plans edits and other gates ran beside it - but the
-    per-file sums are). 1,722s of test time across 221 files, on 4 workers:
-    - `test_dashboard_e2e.py` **396s, 204 tests - THE LONG POLE.** `--dist
-      loadfile` pins the whole file to ONE worker, so it alone is ~6.6 min
-      of wall clock while the other three workers finish the remaining
-      ~1,330s between them (~5.5 min each). Splitting it - several files
-      sharing one build per worker, or `--dist loadgroup` - is the single
-      biggest cut available, and costs a dashboard build per extra worker.
-    - `test_embed_dashboard_data.py` 169s for **13 tests (~13s each)** -
-      almost certainly rebuilding the dashboard per test.
-    - `test_generate_to_target.py` 110s/32, `test_dbt_worker.py` 96s/10,
-      `test_cli_cp.py` 68s/10, `test_cli_plans.py` **60s for 4 tests**.
-    The top six files are 55% of all test time. Next: a proposal for Keith
-    per file - share a fixture, split the pole - before changing any test.
+    **Scoped 2026-10-23 as REQ-TEST-281 (the e2e module across workers,
+    per-worker build) and REQ-TEST-282 (one page per class), with the
+    2026-10-21/22 gate profile as their evidence.**
+
     Priority: this week, after the line of work already queued (Keith,
     2026-10-13: "we'll make a note to come back to that this week. Maybe
     after this next line of things we've got lined up").
@@ -5856,18 +5842,6 @@ could never have computed it), and it belongs with batch 5's check work.
      trace of the failed attempt (`reopen_run` clears `completed_at`;
      results are replaced), so recording attempts would have to come first.
      Display for the UX review alongside #118-#120.
-
-122. **[todo, 2026-10-22]** **[Testing]** **Pause and retire the equivalence
-     harness - but do not delete it yet.** Keith, 2026-10-22, answering
-     REQ-PIPE-279 K6: "The equivalence check is all about the refactor ...
-     to have a single set of registration stuff. Like, this is about genuine
-     changes, so we don't need to run the equivalence check. That was a point
-     in time thing and can be paused and retired ... But not yet deleted."
-     REQ-TEST-239 (`mothman debug equivalence capture/compare`) served the
-     collection-registry refactor (REQ-PIPE-240 to 248). From here, changes
-     that genuinely alter behaviour are proved by their own tests, not by a
-     zero-difference comparison. Retiring it touches REQ-TEST-239's own
-     record (a requirement claim), so the wording goes to Keith first.
 
 123. **[todo, 2026-10-22]** **[Dashboard UI]** **[Pipeline & publishing]** **Make
      publishing the dashboard part of a routine, so the site cannot silently

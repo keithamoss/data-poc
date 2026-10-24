@@ -112,7 +112,7 @@ releases:
   - date: "2026-10-24"
     summary: >
       Every result now sits on the delivery it actually read, in the order it
-      ran, and a check that crashes or times out leaves a record.
+      ran; a check that crashes leaves a record, and a blocked row says why.
     changes:
       - category: Improved
         items:
@@ -128,6 +128,18 @@ releases:
               When a later file or a re-check is checked hours after the first,
               it now appears as a new point in the check's history instead of
               quietly changing an earlier one.
+          - headline: Blocked rows say why
+            components: ["Dashboard UI"]
+            description: >
+              When a check between two tables could not be run, its row now
+              tells you why: two competing files are waiting to be settled, or
+              the supply it reads is being held.
+          - headline: Trend lines name their causes
+            components: ["Dashboard UI"]
+            description: >
+              Hover over a point on a dataset's trend line in the list to see
+              what caused it and when: the supply arriving, another table's
+              delivery, or a re-check.
       - category: New
         items:
           - headline: Crashes and timeouts are remembered

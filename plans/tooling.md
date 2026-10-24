@@ -2739,14 +2739,7 @@ testing before anyone treats it as the easy option.
     request. The profile after fix 1 showed exactly where it was going:
     ten setups at ~6.5s each, which is three now.
 
-    **Fix 3 (let the module parallelise) is still open** and is still
-    the biggest remaining win, ~150s -> ~50s on four cores. The blocker
-    is unchanged: the session build fixture has to be made worker-safe
-    first (item #10). Worth knowing before picking it up: the profile
-    now has a 15.5s single test that is CORRECT (the masthead proving
-    it does not tick) and a 12.9s session build paid once - parallelism
-    helps neither, so the realistic ceiling is lower than the arithmetic
-    suggests.
+    Fix 3 is REQ-TEST-281.
 
     **On the runner itself: keep pytest.** Playwright's Python docs
     document the pytest plugin as the supported path and recommend

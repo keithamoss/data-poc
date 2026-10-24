@@ -11095,7 +11095,7 @@ twice. It deliberately did not re-find the `TypeError`.
      (Compared run 1197-1742px in a panel ending at 1734px), green after,
      with the class's other three tests (4 passed).
 
-262. **[in-progress, 2026-10-24]** **[Pipeline & publishing]** **REQ-PIPE-279 post-build critic,
+262. **[done, 2026-10-24]** **[Pipeline & publishing]** **REQ-PIPE-279 post-build critic,
      2026-10-24 overnight.** delivery-critic on 98b67fc, read-only against
      ed_probe, 98 core tests and a 130-test coverage subset run. Most of the
      28 criteria met. Findings, verified against the code where marked:
@@ -11142,3 +11142,13 @@ twice. It deliberately did not re-find the `TypeError`.
      own-entry gap all to be fixed now (defects test-first).
      Plan: D1 and D2 now, test-first; T6's test-23/26 strengthening with them;
      R3, R4, F5 and the c13 gap to Keith (morning report #8).
+     **Closed 2026-10-24, every finding placed:**
+     - D1: fixed test-first in f7b6c9e, test 23 extended to drive it.
+     - D2: fixed test-first in f7b6c9e and 20d0d98; the dataset's own
+       run-id parse went in 0d86652 (REQ-PIPE-279 provisional #23).
+     - R3: left until the AWS build - plans/running-thoughts.md #124 and
+       REQ-PIPE-279's decisions.
+     - R4: with #95's sprint 1 - REQ-PIPE-279's decisions.
+     - F5: all five built test-first in 9585a14.
+     - T6: the guard strengthened in 9585a14; test 26 in f7b6c9e.
+     - c13: a dataset's own re-check names its cause, 9585a14.
