@@ -41076,7 +41076,7 @@ requirements:
       question, so that another table's file that never got in can neither turn it red nor leave it green, and one late or bad
       file does not hold back every table it touches.
     moscow: must
-    status: not_started
+    status: built
     signed_off:
       by: Keith
       date: '2026-10-23'
@@ -41194,6 +41194,41 @@ requirements:
     - REQ-PIPE-278
     - REQ-PIPE-279
     - REQ-PIPE-280
+    linked_tests:
+    - "tests/test_warehouse_view.py::TestHeldBackPartnerDoesNotCount"
+    - "tests/test_warehouse_view.py::TestPromotedTogether"
+    - "tests/test_warehouse_view.py::TestCouldNotRunCountsTowardTheAsker"
+    - "tests/test_warehouse_view.py::TestOwedRecheck"
+    - "tests/test_warehouse_view.py::TestCountedPerCheck"
+    - "tests/test_warehouse_view.py::TestKnockOnStaleness"
+    - "tests/test_warehouse_counts.py::TestTheCountedPoints"
+    - "tests/test_warehouse_counts.py::TestAReadersOnlyReCheckIsPlaced"
+    - "tests-js/warehouse-counts.test.js"
+    - "tests/test_dashboard_e2e.py::TestStatusMatchesEachToolsOwnVerdict::test_on_every_past_date_too"
+    - "tests/test_dashboard_e2e.py::TestColumnsNotGreenMatchesTheDatasetPage"
+    - "tests/test_results_about.py::TestTheBuildAndTheGateAgree"
+    - "tests/test_no_guessing_in_placement.py"
+    implemented_by:
+    - "qa_tools/common/supply_status.py::results_about"
+    - "qa_tools/common/supply_status.py::count"
+    - "qa_tools/common/supply_status.py::counts_toward"
+    - "qa_tools/common/supply_status.py::stand_in"
+    - "qa_tools/common/supply_status.py::holdings_at"
+    - "qa_tools/common/supply_status.py::HoldingsTimeline"
+    - "qa_tools/common/supply_status.py::owing"
+    - "qa_tools/common/supply_status.py::latest_results"
+    - "qa_tools/common/knock_on.py::stale_for"
+    - "qa_tools/common/knock_on.py::read_as"
+    - "pipeline/red_promoted.py::for_dataset"
+    - "pipeline/warehouse_counts.py::points"
+    - "pipeline/build_dashboard_data.py::build_one_table"
+    - "pipeline/build_dashboard_data.py::build_datasets"
+    - "dashboard/qa-reporting-dashboard.template.html::countedOnShow"
+    - "dashboard/qa-reporting-dashboard.template.html::clipDatasetToInPlaceOn"
+    - "dashboard/qa-reporting-dashboard.template.html::unitCounts"
+    evidence:
+    - "2026-10-24, TARGETED RUNS ON THE BUILT CODE (tree dcc33f8, against ed_probe at schema 46, bootstrapped earlier by the main session): 48 affected pytest modules - tests/test_warehouse_view.py, test_warehouse_counts.py, test_in_place_in_the_warehouse.py, test_results_about.py, test_supply_status.py, test_knock_on.py, test_red_promoted.py, test_no_guessing_in_placement.py, test_cp_pair.py and the build, CLI and scenario modules - 1351 passed, 1 xfailed in 4m50s; npm test 899 passed (65 files); tests/test_dashboard_e2e.py -n0 303 passed, 2 failed in 44m51s - the two are TestARequirementHasItsOwnAddress, which fail identically on the base commit aaaa9ba (run there the same day), so not this change. The full suite was not run here; the main session runs one full gate before the push."
+    - "2026-10-24, TEST-FIRST: every test named in criteria 11 to 13 and 15 to 18 was run against the code before this change and failed for the reason it names (S4 'red' == 'green'; the other direction 'red' == 'green'; the owed re-check 'green' == 'red'; B1 at knock_on.readers, stale False); test_one_verdict_counts_toward_both and test_an_absent_clients_reddens_only_the_asker failed on the knock-on's physical-name read and passed on the asker's side respectively, neither criterion asking for a failure first. tests-js/warehouse-counts.test.js's R4 case failed 'red' to be 'green' before the template change."
     decisions:
     - 'WAREHOUSE VIEW BY SUPPLY (Keith, 2026-10-21): ''A warehouse view counts a cross-table verdict only when every supply
       it read is the one in place, judged by supply.'' So a first-time zip where both promote together counts with no re-run,
@@ -41253,6 +41288,24 @@ requirements:
       (a)): REQ-PIPE-279 ships first and amends it with its own wording; this requirement amends it again, quoting 279''s text
       as OLD. #95''s wording is a strict refinement (counted toward the supply on show), so no reader sees a contradiction between
       the two. REJECTED (b), 279 leaving criterion 1 to this requirement and shipping only its K2 clause.'
+    - "BUILT 2026-10-24 (plan #95 sprint A1), ONE RULE WITH TWO READERS: supply_status.count is the rule - pure, over the results results_about SHOWS and the warehouse at the view's instant (qa.slot_holds) - and results_about(view=...) returns About(shown, counted) through it, filtering first and then taking the newest per check by run_seq (criterion 7). The gate's readers (latest_results, status, the knock-on's re-gate, recheck, filing_queue, the status recorded at promotion) and red_promoted ask results_about; the dashboard build asks count itself over each card's entries at every instant something changed (pipeline/warehouse_counts.py), the warehouse taken from the slot timeline it already reads (supply_status.HoldingsTimeline - qa.slot_holds asked at each decision's instant). PROVISIONAL, not put to Keith: criterion 7 names the dashboard build among results_about's callers; asking it once per supply per date would be the per-render walk the PERFORMANCE NFR rules out, so the build shares the RULE rather than the query, and tests/test_warehouse_counts.py and tests/test_warehouse_view.py hold the two to one answer on S4 and R4."
+    - "WHICH PERIOD (PROVISIONAL, not put to Keith): a supply can be in the warehouse in several periods at once - promoted into one, inherited or substituted into later ones. A result counts toward it where every supply the check read is the one held in SOME period that holds it, and a check is owed where every table it reads has a supply in one of them."
+    - "A TABLE A CHECK READ NOTHING OF (PROVISIONAL, not put to Keith): criterion 1 speaks of the supplies a check read. A HELD or ABSENT read describes the warehouse only while the period still holds nothing of that table, so it counts only then; a NO-SUPPLY read (a sample's or a trial's table) is ignored. So an absent-Clients red stays on Notifications while no Clients is there, and becomes owed rather than current the moment one is promoted."
+    - "OWED ONLY FOR A CHECK THAT WAS ABOUT THE SUPPLY (PROVISIONAL, not put to Keith): criterion 5's red stand-in (supply_status.stand_in) is made for a check with a result SHOWN about the supply and none counted toward it. A check that never read the supply - one added to the contract after it was promoted - is not made red on every old supply."
+    - "OWED AT T: a re-evaluation qa.owed_run still holds (REQ-PIPE-121) of a table the check reads, in a period that holds the supply, whose cause took effect at or before T and has not cleared; cleared by the run its cause caused, which follows the cause on the asset's timeline (decision_log.follows), so a cleared item is owed at no T from its cause on. Never the wall clock. Named by the cause decision's id and effective instant on the stand-in (owed_by_decision, owed_since). A carry-forward (REQ-PIPE-280) owes through the same apply_decision hook when it is built. Nothing is raised for it: the knock-on shouts only for a WAITING reader, and no ticket is written by the pipeline today (TestOwedRecheck asserts no still-failing record); REQ-PIPE-278 owns what is raised."
+    - "WHAT REQ-PIPE-267 STILL OWES THIS (criterion 3's 'subject to REQ-PIPE-267 criterion 1', and criterion 7's 'used by the promotion gate'): an ARRIVAL's own gate (promotion.after_runs) still reads its run's results and what it carried (REQ-PIPE-265); 267 criterion 1 moves it onto the view of what the warehouse will hold. Every other reader of a supply's status reads the counted view now."
+    - "THE TRANSIENT RED THIS MAKES VISIBLE BEFORE REQ-PIPE-267 (found building it, on ed_probe): a supply promoted while a partner its OWN cross-table check read was still waiting - Notifications 2014-02-11, promoted 16 Feb 2014, the Case Workers it read not until 25 Feb - has no result about the warehouse as it stood, and nothing re-checks it, because the knock-on re-runs the checks that READ the moved table, not the moved table's own. So it reads red, no-current-result, until its partner is promoted: 516 such points in Child Protection's history on ed_probe, none still standing at its end. That is criterion 5 working as written; REQ-PIPE-267 removes the cause by gating on the warehouse the promotion will make. For Keith, at the walk-through of this build."
+    - "S2 AND S14 WITHOUT THE PACKAGE GATE: TestPromotedTogether and TestCountedPerCheck record the OUTCOME of the zip - both promoted, or Placements withheld - rather than driving the package gate (REQ-PIPE-266); 'no readers-only run' is asserted as the knock-on finding no reader stale. Criterion 14's S14 tests, the gate holding back only Placements, need that gate and wait for it (unmet_criteria)."
+    - "THE PAGE (REQ-DASH-264 criterion 1 as amended): a cross-table card carries `counted` - {supply: [{on, rank|reason}]} - and clipDatasetToInPlaceOn takes the current from the entry of that rank for the supply on show (countedOnShow). Where none counts, the card reads red with warehouseReason 'recheck-owed' or 'no-current-result', and No data where the reason is 'not-counted' (criteria 4 and 6). The history keeps every evaluation (AUDITABILITY). unitCounts' newest point carries the same verdicts (countedNow), so the dataset list's latest count and the page agree (REQ-DASH-225 criterion 18) - REQ-DASH-272 criterion 18 owns the rest of that (counts, rollups and grid cells), and criterion 10 the wording of an owed re-check."
+    - "A READERS-ONLY RE-CHECK IS PLACED ON THE PAGE (post-build-review #264, a defect fixed test-first): it records no dataset_stats, so it was never among the results file's runs and its results reached no page - which would have read as false no-current-result reds once the page counted only results about the warehouse."
+    - "THE KNOCK-ON'S STALENESS FROM THE CHECK'S OWN READ (criterion 8): knock_on.stale_for reads qa.check_read on the newest COUNTED result (read_as) - stale where it read the moved table as another supply, read nothing of it, was not evaluated, or is an owed stand-in. It read the run-level qa.tables_read by physical name, which said None == None for a reader that could not read a table and only re-gated it."
+    - "COST, MEASURED 2026-10-24 on ed_probe: the Child Protection dashboard build 44s -> 56s and its file 14.7 MB -> 15.8 MB (+7%), for 5,247 counted points across 2,847 (card, supply) pairs; Birth Registrations and Emergency Department have no cross-table cards, so nothing."
+    unmet_criteria:
+    - criterion: "Criterion 14 - S14's tests/test_warehouse_view.py::TestCouldNotRunCountsTowardTheAsker::test_a_red_placements_holds_back_only_placements and test_a_zip_without_placements_promotes_clients."
+      why: "Both drive the package gate - a first-time zip of all six tables gated together, Placements alone held back and the other five promoted - which REQ-PIPE-266 builds; 267 criterion 6's re-check against no Placements is what makes Placements' checks count toward nothing. The counting rule they rest on is built and tested at the record (TestCountedPerCheck)."
+      owner: "the plan #95 sprint that builds REQ-PIPE-270, 266, 267, 273 and 278 in one push behind one bootstrap"
+      blocked_by:
+        requirements: ["REQ-PIPE-266", "REQ-PIPE-267"]
     open_questions: []
   - id: REQ-PIPE-270
     title: A cross-table check that cannot read a table is red for the table that asks, whatever the reason, not yet due included
@@ -42247,7 +42300,7 @@ requirements:
       that I never have to guess whether a supply is merely received, staged, or actually in the warehouse that other people
       query.
     moscow: should
-    status: not_started
+    status: built
     signed_off:
       by: Keith
       date: '2026-10-23'
@@ -42307,6 +42360,27 @@ requirements:
     - REQ-DASH-208
     - REQ-GEN-199
     - REQ-GHUB-229
+    linked_tests:
+    - "tests/test_dashboard_e2e.py::TestInPlaceInTheWarehouse::test_no_visible_text_says_in_place_alone"
+    - "tests/test_dashboard_e2e.py::TestTheAsAtScenarioChips"
+    - "tests/test_in_place_in_the_warehouse.py::TestTheTerminalSaysWhere"
+    - "tests-js/scenario-jump.test.js"
+    implemented_by:
+    - "dashboard/qa-reporting-dashboard.template.html"
+    - "cli/filing_tui.py::listed_words"
+    - "cli/filing_tui.py::stands_on_line"
+    - "cli/filing_tui.py::_supply_line"
+    - "cli/scenarios.py::where_line"
+    - "qa_tools/common/scenario_map.py::_entry"
+    evidence:
+    - "2026-10-24, TARGETED RUNS ON THE BUILT CODE (tree dcc33f8): tests/test_in_place_in_the_warehouse.py 7 passed within the 48-module run (1351 passed, 1 xfailed); npm test 899 passed; tests/test_dashboard_e2e.py -n0 303 passed, 2 failed (TestARequirementHasItsOwnAddress, failing identically on base aaaa9ba), TestInPlaceInTheWarehouse and the TS-78b chip among the passes; mothman scenarios map --check current."
+    - "2026-10-24, TEST-FIRST (criterion 7): the TS-78b chip in tests/test_dashboard_e2e.py, tests-js/scenario-jump.test.js and the new TestInPlaceInTheWarehouse::test_no_visible_text_says_in_place_alone were each run against the old wording first and failed (the verdict line not found; the label did not match; 0 visible texts saying 'in place in the warehouse'), as did all six of tests/test_in_place_in_the_warehouse.py's original tests."
+    unmet_criteria:
+    - criterion: "Criterion 5 - 'in place in the warehouse' in every wording drafted for #95 (REQ-DASH-204, REQ-DASH-272, REQ-DASH-275, REQ-PIPE-267, REQ-PIPE-271, REQ-PIPE-276, REQ-PIPE-280)."
+      why: "Those wordings exist only in their requirements, which already carry 'in place in the warehouse'; none is built, so there is no shown text to change yet. Each takes the phrase, and the 80-column rule, when it is built."
+      owner: "plan #95's later sprints, each with its own requirement - REQ-DASH-204, 272 and 275 with sprint A6"
+      blocked_by:
+        requirements: ["REQ-DASH-204", "REQ-DASH-272", "REQ-DASH-275", "REQ-PIPE-267", "REQ-PIPE-271", "REQ-PIPE-276", "REQ-PIPE-280"]
     decisions:
     - 'SAY WHERE (Keith, 2026-10-22): ''in place'' becomes ''in place in the warehouse'' wherever the phrase is shown to a person,
       here and everywhere else it is already exposed. Its own requirement because it changes built, signed wording outside #95.'
@@ -42337,6 +42411,11 @@ requirements:
     - 'ONE NARROW CONTROL, TWO REQUIREMENTS (dashboard UX review v5 P4; period-clarity Q2 = B): the period-clarity work adds
       the period to this same button (''· 2026-Q3''); the two are coordinated before either is built, this one owning the label''s
       words.'
+    - "BUILT 2026-10-24 (plan #95 sprint A1), THE SHOWN USES, as counted at scoping: fourteen lines of the template - the date control's button and label ('In the warehouse on'), its panel's heading and body, the verdict line's three sentences, REQ-DASH-182's way-back sentence, the scenario label, the jump label and the scenario-not-found message, and both past-date notices - and in the terminal filing_tui's state words for a promoted supply, one awaiting acknowledgement and one re-checked worse, the line a period standing on another's supply prints, mothman scenarios' 'where' line and the generated scenario register (SCENARIOS.md, regenerated). Ids, the in-place-on parameter, comments and 'in place of' unchanged (criterion 4)."
+    - "THE SCENARIO REGISTER'S ROW READS 'Set \"in the warehouse on\" to' (PROVISIONAL, not put to Keith): criterion 3 asks for the control's words in lower case; 'Set the in-place-on date to' became that, the quotes marking the control's name so the row does not read as a sentence about the warehouse."
+    - "80 COLUMNS (criterion 5): the line a person picks in the door's list of a period's supplies drops its 'arrived' and 'verdict:' labels - the table printed above it heads those columns - because 'in place in the warehouse, awaiting acknowledgement' took it to about 95 (PROVISIONAL, not put to Keith); the stands-on line is printed as two lines. Each is held to 80 columns by tests/test_in_place_in_the_warehouse.py."
+    - "REQ-GEN-199 CRITERION 18's STATUS CLAUSE COMES WITH REQ-DASH-272: its amended wording ends ', and is <status>.' (REQ-DASH-272 criterion 1); this change makes the rest of that verdict line true and tests/test_dashboard_e2e.py's TS-78b chip asserts it, the clause landing with 272."
+    - "CRITERION 6 WAS DONE AT SIGN-OFF: the six quoted-wording amendments (REQ-PIPE-081 criteria 20 and 23, REQ-DASH-182 criterion 3, REQ-DASH-208 criterion 4, REQ-GEN-199 criterion 18, REQ-GHUB-229 criterion 5) were made in the register on 2026-10-23 with Keith's approval of summary-v4/v5/v6's wording; this build makes the product match them."
     open_questions: []
   - id: REQ-PIPE-278
     title: One ticket and one still-failing record per root cause, naming everything it holds back
