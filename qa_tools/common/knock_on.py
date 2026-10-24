@@ -18,10 +18,12 @@ own re-evaluation - for each supply WAITING there or PROMOTED there whose own
 first run has happened. Never a supply's own table and column checks.
 
 CHEAPEST CORRECT PATH FIRST (NFR 4): a reader's tools run again only where
-the latest result of one of its reading checks read the moved table as a
-DIFFERENT supply than the period now holds. A reader that already read what
-the period holds - the usual case right after an arrival, whose own run
-re-evaluated its readers (REQ-PIPE-079 criterion 6) - is only re-gated.
+the newest COUNTED result of one of its reading checks read the moved table
+as a DIFFERENT supply than the period now holds, read nothing of it, or was
+not evaluated for want of a table (REQ-PIPE-269 criterion 8). A reader that
+already read what the period holds - the usual case right after an arrival,
+whose own run re-evaluated its readers (REQ-PIPE-079 criterion 6) - is only
+re-gated.
 
 THEN THE GATE (criterion 3), for each WAITING supply it touched, exactly as
 for a first arrival, reading the supply's whole status: the newest result of
@@ -94,24 +96,34 @@ def _now_holds(conn, table: str, period: str) -> str | None:
                                            decision_log.INHERITED) else None
 
 
-def _read_as(conn, run_key: str, table: str) -> str | None:
-    """The supply a run read `table` as, from what it recorded reading."""
-    from qa_tools.common import hierarchy
+def read_as(record: dict, table: str) -> str | None:
+    """The supply a result READ `table` as, from what it recorded reading
+    (qa.check_read, REQ-PIPE-279 criterion 1) - None where it read nothing of
+    it, held or absent. It was the run-level qa.tables_read, matched by
+    physical name, which says what the RUN read rather than the check."""
+    read = (record.get("reads") or {}).get(table) or {}
+    return read.get("supply_id") if read.get("state") == qa_store.READ else None
 
-    rows = conn.execute(
-        f'SELECT physical_table, supply FROM "{qa_store.SCHEMA}".tables_read '
-        "WHERE run_key = ? AND logical_table = ?", [run_key, table]).fetchall()
-    if not rows:
-        return None
-    physical, supply = rows[0]
-    if supply:
-        return supply
-    # THE ONE RESOLVER'S REVERSE (REQ-PIPE-193 criterion 13): a settled
-    # pair's `__2` may be its `#1`, so `__N` is never read as `#N`.
-    from qa_tools.common import supply_files
 
-    dataset_id = hierarchy.dataset_for_table(table).dataset_id
-    return supply_files.supply_for_table(conn, dataset_id, physical)
+def stale_for(latest: list[dict], table: str, holds: str | None) -> bool:
+    """Whether a reader's reading checks must run again (REQ-PIPE-121 NFR 4
+    as REQ-PIPE-269 criterion 8 has it): where its newest COUNTED result
+    read the moved table as a different supply than the period now holds,
+    read nothing of it, or was not evaluated for want of a table - so a
+    reader that could not read a table is re-run, not only re-gated. An
+    owed check's red stand-in (supply_status.stand_in) has no result of the
+    warehouse as it stands, so it is stale too."""
+    from qa_tools.common import carried
+
+    if not latest:
+        return True
+    for r in latest:
+        if r.get("warehouse_reason") or carried.not_evaluated_reason(r):
+            return True
+        got = read_as(r, table)
+        if got is None or got != holds:
+            return True
+    return False
 
 
 def readers(conn, period: str, tables: list[str], reads: dict[str, list[str]]) -> list[Reader]:
@@ -153,8 +165,7 @@ def readers(conn, period: str, tables: list[str], reads: dict[str, list[str]]) -
                 reader.tables.add(table)
                 latest = [r for r in supply_status.latest_results(conn, dataset_id, supply)
                           if r.get("check_id") in mine]
-                if not latest or any(_read_as(conn, r["run_id"], table) != holds
-                                     for r in latest):
+                if stale_for(latest, table, holds):
                     reader.stale = True
     return sorted(found.values(), key=lambda r: (r.dataset_id, r.supply))
 

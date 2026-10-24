@@ -52,8 +52,15 @@ def _cause(conn, run_key: str) -> tuple[str, str]:
 def for_dataset(dataset_id: str, conn=None) -> dict[str, dict]:
     """{run id: {promotedOn, promotedAt, timeline: [{at, status, cause}]}} for
     every supply of this dataset that was ever promoted, keyed by the run
-    that checked it (the page knows runs). `timeline` holds the status after
-    each run that read the supply, where it changed, oldest first."""
+    that checked it (the page knows runs). `timeline` holds the supply's
+    status after each run that read it AND after each decision that changed
+    what the warehouse holds beside it, where it changed, oldest first.
+
+    COUNTED AS AT EACH STEP (REQ-PIPE-269 criteria 1 to 7, 9): a step's
+    status is supply_status.count over the results recorded by then, in the
+    warehouse as the decision log had it then - so a held-back partner's red
+    never colours a supply it read, and a verdict about a partner that has
+    since left stops counting the moment it leaves."""
     if conn is None:
         with supply_db.connect(read_only=True, label="mothman:red-promoted") as opened:
             return for_dataset(dataset_id, conn=opened)
@@ -62,6 +69,8 @@ def for_dataset(dataset_id: str, conn=None) -> dict[str, dict]:
 
     reads = promotion._declared_reads()
     out: dict[str, dict] = {}
+    timelines: dict[str, list[dict]] = {}
+    owed = None
     for supply, promoted_on, promoted_at in conn.execute(
             f"SELECT DISTINCT ON (supply) supply, promoted_status, effective_at "
             f"FROM {decision_log.TABLE} WHERE dataset_id = ? AND action = ? "
@@ -70,28 +79,74 @@ def for_dataset(dataset_id: str, conn=None) -> dict[str, dict]:
         run = slot_timeline._run_for(conn, dataset_id, supply)
         if not run:
             continue
-        latest: dict[str, dict] = {}
-        timeline: list[dict] = []
         # THE GATE'S OWN ANSWER (REQ-PIPE-279 criterion 21): the results about
-        # this supply, in the order their runs were opened, a step per run.
-        about = supply_status.results_about(conn, dataset_id, supply)
-        for i, record in enumerate(about):
-            latest[record["check_id"]] = record
-            run_key = record["run_id"]
-            if i + 1 < len(about) and about[i + 1]["run_id"] == run_key:
+        # this supply, in the order their runs were opened.
+        shown = supply_status.results_about(conn, dataset_id, supply,
+                                            view=supply_status.View()).shown
+        involved = {dataset_id, *(d for r in shown for d in map(
+            supply_status._dataset_of, r.get("reads") or {}) if d)}
+        for ds in involved:
+            if ds not in timelines:
+                timelines[ds] = slot_timeline.for_dataset(ds, conn=conn)
+        warehouse = supply_status.HoldingsTimeline({ds: timelines[ds] for ds in involved})
+        if owed is None:
+            owed = supply_status.owing(conn)
+        # EACH STEP: a run that recorded a result about it, at its cause's
+        # instant, and a decision that changed what a period beside it holds.
+        steps: dict = {}
+        run_at: dict[str, object] = {}
+        for record in shown:
+            key = record["run_id"]
+            if key not in run_at:
+                at, cause = _cause(conn, key)
+                run_at[key] = supply_status._instant(at) if at else None
+                if run_at[key] is not None:
+                    steps.setdefault(run_at[key], (at, cause))
+        for ds in sorted(involved):
+            for entry in timelines[ds]:
+                when = supply_status._instant(entry["at"])
+                steps.setdefault(when, (entry["at"], f"the {entry['action']} of {_name(ds)}"))
+        timeline: list[dict] = []
+        for when in sorted(steps):
+            got = [r for r in shown if run_at[r["run_id"]] is None or run_at[r["run_id"]] <= when]
+            if not got:
                 continue
+            counted = supply_status.count(dataset_id, supply, got,
+                                          holdings=warehouse.at(when), owed=owed, at=when)
             try:
                 # FOR DISPLAY, the recorded verdict - never the gate's reading
                 # (post-build-review #132 A1).
-                status = promotion.status_of(dataset_id, list(latest.values()), reads=reads,
-                                             for_gate=False)
+                status = promotion.status_of(dataset_id, supply_status.newest_per_check(counted),
+                                             reads=reads, for_gate=False)
             except promotion.UnreadableVerdictError:
                 continue
             if timeline and timeline[-1]["status"] == status:
                 continue
-            at, cause = _cause(conn, run_key)
+            at, cause = steps[when]
             timeline.append({"at": at, "status": status, "cause": cause})
         out[run] = {"promotedOn": promoted_on,
                     "promotedAt": promoted_at.isoformat() if promoted_at else None,
                     "timeline": timeline}
     return out
+
+
+def _name(ds: str) -> str:
+    from qa_tools.common import hierarchy
+
+    try:
+        return hierarchy.dataset(ds).dataset_name
+    except Exception:  # noqa: BLE001 - a name is decoration, never a failure
+        return ds or "a supply"
+
+
+def status_on(health: dict, on: str) -> str | None:
+    """The status in force at the end of asset day `on` - the page's own
+    lookup (redPromotedBadge), here so a test can ask it of the build."""
+    from qa_tools.common import asset_time
+
+    found = None
+    for step in health.get("timeline") or []:
+        day = asset_time.local_date(asset_time.parse_instant(step["at"], "red promoted"))
+        if day.isoformat() <= on:
+            found = step["status"]
+    return found

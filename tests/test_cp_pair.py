@@ -300,7 +300,7 @@ def _readers_now_read(conn, cp_pair, expected):
                                                           reader.supply)
                   if r.get("check_id") in mine]
         assert latest, reader
-        assert {knock_on._read_as(conn, r["run_id"], "cp_clients") for r in latest} == {
+        assert {knock_on.read_as(r, "cp_clients") for r in latest} == {
             holds}
         assert not any((r.get("extra") or {}).get("unrunnable_code") == "contested"
                        for r in latest)

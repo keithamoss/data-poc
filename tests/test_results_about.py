@@ -78,6 +78,11 @@ def _run(conn, key: str, *, dataset_id: str, supply: str | None, at: str,
     return key
 
 
+def _shown(conn, dataset_id: str, supply: str) -> list[dict]:
+    """Every result about the supply, as results_about SHOWS it."""
+    return supply_status.results_about(conn, dataset_id, supply, view=supply_status.View()).shown
+
+
 def _read(table: str, supply: str | None, state: str = qa_store.READ) -> qa_store.CheckRead:
     return qa_store.CheckRead(table, state, supply)
 
@@ -144,7 +149,7 @@ class TestWhatIsAboutASupplyIsWhatItRecordedReading:
                    cross=[(_result(CLIENT_REF, "cp-notifications", "fail"),
                            (_read("cp_clients", supply),
                             _read("cp_notifications", notifications)))])
-        assert [r["run_id"] for r in supply_status.results_about(conn, "cp-clients", supply)] \
+        assert [r["run_id"] for r in _shown(conn, "cp-clients", supply)] \
             == [key]
 
     def test_a_result_that_read_another_supply_of_the_table_is_not(self, conn):
@@ -156,7 +161,7 @@ class TestWhatIsAboutASupplyIsWhatItRecordedReading:
              physical={"cp_clients": (physical, None)},
              cross=[(_result(CLIENT_REF, "cp-notifications", "fail"),
                      (_read("cp_clients", other), _read("cp_notifications", notifications)))])
-        assert supply_status.results_about(conn, "cp-clients", supply) == []
+        assert _shown(conn, "cp-clients", supply) == []
 
     def test_a_result_that_read_no_supply_of_the_table_is_not(self, conn):
         """K2 = A's recorded half: ABSENT is about no supply of the table,
@@ -169,7 +174,7 @@ class TestWhatIsAboutASupplyIsWhatItRecordedReading:
              cross=[(_result(CLIENT_REF, "cp-notifications", "fail"),
                      (_read("cp_clients", None, qa_store.ABSENT),
                       _read("cp_notifications", notifications)))])
-        assert supply_status.results_about(conn, "cp-clients", supply) == []
+        assert _shown(conn, "cp-clients", supply) == []
 
     def test_its_own_runs_single_table_results_are_about_it(self, conn):
         supply, _ = self._clients(conn)
@@ -177,7 +182,7 @@ class TestWhatIsAboutASupplyIsWhatItRecordedReading:
                    supply=supply, at="2099-02-01T09:00:00+08:00",
                    own=[_result(CLIENTS_OWN, "cp-clients", "pass")])
         assert [(r["run_id"], r["check_id"])
-                for r in supply_status.results_about(conn, "cp-clients", supply)] == [
+                for r in _shown(conn, "cp-clients", supply)] == [
                     (key, CLIENTS_OWN)]
 
     def test_another_supplys_own_results_are_not(self, conn):
@@ -186,7 +191,7 @@ class TestWhatIsAboutASupplyIsWhatItRecordedReading:
              supply=f"cp-clients@{_key()}", at="2099-02-01T09:00:00+08:00",
              physical={"cp_clients": (physical, None)},
              own=[_result(CLIENTS_OWN, "cp-clients", "pass")])
-        assert supply_status.results_about(conn, "cp-clients", supply) == []
+        assert _shown(conn, "cp-clients", supply) == []
 
 
 class TestTheBuildAndTheGateAgree:
@@ -385,7 +390,7 @@ class TestAPairsFileChecksAreAboutTheFileEachSupplyIs:
     @staticmethod
     def _files(conn, dataset_id, supply):
         return sorted(r["check_id"].rsplit(".", 2)[-2]
-                      for r in supply_status.results_about(conn, dataset_id, supply))
+                      for r in _shown(conn, dataset_id, supply))
 
     @pytest.fixture
     def received(self):
