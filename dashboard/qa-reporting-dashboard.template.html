@@ -3653,11 +3653,11 @@ function unitCounts(units){
         let p = points.get(key);
         if(!p){
           p = {key, supply: h.supply_id && h.cause ? h.supply_id : null, rank, date: h.date,
-               runId: key, own: false, seen: points.size};
+               runId: key, own: false, seen: points.size, source: h};
           points.set(key, p);
         } else if(rank != null && (p.rank == null || rank < p.rank)){
-          // DATED BY ITS LOWEST-RANKED RESULT (criterion 16).
-          p.rank = rank; p.date = h.date;
+          // DATED BY ITS LOWEST-RANKED RESULT (criterion 16), and named by it.
+          p.rank = rank; p.date = h.date; p.source = h;
         }
         if(!h.recorded_by && !p.own){ p.own = true; p.runId = h.run_id; }
         const was = perPoint.get(key);
@@ -3695,6 +3695,7 @@ function unitCounts(units){
       if(s !== "red" && s !== "amber" && s !== "green") return;
       const p = points.get(key);
       if(!byPoint.has(key)) byPoint.set(key, {runId: p.runId, rank: p.rank, date: p.date, own: p.own,
+                                             source: p.source,
                                              counted:0, red:0, amber:0, sectionNames:[], order: p});
       const was = worst.get(key);
       if(!was || STATUS_ORDER[s] > STATUS_ORDER[was]) worst.set(key, s);
@@ -3748,10 +3749,27 @@ function twoLineSparkline(series, opts){
   const unit = o.unitWord || "Columns";
   const label = o.label ? o.label(series)
     : `${unit} red and amber on each QA run, ${n} runs from ${shortDay(series[0].date)} to ${shortDay(last.date)}; latest ${last.red} red and ${last.amber} amber of ${last.counted}`;
+  // A TOOLTIP PER POINT where the caller names them (criterion 13; Keith,
+  // 2026-10-24, reversing provisional #18): a native <title> on a band
+  // around each point, so it costs one element a point and no script. The
+  // sparkline keeps its one accessible name; role="img" makes these
+  // presentational to a screen reader.
+  const step = (w-2*pad)/(n-1);
+  const tips = o.pointTitle ? series.map((p, i)=>
+    `<rect class="spark-tip" x="${Math.max(0, x(i)-step/2).toFixed(1)}" y="0" width="${step.toFixed(1)}" height="${h}" fill="transparent"><title>${escHtml(o.pointTitle(p))}</title></rect>`).join("") : "";
   return `<svg class="spark${o.cls ? " "+o.cls : ""}" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" role="img" aria-label="${escAttr(label)}">
     <line x1="${pad}" y1="${y(0).toFixed(1)}" x2="${w-pad}" y2="${y(0).toFixed(1)}" stroke="var(--line-strong)" stroke-width="1" vector-effect="non-scaling-stroke"/>
-    ${twoLinePaths(series, x, y, !!o.quiet)}
+    ${twoLinePaths(series, x, y, !!o.quiet)}${tips}
   </svg>`;
+}
+// What one point of a dataset's series was and what caused it, in the panel
+// chart's words (historySource): its own arrival as the dataset's run.
+function pointSourceTitle(col, ds, p){
+  const h = p.source || {};
+  const said = historySource(col, h, ds);
+  const when = h.recorded_at ? `, ${fmtInstant(h.recorded_at)}` : "";
+  const text = said || `from the ${ds.name}'s run${when}`;
+  return text.charAt(0).toUpperCase() + text.slice(1);
 }
 // A quiet trend's name: its history, and that nothing has a verdict now.
 function noVerdictTrendLabel(unitWord, ser, noun){
@@ -3788,7 +3806,7 @@ function twoLinePaths(series, x, y, quiet){
 // `noVerdict`: nothing is in the dataset's current period on the date on
 // show, so its tiles and sections all read "No data" and no column holds a
 // verdict to count (criterion 21) - the history is still drawn, neutral.
-function columnsNotGreenCell(units, quietStatus, noVerdict){
+function columnsNotGreenCell(units, quietStatus, noVerdict, ctx){
   const series = unitCounts(units);
   const faint = t=> `<span class="not-green-faint">${t}</span>`;
   if(!series.length) return faint("No column has a verdict on this date");
@@ -3796,7 +3814,8 @@ function columnsNotGreenCell(units, quietStatus, noVerdict){
     // The name says what the text says (post-build-review #184): the lines
     // are history, and no latest count is claimed.
     const lines = series.length < 2 ? "" : twoLineSparkline(series, {quiet: true, unitWord: "Columns", w: 120, h: 28,
-      label: ser=> noVerdictTrendLabel("Columns", ser)});
+      label: ser=> noVerdictTrendLabel("Columns", ser),
+      pointTitle: ctx ? (p=> pointSourceTitle(ctx.col, ctx.ds, p)) : null});
     return `<div class="not-green-cell"><div class="not-green-text">${faint("No column has a verdict on this date")}</div><div class="not-green-lines">${lines}</div></div>`;
   }
   const last = series[series.length-1];
@@ -3805,7 +3824,8 @@ function columnsNotGreenCell(units, quietStatus, noVerdict){
     ? `<b class="not-green-count">${n} of ${m}</b><div class="not-green-split">${last.red} red, ${last.amber} amber${last.sectionNames.length ? ` · incl. ${escHtml(last.sectionNames.join(", "))}` : ""}</div>`
     : `<span class="not-green-count all-green">All ${m} green</span>`;
   const lines = series.length < 2 ? faint("One QA run so far")
-    : twoLineSparkline(series, {quiet: !!quietStatus, unitWord: "Columns", w: 120, h: 28});
+    : twoLineSparkline(series, {quiet: !!quietStatus, unitWord: "Columns", w: 120, h: 28,
+        pointTitle: ctx ? (p=> pointSourceTitle(ctx.col, ctx.ds, p)) : null});
   return `<div class="not-green-cell"><div class="not-green-text">${count}</div><div class="not-green-lines">${lines}</div></div>`;
 }
 // The key, once above each collection's table rather than on every row
@@ -6723,7 +6743,8 @@ function renderAgency(view, agencyId){
           // sections counted as columns - are not green on its newest
           // checked run, and the red and amber shares on each run before.
           // ds is already clipped to the date on show, so both are as at it.
-          const dsSpark = columnsNotGreenCell(ds.columns, quietOf(ds.status), !!ds.noDataInPlaceOn);
+          const dsSpark = columnsNotGreenCell(ds.columns, quietOf(ds.status), !!ds.noDataInPlaceOn,
+                                              {col, ds});
           return `<tr tabindex="0" data-nav='${JSON.stringify({tier:"dataset", agencyId:ag.id, collectionId:col.id, datasetId:ds.id})}'>
             <td>${datasetLink(ag, col, ds)}<div class="dataset-provider">${ds.provider}</div></td>
             <td>${statusPill(ds,"sm")} ${ticketBadge(ds.id,"sm")} ${turnOffMarker(rawRealDatasetById(ds.id) || ds, CURRENT_IN_PLACE_ON)} ${unagreedMarker(ds)}${noSupplyNote(ds)}</td>

@@ -320,3 +320,29 @@ describe("a dataset's own re-check names its cause (criterion 13)", () => {
     expect(w.historySource({ datasets: [] }, arrival, { name: "Client Register" })).toBe("");
   });
 });
+
+// Keith, 2026-10-24, reversing provisional #18: the dataset list's small
+// sparkline names each point's cause in a per-point tooltip (criterion 13).
+describe("the dataset list's sparkline names each point's cause", () => {
+  it("gives every point a tooltip saying when it was and what caused it", () => {
+    const w = load();
+    const col = { datasets: [{ id: "cp-notifications", name: "Notifications" }] };
+    const ds = { id: "cp-clients", name: "Client Register" };
+    const units = [column("c", [
+      entry({ run: "a", rank: 1, supply: "s@1", cause: "arrival:1", at: "2026-03-01T09:00:00+08:00" }),
+      entry({ run: "b", rank: 2, supply: "s@1", cause: "decision:7", at: "2026-03-02T15:00:00+08:00",
+              status: "red" }),
+      entry({ run: "n", rank: 3, supply: "s@1", cause: "arrival:9", at: "2026-03-03T10:00:00+08:00",
+              by: "cp-notifications" }),
+    ])];
+    const html = w.columnsNotGreenCell(units, false, false, { col, ds });
+    const doc = new w.DOMParser().parseFromString(html, "text/html");
+    const titles = [...doc.querySelectorAll("svg title")].map((t) => t.textContent);
+    expect(titles).toHaveLength(3);
+    expect(titles[0]).toMatch(/Client Register's run/);
+    expect(titles[1]).toMatch(/Client Register's re-check/);
+    expect(titles[2]).toMatch(/Notifications's run/);
+    // One accessible name for the whole sparkline, as before.
+    expect(doc.querySelectorAll("svg[aria-label]")).toHaveLength(1);
+  });
+});

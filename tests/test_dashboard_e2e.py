@@ -4416,6 +4416,26 @@ class TestColumnsNotGreenMatchesTheDatasetPage:
         assert m, f"unexpected cell text {text!r}"
         return {"red": 0, "amber": 0, "counted": int(m.group(1))}
 
+    def test_each_point_of_a_rows_lines_names_its_cause(self, clean_page, built_dashboard_html):
+        """REQ-PIPE-279 criterion 13 on the list (Keith, 2026-10-24, reversing
+        provisional #18): every point of a row's sparkline has a tooltip
+        naming the run or re-check that caused it, in the panel's words, and
+        the sparkline keeps its one accessible name."""
+        import re
+        titles, sparks = [], 0
+        for agency in self._AGENCIES:
+            _goto(clean_page, built_dashboard_html, {"tier": "agency", "agencyId": agency})
+            for got in clean_page.evaluate("""() => [...document.querySelectorAll(
+                  'tr[data-nav] .not-green-td svg.spark')].map(svg => ({
+                    labels: svg.querySelectorAll('[aria-label]').length + 1,
+                    titles: [...svg.querySelectorAll('title')].map(t => t.textContent)}))"""):
+                sparks += 1
+                assert got["labels"] == 1 and got["titles"], got
+                titles += got["titles"]
+        assert sparks, "no row drew a sparkline - this proves nothing"
+        bad = [s for s in titles if not re.match(r"^From the .+'s (run|re-check)(, .+)?$", s)]
+        assert not bad, bad[:5]
+
     # 15 May 2025: the readers are red there (see TestTheDatasetPageSaysWhatItsTrendPlots).
     @pytest.mark.parametrize("in_place_on", [None, "2025-05-15"])
     def test_each_rows_count_matches_its_dataset_page(self, clean_page, built_dashboard_html, in_place_on):
