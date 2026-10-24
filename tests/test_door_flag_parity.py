@@ -62,6 +62,15 @@ HIDDEN: dict[tuple[str, str], str] = {
     (slot_state.INHERITED, fd.SUBSTITUTE): (
         "substituting over an inheritance is un-inherit then substitute in the door - kept "
         "as REQ-GHUB-082 built it (Keith, 2026-10-15)"),
+    # A PERIOD OWING NOTHING THAT CARRIES NOTHING (REQ-PIPE-280, PROVISIONAL, not
+    # put to Keith): the door offers carry-forward alone.
+    (filing_queue.CARRIES_NOTHING, fd.INHERIT): (
+        "on a period carrying nothing, inherit and carry-forward make the same view; the "
+        "door offers the one REQ-PIPE-271's warning names, so a person learns one command "
+        "(REQ-PIPE-280's decision 'one operation for both cases')"),
+    (filing_queue.CARRIES_NOTHING, fd.SUBSTITUTE): (
+        "a substitution says a supply was owed (REQ-PIPE-084 criterion 12) and this period "
+        "owes none; kept off the door as (inherited, substitute) is"),
     ("held:agreement-refused", fd.PLACE): (
         "a hold on a dataset the agreement backstop refuses files itself once the "
         "agreement is put right (REQ-PIPE-173; #188 D9), so the door offers nothing to "
@@ -291,6 +300,22 @@ def ex_inherited(conn, mint):
     return _state(conn, mint.now, s), None
 
 
+def ex_carries_nothing(conn, mint):
+    """An opened period the dataset owes nothing for, whose inheritance was
+    refused - listed in the period door beside the slots (REQ-PIPE-280
+    criterion 1), never a slot itself."""
+    from qa_tools.common import hierarchy, inheritance, period_schema
+
+    s = mint("nothing")
+    period_schema.ensure_period_schema(conn, s.name)
+    inheritance._record(conn, hierarchy.dataset(DS), action=dl.INHERIT_REFUSED, supply="",
+                        period=s.name, stands_on=None, reason="nothing earlier (minted)",
+                        effective_at=_iso(_now()))
+    (got,) = [x for x in __import__("qa_tools.common.carry_forward", fromlist=["x"])
+              .carried_periods(conn, DS) if x.period == s.name]
+    return got, None
+
+
 def ex_not_supplied_accepted(conn, mint):
     s = mint("closed")
     _person(conn, fd.MARK_NOT_SUPPLIED, period=s.name)
@@ -389,6 +414,7 @@ EXAMPLES = {
     slot_state.REJECTED: ex_rejected,
     slot_state.SUBSTITUTED: ex_substituted,
     slot_state.INHERITED: ex_inherited,
+    filing_queue.CARRIES_NOTHING: ex_carries_nothing,
     slot_state.NOT_SUPPLIED_ACCEPTED: ex_not_supplied_accepted,
     slot_state.TWO_FILES: ex_two_files,
     filing_queue.ANOTHER_VERSION_WAITING: ex_another_version_waiting,

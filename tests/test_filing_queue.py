@@ -107,13 +107,9 @@ class TestWhatASlotOffers:
         # tests/test_door_flag_parity.py covers both. WITHDRAW-ACKNOWLEDGEMENT
         # comes from acknowledgement_offers, where one is recorded as standing
         # (REQ-PIPE-166 criterion 6) - tests/test_withdrawal.py covers it.
-        # CARRY-FORWARD is offered on a period the dataset owes nothing for,
-        # which is not a slot (REQ-PIPE-280 criterion 1) -
-        # tests/test_period_opening.py's door test covers it.
         assert offered == set(fd.OPERATIONS) - {fd.EXCUSE_LATENESS, fd.WITHDRAW_EXCUSE,
                                                 fd.PLACE, fd.UN_SUPERSEDE,
-                                                fd.WITHDRAW_ACKNOWLEDGEMENT,
-                                                fd.CARRY_FORWARD}
+                                                fd.WITHDRAW_ACKNOWLEDGEMENT}
 
     def test_the_queue_half_is_only_ever_supply_scoped(self):
         """Criterion 31 made mechanical: whatever a slot is in, the first
@@ -146,7 +142,9 @@ class TestWhatASlotOffers:
         """The two are identical in SQL and opposite in meaning, which is
         exactly why offering the wrong one would be a trap."""
         _, period_scoped = filing_queue.operations_for(_state(slot_state.INHERITED))
-        assert period_scoped == (fd.UN_INHERIT,)
+        # AND CARRY-FORWARD (REQ-PIPE-280 criterion 1), the way to re-point it
+        # without a gap - never de-substitute.
+        assert period_scoped == (fd.CARRY_FORWARD, fd.UN_INHERIT)
 
 
 class TestWhichArrivalASupplyBelongsTo:

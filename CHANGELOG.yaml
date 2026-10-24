@@ -169,6 +169,18 @@ releases:
               it had replaced.
       - category: New
         items:
+          - headline: Carry the newer one forward
+            components: ["Pipeline & publishing", "Testing & dev tooling"]
+            description: >
+              When a quarter that skips a table is carrying forward an older
+              copy of it, you now see a warning and can swap in the newer one
+              in one step, so nothing reading it goes red in between.
+          - headline: Quarters open at the first file
+            components: ["Pipeline & publishing"]
+            description: >
+              A quarter now opens, and fills in the tables it does not owe,
+              when its first file arrives, so the checks of that first delivery
+              can read them.
           - headline: Crashes and timeouts are remembered
             components: ["Pipeline & publishing"]
             description: >

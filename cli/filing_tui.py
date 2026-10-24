@@ -171,7 +171,7 @@ _HOW_IT_READS = {
     slot_state.SUBSTITUTED: "[blue]substituted[/blue]",
     slot_state.INHERITED: "[blue]inherited[/blue]",
     # REQ-PIPE-280 criterion 1: an opened period owing nothing, carrying nothing.
-    "carries-nothing-forward": "[yellow]owes nothing, carries nothing forward[/yellow]",
+    filing_queue.CARRIES_NOTHING: "[yellow]owes nothing, carries nothing forward[/yellow]",
     slot_state.NOT_SUPPLIED_ACCEPTED: "[dim]not supplied (accepted)[/dim]",
     # REQ-PIPE-122 criteria 17 and 18: each distinguishable from a red
     # supply awaiting a decision, and the first never called "held".
@@ -1374,9 +1374,7 @@ def _owed_nothing_door(collection_id: str, state: slot_state.SlotState) -> None:
         say_unreachable(exc)
         return
     say_carry_forward_warnings(warned)
-    offer = ((filing_decisions.CARRY_FORWARD, filing_decisions.UN_INHERIT)
-             if state.state == slot_state.INHERITED else (filing_decisions.CARRY_FORWARD,))
-    _decide_on(state, offer=offer)
+    _decide_on(state, offer=filing_queue.operations_for(state)[1])
 
 
 #: The choice beside the listed supplies for the period's own decisions

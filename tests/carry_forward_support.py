@@ -18,7 +18,7 @@ from datetime import date
 import pytest
 
 from qa_tools.common import decision_log as dl
-from qa_tools.common import hierarchy, inheritance, promotion, qa_store, schedule, supply_db
+from qa_tools.common import hierarchy, promotion, qa_store, schedule, supply_db
 
 CASE_WORKERS = "cp-case-workers"
 REASON = "Case Workers is delivered in February and August only"
@@ -59,8 +59,10 @@ def world(monkeypatch) -> World:
                              else real_not_expected(ds, *a, **k)))
     monkeypatch.setattr(schedule, "date_of",
                         lambda name, ds=None: order.get(name) or real_date_of(name, ds))
-    monkeypatch.setattr(inheritance.hierarchy, "all_datasets",
-                        lambda: [hierarchy.dataset(CASE_WORKERS)])
+    # hierarchy.all_datasets is NOT narrowed, as test_inheritance.py narrows it:
+    # it is read through caches the real run step keeps, and a narrowed list
+    # leaked into a later real run's overlay. Every other dataset takes part
+    # in these private periods, so the opening inherits nothing else anyway.
     return w
 
 

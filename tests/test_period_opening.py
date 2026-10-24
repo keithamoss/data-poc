@@ -28,7 +28,8 @@ def _file(monkeypatch, world, period: str | None, dataset_id: str = "cp-notifica
           collection_id: str = "child-protection"):
     """File one supply of `dataset_id` through the real filing.file_arrivals,
     the assignment rule's answer stated as `period` (None: held)."""
-    supply = f"{dataset_id}@{AT.strftime('%Y%m%d%H%M%S')}{id(world) % 1000000:06d}"
+    import uuid
+    supply = f"{dataset_id}@{AT.strftime('%Y%m%d')}{uuid.uuid4().int % 10**12:012d}"
     name = f"pytest-open-{supply}"
     filing_support.ensure_delivery(name, dataset_id, AT)
     arrival = SimpleNamespace(files_by_dataset={dataset_id: ["f"]}, received_at=AT,

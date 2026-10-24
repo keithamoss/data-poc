@@ -337,9 +337,6 @@ def standing(conn: supply_db.SupplyConnection | None = None, *,
     return sorted(best.values(), key=lambda w: (w.dataset_id, w.period))
 
 
-#: A period the dataset owes nothing for and which carries nothing forward for
-#: it - its inheritance was refused when it opened (REQ-PIPE-098 criterion 10).
-CARRIES_NOTHING = "carries-nothing-forward"
 
 
 def carried_periods(conn: supply_db.SupplyConnection, dataset_id: str) -> list:
@@ -349,6 +346,7 @@ def carried_periods(conn: supply_db.SupplyConnection, dataset_id: str) -> list:
     so the slot list never shows them, and without these the door could reach
     neither carry-forward nor un-inherit. Newest period first."""
     from qa_tools.common import slot_state
+    from qa_tools.common.filing_queue import CARRIES_NOTHING
 
     rows = conn.execute(
         f"SELECT DISTINCT to_slot FROM {decision_log.TABLE} WHERE dataset_id = ? "

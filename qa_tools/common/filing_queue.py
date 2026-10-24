@@ -108,6 +108,11 @@ RECHECKED_WORSE = "promoted-then-rechecked"
 #: the queue: it waits on nobody. Its one offer is bringing it back.
 SUPERSEDED = "superseded"
 
+#: An opened period its dataset owes nothing for, carrying nothing forward -
+#: its inheritance was refused (REQ-PIPE-098 criterion 10). Listed in the
+#: period door beside the slots (REQ-PIPE-280 criterion 1); never a slot.
+CARRIES_NOTHING = "carries-nothing-forward"
+
 #: A listed supply no check read (REQ-GHUB-229 criterion 4), and one whose
 #: recorded results could not be read (criterion 11) - said, never guessed.
 NO_VERDICT = "no verdict recorded"
@@ -750,7 +755,13 @@ def operations_for(state: slot_state.SlotState) -> tuple[tuple[str, ...], tuple[
     elif state.state == slot_state.SUBSTITUTED:
         period_scoped = (filing_decisions.DE_SUBSTITUTE,)
     elif state.state == slot_state.INHERITED:
-        period_scoped = (filing_decisions.UN_INHERIT,)
+        # CARRY-FORWARD BESIDE UN-INHERIT (REQ-PIPE-280 criterion 1): the way to
+        # re-point an inheritance without a gap.
+        period_scoped = (filing_decisions.CARRY_FORWARD, filing_decisions.UN_INHERIT)
+    elif state.state == CARRIES_NOTHING:
+        # A PERIOD OWING NOTHING THAT CARRIES NOTHING (REQ-PIPE-280 criterion 1):
+        # the one operation REQ-PIPE-271's warning names.
+        period_scoped = (filing_decisions.CARRY_FORWARD,)
     elif state.state == slot_state.PROMOTED:
         period_scoped = ()
     else:
