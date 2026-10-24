@@ -49,7 +49,8 @@ class TestRedPromoted:
         about = [{"run_id": "arrival", "dataset_id": DS, "check_id": "x", "status": "pass"},
                  {"run_id": "later", "dataset_id": DS, "check_id": "x", "status": "fail"}]
         monkeypatch.setattr(supply_status, "results_about",
-                            lambda c, d, s: about if s == a else [])
+                            lambda c, d, s, view: supply_status.About(
+                                about if s == a else [], about if s == a else []))
         causes = {"arrival": ("2026-05-01T01:00:00+00:00", "the arrival of Carers"),
                   "later": ("2026-06-01T01:00:00+00:00", "the promote of Client Register")}
         monkeypatch.setattr(red_promoted, "_cause", lambda c, k: causes[k])

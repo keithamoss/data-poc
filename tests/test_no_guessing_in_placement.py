@@ -62,7 +62,10 @@ WHOLE = {
     "qa_tools.common.qa_results_reader": ("list_run_ids", "run_facts", "read_check_reads",
                                           "current_runs_only"),
     "qa_tools.common.qa_store": ("runs_for",),
-    "qa_tools.common.supply_status": ("results_about", "latest_results"),
+    # And the warehouse view's rule over them (REQ-PIPE-269 criterion 7).
+    "qa_tools.common.supply_status": ("_shown", "results_about", "latest_results",
+                                      "newest_per_check", "count", "counts_toward", "_matches",
+                                      "_owed", "holdings_at", "owing"),
     "qa_tools.common.drift_reference": ("run_for",),
     "qa_tools.common.carried": ("siblings", "decide", "_evaluated_reads", "_supply_read"),
     "qa_tools.common.qa_results_writer": ("_arrival_purpose",),
@@ -72,7 +75,8 @@ WHOLE = {
 #: and none a time or a run id's text: the opening order, a row's identity
 #: within one run's recording, a table's name, and drift_reference.run_for's
 #: preference for a run of the dataset itself.
-ORDER_KEYS = ("run_seq", "id", "logical_table", "(dataset_id IS DISTINCT FROM ?)")
+ORDER_KEYS = ("run_seq", "id", "check_result_id", "logical_table",
+              "(dataset_id IS DISTINCT FROM ?)")
 
 #: Sorts with no key in read-whole functions, each sorting NAMES - tables,
 #: datasets, checks, files - for stable output, never runs or results.
@@ -85,6 +89,8 @@ BARE_SORTS = {
     ("qa_tools.common.carried", "decide"):
         ("sorted(_evaluated_reads(conn, sibling, open_).items())",),
     ("qa_tools.common.carried", "_evaluated_reads"): ("sorted(check_ids)",),
+    ("qa_tools.common.supply_status", "_shown"): ("sorted(files or ())",),
+    ("qa_tools.common.supply_status", "holdings_at"): ("sorted(set(dataset_ids))",),
 }
 
 #: Read only in their sort, max and min keys: they also date results for display.
@@ -274,7 +280,7 @@ class TestTheGuardCanFail:
         assert broken != real and _forbidden_in(broken) == ["split_staged"]
 
     def test_an_order_by_run_key_is_caught(self):
-        real = _source_of("qa_tools.common.supply_status", "results_about")
+        real = _source_of("qa_tools.common.supply_status", "_shown")
         assert _order_by_violations(real) == [], "test precondition"
         broken = real.replace("ORDER BY r.run_seq, c.id", "ORDER BY r.run_key, c.id")
         assert broken != real and _order_by_violations(broken) == ["run_key"]

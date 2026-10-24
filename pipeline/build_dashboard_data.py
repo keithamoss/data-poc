@@ -41,12 +41,12 @@ import yaml
 
 from pipeline import (acknowledgements, closed_slots, corrections, excuses, file_check_panel,
                       owed_nothing, placements, promotion_timeline, recorded_arrival, red_promoted,
-                      slot_timeline)
+                      slot_timeline, warehouse_counts)
 from pipeline.dashboard_check_labels import (dashboard_status, display_name, measure, pooled_url_key,
                                              rank_for_headline, tool_ref, url_key)
 from qa_tools import collections
 from qa_tools.common import (agreement, amber_setting, asset_time, census, drift_reference, hierarchy,
-                             qa_store, schedule_ended, turned_off)
+                             qa_store, schedule_ended, supply_db, supply_status, turned_off)
 from qa_tools.common.validate_check_lifecycle import collect_checks
 
 ROOT = os.path.join(os.path.dirname(__file__), "..")
@@ -337,7 +337,9 @@ def share_cross_table_results(results: list[dict], by_table: dict[str, list[dict
 
 def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], dataset_stats: dict,
                     lifecycle_by_id: dict, *, facts: dict[str, dict],
-                    all_runs: list[dict] | None = None) -> dict:
+                    all_runs: list[dict] | None = None,
+                    slot_timelines: dict[str, list[dict]] | None = None,
+                    owed=None) -> dict:
     """One dataset's page. `manifest` is its own runs; `all_runs` is every
     run in the collection, so a result recorded under another table's run -
     a re-check re-running this table's cross-table checks - is placed and
@@ -345,9 +347,20 @@ def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], da
     each run's dataset, scope, supply, cause and rank, from qa.run
     (REQ-PIPE-279 criteria 16 and 17) - what every placement and ordering
     below reads, never a run id, a day or a recording time (criterion 19).
+    `slot_timelines` is every dataset's slot timeline (slot_timeline.
+    for_dataset), read once per collection, and `owed` its owed
+    re-evaluations - what a cross-table card's counted points are worked out
+    from (REQ-PIPE-269, pipeline.warehouse_counts).
     """
 
     table, dataset_id = dataset.table, dataset.dataset_id
+    if slot_timelines is None:
+        slot_timelines = {d.dataset_id: slot_timeline.for_dataset(d.dataset_id)
+                          for d in coll.datasets}
+    if owed is None:
+        with supply_db.connect(read_only=True, label="mothman:warehouse-counts") as opened:
+            owed = supply_status.owing(opened)
+    warehouse = supply_status.HoldingsTimeline(slot_timelines)
     meta = column_meta(coll, dataset)
     all_columns = list(meta)
     stats_spec = collections.adapter(coll).stats
@@ -542,6 +555,12 @@ def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], da
                             if col == CROSS_TABLE_PSEUDO_COLUMN else None),
                 "previous": slot["by_run"].get(prev_run, 0),
                 "history": history,
+                # WHICH OF THEM COUNTS TOWARD THE SUPPLY ON SHOW, ON EACH DATE
+                # (REQ-PIPE-269; post-build-review #262 R4) - worked out here
+                # by the gate's own function, looked up by the page.
+                **({"counted": warehouse_counts.points(dataset_id, slot["check_id"], history,
+                                                       warehouse=warehouse, owed=owed)}
+                   if col == CROSS_TABLE_PSEUDO_COLUMN else {}),
                 "contested_reads": sorted(contested_reads, key=lambda h: h["rank"]),
                 "note": f"Computed by {engine} against this run's real data — not a fabricated figure.",
                 "retired_as_of": lifecycle.retired_as_of if lifecycle else None,
@@ -656,8 +675,10 @@ def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], da
                      **arrival_by_run[latest_run]} if latest_entry else None)
 
     presented = _presented(coll)
-    # What each slot held, read once and shared by two embeds below.
-    slot_timeline_raw = slot_timeline.for_dataset(dataset_id)
+    # What each slot held, read once and shared by the embeds below.
+    slot_timeline_raw = slot_timelines.get(dataset_id)
+    if slot_timeline_raw is None:
+        slot_timeline_raw = slot_timeline.for_dataset(dataset_id)
     return {
         "id": dataset_id,
         "name": dataset.dataset_name,
@@ -716,7 +737,10 @@ def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], da
         # hand-maintained allowlist silently drops every field added later
         # (CLAUDE.md's standing lesson from item 74). Its rank too, which the
         # supply history orders by (post-build-review #262 F5).
-        "runs": [{**m, "run_date": _run_date(m), "rank": rank(m["run_id"])} for m in manifest],
+        "runs": [{**m, "run_date": _run_date(m), "rank": rank(m["run_id"]),
+                  # ITS SUPPLY (qa.run.supply_id), which a cross-table card's
+                  # counted points are keyed by (REQ-PIPE-269).
+                  "supply_id": facts[m["run_id"]]["supply_id"]} for m in manifest],
         "columns": columns_out,
         "_provenance": presented["provenance"].format(
             table_description=table_description(coll, dataset)),
@@ -778,8 +802,28 @@ def build_datasets(collection_id: str) -> list[dict]:
     by_table = {d.table: [r for r in results if r["dataset_id"] == d.dataset_id]
                 for d in coll.datasets}
     share_cross_table_results(results, by_table)
+    # WHAT EVERY PERIOD HELD, AND WHAT DECISIONS STILL OWE - read once for the
+    # collection, so each card's counted points are a walk in memory.
+    slot_timelines = {d.dataset_id: slot_timeline.for_dataset(d.dataset_id)
+                      for d in coll.datasets}
+    with supply_db.connect(read_only=True, label="mothman:warehouse-counts") as conn:
+        owed = supply_status.owing(conn)
+    # A READERS-ONLY RE-CHECK RECORDS NO dataset_stats (the knock-on's, REQ-PIPE-140
+    # criterion 2), so it is not among the file's runs - and its results were
+    # placed nowhere, leaving a page on the verdict it replaced (post-build-review
+    # #264). It is a run of the collection all the same, dated by when it ran.
+    known = {m["run_id"] for m in manifest}
+    readers_runs: dict[str, dict] = {}
+    for r in results:
+        run_id = r.get("run_id")
+        if (run_id not in known and run_id not in readers_runs and run_id in facts
+                and facts[run_id]["scope"] == "readers"):
+            readers_runs[run_id] = {"run_id": run_id, "received_at": r["run_timestamp"]}
+    all_runs = sorted([*manifest, *readers_runs.values()],
+                      key=lambda m: facts[m["run_id"]]["rank"])
     return [build_one_table(coll, d, by_table[d.table], own_runs(manifest, d.dataset_id, facts),
-                            dataset_stats, lifecycle_by_id, facts=facts, all_runs=manifest)
+                            dataset_stats, lifecycle_by_id, facts=facts, all_runs=all_runs,
+                            slot_timelines=slot_timelines, owed=owed)
             for d in coll.datasets]
 
 

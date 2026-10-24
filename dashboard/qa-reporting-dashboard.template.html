@@ -2828,6 +2828,18 @@ function promotionStateOn(d, dateStr){
           past, on: dateStr, standingIn, decisions: point.decisions || [],
           standingDecisions: stand ? stand.decisions || [] : []};
 }
+// THE BUILD'S ANSWER for one cross-table card: which result counts toward the
+// supply on show on this date (REQ-PIPE-269 criterion 7, pipeline/
+// warehouse_counts.py) - {rank} for a result, or {reason} where none does:
+// 'recheck-owed' or 'no-current-result' (red, criterion 5) or 'not-counted'
+// (criteria 4 and 6, No data). Undefined for a card the build gave no answer
+// for - one with no recorded cross-table reads - which keeps its newest result.
+// A supply no result was ever about has nothing counted toward it.
+function countedOnShow(ck, run, dateStr){
+  if(!ck.counted || !run || !run.supply_id) return undefined;
+  const point = newestOnOrBefore(ck.counted[run.supply_id], dateStr);
+  return point || {rank: null, reason: "not-counted"};
+}
 function clipDatasetToInPlaceOn(d, inPlaceOnDateStr){
   // THE NEWEST SUPPLY IN PLACE OR AWAITING A DECISION (criterion 1 as
   // amended): one withdrawn by the date on show - demoted, turned down,
@@ -2922,7 +2934,25 @@ function clipDatasetToInPlaceOn(d, inPlaceOnDateStr){
         const history = ck.history.filter(h => (eligibleRunIds.has(h.run_id) || h.recorded_by)
           && (!h.recorded_at || assetDateStrOf(h.recorded_at) <= inPlaceOnDateStr));
         if(!history.length){ keepAside(ck); return null; }
-        const last = history[history.length-1], prev = history.length>1 ? history[history.length-2] : last;
+        // WHICH RESULT COUNTS TOWARD THE SUPPLY ON SHOW (REQ-PIPE-269;
+        // post-build-review #262 R4). A cross-table card carries the build's
+        // answer per supply and date - the gate's own rule, worked out in
+        // Python (pipeline/warehouse_counts.py) and only looked up here - so a
+        // late reader of an older supply, or a verdict about a partner that is
+        // not in the warehouse, is shown in the history but never the current.
+        const counted = countedOnShow(ck, effectiveRun, inPlaceOnDateStr);
+        if(counted && counted.rank == null){
+          const ownLast = history[history.length-1];
+          const inPlaceOn = {...ck, history, current: null, previous: ownLast.value,
+            current_status: counted.reason === "not-counted" ? "nodata" : "red",
+            warehouseReason: counted.reason, owedBy: counted.owedBy || null,
+            owedSince: counted.owedSince || null};
+          if(ck.contested_reads) inPlaceOn.contested_reads = ck.contested_reads.filter(recordedBy);
+          return inPlaceOn;
+        }
+        const countedAt = counted ? history.findIndex(h=> h.rank === counted.rank) : -1;
+        const lastAt = countedAt >= 0 ? countedAt : history.length-1;
+        const last = history[lastAt], prev = lastAt>0 ? history[lastAt-1] : last;
         // THE STATUS OF THE RUN ON SHOW, not the newest run's (dashboard UX
         // critic on 8a942e7, H2): checkStatus() reads current_status first,
         // so keeping the newest one coloured a past date by today's
