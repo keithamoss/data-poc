@@ -167,6 +167,24 @@ releases:
               A re-check that ran only the checks between tables now shows on
               each table's page; before, the page went on showing the result
               it had replaced.
+          - headline: Worst of its quarters
+            components: ["Pipeline & publishing", "Dashboard UI"]
+            description: >
+              A table carried into a later quarter is now judged in each quarter
+              it sits in, and shows the worst, so a pass beside one quarter's
+              files cannot hide a failure beside another's.
+          - headline: Went in red, says so
+            components: ["Dashboard UI"]
+            description: >
+              A promoted supply that was already red before it was promoted now
+              says it went in red, and since when, instead of claiming it went
+              in green and turned red afterwards.
+          - headline: Owed until it runs
+            components: ["Pipeline & publishing", "Dashboard UI"]
+            description: >
+              A re-check that failed and was retried later now reads as owed on
+              every day in between, on the check and on the red promoted label
+              alike.
       - category: New
         items:
           - headline: Carry the newer one forward

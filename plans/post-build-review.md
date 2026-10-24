@@ -11342,38 +11342,113 @@ twice. It deliberately did not re-find the `TypeError`.
        one (`test_the_scenario_list_as_printed_stays_within_80_columns`)
        checks the table as printed.
 
-     **For Keith (not changed):**
-     - **S1, criterion 7's "one rule".** The arrival gate
-       (`promotion.after_runs`) still reads its own run's results and what it
-       carried, not `results_about`'s counted view, until REQ-PIPE-267
-       criterion 1. Provisional call 1 was "share the count, not the query" -
-       `count` is shared, the queries are not. Whether 269's claim of one rule
-       stands with that caveat, or should say so in its criterion, is a
-       register claim and his.
-     - **D2, "judged from the clearing run's cause" on past dates.** Three
-       readers date the same history differently: `Owing.owing` treats a
-       cleared item as owed at no instant at all (so as at a moment between
-       the cause and its clearing run, the past reads 'no current result'
-       rather than 'recheck-owed'); `warehouse_counts._at` dates a result by
-       its run's `run_timestamp`; `red_promoted._cause` dates a re-check by
-       its cause's `effective_at`. Which instant a past date should use is a
-       semantic choice.
-     - **S4, the 516 red stand-ins.** The transient 'no current result' reds
-       before REQ-PIPE-267 (recorded on REQ-PIPE-269's decisions) - whether
-       they are exempt from tickets, and what the page should say about them
-       in the meantime.
-     - **S5, provisional call 2:** which period counts for an inherited
-       supply.
-     - **S3's register vocabulary**: "supersedes the one in place" and
-       "naming ... as in place" in the register's own prose are left as they
-       are (REQ-DASH-277 criterion 6 leaves the register's own term alone).
-     - **The red before the promotion** (found investigating the caption,
-       predates A1): a supply the gate promoted green whose RECORDED verdict
-       (the display reading, #132 A1) was already red at its arrival reads
-       "Went in green, turned red <its arrival> after the arrival of <itself>"
-       - a date before it went in. #116 D3 counts the points before a
-       promotion on purpose; the sentence's "went in green" is the gate's
-       reading and "turned red" the display's. How that case should read is a
-       wording and product choice.
+     **Keith's answers (2026-10-24, Perth), and what was built for each:**
+     - **Q1, S4 (the 516 red stand-ins): B.** Left as they are until A3, where
+       REQ-PIPE-267 (which removes their cause) and REQ-PIPE-278 (what is
+       raised for them) land together. No code change; recorded on
+       REQ-PIPE-269's decisions.
+     - **Q2, S1 (criterion 7's "one rule"): A.** Criterion 7 moved into
+       REQ-PIPE-269's `unmet_criteria`, `blocked_by` REQ-PIPE-267 (the
+       arrival gate, `promotion.after_runs`, keeps its own rule until 267
+       criterion 1). Provisional call 1 is now a decision agreed by Keith:
+       the dashboard build shares the counting rule (`supply_status.count`),
+       not the query. New test,
+       `tests/test_warehouse_counts.py::TestTheBuildAgreesWithResultsAboutOnTheDeployment`
+       (`deployment_history`, so it is in the deployment half): rebuilds and
+       builds Child Protection from the deployment's history, then compares
+       each sampled card's counted point with `results_about(view=as at the
+       end of that day)` for 120 (card, supply) pairs - 336 comparisons on
+       ed_probe, about 65s. A full scan of all 2,847 pairs (7,983
+       comparisons, a one-off script, ~10 minutes) found two disagreements:
+       - **6 dates where the card read 'recheck-owed' after the clearing run
+         and results_about 'no-current-result'** - the build asked only at
+         results and warehouse changes, and the run that clears an owed
+         re-check need record nothing on the card. A defect of the Q4 change
+         below, fixed test-first
+         (`TestOwedEndsAtTheClearingRun`, failed with the third point
+         missing): `Owing.changes` gives every instant 'owed' begins or ends,
+         and both the card and the red-promoted badge ask at those. Re-run
+         after the fix: none left.
+       - **48 dates where results_about counts a result the page has no
+         run for** - for Keith, below ("the page forgets a re-checked
+         supply's arrival run"). The agreement test leaves exactly that case
+         out, counted (2 of 336 in its sample), and fails on anything else.
+     - **Q3, S5 (a supply in several periods): A.** Counted per period;
+       each check reads the worst of its periods' readings, so a supply's
+       status is the worst across the periods it stands in
+       (`supply_status.count`, `_count_in`, `_severity`). `View(period=...)`
+       reads one period alone: the terminal's list of a period's supplies
+       (`filing_queue._verdict`) and the knock-on's staleness for the period
+       it re-evaluates use it. Test first:
+       `tests/test_warehouse_view.py::TestASupplyInSeveralPeriods` (Clients
+       c1 promoted into Q1 and inherited into Q2; a later green against Q1's
+       Notifications, a red against Q2's) failed 'green' == 'red', and the
+       period list's test failed for want of a period reading; the build's
+       half, `TestThePointsThemselves::test_a_later_green_in_one_period_does_not_hide_a_red_in_another`,
+       failed with the green as the card's current. The dashboard's dataset
+       page shows a supply rather than a period, so it reads the worst; no
+       dashboard page shows a counted verdict per period today (the period
+       page lists "status when promoted"), so there was no page reading to
+       give. Provisional call 2 is now a decision agreed by Keith.
+     - **Q4, D2 (dating): A, one clock.** `Owing.owing` is owed from the
+       decision's effective instant until the recorded instant
+       (`qa.run.run_instant`) of `qa.owed_run.cleared_by_run`, where it
+       skipped a cleared item at every instant; an item cleared with no
+       recorded run stays owed at none. `red_promoted._cause` dates every
+       run by `run_instant` (it dated a re-check by its cause and an arrival
+       by its receipt); `warehouse_counts._at` already dated by
+       `run_timestamp`, from which `run_instant` is written. Test first:
+       `tests/test_warehouse_counts.py::TestOneClockForTheCardAndTheBadge`
+       (a re-check made to fail, retried three days later) failed
+       'no-current-result' != 'recheck-owed'; it now asserts the card reads
+       'recheck-owed' in between and the badge agrees with it on every date.
+       REQ-DASH-126's "on the asset's clock" decision amended to match.
+     - **Q5, S3 (register vocabulary): A.** TS-4's "promoting it supersedes
+       the one in place" and TS-78b's Breaks-as "naming 31 August's supply as
+       in place" in plans/supply-model.md now say "in place in the
+       warehouse"; SCENARIOS.md regenerated with `mothman scenarios map`,
+       `--check` current. Recorded on REQ-DASH-277.
+     - **Q6, the Red promoted caption: A.** Where the timeline's current red
+       stretch began at or before the promotion, `redPromotedBadge` reads
+       "Went in red. Red since the arrival of <X>, <date>; promoted
+       <date>."; "Went in green, turned red <date> after <cause>" is kept
+       for a red that came after. Test first, in
+       `tests-js/supply-outcome.test.js`: the Notifications 11/16 February
+       2014 case failed (it read "Went in green, turned red ... after the
+       arrival of Notifications"), and the opposite case is asserted beside
+       it. "Promoted while red" (#116 D3) is the same case and now reads the
+       new sentence; its test was updated with it.
+       **The gate question, investigated: not a defect.** Notifications
+       2014-02-11's two red checks, `concern_type.drift_psi_evidently` and
+       `row_count_growth_evidently`, are recorded red under REQ-QAC-108
+       criterion 9: no earlier period held a promoted Notifications and
+       2013-Q2 owed one (`extra`: `reference_gap: ["2013-Q2"]`,
+       `reference_not_evaluated: true`, no measured status). Criterion 15
+       (amended by Keith 2026-10-05) has the promotion rule read such a check
+       as having no reference, neither passing nor blocking
+       (`promotion._gating_status` returns 'nodata'), and the promotion's
+       own recorded reason names both checks ("apart from 2 recorded red
+       only because its reference crossed an owed period, which warns rather
+       than blocks"). Non-blocking by contract; the red is the display
+       reading (#132 A1), which is what the caption now says.
+     - **Q7 (terminal labels): A, keep.** The picker line without its
+       'arrived' and 'verdict:' labels stays; REQ-DASH-277's provisional
+       decision now says agreed. No code change.
+
+     **For Keith (new, not changed):**
+     - **The page forgets a re-checked supply's arrival run** (found by the
+       Q2 agreement test; predates A1). A supply's page carries its CURRENT
+       run only (`qa.supply_current_run`), so once a full re-check of it is
+       recorded its arrival run's own results are on no page. On the dates
+       between the arrival and the re-check, `results_about` as at that date
+       counts the arrival's result (and the gate used it), while the card
+       has no result at all. Example: Clients received 12 Oct 2023, re-checked
+       in full 21 Oct; Investigations' Client reference counts the arrival's
+       pass toward it on 12-20 October, and the Clients page shows nothing
+       for that check until the 21st. 48 of 7,983 comparisons on ed_probe,
+       all on supplies with a full re-check. Criterion 9 says the page and
+       the terminal agree as at T; whether the page should keep the arrival
+       run's results until the re-check is recorded is a change to what a
+       page lists, and his.
      - The functional critic's T2 and T5 were not in the brief this session
        worked from, so they are not placed here.
