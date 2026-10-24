@@ -27,10 +27,9 @@ DELIBERATELY NOT READ: qa_results_reader.canonical_order, which sorts a
 results FILE by run id so a live write and a rebuild produce the same bytes
 (REQ-PIPE-038). It decides nothing about which result is newer or where one
 is placed - the build re-orders by rank - so the rule has no claim on it.
-Nor qa_results_writer._arrival_dataset, where an arrival run's dataset is
-first written to qa.run from the run id the pipeline named after its own
-table: nothing earlier records it. The supply beside it, _arrival_purpose,
-is read whole (post-build-review #262 D2).
+Nothing else is excepted: an arrival run's dataset is passed to open_run by
+the orchestrator from the arrival (Keith, 2026-10-24, provisional #23), and
+_arrival_purpose, which records it with its supply, is read whole.
 """
 from __future__ import annotations
 

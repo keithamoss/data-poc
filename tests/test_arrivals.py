@@ -231,7 +231,15 @@ class TestWhatAnArrivalHandsToThePipeline:
     def test_an_entry_carries_only_observed_facts(self, dirs):
         _bdm(dirs, "BDM_20260824")
         entry = _for(dirs)[0].as_entry()
-        assert set(entry) == {"run_id", "run_index", "received_at", "delivery", "path"}
+        assert set(entry) == {"run_id", "run_index", "received_at", "delivery", "path",
+                              "dataset_id"}
+
+    def test_an_entry_says_which_dataset_its_file_is_for(self, dirs):
+        """Recognised from its file name by the dataset's own pattern - the
+        dataset the orchestrator records for the run (provisional #23,
+        decided by Keith 2026-10-24), so nothing reads it off the run id."""
+        _bdm(dirs, "BDM_20260824")
+        assert _for(dirs)[0].as_entry()["dataset_id"] == "birth-registrations"
 
     def test_the_received_at_is_ours_and_carries_its_offset(self, dirs):
         _bdm(dirs, "drop")

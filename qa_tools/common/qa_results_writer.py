@@ -685,7 +685,8 @@ def _record_in_database(agency: str, collection: str, run_id: str, run_timestamp
 
 
 def open_run(agency: str, collection: str, run_id: str, run_timestamp: str,
-             run_by: str, purpose: dict | None = None) -> "Attempt":
+             run_by: str, purpose: dict | None = None, *, dataset_id: str | None = None,
+             delivery: str | None = None, received_at: str | None = None) -> "Attempt":
     """Register a run before any of its tools write, with the identity
     only the orchestrator knows (REQ-PIPE-089 criteria 6 and 13) - and
     begin an ATTEMPT at it (REQ-PIPE-279 criteria 5 to 7).
@@ -703,6 +704,11 @@ def open_run(agency: str, collection: str, run_id: str, run_timestamp: str,
     connection that holds the run key's lock for the attempt's whole life;
     see Attempt. Called after the run's resolution is recorded and before
     any tool, by orchestrate._run_one_inner.
+
+    AN ARRIVAL'S DATASET IS GIVEN, with its delivery and receipt instant,
+    by the caller that knows them from the arrival (Keith, 2026-10-24,
+    provisional #23) - never read off the run id. A run given none and no
+    purpose is a trial's or a fixture's, about no dataset.
     """
     from qa_tools.common import environments, qa_store, supply_db
 
@@ -729,7 +735,8 @@ def open_run(agency: str, collection: str, run_id: str, run_timestamp: str,
             qa_store.reopen_run(lock, run_id)
             # WHAT THE RUN IS FOR (REQ-PIPE-140). A re-run's executor states
             # it; an arrival's run is the supply its id names, where filed.
-            qa_store.set_run_purpose(lock, run_id, **(purpose or _arrival_purpose(lock, run_id)))
+            qa_store.set_run_purpose(lock, run_id, **(purpose or _arrival_purpose(
+                lock, run_id, dataset_id, delivery=delivery, received_at=received_at)))
             qa_store.set_run_seq(lock, run_id, run_seq)
     except BaseException:
         lock.close()
@@ -864,20 +871,13 @@ def close_attempt(run_id: str, exc: BaseException | None) -> None:
               f"({type(failure).__name__}: {failure}); the next attempt will close it.")
 
 
-def _arrival_dataset(run_id: str) -> tuple[str, str, str] | None:
-    """(dataset id, logical table, staged name) of an arrival run - the one
-    place qa.run.dataset_id is first written for one, and so the one place
-    it can come from nothing but the run id: the pipeline names an
-    arrival's run after its own staged table (REQ-PIPE-105), and no earlier
-    record says which dataset the run is for. Every READER takes it from
-    qa.run (REQ-PIPE-279 criterion 17)."""
-    owner = run_owner(run_id)
-    return None if owner is None else (*owner, run_id)
-
-
-def _arrival_purpose(conn, run_id: str) -> dict:
+def _arrival_purpose(conn, run_id: str, dataset_id: str | None, *,
+                     delivery: str | None = None, received_at: str | None = None) -> dict:
     """An arrival run's own dataset, supply and period - none for a trial's
-    or a fixture's run.
+    or a fixture's run, which is given no dataset.
+
+    THE DATASET IS THE ONE IT WAS GIVEN (Keith, 2026-10-24, provisional #23),
+    from the arrival the orchestrator is running - never the run id's.
 
     THE SUPPLY IS THE ONE ITS RESOLUTION RECORDS for its own table
     (post-build-review #262 D2), recorded by the overlay before this is
@@ -888,20 +888,18 @@ def _arrival_purpose(conn, run_id: str) -> dict:
     named a pair's `#1` whichever of the two the run was about.
 
     AN ABSENT OWN TABLE - a file the load refused, so nothing was staged -
-    is still its supply's arrival: the filed supply whose file that staged
-    name was (supply_files, which keeps a refused file's name). NONE where
-    none of this records one - a supply never filed, a table read from the
-    period rather than staged, or files that are now two supplies (a
-    settled pair): such a run is about no ONE supply, and its file checks
-    are placed by the file each names (supply_status). The dataset comes
-    from _arrival_dataset.
+    is still its supply's arrival: the filed supply whose file the delivery
+    received at the arrival's instant (qa.supply_receipt). NONE where none
+    of this records one - a supply never filed, a table read from the period
+    rather than staged, or files that are now two supplies (a settled pair):
+    such a run is about no ONE supply, and its file checks are placed by
+    the file each names (supply_status).
     """
-    from qa_tools.common import filing, period_schema, supply_db, supply_files
+    from qa_tools.common import filing, hierarchy, period_schema, qa_store, supply_db, supply_files
 
-    owner = _arrival_dataset(run_id)
-    if owner is None:
+    if dataset_id is None:
         return {"dataset_id": None, "supply_id": None}
-    dataset_id, table, staged = owner
+    table = hierarchy.dataset(dataset_id).table
     res = supply_db.resolution_for(conn, run_id)
     if res.source.get(table) == period_schema.FROM_STAGING and table in res.supply_of:
         found = {res.supply_of[table]}
@@ -910,8 +908,11 @@ def _arrival_purpose(conn, run_id: str) -> dict:
     elif table in res.ambiguous:
         found = {supply_files.supply_for_table(conn, dataset_id, physical)
                  for physical in res.ambiguous[table]}
-    elif table in res.absent:
-        found = {supply_files.supply_for_table(conn, dataset_id, staged)}
+    elif table in res.absent and delivery and received_at:
+        found = {r[0] for r in conn.execute(
+            f'SELECT supply_id FROM "{qa_store.SCHEMA}".supply_receipt WHERE dataset_id = ? '
+            "AND delivery = ? AND received_instant = ?",
+            [dataset_id, delivery, received_at]).fetchall()}
     else:
         found = set()
     if len(found) != 1 or None in found:

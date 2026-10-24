@@ -330,14 +330,16 @@ class TestAnArrivalRunsSupplyIsTheOneItsResolutionRecords:
             filing_support.place(conn, "cp-notifications", supply, "2099-Q1", delivery)
         _resolve(conn, run_id, resolved={"cp_notifications": f"{run_id}__2"},
                  supply_of={"cp_notifications": two}, source={"cp_notifications": "staging"})
-        qa_results_writer.open_run(AGENCY, COLLECTION, run_id, WHEN, BY)
+        qa_results_writer.open_run(AGENCY, COLLECTION, run_id, WHEN, BY,
+                                   dataset_id="cp-notifications")
         qa_results_writer.close_attempt(run_id, None)
         assert conn.execute(f'SELECT dataset_id, supply_id FROM "{qa_store.SCHEMA}".run '
                             "WHERE run_key = ?", [run_id]).fetchone() == ("cp-notifications", two)
 
     def test_a_refused_files_arrival_is_its_filed_supplys(self, conn):
         """The load refused the file, so nothing was staged and the own table
-        is absent - but the supply was filed, and this is its arrival."""
+        is absent - but the supply was filed, and this is its arrival: the
+        supply its delivery's file, received at the arrival's instant, is."""
         import filing_support
 
         key = _key()
@@ -345,10 +347,16 @@ class TestAnArrivalRunsSupplyIsTheOneItsResolutionRecords:
         delivery = f"pytest-d2-{key}"
         conn.execute(f'INSERT INTO "{qa_store.SCHEMA}".delivery (name, received_at, '
                      "received_instant) VALUES (?, ?, ?)", [delivery, WHEN, WHEN])
+        conn.execute(f'INSERT INTO "{qa_store.SCHEMA}".delivery_file (delivery, filename, '
+                     "dataset_id, received_at, received_instant, received_from, "
+                     "receipt_sequence) VALUES (?, 'n.csv', 'cp-notifications', ?, ?, "
+                     "'our-clock', 0)", [delivery, WHEN, WHEN])
         filing_support.place(conn, "cp-notifications", f"cp-notifications@{key}", "2099-Q1",
                              delivery)
         _resolve(conn, run_id, absent=["cp_notifications"])
-        qa_results_writer.open_run(AGENCY, COLLECTION, run_id, WHEN, BY)
+        qa_results_writer.open_run(AGENCY, COLLECTION, run_id, WHEN, BY,
+                                   dataset_id="cp-notifications", delivery=delivery,
+                                   received_at=WHEN)
         qa_results_writer.close_attempt(run_id, None)
         assert conn.execute(f'SELECT supply_id, period FROM "{qa_store.SCHEMA}".run '
                             "WHERE run_key = ?", [run_id]).fetchone() == (
@@ -359,10 +367,44 @@ class TestAnArrivalRunsSupplyIsTheOneItsResolutionRecords:
         no supply."""
         run_id = _run_id()
         _resolve(conn, run_id, absent=["cp_notifications"])
-        qa_results_writer.open_run(AGENCY, COLLECTION, run_id, WHEN, BY)
+        qa_results_writer.open_run(AGENCY, COLLECTION, run_id, WHEN, BY,
+                                   dataset_id="cp-notifications")
         qa_results_writer.close_attempt(run_id, None)
         assert conn.execute(f'SELECT dataset_id, supply_id FROM "{qa_store.SCHEMA}".run '
                             "WHERE run_key = ?", [run_id]).fetchone() == ("cp-notifications", None)
+
+    def test_the_dataset_is_the_one_given_never_the_run_ids(self, conn):
+        """Keith, 2026-10-24 (provisional #23 decided): an arrival run's
+        dataset is passed in by the orchestrator, which knows it from the
+        arrival, and never read off the run id."""
+        run_id = _run_id("cp_clients")
+        _resolve(conn, run_id, absent=["cp_notifications"])
+        qa_results_writer.open_run(AGENCY, COLLECTION, run_id, WHEN, BY,
+                                   dataset_id="cp-notifications")
+        qa_results_writer.close_attempt(run_id, None)
+        assert conn.execute(f'SELECT dataset_id FROM "{qa_store.SCHEMA}".run '
+                            "WHERE run_key = ?", [run_id]).fetchone() == ("cp-notifications",)
+
+    def test_a_run_given_no_dataset_records_none_whatever_its_id_says(self, conn):
+        """A trial's or a fixture's run: no dataset, and the id is not asked."""
+        run_id = _run_id()
+        qa_results_writer.open_run(AGENCY, COLLECTION, run_id, WHEN, BY)
+        qa_results_writer.close_attempt(run_id, None)
+        assert conn.execute(f'SELECT dataset_id, supply_id FROM "{qa_store.SCHEMA}".run '
+                            "WHERE run_key = ?", [run_id]).fetchone() == (None, None)
+
+    def test_the_orchestrator_passes_the_arrivals_dataset(self, conn, monkeypatch):
+        from qa_tools.tools import orchestrate
+
+        seen = {}
+        monkeypatch.setattr(orchestrate, "open_run",
+                            lambda *a, **k: seen.update(k) or (_ for _ in ()).throw(SystemExit))
+        with pytest.raises(SystemExit):
+            orchestrate._run_one_inner(COLLECTION, {"run_id": "x", "dataset_id": "cp-clients",
+                                                    "delivery": "d", "received_at": WHEN},
+                                       "x", WHEN, BY, None, None)
+        assert (seen["dataset_id"], seen["delivery"], seen["received_at"]) == (
+            "cp-clients", "d", WHEN)
 
 
 class TestRunSeqIsDrawnWhenARunIsOpened:

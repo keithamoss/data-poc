@@ -139,7 +139,12 @@ def _run_one_inner(collection_id: str, entry: dict, run_id: str, run_timestamp: 
     coll = collections.by_id(collection_id)
     # BEFORE ANY TOOL WRITES, so the run exists with the identity only this
     # layer knows (REQ-PIPE-089 criterion 6).
-    open_run(coll.agency_id, coll.id, run_id, run_timestamp, run_by, purpose=entry.get("purpose"))
+    # AN ARRIVAL'S DATASET, DELIVERY AND RECEIPT come from its arrival
+    # (Keith, 2026-10-24, provisional #23) - none for a trial's or a
+    # fixture's entry, which is about no dataset.
+    open_run(coll.agency_id, coll.id, run_id, run_timestamp, run_by, purpose=entry.get("purpose"),
+             dataset_id=entry.get("dataset_id"), delivery=entry.get("delivery"),
+             received_at=entry.get("received_at"))
 
     # THE REFERENCE IS RESOLVED PER SUPPLY (REQ-QAC-108 criteria 2 and 4), for
     # THIS RUN'S OWN DATASET (REQ-PIPE-105) - the run that checked its own
@@ -341,6 +346,9 @@ def run_single(collection_id: str, entry: dict, reference_run_id: str | None = N
     arrival did not carry, so a call after the first file is a true statement
     about the data as it stands. Trials only (REQ-PIPE-086 criterion 10)."""
     trial.require_trial(entry["run_id"], "orchestrate.run_single")
+    # A TRIAL IS ABOUT NO DATASET, though the arrival it re-checks names one
+    # (provisional #23): its run reads every table and belongs to no supply.
+    entry = {k: v for k, v in entry.items() if k != "dataset_id"}
     return run_one(collection_id, entry, asset_time.now().isoformat(), run_by or get_run_by(),
                    reference_run_id, on_step=on_step)
 

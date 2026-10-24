@@ -83,7 +83,18 @@ class Arrival:
         """
         return {"run_id": self.run_id, "run_index": self.run_index,
                 "received_at": self.received_at.isoformat(),
-                "delivery": self.delivery_name, "path": str(self.path)}
+                "delivery": self.delivery_name, "path": str(self.path),
+                # WHICH DATASET ITS FILE IS FOR, recognised by the dataset's own
+                # pattern - what the run is recorded as being for (Keith,
+                # 2026-10-24, provisional #23), never read off the run id.
+                "dataset_id": self.dataset_id}
+
+    @property
+    def dataset_id(self) -> str:
+        """The one dataset this arrival's file is for (REQ-PIPE-105 criterion 1:
+        one arrival is one file, so one dataset)."""
+        (dataset_id,) = self.files_by_dataset
+        return dataset_id
 
     @property
     def contested(self) -> frozenset[str]:
