@@ -5788,15 +5788,6 @@ could never have computed it), and it belongs with batch 5's check work.
      now. Semantic embeddings need an allow-listed model host, or Bedrock in
      an AWS deployment. Not scoped.
 
-116. **[todo, 2026-10-22]** **[Dashboard UI]** **Say "in place in the
-     warehouse", not just "in place".** Keith, 2026-10-22, settling #95's
-     wording: "when we say 'in place', let's say 'in place in the warehouse',
-     here and anywhere else we actually expose that wording." About 33 uses
-     in the dashboard template and 12 in the CLI (counted 2026-10-22). It
-     changes built, signed wording (REQ-PIPE-081 among others), so it needs a
-     small requirement of its own. Open: the "In place on" date picker label,
-     where "In the warehouse on" is the candidate.
-
 118. **[investigate, 2026-10-22]** **[Dashboard UI]** **Is it obvious which
      period a page is talking about?** Keith, 2026-10-22, answering REQ-PIPE-279
      K2 (a result that read no Clients supply shows only on Notifications'
