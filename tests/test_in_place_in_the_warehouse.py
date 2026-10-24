@@ -62,10 +62,18 @@ class TestTheTerminalSaysWhere:
         """Post-build-review #266: the 'where' line above is checked as a
         string; this is the table `mothman scenarios list` prints, at 80
         columns - its Where cell wraps (as 'in place on' did before), never
-        past the edge."""
+        past the edge. The placement is the test's own: one read from the
+        deployment is absent on an empty database, as in CI's fast half,
+        where 'warehouse on' never printed (post-build-review #270)."""
         from rich.cells import cell_len
         from rich.console import Console
 
+        injected = next(s for s in scenarios_cli.scenarios.parse_register() if s.is_injected)
+        placement = scenario_map.Placement.of({
+            "dataset": "cp-investigations", "period": "2024-Q3", "in_place_on": "2024-08-14",
+            "supplies": ["cp-investigations@1"]})
+        monkeypatch.setattr(scenarios_cli.scenario_map, "read_placements",
+                            lambda: {injected.id: placement})
         printer = Console(width=80, record=True, file=io.StringIO())
         monkeypatch.setattr(scenarios_cli, "console", printer)
         scenarios_cli.list_command.callback(injected_only=False)

@@ -11884,3 +11884,21 @@ twice. It deliberately did not re-find the `TypeError`.
      `contested_reads` the same way, and drops `counted` for cut supplies.
      `tests/test_divergent_arrivals_cut.py` drives it on a small card of the
      real shape; all three tests failed against the run-only cut first.
+
+270. **[done, 2026-10-25]** **[Testing & dev tooling]** **The scenario-list
+     width test read its placement from the deployment, so CI's fast half -
+     an empty database - never printed the line it looks for.** Found by CI
+     on f9494a5 (run 40118365643, job `test`): `TestTheTerminalSaysWhere::
+     test_the_scenario_list_as_printed_stays_within_80_columns` failed `assert
+     any("warehouse on" in line ...)`, the only failure in 5,791. Locally it
+     passed because ed_probe holds a deployment whose placements fill the
+     Where column; with nothing injected every injected row says "not
+     injected yet". Reproduced exactly in a fresh clone against an empty
+     scratch database (CLAUDE.md's CI-condition recipe). The command is
+     right - an empty deployment has nothing placed. The test was in the
+     wrong shape for its half: it now supplies its own placement (an injected
+     scenario placed on cp-investigations, the longest Where line the
+     register can carry) through `scenario_map.read_placements`, so it holds
+     on any database and can still fail on a line past 80 columns. Minor
+     under the standing rule (a test, no product change); no failing-first
+     step applies, the CI run being the failure.
