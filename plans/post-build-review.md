@@ -11845,3 +11845,42 @@ twice. It deliberately did not re-find the `TypeError`.
 
      <!-- The visual critic's findings above are as the coordinator relayed
      them; the main session adds anything further here. -->
+
+269. **[done, 2026-10-25]** **[Testing & dev tooling]** **The divergent-arrivals
+     fixture cut a card's results by RUN, so the build's counted answer named
+     a result the cut had dropped.** Found by a full `mothman check` on
+     3670465: five teardown errors in `TestPerDatasetArrivals`, each the
+     #266 console error "the build counts rank 76 toward
+     cp-investigations@201805010100000000 ... which its history on that date
+     does not hold", on cp-investigations' six `cp_client_id`/closed-case
+     cross-table checks.
+
+     **Not a product defect, checked rather than assumed.** In the real built
+     `reports/cpfs_child-protection_dashboard.json` every one of 4,179 counted
+     ranks resolves to a history or superseded entry about the same supply,
+     and all 1,704 entries recorded under another table's run carry
+     `recorded_by` (the rank-76 entry is `cp_clients__201805010100000000`,
+     `recorded_by: cp-clients`), so `currentEntriesOn` keeps it on the real
+     page. The fixture `dashboard_html_with_divergent_arrivals` keeps each
+     cut dataset's first N runs and filtered `history` to entries whose
+     `run_id` was a kept run, leaving `counted`, `superseded` and
+     `contested_reads` alone. Since REQ-PIPE-265 a same-instant sibling's run
+     is the ONLY record of such a check (ed_probe, schema 47, holds the
+     2018-05 result under `cp_clients__...` alone; the older `supply`
+     database, schema 44, holds it under both runs), so the cut removed it
+     while `counted` still pointed at it - the very "shape the real data can
+     never produce" the fixture's own docstring warns against. KEEP=14 is why
+     the supply on show is the 2018-05 one; the default as-of date only
+     enters through "recorded by", which a 2026 date satisfies for all of
+     it, so the failure is not date-dependent. It needs a database built
+     after REQ-PIPE-265 plus #266's console error (db6d439); f861ee4's own
+     commit records 11 e2e classes and "full suite not run", so no recorded
+     run of this class on such a database exists to have passed.
+
+     Minor under the standing rule (a test fixture, no change to the page or
+     the build); fixed test-first. The cut moved into `tests/
+     divergent_arrivals.py` and now keeps a result by the SUPPLY it is about
+     as well as the run that recorded it, filters `superseded` and
+     `contested_reads` the same way, and drops `counted` for cut supplies.
+     `tests/test_divergent_arrivals_cut.py` drives it on a small card of the
+     real shape; all three tests failed against the run-only cut first.

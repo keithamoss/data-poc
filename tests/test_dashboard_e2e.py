@@ -3255,26 +3255,8 @@ def dashboard_html_with_divergent_arrivals(built_dashboard_html, tmp_path_factor
 
     # How many of each dataset's own runs to keep. One is left whole,
     # so the collection genuinely does not line up.
-    KEEP = {"cp-carers": 9, "cp-case-workers": 1, "cp-investigations": 14}
-    for dataset in data["datasets"]:
-        keep = KEEP.get(dataset["id"])
-        if keep is None:
-            continue
-        dataset["runs"] = dataset["runs"][:keep]
-        kept = {r["run_id"] for r in dataset["runs"]}
-        dataset["arrivalHistory"] = [a for a in dataset.get("arrivalHistory") or []
-                                      if a["run_id"] in kept]
-        dataset["arrivalByRun"] = {k: v for k, v in (dataset.get("arrivalByRun") or {}).items()
-                                    if k in kept}
-        dataset["lastArrival"] = {
-            **(dataset.get("lastArrival") or {}),
-            "run_date": dataset["runs"][-1]["run_date"]}
-        for column in dataset.get("columns") or []:
-            for check in column.get("checks") or []:
-                check["history"] = [h for h in check.get("history") or []
-                                     if h["run_id"] in kept]
-            stats = column.get("stats") or {}
-            stats["byRun"] = {k: v for k, v in (stats.get("byRun") or {}).items() if k in kept}
+    from tests.divergent_arrivals import cut_datasets_short
+    cut_datasets_short(data, {"cp-carers": 9, "cp-case-workers": 1, "cp-investigations": 14})
 
     doctored = tmp_path / "cpfs_child-protection_dashboard.json"
     doctored.write_text(json.dumps(data))
