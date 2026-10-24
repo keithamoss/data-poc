@@ -50,9 +50,10 @@ whichever file happens to need editing.
 real production data in an actual deployment - both the real, wired-in
 generator and the separate, exploratory population-scale one.
 
-**Owns:** `generator/` (Birth Registrations - `daily_batch.py`,
-`generate_runs.py`, `resupply.py`, `dirty.py`, `names_au.py`,
-`presentation.py` - plus Child Protection's own run generation),
+**Owns:** `generator/` (one shared driver, `driver.py`, and a provider per
+collection under `collections/` - Birth Registrations' `civil_registration.py`
+over `daily_batch.py`, `resupply.py`, `dirty.py`, `names_au.py` and
+`presentation.py`, and Child Protection's `child_protection.py`),
 `synthetic_data_generator/` (the separate, population-scale,
 cross-agency-identity-linked generator, `mothman population`, Tier 4/
 exploratory, not currently wired into the real pipeline).
@@ -74,11 +75,12 @@ data (`QAC`), how a generated run's results get stored or published
 real tools that evaluate them - the actual substance of "is this data
 good."
 
-**Owns:** `contract/` (the real ODCS contract + SodaCL checks -
-`data-asset.yaml`, `people.yaml`'s own role definitions aside),
-`dbt_project/`, `qa_tools/bdm/` and `qa_tools/cp/` (the real dbt-core/
-Soda Core/datacontract-cli/Evidently AI run + evaluate logic and each
-one's own `dataset_stats.py`), `qa_tools/common/check_lifecycle.py`
+**Owns:** `contract/` (each agency's folder `contract/<agency-id>/` of
+real ODCS contracts, SodaCL and Evidently checks - `data-asset.yaml`,
+`people.yaml`'s own role definitions aside),
+`dbt_project/`, `qa_tools/tools/` (the real dbt-core/Soda Core/
+datacontract-cli/Evidently AI run + evaluate logic, one module per tool
+for every collection, and `dataset_stats.py`), `qa_tools/common/check_lifecycle.py`
 and `validate_check_lifecycle.py` (check definition/retirement rules),
 `qa_tools/common/dataset_status.py` and the resupply-chain-identification
 logic it implements (`plans/conceptual-design.md`'s own real decisions
@@ -98,16 +100,19 @@ human acts on a bad result - a ticket, an accept/reject decision
 
 ## `PIPE` — Pipeline & publishing
 
-**What it is:** orchestration, the permanent committed QA history, and
-the CI-gated publish path - the plumbing between "a check ran" and "the
+**What it is:** orchestration, the permanent recorded QA history, and
+the gated publish path - the plumbing between "a check ran" and "the
 public dashboard reflects it."
 
 **Owns:** `pipeline/` (`orchestrate.py`'s warehouse build,
-`build_dashboard_data.py`/`build_cp_dashboard_data.py`), `qa_tools/
+`build_dashboard_data.py`, one builder for every collection), `qa_tools/
 common/qa_results_writer.py`/`qa_results_reader.py`/`git_identity.py`/
-`changelog.py`/`cadence.py`/`parallel_orchestrate.py`, `qa_tools/bdm/
-build_results_from_history.py`/`orchestrate_bdm.py` and their Child
-Protection equivalents, `.github/workflows/deploy-pages.yml`, `aws/`
+`changelog.py`/`cadence.py`/`parallel_orchestrate.py`, `qa_tools/
+collections/` (the collection registry and each collection's adapter,
+REQ-PIPE-240) and `qa_tools/common/validate_collections.py` (its gate),
+`qa_tools/tools/orchestrate.py` and `results_history.py` (one orchestrator
+and one results rebuild for every collection, REQ-PIPE-243),
+`.github/workflows/deploy-pages.yml`, `aws/`
 (the event-driven MVP design, real code + doc, not yet the live
 pipeline).
 
@@ -155,14 +160,14 @@ tickets, ownership, and recorded governance decisions - plus the config
 of who's actually involved.
 
 **Owns:** `qa_tools/common/ticket_sync.py`/`ticket_status.py`/
-`github_links.py`/`people.py`/`acceptance_sync.py`/`leaderboard.py`,
+`github_links.py`/`people.py`/`leaderboard.py`,
 `contract/people.yaml`, `.github/workflows/ticket-sync.yml`.
 
 **In scope:** opening/updating/commenting on real GitHub Issues for QA
-events; routing a ticket to the right person; the real `/accept`/
-`/reject` amber-governance decision workflow (a GitHub-comment-driven
-mechanism, even though its *result* is displayed on the dashboard);
-who's assigned to what.
+events; routing a ticket to the right person; filing decisions raised
+on a slot's ticket (REQ-GHUB-082), including acknowledging an amber
+supply (REQ-PIPE-122, which retired the old per-run `/accept`/`/reject`
+workflow, REQ-QAC-017); who's assigned to what.
 
 **Out of scope:** the underlying QA status that triggers a ticket
 (`QAC`), rendering any of this in the UI (`DASH`).
@@ -175,7 +180,9 @@ who's assigned to what.
 verified - not the product itself, the tooling around building it.
 
 **Owns:** `cli/` (the whole `mothman` CLI/TUI shell - `app.py`/
-`common.py`/`banner.py`, and each Tier's own command group file, even
+`common.py`/`banner.py`, the per-collection command factory
+`collection_cli.py` with its two shapes `one_table.py`/`many_tables.py`
+since REQ-TEST-245, and each Tier's own command group file, even
 though a given subcommand's own underlying work may belong to a
 different component - e.g. `mothman dashboard embed` wraps `DASH` work,
 but the CLI mechanism itself is `TEST`), `tests/`, `tests-js/`,

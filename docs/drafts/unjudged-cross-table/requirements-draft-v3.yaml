@@ -1,0 +1,379 @@
+# DRAFT v3 - plans/running-thoughts.md #95, re-scoped by delivery-scoper on
+# 2026-10-21 on the shape Keith settled 2026-10-20/21 (summary.md, from
+# "Shape REOPENED" to the end). A PROPOSAL for Keith's sign-off, not a settled
+# requirement. Nothing here is in requirements.yaml and nothing is signed.
+#
+# v2 (requirements-draft.yaml, REQ-QAC-212 to REQ-PIPE-217 plus the Incomplete
+# re-folds of REQ-DASH-204/210/211) is WITHDRAWN by this draft - see
+# summary-v3.md for what survives and where it went. The close-out batch's
+# REQ-DASH-204, REQ-PIPE-210 and REQ-PIPE-211 return to their close-out
+# versions (docs/drafts/calendar-close-out/requirements-draft.yaml), with the
+# edits listed in summary-v3.md.
+#
+# TERMINOLOGY. Keith says "held" for a file the gate does not promote. In the
+# register "held" already means something narrower - a supply no slot could be
+# claimed for (REQ-PIPE-078, held_blast_radius). These requirements therefore
+# say "not promoting" (at a gate) and "waiting" (afterwards, staged awaiting a
+# decision), and keep "held" for REQ-PIPE-078's meaning.
+#
+# Anything marked PROVISIONAL hangs on a question in summary-v3.md (Q1-Q12).
+requirements:
+- id: REQ-PIPE-266
+  title: "Files that arrive together are gated together, once every one of them has been checked"
+  date_written: "2026-10-21"
+  story: "As the person answerable for a collection's supplies, I want the files that arrive in one package to be gated together, and only once every one of them has been checked, so that no file is promoted on a verdict about a package-mate that is then not promoted."
+  moscow: must
+  status: not_started
+  source: "Keith, settling plans/running-thoughts.md #95's shape, 2026-10-20 evening to 2026-10-21 morning (summary.md, 'Shape settled in principle'): 'A package of files is gated together, after every file in it has been checked'; zip as the stand-in for a package, plans/running-thoughts.md #114. Drafted by delivery-scoper 2026-10-21."
+  acceptance_criteria:
+  - "THE SYSTEM SHALL treat as ONE PACKAGE the arrivals of one collection that share a receipt instant and are filed to one period - the siblings of REQ-PIPE-265 criterion 1, read from the record, partitioned by period (architect, v3 shape T6) - and SHALL treat an arrival that shares its instant with no other as a package of one."
+  - "THE SYSTEM SHALL gate a package through ONE package-gate function, reached from every place a gate is applied today - the per-arrival lifecycle, the orchestrator, the processing pass and a person's hand-filed run - and SHALL NOT leave any of them gating one sibling alone (architect, v3 shape B2)."
+  - "WHILE an arrival is checked and the rest of its package is not, THE SYSTEM SHALL classify it as CHECKED, WAITING FOR ITS PACKAGE - not a failure (processing_pass.fail_arrival), holding back later arrivals as an ungated one does - and SHALL record the package's gate as owed, so that a timeout, a budget stop or a crash resumes it."
+  - "THE SYSTEM SHALL give every promotion and refusal of one package gate the same effective instant, rather than one seeded per arrival (orchestrate.promote_after's effective_at_for), so that newest-cause ordering (REQ-PIPE-121 criterion 10) treats the package as one decision point."
+  - "WHEN a person runs one file of a package that is not yet fully checked (mothman cp qa --commit), THE SYSTEM SHALL say it is not gated yet and waits until every file of its package is checked, naming how many are, SHALL exit 0, and SHALL offer no decision on it (CLI review of the v3 shape, S6)."
+  - "WHERE arrivals come from the cloud ingest path, which records each object as its own delivery at its own storage instant (s3_arrival.record_object), THE SYSTEM SHALL treat each as a package of one until a package boundary for that path is defined (plans/supply-thoughts.md), and SHALL say so in docs/aws-event-driven-mvp-design.md. (PROVISIONAL - question Q9.)"
+  - "WHEN an arrival of a package of more than one has been checked, THE SYSTEM SHALL NOT apply the promotion gate to it until every arrival of that package has been checked, an arrival counting as checked once its run is recorded or its supply is recorded as could not be loaded, held (REQ-PIPE-078) or contested."
+  - "WHEN the last arrival of a package has been checked, THE SYSTEM SHALL gate the package's supplies together as REQ-PIPE-267 defines, and SHALL do so before any arrival received after the package is filed."
+  - "THE SYSTEM SHALL record each promotion and each refusal the package gate makes as a decision of its own (REQ-PIPE-075 criterion 14 is about a person and is unchanged), naming on each the package's receipt instant."
+  - "WHEN a package gate promotes one or more supplies, THE SYSTEM SHALL owe ONE re-evaluation (REQ-PIPE-121) covering every table it moved, after the last of those promotions commits, and SHALL NOT owe one per promotion."
+  - "IF the processing pass stops after some arrivals of a package have been checked and before the package is gated, THEN THE SYSTEM SHALL leave the checked arrivals ungated, check the rest on its next pass and then gate the package, and SHALL NOT gate the checked arrivals on their own."
+  - "IF an arrival of a package cannot be checked because its run fails to complete, THEN THE SYSTEM SHALL leave the whole package ungated and owed, report which arrival stopped it, and SHALL NOT gate its package-mates without it. (PROVISIONAL - question Q3.)"
+  - "WHERE an arrival of a package is checked but left ungated because the agreement backstop refuses its dataset (REQ-PIPE-170), THE SYSTEM SHALL treat that supply as not promoting at the package gate, so that its package-mates are gated against what is in place (REQ-PIPE-267). (PROVISIONAL - question Q3.)"
+  - "WHEN a replay of one collection is asked for a checkpoint before an arrival that is not the first of its package, THE SYSTEM SHALL refuse, naming the package's first arrival, and SHALL NOT save a checkpoint between two arrivals of one package."
+  - "THE SYSTEM SHALL amend, in the same change, REQ-PIPE-105 criterion 1, REQ-PIPE-121 criterion 9 and REQ-TEST-159 criterion 1 with the wording in summary-v3.md once Keith has approved it."
+  - "S1, NOTHING IS GATED BEFORE THE LAST FILE IS CHECKED: THE SYSTEM SHALL have tests/test_package_gate.py::TestGatedTogether::test_no_sibling_is_gated_before_the_last_is_checked, driving the real Child Protection orchestrator with a zip of Clients v2 and Notifications v2 over a 2024-Q3 holding Clients v1 and Notifications v1, asserting that no promotion or refusal is recorded for either v2 before both runs are recorded - written first and seen to fail, because today each arrival is gated straight after its own run (arrival_lifecycle.process)."
+  - "S2, ONE KNOCK-ON FOR A PACKAGE PROMOTED WHOLE: THE SYSTEM SHALL have tests/test_package_gate.py::TestGatedTogether::test_a_package_promoted_whole_owes_one_reevaluation, in which a first-time zip of Clients v2 and Notifications v2, both green, promotes both, owes exactly one re-evaluation, and records no readers-only run for either - written first and seen to fail."
+  - "THE SYSTEM SHALL have tests/test_package_gate.py::TestInterruptedPackage::test_a_part_checked_package_is_finished_and_gated_whole, which stops the processing pass between the two runs of S1's zip and asserts that the next pass checks the second, then gates both together - written first and seen to fail."
+  non_functional_requirements:
+  - "NO HALF-AND-HALF VIEW (Keith, 2026-10-21): nothing is promoted on a verdict about a package-mate that has not itself been gated."
+  - "NO FLICKERING REDS (plans/running-thoughts.md #113): a package's refusals and promotions are written only once the whole package is decided, so no intermediate state of a package is ever recorded as a decision."
+  - "PERFORMANCE: a package's gate waits only for its own files' checks - minutes on Child Protection - and never for any other arrival, so REQ-PIPE-105 criterion 2 (no supply held pending another's arrival) still holds."
+  - "DETERMINISM AND REPLAY: package membership comes from the recorded receipt instant, never from process timing, so a parallel and a sequential bootstrap still record the same decisions (REQ-PIPE-262 criterion 13), and a checkpoint is only ever at a package boundary (criterion 14)."
+  - "RELIABILITY: a package interrupted part-way is finished, never gated in part (criterion 11); the owed state is visible in the terminal as any owed processing is (REQ-PIPE-151)."
+  - "AUDITABILITY: every promotion and refusal names its package's receipt instant (criterion 9), so 'what was gated together' is one query over qa.decision."
+  - "SCALE (~30 collections on the quarterly asset, deliveries from many supplying teams): a package is one collection's files at one instant, so the cost is per package and does not grow with the number of collections."
+  - "SECURITY AND PRIVACY: nothing widened; the package is identified from receipt records, never file contents."
+  dependencies:
+  - REQ-PIPE-265
+  - REQ-PIPE-267
+  - REQ-PIPE-105
+  - REQ-PIPE-121
+  - REQ-PIPE-151
+  - REQ-TEST-159
+  decisions:
+  - "GATED TOGETHER, AFTER ALL ARE CHECKED (Keith, 2026-10-20/21): 'A package of files is gated together, after every file in it has been checked.' REJECTED today's behaviour, gating each file straight after its own run (arrival_lifecycle.process calls promote_after per arrival), which in S1 promotes Clients v2 before Notifications v2 has been checked at all."
+  - "A ZIP STANDS IN FOR A PACKAGE, AND A PACKAGE IS A SHARED RECEIPT INSTANT (Keith, 2026-10-20, plans/running-thoughts.md #114: 'zip is just a stand-in for like a package of files. We might find other ways to say mark the start and end of a batch of files... but let's just go with the zip container as the current concept'). Criterion 1 reads it from the record exactly as REQ-PIPE-265 does, so another boundary marker later changes one definition, not two. NOT the delivery directory: a delivery's files can land minutes apart (REQ-GEN-044), and those are staggered, not a package."
+  - "NO COMPLETENESS IS INFERRED (REQ-PIPE-105 criteria 2 and 12, unchanged): a package's files share one instant and are all present when it is filed, so gating together waits on their checks, never on an arrival. The retired completion tracker stays retired."
+  - "STAGGERED FILES FLICKER, ACCEPTED (Keith, 2026-10-20): 'I guess that's just going to have to flicker at that point. And we need to say, if you want to avoid a flicker, make sure you send us a package of files... I don't think we can really design around that.' So this requirement deliberately does not group files arriving minutes apart; REQ-DOCS-274 carries the supplier guidance."
+  - "ONE KNOCK-ON PER PACKAGE (delivery-scoper, 2026-10-21): REQ-PIPE-121 criterion 9 says one re-evaluation per decision; a package promoted whole is several decisions, and a knock-on after the first would re-run the second's readers against a period about to change - wasted runs, and results counted against a half-promoted package. Hence criterion 10 and the amendment."
+  - "A CHECKPOINT NEVER SPLITS A PACKAGE (delivery-scoper): REQ-TEST-159 checkpoints after each arrival; one taken between two siblings would hold a checked-but-ungated package that a resume would have to know to gate. Refusing such a checkpoint is simpler than teaching resume about part-gated packages."
+  open_questions:
+  - "1. Q3 (put to Keith): a sibling whose run cannot complete, and a sibling refused by the agreement backstop - wait, or count as not promoting? Criteria 12 and 13 carry the recommendation."
+  - "2. Q9 (put to Keith): the cloud ingest path forms no packages (architect, v3 shape B1) - zip-only for now (criterion 6), or define a cloud boundary now?"
+- id: REQ-PIPE-267
+  title: "A supply is promoted only on cross-table verdicts about what the warehouse will hold; when a package-mate is not promoted, the others are re-checked against what is in place, until nothing changes"
+  date_written: "2026-10-21"
+  story: "As a data team leader, I want a file promoted only on cross-table verdicts about the tables it will actually sit beside in the warehouse, so that the warehouse never holds a table that was only ever judged against a package-mate that did not get in."
+  moscow: must
+  status: not_started
+  source: "Keith, 2026-10-20/21 (summary.md, 'Shape settled in principle'): the no-half-and-half principle; 'When a file in the package is held, the others' cross-table checks re-run against the warehouse partner before any of them can promote'; 'Re-checks cascade within a package until nothing changes'; 'things that depend on each other don't promote until they're all happy... A human can always overrule that using the terminal'; REQ-PIPE-265 stands, a carried verdict stops counting once a file it read is held. Worked example S1, Clients v2 / Notifications v2 over v1 + v1. Drafted by delivery-scoper 2026-10-21."
+  acceptance_criteria:
+  - "THE SYSTEM SHALL count toward a supply's promotion gate a cross-table verdict only where every supply the check's run read (qa.tables_read, compared by supply, never by physical table name) is either the supply in place for its table in that period - promoted, inherited or substituted - or a supply promoting in the same gate application."
+  - "THE SYSTEM SHALL treat as one GATE APPLICATION a package's gate (REQ-PIPE-266) and the re-gate of the waiting supplies one re-evaluation touched (REQ-PIPE-121 criterion 3), and SHALL apply criteria 1 to 8 to both."
+  - "WHEN a gate application begins, THE SYSTEM SHALL mark as NOT PROMOTING every supply of it that would not be promoted on checks that read no other supply of the application - its own checks, and cross-table verdicts against supplies in place - or that is red, amber under 'hold', contested, held, could not be loaded, superseded, refused by the agreement backstop, or a resupply its slot's replacement setting does not let replace (architect, v3 shape B3 step 1 and T4), and SHALL NOT mark a supply not promoting at this step only because a verdict against another supply of the application failed."
+  - "WHEN a supply of a gate application is not promoting and another supply of it, still promoting, has a cross-table verdict that read it, THE SYSTEM SHALL re-evaluate that check for the other supply against the period as it will stand - that table's supply in place, or none - reading the application's other still-promoting supplies as staged, before the gate decides on the other supply (B3 step 2)."
+  - "THE SYSTEM SHALL then mark not promoting every supply that a re-evaluation of criterion 4 left failing, repeat criterion 4, and - once no re-evaluation changes anything - mark not promoting together every still-promoting supply whose verdict against another still-promoting supply fails, and repeat from criterion 4, stopping only when the set of supplies not promoting stops growing; THE SYSTEM SHALL then promote the rest together, so that supplies that read each other promote together or not at all (B3 steps 3 to 5)."
+  - "THE SYSTEM SHALL reach the same outcome whatever order a gate application's supplies are considered in, SHALL NOT re-check a supply already not promoting, and SHALL NOT re-run a check whose read supplies have not changed since its last result."
+  - "WHERE a re-evaluated check has no supply in place to read for a table, THE SYSTEM SHALL record it not evaluated and red with the reason that applies (REQ-PIPE-079 criteria 4, 15 and 16; REQ-PIPE-270), and SHALL NOT treat the absent table as empty."
+  - "WHERE a check's verdict was carried from a sibling (REQ-PIPE-265) and a supply it read is not promoting, THE SYSTEM SHALL stop counting the carried verdict and re-evaluate the check under criterion 4, whose result replaces it; REQ-PIPE-265's criteria are unchanged."
+  - "THE SYSTEM SHALL record each re-evaluation of criterion 4 as a readers-only run (REQ-PIPE-121 criterion 2), naming as its cause the recorded refusal of the supply that is not promoting, recording on the run which tables it read from what is in place rather than from staging (from_warehouse, on qa.run), batching one run per supply per round, and SHALL NOT re-run any supply's own table and column checks for it."
+  - "WHILE a gate application has not settled, THE SYSTEM SHALL NOT count the results its re-evaluations record toward any status, page, count, ticket or notification, and SHALL count them only once its refusals and promotions are written, so that an intermediate result of a cascade is never shown (dashboard UX review of the v3 shape, S12)."
+  - "WHERE `mothman cp qa`, `mothman bdm qa` or `mothman pipeline process` touched a supply that ends refused on a red - a red from a re-evaluation of criterion 4 included - THE SYSTEM SHALL exit with the existing red exit code and show the re-evaluation's results in its report, and SHALL NOT exit 0 on the run's own earlier results (CLI review of the v3 shape, item 5)."
+  - "WHERE the terminal shows a supply refused because of a package-mate, THE SYSTEM SHALL name that package-mate's decision as the next step first ('Decide cp-notifications <period> (received <date>) - promoting it re-checks this one'), the supply's own decisions after it, using 'held back' as the gate's word for the outcome (CLI review of the v3 shape, items 1 and 3)."
+  - "WHEN a supply is refused because of a re-evaluation under criterion 4, THE SYSTEM SHALL say in its refusal which checks are responsible, which supply in place each was checked against (or that there was none), and which package-mate was not promoted. (NEW WORDING for Keith's approval: 'Refused: <check>, re-checked against the <dataset> in place (received <instant>) because the <dataset> received with this supply was not promoted' / '... re-checked with no <dataset> in place, because the <dataset> received with this supply was not promoted'.)"
+  - "WHERE a single arrival's cross-table verdict read a staged supply of another table that is waiting for a reason of its own - red on its own checks, amber under 'hold', contested, or refused by the backstop - THE SYSTEM SHALL treat that waiting supply as not promoting under criterion 4 before gating the arrival. (PROVISIONAL - question Q2.)"
+  - "WHEN a person is about to promote a supply in the terminal and a cross-table verdict it holds read a supply that is not in place, THE SYSTEM SHALL say so before the person confirms, naming that supply and saying the check is re-run against what is in place once it is promoted (REQ-PIPE-121), and SHALL keep the promotion available on the same terms as today."
+  - "THE SYSTEM SHALL amend, in the same change, REQ-PIPE-075 criterion 2 with the wording in summary-v3.md once Keith has approved it."
+  - "S1 GREEN BRANCH: THE SYSTEM SHALL have tests/test_package_gate.py::TestPackageMateNotPromoted::test_clients_rechecked_against_notifications_in_place_and_promoted - 2024-Q3 holding Clients v1 and Notifications v1, a zip of Clients v2 (green) and Notifications v2 (red on blank values of its own) - asserting that Notifications v2 is refused, that Notifications' Client reference is re-run for Clients v2 against Notifications v1 and passes, that Clients v2 is promoted, and that the period then holds Clients v2 and Notifications v1 - written first and seen to fail, because today Clients v2 is promoted on the verdict against Notifications v2."
+  - "S1 RED BRANCH: THE SYSTEM SHALL assert in the same class (test_clients_refused_when_it_drops_clients_notifications_v1_points_at) that where Clients v2 lacks clients Notifications v1 points at, the re-run fails, Clients v2 is refused as a red like any other, and its refusal carries criterion 13's wording naming Notifications v1 and the not-promoted Notifications v2."
+  - "S1 STEP 4: THE SYSTEM SHALL assert in the same class (test_rejecting_the_refused_package_mate_changes_nothing) that a person rejecting Notifications v2 afterwards owes no re-evaluation and leaves Clients v2's results and decision unchanged, and (test_promoting_it_later_rechecks_through_the_knock_on) that a person promoting Notifications v2 instead re-checks Clients v2 through REQ-PIPE-121's knock-on - characterization guards, not claimed to fail first."
+  - "S2 STRICT: THE SYSTEM SHALL assert in tests/test_package_gate.py::TestFirstTimePackage::test_clients_refused_when_notifications_is_not_promoted that in a first-time zip with Notifications v2 refused, Clients v2's Client reference is re-run with no Notifications in place, records not evaluated and red, and Clients v2 is refused; and that a later promotion of Notifications v2 by a person re-checks and promotes Clients v2 through the knock-on - written first and seen to fail."
+  - "S5 CASCADE: THE SYSTEM SHALL have tests/test_package_gate.py::TestCascade::test_mutual_readers_settle_in_any_order - a zip of Clients v2, Notifications v2 and Investigations v2 over v1s, Investigations v2 red on its own checks; Notifications' Escalation completeness re-run against Investigations v1 fails, so Notifications v2 becomes not promoting, so Clients v2's Client reference is re-run against Notifications v1 - asserting the same promotions and refusals whichever order the three are considered in, and that the cascade stops when nothing changes - written first and seen to fail."
+  - "S3b: THE SYSTEM SHALL have tests/test_package_gate.py::TestStaggeredAgainstAWaitingPartner::test_arrival_rechecked_against_what_is_in_place, in which Clients v2 waits red on its own checks and Notifications v2 arrives alone twenty minutes later, asserting that Notifications v2 is gated on its Client reference re-run against Clients v1, not on its verdict against Clients v2 - written first and seen to fail. (PROVISIONAL - question Q2.)"
+  non_functional_requirements:
+  - "NO HALF-AND-HALF VIEW (Keith, 2026-10-21): a supply is never promoted on a verdict about a supply that will not be beside it in the warehouse (criterion 1)."
+  - "NO FALSE GREEN: an absent partner is could-not-run, which is red (criterion 7); nothing is promoted because a check that could not read a table was left out."
+  - "NO FLICKERING REDS (plans/running-thoughts.md #113): the cascade runs inside one gate application and writes its refusals and promotions once it has settled, and its intermediate results are not counted until then (criterion 10), so an intermediate 'not promoting' never reaches the decision log, the page, the terminal or a ticket."
+  - "PERFORMANCE OF THE CASCADE: each round re-runs only cross-table checks (never a supply's own), only for still-promoting supplies that read a newly not-promoting one, and a package of n files settles in at most n-1 rounds - at most 5 for Child Protection's six tables. On the bootstrapped history queried 2026-10-21, 12 of 53 multi-file Child Protection packages held a file that was never promoted - the packages this would add runs to. The added runs and wall clock are measured on the first bootstrap after build (REQ-PIPE-121 NFR 2's precedent), and the bootstrap figure in CLAUDE.md updated."
+  - "SCALE (~30 collections; a widely read table such as a client register refused): the cascade is per package and per collection, bounded by that collection's table count, never by the asset's; the shout for many readers made red by one refusal is aggregated by REQ-DASH-204 and REQ-PIPE-210 (question Q6)."
+  - "DETERMINISM AND REPLAY: the outcome is a fixed point independent of order (criterion 6), so a replay, a resume and a parallel bootstrap reach the same decisions."
+  - "AUDITABILITY: every re-run names the refusal that caused it (criterion 9) and every refusal names its package-mate and the supply it was checked against (criterion 13), so 'why was this refused when its own data was fine' is answerable from the decision log alone."
+  - "SECURITY: a person's override (promote, accept) keeps its allowlist, actor and mandatory reason; nothing widened."
+  - "THE BUILD RULE: everything here is decided at run time where a connection is legitimately open; the dashboard build reads only what was recorded."
+  dependencies:
+  - REQ-PIPE-266
+  - REQ-PIPE-265
+  - REQ-PIPE-270
+  - REQ-PIPE-075
+  - REQ-PIPE-079
+  - REQ-PIPE-121
+  - REQ-PIPE-105
+  - REQ-QAC-037
+  decisions:
+  - "RE-CHECK WHEN A PACKAGE-MATE IS NOT PROMOTED, AND CASCADE (Keith, 2026-10-20/21): 'the others' cross-table checks re-run against the warehouse partner before any of them can promote', and 'Re-checks cascade within a package until nothing changes'; 'Things that depend on each other don't promote until they're all happy.'"
+  - "NO HALF-AND-HALF VIEW (Keith, 2026-10-21): every result is either the warehouse view or the staging view, never a warehouse table judged against a staged partner that may not get in. Criterion 1 is that principle at the gate: the gate's view is the warehouse as it will stand once this gate's promotions are made."
+  - "STRICT: AN ABSENT PARTNER IS RED, NEVER EMPTY (Keith, 2026-10-21): 'It's the strictest rule. It's probably the easiest to sort of think about and understand.' REJECTED treating a table that was not supplied as empty (considered and rejected 2026-10-21)."
+  - "RED ONLY (Keith, 2026-10-20/21): no new status, and no red that follows different rules. REJECTED v2's Incomplete status (its own status between amber and red, chosen 2026-10-20 morning and reopened the same day: 'red feels right somehow'). REJECTED red that promotes itself - red would mean two things."
+  - "A CARRIED VERDICT STOPS COUNTING WHEN A FILE IT READ IS NOT PROMOTED (Keith, 2026-10-21: REQ-PIPE-265 stands, with the rule that a carried verdict stops counting once a file it read is held): criterion 8. REQ-PIPE-265 itself is not amended - within a package a verdict is still evaluated once and carried."
+  - "OTHER TABLES ARE RE-CHECKED ONLY ON PROMOTION (Keith, 2026-10-20/21, keeping REQ-PIPE-121's decision 'A FILE LANDING IN STAGING STAYS OUTSIDE THIS MECHANISM'): the re-evaluations here are within one gate application - the package's own files, or the knock-on's own re-gate - never another table's supply re-checked because a file landed. REJECTED re-checking other tables on a staged arrival (v1 architect A1)."
+  - "A SUPPLY ALREADY NOT PROMOTING IS NOT RE-CHECKED (delivery-scoper, 2026-10-21): no gate depends on its results, so the runs would be waste. Accepted consequence (tension T12 in summary-v3.md): in S1's red branch Notifications v2's Client reference still shows its verdict against Clients v2, which is also waiting - a staging view against a staging partner, labelled as such by REQ-DASH-272 - and is judged against what is in place by the knock-on if a person promotes it."
+  - "THE OUTCOME IS A FIXED POINT (delivery-scoper): 'not promoting' only grows within a gate application and each check depends only on which of its read supplies are promoting, so the result does not depend on order (criterion 6) - which is what makes it safe for replay and checkpoints."
+  - "THE STAGING VIEW, MADE PRECISE (delivery-scoper, from Keith's S1): Keith's staging view is this file in staging against what is staged for its dependencies, else the warehouse version. Once a package-mate is not promoting, S1 has Clients v2 judged against Notifications v1, not the staged v2 - so for a supply still able to promote, 'what is staged for its dependencies' means what is staged AND promoting with it. For Keith to confirm at sign-off; it is what S1 step 3 says."
+  - "REQ-PIPE-079'S OWN WORKED CASE AGREES WITH CRITERION 14 (REQ-PIPE-079 decision 23, Keith 2026-09-26): 'judging notifications against a supply nobody accepted into Q3 would record a green that becomes retroactively meaningless if that supply is later rejected'. REQ-PIPE-105 criterion 5 (2026-09-28) later made a run read the staged version, which is why Q2 asks rather than assumes."
+  - "WHAT A PERSON SEES BEFORE OVERRIDING (delivery-scoper, from the v2 CLI review's one-vocabulary finding): criterion 15 warns in dataset ids, state first, as the terminal's other lines do."
+  open_questions:
+  - "1. Q2 (put to Keith): criterion 14 and the S3b test - re-check a single arrival against what is in place when its staged partner waits for a reason of its own?"
+  - "2. FOR THE ARCHITECT, PARTLY ANSWERED by the v3-shape review: the re-check reads from what is in place through recheck.execute(purpose=...) with from_warehouse recorded on qa.run, period_overlay dropping those tables from what is staged. Confirm at build that a readers-only run may be caused by a 'promotion-refused' decision (qa.run's check constraint needs a cause), and that no second resolver is introduced."
+  - "3. FOR THE ARCHITECT: S1 assumes Child Protection's replacement setting lets a green resupply replace a promoted one (REQ-PIPE-123). Under a 'hold' replacement setting both v2s wait for a person whatever this requirement decides; confirm the tests pin a setting rather than inherit one."
+- id: REQ-PIPE-268
+  title: "A file waiting only for a partner is promoted together with that partner's later file"
+  date_written: "2026-10-21"
+  story: "As the person answerable for a collection's supplies, I want a file that is clean on its own data, and waiting only because its partner had not arrived, to be promoted together with the partner's file when that arrives and the two agree, so that two clean files never wait on each other for a person."
+  moscow: must
+  status: not_started
+  source: "Delivery-scoper, 2026-10-21, from Keith's S3 (staggered files: 'Notifications red/held (accepted flicker) until Clients arrives and promotes, then knock-on'), which REQ-PIPE-267 criterion 1 alone cannot reach - see tension T1 in summary-v3.md. PROVISIONAL IN WHOLE on question Q1."
+  acceptance_criteria:
+  - "WHEN an arrival's run records a cross-table verdict that read a supply of another table WAITING in the same period, and that waiting supply's recorded results - its newest result per check, with the arrival counted as promoting under REQ-PIPE-267 criterion 1 - would let it promote, THE SYSTEM SHALL add the waiting supply to the arrival's gate application (REQ-PIPE-267 criterion 2), so that the two are promoted together or not at all."
+  - "THE SYSTEM SHALL NOT run any check of the waiting supply for this, and SHALL NOT add a waiting supply whose recorded results would not let it promote, so that no other table is re-checked because a file landed."
+  - "WHERE the arrival itself turns out not promoting, THE SYSTEM SHALL leave the waiting supply waiting with its results and decisions unchanged."
+  - "THE SYSTEM SHALL record the waiting supply's promotion as made by the rule, naming the arrival it was gated with."
+  - "THE SYSTEM SHALL amend, in the same change, REQ-PIPE-121's decision 'A FILE LANDING IN STAGING STAYS OUTSIDE THIS MECHANISM' with the wording in summary-v3.md once Keith has approved it."
+  - "S3: THE SYSTEM SHALL have tests/test_package_gate.py::TestStaggeredPair::test_waiting_partner_promoted_with_the_later_file - Notifications v2 arriving alone at 08:40, refused red because no Clients is in place or staged; Clients v2 arriving alone at 09:00 whose run passes Notifications' Client reference against the staged Notifications v2 - asserting both promoted at Clients v2's gate and no readers-only run - written first and seen to fail (today Notifications v2 is promoted at 08:40 on a not-yet-due 'no data')."
+  - "S2b, A CORRECTION AFTER A STRICT REFUSAL: THE SYSTEM SHALL assert in the same class (test_correction_promotes_with_the_waiting_clients) that after S2's first-time zip leaves Clients v2 and Notifications v2 both refused, a Notifications v3 arriving alone the next day, clean, whose Client reference passes against Clients v2, is promoted together with Clients v2 - written first and seen to fail."
+  non_functional_requirements:
+  - "NO DEADLOCK BETWEEN CLEAN FILES: without this, REQ-PIPE-267 criterion 1 re-checks the later file against no partner, so two files clean together wait on each other for a person - every staggered pair, of which REQ-PIPE-265's measurement found 312 on the bootstrapped history."
+  - "NO HALF-AND-HALF VIEW: the two promote in one gate application, so the warehouse never holds one judged against the other while the other is outside it."
+  - "PERFORMANCE: no check is run for the waiting supply (criterion 2); the added cost is one status computation per waiting partner of an arrival."
+  - "DETERMINISM: which waiting supplies join is decided from recorded results alone, so a replay reaches the same decision."
+  - "AUDITABILITY: the waiting supply's promotion names the arrival it was gated with (criterion 4)."
+  dependencies:
+  - REQ-PIPE-267
+  - REQ-PIPE-266
+  - REQ-PIPE-121
+  decisions:
+  - "WHY THIS EXISTS (delivery-scoper, 2026-10-21, tension T1): Keith's S3 expects Clients to promote on arrival and the knock-on to clear Notifications. Clients' verdict read Notifications v2, which is waiting, so REQ-PIPE-267 criterion 1 would not count it, and re-checking Clients against what is in place (none) is red - S3 would deadlock, and so would the 312 staggered pairs. Something has to let the two in together."
+  - "RE-GATE, NOT RE-CHECK (delivery-scoper): the waiting supply needs no new run - the arrival's own run already evaluated the shared check against it, and that verdict counts toward both (REQ-QAC-037). So Keith's 'other tables are re-checked only on promotion' still holds; what changes is that a waiting supply is re-GATED when a file lands, which is why REQ-PIPE-121's staging decision is amended rather than left silently contradicted."
+  - "OPTIONS (question Q1, pending Keith). A, recommended: this requirement - gate them together. B: Clients promotes alone on its verdict against the waiting Notifications, and the knock-on then re-checks and promotes Notifications (closest to Keith's own words for S3), at the price of a moment where Clients is in the warehouse judged against a Notifications that is not, and a gap if the knock-on then cannot promote it. C: neither - strict, both wait for a person; deadlocks every staggered pair."
+  open_questions:
+  - "1. Q1 (put to Keith): this whole requirement is provisional on it."
+- id: REQ-PIPE-269
+  title: "A promoted supply's status counts a cross-table verdict only when every supply it read is the one now in place"
+  date_written: "2026-10-21"
+  story: "As a data team leader reading a promoted dataset, I want its status to count only cross-table verdicts about the tables actually beside it in the warehouse, so that another table's file that never got in can neither turn it red nor leave it green."
+  moscow: must
+  status: not_started
+  source: "Keith, 2026-10-20 ('the promoted view reflects what's actually in the warehouse across rechecks') and 2026-10-21 ('A warehouse view counts a cross-table verdict only when every supply it read is the one in place, judged by supply'); the live flaw in supply_status.runs_about / latest_results established from the code 2026-10-20 (Keith's scenario: Notifications promoted green, a new Clients file arrives red and is held, and Notifications' in-place status shows the verdict against the unpromoted Clients). Drafted by delivery-scoper 2026-10-21."
+  acceptance_criteria:
+  - "WHERE a supply is in place for its table in a period at T - promoted, inherited or substituted - THE SYSTEM SHALL count toward its status at T a cross-table result only where every supply that result's run read (qa.tables_read) is the one in place for its table in that period at T, judged by supply and never by physical table name."
+  - "THE SYSTEM SHALL NOT count toward an in-place supply's status at T any result from a run that read a supply of another table not in place at T - the arrival run of a supply that was then refused, is still waiting, or was later rejected or superseded included."
+  - "WHERE a supply is waiting, THE SYSTEM SHALL count toward its status the newest result per check from every run that read it, as today, its gate being subject to REQ-PIPE-267 criterion 1."
+  - "THE SYSTEM SHALL count a cross-table result toward every supply its run read and toward no other, so that a table a check could not read is never coloured by that check."
+  - "WHERE an in-place supply has a cross-table check reading it for which no recorded result satisfies criterion 1 at T, THE SYSTEM SHALL read that check as not evaluated and red, saying it has not been checked against the <table> in place, and SHALL NOT fall back to a result about a supply not in place. (PROVISIONAL - question Q5.)"
+  - "THE SYSTEM SHALL answer criteria 1 to 5 through ONE record-selection function taking the view as an explicit argument - filtering to the results that count FIRST and then taking the newest per check, so that a check falls back to its newest counted result - used by the promotion gate, the knock-on (knock_on.readers), supply_status, red_promoted, the status recorded at promotion (REQ-PIPE-130 criterion 11), the dashboard build (build_dashboard_data.share_cross_table_results) and the terminal, and SHALL NOT keep a second rule anywhere for which results are about a supply (architect, v3 shape B5)."
+  - "WHEN the knock-on decides whether a reader must run again (REQ-PIPE-121 non-functional requirement 4), THE SYSTEM SHALL treat a reading check as stale where its newest result counted under criteria 1 to 3 read the moved table as a different supply than the period now holds, read nothing for it, or is not evaluated for want of a table, so that a reader that could not read a table is re-run rather than only re-gated (round 4's B1)."
+  - "THE SYSTEM SHALL judge 'in place at T' from the decision log alone (REQ-PIPE-081 criterion 3), so that the dashboard's in-place-on view and the terminal give the same answer for the same T."
+  - "THE SYSTEM SHALL amend, in the same change, REQ-QAC-037 criterion 7, REQ-DASH-264 criterion 1 and REQ-PIPE-121 non-functional requirement 4 with the wording in summary-v3.md once Keith has approved it."
+  - "S4: THE SYSTEM SHALL have tests/test_warehouse_view.py::TestRefusedPartnerDoesNotCount::test_promoted_clients_unaffected_by_a_refused_notifications - Clients v1 and Notifications v1 promoted green; Notifications v2 arrives alone pointing at missing clients, its Client reference red, and is refused - asserting Clients v1 reads green through supply_status, promotion.status_of and the dashboard build's per-dataset status at a date after the refusal - written first and seen to fail (today supply_status.runs_about counts Notifications v2's arrival run toward Clients v1)."
+  - "THE OTHER DIRECTION: THE SYSTEM SHALL assert in the same class (test_promoted_notifications_unaffected_by_a_refused_clients) Keith's 2026-10-20 case - Notifications promoted green, a Clients v2 red on its own checks refused - Notifications' in-place status and its rows showing the verdict against the Clients in place - written first and seen to fail."
+  - "S2, COUNTED WITH NO RE-RUN: THE SYSTEM SHALL assert in tests/test_warehouse_view.py::TestPromotedTogether::test_one_verdict_counts_toward_both that after a first-time zip promotes Clients v2 and Notifications v2 together, the single Client reference verdict (evaluated once, carried by REQ-PIPE-265) counts toward both in-place statuses, and no readers-only run is recorded."
+  - "B1: THE SYSTEM SHALL have tests/test_warehouse_view.py::TestKnockOnStaleness::test_not_evaluated_reader_is_rerun_not_only_regated, injecting a knock-on owed for a table the period still does not hold and asserting the reader's reading checks are re-run - written first and seen to fail at knock_on.readers (None == None, only re-gated), as the v2 architect review located it."
+  non_functional_requirements:
+  - "NO FALSE GREEN AND NO FALSE RED: an in-place supply's status is about the warehouse as it stands, so a refused partner cannot turn it red (S4) and a verdict about a supply that left cannot keep it green (criterion 5)."
+  - "THE BUILD RULE: computed from recorded QA results and the decision log only, never supply rows (REQ-DOCS-101)."
+  - "PERFORMANCE: the build works out once, per recorded result, the window of dates in which every supply it read was in place (from the decision log), and the page filters by the date on show - no per-render walk of history, so page load does not grow with the number of past runs; at ~30 collections the work is linear in recorded cross-table results."
+  - "DETERMINISM: 'in place at T' comes from the decision log alone (criterion 8), so a rebuild of the same history gives the same statuses."
+  - "MAINTAINABILITY: one function (criterion 6) - the v2 architect review found four status rankings where two were expected; a second 'which results count' rule would drift the same way."
+  - "AUDITABILITY: a result that does not count toward a supply is still recorded and still shown on the supply it does describe; nothing is deleted or rewritten."
+  - "PRIVACY: unchanged - only supply ids and table names are compared."
+  dependencies:
+  - REQ-QAC-037
+  - REQ-PIPE-121
+  - REQ-PIPE-081
+  - REQ-PIPE-130
+  - REQ-DASH-264
+  - REQ-DASH-126
+  - REQ-PIPE-265
+  decisions:
+  - "WAREHOUSE VIEW BY SUPPLY (Keith, 2026-10-21): 'A warehouse view counts a cross-table verdict only when every supply it read is the one in place, judged by supply.' So a first-time zip where both promote together counts with no re-run, and a refused partner's arrival run never counts toward the other table's promoted status - the runs_about flaw fixed in both directions."
+  - "THE LIVE FLAW, FROM BEFORE #95 (established from the code 2026-10-20, re-read 2026-10-21): supply_status.runs_about selects every completed run whose qa.tables_read names this supply, whatever else it read; latest_results then takes the newest per check. On the database queried 2026-10-21, 23 Child Protection arrival runs whose supply was never promoted recorded 144 results for checks declared on other datasets - the upper bound of verdicts that can colour a promoted partner today."
+  - "BY SUPPLY, NOT BY PHYSICAL NAME (REQ-PIPE-265 criterion 5's own reasoning): a table promoted out of staging is read as cp_clients where it was read as cp_clients__<instant>, and is the same supply; a settled pair's __2 may be its #1 (REQ-PIPE-193 criterion 13)."
+  - "REJECTED filtering by whose run it was (supply_status's own docstring): a refreshed cross-table result recorded in another table's run is exactly what REQ-DASH-126 needs; the filter is on what the run read, not who ran it."
+  - "COUNTED TOWARD WHAT IT READ, AND NOTHING ELSE (delivery-scoper, 2026-10-21): this answers v2's case 15 (the missing table coloured by its readers) without a rule of its own - a record that could not read Notifications read no Notifications supply, so it counts toward none."
+  - "B1 LIVES HERE NOW (delivery-scoper): it was v2's REQ-PIPE-215 criterion 1, withdrawn with v2; REQ-PIPE-211 depends on it."
+  open_questions:
+  - "1. Q5 (put to Keith): criterion 5 - what an in-place supply shows when nothing recorded is about the combination in place."
+- id: REQ-PIPE-270
+  title: "A cross-table check that cannot read a table is red whatever the reason, not yet due included"
+  date_written: "2026-10-21"
+  story: "As a data team leader, I want a cross-table check that could not run, because a table it reads has no supply it may read, to be red whether that table is not yet due, overdue, waiting, contested or never sent, so that nothing reads green that nobody could check, and the red holds like any red until the table is in place or a person overrides it."
+  moscow: must
+  status: not_started
+  source: "Keith, 2026-10-21 ('STRICT, not relaxed. An absent partner stays could-not-run, which is red; things that depend on each other don't promote until they're all happy... A human can always overrule that using the terminal'); S3, 2026-10-20/21 (Notifications arriving alone is red until Clients arrives and promotes). The false green behind it: plans/running-thoughts.md #95, decision 103. Drafted by delivery-scoper 2026-10-21."
+  acceptance_criteria:
+  - "WHERE a cross-table check cannot read a table because the period offers no supply of it the run may read - none in place, none promoting with it (REQ-PIPE-267), none staged that the run may read - THE SYSTEM SHALL record the check not evaluated, with status red, naming the table and the reason, for every reason, a table not yet due for the period included."
+  - "THE SYSTEM SHALL write that status where not-evaluated cross-table records are written (unrunnable.results_for and held_blast_radius), and SHALL NOT record such a check as no data."
+  - "THE SYSTEM SHALL NOT treat a table the period does not offer as empty, for any check."
+  - "THE SYSTEM SHALL keep on the record the reason the table could not be read - not yet due, overdue, staged awaiting a decision, contested, could not be loaded, held, or not promoted with its package - and SHALL NOT let the reason change the status."
+  - "THE SYSTEM SHALL treat a table the period holds by inheritance or substitution as readable, so that it makes no check red under this requirement."
+  - "THE SYSTEM SHALL let a person promote a supply that is red only for this reason on the same terms as any red supply (REQ-PIPE-075 criterion 3; REQ-GHUB-082), shown as red promoted (REQ-DASH-126) until a re-evaluation clears it."
+  - "THE SYSTEM SHALL leave a trial run's cross-table checks as REQ-PIPE-115 criterion 17 and REQ-PIPE-079 criterion 9 have them: a trial is filed to no period, so this requirement does not apply to it."
+  - "THE SYSTEM SHALL amend, in the same change, REQ-PIPE-079 criterion 14 and its decision 23's 'awaiting-supply (NOT red)', and REQ-PIPE-115 criterion 20, with the wording in summary-v3.md once Keith has approved it."
+  - "S3, THE FALSE GREEN CLOSED: THE SYSTEM SHALL have tests/test_strict_cross_table.py::TestNotYetDuePartner::test_early_file_is_red_until_its_partner_is_in_place - Notifications v2 arriving alone at 08:40 on Child Protection's due day, Clients due at 09:00 - asserting Notifications v2's Client reference records not evaluated and red, and that it is refused rather than promoted - written first and seen to fail (today 'no data', and promoted on it, as decision 103 promoted cp-investigations@202408010100000000)."
+  - "THE SYSTEM SHALL have tests/test_strict_cross_table.py::TestEveryReasonIsRed::test_each_reason_records_red, driving the real Child Protection orchestrator with an unreadable partner for each reason criterion 4 names and asserting red with that reason's code at qa.check_result - written first and seen to fail for not yet due."
+  non_functional_requirements:
+  - "NO FALSE GREEN (Keith, #95): 'we can't assert that it's complete and actually green' - a table nobody could check against never reads green."
+  - "FLICKER ACCEPTED FOR STAGGERED FILES (Keith, 2026-10-20): an early file of a delivery whose files arrive minutes apart reads red until its partner arrives; the remedy is supplier guidance (REQ-DOCS-274), not design."
+  - "NOTIFICATIONS (plans/running-thoughts.md #113, not scoped): every early-arrival red this creates is a red a notification would fire on. Tension T8 in summary-v3.md records that a supplier sending files days apart before the due time makes the red days long, not minutes; the notification design has to decide that, not this requirement."
+  - "SCALE: one missing, widely read table makes every reader red at once; REQ-DASH-204 and REQ-PIPE-210 say it once per table, never per reader or per check."
+  - "THE BUILD RULE: decided at the run; the build reads the recorded status."
+  - "REGENERATE, DO NOT MIGRATE (REQ-PIPE-089's standing rule): today's 'no data' not-yet-due records are replaced by a bootstrap from empty."
+  dependencies:
+  - REQ-PIPE-079
+  - REQ-PIPE-115
+  - REQ-PIPE-105
+  - REQ-PIPE-078
+  - REQ-PIPE-267
+  decisions:
+  - "STRICT (Keith, 2026-10-21): 'things that depend on each other don't promote until they're all happy... A human can always overrule that using the terminal... It's the strictest rule. It's probably the easiest to sort of think about and understand.' REJECTED 'not supplied = empty' (considered and rejected 2026-10-21)."
+  - "SUPERSEDES REQ-PIPE-079 CRITERION 14 AND DECISION 23's 'awaiting-supply (NOT red)' (Keith, 2026-09-26): that carve-out was written so that an early arrival does not 'start life red', 'which is how people learn to ignore a signal'. It is reversed knowingly: it is also what produced the false green (decision 103 promoted a reader on 'no data'), and Keith has accepted the early-arrival red for staggered files with supplier guidance as the remedy. The reason codes stay - awaiting-supply remains its own code, now red."
+  - "RED ONLY (Keith, 2026-10-20/21): REJECTED v2's Incomplete status and red that promotes itself; this red holds like every other red (REQ-PIPE-075 criterion 3)."
+  - "RECORDED AT THE WRITERS (v1 architect H3, carried): the status is written where the record is written, never derived later from the not-evaluated marker, which Soda's left-out checks and Evidently's reference_not_evaluated also carry."
+  - "INHERITED AND SUBSTITUTED TABLES ARE READABLE (v1 architect H2, carried): criterion 5."
+  - "WHAT THE STRICT RULE RESTORES: REQ-PIPE-115's 'not a new status', held_blast_radius's 'not a fourth status' and the close-out REQ-DASH-204's 'the line explains the red, never removes it' - which v2 marked superseded - stand again unchanged."
+  open_questions: []
+- id: REQ-PIPE-271
+  title: "A period is opened, and its non-participating datasets inherited, when the first supply is filed to it"
+  date_written: "2026-10-21"
+  story: "As the person answerable for a quarterly collection, I want a quarter's inheritances made as soon as the first supply is filed to it, so that a quarter in which a dataset owes nothing never waits for a first promotion that every reader is waiting on."
+  moscow: must
+  status: not_started
+  source: "Keith, 2026-10-20 ('inherit when the quarter is filed, not when it is first promoted. That would align with the idea we have of having a command to open a quarter that's separate to any checks'), answering the owe-nothing-quarter deadlock found the same day (summary.md, 'Talking it through'). Drafted by delivery-scoper 2026-10-21."
+  acceptance_criteria:
+  - "WHEN the first supply is filed to a period whose schema does not yet exist, THE SYSTEM SHALL open that period through the one mechanism REQ-PIPE-098 criterion 4 names, making its inheritances (REQ-PIPE-098 criterion 1) in the same step, before any check runs over that supply."
+  - "THE SYSTEM SHALL open the period before the run's overlay is built (REQ-PIPE-105 criterion 5), so that every check in the first package filed to the period reads the inherited tables."
+  - "THE SYSTEM SHALL NOT open a period for a supply held with no period (REQ-PIPE-078) or for a trial."
+  - "THE SYSTEM SHALL open a period shared by several collections on one calendar (REQ-PIPE-262) at the first filing of any of them, recording which collection's filing opened it."
+  - "WHERE a period's inheritance was REFUSED for want of an earlier promoted supply (REQ-PIPE-098 criteria 9 and 10) and such a supply is later promoted, THE SYSTEM SHALL make the inheritance then, recorded with the rule as actor and owing the knock-on, so that the period's readers are not red for good (architect, v3 shape Q-B, S9). (PROVISIONAL - question Q4.)"
+  - "WHERE a period's inheritance has been MADE and a newer supply of the inherited dataset is later promoted into an earlier period, THE SYSTEM SHALL leave the inheritance as it is (REQ-PIPE-098 criterion 2) and SHALL record a warning in the decision log naming the period, the dataset, the supply it stands on and the newer one, at the prominence of a refused inheritance (REQ-PIPE-098 criterion 10). (PROVISIONAL - question Q4.)"
+  - "THE SYSTEM SHALL amend, in the same change, REQ-PIPE-098 criterion 4 with the wording in summary-v3.md once Keith has approved it, and SHALL re-capture REQ-PIPE-262 criterion 12's pinned inheritances where the bootstrap moves them, with Keith's approval of the new values."
+  - "S6: THE SYSTEM SHALL have tests/test_period_opening.py::TestOweNothingQuarter::test_readers_of_case_workers_promote_in_a_quarter_it_sits_out - a 2024-Q4 in which cp-case-workers does not participate and a package of the other five tables, all green - asserting that 2024-Q4 is opened at the package's filing, cp-case-workers is inherited before any run, the readers' cross-table checks read the inherited table and pass, and all five promote - written first and seen to fail (today the period opens only at a first promotion, which strict cross-table checks against a missing cp_case_workers prevent)."
+  non_functional_requirements:
+  - "NO DEADLOCK: the owe-nothing quarter's first promotion no longer depends on a table that only its first promotion would bring."
+  - "DETERMINISM AND REPLAY: who opens a period depends only on receipt order across the stream (REQ-PIPE-262), never on process timing; checked by REQ-PIPE-262 criterion 11's one query."
+  - "OBSERVABILITY: the opening is a recorded event naming the filing and collection that caused it (REQ-PIPE-098 criterion 3)."
+  - "COMPATIBILITY: a consumer querying a period schema directly in SQL may now see a period holding only inherited views while everything else is staged; REQ-PIPE-081 criterion 11 already promises such a consumer nothing about as-at answers, and the _manifest view (REQ-PIPE-130) lists what it holds."
+  - "MAINTAINABILITY: one opening mechanism (REQ-PIPE-098 decision 6) - filing calls it, as promotion, substitution and the future explicit command do."
+  dependencies:
+  - REQ-PIPE-098
+  - REQ-PIPE-262
+  - REQ-PIPE-105
+  - REQ-PIPE-270
+  decisions:
+  - "INHERIT WHEN THE QUARTER IS FILED (Keith, 2026-10-20): 'That would align with the idea we have of having a command to open a quarter that's separate to any checks.' The deadlock it removes: in an owe-nothing quarter every reader of Case Workers needs an inherited table that arrives only at a first promotion, which none of them can make under the strict rule."
+  - "REQ-PIPE-098 CRITERION 4's EXPLICIT COMMAND STAYS UNMET AND UNOWNED (Keith, 2026-10-19, 'Leave until needed'): filing is a third trigger of the same mechanism, not the command. If Keith wants the command now, it is its own requirement - its wording, prompts and refusals want his sign-off first."
+  - "INHERITANCE STAYS ONCE (REQ-PIPE-098 criterion 2 and decision 8, Keith 2026-09-26: 'any other inheritance would be per-dataset and by operator command'): opening earlier makes a stale inheritance more likely - the previous period's supply promoted after the next period opened - so criterion 6 warns rather than re-points. Criterion 5 retries only a REFUSED inheritance, which never stood on anything and so changes no reader's earlier verdict (architect, v3 shape T2: S7, a waiting 2021-Q4 Carers leaving 2022-Q1 on 2021-Q3's for good; S9, a period with nothing earlier to inherit). Question Q4."
+  - "SHARED PERIODS (REQ-PIPE-262): Emergency Department and Child Protection share the quarterly calendar, so an Emergency Department filing can now open a Child Protection quarter and make its inheritances; criterion 4 records which."
+  open_questions:
+  - "1. Q4 (put to Keith): criteria 5 and 6 - retry a refused inheritance, and warn on (rather than re-point) a stale one."
+  - "3. FOR KEITH AT SIGN-OFF (tension T18): a period BEFORE a partner dataset's participation starts has nothing to inherit and never will, so under the strict rule its readers' checks reading that dataset are red with no way out but a person. Recommended: a cross-table check is out of scope for a period in which a table it reads is not owed and has never been supplied - which is the agreement, not an absence - and not red."
+  - "2. FOR THE ARCHITECT: does any reader assume a period exists only once something is promoted into it (slot_state, the in-place-on picker, REQ-DASH-100's inherited badge, the census)? A period holding only inherited views is new."
+- id: REQ-DASH-272
+  title: "A dataset page awaiting a decision also says the in-place supply's status, and a row re-checked against what is in place says why"
+  date_written: "2026-10-21"
+  story: "As a data team leader opening a dataset whose newest supply is awaiting a decision, I want the page to say not only what the newest supply found but whether the supply actually in the warehouse is green, and why a cross-table row was re-checked against it, so that I can tell 'a bad file is waiting' from 'the warehouse is broken'."
+  moscow: must
+  status: not_started
+  source: "Keith, 2026-10-20 evening (with a staged v2 awaiting a decision, the page and its pill show the v2 verdict - how does someone see that the warehouse is still green?) and 2026-10-21 morning ('Warehouse view: option 2. The awaiting line gains a clause giving the in-place supply's status'; rejecting the staged reds puts the page back on the warehouse supply's verdict). S1 red branch: wording names the cause. Drafted by delivery-scoper 2026-10-21."
+  acceptance_criteria:
+  - "WHERE a dataset page's verdict line says the newest supply is awaiting a decision and names the supply in place (REQ-PIPE-081 criterion 1), THE SYSTEM SHALL end that sentence with the in-place supply's status on the date on show, counted by REQ-PIPE-269, worded 'The supply in place is the one received <instant>, and is <status>.' - for example 'The supply in place is the one received 1 July 2024 9:00am, and is green.'"
+  - "THE SYSTEM SHALL word <status> with the status legend's own word and icon, never colour alone, and WHERE that supply is red promoted SHALL say 'and is red' with REQ-DASH-126's label beside it."
+  - "WHERE nothing is in place for the period, THE SYSTEM SHALL keep 'Nothing is in place for this period yet.' unchanged."
+  - "WHERE a cross-table row's result was recorded by a re-evaluation REQ-PIPE-267 criterion 4 made, THE SYSTEM SHALL say so on the row and in its panel, in place of REQ-DASH-264 criterion 7's sentence, worded 'Re-checked <time and day> against the <table> in place (received <date>), because the <table> received with this supply was not promoted.' or, where none was in place, 'Could not be checked <time and day>: no <table> is in place, and the <table> received with this supply was not promoted.' (NEW WORDING for Keith's approval.)"
+  - "WHERE a waiting supply's cross-table row shows a verdict against a supply that is itself waiting, THE SYSTEM SHALL say on the row that the <table> it was checked against is also awaiting a decision, naming its receipt."
+  - "THE SYSTEM SHALL say on every cross-table row, in both views, which supply of each other table it was read against - 'Read against the <table> in place, received <date>', '... in place for <period>, carried forward from <period> (received <date>)' for an inherited one, or '... supply received <date>, not in place yet' - naming supplies by receipt, never 'v1' or 'v2', and judging 'in place' as at the date on show rather than when the result was recorded. (PROVISIONAL - question Q12; dashboard UX review of the v3 shape, items 1c, S10 and S16.)"
+  - "THE SYSTEM SHALL word criterion 1's clause for every case: green or amber '..., and is <pill>.'; red and promoted while red '..., and is <Red>: it was promoted while red.'; red since promotion '..., and is <Red>: it turned red <time>, after <cause>' (redPromotedBadge's wording); and SHALL put the in-place half on its own line at phone width (dashboard UX review of the v3 shape, item 2)."
+  - "THE SYSTEM SHALL count a re-evaluation of REQ-PIPE-267 criterion 4 of a dataset's own supply as part of that supply's delivery in REQ-DASH-264 criterion 11's run count (sameDelivery), labelled 're-checked against the <table> in place', and SHALL NOT count it as a second run (dashboard UX review of the v3 shape, item 5)."
+  - "THE SYSTEM SHALL compute the in-place clause and every row's 'read against' in the Python build, and SHALL NOT re-derive them in the page's script (architect, v3 shape, lesser points)."
+  - "THE SYSTEM SHALL show an in-place supply's rows, pill, counts, sparklines and rollups from the results REQ-PIPE-269 counts at the date on show, through the build's one function, and SHALL NOT show on it a result about a supply not in place."
+  - "WHEN a waiting supply is rejected, THE SYSTEM SHALL show the page from the in-place supply's results from the rejection's date on, as clipDatasetToInPlaceOn does today for a withdrawn run."
+  - "THE SYSTEM SHALL compute all of this at build time from recorded QA results and the decision log, and SHALL render every name as text."
+  - "THE SYSTEM SHALL amend, in the same change, REQ-PIPE-081 criterion 1 with the wording in summary-v3.md once Keith has approved it."
+  - "THE SYSTEM SHALL have real-browser tests, tests/test_dashboard_e2e.py::TestWarehouseAndStagingViews, against a dashboard built from a fixture history, written first and seen to fail: S1 green branch - Notifications' page on the gate's date reads 'Awaiting a decision' for v2 and 'The supply in place is the one received <v1 instant>, and is green.'; S1 red branch - Clients' page shows Client reference with criterion 4's first sentence naming Notifications; S4 - Clients' page after Notifications v2's refusal reads green with no row from Notifications v2's run; and after a rejection the page reads the in-place supply's verdict."
+  non_functional_requirements:
+  - "NO FALSE GREEN AND NO FALSE ALARM: the newest supply's red stays the headline (REQ-PIPE-081 criterion 1's 2026-10-05 reason), and the in-place clause stops a reader concluding the warehouse is broken when it is not."
+  - "PERFORMANCE: the in-place status is the one REQ-PIPE-269 already computes per supply per date window at build; no new per-render history walk."
+  - "SCALE: one clause per page and one sentence per affected row; nothing is listed per reader."
+  - "ACCESSIBILITY: status word and icon, never colour alone (REQ-DASH-070 criterion 6)."
+  - "COMPATIBILITY: no new asset; file:// and offline viewing unaffected."
+  dependencies:
+  - REQ-PIPE-269
+  - REQ-PIPE-267
+  - REQ-PIPE-081
+  - REQ-DASH-264
+  - REQ-DASH-126
+  decisions:
+  - "OPTION 2, A CLAUSE ON THE AWAITING LINE (Keith, 2026-10-21 morning): 'The supply in place is the one received <date>, and is green'. REJECTED (by choosing option 2) sending the reader to supply history to find the warehouse's state, Keith's first guess."
+  - "THE PAGE STILL LEADS WITH THE NEWEST SUPPLY (REQ-PIPE-081 criterion 1, amended 2026-10-05 by Keith): answering with promoted supplies alone hid the supply QA exists to judge - a false green. The clause adds the warehouse's state; it does not replace the newest supply's."
+  - "REJECTING RETURNS THE PAGE TO THE WAREHOUSE (Keith, 2026-10-21): already today's behaviour (clipDatasetToInPlaceOn drops a turned-down run); criterion 11 makes it a tested claim."
+  - "WORDING NAMES THE CAUSE (Keith, S1): criterion 4's sentences, for approval. They extend REQ-DASH-264 criterion 7's pattern ('Re-checked <time and day>, when the <table> was re-checked.') rather than adding a banner, because the cause is about one row."
+  - "COLLECTION AND AGENCY ROLLUPS ARE UNCHANGED (delivery-scoper): they follow the dataset's headline status as today; the in-place clause is on the dataset page only, and a card adds one line per held-back delivery. PROVISIONAL - question Q11."
+  open_questions:
+  - "1. FOR THE DASHBOARD UX REVIEW: whether criterion 5's 'also awaiting a decision' note and REQ-DASH-204's top-of-page line say the same thing twice on S2's Clients page; and the wording's length at 598px."
+- id: REQ-GEN-273
+  title: "Target agreement compares a targeted supply with its own verdict, not with a red its partner's refusal caused"
+  date_written: "2026-10-21"
+  story: "As whoever maintains the synthetic history, I want the bootstrap's target check to compare each supply with what its own data and its partners in place showed, so that a supply built green is not reported as a disagreement because a package-mate built red was refused."
+  moscow: must
+  status: not_started
+  source: "Delivery-scoper, 2026-10-21, tension T7 in summary-v3.md: REQ-GEN-186 criterion 3 compares every targeted supply's verdict as the promotion gate reads it and fails the bootstrap on a difference; under REQ-PIPE-267 and REQ-PIPE-270 a supply built green can end red for want of a partner. The v2 architect review's X2 raised the same shape for the Incomplete status. PROVISIONAL IN WHOLE on question Q7."
+  acceptance_criteria:
+  - "WHEN a replay finishes, THE SYSTEM SHALL compare each targeted supply's target with its gate reading leaving out the cross-table checks recorded not evaluated for want of a table (REQ-PIPE-270) and the re-evaluations REQ-PIPE-267 criterion 4 made because a package-mate was not promoting, and SHALL fail the bootstrap only on a difference in that comparison (REQ-GEN-186 criterion 3)."
+  - "THE SYSTEM SHALL report, without failing the bootstrap, each targeted supply whose full gate reading differs from its target only because of the checks criterion 1 leaves out, naming the package-mate or the missing table."
+  - "THE SYSTEM SHALL NOT compute a predicted verdict (REQ-GEN-186 criterion 4) and SHALL change no filing, promotion, decision or verdict (REQ-GEN-186 criterion 6)."
+  - "THE SYSTEM SHALL amend, in the same change, REQ-GEN-186 criterion 3 with the wording in summary-v3.md once Keith has approved it."
+  - "THE SYSTEM SHALL audit, in the same change, every scripted decision in the scenario map that names a supply this batch's gating changes the outcome of (scripted_decisions refuses a changed target), and SHALL bring each changed expectation to Keith rather than re-pin it silently (architect, v3 shape T7)."
+  - "THE SYSTEM SHALL have tests/test_target_agreement.py::TestPackageMateRefused::test_green_target_agrees_when_only_a_refused_partner_made_it_red, a fixture replay of S2 with Clients built green and Notifications built red, asserting no bootstrap failure and one reported difference naming Notifications - written first and seen to fail."
+  non_functional_requirements:
+  - "NO MASKED DEFECT: only checks that could not read a partner, or were re-run because a partner was refused, are left out - every verdict on the supply's own data and on partners in place still counts."
+  - "MAINTAINABILITY: the left-out set comes from REQ-PIPE-270's recorded reasons and REQ-PIPE-267's recorded causes, never from prose."
+  - "DETERMINISM: the same history gives the same report."
+  dependencies:
+  - REQ-GEN-186
+  - REQ-PIPE-267
+  - REQ-PIPE-270
+  decisions:
+  - "WHY (delivery-scoper): the 312 staggered pairs REQ-PIPE-265 measured each have an early file that is red under REQ-PIPE-270 until its partner arrives; Child Protection's targeted scenarios plant red tables beside green ones (TS-48, TS-75). Compared as today, the bootstrap would fail on supplies whose own data matched their target exactly."
+  - "OPTIONS (question Q7, pending Keith). A, recommended: this requirement. B: targets declare the strict red too, so scenario authors encode the gating rule in every target. C: compare as today and fix each scenario that fails."
+  open_questions:
+  - "1. Q7 (put to Keith): this whole requirement is provisional on it. The v3-shape architect review recommends the same reading - a target is about the file, not the gate's view - and notes after_replay reads the arrival run today (target_agreement.py:132-137)."
+- id: REQ-DOCS-274
+  title: "Supplier guidance says to send a delivery's files as one package"
+  date_written: "2026-10-21"
+  story: "As a supplying team, I want to be told that files sent separately are each judged as they arrive and may read red until the rest arrive, so that I send them as one package and nobody is notified about a red that clears by itself."
+  moscow: should
+  status: not_started
+  source: "Keith, 2026-10-20: 'we need to say, if you want to avoid a flicker, make sure you send us a package of files'. Drafted by delivery-scoper 2026-10-21."
+  acceptance_criteria:
+  - "THE SYSTEM SHALL carry, in the documentation a supplying team is given, guidance that the files of one delivery should be sent as one package - a zip today (plans/running-thoughts.md #114) - and that files sent separately are checked as they arrive, so that an early file whose cross-table checks need a later one reads red until it arrives."
+  - "THE SYSTEM SHALL state in that guidance that the red clears by itself once the later file arrives and is promoted, and that a package avoids it."
+  - "THE SYSTEM SHALL NOT describe a package as anything other than files sharing one receipt instant until another boundary marker is scoped."
+  non_functional_requirements:
+  - "NO FLICKERING REDS (#113): the remedy Keith chose for staggered files is this guidance, so it should exist before notification on red is switched on."
+  - "MAINTAINABILITY: one place, linked from docs/delivery-format.md, so a later boundary marker changes one text."
+  dependencies:
+  - REQ-PIPE-266
+  - REQ-PIPE-270
+  decisions:
+  - "GUIDANCE, NOT DESIGN (Keith, 2026-10-20): 'I don't think we can really design around that.'"
+  open_questions:
+  - "1. WHERE IT LIVES: no supplier-facing document exists in this repository; docs/delivery-format.md is the synthetic on-disk format. Keith to say whether this is a new doc, a section there, or waits for the transport-layer work (plans/supply-thoughts.md)."

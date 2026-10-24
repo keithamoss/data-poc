@@ -12,36 +12,37 @@ import cli.dashboard as dashboard_cli
 _runner = CliRunner()
 
 
-def test_rebuild_results_calls_both_datasets_build_results_from_history(monkeypatch):
-    import qa_tools.bdm.build_results_from_history as bdm_history
-    import qa_tools.cp.build_results_from_history as cp_history
+def test_rebuild_results_rebuilds_every_registered_collection(monkeypatch):
+    from qa_tools.tools import results_history
 
     called = []
-    monkeypatch.setattr(bdm_history, "build_results_from_history", lambda: called.append("bdm"))
-    monkeypatch.setattr(cp_history, "build_results_from_history", lambda: called.append("cp"))
+    monkeypatch.setattr(results_history, "build_results_from_history",
+                        lambda collection_id: called.append(collection_id))
 
     result = _runner.invoke(dashboard_cli.dashboard_group, ["rebuild-results"])
 
     assert result.exit_code == 0, result.output
-    assert called == ["bdm", "cp"]
+    from qa_tools import collections
+
+    assert called == [c.id for c in collections.all_collections()]
 
 
-def test_build_data_writes_both_datasets_output(monkeypatch, tmp_path):
+def test_build_data_writes_every_collections_output(monkeypatch, tmp_path):
+    """REQ-DASH-244 criterion 9: one builder, every registered collection."""
+    import json
+
     import pipeline.build_dashboard_data as build_dashboard_data
-    import pipeline.build_cp_dashboard_data as build_cp_dashboard_data
+    from qa_tools import collections
 
-    bdm_out = tmp_path / "bdm.json"
-    cp_out = tmp_path / "cp.json"
-    monkeypatch.setattr(build_dashboard_data, "OUT_PATH", str(bdm_out))
-    monkeypatch.setattr(build_dashboard_data, "build", lambda: {"dataset": "bdm"})
-    monkeypatch.setattr(build_cp_dashboard_data, "OUT_PATH", str(cp_out))
-    monkeypatch.setattr(build_cp_dashboard_data, "build", lambda: {"dataset": "cp"})
+    monkeypatch.setattr(build_dashboard_data, "out_path", lambda cid: str(tmp_path / f"{cid}.json"))
+    monkeypatch.setattr(build_dashboard_data, "build", lambda cid: {"collection": cid})
 
     result = _runner.invoke(dashboard_cli.dashboard_group, ["build-data"])
 
     assert result.exit_code == 0, result.output
-    assert bdm_out.exists()
-    assert cp_out.exists()
+    ids = [c.id for c in collections.all_collections()]
+    assert ids and sorted(p.stem for p in tmp_path.iterdir()) == sorted(ids)
+    assert all(json.loads((tmp_path / f"{i}.json").read_text()) == {"collection": i} for i in ids)
 
 
 def test_embed_calls_the_real_embed_function(monkeypatch):
@@ -59,7 +60,11 @@ def test_embed_calls_the_real_embed_function(monkeypatch):
 def test_validate_check_lifecycle_raises_click_exception_on_nonzero_exit(monkeypatch):
     import qa_tools.common.validate_check_lifecycle as validate_check_lifecycle
 
-    monkeypatch.setattr(validate_check_lifecycle, "main", lambda: 1)
+    # Takes the flag REQ-QAC-024 added, defaulted here rather than
+    # swallowed with *_: the bare command must still pass False, which
+    # is what keeps the explanations gate off unless asked for.
+    monkeypatch.setattr(validate_check_lifecycle, "main",
+                        lambda require_explanations=False: 1)
 
     result = _runner.invoke(dashboard_cli.dashboard_group, ["validate-check-lifecycle"])
 
@@ -70,7 +75,11 @@ def test_validate_check_lifecycle_raises_click_exception_on_nonzero_exit(monkeyp
 def test_validate_check_lifecycle_succeeds_on_zero_exit(monkeypatch):
     import qa_tools.common.validate_check_lifecycle as validate_check_lifecycle
 
-    monkeypatch.setattr(validate_check_lifecycle, "main", lambda: 0)
+    # Takes the flag REQ-QAC-024 added, defaulted here rather than
+    # swallowed with *_: the bare command must still pass False, which
+    # is what keeps the explanations gate off unless asked for.
+    monkeypatch.setattr(validate_check_lifecycle, "main",
+                        lambda require_explanations=False: 0)
 
     result = _runner.invoke(dashboard_cli.dashboard_group, ["validate-check-lifecycle"])
 
@@ -80,12 +89,37 @@ def test_validate_check_lifecycle_succeeds_on_zero_exit(monkeypatch):
 def test_validate_requirements_raises_click_exception_on_nonzero_exit(monkeypatch):
     import qa_tools.common.validate_requirements as validate_requirements
 
-    monkeypatch.setattr(validate_requirements, "main", lambda: 1)
+    # Takes the optional `path` the CLI now passes (2026-09-22, so a
+    # scoped DRAFT can be validated before it is applied). The zero-arg
+    # lambda this replaced turned a deliberate signature change into a
+    # TypeError that read as a test failure, not as the stub being stale.
+    monkeypatch.setattr(validate_requirements, "main", lambda path=None: 1)
 
     result = _runner.invoke(dashboard_cli.dashboard_group, ["validate-requirements"])
 
     assert result.exit_code != 0
     assert "requirements validation failed" in result.output
+
+
+def test_validate_requirements_passes_draft_path_through(monkeypatch):
+    """The --draft option has to actually reach the validator.
+
+    Without this, `mothman dashboard validate-requirements --draft x`
+    would silently validate the real register instead of the draft and
+    report OK - the failure mode being a scoper handing back a broken
+    draft that something said was fine.
+    """
+    import qa_tools.common.validate_requirements as validate_requirements
+
+    seen = []
+    monkeypatch.setattr(validate_requirements, "main",
+                        lambda path=None: (seen.append(path), 0)[1])
+
+    result = _runner.invoke(dashboard_cli.dashboard_group,
+                            ["validate-requirements", "--draft", "/tmp/draft.yaml"])
+
+    assert result.exit_code == 0, result.output
+    assert seen == ["/tmp/draft.yaml"]
 
 
 def test_check_renders_raises_click_exception_on_nonzero_exit(monkeypatch):
@@ -188,3 +222,20 @@ def test_rebuild_stops_and_fails_when_a_gate_raises(monkeypatch):
 
     assert result.exit_code != 0
     assert "check-lifecycle validation failed" in result.output
+
+
+def test_build_data_refuses_a_missing_results_file_by_name(tmp_path, monkeypatch):
+    """post-build-review #233: refused as a message naming the command, not a
+    traceback."""
+    from click.testing import CliRunner
+
+    from cli import dashboard as dashboard_cli
+    from pipeline import build_dashboard_data as bdd
+
+    monkeypatch.setattr(bdd, "results_path", lambda cid: str(tmp_path / f"absent-{cid}.json"))
+    monkeypatch.setattr(bdd, "out_path", lambda cid: str(tmp_path / f"{cid}.json"))
+    out = CliRunner().invoke(dashboard_cli.dashboard_group, ["build-data"])
+    assert out.exit_code == 1 and isinstance(out.exception, SystemExit), out.exception
+    import re
+
+    assert "mothman dashboard rebuild-results" in " ".join(re.sub(r"[│╭╮╰╯─]", " ", out.output).split())

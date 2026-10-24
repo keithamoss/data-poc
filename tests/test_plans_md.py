@@ -4,7 +4,9 @@ test), not the real committed plans/*.md files - those change over time
 and aren't what this module's own correctness depends on."""
 from __future__ import annotations
 
-from dashboard.plans_md import _parse_numbered_items, _parse_notes, _parse_threads, parse_plans
+import pytest
+
+from dashboard.plans_md import _parse_numbered_items, _parse_threads, parse_plans
 
 
 def test_parses_a_single_numbered_item_with_one_component(tmp_path):
@@ -23,63 +25,49 @@ def test_parses_multiple_components_on_one_item(tmp_path):
     assert items[0]["components"] == ["QA checks & contract", "Pipeline & publishing"]
 
 
-def test_joins_a_wrapped_paragraph_across_multiple_lines(tmp_path):
-    text = """1. **[investigate, 2026-09-18]** **[Docs & process]** A long item that wraps
-   across multiple lines in the markdown
-   source, same paragraph.
-"""
-    items = _parse_numbered_items(text, "wider")
-    assert items[0]["text"] == "A long item that wraps across multiple lines in the markdown source, same paragraph."
+_ITEM = "1. **[done, 2026-09-18]** **[Dashboard UI]** "
 
 
-def test_preserves_paragraph_breaks_within_one_item(tmp_path):
-    text = """1. **[done, 2026-09-18]** **[Dashboard UI]** First paragraph.
-
-   Second paragraph, a separate thought.
-"""
-    items = _parse_numbered_items(text, "wider")
-    assert items[0]["text"] == "First paragraph.\n\nSecond paragraph, a separate thought."
-
-
-def test_preserves_a_bullet_list_within_one_item_as_its_own_lines(tmp_path):
-    text = """1. **[done, 2026-09-18]** **[Dashboard UI]** Built:
-   - first thing done
-   - second thing done, wrapped
-     across two lines
-"""
-    items = _parse_numbered_items(text, "wider")
-    assert items[0]["text"] == (
-        "Built:\n\n- first thing done\n- second thing done, wrapped across two lines"
-    )
-
-
-def test_preserves_a_numbered_list_within_one_item_as_its_own_lines(tmp_path):
-    """Real bug, found via Keith's own dashboard report (2026-09-19): a
-    numbered/ordered sub-list inside an item's body (e.g. plans/
-    tooling.md #1's own "Build order" phase list) was silently word-
-    joined into one flowing, illegible paragraph - only "- "/"* " bullet
-    markers were recognised as list-item boundaries, not "1. "/"2. "
-    ones."""
-    text = """1. **[done, 2026-09-18]** **[Testing & dev tooling]** Build order:
-   1. Phase one does the first thing.
-   2. Phase two does the second thing.
-"""
-    items = _parse_numbered_items(text, "wider")
-    assert items[0]["text"] == (
-        "Build order:\n\n1. Phase one does the first thing.\n2. Phase two does the second thing."
-    )
-
-
-def test_a_numbered_list_item_that_wraps_across_lines_stays_one_list_item(tmp_path):
-    text = """1. **[done, 2026-09-18]** **[Testing & dev tooling]** Build order:
-   1. Phase one does the first thing,
-      wrapped across two lines.
-   2. Phase two.
-"""
-    items = _parse_numbered_items(text, "wider")
-    assert items[0]["text"] == (
-        "Build order:\n\n1. Phase one does the first thing, wrapped across two lines.\n2. Phase two."
-    )
+@pytest.mark.parametrize("body, expected", [
+    pytest.param("A long item that wraps\n   across multiple lines in the markdown\n"
+                 "   source, same paragraph.\n",
+                 "A long item that wraps across multiple lines in the markdown source, same paragraph.",
+                 id="test_joins_a_wrapped_paragraph_across_multiple_lines"),
+    pytest.param("First paragraph.\n\n   Second paragraph, a separate thought.\n",
+                 "First paragraph.\n\nSecond paragraph, a separate thought.",
+                 id="test_preserves_paragraph_breaks_within_one_item"),
+    pytest.param("Built:\n   - first thing done\n   - second thing done, wrapped\n"
+                 "     across two lines\n",
+                 "Built:\n\n- first thing done\n- second thing done, wrapped across two lines",
+                 id="test_preserves_a_bullet_list_within_one_item_as_its_own_lines"),
+    # Real bug, found via Keith's own dashboard report (2026-09-19): a
+    # numbered sub-list inside an item's body (plans/tooling.md #1's "Build
+    # order" phase list) was word-joined into one illegible paragraph -
+    # only "- "/"* " were recognised as list-item boundaries, not "1. ".
+    pytest.param("Build order:\n   1. Phase one does the first thing.\n"
+                 "   2. Phase two does the second thing.\n",
+                 "Build order:\n\n1. Phase one does the first thing.\n2. Phase two does the second thing.",
+                 id="test_preserves_a_numbered_list_within_one_item_as_its_own_lines"),
+    pytest.param("Build order:\n   1. Phase one does the first thing,\n"
+                 "      wrapped across two lines.\n   2. Phase two.\n",
+                 "Build order:\n\n1. Phase one does the first thing, wrapped across two lines.\n2. Phase two.",
+                 id="test_a_numbered_list_item_that_wraps_across_lines_stays_one_list_item"),
+    # Real bug, found 2026-09-20: wrapped lines were joined with " ".join,
+    # so a hyphenated word split across two source lines came back as
+    # "requirements- analysis" in the live Plans tab (195 occurrences
+    # across 74 of 137 items at the time).
+    pytest.param("A requirements-\n   analysis subagent.\n",
+                 "A requirements-analysis subagent.",
+                 id="test_a_hyphenated_word_wrapped_across_lines_is_rejoined_without_a_space"),
+    # The other half of the same fix, and why it cannot strip every
+    # trailing hyphen: ' - ' is a dash this project uses constantly. A line
+    # ending in a standalone hyphen is punctuation and keeps its space.
+    pytest.param("a real bug -\n   not a design gap\n",
+                 "a real bug - not a design gap",
+                 id="test_a_real_dash_between_words_keeps_its_spaces"),
+])
+def test_an_items_wrapped_body_is_joined(body, expected):
+    assert _parse_numbered_items(_ITEM + body, "wider")[0]["text"] == expected
 
 
 def test_parses_multiple_items_in_file_order(tmp_path):
@@ -110,7 +98,7 @@ def test_an_item_in_the_old_untagged_format_is_silently_skipped(tmp_path):
     """Real content: qa-pipeline.md's own "Held over from the original
     (equivalent-only) build" section restarts its own numbering in the
     OLD, pre-retrofit tag format - this parser doesn't retrofit-match it,
-    same "skip what doesn't match" philosophy as changelog_md.py's own
+    same "skip what doesn't match" philosophy the changelog parser has always had
     optional fields."""
     text = "7. **[open]** An old-format item with no date/component tags.\n"
     assert _parse_numbered_items(text, "qa-pipeline") == []
@@ -169,48 +157,6 @@ Second body.
     assert [t["heading"] for t in threads] == ["Thread B - first", "Thread A - second"]
 
 
-def test_parses_a_numbered_note_with_title_and_body(tmp_path):
-    text = """### 4. GitHub Issues -> Microsoft Teams integration (research first)
-
-Some raw prose, no status/component tags at all - running-thoughts.md
-keeps its own simpler shape by design.
-
-Second paragraph.
-"""
-    notes = _parse_notes(text)
-    assert len(notes) == 1
-    assert notes[0]["number"] == 4
-    assert notes[0]["title"] == "GitHub Issues -> Microsoft Teams integration (research first)"
-    assert notes[0]["body"] == (
-        "Some raw prose, no status/component tags at all - running-thoughts.md\n"
-        "keeps its own simpler shape by design.\n\nSecond paragraph."
-    )
-
-
-def test_a_note_heading_with_no_leading_number_still_parses(tmp_path):
-    text = "### Untitled idea with no number\n\nBody.\n"
-    notes = _parse_notes(text)
-    assert notes[0]["number"] is None
-    assert notes[0]["title"] == "Untitled idea with no number"
-
-
-def test_note_body_stops_at_the_next_two_hash_batch_heading(tmp_path):
-    text = """### 1. First idea
-
-Body of the first idea.
-
-## Also flagged, queued separately
-
-### 2. Second idea
-
-Body of the second idea.
-"""
-    notes = _parse_notes(text)
-    assert len(notes) == 2
-    assert notes[0]["body"] == "Body of the first idea."
-    assert notes[1]["body"] == "Body of the second idea."
-
-
 def test_parse_plans_reads_all_files_and_returns_the_combined_shape(tmp_path):
     plans_dir = tmp_path
     (plans_dir / "wider.md").write_text("1. **[done, 2026-09-18]** **[Dashboard UI]** A wider item.\n")
@@ -224,12 +170,98 @@ def test_parse_plans_reads_all_files_and_returns_the_combined_shape(tmp_path):
     (plans_dir / "conceptual-design.md").write_text(
         "## Thread A - a thread\n\n**Status:** parked (2026-09-17) · **Category:** QA checks & contract\n\nBody.\n"
     )
-    (plans_dir / "running-thoughts.md").write_text("### 1. A raw idea\n\nBody.\n")
+    # publishing-and-history legitimately carries BOTH numbered items and
+    # threads; performance.md was never listed when this was an
+    # allowlist. Both are picked up by the directory walk now.
+    (plans_dir / "performance.md").write_text(
+        "1. **[done, 2026-09-18]** **[Testing & dev tooling]** A perf item.\n"
+    )
 
     result = parse_plans(plans_dir)
-    assert len(result["items"]) == 5
-    assert {i["file"] for i in result["items"]} == {"wider", "qa-pipeline", "dashboard", "data-generation", "tooling"}
+    assert len(result["items"]) == 6
+    assert {i["file"] for i in result["items"]} == {
+        "wider", "qa-pipeline", "dashboard", "data-generation", "tooling", "performance"}
     assert len(result["threads"]) == 2
     assert {t["file"] for t in result["threads"]} == {"publishing-and-history", "conceptual-design"}
-    assert len(result["notes"]) == 1
-    assert result["notes"][0]["title"] == "A raw idea"
+
+
+def test_every_numbered_item_in_every_plans_file_is_parsed():
+    """Real bug, found 2026-09-20 while building the plans index
+    (plans/tooling.md #17): NUMBERED_FILES was an allowlist of five
+    files, and two others had since grown numbered items -
+    publishing-and-history.md (8) and performance.md (5). All 13 were
+    invisible to the dashboard's Plans tab, which presents itself as the
+    browsable view of this project's memory and was silently showing 138
+    of 151. Among the missing was publishing-and-history #6, the
+    HIGH-priority per-dataset architecture item.
+
+    Asserted generically against the real files rather than against a
+    count, so that a NEW plans file growing items cannot be forgotten
+    the same way - which is exactly how this happened.
+
+    Writing it caught a second, separate thing: 10 items across three
+    files still carried the pre-2026-09-18 shape (`**[open, low]**`,
+    `**[done]**` - a status and a PRIORITY, no date), left behind by that
+    convention's own retrofit and silently unparsed for the same reason.
+    Those were retrofitted 2026-09-20, so this assertion is deliberately
+    UNSCOPED - anything shaped like a numbered item must parse, whatever
+    format it is in. An item written in some third shape should fail here
+    rather than vanish."""
+    import re
+    from pathlib import Path
+    seen = {(i["file"], i["number"]) for i in parse_plans("plans")["items"]}
+    missing = []
+    for path in sorted(Path("plans").glob("*.md")):
+        if path.name == "INDEX.md":
+            continue
+        for m in re.finditer(r"^(\d+)\.\s+\*\*\[", path.read_text(), re.M):
+            if (path.stem, int(m.group(1))) not in seen:
+                missing.append(f"{path.name}#{m.group(1)}")
+    assert not missing, f"{len(missing)} numbered items never parsed: {missing}"
+
+
+def test_a_brand_new_plans_file_is_picked_up_with_no_code_change(tmp_path):
+    """Keith's own call, 2026-09-20, on being shown that two files had
+    grown numbered items nobody had added to an allowlist: "I'm happy for
+    it just to walk all of the markdown files in a given directory -
+    that's probably safer because we will probably add more files as we
+    go."
+
+    The failure mode the allowlist had is the dangerous kind: a file it
+    didn't know about was skipped SILENTLY, so the dashboard's Plans tab
+    under-reported without anything looking wrong."""
+    (tmp_path / "a-brand-new-topic.md").write_text(
+        "1. **[todo, 2026-09-20]** **[Dashboard UI]** An item in a file nobody listed.\n"
+    )
+    result = parse_plans(tmp_path)
+    assert [(i["file"], i["number"]) for i in result["items"]] == [("a-brand-new-topic", 1)]
+
+
+def test_the_generated_index_is_not_parsed_as_planning_content(tmp_path):
+    """plans/INDEX.md lives in the same directory and is generated FROM
+    these files - walking the directory must not read it back in, or the
+    index becomes self-referential."""
+    (tmp_path / "real.md").write_text(
+        "1. **[todo, 2026-09-20]** **[Dashboard UI]** A real item.\n"
+    )
+    (tmp_path / "INDEX.md").write_text(
+        "## plans/real.md\n\n- **#1** `todo` 2026-09-20 - A real item.\n"
+    )
+    result = parse_plans(tmp_path)
+    assert {i["file"] for i in result["items"]} == {"real"}
+    assert not [t for t in result["threads"] if t["file"] == "INDEX"]
+
+
+def test_a_paragraph_after_a_list_is_not_glued_onto_its_last_bullet():
+    """post-build-review #185 (found building REQ-DOCS-219): after a blank
+    line, a paragraph following a bullet list was joined onto the list's
+    last bullet as though it were a wrapped continuation, so the Plans tab
+    rendered the paragraph inside that bullet - and a feedback card's last
+    line swallowed the prose after it."""
+    from dashboard.plans_md import _parse_numbered_items
+    text = ("1. **[todo, 2026-01-01]** **[Dashboard UI]** Title.\n\n"
+            "- a bullet\n"
+            "  wrapped onto two lines\n\n"
+            "    A paragraph after the list.\n")
+    (item,) = _parse_numbered_items(text, "x")
+    assert item["text"] == "Title.\n\n- a bullet wrapped onto two lines\n\nA paragraph after the list."

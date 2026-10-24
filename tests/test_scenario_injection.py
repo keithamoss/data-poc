@@ -1,0 +1,823 @@
+"""Placing the register's scenarios into the generated history
+(REQ-GEN-044).
+
+WHAT THESE TESTS ARE FOR, given the requirement's own point is that a
+passing test is NOT the evidence: they cover the placement rule - where
+a scenario lands, that it lands in the same place every time, and that a
+history which cannot host one is refused rather than emitted. The
+scenario itself being visible on the real dashboard is the deliverable,
+and no test can stand in for it.
+"""
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from datetime import date, timedelta
+
+import pytest
+
+from generator import scenario_injection as si
+
+
+@dataclass(frozen=True)
+class _Period:
+    """The two fields resolve() reads off a real schedule.Period."""
+
+    name: str
+    date: date
+
+
+def _daily(n: int, start: date = date(2026, 8, 24)) -> list[_Period]:
+    days = [start + timedelta(days=i) for i in range(n)]
+    return [_Period(name=d.isoformat(), date=d) for d in days]
+
+
+@dataclass(frozen=True)
+class _Recognised:
+    """The three fields the two read-back helpers use."""
+
+    run_id: str
+    delivery_name: str
+    received_at: str | None = None
+    #: One dataset per arrival since REQ-PIPE-105; empty where a test
+    #: does not care which.
+    files_by_dataset: dict = field(default_factory=dict)
+
+
+class TestAScenarioLandsWhereItsAnchorSays:
+    """Criteria 1 and 3."""
+
+    def test_a_negative_anchor_counts_from_the_recent_end(self):
+        periods = _daily(30)
+        placed = si.resolve(si.Injection("TS-x", "d", -3, "cfg"), periods)
+        assert placed.period == periods[-3].name
+
+    def test_the_same_configuration_places_it_in_the_same_period(self):
+        """Criterion 3, and the reason there is no seed in this module:
+        the placement is an index, so determinism is a property of the
+        design rather than something a fixed draw has to preserve."""
+        injection = si.Injection("TS-x", "d", -8, "cfg")
+        first = si.resolve(injection, _daily(30))
+        second = si.resolve(injection, _daily(30))
+        assert first == second
+
+    def test_the_arrivals_are_dated_from_the_anchor(self):
+        placed = si.resolve(si.Injection(
+            "TS-x", "d", -5, "cfg",
+            arrivals=(si.ExtraArrival(0, "14:00"), si.ExtraArrival(2, "09:00"))),
+            _daily(30))
+        assert [a["date"] for a in placed.arrivals] == [
+            placed.period_date.isoformat(),
+            (placed.period_date + timedelta(days=2)).isoformat()]
+
+    def test_the_in_place_on_date_reaches_the_latest_arrival(self):
+        """A reader sets the dashboard to this date, so an in-place-on date before
+        the scenario's own last arrival would hide the thing it is
+        about."""
+        placed = si.resolve(si.Injection(
+            "TS-x", "d", -5, "cfg", arrivals=(si.ExtraArrival(3, "09:00"),)), _daily(30))
+        assert placed.as_record()["in_place_on"] == (
+            placed.period_date + timedelta(days=3)).isoformat()
+
+
+class TestAHistoryThatCannotHostOneIsRefused:
+    """Criterion 4 - loud, naming the scenario, and never a quiet skip."""
+
+    def test_an_anchor_past_the_end_of_the_history_raises(self):
+        with pytest.raises(si.CannotPlace) as exc:
+            si.resolve(si.Injection("TS-x", "d", 99, "cfg"), _daily(30))
+        assert "TS-x" in str(exc.value)
+
+    def test_it_says_why_rather_than_only_that(self):
+        """A refusal nobody can act on costs as much as a silent skip."""
+        with pytest.raises(si.CannotPlace) as exc:
+            si.resolve(si.Injection("TS-x", "d", 99, "cfg"), _daily(30))
+        assert "outside" in str(exc.value)
+        assert "not safe to place it somewhere else" in str(exc.value)
+
+    def test_an_empty_history_raises_rather_than_indexing(self):
+        with pytest.raises(si.CannotPlace):
+            si.resolve(si.Injection("TS-x", "d", -1, "cfg"), [])
+
+    def test_a_suppressed_period_outside_the_history_raises(self):
+        with pytest.raises(si.CannotPlace) as exc:
+            si.resolve(si.Injection("TS-x", "d", 0, "cfg", suppress=(-1,)), _daily(30))
+        assert "carry no supply" in str(exc.value)
+
+    def test_two_scenarios_in_one_period_are_refused(self):
+        """Criterion 11 one level down: each one's outcome would depend
+        on the other's arrivals, and whichever is read first looks
+        right."""
+        both = [si.Injection("TS-a", "d", -5, "cfg"), si.Injection("TS-b", "d", -5, "cfg")]
+        with pytest.raises(si.CannotPlace) as exc:
+            si.no_two_scenarios_share_a_period(both, {"d": _daily(30)})
+        assert "TS-a" in str(exc.value) and "TS-b" in str(exc.value)
+
+    def test_a_scenario_may_not_suppress_another_s_period(self):
+        both = [si.Injection("TS-a", "d", -5, "cfg"),
+                si.Injection("TS-b", "d", -3, "cfg", suppress=(-2,))]
+        with pytest.raises(si.CannotPlace):
+            si.no_two_scenarios_share_a_period(both, {"d": _daily(30)})
+
+    def test_one_scenario_alone_is_fine(self):
+        si.no_two_scenarios_share_a_period(
+            [si.Injection("TS-a", "d", -5, "cfg", suppress=(-1,))], {"d": _daily(30)})
+
+
+class TestAStoodOnPeriodIsClaimed:
+    """REQ-GEN-207 criterion 3: the period a scenario's substitution stands
+    on counts as claimed under the collision rule, so a quarter another
+    scenario stands on is never read as free."""
+
+    def test_another_scenario_on_the_stood_on_period_is_refused(self):
+        both = [si.Injection("TS-a", "d", -5, "cfg", stands_on=-1),
+                si.Injection("TS-b", "d", -6, "cfg")]
+        with pytest.raises(si.CannotPlace) as exc:
+            si.no_two_scenarios_share_a_period(both, {"d": _daily(30)})
+        assert "TS-a" in str(exc.value) and "TS-b" in str(exc.value)
+
+    def test_a_stood_on_period_outside_the_history_is_refused(self):
+        with pytest.raises(si.CannotPlace):
+            si.no_two_scenarios_share_a_period(
+                [si.Injection("TS-a", "d", 0, "cfg", stands_on=-1)], {"d": _daily(30)})
+
+    def test_the_real_child_protection_plan_passes(self):
+        """TS-76 stands on 2024-Q4 and TS-77a on 2023-Q1; TS-56 moved to the
+        newest quarter so neither is another scenario's (Keith, 2026-10-15)."""
+        from generator.collections import child_protection as cp_provider
+
+        periods = cp_provider.generated_periods()
+        resolved, _ = cp_provider._plan_injections(periods)
+        stood = {inj.scenario_id: si.stood_on(inj, periods) for inj, _p in resolved
+                 if inj.stands_on is not None}
+        assert stood == {"TS-76": periods[-8].name, "TS-77a": periods[-15].name}
+
+
+class TestADayMeantToBeEmptyMustBeEmpty:
+    """Criterion 4 again, against the case that actually happened.
+
+    Suppressing a period stops that period's own chain and does nothing
+    about a RESUPPLY of an earlier one landing the same day, because the
+    delay is drawn at random. TS-2's whole claim is that two days stay
+    unfilled.
+    """
+
+    def test_an_arrival_on_a_suppressed_day_is_refused(self):
+        placed = si.resolve(
+            si.Injection("TS-2", "d", -1, "cfg", suppress=(-2,)), _daily(30))
+        stray = _Recognised("run_009", "some-delivery",
+                            f"{placed.suppressed[0]} 05:00:00+00:00")
+        with pytest.raises(si.CannotPlace) as exc:
+            si.check_suppressed_days_are_empty([placed], [stray])
+        assert "TS-2" in str(exc.value) and "run_009" in str(exc.value)
+
+    def test_an_empty_day_passes(self):
+        placed = si.resolve(
+            si.Injection("TS-2", "d", -1, "cfg", suppress=(-2,)), _daily(30))
+        si.check_suppressed_days_are_empty(
+            [placed], [_Recognised("run_009", "x", "2026-01-01 05:00:00+00:00")])
+
+    def test_an_arrival_with_no_receipt_instant_is_not_read_as_landing(self):
+        """An in-flight delivery has no receipt yet, and treating its
+        absence as a landing on every day would refuse every history."""
+        placed = si.resolve(
+            si.Injection("TS-2", "d", -1, "cfg", suppress=(-2,)), _daily(30))
+        si.check_suppressed_days_are_empty([placed], [_Recognised("run_009", "x", None)])
+
+
+class TestTheRunIdsComeFromRecognition:
+    """The correction that cost the first real run.
+
+    Run identity is RECEIPT ORDER over recognised deliveries, not the
+    generator's manifest numbering, and suppressing two periods makes
+    the two disagree by exactly the slots removed.
+    """
+
+    def test_a_delivery_name_resolves_to_its_recognised_run_id(self):
+        placed = si.resolve(si.Injection(
+            "TS-x", "d", -5, "cfg", arrivals=(si.ExtraArrival(0, "14:00"),)), _daily(30))
+        placed.arrivals[0]["delivery"] = "some-supplier-folder"
+        si.resolve_run_ids([placed], [_Recognised("run_034", "some-supplier-folder")])
+        assert placed.as_record()["supplies"] == ["run_034"]
+
+    def test_a_delivery_of_several_files_resolves_to_the_scenarios_own_dataset(self):
+        """REAL DEFECT, 2026-10-02. One file is one arrival
+        (REQ-PIPE-105), so a six-file delivery is recognised as six runs
+        sharing a delivery name - and keying on the name alone gave
+        whichever file was recognised LAST. A cp-clients scenario then
+        pointed at the cp_placements run: a coordinate leading to
+        somebody else's data, which is the failure this class exists
+        for, arriving by a new route."""
+        placed = si.resolve(si.Injection(
+            "TS-x", "cp-clients", -5, "cfg", arrivals=(si.ExtraArrival(0, "14:00"),)),
+            _daily(30))
+        placed.arrivals[0]["delivery"] = "six-files"
+        si.resolve_run_ids([placed], [
+            _Recognised("cp_clients__1", "six-files", files_by_dataset={"cp-clients": ["a"]}),
+            _Recognised("cp_placements__1", "six-files",
+                        files_by_dataset={"cp-placements": ["b"]})])
+        assert placed.as_record()["supplies"] == ["cp_clients__1"]
+
+    def test_an_unrecognised_delivery_contributes_no_supply(self):
+        """Better an incomplete coordinate than one pointing at
+        somebody else's data - which is exactly what the bug did."""
+        placed = si.resolve(si.Injection(
+            "TS-x", "d", -5, "cfg", arrivals=(si.ExtraArrival(0, "14:00"),)), _daily(30))
+        placed.arrivals[0]["delivery"] = "never-recognised"
+        si.resolve_run_ids([placed], [_Recognised("run_034", "something-else")])
+        assert placed.as_record()["supplies"] == []
+
+
+class TestTheRecordTheScenarioMapReads:
+    """Criterion 7, against the reader rather than against this module."""
+
+    def test_it_round_trips_through_the_scenario_map(self, tmp_path):
+        from qa_tools.common import scenario_map
+
+        placed = si.resolve(si.Injection(
+            "TS-1", "birth-registrations", -8, "daily, due 14:00",
+            arrivals=(si.ExtraArrival(0, "14:00"),)), _daily(30))
+        placed.arrivals[0]["delivery"] = "d"
+        si.resolve_run_ids([placed], [_Recognised("run_028", "d")])
+        path = si.write_placements([placed], tmp_path / "placements.json")
+
+        back = scenario_map.read_placements(path)
+        assert back["TS-1"].dataset == "birth-registrations"
+        assert back["TS-1"].supplies == ("run_028",)
+        assert back["TS-1"].is_complete
+
+    def test_a_shared_placement_is_recorded_under_both_scenarios(self, tmp_path):
+        """TS-1's third file IS TS-4's arrival into a filled slot.
+        Recording one placement under both is honest; generating a
+        second identical arrival would be padding.
+
+        Proved by writing a TS-1 placement, so it holds on a clean checkout;
+        then held against the generated record where that record has
+        Birth Registrations' scenarios in it at all - a history generated
+        for other collections only (a worktree that never generated Birth
+        Registrations) has neither TS-1 nor TS-4, which is not a fault."""
+        import json
+
+        assert "TS-4" in si._ALSO.get("TS-1", ())
+        placed = si.resolve(si.Injection(
+            "TS-1", "birth-registrations", -8, "daily, due 14:00",
+            arrivals=(si.ExtraArrival(0, "14:00"),)), _daily(30))
+        placed.arrivals[0]["delivery"] = "d"
+        si.resolve_run_ids([placed], [_Recognised("run_028", "d")])
+        written = json.loads(si.write_placements(
+            [placed], tmp_path / "placements.json").read_text())["placements"]
+        by_id = {r["scenario_id"]: r for r in written}
+        assert by_id["TS-1"]["supplies"] == ["run_028"]
+        assert by_id["TS-4"]["supplies"] == by_id["TS-1"]["supplies"]
+
+        recorded = json.loads(si.PLACEMENTS_PATH.read_text())["placements"] \
+            if si.PLACEMENTS_PATH.exists() else []
+        by_id = {r["scenario_id"]: r for r in recorded}
+        assert ("TS-1" in by_id) == ("TS-4" in by_id), sorted(by_id)
+        if "TS-1" in by_id:
+            assert by_id["TS-4"]["supplies"] == by_id["TS-1"]["supplies"]
+
+    def test_the_config_is_recorded_beside_the_placement(self):
+        """Criterion 2. An outcome without its config is meaningless -
+        Keith's own finding, which invalidated two expected results as
+        first written."""
+        placed = si.resolve(
+            si.Injection("TS-x", "d", -5, "daily, due 14:00, 4-hour window"), _daily(30))
+        assert placed.as_record()["config"] == "daily, due 14:00, 4-hour window"
+
+    def test_every_injection_states_one(self):
+        for injection in si.INJECTIONS:
+            assert injection.config.strip(), injection.scenario_id
+
+
+class TestTheInjectedSetItself:
+    """What is actually wired up, held against the register."""
+
+    def test_every_injection_names_a_scenario_the_register_marks_for_injection(self):
+        from qa_tools.common import scenarios
+
+        marked = {s.id for s in scenarios.injected()}
+        for injection in si.INJECTIONS:
+            assert injection.scenario_id in marked, injection.scenario_id
+            for also in injection.also_demonstrates:
+                assert also in marked, also
+
+    def test_it_generates_no_verdict(self):
+        """Criterion 6. `severity` is what the generator injects into the
+        ROWS - the same lever the ordinary chain pulls - and the QA tools
+        still decide whether a supply is red. Nothing here names a
+        status, a slot or a lateness."""
+        for injection in si.INJECTIONS:
+            for arrival in injection.arrivals:
+                assert arrival.severity in (None, "amber", "red"), arrival
+
+
+class TestNothingSaysScenarioOnTheDashboard:
+    """Criterion 5, and the decision behind it.
+
+    Keith turned down a scenario label on the injected runs - "this is
+    still just a proof of concept remember" - against a first draft that
+    argued for one to stop the dashboard growing permanent red that
+    looks like a defect. For a PoC that is over-building: the red IS the
+    point, the audience knows the data is synthetic, and SCENARIOS.md
+    carries the which-one-is-this information instead.
+
+    ASSERTED AGAINST THE DATA THE PAGE RENDERS, not against the built
+    HTML, and the difference matters: the Plans tab embeds this repo's
+    own plans/*.md, which contains the register itself, so every
+    scenario id appears in the page by design. What must not happen is a
+    SUPPLY carrying one.
+    """
+
+    # NEEDS A BOOTSTRAPPED DEPLOYMENT (plans/tooling.md #27) - it reads
+    # a built reports/*.json, and skips when there is none. In CI's fast
+    # half there never is, so without this it would skip rather than run.
+    # One test rather than the module: nothing else here reads them.
+    @pytest.mark.needs_deployment
+    def test_no_supply_or_dataset_record_carries_a_scenario_id(self):
+        import re
+        from pathlib import Path
+
+        from qa_tools.common import scenarios
+
+        from qa_tools import collections
+
+        ids = {s.id for s in scenarios.parse_register()}
+        # WITH OR WITHOUT ITS HYPHEN: a change reference spelt "...-TS62"
+        # names the scenario as surely as "TS-62" does.
+        pattern = re.compile(r"\bTS-?([0-9]+[a-z]?)\b")
+        root = Path(__file__).resolve().parent.parent
+        # EVERY REGISTERED COLLECTION'S FILE (REQ-PIPE-240): two names written
+        # here left Emergency Department's unread, and it carried two.
+        names = [c.dashboard_file for c in collections.all_collections()]
+        assert len(names) >= 3, names
+        for name in names:
+            path = root / "reports" / name
+            if not path.is_file():
+                pytest.skip(f"{name} not built - run `mothman dashboard build-data`")
+            found = {f"TS-{m}" for m in pattern.findall(path.read_text())} & ids
+            assert not found, (
+                f"{name} carries scenario id(s) {sorted(found)} - an injected "
+                f"scenario must not be marked as one in what the dashboard renders")
+
+
+@pytest.mark.needs_deployment
+class TestTheChildProtectionScenariosAreReallyThere:
+    """REQ-GEN-044 criterion 1, against the real generated delivery tree.
+
+    SKIPPED RATHER THAN FAILED WHERE `data/` IS ABSENT, which is not
+    laziness: a freshly-cloned CI runner has no generated history at
+    all, and a test asserting a gitignored path exists is green locally
+    and red on the runner every time - this repo has already shipped
+    that mistake twice.
+
+    AND MARKED `needs_deployment` SINCE 2026-09-29, which is what makes
+    that skip stop happening in CI rather than merely be survivable.
+    The old single job bootstrapped before running anything, so `data/`
+    was there and these ran; the fast half of the split never
+    bootstraps, so without the mark they would quietly skip - green, and
+    proving nothing. The skip stays as the guard for a developer's own
+    fresh checkout.
+    """
+
+    @staticmethod
+    def _tree():
+        from pathlib import Path
+
+        root = Path(__file__).resolve().parent.parent / "data" / "deliveries"
+        if not root.is_dir():
+            pytest.skip("no generated delivery tree - run `mothman cp generate-synthetic-data`")
+        return root
+
+    @staticmethod
+    def _files_of(scenario_id: str, tree):
+        from qa_tools.common import arrivals, scenario_map
+
+        placement = scenario_map.read_placements().get(scenario_id)
+        if placement is None or not placement.supplies:
+            pytest.skip(f"{scenario_id} is not placed in this history")
+        by_run = {a.run_id: a for a in arrivals.arrivals_for("child-protection", "cp_run_")}
+        return [sorted(f.name for f in (tree / by_run[run].delivery_name).iterdir())
+                for run in placement.supplies if run in by_run]
+
+    def test_the_unreadable_shape_is_genuinely_unreadable(self, tmp_path):
+        """TS-12's shape, tested WITHOUT injecting it.
+
+        The scenario is not in the history - one unloadable table takes
+        the whole run down today, so injecting it produces an INCOMPLETE
+        run the dashboard cannot be built from (see
+        scenario_injection's own note). The SHAPE is right and stays
+        tested, so the day the pipeline can survive it, injecting is one
+        line.
+
+        AGAINST THE REAL READER, not Python's own `csv` module, which is
+        why the first version of this shape was wrong: `csv` parses an
+        unterminated quote quite happily into an empty table, so a test
+        using it passed while the file was perfectly loadable.
+        """
+        from qa_tools.common.csv_io import read_csv_explicit_nulls
+
+        good = "a,b,c\n1,2,3\n4,5,6\n7,8,9\n"
+        shaped = si.apply_file_shape("one_file_unreadable", {"cp_clients.csv": good})
+        path = tmp_path / "cp_clients.csv"
+        path.write_text(shaped["cp_clients.csv"])
+        with pytest.raises(Exception) as exc:
+            read_csv_explicit_nulls(str(path), {})
+        assert "fields" in str(exc.value) or "parse" in str(exc.value).lower(), exc.value
+
+    def test_the_unreadable_shape_keeps_the_real_header_and_first_rows(self):
+        """A file of obvious rubbish would be caught by anyone glancing
+        at it. What this has to imitate is an export that starts out
+        fine and goes wrong partway."""
+        good = "a,b,c\n1,2,3\n4,5,6\n7,8,9\n"
+        shaped = si.apply_file_shape("one_file_unreadable", {"cp_clients.csv": good})
+        assert shaped["cp_clients.csv"].startswith("a,b,c\n1,2,3")
+
+    def test_the_single_table_shape_is_a_single_table(self):
+        """TS-14's shape, tested WITHOUT injecting it - the same
+        position TS-12 is in, and for the same underlying reason.
+
+        A delivery carrying one table was written correctly and the RUN
+        then died on `cp_placements`, because a run resolves its views
+        from the tables THIS ARRIVAL carried and dbt's models ref() all
+        six. `supply_db.borrow_views()` exists for exactly this and
+        nothing calls it from the ordinary path. So a delivery that does
+        not carry all six cannot be QA'd at all today, whether a table
+        is missing because it never came or because it could not be
+        read.
+        """
+        files = {f"{t}.csv": "a,b\n1,2\n" for t in
+                 ("cp_clients", "cp_notifications", "cp_carers")}
+        shaped = si.apply_file_shape("one_table_only", files)
+        assert sorted(shaped) == ["cp_clients.csv"]
+
+    def test_the_renamed_resupplies_are_present_and_match_nothing(self):
+        """TS-38, which Keith called the most dangerous shape in the
+        register: the matched files are processed and the renamed ones
+        are not, so the supply is HALF and only a warning says so."""
+        from qa_tools.common import delivery
+
+        sets = self._files_of("TS-38", self._tree())
+        assert sets, "TS-38 placed no supply"
+        names = sets[0]
+        assert len(names) == 8, names
+        unmatched = [n for n in names if delivery.dataset_for_filename(n) is None]
+        assert len(unmatched) == 2, unmatched
+        matched = [n for n in names if delivery.dataset_for_filename(n) is not None]
+        assert len(matched) == 6, matched
+
+    def test_no_two_files_in_one_delivery_claim_one_dataset(self):
+        """Why TS-34 is absent, asserted rather than only written down.
+
+        Every Child Protection arrival pattern but cp_clients' is an exact
+        filename, so the duplicate-match hold cannot arise for those
+        datasets - an attempt to inject TS-34 produced TS-38's scenario
+        wearing TS-34's name. cp_clients' was widened by REQ-PIPE-202 for
+        TS-42's one-table pair (REQ-GEN-203), so it is left out here. If
+        this ever stops holding, another pattern was widened and TS-34
+        becomes injectable.
+        """
+        from collections import Counter
+
+        from qa_tools.common import delivery, hierarchy
+
+        tree = self._tree()
+        patterns = {d.dataset_id for d in hierarchy.datasets_in_collection("child-protection")
+                    if d.dataset_id != "cp-clients"}
+        assert len(patterns) == 5
+        for folder in sorted(tree.iterdir()):
+            if not folder.is_dir():
+                continue
+            claimed = Counter()
+            for f in folder.iterdir():
+                owner = delivery.dataset_for_filename(f.name)
+                if owner in patterns:
+                    claimed[owner] += 1
+            duplicates = {k: v for k, v in claimed.items() if v > 1}
+            assert not duplicates, f"{folder.name}: {duplicates}"
+
+
+class TestQuietDays:
+    """Found by the first scripted replay (2026-10-05): TS-47 says the
+    day's own supply never comes, and an EARLIER day's resend landed on it
+    at 10:11 and filled it - so the scripted person's mark-not-supplied
+    was rightly refused. A scenario can name days no OTHER period's
+    arrival may land on, without suppressing those periods' own supply."""
+
+    def test_quiet_days_are_resolved_by_name(self):
+        periods = _daily(30)
+        placed = si.resolve(si.Injection("TS-x", "d", -5, "cfg", quiet=(0, 1)), periods)
+        assert placed.quiet == (periods[-5].name, periods[-4].name)
+
+    def test_a_period_keeps_its_own_supply_on_a_quiet_day(self):
+        from generator.collections import civil_registration as gr
+
+        avoid = gr._days_to_avoid("2026-09-08", suppressed={"2026-09-01"},
+                                  quiet={"2026-09-07", "2026-09-08"})
+        assert avoid == {"2026-09-01", "2026-09-07"}
+
+    def test_another_period_s_resend_is_moved_off_a_quiet_day(self):
+        from generator.collections import civil_registration as gr
+        from generator.resupply import Delivery
+
+        resend = Delivery(received_date=date(2026, 9, 7), severity=None, payload=None)
+        (moved,) = gr._away_from_suppressed([resend], {"2026-09-07", "2026-09-08"}, set())
+        assert moved.received_date == date(2026, 9, 9)
+
+    def test_a_quiet_day_is_part_of_the_scenario_s_footprint(self):
+        both = [si.Injection("TS-a", "d", -5, "cfg"),
+                si.Injection("TS-b", "d", -6, "cfg", quiet=(0, 1))]
+        with pytest.raises(si.CannotPlace):
+            si.no_two_scenarios_share_a_period(both, {"d": _daily(30)})
+
+
+class TestTheFileCheckShapes:
+    """REQ-GEN-044 criteria 15 and 16: each shape is what the file checks
+    will see - TS-12's ragged extract refused, TS-56's reorder only warned.
+    Asked of the real evaluator, not assumed."""
+
+    _CARERS = ("carer_id,given_name,family_name,carer_type,approval_status,extract_timestamp\n"
+               'C1,Ann,"Smith, Jr",kin,approved,2026-01-01T00:00:00\n'
+               "C2,Bo,Jones,foster,approved,2026-01-01T00:00:00\n"
+               "C3,Cy,Lee,foster,pending,2026-01-01T00:00:00\n")
+
+    def _evaluate(self, tmp_path, content, table):
+        from qa_tools.common import file_checks, hierarchy
+
+        path = tmp_path / f"{table}.csv"
+        path.write_text(content)
+        contract = hierarchy.contract_path("child-protection")
+        return {f.check: f for f in file_checks.evaluate(
+            path, file_checks.expected_columns(contract, table))}
+
+    def test_ts12_is_refused_by_fields_per_row(self, tmp_path):
+        from qa_tools.common import file_checks
+
+        found = self._evaluate(tmp_path, si.unreadable(self._CARERS * 3), "cp_carers")
+        assert found[file_checks.FIELDS_PER_ROW].refuses
+
+    def test_ts56_only_warns(self, tmp_path):
+        from qa_tools.common import file_checks
+
+        found = self._evaluate(tmp_path, si.reordered(self._CARERS), "cp_carers")
+        assert found[file_checks.COLUMN_ORDER].status == file_checks.WARN
+        assert file_checks.refusal(list(found.values())) is None
+
+    def test_the_reorder_keeps_a_quoted_comma_in_its_field(self):
+        assert '"Smith, Jr"' in si.reordered(self._CARERS)
+
+
+class TestEveryChildProtectionInjectionIsPlanned:
+    """Found by the sprint 12 rebuild (2026-10-05): the Child Protection
+    generator planned only injections whose dataset was cp-clients, so
+    TS-56 (cp-carers) was skipped without a word - criterion 4's silent
+    absence. One delivery carries all six tables, so an injection for ANY
+    dataset of the collection is planned against the delivery's periods,
+    and two may never share one."""
+
+    def test_an_injection_on_another_dataset_is_planned(self, monkeypatch):
+        import dataclasses
+
+        from generator.collections import child_protection as cp
+
+        # PLANNED WITHOUT LINKS: these periods are made up, so a link's
+        # period-scoped decision has no real slot to be timed from.
+        monkeypatch.setattr(si, "INJECTIONS", tuple(
+            dataclasses.replace(i, links=()) for i in si.INJECTIONS))
+        resolved, by_period = cp._plan_injections(_daily(30))
+        assert "TS-56" in {inj.scenario_id for inj, _ in resolved}
+
+    def test_two_in_one_delivery_are_refused(self, monkeypatch):
+        from generator.collections import child_protection as cp
+
+        both = (si.Injection("TS-a", "cp-clients", -5, "cfg"),
+                si.Injection("TS-b", "cp-carers", -5, "cfg"))
+        monkeypatch.setattr(si, "INJECTIONS", both)
+        with pytest.raises(si.CannotPlace):
+            cp._plan_injections(_daily(30))
+
+
+class TestTheEarlyChildProtectionSupplies:
+    """REQ-GEN-195 (Keith, 2026-10-12): three supplies inside their quarter's
+    claim window and one before it - measured against the real calendar's
+    own slot instants, so the scenarios and the configuration cannot drift
+    apart unnoticed."""
+
+    @staticmethod
+    def _where(scenario_id):
+        from datetime import timedelta
+
+        from generator.collections import child_protection as g
+        from generator import scenario_injection
+        from generator.anchor_date import get_anchor_date
+        from qa_tools.common import asset_time, schedule, slots
+
+        injection = next(i for i in scenario_injection.INJECTIONS
+                         if i.scenario_id == scenario_id)
+        periods = schedule.periods_for_dataset(g.DATASET_ID,
+                                               until=get_anchor_date())[-len(g.RUN_PLAN):]
+        period = scenario_injection.resolve(injection, periods)
+        (extra,) = injection.arrivals
+        arrives = asset_time.wall_clock(period.period_date + timedelta(days=extra.day_offset),
+                                        extra.at)
+        return arrives, slots.slot_instants(injection.dataset_id, period.period_date)
+
+    @pytest.mark.parametrize("scenario_id", ["TS-9", "TS-65", "TS-66"])
+    def test_an_early_one_arrives_inside_its_window(self, scenario_id):
+        arrives, slot = self._where(scenario_id)
+        assert slot.claim_opens_at <= arrives < slot.due_at, (scenario_id, arrives, slot)
+
+    def test_the_too_early_one_arrives_before_its_window_opens(self):
+        arrives, slot = self._where("TS-67")
+        assert arrives < slot.claim_opens_at, (arrives, slot)
+
+    @pytest.mark.parametrize("scenario_id,period,classification", [
+        ("TS-9", "2024-Q2", "early"), ("TS-65", "2025-Q3", "early"),
+        ("TS-66", "2025-Q4", "early"),
+        # TOO EARLY: its own quarter's window is not open, so the RULE files it
+        # as a late resupply of 2023-Q3; a scripted person then re-files it to
+        # 2023-Q4, where it is judged early (the next test).
+        ("TS-67", "2023-Q4", "early"),
+    ])
+    def test_the_pipeline_files_and_judges_each_as_the_register_expects(
+            self, deployment_history, scenario_id, period, classification):
+        """On the bootstrapped history: what the assignment rule and the
+        verdict made of each planted arrival."""
+        from qa_tools.common import scenario_map, supply_db
+
+        placement = scenario_map.read_placements().get(scenario_id)
+        if placement is None or not placement.supplies:
+            pytest.skip(f"{scenario_id} is not placed in this history")
+        (run,) = placement.supplies
+        key = run.split("__", 1)[1]
+        with supply_db.connect(read_only=True, label="test-early-cp") as conn:
+            rows = conn.execute(
+                "SELECT f.slot, v.classification FROM qa.filing_current f "
+                "JOIN LATERAL (SELECT classification FROM qa.verdict w "
+                "              WHERE w.filing_id = f.id ORDER BY w.id DESC LIMIT 1) v ON true "
+                "WHERE f.dataset_id = 'cp-clients' AND f.supply_id = ?",
+                [f"cp-clients@{key}"]).fetchall()
+        assert rows == [(period, classification)], rows
+
+    def test_the_too_early_one_is_moved_by_a_person_not_the_rule(self, deployment_history):
+        """Keith, 2026-10-12: "have it refiled to Q4 by a synthetic human".
+        The rule's filing stays 2023-Q3 and its promotion there is refused; the
+        move to 2023-Q4 is a person's decision. cp-case-workers, not delivered
+        in 2023-Q4, is rejected by the same person instead."""
+        from qa_tools.common import scenario_map, supply_db
+
+        placement = scenario_map.read_placements().get("TS-67")
+        assert placement is not None and placement.supplies, "TS-67 is not placed"
+        key = placement.supplies[0].split("__", 1)[1]
+        with supply_db.connect(read_only=True, label="test-early-cp") as conn:
+            rows = conn.execute(
+                "SELECT dataset_id, action, from_slot, to_slot, actor_kind FROM qa.decision "
+                "WHERE supply LIKE ? AND action IN ('promotion-refused', 'refile', 'reject') "
+                "ORDER BY dataset_id, effective_at", [f"%@{key}"]).fetchall()
+        assert rows, "no decisions about TS-67's supply"
+        by = {}
+        for ds, action, frm, to, kind in rows:
+            by.setdefault(ds, []).append((action, frm, to, kind))
+        assert len(by) == 6, sorted(by)
+        for ds, acts in by.items():
+            if ds == "cp-case-workers":
+                assert acts[-1][0] == "reject" and acts[-1][3] == "person", acts
+            else:
+                assert ("refile", "2023-Q3", "2023-Q4", "person") in acts, (ds, acts)
+
+
+def test_a_pair_targets_only_the_files_its_script_makes_supplies():
+    """REQ-GEN-196 criterion 19: a file the script settles as rejected or
+    kept but superseded is not targeted - nobody checks it, so it has no
+    verdict to compare - and a file it makes a supply is."""
+    from generator import scenario_injection as si
+    from qa_tools.common import scripted_decisions as sd
+
+    scripts = {s.scenario: s for s in sd.load() if s.operation == sd.CHOOSE_FILE}
+    pairs = [i for i in si.INJECTIONS if any(a.files for a in i.arrivals)]
+    assert pairs
+    # A PAIR NO PERSON SETTLES (REQ-GEN-203, TS-42) is superseded by a later
+    # file, so neither of its files is a supply - and neither is targeted.
+    for injection in pairs:
+        if injection.scenario_id not in scripts:
+            (arrival,) = [a for a in injection.arrivals if a.files]
+            assert all(f.target is None for f in arrival.files), injection.scenario_id
+    pairs = [i for i in pairs if i.scenario_id in scripts]
+    assert pairs
+    for injection in pairs:
+        (arrival,) = [a for a in injection.arrivals if a.files]
+        outcomes = scripts[injection.scenario_id].files
+        for position, (f, outcome) in enumerate(zip(arrival.files, outcomes), start=1):
+            makes_a_supply = outcome == "supply" or outcome.startswith("refile")
+            assert (f.target is not None) == makes_a_supply, (
+                f"{injection.scenario_id} file {position} is {outcome} and "
+                f"{'not ' if f.target is None else ''}targeted")
+
+
+class TestAPerFileShape:
+    """REQ-GEN-196's NFR: shapes are named, applied per file, and an unknown
+    name raises (#172: the raise was untested)."""
+
+    CSV = "child_given_names,child_family_name,x\nAva,Ryan,1\n"
+
+    def test_an_unknown_shape_is_refused_naming_the_known_ones(self):
+        from generator import scenario_injection as si
+
+        with pytest.raises(si.CannotPlace, match="unknown per-file shape 'typo'.*stray_test_rows"):
+            si.shape_file("typo", self.CSV)
+
+    def test_stray_test_rows_names_every_registrant_test(self):
+        from generator import scenario_injection as si
+
+        out = si.shape_file("stray_test_rows", self.CSV)
+        assert "Ava" not in out and "Ryan" not in out and out.count("TEST") >= 2
+
+    def test_a_pair_file_shape_is_not_a_delivery_shape(self):
+        from generator import scenario_injection as si
+
+        with pytest.raises(si.CannotPlace):
+            si.apply_file_shape("stray_test_rows", {"a.csv": self.CSV})
+
+
+class TestTheLaterSingleTableResupplyAndTheStoodOnPeriod:
+    """REQ-GEN-044 criterion 1 for TS-14 and TS-54, both on placements that
+    already exist: TS-14 is TS-12's refused Client Register corrected weeks
+    later by a delivery carrying it alone; TS-54 is TS-76's substitution onto
+    an earlier promoted supply (Keith, 2026-10-14, Q13)."""
+
+    @staticmethod
+    def _of(sid):
+        return next(i for i in si.INJECTIONS if i.scenario_id == sid)
+
+    def test_ts14_rides_ts12_with_its_corrected_file_alone(self):
+        ts12 = self._of("TS-12")
+        assert "TS-14" in ts12.also_demonstrates
+        shapes = [a.file_shape for a in ts12.arrivals]
+        assert shapes == ["one_file_unreadable", "one_table_only"]
+        assert ts12.arrivals[1].day_offset > ts12.arrivals[0].day_offset
+
+    def test_ts54_rides_ts76(self):
+        assert "TS-54" in self._of("TS-76").also_demonstrates
+
+    def test_their_links_resolve_on_the_real_calendar(self):
+        from generator.collections import child_protection as cp_provider
+
+        periods = cp_provider.generated_periods()
+        for sid in ("TS-12", "TS-76"):
+            injection = self._of(sid)
+            dates = si.link_dates(injection, si.resolve(injection, periods))
+            linked = {d.scenario_id for d in dates}
+            assert {"TS-12"} <= linked if sid == "TS-12" else {"TS-54", "TS-76"} <= linked
+            assert not [d.problem for d in dates if d.problem], dates
+
+
+class TestTheChildProtectionPairsArePlacedAsDecided:
+    """REQ-GEN-203 criteria 5 and 8: TS-42 and TS-80 in the grown quarters
+    (REQ-GEN-207), each with one green lead-in and a green following quarter,
+    clear of every other scenario's claim - and the settlement and links
+    their pages are read by, from configuration alone."""
+
+    @staticmethod
+    def _injection(sid):
+        [found] = [i for i in si.INJECTIONS if i.scenario_id == sid]
+        return found
+
+    @pytest.mark.parametrize("sid,period,lead,follow", [
+        ("TS-42a", "2019-Q4", "2019-Q3", "2020-Q1"),
+        ("TS-80", "2020-Q4", "2020-Q3", "2021-Q1")])
+    def test_it_lands_in_its_grown_quarter(self, sid, period, lead, follow):
+        from generator.collections import child_protection as cp
+
+        placed = si.resolve(self._injection(sid), cp.generated_periods())
+        assert (placed.period, placed.lead_in, placed.follow) == (period, (lead,), (follow,))
+        grown = {p.name for p in cp.grown_periods()}
+        assert {period, lead, follow} <= grown
+
+    def test_no_other_scenario_claims_their_quarters(self):
+        from generator.collections import child_protection as cp
+
+        periods = cp.generated_periods()
+        ours = {sid: set(si.claimed_periods(self._injection(sid), periods))
+                for sid in ("TS-42a", "TS-80")}
+        assert not ours["TS-42a"] & ours["TS-80"]
+        cp_ids = {d.dataset_id for d in cp.hierarchy.datasets_in_collection("child-protection")}
+        for other in si.INJECTIONS:
+            if other.dataset_id in cp_ids and other.scenario_id not in ours:
+                theirs = set(si.claimed_periods(other, periods))
+                for sid, claimed in ours.items():
+                    assert not claimed & theirs, (sid, other.scenario_id)
+
+    def test_ts80_is_settled_by_one_scripted_choose_file_the_next_day(self):
+        from qa_tools.common import scripted_decisions
+
+        [script] = [s for s in scripted_decisions.load() if s.scenario == "TS-80"]
+        assert (script.operation, script.dataset_id, script.supply_index) == (
+            "choose-file", "cp-clients", 0)
+        assert (script.at, script.day_offset) == ("11:00", 1)
+        # BY RECEIPT POSITION (REQ-GEN-196 criterion 7): the test file came first.
+        assert list(script.files) == ["reject", "supply"]
+
+    def test_their_links_stand(self):
+        assert si.link_problems(injections=[self._injection("TS-42a"),
+                                            self._injection("TS-80")]) == []
+        assert {link.scenario_id for link in self._injection("TS-42a").links} == {
+            "TS-42a", "TS-42b"}

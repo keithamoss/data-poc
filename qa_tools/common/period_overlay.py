@@ -1,0 +1,357 @@
+"""What a one-file arrival's run reads (REQ-PIPE-105 criterion 5).
+
+ONE FILE IS ONE ARRIVAL (criterion 1), so a run's own staged tables are
+ONE table - and every cross-table check asks for six. This module is
+what makes that viable rather than a broken pipeline: the run reads the
+table its arrival carried from that arrival, and every OTHER table from
+the version staged for the same PERIOD where exactly one is, falling
+back to that period's promoted state where none is.
+
+WHY IT RUNS AFTER FILING, NOT AT STAGING. A run's period is
+`filing.period_of()`, and a supply is filed one arrival at a time in
+receipt order because the slot it files to depends on what the arrival
+before it promoted. The warehouse builders still give a run a view of
+its own table at staging time; this REPLACES that schema once the
+period is known. A supply with no filing - held, unfiled, a trial - is
+left with what staging gave it (REQ-PIPE-079 criterion 9: no invented
+period, no period-scoped run).
+
+"STAGED FOR THE PERIOD" MEANS FILED TO IT AND STILL IN STAGING. Filing
+says which period a supply claims; promotion MOVES a supply's tables out
+of staging into the period's schema, so what is left in staging is
+exactly what nobody has decided on. A supply staged for a DIFFERENT
+period is never read, which is criterion 8 of REQ-PIPE-079 - no reading
+across period schemas.
+
+THE RUN'S OWN TABLE IS READ FROM ITS OWN ARRIVAL, always (criterion 5,
+and criterion 6 as Keith amended it on the evening of 2026-10-02). It
+is contested only where that one arrival carried two files for it. A
+SIBLING with several versions staged for the period is contested for
+the run reading it (criterion 8): the view falls through to the
+period's promoted version and nothing chooses between them by arrival
+time. An earlier reading, that any second staged version contested the
+run's own table "however they arrived", left a correction beside a red
+supply unchecked and unpromotable - 28 supplies in the regenerate - and
+is recorded as rejected on REQ-PIPE-105.
+"""
+from __future__ import annotations
+
+from collections.abc import Collection, Sequence
+
+from qa_tools.common import period_schema, supply_db
+
+
+def staged_for_period(conn, period: str, logical_names: Sequence[str], *,
+                       staging: str,
+                       loaded: frozenset[str] | None) -> dict[str, list[str]]:
+    """Every physical table in `staging` whose supply is FILED to
+    `period`, keyed by the logical name it claims.
+
+    Joined on (dataset, arrival key) against `qa.filing`, because the
+    supply id is filing's answer and the physical name is staging's -
+    the arrival key is what both carry. The `#1` a held supply's id
+    carries is stripped, and a held supply is never filed to a slot
+    anyway, so it cannot appear here.
+
+    The load-record gate applies as it does everywhere a check's view is
+    built (REQ-PIPE-060 criterion 7): `loaded=None` skips it.
+    """
+    wanted = set(logical_names)
+    filed = filed_tables(conn, period, wanted)
+    found: dict[str, list[str]] = {name: [] for name in wanted}
+    for logical, physicals in supply_db.candidates_in(
+            conn, staging, sorted(wanted), loaded=loaded).items():
+        for physical in physicals:
+            if physical in filed:
+                found[logical].append(physical)
+    return found
+
+
+def filed_tables(conn, period: str, wanted: Collection[str] | None = None) -> dict[str, str]:
+    """Every staged physical table of a supply FILED to `period` -> that
+    supply's id, for the logical tables in `wanted` (every one where None).
+
+    EACH FILED SUPPLY'S OWN TABLES, by the one resolver (REQ-PIPE-193
+    criterion 13): a settled pair's two supplies filed to two periods each
+    own one file, so matching on the arrival key alone gave both periods
+    both files. The supply id is the same walk's, which is how a staged
+    table's supply reaches the resolution (REQ-PIPE-279 criterion 2)."""
+    from qa_tools.common import filing, hierarchy, qa_store, supply_files
+
+    qa_store.ensure_schema(conn)
+    filed: dict[str, str] = {}
+    for dataset_id, supply_id in conn.execute(
+            f"SELECT dataset_id, supply_id FROM {filing.CURRENT} WHERE slot = ? "
+            "ORDER BY dataset_id, supply_id", [period]).fetchall():
+        try:
+            logical = hierarchy.dataset(dataset_id).table
+        except hierarchy.UnknownDatasetError:
+            continue
+        if (wanted is not None and logical not in wanted) or "@" not in supply_id:
+            continue
+        found_supply = supply_files.resolve(conn, dataset_id, supply_id)
+        for physical in (found_supply.tables if found_supply else ()):
+            filed.setdefault(physical, supply_id)
+    return filed
+
+
+def build(conn, run_id: str, *, period: str, own_table: str, arrival_key: str,
+          tables: Sequence[str], loaded: frozenset[str] | None,
+          held: Collection[str] = (),
+          own_physical: Collection[str] | None = None) -> period_schema.PeriodResolution:
+    """Replace this run's view schema with the period overlay, and
+    record what it resolved.
+
+    `tables` is every agreed logical table a check in this collection
+    may read, `own_table` among them. Sample tables are not here: they
+    have no period, and the caller adds them on top exactly as it did
+    before (REQ-PIPE-106).
+
+    `held` applies to the run's OWN table only, as it did at staging. A
+    held supply has no filing, so it can never be staged-for-period for
+    a sibling to read.
+    """
+    staging = supply_db.staging_schema_for(run_id)
+    others = [t for t in tables if t != own_table]
+    staged = staged_for_period(conn, period, others, staging=staging, loaded=loaded)
+
+    # THE RUN'S OWN TABLE IS ITS OWN ARRIVAL'S, and nothing else staged
+    # for the period competes with it (criterion 6 as amended 2026-10-02
+    # evening). Two files in THIS arrival are contested; a correction
+    # beside an earlier red supply is not - it is checked on its own
+    # data, which is the only way it can ever be accepted.
+    own = supply_db.candidates_in(conn, staging, [own_table], arrival=arrival_key,
+                                   loaded=loaded).get(own_table) or []
+    if own_physical is not None:
+        # A RUN ABOUT ONE SUPPLY reads that supply's own file and nothing
+        # else its arrival carried (REQ-PIPE-193 criterion 13): a settled
+        # pair's supply is one of the two tables.
+        own = [t for t in own if t in set(own_physical)]
+    else:
+        # AN OPEN PAIR STAYS CONTESTED WHEN ONE FILE WAS REFUSED
+        # (post-build-review #172): the load-record gate drops the refused
+        # file, so its one loaded sibling would read as a clean supply and
+        # be checked before anybody said which file is the supply. Both of
+        # the pair's staged names are its candidates, so neither is read.
+        own = sorted(set(own) | set(_open_pair_tables(conn, own_table, arrival_key)))
+    staged[own_table] = sorted(own)
+
+    withheld = None
+    if own_table in set(held) and own:
+        # Same refusal create_run_views() makes: the held table is
+        # sitting right there and is deliberately not read.
+        withheld = own[0] if len(own) == 1 else ""
+        staged[own_table] = []
+
+    promoted = period_schema.promoted_in(conn, period, list(tables))
+    if withheld is not None:
+        # A held table falls through to nothing, not to the period: a
+        # hold is about not knowing the period at all.
+        promoted.pop(own_table, None)
+    out = period_schema.create_overlay_views(conn, run_id, period, staged, promoted)
+    out.resolution.supply_of.update(_supplies_held(conn, period, out))
+    # A STAGED TABLE'S SUPPLY TOO (REQ-PIPE-279 criterion 2), the run's own
+    # among them, from its filing - so every table a result read names a
+    # supply, wherever it was read from.
+    staged_supply = filed_tables(conn, period)
+    for logical, origin in out.source.items():
+        supply = staged_supply.get(out.resolution.resolved[logical])
+        if origin == period_schema.FROM_STAGING and supply:
+            out.resolution.supply_of[logical] = supply
+    if withheld is not None:
+        out.resolution.held[own_table] = withheld
+        if own_table in out.resolution.absent:
+            out.resolution.absent.remove(own_table)
+    return out
+
+
+def _supplies_held(conn, period: str, out: period_schema.PeriodResolution) -> dict[str, str]:
+    """The supply the decision log says each table read FROM THE PERIOD
+    resolves to (REQ-PIPE-129 criteria 7 and 13) - the plain name says
+    nothing, so the log answers."""
+    from qa_tools.common import decision_log, hierarchy
+
+    held = {}
+    for logical, source in out.source.items():
+        if source != period_schema.FROM_PERIOD:
+            continue
+        try:
+            dataset_id = hierarchy.dataset_for_table(logical).dataset_id
+        except Exception:  # noqa: BLE001 - a table no dataset claims has no supply
+            continue
+        h = decision_log.held(conn, dataset_id, period)
+        if h and h.holder:
+            held[logical] = h.holder
+    return held
+
+
+def name_held_siblings(conn, res: supply_db.Resolution, arrival) -> list[str]:
+    """Say HELD, not absent, for a sibling whose supply came WITH this
+    arrival and is held (REQ-PIPE-115 criterion 14).
+
+    A held supply has no filing, so it is never staged for a period and
+    its table reaches a sibling run exactly as a table that never
+    arrived does - and the checks reading it then said "no filled slot"
+    or "overdue", sending somebody after a supplier who had already sent
+    the file. Keith, 2026-10-04 (option B): only for runs of arrivals
+    received WITH the held supply - same delivery or same receipt
+    instant. Every run while any hold for the table is outstanding would
+    redden another quarter's checks for a file meant elsewhere.
+
+    ONLY A TABLE THE RUN CANNOT READ. Where the period's promoted
+    version is there to read, the check reads it, as REQ-PIPE-079
+    criterion 12 lets a sibling do (PROVISIONAL, 2026-10-04 overnight).
+
+    Moved into `held` in place, so held_blast_radius records it once,
+    naming the supply, and unrunnable leaves it alone (criterion 15).
+    Returns the tables moved.
+    """
+    from qa_tools.common import hierarchy, supply_holds
+
+    if not res.absent:
+        return []
+    key = supply_db.arrival_segment(arrival.received_at)
+    delivery = getattr(arrival, "delivery_name", None)
+    moved = []
+    for held in supply_holds.outstanding(conn):
+        if not (supply_holds.arrival_key_of(held.supply_id) == key
+                or (delivery and held.delivery == delivery)):
+            continue
+        try:
+            table = hierarchy.dataset(held.dataset_id).table
+        except Exception:  # noqa: BLE001 - a retired dataset reads as absent
+            continue
+        if table in res.absent:
+            res.absent.remove(table)
+            res.held[table] = held.supply_id
+            res.held_supply[table] = held.supply_id
+            moved.append(table)
+    return moved
+
+
+def _open_pair_tables(conn, own_table: str, arrival_key: str) -> tuple[str, ...]:
+    """Every staged name an OPEN pair in this arrival owns, a refused file's
+    included - or () where this arrival's file for the table is no open
+    pair. Through the one resolver (REQ-PIPE-193 criterion 13)."""
+    from qa_tools.common import hierarchy, supply_files
+
+    try:
+        dataset_id = hierarchy.dataset_for_table(own_table).dataset_id
+    except hierarchy.UnknownDatasetError:
+        return ()
+    pair = supply_files.resolve(conn, dataset_id, f"{dataset_id}@{arrival_key}#1")
+    return tuple(pair.own) if pair is not None and pair.is_pair else ()
+
+
+def _withhold_if_held(arrival, dataset_id: str, own_table: str, *,
+                      dsn: str | None) -> None:
+    """A HELD supply's run must not read its own table (REQ-PIPE-115
+    criterion 5), whatever staging gave it.
+
+    THE DEFECT THIS CLOSES: staging builds every run's views before
+    filing raises the hold, and returning early here for a supply with
+    no period left that view in place - so all four tools ran over a
+    supply nobody had placed and recorded ordinary verdicts against it.
+    The view is dropped and the table recorded as HELD, which is what
+    the orchestrators read to run nothing.
+
+    ONLY WHERE THIS ARRIVAL'S SUPPLY HAS AN OPEN HOLD. An unfiled supply
+    with no hold - a trial - keeps what staging gave it, exactly as
+    before (REQ-PIPE-079 criterion 9).
+    """
+    from qa_tools.common import supply_holds
+
+    key = supply_db.arrival_segment(arrival.received_at)
+    conn = supply_db.connect(dsn=dsn, label="mothman:period-overlay")
+    try:
+        holds = [h for h in supply_holds.outstanding(conn, dataset_id=dataset_id)
+                 if supply_holds.arrival_key_of(h.supply_id) == key]
+        if not holds:
+            return
+        res = supply_db.resolution_for(conn, arrival.run_id)
+        physical = res.resolved.pop(own_table, None)
+        if physical is None:
+            physical = (res.ambiguous.pop(own_table, None) or [""])[0]
+        if own_table in res.absent:
+            res.absent.remove(own_table)
+        res.held[own_table] = physical
+        res.held_supply[own_table] = holds[0].supply_id
+        conn.execute(f'DROP VIEW IF EXISTS "{supply_db.run_schema(arrival.run_id)}".'
+                     f'"{own_table}"')
+        supply_db.record_resolution(conn, res)
+    finally:
+        conn.close()
+
+
+def rebuild_for_arrival(arrival, *, tables: Sequence[str],
+                        dsn: str | None = None) -> period_schema.PeriodResolution | None:
+    """The batch's one call: after an arrival is filed, give its run
+    the period overlay and record what it read.
+
+    Returns None - and leaves the staging-time views alone - where the
+    arrival's supply was filed to no period, which is the held and the
+    unfiled case alike (REQ-PIPE-079 criterion 9).
+
+    `tables` is the collection's logical tables. Those with no agreed
+    calendar are SAMPLE data and are added from the sample schema on
+    top, newest version, exactly as the staging-time build does: sample
+    data has no arrival or period that matters (REQ-PIPE-106).
+    """
+    from qa_tools.common import (filing, hierarchy, load_log, sample_data,
+                                  supply_holds, trial)
+
+    (dataset_id,) = tuple(arrival.files_by_dataset)
+    own_table = hierarchy.dataset(dataset_id).table
+    # A RUN THAT SAYS WHICH SUPPLY IT IS ABOUT (a re-check) takes its period,
+    # its own table and its staging key from the one resolver, never from
+    # its receipt - a settled pair's supply has its own file's receipt,
+    # whose key names no table (REQ-PIPE-193 criterion 13).
+    stated = (getattr(arrival, "supply_ids", None) or {}).get(dataset_id)
+    resolved = None
+    if stated:
+        from qa_tools.common import supply_files
+
+        with supply_db.connect(dsn=dsn, label="mothman:period-overlay") as c:
+            resolved = supply_files.resolve(c, dataset_id, stated)
+    if resolved is not None:
+        period, key, own_physical = resolved.period, resolved.staging_key, resolved.tables
+    else:
+        period = filing.period_of(dataset_id, arrival.received_at)
+        key, own_physical = supply_db.arrival_segment(arrival.received_at), None
+    if not period:
+        _withhold_if_held(arrival, dataset_id, own_table, dsn=dsn)
+        return None
+    sample = [t for t in tables
+              if sample_data.is_sample(hierarchy.dataset_for_table(t).dataset_id)]
+    agreed = [t for t in tables if t not in sample]
+    trial_scope = trial.scope_for(arrival.run_id)
+    loaded = load_log.loaded_tables(trial_scope)
+
+    conn = supply_db.connect(dsn=dsn, label="mothman:period-overlay")
+    try:
+        out = build(conn, arrival.run_id, period=period, own_table=own_table,
+                    arrival_key=key, tables=agreed, loaded=loaded,
+                    held=supply_holds.held_tables(
+                        conn, arrival_key=key,
+                        supply=resolved.supply_id if resolved is not None else None),
+                    own_physical=own_physical)
+        if sample:
+            found = supply_db.candidates_in(conn, sample_data.SCHEMA, sample,
+                                             loaded=loaded)
+            newest = {logical: [sample_data.newest(versions)]
+                      for logical, versions in found.items()
+                      if sample_data.newest(versions) is not None}
+            supply_db.add_run_views(conn, arrival.run_id, newest,
+                                     sample_data.SCHEMA, out.resolution)
+        name_held_siblings(conn, out.resolution, arrival)
+        # THE RUN'S OWN HELD TABLE BY ITS SUPPLY ID (REQ-PIPE-279 criterion 1),
+        # from the same holds that withheld it.
+        for table, supply in supply_holds.held_supplies(
+                conn, arrival_key=key,
+                supply=resolved.supply_id if resolved is not None else None).items():
+            if table in out.resolution.held:
+                out.resolution.held_supply.setdefault(table, supply)
+        supply_db.record_resolution(conn, out.resolution)
+    finally:
+        conn.close()
+    return out

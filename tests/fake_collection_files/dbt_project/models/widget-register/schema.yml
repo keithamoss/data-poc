@@ -1,0 +1,31 @@
+# REQ-TEST-249: the fake collection's dbt tests.
+version: 2
+
+models:
+  - name: stg_widgets
+    description: One row per widget on the register, per quarterly extract.
+    columns:
+      - name: widget_id
+        tests:
+          - unique:
+              meta:
+                check_id: data-asset-1.widget-agency.widget-register.widgets.widget_id.unique_dbt
+                category: uniqueness
+                introduced_date: "2026-10-18"
+                description: >
+                  This value must be unique.
+                failure_indicates: >
+                  self-evident
+                changelog: []
+      - name: colour
+        tests:
+          - not_null:
+              meta:
+                check_id: data-asset-1.widget-agency.widget-register.widgets.colour.not_null_dbt
+                category: completeness
+                introduced_date: "2026-10-18"
+                description: >
+                  This value must never be empty.
+                failure_indicates: >
+                  self-evident
+                changelog: []

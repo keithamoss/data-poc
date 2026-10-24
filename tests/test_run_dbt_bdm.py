@@ -1,5 +1,5 @@
-"""Real dbt-core integration test for qa_tools/bdm/run_dbt_bdm.py's
-evaluate_dbt_bdm() - the actual "parse dbt's real manifest.json/
+"""Real dbt-core integration test for qa_tools/tools/run_dbt.py's
+evaluate() - the actual "parse dbt's real manifest.json/
 run_results.json into our check-result shape, and re-verify counts via
 the audit-table workaround for the real dbt-core#11312 bug" logic, not
 previously exercised under pytest at all (see tests/conftest.py's own
@@ -12,40 +12,41 @@ from __future__ import annotations
 
 import pytest
 
-import qa_tools.bdm.run_dbt_bdm as run_dbt_bdm
+import qa_tools.tools.run_dbt as run_dbt
 
-# Must match conftest.py's own _REF_RUN_ID/_DIRTY_RUN_ID exactly - those
-# are the literal names bdm_duckdb_dir's fixture builds the real per-run
-# DuckDB files under, and evaluate_dbt_bdm() looks up db_path purely from
-# this run_id, so the two can never drift apart. (Real parallel-test
-# safety for dbt's own target-path output lives in evaluate_dbt_bdm()
-# itself now - see that function's own comment, plans/running-thoughts.md
-# #12 - not here.)
-_REF_RUN_ID = "pytest_bdm_ref"
-_DIRTY_RUN_ID = "pytest_bdm_dirty"
+# The run_ids bdm_duckdb_dir's fixture deliveries are RECOGNISED as, not
+# the names the fixture wrote (REQ-GEN-043) - evaluate() looks up
+# db_path purely from this run_id, so the two can never drift apart. See
+# tests/fixture_ids.py, and tests/test_fixture_ids.py for the guard that
+# keeps it honest. (Real parallel-test safety for dbt's own target-path
+# output lives in evaluate() itself now - see that function's own
+# comment, plans/running-thoughts.md #12 - not here.)
+from fixture_ids import BDM_DIRTY_RUN_ID as _DIRTY_RUN_ID, BDM_REF_RUN_ID as _REF_RUN_ID
 
 
 @pytest.fixture
 def _dbt_bdm(monkeypatch, bdm_duckdb_dir):
-    # dbt's own target_path now lives under DUCKDB_RUNS_DIR itself (see
-    # evaluate_dbt_bdm()'s own comment) - a per-worker pytest tmp dir, not
-    # a real repo-relative location, so no manual cleanup is needed here
-    # any more (pytest's own tmp dir retention handles it, same as every
-    # other tmp_path_factory-based fixture in this suite).
-    monkeypatch.setattr(run_dbt_bdm, "DUCKDB_RUNS_DIR", bdm_duckdb_dir)
+    # dbt's scratch database and its target_path both hang off the
+    # supply database's own directory (see evaluate() and
+    # supply_db.dbt_target_path()) - a per-worker pytest tmp dir, not a
+    # real repo-relative location, so no manual cleanup is needed here
+    # (pytest's own tmp dir retention handles it, same as every other
+    # tmp_path_factory-based fixture in this suite).
+    # The environment already points at this worker's database
+    # (conftest's supply_dsn); bdm_duckdb_dir is what staged the data into it.
     captured = {}
-    monkeypatch.setattr(run_dbt_bdm, "write_qa_result",
+    monkeypatch.setattr(run_dbt, "write_qa_result",
                          lambda *a, **k: captured.setdefault("write_qa_result_called", True))
     return captured
 
 
 def test_clean_run_resolves_every_check_id_and_mostly_passes(_dbt_bdm):
-    results = run_dbt_bdm.evaluate_dbt_bdm(_REF_RUN_ID, "2026-01-01T06:30:00Z")
+    results = run_dbt.evaluate("civil-registration", _REF_RUN_ID, "2026-01-01T06:30:00Z")
 
     assert results, "the real dbt build produced no test results at all"
     assert all(r["check_id"] for r in results), "every result must resolve a real check_id (evaluate_dbt_bdm raises if not)"
     assert all(r["run_id"] == _REF_RUN_ID for r in results)
-    assert all(r["engine"] == run_dbt_bdm.ENGINE_TAG for r in results)
+    assert all(r["engine"] == run_dbt.ENGINE_TAG for r in results)
     assert all(r["status"] in ("pass", "warn", "fail") for r in results)
     # A clean, undirtied 60-row batch should have no genuine failures -
     # real assertion on real dbt output, not a fixture stand-in.
@@ -55,7 +56,7 @@ def test_clean_run_resolves_every_check_id_and_mostly_passes(_dbt_bdm):
 
 
 def test_dirty_run_produces_a_real_failure_and_correct_row_counts(_dbt_bdm):
-    results = run_dbt_bdm.evaluate_dbt_bdm(_DIRTY_RUN_ID, "2026-01-02T06:30:00Z")
+    results = run_dbt.evaluate("civil-registration", _DIRTY_RUN_ID, "2026-01-02T06:30:00Z")
 
     assert results
     assert all(r["check_id"] for r in results)
@@ -82,7 +83,7 @@ def test_audit_table_correction_overrides_run_results_failures_field(_dbt_bdm):
     non-negative integer, never None/negative - the shape the audit-
     table re-derivation is meant to guarantee regardless of what dbt's
     own (sometimes-wrong) run_results.json said."""
-    results = run_dbt_bdm.evaluate_dbt_bdm(_REF_RUN_ID, "2026-01-01T06:30:00Z")
-    covered = [r for r in results if r["check_name"].removeprefix("dbt:") in run_dbt_bdm._AUDIT_AGGREGATE_SQL]
+    results = run_dbt.evaluate("civil-registration", _REF_RUN_ID, "2026-01-01T06:30:00Z")
+    covered = [r for r in results if r["check_name"].removeprefix("dbt:") in (run_dbt._AUDIT_COUNTED | run_dbt._AUDIT_SUMMED | {"multiple_birth_sibling", "recency"})]
     assert covered, "no results matched any _AUDIT_AGGREGATE_SQL-covered test - fixture/test drifted from real schema.yml"
     assert all(isinstance(r["metric_value"], int) and r["metric_value"] >= 0 for r in covered)

@@ -14,18 +14,23 @@ from __future__ import annotations
 from dashboard import check_dashboard_renders as cdr
 
 
-def _write_dashboard(path, birth_reg_json="{}", cp_json="{}"):
-    path.write_text(
-        "<html><script>\n"
-        f"const REAL_BIRTH_REG_DATA = {birth_reg_json};\n"
-        f"const REAL_CP_DATA = {cp_json};\n"
-        "</script></html>\n"
-    )
+def _write_dashboard(path, collection_data):
+    path.write_text("<html><script>\n"
+                    f"const COLLECTION_DATA = {collection_data};\n"
+                    "</script></html>\n")
 
 
-def test_check_embedded_json_passes_for_valid_json(tmp_path, monkeypatch):
+def _every_collection() -> str:
+    from qa_tools import collections
+
+    ids = [c.id for c in collections.all_collections()]
+    assert ids, "the registry must hold collections for these tests to mean anything"
+    return "{" + ",".join(f'"{i}": {{"datasets": []}}' for i in ids) + "}"
+
+
+def test_check_embedded_json_passes_when_every_collection_is_there(tmp_path, monkeypatch):
     dashboard_path = tmp_path / "dashboard.html"
-    _write_dashboard(dashboard_path, birth_reg_json='{"a": 1}', cp_json='{"b": [1, 2]}')
+    _write_dashboard(dashboard_path, _every_collection())
     monkeypatch.setattr(cdr, "DASHBOARD_PATH", dashboard_path)
 
     assert cdr._check_embedded_json() == []
@@ -33,24 +38,35 @@ def test_check_embedded_json_passes_for_valid_json(tmp_path, monkeypatch):
 
 def test_check_embedded_json_flags_invalid_json(tmp_path, monkeypatch):
     dashboard_path = tmp_path / "dashboard.html"
-    _write_dashboard(dashboard_path, birth_reg_json='{"a": 1,}')  # trailing comma - invalid JSON
+    _write_dashboard(dashboard_path, '{"a": 1,}')  # trailing comma - invalid JSON
     monkeypatch.setattr(cdr, "DASHBOARD_PATH", dashboard_path)
 
     errors = cdr._check_embedded_json()
 
-    assert len(errors) == 1
-    assert "REAL_BIRTH_REG_DATA" in errors[0]
+    assert len(errors) == 1 and "COLLECTION_DATA" in errors[0]
 
 
 def test_check_embedded_json_flags_a_missing_const(tmp_path, monkeypatch):
     dashboard_path = tmp_path / "dashboard.html"
-    dashboard_path.write_text("<html><script>\nconst REAL_BIRTH_REG_DATA = {};\n</script></html>\n")
+    dashboard_path.write_text("<html><script>\nconst OTHER = {};\n</script></html>\n")
     monkeypatch.setattr(cdr, "DASHBOARD_PATH", dashboard_path)
 
-    errors = cdr._check_embedded_json()
+    assert cdr._check_embedded_json() == ["COLLECTION_DATA: no embedded const found in the built HTML"]
 
-    assert len(errors) == 1
-    assert "REAL_CP_DATA" in errors[0]
+
+def test_check_embedded_json_names_a_collection_that_is_not_in_it(tmp_path, monkeypatch):
+    """REQ-DASH-244 criterion 9: the registry says which collections must be
+    there, so a third one registered but not built is named."""
+    import json
+
+    dashboard_path = tmp_path / "dashboard.html"
+    data = json.loads(_every_collection())
+    dropped = next(iter(data))
+    del data[dropped]
+    _write_dashboard(dashboard_path, json.dumps(data))
+    monkeypatch.setattr(cdr, "DASHBOARD_PATH", dashboard_path)
+
+    assert cdr._check_embedded_json() == [f"COLLECTION_DATA: no entry for collection {dropped!r}"]
 
 
 def test_main_fails_fast_when_the_dashboard_was_never_built(tmp_path, monkeypatch):
@@ -86,3 +102,70 @@ def test_resolve_chromium_path_returns_none_when_neither_is_available(monkeypatc
     monkeypatch.setattr(cdr, "_SANDBOX_CHROMIUM_SYMLINK", str(tmp_path / "does-not-exist"))
 
     assert cdr._resolve_chromium_path() is None
+
+
+# REQ-DASH-291 criterion 14: the structural check reads COLLECTION_DATA
+# through the one reader, and fails a missing file or one whose SHA-256
+# differs from the page's list.
+
+def _split_page(tmp_path):
+    from dashboard import data_files
+    from qa_tools import collections
+
+    files = []
+    for c in collections.all_collections():
+        files += data_files.encode(data_files.collection_key(c.id), {"datasets": []},
+                                   kind="collection", collection=c.id)
+    html = ("<html>\n<!-- mothman:data-files -->\n<script>\nconst DATA_FILES = null;\n"
+            "const COLLECTION_DATA = null;\n</script></html>\n")
+    page = tmp_path / "dashboard.html"
+    page.write_text(data_files.embed_into_page(html, data_files.manifest(files)))
+    data_files.write(files, tmp_path / "data")
+    return page, files
+
+
+def test_check_embedded_json_reads_the_data_files(tmp_path, monkeypatch):
+    page, _ = _split_page(tmp_path)
+    monkeypatch.setattr(cdr, "DASHBOARD_PATH", page)
+    assert cdr._check_embedded_json() == []
+
+
+def test_check_embedded_json_fails_a_missing_data_file(tmp_path, monkeypatch):
+    page, files = _split_page(tmp_path)
+    (tmp_path / "data" / files[0].entry["name"]).unlink()
+    monkeypatch.setattr(cdr, "DASHBOARD_PATH", page)
+    errors = cdr._check_embedded_json()
+    assert any(files[0].entry["name"] in e and "missing" in e for e in errors), errors
+
+
+def test_check_embedded_json_fails_a_data_file_whose_sha256_differs(tmp_path, monkeypatch):
+    page, files = _split_page(tmp_path)
+    path = tmp_path / "data" / files[-1].entry["name"]
+    path.write_bytes(path.read_bytes().replace(b"datasets", b"datasetz"))
+    monkeypatch.setattr(cdr, "DASHBOARD_PATH", page)
+    errors = cdr._check_embedded_json()
+    assert any(files[-1].entry["name"] in e and "SHA-256" in e for e in errors), errors
+
+
+def test_the_browser_check_fails_a_page_showing_its_data_file_error(tmp_path):
+    """post-build-review #268 T3: REQ-DASH-291 criterion 14's browser half -
+    a page that renders its missing-file error fails the gate whatever the
+    console says. The real template, given a list naming a file that was
+    never written, exactly as embed() would leave it; the raw template
+    beside it is the control, so a gate that failed everything would fail
+    here too."""
+    import asyncio
+
+    from dashboard import data_files
+
+    [missing] = data_files.encode(data_files.collection_key("civil-registration"),
+                                  {"datasets": []}, kind="collection",
+                                  collection="civil-registration")
+    page = tmp_path / "page.html"
+    page.write_text(data_files.embed_into_page(cdr.TEMPLATE_PATH.read_text(),
+                                               data_files.manifest([missing])))
+    errors = asyncio.run(cdr._check_render(page, "built output"))
+    assert any("shows its data-file error" in e and missing.entry["name"] in e
+               for e in errors), errors
+    control = asyncio.run(cdr._check_render(cdr.TEMPLATE_PATH, "template"))
+    assert not any("data-file error" in e for e in control), control

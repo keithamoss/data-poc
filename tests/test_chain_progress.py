@@ -1,0 +1,124 @@
+"""The check chain's own progress reporting (plans/tooling.md #13).
+
+The chain takes ~13.5s and used to print one line and then nothing at
+all for that whole stretch - a static screen with no sign the tool was
+alive, working, or hung. Found while re-recording the demo
+(plans/dashboard.md #13), where it showed up as a gap with literally
+zero terminal events.
+
+These cover the plumbing rather than the rendering: that the real,
+discrete steps get announced in the right order, that every existing
+caller is genuinely unaffected (on_step is optional by design - the
+batch pipeline, the Lambda handlers and the tests all pass nothing),
+and that the labels and the count come from ONE source of truth so a
+progress bar built on them can't drift from what actually runs."""
+from __future__ import annotations
+
+import re
+import sys
+from unittest.mock import patch
+
+from cli import common
+from qa_tools.tools import orchestrate
+
+
+def test_both_orchestrators_agree_on_the_real_steps():
+    """cli/common.chain_progress() sizes its bar off BDM's RUN_STEPS; if
+    CP's ever diverged, a CP run would over- or under-fill it."""
+    assert orchestrate.RUN_STEPS == orchestrate.RUN_STEPS
+    assert common.RUN_STEPS == orchestrate.RUN_STEPS
+    # The 4 real tools plus the dataset_stats computation - the genuinely
+    # known steps that make this a real progress measure, not a fake one.
+    assert orchestrate.RUN_STEPS == (
+        "dbt-core", "Soda Core", "datacontract-cli", "Evidently", "Dataset statistics")
+
+
+def test_announce_is_a_no_op_without_a_callback():
+    """The contract every existing caller relies on: pass nothing, get
+    exactly the old behaviour."""
+    orchestrate._announce(None, "dbt-core")  # must not raise
+    orchestrate._announce(None, "dbt-core")
+
+
+def test_announce_reports_the_label_when_a_callback_is_given():
+    seen = []
+    orchestrate._announce(seen.append, "Soda Core")
+    assert seen == ["Soda Core"]
+
+
+def test_chain_progress_reports_every_step_in_order(monkeypatch):
+    """Drives the real helper with a real (forced-TTY) rich Progress and
+    checks the callback tracks genuine position - the count reported is
+    steps FINISHED, never work that hasn't happened yet."""
+    monkeypatch.setattr(sys.stdout, "isatty", lambda: True, raising=False)
+    completions = []
+    with patch.object(common.console, "print"):
+        with common.chain_progress("run_001") as on_step:
+            assert on_step is not None
+            for i, label in enumerate(common.RUN_STEPS):
+                on_step(label)
+                completions.append(i)
+    # Five real steps announced, each before it starts.
+    assert completions == [0, 1, 2, 3, 4]
+
+
+def test_chain_progress_degrades_to_a_plain_line_off_a_tty(monkeypatch, capsys):
+    """A redirected log or a CI runner must not get thousands of cursor
+    control sequences - and a caller that gets None back must still work,
+    which is what makes on_step optional all the way down."""
+    monkeypatch.setattr(sys.stdout, "isatty", lambda: False, raising=False)
+    with common.chain_progress("run_042") as on_step:
+        assert on_step is None
+    assert "run_042" in capsys.readouterr().out
+
+
+def test_no_check_chain_call_site_is_left_without_a_progress_indicator():
+    """Every place the CLI kicks off the real ~13.5s chain must show
+    progress - a human waits exactly as long whichever route they took.
+
+    This exists because the first pass at plans/tooling.md #13 wired only
+    some of them. Keith caught it by asking a question I had to go and
+    check rather than answer from memory ("does it need to be in the CP
+    one as well?"): BDM's Synthetic and Local-files paths had it, and
+    eight others did not - both S3 modes, CP's single-table mode, and
+    every flag-invocable `mothman <ds> qa` form, which is the route a
+    human most likely uses more than once.
+
+    Asserted structurally rather than by driving 13 real chain runs,
+    which would cost minutes. It's deliberately a blunt check: any new
+    `results, tmp_dir = run_check*(...)` must sit inside a
+    `common.chain_progress(...)` block. If a future call site genuinely
+    shouldn't show a bar, that's a real decision worth making explicitly
+    here rather than by omission."""
+    import ast
+    import pathlib
+
+    #: THE ONE DELIBERATE EXCEPTION: the target trial runs while generating,
+    #: where each target's own "Trying ..." line is the progress (REQ-GEN-186).
+    exempt = {"try_targets"}
+    bare, seen = [], 0
+    for name in ("cli/one_table.py", "cli/many_tables.py"):
+        source = pathlib.Path(name).read_text()
+        lines = source.splitlines()
+        owner = {}
+        for node in ast.walk(ast.parse(source)):
+            if isinstance(node, ast.FunctionDef):
+                for n in range(node.lineno, node.end_lineno + 1):
+                    owner.setdefault(n, []).append(node.name)
+        for i, line in enumerate(lines):
+            if not re.search(r"results, \w+ = (?:self|cli_)\.run_check", line):
+                continue
+            seen += 1
+            if exempt & set(owner.get(i + 1, ())):
+                continue
+            # the `with common.chain_progress(...) as on_step:` opening
+            # the block sits within a couple of lines above the call
+            if not any("chain_progress" in lines[j] for j in range(max(0, i - 3), i)):
+                bare.append(f"{name}:{i + 1}: {line.strip()}")
+
+    # A PATTERN THAT MATCHES NOTHING PROVES NOTHING - which is what this
+    # test did from the day its call sites were renamed until REQ-TEST-245.
+    assert seen >= 16, f"only {seen} check-chain call sites found - has the call form changed?"
+    assert bare == [], (
+        "these start the real check chain with no progress indicator, so a "
+        "human waits ~13.5s at a frozen screen:\n" + "\n".join(bare))

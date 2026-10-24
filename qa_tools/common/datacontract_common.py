@@ -1,7 +1,6 @@
 """
 Tool-generic datacontract-cli helpers, shared by
-qa_tools/bdm/run_datacontract_bdm.py and
-qa_tools/cp/run_datacontract_cp.py. Constructing an in-memory
+qa_tools/tools/run_datacontract.py. Constructing an in-memory
 contract copy with a "local_test" server added and calling
 DataContract.test() is identical regardless of dataset; only which
 contract file and which local CSV path get used differs.
@@ -11,9 +10,12 @@ everywhere) - shared for that reason, not because they're subprocess/API
 plumbing like the rest of this module. See plans/qa-pipeline.md #84.
 """
 from __future__ import annotations
+
+import functools
 import copy
 
 import yaml
+from qa_tools.common import config_yaml
 
 ENGINE_TAG = "datacontract-cli 1.2.0"
 
@@ -36,30 +38,123 @@ LABEL_BY_METRIC = {
 }
 
 
-def run_against_local_server(contract_path: str, local_path: str):
-    """Loads contract_path, adds a "local_test" local server pointed at
-    local_path (a CSV file, or a datacontract-cli {model}-templated path
-    for a multi-table contract), and runs DataContract.test() against it.
-    The file on disk is never touched - a deep copy gets the extra
-    server, not the original dict - and its own "production" server (e.g.
-    S3) is untouched too. Returns the DataContract `run` result (caller
-    reads run.checks)."""
+class SelectionRefused(RuntimeError):
+    """datacontract-cli could not select what the run asked for - a rule id
+    or a model the contract does not hold (REQ-PIPE-190 criterion 7)."""
+
+
+#: The checks datacontract-cli adds when a selection names something the
+#: contract does not hold. It reports them rather than raising.
+_SELECTION_CHECKS = ("Check that quality rule id exists", "Check that schema name exists")
+
+
+def run_against_warehouse(contract_path: str, schema: str, *,
+                          quality_ids: set[str] | None = None,
+                          schema_name: str | None = None):
+    """Test the contract against the WAREHOUSE, not the file that arrived.
+
+    `quality_ids` and `schema_name` ARE THE TOOL'S OWN OPTIONS (REQ-PIPE-190,
+    Keith 2026-10-12): a run asks for its scope through them, and the
+    contract text is never pruned to do it - the seam the declined
+    REQ-PIPE-161 touched. Neither is passed where the caller asks for
+    everything. A selection the tool cannot honour raises SelectionRefused
+    rather than testing anything else.
+
+    THIS IS WHAT REQ-QAC-088 IS FOR. Until now this tool read the
+    supplier's CSV directly through a "local_test" server, which made it
+    the one tool answering a different question from the other three:
+    they checked what had been loaded, it checked what had been sent. Two
+    tools can then disagree about a dataset and both be right, which is
+    the failure REQ-PIPE-068 criterion 2 recorded as an outstanding
+    exception and this closes.
+
+    The run's view schema arrives as the server's own `schema`, so a
+    model name in the contract means exactly one arrival's rows - the
+    same resolution dbt and Soda see.
+
+    CREDENTIALS GO THROUGH THE ENVIRONMENT because datacontract-cli
+    wants them there rather than in the document, which is the right way
+    round: the contract is committed and a credential must not be.
+
+    A PASSWORD IS MANDATORY, and that is this tool's constraint on the
+    whole project rather than a detail of this function. Two attempts got
+    it wrong before the source settled it. libpq ignores a password
+    entirely under trust authentication, so setting one only when
+    non-empty looked right; datacontract-cli then failed with
+    `missing_env_DATACONTRACT_POSTGRES_PASSWORD`. Setting it to an empty
+    string failed identically, because its own check is `if required and
+    not value` - an empty string is missing. So every PostgreSQL this
+    project talks to needs a real password, including the local
+    development one, and the DSN must carry it.
+
+    PASSED AS `config=`, NOT THROUGH os.environ. The earlier version set
+    the two DATACONTRACT_POSTGRES_* variables on the process, which is a
+    side effect a library function has no business having - it outlives
+    the call, leaks into everything else in the process, and in a test
+    run leaks between tests.
+
+    The dict is keyed by the ENVIRONMENT VARIABLE NAMES, not by the
+    Config model's field names, which is the opposite of what it looks
+    like from the outside - Config.resolve() reverses env_name() over its
+    own fields, so `postgres_password` is rejected as unknown while
+    `DATACONTRACT_POSTGRES_PASSWORD` is accepted. Its own docstring says
+    so in as many words; reading the source settled it after guessing
+    wrong.
+    """
     from datacontract.data_contract import DataContract
+    from qa_tools.common import supply_db
 
     with open(contract_path) as f:
-        contract_dict = yaml.safe_load(f)
+        contract_dict = config_yaml.parse(f)
 
+    fields = supply_db.connection_fields()
     d = copy.deepcopy(contract_dict)
     d["servers"].append({
-        "server": "local_test",
-        "type": "local",
-        "path": local_path,
-        "format": "csv",
-        "delimiter": "comma",
+        "server": "warehouse",
+        "type": "postgres",
+        "host": fields["host"],
+        "port": int(fields["port"]),
+        "database": fields["dbname"],
+        "schema": schema,
     })
 
-    dc = DataContract(data_contract_str=yaml.dump(d), server="local_test", include_failed_samples=True)
-    return dc.test()
+    if not fields["password"]:
+        raise ValueError(
+            "the supply DSN carries no password, and datacontract-cli requires "
+            "one - it treats an empty value as missing. Give the database a "
+            "real password and put it in MOTHMAN_SUPPLY_DSN.")
+
+    selected = {}
+    if quality_ids is not None:
+        selected["quality_ids"] = set(quality_ids)
+    if schema_name is not None:
+        selected["schema_name"] = schema_name
+    dc = DataContract(data_contract_str=yaml.dump(d), server="warehouse",
+                      include_failed_samples=True,
+                      config={"DATACONTRACT_POSTGRES_USERNAME": fields["user"],
+                              "DATACONTRACT_POSTGRES_PASSWORD": fields["password"]},
+                      **selected)
+    run = dc.test()
+    refused = [c for c in run.checks if c.name in _SELECTION_CHECKS
+               and getattr(c.result, "value", c.result) != "passed"]
+    if selected and refused:
+        raise SelectionRefused(
+            "datacontract-cli could not select what this run asked for - "
+            + "; ".join(f"{c.name}: {c.reason}" for c in refused)
+            + ". Refused rather than testing the whole contract instead.")
+    return run
+
+
+def selection_for(contract_path: str, asked: list[str]) -> dict:
+    """The options a run asks datacontract-cli with: its rules by id, and
+    their model where they all sit on one (REQ-PIPE-190 criterion 3)."""
+    from qa_tools.common import check_lifecycle
+
+    models = {check_lifecycle.contract_rule_models(contract_path).get(c) for c in asked}
+    options: dict = {"quality_ids": {check_lifecycle.odcs_quality_id(c) for c in asked}}
+    if len(models) == 1 and None not in models:
+        options["schema_name"] = models.pop()
+    return options
 
 
 # datacontract-cli's own SAMPLEABLE_METRICS (missing_count/invalid_count/
@@ -70,7 +165,7 @@ def run_against_local_server(contract_path: str, local_path: str):
 # but, unlike the other two, its own samples are shaped {field: value,
 # duplicate_count: N} - the offending VALUE, not the identifier - so
 # failing_sample_keys() below correctly returns [] for it (same class of
-# gap as dbt's own `unique` test - see run_dbt_bdm.py's
+# gap as dbt's own `unique` test - see qa_tools/tools/run_dbt.py's
 # failing_sample_keys_via_values, not replicated here since it needs
 # a fresh read of the source CSV this module doesn't otherwise hold).
 # Soda and dbt each already cover the equivalent duplicate/unique check
@@ -97,11 +192,29 @@ def check_id_from_quality_definition(quality_definition: str | None) -> str | No
     `_QUALITY_CHECK_TYPES` guard before this ever gets called on one."""
     if not quality_definition:
         return None
-    doc = yaml.safe_load(quality_definition) or {}
+    return _derived(quality_definition)[0]
+
+
+@functools.lru_cache(maxsize=4096)
+def _derived(quality_definition: str) -> tuple:
+    """(check_id, the first of mustBe/mustBeLessThan/mustBeLessOrEqualTo or
+    None) from one rule's qualityDefinition, parsed once per distinct text
+    (REQ-PIPE-192): the two readers below parsed every rule's YAML again on
+    every run - 17,687 parses in one bootstrap. Immutable, so shared."""
+    doc = config_yaml.parse(quality_definition) or {}
+    check_id = None
     for prop in doc.get("customProperties") or []:
         if prop.get("property") == "check_id":
-            return prop.get("value")
-    return None
+            check_id = prop.get("value")
+            break
+    threshold = next((doc[k] for k in ("mustBe", "mustBeLessThan", "mustBeLessOrEqualTo")
+                      if k in doc), _NO_THRESHOLD)
+    return check_id, threshold
+
+
+#: No threshold key at all - distinct from a key present with a null value,
+#: which is returned as it always was.
+_NO_THRESHOLD = object()
 
 
 # Item 74 (plans/qa-pipeline.md, found 2026-09-18) - Bug B. Both
@@ -142,11 +255,8 @@ def fail_threshold_from_quality_definition(quality_definition: str | None, sever
         return None
     if not quality_definition:
         return 0
-    doc = yaml.safe_load(quality_definition) or {}
-    for key in ("mustBe", "mustBeLessThan", "mustBeLessOrEqualTo"):
-        if key in doc:
-            return doc[key]
-    return 0
+    threshold = _derived(quality_definition)[1]
+    return 0 if threshold is _NO_THRESHOLD else threshold
 
 
 def failing_sample_keys(check, pk_column: str) -> list[str]:
@@ -157,4 +267,5 @@ def failing_sample_keys(check, pk_column: str) -> list[str]:
     column, matching every other tool's samples. Empty when the tool
     didn't capture any (metric not sampleable, or a passing check)."""
     samples = getattr(check, "failedSamples", None) or []
-    return [str(s[pk_column]) for s in samples if pk_column in s]
+    # SORTED, so the same data records the same sample (post-build-review #129).
+    return sorted(str(s[pk_column]) for s in samples if pk_column in s)

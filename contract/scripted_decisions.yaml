@@ -1,0 +1,310 @@
+# SCRIPTED PERSON DECISIONS, played back into the synthetic history
+# (REQ-GEN-135). Configuration, reviewed like the injection table: each
+# names its scenario and which of that scenario's recorded supplies it acts
+# on (by index - never a generated id), and takes effect `after_hours` after
+# that supply was received. Raised through the one decision path as the
+# synthetic person in contract/people.yaml, only on a synthetic asset, and a
+# refusal stops the replay. `mothman scenarios validate` gates it in CI.
+#
+# SCRIPTED CORRECTION CONFIRMATIONS (REQ-GEN-205) sit in a separate
+# top-level `corrections:` list, after `decisions:`. Each names a declared
+# correction by `change_reference:` (no dataset of its own) and says either
+# `keep:` - a list of supplies, each `{scenario, dataset, supply}` by the
+# scenario's supply index, never a generated id - with one `keep_reason:`
+# covering them, or `pending: true`, leaving it for the asset manager. No
+# timing field: it is confirmed when the replay confirms the due
+# corrections. A correction with no entry moves everything it proposes.
+#
+decisions:
+  - scenario: TS-47
+    operation: mark-not-supplied
+    dataset: birth-registrations
+    supply: 0
+    after_hours: 2
+    names_supply: false
+    period_from: placement
+    reason: "The supplier's file for this day arrived the next morning and filled that day instead; this day was not supplied."
+  # REQ-GEN-185 criterion 7: TS-43's held amber is promoted by a person, so the
+  # gap it opens is closed before the next day's supply is measured. TWENTY
+  # HOURS - ten the next morning, before that day's 14:30 supply - so it comes
+  # after the rule has held it (a replayed rule decision lands within the
+  # 4-hour claim window, promotion.effective_at_for) and the hold is still
+  # what the page shows at the end of its own day (post-build-review #156).
+  - scenario: TS-43
+    operation: promote
+    dataset: birth-registrations
+    supply: 0
+    after_hours: 20
+    reason: "Facility details missing on more registrations than usual, explained by the supplier; accepted for this day."
+  # REQ-GEN-137 criterion 4: TS-45's promoted amber is acknowledged by a person,
+  # five hours after it arrived - after the rule has promoted it.
+  - scenario: TS-45
+    operation: acknowledge
+    dataset: birth-registrations
+    supply: 0
+    after_hours: 5
+    reason: "Second-parent names missing on more registrations than usual; checked with the supplier, expected for this day."
+  # REQ-GEN-195 (Keith, 2026-10-12: "have it refiled to Q4 by a synthetic
+  # human making a decision"): TS-67's supply arrived before 2023-Q4's claim
+  # window opened, so the rule filed it as a resupply of 2023-Q3 and refused to
+  # promote it over Q3's accepted supply. A person re-files it to 2023-Q4 at
+  # 10:00 on 21 October, nine days after it arrived - once Q4's window is open
+  # and after the rule's refusal - so 2023-Q4 is not left with no supply.
+  - scenario: TS-67
+    operation: refile
+    dataset: cp-clients
+    supply: 0
+    after_hours: 216
+    to_period: 2023-Q4
+    reason: "This is the supplier's 2023-Q4 extract, sent before the quarter's window opened; it belongs to 2023-Q4, not 2023-Q3."
+  - scenario: TS-67
+    operation: refile
+    dataset: cp-notifications
+    supply: 0
+    after_hours: 216
+    to_period: 2023-Q4
+    reason: "This is the supplier's 2023-Q4 extract, sent before the quarter's window opened; it belongs to 2023-Q4, not 2023-Q3."
+  - scenario: TS-67
+    operation: refile
+    dataset: cp-investigations
+    supply: 0
+    after_hours: 216
+    to_period: 2023-Q4
+    reason: "This is the supplier's 2023-Q4 extract, sent before the quarter's window opened; it belongs to 2023-Q4, not 2023-Q3."
+  - scenario: TS-67
+    operation: refile
+    dataset: cp-placements
+    supply: 0
+    after_hours: 216
+    to_period: 2023-Q4
+    reason: "This is the supplier's 2023-Q4 extract, sent before the quarter's window opened; it belongs to 2023-Q4, not 2023-Q3."
+  - scenario: TS-67
+    operation: refile
+    dataset: cp-carers
+    supply: 0
+    after_hours: 216
+    to_period: 2023-Q4
+    reason: "This is the supplier's 2023-Q4 extract, sent before the quarter's window opened; it belongs to 2023-Q4, not 2023-Q3."
+  # cp-case-workers is not delivered in 2023-Q4 (its participation), so its
+  # table has no Q4 to go to - the same person rejects it instead.
+  - scenario: TS-67
+    operation: reject
+    dataset: cp-case-workers
+    supply: 0
+    after_hours: 216
+    reason: "Part of the supplier's 2023-Q4 extract, sent early; case workers are not delivered for 2023-Q4, so this table is not a supply for any period."
+  # REQ-GEN-196: each two-file pair (TS-68 to TS-74) is settled by a person
+  # with one choose-file decision at 11:00 the NEXT day on the asset's clock -
+  # a later asset day than both receipts, so the arrival day reads contested,
+  # and before that day's own 14:30 supply. Files are named by POSITION in
+  # receipt order (1 = the earlier), resolved to filenames at play time;
+  # `refile:+1` is the day after the placement.
+  - scenario: TS-68
+    operation: choose-file
+    dataset: birth-registrations
+    supply: 0
+    at: "11:00"
+    day_offset: 1
+    files: [supply, supersede]
+    reason: "The supplier sent the same file twice; the first is the day's supply and the copy is kept but superseded."
+  - scenario: TS-69
+    operation: choose-file
+    dataset: birth-registrations
+    supply: 0
+    at: "11:00"
+    day_offset: 1
+    files: [supply, "refile:+1"]
+    reason: "The second file is the next day's extract, sent early; it belongs to the next day."
+  - scenario: TS-70
+    operation: choose-file
+    dataset: birth-registrations
+    supply: 0
+    at: "11:00"
+    day_offset: 1
+    files: [reject, supply]
+    reason: "The supplier re-exported the day's extract with the fault fixed; the corrected file is the day's supply."
+  - scenario: TS-71
+    operation: choose-file
+    dataset: birth-registrations
+    supply: 0
+    at: "11:00"
+    day_offset: 1
+    files: [reject, supply]
+    reason: "The first file is the supplier's test data, sent by mistake; the real extract is the day's supply."
+  - scenario: TS-72
+    operation: choose-file
+    dataset: birth-registrations
+    supply: 0
+    at: "11:00"
+    day_offset: 1
+    files: [supply, reject]
+    reason: "The second file is the supplier's test data and never loaded; the real extract is the day's supply."
+  - scenario: TS-73
+    operation: choose-file
+    dataset: birth-registrations
+    supply: 0
+    at: "11:00"
+    day_offset: 1
+    files: [reject, reject]
+    reason: "Neither file is usable: the extract is faulty and the other is test data. The supplier will resend."
+  - scenario: TS-74
+    operation: choose-file
+    dataset: birth-registrations
+    supply: 0
+    at: "11:00"
+    day_offset: 1
+    files: ["refile:+1", reject]
+    reason: "The first file is the next day's extract, sent early, and the second is test data; nothing came for this day."
+  # REQ-GEN-203 criterion 11: TS-80's Client Register pair - a stray test file
+  # at 08:20, the real extract at 08:30 - settled by a person at 11:00 the day
+  # after its due day, so its arrival day reads contested. File 1 by receipt is
+  # the test file, although the real extract sorts first by name.
+  - scenario: TS-80
+    name: TS-80 settle
+    operation: choose-file
+    dataset: cp-clients
+    supply: 0
+    at: "11:00"
+    day_offset: 1
+    files: [reject, supply]
+    reason: "The first file is the supplier's test data, sent by mistake; the real Client Register extract is the quarter's supply."
+  # REQ-GEN-199: what the as-at panel and qualifier say on a past date.
+  # TS-75: cp_clients' red supply waits, and a person rejects it three weeks
+  # after it arrived; a corrected one-table resupply fills the quarter later.
+  - scenario: TS-75a
+    name: TS-75 reject
+    operation: reject
+    dataset: cp-clients
+    supply: 0
+    after_hours: 504
+    reason: "Client records fail their checks - the supplier is sending a corrected cp_clients extract."
+  # TS-76: the delivery left cp_placements out; the quarter stands on the one
+  # before until the next quarter's window has opened, when the substitution is
+  # removed and the quarter marked not supplied - de-substitution first.
+  - scenario: TS-76
+    name: TS-76 substitute
+    operation: substitute
+    dataset: cp-placements
+    scope: period
+    stands_on: -1
+    after_hours: 48
+    reason: "The supplier's delivery left placements out; the previous quarter's placements stand in until it is resent."
+  - scenario: TS-76
+    name: TS-76 de-substitute
+    operation: de-substitute
+    dataset: cp-placements
+    scope: period
+    after_hours: 1872
+    reason: "Placements for this quarter will not be resent; the previous quarter's should no longer stand in for it."
+  - scenario: TS-76
+    operation: mark-not-supplied
+    dataset: cp-placements
+    scope: period
+    after_hours: 1872
+    reason: "The supplier confirmed placements for this quarter will not be supplied."
+  # TS-77: the same omission, but cp_placements arrives late, waits a day, and
+  # the person promotes it - which removes the substitution.
+  - scenario: TS-77a
+    name: TS-77 substitute
+    operation: substitute
+    dataset: cp-placements
+    scope: period
+    stands_on: -1
+    after_hours: 48
+    reason: "The supplier's delivery left placements out; the previous quarter's placements stand in until it is resent."
+  - scenario: TS-77a
+    name: TS-77 promote
+    operation: promote
+    dataset: cp-placements
+    supply: 0
+    after_hours: 24
+    reason: "The supplier's resent placements for this quarter - checked, and replacing the stand-in."
+  # TS-78: a supply promoted after a newer one. D's held amber is promoted at
+  # 20:00 on D+1, after D+1's own promotion; D+2's at 10:00 on D+3.
+  - scenario: TS-78a
+    name: TS-78 promote D
+    operation: promote
+    dataset: birth-registrations
+    supply: 0
+    after_hours: 30
+    reason: "Parent names missing on more registrations than usual, explained by the supplier; accepted for this day."
+  - scenario: TS-78a
+    name: TS-78 promote D+2
+    operation: promote
+    dataset: birth-registrations
+    supply: 2
+    after_hours: 20
+    reason: "Second-parent names missing on more registrations than usual, explained by the supplier; accepted for this day."
+  # GROWN RED CHAINS, SETTLED (REQ-GEN-207; Keith, 2026-10-16: "Script
+  # decisions", "Promote the resend", "One entry per chain", "Grown years
+  # only"). An ordinary red in Child Protection's grown years is promoted, and
+  # under replacement `never` its resend waited for a person for ever - a
+  # permanent queue item no scenario is about. A person promotes the resend a
+  # day after it arrives. No scenario: each names its period, and `supply: 1`
+  # is the period's second supply in receipt order, the resend.
+  # (2013-Q3's chain is gone: Child Protection writes nothing in a quarter
+  # REQ-GEN-205's correction alters - REQ-GEN-237 criterion 3, PROVISIONAL.)
+  - period: 2014-Q1
+    operation: promote
+    dataset: cp-carers
+    supply: 1
+    after_hours: 24
+    reason: "The supplier's corrected carers extract for 2014-Q1; it replaces the version that failed its checks."
+  - period: 2014-Q1
+    operation: promote
+    dataset: cp-placements
+    supply: 1
+    after_hours: 24
+    reason: "The supplier's corrected placements extract for 2014-Q1; it replaces the version that failed its checks."
+
+  # EMPTIED QUARTERS, MARKED NOT SUPPLIED (Keith, 2026-10-19). REQ-GEN-237
+  # criterion 3 leaves Child Protection with no supply in the quarters
+  # Emergency Department's correction alters; unmarked, each read as a red
+  # "No supply" gap with a Needs action item on every CP page. A person
+  # accepts each as not supplied a day after its slot closes. Exactly the
+  # emptied quarters each dataset owes - tests/test_scripted_decisions.py
+  # derives the list from configuration and fails on any difference.
+  - periods: ["2013-Q1", "2013-Q3", "2013-Q4", "2014-Q2", "2014-Q3", "2014-Q4", "2015-Q1", "2015-Q2", "2015-Q3"]
+    operation: mark-not-supplied
+    dataset: cp-clients
+    after_hours: 24
+    reason: "Nothing was supplied for this quarter, and nothing will be; accepted as not supplied."
+  - periods: ["2013-Q1", "2013-Q3", "2013-Q4", "2014-Q2", "2014-Q3", "2014-Q4", "2015-Q1", "2015-Q2", "2015-Q3"]
+    operation: mark-not-supplied
+    dataset: cp-notifications
+    after_hours: 24
+    reason: "Nothing was supplied for this quarter, and nothing will be; accepted as not supplied."
+  - periods: ["2013-Q1", "2013-Q3", "2013-Q4", "2014-Q2", "2014-Q3", "2014-Q4", "2015-Q1", "2015-Q2", "2015-Q3"]
+    operation: mark-not-supplied
+    dataset: cp-investigations
+    after_hours: 24
+    reason: "Nothing was supplied for this quarter, and nothing will be; accepted as not supplied."
+  - periods: ["2013-Q1", "2013-Q3", "2013-Q4", "2014-Q2", "2014-Q3", "2014-Q4", "2015-Q1", "2015-Q2", "2015-Q3"]
+    operation: mark-not-supplied
+    dataset: cp-placements
+    after_hours: 24
+    reason: "Nothing was supplied for this quarter, and nothing will be; accepted as not supplied."
+  - periods: ["2013-Q1", "2013-Q3", "2013-Q4", "2014-Q2", "2014-Q3", "2014-Q4", "2015-Q1", "2015-Q2", "2015-Q3"]
+    operation: mark-not-supplied
+    dataset: cp-carers
+    after_hours: 24
+    reason: "Nothing was supplied for this quarter, and nothing will be; accepted as not supplied."
+  - periods: ["2013-Q1", "2013-Q3", "2015-Q1", "2015-Q3"]
+    operation: mark-not-supplied
+    dataset: cp-case-workers
+    after_hours: 24
+    reason: "Nothing was supplied for this quarter, and nothing will be; accepted as not supplied."
+
+# SCRIPTED CORRECTION CONFIRMATIONS (REQ-GEN-205) - see the header.
+corrections:
+  # TS-59: of the moves REQ-GEN-205's correction proposes, the asset manager
+  # keeps 2014-Q3's supply where it was filed; every other move goes ahead.
+  - change_reference: REQ-GEN-205
+    keep:
+      - scenario: TS-59a
+        dataset: ed-presentations
+        supply: 0
+    keep_reason: "The supplier confirms this was a late resend of 2014-Q2's extract, not 2014-Q3's supply; it stays in 2014-Q2."
+  # TS-62: merged and left for the asset manager - pending to the end.
+  - change_reference: REQ-GEN-205-WINDOW
+    pending: true

@@ -17,13 +17,70 @@ from __future__ import annotations
 import json
 import re
 
+import pytest
+
 from dashboard import embed_dashboard_data as edd
 
+# NEEDS A BOOTSTRAPPED DEPLOYMENT (plans/tooling.md #27). This module
+# reads `reports/*.json`, which is built from the deployment's recorded
+# QA history - so it belongs in the CI job that bootstraps one. Nothing
+# in a signature says so, which is why the mark is here rather than
+# derived; tests/test_publish.py asserts it is not forgotten.
+pytestmark = pytest.mark.needs_deployment
 
-def _entry(dataset, committed_at, run_timestamp="2026-01-01T00:00:00+00:00", run_by="a@b.com"):
+
+
+@pytest.fixture(autouse=True)
+def _isolate_embed_data_targets(monkeypatch, tmp_path):
+    """plans/tooling.md #10 - every test here drives the real embed(),
+    which reads every collection's real, repo-relative dashboard file under
+    reports/ (edd.collection_targets(), REQ-DASH-244). Those are BUILD ARTIFACTS, rewritten
+    from scratch by tests/test_dashboard_e2e.py's own session-scoped
+    built_dashboard_html fixture - so under pytest-xdist the two modules
+    land on different workers and this one reads a 6.5MB file mid-rewrite,
+    getting a truncated JSON and a failure that vanishes on a re-run.
+
+    Nothing in this module asserts anything about those two files'
+    CONTENTS - they're unit tests of embed()'s own wiring (changelog feed
+    merging, ticket status, leaderboard, amber decisions), and embed()
+    only json.loads each target and substitutes it into a const. So
+    pointing them at tiny local stubs is both the real isolation fix and
+    strictly more honest about what's under test. Every other real file
+    embed() touches was already monkeypatched per-test; TARGETS was the
+    one shared read nobody had covered (it was edd.TARGETS until REQ-DASH-244)."""
+    stub = tmp_path / "targets"
+    stub.mkdir()
+    targets = []
+    for collection_id, _real_path in edd.collection_targets():
+        p = stub / f"{collection_id}.json"
+        p.write_text(json.dumps({"datasets": []}))
+        targets.append((collection_id, str(p)))
+    monkeypatch.setattr(edd, "collection_targets", lambda: targets)
+
+
+@pytest.fixture(autouse=True)
+def _no_applied_corrections_read(monkeypatch):
+    """The feed also lists each applied calendar correction (REQ-DASH-172),
+    read from the database. These are unit tests of the merge, so that read
+    is stubbed: on a fresh worker database with no qa schema it failed every
+    one of them in CI (94f1ea6) while passing locally, where an earlier
+    module on the same worker had created the schema."""
+    from pipeline import corrections
+
+    monkeypatch.setattr(corrections, "applied_feed", lambda: [])
+
+
+def _entry(dataset, published_at, run_timestamp="2026-01-01T00:00:00+00:00", run_by="a@b.com"):
+    """One feed entry as build_changelog() produces it.
+
+    IT USED TO CARRY commit_sha AND committed_at. Both went with the git
+    walk and its vocabulary (REQ-PIPE-089, REQ-PIPE-090): a result is
+    visible the moment its run completes, so there is no commit in the
+    path and `published_at` IS that completion.
+    """
     return {
         "agency": "some-agency", "dataset": dataset, "run_timestamp": run_timestamp,
-        "run_by": run_by, "commit_sha": "abc123", "committed_at": committed_at,
+        "run_by": run_by, "published_at": published_at,
     }
 
 
@@ -52,12 +109,12 @@ def test_build_changelog_feed_sorts_newest_committed_first(monkeypatch):
 
     feed = edd._build_changelog_feed()
 
-    assert [e["committed_at"] for e in feed] == [
+    assert [e["published_at"] for e in feed] == [
         "2026-01-03T09:00:00+00:00", "2026-01-02T09:00:00+00:00", "2026-01-01T09:00:00+00:00",
     ]
 
 
-def test_build_changelog_feed_puts_missing_committed_at_last(monkeypatch):
+def test_build_changelog_feed_puts_a_missing_instant_last(monkeypatch):
     monkeypatch.setattr(edd, "CHANGELOG_SOURCES", [("agency-a", "dataset-a", "Dataset A")])
     monkeypatch.setattr(edd, "build_changelog", lambda agency, dataset: [
         _entry("dataset-a", None),
@@ -66,8 +123,8 @@ def test_build_changelog_feed_puts_missing_committed_at_last(monkeypatch):
 
     feed = edd._build_changelog_feed()
 
-    assert feed[0]["committed_at"] == "2026-01-01T09:00:00+00:00"
-    assert feed[1]["committed_at"] is None
+    assert feed[0]["published_at"] == "2026-01-01T09:00:00+00:00"
+    assert feed[1]["published_at"] is None
 
 
 def test_build_changelog_feed_caps_to_changelog_depth(monkeypatch):
@@ -80,7 +137,7 @@ def test_build_changelog_feed_caps_to_changelog_depth(monkeypatch):
     feed = edd._build_changelog_feed()
 
     assert len(feed) == 2
-    assert feed[0]["committed_at"] == "2026-01-05T09:00:00+00:00"
+    assert feed[0]["published_at"] == "2026-01-05T09:00:00+00:00"
 
 
 def _run_embed_and_extract_ticket_status(monkeypatch, tmp_path, raw_issues=None):
@@ -175,61 +232,6 @@ def test_embed_reads_real_ticket_resolutions_json_when_present(monkeypatch, tmp_
     }]
 
 
-def _run_embed_and_extract_amber_decisions(monkeypatch, tmp_path, raw_tickets=None):
-    out_html = tmp_path / "out.html"
-    monkeypatch.setattr(edd, "DASHBOARD_HTML", out_html)
-    if raw_tickets is None:
-        monkeypatch.setattr(edd, "QA_COMMENTS_JSON", tmp_path / "does_not_exist.json")
-    else:
-        path = tmp_path / "qa_comments.json"
-        path.write_text(json.dumps(raw_tickets))
-        monkeypatch.setattr(edd, "QA_COMMENTS_JSON", path)
-
-    edd.embed()
-
-    html = out_html.read_text()
-    match = re.search(r"const AMBER_DECISIONS = (.*?);\n", html)
-    assert match, "AMBER_DECISIONS const not found in built output"
-    return json.loads(match.group(1))
-
-
-def test_embed_defaults_to_empty_amber_decisions_when_file_absent(monkeypatch, tmp_path):
-    """Real scenario, same as TICKET_STATUS/LEADERBOARD above: a local
-    build has no GH token, so .github/workflows/deploy-pages.yml's own
-    QA_COMMENTS_JSON-writing step (qa_tools/common/acceptance_sync.py's
-    own real `gh` boundary) never ran - embed() must degrade to {}
-    rather than crash. Unlike LEADERBOARD (which now always shows the
-    real assignee roster), there's no roster-equivalent for amber
-    decisions - a dataset with no real /accept or /reject comment simply
-    has nothing to show, correctly."""
-    assert _run_embed_and_extract_amber_decisions(monkeypatch, tmp_path) == {}
-
-
-def test_embed_reads_real_qa_comments_json_when_present(monkeypatch, tmp_path):
-    """Real /accept and /reject comments on two different real tickets -
-    confirms both decision kinds embed correctly, not just accept."""
-    raw_tickets = [
-        {"number": 1, "labels": [{"name": "dataset:birth-registrations"}],
-         "comments": [{"author": {"login": "knownperson"}, "body": "/accept",
-                       "createdAt": "2026-01-10T09:00:00Z",
-                       "url": "https://github.com/o/r/issues/1#issuecomment-1"}]},
-        {"number": 2, "labels": [{"name": "dataset:cp-clients"}],
-         "comments": [{"author": {"login": "knownperson"}, "body": "/reject",
-                       "createdAt": "2026-01-10T09:00:00Z",
-                       "url": "https://github.com/o/r/issues/2#issuecomment-1"}]},
-    ]
-    from datetime import date
-
-    from qa_tools.common import acceptance_sync as acc
-    fixed_windows = [("run_x", date(2026, 1, 1), None)]
-    monkeypatch.setattr(acc, "_run_windows_for_dataset", lambda dataset_id, qa_results_dir=None: fixed_windows)
-
-    decisions = _run_embed_and_extract_amber_decisions(monkeypatch, tmp_path, raw_tickets)
-
-    assert decisions["birth-registrations"]["run_x"]["decision"] == "accept"
-    assert decisions["cp-clients"]["run_x"]["decision"] == "reject"
-
-
 def _run_embed_and_extract_demo_cast(monkeypatch, tmp_path, cast_text=None):
     out_html = tmp_path / "out.html"
     monkeypatch.setattr(edd, "DASHBOARD_HTML", out_html)
@@ -267,3 +269,350 @@ def test_embed_reads_the_real_committed_cast_file_when_present(monkeypatch, tmp_
     )
     embedded = _run_embed_and_extract_demo_cast(monkeypatch, tmp_path, cast_text)
     assert embedded == cast_text
+
+
+# ---------------------------------------------------------------------------
+# PERIOD_SEQUENCES - REQ-DASH-054 criteria 1, 2 and 3.
+#
+# The page's period arithmetic is a LOOKUP against these now, replacing a
+# JS port of pipeline/cadence.py's cycle_start(). What the port could never
+# do is the reason the embed exists: a cadence RULE cannot produce an
+# AUTHORED date list, and the quarterly calendar is one (Feb/May/Aug/Nov,
+# deliberately not calendar quarters), so "which quarter is this date in"
+# had no answer at all for Child Protection.
+# ---------------------------------------------------------------------------
+def _run_embed_and_extract_period_sequences(monkeypatch, tmp_path):
+    out_html = tmp_path / "out.html"
+    monkeypatch.setattr(edd, "DASHBOARD_HTML", out_html)
+    edd.embed()
+    match = re.search(r"const PERIOD_SEQUENCES = (.*?);\n", out_html.read_text())
+    assert match, "PERIOD_SEQUENCES const not found in built output"
+    return json.loads(match.group(1))
+
+
+def test_the_embed_carries_every_named_calendar_and_which_one_each_dataset_follows(
+        monkeypatch, tmp_path):
+    """Criterion 1, both halves. The sequences alone are unusable: the page
+    is asked about a DATASET's period, and without the mapping it would
+    have to guess which calendar to look in - or merge them, which is
+    silently wrong for whichever calendar lost."""
+    from qa_tools.common import hierarchy, schedule
+
+    sequences = _run_embed_and_extract_period_sequences(monkeypatch, tmp_path)
+
+    assert set(sequences["calendars"]) == {c.name for c in schedule.calendars()}
+    assert set(sequences["datasetCalendar"]) == {
+        d.dataset_id for d in hierarchy.all_datasets()}
+    for name, periods in sequences["calendars"].items():
+        assert periods, f"{name} embedded no periods at all"
+        assert all({"period", "date"} == set(p) for p in periods)
+
+
+def test_a_dataset_with_no_calendar_is_recorded_as_having_none(monkeypatch, tmp_path):
+    """REQ-PIPE-106's subject reaching the embed. It is a real state - a
+    dataset can exist before any supply is agreed - so the mapping says
+    null rather than the build failing or the dataset being left out.
+    Omitting it would be worse than either: a missing key and a null key
+    read identically in JavaScript, so the page could not tell "no
+    calendar" from "not a dataset"."""
+    sequences = _run_embed_and_extract_period_sequences(monkeypatch, tmp_path)
+    # Every value is either a real calendar name or an explicit null.
+    known = set(sequences["calendars"])
+    for dataset_id, calendar in sequences["datasetCalendar"].items():
+        assert calendar is None or calendar in known, \
+            f"{dataset_id} points at a calendar that was not embedded: {calendar!r}"
+
+
+def test_the_embedded_dates_come_from_the_authored_calendar_rather_than_a_rule(
+        monkeypatch, tmp_path):
+    """Criterion 2, positively. The quarterly calendar's own anchor is
+    February, so its periods are Feb/May/Aug/Nov - a rule producing
+    calendar quarters would give Jan/Apr/Jul/Oct, which is the exact
+    mistake this replaces. AUTHORED DATES ARE THE REFERENCE, not a month
+    set: REQ-GEN-205's correction authors 2013-Q4 and 2014-Q3 in October
+    and July, and the embedded dates must be exactly those."""
+    from qa_tools.common import schedule
+
+    sequences = _run_embed_and_extract_period_sequences(monkeypatch, tmp_path)
+    embedded = {(p["period"], p["date"][:10]) for p in sequences["calendars"]["quarterly"]}
+    authored = {(p.name, p.date.isoformat())
+                for v in schedule.calendar("quarterly").versions for p in v.periods}
+    assert embedded and embedded <= authored, sorted(embedded - authored)[:5]
+    assert {int(d[5:7]) for _n, d in embedded} >= {2, 5, 8, 11}
+
+
+def test_nothing_that_has_not_begun_is_embedded(monkeypatch, tmp_path):
+    """Criterion 3, and Keith's own question behind it: "why would we be
+    able to choose a date in the future? nothing has happened yet, so why
+    project forward?" The as-of picker asks about the past, so a date with
+    nothing behind it has no answer to give - which removes the horizon
+    question rather than answering it.
+
+    ON THE ASSET'S CLOCK, not this machine's. Perth is eight hours ahead of
+    UTC, so for a third of every day the two are on different calendar
+    dates - and a test that took `today` from date.today() would go red in
+    that window for no reason about the code."""
+    from qa_tools.common import asset_time
+
+    today = asset_time.now().date().isoformat()
+    sequences = _run_embed_and_extract_period_sequences(monkeypatch, tmp_path)
+    for name, periods in sequences["calendars"].items():
+        future = [p["date"] for p in periods if p["date"] > today]
+        assert not future, f"{name} embedded {len(future)} period(s) that have not begun: {future[:3]}"
+
+
+def test_the_current_period_IS_embedded_because_it_has_begun(monkeypatch, tmp_path):
+    """The other side of criterion 3, and the one a naive "drop anything
+    not in the past" filter gets wrong. A quarterly period that began six
+    weeks ago is the period a viewer asking about today is in; dropping it
+    would make today unpickable on that calendar."""
+    from qa_tools.common import asset_time, schedule
+
+    today = asset_time.now().date()
+    sequences = _run_embed_and_extract_period_sequences(monkeypatch, tmp_path)
+    for name in sequences["calendars"]:
+        expected = [p.date.isoformat()
+                     for p in schedule.periods_for_calendar(name, until=today)]
+        assert [p["date"] for p in sequences["calendars"][name]] == expected
+
+
+def test_deriving_the_sequences_opens_nothing_under_data(monkeypatch, tmp_path):
+    """Criterion 2's real constraint, asserted rather than reasoned about.
+
+    A schedule is CONFIGURATION, so this derivation is entitled to read
+    contract/ and nothing else - and a new embed into the dashboard build
+    is exactly the shape CLAUDE.md's never-read-data rule exists to catch.
+    Asserted by watching the real `open` for a path under data/, which is
+    the mechanism rather than a promise about it.
+
+    SCOPED TO THE DERIVATION, not to embed() as a whole, and the narrower
+    claim is the honest one: embed() reads a dozen other things whose own
+    entitlements are their own requirements' business, and a test that
+    swept them all up here would go red for a reason that had nothing to do
+    with period sequences. What this holds is that the two calls the embed
+    makes for THIS const - periods_for_calendar() and
+    calendar_for_dataset() - touch configuration only."""
+    import builtins
+    from pathlib import Path
+
+    from qa_tools.common import hierarchy, schedule
+
+    root = Path(edd.__file__).resolve().parent.parent
+    data_dir = root / "data"
+    opened: list[str] = []
+    real_open = builtins.open
+
+    def watched(file, *args, **kwargs):
+        try:
+            resolved = Path(file).resolve()
+        except TypeError:                     # a file descriptor, not a path
+            resolved = None
+        if resolved is not None and data_dir in resolved.parents:
+            opened.append(str(resolved))
+        return real_open(file, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "open", watched)
+    today = __import__("datetime").date(2026, 9, 27)
+    for cal in schedule.calendars():
+        schedule.periods_for_calendar(cal.name, until=today)
+    for entry in hierarchy.all_datasets():
+        try:
+            schedule.calendar_for_dataset(entry.dataset_id)
+        except Exception:
+            pass
+
+    assert opened == [], f"the schedule read {len(opened)} file(s) under data/: {opened[:3]}"
+
+
+def test_the_schedule_ended_notice_names_the_file_dates_are_authored_in(monkeypatch, tmp_path):
+    """REQ-PIPE-154 criterion 3 on the page, after REQ-PIPE-110: the
+    exhausted-schedule notice tells a person which file to edit, and the
+    calendars live in contract/calendar.yaml now. The embed hardcoded
+    contract/data-asset.yaml, so the notice sent people to a file that no
+    longer holds a single delivery date."""
+    from qa_tools.common import supply_holds
+
+    out_html = tmp_path / "out.html"
+    monkeypatch.setattr(edd, "DASHBOARD_HTML", out_html)
+    edd.embed()
+    match = re.search(r"const SCHEDULE_RUNWAY = (.*?);\n", out_html.read_text())
+    assert match, "SCHEDULE_RUNWAY const not found in built output"
+    assert json.loads(match.group(1))["configFile"] == "contract/calendar.yaml"
+    assert supply_holds.SCHEDULE_FILE == "contract/calendar.yaml"
+
+
+def test_slot_due_dates_carry_only_the_slots_due_off_their_period_date(monkeypatch, tmp_path):
+    """REQ-PIPE-167 criterion 5: the page is told a slot's own due date
+    wherever it differs from the period's date - today, exactly Birth
+    Registrations' twelve evening-before days (REQ-GEN-044, 2026-06-18 to
+    2026-06-29), each due the day before, and nowhere else."""
+    out_html = tmp_path / "out.html"
+    monkeypatch.setattr(edd, "DASHBOARD_HTML", out_html)
+    edd.embed()
+    match = re.search(r"const SLOT_DUE_DATES = (.*?);\n", out_html.read_text())
+    assert match, "SLOT_DUE_DATES const not found in built output"
+    from datetime import date, timedelta
+    era = [date(2026, 6, 18) + timedelta(days=n) for n in range(12)]
+    assert json.loads(match.group(1)) == {
+        "birth-registrations": {d.isoformat(): (d - timedelta(days=1)).isoformat() for d in era}}
+
+
+def test_slot_due_dates_name_a_following_period_datasets_due_date():
+    from qa_tools.common import slots
+
+    class Slot:
+        def __init__(self, period_date, due):
+            from datetime import date, datetime, timezone
+            self.date = date.fromisoformat(period_date)
+            self.due_at = datetime.fromisoformat(due).replace(tzinfo=timezone.utc)
+
+    got = edd._slot_due_dates({"cp-early": [Slot("2026-02-01", "2026-01-04T01:00:00"),
+                                            Slot("2026-05-01", "2026-05-01T01:00:00")]})
+    assert got == {"cp-early": {"2026-02-01": "2026-01-04"}}
+    assert slots  # imported for the shape the real call passes
+
+
+def test_applied_corrections_are_listed_outside_the_cap(monkeypatch):
+    """REQ-DASH-172 criterion 8 (delivery-critic on 172, #7): rare, so never
+    pushed out by thirty publishes."""
+    from pipeline import corrections
+
+    monkeypatch.setattr(edd, "CHANGELOG_SOURCES", [("agency-a", "dataset-a", "Dataset A")])
+    monkeypatch.setattr(edd, "build_changelog", lambda agency, dataset: [
+        _entry("dataset-a", f"2026-01-{d:02d}T09:00:00+00:00")
+        for d in range(1, edd.CHANGELOG_DEPTH + 6)])
+    monkeypatch.setattr(corrections, "applied_feed", lambda: [{
+        "kind": "correction", "reference": "CAB-1", "published_at": "2025-01-01T00:00:00+00:00"}])
+    feed = edd._build_changelog_feed()
+    assert [e.get("reference") for e in feed if e.get("kind") == "correction"] == ["CAB-1"]
+    assert len([e for e in feed if e.get("kind") != "correction"]) == edd.CHANGELOG_DEPTH
+
+
+def test_an_embedded_const_cannot_close_its_script_element():
+    """post-build-review #187: json.dumps leaves '</script>' as it is, and
+    inside a <script> that ends the element - every const was exposed."""
+    from dashboard.embed_dashboard_data import _replace_const
+    html = _replace_const("<script>\nconst X = null;\n</script>", "X",
+                          json.dumps({"t": "</script><img src=x onerror=alert(1)>"}))
+    assert html.count("</script>") == 1
+    assert "<\\/script>" in html
+
+
+# --- REQ-DASH-291 and REQ-DASH-293: the data files embed() writes ---------
+
+def _embed_to(monkeypatch, tmp_path, name="out.html"):
+    out_html = tmp_path / name
+    monkeypatch.setattr(edd, "DASHBOARD_HTML", str(out_html))
+    edd.embed()
+    return out_html
+
+
+class TestTheDataFiles:
+    """REQ-DASH-291 criteria 1, 2, 4, 6, 11 and 16."""
+
+    def test_one_file_per_collection_and_one_for_requirements_and_plans(self, monkeypatch, tmp_path):
+        from dashboard import data_files
+
+        page = _embed_to(monkeypatch, tmp_path)
+        manifest = data_files.page_manifest(page.read_text())
+        keys = [e["key"] for e in manifest["files"]]
+        expected = [data_files.collection_key(c) for c, _ in edd.collection_targets()]
+        assert expected, "the registry must hold collections for this to mean anything"
+        assert keys == expected + [data_files.REQUIREMENTS_PLANS_KEY]
+        on_disk = sorted(p.name for p in (tmp_path / "data").iterdir())
+        assert on_disk == sorted(e["name"] for e in manifest["files"])
+
+    def test_the_page_loads_collections_by_classic_script_and_requirements_on_demand(
+            self, monkeypatch, tmp_path):
+        from dashboard import data_files
+
+        html = _embed_to(monkeypatch, tmp_path).read_text()
+        manifest = data_files.page_manifest(html)
+        main_script = html.index('<script>\n"use strict";')
+        for e in manifest["files"]:
+            tag = (f'<script src="data/{e["name"]}" data-mothman-key="{e["key"]}" '
+                   f'data-mothman-file="{e["name"]}"></script>')
+            if e["kind"] == "collection":
+                assert html.count(tag) == 1 and html.index(tag) < main_script
+            else:
+                assert e["name"] not in html.replace(json.dumps(manifest, separators=(",", ":")), "")
+        assert "const COLLECTION_DATA = assembleCollectionData();\n" in html
+        assert "let REQUIREMENTS = [];\n" in html and "let PLANS = {items:[], threads:[]};\n" in html
+
+    def test_every_other_const_stays_inline(self, monkeypatch, tmp_path):
+        html = _embed_to(monkeypatch, tmp_path).read_text()
+        for name in ("HIERARCHY", "BUILD_PROVENANCE", "OUTSTANDING", "FEEDBACK",
+                     "SPRINT_DEPENDENCIES", "RELEASE_NOTES", "SCHEDULE_RUNWAY"):
+            m = re.search(rf"const {name} = (.*?);\n", html)
+            assert m and m.group(1) not in ("null", "[]", "{}"), name
+
+    def test_the_files_carry_the_payloads(self, monkeypatch, tmp_path):
+        from dashboard import data_files
+
+        page = _embed_to(monkeypatch, tmp_path)
+        got = data_files.read_page(page.read_text(), page.parent)
+        assert got.problems == []
+        assert got.collections == edd.collection_data()
+        assert got.requirements == edd.parse_requirements(edd.REQUIREMENTS_YAML)
+        assert got.plans == edd.parse_plans(edd.PLANS_DIR)
+
+    def test_files_are_written_before_the_page_and_stale_ones_pruned_after(self, monkeypatch, tmp_path):
+        from dashboard import data_files
+
+        data = tmp_path / "data"
+        data.mkdir()
+        (data / "collection-gone.0123456789ab.js").write_text("stale")
+        (tmp_path / "beside.txt").write_text("not ours")
+        out_html = tmp_path / "out.html"
+        seen = {}
+        real_write, real_prune = data_files.write, data_files.prune
+
+        def write(files, data_dir):
+            seen["page_existed_at_write"] = out_html.exists()
+            return real_write(files, data_dir)
+
+        def prune(data_dir, keep):
+            seen["page_existed_at_prune"] = out_html.exists()
+            return real_prune(data_dir, keep)
+
+        monkeypatch.setattr(data_files, "write", write)
+        monkeypatch.setattr(data_files, "prune", prune)
+        _embed_to(monkeypatch, tmp_path)
+        assert seen == {"page_existed_at_write": False, "page_existed_at_prune": True}
+        assert not (data / "collection-gone.0123456789ab.js").exists()
+        assert (tmp_path / "beside.txt").exists()
+
+    def test_two_builds_write_the_same_names_and_bytes(self, monkeypatch, tmp_path):
+        first = tmp_path / "one"
+        second = tmp_path / "two"
+        first.mkdir()
+        second.mkdir()
+        _embed_to(monkeypatch, first)
+        _embed_to(monkeypatch, second)
+        read = lambda d: {p.name: p.read_bytes() for p in (d / "data").iterdir()}  # noqa: E731
+        assert read(first) and read(first) == read(second)
+
+
+def test_every_build_prints_each_files_size_and_warns_at_the_budget(monkeypatch, tmp_path, capsys):
+    """REQ-DASH-293 criteria 1, 2 and 4, REQ-PIPE-255 criterion 26: a payload
+    over the budget is written as parts within it, each named in the
+    page's list in order, and every file's size is printed."""
+    from dashboard import data_files
+
+    monkeypatch.setattr(data_files, "BUDGET_BYTES", 300 * 1024)
+    page = _embed_to(monkeypatch, tmp_path)
+    out = capsys.readouterr().out
+    manifest = data_files.page_manifest(page.read_text())
+    parted = [e for e in manifest["files"] if e["parts"] > 1]
+    assert parted, "the Requirements and Plans payload is several MiB, so it must be in parts here"
+    for e in manifest["files"]:
+        assert e["bytes"] <= 300 * 1024
+        assert f"{e['name']}: " in out
+    assert f"{page.name}: " in out
+    key = parted[0]["key"]
+    assert [e["part"] for e in manifest["files"] if e["key"] == key] == \
+        list(range(1, parted[0]["parts"] + 1))
+    got = data_files.read_page(page.read_text(), page.parent)
+    assert got.problems == [] and got.requirements == edd.parse_requirements(edd.REQUIREMENTS_YAML)
+    # The page itself is far over a 300 KiB budget, so it is the one warned about.
+    assert re.search(rf"WARNING: {re.escape(page.name)} is .* budget", out), out[-2000:]

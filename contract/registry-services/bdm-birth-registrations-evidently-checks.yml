@@ -1,0 +1,49 @@
+# Birth Registrations' Evidently checks (REQ-QAC-241). They used to be a
+# Python dict in qa_tools/bdm/evidently_check_lifecycle.py, the one tool
+# whose checks had no file of their own; they sit beside the contract and
+# Soda files now, found the same way, so a collection's checks for all four
+# tools are found by convention from the registry.
+#
+# Evidently's checks are hand-written evaluations in qa_tools/tools/run_evidently.py,
+# which reads each check's id from here: the psi check, and the row_drop
+# check. What a check DOES - its column, method and warn/fail bands - is
+# here, where the definition hash sees it (REQ-QAC-223 criterion 3); a band
+# is tripped on a strict >.
+#
+# Every date is quoted, so it stays the string it was rather than becoming
+# a YAML date, which would move the check's config_hash.
+#
+# Writing the reader-facing prose (description/failure_indicates/
+# technical_note): docs/check-authoring-rules.md is the standing authoring
+# standard - read it before adding or editing any of the three. The
+# lifecycle gate only checks that failure_indicates is present.
+checks:
+  - check_id: data-asset-1.registry-services.civil-registration.birth-registrations.sex.drift_psi_evidently
+    # A distribution shift between supplies, read as a cross-run logical
+    # consistency concern - the "dimension" qa_tools/tools/run_evidently.py's result
+    # has always carried.
+    category: consistency
+    introduced_date: "2026-01-15"
+    description: The spread of values must stay close to the reference supply.
+    failure_indicates: self-evident
+    column: sex
+    method: psi
+    warn_threshold: 0.10
+    fail_threshold: 0.25
+    changelog:
+      - date: "2026-10-14T00:00:00Z"
+        description: "Definition now recorded with the check (its column, method and warn/fail bands, REQ-QAC-223); behaviour unchanged."
+  - check_id: data-asset-1.registry-services.civil-registration.birth-registrations.row_count_growth_evidently
+    # A growth-over-time concern read as timeliness, not completeness. The
+    # result is attributed to registration_number (see qa_tools/tools/run_evidently.py).
+    category: timeliness
+    introduced_date: "2026-01-15"
+    description: The number of rows must not drop sharply against the previous supply.
+    failure_indicates: self-evident
+    column: registration_number
+    method: row_drop
+    warn_threshold: 0.10
+    fail_threshold: 0.25
+    changelog:
+      - date: "2026-10-14T00:00:00Z"
+        description: "Definition now recorded with the check (its column, method and warn/fail bands, REQ-QAC-223); behaviour unchanged."

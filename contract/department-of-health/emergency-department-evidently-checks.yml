@@ -1,0 +1,23 @@
+# Emergency Department's Evidently checks (REQ-QAC-231): two drift checks on
+# the one table, each against the last promoted supply.
+checks:
+  - check_id: data-asset-1.department-of-health.emergency-department.ed-presentations.triage_category.drift_psi_evidently
+    category: consistency
+    introduced_date: "2013-01-01"
+    description: The spread of values must stay close to the reference supply.
+    failure_indicates: self-evident
+    column: triage_category
+    method: psi
+    warn_threshold: 0.10
+    fail_threshold: 0.25
+    changelog: []
+  - check_id: data-asset-1.department-of-health.emergency-department.ed-presentations.age_group.drift_psi_evidently
+    category: consistency
+    introduced_date: "2013-01-01"
+    description: The spread of values must stay close to the reference supply.
+    failure_indicates: self-evident
+    column: age_group
+    method: psi
+    warn_threshold: 0.10
+    fail_threshold: 0.25
+    changelog: []

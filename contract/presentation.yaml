@@ -1,0 +1,41 @@
+# How the dashboard DESCRIBES the asset - presentation, not hierarchy
+# (REQ-DASH-244 criterion 10). The hierarchy (data-asset.yaml) says what
+# exists; this says how the page puts it in words, which the hierarchy has
+# no business knowing. Read by pipeline/build_dashboard_data.py and
+# dashboard/embed_dashboard_data.py, and nothing else.
+#
+# A COLUMN'S OR TABLE'S TYPE AND DESCRIPTION ARE NOT HERE: they come from
+# the collection's own ODCS contract (criterion 1), so the page describes a
+# column in the words the contract holds it to. What is here is what no
+# contract field carries.
+#
+# EVERY REGISTERED COLLECTION NEEDS AN ENTRY under `collections:` -
+# `mothman check`'s collections gate fails one that has none, naming it,
+# before any build (criterion 8). An agency with no blurb shows none.
+
+agencies:
+  registry-services:
+    blurb: "Civil registration of life events for the whole state."
+  child-protection-family-support:
+    blurb: "Casework for children and families needing protection or support services."
+  department-of-health:
+    blurb: "Hospital and emergency care across the state's public health system."
+
+collections:
+  civil-registration:
+    # Who supplies it and how, shown on each dataset's page.
+    provider: "Registry of Births, Deaths & Marriages (BDM)"
+    delivery_format: "CSV (S3 drop) — Parquet planned"
+    # Each dataset's `_provenance` note in the dashboard JSON. Never
+    # rendered; kept word for word so the build's output is unchanged
+    # (criterion 15) - `{table_description}` is replaced by the dataset's
+    # table description from the contract.
+    provenance: "Computed by qa_tools/bdm/orchestrate_bdm.py - actual dbt-core, Soda Core, datacontract-cli and Evidently runs against real generated CSVs, the real ODCS contract, the real Soda checks YAML, and a real dbt schema.yml — see README.md."
+  child-protection:
+    provider: "Department for Child Protection and Family Support — Casework Management System"
+    delivery_format: "CSV (S3 drop)"
+    provenance: "Computed by qa_tools/cp/orchestrate_cp.py from real generated CSVs, the real child-protection-contract.yaml, the real child-protection-soda-checks.yml, a real dbt schema.yml, and real Evidently AI drift on concern_type — see README.md. ({table_description})"
+  emergency-department:
+    provider: "Department of Health - Emergency Department Information System"
+    delivery_format: "CSV (S3 drop)"
+    provenance: "Computed from the synthetic Emergency Department CSVs by the real dbt-core, Soda Core, datacontract-cli and Evidently runs. ({table_description})"

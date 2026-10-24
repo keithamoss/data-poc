@@ -67,11 +67,23 @@ appear, by name/nickname.
 from __future__ import annotations
 
 import json
-import os
 import subprocess
 
-from qa_tools.common.acceptance_sync import list_ticket_numbers
+from qa_tools.common.ticket_sync import TICKET_LABEL
 from qa_tools.common.people import assignees_for
+
+
+def list_ticket_numbers(owner: str, repo: str) -> list[int]:
+    """Every qa-ticket issue this project has ever opened, open or closed.
+
+    MOVED HERE from acceptance_sync.py when REQ-PIPE-122 criterion 23
+    retired that module with REQ-QAC-017's per-run /accept - this was the
+    one piece of it anything else still used."""
+    out = subprocess.run(
+        ["gh", "issue", "list", "--repo", f"{owner}/{repo}", "--label", TICKET_LABEL,
+         "--state", "all", "--json", "number", "--limit", "100"],
+        capture_output=True, text=True, check=True).stdout
+    return [issue["number"] for issue in json.loads(out)]
 
 
 def _run_gh(args: list[str]) -> str:
@@ -273,7 +285,14 @@ def build_leaderboard(raw_tickets: list[dict], people_config: dict, dataset_agen
 
 
 def main() -> None:
-    owner, repo = os.environ["GITHUB_REPOSITORY"].split("/", 1)
+    # THE ASSET'S TICKET REPOSITORY, never GITHUB_REPOSITORY (REQ-PIPE-093
+    # criterion 12): that names whichever repository a workflow runs in.
+    from qa_tools.common import environments
+
+    slug = environments.ticket_repository()
+    if not slug or "/" not in slug:
+        raise SystemExit("contract/data-asset.yaml names no ticket_repository (owner/repo)")
+    owner, repo = slug.split("/", 1)
     print(json.dumps(fetch_all_ticket_resolutions(owner, repo)))
 
 
