@@ -387,3 +387,41 @@ describe("the dataset list's sparkline names each point's cause", () => {
     expect(doc.querySelectorAll("svg[aria-label]")).toHaveLength(1);
   });
 });
+
+// Keith, 2026-10-24: a row matched to the blocker - rule #21's contested pair
+// or the held rule - that could not be checked says WHY, in the same sentence
+// the banner alone used to explain.
+describe("a blocked table's could-not-be-checked row says why", () => {
+  const coll = { datasets: [{ id: "cp-notifications", name: "Notifications" }] };
+  const tried = (extra) => entry({ run: "n", rank: 5, supply: null, cause: "arrival:n", status: "red",
+                                   at: "2020-11-01T08:20:00+08:00", by: "cp-notifications",
+                                   not_evaluated: "missing_table", ...extra });
+  const page = (ck) => ({ id: "cp-clients", name: "Client Register",
+                          columns: [{ name: "Cross-table", scope: "cross-table", checks: [ck] }] });
+  const START = "Could not be checked 8:20am Sunday, 1 November 2020, when the Notifications supply arrived";
+
+  it("names the contested pair's files", () => {
+    const w = load();
+    const pair = ["cp_clients__k__1", "cp_clients__k__2"];
+    const ds = page({ key: "ref", history: [], contested_reads: [
+      tried({ read_state: "ABSENT", contested_files: pair })] });
+    w.blockChecksWhileHeld(ds, { kind: "contested", supply: "cp-clients@k#1", tables: pair,
+                                 files: ["cp_clients.csv", "cp_clients_part2.csv"] });
+    expect(w.rowRecheckNote(coll, ds.columns[0].checks[0])).toBe(
+      `${START}: two Client Register files (cp_clients.csv, cp_clients_part2.csv) are waiting to be settled.`);
+  });
+
+  it("says the held supply is held", () => {
+    const w = load();
+    const ds = page({ key: "ref", history: [tried({ supply: "cp-clients@held", read_state: "HELD" })] });
+    w.blockChecksWhileHeld(ds, { kind: "held", supply: "cp-clients@held" });
+    expect(w.rowRecheckNote(coll, ds.columns[0].checks[0])).toBe(
+      `${START}: the Client Register supply is held.`);
+  });
+
+  it("leaves a row the blocker did not match as it was", () => {
+    const w = load();
+    const ck = { key: "ref", history: [tried({})] };
+    expect(w.rowRecheckNote(coll, ck)).toBe(`${START}.`);
+  });
+});

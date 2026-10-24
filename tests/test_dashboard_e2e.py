@@ -5689,9 +5689,20 @@ class TestACrossTableCheckOnTS80:
         assert "The cross-table checks did run" not in text
         assert ("The cross-table checks could not run either: the tables that read this one "
                 "need its supply first.") in text
+        # The row also says why (Keith 2026-10-24, on provisional #21): the
+        # reason follows a colon where the sentence used to end.
         assert ("Could not be checked 8:20am Sunday, 1 November 2020, when the Notifications "
-                "supply arrived.") in text
+                "supply arrived: two Client Register files (cp_clients.csv, cp_clients_TEST.csv) "
+                "are waiting to be settled.") in text
         assert "Checked 8:20am" not in text
         # Criterion 5: the section's own pill follows its rows.
         head = clean_page.locator('.scope-section[data-scope="cross-table"] .head .pill')
         assert "Red" in head.inner_text(), head.inner_text()
+
+    def test_a_row_that_could_not_be_checked_names_both_of_the_pairs_files(
+            self, clean_page, built_dashboard_html):
+        """Keith, 2026-10-24: the row says why, not only the banner."""
+        rows = self._rows(clean_page, built_dashboard_html, "cp-clients", "2020-11-01")
+        assert any("when the Notifications supply arrived: two Client Register files "
+                   "(cp_clients.csv, cp_clients_TEST.csv) are waiting to be settled." in r
+                   for r in rows), rows

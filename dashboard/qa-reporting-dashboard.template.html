@@ -5154,6 +5154,13 @@ function blockChecksWhileHeld(ds, blocker){
   const pair = blocker && blocker.kind === "contested" ? [...(blocker.tables || [])].sort() : null;
   const isThePair = files=> !!(pair && pair.length && files
     && files.length === pair.length && [...files].sort().every((f, i)=> f === pair[i]));
+  // WHY A MATCHED ROW COULD NOT BE CHECKED (Keith, 2026-10-24), in the row's
+  // own sentence rather than only the banner: the pair's own files, or the
+  // held supply - named from the blocker, never guessed.
+  const files = (blocker && blocker.files) || [];
+  const why = held ? `the ${ds.name || ds.id} supply is held`
+    : pair && files.length ? `${countWord(files.length)} ${ds.name || ds.id} files (${files.join(", ")}) are waiting to be settled`
+    : "";
   let shown = 0, rows = 0;
   (ds.columns||[]).forEach(c=>{
     // A CHECK WHOSE ONLY RESULT HERE IS A CONTESTED READ (Keith, 2026-10-24,
@@ -5179,6 +5186,7 @@ function blockChecksWhileHeld(ds, blocker){
         if(!last.not_evaluated) shown += 1;
         const out = {...ck, history: met, current: last.value};
         if(last.status) out.current_status = last.status; else delete out.current_status;
+        if(why) out.whyNotChecked = why;
         return out;
       }
       return {...ck, blockedThisPeriod:true};
@@ -5316,9 +5324,15 @@ function historySource(col, h, own){
 // supply's result under a pill saying there is none (#258 D2).
 function rowRecheckNote(col, check){
   if(check.blockedThisPeriod) return "";
-  return recheckNote(col, (check.history || [])[(check.history || []).length - 1]);
+  return recheckNote(col, (check.history || [])[(check.history || []).length - 1], check.whyNotChecked);
 }
-function recheckNote(col, point){
+// A function, not a const: the page renders before a later const exists.
+function countWord(n){
+  return ["no", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"][n] || String(n);
+}
+// `why`: what kept a blocked table's row from being checked, said only on a
+// row blockChecksWhileHeld matched to its blocker.
+function recheckNote(col, point, why){
   if(!point || !point.recorded_by || !point.recorded_at) return "";
   const ds = (col.datasets || []).find(d=> d.id === point.recorded_by);
   const name = ds ? ds.name : point.recorded_by;
@@ -5326,7 +5340,7 @@ function recheckNote(col, point){
   const when = recheck ? `when the ${name} was re-checked` : `when the ${name} supply arrived`;
   // A RESULT THAT COULD NOT BE EVALUATED says so (post-build-review #258 Q1,
   // Keith 2026-10-20, option a): nothing was checked, but something tried.
-  if(notEvaluated(point)) return `Could not be checked ${fmtInstant(point.recorded_at)}, ${when}.`;
+  if(notEvaluated(point)) return `Could not be checked ${fmtInstant(point.recorded_at)}, ${when}${why ? `: ${why}` : ""}.`;
   return recheck
     ? `Re-checked ${fmtInstant(point.recorded_at)}, ${when}.`
     : `Checked ${fmtInstant(point.recorded_at)}, ${when}.`;
