@@ -11126,7 +11126,17 @@ twice. It deliberately did not re-find the `TypeError`.
        test of this exact case goes in with it.** The as-of clip
        keeps every other-table result whatever supply it read, so a late
        reader of an older supply can show as current on the partner's page
-       while the gate would not use it.
+       while the gate would not use it. **FIXED 2026-10-24 with REQ-PIPE-269
+       (sprint A1):** the build now says, per cross-table card, supply and
+       date, which result counts toward the supply on show - through the
+       gate's own `supply_status.count` (pipeline/warehouse_counts.py) - and
+       `clipDatasetToInPlaceOn` looks it up (`countedOnShow`) instead of
+       taking the newest result recorded under any run. The late reader stays
+       in the history and is never the current. Test of this exact case,
+       written first and seen to fail (expected 'red' to be 'green'):
+       tests-js/warehouse-counts.test.js "R4: a late reader of an older
+       supply"; the build's half is tests/test_warehouse_counts.py
+       `TestTheCountedPoints::test_r4_a_late_reader_of_an_older_supply_never_counts_toward_the_newer`.
      - **F5 (minor).** Orderings and writes outside the guard: the column
        drawer's dot row keyed by day; supply history sorted by run_date then
        run-id text; `carried_for` swallowing every exception (duplicates, not
@@ -11148,7 +11158,8 @@ twice. It deliberately did not re-find the `TypeError`.
        run-id parse went in 0d86652 (REQ-PIPE-279 provisional #23).
      - R3: left until the AWS build - plans/running-thoughts.md #124 and
        REQ-PIPE-279's decisions.
-     - R4: with #95's sprint 1 - REQ-PIPE-279's decisions.
+     - R4: fixed with #95's sprint 1 (REQ-PIPE-269), test-first - see R4
+       above.
      - F5: all five built test-first in 9585a14.
      - T6: the guard strengthened in 9585a14; test 26 in f7b6c9e.
      - c13: a dataset's own re-check names its cause, 9585a14.
@@ -11176,3 +11187,28 @@ twice. It deliberately did not re-find the `TypeError`.
      named that fix on 2026-10-24, at REQ-PIPE-211's sign-off. A defect, so
      a failing test first (a settlement by flags whose owed run fails exits
      3), then the fix. Not yet built.
+
+264. **[done, 2026-10-24]** **[Pipeline & publishing]** **[Dashboard UI]**
+     **A readers-only re-check's results were placed on no page.** Found
+     building REQ-PIPE-269 (sprint A1), not by a critic: on ed_probe 19
+     readers-only runs - the knock-on's re-checks of the checks that read a
+     moved table (REQ-PIPE-140 criterion 2) - recorded cross-table results
+     that no dataset page showed. A readers-only run records no
+     dataset_stats, so `build_results_from_history` never puts it among the
+     results file's runs, and `build_one_table` places only results of runs
+     in that list; the results file carried them and the build dropped them.
+     So a page went on showing the verdict the re-check had replaced (on
+     ed_probe, the Client Register's 2024-08-13 supply showed Investigations'
+     Client reference as read against a held-back Investigations, though
+     `cp_investigations__202408010100000000__r2` had re-checked it against
+     the one in the warehouse). A pre-existing defect of REQ-PIPE-279's build
+     rather than of 269, and it would have turned into false "no current
+     result" reds once 269 counted only results about the warehouse. Minor
+     under the standing rule (a display fix, no agreed behaviour changed).
+     FIXED test-first: tests/test_warehouse_counts.py
+     `TestAReadersOnlyReCheckIsPlaced::test_its_result_is_in_the_readers_page_history`,
+     red before (the re-check's run in neither page's history), green after:
+     `build_datasets` adds each readers-scope run that recorded a result to
+     the runs the pages place results from, dated by when it ran. Arrival and
+     full runs left out of the file (a supply's replaced runs) stay out, as
+     REQ-PIPE-140 criterion 5 has it.

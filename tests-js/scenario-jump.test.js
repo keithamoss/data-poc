@@ -89,7 +89,7 @@ describe("a stale parameter (criterion 9)", () => {
 });
 
 describe("the mark (criterion 4)", () => {
-  it("is a labelled left rule on the subject, '<id> · in place on <date>'", () => {
+  it("is a labelled left rule on the subject, '<id> · in the warehouse on <date>'", () => {
     const w = load();
     const view = w.document.getElementById("view");
     view.innerHTML = `<div class="view-head"><span class="pill" data-testid="standing-in">Substituted</span></div>`;
@@ -97,7 +97,7 @@ describe("the mark (criterion 4)", () => {
     const el = w.markScenarioSubject();
     expect(el.classList.contains("scenario-subject")).toBe(true);
     const label = view.querySelector("[data-scenario-label]");
-    expect(label.textContent).toMatch(/^TS-75a · in place on .*2025/);
+    expect(label.textContent).toMatch(/^TS-75a · in the warehouse on .*2025/);
     // Never the focus ring.
     expect(el.style.outline).toBe("");
   });

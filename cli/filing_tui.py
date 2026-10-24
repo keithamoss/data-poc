@@ -184,8 +184,9 @@ _HOW_IT_READS = {
 #: about that supply rather than about the period, which is what
 #: _HOW_IT_READS says. Never a raw state or operation name.
 _LISTED_AS = {
-    slot_state.PROMOTED: "in place (promoted)",
-    slot_state.AWAITING_ACKNOWLEDGEMENT: "in place, awaiting acknowledgement",
+    # IN PLACE IN THE WAREHOUSE, saying where (REQ-DASH-277 criterion 2).
+    slot_state.PROMOTED: "in place in the warehouse (promoted)",
+    slot_state.AWAITING_ACKNOWLEDGEMENT: "in place in the warehouse, awaiting acknowledgement",
     slot_state.AWAITING_DECISION: "waiting on a decision",
     slot_state.RETURNED: "taken back out by a person, waiting on a decision",
     slot_state.AMBER_WAITING: "amber and held for a person",
@@ -699,6 +700,15 @@ def _pick_slot(states, message: str, counts: dict | None = None) -> slot_state.S
     return by_label.get(choice) if choice else None
 
 
+def stands_on_line(state: slot_state.SlotState) -> str:
+    """The line a period standing on another's supply prints above its own
+    (REQ-GHUB-229 criterion 6) - saying where (REQ-DASH-277 criterion 2)."""
+    how = "substituted" if state.state == slot_state.SUBSTITUTED else "inherited"
+    # TWO LINES rather than one past 80 columns (REQ-DASH-277 criterion 5).
+    return (f"{state.period} stands on {state.stands_on}'s supply ({how}) -\n"
+            f"the supply in place in the warehouse is not one of these.")
+
+
 def listed_words(entry: "filing_queue.FiledSupply") -> str:
     """One listed supply's state in words (REQ-GHUB-229 criterion 5), with
     what each needs: why it could not be loaded, who rejected it and when,
@@ -706,7 +716,7 @@ def listed_words(entry: "filing_queue.FiledSupply") -> str:
     s = entry.state
     words = _LISTED_AS.get(s.state, "")
     if s.state == filing_queue.RECHECKED_WORSE and s.reason:
-        words = "in place - " + s.reason.split(":")[0].lower()
+        words = "in place in the warehouse - " + s.reason.split(":")[0].lower()
     elif s.state == slot_state.TWO_FILES:
         words = f"{words} - {' and '.join(s.files)}" if s.files else words
     elif s.state in (filing_queue.COULD_NOT_LOAD, slot_state.REJECTED,
@@ -717,9 +727,11 @@ def listed_words(entry: "filing_queue.FiledSupply") -> str:
 
 
 def _supply_line(entry: "filing_queue.FiledSupply") -> str:
-    """Arrived, state, verdict (criterion 4) - and the line a person picks."""
-    return (f"arrived {arrived(entry.state.supply)}  {listed_words(entry)}  "
-            f"(verdict: {entry.verdict})")
+    """Arrived, state, verdict (criterion 4) - and the line a person picks.
+    Under the table that heads those three columns, so it carries no labels
+    of its own: 'in place in the warehouse, awaiting acknowledgement' would
+    otherwise run past 80 columns (REQ-DASH-277 criterion 5)."""
+    return f"{arrived(entry.state.supply)}  {listed_words(entry)}  ({entry.verdict})"
 
 
 def _excuse_offers(state: slot_state.SlotState) -> tuple[str, ...]:
@@ -1232,9 +1244,7 @@ def _choose_a_supply(state: slot_state.SlotState, period_scoped: tuple[str, ...]
         return
     if state.state in (slot_state.SUBSTITUTED, slot_state.INHERITED) and state.stands_on:
         # CRITERION 6: the supply in place is not one filed to this period.
-        how = "substituted" if state.state == slot_state.SUBSTITUTED else "inherited"
-        console.print(f"{state.period} stands on {state.stands_on}'s supply ({how}) - the "
-                      f"supply in place is not one of these.", style="cyan")
+        console.print(stands_on_line(state), style="cyan")
     table = Table("Arrived", "Where it stands", "Verdict", box=None, pad_edge=False)
     for e in entries:
         table.add_row(arrived(e.state.supply), escape(listed_words(e)), e.verdict)

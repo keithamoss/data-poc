@@ -173,7 +173,7 @@ the same as a real one would, because that is the point. **This is the
 list that says which red was on purpose, and where to look at it.**
 
 Each entry gives coordinates - the dataset, the supplies, the period,
-and the date to set the In place on picker to - and never a link. The
+and the date to set the In the warehouse on picker to - and never a link. The
 generator knows where a scenario landed; it does not know how the
 dashboard addresses its pages, and a URL written here would break
 silently the next time a route changed.
@@ -235,7 +235,8 @@ def _entry(scenario: scenarios_mod.Scenario, placement: Placement | None) -> lis
             f"| Dataset | {placement.dataset} |",
             f"| Supplies | {supplies} |",
             f"| Period | {placement.period} |",
-            f"| Set the in-place-on date to | {placement.in_place_on} |",
+            # THE DATE CONTROL'S OWN WORDS, lower case (REQ-DASH-277 criterion 3).
+            f'| Set "in the warehouse on" to | {placement.in_place_on} |',
             *[f"| Built to | {_target_text(t)} |" for t in placement.targets],
             "",
         ]

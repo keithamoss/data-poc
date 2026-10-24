@@ -1240,13 +1240,36 @@ class TestStatusMatchesEachToolsOwnVerdict:
             const own = new Set(clipped.runs.map(x => x.run_id));
             const raw = new Map(d.columns.flatMap(c => c.checks).map(ck => [ck.check_id || ck.key, ck]));
             const built = buildRealDataset(clipped);
+            // THE SUPPLY ON SHOW, whose counted answer a cross-table card
+            // carries (REQ-DASH-264 criterion 1 as amended by REQ-PIPE-269).
+            const onShow = clipped.runs[clipped.runs.length - 1].supply_id;
             built.columns.forEach(c => c.checks.forEach(ck => {
               if (ck.blockedThisPeriod) return;   // a held table's own check: criterion 3, tested apart
+              const rawCk = raw.get(ck.check_id || ck.key) || {history: []};
               let h = null;
-              for (const x of (raw.get(ck.check_id || ck.key) || {history: []}).history) {
-                if (!(own.has(x.run_id) || x.recorded_by)) continue;
-                if (x.recorded_at && assetDateStrOf(x.recorded_at) > date) continue;
-                if (!h || x.rank >= h.rank) h = x;
+              if (rawCk.counted && onShow) {
+                // COUNTED TOWARD THE SUPPLY ON SHOW: the build's answer for
+                // that supply on that date, looked up in the raw data - a
+                // result about another supply, or a partner not in the
+                // warehouse, is never the current one.
+                const point = newestOnOrBefore(rawCk.counted[onShow], date);
+                if (!point || point.rank == null) {
+                  compared++;
+                  const want = point && point.reason !== "not-counted" ? "red" : "nodata";
+                  const got = checkStatus(ck);
+                  if (got !== want && disagreements.length < 10) {
+                    disagreements.push({dataset: d.id, inPlaceOn: date, check: ck.check_id || ck.id,
+                                        counted: point && point.reason, tool: want, rendered: got});
+                  }
+                  return;
+                }
+                h = rawCk.history.find(x => x.rank === point.rank) || null;
+              } else {
+                for (const x of rawCk.history) {
+                  if (!(own.has(x.run_id) || x.recorded_by)) continue;
+                  if (x.recorded_at && assetDateStrOf(x.recorded_at) > date) continue;
+                  if (!h || x.rank >= h.rank) h = x;
+                }
               }
               if (!h || !h.status) return;
               compared++;
@@ -1268,7 +1291,9 @@ class TestStatusMatchesEachToolsOwnVerdict:
         colour their own run did not record - a check red that day read
         green. This test only ever looked at the default date. Since
         REQ-DASH-264 the expected verdict is the newest one RECORDED by the
-        date, whichever table's run recorded it."""
+        date, whichever table's run recorded it - and since REQ-PIPE-269, for
+        a cross-table check, the newest one COUNTED toward the supply on
+        show (REQ-DASH-264 criterion 1 as amended)."""
         _goto(clean_page, built_dashboard_html)
         result = clean_page.evaluate(self._IN_PLACE_ON_JS)
         assert result["compared"] > 100, result
@@ -5197,11 +5222,81 @@ _AS_AT_CHIPS = (
      "a decision."),
     ("TS-78a", '[data-testid="promotion-split"]',
      "the newest file was not the newest promotion"),
-    ("TS-78b", ".verdict-of", "The supply in place is the one received 2:00pm Sunday, "
-     "30 August 2026."),
+    # 'In place' says where (REQ-DASH-277; REQ-GEN-199 criterion 18 as amended):
+    # the status clause after it comes with REQ-DASH-272.
+    ("TS-78b", ".verdict-of", "The supply in place in the warehouse is the one received "
+     "2:00pm Sunday, 30 August 2026."),
     ("TS-79a", '[data-testid="standing-in"]', "Inherited from 2026-Q1"),
     ("TS-79b", '[data-testid="standing-in"]', "Inherited from 2023-Q1"),
 )
+
+_VISIBLE_TEXT = """() => {
+  const out = [];
+  const walk = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+  let node;
+  while ((node = walk.nextNode())) {
+    const el = node.parentElement;
+    if (!el || el.closest("script, style, [hidden]")) continue;
+    if (el.checkVisibility && !el.checkVisibility()) continue;
+    const text = node.textContent.replace(/\\s+/g, " ").trim();
+    if (text) out.push(text);
+  }
+  return {nodes: out, whole: document.body.innerText.replace(/\\s+/g, " ")};
+}"""
+
+#: 'In place' with nothing after it to say where - the idiom 'in place of' aside.
+_IN_PLACE_ALONE = re.compile(r"\bin place\b(?! in the warehouse)(?! of\b)", re.IGNORECASE)
+
+
+class TestInPlaceInTheWarehouse:
+    """REQ-DASH-277 criterion 7: no visible text on a DATASET or COLLECTION
+    view says 'in place' without saying where - walked as every visible text
+    node, with a past date selected and an awaiting supply on show (TS-78b's
+    placement: Birth Registrations, its newest supply awaiting a decision
+    beside the one in the warehouse). Release Notes and Plans are left out:
+    they render CHANGELOG.yaml and plans/, which say 'in place' as history."""
+
+    def _walk(self, page) -> dict:
+        found = page.evaluate(_VISIBLE_TEXT)
+        assert found["nodes"], "nothing visible to walk"
+        return found
+
+    def _check(self, found: dict, where: str) -> None:
+        alone = [t for t in found["nodes"] if _IN_PLACE_ALONE.search(t)]
+        assert not alone, f"{where}: says 'in place' without where: {alone[:3]}"
+        assert not _IN_PLACE_ALONE.search(found["whole"]), f"{where}: across nodes"
+
+    def test_no_visible_text_says_in_place_alone(self, clean_page, built_dashboard_html):
+        from qa_tools.common import scenario_map
+
+        placement = scenario_map.read_placements().get("TS-78b")
+        assert placement is not None and placement.in_place_on, "TS-78b is not placed"
+        _goto(clean_page, built_dashboard_html)
+        clean_page.locator("#scenarios-btn").click()
+        clean_page.wait_for_timeout(400)
+        index = clean_page.evaluate("SCENARIO_MAP.findIndex(e => e.id === 'TS-78b')")
+        clean_page.locator(f'a[data-scenario="{index}"]').click()
+        clean_page.wait_for_selector('.verdict-of[data-verdict-of="awaiting"]', timeout=10000)
+        assert "in-place-on=" in clean_page.url
+        clean_page.locator("#in-place-on-btn").click()
+        clean_page.wait_for_selector("#in-place-on-input", state="visible")
+        dataset = self._walk(clean_page)
+        # IT CANNOT PASS ON AN EMPTY PAGE: the verdict line, the past-date
+        # notice and the date panel all say where.
+        said = [t for t in dataset["nodes"] if "in place in the warehouse" in t.lower()]
+        assert len(said) >= 2, said
+        assert any(t.startswith("In the warehouse on") for t in dataset["nodes"])
+        self._check(dataset, "the dataset view")
+
+        state = clean_page.evaluate("({...STATE})")
+        _goto(clean_page, built_dashboard_html,
+              state={"tier": "collection", "agencyId": state["agencyId"],
+                     "collectionId": state["collectionId"]},
+              in_place_on=placement.in_place_on)
+        collection = self._walk(clean_page)
+        assert any("in place in the warehouse" in t.lower() for t in collection["nodes"])
+        self._check(collection, "the collection view")
+
 
 class TestTheAsAtScenarioChips:
     """REQ-GEN-199 criteria 32-37 as amended by REQ-DASH-208 (Keith, 2026-10-14):

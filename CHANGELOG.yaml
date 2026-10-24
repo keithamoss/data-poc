@@ -112,10 +112,29 @@ releases:
   - date: "2026-10-24"
     summary: >
       Every result now sits on the delivery it actually read, in the order it
-      ran; a check that crashes leaves a record, and a blocked row says why.
+      ran; a table in the warehouse is judged only by what sits beside it, and
+      "in place" says where.
     changes:
       - category: Improved
         items:
+          - headline: Judged by its neighbours
+            components: ["Pipeline & publishing", "Dashboard UI"]
+            description: >
+              A table already in the warehouse is now judged only against the
+              tables in the warehouse beside it, so a file that was held back
+              can neither turn it red nor keep it green.
+          - headline: The asker takes the blame
+            components: ["Pipeline & publishing", "QA checks & contract"]
+            description: >
+              When a check between two tables cannot run because one is
+              missing, only the table asking the question turns red. One late
+              file no longer colours every table it touches.
+          - headline: "\"In place\" says where"
+            components: ["Dashboard UI", "Testing & dev tooling"]
+            description: >
+              The dashboard and the terminal now say a supply is "in place in
+              the warehouse", and the date control reads "In the warehouse on".
+              Saved links still open where they did.
           - headline: Results placed by what they read
             components: ["Dashboard UI", "Pipeline & publishing"]
             description: >
@@ -140,6 +159,14 @@ releases:
               Hover over a point on a dataset's trend line in the list to see
               what caused it and when: the supply arriving, another table's
               delivery, or a re-check.
+      - category: Fixed
+        items:
+          - headline: Re-checks reach the page
+            components: ["Dashboard UI"]
+            description: >
+              A re-check that ran only the checks between tables now shows on
+              each table's page; before, the page went on showing the result
+              it had replaced.
       - category: New
         items:
           - headline: Crashes and timeouts are remembered

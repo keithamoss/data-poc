@@ -83,3 +83,31 @@ describe("a check with nothing counted toward the supply on show", () => {
     expect(ck.current_status).toBe("nodata");
   });
 });
+
+// The dataset list's count and the dataset page's trend are unitCounts() over
+// the same clipped page, and its newest point must say what the page says
+// (REQ-DASH-225 criterion 18, REQ-DASH-227 criterion 8) - so the late reader's
+// point, the newest by rank, does not carry its red into the latest count.
+describe("the newest point of the list's count", () => {
+  it("agrees with the page on the late reader", () => {
+    dashboard = loadDashboard();
+    const w = dashboard.window;
+    const clipped = w.clipDatasetToInPlaceOn(clients(COUNTED), "2020-11-06");
+    const counts = w.unitCounts(clipped.columns);
+    expect(counts.at(-1)).toMatchObject({ counted: 1, red: 0, amber: 0 });
+  });
+
+  it("leaves out a check counted toward nothing", () => {
+    dashboard = loadDashboard();
+    const w = dashboard.window;
+    const counted = { ...COUNTED, [C2]: [{ on: "2020-11-01", rank: null, reason: "not-counted" }] };
+    const ds = clients(counted);
+    // Its own column, checked by its own run, beside the cross-table section.
+    ds.columns.unshift({ name: "cp_client_id", stats: { current: {}, previous: {}, byRun: {} }, checks: [{
+      key: "not_null", name: "Not null", warn: 0, fail: 0, history: [
+        { run_id: "cp_clients__2020-11-01", run_date: "2020-11-01", rank: 4, supply_id: C2, value: 0,
+          status: "green", recorded_at: "2020-11-01T09:00:00+08:00", recorded_by: null, cause: "arrival:c2" }] }] });
+    const clipped = w.clipDatasetToInPlaceOn(ds, "2020-11-04");
+    expect(w.unitCounts(clipped.columns).at(-1)).toMatchObject({ counted: 1, red: 0, amber: 0 });
+  });
+});

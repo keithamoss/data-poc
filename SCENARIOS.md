@@ -21,7 +21,7 @@ the same as a real one would, because that is the point. **This is the
 list that says which red was on purpose, and where to look at it.**
 
 Each entry gives coordinates - the dataset, the supplies, the period,
-and the date to set the In place on picker to - and never a link. The
+and the date to set the In the warehouse on picker to - and never a link. The
 generator knows where a scenario landed; it does not know how the
 dashboard addresses its pages, and a URL written here would break
 silently the next time a route changed.
@@ -47,7 +47,7 @@ for injection and has not been placed yet.
 | Dataset | birth-registrations |
 | Supplies | `birth_registrations__202609151400000800`, `birth_registrations__202609151600000800`, `birth_registrations__202609152000000800` |
 | Period | 2026-09-15 |
-| Set the in-place-on date to | 2026-09-15 |
+| Set "in the warehouse on" to | 2026-09-15 |
 
 ### TS-2 - Backward cascade
 
@@ -62,7 +62,7 @@ for injection and has not been placed yet.
 | Dataset | birth-registrations |
 | Supplies | `birth_registrations__202609111400000800` |
 | Period | 2026-09-11 |
-| Set the in-place-on date to | 2026-09-11 |
+| Set "in the warehouse on" to | 2026-09-11 |
 
 ### TS-3 - Arrival just OUTSIDE the claim window - four sub-tests
 
@@ -83,7 +83,7 @@ Reframed from daily during Keith's review: the original example (22:00 due, 21:5
 | Dataset | ed-presentations |
 | Supplies | `ed_presentations__202504161000000800` |
 | Period | 2025-Q2 |
-| Set the in-place-on date to | 2025-05-01 |
+| Set "in the warehouse on" to | 2025-05-01 |
 
 ### TS-3b - Quarterly, prior slot UNFILLED
 
@@ -96,7 +96,7 @@ Reframed from daily during Keith's review: the original example (22:00 due, 21:5
 | Dataset | ed-presentations |
 | Supplies | `ed_presentations__202604161000000800` |
 | Period | 2026-Q2 |
-| Set the in-place-on date to | 2026-05-01 |
+| Set "in the warehouse on" to | 2026-05-01 |
 
 ### TS-3c - Daily, prior slot FILLED
 
@@ -109,7 +109,7 @@ Reframed from daily during Keith's review: the original example (22:00 due, 21:5
 | Dataset | birth-registrations |
 | Supplies | `birth_registrations__202606212100000800`, `birth_registrations__202606221700000800` |
 | Period | 2026-06-22 |
-| Set the in-place-on date to | 2026-06-22 |
+| Set "in the warehouse on" to | 2026-06-22 |
 
 ### TS-3d - Daily, prior slot UNFILLED
 
@@ -120,7 +120,7 @@ Reframed from daily during Keith's review: the original example (22:00 due, 21:5
 | Dataset | birth-registrations |
 | Supplies | `birth_registrations__202606251700000800` |
 | Period | 2026-06-25 |
-| Set the in-place-on date to | 2026-06-25 |
+| Set "in the warehouse on" to | 2026-06-25 |
 
 ### TS-4 - Arrival into an already-filled slot
 
@@ -131,7 +131,7 @@ Reframed from daily during Keith's review: the original example (22:00 due, 21:5
 | Dataset | birth-registrations |
 | Supplies | `birth_registrations__202609151400000800`, `birth_registrations__202609151600000800`, `birth_registrations__202609152000000800` |
 | Period | 2026-09-15 |
-| Set the in-place-on date to | 2026-09-15 |
+| Set "in the warehouse on" to | 2026-09-15 |
 
 ### TS-5 - A missed slot must not absorb a later resupply
 
@@ -188,7 +188,7 @@ Reframed from daily during Keith's review: the original example (22:00 due, 21:5
 | Dataset | cp-clients |
 | Supplies | `cp_clients__202404221000000800` |
 | Period | 2024-Q2 |
-| Set the in-place-on date to | 2024-05-01 |
+| Set "in the warehouse on" to | 2024-05-01 |
 
 ### TS-10a - Evening-before daily arrival, Monday filled
 
@@ -201,7 +201,7 @@ Reframed from daily during Keith's review: the original example (22:00 due, 21:5
 | Dataset | birth-registrations |
 | Supplies | `birth_registrations__202606192200000800` |
 | Period | 2026-06-20 |
-| Set the in-place-on date to | 2026-06-20 |
+| Set "in the warehouse on" to | 2026-06-20 |
 
 ### TS-10b - Evening-before daily arrival, Monday unfilled
 
@@ -212,7 +212,7 @@ Reframed from daily during Keith's review: the original example (22:00 due, 21:5
 | Dataset | birth-registrations |
 | Supplies | `birth_registrations__202606272200000800` |
 | Period | 2026-06-28 |
-| Set the in-place-on date to | 2026-06-28 |
+| Set "in the warehouse on" to | 2026-06-28 |
 
 ### TS-11 - A re-filed supply reclassifies
 
@@ -233,7 +233,7 @@ Reframed from daily during Keith's review: the original example (22:00 due, 21:5
 | Dataset | cp-clients |
 | Supplies | `cp_clients__202507191000000800` |
 | Period | 2025-Q3 |
-| Set the in-place-on date to | 2025-08-01 |
+| Set "in the warehouse on" to | 2025-08-01 |
 
 ### TS-66 - A couple of days early - the everyday case
 
@@ -248,7 +248,7 @@ Reframed from daily during Keith's review: the original example (22:00 due, 21:5
 | Dataset | cp-clients |
 | Supplies | `cp_clients__202510301000000800` |
 | Period | 2025-Q4 |
-| Set the in-place-on date to | 2025-11-01 |
+| Set "in the warehouse on" to | 2025-11-01 |
 
 ### TS-67 - A quarterly supply sent too early
 
@@ -263,7 +263,7 @@ Reframed from daily during Keith's review: the original example (22:00 due, 21:5
 | Dataset | cp-clients |
 | Supplies | `cp_clients__202310121000000800` |
 | Period | 2023-Q4 |
-| Set the in-place-on date to | 2023-11-01 |
+| Set "in the warehouse on" to | 2023-11-01 |
 
 ### TS-68 - A duplicate send
 
@@ -276,7 +276,7 @@ Reframed from daily during Keith's review: the original example (22:00 due, 21:5
 | Dataset | birth-registrations |
 | Supplies | `birth_registrations__202607281340000800` |
 | Period | 2026-07-28 |
-| Set the in-place-on date to | 2026-07-28 |
+| Set "in the warehouse on" to | 2026-07-28 |
 | Built to | green, the 2026-07-28 13:40 arrival |
 
 ### TS-69 - Tomorrow's file sent early with today's
@@ -290,7 +290,7 @@ Reframed from daily during Keith's review: the original example (22:00 due, 21:5
 | Dataset | birth-registrations |
 | Supplies | `birth_registrations__202608021330000800` |
 | Period | 2026-08-02 |
-| Set the in-place-on date to | 2026-08-02 |
+| Set "in the warehouse on" to | 2026-08-02 |
 | Built to | green, the 2026-08-02 13:30 arrival |
 | Built to | green, the 2026-08-02 13:45 arrival |
 
@@ -305,7 +305,7 @@ Reframed from daily during Keith's review: the original example (22:00 due, 21:5
 | Dataset | birth-registrations |
 | Supplies | `birth_registrations__202608071340000800` |
 | Period | 2026-08-07 |
-| Set the in-place-on date to | 2026-08-07 |
+| Set "in the warehouse on" to | 2026-08-07 |
 | Built to | green, the 2026-08-07 16:30 arrival |
 
 ### TS-71 - A stray test file that loads
@@ -319,7 +319,7 @@ Reframed from daily during Keith's review: the original example (22:00 due, 21:5
 | Dataset | birth-registrations |
 | Supplies | `birth_registrations__202608121320000800` |
 | Period | 2026-08-12 |
-| Set the in-place-on date to | 2026-08-12 |
+| Set "in the warehouse on" to | 2026-08-12 |
 | Built to | green, the 2026-08-12 13:40 arrival |
 
 ### TS-72 - A stray test file the load refuses
@@ -333,7 +333,7 @@ Reframed from daily during Keith's review: the original example (22:00 due, 21:5
 | Dataset | birth-registrations |
 | Supplies | `birth_registrations__202608171330000800` |
 | Period | 2026-08-17 |
-| Set the in-place-on date to | 2026-08-17 |
+| Set "in the warehouse on" to | 2026-08-17 |
 | Built to | green, the 2026-08-17 13:30 arrival |
 
 ### TS-73 - Reject both
@@ -347,7 +347,7 @@ Reframed from daily during Keith's review: the original example (22:00 due, 21:5
 | Dataset | birth-registrations |
 | Supplies | `birth_registrations__202608211320000800` |
 | Period | 2026-08-21 |
-| Set the in-place-on date to | 2026-08-21 |
+| Set "in the warehouse on" to | 2026-08-21 |
 
 ### TS-74 - Re-file one, reject the other
 
@@ -360,7 +360,7 @@ Reframed from daily during Keith's review: the original example (22:00 due, 21:5
 | Dataset | birth-registrations |
 | Supplies | `birth_registrations__202608251330000800` |
 | Period | 2026-08-25 |
-| Set the in-place-on date to | 2026-08-25 |
+| Set "in the warehouse on" to | 2026-08-25 |
 | Built to | green, the 2026-08-25 13:30 arrival |
 
 ## Delivery and multi-table
@@ -374,7 +374,7 @@ Reframed from daily during Keith's review: the original example (22:00 due, 21:5
 | Dataset | cp-clients |
 | Supplies | `cp_clients__202505010900000800`, `cp_clients__202505291000000800` |
 | Period | 2025-Q2 |
-| Set the in-place-on date to | 2025-05-02 |
+| Set "in the warehouse on" to | 2025-05-02 |
 
 ### TS-13 - Six tables landing seconds apart
 
@@ -393,7 +393,7 @@ Reframed from daily during Keith's review: the original example (22:00 due, 21:5
 | Dataset | cp-clients |
 | Supplies | `cp_clients__202505010900000800`, `cp_clients__202505291000000800` |
 | Period | 2025-Q2 |
-| Set the in-place-on date to | 2025-05-29 |
+| Set "in the warehouse on" to | 2025-05-29 |
 
 ### TS-15a - An UNEXPECTED TABLE - recognised, but not owed
 
@@ -570,7 +570,7 @@ The negative case, and it exists for the same reason TS-33b does: the rejected d
 | Dataset | cp-clients |
 | Supplies | `cp_clients__202602010900000800` |
 | Period | 2026-Q1 |
-| Set the in-place-on date to | 2026-02-01 |
+| Set "in the warehouse on" to | 2026-02-01 |
 
 ### TS-39 - A split extract, once patterns are regexes
 
@@ -613,7 +613,7 @@ The negative case, and it exists for the same reason TS-33b does: the rejected d
 | Dataset | birth-registrations |
 | Supplies | `birth_registrations__202609151400000800`, `birth_registrations__202609151600000800`, `birth_registrations__202609152000000800` |
 | Period | 2026-09-15 |
-| Set the in-place-on date to | 2026-09-15 |
+| Set "in the warehouse on" to | 2026-09-15 |
 
 ### TS-42a - A contested pair of one Child Protection table, while it is contested
 
@@ -628,7 +628,7 @@ PLANTED by REQ-GEN-203 (2026-10-18) in a grown quarter (REQ-GEN-207), after REQ-
 | Dataset | cp-clients |
 | Supplies | `cp_clients__201911010830000800`, `cp_clients__201911291000000800` |
 | Period | 2019-Q4 |
-| Set the in-place-on date to | 2019-11-01 |
+| Set "in the warehouse on" to | 2019-11-01 |
 | Built to | green, the 2019-11-29 10:00 arrival |
 
 ### TS-42b - A contested pair of one Child Protection table, resolved by a later file
@@ -644,7 +644,7 @@ TS-42a's placement; this link opens on the later file's asset day. *Config: as T
 | Dataset | cp-clients |
 | Supplies | `cp_clients__201911010830000800`, `cp_clients__201911291000000800` |
 | Period | 2019-Q4 |
-| Set the in-place-on date to | 2019-11-29 |
+| Set "in the warehouse on" to | 2019-11-29 |
 | Built to | green, the 2019-11-29 10:00 arrival |
 
 ### TS-43 - An amber supply held under hold
@@ -660,7 +660,7 @@ TS-42a's placement; this link opens on the later file's asset day. *Config: as T
 | Dataset | birth-registrations |
 | Supplies | `birth_registrations__202609051400000800` |
 | Period | 2026-09-05 |
-| Set the in-place-on date to | 2026-09-05 |
+| Set "in the warehouse on" to | 2026-09-05 |
 | Built to | amber on place_of_birth_facility.completeness (445 of 1,933), the 2026-09-05 14:00 arrival |
 
 ### TS-44 - An amber supply promoted and awaiting acknowledgement
@@ -676,7 +676,7 @@ TS-42a's placement; this link opens on the later file's asset day. *Config: as T
 | Dataset | birth-registrations |
 | Supplies | `birth_registrations__202609131400000800` |
 | Period | 2026-09-13 |
-| Set the in-place-on date to | 2026-09-13 |
+| Set "in the warehouse on" to | 2026-09-13 |
 | Built to | amber on registering_parent_1_name.completeness (145 of 1,993), the 2026-09-13 14:00 arrival |
 
 ### TS-45 - The same, acknowledged by a person
@@ -692,7 +692,7 @@ TS-42a's placement; this link opens on the later file's asset day. *Config: as T
 | Dataset | birth-registrations |
 | Supplies | `birth_registrations__202609171400000800` |
 | Period | 2026-09-17 |
-| Set the in-place-on date to | 2026-09-17 |
+| Set "in the warehouse on" to | 2026-09-17 |
 | Built to | amber on registering_parent_2_name.completeness (625 of 2,119), the 2026-09-17 14:00 arrival |
 
 ### TS-46 - A green resupply replaces the promoted supply
@@ -708,7 +708,7 @@ TS-42a's placement; this link opens on the later file's asset day. *Config: as T
 | Dataset | birth-registrations |
 | Supplies | `birth_registrations__202609211400000800`, `birth_registrations__202609211600000800` |
 | Period | 2026-09-21 |
-| Set the in-place-on date to | 2026-09-21 |
+| Set "in the warehouse on" to | 2026-09-21 |
 | Built to | green, the 2026-09-21 14:00 arrival |
 | Built to | green, the 2026-09-21 16:00 arrival |
 
@@ -725,7 +725,7 @@ TS-42a's placement; this link opens on the later file's asset day. *Config: as T
 | Dataset | birth-registrations |
 | Supplies | `birth_registrations__202609081100000800` |
 | Period | 2026-09-07 |
-| Set the in-place-on date to | 2026-09-08 |
+| Set "in the warehouse on" to | 2026-09-08 |
 
 ### TS-48 - A correction arriving before its partner is promoted
 
@@ -772,7 +772,7 @@ In the data since 2026-10-15 (REQ-GEN-044 criterion 1; Keith, 2026-10-14, Q13): 
 | Dataset | cp-placements |
 | Supplies | — |
 | Period | 2025-Q1 |
-| Set the in-place-on date to | 2025-02-17 |
+| Set "in the warehouse on" to | 2025-02-17 |
 
 ### TS-55 - A period whose _manifest lists all three kinds
 
@@ -793,7 +793,7 @@ NOT IN THE DATA YET: needs TS-54's substitution beside an inheritance in one per
 | Dataset | cp-carers |
 | Supplies | `cp_carers__202608010900000800` |
 | Period | 2026-Q3 |
-| Set the in-place-on date to | 2026-08-01 |
+| Set "in the warehouse on" to | 2026-08-01 |
 
 ### TS-80 - A contested pair of one Child Protection table, settled by a person
 
@@ -808,7 +808,7 @@ PLANTED by REQ-GEN-203 (2026-10-18) in a grown quarter (REQ-GEN-207): a stray te
 | Dataset | cp-clients |
 | Supplies | `cp_clients__202011010820000800` |
 | Period | 2020-Q4 |
-| Set the in-place-on date to | 2020-11-01 |
+| Set "in the warehouse on" to | 2020-11-01 |
 | Built to | green, the 2020-11-01 08:30 arrival |
 
 ## Calendar corrections
@@ -826,7 +826,7 @@ PLANTED by REQ-GEN-203 (2026-10-18) in a grown quarter (REQ-GEN-207): a stray te
 | Dataset | ed-presentations |
 | Supplies | `ed_presentations__201502021200000800` |
 | Period | 2015-Q1 |
-| Set the in-place-on date to | 2026-09-08 |
+| Set "in the warehouse on" to | 2026-09-08 |
 
 ### TS-57b - A correction that only re-judges, once confirmed
 
@@ -841,7 +841,7 @@ PLANTED by REQ-GEN-203 (2026-10-18) in a grown quarter (REQ-GEN-207): a stray te
 | Dataset | ed-presentations |
 | Supplies | `ed_presentations__201502021200000800` |
 | Period | 2015-Q1 |
-| Set the in-place-on date to | 2026-09-25 |
+| Set "in the warehouse on" to | 2026-09-25 |
 
 ### TS-58a - A correction that moves a supply, before it is confirmed
 
@@ -856,7 +856,7 @@ PLANTED by REQ-GEN-203 (2026-10-18) in a grown quarter (REQ-GEN-207): a stray te
 | Dataset | ed-presentations |
 | Supplies | `ed_presentations__201310101000000800` |
 | Period | 2013-Q4 |
-| Set the in-place-on date to | 2026-09-08 |
+| Set "in the warehouse on" to | 2026-09-08 |
 
 ### TS-58b - A correction that moves a supply, once confirmed
 
@@ -871,7 +871,7 @@ PLANTED by REQ-GEN-203 (2026-10-18) in a grown quarter (REQ-GEN-207): a stray te
 | Dataset | ed-presentations |
 | Supplies | `ed_presentations__201310101000000800` |
 | Period | 2013-Q4 |
-| Set the in-place-on date to | 2026-09-25 |
+| Set "in the warehouse on" to | 2026-09-25 |
 
 ### TS-59a - A supply the asset manager will keep, before the correction is confirmed
 
@@ -886,7 +886,7 @@ PLANTED by REQ-GEN-203 (2026-10-18) in a grown quarter (REQ-GEN-207): a stray te
 | Dataset | ed-presentations |
 | Supplies | `ed_presentations__201407101000000800` |
 | Period | 2014-Q3 |
-| Set the in-place-on date to | 2026-09-08 |
+| Set "in the warehouse on" to | 2026-09-08 |
 
 ### TS-59b - A supply the asset manager kept
 
@@ -901,7 +901,7 @@ PLANTED by REQ-GEN-203 (2026-10-18) in a grown quarter (REQ-GEN-207): a stray te
 | Dataset | ed-presentations |
 | Supplies | `ed_presentations__201407101000000800` |
 | Period | 2014-Q3 |
-| Set the in-place-on date to | 2026-09-25 |
+| Set "in the warehouse on" to | 2026-09-25 |
 
 ### TS-60a - A correction that leaves a supply with no period, before it is confirmed
 
@@ -916,7 +916,7 @@ PLANTED by REQ-GEN-203 (2026-10-18) in a grown quarter (REQ-GEN-207): a stray te
 | Dataset | ed-presentations |
 | Supplies | `ed_presentations__201301221000000800` |
 | Period | 2013-Q1 |
-| Set the in-place-on date to | 2026-09-08 |
+| Set "in the warehouse on" to | 2026-09-08 |
 
 ### TS-60b - A supply left with no period, once confirmed
 
@@ -931,7 +931,7 @@ PLANTED by REQ-GEN-203 (2026-10-18) in a grown quarter (REQ-GEN-207): a stray te
 | Dataset | ed-presentations |
 | Supplies | `ed_presentations__201301221000000800` |
 | Period | 2013-Q1 |
-| Set the in-place-on date to | 2026-09-25 |
+| Set "in the warehouse on" to | 2026-09-25 |
 
 ### TS-61a - A move that will be blocked, before the correction is confirmed
 
@@ -946,7 +946,7 @@ PLANTED by REQ-GEN-203 (2026-10-18) in a grown quarter (REQ-GEN-207): a stray te
 | Dataset | ed-presentations |
 | Supplies | `ed_presentations__201507221000000800` |
 | Period | 2015-Q3 |
-| Set the in-place-on date to | 2026-09-08 |
+| Set "in the warehouse on" to | 2026-09-08 |
 
 ### TS-61b - A move that is blocked, once confirmed
 
@@ -961,7 +961,7 @@ PLANTED by REQ-GEN-203 (2026-10-18) in a grown quarter (REQ-GEN-207): a stray te
 | Dataset | ed-presentations |
 | Supplies | `ed_presentations__201507221000000800` |
 | Period | 2015-Q3 |
-| Set the in-place-on date to | 2026-09-25 |
+| Set "in the warehouse on" to | 2026-09-25 |
 
 ### TS-62 - A correction merged and not yet confirmed
 
@@ -976,7 +976,7 @@ The correction is merged and a new supply arrives before anyone confirms it. *Co
 | Dataset | birth-registrations |
 | Supplies | `birth_registrations__202609250900000800` |
 | Period | 2026-09-25 |
-| Set the in-place-on date to | 2026-09-25 |
+| Set "in the warehouse on" to | 2026-09-25 |
 
 ### TS-63a - A dataset turned off for a while: the turn-off
 
@@ -991,7 +991,7 @@ PLANTED by REQ-GEN-218 (2026-10-18) in Child Protection's grown history. *Config
 | Dataset | cp-carers |
 | Supplies | `cp_carers__202201051000000800`, `cp_carers__202203151000000800` |
 | Period | 2021-Q4 |
-| Set the in-place-on date to | 2021-12-20 |
+| Set "in the warehouse on" to | 2021-12-20 |
 
 ### TS-63b - A dataset turned off for a while: the gap
 
@@ -1006,7 +1006,7 @@ TS-63a's placement; this link opens on 2021-Q4's delivery and runs to the end of
 | Dataset | cp-carers |
 | Supplies | `cp_carers__202201051000000800`, `cp_carers__202203151000000800` |
 | Period | 2021-Q4 |
-| Set the in-place-on date to | 2022-03-20 |
+| Set "in the warehouse on" to | 2022-03-20 |
 
 ### TS-64 - An undeclared change to a frozen date
 
@@ -1029,7 +1029,7 @@ Cp-clients, 2024-Q1: the whole delivery on time at 09:00 on 1 February with cp_c
 | Dataset | cp-clients |
 | Supplies | `cp_clients__202402010900000800`, `cp_clients__202402291000000800` |
 | Period | 2024-Q1 |
-| Set the in-place-on date to | 2024-02-08 |
+| Set "in the warehouse on" to | 2024-02-08 |
 
 ### TS-75b - A supply rejected after it waited - after it was rejected
 
@@ -1042,7 +1042,7 @@ The same placement, on 25 February. **Expect** (REQ-DASH-197), in the same panel
 | Dataset | cp-clients |
 | Supplies | `cp_clients__202402010900000800`, `cp_clients__202402291000000800` |
 | Period | 2024-Q1 |
-| Set the in-place-on date to | 2024-02-25 |
+| Set "in the warehouse on" to | 2024-02-25 |
 
 ### TS-76 - A substitution later removed
 
@@ -1055,7 +1055,7 @@ Cp-placements, 2025-Q1: the delivery leaves cp_placements out; a person substitu
 | Dataset | cp-placements |
 | Supplies | — |
 | Period | 2025-Q1 |
-| Set the in-place-on date to | 2025-02-17 |
+| Set "in the warehouse on" to | 2025-02-17 |
 
 ### TS-77a - A substitution later replaced - while it stood
 
@@ -1068,7 +1068,7 @@ Cp-placements, 2023-Q2: the delivery leaves cp_placements out; a person substitu
 | Dataset | cp-placements |
 | Supplies | `cp_placements__202306081000000800` |
 | Period | 2023-Q2 |
-| Set the in-place-on date to | 2023-05-17 |
+| Set "in the warehouse on" to | 2023-05-17 |
 
 ### TS-77b - Known wrong today (post-build-review #164): A substitution later replaced - the day the late file waited
 
@@ -1081,7 +1081,7 @@ Cp-placements, 2023-Q2: the delivery leaves cp_placements out; a person substitu
 | Dataset | cp-placements |
 | Supplies | `cp_placements__202306081000000800` |
 | Period | 2023-Q2 |
-| Set the in-place-on date to | 2023-06-08 |
+| Set "in the warehouse on" to | 2023-06-08 |
 
 ### TS-78a - A supply promoted after a newer one - the day it was promoted
 
@@ -1094,7 +1094,7 @@ Birth Registrations, 30 August to 2 September 2026, inside the hold era: D's sup
 | Dataset | birth-registrations |
 | Supplies | `birth_registrations__202608301400000800`, `birth_registrations__202608311400000800`, `birth_registrations__202609011400000800` |
 | Period | 2026-08-30 |
-| Set the in-place-on date to | 2026-08-31 |
+| Set "in the warehouse on" to | 2026-08-31 |
 | Built to | amber on registering_parent_1_name.completeness (145 of 1,933), the 2026-08-30 14:00 arrival |
 | Built to | green, the 2026-08-31 14:00 arrival |
 | Built to | amber on registering_parent_2_name.completeness (625 of 1,933), the 2026-09-01 14:00 arrival |
@@ -1110,7 +1110,7 @@ The same placement, on 1 September. **Expect** (REQ-DASH-197 criterion 13), the 
 | Dataset | birth-registrations |
 | Supplies | `birth_registrations__202608301400000800`, `birth_registrations__202608311400000800`, `birth_registrations__202609011400000800` |
 | Period | 2026-08-30 |
-| Set the in-place-on date to | 2026-09-01 |
+| Set "in the warehouse on" to | 2026-09-01 |
 | Built to | amber on registering_parent_1_name.completeness (145 of 1,933), the 2026-08-30 14:00 arrival |
 | Built to | green, the 2026-08-31 14:00 arrival |
 | Built to | amber on registering_parent_2_name.completeness (625 of 1,933), the 2026-09-01 14:00 arrival |
@@ -1126,7 +1126,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
 | Dataset | cp-case-workers |
 | Supplies | — |
 | Period | 2026-Q2 |
-| Set the in-place-on date to | 2026-06-16 |
+| Set "in the warehouse on" to | 2026-06-16 |
 
 ### TS-79b - An inherited quarter - the oldest of the original fifteen
 
@@ -1139,7 +1139,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
 | Dataset | cp-case-workers |
 | Supplies | — |
 | Period | 2023-Q2 |
-| Set the in-place-on date to | 2023-06-16 |
+| Set "in the warehouse on" to | 2023-06-16 |
 
 
 <!-- scenario-map-data

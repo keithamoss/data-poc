@@ -953,7 +953,7 @@ footer{color:var(--ink-faint); font-size:12px; padding-block:30px 40px; border-t
     </button>
     <div class="header-actions">
       <button class="snapshots-btn" id="theme-btn" type="button">🌙 Dark mode</button>
-      <button class="snapshots-btn" id="in-place-on-btn" type="button">📅 In place on: <span id="in-place-on-btn-label">…</span></button>
+      <button class="snapshots-btn" id="in-place-on-btn" type="button">📅 In the warehouse on: <span id="in-place-on-btn-label">…</span></button>
       <button class="snapshots-btn" id="activity-btn" type="button">📋 Recent activity</button>
       <button class="snapshots-btn" id="changelog-btn" type="button">🗒 Release notes</button>
       <button class="snapshots-btn" id="requirements-btn" type="button">📐 Requirements</button>
@@ -1044,13 +1044,13 @@ footer{color:var(--ink-faint); font-size:12px; padding-block:30px 40px; border-t
   <div class="drawer-head">
     <div>
       <div class="legend-key" style="margin:0 0 4px;">Cadence-aware viewing</div>
-      <h3>What was in place on a date</h3>
+      <h3>What was in place in the warehouse on a date</h3>
     </div>
     <button class="drawer-close" id="in-place-on-panel-close" aria-label="Close">✕</button>
   </div>
   <div class="drawer-body" id="in-place-on-panel-body">
     <div style="font-size:12.5px; color:var(--ink-muted); margin-bottom:16px;">
-      Shows, for every dataset, the supply that was in place on the date
+      Shows, for every dataset, the supply that was in place in the warehouse on the date
       you pick - or the newest one still awaiting a decision - and its
       results. It uses <b>everything known today</b>: a decision written down
       after that date still counts if it took effect by then, and one that
@@ -1059,7 +1059,7 @@ footer{color:var(--ink-faint); font-size:12px; padding-block:30px 40px; border-t
       supplied by that date shows as <b>No data</b>, never a misleading
       blank, green, or red. Applies to the whole data asset at once.
     </div>
-    <label for="in-place-on-input" style="display:block; font-size:12.5px; font-weight:600; margin-bottom:6px;">In place on</label>
+    <label for="in-place-on-input" style="display:block; font-size:12.5px; font-weight:600; margin-bottom:6px;">In the warehouse on</label>
     <input type="date" id="in-place-on-input" style="font:600 14px 'IBM Plex Mono',monospace; padding:8px 10px; border:1px solid var(--line-strong); border-radius:var(--radius-sm); background:var(--surface); color:var(--ink); width:100%; max-width:220px;">
     <!-- WHICH PERIOD, PER CALENDAR (criterion 6). A date on its own does
          not tell a reader what they are about to see: on a quarterly
@@ -2943,8 +2943,9 @@ function clipDatasetToInPlaceOn(d, inPlaceOnDateStr){
         const counted = countedOnShow(ck, effectiveRun, inPlaceOnDateStr);
         if(counted && counted.rank == null){
           const ownLast = history[history.length-1];
+          const status = counted.reason === "not-counted" ? "nodata" : "red";
           const inPlaceOn = {...ck, history, current: null, previous: ownLast.value,
-            current_status: counted.reason === "not-counted" ? "nodata" : "red",
+            current_status: status, countedNow: status,
             warehouseReason: counted.reason, owedBy: counted.owedBy || null,
             owedSince: counted.owedSince || null};
           if(ck.contested_reads) inPlaceOn.contested_reads = ck.contested_reads.filter(recordedBy);
@@ -2963,6 +2964,8 @@ function clipDatasetToInPlaceOn(d, inPlaceOnDateStr){
         // recorded-by-then rule as the history, and nothing more.
         if(ck.contested_reads) inPlaceOn.contested_reads = ck.contested_reads.filter(recordedBy);
         if(last.status) inPlaceOn.current_status = last.status; else delete inPlaceOn.current_status;
+        // The newest point of the list's count agrees (unitCounts).
+        if(counted) inPlaceOn.countedNow = historyStatus(last, ck);
         return inPlaceOn;
       })
       .filter(Boolean);
@@ -3705,7 +3708,7 @@ function unitCounts(units){
           perPoint.set(key, {rank, status: historyStatus(h, ck)});
         }
       });
-      perCheck.push({unit: u, perPoint});
+      perCheck.push({unit: u, ck, perPoint});
     });
   });
   // A TOTAL ORDER: ranked points by rank, then any unranked (illustrative
@@ -3725,6 +3728,16 @@ function unitCounts(units){
       if(here){ if(p.supply) lastBySupply.set(p.supply, here); return; }
       if(!p.own && p.supply && lastBySupply.has(p.supply)) perPoint.set(p.key, lastBySupply.get(p.supply));
     });
+  });
+  // THE NEWEST POINT SAYS WHAT THE PAGE SAYS (REQ-PIPE-269; post-build-review
+  // #262 R4): where the as-of clip took a cross-table check's current from the
+  // build's counted answer for the supply on show (`countedNow`), the newest
+  // point carries that verdict - so a late reader of an older supply, newest
+  // by rank, never puts its red in the list's latest count, and a check
+  // counted toward nothing is not counted there either.
+  const newest = ordered.length ? ordered[ordered.length-1].key : null;
+  if(newest != null) perCheck.forEach(({ck, perPoint})=>{
+    if(ck.countedNow !== undefined) perPoint.set(newest, {rank: null, status: ck.countedNow});
   });
   const byPoint = new Map();
   const worstByUnit = new Map();
@@ -6247,12 +6260,12 @@ function verdictLine(ds){
   // NOR WHERE THE DATE ON SHOW BLANKS THEM (#123 A5) - the other cause.
   if(!v || !ds.lastArrival || ds.blocked || ds.noDataInPlaceOn) return "";
   if(v.state === "promoted"){
-    return `<div class="verdict-of" data-verdict-of="promoted" style="font-size:12.5px; color:var(--ink-muted); margin:-6px 0 8px;">The results below are the supply in place, received ${fmtInstant(ds.lastArrival.arrivedAt)}.</div>`;
+    return `<div class="verdict-of" data-verdict-of="promoted" style="font-size:12.5px; color:var(--ink-muted); margin:-6px 0 8px;">The results below are the supply in place in the warehouse, received ${fmtInstant(ds.lastArrival.arrivedAt)}.</div>`;
   }
   const inPlace = v.inPlaceRunDate
-    ? `The supply in place is the one received ${v.inPlaceReceivedAt ? fmtInstant(v.inPlaceReceivedAt) : escHtml(fmtDay(String(v.inPlaceRunDate).slice(0,10)))}.`
-    : "Nothing is in place for this period yet.";
-  return `<div class="verdict-of" data-verdict-of="awaiting" style="font-size:12.5px; color:var(--ink); margin:-6px 0 8px;"><b style="display:inline">Awaiting a decision</b> — the results below are the newest supply, received ${fmtInstant(ds.lastArrival.arrivedAt)}, which is not in place yet. ${inPlace}</div>`;
+    ? `The supply in place in the warehouse is the one received ${v.inPlaceReceivedAt ? fmtInstant(v.inPlaceReceivedAt) : escHtml(fmtDay(String(v.inPlaceRunDate).slice(0,10)))}.`
+    : "Nothing is in place in the warehouse for this period yet.";
+  return `<div class="verdict-of" data-verdict-of="awaiting" style="font-size:12.5px; color:var(--ink); margin:-6px 0 8px;"><b style="display:inline">Awaiting a decision</b> — the results below are the newest supply, received ${fmtInstant(ds.lastArrival.arrivedAt)}, which is not in place in the warehouse yet. ${inPlace}</div>`;
 }
 // THE CENSUS AS AT THE DATE ON SHOW (REQ-PIPE-081 criteria 14 and 15): the
 // last recorded census taken on or before the end of that day - never the
@@ -7423,7 +7436,7 @@ function owedPeriodStart(d, dateStr){
 // so the heading says so and the body keeps only its way back - 'no QA run
 // within the accepted freshness window' would read as a supply missed.
 function neverSuppliedNotice(d, dateStr){
-  const back = `Pick a later date, or reset to the default, using the 📅 In place on control above.`;
+  const back = `Pick a later date, or reset to the default, using the 📅 In the warehouse on control above.`;
   const s = slaInPlaceOn(d, dateStr);
   if(s.notOwedYet){
     return `<div class="notice-exhausted" role="status" data-not-owed-yet>
@@ -9524,7 +9537,7 @@ function markScenarioSubject(){
     const label = document.createElement(el.tagName === "TR" || el.tagName === "SPAN" ? "span" : "div");
     label.className = "scenario-subject-label";
     label.dataset.scenarioLabel = "";
-    label.textContent = `${entry.id} \u00b7 in place on ${fmtDay(jump.to)}`;
+    label.textContent = `${entry.id} \u00b7 in the warehouse on ${fmtDay(jump.to)}`;
     if(el.tagName === "TR" && el.cells[0]) el.cells[0].prepend(label);
     else el.before(label);
   }
@@ -9603,7 +9616,7 @@ function scenarioNotOnPage(id, on){
   notice.setAttribute("role", "status");
   notice.dataset.scenarioNotFound = "";
   notice.innerHTML = id
-    ? `Scenario <code>${escHtml(id)}</code> has nothing to show on this page in place on ${escHtml(fmtDay(on))}, so the page opens at the top.`
+    ? `Scenario <code>${escHtml(id)}</code> has nothing to show on this page in the warehouse on ${escHtml(fmtDay(on))}, so the page opens at the top.`
     : `This link names a test scenario this dashboard does not hold, so the page opens at the top.`;
   view.prepend(notice);
 }
@@ -9649,7 +9662,7 @@ function scenarioEntryHtml(entry, index){
     // drew at 15px and clipped at phone width. The family only, and it wraps.
     // A REAL LINK (REQ-DASH-208 criterion 10): middle-click and copy link work.
     ? `<a class="pill tag sm" data-scenario="${index}" href="${escAttr(scenarioChipHref(entry))}"
-         style="border:0; cursor:pointer; font-family:inherit; white-space:normal; text-align:left; max-width:100%; min-height:28px; text-decoration:none; color:inherit;"><span class="ico"></span>${escHtml(coords.dataset)} · ${escHtml(coords.period)} · in place on ${escHtml(coords.inPlaceOn)}</a>`
+         style="border:0; cursor:pointer; font-family:inherit; white-space:normal; text-align:left; max-width:100%; min-height:28px; text-decoration:none; color:inherit;"><span class="ico"></span>${escHtml(coords.dataset)} · ${escHtml(coords.period)} · in the warehouse on ${escHtml(coords.inPlaceOn)}</a>`
     : `<span style="font-size:11.5px; color:var(--ink-faint);">${
          entry.mode==="INJECT" ? "no data behind it yet" : "no data behind it — a unit test"}</span>`;
   return `<div style="border-top:1px solid var(--line); padding:9px 0;">
@@ -10438,7 +10451,7 @@ function renderInPlaceOnPastNotice(){
   const past = CURRENT_IN_PLACE_ON && DEFAULT_IN_PLACE_ON && CURRENT_IN_PLACE_ON !== DEFAULT_IN_PLACE_ON;
   if(!past){ notice.hidden = true; notice.innerHTML = ""; return; }
   notice.hidden = false;
-  notice.innerHTML = `Showing what was <b>in place on ${fmtDay(CURRENT_IN_PLACE_ON)}</b>, using
+  notice.innerHTML = `Showing what was <b>in place in the warehouse on ${fmtDay(CURRENT_IN_PLACE_ON)}</b>, using
     everything known today - including decisions written down since, where they took effect by then. The
     snapshot archive (🕐 Past snapshots) shows what this page itself said then.${changedSinceNote(CURRENT_IN_PLACE_ON)}`;
 }
@@ -10459,7 +10472,7 @@ function renderInPlaceOnRangeNotice(){
     : DEFAULT_IN_PLACE_ON > range.last ? range.last : DEFAULT_IN_PLACE_ON;
   const why = offer === DEFAULT_IN_PLACE_ON ? "" : offer === range.last
     ? ", the newest date this dashboard has periods for" : ", the earliest date this dashboard has periods for";
-  notice.innerHTML = `You are viewing what was in place on
+  notice.innerHTML = `You are viewing what was in place in the warehouse on
     <b>${fmtDay(CURRENT_IN_PLACE_ON)}</b>, which is outside the dates this
     dashboard has delivery periods for — it covers
     <b>${fmtDay(range.first)}</b> to <b>${fmtDay(range.last)}</b>.

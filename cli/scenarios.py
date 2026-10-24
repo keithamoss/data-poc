@@ -61,6 +61,13 @@ def map_command(out_path: str | None, check: bool) -> None:
                        "that places scenarios into the generated history.", style="dim")
 
 
+def where_line(placement) -> str:
+    """Where a placed scenario is to be looked at - its dataset, period and
+    the date control's date, in the control's own words, lower case
+    (REQ-DASH-277 criterion 3)."""
+    return f"{placement.dataset} · {placement.period} · in the warehouse on {placement.in_place_on}"
+
+
 @scenarios_group.command("list")
 @click.option("--injected-only", is_flag=True,
                help="Only the scenarios the register marks for injection.")
@@ -79,7 +86,7 @@ def list_command(injected_only: bool) -> None:
     for scenario in sorted(entries, key=lambda s: s.sort_key):
         placement = placements.get(scenario.id)
         if placement is not None and placement.is_complete:
-            where = f"{placement.dataset} · {placement.period} · in place on {placement.in_place_on}"
+            where = where_line(placement)
         elif scenario.is_injected:
             where = "not injected yet"
         else:
