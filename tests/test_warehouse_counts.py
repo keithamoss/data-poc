@@ -174,3 +174,104 @@ class TestTheCountedPoints:
         assert {late, beside} <= set(ranks)
         assert ranks[late] not in [p["rank"] for p in card["counted"][c2]]
         assert card["counted"][c2][-1]["rank"] == ranks[beside]
+
+    def test_a_late_reader_of_the_newer_supply_beside_a_waiting_partner_does_not_count(
+            self, build, period):
+        """R4 able to fail on the counting itself, not only on which supply an
+        entry is grouped under (post-build-review #266 T6): a later result
+        that DID read Clients v2 - beside a Notifications that is waiting,
+        not in the warehouse - is the newest about v2 and is grouped under
+        v2, so the R4 behaviour (the newest recorded result is the card's
+        current) would show it. Counted, it is not: v2's current stays the
+        verdict beside the Notifications in the warehouse."""
+        c2, n1, n_waiting = (f"cp-clients@{_key()}", f"cp-notifications@{_key()}",
+                             f"cp-notifications@{_key()}")
+        _run(_uid("n"), dataset_id="cp-notifications", supply=n1,
+             when="2099-03-01T09:00:00+08:00")
+        _decide(dl.PROMOTE, "cp-notifications", n1, period, "2099-03-01T10:00:00+08:00")
+        _run(_uid("c"), dataset_id="cp-clients", supply=c2, when="2099-03-02T09:00:00+08:00")
+        beside = _run(_uid("c"), dataset_id="cp-clients", supply=c2,
+                      when="2099-03-02T09:00:00+08:00",
+                      reads={"cp_clients": c2, "cp_notifications": n1},
+                      results=[_record(CLIENT_REF, "cp-notifications", "pass")])
+        _decide(dl.PROMOTE, "cp-clients", c2, period, "2099-03-02T10:00:00+08:00")
+        late = _run(_uid("n"), dataset_id="cp-notifications", supply=n_waiting,
+                    when="2099-03-05T09:00:00+08:00",
+                    reads={"cp_clients": c2, "cp_notifications": n_waiting},
+                    results=[_record(CLIENT_REF, "cp-notifications", "fail")])
+        card = _card(build()["cp-clients"], CLIENT_REF)
+        by_run = {h["run_id"]: h for h in card["history"]}
+        assert by_run[late]["supply_id"] == by_run[beside]["supply_id"] == c2
+        assert by_run[late]["rank"] > by_run[beside]["rank"], "the late one is the newest"
+        on_6th = [p for p in card["counted"][c2] if p["on"] <= "2099-03-06"][-1]
+        assert on_6th["rank"] == by_run[beside]["rank"]
+
+
+# ---------------------------------------------------------------------------
+# The points themselves (post-build-review #266 T1), through points()
+# ---------------------------------------------------------------------------
+
+def _entry(run_id, rank, *, supply, reads, at, status="pass", not_evaluated=None):
+    from qa_tools.common import qa_store
+    return {"run_id": run_id, "rank": rank, "supply_id": supply, "read_state": qa_store.READ,
+            "recorded_at": at, "status": status, "not_evaluated": not_evaluated,
+            "reads": {t: {"state": qa_store.READ if s else qa_store.ABSENT, "supply_id": s}
+                      for t, s in reads.items()}}
+
+
+def _held(slot, holder, at, ds):
+    return {"at": at, "slot": slot, "held_as": "promoted", "holder": holder, "_ds": ds}
+
+
+def _timeline(*entries):
+    from qa_tools.common import supply_status
+    by_ds: dict = {}
+    for e in entries:
+        by_ds.setdefault(e.pop("_ds"), []).append(e)
+    return supply_status.HoldingsTimeline(by_ds)
+
+
+class TestThePointsThemselves:
+
+    def test_a_could_not_run_counts_only_toward_the_table_that_asks(self):
+        """Criterion 4 in the build: Placements' Client reference, recorded
+        not evaluated for want of a Placements, read Clients v2 - on the
+        Clients page it counts toward nothing, so its point says so."""
+        from pipeline import warehouse_counts
+        placements_ref = CLIENT_REF.replace(".cp-notifications.", ".cp-placements.")
+        c2 = "cp-clients@1"
+        history = [_entry("r1", 0, supply=c2, at="2099-03-01T09:00:00+08:00", status="fail",
+                          not_evaluated="no Placements supply this run may read",
+                          reads={"cp_clients": c2, "cp_placements": None})]
+        got = warehouse_counts.points("cp-clients", placements_ref, history,
+                                      warehouse=_timeline(), owed=None)
+        assert got == {c2: [{"rank": None, "reason": warehouse_counts.NOT_COUNTED,
+                             "on": "2099-03-01"}]}
+
+    def test_owed_points_say_no_current_result_then_recheck_owed(self):
+        """Clients v2's only Client reference read a Notifications that is
+        never in the warehouse. Waiting, it counts (criterion 3); promoted
+        beside Notifications v1 nothing counts and the owed check reads
+        'no-current-result'; once Notifications v2's promotion owes a
+        re-check that has not run, 'recheck-owed' naming it."""
+        from pipeline import warehouse_counts
+        from qa_tools.common import supply_status
+        c2, n0 = "cp-clients@2", "cp-notifications@0"
+        n1, n2 = "cp-notifications@1", "cp-notifications@2"
+        history = [_entry("r1", 0, supply=c2, at="2099-03-01T09:00:00+08:00",
+                          reads={"cp_clients": c2, "cp_notifications": n0})]
+        warehouse = _timeline(
+            _held("P", n1, "2099-02-01T10:00:00+08:00", "cp-notifications"),
+            _held("P", c2, "2099-03-02T10:00:00+08:00", "cp-clients"),
+            _held("P", n2, "2099-03-04T10:00:00+08:00", "cp-notifications"))
+        cause_at = supply_status.instant("2099-03-04T10:00:00+08:00")
+        owed = supply_status.Owing([("P", frozenset({"cp_notifications"}), 99, cause_at,
+                                     None)])
+        got = warehouse_counts.points("cp-clients", CLIENT_REF, history,
+                                      warehouse=warehouse, owed=owed)
+        assert got == {c2: [
+            {"rank": 0, "reason": None, "on": "2099-03-01"},
+            {"rank": None, "reason": supply_status.NO_CURRENT_RESULT, "owedBy": None,
+             "owedSince": None, "on": "2099-03-02"},
+            {"rank": None, "reason": supply_status.RECHECK_OWED, "owedBy": 99,
+             "owedSince": cause_at.isoformat(), "on": "2099-03-04"}]}

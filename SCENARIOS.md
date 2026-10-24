@@ -1101,7 +1101,7 @@ Birth Registrations, 30 August to 2 September 2026, inside the hold era: D's sup
 
 ### TS-78b - A supply promoted after a newer one - the day after
 
-The same placement, on 1 September. **Expect** (REQ-DASH-197 criterion 13), the verdict line above the results: "Awaiting a decision — the results below are the newest supply, received 2:00pm Tuesday, 1 September 2026, which is not in place yet. The supply in place is the one received 2:00pm Sunday, 30 August 2026." - naming D's supply, not D+1's, which is newer by receipt. **Breaks as**: the verdict line naming 31 August's supply as in place.
+The same placement, on 1 September. **Expect** (REQ-DASH-197 criterion 13), the verdict line above the results: "Awaiting a decision — the results below are the newest supply, received 2:00pm Tuesday, 1 September 2026, which is not in place in the warehouse yet. The supply in place in the warehouse is the one received 2:00pm Sunday, 30 August 2026." - naming D's supply, not D+1's, which is newer by receipt. **Breaks as**: the verdict line naming 31 August's supply as in place.
 
 **What it would look like if the rule were wrong.** The verdict line naming 31 August's supply as in place.
 
@@ -3128,7 +3128,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "mode": "INJECT",
    "title": "A supply promoted after a newer one - the day after",
    "section": "Calendar corrections",
-   "demonstrates": "The same placement, on 1 September. **Expect** (REQ-DASH-197 criterion 13), the verdict line above the results: \"Awaiting a decision \u2014 the results below are the newest supply, received 2:00pm Tuesday, 1 September 2026, which is not in place yet. The supply in place is the one received 2:00pm Sunday, 30 August 2026.\" - naming D's supply, not D+1's, which is newer by receipt. **Breaks as**: the verdict line naming 31 August's supply as in place.",
+   "demonstrates": "The same placement, on 1 September. **Expect** (REQ-DASH-197 criterion 13), the verdict line above the results: \"Awaiting a decision \u2014 the results below are the newest supply, received 2:00pm Tuesday, 1 September 2026, which is not in place in the warehouse yet. The supply in place in the warehouse is the one received 2:00pm Sunday, 30 August 2026.\" - naming D's supply, not D+1's, which is newer by receipt. **Breaks as**: the verdict line naming 31 August's supply as in place.",
    "breaksAs": "The verdict line naming 31 August's supply as in place.",
    "config": null,
    "requirements": [

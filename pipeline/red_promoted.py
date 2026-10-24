@@ -24,8 +24,6 @@ from qa_tools.common import decision_log, qa_store, supply_db
 def _cause(conn, run_key: str) -> tuple[str, str]:
     """(instant, words) for what caused a run - an arrival, or the decision
     a re-evaluation followed (criterion 2)."""
-    from qa_tools.common import hierarchy
-
     # THE ASSET'S TIMELINE, as supply_status orders runs (#116, D1): an
     # arrival's run is dated by its supply's receipt, never the batch clock.
     rows = conn.execute(
@@ -38,15 +36,9 @@ def _cause(conn, run_key: str) -> tuple[str, str]:
     if not rows:
         return "", ""
     run_at, run_ds, action, cause_ds, cause_at = rows[0]
-
-    def name(ds):
-        try:
-            return hierarchy.dataset(ds).dataset_name
-        except Exception:  # noqa: BLE001 - a name is decoration, never a failure
-            return ds or "a supply"
     if action:
-        return cause_at.isoformat(), f"the {action} of {name(cause_ds)}"
-    return (run_at.isoformat() if run_at else ""), f"the arrival of {name(run_ds)}"
+        return cause_at.isoformat(), f"the {action} of {_name(cause_ds)}"
+    return (run_at.isoformat() if run_at else ""), f"the arrival of {_name(run_ds)}"
 
 
 def for_dataset(dataset_id: str, conn=None) -> dict[str, dict]:

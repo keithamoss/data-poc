@@ -2952,6 +2952,21 @@ function clipDatasetToInPlaceOn(d, inPlaceOnDateStr){
           return inPlaceOn;
         }
         const countedAt = counted ? history.findIndex(h=> h.rank === counted.rank) : -1;
+        if(counted && countedAt < 0){
+          // IMPOSSIBLE, AND SAID SO (post-build-review #266): the build counts a
+          // result the history on this date does not hold. Taking the newest
+          // instead was R4's own behaviour - a result the gate would not use
+          // shown as current - so the card reads No data and the console says
+          // why, which the render gates fail on.
+          console.error(`check ${ck.check_id} on ${d.id}: the build counts rank ${counted.rank} `
+            + `toward ${effectiveRun.supply_id} on ${inPlaceOnDateStr}, which its history on that `
+            + `date does not hold - not shown`);
+          const notShown = {...ck, history, current: null, previous: history[history.length-1].value,
+            current_status: "nodata", countedNow: "nodata", warehouseReason: "not-shown",
+            owedBy: null, owedSince: null};
+          if(ck.contested_reads) notShown.contested_reads = ck.contested_reads.filter(recordedBy);
+          return notShown;
+        }
         const lastAt = countedAt >= 0 ? countedAt : history.length-1;
         const last = history[lastAt], prev = lastAt>0 ? history[lastAt-1] : last;
         // THE STATUS OF THE RUN ON SHOW, not the newest run's (dashboard UX

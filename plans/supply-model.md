@@ -4131,8 +4131,9 @@ generation refuses, naming TS-78a, if it stops doing so.
 The same placement, on 1 September. **Expect** (REQ-DASH-197 criterion 13),
 the verdict line above the results: "Awaiting a decision — the results
 below are the newest supply, received 2:00pm Tuesday, 1 September 2026,
-which is not in place yet. The supply in place is the one received 2:00pm
-Sunday, 30 August 2026." - naming D's supply, not D+1's, which is newer by
+which is not in place in the warehouse yet. The supply in place in the
+warehouse is the one received 2:00pm Sunday, 30 August 2026." - naming D's
+supply, not D+1's, which is newer by
 receipt. **Breaks as**: the verdict line naming 31 August's supply as in
 place.
 

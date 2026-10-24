@@ -205,14 +205,26 @@ class TestCouldNotRunCountsTowardTheAsker:
 
     def test_an_absent_clients_reddens_only_the_asker(self, conn, period):
         """Clients absent: Notifications' Client reference could not run and
-        counts toward Notifications only - and an earlier Clients supply of
-        another period is coloured by nothing."""
+        counts toward Notifications only. And the other way about, able to
+        fail (post-build-review #266 T3): a Clients supply the same check
+        DID read, recorded not evaluated for want of a Notifications, is
+        shown on Clients and coloured by nothing - waiting or in the
+        warehouse. (The first half alone could never redden a Clients
+        supply: it read none.)"""
         n1, c0 = _supply("cp-notifications"), _supply("cp-clients")
         _own(conn, "cp-clients", c0, CLIENTS_OWN, "pass", "2099-01-01T09:00:00+08:00")
         _own(conn, "cp-notifications", n1, NOTIFICATIONS_OWN, "pass", "2099-03-01T09:00:00+08:00")
         _client_ref(conn, under="cp-notifications", supply=n1, clients=None, notifications=n1,
                     status="fail", not_evaluated=True, at="2099-03-01T09:00:00+08:00")
         assert _status(conn, "cp-notifications", n1) == "red"
+        assert _status(conn, "cp-clients", c0) == "green"
+
+        _client_ref(conn, under="cp-clients", supply=c0, clients=c0, notifications=None,
+                    status="fail", not_evaluated=True, at="2099-03-02T09:00:00+08:00")
+        about = supply_status.results_about(conn, "cp-clients", c0, view=NOW)
+        assert [r["check_id"] for r in about.shown].count(CLIENT_REF) == 1
+        assert _status(conn, "cp-clients", c0) == "green"
+        _promote(conn, "cp-clients", c0, period, "2099-03-02T10:00:00+08:00")
         assert _status(conn, "cp-clients", c0) == "green"
 
     def test_an_absent_placements_leaves_clients_alone(self, conn, period):
@@ -285,6 +297,13 @@ class TestOwedRecheck:
         assert conn.execute(
             f"SELECT count(*) FROM {dl.TABLE} WHERE to_slot = ? AND action = ?",
             [period, dl.STILL_FAILING]).fetchone()[0] == decisions_before == 0
+        # NO NOTIFICATION MARK (post-build-review #266 T4): the owed item
+        # carries no found-worse mark, and Clients v2 is not on the list of
+        # supplies re-checked worse that asks a person to acknowledge.
+        from qa_tools.common import rechecking
+        assert conn.execute(f"SELECT found_worse FROM {recheck.TABLE} WHERE id = ?",
+                            [owed.id]).fetchone()[0] is None
+        assert rechecking.worse_than_promoted(conn, "cp-clients", c2) == []
         # The as-at view agrees: before the promotion took effect nothing was owed.
         before = supply_status.View(as_at="2099-04-03T09:00:00+08:00")
         assert _status(conn, "cp-clients", c2, before) == "green"
@@ -448,3 +467,90 @@ class TestAsAtTheView:
         on_10th = supply_status.View(as_at="2099-01-10T09:00:00+08:00")
         assert _status(conn, "cp-clients", c1, on_10th) == "red"
         assert _status(conn, "cp-clients", c1) == "red"
+
+
+# ---------------------------------------------------------------------------
+# The rule's edges (post-build-review #266 T1)
+# ---------------------------------------------------------------------------
+
+class TestTheRulesEdges:
+
+    @pytest.mark.parametrize("state", [qa_store.ABSENT, qa_store.HELD])
+    def test_a_read_of_nothing_stops_counting_once_the_period_holds_the_table(
+            self, conn, period, state):
+        """Notifications v1 promoted into a period with no Clients; its
+        Client reference read nothing of cp_clients (absent, or a supply
+        deliberately not read) and passed, and counts. Once Clients v1 is
+        promoted into the period that read no longer describes the
+        warehouse, so it stops counting and the owed check reads red."""
+        c1, n1 = _supply("cp-clients"), _supply("cp-notifications")
+        _own(conn, "cp-notifications", n1, NOTIFICATIONS_OWN, "pass", "2099-09-01T09:00:00+08:00")
+        record = _result(CLIENT_REF, "cp-notifications", "pass")
+        verdict = _run(conn, _uid("n"), dataset_id="cp-notifications", supply=n1,
+                       at="2099-09-01T09:00:00+08:00",
+                       cross=[(record, (_read("cp_clients", c1 if state == qa_store.HELD
+                                              else None, state),
+                                        _read("cp_notifications", n1)))])
+        _promote(conn, "cp-notifications", n1, period, "2099-09-01T10:00:00+08:00")
+        before = supply_status.View(as_at="2099-09-02T09:00:00+08:00")
+        assert [r["run_id"] for r in _counted(conn, "cp-notifications", n1, CLIENT_REF,
+                                              before)] == [verdict]
+        _own(conn, "cp-clients", c1, CLIENTS_OWN, "pass", "2099-09-03T09:00:00+08:00")
+        _promote(conn, "cp-clients", c1, period, "2099-09-03T10:00:00+08:00")
+        (row,) = _counted(conn, "cp-notifications", n1, CLIENT_REF)
+        assert row["warehouse_reason"] in (supply_status.RECHECK_OWED,
+                                           supply_status.NO_CURRENT_RESULT)
+        assert _status(conn, "cp-notifications", n1) == "red"
+
+    def test_a_no_supply_read_is_ignored(self, conn, period):
+        """A result whose read of cp_clients was of no supply at all (a
+        sample's or a trial's table) is judged by its other reads alone: it
+        counts toward Notifications v1 although the period holds a Clients
+        supply it did not read."""
+        c1, n1 = _supply("cp-clients"), _supply("cp-notifications")
+        _own(conn, "cp-clients", c1, CLIENTS_OWN, "pass", "2099-10-01T09:00:00+08:00")
+        _own(conn, "cp-notifications", n1, NOTIFICATIONS_OWN, "pass", "2099-10-01T09:00:00+08:00")
+        verdict = _run(conn, _uid("n"), dataset_id="cp-notifications", supply=n1,
+                       at="2099-10-01T09:00:00+08:00",
+                       cross=[(_result(CLIENT_REF, "cp-notifications", "pass"),
+                               (_read("cp_clients", None, qa_store.NO_SUPPLY),
+                                _read("cp_notifications", n1)))])
+        _promote(conn, "cp-clients", c1, period, "2099-10-01T10:00:00+08:00")
+        _promote(conn, "cp-notifications", n1, period, "2099-10-01T10:00:00+08:00")
+        assert [r["run_id"] for r in _counted(conn, "cp-notifications", n1, CLIENT_REF)] == [
+            verdict]
+        assert _status(conn, "cp-notifications", n1) == "green"
+
+    def test_owed_honours_the_causes_effective_instant(self, conn, period):
+        """Clients v2 is promoted beside Notifications v1, its only Client
+        reference having read another Notifications - so nothing counts and
+        the check is owed. A later promotion owes a re-check that fails. As
+        at a moment before that promotion took effect the red is 'no
+        current result'; from it on, 'recheck-owed' naming it."""
+        n0, n1, n2 = (_supply("cp-notifications"), _supply("cp-notifications"),
+                      _supply("cp-notifications"))
+        c2 = _supply("cp-clients")
+        _own(conn, "cp-notifications", n1, NOTIFICATIONS_OWN, "pass", "2099-11-01T09:00:00+08:00")
+        _promote(conn, "cp-notifications", n1, period, "2099-11-01T10:00:00+08:00")
+        _own(conn, "cp-clients", c2, CLIENTS_OWN, "pass", "2099-11-02T09:00:00+08:00")
+        _client_ref(conn, under="cp-clients", supply=c2, clients=c2, notifications=n0,
+                    status="pass", at="2099-11-02T09:00:00+08:00")
+        _promote(conn, "cp-clients", c2, period, "2099-11-02T10:00:00+08:00")
+        with conn.raw.transaction():
+            for o in recheck.owed(conn):
+                if o.period == period:
+                    recheck.clear(o.id, "pytest/earlier")
+        _own(conn, "cp-notifications", n2, NOTIFICATIONS_OWN, "pass", "2099-11-03T09:00:00+08:00")
+        promote = _decide(conn, dl.PROMOTE, "cp-notifications", n2, period,
+                          "2099-11-03T10:00:00+08:00", kind=dl.PERSON, promoted_status="green",
+                          reason="looked at it")
+        (owed,) = [o for o in recheck.owed(conn) if o.period == period]
+        recheck.fail(owed.id, "RuntimeError: made to fail")
+
+        between = supply_status.View(as_at="2099-11-02T12:00:00+08:00")
+        (row,) = _counted(conn, "cp-clients", c2, CLIENT_REF, between)
+        assert (row["warehouse_reason"], row["owed_by_decision"]) == (
+            supply_status.NO_CURRENT_RESULT, None)
+        (row,) = _counted(conn, "cp-clients", c2, CLIENT_REF)
+        assert (row["warehouse_reason"], row["owed_by_decision"]) == (
+            supply_status.RECHECK_OWED, promote)

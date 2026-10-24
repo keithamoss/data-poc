@@ -84,6 +84,24 @@ describe("a check with nothing counted toward the supply on show", () => {
   });
 });
 
+// IMPOSSIBLE, AND SAID SO (post-build-review #266): a counted rank the history
+// on the date does not hold. Taking the newest instead was R4 again - the late
+// reader, rank 3, would have been shown as current on the newer supply's page.
+describe("a counted result the history does not hold", () => {
+  it("reads No data and says so in the console, never the newest result", () => {
+    const counted = { ...COUNTED, [C2]: [{ on: "2020-11-01", rank: 99, reason: null }] };
+    dashboard = loadDashboard();
+    const errors = [];
+    dashboard.window.console.error = (...args) => errors.push(args.join(" "));
+    const ck = dashboard.window.clipDatasetToInPlaceOn(clients(counted), "2020-11-06")
+      .columns[0].checks[0];
+    expect(ck.current_status).toBe("nodata");
+    expect(ck.warehouseReason).toBe("not-shown");
+    expect(ck.current).toBe(null);
+    expect(errors.some((e) => e.includes("rank 99") && e.includes("not shown"))).toBe(true);
+  });
+});
+
 // The dataset list's count and the dataset page's trend are unitCounts() over
 // the same clipped page, and its newest point must say what the page says
 // (REQ-DASH-225 criterion 18, REQ-DASH-227 criterion 8) - so the late reader's
