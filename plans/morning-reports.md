@@ -2725,3 +2725,41 @@ one or more component tags, and a date.
      gap, not a product defect: the fake now answers "no such table", as its
      empty catalogue implies. Seen failing first (2 failed), then 2 passed;
      with test_cli_cp's own fake 35 passed; ruff clean.
+
+9. **[in-progress, 2026-10-24]** **[Docs & process]** **Daytime build 2026-10-24
+   (Keith around; overnight policy, 10-minute check-ins, local commits only).**
+   - **YOUR TERMS**: "do all this build work, and then we'll push once at the
+     end. And I will give permission for that push later." Flag important
+     things as they come up; otherwise the overnight policy. Build order agreed:
+     A1, A2, E (split early), A3, B, A4-A7, C, D, F.
+   - **SIGNED TODAY**: REQ-QAC-176 (all recommendations, 64-hex closed; 177 c2
+     / NFR3, 178 c7 / NFR4 amended; stale #89 holds cleared), REQ-PIPE-254
+     (nine content-keyed caches, guard over qa_tools/ and pipeline/),
+     REQ-PIPE-211 (narrowed to an emptied period; new `rejected` reason; nine
+     amendments), REQ-DASH-291/292/293 (the dashboard split in three; 255 and
+     257 amended, SameSite=Lax set explicitly), REQ-GEN-235 c3 amended.
+   - **BUILT, all local, none pushed**:
+     - A1: REQ-PIPE-269 (warehouse view, one counting rule - c7 now unmet,
+       blocked by 267), REQ-DASH-277 ("in place in the warehouse"), R4.
+       Critic fixes #266; your seven answers (per-period worst, one clock,
+       "Went in red" caption, wording).
+     - A2: REQ-PIPE-271 (opening at filing, carry-forward warning) and
+       REQ-PIPE-280 (carry-forward in one decision; c2 waits on 266), schema
+       47. Critic fixes #267; your eight answers K1-K8.
+     - Fixes found on the way: #265 (Requirements panel read register text as
+       markup - 41 requirements hidden); two test setups broken by 9585a14.
+   - **NOT A DEFECT**: Notifications 2014-02-11 promoted while its drift
+     checks were red - non-blocking by contract (REQ-QAC-108 c15, reference
+     crossed an owed period).
+   - **#266 GAP A BUILT (f861ee4)**: a replaced run's results stay on the
+     page for the dates they were current - wider than #266 said (column
+     checks showed the PREVIOUS supply's results too); the agreement test now
+     holds with no exception.
+   - **FRESH BOOTSTRAP on f861ee4's tree**: 1610s; all four REQ-PIPE-262 c12
+     pins hold; 14 re-checks and 419 re-evaluations cleared, longest wait 5s;
+     dashboard rebuild gates passed; deployment tests 114 passed, 1 xfailed.
+     So K6 (inherit as at receipt) and S5 (open after re-judgement) hold on a
+     replayed history.
+   - **STILL TO DO**: E (the dashboard split) waits for you; the one push
+     waits for your permission and a full gate on the final tree. Next in the
+     agreed order after E: A3 (270+266+267+273+278, schema bump, bootstrap).
