@@ -496,3 +496,123 @@ def test_an_embedded_const_cannot_close_its_script_element():
                           json.dumps({"t": "</script><img src=x onerror=alert(1)>"}))
     assert html.count("</script>") == 1
     assert "<\\/script>" in html
+
+
+# --- REQ-DASH-291 and REQ-DASH-293: the data files embed() writes ---------
+
+def _embed_to(monkeypatch, tmp_path, name="out.html"):
+    out_html = tmp_path / name
+    monkeypatch.setattr(edd, "DASHBOARD_HTML", str(out_html))
+    edd.embed()
+    return out_html
+
+
+class TestTheDataFiles:
+    """REQ-DASH-291 criteria 1, 2, 4, 6, 11 and 16."""
+
+    def test_one_file_per_collection_and_one_for_requirements_and_plans(self, monkeypatch, tmp_path):
+        from dashboard import data_files
+
+        page = _embed_to(monkeypatch, tmp_path)
+        manifest = data_files.page_manifest(page.read_text())
+        keys = [e["key"] for e in manifest["files"]]
+        expected = [data_files.collection_key(c) for c, _ in edd.collection_targets()]
+        assert expected, "the registry must hold collections for this to mean anything"
+        assert keys == expected + [data_files.REQUIREMENTS_PLANS_KEY]
+        on_disk = sorted(p.name for p in (tmp_path / "data").iterdir())
+        assert on_disk == sorted(e["name"] for e in manifest["files"])
+
+    def test_the_page_loads_collections_by_classic_script_and_requirements_on_demand(
+            self, monkeypatch, tmp_path):
+        from dashboard import data_files
+
+        html = _embed_to(monkeypatch, tmp_path).read_text()
+        manifest = data_files.page_manifest(html)
+        main_script = html.index('<script>\n"use strict";')
+        for e in manifest["files"]:
+            tag = (f'<script src="data/{e["name"]}" data-mothman-key="{e["key"]}" '
+                   f'data-mothman-file="{e["name"]}"></script>')
+            if e["kind"] == "collection":
+                assert html.count(tag) == 1 and html.index(tag) < main_script
+            else:
+                assert e["name"] not in html.replace(json.dumps(manifest, separators=(",", ":")), "")
+        assert "const COLLECTION_DATA = assembleCollectionData();\n" in html
+        assert "let REQUIREMENTS = [];\n" in html and "let PLANS = {items:[], threads:[]};\n" in html
+
+    def test_every_other_const_stays_inline(self, monkeypatch, tmp_path):
+        html = _embed_to(monkeypatch, tmp_path).read_text()
+        for name in ("HIERARCHY", "BUILD_PROVENANCE", "OUTSTANDING", "FEEDBACK",
+                     "SPRINT_DEPENDENCIES", "RELEASE_NOTES", "SCHEDULE_RUNWAY"):
+            m = re.search(rf"const {name} = (.*?);\n", html)
+            assert m and m.group(1) not in ("null", "[]", "{}"), name
+
+    def test_the_files_carry_the_payloads(self, monkeypatch, tmp_path):
+        from dashboard import data_files
+
+        page = _embed_to(monkeypatch, tmp_path)
+        got = data_files.read_page(page.read_text(), page.parent)
+        assert got.problems == []
+        assert got.collections == edd.collection_data()
+        assert got.requirements == edd.parse_requirements(edd.REQUIREMENTS_YAML)
+        assert got.plans == edd.parse_plans(edd.PLANS_DIR)
+
+    def test_files_are_written_before_the_page_and_stale_ones_pruned_after(self, monkeypatch, tmp_path):
+        from dashboard import data_files
+
+        data = tmp_path / "data"
+        data.mkdir()
+        (data / "collection-gone.0123456789ab.js").write_text("stale")
+        (tmp_path / "beside.txt").write_text("not ours")
+        out_html = tmp_path / "out.html"
+        seen = {}
+        real_write, real_prune = data_files.write, data_files.prune
+
+        def write(files, data_dir):
+            seen["page_existed_at_write"] = out_html.exists()
+            return real_write(files, data_dir)
+
+        def prune(data_dir, keep):
+            seen["page_existed_at_prune"] = out_html.exists()
+            return real_prune(data_dir, keep)
+
+        monkeypatch.setattr(data_files, "write", write)
+        monkeypatch.setattr(data_files, "prune", prune)
+        _embed_to(monkeypatch, tmp_path)
+        assert seen == {"page_existed_at_write": False, "page_existed_at_prune": True}
+        assert not (data / "collection-gone.0123456789ab.js").exists()
+        assert (tmp_path / "beside.txt").exists()
+
+    def test_two_builds_write_the_same_names_and_bytes(self, monkeypatch, tmp_path):
+        first = tmp_path / "one"
+        second = tmp_path / "two"
+        first.mkdir()
+        second.mkdir()
+        _embed_to(monkeypatch, first)
+        _embed_to(monkeypatch, second)
+        read = lambda d: {p.name: p.read_bytes() for p in (d / "data").iterdir()}  # noqa: E731
+        assert read(first) and read(first) == read(second)
+
+
+def test_every_build_prints_each_files_size_and_warns_at_the_budget(monkeypatch, tmp_path, capsys):
+    """REQ-DASH-293 criteria 1, 2 and 4, REQ-PIPE-255 criterion 26: a payload
+    over the budget is written as parts within it, each named in the
+    page's list in order, and every file's size is printed."""
+    from dashboard import data_files
+
+    monkeypatch.setattr(data_files, "BUDGET_BYTES", 300 * 1024)
+    page = _embed_to(monkeypatch, tmp_path)
+    out = capsys.readouterr().out
+    manifest = data_files.page_manifest(page.read_text())
+    parted = [e for e in manifest["files"] if e["parts"] > 1]
+    assert parted, "the Requirements and Plans payload is several MiB, so it must be in parts here"
+    for e in manifest["files"]:
+        assert e["bytes"] <= 300 * 1024
+        assert f"{e['name']}: " in out
+    assert f"{page.name}: " in out
+    key = parted[0]["key"]
+    assert [e["part"] for e in manifest["files"] if e["key"] == key] == \
+        list(range(1, parted[0]["parts"] + 1))
+    got = data_files.read_page(page.read_text(), page.parent)
+    assert got.problems == [] and got.requirements == edd.parse_requirements(edd.REQUIREMENTS_YAML)
+    # The page itself is far over a 300 KiB budget, so it is the one warned about.
+    assert re.search(rf"WARNING: {re.escape(page.name)} is .* budget", out), out[-2000:]

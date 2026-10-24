@@ -1156,6 +1156,7 @@ footer{color:var(--ink-faint); font-size:12px; padding-block:30px 40px; border-t
   <div class="drawer-body" id="leaderboard-panel-body"></div>
 </aside>
 
+<!-- mothman:data-files -->
 <script>
 "use strict";
 /* =========================================================================
@@ -2154,6 +2155,67 @@ const BUILD_PROVENANCE = null;
 // dashboard/embed_dashboard_data.py. It replaced one const per collection
 // (one per real feed), so a new collection needs no page
 // code of its own. Null in the raw template, as before.
+//
+// FROM SIBLING FILES SINCE REQ-DASH-291. One built page could not hold
+// thirty collections under Cloudflare Pages' 25 MiB per-file limit, so the
+// build writes each collection's entry to its own file under data/, loaded
+// by a classic <script src> placed before this script, and replaces the
+// null below with assembleCollectionData(). The Requirements and Plans data
+// is one more file, loaded on demand (requirementsPlansData() below).
+//
+// DATA_FILES is the page's list of the files it expects - each one's key,
+// name, size, SHA-256 and the build id it must register under - and the
+// build's own id. Without it the page could not tell "no such collection"
+// from "its file failed to load", which is the quietly empty page this
+// exists to prevent. Null in the raw template, which therefore lists no
+// files, loads none and shows no error (criterion 10).
+const DATA_FILES = null;
+// What each data file registered: {"<key>#<part>": {build, text}}. A
+// plain global the files write to, because they run before this script.
+function dataFileRegistry(){
+  return (typeof window !== "undefined" && window.MOTHMAN_DATA) || {};
+}
+function dataFilesOf(kind){
+  return ((DATA_FILES && DATA_FILES.files) || []).filter(f=>
+    kind === "collection" ? f.kind === "collection" : f.kind !== "collection");
+}
+// Every listed file of a kind that has not registered, or registered under
+// a build id other than the one the list expects - each named.
+function dataFileProblems(kind){
+  const reg = dataFileRegistry();
+  return dataFilesOf(kind).flatMap(f=>{
+    const got = reg[`${f.key}#${f.part}`];
+    if(!got) return [{name: f.name, why: "missing"}];
+    if(got.build !== f.build) return [{name: f.name, why: "other-build"}];
+    return [];
+  });
+}
+// {key: parsed payload}: a key's parts joined in the list's order and the
+// joined text parsed ONCE (REQ-DASH-293 criterion 3).
+function assembleDataFiles(kind){
+  const reg = dataFileRegistry();
+  const parts = {};
+  dataFilesOf(kind).forEach(f=> (parts[f.key] = parts[f.key] || []).push(f));
+  const out = {};
+  for(const [key, list] of Object.entries(parts)){
+    out[key] = JSON.parse(list.slice().sort((a,b)=> a.part - b.part)
+      .map(f=> reg[`${f.key}#${f.part}`].text).join(""));
+  }
+  return out;
+}
+const DATA_FILE_PROBLEMS = dataFileProblems("collection");
+// The built page's COLLECTION_DATA. Empty rather than null when a file is
+// missing, so nothing falls back to the raw template's own empty state:
+// render() shows the page-level error instead of any tier.
+function assembleCollectionData(){
+  if(DATA_FILE_PROBLEMS.length) return {};
+  const byKey = assembleDataFiles("collection");
+  const out = {};
+  dataFilesOf("collection").forEach(f=>{ if(!(f.collection in out)) out[f.collection] = byKey[f.key]; });
+  // When the data is assembled, for REQ-DASH-291 criterion 18's timing.
+  try{ performance.mark("mothman:data-assembled"); }catch(e){}
+  return out;
+}
 const COLLECTION_DATA = null;
 const SNAPSHOT_MANIFEST = [];
 // SCHEDULE_RUNWAY - REQ-PIPE-053, embedded from contract/calendar.yaml
@@ -2223,7 +2285,10 @@ const SCENARIO_MAP = [];
 const OUTSTANDING = {items:[], total:0, blockingCount:0, byAgency:{}, byCollection:{}, byDataset:{}, summary:"Nothing is waiting for a person."};
 const CHANGELOG_FEED = [];
 const RELEASE_NOTES = {intro:[], entries:[]};
-const REQUIREMENTS = [];
+// `let`, as PLANS below: on the built page both arrive on demand from the
+// Requirements and Plans data file (REQ-DASH-291 criterion 7), assigned by
+// requirementsPlansData() once it registers.
+let REQUIREMENTS = [];
 const TICKET_STATUS = {};
 const GITHUB_LINKS = {checks:{}, agencies:{}, datasets:{}, titles:{agencies:{}, datasets:{}}};
 const ASSIGNMENTS = {agencies:{}, datasets:{}};
@@ -2247,7 +2312,7 @@ const LEADERBOARD = [];
 // panel - Keith's explicit choice (AskUserQuestion) given the real
 // content volume (100+ items/threads/notes) doesn't fit a cramped
 // drawer.
-const PLANS = {items:[], threads:[]};
+let PLANS = {items:[], threads:[]};
 
 // FEEDBACK - REQ-DASH-220's cards, one per plans/road-testing.md entry,
 // embedded by dashboard/embed_dashboard_data.py through the same parser
@@ -5808,6 +5873,87 @@ function describeRoute(){
   if(announcer) announcer.textContent = name || SITE_NAME;
 }
 
+// A MISSING OR MIXED DATA FILE IS SAID, NEVER QUIETLY EMPTY (REQ-DASH-291
+// criteria 8 and 9). Each file named, with what is wrong with it, and what
+// to do about it for both kinds of reader - one who opened the page from
+// disk, and one reading the published site - since the page cannot know
+// which build step a published copy skipped.
+function dataFileErrorHtml(problems, where){
+  const items = problems.map(p=> `<li><code>${escHtml(p.name)}</code> - ${p.why === "missing"
+    ? "missing: the page lists it and it did not load"
+    : "from another build: it registered under a different build id than this page expects"}</li>`).join("");
+  return `<div class="data-file-error" role="alert" data-testid="data-file-error"
+      style="border:1px solid var(--red, #b42318); border-radius:8px; padding:14px 16px; margin:12px 0; font-size:13.5px;">
+    <h2 style="font-size:16px; margin:0 0 8px;">${escHtml(where)} cannot be shown: ${problems.length === 1 ? "one of its data files is" : "some of its data files are"} not right</h2>
+    <ul style="margin:0 0 10px 18px; padding:0;">${items}</ul>
+    <p style="margin:0 0 4px;">Opened from disk: run <code>mothman dashboard embed</code> to write the page and its files again.</p>
+    <p style="margin:0;">On the published site: the publish is incomplete - the page arrived without the files it lists.</p>
+  </div>`;
+}
+function renderDataFileProblems(view){
+  setRail([]);
+  view.innerHTML = dataFileErrorHtml(DATA_FILE_PROBLEMS, "This dashboard");
+}
+// THE REQUIREMENTS AND PLANS DATA, ON DEMAND (REQ-DASH-291 criterion 7):
+// about 6 MiB that a reader who never opens the Plans tab or the
+// Requirements panel never loads. Inserted as classic script elements -
+// not fetch(), which file:// refuses - and from a snapshot's own inline
+// block when the page carries one (REQ-DASH-292 criterion 2), so an
+// archived page asks for no sibling file. `async = false` keeps parts in
+// order.
+let REQ_PLANS_LOAD = null;
+function dataFileDir(){
+  const tag = document.querySelector("script[src][data-mothman-file]");
+  if(!tag) return "data/";
+  const src = tag.getAttribute("src");
+  return src.slice(0, src.length - tag.dataset.mothmanFile.length);
+}
+function loadDataFileScripts(files){
+  const dir = dataFileDir();
+  return Promise.all(files.map(f=> new Promise(resolve=>{
+    const s = document.createElement("script");
+    const block = [...document.querySelectorAll('script[type="text/plain"][data-mothman-file]')]
+      .find(el=> el.dataset.mothmanFile === f.name);
+    if(block){
+      s.text = block.textContent;
+      document.head.appendChild(s);
+      resolve();
+      return;
+    }
+    s.async = false;
+    s.onload = s.onerror = ()=> resolve();
+    s.src = dir + f.name;
+    document.head.appendChild(s);
+  })));
+}
+function requirementsPlansData(){
+  // The raw template lists no files: REQUIREMENTS and PLANS are what they
+  // always were, and nothing is loaded (criterion 10).
+  if(!DATA_FILES) return {state: "ready", problems: []};
+  if(REQ_PLANS_LOAD) return REQ_PLANS_LOAD;
+  const load = REQ_PLANS_LOAD = {state: "loading", problems: []};
+  load.promise = loadDataFileScripts(dataFilesOf("requirements-plans")).then(()=>{
+    const problems = dataFileProblems("requirements-plans");
+    if(problems.length){ load.state = "failed"; load.problems = problems; }
+    else {
+      const payload = assembleDataFiles("requirements-plans")["requirements-plans"] || {};
+      REQUIREMENTS = payload.requirements || [];
+      PLANS = payload.plans || {items:[], threads:[]};
+      PLANS_ENTRIES = buildPlansEntries();
+      load.state = "ready";
+    }
+    if(STATE.tier === "plans") render();
+    if(STATE.panel === "requirements"){
+      renderRequirementsPanel();
+      if(STATE.req) showRequirement(STATE.req);
+    }
+  });
+  return load;
+}
+function dataFileLoadingHtml(what){
+  return `<div data-testid="data-file-loading" role="status" style="font-size:13px; color:var(--ink-muted);">Loading ${escHtml(what)}…</div>`;
+}
+
 function render(){
   const view = document.getElementById("view");
   // A RENDER COUNTER, for tests to wait on rather than sleep through.
@@ -5826,8 +5972,14 @@ function render(){
     describeRoute();
     const el = document.documentElement;
     el.dataset.renderCount = String((Number(el.dataset.renderCount) || 0) + 1);
+    // The end of the first render, for REQ-DASH-291 criterion 18's timing
+    // against "mothman:data-assembled".
+    if(el.dataset.renderCount === "1"){ try{ performance.mark("mothman:first-render"); }catch(e){} }
     return r;
   };
+  // No tier at all while a collection file is missing or from another
+  // build (REQ-DASH-291 criterion 8) - one page-level error instead.
+  if(DATA_FILE_PROBLEMS.length) return done(renderDataFileProblems(view));
   if(STATE.tier==="exec") return done(renderExec(view));
   if(STATE.tier==="plans"){ PLANS_FILTER = plansFilterFromUrl(); return done(renderPlans(view)); }
   if(STATE.tier==="demo") return done(renderDemo(view));
@@ -9271,6 +9423,11 @@ function reqText(s){
 }
 function renderRequirementsPanel(){
   const body = document.getElementById("requirements-panel-body");
+  // Loading, or a named error - never the empty register while the file
+  // is on its way or broken (REQ-DASH-291 criteria 7 and 9).
+  const rp = requirementsPlansData();
+  if(rp.state === "loading"){ body.innerHTML = dataFileLoadingHtml("the requirements"); return; }
+  if(rp.state === "failed"){ body.innerHTML = dataFileErrorHtml(rp.problems, "The requirements"); return; }
   if(!REQUIREMENTS.length){
     body.innerHTML = `<div style="font-size:13px; color:var(--ink-muted);">
       No requirements yet — this page renders the repo's own committed
@@ -9392,6 +9549,9 @@ function renderRequirementsPanel(){
 // opens the panel at the top with the stale-link notice (criterion 7).
 let REQ_OPENER = null;
 function showRequirement(id){
+  // Called again once the register has loaded; before then an id cannot be
+  // judged stale, because nothing is known yet.
+  if(requirementsPlansData().state !== "ready") return;
   const body = document.getElementById("requirements-panel-body");
   const known = REQUIREMENTS.find(r=> r.id === id);
   if(!known){
@@ -9962,8 +10122,9 @@ function renderPlansMarkdown(md){
 // Reshapes PLANS' 3 separate arrays (items/threads/notes - each file
 // format's own real shape, dashboard/plans_md.py's own docstring) into
 // one flat, uniform list the rest of this section works with - computed
-// once at load (PLANS never changes after the page loads), not per-render.
-const PLANS_ENTRIES = (function(){
+// once per PLANS: at load, and again when the built page's PLANS arrives
+// on demand (REQ-DASH-291 criterion 7) - never per render.
+function buildPlansEntries(){
   const items = PLANS.items.map(i => ({
     id:`${i.file}-${i.number}`, kind:"item", file:i.file,
     title:`${PLANS_FILE_LABEL[i.file]||i.file} #${i.number}`,
@@ -9975,7 +10136,8 @@ const PLANS_ENTRIES = (function(){
     components:[t.category], body:t.body,
   }));
   return [...items, ...threads];
-})();
+}
+let PLANS_ENTRIES = buildPlansEntries();
 
 const PLANS_ALL_STATUSES = ["done","in-progress","blocked","investigate","todo","parked","superseded"];
 const PLANS_ALL_COMPONENTS = ["Data generation","QA checks & contract","Pipeline & publishing",
@@ -10259,6 +10421,12 @@ document.getElementById("feedback-btn").addEventListener("click", e=>{
 
 function renderPlans(view){
   setRail([{tier:"Tier 1", label:"Plans", nav:{tier:"plans"}}]);
+  const rp = requirementsPlansData();
+  if(rp.state !== "ready"){
+    view.innerHTML = `<div class="view-head"><div><h2>Plans</h2></div></div>
+      ${rp.state === "loading" ? dataFileLoadingHtml("the plans") : dataFileErrorHtml(rp.problems, "The Plans tab")}`;
+    return;
+  }
   view.innerHTML = `
     <div class="view-head">
       <div>

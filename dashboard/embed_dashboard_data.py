@@ -175,6 +175,7 @@ import json
 import os
 import re
 
+from dashboard import data_files
 from dashboard.changelog_yaml import parse_changelog
 from dashboard.plans_md import feedback_data, parse_plans
 from qa_tools.common.sprint_state import dependency_data
@@ -202,6 +203,13 @@ DEMO_CAST_PATH = os.path.join(os.path.dirname(__file__), "demos", "qa_wizard.cas
 REQUIREMENTS_YAML = os.path.join(ROOT, "requirements.yaml")
 OPEN_TICKETS_JSON = os.path.join(ROOT, "reports", "open_tickets.json")
 TICKET_RESOLUTIONS_JSON = os.path.join(ROOT, "reports", "ticket_resolutions.json")
+
+def data_dir_for(page_path) -> str:
+    """The directory beside a built page its data files go in
+    (REQ-DASH-291 criterion 1) - derived from the page's own path, so a build
+    written somewhere else takes its files with it."""
+    return os.path.join(os.path.dirname(os.fspath(page_path)), data_files.DATA_DIR)
+
 
 class MissingCollectionData(RuntimeError):
     """A collection the hierarchy declares has no dashboard file to embed
@@ -342,10 +350,19 @@ def embed() -> None:
 
     # COLLECTION_DATA - REQ-DASH-244. Read before anything else, so a missing
     # collection refuses the build before any other work is done.
+    #
+    # ONE DATA FILE PER COLLECTION since REQ-DASH-291, under data/ beside the
+    # page, rather than one const holding them all: the page outgrew
+    # Cloudflare Pages' 25 MiB per-file limit with three collections. Each
+    # is held to REQ-DASH-293's budget by writing parts past it. The files
+    # are only ENCODED here; they are written once the page is ready, just
+    # before it (criterion 11).
     data = collection_data()
-    real_json = json.dumps(data, separators=(",", ":"))
-    html = _replace_const(html, "COLLECTION_DATA", real_json)
-    print(f"Re-embedded {len(real_json)} bytes of real data into COLLECTION_DATA "
+    files = []
+    for collection_id, entry in data.items():
+        files += data_files.encode(data_files.collection_key(collection_id), entry,
+                                   kind=data_files.COLLECTION_KIND, collection=collection_id)
+    print(f"Encoded COLLECTION_DATA into {len(files)} data file(s) "
           f"({len(data)} collection(s): {', '.join(data)})")
 
     # AGENCY_BLURB - REQ-DASH-244 criterion 10, from contract/presentation.yaml.
@@ -616,9 +633,11 @@ def embed() -> None:
     html = _replace_const(html, "RELEASE_NOTES", json.dumps(release_notes, separators=(",", ":")))
     print(f"Re-embedded RELEASE_NOTES = {len(release_notes['entries'])} dated entries")
 
+    # REQUIREMENTS and PLANS (below) go into ONE data file of their own,
+    # which the page loads only when a reader opens the Requirements panel
+    # or the Plans tab (REQ-DASH-291 criterion 7).
     requirements = parse_requirements(REQUIREMENTS_YAML)
-    html = _replace_const(html, "REQUIREMENTS", json.dumps(requirements, separators=(",", ":")))
-    print(f"Re-embedded REQUIREMENTS = {len(requirements)} requirements")
+    print(f"Read REQUIREMENTS = {len(requirements)} requirements")
 
     if os.path.exists(OPEN_TICKETS_JSON):
         with open(OPEN_TICKETS_JSON) as f:
@@ -662,9 +681,11 @@ def embed() -> None:
           + ("" if os.path.exists(TICKET_RESOLUTIONS_JSON) else " (no reports/ticket_resolutions.json - local build, embedding empty)"))
 
     plans = parse_plans(PLANS_DIR)
-    html = _replace_const(html, "PLANS", json.dumps(plans, separators=(",", ":")))
-    print(f"Re-embedded PLANS = {len(plans['items'])} items, "
+    print(f"Read PLANS = {len(plans['items'])} items, "
           f"{len(plans['threads'])} threads")
+    files += data_files.encode(data_files.REQUIREMENTS_PLANS_KEY,
+                               {"requirements": requirements, "plans": plans},
+                               kind=data_files.REQUIREMENTS_PLANS_KEY)
 
     # REQ-DASH-220. The Feedback tab's cards, through the same parser the
     # validate-feedback gate uses; a card error refuses the build.
@@ -690,8 +711,23 @@ def embed() -> None:
         html = _replace_const(html, "DEMO_CAST", "null")
         print("Re-embedded DEMO_CAST = null (no dashboard/demos/qa_wizard.cast - not recorded yet)")
 
+    # THE FILES, THEN THE PAGE, THEN THE TIDY (REQ-DASH-291 criterion 11): a
+    # page is never on disk naming a file that is not, and a file the old
+    # page named goes only once the new page has replaced it.
+    manifest = data_files.manifest(files)
+    html = data_files.embed_into_page(html, manifest)
+    data_dir = data_dir_for(DASHBOARD_HTML)
+    written = data_files.write(files, data_dir)
     with open(DASHBOARD_HTML, "w") as f:
         f.write(html)
+    data_files.prune(data_dir, [f.entry["name"] for f in files])
+
+    # EVERY FILE'S SIZE, EVERY BUILD (REQ-DASH-293 criterion 4, REQ-PIPE-255
+    # criterion 26), so growth is seen while developing rather than first met
+    # at a publish. Warnings only: nothing here stops a build.
+    print(f"Wrote {DASHBOARD_HTML} and {len(written)} data file(s) under {data_dir}:")
+    for level, line in data_files.size_report(DASHBOARD_HTML, written):
+        print(("  " if level == "info" else "") + line)
 
 
 if __name__ == "__main__":

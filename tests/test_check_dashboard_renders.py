@@ -102,3 +102,46 @@ def test_resolve_chromium_path_returns_none_when_neither_is_available(monkeypatc
     monkeypatch.setattr(cdr, "_SANDBOX_CHROMIUM_SYMLINK", str(tmp_path / "does-not-exist"))
 
     assert cdr._resolve_chromium_path() is None
+
+
+# REQ-DASH-291 criterion 14: the structural check reads COLLECTION_DATA
+# through the one reader, and fails a missing file or one whose SHA-256
+# differs from the page's list.
+
+def _split_page(tmp_path):
+    from dashboard import data_files
+    from qa_tools import collections
+
+    files = []
+    for c in collections.all_collections():
+        files += data_files.encode(data_files.collection_key(c.id), {"datasets": []},
+                                   kind="collection", collection=c.id)
+    html = ("<html>\n<!-- mothman:data-files -->\n<script>\nconst DATA_FILES = null;\n"
+            "const COLLECTION_DATA = null;\n</script></html>\n")
+    page = tmp_path / "dashboard.html"
+    page.write_text(data_files.embed_into_page(html, data_files.manifest(files)))
+    data_files.write(files, tmp_path / "data")
+    return page, files
+
+
+def test_check_embedded_json_reads_the_data_files(tmp_path, monkeypatch):
+    page, _ = _split_page(tmp_path)
+    monkeypatch.setattr(cdr, "DASHBOARD_PATH", page)
+    assert cdr._check_embedded_json() == []
+
+
+def test_check_embedded_json_fails_a_missing_data_file(tmp_path, monkeypatch):
+    page, files = _split_page(tmp_path)
+    (tmp_path / "data" / files[0].entry["name"]).unlink()
+    monkeypatch.setattr(cdr, "DASHBOARD_PATH", page)
+    errors = cdr._check_embedded_json()
+    assert any(files[0].entry["name"] in e and "missing" in e for e in errors), errors
+
+
+def test_check_embedded_json_fails_a_data_file_whose_sha256_differs(tmp_path, monkeypatch):
+    page, files = _split_page(tmp_path)
+    path = tmp_path / "data" / files[-1].entry["name"]
+    path.write_bytes(path.read_bytes().replace(b"datasets", b"datasetz"))
+    monkeypatch.setattr(cdr, "DASHBOARD_PATH", page)
+    errors = cdr._check_embedded_json()
+    assert any(files[-1].entry["name"] in e and "SHA-256" in e for e in errors), errors

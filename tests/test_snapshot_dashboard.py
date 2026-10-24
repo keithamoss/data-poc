@@ -432,3 +432,165 @@ def test_main_prepare_site_flag_requires_a_directory_argument(monkeypatch, capsy
         assert False, "expected SystemExit for a missing --prepare-site argument"
     except SystemExit as e:
         assert e.code == 2
+
+
+# --- REQ-DASH-292: a snapshot inlines its data files; the site splits them back
+
+def _split_built_page(tmp_path, *, budget=None, size=4000):
+    """A page in the built page's shape with its data files beside it -
+    two collections and the Requirements and Plans file."""
+    from dashboard import data_files
+
+    files = []
+    for cid in ("civil-registration", "child-protection"):
+        files += data_files.encode(data_files.collection_key(cid),
+                                   {"datasets": [{"id": cid, "pad": "y" * size}]},
+                                   kind="collection", collection=cid, budget=budget)
+    files += data_files.encode(data_files.REQUIREMENTS_PLANS_KEY,
+                               {"requirements": [{"id": "REQ-X"}], "plans": {"items": []}},
+                               kind=data_files.REQUIREMENTS_PLANS_KEY, budget=budget)
+    html = ("<html>\n<!-- mothman:data-files -->\n<script>\nconst DATA_FILES = null;\n"
+            "const COLLECTION_DATA = null;\nconst SNAPSHOT_MANIFEST = [];\n</script>\n</html>\n")
+    page = tmp_path / "qa-reporting-dashboard.html"
+    page.write_text(data_files.embed_into_page(html, data_files.manifest(files)))
+    data_files.write(files, tmp_path / "data")
+    return page, files
+
+
+def _archived(out_path) -> str:
+    with gzip.open(out_path, "rb") as f:
+        return f.read().decode("utf-8")
+
+
+def test_a_snapshot_inlines_every_data_file_each_block_marked(tmp_path):
+    """Criterion 1: the Requirements and Plans file included, and no
+    sibling file referenced."""
+    page, files = _split_built_page(tmp_path)
+    out = snapshot_dashboard.take_snapshot(html_path=page, snapshots_dir=tmp_path / "snapshots")
+    html = _archived(out)
+    assert 'src="data/' not in html
+    for f in files:
+        marker = f'data-mothman-key="{f.entry["key"]}" data-mothman-file="{f.entry["name"]}">'
+        assert html.count(marker) == 1, f.entry["name"]
+        assert f.content.decode("ascii") + "</script>" in html
+    assert ('<script type="text/plain" data-mothman-key="requirements-plans"' in html), \
+        "the on-demand file is inlined inert, to be run when asked for"
+
+
+def test_a_snapshot_refuses_a_missing_or_altered_file_and_writes_nothing(tmp_path):
+    """Criterion 3."""
+    import pytest
+    from dashboard import data_files
+
+    page, files = _split_built_page(tmp_path)
+    (tmp_path / "data" / files[0].entry["name"]).unlink()
+    altered = tmp_path / "data" / files[1].entry["name"]
+    altered.write_bytes(altered.read_bytes().replace(b"yyy", b"zzz", 1))
+    snapshots = tmp_path / "snapshots"
+    with pytest.raises(data_files.DataFileError) as refused:
+        snapshot_dashboard.take_snapshot(html_path=page, snapshots_dir=snapshots)
+    said = str(refused.value)
+    assert files[0].entry["name"] in said and files[1].entry["name"] in said
+    assert not snapshots.exists()
+
+
+def _site_with_a_snapshot(tmp_path, *, budget=None, size=4000):
+    page, files = _split_built_page(tmp_path, size=size)
+    snapshots = tmp_path / "snapshots"
+    out = snapshot_dashboard.take_snapshot(html_path=page, snapshots_dir=snapshots)
+    site = tmp_path / "_site"
+    snapshot_dashboard.prepare_deploy_site(site, html_path=page, snapshots_dir=snapshots,
+                                           budget=budget)
+    return page, files, out, site
+
+
+def test_the_site_carries_the_live_pages_files(tmp_path):
+    page, files, _out, site = _site_with_a_snapshot(tmp_path)
+    for f in files:
+        assert (site / "data" / f.entry["name"]).read_bytes() == f.content
+
+
+def test_the_site_carries_each_snapshot_split_back_byte_for_byte(tmp_path):
+    """Criteria 4 and 5, and the fingerprint risk: a split one byte off
+    would fail the page's own list and make every publish count as
+    changed (REQ-PIPE-255 criterion 24)."""
+    import hashlib
+    from dashboard import data_files
+
+    page, files, out, site = _site_with_a_snapshot(tmp_path)
+    stem = out.name[: -len(".html.gz")]
+    placed = site / "snapshots" / f"{stem}.html"
+    html = placed.read_text()
+    assert "data-mothman-file" in html and "</script>" in html
+    assert not re.search(r'data-mothman-file="[^"]+">\(window', html), "a block was left inline"
+    listed = data_files.page_manifest(html)["files"]
+    for e in listed:
+        content = (site / "snapshots" / f"{stem}.data" / e["name"]).read_bytes()
+        assert hashlib.sha256(content).hexdigest() == e["sha256"]
+        assert len(content) <= data_files.BUDGET_BYTES
+    assert data_files.read_page(html, placed.parent).problems == []
+    assert {e["name"]: e["sha256"] for e in listed} == \
+        {f.entry["name"]: f.entry["sha256"] for f in files}
+
+
+def test_a_snapshot_fingerprints_the_same_as_the_page_it_archived(tmp_path):
+    """REQ-PIPE-255 criteria 22 and 24, as REQ-DASH-292 amends them: the
+    newest snapshot, its inlined files read back out, fingerprints exactly
+    as the build it archived - and a one-byte change in a data file does
+    not."""
+    page, files = _split_built_page(tmp_path)
+    before = snapshot_dashboard.page_fingerprint(page)
+    out = snapshot_dashboard.take_snapshot(html_path=page, snapshots_dir=tmp_path / "snapshots")
+    assert snapshot_dashboard.snapshot_fingerprint(out) == before
+    # take_snapshot re-embedded SNAPSHOT_MANIFEST into the live page, which
+    # the fingerprint deliberately ignores.
+    assert snapshot_dashboard.page_fingerprint(page) == before
+    path = tmp_path / "data" / files[0].entry["name"]
+    path.write_bytes(path.read_bytes().replace(b"yyy", b"yyz", 1))
+    from dashboard import data_files
+    import pytest
+
+    with pytest.raises(data_files.DataFileError):
+        snapshot_dashboard.page_fingerprint(page)
+
+
+def test_a_block_over_the_budget_is_split_into_parts_within_it(tmp_path):
+    """Criterion 6."""
+    from dashboard import data_files
+
+    budget = 3000
+    page, files, out, site = _site_with_a_snapshot(tmp_path, budget=budget, size=9000)
+    stem = out.name[: -len(".html.gz")]
+    placed = site / "snapshots" / f"{stem}.html"
+    listed = data_files.page_manifest(placed.read_text())["files"]
+    assert len(listed) > len(files)
+    for e in listed:
+        assert (site / "snapshots" / f"{stem}.data" / e["name"]).stat().st_size <= budget
+    got = data_files.read_page(placed.read_text(), placed.parent)
+    assert got.problems == []
+    whole = data_files.read_page(_archived(out), tmp_path / "nowhere")
+    assert got.collections == whole.collections
+
+
+def test_a_snapshot_from_before_the_split_is_placed_as_it_is(tmp_path):
+    """Criterion 7."""
+    page, _files = _split_built_page(tmp_path)
+    snapshots = tmp_path / "snapshots"
+    snapshots.mkdir()
+    old = b"<html>\nconst COLLECTION_DATA = {\"x\":{\"datasets\":[]}};\n</html>\n"
+    with gzip.open(snapshots / "20261022T000000Z_abc1234.html.gz", "wb") as f:
+        f.write(old)
+    site = tmp_path / "_site"
+    snapshot_dashboard.prepare_deploy_site(site, html_path=page, snapshots_dir=snapshots)
+    assert (site / "snapshots" / "20261022T000000Z_abc1234.html").read_bytes() == old
+    assert not (site / "snapshots" / "20261022T000000Z_abc1234.data").exists()
+
+
+def test_a_local_snapshot_copy_is_still_decompressed_whole(tmp_path):
+    """Criterion 8."""
+    page, _files = _split_built_page(tmp_path)
+    snapshots = tmp_path / "snapshots"
+    out = snapshot_dashboard.take_snapshot(html_path=page, snapshots_dir=snapshots)
+    local = out.with_suffix("")
+    assert local.read_text() == _archived(out)
+    assert not (snapshots / (local.stem + ".data")).exists()

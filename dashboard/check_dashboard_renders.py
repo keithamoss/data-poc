@@ -26,9 +26,7 @@ Run as `python3 -m dashboard.check_dashboard_renders`.
 from __future__ import annotations
 
 import asyncio
-import json
 import os
-import re
 import sys
 from pathlib import Path
 
@@ -75,20 +73,21 @@ _CHROMIUM_PATH = _resolve_chromium_path()
 
 
 def _check_embedded_json() -> list[str]:
-    """Each `const <NAME> = {...};` block actually parses as JSON - the
-    exact same single-line regex embed_dashboard_data.py itself uses to
-    find and replace these lines, reused here rather than re-derived, so
-    the two never drift apart on what "the embedded data line" means."""
+    """The built page's COLLECTION_DATA is all there and is what its list
+    says - read through dashboard/data_files.py's one reader
+    (REQ-DASH-291 criteria 13 and 14), which takes the page's data from its
+    sibling files, its inline blocks or, for a page built before the split,
+    the const itself. So the gate and the build cannot disagree on what "the
+    page's data" is, and a missing file, or one whose SHA-256 differs from
+    the page's list, fails here before any browser is started."""
+    from dashboard import data_files
     from qa_tools import collections
 
-    html = DASHBOARD_PATH.read_text()
-    match = re.compile(r"const COLLECTION_DATA = (.*?);\n").search(html)
-    if not match:
-        return ["COLLECTION_DATA: no embedded const found in the built HTML"]
-    try:
-        data = json.loads(match.group(1))
-    except json.JSONDecodeError as e:
-        return [f"COLLECTION_DATA: embedded data isn't valid JSON - {e}"]
+    found = data_files.read_page(DASHBOARD_PATH.read_text(), DASHBOARD_PATH.parent)
+    if found.problems:
+        return [f"COLLECTION_DATA: {p}" if not p.startswith("COLLECTION_DATA") else p
+                for p in found.problems]
+    data = found.collections
     # EVERY REGISTERED COLLECTION IS IN IT (REQ-DASH-244 criterion 9) -
     # the list from the registry, never a second one here.
     return [f"COLLECTION_DATA: no entry for collection {c.id!r}"
@@ -112,6 +111,11 @@ async def _check_render(html_path: Path, label: str) -> list[str]:
         view_html = await page.locator("#view").inner_html()
         if not view_html.strip():
             console_errors.append("#view is empty after load - the dashboard app never rendered")
+        # A page that rendered its missing-file error rendered no tier at all
+        # (REQ-DASH-291 criterion 14), whatever the console says.
+        if await page.locator('[data-testid="data-file-error"]').count():
+            console_errors.append("the page shows its data-file error: "
+                                  + (await page.locator('[data-testid="data-file-error"]').inner_text()))
 
         # EVERY DATASET, not just the landing page
         # (plans/post-build-review.md #43). This gate is cited as "what

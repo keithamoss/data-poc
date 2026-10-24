@@ -130,6 +130,21 @@ def built_dashboard_html(supply_dsn) -> Path:
     return DASHBOARD_HTML
 
 
+def _await_requirements_plans(page, *, start: bool = False) -> None:
+    """Wait for the Requirements and Plans data to have arrived.
+
+    REQ-DASH-291 criterion 7: on the built page it is a data file of its
+    own, loaded on demand when a reader opens the Requirements panel or the
+    Plans tab, so a test that opens either and reads straight away would
+    read the loading state. `start` asks for it without opening either, for
+    a test that reads REQUIREMENTS itself. A page with no list of data files
+    (the raw template) has nothing to wait for."""
+    if start:
+        page.evaluate("() => { requirementsPlansData(); }")
+    page.wait_for_function(
+        "() => !DATA_FILES || (REQ_PLANS_LOAD && REQ_PLANS_LOAD.state !== 'loading')")
+
+
 @pytest.fixture
 def clean_page(page):
     """Wraps pytest-playwright's own `page` fixture with a real console-
@@ -515,6 +530,8 @@ class TestRequirementsPanel:
         _goto(clean_page, built_dashboard_html)
 
         clean_page.locator("#requirements-btn").click()
+
+        _await_requirements_plans(clean_page)
         body = clean_page.locator("#requirements-panel-body")
         rows_text = body.inner_text()
 
@@ -538,6 +555,8 @@ class TestRequirementsPanel:
         _goto(clean_page, built_dashboard_html)
 
         clean_page.locator("#requirements-btn").click()
+
+        _await_requirements_plans(clean_page)
         rows_text = clean_page.locator("#requirements-panel-body").inner_text()
 
         assert "Signed off by" in rows_text
@@ -550,6 +569,8 @@ class TestRequirementsPanel:
         _goto(clean_page, built_dashboard_html)
 
         clean_page.locator("#requirements-btn").click()
+
+        _await_requirements_plans(clean_page)
         assert "panel=requirements" in clean_page.url
         assert clean_page.locator("#requirements-panel").get_attribute("aria-hidden") == "false"
 
@@ -566,6 +587,7 @@ class TestRequirementsPanel:
         back."""
         _goto(clean_page, built_dashboard_html)
         clean_page.locator("#requirements-btn").click()
+        _await_requirements_plans(clean_page)
         body = clean_page.locator("#requirements-panel-body")
         everything = body.inner_text()
 
@@ -594,6 +616,8 @@ class TestARequirementHasItsOwnAddress:
         page.goto("about:blank")
         page.goto(self._url(html_path, query))
         page.wait_for_function("() => Number(document.documentElement.dataset.renderCount || 0) > 0")
+        if "panel=requirements" in query:
+            _await_requirements_plans(page)
 
     def _ids(self, page):
         ids = page.evaluate("() => REQUIREMENTS.map(r => [r.id, r.status])")
@@ -693,6 +717,7 @@ class TestARequirementHasItsOwnAddress:
         before = clean_page.evaluate("() => history.length")
         ids = [r for r, _ in self._ids(clean_page)][:3]
         clean_page.locator("#requirements-btn").click()
+        _await_requirements_plans(clean_page)
         clean_page.wait_for_function("() => STATE.panel === 'requirements'")
         self._follow_in_panel(clean_page, ids[1])
         self._follow_in_panel(clean_page, ids[2])
@@ -726,6 +751,7 @@ class TestARequirementHasItsOwnAddress:
         ids = self._ids(clean_page)
         hidden = next(i for i, st in ids if st != "built")
         clean_page.locator("#requirements-btn").click()
+        _await_requirements_plans(clean_page)
         clean_page.locator('#requirements-panel-body [data-req-status="built"]').click()
         clean_page.locator("#requirements-panel-close").click()
         clean_page.wait_for_function("() => !STATE.panel")
@@ -776,6 +802,7 @@ class TestARequirementHasItsOwnAddress:
         clean_page.locator("#requirements-panel-close").click()
         clean_page.wait_for_function("() => !STATE.panel")
         clean_page.locator("#requirements-btn").click()
+        _await_requirements_plans(clean_page)
         assert "panel=requirements" in clean_page.url and "req=" not in clean_page.url
         assert self._linked(clean_page) is None
 
@@ -1093,10 +1120,7 @@ class TestAcknowledgementBadge:
     ACKNOWLEDGED = "2026-09-15T02:00:00+00:00"
 
     def _page(self, built, tmp_path, acks=None):
-        html = built.read_text()
-        start = html.index("const COLLECTION_DATA = ") + len("const COLLECTION_DATA = ")
-        end = html.index(";\n", start)
-        data = json.loads(html[start:end])
+        data = _collection_data(built)
         record = next(d for entry in data.values() for d in entry["datasets"]
                       if d["id"] == "birth-registrations")
         run_id = record["runs"][-1]["run_id"]
@@ -1109,7 +1133,7 @@ class TestAcknowledgementBadge:
         for name in ("fonts", "vendor"):
             if not (tmp_path / name).exists():
                 (tmp_path / name).symlink_to((root / name).resolve())
-        out.write_text(html[:start] + json.dumps(data, separators=(",", ":")) + html[end:])
+        out.write_text(_with_collection_data_inline(built.read_text(), data))
         return out, run_id
 
     def _badge(self, page, run_id, in_place_on):
@@ -2876,6 +2900,7 @@ class TestABuiltRequirementShowsItsOwnHoles:
         assert expected, "no requirement declares an unmet criterion - this test is vacuous"
 
         _goto(clean_page, built_dashboard_html)
+        _await_requirements_plans(clean_page, start=True)
         rendered = clean_page.evaluate("""() => {
             const out = {};
             (REQUIREMENTS||[]).forEach(r => {
@@ -2893,6 +2918,7 @@ class TestABuiltRequirementShowsItsOwnHoles:
         """A record that cannot answer those three is the same sentence
         the prose already carried, in a different place."""
         _goto(clean_page, built_dashboard_html)
+        _await_requirements_plans(clean_page, start=True)
         bad = clean_page.evaluate("""() => {
             const out = [];
             (REQUIREMENTS||[]).forEach(r => (r.unmet_criteria||[]).forEach(u => {
@@ -3915,6 +3941,31 @@ class TestDrillingThroughToThePeriodThatEarnedTheResults:
         assert errors == []
 
 
+def _collection_data(built: Path) -> dict:
+    """The built page's COLLECTION_DATA, through the one reader that finds it
+    in the page's data files (REQ-DASH-291 criterion 13)."""
+    from dashboard import data_files
+
+    found = data_files.read_page(built.read_text(), built.parent)
+    assert found.problems == [], found.problems
+    return found.collections
+
+
+def _with_collection_data_inline(html: str, data: dict) -> str:
+    """The built page with COLLECTION_DATA written back INTO it as a
+    literal, the way the template takes it from a test (tests-js does the
+    same), and its list of data files and their script elements removed -
+    so a test can change one dataset without re-encoding the files. A page
+    in this shape has no Requirements and Plans data, which none of its
+    callers reads."""
+    html = re.sub(r'<script src="[^"]*" data-mothman-key="[^"]+" data-mothman-file="[^"]+"></script>\n',
+                  "", html)
+    html = re.sub(r"const DATA_FILES = .*?;\n", "const DATA_FILES = null;\n", html, count=1)
+    line = "const COLLECTION_DATA = assembleCollectionData();\n"
+    assert html.count(line) == 1
+    return html.replace(line, f"const COLLECTION_DATA = {json.dumps(data, separators=(',', ':'))};\n")
+
+
 def _rewrite_const(html: str, name: str, change) -> str:
     start = html.index(f"const {name} = ") + len(f"const {name} = ")
     end = html.index(";\n", start)
@@ -3932,7 +3983,7 @@ def _with_blockers(built: Path, out: Path, blockers: list,
     unfilled periods (REQ-DASH-133) - the dataset ids it names get those
     slots, every other dataset none."""
     root = Path(__file__).resolve().parent.parent / "dashboard"
-    for name in ("fonts", "vendor"):
+    for name in ("fonts", "vendor", "data"):
         if not (out.parent / name).exists():
             (out.parent / name).symlink_to((root / name).resolve())
     html = _rewrite_const(built.read_text(), "OUTSTANDING",
@@ -3942,7 +3993,9 @@ def _with_blockers(built: Path, out: Path, blockers: list,
             for entry in record.values():
                 for d in entry["datasets"]:
                     d["closedSlots"] = closed_slots.get(d["id"], [])
-        html = _rewrite_const(html, "COLLECTION_DATA", _slots)
+        data = _collection_data(built)
+        _slots(data)
+        html = _with_collection_data_inline(html, data)
     out.write_text(html)
     return out
 
@@ -4770,6 +4823,7 @@ class TestClosingASidePanelReachedByItsUrl:
         _goto(clean_page, built_dashboard_html)
         before = clean_page.evaluate("() => history.length")
         clean_page.locator("#requirements-btn").click()
+        _await_requirements_plans(clean_page)
         clean_page.locator("#requirements-panel-close").click()
         clean_page.wait_for_function("() => !STATE.panel")
         assert clean_page.evaluate("() => history.length") == before + 1
@@ -4987,7 +5041,9 @@ def dashboard_html_with_a_later_rejection(built_dashboard_html, supply_dsn,
         for d in record["child-protection"]["datasets"]:
             if d["id"] == "cp-carers":
                 d["promotionTimeline"] = points
-    out.write_text(_rewrite_const(html, "COLLECTION_DATA", splice))
+    data = _collection_data(built_dashboard_html)
+    splice(data)
+    out.write_text(_with_collection_data_inline(html, data))
     return out
 
 
@@ -5885,3 +5941,121 @@ class TestASupersededRunOnTheDatesItWasCurrent:
         later = {r for c in after["own"] for r in c["runs"]}
         # The arrival is shown only before its re-check, the re-check only after.
         assert earlier - later and later - earlier, (earlier ^ later)
+
+
+# --- REQ-DASH-291: the built page's data files, from file:// -------------
+
+def _copy_of_the_built_page(built: Path, dest: Path) -> Path:
+    """The built page and its data files copied somewhere a test may break
+    them, with fonts/ and vendor/ beside it as on the real site."""
+    import shutil
+
+    dest.mkdir(parents=True, exist_ok=True)
+    shutil.copy(built, dest / built.name)
+    shutil.copytree(built.parent / "data", dest / "data")
+    for name in ("fonts", "vendor"):
+        (dest / name).symlink_to((built.parent / name).resolve())
+    return dest / built.name
+
+
+def _data_file(page_path: Path, kind: str) -> dict:
+    from dashboard import data_files
+
+    entries = data_files.page_manifest(page_path.read_text())["files"]
+    return next(e for e in entries if e["kind"] == kind)
+
+
+def _wait_rendered(page):
+    page.wait_for_function("() => Number(document.documentElement.dataset.renderCount || 0) > 0")
+
+
+class TestTheDataFilesLoadFromDisk:
+    """REQ-DASH-291 criteria 6 to 9, 15 and 18, in a real browser over
+    file:// - the supported local path, and the one fetch() could not use."""
+
+    def test_every_collection_renders_from_its_own_file(self, clean_page, built_dashboard_html):
+        _goto(clean_page, built_dashboard_html)
+        assert clean_page.url.startswith("file://")
+        got = clean_page.evaluate("""() => ({
+            collections: Object.keys(COLLECTION_DATA),
+            datasets: Object.values(COLLECTION_DATA).map(e => e.datasets.length),
+            scripts: [...document.querySelectorAll('script[src][data-mothman-file]')]
+                .map(s => [s.getAttribute('src'), s.async, s.defer, s.type]),
+        })""")
+        assert got["collections"] == [c.id for c in _registry.all_collections()]
+        assert all(n > 0 for n in got["datasets"]), got["datasets"]
+        assert got["scripts"] and all(src.startswith("data/") and not a and not d and t == ""
+                                      for src, a, d, t in got["scripts"]), got["scripts"]
+        assert clean_page.locator('[data-testid="data-file-error"]').count() == 0
+        for agency in clean_page.evaluate("() => HIERARCHY.agencies.map(a => a.name)"):
+            assert agency in clean_page.locator("#view").inner_text()
+
+    def test_a_deleted_collection_file_is_named_and_no_tier_is_rendered(
+            self, page, built_dashboard_html, tmp_path):
+        copy = _copy_of_the_built_page(built_dashboard_html, tmp_path / "site")
+        gone = _data_file(copy, "collection")
+        (copy.parent / "data" / gone["name"]).unlink()
+        page.goto(f"file://{copy}")
+        _wait_rendered(page)
+        error = page.locator('[data-testid="data-file-error"]')
+        text = error.inner_text()
+        assert gone["name"] in text and "missing" in text
+        assert "mothman dashboard embed" in text and "publish is incomplete" in text
+        assert page.locator("#view > *").count() == 1
+
+    def test_a_file_from_another_build_is_named(self, page, built_dashboard_html, tmp_path):
+        from dashboard import data_files
+
+        copy = _copy_of_the_built_page(built_dashboard_html, tmp_path / "site")
+        entry = _data_file(copy, "collection")
+        [other] = data_files.encode(entry["key"], {"datasets": []}, kind="collection",
+                                    collection=entry["collection"])
+        assert other.entry["build"] != entry["build"]
+        (copy.parent / "data" / entry["name"]).write_bytes(other.content)
+        page.goto(f"file://{copy}")
+        _wait_rendered(page)
+        text = page.locator('[data-testid="data-file-error"]').inner_text()
+        assert entry["name"] in text and "another build" in text
+
+    def test_the_plans_tab_loads_its_file_on_demand(self, clean_page, built_dashboard_html):
+        _goto(clean_page, built_dashboard_html)
+        selector = 'script[src*="requirements-plans"]'
+        assert clean_page.locator(selector).count() == 0, "loaded before anyone asked"
+        clean_page.locator("#plans-btn").click()
+        clean_page.wait_for_selector("#plans-list .plans-entry")
+        assert clean_page.locator(selector).count() == 1
+        count = clean_page.locator("#plans-count").inner_text()
+        assert re.search(r"of [1-9][\d,]* entries", count), count
+
+    def test_a_cold_loaded_requirements_link_loads_on_demand(self, clean_page, built_dashboard_html):
+        clean_page.goto(f"file://{built_dashboard_html.resolve()}?panel=requirements&req=REQ-DASH-291")
+        clean_page.wait_for_selector('#requirements-panel-body .req-linked[data-req-id="REQ-DASH-291"]')
+        assert "req=REQ-DASH-291" in clean_page.url
+
+    def test_a_missing_requirements_and_plans_file_is_named_in_the_plans_tab(
+            self, page, built_dashboard_html, tmp_path):
+        copy = _copy_of_the_built_page(built_dashboard_html, tmp_path / "site")
+        entry = _data_file(copy, "requirements-plans")
+        (copy.parent / "data" / entry["name"]).unlink()
+        page.goto(f"file://{copy}#/plans")
+        _wait_rendered(page)
+        error = page.wait_for_selector('#view [data-testid="data-file-error"]')
+        assert entry["name"] in error.inner_text()
+        assert page.locator("#plans-list").count() == 0
+
+    def test_the_agencies_tier_renders_within_its_budget_of_the_data_being_assembled(
+            self, clean_page, built_dashboard_html):
+        """REQ-DASH-226 criterion 13's 400ms, measured from the moment the
+        data is assembled to the end of the first render, three loads; the
+        time from navigation to assembled data is printed beside it."""
+        timings = []
+        for _ in range(3):
+            clean_page.goto("about:blank")
+            _goto(clean_page, built_dashboard_html)
+            timings.append(clean_page.evaluate("""() => {
+                const at = n => performance.getEntriesByName(n)[0].startTime;
+                return {assembled: at('mothman:data-assembled'),
+                        rendered: at('mothman:first-render') - at('mothman:data-assembled')};
+            }"""))
+        print(f"\nREQ-DASH-291 criterion 18: {timings}")
+        assert all(t["rendered"] < 400 for t in timings), timings

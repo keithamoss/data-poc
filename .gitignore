@@ -39,6 +39,11 @@ dbt_project/dbt_packages/
 qa_tools/dbt_profiles/.user.yml
 dashboard/snapshots/*.html
 dashboard/qa-reporting-dashboard.html
+# The built page's data files (REQ-DASH-291) - build output exactly like the
+# page that references them; their only committed form is inside an archived
+# snapshot (REQ-DASH-292). The unanchored `data/` above already matches this
+# directory, by accident rather than intent, so it is named here as well.
+dashboard/data/
 .coverage
 node_modules/
 
