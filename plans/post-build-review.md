@@ -11212,3 +11212,18 @@ twice. It deliberately did not re-find the `TypeError`.
      the runs the pages place results from, dated by when it ran. Arrival and
      full runs left out of the file (a supply's replaced runs) stay out, as
      REQ-PIPE-140 criterion 5 has it.
+
+265. **[done, 2026-10-24]** **[Dashboard UI]** **The Requirements panel read
+     register text as markup.** Found running `tests/test_dashboard_e2e.py`
+     after sprint A1: `TestARequirementHasItsOwnAddress` failed on base
+     (aaaa9ba) as well, with 231 rows shown for 272 requirements.
+     `renderRequirementsPanel` wrote every register field into the page as
+     HTML. Today's REQ-PIPE-257 amendment mentions `<script src>`, which
+     opened a real script element and swallowed every requirement after it.
+     The same mechanism has always rendered placeholders such as
+     `<dataset>`, `<period>` and `<date>` as nothing, which nobody noticed.
+     Minor under the standing rule; fixed test-first: one `reqText()` escape
+     on every register field the panel shows, and a new e2e test
+     (`test_register_text_is_shown_as_text_never_read_as_markup`) that every
+     row renders and every criterion carrying a `<placeholder>` appears
+     literally. It failed first (231 == 272).

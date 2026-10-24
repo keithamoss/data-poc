@@ -634,6 +634,26 @@ class TestARequirementHasItsOwnAddress:
         assert focused == rid
         assert "Linked here" in clean_page.locator(".req-linked").inner_text()
 
+    def test_register_text_is_shown_as_text_never_read_as_markup(self, clean_page,
+                                                                 built_dashboard_html):
+        """post-build-review #265: the panel wrote register text into the
+        page as HTML, so REQ-PIPE-257's "<script src>" opened a real script
+        element and swallowed every requirement after it (231 of 272 shown),
+        and placeholders such as <dataset> had always rendered as nothing."""
+        self._load(clean_page, built_dashboard_html, "panel=requirements")
+        found = clean_page.evaluate("""() => {
+            const rows = new Map([...document.querySelectorAll(
+                '#requirements-panel-body [data-req-id]')].map(e => [e.dataset.reqId, e.textContent]));
+            const withMarkup = REQUIREMENTS.flatMap(r => (r.acceptance_criteria || [])
+                .filter(c => /<[a-zA-Z]/.test(c)).map(c => [r.id, c]));
+            return {rows: rows.size, total: REQUIREMENTS.length, checked: withMarkup.length,
+                    missing: withMarkup.filter(([id, c]) => !(rows.get(id) || "").includes(c))
+                                       .map(([id]) => id)};
+        }""")
+        assert found["checked"], "precondition: some criterion carries a <placeholder>"
+        assert found["rows"] == found["total"]
+        assert found["missing"] == []
+
     def test_every_row_carries_a_link_to_its_own_address(self, clean_page, built_dashboard_html):
         self._load(clean_page, built_dashboard_html, "panel=requirements")
         ids = self._ids(clean_page)

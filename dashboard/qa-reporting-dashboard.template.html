@@ -9188,6 +9188,13 @@ function retirementNote(ret){
 }
 function requirementStatusLabel(s){ return REQ_STATUS_LABEL[s] || s; }
 function requirementStatusPill(s){ return `<span class="pill ${REQ_STATUS_CLASS[s]||"nodata"} sm"><span class="ico"></span>${requirementStatusLabel(s)}</span>`; }
+// REGISTER TEXT IS TEXT (post-build-review #265). The register writes
+// placeholders as <dataset>, <period> and once "<script src>", which
+// written in as markup became elements: the placeholders vanished, and the
+// script tag swallowed every requirement after it.
+function reqText(s){
+  return escHtml(String(s ?? ""));
+}
 function renderRequirementsPanel(){
   const body = document.getElementById("requirements-panel-body");
   if(!REQUIREMENTS.length){
@@ -9208,11 +9215,11 @@ function renderRequirementsPanel(){
     const retiredAt = {};
     (r.retired_criteria||[]).forEach(c=>{ retiredAt[c.criterion] = c; });
     const criteria = (r.acceptance_criteria||[]).map((c,i)=> retiredAt[i+1]
-      ? `<li style="margin-bottom:4px; color:var(--ink-faint);"><s>${c}</s> <span class="pill retired sm"><span class="ico"></span>Retired</span> <span style="font-size:11.5px;">${retirementNote(retiredAt[i+1])}</span></li>`
-      : `<li style="margin-bottom:4px;">${c}</li>`).join("");
+      ? `<li style="margin-bottom:4px; color:var(--ink-faint);"><s>${reqText(c)}</s> <span class="pill retired sm"><span class="ico"></span>Retired</span> <span style="font-size:11.5px;">${retirementNote(retiredAt[i+1])}</span></li>`
+      : `<li style="margin-bottom:4px;">${reqText(c)}</li>`).join("");
     const tests = (r.linked_tests||[]).length
       ? `<div style="margin-top:10px; font-size:12px; color:var(--ink-muted);">
-          Verified by: ${r.linked_tests.map(t=>`<code>${t}</code>`).join(", ")}
+          Verified by: ${r.linked_tests.map(t=>`<code>${reqText(t)}</code>`).join(", ")}
         </div>`
       : `<div style="margin-top:10px; font-size:12px; color:var(--ink-faint);">No linked tests yet.</div>`;
     // 6 further optional fields (2026-09-19, plans/wider.md #10) - each
@@ -9224,7 +9231,7 @@ function renderRequirementsPanel(){
     const dateWritten = r.date_written
       ? `<span style="font-size:11px; color:var(--ink-faint);">${fmtDay(r.date_written)}</span>` : "";
     const source = r.source
-      ? `<div style="margin-top:8px; font-size:11.5px; color:var(--ink-faint);">Source: ${r.source}</div>` : "";
+      ? `<div style="margin-top:8px; font-size:11.5px; color:var(--ink-faint);">Source: ${reqText(r.source)}</div>` : "";
     // Sits in the pill row rather than down with source/dates, because
     // it answers the same question the status pill does - "has anyone
     // agreed to this?" is not a footnote next to "is it built?". An
@@ -9232,13 +9239,13 @@ function renderRequirementsPanel(){
     // that is the normal resting state for one still being drafted, and
     // CI already refuses to let it reach any other status unsigned.
     const signedOff = r.signed_off
-      ? `<span style="font-size:11.5px; color:var(--ink-faint);">Signed off by ${r.signed_off.by}, ${fmtDay(r.signed_off.date)}</span>` : "";
+      ? `<span style="font-size:11.5px; color:var(--ink-faint);">Signed off by ${reqText(r.signed_off.by)}, ${fmtDay(r.signed_off.date)}</span>` : "";
     const nfrs = (r.non_functional_requirements||[]).length
       ? `<div style="margin-top:10px; font-size:12px;"><b>Non-functional:</b>
-          <ul style="margin:4px 0 0; padding-left:18px; line-height:1.5;">${r.non_functional_requirements.map(n=>`<li>${n}</li>`).join("")}</ul>
+          <ul style="margin:4px 0 0; padding-left:18px; line-height:1.5;">${r.non_functional_requirements.map(n=>`<li>${reqText(n)}</li>`).join("")}</ul>
         </div>` : "";
     const deps = (r.dependencies||[]).length
-      ? `<div style="margin-top:8px; font-size:12px; color:var(--ink-muted);">Depends on: ${r.dependencies.map(d=>`<code>${d}</code>`).join(", ")}</div>` : "";
+      ? `<div style="margin-top:8px; font-size:12px; color:var(--ink-muted);">Depends on: ${r.dependencies.map(d=>`<code>${reqText(d)}</code>`).join(", ")}</div>` : "";
     // A BUILT REQUIREMENT'S OWN HOLES, where a reader will see them
     // (post-build-review #33). The register marked REQ-PIPE-053 `built`
     // while one of its dashboard criteria was not built at all, and the
@@ -9255,7 +9262,7 @@ function renderRequirementsPanel(){
     const openQs = (r.open_questions||[]).length
       ? `<div style="margin-top:10px; padding:8px 10px; background:var(--surface-alt); border-radius:6px; font-size:12px;">
           <b>Open questions:</b>
-          <ul style="margin:4px 0 0; padding-left:18px; line-height:1.5;">${r.open_questions.map(q=>`<li>${q}</li>`).join("")}</ul>
+          <ul style="margin:4px 0 0; padding-left:18px; line-height:1.5;">${r.open_questions.map(q=>`<li>${reqText(q)}</li>`).join("")}</ul>
         </div>` : "";
     // Decisions render before the evidence/tests/links block: they are
     // the reasoning, and a reader scanning a requirement wants to know
@@ -9263,7 +9270,7 @@ function renderRequirementsPanel(){
     const decisions = (r.decisions||[]).length
       ? `<div style="margin-top:10px; padding:8px 10px; background:var(--surface-alt); border-radius:6px; font-size:12px;">
           <b>Decisions:</b>
-          <ul style="margin:4px 0 0; padding-left:18px; line-height:1.5;">${r.decisions.map(d=>`<li>${d}</li>`).join("")}</ul>
+          <ul style="margin:4px 0 0; padding-left:18px; line-height:1.5;">${r.decisions.map(d=>`<li>${reqText(d)}</li>`).join("")}</ul>
         </div>` : "";
     // "Implemented in" sits directly above "Verified by" deliberately -
     // they are the two halves of the same question (where it lives, what
@@ -9271,23 +9278,23 @@ function renderRequirementsPanel(){
     // answer only the second one for a year.
     const impl = (r.implemented_by||[]).length
       ? `<div style="margin-top:10px; font-size:12px; color:var(--ink-muted);">
-          Implemented by: ${r.implemented_by.map(i=>`<code>${i}</code>`).join(", ")}
+          Implemented by: ${r.implemented_by.map(i=>`<code>${reqText(i)}</code>`).join(", ")}
         </div>`
       : "";
     const evidence = (r.evidence||[]).length
       ? `<div style="margin-top:8px; font-size:12px; color:var(--ink-muted);"><b>Evidence:</b>
-          <ul style="margin:4px 0 0; padding-left:18px; line-height:1.5;">${r.evidence.map(e=>`<li>${e}</li>`).join("")}</ul>
+          <ul style="margin:4px 0 0; padding-left:18px; line-height:1.5;">${r.evidence.map(e=>`<li>${reqText(e)}</li>`).join("")}</ul>
         </div>` : "";
     return `
       <div data-req-row-status="${r.status}" data-req-id="${escAttr(r.id)}" style="margin-bottom:22px; padding-bottom:18px; border-bottom:1px solid var(--line);">
         <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:6px;">
-          <a class="mono req-self-link" href="${escAttr(requirementHref(r.id))}" data-req-link="${escAttr(r.id)}" title="A link to this requirement" style="font-size:11.5px; color:var(--ink-faint);">${r.id}</a>
-          <b class="req-title" tabindex="-1" style="font-size:14px;">${r.title}</b>
+          <a class="mono req-self-link" href="${escAttr(requirementHref(r.id))}" data-req-link="${escAttr(r.id)}" title="A link to this requirement" style="font-size:11.5px; color:var(--ink-faint);">${reqText(r.id)}</a>
+          <b class="req-title" tabindex="-1" style="font-size:14px;">${reqText(r.title)}</b>
           ${dateWritten}
         </div>
         <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:8px;">${moscowPill(r.moscow)}${requirementStatusPill(r.status)}${signedOff}</div>
         ${r.retired ? `<div class="req-retired-note" style="font-size:12.5px; color:var(--ink-muted); margin-bottom:8px;">${retirementNote(r.retired)}</div>` : ""}
-        <div style="font-size:13px; color:var(--ink-muted); margin-bottom:10px;">${r.story}</div>
+        <div style="font-size:13px; color:var(--ink-muted); margin-bottom:10px;">${reqText(r.story)}</div>
         <ul style="margin:0; padding-left:18px; font-size:12.5px; line-height:1.5;">${criteria}</ul>
         ${nfrs}
         ${unmet}
