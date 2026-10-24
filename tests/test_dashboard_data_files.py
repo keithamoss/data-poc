@@ -22,8 +22,10 @@ from dashboard import data_files
 def _payload(size: int = 2000) -> dict:
     # Every character the encoding has to escape, so a round trip proves
     # each one: quotes of both kinds, a backslash, "</script>", a line
-    # separator and non-ASCII text.
-    return {"datasets": [{"id": "d", "note": "it's \"quoted\" \\ </script> <!--   café",
+    # separator (U+2028, spelt as an escape so it can be seen - it was here
+    # all along as the raw character, which reads as a space) and non-ASCII
+    # text.
+    return {"datasets": [{"id": "d", "note": "it's \"quoted\" \\ </script> <!-- \u2028 café",
                           "blob": "x" * size}]}
 
 
@@ -241,3 +243,114 @@ def test_a_block_that_quotes_the_list_line_does_not_stand_in_for_it(tmp_path):
     assert data_files.page_manifest(inlined) == data_files.page_manifest(page.read_text())
     split_html, written = data_files.split(inlined, "snap.data")
     assert len(written) == 2
+
+
+class TestPartsAreFilledBelowTheBudget:
+    """post-build-review #268 S4: parts were filled to the budget exactly and
+    the size report warns AT it (REQ-DASH-293 criterion 4), so every full
+    part of every split payload warned about a file the build had just
+    written correctly."""
+
+    def test_no_part_of_a_split_payload_warns(self, tmp_path):
+        budget = 4096
+        files = data_files.encode("collection-x", _payload(40000), kind="collection",
+                                  collection="x", budget=budget)
+        assert len(files) > 2, "not split - this test proves nothing"
+        assert all(len(f.content) < budget for f in files)
+        paths = data_files.write(files, tmp_path / "data")
+        page = tmp_path / "page.html"
+        page.write_text("x")
+        with pytest.MonkeyPatch.context() as mp:
+            mp.setattr(data_files, "BUDGET_BYTES", budget)
+            warned = [t for level, t in data_files.size_report(page, paths) if level == "warn"]
+        assert warned == []
+
+    def test_a_split_snapshot_block_is_filled_below_it_too(self, tmp_path):
+        files = _files(_payload(30000))
+        page = _built_page(tmp_path, files)
+        inlined = data_files.inline(page.read_text(), page.parent)
+        _html, written = data_files.split(inlined, "snap.data", budget=4096)
+        assert len(written) > 2 and all(len(c) < 4096 for c in written.values())
+
+
+def _fingerprint(tmp_path, *, payload=None, built_at="2026-10-24T00:00:00Z", font=b"font"):
+    """A built page and a fonts/ and vendor/ beside it, fingerprinted."""
+    work = tmp_path / f"fp{len(list(tmp_path.iterdir()))}"
+    work.mkdir()
+    page = _built_page(work, _files(payload or _payload()))
+    page.write_text(page.read_text().replace(
+        "<script>\n", f'<script>\nconst BUILT_AT = "{built_at}";\n', 1))
+    (work / "fonts").mkdir()
+    (work / "fonts" / "a.woff2").write_bytes(font)
+    (work / "vendor").mkdir()
+    (work / "vendor" / "p.js").write_bytes(b"player")
+    return data_files.fingerprint(page.read_text(), page.parent, [work / "fonts", work / "vendor"])
+
+
+class TestTheFingerprint:
+    """post-build-review #268 T2: the fingerprint was only ever compared with
+    itself, so a constant would have passed every test. REQ-PIPE-255
+    criterion 22's three halves, each made to move or not."""
+
+    def test_it_changes_with_a_data_files_content(self, tmp_path):
+        assert _fingerprint(tmp_path) != _fingerprint(tmp_path, payload=_payload(2001))
+
+    def test_it_ignores_when_the_page_was_built(self, tmp_path):
+        assert _fingerprint(tmp_path) == _fingerprint(tmp_path, built_at="2030-01-01T00:00:00Z")
+
+    def test_it_covers_fonts_and_vendor(self, tmp_path):
+        assert _fingerprint(tmp_path) != _fingerprint(tmp_path, font=b"another font")
+
+
+class TestTheListLineIsFoundOutsideTheBlocks:
+    """post-build-review #268 P1: page_manifest() learned to look past a block
+    that quotes `const DATA_FILES = ...;` (the test above); _set_manifest(),
+    which rewrites that line, had not, and refused any page holding one."""
+
+    def test_the_list_is_rewritten_on_an_inlined_page_and_the_quote_kept(self, tmp_path):
+        quote = "the template gains `const DATA_FILES = null;\n` here"
+        page = _built_page(tmp_path, _files(_payload()), requirements_plans={
+            "requirements": [{"id": "R", "text": quote}], "plans": {}})
+        inlined = data_files.inline(page.read_text(), page.parent)
+        value = data_files.page_manifest(inlined)
+        out = data_files._set_manifest(inlined, {**value, "build": "000000000000"})
+        assert data_files.page_manifest(out)["build"] == "000000000000"
+        assert out.replace('"build":"000000000000"', f'"build":"{value["build"]}"', 1) == inlined
+
+
+class TestAProblemNamesItsFile:
+    """post-build-review #268 P2: a bare KeyError or JSONDecodeError named
+    nothing a person could act on."""
+
+    def test_a_listed_file_with_no_block_is_named_by_split(self, tmp_path):
+        files = _files(_payload(), _payload(3))
+        page = _built_page(tmp_path, files)
+        inlined = data_files.inline(page.read_text(), page.parent)
+        gone = files[1].entry["name"]
+        inlined = re.sub(rf'<script data-mothman-key="[^"]+" data-mothman-file="{re.escape(gone)}">'
+                         r'.*?</script>\n', "", inlined, flags=re.DOTALL)
+        with pytest.raises(data_files.DataFileError, match=re.escape(gone)):
+            data_files.split(inlined, "snap.data")
+
+    def test_a_list_that_is_not_json_is_named(self):
+        html = "<script>\nconst DATA_FILES = {not json};\n</script>\n"
+        with pytest.raises(data_files.DataFileError, match=r"snap\.html.*DATA_FILES"):
+            data_files.page_manifest(html, source="snap.html")
+
+
+class TestScriptAttributesAreEscaped:
+    """post-build-review #268 P3: a key or name went into an attribute as it
+    was. Today's are content hashes and registry ids; nothing makes them so."""
+
+    def test_a_key_with_markup_round_trips_through_the_page(self, tmp_path):
+        files = data_files.encode('collection-a&"b', _payload(), kind="collection", collection="a")
+        page = _built_page(tmp_path, files)
+        html = page.read_text()
+        assert 'data-mothman-key="collection-a&amp;&quot;b"' in html
+        got = data_files.read_page(html, page.parent)
+        assert got.problems == [] and got.collections == {"a": _payload()}
+        inlined = data_files.inline(html, page.parent)
+        assert data_files.read_page(inlined, tmp_path / "nowhere").collections == {"a": _payload()}
+        split_html, written = data_files.split(inlined, "snap.data")
+        assert set(written) == {files[0].entry["name"]}
+        assert 'data-mothman-key="collection-a&amp;&quot;b"' in split_html

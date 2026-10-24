@@ -114,6 +114,31 @@ describe("REQ-DASH-291 criterion 8: a missing or other-build file is a page-leve
     expect(box.textContent).toMatch(/another build/i);
   });
 
+  it("says which in its heading, never just 'not right' (post-build-review #268)", () => {
+    const heading = files => {
+      const w = load({files, registrations: [
+        register("collection-civil-registration", 1, "zz", JSON.stringify(PAYLOAD["civil-registration"]))]});
+      return errorBox(w).querySelector("h2").textContent;
+    };
+    expect(heading([entry("child-protection", 1, 1, "b2")]))
+      .toBe("This dashboard cannot be shown: one of its data files is missing");
+    expect(heading([entry("civil-registration", 1, 1, "b1")]))
+      .toBe("This dashboard cannot be shown: one of its data files is from another build");
+    expect(heading([entry("civil-registration", 1, 1, "b1"), entry("child-protection", 1, 1, "b2")]))
+      .toBe("This dashboard cannot be shown: some of its data files are from another build or missing");
+  });
+
+  it("is styled by the stylesheet in the page's own tokens, not an inline --red (#268 V1, V4)", () => {
+    const w = load({files: [entry("child-protection", 1, 1, "b2")]});
+    const box = errorBox(w);
+    expect(box.getAttribute("style")).toBeNull();
+    expect(box.classList.contains("data-file-error")).toBe(true);
+    expect(box.querySelector("code.data-file-name").textContent).toBe("collection-child-protection.aaaaaaaaaaaa.js");
+    const css = [...w.document.querySelectorAll("style")].map(el => el.textContent).join("\n");
+    expect(css).toMatch(/\.data-file-error\{border:1px solid var\(--bad\)/);
+    expect(css).not.toMatch(/var\(--red/);
+  });
+
   it("names one missing part of a payload (REQ-DASH-293 criterion 3)", () => {
     const w = load({
       files: [entry("child-protection", 1, 2, "b2"), entry("child-protection", 2, 2, "b2")],
@@ -196,7 +221,11 @@ describe("REQ-DASH-291 criteria 7 and 9: Requirements and Plans load on demand",
     w.document.getElementById("requirements-btn").click();
     return new Promise(r => setTimeout(r, 0)).then(() => {
       const body = w.document.getElementById("requirements-panel-body");
-      expect(body.querySelector('[data-testid="data-file-error"]').textContent).toContain(REQS.name);
+      const box = body.querySelector('[data-testid="data-file-error"]');
+      expect(box.textContent).toContain(REQS.name);
+      // One panel, so "its" agrees (post-build-review #268).
+      expect(box.querySelector("h2").textContent)
+        .toBe("The Requirements panel cannot be shown: one of its data files is from another build");
       expect(body.textContent).not.toContain("No requirements yet");
     });
   });
@@ -212,5 +241,29 @@ describe("REQ-DASH-291 criterion 10: the raw template is unchanged", () => {
     expect(w.document.getElementById("requirements-panel-body").textContent).toContain("No requirements yet");
     expect(w.document.querySelector('script[src*="data/"]')).toBeNull();
     expect(dashboard.errors).toEqual([]);
+  });
+});
+
+describe("post-build-review #268: the Demo tab says which half is missing", () => {
+  const demo = cast => {
+    let html = readFileSync(TEMPLATE_PATH, "utf-8");
+    expect(html).toContain("const DEMO_CAST = null;");
+    if(cast) html = html.replace("const DEMO_CAST = null;", `const DEMO_CAST = ${JSON.stringify(cast)};`);
+    dashboard = loadDashboard({html, hierarchy: MINIMAL_HIERARCHY});
+    const w = dashboard.window;
+    w.document.getElementById("demo-btn").click();
+    return w.document.querySelector('[data-testid="demo-unavailable"]').textContent;
+  };
+
+  it("names the player, not the recording, when only the player is missing - as in a snapshot", () => {
+    // jsdom loads no <script src>, so the vendored player is absent here
+    // exactly as it is beside an archived snapshot.
+    const said = demo('{"version": 2, "width": 80, "height": 24}\n');
+    expect(said).toMatch(/the player that plays it is not/);
+    expect(said).not.toMatch(/No demo recording/);
+  });
+
+  it("still says there is no recording when there is none", () => {
+    expect(demo(null)).toMatch(/No demo recording embedded yet/);
   });
 });

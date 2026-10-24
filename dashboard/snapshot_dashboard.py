@@ -321,6 +321,18 @@ def prepare_deploy_site(site_dir: Path, html_path: Path = DASHBOARD_HTML,
     this - only the site copy gets the embed, same one-way relationship
     as embed_dashboard_data.py's own gitignored build output."""
     site_dir.mkdir(parents=True, exist_ok=True)
+    # EVERYTHING THE SITE IS MADE OF IS CLEARED FIRST (post-build-review #268
+    # D1): `mothman dashboard publish` reuses `_site/`, and a data file or a
+    # split snapshot from an earlier build was otherwise published again on
+    # every publish after - content-hashed names mean a changed file always
+    # leaves its predecessor behind. Only these names: prepare-site takes any
+    # directory a person names, so nothing else in it is touched.
+    for name in ("index.html", data_files.DATA_DIR, "snapshots", "fonts", "vendor"):
+        stale = site_dir / name
+        if stale.is_dir() and not stale.is_symlink():
+            shutil.rmtree(stale)
+        elif stale.exists() or stale.is_symlink():
+            stale.unlink()
     manifest = _read_manifest(snapshots_dir)
     page = html_path.read_bytes().decode("utf-8")
     html = _embed_snapshot_manifest_into_html(page, manifest, f"{html_path} (deploy site copy)")

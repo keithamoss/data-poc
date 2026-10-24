@@ -351,7 +351,7 @@ button{font:inherit; color:inherit;}
    own IBM Plex Mono with tabular numerals, which every other code-ish
    string on the page uses. */
 .notice-exhausted code, .notice-runway code, .notice-queue code,
-.stale-link-notice code, .in-place-on-range-notice code, .view-sub code{
+.stale-link-notice code, .in-place-on-range-notice code, .view-sub code, .data-file-error code{
   background:var(--surface); padding:1px 5px; border-radius:4px;
   /* Without this a wrapped chip renders as TWO rounded boxes, so
      `mothman schedule candidate-dates` reads as two commands at 390px
@@ -380,6 +380,32 @@ button{font:inherit; color:inherit;}
   padding:10px 12px; margin-bottom:14px; font-size:13.5px; color:var(--ink);
   background:var(--warn-bg, transparent); max-width:72ch;}
 .stale-link-notice code, .in-place-on-range-notice code{font-size:12.5px;}
+/* A DATA FILE THAT DID NOT LOAD (REQ-DASH-291 criteria 8 and 9; post-build-
+   review #268 V1, V2, V4). A notice like the two above, in the page's own
+   tokens - its inline style named a --red the page never defined, and fell
+   back to a hex that reached 2.78:1 in dark mode. --bad is PROVISIONAL: red
+   means failing data everywhere else here, and a neutral border may suit a
+   page that cannot show any data at all better; the question is Keith's. */
+.data-file-error{border:1px solid var(--bad); background:var(--bad-soft); border-radius:var(--radius-sm);
+  padding:12px 14px; margin:12px 0; font-size:13.5px; color:var(--ink); max-width:72ch;}
+.data-file-error h2{font-size:16px; margin:0 0 8px;}
+.data-file-error ul{margin:0 0 10px 18px; padding:0;}
+.data-file-error li{margin-bottom:4px;}
+.data-file-error p{margin:0 0 4px;}
+.data-file-error p:last-child{margin-bottom:0;}
+/* A file name breaks anywhere rather than at its hyphens, so at 390px it
+   does not read as two names. */
+.data-file-error .data-file-name{overflow-wrap:anywhere;}
+/* HELD SPACE, AND WORDS ONLY IF IT IS SLOW (#268 V3). */
+.data-file-loading{min-height:50vh; font-size:13px; color:var(--ink-muted);}
+.data-file-loading-text, .data-file-loading-bar{opacity:0; animation:data-file-loading-show 0s linear .2s forwards;}
+.data-file-loading-bar{display:block; position:relative; overflow:hidden; height:2px; max-width:240px; margin-top:8px;
+  background:var(--line); border-radius:var(--radius-sm);}
+.data-file-loading-bar::after{content:""; position:absolute; inset:0 auto 0 0; width:30%; background:var(--ink-muted);
+  animation:data-file-loading-slide 1.4s ease-in-out .2s infinite;}
+@keyframes data-file-loading-show{to{opacity:1;}}
+@keyframes data-file-loading-slide{from{transform:translateX(-100%);} to{transform:translateX(340%);}}
+@media (prefers-reduced-motion: reduce){ .data-file-loading-bar::after{animation:none; width:100%; opacity:.5;} }
 /* Visually hidden, still announced. The route announcer (#10) has to
    reach a screen reader without appearing on the page; display:none
    and visibility:hidden would remove it from the accessibility tree
@@ -1314,13 +1340,30 @@ function assetZoneOn(dateStr){
 // Shared by every entry point here, so the refusal cannot be true of
 // one of them and not another - its Python twin leans on
 // asset_time.parse_instant for the same reason.
+// A STRING IS READ ONCE (post-build-review #268 L1): the agency trends ask
+// for every check's every result on every week back to 2023, the same few
+// thousand strings each time, and re-reading them was most of a 9-second
+// first load. The answer for a string never changes - an instant, or the
+// same refusal - so it is kept; each caller still gets its own Date.
+const _INSTANT_OF = new Map();
+const _ASSET_DATE_STR = new Map(); // assetDateStrOf()'s, below
 function asInstant(value){
-  const at = value instanceof Date ? value : new Date(value);
-  if(isNaN(at.getTime())) throw new Error(`not an instant: ${value}`);
-  if(typeof value === "string" && /^\d{4}-\d{2}-\d{2}[T ][\d:.]+$/.test(value.trim())){
-    throw new Error(`instant has no timezone offset, so it cannot be placed: ${value}`);
+  if(value instanceof Date){
+    if(isNaN(value.getTime())) throw new Error(`not an instant: ${value}`);
+    return value;
   }
-  return at;
+  const key = typeof value === "string" ? value : null;
+  let known = key === null ? undefined : _INSTANT_OF.get(key);
+  if(known === undefined){
+    const at = new Date(value);
+    if(isNaN(at.getTime())) known = {error: `not an instant: ${value}`};
+    else if(key !== null && /^\d{4}-\d{2}-\d{2}[T ][\d:.]+$/.test(key.trim())){
+      known = {error: `instant has no timezone offset, so it cannot be placed: ${value}`};
+    } else known = {ms: at.getTime()};
+    if(key !== null) _INSTANT_OF.set(key, known);
+  }
+  if(known.error) throw new Error(known.error);
+  return new Date(known.ms);
 }
 
 // ONE FORMATTER PER ZONE, AND ONE ANSWER PER INSTANT (REQ-DASH-226 NFR 6).
@@ -2917,10 +2960,12 @@ function currentEntriesOn(ck, eligibleRunIds, inPlaceOnDateStr, counted){
   const recordedBy = h => !h.recorded_at || assetDateStrOf(h.recorded_at) <= inPlaceOnDateStr;
   const history = ck.history.filter(h => (eligibleRunIds.has(h.run_id) || h.recorded_by)
     && recordedBy(h));
-  const superseded = (ck.superseded || []).filter(h => recordedBy(h)
-    && (h.recorded_by || eligibleRunIds.has(h.supply_run)));
+  const superseded = (ck.superseded || []).filter(h => (h.recorded_by || eligibleRunIds.has(h.supply_run))
+    && recordedBy(h));
   if(!superseded.length) return history;
-  const recorded = new Set([...ck.history, ...ck.superseded].filter(recordedBy).map(h => h.run_id));
+  const recorded = new Set();
+  for(const h of ck.history) if(recordedBy(h)) recorded.add(h.run_id);
+  for(const h of ck.superseded) if(recordedBy(h)) recorded.add(h.run_id);
   const still = superseded.filter(h => !recorded.has(h.replaced_by)
     || (counted && counted.rank === h.rank));
   return [...history, ...still].sort((a, b) => a.rank - b.rank);
@@ -4127,7 +4172,13 @@ function datasetsTrendSlot(datasetIds, quiet){
 function fillDatasetsTrends(root){
   const slots = [...root.querySelectorAll(".datasets-trend-slot")];
   if(!slots.length) return;
-  setTimeout(()=>{
+  // AFTER A FRAME, then in a task of its own (post-build-review #268 L1): a
+  // bare setTimeout could run before the browser painted, so the reader saw
+  // nothing at all until every trend was drawn - criterion 13 is pills and
+  // counts FIRST. A page nobody can see draws no frame, so it waits too.
+  const later = typeof requestAnimationFrame === "function"
+    ? fn => requestAnimationFrame(()=> setTimeout(fn, 0)) : fn => setTimeout(fn, 0);
+  later(()=>{
     slots.forEach(slot=>{
       if(!slot.isConnected) return;
       const ids = slot.dataset.ids.split(" ").filter(Boolean);
@@ -4135,7 +4186,7 @@ function fillDatasetsTrends(root){
       slot.innerHTML = datasetsTrendHtml(series, slot.hasAttribute("data-quiet"));
     });
     root.dataset.trendsDrawn = String(Number(root.dataset.trendsDrawn || 0) + 1);
-  }, 0);
+  });
 }
 // The row and tile entry point: the units' series, drawn.
 function aggregateSparkline(units, quietStatus, opts){
@@ -5878,16 +5929,20 @@ function describeRoute(){
 // to do about it for both kinds of reader - one who opened the page from
 // disk, and one reading the published site - since the page cannot know
 // which build step a published copy skipped.
+// THE WORDS SAY WHICH, and the box is the stylesheet's (post-build-review
+// #268): "not right" told the reader nothing the list below did not, and an
+// inline style named a --red token the page never defined.
 function dataFileErrorHtml(problems, where){
-  const items = problems.map(p=> `<li><code>${escHtml(p.name)}</code> - ${p.why === "missing"
-    ? "missing: the page lists it and it did not load"
-    : "from another build: it registered under a different build id than this page expects"}</li>`).join("");
-  return `<div class="data-file-error" role="alert" data-testid="data-file-error"
-      style="border:1px solid var(--red, #b42318); border-radius:8px; padding:14px 16px; margin:12px 0; font-size:13.5px;">
-    <h2 style="font-size:16px; margin:0 0 8px;">${escHtml(where)} cannot be shown: ${problems.length === 1 ? "one of its data files is" : "some of its data files are"} not right</h2>
-    <ul style="margin:0 0 10px 18px; padding:0;">${items}</ul>
-    <p style="margin:0 0 4px;">Opened from disk: run <code>mothman dashboard embed</code> to write the page and its files again.</p>
-    <p style="margin:0;">On the published site: the publish is incomplete - the page arrived without the files it lists.</p>
+  const items = problems.map(p=> `<li><code class="data-file-name">${escHtml(p.name)}</code>: ${p.why === "missing"
+    ? "missing — the page lists it and it did not load"
+    : "from another build — it is from a different build than this page"}</li>`).join("");
+  const kinds = new Set(problems.map(p=> p.why === "missing" ? "missing" : "from another build"));
+  const what = [...kinds].join(" or ");
+  return `<div class="data-file-error" role="alert" data-testid="data-file-error">
+    <h2>${escHtml(where)} cannot be shown: ${problems.length === 1 ? `one of its data files is ${what}` : `some of its data files are ${what}`}</h2>
+    <ul>${items}</ul>
+    <p>Opened from disk: run <code>mothman dashboard embed</code> to write the page and its files again.</p>
+    <p>On the published site: the publish is incomplete — the page arrived without the files it lists.</p>
   </div>`;
 }
 function renderDataFileProblems(view){
@@ -5942,7 +5997,16 @@ function requirementsPlansData(){
       PLANS_ENTRIES = buildPlansEntries();
       load.state = "ready";
     }
-    if(STATE.tier === "plans") render();
+    if(STATE.tier === "plans"){
+      // FOCUS STAYS WHERE THE NAVIGATION PUT IT (post-build-review #268): the
+      // loading state's heading had it, and this render replaces that heading,
+      // which dropped focus to the body - the next Tab started from the top.
+      const view = document.getElementById("view");
+      const hadFocus = view.contains(document.activeElement);
+      render();
+      const heading = hadFocus && view.querySelector("h2");
+      if(heading){ heading.setAttribute("tabindex", "-1"); heading.focus({preventScroll:true}); }
+    }
     if(STATE.panel === "requirements"){
       renderRequirementsPanel();
       if(STATE.req) showRequirement(STATE.req);
@@ -5950,8 +6014,12 @@ function requirementsPlansData(){
   });
   return load;
 }
+// QUIET UNLESS IT IS SLOW (post-build-review #268 V3): the words and a thin
+// moving bar appear only after 200ms, so a fast load never flashes them, and
+// the space the content will take is held meanwhile, so the footer does not
+// jump when it arrives. The stylesheet does all of it.
 function dataFileLoadingHtml(what){
-  return `<div data-testid="data-file-loading" role="status" style="font-size:13px; color:var(--ink-muted);">Loading ${escHtml(what)}…</div>`;
+  return `<div class="data-file-loading" data-testid="data-file-loading" role="status"><span class="data-file-loading-text">Loading ${escHtml(what)}…</span><span class="data-file-loading-bar" aria-hidden="true"></span></div>`;
 }
 
 function render(){
@@ -6175,15 +6243,25 @@ const BLOCKER_SAYS = {
   contested:"waiting for a person to say what each file is",
   refused:"its supply arrived and could not be loaded",
   "agreement-refused":"a configuration problem on our side - its recorded judgements no longer match the agreement and no declared correction accounts for it"};
+// One answer per string, kept in _ASSET_DATE_STR (post-build-review #268 L1,
+// declared beside asInstant's own cache because this runs before here is
+// reached): the asset's zone versions are fixed for the life of the page, so
+// the date a string falls on is too - and a check's results are dated this
+// way on every week the agency trends draw.
 function assetDateStrOf(value){
+  const key = typeof value === "string" ? value : null;
+  let got = key === null ? undefined : _ASSET_DATE_STR.get(key);
+  if(got !== undefined) return got;
   try{
     const p = assetParts(value);
-    return `${p.year}-${String(p.month).padStart(2,"0")}-${String(p.day).padStart(2,"0")}`;
+    got = `${p.year}-${String(p.month).padStart(2,"0")}-${String(p.day).padStart(2,"0")}`;
   }catch(e){
     // The raw template has no asset clock; the instant's own date is
     // the only reading available there.
-    return String(value).slice(0,10);
+    got = String(value).slice(0,10);
   }
+  if(key !== null) _ASSET_DATE_STR.set(key, got);
+  return got;
 }
 function blockersFor(datasetId, source){
   const src = outstandingSource(source);
@@ -9427,7 +9505,7 @@ function renderRequirementsPanel(){
   // is on its way or broken (REQ-DASH-291 criteria 7 and 9).
   const rp = requirementsPlansData();
   if(rp.state === "loading"){ body.innerHTML = dataFileLoadingHtml("the requirements"); return; }
-  if(rp.state === "failed"){ body.innerHTML = dataFileErrorHtml(rp.problems, "The requirements"); return; }
+  if(rp.state === "failed"){ body.innerHTML = dataFileErrorHtml(rp.problems, "The Requirements panel"); return; }
   if(!REQUIREMENTS.length){
     body.innerHTML = `<div style="font-size:13px; color:var(--ink-muted);">
       No requirements yet — this page renders the repo's own committed
@@ -10484,9 +10562,18 @@ function renderDemo(view){
     <div id="demo-player-container" style="max-width:900px;"></div>
   `;
   const container = document.getElementById("demo-player-container");
-  if(!DEMO_CAST || typeof AsciinemaPlayer==="undefined"){
-    container.innerHTML = `<div style="font-size:13px; color:var(--ink-muted);">
+  // TWO CAUSES, TWO MESSAGES (post-build-review #268): an archived snapshot
+  // carries the recording and not the player, and said there was no
+  // recording - which was false.
+  if(!DEMO_CAST){
+    container.innerHTML = `<div data-testid="demo-unavailable" style="font-size:13px; color:var(--ink-muted);">
       No demo recording embedded yet - run <code>mothman dashboard embed</code> (or <code>mothman pipeline run</code>) after recording one with <code>scripts/dev/record_cast.py</code>.
+    </div>`;
+    return;
+  }
+  if(typeof AsciinemaPlayer==="undefined"){
+    container.innerHTML = `<div data-testid="demo-unavailable" style="font-size:13px; color:var(--ink-muted);">
+      The recording is here, but the player that plays it is not: it did not load beside this page. An archived copy of the dashboard carries its data and not the player, so open the live dashboard to watch it.
     </div>`;
     return;
   }

@@ -594,3 +594,33 @@ def test_a_local_snapshot_copy_is_still_decompressed_whole(tmp_path):
     local = out.with_suffix("")
     assert local.read_text() == _archived(out)
     assert not (snapshots / (local.stem + ".data")).exists()
+
+
+def test_a_reused_site_directory_publishes_none_of_its_stale_files(tmp_path):
+    """post-build-review #268 D1: `mothman dashboard publish` reuses `_site/`,
+    and the site was never cleared, so a data file or snapshot directory
+    from an earlier build stayed in it and was published again on every
+    publish after. Only what this build lists is on the site afterwards."""
+    page, files, out, site = _site_with_a_snapshot(tmp_path)
+    stale = [site / "data" / "collection-gone.0123456789ab.js",
+             site / "snapshots" / "20200101T000000Z_old.data" / "x.js",
+             site / "snapshots" / "20200101T000000Z_old.html"]
+    for path in stale:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("stale")
+    snapshot_dashboard.prepare_deploy_site(site, html_path=page, snapshots_dir=tmp_path / "snapshots")
+    assert [p for p in stale if p.exists()] == []
+    assert sorted(p.name for p in (site / "data").iterdir()) == sorted(f.entry["name"] for f in files)
+    assert (site / "snapshots" / out.with_suffix("").name).is_file()
+
+
+def test_clearing_the_site_touches_nothing_it_does_not_write(tmp_path):
+    """The other half of D1: `mothman dashboard prepare-site` takes any
+    directory, so only what the site is made of is cleared - never the
+    directory itself or a file beside it."""
+    page, _files = _split_built_page(tmp_path)
+    site = tmp_path / "_site"
+    site.mkdir()
+    (site / "keep.txt").write_text("not ours")
+    snapshot_dashboard.prepare_deploy_site(site, html_path=page, snapshots_dir=tmp_path / "snapshots")
+    assert (site / "keep.txt").read_text() == "not ours"

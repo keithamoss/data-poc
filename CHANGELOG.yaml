@@ -109,6 +109,25 @@ intro: >
   all three.
 
 releases:
+  - date: "2026-10-25"
+    summary: >
+      The dashboard appears in under half a second again, and a page whose
+      data files did not load says exactly which and why.
+    changes:
+      - category: Fixed
+        items:
+          - headline: Opens in a blink
+            components: ["Dashboard UI"]
+            description: >
+              The dashboard showed nothing for up to ten seconds while it drew
+              every agency's weekly trend. The agencies now appear straight
+              away, and the trend lines fill in a moment later.
+          - headline: Missing files, plainly said
+            components: ["Dashboard UI", "Pipeline & publishing"]
+            description: >
+              When a data file is missing or from another build, the page now
+              says which, and the published site no longer keeps files from
+              earlier builds.
   - date: "2026-10-24"
     summary: >
       Every result now sits on the delivery it actually read, in the order it

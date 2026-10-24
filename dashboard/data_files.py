@@ -47,6 +47,7 @@ step and the tests cannot drift on what "the page's data" is (criterion
 from __future__ import annotations
 
 import hashlib
+import html as _html
 import json
 import re
 from dataclasses import dataclass, field
@@ -157,8 +158,11 @@ def encode_text(key: str, text: str, *, kind: str, collection: str | None = None
         raise ValueError(f"{key}: a payload's text must be single-line ASCII JSON")
     build = _sha(text.encode("ascii"))[:12]
 
+    # BELOW THE BUDGET, not at it (post-build-review #268 S4): the size
+    # report warns at the budget (REQ-DASH-293 criterion 4), so a part filled
+    # to it exactly warned about a file written correctly.
     def fits(part: int, start: int, end: int) -> bool:
-        return len(_file_bytes(key, part, build, "")) + _escaped_len(text, start, end) <= budget
+        return len(_file_bytes(key, part, build, "")) + _escaped_len(text, start, end) < budget
 
     chunks: list[str] = []
     start = 0
@@ -210,9 +214,15 @@ def manifest(files: list[DataFile]) -> dict:
     return {"build": page_build, "files": entries}
 
 
+def _attr(value: str) -> str:
+    # Every attribute value escaped (post-build-review #268 P3): today's keys
+    # and names are registry ids and content hashes, and nothing makes them so.
+    return _html.escape(value, quote=True)
+
+
 def _tags(entries: list[dict], prefix: str) -> str:
-    return "".join(f'<script src="{prefix}/{e["name"]}" data-mothman-key="{e["key"]}" '
-                   f'data-mothman-file="{e["name"]}"></script>\n'
+    return "".join(f'<script src="{_attr(prefix + "/" + e["name"])}" data-mothman-key="{_attr(e["key"])}" '
+                   f'data-mothman-file="{_attr(e["name"])}"></script>\n'
                    for e in entries if e["kind"] == COLLECTION_KIND)
 
 
@@ -223,12 +233,23 @@ def _replace_once(html: str, old: str, new: str, what: str) -> str:
     return html.replace(old, new)
 
 
+def _outside_blocks(html: str, regex: re.Pattern) -> list[re.Match]:
+    """Every match of `regex` in `html` that is not inside an inline data
+    block - a block is data, and may quote the page's own lines."""
+    blocks = [m.span() for m in _BLOCK_RE.finditer(html)]
+    return [m for m in regex.finditer(html)
+            if not any(a <= m.start() < b for a, b in blocks)]
+
+
 def _set_manifest(html: str, value: dict) -> str:
-    found = _MANIFEST_RE.findall(html)
+    # Outside the inline blocks, as page_manifest() reads it (post-build-review
+    # #268 P1): a block quoting this line is not this line.
+    found = _outside_blocks(html, _MANIFEST_RE)
     if len(found) != 1:
         raise RuntimeError(f"expected exactly one 'const DATA_FILES = ...;' line, found {len(found)}")
     line = f"const DATA_FILES = {json.dumps(value, separators=(',', ':'))};\n"
-    return _MANIFEST_RE.sub(lambda _m: line, html, count=1)
+    m = found[0]
+    return html[:m.start()] + line + html[m.end():]
 
 
 def embed_into_page(html: str, value: dict, prefix: str = DATA_DIR) -> str:
@@ -243,12 +264,19 @@ def embed_into_page(html: str, value: dict, prefix: str = DATA_DIR) -> str:
                          "data-file marker")
 
 
-def page_manifest(html: str) -> dict | None:
+def page_manifest(html: str, source: str = "the page") -> dict | None:
     # Searched with the inline blocks taken out: a block is data, and the
     # Requirements block quotes this very line (found 2026-10-24, when the
     # register gained a decision naming it and the snapshot read the quote).
     m = _MANIFEST_RE.search(_BLOCK_RE.sub("", html))
-    return json.loads(m.group(1)) if m else None
+    if not m:
+        return None
+    try:
+        return json.loads(m.group(1))
+    except json.JSONDecodeError as e:
+        # Named (post-build-review #268 P2): a bare JSONDecodeError said nothing
+        # about which page, or which line of it.
+        raise DataFileError([f"{source}: its 'const DATA_FILES = ...;' list is not valid JSON - {e}"])
 
 
 def _assemble(entries: list[dict], decoded: dict) -> dict:
@@ -287,8 +315,8 @@ def read_page(html: str, page_dir: Path) -> PageData:
     if not value:
         return _legacy(html)
     page_dir = Path(page_dir)
-    blocks = {m.group(3): m.group(4).encode("ascii") for m in _BLOCK_RE.finditer(html)}
-    srcs = {m.group(3): m.group(1) for m in _TAG_RE.finditer(html)}
+    blocks = _blocks(html)
+    srcs = {_html.unescape(m.group(3)): _html.unescape(m.group(1)) for m in _TAG_RE.finditer(html)}
     default_dir = next((s[: -len(n)] for n, s in srcs.items()), DATA_DIR + "/")
     out = PageData(manifest=value)
     decoded = {}
@@ -329,6 +357,11 @@ def read_page(html: str, page_dir: Path) -> PageData:
     return out
 
 
+def _blocks(html: str) -> dict[str, bytes]:
+    """{file name: content} of every inline data block."""
+    return {_html.unescape(m.group(3)): m.group(4).encode("ascii") for m in _BLOCK_RE.finditer(html)}
+
+
 def _strip_data_elements(html: str) -> str:
     return _BLOCK_RE.sub("", _TAG_RE.sub("", html))
 
@@ -349,7 +382,7 @@ def inline(html: str, page_dir: Path) -> str:
     blocks = []
     for e in data.manifest["files"]:
         inert = "" if e["kind"] == COLLECTION_KIND else ' type="text/plain"'
-        blocks.append(f'<script{inert} data-mothman-key="{e["key"]}" data-mothman-file="{e["name"]}">'
+        blocks.append(f'<script{inert} data-mothman-key="{_attr(e["key"])}" data-mothman-file="{_attr(e["name"])}">'
                       f'{data.contents[e["name"]].decode("ascii")}</script>\n')
     return _replace_once(_strip_data_elements(html), MARKER, MARKER + "".join(blocks),
                          "data-file marker")
@@ -363,17 +396,22 @@ def split(html: str, files_dir: str, budget: int | None = None) -> tuple[str, di
     re-written as parts within it, and the page's list updated to match. A
     page with no blocks is returned unchanged."""
     budget = BUDGET_BYTES if budget is None else budget
-    blocks = {m.group(3): m.group(4).encode("ascii") for m in _BLOCK_RE.finditer(html)}
+    blocks = _blocks(html)
     value = page_manifest(html)
     if not blocks or not value:
         return html, {}
+    # Every listed file has its block, or the split names those that do not
+    # (post-build-review #268 P2) - a bare KeyError named nothing.
+    absent = [e["name"] for e in value["files"] if e["name"] not in blocks]
+    if absent:
+        raise DataFileError([f"{name}: listed by the page and not inlined in it" for name in absent])
     entries, files = [], {}
     by_key: dict[str, list] = {}
     for e in value["files"]:
         by_key.setdefault(e["key"], []).append(e)
     for key, group in by_key.items():
         contents = [blocks[e["name"]] for e in group]
-        if all(len(c) <= budget for c in contents):
+        if all(len(c) < budget for c in contents):
             entries += group
             files.update({e["name"]: c for e, c in zip(group, contents)})
             continue

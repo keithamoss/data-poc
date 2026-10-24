@@ -11661,3 +11661,187 @@ twice. It deliberately did not re-find the `TypeError`.
      inheritances, and the next cache-miss bootstrap is the real test.
 
      **For Keith:** none new.
+
+268. **[in-progress, 2026-10-25]** **[Dashboard UI]** **[Pipeline & publishing]**
+     **[Testing & dev tooling]** **REQ-DASH-291/292/293 post-build critics.**
+     delivery-critic (functional), the dashboard UX critic and the dashboard
+     visual critic on sprint E, the dashboard split, read-only against
+     ed_probe; fixes on top of 9281e74. Each finding was checked against the
+     code before it was acted on, and each defect's test was run against the
+     unfixed code and seen to fail; the rest are coverage of paths that
+     already worked, said so below. Tests are `tests/test_dashboard_e2e.py`
+     (e2e), `tests/test_dashboard_data_files.py` (data_files),
+     `tests/test_snapshot_dashboard.py` (snapshot) and
+     `tests-js/data-files.test.js` (js) unless named otherwise.
+
+     **L1. The first view took 8.8 to 10 seconds to appear (UX critic) -
+     a significant defect, FIXED and flagged.** Reproduced: 10.0s to the
+     load event on the built page over file://, in a real Chromium. The
+     critic's attribution was right about the functions and wrong about the
+     phase: the data was assembled at ~0.3s and the first render ended at
+     ~0.4s, inside REQ-DASH-291 criterion 18's budget, which is why that
+     criterion's test stayed green. What followed it was one task of ~9.5s,
+     `fillDatasetsTrends()` drawing every agency card's weekly trend:
+     `groupWeeklySeries` asks `datasetStatusesOn` for every week back to
+     2023, each rebuilds every dataset, and every check's every history
+     entry was re-dated on the asset clock - `assetDateStrOf(recorded_at)`
+     to `assetParts` to `asInstant`, a regex and a Date parse per call - in
+     both `currentEntriesOn` and `buildRealDataset`. And the task was a bare
+     `setTimeout`, which ran before the browser painted, so the reader saw
+     nothing until all of it was done.
+     - **Where it came from.** Not bisected commit by commit - measured
+       instead. Per-entry asset-clock dating arrived with REQ-DASH-264 on 19
+       October (f6d2e9e, db4b11e; the 18 October page has none and loads in
+       1.3s) and widened through the week: c564394, a921749, the contested
+       reads (aeb996b), and gap A (f861ee4), whose superseded pass re-dates
+       every history entry of any check with a superseded one, unguarded by
+       the eligibility test. Removing just that pass from the slow page took
+       it from ~9.6s to ~7.9s, so f861ee4 is about 1.7s of it and the rest is
+       the cost the week's dating built up.
+     - **Fix.** `asInstant` reads a string once (its instant or its refusal,
+       kept; each caller still gets its own Date), `assetDateStrOf` keeps one
+       answer per string (the zone versions are fixed for the page's life,
+       as `_ZONE_VERSIONS` already assumed), `currentEntriesOn` tests
+       eligibility before dating and builds its set without spreading, and
+       the trends wait for a frame before their task, so pills and counts
+       paint first as REQ-DASH-226 criterion 13 meant.
+     - **Before and after**, three loads each, navigation to the moment the
+       page itself answers, in the e2e test below: agencies tier on screen
+       8.8 to 9.0s, now 0.28 to 0.39s; trends drawn 8.9 to 9.1s, now 2.4 to
+       2.6s.
+     - **Results unchanged**: `datasetStatusesOn` on every third day from
+       the first run to today (1,675 dates), the weekly series and the
+       view's text, compared in a real browser between the page built from
+       9281e74's template and the fixed one over the same data files -
+       identical.
+     - **Test**: e2e `test_the_first_view_answers_within_its_budget_of_navigation`
+       - the view under 3s and the trends under 6s from navigation, read by
+       the page itself by polling, so a busy main thread cannot answer early.
+       Failed first at 8.8 to 9.0s.
+     - **Still for later, not this fix**: 2.4 to 2.9s of trend work after
+       first paint is the same order as 18 October's page (2.9s to its load
+       event) and grows with weeks and collections; at ~30 collections it is
+       the next thing to profile.
+
+     **Functional critic.**
+     - **D1. Stale data files were published forever - FIXED.**
+       `prepare_deploy_site` never cleared `_site/`, and `mothman dashboard
+       publish` reuses it, so every data file and split snapshot a build ever
+       wrote stayed on the site (content-hashed names make every change leave
+       one behind). It now clears what the site is made of - `index.html`,
+       `data/`, `snapshots/`, `fonts/`, `vendor/` - and nothing else, since
+       `prepare-site` takes any directory. Snapshot
+       `test_a_reused_site_directory_publishes_none_of_its_stale_files`
+       (failed first) and `test_clearing_the_site_touches_nothing_it_does_not_write`.
+     - **S4. Every full part warned - FIXED.** Parts filled to `<= budget`
+       and the report warns `>= budget` (REQ-DASH-293 criterion 4 says "at
+       or above", so the warning stays). Parts, and a split snapshot's
+       blocks, are now filled strictly below it. Data_files
+       `TestPartsAreFilledBelowTheBudget` (both failed first).
+     - **T2. A constant fingerprint would have passed - FIXED (coverage).**
+       Data_files `TestTheFingerprint`: changes with a data file's content,
+       ignores BUILT_AT, covers fonts/ and vendor/. All three passed on the
+       old code; they were missing, not failing.
+     - **T3. The render gate's browser branch was untested - FIXED
+       (coverage).** `tests/test_check_dashboard_renders.py`
+       `test_the_browser_check_fails_a_page_showing_its_data_file_error`:
+       the real template given a list naming a file never written, with the
+       raw template as the control. Proven able to fail by disabling the
+       branch (it then failed).
+     - **T4. The Requirements panel's onerror path was untested - FIXED
+       (coverage).** E2e
+       `test_a_missing_requirements_and_plans_file_is_named_in_the_requirements_panel`.
+       Passed on the old code.
+     - **T5. "`_payload` claims a line separator it lacks" - REJECTED, and
+       made visible.** The U+2028 was there all along as the raw character,
+       which reads as a space; it is now spelt ` ` and the comment says
+       so.
+     - **P1. `_set_manifest` searched inside the inline blocks - FIXED.**
+       Latent today (its callers pass a page with the blocks stripped), the
+       same class as the `page_manifest` fix. Now it rewrites the one line
+       outside them. Data_files `TestTheListLineIsFoundOutsideTheBlocks`
+       (failed first: "found 2").
+     - **P2. Bare KeyError and JSONDecodeError - FIXED.** `split()` names
+       each listed file with no block; `page_manifest()` names its source
+       when the list is not JSON (a new `source=` argument, default "the
+       page"). Data_files `TestAProblemNamesItsFile` (both failed first).
+     - **P3. Unescaped attribute values - FIXED.** `_tags` and `inline`
+       escape the src, key and name, and every reader unescapes them. Data_files
+       `TestScriptAttributesAreEscaped` (failed first). Today's values are
+       registry ids and content hashes, so nothing was broken in practice.
+
+     **UX critic.**
+     - **Focus after Plans loads - FIXED.** The render after the on-demand
+       load replaced the focused heading and dropped focus to the body. It
+       now re-focuses the new heading when focus was in the view. E2e
+       `test_the_plans_heading_keeps_focus_once_its_file_has_loaded` (failed
+       first: BODY).
+     - **The Demo tab said "No demo recording embedded yet" in a snapshot -
+       FIXED.** False: DEMO_CAST is there and only the vendored player is
+       not. Two messages now; the player one says the recording is here, the
+       player did not load beside the page, an archived copy carries its data
+       and not the player, and to open the live dashboard. Js "the Demo tab
+       says which half is missing" (failed first). Whether to hide the
+       button instead is (h) below.
+     - **Wording - FIXED.** The heading says which ("is missing", "is from
+       another build", or both) instead of "is not right"; the other-build
+       line is "it is from a different build than this page"; the panel is
+       "The Requirements panel", so "its" agrees; dashes are "—" as elsewhere
+       on the page. The advice itself is unchanged - its direction is (f).
+       Js "says which in its heading" and the panel's other-build test
+       (both failed first).
+
+     **Visual critic.**
+     - **V1. Off-palette border - FIXED, colour PROVISIONAL.** The inline
+       `var(--red, #b42318)` named no token (the #121 D1/D2 mistake again),
+       reaching 2.78:1 in dark mode. Now `--bad` border with `--bad-soft`
+       fill - provisional, see (i).
+     - **V2. File names - FIXED.** The box's `code` joins the shared notice
+       chip rule (IBM Plex Mono, `--surface` chip, .92em); the reason
+       follows a colon; the name carries `overflow-wrap:anywhere`.
+     - **V3. Loading state - FIXED.** The words and a thin indeterminate bar
+       appear only after 200ms (a CSS animation delay, still announced at
+       once through `role="status"`); the loading block holds 50vh so the
+       footer does not jump; reduced motion gets a still bar.
+     - **V4. Box styling - FIXED.** In the stylesheet as `.data-file-error`:
+       `--radius-sm`, a 72ch cap like `.stale-link-notice`, the notices'
+       padding and size. Js "is styled by the stylesheet in the page's own
+       tokens" (failed first).
+     - **V5.** The "its" agreement, above.
+
+     **For Keith** - each with a recommendation; nothing here is decided:
+     - **(a) REQ-DASH-291 criterion 16 and `waitedSeconds`.** Recommend the
+       page measures how long it has waited for a file against BUILT_AT, so
+       the figure is about the build rather than the clock of whoever opened
+       it.
+     - **(b) Cross-site script inclusion.** A data file is a script any other
+       site could include. Recommend a Pages `_headers` with
+       `Cross-Origin-Resource-Policy: same-origin` and `X-Content-Type-Options:
+       nosniff` on `/data/*` and `/snapshots/*`, before REQ-PIPE-255 goes
+       live.
+     - **(c) A snapshot's fonts and player on the site, and 292 criterion
+       9's "no console error".** Today the snapshot tests filter out failed
+       font and player loads. Recommend placing fonts/ and vendor/ under
+       `_site/snapshots/` too, and keeping criterion 9 as written.
+     - **(d) Commit SHAs in GITHUB_LINKS defeat REQ-PIPE-255's
+       "unchanged".** Recommend blanking them in the fingerprint's
+       normalisation.
+     - **(e) The build id is per payload, not per page** (PROVISIONAL in
+       `data_files.py`'s docstring). Recommend amending 291's wording to say
+       so.
+     - **(f) The error's advice.** Recommend "Reload the page" first, then
+       the rebuild, and on the site "tell the data team" rather than "the
+       publish is incomplete".
+     - **(g) One bad collection file blocks the whole page**, including the
+       Plans and Demo tabs, which need no collection data (the visual
+       critic's question, the same one). Keep criterion 8 as it is, or show
+       the healthy collections and the tabs that need none?
+     - **(h) The Demo button in a snapshot.** Hide it, or keep it with the
+       honest message it now has?
+     - **(i) The error box's colour (V1).** `--bad` is provisional: red means
+       failing data everywhere else on this dashboard, and a page that cannot
+       show any data is not failing data. A neutral `--ink-muted` border is
+       the alternative.
+
+     <!-- The visual critic's findings above are as the coordinator relayed
+     them; the main session adds anything further here. -->

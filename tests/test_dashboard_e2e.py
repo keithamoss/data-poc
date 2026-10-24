@@ -6044,6 +6044,31 @@ class TestTheDataFilesLoadFromDisk:
         assert entry["name"] in error.inner_text()
         assert page.locator("#plans-list").count() == 0
 
+    def test_a_missing_requirements_and_plans_file_is_named_in_the_requirements_panel(
+            self, page, built_dashboard_html, tmp_path):
+        """post-build-review #268 T4: the script element's onerror path, which
+        only a real browser takes - jsdom loads no <script src> at all."""
+        copy = _copy_of_the_built_page(built_dashboard_html, tmp_path / "site")
+        entry = _data_file(copy, "requirements-plans")
+        (copy.parent / "data" / entry["name"]).unlink()
+        page.goto(f"file://{copy}?panel=requirements")
+        _wait_rendered(page)
+        error = page.wait_for_selector('#requirements-panel-body [data-testid="data-file-error"]')
+        text = error.inner_text()
+        assert entry["name"] in text and "missing" in text, text
+        assert "No requirements yet" not in page.locator("#requirements-panel-body").inner_text()
+
+    def test_the_plans_heading_keeps_focus_once_its_file_has_loaded(self, clean_page, built_dashboard_html):
+        """post-build-review #268: navigating to Plans focuses its heading, and
+        the render that follows the on-demand load replaced that heading and
+        dropped focus to the body, so the next Tab started from the top."""
+        _goto(clean_page, built_dashboard_html)
+        clean_page.locator("#plans-btn").click()
+        clean_page.wait_for_selector("#plans-list .plans-entry")
+        focused = clean_page.evaluate(
+            "() => [document.activeElement.tagName, document.activeElement.textContent.trim()]")
+        assert focused == ["H2", "Plans"], focused
+
     def test_the_agencies_tier_renders_within_its_budget_of_the_data_being_assembled(
             self, clean_page, built_dashboard_html):
         """REQ-DASH-226 criterion 13's 400ms, measured from the moment the
@@ -6060,6 +6085,37 @@ class TestTheDataFilesLoadFromDisk:
             }"""))
         print(f"\nREQ-DASH-291 criterion 18: {timings}")
         assert all(t["rendered"] < 400 for t in timings), timings
+
+    def test_the_first_view_answers_within_its_budget_of_navigation(
+            self, clean_page, built_dashboard_html):
+        """From NAVIGATION to the agencies tier on screen and the page
+        answering, three loads, under 3 seconds; and the agency trends drawn
+        under 6 (post-build-review #268 L1).
+
+        The budget above ends at the first render and could not see the 8 to
+        10 seconds that followed it. The trends were filled by a task queued
+        straight after that render, which could run before the browser painted
+        - so the reader saw nothing until every trend was drawn - and every
+        trend re-read every check's `recorded_at` on the asset clock for every
+        week back to 2023. The view's time is read BY THE PAGE, polled, so a
+        main thread still busy cannot answer early. Generous on purpose: a
+        fixed page answers in about half a second here and draws its trends in
+        about three, and a guard that flakes is one somebody deletes."""
+        url = f"file://{built_dashboard_html.resolve()}"
+        timings = []
+        for _ in range(3):
+            clean_page.goto("about:blank")
+            clean_page.goto(url, wait_until="commit")
+            view = clean_page.wait_for_function(
+                "() => document.querySelector('#agency-grid .card') && performance.now()",
+                polling=50, timeout=60000).json_value()
+            clean_page.wait_for_selector("#agency-grid[data-trends-drawn]", state="attached",
+                                         timeout=60000)
+            trends = clean_page.evaluate("() => performance.now()")
+            timings.append({"view": round(view), "trends": round(trends)})
+        print(f"\npost-build-review #268 L1, ms from navigation: {timings}")
+        assert all(t["view"] < 3000 for t in timings), timings
+        assert all(t["trends"] < 6000 for t in timings), timings
 
 
 # --- REQ-DASH-293: a payload past the budget, in parts -------------------
