@@ -12290,3 +12290,16 @@ twice. It deliberately did not re-find the `TypeError`.
      off-month check already allowed. Shaped deliveries that do not carry the
      table are exempt (`scenario_injection.carries`); every routine delivery
      is still checked. The full gate run is the failing-first evidence.
+
+278. **[done, 2026-10-25]** **[Dashboard UI]** **Seven colour and font names the
+     page used were not tokens the theme defines** (road-testing #20, the
+     second sighting after #121's `--red`). A `var(--name)` the theme does not
+     define falls back to its hard-coded default in both themes, or to nothing,
+     silently. Found by a new guard, `tests-js/theme-tokens.test.js`, written
+     first and seen to fail listing `--amber`, `--font-mono`, `--panel-2`,
+     `--red` (in a comment only), `--surface-2`, `--warn-bg`, `--warn-border`.
+     The two that meant amber - the "awaiting a correction" border (#20) and the
+     Plans tab's "Worth re-testing" box - now use `--warn`, so they follow dark
+     mode. The other five keep exactly what they rendered (their fallbacks,
+     written directly), so nothing else on the page moves. Minor under the
+     standing rule (styling; a guard added).

@@ -1733,15 +1733,14 @@ Still to settle by driving the page: #8 and #17 - both since closed
 
     **DECIDED (Keith, 2026-10-25)**: keep the whole history and MARK supplies that arrived after the date on show as "arrived after this date", rather than clipping or leaving them. Goes to delivery-scoper as a small requirement.
 
-20. **[todo, 2026-10-20]** **[Dashboard UI]** **The "awaiting a correction"
-    line's border ignores the theme.** Seen by delivery-dashboard-ux while
-    reviewing #95 v2: `awaitingCorrectionLine` styles its border
-    `var(--amber, #b7791f)`, and `--amber` is not a token, so the hard-coded
-    fallback always applies in both themes. The same slip as the `var(--red)`
-    recorded in post-build-review #121. A sighting; not checked in a browser yet.
+20. **[done, 2026-10-25]** **[Dashboard UI]** **The "awaiting a correction"
+    line's border ignores the theme.**
 
 - **We noticed:** The "awaiting a correction" line's border colour is the same in light and dark themes.
 - **What we heard:** Every colour on the page should come from the theme's own tokens.
+- **What we built:** The border now uses the theme's amber, and a test fails the page if any colour or font it names is not one the theme defines - six others were found and fixed with it.
+- **Evidence:** [Client Register](#/agency/child-protection-family-support/collection/child-protection/dataset/cp-clients)
+- **Card status:** fixed
 
 ## Landed entries, kept as feedback cards (REQ-DOCS-219)
 

@@ -323,8 +323,8 @@ button{font:inherit; color:inherit;}
 .queue-head{display:flex; align-items:baseline; gap:7px; flex-wrap:wrap;}
 .queue-detail, .queue-responses{color:var(--ink-muted); font-size:12.5px; margin-top:3px;}
 .queue-responses b{font-weight:600; color:var(--ink);}
-.queue-responses code.queue-command{display:inline-block; font-family:var(--font-mono, ui-monospace, monospace);
-  font-size:12px; color:var(--ink); background:var(--surface-2, transparent); padding:2px 4px;
+.queue-responses code.queue-command{display:inline-block; font-family:ui-monospace, monospace;
+  font-size:12px; color:var(--ink); background:transparent; padding:2px 4px;
   border-radius:4px; overflow-wrap:anywhere; margin:2px 0;}
 /* Running LOW, not run out - a different state from .notice-exhausted
    and deliberately quieter than it, since nothing has failed and
@@ -376,9 +376,9 @@ button{font:inherit; color:inherit;}
    notice appeared, so a second thing wearing that class breaks an
    assertion about the first. Sharing the rule shares the look without
    making the class an identifier. */
-.stale-link-notice, .in-place-on-range-notice{border:1px solid var(--warn-border, var(--ink-faint)); border-radius:8px;
+.stale-link-notice, .in-place-on-range-notice{border:1px solid var(--ink-faint); border-radius:8px;
   padding:10px 12px; margin-bottom:14px; font-size:13.5px; color:var(--ink);
-  background:var(--warn-bg, transparent); max-width:72ch;}
+  background:transparent; max-width:72ch;}
 .stale-link-notice code, .in-place-on-range-notice code{font-size:12.5px;}
 /* A DATA FILE THAT DID NOT LOAD (REQ-DASH-291 criteria 8 and 9; post-build-
    review #268 V1, V2, V4). A notice like the two above, in the page's own
@@ -7454,7 +7454,7 @@ function awaitingCorrectionLine(datasetId){
   const c = (raw && raw.corrections) || {};
   // NEVER A SILENT ALL-CLEAR (delivery-critic on 172, #6).
   if(c.awaitingUnknown){
-    return `<div class="notice-exhausted" role="status" data-awaiting-correction-unknown style="border-color:var(--amber, #b7791f);">
+    return `<div class="notice-exhausted" role="status" data-awaiting-correction-unknown style="border-color:var(--warn);">
       Whether a calendar correction is awaiting confirmation for this dataset could not be worked out
       when this page was built. <code>mothman supply corrections</code> says.</div>`;
   }
@@ -7462,7 +7462,7 @@ function awaitingCorrectionLine(datasetId){
   if(!list.length) return "";
   const refs = list.map(a => `<b style="display:inline">${escHtml(a.reference)}</b>`).join(", ");
   const one = list.length === 1;
-  return `<div class="notice-exhausted" role="status" data-awaiting-correction style="border-color:var(--amber, #b7791f);">
+  return `<div class="notice-exhausted" role="status" data-awaiting-correction style="border-color:var(--warn);">
     ${one ? "A calendar correction" : "Calendar corrections"} to this dataset's delivery agreement - ${refs} -
     ${one ? "is" : "are"} awaiting the data asset's manager to confirm ${one ? "it" : "them"}. Until then its
     supplies keep the period and verdict shown here. <code>mothman supply corrections</code> lists
@@ -7576,7 +7576,7 @@ function redPromotedBadge(datasetId, runId, inPlaceOnDateStr){
       : `turned red ${fmtInstant(since.at)} after ${escHtml(since.cause)}`;
     // A SHORT PILL WITH ITS SENTENCE BENEATH (#121 D1/D2, Keith 2026-10-06):
     // the whole sentence in one nowrap pill was 598px wide and coloured with
-    // var(--red), which is not a token, so it had no red in it at all.
+    // a `--red` colour, which is not a token, so it had no red in it at all.
     return `<span class="red-promoted" data-red-promoted><span class="pill red sm"><span class="ico"></span>Red promoted</span><span class="rp-why" data-red-promoted-why>${sentenceCase(`${wentRed || before ? "" : went}${how}`)}</span></span>`;
   }
   if(later){
@@ -9103,7 +9103,7 @@ function openCheckPanel(ag, col, ds, column, check, opts){
       <div style="margin-top:10px;">
         <div style="font-size:11px; color:var(--ink-faint); margin-bottom:5px;">Example failing rows (primary key only)${currentPoint.row_count_invalid > sampleKeys.length ? ` — ${sampleKeys.length} of ${fmtInt(currentPoint.row_count_invalid)}` : ""}:</div>
         <div style="display:flex; flex-wrap:wrap; gap:5px;">
-          ${sampleKeys.map(k => `<span style="font:11px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; background:var(--panel-2, rgba(127,127,127,.12)); border-radius:4px; padding:2px 6px;">${k}</span>`).join("")}
+          ${sampleKeys.map(k => `<span style="font:11px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; background:rgba(127,127,127,.12); border-radius:4px; padding:2px 6px;">${k}</span>`).join("")}
         </div>
         ${(fp => fp ? `<div class="sample-fine-print" style="font-size:11px; color:var(--ink-muted); margin-top:5px;">${fp}</div>` : "")(sampleFinePrint(check.tool_ref, sampleKeys.length, currentPoint.row_count_invalid))}
       </div>` : (currentPoint.row_count_invalid ? `
@@ -9132,7 +9132,7 @@ function openCheckPanel(ag, col, ds, column, check, opts){
     return `
       <div style="margin-top:14px; padding-top:12px; border-top:1px solid var(--line);">
         <div style="font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--ink-faint); font-weight:700;">Failing rows vs. the compared run</div>
-        ${keyGroup("Still failing in both runs", stillFailing, "var(--panel-2, rgba(127,127,127,.12))")}
+        ${keyGroup("Still failing in both runs", stillFailing, "rgba(127,127,127,.12)")}
         ${keyGroup("New since the compared run", newSinceCompare, "var(--bad-soft)")}
         ${keyGroup("No longer sampled as failing", noLongerSampled, "var(--good-soft)")}
         <div style="font-size:11px; color:var(--ink-faint); margin-top:8px;">Based on each run's own sampled failing-row keys only (see above) - not an exhaustive diff of every failing row in either run.</div>
@@ -10554,7 +10554,7 @@ function renderSprintDependencies(){
   // A blocker that has since shipped is a prompt to re-test, never a
   // claim that the criterion is met - see REQ-DOCS-073's own decision.
   const stale = (data.stale||[]).length
-    ? `<div style="margin-top:10px; padding:8px 10px; border:1px dashed var(--amber); border-radius:6px; font-size:12px;">
+    ? `<div style="margin-top:10px; padding:8px 10px; border:1px dashed var(--warn); border-radius:6px; font-size:12px;">
         <b>Worth re-testing</b> — every blocker below has since been delivered, which means
         the criterion <em>can</em> now be met, not that it has been.
         <ul style="margin:4px 0 0; padding-left:18px; line-height:1.5;">${data.stale.map(s=>`<li>${escHtml(s)}</li>`).join("")}</ul>
