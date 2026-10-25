@@ -12266,3 +12266,23 @@ twice. It deliberately did not re-find the `TypeError`.
      its COLLECTION (any file), or floor a joined member's promotion at its
      own latest decision. Not built - it changes every staggered pair's
      instants in the replayed history.
+
+277. **[done, 2026-10-25]** **[Testing & dev tooling]** **Two generator tests
+     read REQ-GEN-273's new scenario deliveries as invariant breaks.** Found by
+     the full `mothman check` on 651f9ec (2 failed of 6,341, both in
+     `tests/test_generate_cp_runs.py`, which the module runs for TS-81 to
+     TS-85 did not include). Minor under the standing rule: tests only, the
+     generated history unchanged, so no re-bootstrap. (1)
+     `test_a_resupply_only_ever_follows_a_red_delivery` exempted a scripted
+     chain only where its FIRST arrival carried a file shape or a pair; S1's
+     chains (TS-81, TS-82) start with a clean, unshaped delivery and follow it
+     with the scenario's zip, which no drawn severity chose. The exemption is
+     now any injected chain of several arrivals - each named in its injection
+     - and the test asserts it still checked at least one ordinary chain. (2)
+     `test_a_grown_delivery_leaves_case_workers_out_of_its_off_months` held
+     every delivery of an owed grown quarter to carrying Case Workers; TS-85's
+     corrected Placements (2016-Q1) and TS-82's and TS-83's zips (2017-Q3,
+     2016-Q3) leave it out by their shape, as the original quarters'
+     off-month check already allowed. Shaped deliveries that do not carry the
+     table are exempt (`scenario_injection.carries`); every routine delivery
+     is still checked. The full gate run is the failing-first evidence.

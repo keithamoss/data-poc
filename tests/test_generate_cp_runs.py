@@ -212,6 +212,7 @@ def test_a_resupply_only_ever_follows_a_red_delivery(manifest):
         by_slot.setdefault(e["slot_id"], []).append(e)
 
     _, injected = cp_provider._plan_injections(cp_provider.generated_periods())
+    ordinary_chains: list[str] = []
     for slot_id, deliveries in by_slot.items():
         deliveries = sorted(deliveries, key=lambda e: e["run_index"])
         # A SCENARIO WHOSE FIRST DELIVERY KEEPS ITS QUARTER'S DRAWN AMBER is
@@ -226,17 +227,24 @@ def test_a_resupply_only_ever_follows_a_red_delivery(manifest):
         # severity chose, which is all this test is about.
         # Nor TS-42's, whose clean Client Register follows its contested pair
         # (REQ-GEN-203): every arrival of a scenario with several is scripted.
+        # Nor REQ-GEN-273's S1 (TS-81, TS-82), whose clean first delivery is
+        # followed two weeks later by the zip the scenario is about - so the
+        # exemption is ANY injected chain of several arrivals, each named in
+        # the injection, never a drawn severity's resupply. Every ordinary
+        # slot is still held to the rule, and at least one is (below).
         if deliveries[0]["period"] in injected:
             first = injected[deliveries[0]["period"]][0]
-            if len(first.arrivals) > 1 and (first.arrivals[0].file_shape
-                                            or first.arrivals[0].files):
+            if len(first.arrivals) > 1:
                 continue
         if len(deliveries) > 1:
+            ordinary_chains.append(slot_id)
             assert deliveries[0]["dirty_severity"] == "red", \
                 f"{slot_id} has more than one delivery but the first wasn't red"
         for delivery in deliveries[:-1]:
             assert delivery["dirty_severity"] == "red", \
                 f"{slot_id}: {delivery['run_id']} isn't red but the chain continued"
+    # ABLE TO FAIL: the drawn reds' resupply chains are still checked.
+    assert ordinary_chains, "no ordinary resupply chain was checked"
 
 
 def test_every_resupply_arrives_on_a_weekday(manifest):
@@ -609,6 +617,15 @@ def test_a_grown_delivery_leaves_case_workers_out_of_its_off_months(manifest, ra
     on_grown = [e for e in manifest if e["period"] in grown and e["period"] in owed]
     off_original = [e for e in manifest if e["period"] in original - owed
                     and _shape_of(e, manifest) is None]
+    # A SCENARIO'S DELIVERY THAT LEAVES CASE WORKERS OUT BY ITS SHAPE (a
+    # corrected table resent alone - REQ-GEN-273's TS-85 Placements in
+    # 2016-Q1, TS-83's Client Register and readers in 2016-Q3) is not the
+    # quarter's routine delivery, so it owes no Case Workers file; every
+    # other delivery of an owed grown quarter still does.
+    from generator import scenario_injection as si
+
+    on_grown = [e for e in on_grown
+                if si.carries(_shape_of(e, manifest), "cp_case_workers")]
     assert off_grown and on_grown and off_original
     for e in off_grown:
         assert not (_delivery_dir(raw_dir, e) / "cp_case_workers.csv").exists(), e["delivery"]
