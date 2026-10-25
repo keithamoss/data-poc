@@ -33785,7 +33785,7 @@ requirements:
     - Each early delivery replaces its quarter's ordinary chain, so the number of deliveries a quarter receives is unchanged.
     dependencies: [REQ-GEN-040, REQ-GEN-044, REQ-PIPE-131, REQ-PIPE-062]
     linked_tests:
-    - tests/test_scenario_injection.py::TestTheEarlyChildProtectionSupplies
+    - tests/test_scenario_injection.py::TestTheEarlyEmergencyDepartmentSupplies
     implemented_by:
     - generator/scenario_injection.py::INJECTIONS
     - contract/scripted_decisions.yaml
