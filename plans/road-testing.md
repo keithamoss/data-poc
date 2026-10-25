@@ -148,8 +148,10 @@ Still to settle by driving the page: #8 and #17 - both since closed
    daily supply really stands in for a separate data asset, kept in this
    one for now, and goes into the CURRENT period - so in the synthetic
    history only Child Protection goes into the next period. A synthetic
-   linkage dataset is wanted, at DATASET level (not per collection), and is
-   SCOPED SEPARATELY. A change of a collection's offset is refused until a
+   linkage dataset is wanted, at DATA ASSET level (Keith corrected
+   "dataset level" the same evening), its cross-table checks internal to
+   the period, in a linkage-products collection of its own within
+   Department of Health, and is SCOPED SEPARATELY. A change of a collection's offset is refused until a
    period is declared not owed. The page names the period, e.g. "For
    2026-Q2 - received 1 Feb".
 
@@ -626,6 +628,19 @@ Still to settle by driving the page: #8 and #17 - both since closed
 - **What we built:** The border now uses the theme's amber, and a test fails the page if any colour or font it names is not one the theme defines - six others were found and fixed with it.
 - **Evidence:** [Client Register](#/agency/child-protection-family-support/collection/child-protection/dataset/cp-clients)
 - **Card status:** fixed
+
+31. **[todo, 2026-10-25]** **[QA checks & contract]** **How is an address
+    that "could not be geocoded" represented, and handled?** A follow-up
+    question Keith asked to be reminded of, 2026-10-25, while scoping the
+    geocoding datasets (road-testing #12). Geocoding has one row per
+    source row per declared census year, and a missing year is red on any.
+    Still open: whether an address that could not be geocoded is a row
+    with an empty or flagged result, or no row at all (which the missing
+    check would then call red), and how a check and the page should treat
+    it. Ask Keith before the geocoding requirements are signed off.
+
+- **We noticed:** The geocoding checks treat a missing census-year row as red, but nothing yet says how an address that could not be geocoded arrives.
+- **What we heard:** Ask how "could not be geocoded" is represented and handled before the geocoding checks are settled.
 
 ## Landed entries, kept as feedback cards (REQ-DOCS-219)
 
