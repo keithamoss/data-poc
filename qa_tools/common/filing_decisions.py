@@ -334,10 +334,14 @@ def consequences(conn, request: Request) -> Consequences:
             decision_log.refuse_if_stood_on(conn, ds, h.holder, decision_log.SUPERSEDE)
             # THE UNDO, HONESTLY (Keith, 2026-10-05): un-supersede returns
             # it to waiting only; putting it back takes a promotion too.
+            # IN PLAIN WORDS (CLI UX review P5): the dataset and when each
+            # supply arrived - ids only in the commands.
+            name = hierarchy.dataset(ds).dataset_name
             lines.append(
-                f"{h.holder}, the supply {period} holds now, moves to superseded. "
-                f"{period} reads {supply} from this decision on. To put {h.holder} back, "
-                f"un-supersede it (it returns to waiting), then promote it again:\n"
+                f"The {name} supply {period} holds now (received "
+                f"{_received_words(conn, ds, h.holder)}) moves to superseded, and {period} "
+                f"reads this one from this decision on. To put it back, un-supersede it "
+                f"(it returns to waiting), then promote it again:\n"
                 f"  mothman supply decide --operation un-supersede --dataset {ds} "
                 f"--period {period} --supply {h.holder} --reason '<why>' --yes\n"
                 f"  mothman supply decide --operation promote --dataset {ds} "
@@ -399,8 +403,12 @@ def consequences(conn, request: Request) -> Consequences:
     # promotion is compared against under the locks (REQ-PIPE-266 criterion
     # 17): a moved read supply changes the key and raises the existing
     # consequences-changed refusal.
-    lines += _held_back_consequences(conn, request)
-    readers = _readers_rechecked(conn, request)
+    held_back = _held_back_consequences(conn, request)
+    lines += held_back
+    # EACH CONSEQUENCE ONCE (CLI UX review P5): a waiting reader criterion 9
+    # already names is not listed again among the readers re-checked.
+    named = {(ds, sup) for ds, sup in _changed_waiting(conn, request)}
+    readers = _readers_rechecked(conn, request, besides=named)
     if readers:
         lines += readers
         count = readers[0].count("\n")
@@ -494,7 +502,7 @@ def _held_back_consequences(conn, request: Request) -> list[str]:
                 out.append(f"{_check_name(r)} counted for this supply read the {t_ds} "
                            f"received {_received_words(conn, t_ds, other)}, which is not in "
                            f"the warehouse ({holds}). The check is re-run against the "
-                           f"warehouse once that {t_ds} is promoted (REQ-PIPE-121).")
+                           f"warehouse once that {t_ds} is promoted.")
     # 8: in-warehouse readers whose check against this supply already failed.
     for reader in knock_on.readers(conn, period, [table], reads):
         if reader.dataset_id == ds:
@@ -537,6 +545,15 @@ def _left_behind(conn, request: Request) -> list[str]:
     if package is None:
         return []
     return [ds for ds, sup in package.supplies if sup != request.supply]
+
+
+def _changed_waiting(conn, request: Request) -> list:
+    """The waiting supplies criterion 9's line names for a promotion."""
+    if request.operation != PROMOTE or not (request.period and request.supply):
+        return []
+    return (_held_back_by_this(conn, request.dataset_id, request.supply, request.period)
+            + _passing_against_this(conn, request.dataset_id, request.supply,
+                                    request.period))
 
 
 def _check_name(record: dict) -> str:
@@ -603,7 +620,7 @@ def _failed_for_pair(conn, reader, table: str, supply: str):
     return None
 
 
-def _readers_rechecked(conn, request: Request) -> list[str]:
+def _readers_rechecked(conn, request: Request, besides=frozenset()) -> list[str]:
     """REQ-PIPE-128 criterion 8: the OTHER supplies whose checks read the
     table this decision moves, which the re-evaluation it owes
     (REQ-PIPE-121) will re-check - said only where the decision really
@@ -648,14 +665,14 @@ def _readers_rechecked(conn, request: Request) -> list[str]:
         return []
     table = hierarchy.dataset(ds).table
     found = [r for r in knock_on.readers(conn, period, [table], promotion._declared_reads())
-             if r.dataset_id != ds]
+             if r.dataset_id != ds and (r.dataset_id, r.supply) not in besides]
     if not found:
         return []
     # IN PLAIN TERMS (REQ-GHUB-142 NFR 2, as the re-file warning): datasets
     # by name, supplies by the day they arrived - ids are for commands only.
     # ONE ENTRY, its readers indented inside it, so a route that bullets
     # each entry shows one bullet with its list rather than a bullet each.
-    from qa_tools.common import asset_time, filing
+    from qa_tools.common import filing
 
     against = None
     if op == CARRY_FORWARD:
@@ -664,8 +681,11 @@ def _readers_rechecked(conn, request: Request) -> list[str]:
 
     def described(r) -> str:
         received = filing.received_at_of(r.dataset_id, r.supply)
-        day = (asset_time.local_date(received.isoformat()).strftime("%-d %B %Y")
-               if received else "an unknown date")
+        # ONE DATE STYLE IN ONE WARNING (CLI UX review P5): the instant, as
+        # every other line here says it.
+        from qa_tools.common import display_time
+
+        day = display_time.format_instant(received) if received else "an unknown date"
         state = "waiting" if r.waiting else "accepted"
         line = f"    {hierarchy.dataset(r.dataset_id).dataset_name}, received {day} ({state})"
         if against and _failed_against(conn, r, table, against):
@@ -954,10 +974,18 @@ def _settlement_consequences(conn, request: Request
         if readers:
             shown = ", ".join(readers[:8]) + (f" and {len(readers) - 8} more"
                                               if len(readers) > 8 else "")
-            notes.append(f"Then re-checks the cross-table checks of {len(readers)} "
-                         f"dataset{'s' if len(readers) != 1 else ''} that read "
-                         f"{request.dataset_id} in {p.period}, while you wait - not their "
-                         f"own tables:\n    {shown}")
+            # NO DANGLING 'Then', AND THE LIKELY RED SAID BEFORE THE PERSON
+            # CONFIRMS (CLI UX review P7) - where the period will hold no file
+            # of the table at all.
+            note = (f"After settling, the cross-table checks of {len(readers)} "
+                    f"dataset{'s' if len(readers) != 1 else ''} that read "
+                    f"{request.dataset_id} in {p.period} are re-checked while you wait - "
+                    f"not their own tables:\n    {shown}")
+            if decision_log.promoted_into(conn, request.dataset_id, p.period) is None:
+                note += (f"\n  With no {request.dataset_id} file left in {p.period}, they will "
+                         f"very likely turn red: those checks cannot run until one is "
+                         f"promoted.")
+            notes.append(note)
     return lines, done, notes
 
 

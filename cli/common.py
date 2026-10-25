@@ -75,7 +75,7 @@ class NotInteractive(click.ClickException):
     def __init__(self, flag_hint: str) -> None:
         super().__init__(
             f"This needs a real interactive terminal, and stdin/stdout here isn't one. "
-            f"Use the flag-based form instead: {flag_hint}"
+            f"Give it on the command line instead: {flag_hint}"
         )
 
 

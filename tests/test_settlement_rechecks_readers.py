@@ -247,10 +247,16 @@ class TestTheTerminal:
                              file_outcomes=tuple(_reject_both()))
         with supply_db.connect(read_only=True, label="pytest") as conn:
             shown = fd.consequences(conn, request)
-        (note,) = [n for n in shown.notes if n.startswith("Then re-checks")]
-        assert note == ("Then re-checks the cross-table checks of 3 datasets that read "
-                        "cp-clients in 2024-Q4, while you wait - not their own tables:\n"
-                        "    cp-investigations, cp-notifications, cp-placements"), note
+        (note,) = [n for n in shown.notes if "datasets that read cp-clients" in n]
+        # P7 (CLI UX critic): no dangling 'Then', and the likely red said
+        # BEFORE the person confirms.
+        assert note == ("After settling, the cross-table checks of 3 datasets that read "
+                        "cp-clients in 2024-Q4 are re-checked while you wait - not their own "
+                        "tables:\n"
+                        "    cp-investigations, cp-notifications, cp-placements\n"
+                        "  With no cp-clients file left in 2024-Q4, they will very likely "
+                        "turn red: those checks cannot run until one is promoted."), note
+        assert not any(n.startswith("Then") for n in shown.notes), shown.notes
         assert not any("re-checks the cross-table" in line for line in shown.lines)
 
     def test_reject_both_in_the_settle_flow_rechecks_before_the_outcome_panel(
