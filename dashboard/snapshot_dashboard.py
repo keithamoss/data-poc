@@ -237,7 +237,8 @@ def snapshot_fingerprint(gz_path: Path, fonts_dir: Path = FONTS_DIR,
     return data_files.fingerprint(html, gz_path.parent, [fonts_dir, vendor_dir])
 
 
-def sync_local_snapshots(snapshots_dir: Path = SNAPSHOTS_DIR) -> list[Path]:
+def sync_local_snapshots(snapshots_dir: Path = SNAPSHOTS_DIR, fonts_dir: Path = FONTS_DIR,
+                         vendor_dir: Path = VENDOR_DIR) -> list[Path]:
     """Decompresses every `*.html.gz` in `snapshots_dir` that doesn't
     already have a local `.html` sibling, so the live dashboard's "past
     snapshots" picker (each row links to `snapshots/<name>.html`) resolves
@@ -254,6 +255,12 @@ def sync_local_snapshots(snapshots_dir: Path = SNAPSHOTS_DIR) -> list[Path]:
     taken)."""
     if not snapshots_dir.exists():
         return []
+    # THE FONTS AND PLAYER BESIDE THEM, as on the published site (Keith,
+    # 2026-10-25, post-build-review #268 (c)): a local snapshot asks for
+    # fonts/ and vendor/ relative to itself too. Gitignored copies.
+    for static_dir, dest_name in ((fonts_dir, "fonts"), (vendor_dir, "vendor")):
+        if static_dir.exists():
+            shutil.copytree(static_dir, snapshots_dir / dest_name, dirs_exist_ok=True)
     written = []
     for gz_path in sorted(snapshots_dir.glob("*.html.gz")):
         html_path = gz_path.with_suffix("")  # strips only the trailing .gz

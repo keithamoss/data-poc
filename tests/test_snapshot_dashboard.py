@@ -223,6 +223,33 @@ def test_sync_local_snapshots_decompresses_gz_files_missing_a_local_copy(tmp_pat
     assert expected_html.read_bytes() == b"<html>archived content</html>"
 
 
+def test_a_local_snapshot_gets_the_fonts_and_player_beside_it(tmp_path):
+    """Keith, 2026-10-25 (#268 (c)): a snapshot opened from
+    dashboard/snapshots/ asks for fonts/ and vendor/ relative to itself, as
+    the published copy does, so the local sync places them there too."""
+    snapshots_dir = tmp_path / "snapshots"
+    snapshots_dir.mkdir()
+    with gzip.open(snapshots_dir / "20260916T000000Z_abc1234.html.gz", "wb") as f:
+        f.write(b"<html>archived content</html>")
+    fonts, vendor = tmp_path / "fonts", tmp_path / "vendor"
+    fonts.mkdir(); vendor.mkdir()
+    (fonts / "a.woff2").write_bytes(b"font")
+    (vendor / "asciinema-player.min.js").write_bytes(b"player")
+
+    snapshot_dashboard.sync_local_snapshots(snapshots_dir, fonts_dir=fonts, vendor_dir=vendor)
+
+    assert (snapshots_dir / "fonts" / "a.woff2").read_bytes() == b"font"
+    assert (snapshots_dir / "vendor" / "asciinema-player.min.js").read_bytes() == b"player"
+
+
+def test_the_local_fonts_and_player_copies_are_never_committed():
+    import subprocess
+
+    for path in ("dashboard/snapshots/fonts/a.woff2", "dashboard/snapshots/vendor/x.js"):
+        assert subprocess.run(["git", "check-ignore", "-q", path],
+                              cwd=snapshot_dashboard.SNAPSHOTS_DIR.parent.parent).returncode == 0, path
+
+
 def test_sync_local_snapshots_skips_gz_files_that_already_have_a_local_copy(tmp_path):
     snapshots_dir = tmp_path / "snapshots"
     snapshots_dir.mkdir()
