@@ -864,9 +864,9 @@ def queue_command(collection_id: str) -> None:
             if not groups.rows:
                 console.print(f"Nothing is waiting on a person in "
                               f"{filing_tui._collection_name(collection_id)}.", style="green")
-                filing_tui.say_gating(groups)
-            else:
-                filing_tui.say_queue(conn, groups, collection_id)
+            # WHATEVER IS COUNTED (post-build critic D3): beneath a held root
+            # and the gating line too.
+            filing_tui.say_queue(conn, groups, collection_id)
             _say_owed(owed_now, conn)
     except filing_queue.LogUnreachable as exc:
         filing_tui.say_unreachable(exc)

@@ -109,7 +109,7 @@ class TestListedBeneathItsCause:
         assert not rows & set(beneath)
         out, offered = _queue(monkeypatch, capsys)
         flat = _flat(out)
-        assert (f"{groups.count} supply/supplies waiting on a decision in Child Protection "
+        assert (f"{groups.count} supply waiting on a decision in Child Protection "
                 f"(3 more held back with it, listed beneath)") in flat, out
         for dataset_id in ("cp-notifications", "cp-investigations", "cp-placements"):
             assert not any(dataset_id in c for c in offered), offered
@@ -132,7 +132,7 @@ class TestListedBeneathItsCause:
         sc.process()
         out, offered = _queue(monkeypatch, capsys)
         flat = _flat(out)
-        assert ("1 supply/supplies waiting on a decision in Child Protection (1 more held "
+        assert ("1 supply waiting on a decision in Child Protection (1 more held "
                 "back with it, listed beneath)") in flat, out
         assert "- cp-notifications nothing needs deciding on this supply" in flat
         command = (f"mothman supply decide --operation promote --dataset cp-notifications "

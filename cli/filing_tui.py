@@ -796,6 +796,7 @@ def outcome_panel(operation: str, supply: str | None, period: str | None,
     lines = [f"{who} is filed to {where}, checked {got.status or 'without a verdict'}."]
     if operation == filing_decisions.PLACE:
         lines.append(f"It had not been checked in {where} before.")
+    step = None
     if got.promoted:
         lines.append(f"The promotion gate promoted it into {where}.")
         why = _rule_promotion_words(who, got.period or period)
@@ -807,15 +808,11 @@ def outcome_panel(operation: str, supply: str | None, period: str | None,
                      f"gate did not promote it - {_gate_words(got.waits_because or 'it waits for a person')}."
                      + ("" if step else " Promote or reject it next, at Filing decisions > "
                         "Supplies waiting on a decision."))
-        if step:
-            # NEVER THROUGH _gate_words (REQ-PIPE-276 criterion 2): 'turned
-            # down' is a person's decision, not a gate's outcome.
-            style = ("green" if got.status in ("green", "amber") else
-                     "red" if got.status == "red" else "yellow")
-            return " ".join(lines) + "\n" + step, "Where it stands now", style
     style = ("green" if got.status in ("green", "amber") else
              "red" if got.status == "red" else "yellow")
-    return " ".join(lines), "Where it stands now", style
+    # THE NEXT STEP NEVER THROUGH _gate_words (REQ-PIPE-276 criterion 2):
+    # 'turned down' is a person's decision, not a gate's outcome.
+    return " ".join(lines) + (f"\n{step}" if step else ""), "Where it stands now", style
 
 
 def _rule_promotion_words(supply: str | None, period: str | None) -> str | None:
@@ -858,6 +855,15 @@ def next_step(supply: str | None, period: str | None) -> str | None:
             if head:
                 return (head + " Promote or reject it next, at Filing decisions > Supplies "
                         "waiting on a decision.")
+            if decision_log.promoted_into(conn, by_ds, period) == by_supply:
+                # ITS CAUSE IS IN THE WAREHOUSE NOW and the re-check it owes this
+                # supply has not run (REQ-PIPE-276 criterion 4): nothing to
+                # decide first - the processing pass re-checks and re-gates it.
+                got = filing.received_at_of(by_ds, by_supply, conn=conn)
+                when = display_time.format_instant(got) if got else by_supply
+                return (f"The {by_ds} it was held back by (received {when}) has been "
+                        f"promoted into {period}; its re-check against it is owed and runs "
+                        f"on the next processing pass:\nmothman pipeline process")
             wholly = root_cause.root_of(conn, dataset_id, supply, period) is not None
             got = filing.received_at_of(by_ds, by_supply, conn=conn)
             when = display_time.format_instant(got) if got else by_supply
@@ -1044,7 +1050,7 @@ SUPPLIER_HINT = ("Files sent separately are gated as each arrives; sent as one z
                  "gated together (supplier guidance, REQ-DOCS-274).")
 
 
-def say_queue(conn, groups, collection_id: str, *, with_header: bool = True) -> None:
+def say_queue(conn, groups, collection_id: str) -> None:
     """THE ONE RENDERER the Filing decisions queue and `mothman supply queue`
     share (REQ-PIPE-276 criteria 6 and 12; REQ-PIPE-210 criteria 1 to 3, 5,
     8 and 9): the counted rows in their table; beneath each root's item, the
@@ -1059,14 +1065,14 @@ def say_queue(conn, groups, collection_id: str, *, with_header: bool = True) -> 
     name = _collection_name(collection_id)
     plain = dict(markup=False, highlight=False)
     if groups.rows:
-        head = f"{groups.count} supply/supplies waiting on a decision in {name}"
+        head = (f"{groups.count} {'supply' if groups.count == 1 else 'supplies'} waiting "
+                f"on a decision in {name}")
         if groups.listed_beneath:
             came = ("joined" if any(b.traced.came == "joined"
                                      for v in groups.beneath.values() for b in v)
                     else "package-mate")
             head += " " + lifecycle_report.header_more(groups.listed_beneath, came)
-        if with_header:
-            console.print(head + "\n", **plain)
+        console.print(head + "\n", **plain)
         console.print(queue_table(groups.rows))
         console.print()
     by_key = {root_cause.row_key(r): r for r in groups.rows}
@@ -1083,11 +1089,11 @@ def say_queue(conn, groups, collection_id: str, *, with_header: bool = True) -> 
         if root is None:
             # A HELD ROOT (filing_queue.HeldRow) - its own group above.
             root_line = f"{members[0].traced.root.dataset_id}  held - no period yet"
-            root_name, period = members[0].traced.root.dataset_id, None
+            root_name = members[0].traced.root.dataset_id
         else:
             root_line = (f"{root.dataset_id}  {root.period}  received {arrived(root.supply)}"
                          f"  {_own_red_words(conn, root)}")
-            root_name, period = root.dataset_id, root.period
+            root_name = root.dataset_id
         rows = []
         for b in members:
             why = (b.reason or "").strip()
@@ -1111,7 +1117,6 @@ def say_queue(conn, groups, collection_id: str, *, with_header: bool = True) -> 
         if any(b.traced.came == "joined" for b in members):
             console.print(SUPPLIER_HINT, style="dim", **plain)
         console.print()
-        del period
     say_gating(groups)
 
 
@@ -1511,17 +1516,16 @@ def _queue_screen(conn, collection_id: str, *, gaps, held, carry, groups):
                       f"period chosen, or rejecting")
         console.print(held_table(held))
         console.print()
-    if not waiting and not held:
-        if not gaps:
-            console.print(f"Nothing is waiting on a person in "
-                           f"{_collection_name(collection_id)}.", style="green")
-        # A DELIVERY BEING GATED, BENEATH IT AND NEVER ASKED ABOUT (REQ-PIPE-276
-        # criterion 12): no 'Which one?' when it is all there is.
-        say_gating(groups)
-        if not quiet and not carry:
-            return None
-    if waiting:
-        say_queue(conn, groups, collection_id)
+    if not waiting and not held and not gaps:
+        console.print(f"Nothing is waiting on a person in "
+                       f"{_collection_name(collection_id)}.", style="green")
+    # WHATEVER IS COUNTED (post-build critic D3): the counted rows, the supplies
+    # beneath a root - a held one included - and a delivery being gated, as
+    # one quiet line beneath the rest and never asked about (REQ-PIPE-276
+    # criterion 12): no 'Which one?' when it is all there is.
+    say_queue(conn, groups, collection_id)
+    if not waiting and not held and not quiet and not carry:
+        return None
     if quiet:
         total = sum(len(g.rows) for g in quiet)
         console.print(f"[dim]Received while turned off ({total})[/dim]")

@@ -482,10 +482,15 @@ def _held_back_consequences(conn, request: Request) -> list[str]:
             other = read.get("supply_id")
             holder = knock_on._now_holds(conn, t, period)
             if other and other != holder:
+                # THE WAREHOUSE'S HOLDER NAMED TOO (REQ-PIPE-266 criterion 17):
+                # the key then changes when the holder moves, not only when the
+                # supply read does.
+                holds = (f"it holds the one received {_received_words(conn, t_ds, holder)}"
+                         if holder else f"it holds no {t_ds}")
                 out.append(f"{_check_name(r)} counted for this supply read the {t_ds} "
                            f"received {_received_words(conn, t_ds, other)}, which is not in "
-                           f"the warehouse. The check is re-run against the warehouse once "
-                           f"that {t_ds} is promoted (REQ-PIPE-121).")
+                           f"the warehouse ({holds}). The check is re-run against the "
+                           f"warehouse once that {t_ds} is promoted (REQ-PIPE-121).")
     # 8: in-warehouse readers whose check against this supply already failed.
     for reader in knock_on.readers(conn, period, [table], reads):
         if reader.dataset_id == ds:
@@ -510,7 +515,10 @@ def _held_back_consequences(conn, request: Request) -> list[str]:
         out.append(f"re-checks {w_ds}' waiting supply received "
                    f"{_received_words(conn, w_ds, w_supply)}; if it is green, the rule "
                    f"promotes it.")
-    return out
+    # ONCE PER LOGICAL CHECK (post-build critic D2): dbt, Soda and datacontract
+    # each record the same check, and _check_name names it without the tool -
+    # so the key is built from the lines as said, each once.
+    return list(dict.fromkeys(out))
 
 
 def _left_behind(conn, request: Request) -> list[str]:
@@ -1647,7 +1655,9 @@ def _apply_held(request: Request, reason: str, *, effective_at: str, conn) -> Ou
     # where the person confirmed exactly these; anything else is refused
     # with the warning as it stands.
     found = consequences(conn, request)
-    if found.lines and request.acknowledged != found.key:
+    # A STALE KEY IS REFUSED EVEN WHERE THE WARNING HAS SINCE GONE (REQ-PIPE-266
+    # criterion 17 (a)): what was confirmed is no longer what the decision does.
+    if (found.lines or request.acknowledged) and request.acknowledged != found.key:
         raise ConsequencesNotAcknowledged(
             found, given=request.acknowledged,
             terminal_only=request.operation in TERMINAL_ONLY)

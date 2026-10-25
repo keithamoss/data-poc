@@ -690,7 +690,7 @@ class TestTheWarningIsShownForBothCases:
         out = capsys.readouterr().out
         (w,) = carry_forward.standing(conn, dataset_id=CASE_WORKERS, period=world.q4)
         assert carry_forward.command(w) in out.splitlines()
-        counted = re.findall(r"(\d+) supply/supplies waiting on a decision", out)
+        counted = re.findall(r"(\d+) (?:supply|supplies) waiting on a decision", out)
         assert not counted or all(world.q4 not in line for line in out.splitlines()
                                   if "waiting on a decision" in line)
         assert any(c.startswith("Could be carried forward (") for c in asked[0])

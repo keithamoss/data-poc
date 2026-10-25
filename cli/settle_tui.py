@@ -716,8 +716,10 @@ def reader_lines(readers: "_Readers") -> list[str]:
     queue, and a red for want of the table worded 'red - could not run:
     <period> holds no <dataset>'. Never 'contested', 'rejected' or
     'refused', nor a raw 'knock-on:' line."""
+    import re
+
     from cli import filing_tui, lifecycle_report
-    from qa_tools.common import carried, hierarchy, promotion, supply_status
+    from qa_tools.common import carried, hierarchy, promotion, root_cause, supply_status
 
     table = hierarchy.dataset(readers.dataset_id).table
     outcomes = []
@@ -737,13 +739,14 @@ def reader_lines(readers: "_Readers") -> list[str]:
                         for r in failing):
                     words = f"red - could not run: {readers.period} holds no {readers.dataset_id}"
             if result == "still held back":
-                from qa_tools.common import root_cause
-
                 why = root_cause.holdback_reason(conn, ds, sup)
                 if why:
-                    import re
-
                     result = f"still held back - {re.sub(r'^Held back[^:]*: ', '', why)}"
+            # NEVER 'refused' HERE (criterion 14; post-build critic D5): the
+            # backstop's hold, in words that keep its meaning.
+            result = result.replace("refused by the agreement backstop",
+                                    "kept waiting by the agreement backstop until its "
+                                    "dataset matches the agreement again")
             outcomes.append((ds, words, result))
     pointer = (f"see Filing decisions > {filing_tui._collection_name(readers.collection_id)} "
                f"> Supplies waiting on a decision")

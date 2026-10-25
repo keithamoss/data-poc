@@ -359,8 +359,7 @@ def crashed_sibling_lines(exc) -> list[str]:
         return []
     shown = ", ".join(mates[:8]) + (f" and {len(mates) - 8} more" if len(mates) > 8 else "")
     gates = "gates both" if len(package.supplies) == 2 else "gates them all"
-    whose = f"{dataset_id}'" if dataset_id.endswith("s") else f"{dataset_id}'s"
-    return [f"{shown}: checked, waiting for its package - {whose} run stopped at the "
+    return [f"{shown}: checked, waiting for its package - {dataset_id}'s run stopped at the "
             f"{exc.stage} stage; the next pass re-runs it and {gates}",
             "mothman pipeline process"]
 
@@ -1687,18 +1686,24 @@ def touched(conn, supplies) -> Touched:
     return out
 
 
-def supplies_of_arrivals(conn, arrivals) -> list[tuple[str, str]]:
+def supplies_of_arrivals(conn, arrivals, *, with_package: bool = False) -> list[tuple[str, str]]:
     """[(dataset, supply)] of every supply these arrivals became (filing.
-    supplies_of, the one reading)."""
+    supplies_of, the one reading) - and, `with_package`, every other supply
+    of each one's package, which the package's last arrival gates with it."""
     from qa_tools.common import filing
 
-    out = []
+    out: list[tuple[str, str]] = []
     for a in arrivals:
         try:
-            out += [(i["dataset_id"], i["supply"]) for i in filing.supplies_of(conn, a)]
+            mine = [(i["dataset_id"], i["supply"]) for i in filing.supplies_of(conn, a)]
         except Exception:  # noqa: BLE001 - an arrival never filed touched nothing
             continue
-    return out
+        out += mine
+        if with_package:
+            for ds, sup in mine:
+                package = package_of(conn, ds, sup)
+                out += list(package.supplies) if package is not None else []
+    return list(dict.fromkeys(out))
 
 
 def report(applied: Applied) -> None:

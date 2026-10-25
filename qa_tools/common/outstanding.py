@@ -557,10 +557,17 @@ def _from_awaiting_decisions(conn=None) -> list[Item]:
                 # through the same one function: a supply listed beneath its
                 # cause is not counted, one with nothing to sit beneath is, and
                 # a delivery still being gated is not (REQ-PIPE-276 criterion 12).
-                counted = root_cause.group_queue(
-                    db, filing_queue.awaiting(db, collection),
-                    held=[h for h in filing_queue.held_in(db, collection)
-                          if not h.turned_off]).rows
+                waiting = filing_queue.awaiting(db, collection)
+                try:
+                    counted = root_cause.group_queue(
+                        db, waiting, held=[h for h in filing_queue.held_in(db, collection)
+                                           if not h.turned_off]).rows
+                except Exception as exc:  # noqa: BLE001 - as the terminal's queue_groups
+                    # UNGROUPED RATHER THAN NOTHING (post-build critic): every
+                    # supply its own counted item, as before REQ-PIPE-210.
+                    print(f"note: the supplies awaiting a decision could not be grouped by "
+                          f"cause ({type(exc).__name__}: {exc}) - each is counted on its own.")
+                    counted = waiting
                 for state in counted:
                     if state.state in skip or not state.supply:
                         continue

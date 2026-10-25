@@ -183,34 +183,30 @@ class CollectionCLI:
     def exit_status(self, results: list[dict], arrivals=()) -> int:
         """`mothman <short> qa`'s exit status, FED BY THE GATE (REQ-PIPE-276
         criterion 3): its own run's results, and - for a kept run - whether
-        a supply it touched ends held back on a red, a re-check against the
-        warehouse included, whose results it prints as a table headed
-        're-checked against the warehouse'. processing_pass.exit_status's
-        order: the agreement backstop's refusal 3 over red 1 over OK 0 (a
-        failed stage has already exited 2)."""
-        from qa_tools.common import agreement_drift, gate, processing_pass, supply_db
+        a supply of its package ends held back on a red, a re-check against
+        the warehouse included, whose results it prints as a table headed
+        're-checked against the warehouse'. 1 where anything is red, else 0;
+        a failed stage has already exited 2. NEVER 3 (PROVISIONAL, option B
+        of the post-build critic's call): exit 3's meanings are not widened
+        to qa - an agreement backstop refusal is said by the run's own output
+        and by `mothman pipeline process` - so qa never asks the backstop."""
+        from qa_tools.common import gate, processing_pass, supply_db
 
         red = self.has_failures(results)
-        refused = False
         if arrivals:
             try:
                 with supply_db.connect(read_only=True, label="mothman:qa-exit") as conn:
-                    supplies = gate.supplies_of_arrivals(conn, arrivals)
-                    got = gate.touched(conn, supplies)
-                    refused = bool(agreement_drift.refusals(
-                        conn, sorted({ds for ds, _s in supplies})))
+                    got = gate.touched(conn, gate.supplies_of_arrivals(
+                        conn, arrivals, with_package=True))
             except Exception as exc:  # noqa: BLE001 - the run's own results still say red
                 console.print(f"The gate's outcome could not be read ({exc}); the exit "
                               f"status is the run's own results'.", style="yellow",
                               markup=False, highlight=False)
                 got = gate.Touched()
             if got.rechecks:
-                table = self.report_table(got.rechecks, "re-checked against the warehouse")
-                table.title = "re-checked against the warehouse"
-                console.print(table)
+                console.print(self.report_table(got.rechecks,
+                                                "re-checked against the warehouse"))
             red = red or got.red
-        if refused:
-            return processing_pass.EXIT_REFUSED
         return processing_pass.EXIT_RED if red else processing_pass.EXIT_OK
 
     @staticmethod

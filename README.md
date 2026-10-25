@@ -328,8 +328,11 @@ already downloaded, on demand, before you use it:
   --reference-folder path/to/a-known-good-delivery_folder
 ```
 
-Both print a short pass/warn/fail/error report and exit non-zero on any
-real failure/error (so a shell script can gate on it). `--reference-file`/
+Both print a short pass/warn/fail/error report and exit 1 on any real
+failure/error - including, for a kept supply, one the promotion gate held
+back on a red, such as a re-check against the warehouse that failed - 2 if
+a stage of the run itself failed, and 0 otherwise (so a shell script can
+gate on it). `--reference-file`/
 `--reference-folder` is required — the distribution-drift check needs a
 real known-good comparison, and there's no synthetic manifest to
 default one from for a file you downloaded yourself. The same flow is also

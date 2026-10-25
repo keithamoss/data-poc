@@ -1122,7 +1122,7 @@ def apply_decision(conn: supply_db.SupplyConnection,
             if _holding(conn, decision.dataset_id, slot) != was:
                 conn._period_moves.append((entry_id, decision.dataset_id, slot))
             elif contested.get(slot) and not open_contest_in(conn, decision.dataset_id, slot) \
-                    and not _a_file_of_it_stays(conn, decision, slot):
+                    and not _a_file_of_it_stays(conn, decision, slot, entry_id):
                 # IT ENDED THE CONTEST AND LEFT NO FILE OF THE PAIR AS THE
                 # PERIOD'S SUPPLY (REQ-PIPE-211 criterion 1): the readers the
                 # contest stopped are owed their re-evaluation through the one
@@ -1146,14 +1146,17 @@ def open_contest_in(conn, dataset_id: str, period: str) -> bool:
     return False
 
 
-def _a_file_of_it_stays(conn, decision: Decision, period: str) -> bool:
+def _a_file_of_it_stays(conn, decision: Decision, period: str, entry_id: int) -> bool:
     """Whether a file of the settled pair is now a supply waiting in this
     period - its own owed run re-checks the readers (REQ-PIPE-193 criterion
     21), so nothing more is owed (REQ-PIPE-211, Keith Q1 = A)."""
-    from qa_tools.common import supersession, supply_files
+    from qa_tools.common import qa_store, supersession
 
-    pair = supply_files.pair_supply(decision.supply or "")
-    files = {pair, pair[:-1] + "2"}
+    # THE PAIR'S OWN SUPPLIES, as the settlement recorded them per file
+    # (qa.decision_file) - never worked out from a '#1'/'#2' shape.
+    files = {r[0] for r in conn.execute(
+        f'SELECT supply_id FROM "{qa_store.SCHEMA}".decision_file WHERE decision_id = ?',
+        [entry_id]).fetchall()} | {decision.supply}
     waiting = set(supersession.waiting_in(conn, decision.dataset_id, period))
     return bool(files & waiting)
 

@@ -337,3 +337,20 @@ class TestTheTerminal:
         assert any(line.strip() == "mothman pipeline process"
                    for line in result.output.splitlines())
         assert sc.owed("reevaluate"), "the re-evaluation stays owed"
+
+
+def test_a_backstopped_reader_is_not_said_refused(private_supply_dsn):
+    """D5 (post-build critic): the knock-on's 'refused by the agreement
+    backstop' reaches the settlement's panel, which criterion 14 forbids the
+    word 'refused' in - said in other words, the meaning kept."""
+    from cli import settle_tui
+    from qa_tools.common import qa_store, supply_db
+
+    with supply_db.connect(label="pytest") as conn:
+        qa_store.ensure_schema(conn)
+    readers = settle_tui._Readers("cp-clients", Q4, "child-protection", regated=(
+        ("cp-notifications", "cp-notifications@1", Q4, "amber",
+         "still waiting - refused by the agreement backstop"),))
+    said = " ".join(settle_tui.reader_lines(readers))
+    assert "refused" not in said, said
+    assert "agreement backstop" in said, said

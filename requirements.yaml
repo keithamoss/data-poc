@@ -40652,6 +40652,8 @@ requirements:
     - 'tests/test_package_gate.py::TestAFiledSupplyWithNoReceipt::test_it_is_reported_not_skipped'
     - tests/test_package_gate.py::TestFirstTimePackage::test_a_hold_back_is_said_once_until_something_moves
     - tests/test_cli_package_gate.py::TestConsequences::test_a_promotion_whose_read_supply_moved_raises_the_consequences_refusal
+    - tests/test_cli_package_gate.py::TestCriticFindings::test_a_vanished_warning_still_refuses_a_stale_key
+    - tests/test_cli_package_gate.py::TestCriticFindings::test_a_moved_warehouse_holder_changes_the_key
     implemented_by:
     - "qa_tools/common/gate.py::Package"
     - "qa_tools/common/gate.py::package_of"
@@ -40808,6 +40810,14 @@ requirements:
       period are excluded by the period try-lock (criterion 16), so the comparison cannot be overtaken between the check and the move. NOTE, said plainly: the
       test also passed on c1563cb, before REQ-PIPE-276, because in that scenario the warning already changed when Notifications v2 was promoted; criteria 7
       to 9 make the comparison cover a moved read holder that changes no other line.'
+    - 'CRITERION 17''s TWO EDGES (post-build critic, 2026-10-25): (a) a key confirmed for a warning that has since vanished is refused, not applied - _apply_held
+      compares whenever a key was given or lines stand; (b) criterion 7''s line names the warehouse''s holder of the table read as well as the supply read,
+      so a moved holder changes the key even where every other line stands still (test_a_moved_warehouse_holder_changes_the_key, which stands the holder in
+      at knock_on._now_holds because every real way to move it in that scenario also moves the waiting supply read).'
+    - 'A FILE KEPT ALONE BY --run-id IS GATED AS A PACKAGE OF ONE (found at REQ-PIPE-276''s build; PROVISIONAL, accepted as a known limit, Keith away): `mothman
+      cp qa --commit --run-id` on one file of a zip files that arrival alone, so its package counts one file and it is gated at once instead of waiting for
+      the rest of its delivery. The processing pass and the hand-filed folder route file the whole delivery first and are not affected. Not a criterion change;
+      to put to Keith.'
     open_questions: []
   - id: REQ-PIPE-267
     title: A supply is promoted only on cross-table verdicts about what the warehouse will hold, and supplies that depend on
@@ -42607,6 +42617,14 @@ requirements:
     - tests/test_cli_package_gate.py::TestWhatTheRuleDid::test_crashed_sibling_wording
     - tests/test_cli_package_gate.py::TestWhatTheRuleDid::test_partial_refile_warns
     - tests/test_cli_package_gate.py::TestWhatTheRuleDid::test_a_joined_supply_carries_the_supplier_hint
+    - tests/test_cli_package_gate.py::TestCriticFindings::test_the_pass_counts_a_package_mate_held_back_on_red
+    - tests/test_cli_package_gate.py::TestCriticFindings::test_a_consequence_is_said_once_per_logical_check
+    - tests/test_cli_package_gate.py::TestCriticFindings::test_the_gating_line_and_a_held_roots_supplies_show_beside_held_rows
+    - tests/test_cli_package_gate.py::TestCriticFindings::test_qa_never_asks_the_backstop_and_never_exits_3
+    - tests/test_cli_package_gate.py::TestCriticFindings::test_next_step_says_the_recheck_is_owed_once_the_cause_is_promoted
+    - tests/test_cli_package_gate.py::TestCheapPaths::test_the_period_door_lists_a_supply_being_checked_and_offers_nothing_on_it
+    - tests/test_cli_package_gate.py::TestCheapPaths::test_the_owed_recheck_and_still_held_back_words
+    - tests/test_cli_package_gate.py::TestCheapPaths::test_the_settle_flows_owed_panels
     implemented_by:
     - cli/lifecycle_report.py::_gate_line
     - cli/lifecycle_report.py::rechecked_promotion_words
@@ -42751,12 +42769,6 @@ requirements:
     - 'THE RULE''S ACTOR STAYS ON CRITERION 15''s LINE (build, PROVISIONAL): ''promoted by the rule (<actor>), not by you - <check> re-checked against the <dataset>
       in place in the warehouse (received <instant>), green, because ...'', keeping REQ-TEST-150 criterion 5''s ''not by you''; the check is named by gate._check_words,
       as the hold-back''s own entry names it.'
-    - 'qa''s EXIT FOLLOWS exit_status''s ORDER (build): CollectionCLI.exit_status gives 3 where a dataset the run touched is refused by the agreement backstop,
-      1 where its own results or the gate''s outcome are red (held back, or a re-check that failed), else 0; a failed stage still exits 2 before it. The pipeline
-      pass counts the same held-back reds (gate.touched), and an owed ''gate'' item that held a supply back reports red.'
-    - 'A FIRST FILE KEPT ALONE BY --run-id IS GATED AS A PACKAGE OF ONE (found at build, pre-existing, NOT changed here): `mothman cp qa --commit --run-id`
-      on one file of a zip files that arrival alone, so its package counts one file and it is gated at once. test_waiting_first_file_exits_as_its_own_results_say
-      therefore drives CollectionCLI.exit_status on the per-arrival lifecycle; flagged in the build report for Keith.'
     - 'OWED RE-CHECK WORDS NAME THE DECISION AS decision_words SAYS IT (build, PROVISIONAL): REQ-DASH-204 criterion 7''s ''against the <dataset> promoted <instant>''
       reads ''demoted'', ''carried forward instead'' and so on where the decision that owes it was not a promotion. A red owed only a re-check is left off rechecking.worse_than_promoted,
       so it is never ''Promoted, then re-checked worse''.'
@@ -42770,6 +42782,27 @@ requirements:
     - 'THE CARRY-FORWARD WARNING IN mothman supply queue IS REQ-PIPE-271''s TO TEST (build): test_supply_queue_shows_grouping_gating_and_the_carry_forward_warning
       asserts the grouping and the gating line through the shared renderer; REQ-PIPE-271''s TestCarryForwardWarning already asserts the warning in that command''s
       output.'
+    - 'qa NEVER EXITS 3 (post-build critic, 2026-10-25; PROVISIONAL, option B, taken while Keith was away - to confirm): this requirement''s own decision says
+      exit 3''s meanings are not widened, so `mothman cp qa`/`mothman bdm qa` exit 0, 1 or 2 only - 1 where its own results or the gate''s outcome for any supply
+      of its package are red (held back, or a re-check against the warehouse that failed), 2 for a failed stage. An agreement backstop refusal stays visible
+      in the run''s output and in `mothman pipeline process`''s exit 3, and qa never asks the backstop at all - which also closes the critic''s D4 (an empty
+      dataset list read as ''the whole asset''). REPLACES the build''s ''qa''s exit follows exit_status''s order'' decision, which gave qa a 3. REJECTED option
+      A, keeping qa''s 3.'
+    - 'THE PASS AND qa COUNT THE WHOLE PACKAGE (post-build critic D1): a package''s last arrival gates every member inline, so the pass and qa read the gate''s
+      outcome for every supply of the package (gate.supplies_of_arrivals with_package), not only the arrival just handled - a green first file held back when
+      its amber package-mate completed the package used to leave the pass at exit 0.'
+    - '3a SUPERSEDES THE SIGNED EXAMPLE LAYOUT PENDING KEITH (post-build critic, 2026-10-25; PROVISIONAL): criterion 6''s example (S1 red''s Clients v2 beneath
+      Notifications v2) and REQ-PIPE-210 criterion 11''s staggered S1 red case are kept met as built under Keith''s later answer 3a - a failed re-check is its
+      own counted row - and the criteria''s text is NOT changed: that needs Keith''s sign-off. Queued for him with the build''s first decision.'
+    - 'THE NEXT STEP ONCE THE CAUSE IS PROMOTED (post-build critic, criterion 4): where the supply that held this one back has since been promoted and the knock-on''s
+      re-check is still owed, the panel and door say the re-check is owed and runs on the next processing pass (with the command), never ''Decide <cause> ...
+      promoting it re-checks this one''.'
+    - 'ONE LINE PER LOGICAL CHECK (post-build critic D2): dbt, Soda and datacontract each record the same check and the line names it without the tool, so _held_back_consequences
+      says each line once and the key is built from the lines as said. The queue header says ''1 supply'' and ''<n> supplies'', and criterion 17''s wording
+      is ''<dataset>''s run'' as signed. The Filing decisions queue and mothman supply queue render the supplies beneath a held root and the gating line whatever
+      is counted (D3). The settlement panel says the backstop ''kept waiting'' a reader, never ''refused'' (D5, REQ-PIPE-211 criterion 14).'
+    - 'NO_COLOR AND 80 COLUMNS, FOR REAL (post-build critic): the module-level Consoles are built at import, before a test''s NO_COLOR, so the terminal tests
+      replace each with a Console built with no colour at 80 columns, and assert no colour code reaches the output; the piped CliRunner output is the pipe.'
     open_questions: []
   - id: REQ-DASH-277
     title: '''In place'' reads ''in place in the warehouse'' wherever it is shown to a person'
@@ -43942,6 +43975,9 @@ requirements:
     - 'WHAT IS SAID AS RED FOR WANT OF THE TABLE (build): a reader is worded ''red - could not run: <period> holds no <dataset>'' where every failing check
       counted toward it is a could-not-run naming the settled table; any other red is said as ''red''. The datasets'' gate results use REQ-PIPE-276''s words
       through lifecycle_report.outcome_lines.'
+    - 'THE BACKSTOP IN THE SETTLEMENT PANEL (post-build critic D5): a reader the knock-on left waiting on the agreement backstop is said as ''kept waiting by
+      the agreement backstop until its dataset matches the agreement again'' - the meaning kept, never ''refused'' (criterion 14). And the settled pair''s own
+      supplies are read from qa.decision_file, never worked out from a ''#1''/''#2'' shape.'
     open_questions: []
   - id: REQ-TEST-281
     title: "The browser-test module runs across every test worker, each worker building its own dashboard into its own output path"

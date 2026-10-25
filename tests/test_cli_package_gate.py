@@ -37,6 +37,20 @@ def sc(private_supply_dsn, cp_raw_dir, tmp_path, monkeypatch):
     return scenario
 
 
+@pytest.fixture(autouse=True)
+def plain_consoles(monkeypatch):
+    """NO_COLOR AND 80 COLUMNS FOR REAL (criterion 21): every cli module
+    prints through a Console built at import, before a test could set
+    NO_COLOR, so each is replaced by one built with no colour at 80 columns -
+    and _cli asserts no colour code reaches the output."""
+    from rich.console import Console
+
+    from cli import collection_cli, common, filing_tui, lifecycle_report, settle_tui, supply
+
+    for module in (collection_cli, common, filing_tui, lifecycle_report, settle_tui, supply):
+        monkeypatch.setattr(module, "console", Console(no_color=True, width=80))
+
+
 @pytest.fixture
 def person(monkeypatch):
     """The keyboard is a real person on contract/people.yaml, and a
@@ -53,6 +67,7 @@ def _cli(group, args, *, input_=None):
     from click.testing import CliRunner
 
     got = CliRunner().invoke(group, args, env=PIPED, input=input_)
+    assert "\x1b[" not in got.output, "a colour code under NO_COLOR"
     return got.exit_code, got.output
 
 
@@ -159,32 +174,38 @@ class TestExitCodes:
         run_id = _arrival(sc, "C2").run_id
         code, out = _cli(of("cp").group, ["qa", "--run-id", run_id, "--commit"])
         assert sc.holder("cp-clients", Q3) == v1["C1"], out
-        assert "re-checked against the warehouse" in out, out
+        assert "re-checked against the warehouse" in _flat(out), out
         own = [r for r in sc.results(run_id) if (r["status"] or "") in ("fail", "error")]
         assert own == [], "precondition: Clients v2 is green on its own run"
         assert code == 1, out
         assert sc.actions(c2)[-1] == "promotion-withheld"
 
-    def test_waiting_first_file_exits_as_its_own_results_say(self, sc):
-        """A first file of a package, checked and waiting for the rest of
-        its delivery: the exit status `mothman cp qa` takes - its own run's
-        results, fed by the gate (CollectionCLI.exit_status) - is 0 for a
-        green first file and 1 for one red on its own data: nothing has been
-        gated yet, so the gate adds nothing."""
-        from cli.collection_cli import of
+    @pytest.mark.parametrize("red", [False, True])
+    def test_waiting_first_file_exits_as_its_own_results_say(self, sc, red):
+        """A first file of a zip, checked and left waiting for the rest of its
+        delivery by the processing pass (the route that files every file of
+        the delivery first - `cp qa --run-id` keeps one file alone, a known
+        limit on REQ-PIPE-266): nothing is gated yet, so the pass exits as
+        that file's own results say - 1 red, 0 green - and reports it
+        waiting, not failed."""
+        from qa_tools.common import arrival_lifecycle, asset_time, processing_pass as pp
+        from qa_tools.tools import stage
 
         established(sc)
-        sc.rules.append(own_red("I2"))
+        if red:
+            sc.rules.append(own_red("C2"))
         sc.deliver("2024-08-05T10:00:00+08:00", {"cp_clients": "C2", "cp_notifications": "N2"})
-        sc.deliver("2024-08-06T10:00:00+08:00",
-                   {"cp_investigations": "I2", "cp_placements": "P2"})
-        sc.process(stop_before="N2")
-        green = _arrival(sc, "C2")
-        assert of("cp").exit_status(sc.results(green.run_id), [green]) == 0
-        sc.process(stop_before="P2")
-        red = _arrival(sc, "I2")
-        assert len(sc.owed("gate")) == 1, "precondition: the second package waits"
-        assert of("cp").exit_status(sc.results(red.run_id), [red]) == 1
+        found = sorted(sc.arrivals(), key=lambda a: (a.received_at, a.sequence, a.run_id))
+        first = _arrival(sc, "C2")
+        prepare = arrival_lifecycle.staged_as_it_arrives(stage.stager(CP))
+        for a in found:
+            if a.run_id not in sc.processed:
+                prepare(a, found)
+        report = pp.PassReport()
+        pp._one(first, found, asset_time.now().isoformat(), "pytest@example.org", report,
+                lambda line: None)
+        assert report.left_waiting == [first.run_id] and report.failures == []
+        assert report.exit_status == (pp.EXIT_RED if red else pp.EXIT_OK)
 
 
 # ---------------------------------------------------------------------------
@@ -329,7 +350,7 @@ class TestGroupedByRoot:
         code, out = _cli(supply_group, ["queue", "--collection", CP])
         assert code == 0, out
         flat = _flat(out)
-        assert ("1 supply/supplies waiting on a decision in Child Protection "
+        assert ("1 supply waiting on a decision in Child Protection "
                 "(1 more held back with it, listed beneath)") in flat, out
         assert "held back with it (same delivery):" in flat
         assert "- cp-notifications nothing needs deciding on this supply" in flat
@@ -725,7 +746,7 @@ class TestWhatTheRuleDid:
         sc.process()
         (stopped,) = sc.failures
         assert gate.crashed_sibling_lines(stopped) == [
-            "cp-clients: checked, waiting for its package - cp-notifications' run stopped at "
+            "cp-clients: checked, waiting for its package - cp-notifications's run stopped at "
             "the checks stage; the next pass re-runs it and gates both",
             "mothman pipeline process"]
 
@@ -767,3 +788,280 @@ class TestWhatTheRuleDid:
         assert "held back by it:" in flat
         assert ("Files sent separately are gated as each arrives; sent as one zip they are "
                 "gated together (supplier guidance, REQ-DOCS-274).") in flat
+
+
+# ---------------------------------------------------------------------------
+# The post-build critic's findings (2026-10-25), each written to fail first
+# ---------------------------------------------------------------------------
+
+def _amber(label):
+    from gate_support import _first_own
+
+    def rule(ctx):
+        if not ctx.cross_table and ctx.own_label == label and ctx.check_id.endswith("_dbt") \
+                and ".unique_" not in ctx.check_id and _first_own(ctx):
+            return "warn"
+        return None
+    return rule
+
+
+def _order_b(sc):
+    """Staggered Order B red: Clients v2 at 9:00 fails Client reference
+    against Notifications v1 and is held back; Notifications v2 at 9:05,
+    red on its own data, passes against the staged Clients v2."""
+    v1 = established(sc)
+    sc.rules += [own_red("N2"), cross_red("cp-notifications", "cp_clients",
+                                          when={"cp_clients": "C2", "cp_notifications": "N1"})]
+    c2 = sc.deliver("2024-08-05T09:00:00+08:00", {"cp_clients": "C2"})["C2"]
+    sc.process()
+    n2 = sc.deliver("2024-08-05T09:05:00+08:00", {"cp_notifications": "N2"})["N2"]
+    sc.process()
+    return v1, c2, n2
+
+
+def _promote_n2(n2, **kw):
+    from qa_tools.common import filing_decisions as fd, people
+    from test_carry_forward import REAL_PERSON
+
+    return fd.Request(operation=fd.PROMOTE, dataset_id="cp-notifications",
+                      actor=people.person_by_email(REAL_PERSON), reason="t", period=Q3,
+                      supply=n2, confirmed=True, **kw)
+
+
+class TestCriticFindings:
+
+    def test_the_pass_counts_a_package_mate_held_back_on_red(self, sc, monkeypatch):
+        """D1: the package's LAST arrival gates every member inline, so the
+        pass counts every supply the gate touched - Clients v2, checked first
+        and green on its own run, re-checked against Notifications v1 and
+        held back when the amber Notifications v2 completes the package."""
+        from qa_tools.common import (amber_setting, arrival_lifecycle, asset_time,
+                                     processing_pass as pp)
+        from qa_tools.tools import stage
+
+        established(sc)
+        monkeypatch.setattr(amber_setting, "resolve", lambda ds, at, **k: amber_setting.Resolved(
+            value=amber_setting.HOLD, level="test", version="test"))
+        sc.rules += [_amber("N2"), cross_red("cp-notifications", "cp_clients",
+                                             when={"cp_clients": "C2", "cp_notifications": "N1"})]
+        v2 = sc.deliver("2024-08-05T10:00:00+08:00",
+                        {"cp_clients": "C2", "cp_notifications": "N2"})
+        found = sorted(sc.arrivals(), key=lambda a: (a.received_at, a.sequence, a.run_id))
+        todo = [a for a in found if a.run_id not in sc.processed]
+        assert [sc.label_of(a) for a in todo] == ["C2", "N2"], "precondition: Clients first"
+        prepare = arrival_lifecycle.staged_as_it_arrives(stage.stager(CP))
+        for a in todo:
+            prepare(a, found)
+        report = pp.PassReport()
+        for a in todo:
+            pp._one(a, found, asset_time.now().isoformat(), "pytest@example.org", report,
+                    lambda line: None)
+        assert sc.actions(v2["C2"])[-1] == "promotion-withheld", sc.actions(v2["C2"])
+        assert report.red and report.exit_status == pp.EXIT_RED
+
+    def test_a_consequence_is_said_once_per_logical_check(self, sc):
+        """D2: dbt, Soda and datacontract each record the same logical check;
+        a consequence line names the check once, and the key is built from
+        the lines as said."""
+        from qa_tools.common import filing_decisions as fd, supply_db
+
+        _v1, _c2, n2 = _order_b(sc)
+        with supply_db.connect(read_only=True, label="pytest") as conn:
+            got = fd.consequences(conn, _promote_n2(n2))
+        assert len(got.lines) == len(set(got.lines)), got.lines
+        read = [line for line in got.lines if "which is not in the warehouse" in line]
+        assert len(read) == 1, read
+
+    def test_the_gating_line_and_a_held_roots_supplies_show_beside_held_rows(
+            self, monkeypatch, capsys):
+        """D3: with held rows and nothing counted, the Filing decisions queue
+        still prints a delivery being gated and the supplies beneath a held
+        root."""
+        from datetime import datetime
+
+        from cli import common, filing_tui
+        from qa_tools.common import filing_queue, gate, root_cause, slot_state
+
+        held = filing_queue.HeldRow(
+            dataset_id="cp-clients", dataset_name="Client Register",
+            supply="cp-clients@202408050900000800", received_at=None,
+            received_text="9:00am", why="no period was open", schedule_ended=False)
+        beneath = root_cause.Beneath(
+            slot_state.SlotState(dataset_id="cp-notifications", period=Q3,
+                                 state=slot_state.AWAITING_DECISION,
+                                 supply="cp-notifications@202408050905000800"),
+            root_cause.Traced(root_cause.Root("supply", "cp-clients", Q3,
+                                              supply=held.supply), (), "joined"),
+            "Held back: its check could not be checked.")
+        package = gate.Package(CP, Q3, "d", datetime.fromisoformat("2024-08-06T10:00:00+08:00"),
+                               (("cp-carers", "a"), ("cp-placements", "b")),
+                               frozenset({("cp-carers", "a")}))
+        groups = root_cause.QueueGroups(beneath={("cp-clients", None, held.supply): [beneath]},
+                                        gating=[(package, [])])
+        monkeypatch.setattr(filing_tui, "open_log", lambda: _NullLog())
+        for name, value in (("awaiting", []), ("closed_gaps", []), ("held_in", [held])):
+            monkeypatch.setattr(filing_queue, name, lambda *a, _v=value, **k: _v)
+        monkeypatch.setattr(filing_tui, "carry_forward_warnings", lambda *a, **k: [])
+        monkeypatch.setattr(filing_tui, "queue_groups", lambda *a, **k: groups)
+        monkeypatch.setattr(common, "select", lambda *a, **k: None)
+        filing_tui.queue_flow(CP)
+        flat = _flat(capsys.readouterr().out)
+        assert "Checking a delivery received" in flat and "(1 of 2 files checked)" in flat, flat
+        assert "- cp-notifications nothing needs deciding on this supply" in flat, flat
+
+    def test_qa_never_asks_the_backstop_and_never_exits_3(self, private_supply_dsn,
+                                                           monkeypatch):
+        """D4 and the PROVISIONAL exit call (option B): `mothman cp qa` exits
+        0, 1 or 2 only - a backstop refusal is said by the output and by
+        `mothman pipeline process` - and so never asks agreement_drift about
+        anything, least of all the whole asset with an empty list."""
+        from cli.collection_cli import of
+        from qa_tools.common import agreement_drift, gate, qa_store, supply_db
+
+        with supply_db.connect(label="pytest") as conn:
+            qa_store.ensure_schema(conn)
+        monkeypatch.setattr(agreement_drift, "refusals",
+                            lambda *a, **k: pytest.fail("qa asked the backstop"))
+        monkeypatch.setattr(gate, "supplies_of_arrivals", lambda conn, arrivals, **k: [])
+        monkeypatch.setattr(gate, "touched", lambda conn, s: gate.Touched())
+        assert of("cp").exit_status([], [object()]) == 0
+        monkeypatch.setattr(gate, "touched",
+                            lambda conn, s: gate.Touched(held_back=[("cp-clients", "x")]))
+        assert of("cp").exit_status([{"status": "pass"}], [object()]) == 1
+        assert of("bdm").exit_status([{"status": "fail"}], []) == 1
+
+    def test_next_step_says_the_recheck_is_owed_once_the_cause_is_promoted(self, sc):
+        """Criterion 4: S2 strict, Clients v2 then promoted by a person and
+        the knock-on not yet run - Notifications v2's next step is the owed
+        re-check, never 'Decide cp-clients'."""
+        from cli import filing_tui
+
+        v2 = s2_strict(sc)
+        sc.promote_by_hand(v2["C2"], Q4, at="2024-12-01T10:00:00+08:00")
+        assert sc.owed("reevaluate"), "precondition: the knock-on is owed"
+        step = filing_tui.next_step(v2["N2"], Q4)
+        assert step and "Decide cp-clients" not in step, step
+        assert "re-check against it is owed" in step, step
+        assert "mothman pipeline process" in step.splitlines()
+
+    def test_a_vanished_warning_still_refuses_a_stale_key(self, sc, monkeypatch):
+        """REQ-PIPE-266 criterion 17 (a): a key was confirmed, and under the
+        locks the decision has no consequences at all any more - the key no
+        longer matches, so it is refused, not applied."""
+        import dataclasses
+
+        from qa_tools.common import filing_decisions as fd
+
+        _v1, _c2, n2 = _order_b(sc)
+        monkeypatch.setattr(fd, "consequences", lambda conn, request: fd.Consequences(lines=()))
+        with pytest.raises(fd.ConsequencesNotAcknowledged):
+            fd.apply(dataclasses.replace(_promote_n2(n2), acknowledged="0123456789"),
+                     effective_at="2024-09-20T10:00:00+08:00")
+        assert sc.holder("cp-notifications", Q3) != n2
+
+    def test_a_moved_warehouse_holder_changes_the_key(self, sc, monkeypatch):
+        """REQ-PIPE-266 criterion 17 (b), with every older consequence held
+        still: Notifications v2's Client reference read the staged Clients v2.
+        Only the warehouse's Clients changes - stood in for at the one reading
+        of what a period holds (knock_on._now_holds), because every real way
+        to move it here also moves the waiting Clients v2 (a promotion
+        supersedes it, a demotion is refused beside it). The key changes, and
+        the promotion confirmed against the old key is refused."""
+        import dataclasses
+
+        from qa_tools.common import filing_decisions as fd, knock_on, supply_db
+
+        _v1, _c2, n2 = _order_b(sc)
+        monkeypatch.setattr(fd, "_readers_rechecked", lambda conn, request: [])
+        with supply_db.connect(read_only=True, label="pytest") as conn:
+            before = fd.consequences(conn, _promote_n2(n2))
+        real = knock_on._now_holds
+        monkeypatch.setattr(knock_on, "_now_holds", lambda conn, table, period: (
+            "cp-clients@202408010900000800" if table == "cp_clients" else
+            real(conn, table, period)))
+        with supply_db.connect(read_only=True, label="pytest") as conn:
+            after = fd.consequences(conn, _promote_n2(n2))
+        unchanged = [line for line in after.lines if "which is not in the warehouse" not in line]
+        assert unchanged == [line for line in before.lines
+                             if "which is not in the warehouse" not in line], \
+            "precondition: no older line moves"
+        assert after.key != before.key, (before.lines, after.lines)
+        with pytest.raises(fd.ConsequencesNotAcknowledged):
+            fd.apply(dataclasses.replace(_promote_n2(n2), acknowledged=before.key),
+                     effective_at="2024-09-20T10:00:00+08:00")
+
+
+class _NullLog:
+    def __enter__(self):
+        return None
+
+    def __exit__(self, *a):
+        return False
+
+
+class TestCheapPaths:
+    """Paths the critic found uncovered, each driven through its real
+    function with the smallest fake around it."""
+
+    def test_the_period_door_lists_a_supply_being_checked_and_offers_nothing_on_it(
+            self, sc, monkeypatch, capsys):
+        from cli import common, filing_tui
+        from qa_tools.common import slot_state
+
+        v2 = part_checked(sc)
+        offered = []
+        monkeypatch.setattr(common, "select", lambda msg, choices, **k: offered.extend(
+            choices) or None)
+        filing_tui._choose_a_supply(slot_state.SlotState(
+            dataset_id="cp-clients", period=Q3, state=slot_state.PROMOTED,
+            supply=None), ())
+        flat = _flat(capsys.readouterr().out)
+        assert "checking with its delivery (1 of 2 files checked)" in flat, flat
+        assert not any(filing_tui.arrived(v2["C2"]) in c for c in offered), offered
+
+    def test_the_owed_recheck_and_still_held_back_words(self, sc):
+        """_follow_up's owed panel names each in-warehouse reader red only
+        for the owed re-check; regated_lines says 'still held back - <why>'."""
+        from cli import filing_tui
+        from qa_tools.common import filing_decisions as fd, people, recheck, supply_db
+        from test_carry_forward import REAL_PERSON
+
+        v1 = established(sc)
+        actor = people.person_by_email(REAL_PERSON)
+        demote = fd.Request(operation=fd.DEMOTE, dataset_id="cp-clients", actor=actor,
+                            reason="t", period=Q3, supply=v1["C1"], confirmed=True)
+        import dataclasses
+
+        with supply_db.connect(read_only=True, label="pytest") as conn:
+            key = fd.consequences(conn, demote).key
+        fd.apply(dataclasses.replace(demote, acknowledged=key or None),
+                 effective_at="2024-09-20T10:00:00+08:00")
+        (owed,) = sc.owed(recheck.REEVALUATE)
+        lines = filing_tui._owed_recheck_lines(owed.id)
+        assert any(line.startswith("cp-notifications: Not yet re-checked against the "
+                                   "cp-clients demoted ") for line in lines), lines
+        assert lines[-1] == "mothman pipeline process"
+        # A HELD-BACK READER RED OF ITS OWN (not owed a re-check) is said as
+        # 'still held back' - and N1, red only for the owed re-check, as not
+        # yet re-checked.
+        said = filing_tui.regated_lines([("cp-placements", "cp-placements@none", Q3, "red",
+                                          "still held back"),
+                                         ("cp-notifications", v1["N1"], Q3, "red",
+                                          "still promoted")])
+        assert "- cp-placements: red, still held back" in said, said
+        assert "- cp-notifications: not yet re-checked, still promoted" in said, said
+
+    def test_the_settle_flows_owed_panels(self, monkeypatch, capsys):
+        from cli import filing_tui, settle_tui
+
+        shown = []
+        monkeypatch.setattr(filing_tui, "_show", lambda text, **k: shown.append((text, k)))
+        settle_tui._say_recheck_owed(settle_tui._Readers("cp-clients", Q4, CP, finished=False,
+                                                         why="locked"))
+        settle_tui._say_recheck_owed(settle_tui._Readers("cp-clients", Q4, CP, finished=False,
+                                                         why="failed"))
+        (locked, k1), (failed, _k2) = shown
+        assert k1["title"] == "Re-check owed"
+        assert "Another decision or gate is working on 2024-Q4." in locked
+        assert "Another decision" not in failed
+        assert locked.splitlines()[-1] == "mothman pipeline process"
