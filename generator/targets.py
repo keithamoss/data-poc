@@ -181,3 +181,29 @@ def csv_of(delivery_name: str, deliveries_dir: Path | None = None,
     if len(files) != 1:
         raise ValueError(f"delivery {delivery_name} holds {len(files)} CSV files, not one")
     return files[0]
+
+
+@dataclass(frozen=True)
+class DeclaredGateOutcome:
+    """What a scripted scenario declares the package gate does with one of
+    its supplies (REQ-GEN-273 criterion 3): promoted, or held back - and
+    where held back, because of which other supply's dataset, and whether
+    after a re-check against the warehouse. A declaration, never a predicted
+    verdict (REQ-GEN-186 criterion 4): it pins the GATE's decision."""
+    scenario: str
+    dataset_id: str
+    delivery: str
+    outcome: str
+    because: str | None = None
+    rechecked: bool = False
+
+
+def gate_outcomes(placements: Path | None = None) -> list[DeclaredGateOutcome]:
+    """Every gate outcome the last generation's placements declare."""
+    from qa_tools.common import scenario_map
+
+    placed = (_read(placements or scenario_map.PLACEMENTS_PATH).get("placements") or [])
+    return [DeclaredGateOutcome(scenario=p["scenario_id"], dataset_id=g["dataset_id"],
+                                delivery=g["delivery"], outcome=g["outcome"],
+                                because=g.get("because"), rechecked=bool(g.get("rechecked")))
+            for p in placed for g in (p.get("gate_outcomes") or [])]

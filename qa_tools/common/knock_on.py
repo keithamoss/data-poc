@@ -181,8 +181,7 @@ def complete(item, *, run_by: str | None = None, on_step=None):
     failing, and clear it. A failure leaves it owed and reported (criterion
     14): the promotion that caused it stands, and each waiting reader keeps
     its earlier verdict."""
-    from qa_tools.common import (decision_log, hierarchy, promotion, recheck,
-                                 supply_status)
+    from qa_tools.common import decision_log, hierarchy, promotion, recheck
 
     period, tables = item.period, list(item.tables or [])
     reads = promotion._declared_reads()
@@ -199,6 +198,11 @@ def complete(item, *, run_by: str | None = None, on_step=None):
             refused = {}
     waiting_on = sorted({r.dataset_id for r in touched if r.dataset_id in refused})
     touched = [r for r in touched if r.dataset_id not in refused]
+    # WHAT EACH WAITING READER WAS FAILING BEFORE (REQ-PIPE-278 criterion 4):
+    # a failure the re-evaluation did not change gets no still-failing record.
+    with supply_db.connect(read_only=True, label="mothman:knock-on") as conn:
+        before = {(r.dataset_id, r.supply): _failing_checks(conn, r.dataset_id, r.supply)
+                  for r in touched if r.waiting}
     last_key = ""
     try:
         for reader in touched:
@@ -237,32 +241,52 @@ def complete(item, *, run_by: str | None = None, on_step=None):
         # bootstrap replaying four years, the cause's instant, never today
         # (REQ-PIPE-081).
         now = decision_log.follows(conn, item.caused_by_decision)
-        for reader in touched:
-            if not reader.waiting:
-                continue  # criterion 6: a promoted reader is shown, never acted on
+        # criterion 6: a promoted reader is shown, never acted on
+        waiting = [r for r in touched if r.waiting]
+        by_collection: dict[str, list[dict]] = {}
+        from qa_tools.common import supply_files
+
+        for reader in waiting:
             ds = hierarchy.dataset(reader.dataset_id)
-            results = supply_status.latest_results(conn, reader.dataset_id, reader.supply)
             # ITS OWN TABLES, AND CONTESTED ONLY WHILE ITS CONTEST IS OPEN -
             # both by the one resolver (REQ-PIPE-193 criterion 13; REQ-PIPE-194
             # criterion 8), never by the `#` in its id.
-            from qa_tools.common import supply_files
+            by_collection.setdefault(ds.collection_id, []).append({
+                "dataset_id": reader.dataset_id, "supply": reader.supply, "period": period,
+                "physical_tables": supply_files.tables_in(conn, reader.dataset_id,
+                                                          reader.supply,
+                                                          supply_db.STAGING_SCHEMA),
+                "contested": supply_files.open_contest(
+                    conn, reader.dataset_id, reader.supply) is not None})
+    # THE WAITING READERS ARE RE-GATED AS ONE GATE APPLICATION (REQ-PIPE-267
+    # criterion 2): the knock-on is a gate entry, so every waiting supply
+    # connected to them is gated with them. Taken after the application that
+    # caused this has released the period (criterion 17); held by another,
+    # this stays owed for the next pass.
+    from qa_tools.common import gate
 
-            physical = supply_files.tables_in(conn, reader.dataset_id, reader.supply,
-                                              supply_db.STAGING_SCHEMA)
-            gated = promotion.after_run(
-                conn, agency_id=ds.agency_id, collection_id=ds.collection_id,
-                supplies=[{"dataset_id": reader.dataset_id, "supply": reader.supply,
-                           "period": period, "physical_tables": physical,
-                           "contested": supply_files.open_contest(
-                               conn, reader.dataset_id, reader.supply) is not None}],
-                results=results, reads=reads, actor=promotion.RULE_ACTOR,
-                actor_kind=decision_log.RULE, effective_at=now)
-            promotion.report(gated)
-            why = gated.refused.get(reader.dataset_id)
-            if why and _fails_the_rules(why):
+    for collection_id, items in sorted(by_collection.items()):
+        applied = gate.apply(collection_id, period, entry=gate.KNOCK_ON, checked=items,
+                             effective_at=now, run_by=run_by)
+        gate.report(applied)
+        if applied.contended:
+            return recheck.Outcome(
+                item.id, last_key, False,
+                f"{period}: {len(touched)} reader(s) re-evaluated; another gate holds "
+                f"{period}, so they are re-gated by the next pass - still owed",
+                contended=True)
+        for reader in waiting:
+            why = applied.refused.get(reader.dataset_id)
+            if why and _fails_the_rules(why) and reader.dataset_id not in {
+                    d for d, _s, _w in failing}:
                 failing.append((reader.dataset_id, reader.supply, why))
-        if failing:
-            _shout(conn, item, period, failing, effective_at=now)
+    if failing:
+        with supply_db.connect(label="mothman:knock-on") as conn:
+            changed = [f for f in failing
+                       if _failing_checks(conn, f[0], f[1]) != before.get((f[0], f[1]))]
+            own, holding = _by_root(conn, period, changed)
+            if own:
+                _shout(conn, item, period, own, effective_at=now, holding=holding)
     if waiting_on:
         return recheck.Outcome(
             item.id, last_key, False,
@@ -285,11 +309,43 @@ def _fails_the_rules(why: str) -> bool:
     return "status is red" in why or why == promotion.AMBER_WAITING_REASON
 
 
+def _failing_checks(conn, dataset_id: str, supply: str) -> frozenset[str]:
+    """The checks counted toward a supply that fail - its failure, as the
+    still-failing rule compares it before and after a re-evaluation."""
+    from qa_tools.common import promotion, supply_status
+
+    try:
+        latest = supply_status.latest_results(conn, dataset_id, supply)
+    except Exception:  # noqa: BLE001 - nothing readable compares as nothing
+        return frozenset()
+    return frozenset(r["check_id"] for r in promotion._contributing_records(
+        dataset_id, latest, promotion._declared_reads())
+        if (r.get("status") or "") in ("fail", "error"))
+
+
+def _by_root(conn, period: str, failing: list[tuple[str, str, str]]):
+    """(the failing supplies whose red is their own, {root supply: the
+    failing supplies it holds back}) - REQ-PIPE-278 criterion 4: a supply
+    whose failing checks are all another table's doing is named in its
+    ROOT CAUSE's record, never given one of its own."""
+    from qa_tools.common import root_cause
+
+    own, holding = [], {}
+    for f in failing:
+        root = root_cause.root_of(conn, f[0], f[1], period)
+        if root is None:
+            own.append(f)
+        else:
+            holding.setdefault(root.supply or root.key, []).append(f)
+    return own, holding
+
+
 def _shout(conn, item, period: str, failing: list[tuple[str, str, str]], *,
-           effective_at: str) -> None:
-    """ONE record per causing decision naming every failing supply
-    (criterion 12), with the rule as actor - `still-failing`, which the
-    terminal shows at full prominence (criterion 13)."""
+           effective_at: str, holding: dict | None = None) -> None:
+    """ONE record per causing decision and ROOT CAUSE naming every failing
+    supply it holds back (criterion 12; REQ-PIPE-278 criterion 4), with the
+    rule as actor - `still-failing`, which the terminal shows at full
+    prominence (criterion 13)."""
     from qa_tools.common import decision_log, hierarchy
 
     cause = conn.execute(
@@ -300,7 +356,13 @@ def _shout(conn, item, period: str, failing: list[tuple[str, str, str]], *,
         cause_name = hierarchy.dataset(cause_ds).dataset_name
     except hierarchy.UnknownDatasetError:
         cause_name = cause_ds
-    names = ", ".join(f"{hierarchy.dataset(d).dataset_name} ({s}: {w})" for d, s, w in failing)
+    def held(supply: str) -> str:
+        found = (holding or {}).get(supply) or []
+        return ("; it holds back " + ", ".join(
+            f"{hierarchy.dataset(d).dataset_name} ({s})" for d, s, _w in found)) if found else ""
+
+    names = ", ".join(f"{hierarchy.dataset(d).dataset_name} ({s}: {w}{held(s)})"
+                      for d, s, w in failing)
     reason = (f"{action.capitalize()} of {period} {cause_name} ({cause_supply}) left "
               f"{len(failing)} waiting supply(ies) still failing the automatic rules after "
               f"re-evaluation: {names}. A person decides.")

@@ -201,7 +201,53 @@ class TestPromotedTogether:
 # Criterion 4: a could-not-run counts only against the table that asks
 # ---------------------------------------------------------------------------
 
+@pytest.fixture
+def gate_scenario(private_supply_dsn, cp_raw_dir, tmp_path, monkeypatch):
+    """The real lifecycle with each tool's evaluation stood in for
+    (tests/gate_support.py), in a database of its own."""
+    from pathlib import Path
+
+    from gate_support import Scenario, install_fake_tools, pin_replacement_setting
+
+    sc = Scenario(root=tmp_path, raw_dir=Path(cp_raw_dir))
+    install_fake_tools(monkeypatch, sc)
+    pin_replacement_setting(monkeypatch)
+    return sc
+
+
+SIX = {"cp_clients": "C2", "cp_notifications": "N2", "cp_investigations": "I2",
+       "cp_placements": "P2", "cp_carers": "K2", "cp_case_workers": "W2"}
+
+
 class TestCouldNotRunCountsTowardTheAsker:
+
+    def test_a_red_placements_holds_back_only_placements(self, gate_scenario):
+        """S14: a first-time zip of all six tables, Placements v2 red on its
+        own data - Placements v2 alone is held back, its checks of Clients
+        are not re-run for Clients v2 (the result would count toward nothing,
+        REQ-PIPE-267 criterion 6's exception), and the other five promote."""
+        from gate_support import own_red
+
+        sc = gate_scenario
+        sc.rules.append(own_red("P2"))
+        # 2024-Q3, a quarter every table owes (Case Workers owes February and
+        # August only).
+        got = sc.deliver("2024-07-25T10:00:00+08:00", SIX)
+        sc.process()
+        assert sc.holder("cp-placements", "2024-Q3") is None
+        for label, supply in got.items():
+            if label != "P2":
+                assert sc.holder(supply.split("@")[0], "2024-Q3") == supply, label
+        assert not [r for r in sc.runs(got["C2"]) if r["scope"] == "readers"]
+
+    def test_a_zip_without_placements_promotes_clients(self, gate_scenario):
+        """S14b: the same zip with no Placements file at all - Clients v2 is
+        promoted."""
+        sc = gate_scenario
+        five = {t: lab for t, lab in SIX.items() if t != "cp_placements"}
+        got = sc.deliver("2024-07-25T10:00:00+08:00", five)
+        sc.process()
+        assert sc.holder("cp-clients", "2024-Q3") == got["C2"]
 
     def test_an_absent_clients_reddens_only_the_asker(self, conn, period):
         """Clients absent: Notifications' Client reference could not run and

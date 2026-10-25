@@ -120,6 +120,9 @@ def results_for(*, held: dict[str, str], reads: dict[str, list[str]],
                 "on_fail_action": "flag",
                 "engine": getattr(meta, "tool", None) or parsed.tool,
                 "held_table": logical,
+                # THE STRUCTURED REASON (REQ-PIPE-270 criterion 4), beside
+                # the held_reason key carried.not_evaluated_reason reads.
+                "unrunnable_code": "held",
                 # ONE RECORD NAMING EVERY HELD TABLE (REQ-PIPE-115
                 # criterion 2 as amended 2026-10-05, Keith): a check keeps
                 # one result per run, and still names all it was blocked by.

@@ -46,10 +46,13 @@ def test_a_check_in_scope_reading_a_missing_table_is_recorded_red_and_named(stat
     assert "did not fail" in out[0]["unrunnable_reason"]
 
 
-def test_not_yet_due_is_no_data_rather_than_red(states):
+def test_not_yet_due_is_red_and_says_so(states):
+    """REQ-PIPE-270 criterion 1, superseding REQ-PIPE-079 criterion 14's
+    'not yet due -> no data': red, with the not-yet-due code kept."""
     states["cp-clients"] = period_schema.NOT_YET_DUE
     (r,) = _run(_res(resolved={"cp_placements": "x"}, absent=["cp_clients"]))
-    assert r["status"] == "nodata"
+    assert r["status"] == "fail"
+    assert r["unrunnable_code"] == period_schema.NOT_YET_DUE
 
 
 def test_another_datasets_check_is_out_of_scope_unless_it_reads_this_table(states):

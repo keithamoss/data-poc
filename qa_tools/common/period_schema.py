@@ -49,6 +49,7 @@ real rule so it lights up on its own.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Iterable, Mapping, Sequence
 
 from qa_tools.common import replay_clock as _replay_clock
@@ -504,6 +505,35 @@ CONTESTED = "contested"
 #: THE FILE ARRIVED AND COULD NOT BE LOADED (REQ-DASH-148 criterion 6) -
 #: first of all: the supplier has sent it, so no slot reason is true.
 COULD_NOT_LOAD = "could-not-be-loaded"
+#: A PERSON REJECTED THIS PERIOD'S FILE and none has replaced it
+#: (REQ-PIPE-270 criterion 4 as amended by REQ-PIPE-211 criterion 9;
+#: slot_state.REJECTED).
+REJECTED = "rejected"
+#: THE TABLE'S SUPPLY IS HELD - filed to no period (REQ-PIPE-078). Recorded
+#: by held_blast_radius, which names the held table; its code here so every
+#: reason a cross-table check could not read a table has one (REQ-PIPE-270
+#: criterion 4).
+HELD = "held"
+#: THE TABLE'S SUPPLY WAS HELD BACK BY THE GATE APPLICATION THIS CHECK WAS
+#: RE-RUN IN (REQ-PIPE-267 criteria 6 and 8): it came with the supply being
+#: judged, or was waiting beside it, and is not promoting - so the check was
+#: re-run against the period as it will stand, which holds no supply of it.
+HELD_BACK_WITH_PACKAGE = "held-back-with-its-package"
+
+#: EVERY REASON A CROSS-TABLE CHECK COULD NOT READ A TABLE, in words
+#: (REQ-PIPE-270 criterion 5) - the one place each code is described, so no
+#: reason can reach a catch-all. `Unrunnable.describe()` and
+#: unrunnable.describe() both read it.
+REASON_WORDS = {
+    NOT_YET_DUE: "not yet due",
+    PAST_DUE: "overdue",
+    STAGED_AWAITING_DECISION: "staged, awaiting a decision",
+    CONTESTED: "contested - two files claim it",
+    COULD_NOT_LOAD: "could not be loaded",
+    HELD: "held - filed to no period",
+    HELD_BACK_WITH_PACKAGE: "held back with its package",
+    REJECTED: "rejected - a person rejected this period's file and none has replaced it",
+}
 
 
 @dataclass(frozen=True)
@@ -518,9 +548,25 @@ class Unrunnable:
     status: str
     reason: str
     names: tuple[str, ...] = ()
+    #: When a not-yet-due table falls due (REQ-PIPE-270 criterion 4), where
+    #: known - so a reader can tell a red that clears by itself from one
+    #: that will not (plans/running-thoughts.md #113).
+    due_at: datetime | None = None
 
     def describe(self) -> str:
         listed = ", ".join(self.names)
+        if self.reason == NOT_YET_DUE and self.due_at is not None:
+            return (f"could not run - {listed} has not been supplied for this period yet; "
+                    f"it falls due {_due_words(self.due_at)}")
+        if self.reason == HELD:
+            return (f"could not run - {listed} is held: its supply is filed to no "
+                    f"period, so it was not read")
+        if self.reason == HELD_BACK_WITH_PACKAGE:
+            return (f"could not run - {listed} was held back with its package, and no "
+                    f"{listed} is in place in the warehouse for this period")
+        if self.reason == REJECTED:
+            return (f"could not run - {listed} was rejected: a person rejected this "
+                    f"period's file and none has replaced it")
         if self.reason == MISSING_TABLE:
             return (f"could not run - {listed} has no filled slot in this period and "
                      f"is not in the delivery under test")
@@ -528,8 +574,8 @@ class Unrunnable:
             return (f"could not run - {listed} was owed but has no filled slot, so "
                      f"there is nothing to compare against")
         if self.reason == NOT_YET_DUE:
-            return (f"{listed} has not been supplied for this period yet and is "
-                     f"not yet overdue")
+            return (f"could not run - {listed} has not been supplied for this period yet "
+                     f"and is not yet overdue")
         if self.reason == PAST_DUE:
             return f"could not run - {listed} is overdue for this period"
         if self.reason == COULD_NOT_LOAD:
@@ -544,27 +590,46 @@ class Unrunnable:
                  "is nothing to compare against yet")
 
 
+def _due_words(due_at: datetime) -> str:
+    """The instant a table falls due, on the asset's clock."""
+    from qa_tools.common import display_time
+
+    try:
+        return display_time.format_instant(due_at)
+    except Exception:  # noqa: BLE001 - words for a record, never a reason to fail it
+        return due_at.isoformat()
+
+
 #: Most specific first. Criterion 4 defers to "the more specific cases
 #: in this requirement", and where several are true at once the one
 #: reported should name an action the reader can actually take: a
 #: staged supply means "go and decide", where "overdue" would send them
 #: to chase a supplier who has already sent it.
-_MISSING_PRECEDENCE = (COULD_NOT_LOAD, CONTESTED, STAGED_AWAITING_DECISION, PAST_DUE,
-                       NOT_YET_DUE)
+_MISSING_PRECEDENCE = (COULD_NOT_LOAD, CONTESTED, HELD_BACK_WITH_PACKAGE,
+                       STAGED_AWAITING_DECISION, REJECTED, PAST_DUE, NOT_YET_DUE)
 
 
-def _why_missing(missing: Sequence[str], supply_states: dict[str, str]) -> "Unrunnable":
+def _why_missing(missing: Sequence[str], supply_states: dict[str, str],
+                 due_at: dict | None = None) -> "Unrunnable":
     """Which of REQ-PIPE-079's cases explains these absent tables.
 
-    NOT RED FOR A SUPPLY THAT IS NOT DUE YET (criterion 14). Nothing is
-    wrong in that case, and a red that fires when nothing is wrong is
-    how a check earns the reputation that makes people ignore it.
+    RED FOR EVERY REASON, NOT YET DUE INCLUDED (REQ-PIPE-270 criterion 1,
+    superseding REQ-PIPE-079 criterion 14 and decision 23's
+    'awaiting-supply (NOT red)'; Keith, 2026-10-21, 'STRICT, not
+    relaxed'). The carve-out was written so an early arrival does not start
+    life red; it is also what produced the false green of decision 103 - a
+    check nobody could run read 'no data' and the supply was promoted on it.
+    The reason codes stay, so a not-yet-due red is still told apart (with
+    the instant it falls due), and the reason never changes the status.
     """
     for reason in _MISSING_PRECEDENCE:
         named = sorted(n for n in missing if supply_states.get(n) == reason)
         if named:
-            status = NODATA if reason == NOT_YET_DUE else RED
-            return Unrunnable(status=status, reason=reason, names=tuple(named))
+            due = None
+            if reason == NOT_YET_DUE and due_at:
+                found = [due_at[n] for n in named if due_at.get(n) is not None]
+                due = min(found) if found else None
+            return Unrunnable(status=RED, reason=reason, names=tuple(named), due_at=due)
     # Criterion 4's fallback, and every caller that knows no state.
     return Unrunnable(status=RED, reason=MISSING_TABLE, names=tuple(sorted(missing)))
 
@@ -573,7 +638,8 @@ def check_readiness(depends_on: Sequence[str], resolution: PeriodResolution, *,
                      reference_period: str | None = None,
                      reference_filled: bool = False,
                      any_prior_period_owed: bool = True,
-                     supply_states: dict[str, str] | None = None) -> Unrunnable | None:
+                     supply_states: dict[str, str] | None = None,
+                     due_at: dict | None = None) -> Unrunnable | None:
     """Whether a check may be evaluated, or why not.
 
     Returns None where the check should run normally.
@@ -592,7 +658,7 @@ def check_readiness(depends_on: Sequence[str], resolution: PeriodResolution, *,
     """
     missing = [name for name in depends_on if name not in resolution.resolution.resolved]
     if missing:
-        return _why_missing(missing, supply_states or {})
+        return _why_missing(missing, supply_states or {}, due_at)
     if reference_period is None:
         return None
     if reference_filled:

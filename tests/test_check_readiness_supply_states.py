@@ -4,9 +4,10 @@ Four different situations that all look identical from inside a check -
 the table it reads is not there - and which an operator needs told
 apart, because each has a different next action:
 
-  14. not supplied yet, and not yet overdue -> NOT red. Nothing is
-      wrong; the supply is not due. Reporting red here is the false-red
-      that teaches people to ignore the colour.
+  14. not supplied yet, and not yet overdue -> red since REQ-PIPE-270
+      (Keith, 2026-10-21, STRICT), with its own reason code and the
+      instant it falls due. It was NOT red, and decision 103 promoted a
+      supply on exactly that - a check nobody could run, read as green.
   16. a supply IS staged, waiting for somebody to decide -> red, and say
       so. The action is "go and decide", which is nobody's until they
       are told it exists.
@@ -39,16 +40,18 @@ def a_resolution(resolved=()):
     return _Res(resolved)
 
 
-class TestNotYetDueIsNotRed:
-    """Criterion 14."""
+class TestNotYetDueIsRed:
+    """Criterion 14 as REQ-PIPE-270 criterion 1 supersedes it (Keith,
+    2026-10-21, STRICT): a check that could not run is red whatever the
+    reason; the reason is kept, so a not-yet-due red is still told apart."""
 
-    def test_it_is_not_red(self):
+    def test_it_is_red(self):
         verdict = ps.check_readiness(
             ["cp_carers"], a_resolution(),
             supply_states={"cp_carers": ps.NOT_YET_DUE})
         assert verdict is not None
-        assert verdict.status != ps.RED, \
-            "a supply that is not due yet is not a failure, and red here teaches people to ignore red"
+        assert verdict.status == ps.RED
+        assert verdict.reason == ps.NOT_YET_DUE
 
     def test_and_it_says_why(self):
         verdict = ps.check_readiness(

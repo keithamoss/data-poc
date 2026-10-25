@@ -98,7 +98,7 @@ class Outcome:
         return not (self.opened or self.updated or self.reopened)
 
 
-def fingerprint(state: slot_state.SlotState) -> str:
+def fingerprint(state: slot_state.SlotState, also: tuple[str, ...] = ()) -> str:
     """What "the state has changed" means, exactly (criterion 5).
 
     A HASH OF WHAT THE COMMENT WOULD SAY, not of the whole SlotState.
@@ -109,10 +109,10 @@ def fingerprint(state: slot_state.SlotState) -> str:
     WORDING is a change - which is right: the ticket would then be
     showing something it has never shown.
     """
-    return hashlib.sha256(body_for(state).encode("utf-8")).hexdigest()[:16]
+    return hashlib.sha256(body_for(state, also).encode("utf-8")).hexdigest()[:16]
 
 
-def body_for(state: slot_state.SlotState) -> str:
+def body_for(state: slot_state.SlotState, also: tuple[str, ...] = ()) -> str:
     """What the ticket says about this slot, and what a person can do.
 
     NAMED, NEVER OFFERED (criterion 9). The responses are a list of what
@@ -154,11 +154,16 @@ def body_for(state: slot_state.SlotState) -> str:
         # disappears.
         lines += ["", "Nothing is waiting on a person. Left open for whoever "
                        "owns this to close."]
+    if also:
+        # ONE TICKET PER ROOT CAUSE (REQ-PIPE-278 criterion 2): every supply
+        # this one holds back, named here rather than given a ticket of its
+        # own - datasets and periods only.
+        lines += ["", "Also held back by this:", *also]
     return "\n".join(lines)
 
 
-def _own_comment(state: slot_state.SlotState) -> str:
-    return f"{MARKER}{fingerprint(state)}{MARKER_END}\n\n{body_for(state)}"
+def _own_comment(state: slot_state.SlotState, also: tuple[str, ...] = ()) -> str:
+    return f"{MARKER}{fingerprint(state, also)}{MARKER_END}\n\n{body_for(state, also)}"
 
 
 def _last_said(comments: list[str]) -> str | None:
@@ -203,7 +208,7 @@ def policy_from_config(config: dict | None = None) -> str:
 
 
 def reconcile(service: TicketService, states, *, policy: str | None = None,
-              title_for=None) -> Outcome:
+              title_for=None, roots=None) -> Outcome:
     """Bring every slot's ticket up to date with its current state.
 
     `states` is the set of slots to reconcile, which the caller narrows
@@ -218,18 +223,26 @@ def reconcile(service: TicketService, states, *, policy: str | None = None,
     policy = policy or policy_from_config()
     opened, updated, reopened, unchanged = [], [], [], []
     failed: dict = {}
+    # ONE TICKET PER ROOT CAUSE (REQ-PIPE-278 criteria 2 and 3), under
+    # needs-action: `roots` is (root key -> its 'Also held back' lines, the
+    # keys of slots red only by another table's doing), from
+    # root_cause.held_back_by_roots.
+    also_by_key, folded = (roots or ({}, set()))
+    if policy == ALL:
+        folded = set()
 
     for state in states:
-        if not wanted(state, policy):
+        if not wanted(state, policy) or state.key in folded:
             continue
+        also = tuple(also_by_key.get(state.key, ()))
         try:
             ticket = service.find(state.key)
             if ticket is None:
                 service.open(state.key, (title_for or _title)(state),
-                              _own_comment(state))
+                              _own_comment(state, also))
                 opened.append(state.key)
                 continue
-            if _last_said(service.comments(ticket)) == fingerprint(state):
+            if _last_said(service.comments(ticket)) == fingerprint(state, also):
                 # CRITERION 5, and criterion 4's "running it twice
                 # changes nothing" in its observable form.
                 unchanged.append(state.key)
@@ -246,8 +259,8 @@ def reconcile(service: TicketService, states, *, policy: str | None = None,
             # got to without anybody scrolling; the comment is WHAT
             # CHANGED, which is what a notification is for. One slot's
             # state in one place, and the history beside it.
-            service.set_body(ticket, body_for(state))
-            service.comment(ticket, _own_comment(state))
+            service.set_body(ticket, body_for(state, also))
+            service.comment(ticket, _own_comment(state, also))
             updated.append(state.key)
         except Exception as exc:  # noqa: BLE001 - see the docstring
             failed[state.key] = f"{type(exc).__name__}: {exc}"
@@ -353,4 +366,26 @@ def after_runs(collection_id: str, *, conn=None) -> Outcome:
         with supply_db.connect(read_only=True,
                                 label="mothman:reconcile-tickets") as opened:
             return after_runs(collection_id, conn=opened)
-    return reconcile(service, slot_state.states_for(conn, collection_id))
+    states = slot_state.states_for(conn, collection_id)
+    return reconcile(service, states, roots=roots_for(conn, states))
+
+
+def roots_for(conn, states) -> tuple[dict[str, tuple[str, ...]], set[str]]:
+    """(root slot key -> 'Also held back by this' lines, keys folded into a
+    root) - REQ-PIPE-278's one root function, for the reconciler. A root
+    that is not one of `states` (an absent table's slot nobody owes yet)
+    holds its supplies back with no ticket at all (criterion 3)."""
+    from qa_tools.common import root_cause
+
+    holding, folded = root_cause.held_back_by_roots(conn, states)
+    keys = {s.key for s in states}
+    also = {k: tuple(root_cause.also_lines(v)) for k, v in holding.items() if k in keys}
+    # A FAILURE OF ITS OWN IS TICKETED AS TODAY (criterion 6), naming beside
+    # it what else holds it back.
+    for s in states:
+        if s.key in folded or not s.supply or not s.needs_action:
+            continue
+        note = root_cause.beside_its_own(conn, s.dataset_id, s.supply)
+        if note:
+            also[s.key] = (*also.get(s.key, ()), f"- {note}")
+    return also, folded

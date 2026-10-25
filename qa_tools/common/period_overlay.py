@@ -98,7 +98,8 @@ def filed_tables(conn, period: str, wanted: Collection[str] | None = None) -> di
 def build(conn, run_id: str, *, period: str, own_table: str, arrival_key: str,
           tables: Sequence[str], loaded: frozenset[str] | None,
           held: Collection[str] = (),
-          own_physical: Collection[str] | None = None) -> period_schema.PeriodResolution:
+          own_physical: Collection[str] | None = None,
+          warehouse_for: Collection[str] = ()) -> period_schema.PeriodResolution:
     """Replace this run's view schema with the period overlay, and
     record what it resolved.
 
@@ -114,6 +115,13 @@ def build(conn, run_id: str, *, period: str, own_table: str, arrival_key: str,
     staging = supply_db.staging_schema_for(run_id)
     others = [t for t in tables if t != own_table]
     staged = staged_for_period(conn, period, others, staging=staging, loaded=loaded)
+    # THE PERIOD AS IT WILL STAND (REQ-PIPE-267 criterion 6): a gate
+    # application's re-check reads a table whose staged supply is not
+    # promoting with it from the warehouse - its supply in place, or none -
+    # never from staging.
+    for table in warehouse_for:
+        if table != own_table and table in staged:
+            staged[table] = []
 
     # THE RUN'S OWN TABLE IS ITS OWN ARRIVAL'S, and nothing else staged
     # for the period competes with it (criterion 6 as amended 2026-10-02
@@ -334,7 +342,8 @@ def rebuild_for_arrival(arrival, *, tables: Sequence[str],
                     held=supply_holds.held_tables(
                         conn, arrival_key=key,
                         supply=resolved.supply_id if resolved is not None else None),
-                    own_physical=own_physical)
+                    own_physical=own_physical,
+                    warehouse_for=tuple(getattr(arrival, "warehouse_for", ()) or ()))
         if sample:
             found = supply_db.candidates_in(conn, sample_data.SCHEMA, sample,
                                              loaded=loaded)

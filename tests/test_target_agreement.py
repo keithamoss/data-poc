@@ -515,3 +515,103 @@ class TestAPipelineRunComparesToo:
         out = CliRunner().invoke(pipeline.run_command, ["--collection", "bdm", "--publish"])
         assert out.exit_code == 0, out.output
         assert calls["compared"] == [["bdm"]] and calls["published"] == [True]
+
+
+# ---------------------------------------------------------------------------
+# REQ-GEN-273: a target describes the file; a few scenarios pin the gate
+# ---------------------------------------------------------------------------
+
+@pytest.fixture
+def gate_scenario(private_supply_dsn, cp_raw_dir, tmp_path, monkeypatch):
+    from pathlib import Path
+
+    from gate_support import Scenario, install_fake_tools, pin_replacement_setting
+
+    sc = Scenario(root=tmp_path, raw_dir=Path(cp_raw_dir))
+    install_fake_tools(monkeypatch, sc)
+    pin_replacement_setting(monkeypatch)
+    return sc
+
+
+@dataclasses.dataclass(frozen=True)
+class _Built:
+    label: str
+    dataset_id: str
+    delivery: str
+    target: str
+    rules: tuple = ()
+
+
+def _delivery_of(sc, supply):
+    from qa_tools.common import qa_store, supply_db
+
+    with supply_db.connect(read_only=True, label="pytest") as conn:
+        return conn.execute(f'SELECT delivery FROM "{qa_store.SCHEMA}".supply_receipt '
+                            "WHERE supply_id = ?", [supply]).fetchone()[0]
+
+
+class TestPackageMateHeldBack:
+
+    def test_green_target_agrees_when_only_a_held_back_partner_made_it_red(self,
+                                                                         gate_scenario):
+        """A fixture replay of S2 strict as re-cast - Clients built red,
+        Notifications built green: no bootstrap failure, and one reported
+        difference, for Notifications, naming Clients."""
+        from gate_support import own_red
+        from qa_tools.common import supply_db
+        from test_package_gate import first_time
+
+        sc = gate_scenario
+        first_time(sc)
+        sc.rules.append(own_red("C2"))
+        v2 = sc.deliver("2024-11-03T10:00:00+08:00",
+                        {"cp_clients": "C2", "cp_notifications": "N2"})
+        sc.process()
+        delivery = _delivery_of(sc, v2["C2"])
+        built = [_Built("S2 strict - Clients", "cp-clients", delivery, "red"),
+                 _Built("S2 strict - Notifications", "cp-notifications", delivery, "green")]
+        with supply_db.connect(read_only=True, label="pytest") as conn:
+            failing, reported = target_agreement.replay_report(conn, built)
+        assert failing == [], [str(f) for f in failing]
+        assert [r.dataset_id for r in reported] == ["cp-notifications"]
+        assert "cp-clients" in reported[0].because
+
+
+class TestGateOutcomes:
+
+    def test_a_declared_gate_outcome_that_differs_fails_the_bootstrap(self, gate_scenario,
+                                                                       monkeypatch):
+        """S1 green declared wrongly - Clients v2 held back, where the gate
+        promotes it - fails the bootstrap's comparison, naming the scenario;
+        declared rightly, nothing fails."""
+        from gate_support import own_red
+        from qa_tools.common import bootstrap, supply_db
+        from test_package_gate import established
+
+        sc = gate_scenario
+        established(sc)
+        sc.rules.append(own_red("N2"))
+        v2 = sc.deliver("2024-08-05T10:00:00+08:00",
+                        {"cp_clients": "C2", "cp_notifications": "N2"})
+        sc.process()
+        delivery = _delivery_of(sc, v2["C2"])
+        wrong = [targets.DeclaredGateOutcome("TS-S1g", "cp-clients", delivery,
+                                             target_agreement.HELD_BACK)]
+        right = [targets.DeclaredGateOutcome("TS-S1g", "cp-clients", delivery,
+                                             target_agreement.PROMOTED),
+                 targets.DeclaredGateOutcome("TS-S1g", "cp-notifications", delivery,
+                                             target_agreement.HELD_BACK)]
+        with supply_db.connect(read_only=True, label="pytest") as conn:
+            found = target_agreement.gate_outcome_differences(conn, wrong)
+            assert target_agreement.gate_outcome_differences(conn, right) == []
+        assert len(found) == 1 and str(found[0]).startswith("TS-S1g: cp-clients")
+        # AND IT FAILS THE BOOTSTRAP: the bootstrap's own comparison reads the
+        # declarations through cli/ and returns them as disagreements.
+        from cli import pipeline as cli_pipeline
+
+        monkeypatch.setattr(cli_pipeline, "generated_targets", lambda: [])
+        monkeypatch.setattr(cli_pipeline, "generated_gate_outcomes", lambda: wrong)
+        monkeypatch.setattr(cli_pipeline, "target_datasets",
+                            lambda collection_id: ("cp-clients", "cp-notifications"))
+        disagreements = bootstrap.targets_agree(["cp"])
+        assert any(d.startswith("TS-S1g: cp-clients") for d in disagreements), disagreements

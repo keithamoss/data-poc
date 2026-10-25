@@ -28,7 +28,7 @@ from collections.abc import Callable
 
 from qa_tools import collections
 from qa_tools.common import (
-    arrival_lifecycle, arrivals, asked_for, asset_time, decision_log, delivery, delivery_log,
+    arrival_lifecycle, arrivals, asked_for, asset_time, delivery, delivery_log,
     drift_reference, filing, held_blast_radius, in_flight_log, left_out, own_table,
     parallel_orchestrate, period_overlay, promotion, qa_store, replay_clock, supply_db,
     ticket_reconciler, trial, unrunnable,
@@ -238,7 +238,13 @@ def _run_one_inner(collection_id: str, entry: dict, run_id: str, run_timestamp: 
     # AND WHAT A MISSING TABLE COST THEM (REQ-PIPE-105 criterion 13, REQ-PIPE-079
     # criteria 4 and 14-16): each in-scope check over an unreadable table gets a
     # could-not-be-evaluated record, never a verdict on the data.
-    missing = _unrunnable_results(entry, run_id, run_timestamp, resolution) if readable else []
+    # A TABLE NOT PART OF THE AGREEMENT FOR THIS PERIOD, never supplied for
+    # it, is no gap (REQ-PIPE-270 criterion 9): a check reading it is left
+    # out of this run's scope, recorded in left_out with its reason below,
+    # and gets neither a record nor red.
+    outside = _out_of_agreement(entry, run_id, resolution) if readable else {}
+    missing = (_unrunnable_results(entry, run_id, run_timestamp, resolution, outside)
+               if readable else [])
     if missing:
         print(unrunnable.describe(missing))
         write_qa_result(coll.agency_id, coll.id, run_id, run_timestamp, unrunnable.TOOL,
@@ -250,13 +256,16 @@ def _run_one_inner(collection_id: str, entry: dict, run_id: str, run_timestamp: 
     # (REQ-PIPE-115 criterion 17): a disagreement refuses the run before it is
     # finished. Each tool's in-scope left-out set is recorded where non-empty.
     noted = left_out.take(run_id)
-    in_scope = scope_of_run(run_id)
+    scoped = scope_of_run(run_id)
+    in_scope = (lambda check: scoped(check) and check not in outside) if outside else scoped
     reconciles = _reconciles(entry, run_id)
     if reconciles:
         compared = left_out.reconcile(run_id, noted, [*blast, *missing], in_scope)
-        if compared:
+        if compared or outside:
             write_qa_result(coll.agency_id, coll.id, run_id, run_timestamp, left_out.TOOL,
-                            {"left_out": compared})
+                            {"left_out": compared,
+                             **({"not_in_agreement": dict(sorted(outside.items()))}
+                                if outside else {})})
     # AND NOTHING IN SCOPE WENT MISSING ALTOGETHER (REQ-PIPE-188 criterion 6):
     # every in-scope check has a verdict or a not-evaluated record. A run with
     # no period records none, so there a check reading what it cannot read,
@@ -314,7 +323,29 @@ def _period_of_entry(entry: dict, dataset_id: str, as_at) -> str | None:
     return stated or filing.period_of(dataset_id, as_at)
 
 
-def _unrunnable_results(entry: dict, run_id: str, run_timestamp: str, resolution) -> list[dict]:
+def _out_of_agreement(entry: dict, run_id: str, resolution) -> dict[str, str]:
+    """{check: why} for the checks out of this run's scope because a table
+    they read is not part of the agreement for its period and was never
+    supplied for it (REQ-PIPE-270 criterion 9) - none for a trial or an
+    unfiled run."""
+    if trial.is_trial(run_id):
+        return {}
+    owner = run_owner(run_id)
+    if owner is None:
+        return {}
+    own_dataset, table = owner
+    as_at = asset_time.parse_instant(entry["received_at"], f"received_at for {run_id}")
+    period = _period_of_entry(entry, own_dataset, as_at)
+    if not period:
+        return {}
+    with supply_db.connect(read_only=True, label="mothman:out-of-agreement") as conn:
+        return unrunnable.out_of_agreement(
+            conn, own_table=table, own_dataset=own_dataset, period=period,
+            resolution=resolution, reads=promotion._declared_reads(), as_at=as_at)
+
+
+def _unrunnable_results(entry: dict, run_id: str, run_timestamp: str, resolution,
+                        outside: dict[str, str] | None = None) -> list[dict]:
     """The could-not-run records for this run - see unrunnable.py. A TRIAL is
     reconciled, so it records what it could not read too."""
     if trial.is_trial(run_id):
@@ -335,7 +366,10 @@ def _unrunnable_results(entry: dict, run_id: str, run_timestamp: str, resolution
         return unrunnable.results_for(
             conn, run_id=run_id, run_timestamp=run_timestamp, own_table=table,
             own_dataset=own_dataset, period=period, resolution=resolution,
-            reads=promotion._declared_reads(), as_at=as_at)
+            reads=promotion._declared_reads(), as_at=as_at, outside=outside,
+            # A GATE APPLICATION'S RE-CHECK (REQ-PIPE-267 criterion 6) reads
+            # these tables from the warehouse: their supply is not promoting.
+            held_back=frozenset((entry.get("purpose") or {}).get("held_back_tables") or ()))
 
 
 def run_single(collection_id: str, entry: dict, reference_run_id: str | None = None,
@@ -422,22 +456,31 @@ def _claim_window(collection_id: str, arrival):
     return min((schedule.claim_window(d, on=on) for d in datasets), default=None)
 
 
-def promote_after(collection_id: str, arrival, got: list[dict], run_by: str) -> None:
+def promote_after(collection_id: str, arrival, got: list[dict], run_by: str,
+                  entry: str | None = None):
     """PROMOTION FOLLOWS THE RUN (REQ-PIPE-075 criteria 1 and 13), and is
     deliberately not inside it: a failed promotion must be retryable without
     re-running QA. WHEN THE DECISION TOOK EFFECT, not when this replay ran
-    (REQ-PIPE-081). Then THE KNOCK-ON of what it promoted (REQ-PIPE-121)."""
-    from qa_tools.common import knock_on
+    (REQ-PIPE-081). Then THE KNOCK-ON of what it promoted (REQ-PIPE-121).
 
+    THROUGH THE ONE PACKAGE GATE (REQ-PIPE-266 criterion 2): an arrival whose
+    package is not all checked waits, its gate owed; the last of a package
+    gates it whole, as one application (REQ-PIPE-267). `got` is not read: the
+    gate reads what was recorded, through the one selection rule (REQ-PIPE-269
+    criterion 7). Returns the application's outcome."""
+    from qa_tools.common import gate, knock_on
+
+    del got
     coll = collections.by_id(collection_id)
-    promotion.report(promotion.after_runs(
-        [arrival], got, agency_id=coll.agency_id, collection_id=coll.id,
-        actor=promotion.RULE_ACTOR, actor_kind=decision_log.RULE,
+    applied = gate.after_arrival(
+        coll.id, arrival, run_by=run_by, entry=entry or gate.PACKAGE,
         effective_at=promotion.effective_at_for(
             arrival.received_at, seed=arrival.run_id,
             before=promotion.next_receipt(arrival),
-            within=_claim_window(coll.id, arrival)).isoformat()))
+            within=_claim_window(coll.id, arrival)).isoformat())
+    gate.report(applied)
     knock_on.follow_up_stream(coll.id, run_by=run_by)
+    return applied
 
 
 def entry_for(collection_id: str, arrival) -> dict:

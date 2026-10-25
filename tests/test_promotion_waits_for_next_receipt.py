@@ -23,11 +23,14 @@ NEXT = RECEIVED + timedelta(seconds=30)
 
 @pytest.mark.parametrize("collection_id", COLLECTIONS, ids=["bdm", "cp"])
 def test_the_promotion_lands_before_the_next_receipt(collection_id, monkeypatch):
+    from qa_tools.common import gate
+
     stamped = []
     monkeypatch.setattr(promotion, "next_receipt", lambda arrival: NEXT)
-    monkeypatch.setattr(promotion, "after_runs",
-                        lambda arrivals, got, **k: stamped.append(k["effective_at"]))
-    monkeypatch.setattr(promotion, "report", lambda *a, **k: None)
+    monkeypatch.setattr(gate, "after_arrival",
+                        lambda collection_id, arrival, **k: stamped.append(k["effective_at"])
+                        or gate.Applied())
+    monkeypatch.setattr(gate, "report", lambda *a, **k: None)
     monkeypatch.setattr(knock_on, "follow_up", lambda *a, **k: [])
     # A run id whose seeded lag is far longer than thirty seconds, so the
     # cap is what keeps it before the next receipt.
@@ -112,9 +115,11 @@ class TestWithinTheClaimWindowInAReplay:
             return real(received_at, **kw)
         monkeypatch.setattr(replay_clock, "active", lambda: replaying)
         monkeypatch.setattr(promotion, "effective_at_for", spy)
+        from qa_tools.common import gate
+
         monkeypatch.setattr(promotion, "next_receipt", lambda arrival: None)
-        monkeypatch.setattr(promotion, "after_runs", lambda *a, **k: None)
-        monkeypatch.setattr(promotion, "report", lambda *a, **k: None)
+        monkeypatch.setattr(gate, "after_arrival", lambda *a, **k: gate.Applied())
+        monkeypatch.setattr(gate, "report", lambda *a, **k: None)
         monkeypatch.setattr(knock_on, "follow_up", lambda *a, **k: [])
         # The arrival carries ITS collection's dataset: the shared orchestrator
         # takes the window from the files carried (REQ-PIPE-243 criterion 2),

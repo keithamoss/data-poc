@@ -200,7 +200,7 @@ _KEY_COLUMNS = ("agency_id", "collection_id", "tool", "scope", "supply_state")
 #: Bumped whenever the DDL below changes shape. `ensure_schema` reads
 #: it and does nothing when it already matches, which is what keeps
 #: migration DDL off the hot write path - see that function.
-SCHEMA_VERSION = 47
+SCHEMA_VERSION = 48
 
 #: The version at which REQ-PIPE-144 RESHAPED qa.filing and qa.delivery
 #: (a column removed, a column replaced by a foreign key). `CREATE TABLE
@@ -1421,8 +1421,46 @@ CREATE TRIGGER decision_no_truncate
 -- is granted these and never the base tables, so "only finished runs"
 -- is something the database enforces rather than something a build
 -- remembers.
+-- ONE ROW PER GATE APPLICATION (REQ-PIPE-267 criterion 12; schema 48): the
+-- supplies one gate entry has just checked and every waiting supply joined
+-- to them, settled together. While it has no end, the results its
+-- re-evaluations record count toward nothing (qa.run_visible below); a
+-- rolled-back one is ABANDONED and never counts. gate.py is its lifecycle.
+CREATE TABLE IF NOT EXISTS "{SCHEMA}".gate_application (
+    id             bigserial PRIMARY KEY,
+    collection_id  text NOT NULL,
+    period         text NOT NULL,
+    entry          text NOT NULL CHECK (entry IN ('package', 'recheck', 'knock-on',
+                                                  'ungated')),
+    started_at     timestamptz NOT NULL,
+    ended          text CHECK (ended IN ('settled', 'abandoned')),
+    ended_at       timestamptz,
+    -- The package it gates, for a package gate (REQ-PIPE-266 criterion 9).
+    delivery        text,
+    package_instant timestamptz,
+    -- The application this one retries (criterion 17), where it does.
+    retries        bigint,
+    CHECK ((ended IS NULL) = (ended_at IS NULL))
+);
+-- EACH RUN INSIDE AN APPLICATION names it (criterion 12) - the point a
+-- re-evaluation's result belongs to (REQ-PIPE-279's point key, amended).
+ALTER TABLE "{SCHEMA}".run ADD COLUMN IF NOT EXISTS gate_application bigint;
+-- THE CHECKS A GATE APPLICATION'S RE-EVALUATION RE-RUNS, where it narrows a
+-- readers-only run below its reads_table (REQ-PIPE-267 criterion 6's
+-- exception: a check whose result could count toward nothing is not
+-- re-run). NULL keeps every reading check of reads_table.
+ALTER TABLE "{SCHEMA}".run ADD COLUMN IF NOT EXISTS readers_checks text[];
+
+-- A RUN INSIDE A GATE APPLICATION THAT HAS NOT SETTLED COUNTS FOR NOTHING
+-- (REQ-PIPE-267 criterion 12): neither while it runs nor once ABANDONED -
+-- toward no status, page, count, ticket or notification. Filtered HERE, so
+-- every reader of a completed run gets it; the gate itself reads its own
+-- application's runs through gate.py.
 CREATE OR REPLACE VIEW "{SCHEMA}".run_visible AS
-    SELECT * FROM "{SCHEMA}".run WHERE completed_at IS NOT NULL;
+    SELECT * FROM "{SCHEMA}".run r WHERE r.completed_at IS NOT NULL
+    AND (r.gate_application IS NULL OR EXISTS (
+        SELECT 1 FROM "{SCHEMA}".gate_application g
+        WHERE g.id = r.gate_application AND g.ended = 'settled'));
 
 -- A SUPPLY'S CURRENT RUN, DEFINED ONCE (REQ-PIPE-140 criterion 5): its
 -- newest COMPLETED run of its own checks - an arrival's or a re-run's,
@@ -1458,7 +1496,9 @@ CREATE TABLE IF NOT EXISTS "{SCHEMA}".owed_run (
     id                 bigserial PRIMARY KEY,
     -- `recheck` - a supply's own checks again (REQ-PIPE-140 criterion 1);
     -- `reevaluate` - only the readers of `tables` in `period` (criterion 2).
-    kind               text NOT NULL CHECK (kind IN ('recheck', 'reevaluate')),
+    -- `gate` - a gate application owed from recorded results, never by
+    -- re-running tools (REQ-PIPE-266 criterion 3; schema 48).
+    kind               text NOT NULL,
     dataset_id         text NOT NULL,
     supply_id          text,
     period             text,
@@ -1473,9 +1513,44 @@ CREATE TABLE IF NOT EXISTS "{SCHEMA}".owed_run (
     last_failure       text,
     cleared_at         timestamptz,
     cleared_by_run     text,
-    CHECK ((caused_by_decision IS NULL) <> (caused_by_load IS NULL)),
     CHECK ((cleared_at IS NULL) = (cleared_by_run IS NULL))
 );
+
+-- A GATE APPLICATION OWED (REQ-PIPE-266 criterion 3, REQ-PIPE-267 criterion
+-- 17; schema 48), beside 'recheck' and 'reevaluate': applied from recorded
+-- results, never by re-running a supply's QA. Its cause is the load of its
+-- package's last arrival, or the application it retries; which package is
+-- (period, delivery, package_instant). Named constraints, so an older
+-- database's inline ones are replaced rather than kept beside them.
+ALTER TABLE "{SCHEMA}".owed_run ADD COLUMN IF NOT EXISTS caused_by_application bigint;
+ALTER TABLE "{SCHEMA}".owed_run ADD COLUMN IF NOT EXISTS delivery text;
+ALTER TABLE "{SCHEMA}".owed_run ADD COLUMN IF NOT EXISTS package_instant timestamptz;
+ALTER TABLE "{SCHEMA}".owed_run DROP CONSTRAINT IF EXISTS owed_run_kind_check;
+ALTER TABLE "{SCHEMA}".owed_run DROP CONSTRAINT IF EXISTS owed_run_check;
+ALTER TABLE "{SCHEMA}".owed_run DROP CONSTRAINT IF EXISTS owed_run_kind_known;
+ALTER TABLE "{SCHEMA}".owed_run ADD CONSTRAINT owed_run_kind_known
+    CHECK (kind IN ('recheck', 'reevaluate', 'gate'));
+ALTER TABLE "{SCHEMA}".owed_run DROP CONSTRAINT IF EXISTS owed_run_one_cause;
+ALTER TABLE "{SCHEMA}".owed_run ADD CONSTRAINT owed_run_one_cause
+    CHECK (CASE WHEN kind = 'gate'
+                THEN num_nonnulls(caused_by_decision, caused_by_load, caused_by_application) <= 1
+                     AND period IS NOT NULL AND package_instant IS NOT NULL
+                ELSE (caused_by_decision IS NULL) <> (caused_by_load IS NULL)
+                     AND caused_by_application IS NULL END);
+
+
+-- WHAT A GATE APPLICATION DECIDED, on its own entries (REQ-PIPE-266
+-- criteria 9 and 10, REQ-PIPE-267 criterion 13; schema 48): which
+-- application, the package's receipt instant, what a promotion was promoted
+-- with, and - for a hold-back caused by another supply - which checks, what
+-- each was checked against, and which supply was not promoting and whether it
+-- came with this one or was waiting already. Structured, so 'what was gated
+-- together' is one query and a repeat is judged on fields, never on wording.
+ALTER TABLE "{SCHEMA}".decision ADD COLUMN IF NOT EXISTS gate_application bigint;
+ALTER TABLE "{SCHEMA}".decision ADD COLUMN IF NOT EXISTS package_instant timestamptz;
+ALTER TABLE "{SCHEMA}".decision ADD COLUMN IF NOT EXISTS promoted_with text[];
+ALTER TABLE "{SCHEMA}".decision ADD COLUMN IF NOT EXISTS held_back_by text;
+ALTER TABLE "{SCHEMA}".decision ADD COLUMN IF NOT EXISTS held_back_detail jsonb;
 
 -- WHETHER A PROMOTED SUPPLY'S RE-CHECK CAME BACK WORSE than the verdict it
 -- was promoted on, set when it clears (REQ-PIPE-130 criterion 12 as amended
@@ -1490,24 +1565,20 @@ CREATE INDEX IF NOT EXISTS owed_run_open
 
 CREATE OR REPLACE VIEW "{SCHEMA}".check_result_visible AS
     SELECT r.* FROM "{SCHEMA}".check_result r
-    JOIN "{SCHEMA}".run ON run.run_key = r.run_key
-    WHERE run.completed_at IS NOT NULL;
+    JOIN "{SCHEMA}".run_visible run ON run.run_key = r.run_key;
 
 CREATE OR REPLACE VIEW "{SCHEMA}".tool_output_visible AS
     SELECT t.* FROM "{SCHEMA}".tool_output t
-    JOIN "{SCHEMA}".run ON run.run_key = t.run_key
-    WHERE run.completed_at IS NOT NULL;
+    JOIN "{SCHEMA}".run_visible run ON run.run_key = t.run_key;
 
 CREATE OR REPLACE VIEW "{SCHEMA}".tables_read_visible AS
     SELECT t.* FROM "{SCHEMA}".tables_read t
-    JOIN "{SCHEMA}".run ON run.run_key = t.run_key
-    WHERE run.completed_at IS NOT NULL;
+    JOIN "{SCHEMA}".run_visible run ON run.run_key = t.run_key;
 
 CREATE OR REPLACE VIEW "{SCHEMA}".check_read_visible AS
     SELECT k.* FROM "{SCHEMA}".check_read k
     JOIN "{SCHEMA}".check_result c ON c.id = k.check_result_id
-    JOIN "{SCHEMA}".run ON run.run_key = c.run_key
-    WHERE run.completed_at IS NOT NULL;
+    JOIN "{SCHEMA}".run_visible run ON run.run_key = c.run_key;
 
 CREATE OR REPLACE VIEW "{SCHEMA}".dataset_stats_visible AS
     SELECT d.* FROM "{SCHEMA}".dataset_stats d
@@ -1919,15 +1990,21 @@ def set_run_purpose(conn: supply_db.SupplyConnection, run_key: str, *,
                     dataset_id: str | None, supply_id: str | None,
                     scope: str = "arrival", period: str | None = None,
                     reads_table: str | None = None, caused_by_decision: int | None = None,
-                    caused_by_load: int | None = None) -> None:
+                    caused_by_load: int | None = None,
+                    gate_application: int | None = None,
+                    readers_checks: list[str] | None = None) -> None:
     """What a run is for (REQ-PIPE-140): whose supply, which scope, and -
     for a re-run - what caused it. Stated on the run rather than read off
-    its id, which says whose table it is and nothing more."""
+    its id, which says whose table it is and nothing more. A re-evaluation
+    inside a gate application names the application (REQ-PIPE-267 criterion
+    12), which keeps its results out of every count until it settles."""
     conn.execute(
         f'UPDATE "{SCHEMA}".run SET dataset_id = ?, supply_id = ?, scope = ?, period = ?, '
-        "reads_table = ?, caused_by_decision = ?, caused_by_load = ? WHERE run_key = ?",
+        "reads_table = ?, caused_by_decision = ?, caused_by_load = ?, gate_application = ?, "
+        "readers_checks = ? WHERE run_key = ?",
         [dataset_id, supply_id, scope, period, reads_table, caused_by_decision,
-         caused_by_load, run_key])
+         caused_by_load, gate_application,
+         sorted(readers_checks) if readers_checks is not None else None, run_key])
 
 
 def current_run(conn: supply_db.SupplyConnection, dataset_id: str,

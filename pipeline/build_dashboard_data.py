@@ -367,7 +367,8 @@ def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], da
                     lifecycle_by_id: dict, *, facts: dict[str, dict],
                     all_runs: list[dict] | None = None,
                     warehouse_cache: dict | None = None,
-                    superseded: dict[str, dict] | None = None) -> dict:
+                    superseded: dict[str, dict] | None = None,
+                    not_in_agreement: dict[str, dict] | None = None) -> dict:
     """One dataset's page. `manifest` is its own runs; `all_runs` is every
     run in the collection, so a result recorded under another table's run -
     a re-check re-running this table's cross-table checks - is placed and
@@ -791,6 +792,17 @@ def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], da
         # A NEWER SUPPLY THAT COULD BE CARRIED FORWARD (REQ-PIPE-271 criterion
         # 7): each warning with the days it stood, its words worked out here.
         "carryForwardWarnings": carry_forward.for_dashboard(dataset_id),
+        # CHECKS LEFT OUT OF A RUN BECAUSE A TABLE THEY READ IS NOT PART OF THE
+        # AGREEMENT FOR ITS PERIOD (REQ-PIPE-270 criterion 9): neither red nor a
+        # result, so the page says why each did not run - per run of this
+        # dataset, by check, with its period and the recorded reason.
+        "notInAgreement": [
+            {"runId": run_id, "supplyId": facts[run_id]["supply_id"], "checkId": check,
+             "reason": why}
+            for run_id, checks in sorted((not_in_agreement or {}).items(),
+                                         key=lambda kv: facts.get(kv[0], {}).get("rank", 0))
+            if run_id in facts and facts[run_id]["dataset_id"] == dataset_id
+            for check, why in checks.items()],
         "arrivalHistory": arrival_history,
         "arrivalByRun": arrival_by_run,
         "rowCount": row_count_by_run.get(latest_run),
@@ -885,7 +897,8 @@ def build_datasets(collection_id: str) -> list[dict]:
     superseded = superseded_runs(facts, manifest)
     return [build_one_table(coll, d, by_table[d.table], own_runs(manifest, d.dataset_id, facts),
                             dataset_stats, lifecycle_by_id, facts=facts, all_runs=all_runs,
-                            warehouse_cache=cache, superseded=superseded)
+                            warehouse_cache=cache, superseded=superseded,
+                            not_in_agreement=payload.get("not_in_agreement") or {})
             for d in coll.datasets]
 
 

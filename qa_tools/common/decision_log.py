@@ -321,6 +321,16 @@ class Decision:
     #: The supply whose promotion opened the period an INHERIT filled
     #: (REQ-TEST-150 criterion 6). None where a person opened it.
     caused_by_supply: str | None = None
+    #: WHAT A GATE APPLICATION DECIDED (REQ-PIPE-266 criteria 9 and 10,
+    #: REQ-PIPE-267 criterion 13): the application, its package's receipt
+    #: instant, every other supply a promotion was promoted with, and - for a
+    #: hold-back another supply caused - that supply and the structured
+    #: detail its reason is worded from.
+    gate_application: int | None = None
+    package_instant: str | None = None
+    promoted_with: tuple[str, ...] | None = None
+    held_back_by: str | None = None
+    held_back_detail: dict | None = None
 
     @property
     def slots(self) -> tuple[str, ...]:
@@ -961,9 +971,10 @@ def _insert(conn: supply_db.SupplyConnection, decision: Decision) -> int:
         "from_slot, to_slot, actor, actor_kind, reason, effective_at, stands_on, "
         "amber_setting, amber_level, amber_version, superseded_by, table_name, "
         "promoted_status, replaces, replacement_setting, replacement_level, "
-        "replacement_version, caused_by_decision, caused_by_supply, recorded_at) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
-        "RETURNING id",
+        "replacement_version, caused_by_decision, caused_by_supply, recorded_at, "
+        "gate_application, package_instant, promoted_with, held_back_by, held_back_detail) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, "
+        "?, ?, ?, ?, ?) RETURNING id",
         [decision.agency_id, decision.collection_id, decision.dataset_id,
          decision.action, decision.supply or None, decision.from_slot, decision.to_slot,
          decision.actor.strip(), decision.actor_kind,
@@ -973,8 +984,20 @@ def _insert(conn: supply_db.SupplyConnection, decision: Decision) -> int:
          decision.promoted_status, decision.replaces, decision.replacement_setting,
          decision.replacement_level, decision.replacement_version,
          decision.caused_by_decision, decision.caused_by_supply,
-         _recorded_at(decision)]).fetchall()
+         _recorded_at(decision), decision.gate_application, decision.package_instant,
+         list(decision.promoted_with) if decision.promoted_with is not None else None,
+         decision.held_back_by,
+         _json(decision.held_back_detail)]).fetchall()
     return int(rows[0][0])
+
+
+def _json(value):
+    """A dict as jsonb, or None."""
+    if value is None:
+        return None
+    from psycopg.types.json import Jsonb
+
+    return Jsonb(value)
 
 
 #: How long a decision waits on a lock before it is refused (REQ-PIPE-129

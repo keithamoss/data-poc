@@ -196,6 +196,23 @@ class TestTheFlagRoute:
                 f"forward into it. Nothing was recorded.") in _flat(got.output)
         assert entries(conn, world.q4) == before, "recorded nothing"
 
+    def test_refused_while_a_gate_holds_the_period(self, conn, world, keyboard):
+        """REQ-PIPE-280 criterion 2 (REQ-PIPE-266 criterion 16): a carry-forward
+        try-locks its period's gate lock, and while a gate application holds
+        it the decision is refused with exit 75 and the gate-running words,
+        recording nothing."""
+        from qa_tools.common import gate
+
+        _stale(conn, world)
+        before = entries(conn, world.q4)
+        with gate.period_lock("child-protection", world.q4) as held:
+            assert held
+            got = self._decide(world)
+        assert got.exit_code == 75, got.output
+        assert (f"A gate is running for {world.q4}. Nothing was changed. Try again in a "
+                f"moment.") in _flat(got.output)
+        assert entries(conn, world.q4) == before, "recorded nothing"
+
     def test_a_second_carry_forward_is_a_no_op_exit_0(self, conn, world, actor, keyboard):
         _stale(conn, world)
         _apply(conn, actor, world)

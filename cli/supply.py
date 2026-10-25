@@ -1027,6 +1027,14 @@ def decide_command(operation: str, dataset_id: str, period: str | None,
     decision stands but its checks did not finish.
 
     \b
+    Exit statuses:
+      0   recorded, or already so
+      1   refused - nothing was recorded
+      3   recorded, but the checks it owes did not finish (--wait)
+      75  a gate is deciding this supply or its period right now - nothing
+          was changed; the same command later goes through
+
+    \b
     carry-forward: inherit the newest promoted supply, replacing what this
     period carries forward (or giving it one) - one decision, so its readers
     never go without the table:

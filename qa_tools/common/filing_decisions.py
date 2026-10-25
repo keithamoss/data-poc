@@ -118,6 +118,26 @@ SUPPLY_SCOPED = (PROMOTE, REJECT, DEMOTE, REFILE, ACKNOWLEDGE, SUPERSEDE, UN_SUP
 PERIOD_SCOPED = (SUBSTITUTE, DE_SUBSTITUTE, INHERIT, UN_INHERIT, MARK_NOT_SUPPLIED,
                  WITHDRAW_NOT_SUPPLIED, CARRY_FORWARD)
 
+#: THE DECISIONS THAT MOVE A TABLE INTO OR OUT OF A PERIOD (REQ-PIPE-266
+#: criterion 16), each of which try-locks the period's gate lock first: a gate
+#: application holding it refuses the decision, which records nothing.
+MOVES_A_TABLE = (PROMOTE, REJECT, DEMOTE, UN_INHERIT, DE_SUBSTITUTE, REFILE, CARRY_FORWARD)
+
+#: The exit status a refusal that the same command, later, gets past gives
+#: on the flag route (REQ-PIPE-266 criteria 15 and 16; Keith, 2026-10-22,
+#: V4-Q3 = A) - EX_TEMPFAIL, processing_pass.EXIT_LOCKED's code: nothing was
+#: changed, try later.
+EXIT_TRY_LATER = 75
+
+
+class GateBusy(decision_log.DecisionRefused):
+    """A decision refused because a gate is deciding its supply or period
+    right now (REQ-PIPE-266 criteria 15 and 16) - not a 'no' but a 'not
+    yet': the same command later goes through, so it exits 75."""
+
+    exit_code = EXIT_TRY_LATER
+
+
 #: Which operations destroy something a reader depends on, and so need
 #: an explicit confirmation on every route (criteria 9 and 28, and
 #: REQ-PIPE-099 criterion 10). The TUI confirms EVERYTHING (criterion
@@ -1259,6 +1279,34 @@ def _refuse_substituting_over_an_open_pair(conn, request: Request) -> None:
             files=blocker.files)
 
 
+def _periods_moved(request: Request) -> list[str]:
+    """The periods a table-moving decision moves a table into or out of."""
+    if request.operation not in MOVES_A_TABLE:
+        return []
+    return sorted({p for p in (request.period, request.to_period) if p})
+
+
+def refuse_while_gated(request: Request, conn=None) -> None:
+    """REFUSED BEFORE A REASON IS ASKED FOR (REQ-PIPE-266 criteria 15 and 16):
+    a supply whose package is still being checked or gated, and a
+    table-moving decision in a period a gate application holds. Records
+    nothing; GateBusy carries exit 75."""
+    from qa_tools.common import gate
+
+    if conn is None:
+        with supply_db.connect(label="mothman:filing-decision") as opened:
+            return refuse_while_gated(request, conn=opened)
+    if request.supply:
+        said = gate.still_being_gated(conn, request.dataset_id, request.supply)
+        if said:
+            raise GateBusy(said)
+    collection_id = hierarchy.dataset(request.dataset_id).collection_id
+    for period in _periods_moved(request):
+        with conn.raw.transaction():
+            if not gate.try_for_decision(conn, collection_id, period):
+                raise GateBusy(gate.GATE_RUNNING.format(period=period))
+
+
 def apply(request: Request, *, effective_at: str, conn=None) -> Outcome:
     """Raise one filing decision, from whichever route.
 
@@ -1302,6 +1350,8 @@ def apply(request: Request, *, effective_at: str, conn=None) -> Outcome:
         role, level = required
         agency = hierarchy.dataset(request.dataset_id).agency_id if level == "agency" else None
         people.require_role(request.actor, role, level, agency)
+    if conn is None:
+        refuse_while_gated(request)
     reason = _reason(request)
     if request.operation != REFILE:
         _confirmation(request)
@@ -1309,6 +1359,33 @@ def apply(request: Request, *, effective_at: str, conn=None) -> Outcome:
     if conn is None:
         with supply_db.connect(label="mothman:filing-decision") as opened:
             return apply(request, effective_at=effective_at, conn=opened)
+    # THE PERIOD'S GATE LOCK, HELD FOR THE DECISION (REQ-PIPE-266 criterion
+    # 16): no gate application starts in a period while a person's
+    # table-moving decision is being applied there, and one already running
+    # refuses this one. Released when the decision is done.
+    from qa_tools.common import gate
+
+    held = []
+    try:
+        for period in _periods_moved(request):
+            key = gate._lock_key(hierarchy.dataset(request.dataset_id).collection_id, period)
+            if not conn.execute("SELECT pg_try_advisory_lock(?, hashtext(?))",
+                                [gate.PERIOD_LOCK_SPACE, key]).fetchone()[0]:
+                raise GateBusy(gate.GATE_RUNNING.format(period=period))
+            held.append(key)
+        if request.supply:
+            said = gate.still_being_gated(conn, request.dataset_id, request.supply)
+            if said:
+                raise GateBusy(said)
+        return _apply_held(request, reason, effective_at=effective_at, conn=conn)
+    finally:
+        for key in held:
+            conn.execute("SELECT pg_advisory_unlock(?, hashtext(?))",
+                         [gate.PERIOD_LOCK_SPACE, key])
+
+
+def _apply_held(request: Request, reason: str, *, effective_at: str, conn) -> Outcome:
+    """apply()'s effect, under the period's gate lock."""
 
     _refuse_on_an_open_pair(conn, request)
     if request.operation == REFILE:
