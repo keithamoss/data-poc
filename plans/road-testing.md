@@ -144,10 +144,14 @@ Still to settle by driving the page: #8 and #17 - both since closed
    Department of Health (Emergency Department) goes into the current
    period; every other collection goes into the next - "that's how it
    works in production now". Keith asked how to model it: a configuration
-   flag or something else. Open with him (2026-10-25): what "next period"
-   means for a daily collection; whether synthetic linkage products come
-   now or later; refusing a change of offset until a period is declared
-   not owed; and the page's wording.
+   flag or something else. KEITH'S ANSWERS, 2026-10-25: Birth Registrations'
+   daily supply really stands in for a separate data asset, kept in this
+   one for now, and goes into the CURRENT period - so in the synthetic
+   history only Child Protection goes into the next period. A synthetic
+   linkage dataset is wanted, at DATASET level (not per collection), and is
+   SCOPED SEPARATELY. A change of a collection's offset is refused until a
+   period is declared not owed. The page names the period, e.g. "For
+   2026-Q2 - received 1 Feb".
 
    **From the road-test participant, not Keith** (Keith, 2026-10-25): the "Keith's own ask" below records who relayed it.
 
