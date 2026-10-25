@@ -42251,7 +42251,7 @@ requirements:
     story: As a supplying team, I want to be told that files sent separately are each judged as they arrive and may read red
       until the rest arrive, so that I send them as one zip and nobody is told about a red that clears by itself.
     moscow: should
-    status: not_started
+    status: built
     signed_off:
       by: Keith
       date: '2026-10-23'
@@ -42278,7 +42278,16 @@ requirements:
     dependencies:
     - REQ-PIPE-266
     - REQ-PIPE-270
+    linked_tests:
+    - "tests/test_supplier_guidance.py"
+    implemented_by:
+    - "docs/supplier-guidance.md"
+    - "docs/delivery-format.md"
+    - "docs/aws-event-driven-mvp-design.md"
+    evidence:
+    - "2026-10-25: docs/supplier-guidance.md written and linked from docs/delivery-format.md and the AWS design's cloud-path limitation section; tests/test_supplier_guidance.py (5) checks both links, that every link it makes resolves (anchor included), and the three things criteria 1 to 3 require it to say - 5 passed."
     decisions:
+    - "WRITTEN FOR THE SUPPLIER, IN PLAIN TERMS (main session, 2026-10-25): one worked example (notifications on Monday, clients on Wednesday), no internal vocabulary (no gate, slot or knock-on), and the cloud path named as the upload path. Guidance only - nothing it says is enforced."
     - 'GUIDANCE, NOT DESIGN (Keith, 2026-10-20): ''I don''t think we can really design around that.'''
     - 'UPLOAD A ZIP, ON THE CLOUD PATH TOO (Keith, 2026-10-22, Q9 = A): the cloud ingest path forms no packages (REQ-PIPE-266
       criterion 6), so a supplier there avoids the flicker only by uploading one zip.'

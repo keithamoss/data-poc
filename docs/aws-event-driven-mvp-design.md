@@ -275,7 +275,7 @@ instant (`qa_tools/common/s3_arrival.record_object`), so there every file is
 a package of one and is gated on its own. An early file whose cross-table
 checks need a later one reads red until the later one arrives and is
 promoted - the accepted flicker (Keith, 2026-10-20), whose remedy is supplier
-guidance to upload one zip (REQ-DOCS-274).
+guidance to upload one zip (REQ-DOCS-274, [supplier-guidance.md](supplier-guidance.md)).
 
 A cloud package boundary - a manifest, or an end marker - is transport-layer
 work, deliberately not designed here (Keith, 2026-10-22, Q9 = A, "B later"):

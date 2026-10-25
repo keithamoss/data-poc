@@ -53,6 +53,9 @@ So: **no code that files a supply may read a statement of intent from
 inside a delivery.** If a supplier puts one there anyway, it is an
 artefact to report, not a value to use.
 
+**For suppliers**: how to send a multi-file delivery - as one zip, and why - is in
+[supplier-guidance.md](supplier-guidance.md) (REQ-DOCS-274).
+
 ## Delivery names mean nothing
 
 A delivery directory's name is whatever the supplier called their drop.
