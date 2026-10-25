@@ -499,6 +499,10 @@ FILE_SHAPES: dict[str, str] = {
     "clients_and_notifications":
         "a zip of cp_clients.csv and cp_notifications.csv alone - a resupply of two "
         "tables that arrive together.",
+    "clients_and_readers":
+        "a zip of cp_clients.csv and the three tables that read it - cp_notifications, "
+        "cp_investigations and cp_placements - a corrected resend of a quarter whose "
+        "Client Register failed.",
     "clients_short_with_notifications":
         "a zip of cp_clients.csv and cp_notifications.csv, the Client Register missing "
         "the five clients only the Notifications point at (none of Investigations or "
@@ -602,6 +606,8 @@ def carries(shape: str | None, table: str) -> bool:
         return table == "cp_carers"
     if shape in ("clients_and_notifications", "clients_short_with_notifications"):
         return table in ("cp_clients", "cp_notifications")
+    if shape == "clients_and_readers":
+        return table in _CLIENTS_AND_READERS
     return True
 
 
@@ -654,11 +660,16 @@ def apply_file_shape(shape: str | None, files: dict[str, str]) -> dict[str, str]
         out = {"cp_carers.csv": files["cp_carers.csv"]}
     elif shape == "clients_and_notifications":
         out = {t: files[t] for t in ("cp_clients.csv", "cp_notifications.csv")}
+    elif shape == "clients_and_readers":
+        out = {f"{t}.csv": files[f"{t}.csv"] for t in _CLIENTS_AND_READERS}
     elif shape == "clients_short_with_notifications":
         out = {"cp_clients.csv": _without_notified_only(files),
                "cp_notifications.csv": files["cp_notifications.csv"]}
     return out
 
+
+#: The Client Register and the tables whose cross-table checks read it.
+_CLIENTS_AND_READERS = ("cp_clients", "cp_notifications", "cp_investigations", "cp_placements")
 
 #: How many clients S1 red's Client Register leaves out (REQ-GEN-273).
 NOTIFIED_ONLY_DROPPED = 5
@@ -2213,7 +2224,8 @@ INJECTIONS: tuple[Injection, ...] = (
         config="quarterly, Feb/May/Aug/Nov, due 09:00 on the 1st; Child Protection's "
                "replacement setting is green for 2017-Q2 and 2017-Q3. The quarter's five "
                "tables arrive on time, clean, and are promoted; two weeks later a zip of a "
-               "clean Client Register and a Notifications red on its own data arrives.",
+               "clean Client Register and a Notifications red on its own data arrives, and "
+               "a person rejects that Notifications three weeks after it.",
         arrivals=(
             ExtraArrival(0, "09:00", None,
                          "the quarter's five tables on time, clean - each promoted"),
@@ -2230,7 +2242,8 @@ INJECTIONS: tuple[Injection, ...] = (
         dataset_id="cp-clients",
         anchor=-37,
         config="as TS-81, the Client Register of the zip missing the five clients only "
-               "the quarter's Notifications point at.",
+               "the quarter's Notifications point at; a person rejects both files of the "
+               "zip three weeks after it.",
         arrivals=(
             ExtraArrival(0, "09:00", None,
                          "the quarter's six tables on time, clean - each promoted"),
@@ -2250,13 +2263,23 @@ INJECTIONS: tuple[Injection, ...] = (
         anchor=-41,
         config="quarterly, Feb/May/Aug/Nov, due 09:00 on the 1st. The quarter's six "
                "tables arrive together on time, the first supply of the quarter, the "
-               "Client Register red on its own data and the other five clean.",
+               "Client Register red on its own data and the other five clean; four weeks "
+               "later a corrected Client Register and its three readers are resent.",
         arrivals=(
             ExtraArrival(0, "09:00", "red",
                          "the quarter's six tables on time, cp_clients red on its own "
                          "data and the other five clean", severity_tables=("cp_clients",)),
+            # RESOLVED, so nothing it held back waits on later pages: the
+            # supplier resends the Client Register and its three readers.
+            ExtraArrival(28, "10:00", None,
+                         "a corrected cp_clients and its three readers, resent together",
+                         file_shape="clients_and_readers"),
         ),
-        gate_outcomes=(GateOutcome("cp-clients", 0, "held back"),
+        gate_outcomes=(GateOutcome("cp-clients", 1, "promoted"),
+                       GateOutcome("cp-notifications", 1, "promoted"),
+                       GateOutcome("cp-investigations", 1, "promoted"),
+                       GateOutcome("cp-placements", 1, "promoted"),
+                       GateOutcome("cp-clients", 0, "held back"),
                        GateOutcome("cp-notifications", 0, "held back", because="cp-clients",
                                    rechecked=True),
                        GateOutcome("cp-investigations", 0, "held back", rechecked=True),
@@ -2296,13 +2319,18 @@ INJECTIONS: tuple[Injection, ...] = (
         anchor=-43,
         config="quarterly, Feb/May/Aug/Nov, due 09:00 on the 1st. The quarter's six "
                "tables arrive together on time, the first supply of the quarter, "
-               "Placements red on its own data and the other five clean.",
+               "Placements red on its own data and the other five clean; four weeks later "
+               "a corrected Placements is resent alone.",
         arrivals=(
             ExtraArrival(0, "09:00", "red",
                          "the quarter's six tables on time, cp_placements red on its own "
                          "data and the other five clean", severity_tables=("cp_placements",)),
+            # RESOLVED: a corrected Placements alone, which the rule promotes.
+            ExtraArrival(28, "10:00", None, "a corrected cp_placements alone",
+                         file_shape="missing_table_late"),
         ),
-        gate_outcomes=(GateOutcome("cp-placements", 0, "held back"),
+        gate_outcomes=(GateOutcome("cp-placements", 1, "promoted"),
+                       GateOutcome("cp-placements", 0, "held back"),
                        GateOutcome("cp-clients", 0, "promoted"),
                        GateOutcome("cp-notifications", 0, "promoted"),
                        GateOutcome("cp-investigations", 0, "promoted"),

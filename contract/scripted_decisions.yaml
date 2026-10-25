@@ -178,6 +178,30 @@ decisions:
     supply: 0
     after_hours: 504
     reason: "Client records fail their checks - the supplier is sending a corrected cp_clients extract."
+  # REQ-GEN-273 criterion 4: TS-81's and TS-82's red package-mates - and TS-82's
+  # held-back Client Register - are rejected three weeks after their zip, so a
+  # supply the gate held back waits on no later page.
+  - scenario: TS-81
+    name: TS-81 reject
+    operation: reject
+    dataset: cp-notifications
+    supply: 1
+    after_hours: 504
+    reason: "Notifications fail their own checks - the quarter keeps the Notifications it already holds."
+  - scenario: TS-82
+    name: TS-82 reject notifications
+    operation: reject
+    dataset: cp-notifications
+    supply: 1
+    after_hours: 504
+    reason: "Notifications fail their own checks - the quarter keeps the Notifications it already holds."
+  - scenario: TS-82
+    name: TS-82 reject clients
+    operation: reject
+    dataset: cp-clients
+    supply: 1
+    after_hours: 505
+    reason: "This Client Register is missing clients the warehouse's Notifications need - the quarter keeps the Client Register it already holds."
   # TS-76: the delivery left cp_placements out; the quarter stands on the one
   # before until the next quarter's window has opened, when the substitution is
   # removed and the quarter marked not supplied - de-substitution first.

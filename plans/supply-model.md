@@ -3725,7 +3725,9 @@ outcomes declared for the bootstrap to compare (criterion 3).
 Protection's replacement setting is green for 2017-Q2 and 2017-Q3
 (contract/data-asset.yaml, Keith 2026-10-25). 2017-Q2's five tables arrive
 on time, clean, and are promoted; on 15 May 2017 at 10:00 a zip of a clean
-cp_clients and a cp_notifications red on its own data arrives.*
+cp_clients and a cp_notifications red on its own data arrives. A scripted
+person rejects that Notifications three weeks later (contract/
+scripted_decisions.yaml, "TS-81 reject"), so it waits on no later page.*
 **Expect**: Notifications v2 is held back (refused on its own data);
 Clients v2's Notifications -> Client Register check is re-run against
 Notifications v1 in the warehouse, passes, and Clients v2 replaces Clients
@@ -3738,7 +3740,7 @@ warehouse's Notifications and held back.** PLANTED by REQ-GEN-273 criterion
 4 (2026-10-25), as TS-81 in the next quarter.
 *Config: as TS-81, in 2017-Q3, the zip's cp_clients missing the five clients
 only the quarter's Notifications point at (no Investigation or Placement
-does).*
+does). A scripted person rejects both files of the zip three weeks later.*
 **Expect**: Notifications v2 is held back on its own data; Clients v2's
 re-check against Notifications v1 fails, so Clients v2 is held back
 ('promotion-withheld' naming Notifications v2, re-checked against
@@ -3751,11 +3753,14 @@ whole first-time package back.** PLANTED by REQ-GEN-273 criterion 4
 (2026-10-25).
 *Config: quarterly, Feb/May/Aug/Nov, due 09:00 on the 1st. 2016-Q3's six
 tables arrive together on time, the quarter's first supply, cp_clients red
-on its own data and the other five clean.*
+on its own data and the other five clean. On 29 August a corrected
+cp_clients and its three readers are resent together.*
 **Expect**: Clients is held back on its own data; Notifications,
 Investigations and Placements are re-checked against no Client Register in
 the warehouse and held back with it ('promotion-withheld', could not be
-checked); Carer Register and Case Workers are promoted.
+checked); Carer Register and Case Workers are promoted. The resend is
+gated as one package and all four are promoted, superseding the first
+four.
 **Breaks as**: Notifications judged alone and promoted, or held back without
 the re-check.
 
@@ -3777,10 +3782,12 @@ Clients promoted alone.
 package.** PLANTED by REQ-GEN-273 criterion 4 (2026-10-25), Q13's case.
 *Config: quarterly, Feb/May/Aug/Nov, due 09:00 on the 1st. 2016-Q1's six
 tables arrive together on time, the quarter's first supply, cp_placements
-red on its own data and the other five clean.*
+red on its own data and the other five clean. On 29 February a corrected
+cp_placements arrives alone.*
 **Expect**: Placements is held back on its own data; Client Register,
 Notifications, Investigations, Carer Register and Case Workers are promoted
-- no check they count reads a Placements the period will hold.
+- no check they count reads a Placements the period will hold. The
+corrected Placements is promoted, superseding the first.
 **Breaks as**: a reader of Placements held back with it.
 
 **TS-43 `[INJECT]` An amber supply held under hold.**
