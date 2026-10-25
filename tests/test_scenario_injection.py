@@ -583,7 +583,9 @@ class TestEveryChildProtectionInjectionIsPlanned:
         # period-scoped decision has no real slot to be timed from.
         monkeypatch.setattr(si, "INJECTIONS", tuple(
             dataclasses.replace(i, links=()) for i in si.INJECTIONS))
-        resolved, by_period = cp._plan_injections(_daily(30))
+        # SIXTY, deep enough for the grown quarters' scenarios (REQ-GEN-273's
+        # TS-81 to TS-85 sit as far back as -46).
+        resolved, by_period = cp._plan_injections(_daily(60))
         assert "TS-56" in {inj.scenario_id for inj, _ in resolved}
 
     def test_two_in_one_delivery_are_refused(self, monkeypatch):
@@ -821,3 +823,58 @@ class TestTheChildProtectionPairsArePlacedAsDecided:
                                             self._injection("TS-80")]) == []
         assert {link.scenario_id for link in self._injection("TS-42a").links} == {
             "TS-42a", "TS-42b"}
+
+
+class TestTheGateOutcomeScenarios:
+    """REQ-GEN-273 criterion 4: TS-81 to TS-85 declare what the package gate
+    does, by delivery, and the two shapes and the staggered receipts they
+    need are the generator's."""
+
+    def test_the_five_declare_their_outcomes_in_the_record(self):
+        from generator.collections import child_protection as cp
+
+        periods = cp.generated_periods()
+        found = {}
+        for inj in si.INJECTIONS:
+            if inj.scenario_id in ("TS-81", "TS-82", "TS-83", "TS-84", "TS-85"):
+                placement = si.resolve(inj, periods)
+                for n, arrival in enumerate(placement.arrivals):
+                    arrival["delivery"] = f"d{n}"
+                found[inj.scenario_id] = placement.as_record()["gate_outcomes"]
+        assert sorted(found) == ["TS-81", "TS-82", "TS-83", "TS-84", "TS-85"]
+        assert {"dataset_id": "cp-clients", "delivery": "d1", "outcome": "held back",
+                "because": "cp-notifications", "rechecked": True} in found["TS-82"]
+        assert all(g["outcome"] == "promoted" for g in found["TS-84"])
+
+    def test_a_gate_outcome_names_a_real_arrival_and_a_known_word(self):
+        with pytest.raises(si.CannotPlace):
+            si.GateOutcome("cp-clients", 0, "refused")
+        with pytest.raises(si.CannotPlace):
+            si.GateOutcome("cp-clients", 0, "promoted", because="cp-notifications")
+        bad = si.Injection("TS-x", "cp-clients", -38, "cfg",
+                           arrivals=(si.ExtraArrival(0, "09:00"),),
+                           gate_outcomes=(si.GateOutcome("cp-clients", 1, "promoted"),))
+        from generator.collections import child_protection as cp
+
+        with pytest.raises(si.CannotPlace, match="arrival 1"):
+            si.resolve(bad, cp.generated_periods())
+
+    def test_the_short_register_drops_clients_only_notifications_point_at(self):
+        clients = "cp_client_id,given_name\n" + "".join(f"C{i},n\n" for i in range(10))
+        notifications = "notification_id,cp_client_id\n" + "".join(
+            f"N{i},C{i}\n" for i in range(9))
+        investigations = "investigation_id,cp_client_id\nI0,C0\nI1,C1\n"
+        placements = "placement_id,cp_client_id\nP2,C2\n"
+        files = {"cp_clients.csv": clients, "cp_notifications.csv": notifications,
+                 "cp_investigations.csv": investigations, "cp_placements.csv": placements,
+                 "cp_carers.csv": "carer_id\nK\n"}
+        out = si.apply_file_shape("clients_short_with_notifications", files)
+        assert sorted(out) == ["cp_clients.csv", "cp_notifications.csv"]
+        kept = {line.split(",")[0] for line in out["cp_clients.csv"].splitlines()[1:]}
+        assert kept == {"C0", "C1", "C2", "C8", "C9"}
+        assert si.carries("clients_short_with_notifications", "cp_notifications")
+        assert not si.carries("clients_and_notifications", "cp_placements")
+
+    def test_a_file_time_before_the_delivery_is_refused(self):
+        with pytest.raises(si.CannotPlace, match="earliest"):
+            si.ExtraArrival(0, "09:00", file_times=(("cp_clients", "08:00"),))

@@ -34,8 +34,21 @@ class TestTheSettingIsReadLikeTheAmberSetting:
     """Criterion 1."""
 
     def test_the_asset_says_never(self):
-        r = replacement_setting.resolve(DS, "2026-10-05T00:00:00+08:00")
+        r = replacement_setting.resolve("birth-registrations", "2026-10-05T00:00:00+08:00")
         assert (r.value, r.level) == ("never", amber_setting.ASSET)
+
+    def test_child_protection_has_a_green_era_of_its_own(self):
+        """REQ-GEN-273 criterion 4 (Keith, 2026-10-25, answer 4a): green for
+        2017-Q2 and 2017-Q3 at the collection level, the asset's 'never'
+        before it and the collection's 'never' after."""
+        def at(when):
+            r = replacement_setting.resolve(DS, when)
+            return r.value, r.level
+        assert at("2017-04-16T12:00:00+08:00") == ("never", amber_setting.ASSET)
+        assert at("2017-05-15T10:00:00+08:00") == ("green", amber_setting.COLLECTION)
+        assert at("2017-10-17T10:00:00+08:00") == ("green", amber_setting.COLLECTION)
+        assert at("2017-10-18T10:00:00+08:00") == ("never", amber_setting.COLLECTION)
+        assert at("2026-10-05T00:00:00+08:00") == ("never", amber_setting.COLLECTION)
 
     def test_nearest_level_wins(self):
         doc = _doc()
@@ -50,8 +63,11 @@ class TestTheSettingIsReadLikeTheAmberSetting:
     def test_no_asset_level_value_is_refused(self):
         doc = _doc()
         del doc["replacement_setting"]
+        # Birth Registrations: Child Protection's collection states its own
+        # versions since REQ-GEN-273 criterion 4, which nearest-wins reads first.
         with pytest.raises(amber_setting.AmberSettingError, match="replacement setting"):
-            replacement_setting.resolve(DS, "2026-10-05T00:00:00+08:00", doc=doc)
+            replacement_setting.resolve("birth-registrations", "2026-10-05T00:00:00+08:00",
+                                        doc=doc)
 
     def test_its_past_is_frozen(self):
         old, new = _doc(), _doc()
@@ -195,6 +211,44 @@ class TestTheGate:
         out = _run(conn, b, b_table, period, _green(), contested=True)
         assert "several files claim" in out.refused[DS]
         assert dl.promoted_into(conn, DS, period) == a
+
+
+class TestStoodOnThroughTheGate:
+    """Criterion 8 THROUGH THE GATE PRODUCTION USES (post-build-review #274
+    D3; Keith, 2026-10-25, answer 2a): an arrival gated by the package gate
+    (gate.after_arrival, via the real per-arrival lifecycle) whose
+    replacement a later period stands on is 'promotion-withheld', the gate's
+    own fields on it - never 'promotion-refused', which is only for a
+    supply's own checks failing. The cases above drive promotion.after_run,
+    which the gate does not call."""
+
+    def test_a_green_resupply_a_later_period_stands_on_is_withheld(
+            self, private_supply_dsn, cp_raw_dir, tmp_path, monkeypatch):
+        from pathlib import Path
+
+        from gate_support import Scenario, install_fake_tools, pin_replacement_setting
+        from qa_tools.common import supply_db
+        from test_package_gate import Q3, Q4, established
+
+        sc = Scenario(root=tmp_path, raw_dir=Path(cp_raw_dir))
+        install_fake_tools(monkeypatch, sc)
+        pin_replacement_setting(monkeypatch)
+        v1 = established(sc)
+        with supply_db.connect(label="pytest-substitute") as c:
+            substitution.substitute(c, agency_id=AG, collection_id=COL,
+                                    dataset_id="cp-clients", logical_table="cp_clients",
+                                    period=Q4, stands_on=Q3, supply=v1["C1"],
+                                    actor=REAL_PERSON, reason="late",
+                                    effective_at="2024-11-03T10:00:00+08:00")
+        c2 = sc.deliver("2024-08-05T10:00:00+08:00", {"cp_clients": "C2"})["C2"]
+        sc.process()
+        assert sc.holder("cp-clients", Q3) == v1["C1"]
+        gated = [d for d in sc.decisions(c2)
+                 if d["action"] in (dl.PROMOTE, dl.PROMOTION_WITHHELD, dl.PROMOTION_REFUSED)]
+        assert [d["action"] for d in gated] == [dl.PROMOTION_WITHHELD], gated
+        (entry,) = gated
+        assert "a later period stands on it" in entry["reason"]
+        assert entry["gate_application"] is not None
 
 
 def test_the_shipped_document_is_unchanged_by_these_tests():

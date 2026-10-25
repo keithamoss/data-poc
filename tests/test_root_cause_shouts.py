@@ -220,7 +220,9 @@ def test_owed_recheck_raises_nothing(sc, monkeypatch):
     sc.promote_by_hand(c["C2"], Q4, at="2024-11-10T10:00:00+08:00", follow_up=True)
     assert [o.period for o in sc.owed("reevaluate")] == [Q4], "precondition: owed"
     assert sc.holder("cp-notifications", Q4) is None, "precondition: N2 still waits"
-    assert sc.actions(n["N2"])[-1] == "promotion-refused"
+    # RED ONLY FOR WANT OF A CLIENT REGISTER IS HELD BACK, NOT REFUSED (Keith,
+    # 2026-10-25, answer 2a): another table's doing, not its own checks failing.
+    assert sc.actions(n["N2"])[-1] == "promotion-withheld"
     service = _tickets(now="2024-11-20T10:00:00+08:00")
     assert f"cp-notifications/{Q4}" not in service.tickets
     assert len(_still_failing(sc)) == before
@@ -248,11 +250,13 @@ def test_an_owed_recheck_does_not_quiet_a_failure_of_its_own(sc, monkeypatch):
     assert f"cp-notifications/{Q4}" in _tickets(now="2024-11-20T10:00:00+08:00").tickets
 
 
-def test_a_root_whose_slot_raises_nothing_leaves_what_it_holds_back_ticketed(sc):
-    """NO FALSE QUIET (NFR 3; post-build-review #274 D4): Notifications v2 is
-    held back by a red Clients v2 resupply whose own slot reads PROMOTED - it
-    raises no ticket - so folding Notifications v2 into it told nobody. Only a
-    root not yet due (criterion 3) holds a supply back with no ticket."""
+def test_a_failed_recheck_against_the_warehouse_is_its_own_root(sc):
+    """Keith, 2026-10-25, answer 3a (post-build-review #274 Q3): the root is
+    the supply whose OWN check failed. Notifications v2 is held back because
+    its re-check against Clients v1 in the warehouse FAILED - re-checked only
+    because its package-mate Clients v2 was red - so its 'promotion-withheld'
+    still names Clients v2 as the cause (REQ-PIPE-267 criterion 13), and it
+    is its own root: ticketed in its own slot, in no other's list."""
     from qa_tools.common import root_cause, supply_db
 
     first_time(sc)
@@ -265,12 +269,58 @@ def test_a_root_whose_slot_raises_nothing_leaves_what_it_holds_back_ticketed(sc)
     v2 = sc.deliver("2024-11-03T10:00:00+08:00", {"cp_clients": "C2", "cp_notifications": "N2"})
     sc.process()
     assert sc.holder("cp-clients", Q4) == c1
+    withheld = [d for d in sc.decisions(v2["N2"]) if d["action"] == "promotion-withheld"]
+    assert withheld and withheld[-1]["held_back_by"] == v2["C2"], "precondition: named"
+    assert withheld[-1]["held_back_detail"]["failed"] is True
+    with supply_db.connect(read_only=True, label="pytest") as conn:
+        assert root_cause.root_of(conn, "cp-notifications", v2["N2"], Q4) is None
+    service = _tickets(now="2024-11-04T10:00:00+08:00")
+    assert f"cp-notifications/{Q4}" in service.tickets
+    assert "Also held back by this" not in service.bodies[f"cp-notifications/{Q4}"]
+
+
+def test_a_could_not_be_checked_hold_back_is_another_tables_doing(sc):
+    """The other side of 3a: Notifications v2's re-check could not be checked
+    at all - no Client Register in the warehouse - so its root stays its red
+    package-mate Clients v2 (S2 strict), recorded failed: false."""
+    from qa_tools.common import root_cause, supply_db
+
+    first_time(sc)
+    sc.rules.append(own_red("C2"))
+    v2 = sc.deliver("2024-11-03T10:00:00+08:00", {"cp_clients": "C2", "cp_notifications": "N2"})
+    sc.process()
+    withheld = [d for d in sc.decisions(v2["N2"]) if d["action"] == "promotion-withheld"]
+    assert withheld[-1]["held_back_detail"]["failed"] is False
     with supply_db.connect(read_only=True, label="pytest") as conn:
         root = root_cause.root_of(conn, "cp-notifications", v2["N2"], Q4)
-    assert root is not None and root.supply == v2["C2"], "precondition: C2 is its root"
-    service = _tickets(now="2024-11-04T10:00:00+08:00")
-    assert f"cp-clients/{Q4}" not in service.tickets, "precondition: the root raises nothing"
-    assert f"cp-notifications/{Q4}" in service.tickets
+    assert root is not None and root.supply == v2["C2"]
+
+
+def test_a_root_whose_slot_raises_nothing_leaves_what_it_holds_back_ticketed(monkeypatch):
+    """NO FALSE QUIET (NFR 3; post-build-review #274 D4): a supply held back
+    by a root whose own slot raises nothing (it reads PROMOTED - a red
+    resupply beside a promoted one) is ticketed on its own, never folded into
+    a ticket that does not exist; only a root NOT YET DUE (criterion 3) holds
+    it back with no ticket. On the folding rule itself, since under 3a the
+    scenario that first showed it is its own root (the test above)."""
+    from types import SimpleNamespace
+
+    from qa_tools.common import root_cause, slot_state
+
+    def state(dataset_id, supply, st, needs):
+        return SimpleNamespace(key=f"{dataset_id}/{Q4}", supply=supply, state=st,
+                               dataset_id=dataset_id, period=Q4, needs_action=needs)
+    held = state("cp-notifications", "cp-notifications@n2", slot_state.AWAITING_DECISION,
+                 True)
+    root = root_cause.Root("supply", "cp-clients", Q4, supply="cp-clients@c2")
+    monkeypatch.setattr(root_cause, "red_only_owed", lambda *a: False)
+    monkeypatch.setattr(root_cause, "root_of",
+                        lambda conn, ds, sup, p: root if ds == "cp-notifications" else None)
+    promoted = state("cp-clients", "cp-clients@c1", slot_state.PROMOTED, False)
+    assert root_cause.held_back_by_roots(None, [held, promoted]) == ({}, set())
+    due_later = state("cp-clients", None, slot_state.NOT_YET_DUE, False)
+    assert root_cause.held_back_by_roots(None, [held, due_later]) == (
+        {f"cp-clients/{Q4}": [held]}, {held.key})
 
 
 def test_a_failure_of_its_own_is_ticketed_naming_what_else_holds_it_back(sc):

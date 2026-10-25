@@ -99,6 +99,10 @@ class Outcome:
     contended: bool = False
     #: A 'gate' item whose package is still being checked (REQ-PIPE-266).
     waiting: bool = False
+    #: A re-evaluation that left a supply NOT JUDGED - a check whose re-run
+    #: still records nothing that counts (Keith, 2026-10-25, post-build-review
+    #: #274 D2): left owed for the next pass, and a red, never a failure.
+    not_judged: bool = False
 
 
 _OWED_COLUMNS = ("id", "kind", "dataset_id", "supply_id", "period", "caused_by_decision",

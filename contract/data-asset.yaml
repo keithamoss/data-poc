@@ -328,6 +328,27 @@ hierarchy:
           run_prefix: cp_run_
           contract: child-protection-family-support/child-protection-contract.yaml
           delivery_boundary: directory   # REQ-PIPE-057 - see above.
+          # SYNTHETIC ERA FOR THIS COLLECTION ONLY (REQ-GEN-273 criterion 4;
+          # Keith, 2026-10-25, answer 4a): a green resupply replaces a promoted
+          # supply in 2017-Q2 and 2017-Q3 - from 2017-Q2's claim window to
+          # 2017-Q4's - so TS-81 (S1 green) and TS-82 (S1 red) can show the
+          # package gate replacing one inside a package, then never again.
+          # Before it, the asset level's 'never' applies. ADDED, back-dated,
+          # which only a synthetic asset may do (REQ-PIPE-123 criterion 1).
+          replacement_setting:
+            versions:
+              - effective_from: "2017-04-17"
+                value: green
+                changelog:
+                  - date: "2026-10-25"
+                    author: REQ-GEN-273
+                    change: "synthetic era - a green resupply replaces the promoted supply in 2017-Q2 and 2017-Q3, so TS-81 and TS-82 show the package gate replacing one inside a package."
+              - effective_from: "2017-10-18"
+                value: never
+                changelog:
+                  - date: "2026-10-25"
+                    author: REQ-GEN-273
+                    change: "synthetic era ends - a filled slot waits for a person again, as at the asset level."
           datasets:
             - id: cp-clients
               name: Client Register

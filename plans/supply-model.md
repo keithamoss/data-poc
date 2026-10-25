@@ -3717,6 +3717,72 @@ the re-check's result shown though it was recorded under cp-clients' run.
 left contested after the settlement, or the file named by sorted name
 rather than by receipt position.
 
+**TS-81 `[INJECT]` S1 green - a clean Client Register promoted beside the
+warehouse's Notifications, its package-mate held back.** PLANTED by
+REQ-GEN-273 criterion 4 (2026-10-25) in a grown quarter, with its gate
+outcomes declared for the bootstrap to compare (criterion 3).
+*Config: quarterly, Feb/May/Aug/Nov, due 09:00 on the 1st; Child
+Protection's replacement setting is green for 2017-Q2 and 2017-Q3
+(contract/data-asset.yaml, Keith 2026-10-25). 2017-Q2's five tables arrive
+on time, clean, and are promoted; on 15 May 2017 at 10:00 a zip of a clean
+cp_clients and a cp_notifications red on its own data arrives.*
+**Expect**: Notifications v2 is held back (refused on its own data);
+Clients v2's Notifications -> Client Register check is re-run against
+Notifications v1 in the warehouse, passes, and Clients v2 replaces Clients
+v1 under the green setting (REQ-PIPE-267 criterion 6, REQ-PIPE-123).
+**Breaks as**: Clients v2 held back with its package-mate, or promoted on a
+verdict that read the held-back Notifications v2.
+
+**TS-82 `[INJECT]` S1 red - a Client Register re-checked against the
+warehouse's Notifications and held back.** PLANTED by REQ-GEN-273 criterion
+4 (2026-10-25), as TS-81 in the next quarter.
+*Config: as TS-81, in 2017-Q3, the zip's cp_clients missing the five clients
+only the quarter's Notifications point at (no Investigation or Placement
+does).*
+**Expect**: Notifications v2 is held back on its own data; Clients v2's
+re-check against Notifications v1 fails, so Clients v2 is held back
+('promotion-withheld' naming Notifications v2, re-checked against
+Notifications v1) and Clients v1 stays. Its root is Clients v2 itself - its
+own check failed (Keith, 2026-10-25, answer 3a).
+**Breaks as**: Clients v2 promoted, or refused without the re-check.
+
+**TS-83 `[INJECT]` S2 strict as re-cast - a red Client Register holds its
+whole first-time package back.** PLANTED by REQ-GEN-273 criterion 4
+(2026-10-25).
+*Config: quarterly, Feb/May/Aug/Nov, due 09:00 on the 1st. 2016-Q3's six
+tables arrive together on time, the quarter's first supply, cp_clients red
+on its own data and the other five clean.*
+**Expect**: Clients is held back on its own data; Notifications,
+Investigations and Placements are re-checked against no Client Register in
+the warehouse and held back with it ('promotion-withheld', could not be
+checked); Carer Register and Case Workers are promoted.
+**Breaks as**: Notifications judged alone and promoted, or held back without
+the re-check.
+
+**TS-84 `[INJECT]` The S10 chain re-ordered - three staggered files promoted
+together at the last one's arrival.** PLANTED by REQ-GEN-273 criterion 4
+(2026-10-25).
+*Config: quarterly, Feb/May/Aug/Nov, due 09:00 on the 1st, 8 hours' grace.
+2015-Q4's one delivery, the quarter's first, each file its own receipt:
+Carer Register 08:30, Notifications 08:40, Placements 08:50, Investigations
+09:00, Client Register 09:20, all clean.*
+**Expect**: Carer Register is promoted at 08:30; Notifications, Placements
+and Investigations each wait red for want of a Client Register
+('promotion-withheld'); at 09:20 the Client Register's arrival gates them
+with it and all four are promoted together (REQ-PIPE-267 criterion 2).
+**Breaks as**: any of the three left waiting after the Client Register, or
+Clients promoted alone.
+
+**TS-85 `[INJECT]` S14 - a red Placements held back alone in a first-time
+package.** PLANTED by REQ-GEN-273 criterion 4 (2026-10-25), Q13's case.
+*Config: quarterly, Feb/May/Aug/Nov, due 09:00 on the 1st. 2015-Q2's five
+tables arrive together on time, the quarter's first supply, cp_placements
+red on its own data and the other four clean.*
+**Expect**: Placements is held back on its own data; Client Register,
+Notifications, Investigations and Carer Register are promoted - no check
+they count reads a Placements the period will hold.
+**Breaks as**: a reader of Placements held back with it.
+
 **TS-43 `[INJECT]` An amber supply held under hold.**
 PLANTED 2026-10-11 (parked 2026-10-05 for want of an amber supply): built
 to amber on facility nulls from the checks' own bands (REQ-GEN-184), after

@@ -426,9 +426,25 @@ def targets_agree(names) -> tuple[str, ...]:
         # record differs - declared by the scenarios, by way of cli/.
         from cli.pipeline import generated_gate_outcomes
 
-        declared = [o for o in generated_gate_outcomes() if o.dataset_id in wanted]
+        # BY COLLECTION, NOT BY TARGET DATASET: a declared gate outcome names
+        # any table of its package (Notifications held back beside Clients),
+        # and Child Protection's providers declare only cp-clients' targets -
+        # filtering by `wanted` dropped every other dataset's declaration in
+        # silence (found building REQ-GEN-273 criterion 4, 2026-10-25).
+        replayed = {_collection(n).id for n in names}
+        declared = [o for o in generated_gate_outcomes()
+                    if _collection_of_dataset(o.dataset_id) in replayed]
         failing = [*failing, *target_agreement.gate_outcome_differences(conn, declared)]
         return tuple(str(d) for d in failing)
+
+
+def _collection_of_dataset(dataset_id: str) -> str | None:
+    from qa_tools.common import hierarchy
+
+    try:
+        return hierarchy.dataset(dataset_id).collection_id
+    except hierarchy.UnknownDatasetError:
+        return None
 
 
 def _confirm_corrections(say) -> None:
@@ -467,7 +483,9 @@ def _run_what_the_confirmations_owe(say) -> None:
         return
     say(f"Running the {n} run(s) the confirmed corrections owe - each takes about a minute")
     outcomes = recheck.run_all_owed(kinds=(recheck.RECHECK, recheck.REEVALUATE))
-    failed = [o for o in outcomes if not o.completed and not o.frozen]
+    # NOT JUDGED IS A RED THAT STAYS OWED, not a run that did not complete
+    # (Keith, 2026-10-25, post-build-review #274 D2).
+    failed = [o for o in outcomes if not o.completed and not o.frozen and not o.not_judged]
     if failed:
         raise ScriptRefused(
             "The bootstrap stopped: a run the confirmed corrections owe did not complete - "

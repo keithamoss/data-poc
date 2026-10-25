@@ -399,6 +399,15 @@ class Cause:
     by_received: str | None
     #: 'package-mate' (came with this supply) or 'joined' (waiting already)
     came: str
+    #: NOT JUDGED (Keith, 2026-10-25, post-build-review #274 D2): the checks
+    #: whose re-evaluation recorded no result that counts, so the supply is
+    #: held back until they do - never promoted without them. Empty for a
+    #: hold-back on a result that did count.
+    not_counted: tuple[str, ...] = ()
+    #: Whether a responsible check's re-check RAN against the warehouse and
+    #: failed - its own failure, so it is its own root (Keith, 2026-10-25,
+    #: answer 3a) - rather than could not be checked.
+    failed: bool = False
 
 
 @dataclass
@@ -418,6 +427,9 @@ class Applied:
     held_back: dict = field(default_factory=dict)
     #: How many readers-only runs it made (criterion 10).
     reevaluations: int = 0
+    #: Supplies held back NOT JUDGED (Keith, 2026-10-25, D2), {dataset: the
+    #: tables the 'reevaluate' item retrying them is owed for}.
+    not_judged: dict = field(default_factory=dict)
 
     def as_after_run(self):
         from qa_tools.common import promotion
@@ -746,22 +758,37 @@ def _settle_fixed_point(collection_id, period, application, members, reads, barr
         # CRITERIA 6 AND 9: re-evaluate, for each member the entry just
         # checked and still promoting, the checks that lost their verdict.
         while True:
+            newly = False
             with supply_db.connect(label="mothman:gate") as conn:
                 _refresh(conn, members, application)
                 todo = _reevaluations_owed(members, warehouse)
                 state = tuple(sorted(k for k, m in members.items() if m.out is None))
-                for key in list(todo):
+                for key in sorted(todo):
                     checks, causes = todo[key]
                     fresh = {c for c in checks if (key, c, state) not in attempted}
-                    if not fresh:
+                    spent = set(checks) - fresh
+                    if spent:
+                        # NOT JUDGED (Keith, 2026-10-25, post-build-review
+                        # #274 D2): a check re-evaluated in this very state
+                        # whose result still does not count is never decided
+                        # without. The supply is held back until it counts -
+                        # owed a re-evaluation the next pass retries - which
+                        # changes the state, so the fixed point goes on.
+                        m = members[key]
+                        m.out = ("held-back", _cause(
+                            m, (spent, {c: causes[c] for c in spent}), members, warehouse,
+                            None, not_counted=True))
                         del todo[key]
+                        newly = True
                         continue
                     attempted.update((key, c, state) for c in fresh)
                     todo[key] = (fresh, {c: causes[c] for c in fresh})
                 _joined_lose_verdicts(members, warehouse)
-                if todo:
+                if todo or newly:
                     _record_final_holdbacks(conn, application, members, effective_at)
             if not todo:
+                if newly:
+                    continue
                 break
             # A FIXED ORDER, sorted by dataset id (criterion 7, REQ-PIPE-262
             # criterion 13), so run_seq is the same in every bootstrap.
@@ -949,8 +976,11 @@ def _latest_gate_entry(conn, supply: str) -> int | None:
     return rows[0][0] if rows and rows[0][0] is not None else None
 
 
-def _cause(y: Member, todo_entry, members, warehouse, judged) -> Cause:
-    """The structured fields of a hold-back by re-evaluation (criterion 13)."""
+def _cause(y: Member, todo_entry, members, warehouse, judged, *,
+           not_counted: bool = False) -> Cause:
+    """The structured fields of a hold-back by re-evaluation (criterion 13);
+    `not_counted` where the re-evaluation of `todo_entry`'s checks recorded
+    nothing that counts (D2's not judged)."""
     from qa_tools.common import supply_status
 
     checks, causes = todo_entry
@@ -958,6 +988,9 @@ def _cause(y: Member, todo_entry, members, warehouse, judged) -> Cause:
     failing = sorted(c for c in checks if c in verdicts
                      and verdicts[c].get("status") not in ("pass", "warn"))
     responsible = tuple(failing or sorted(checks))
+    from qa_tools.common import carried
+
+    ran_and_failed = any(not carried.not_evaluated_reason(verdicts[c]) for c in failing)
     against = {}
     for c in responsible:
         r = verdicts.get(c) or {}
@@ -980,7 +1013,9 @@ def _cause(y: Member, todo_entry, members, warehouse, judged) -> Cause:
     if other is not None and other.received is not None:
         received = supply_status.instant(other.received).isoformat()
     return Cause(checks=responsible, against=against, by=by, by_dataset=by_dataset,
-                 by_received=received, came=came)
+                 by_received=received, came=came,
+                 not_counted=tuple(sorted(checks)) if not_counted else (),
+                 failed=ran_and_failed and not not_counted)
 
 
 # ---- recording and promoting (criteria 13 and 17; REQ-PIPE-266 9 and 10) ----------------
@@ -1007,6 +1042,31 @@ def _record_holdback(conn, application: int, m: Member, members, effective_at: s
         why = detail.why if detail is not None else "refused"
         if detail is not None and detail.frozen:
             return  # left ungated, as the backstop leaves it (no record)
+        if detail is not None and detail.withheld:
+            # HELD BACK BY ANOTHER PERIOD, NOT ITS OWN CHECKS (Keith,
+            # 2026-10-25, answer 2a; post-build-review #274 D3): a later
+            # period stands on the supply it would replace (REQ-PIPE-123
+            # criterion 8) - 'promotion-withheld', as after_run records it.
+            promotion._record_withheld(conn, agency_id=ds.agency_id,
+                                       collection_id=ds.collection_id,
+                                       dataset_id=m.dataset_id, supply=m.supply,
+                                       period=m.item.get("period"), reason=why,
+                                       effective_at=effective_at, gate=gate_fields)
+            return
+        wanted = _red_only_for_want_of(m)
+        if wanted:
+            # RED ONLY BECAUSE ANOTHER TABLE IS ABSENT - could not run is red
+            # (REQ-PIPE-270), but it is another table's doing, not a check of
+            # its own failing, so it is 'promotion-withheld' (Keith,
+            # 2026-10-25, answer 2a): 'promotion-refused' is only for a
+            # supply's own checks failing.
+            promotion._record_withheld(conn, agency_id=ds.agency_id,
+                                       collection_id=ds.collection_id,
+                                       dataset_id=m.dataset_id, supply=m.supply,
+                                       period=m.item.get("period"),
+                                       reason=_absent_words(wanted),
+                                       effective_at=effective_at, gate=gate_fields)
+            return
         if why == promotion.AMBER_WAITING_REASON:
             amber = _amber(m.dataset_id, effective_at)
             promotion._record_amber_waiting(
@@ -1025,38 +1085,131 @@ def _record_holdback(conn, application: int, m: Member, members, effective_at: s
     structured = {"checks": list(cause.checks), "against": cause.against,
                   "by": cause.by, "by_dataset": cause.by_dataset,
                   "by_received": cause.by_received, "came": cause.came}
-    if _same_holdback(conn, m, cause):
+    if cause.not_counted:
+        structured["not_counted"] = list(cause.not_counted)
+    structured["failed"] = cause.failed
+    entry_id = _same_holdback(conn, m, cause)
+    if entry_id is None:
+        with decision_log.apply_decision(conn, decision_log.Decision(
+                agency_id=ds.agency_id, collection_id=ds.collection_id,
+                dataset_id=m.dataset_id, action=decision_log.PROMOTION_WITHHELD,
+                supply=m.supply, actor=promotion.RULE_ACTOR, actor_kind=decision_log.RULE,
+                effective_at=effective_at, to_slot=m.item.get("period"),
+                reason=held_back_words(conn, m, cause), held_back_by=cause.by,
+                held_back_detail=structured, **gate_fields)) as written:
+            entry_id = written
+    if cause.not_counted:
+        _owe_not_judged(conn, m, cause, entry_id)
+
+
+def _red_only_for_want_of(m: Member) -> list[str]:
+    """The tables whose absence is the WHOLE of this supply's red - every
+    failing check counted toward it could not run for want of one
+    (REQ-PIPE-270), and none is an own failure or an owed stand-in - else
+    []."""
+    from qa_tools.common import carried, promotion
+
+    reads = promotion._declared_reads()
+    failing = [r for r in promotion._contributing_records(
+                   m.dataset_id, list(_newest(m).values()), reads)
+               if (r.get("status") or "") in ("fail", "error")]
+    tables: set[str] = set()
+    for r in failing:
+        if not carried.not_evaluated_reason(r) or r.get("warehouse_reason"):
+            return []
+        named = r.get("unrunnable_tables") or ([r["unrunnable_table"]]
+                                              if r.get("unrunnable_table") else [])
+        named = named or r.get("held_tables") or []
+        if not named:
+            return []
+        tables.update(named)
+    return sorted(tables)
+
+
+def _absent_words(tables: list[str]) -> str:
+    """The withheld note for a supply red only for want of other tables."""
+    from qa_tools.common import hierarchy
+
+    def name(table: str) -> str:
+        try:
+            return hierarchy.dataset_for_table(table).dataset_name
+        except hierarchy.UnknownDatasetError:
+            return table
+    names = ", ".join(name(t) for t in tables)
+    return (f"Held back: its cross-table checks of the {names} could not be checked - no "
+            f"{names} is in place for this period - and a check that could not run is red. "
+            f"None of its checks of its own data failed; it is re-checked when the "
+            f"{names} arrives.")
+
+
+def retry_tables(m: Member, cause: Cause) -> list[str]:
+    """The tables a NOT JUDGED supply's retry is owed for: every table its
+    uncounted checks read - the one each is declared on included - but its
+    own (D2)."""
+    from qa_tools.common import hierarchy
+
+    reads = _check_reads(cause.not_counted)
+    tables = set()
+    for c in cause.not_counted:
+        tables.update(reads.get(c) or ())
+        if _home(c):
+            tables.add(_home(c))
+    out = []
+    for t in sorted(tables - {m.table}):
+        try:
+            hierarchy.dataset_for_table(t)
+        except hierarchy.UnknownDatasetError:
+            continue
+        out.append(t)
+    return out
+
+
+def _owe_not_judged(conn, m: Member, cause: Cause, entry_id: int) -> None:
+    """NOT JUDGED STAYS OWED (Keith, 2026-10-25, answer 1a): a 'reevaluate'
+    item for the period and the tables its uncounted checks read, caused by
+    the hold-back - REQ-PIPE-121's knock-on, which re-runs a stale reader's
+    reading checks against the period as it stands and re-gates it. Once:
+    an uncleared item already covering those tables (the knock-on now
+    retrying it) is the retry, and that item stays owed while the supply is
+    still not judged (knock_on.complete)."""
+    from qa_tools.common import hierarchy, knock_on, recheck
+
+    period = m.item.get("period")
+    tables = retry_tables(m, cause)
+    if not period or not tables:
         return
-    with decision_log.apply_decision(conn, decision_log.Decision(
-            agency_id=ds.agency_id, collection_id=ds.collection_id, dataset_id=m.dataset_id,
-            action=decision_log.PROMOTION_WITHHELD, supply=m.supply,
-            actor=promotion.RULE_ACTOR, actor_kind=decision_log.RULE,
-            effective_at=effective_at, to_slot=m.item.get("period"),
-            reason=held_back_words(conn, m, cause), held_back_by=cause.by,
-            held_back_detail=structured, **gate_fields)):
-        pass
+    for o in recheck.owed(conn):
+        if (o.kind == recheck.REEVALUATE and o.period == period
+                and set(tables) <= set(o.tables or ())):
+            return
+    knock_on.owe(conn, [(entry_id, hierarchy.dataset_for_table(t).dataset_id, period)
+                        for t in tables])
 
 
-def _same_holdback(conn, m: Member, cause: Cause) -> bool:
+def _same_holdback(conn, m: Member, cause: Cause) -> int | None:
     """A repeat is judged on the entry's structured fields, never its
-    reason text (REQ-PIPE-266 criterion 9): the latest gate outcome of this
-    supply already says this."""
+    reason text (REQ-PIPE-266 criterion 9): the id of the latest gate
+    outcome of this supply where it already says this, else None."""
     from qa_tools.common import decision_log
 
     rows = conn.execute(
-        f"SELECT action, held_back_by, held_back_detail FROM {decision_log.TABLE} "
+        f"SELECT id, action, held_back_by, held_back_detail FROM {decision_log.TABLE} "
         "WHERE dataset_id = ? AND supply = ? AND action IN (?, ?, ?) ORDER BY id DESC LIMIT 1",
         [m.dataset_id, m.supply, decision_log.PROMOTE, decision_log.PROMOTION_WITHHELD,
          decision_log.PROMOTION_REFUSED]).fetchall()
     if not rows:
-        return False
-    action, by, detail = rows[0]
+        return None
+    entry_id, action, by, detail = rows[0]
+    detail = detail or {}
     # WHAT IT WAS CHECKED AGAINST TOO (post-build-review #274): the same cause
     # against a different supply in the warehouse is a new hold-back, whose
-    # entry - and wording - names the supply it was re-checked against.
-    return (action == decision_log.PROMOTION_WITHHELD and by == cause.by
-            and sorted((detail or {}).get("checks") or []) == sorted(cause.checks)
-            and ((detail or {}).get("against") or {}) == (cause.against or {}))
+    # entry - and wording - names the supply it was re-checked against. And
+    # whether it was judged at all (D2).
+    same = (action == decision_log.PROMOTION_WITHHELD and by == cause.by
+            and sorted(detail.get("checks") or []) == sorted(cause.checks)
+            and (detail.get("against") or {}) == (cause.against or {})
+            and sorted(detail.get("not_counted") or []) == sorted(cause.not_counted))
+    return int(entry_id) if same else None
 
 
 def held_back_words(conn, m: Member, cause: Cause) -> str:
@@ -1078,6 +1231,14 @@ def held_back_words(conn, m: Member, cause: Cause) -> str:
     else:
         tail = f"the {by_name} waiting for a decision (received {when}) is held back."
     against = [s for s in cause.against.values() if s]
+    if cause.not_counted:
+        # NOT JUDGED (Keith, 2026-10-25, answer 1a): could not run is red
+        # (REQ-PIPE-270), so it is never promoted without the check - and the
+        # retry is owed, which the words say.
+        return (f"Held back, not judged: {checks} was re-checked against the warehouse as "
+                f"it will stand, but the re-check recorded no result that counts, because "
+                f"{tail} It is not promoted without that check, and it is re-checked by "
+                f"the next processing pass.")
     if against:
         held = against[0]
         held_ds = held.split("@", 1)[0]
@@ -1165,6 +1326,8 @@ def _decide(collection_id, period, application, members, reads, barred, warehous
             elif kind == "held-back":
                 out.refused[m.dataset_id] = held_back_words(conn, m, detail)
                 out.held_back[m.dataset_id] = detail
+                if detail.not_counted:
+                    out.not_judged[m.dataset_id] = retry_tables(m, detail)
         if not work:
             return
         promoted_supplies = [m.supply for m, _w, _v in work]
@@ -1400,6 +1563,7 @@ def _merge(out: Applied, more: Applied) -> None:
     out.failed.update(more.failed)
     out.frozen.update(more.frozen)
     out.held_back.update(more.held_back)
+    out.not_judged.update(more.not_judged)
     out.contended = out.contended or more.contended
     out.reevaluations += more.reevaluations
     out.waiting = out.waiting or more.waiting

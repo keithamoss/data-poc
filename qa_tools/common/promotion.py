@@ -955,6 +955,10 @@ class Judged:
     why: str | None = None
     #: Left ungated: the agreement backstop refuses the dataset.
     frozen: bool = False
+    #: Held back by ANOTHER period, not its own checks - a later period stands
+    #: on the supply it would replace (REQ-PIPE-123 criterion 8): recorded
+    #: 'promotion-withheld', never 'promotion-refused' (Keith, 2026-10-25, 2a).
+    withheld: bool = False
 
 
 def judge(conn, item: dict, status, *, results: Sequence[dict], reads: dict[str, list[str]],
@@ -1063,7 +1067,7 @@ def judge(conn, item: dict, status, *, results: Sequence[dict], reads: dict[str,
                 _record_withheld(conn, agency_id=agency_id, collection_id=collection_id,
                                  dataset_id=dataset_id, supply=item["supply"],
                                  period=period, reason=why, effective_at=effective_at)
-            return Judged(why=why)
+            return Judged(why=why, withheld=True)
         # THE SETTING THAT AUTHORISED IT IS THE REASON (criterion 5).
         reason = (f"{reason} It replaces {held.holder} under the replacement "
                   f"setting '{replacing.value}' (set for the {replacing.level}, version "
@@ -1097,10 +1101,12 @@ def _record_amber_waiting(conn, *, agency_id: str, collection_id: str, dataset_i
 
 
 def _record_withheld(conn, *, agency_id: str, collection_id: str, dataset_id: str,
-                     supply: str, period: str, reason: str, effective_at: str) -> None:
+                     supply: str, period: str, reason: str, effective_at: str,
+                     gate: dict | None = None) -> None:
     """The rule stood back from a replacement and says why (REQ-PIPE-123
     criterion 8) - a promotion-withheld note, which changes no slot. Once
-    per supply and reason, so a retry records nothing more."""
+    per supply and reason, so a retry records nothing more. The gate's
+    application writes it too (gate._record_holdback), with its fields."""
     if conn.execute(
             f"SELECT 1 FROM {decision_log.TABLE} WHERE dataset_id = ? AND action = ? "
             "AND supply = ? AND reason = ?",
@@ -1110,7 +1116,7 @@ def _record_withheld(conn, *, agency_id: str, collection_id: str, dataset_id: st
             agency_id=agency_id, collection_id=collection_id, dataset_id=dataset_id,
             action=decision_log.PROMOTION_WITHHELD, supply=supply, actor=RULE_ACTOR,
             actor_kind=decision_log.RULE, effective_at=effective_at, to_slot=period,
-            reason=reason)):
+            reason=reason, **(gate or {}))):
         pass
 
 

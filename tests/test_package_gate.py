@@ -693,26 +693,43 @@ class TestTheFixedPointEnds:
         Notifications): a re-evaluation whose run records nothing that counts
         - its check out of scope - was owed again every round, forever (247
         runs before it was stopped). Each check is re-evaluated at most once
-        per state of the period, then decided without."""
+        per state of the period; one that still counts nothing then holds
+        its supply back not judged (Keith, 2026-10-25, 1a), never decided
+        without."""
         from qa_tools.common import gate
 
         established(sc)
         sc.rules.append(own_red("N2"))
         calls = []
-        monkeypatch.setattr(gate, "_reevaluate", lambda y, checks, *a, **k: calls.append(
-            (y.supply, frozenset(checks))))
+        real = gate._reevaluate
+
+        def first_records_nothing(y, checks, *a, **k):
+            # (causes, members, warehouse, application, period, run_by)
+            calls.append((y.supply, frozenset(checks), a[3]))
+            if len(calls) > 1:
+                return real(y, checks, *a, **k)
+            return None
+        monkeypatch.setattr(gate, "_reevaluate", first_records_nothing)
         v2 = sc.deliver("2024-08-05T10:00:00+08:00",
                         {"cp_clients": "C2", "cp_notifications": "N2"})
         sc.process()
-        assert len(calls) == 1, calls
+        # ONCE PER APPLICATION: the package's re-evaluated Clients v2 once and
+        # stopped; the retry is a new application (the knock-on it is owed).
         assert calls[0][0] == v2["C2"]
+        assert [c[2] for c in calls].count(calls[0][2]) == 1, calls
+        assert len(calls) == 2, calls
         # THE OUTCOME, not only the count: Notifications v2 is refused on its
-        # own red, the application settles, and nothing is left owed for it.
-        # Whether Clients v2 may promote with its re-evaluation never counted
-        # is post-build-review #274 D2, waiting on Keith - pinned apart, below.
+        # own red; Clients v2 is held back NOT JUDGED rather than promoted
+        # without the check (Keith, 2026-10-25, answer 1a), and the knock-on
+        # it is owed re-runs the check against the warehouse, where it counts
+        # - so Clients v2 is promoted WITH it, after the hold-back.
         assert _gated(sc, v2["N2"]) == ["promotion-refused"]
         assert sc.holder("cp-notifications", Q3) != v2["N2"]
+        assert _gated(sc, v2["C2"]) == ["promotion-withheld", "promote"]
+        assert sc.holder("cp-clients", Q3) == v2["C2"]
+        assert _withheld(sc, v2["C2"])["held_back_detail"]["not_counted"]
         assert sc.owed("gate") == [] and sc.owed("recheck") == []
+        assert sc.owed("reevaluate") == []
         from qa_tools.common import gate, qa_store, supply_db
 
         with supply_db.connect(read_only=True, label="pytest") as conn:
@@ -720,22 +737,52 @@ class TestTheFixedPointEnds:
                 f'SELECT ended FROM "{qa_store.SCHEMA}".gate_application')}
         assert ended == {gate.SETTLED}
 
-    @pytest.mark.xfail(strict=True, reason=(
-        "post-build-review #274 D2, HELD for Keith: a check whose re-evaluation "
-        "still does not count is dropped from the verdict, so Clients v2 promotes "
-        "without its Notifications -> Client Register check. Should that supply "
-        "be not promoting instead?"))
     def test_a_check_whose_reevaluation_never_counts_does_not_promote_without_it(
             self, sc, monkeypatch):
-        from qa_tools.common import gate
+        """Keith, 2026-10-25, answer 1a (post-build-review #274 D2): a supply
+        whose cross-table check still does not count after the fixed point's
+        re-evaluation is HELD BACK as not judged until it counts - its
+        'promotion-withheld' says so - and its retry STAYS OWED: the
+        knock-on retrying it, finding the check still counting nothing,
+        leaves the item owed for the next pass rather than clearing it, and
+        never loops within one."""
+        from qa_tools.common import gate, recheck
 
         established(sc)
         sc.rules.append(own_red("N2"))
         monkeypatch.setattr(gate, "_reevaluate", lambda *a, **k: None)
+        real = recheck.execute
+        readers_runs = []
+
+        def nothing_for_readers(**kw):
+            if kw["purpose"].get("scope") == "readers":
+                readers_runs.append(kw["supply_id"])
+                return None, []
+            return real(**kw)
+        monkeypatch.setattr(recheck, "execute", nothing_for_readers)
         v2 = sc.deliver("2024-08-05T10:00:00+08:00",
                         {"cp_clients": "C2", "cp_notifications": "N2"})
         sc.process()
         assert sc.holder("cp-clients", Q3) != v2["C2"]
+        assert _gated(sc, v2["C2"]) == ["promotion-withheld"]
+        entry = _withheld(sc, v2["C2"])
+        assert entry["held_back_by"] == v2["N2"]
+        assert set(entry["held_back_detail"]["not_counted"]) <= set(CLIENT_REFS)
+        assert entry["reason"].startswith("Held back, not judged: ")
+        assert "re-checked by the next processing pass" in entry["reason"]
+        (owed,) = sc.owed("reevaluate")
+        assert owed.period == Q3 and "cp_notifications" in owed.tables
+        assert readers_runs.count(v2["C2"]) == 1, readers_runs
+        # THE NEXT PASS RETRIES IT ONCE, and it is still owed and not judged.
+        (outcome,) = sc.run_owed()
+        assert not outcome.completed and outcome.not_judged and outcome.status == "red"
+        assert [o.id for o in sc.owed("reevaluate")] == [owed.id]
+        assert readers_runs.count(v2["C2"]) == 2, readers_runs
+        assert _gated(sc, v2["C2"]) == ["promotion-withheld"]
+        assert sc.holder("cp-clients", Q3) != v2["C2"]
+        from qa_tools.common import processing_pass
+
+        assert not processing_pass._owed_failure(outcome)
 
 
 class TestOnePeriodOneApplication:

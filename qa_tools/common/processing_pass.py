@@ -336,10 +336,13 @@ def _owed_failure(outcome) -> bool:
     """An owed item that did not complete is a failure of the pass - unless
     it waited on a refused dataset, which is the backstop working; another
     gate held its period, which is contention (REQ-PIPE-267 criterion 17);
-    or it is a package gate still waiting for a file (REQ-PIPE-266)."""
+    or it is a package gate still waiting for a file (REQ-PIPE-266); or a
+    re-evaluation left a supply not judged, which is a red that stays owed
+    (Keith, 2026-10-25, post-build-review #274 D2)."""
     return (not outcome.completed and not getattr(outcome, "frozen", False)
             and not getattr(outcome, "contended", False)
-            and not getattr(outcome, "waiting", False))
+            and not getattr(outcome, "waiting", False)
+            and not getattr(outcome, "not_judged", False))
 
 
 def _red(results) -> bool:

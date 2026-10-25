@@ -16,6 +16,15 @@ failure held the others back, or the absent table's SLOT. A root since
 rejected or superseded stops being the root (architect v4 S8; Keith Q10 = A),
 and the held-back supply is then its own root - it needs its own decision.
 
+A FAILED RE-CHECK IS ITS OWN FAILURE (Keith, 2026-10-25, answer 3a;
+post-build-review #274 Q3): the root is the supply whose OWN check failed,
+whether its package arrived together or staggered. A hold-back whose
+re-check against the warehouse ran and failed - Notifications v2 against the
+warehouse's Clients, re-checked only because its package-mate Clients v2 was
+red - names the package-mate as its cause (criterion 13's 'promotion-
+withheld'), and is its own root all the same. Only a check that could not be
+checked, or whose re-check counted nothing, is another table's doing.
+
 From recorded results and the decision log only; never supply rows.
 """
 from __future__ import annotations
@@ -52,6 +61,8 @@ def root_of(conn, dataset_id: str, supply: str, period: str, *, _seen=None) -> R
     entry = _latest_gate_entry(conn, dataset_id, supply)
     if entry is not None and entry["action"] == decision_log.PROMOTION_WITHHELD \
             and entry["held_back_by"]:
+        if _failed_on_its_own(entry["held_back_detail"]):
+            return None  # its re-check ran against the warehouse and failed (3a)
         by = entry["held_back_by"]
         by_dataset = by.split("@", 1)[0]
         if _turned_down(conn, by_dataset, by):
@@ -71,6 +82,19 @@ def _latest_gate_entry(conn, dataset_id: str, supply: str) -> dict | None:
         return None
     action, by, detail = rows[0]
     return {"action": action, "held_back_by": by, "held_back_detail": detail}
+
+
+def _failed_on_its_own(detail) -> bool:
+    """Whether a hold-back's re-check ran against a supply in the warehouse
+    and FAILED - its structured 'failed' (gate.Cause.failed) - rather than
+    could not be checked or counted nothing (Keith, 2026-10-25, 3a)."""
+    detail = detail or {}
+    if detail.get("not_counted"):
+        return False
+    if "failed" in detail:
+        return bool(detail["failed"])
+    # Recorded before the field existed: a named supply in the warehouse.
+    return any((detail.get("against") or {}).values())
 
 
 def _turned_down(conn, dataset_id: str, supply: str) -> bool:

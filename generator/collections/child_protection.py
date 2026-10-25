@@ -997,9 +997,19 @@ class ChildProtection(Provider):
             # scenarios ARE a file set - an unreadable table, a duplicate
             # match, a rename nothing claims - so shaping the delivery is the
             # whole injection rather than a detail of it.
-            csvs = scenario_injection.apply_file_shape(injected[0].arrivals[n - 1].file_shape, csvs)
+            extra = injected[0].arrivals[n - 1]
+            csvs = scenario_injection.apply_file_shape(extra.file_shape, csvs)
             if not isinstance(delivery_obj, PairDelivery):
-                return csvs, first
+                if not extra.file_times:
+                    return csvs, first
+                # EACH FILE ITS OWN RECEIPT (REQ-GEN-273 criterion 4, S10's
+                # staggered chain): a named table at its own time that day, the
+                # rest at the delivery's.
+                times = dict(extra.file_times)
+                return csvs, {fn: (asset_time.wall_clock(delivery_obj.received_date,
+                                                         times[fn[:-4]])
+                                   if fn[:-4] in times else first)
+                              for fn in csvs}
             # A PAIR'S FILES REPLACE THEIR TABLE'S, EACH AT ITS OWN RECEIPT
             # (REQ-GEN-203 criterion 2); the rest share the delivery's instant.
             for f in injected[0].arrivals[n - 1].files:

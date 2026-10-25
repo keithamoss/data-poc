@@ -265,6 +265,7 @@ def complete(item, *, run_by: str | None = None, on_step=None):
     # this stays owed for the next pass.
     from qa_tools.common import gate
 
+    still_not_judged: list[str] = []
     for collection_id, items in sorted(by_collection.items()):
         applied = gate.apply(collection_id, period, entry=gate.KNOCK_ON, checked=items,
                              effective_at=now, run_by=run_by)
@@ -291,6 +292,14 @@ def complete(item, *, run_by: str | None = None, on_step=None):
             if why and _fails_the_rules(why) and reader.dataset_id not in {
                     d for d, _s, _w in failing}:
                 failing.append((reader.dataset_id, reader.supply, why))
+        # STILL NOT JUDGED, AND THIS ITEM IS ITS RETRY (Keith, 2026-10-25,
+        # answer 1a; gate._owe_not_judged): a reader whose re-run check still
+        # records nothing that counts keeps this item owed - retried by the
+        # next pass, never in the same one (recheck.run_all_owed), and red,
+        # never a failure of the pass.
+        for dataset_id, wanted in sorted(applied.not_judged.items()):
+            if set(wanted) <= set(tables):
+                still_not_judged.append(dataset_id)
     if failing:
         with supply_db.connect(label="mothman:knock-on") as conn:
             changed = [f for f in failing
@@ -303,6 +312,13 @@ def complete(item, *, run_by: str | None = None, on_step=None):
             item.id, last_key, False,
             f"{period}: {len(touched)} reader(s) re-evaluated; still owed for "
             f"{', '.join(waiting_on)}, refused by the agreement backstop", frozen=True)
+    if still_not_judged:
+        return recheck.Outcome(
+            item.id, last_key, False,
+            f"{period}: {len(touched)} reader(s) re-evaluated; "
+            f"{', '.join(still_not_judged)} still not judged - a re-checked check recorded "
+            f"no result that counts, so it is held back and this stays owed for the next "
+            f"pass", status="red", not_judged=True)
     recheck.clear(item.id, last_key or f"knock-on/{item.id}")
     names = ", ".join(f"{d}" for d, _s, _w in failing)
     return recheck.Outcome(

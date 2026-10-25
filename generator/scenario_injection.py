@@ -142,6 +142,11 @@ class ExtraArrival:
     #: several (REQ-GEN-199 criterion 1: TS-75's cp_clients alone, the other
     #: five clean). Empty is the preset's own pick, as before.
     severity_tables: tuple[str, ...] = ()
+    #: EACH FILE ITS OWN RECEIPT within one delivery, as (table, "HH:MM") on
+    #: the arrival's day (REQ-GEN-273 criterion 4: S10's staggered chain,
+    #: Notifications 08:40, Investigations 09:00, Clients 09:20). A table not
+    #: named takes `at`, which is the delivery's own (earliest) instant.
+    file_times: tuple[tuple[str, str], ...] = ()
 
     @property
     def targets(self) -> tuple:
@@ -162,6 +167,10 @@ class ExtraArrival:
         if self.severity_tables and self.severity is None:
             raise CannotPlace(f"an arrival at {self.at} names the tables a severity "
                               f"dirties ({', '.join(self.severity_tables)}) and no severity")
+        for table, at in self.file_times:
+            if at < self.at:
+                raise CannotPlace(f"an arrival at {self.at} names {table} received at {at}, "
+                                  f"before the delivery's own instant - `at` is the earliest")
         if self.target is not None and self.severity is not None:
             raise CannotPlace(f"an arrival at {self.at} names both a severity "
                               f"({self.severity}) and a target - a target replaces the "
@@ -237,6 +246,31 @@ class LinkDate:
     first: tuple[str, datetime | None]
     second: tuple[str, datetime | None]
     problem: str | None = None
+
+
+@dataclass(frozen=True)
+class GateOutcome:
+    """What a scenario DECLARES the package gate does with one supply of one
+    of its arrivals (REQ-GEN-273 criterion 3) - promoted, or held back, and
+    where held back, because of which other supply's dataset and whether
+    after a re-check against the warehouse. A declaration of the GATE's
+    decision, never a predicted verdict (REQ-GEN-186 criterion 4); the
+    bootstrap compares it with the recorded promotions and hold-backs."""
+
+    dataset_id: str
+    #: The arrival, by its index in the injection's `arrivals`.
+    arrival: int
+    outcome: str
+    because: str | None = None
+    rechecked: bool = False
+
+    def __post_init__(self):
+        if self.outcome not in ("promoted", "held back"):
+            raise CannotPlace(f"a declared gate outcome is 'promoted' or 'held back', not "
+                              f"{self.outcome!r}")
+        if self.outcome == "promoted" and (self.because or self.rechecked):
+            raise CannotPlace(f"{self.dataset_id} is declared promoted, so nothing held it "
+                              f"back and it names no cause")
 
 
 @dataclass(frozen=True)
@@ -324,6 +358,10 @@ class Injection:
     #: period's own supply, so another scenario there would change it.
     stands_on: int | None = None
 
+    #: THE GATE OUTCOMES IT DECLARES (REQ-GEN-273 criteria 3 and 4), checked
+    #: by the bootstrap against what the gate recorded.
+    gate_outcomes: tuple[GateOutcome, ...] = ()
+
     @property
     def is_targeted(self) -> bool:
         return any(a.targets for a in self.arrivals)
@@ -354,6 +392,8 @@ class Placement:
     #: Scenario id -> what its link lands on (REQ-DASH-208 criterion 2).
     #: Absent ids land on their first supply's row.
     subjects: tuple[tuple[str, str], ...] = ()
+    #: What it declares the gate does (Injection.gate_outcomes).
+    gate_outcomes: tuple = ()
 
     @property
     def built_green(self) -> tuple[str, ...]:
@@ -404,6 +444,12 @@ class Placement:
             + [{"date": a["date"], "at": f["at"], "delivery": a.get("delivery"),
                 "filename": f["filename"], "day": f["built_for"], **f["target"]}
                for a in self.arrivals for f in (a.get("files") or []) if f.get("target")],
+            # EACH DECLARED GATE OUTCOME BY ITS ARRIVAL'S DELIVERY NAME (REQ-GEN-273
+            # criterion 3) - what both sides agree on, as for run ids.
+            "gate_outcomes": [
+                {"dataset_id": g.dataset_id, "delivery": self.arrivals[g.arrival].get("delivery"),
+                 "outcome": g.outcome, "because": g.because, "rechecked": g.rechecked}
+                for g in self.gate_outcomes],
         }
 
 
@@ -449,6 +495,15 @@ FILE_SHAPES: dict[str, str] = {
     "carers_alone":
         "cp_carers.csv arriving on its own - the Carer Register sent separately "
         "from the quarter's delivery.",
+    # REQ-GEN-273 criterion 4 (S1 green and S1 red): a zip of two tables.
+    "clients_and_notifications":
+        "a zip of cp_clients.csv and cp_notifications.csv alone - a resupply of two "
+        "tables that arrive together.",
+    "clients_short_with_notifications":
+        "a zip of cp_clients.csv and cp_notifications.csv, the Client Register missing "
+        "the five clients only the Notifications point at (none of Investigations or "
+        "Placements does) - its own data whole, but short of what the warehouse's "
+        "Notifications need.",
     # PER FILE (REQ-GEN-196's named-shapes NFR): applied to whichever file a
     # pair names, never hardwired to one filename.
     "unreadable_file":
@@ -545,6 +600,8 @@ def carries(shape: str | None, table: str) -> bool:
         return table != "cp_carers"
     if shape == "carers_alone":
         return table == "cp_carers"
+    if shape in ("clients_and_notifications", "clients_short_with_notifications"):
+        return table in ("cp_clients", "cp_notifications")
     return True
 
 
@@ -595,7 +652,39 @@ def apply_file_shape(shape: str | None, files: dict[str, str]) -> dict[str, str]
         out.pop("cp_carers.csv")
     elif shape == "carers_alone":
         out = {"cp_carers.csv": files["cp_carers.csv"]}
+    elif shape == "clients_and_notifications":
+        out = {t: files[t] for t in ("cp_clients.csv", "cp_notifications.csv")}
+    elif shape == "clients_short_with_notifications":
+        out = {"cp_clients.csv": _without_notified_only(files),
+               "cp_notifications.csv": files["cp_notifications.csv"]}
     return out
+
+
+#: How many clients S1 red's Client Register leaves out (REQ-GEN-273).
+NOTIFIED_ONLY_DROPPED = 5
+
+
+def _without_notified_only(files: dict[str, str]) -> str:
+    """cp_clients.csv without the first few clients (by id) that a
+    Notification points at and no Investigation or Placement does - so the
+    Notifications -> Client Register check fails against it while every
+    other check reading it passes (S1 red)."""
+    import io
+
+    import pandas as pd
+
+    def frame(name):
+        return pd.read_csv(io.StringIO(files[name]), dtype=str, keep_default_na=False)
+    clients = frame("cp_clients.csv")
+    notified = set(frame("cp_notifications.csv")["cp_client_id"])
+    others = set(frame("cp_investigations.csv").get("cp_client_id", [])) | set(
+        frame("cp_placements.csv").get("cp_client_id", []))
+    drop = sorted(c for c in set(clients["cp_client_id"]) if c in notified and c not in others)
+    drop = drop[:NOTIFIED_ONLY_DROPPED]
+    if len(drop) < NOTIFIED_ONLY_DROPPED:
+        raise CannotPlace(f"only {len(drop)} client(s) are pointed at by Notifications alone, "
+                          f"not the {NOTIFIED_ONLY_DROPPED} S1 red leaves out")
+    return clients[~clients["cp_client_id"].isin(drop)].to_csv(index=False)
 
 
 def resolve(injection: Injection, periods: Sequence,
@@ -683,6 +772,7 @@ def resolve(injection: Injection, periods: Sequence,
             "severity": extra.severity,
             "note": extra.note,
             "file_shape": extra.file_shape,
+            "file_times": [list(x) for x in extra.file_times],
             # WHAT IT WAS BUILT TO, AND WHAT WAS MOVED (REQ-GEN-184
             # criterion 12): the target as asked here, the rules and their
             # intended counts filled in once the rows are built. Never a
@@ -709,7 +799,12 @@ def resolve(injection: Injection, periods: Sequence,
         quiet=tuple(quiet),
         lead_in=tuple(lead_in),
         follow=tuple(follow),
-        covered=tuple(covered))
+        covered=tuple(covered),
+        gate_outcomes=tuple(injection.gate_outcomes))
+    for g in injection.gate_outcomes:
+        if not 0 <= g.arrival < len(arrivals):
+            raise CannotPlace(f"{injection.scenario_id}: a gate outcome names arrival "
+                              f"{g.arrival}, and it has {len(arrivals)}")
     if not injection.links:
         return placement
     # THE DATE WRITTEN IS THE DATE VALIDATED (REQ-GEN-201 criterion 9):
@@ -2102,6 +2197,114 @@ INJECTIONS: tuple[Injection, ...] = (
         # ON THE PAIR'S ARRIVAL DAY, where it reads contested (REQ-GEN-196
         # criterion 5's rule for a settled pair); settled from the next.
         links=(Link("TS-80", 0, 0, "TS-80 settle"),),
+    ),
+    # WHAT THE PACKAGE GATE DECIDES, DECLARED (REQ-GEN-273 criterion 4; Keith,
+    # 2026-10-22 and 2026-10-25): S1 green and S1 red, S2 strict as re-cast, the
+    # S10 chain re-ordered and S14, each in a grown quarter drawn clean
+    # (REQ-GEN-207), each stating every table of its period, and each declaring
+    # its gate outcomes for the bootstrap to compare (criterion 3). S1's two sit
+    # inside Child Protection's own 'green' replacement-setting era
+    # (contract/data-asset.yaml, 2017-04-17 to 2017-10-18): a green resupply may
+    # replace a promoted one only there.
+    Injection(
+        scenario_id="TS-81",
+        dataset_id="cp-clients",
+        anchor=-38,
+        config="quarterly, Feb/May/Aug/Nov, due 09:00 on the 1st; Child Protection's "
+               "replacement setting is green for 2017-Q2 and 2017-Q3. The quarter's five "
+               "tables arrive on time, clean, and are promoted; two weeks later a zip of a "
+               "clean Client Register and a Notifications red on its own data arrives.",
+        arrivals=(
+            ExtraArrival(0, "09:00", None,
+                         "the quarter's five tables on time, clean - each promoted"),
+            ExtraArrival(14, "10:00", "red",
+                         "a zip of cp_clients, clean, and cp_notifications, red on its "
+                         "own data", file_shape="clients_and_notifications",
+                         severity_tables=("cp_notifications",)),
+        ),
+        gate_outcomes=(GateOutcome("cp-clients", 1, "promoted"),
+                       GateOutcome("cp-notifications", 1, "held back")),
+    ),
+    Injection(
+        scenario_id="TS-82",
+        dataset_id="cp-clients",
+        anchor=-37,
+        config="as TS-81, the Client Register of the zip missing the five clients only "
+               "the quarter's Notifications point at.",
+        arrivals=(
+            ExtraArrival(0, "09:00", None,
+                         "the quarter's six tables on time, clean - each promoted"),
+            ExtraArrival(14, "10:00", "red",
+                         "a zip of cp_clients, short of five clients only Notifications "
+                         "point at, and cp_notifications, red on its own data",
+                         file_shape="clients_short_with_notifications",
+                         severity_tables=("cp_notifications",)),
+        ),
+        gate_outcomes=(GateOutcome("cp-clients", 1, "held back", because="cp-notifications",
+                                   rechecked=True),
+                       GateOutcome("cp-notifications", 1, "held back")),
+    ),
+    Injection(
+        scenario_id="TS-83",
+        dataset_id="cp-clients",
+        anchor=-41,
+        config="quarterly, Feb/May/Aug/Nov, due 09:00 on the 1st. The quarter's six "
+               "tables arrive together on time, the first supply of the quarter, the "
+               "Client Register red on its own data and the other five clean.",
+        arrivals=(
+            ExtraArrival(0, "09:00", "red",
+                         "the quarter's six tables on time, cp_clients red on its own "
+                         "data and the other five clean", severity_tables=("cp_clients",)),
+        ),
+        gate_outcomes=(GateOutcome("cp-clients", 0, "held back"),
+                       GateOutcome("cp-notifications", 0, "held back", because="cp-clients",
+                                   rechecked=True),
+                       GateOutcome("cp-investigations", 0, "held back", rechecked=True),
+                       GateOutcome("cp-placements", 0, "held back", rechecked=True),
+                       GateOutcome("cp-carers", 0, "promoted"),
+                       GateOutcome("cp-case-workers", 0, "promoted")),
+    ),
+    Injection(
+        scenario_id="TS-84",
+        dataset_id="cp-clients",
+        anchor=-44,
+        config="quarterly, Feb/May/Aug/Nov, due 09:00 on the 1st, 8 hours' grace. One "
+               "delivery, the first of the quarter, each file its own receipt: Carer "
+               "Register 08:30, Notifications 08:40, Placements 08:50, Investigations "
+               "09:00, Client Register 09:20 - all clean.",
+        arrivals=(
+            ExtraArrival(0, "08:30", None,
+                         "five tables, staggered: Carer Register 08:30, Notifications "
+                         "08:40, Placements 08:50, Investigations 09:00, Client Register "
+                         "09:20",
+                         file_times=(("cp_notifications", "08:40"),
+                                     ("cp_placements", "08:50"),
+                                     ("cp_investigations", "09:00"),
+                                     ("cp_clients", "09:20"))),
+        ),
+        gate_outcomes=(GateOutcome("cp-notifications", 0, "promoted"),
+                       GateOutcome("cp-investigations", 0, "promoted"),
+                       GateOutcome("cp-placements", 0, "promoted"),
+                       GateOutcome("cp-clients", 0, "promoted"),
+                       GateOutcome("cp-carers", 0, "promoted")),
+    ),
+    Injection(
+        scenario_id="TS-85",
+        dataset_id="cp-placements",
+        anchor=-46,
+        config="quarterly, Feb/May/Aug/Nov, due 09:00 on the 1st. The quarter's five "
+               "tables arrive together on time, the first supply of the quarter, "
+               "Placements red on its own data and the other four clean.",
+        arrivals=(
+            ExtraArrival(0, "09:00", "red",
+                         "the quarter's five tables on time, cp_placements red on its own "
+                         "data and the other four clean", severity_tables=("cp_placements",)),
+        ),
+        gate_outcomes=(GateOutcome("cp-placements", 0, "held back"),
+                       GateOutcome("cp-clients", 0, "promoted"),
+                       GateOutcome("cp-notifications", 0, "promoted"),
+                       GateOutcome("cp-investigations", 0, "promoted"),
+                       GateOutcome("cp-carers", 0, "promoted")),
     ),
     Injection(
         scenario_id="TS-78a",

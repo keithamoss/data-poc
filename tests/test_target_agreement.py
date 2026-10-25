@@ -615,3 +615,33 @@ class TestGateOutcomes:
                             lambda collection_id: ("cp-clients", "cp-notifications"))
         disagreements = bootstrap.targets_agree(["cp"])
         assert any(d.startswith("TS-S1g: cp-clients") for d in disagreements), disagreements
+
+    def test_a_declaration_on_a_dataset_with_no_targets_is_compared_too(self, gate_scenario,
+                                                                        monkeypatch):
+        """A declared gate outcome names any table of its package, and Child
+        Protection's provider declares targets for cp-clients alone - so the
+        bootstrap compares declarations of the collection it replayed, not of
+        its target datasets. Filtering by the latter dropped Notifications v2's
+        declaration in silence (found building REQ-GEN-273 criterion 4,
+        2026-10-25)."""
+        from gate_support import own_red
+        from qa_tools.common import bootstrap
+        from test_package_gate import established
+
+        sc = gate_scenario
+        established(sc)
+        sc.rules.append(own_red("N2"))
+        v2 = sc.deliver("2024-08-05T10:00:00+08:00",
+                        {"cp_clients": "C2", "cp_notifications": "N2"})
+        sc.process()
+        wrong = [targets.DeclaredGateOutcome("TS-S1g", "cp-notifications",
+                                             _delivery_of(sc, v2["N2"]),
+                                             target_agreement.PROMOTED)]
+        from cli import pipeline as cli_pipeline
+
+        monkeypatch.setattr(cli_pipeline, "generated_targets", lambda: [])
+        monkeypatch.setattr(cli_pipeline, "generated_gate_outcomes", lambda: wrong)
+        assert cli_pipeline.target_datasets("child-protection") == ("cp-clients",)
+        disagreements = bootstrap.targets_agree(["cp"])
+        assert any(d.startswith("TS-S1g: cp-notifications") for d in disagreements), \
+            disagreements
