@@ -42024,7 +42024,7 @@ requirements:
       and against what's in the warehouse, so that I can tell 'a bad file is waiting' from 'the warehouse is broken' at a glance,
       while an engineer can still read the full explanation.
     moscow: must
-    status: not_started
+    status: built
     signed_off:
       by: Keith
       date: '2026-10-23'
@@ -42189,6 +42189,87 @@ requirements:
     - REQ-DASH-277
     - REQ-PIPE-279
     - REQ-DASH-275
+    linked_tests:
+    - tests/test_dashboard_e2e.py::TestWarehouseAndStagingViews::test_s1_green_the_clause_the_caption_and_s4
+    - tests/test_dashboard_e2e.py::TestWarehouseAndStagingViews::test_s6_a_dual_row_held_back_against_the_warehouse
+    - tests/test_dashboard_e2e.py::TestWarehouseAndStagingViews::test_staggered_a_result_whose_partner_left_is_in_neither_cell
+    - tests/test_dashboard_e2e.py::TestWarehouseAndStagingViews::test_staggered_order_b_red_shows_both_cells
+    - tests/test_dashboard_e2e.py::TestWarehouseAndStagingViews::test_the_owed_re_check_and_a_rejection
+    - tests/test_dashboard_e2e.py::TestWarehouseAndStagingViews::test_after_a_rejection_the_page_reads_the_warehouse
+    - tests/test_dashboard_e2e.py::TestACrossTableCheckOnTS80
+    - tests/test_cross_table_grid.py::TestTheCell
+    - tests/test_cross_table_grid.py::TestTheClause
+    - tests/test_cross_table_grid.py::TestTheNames
+    - tests-js/cross-table-grid.test.js
+    implemented_by:
+    - pipeline/cross_table_grid.py::place
+    - pipeline/cross_table_grid.py::place_entries
+    - pipeline/cross_table_grid.py::named
+    - pipeline/cross_table_grid.py::Slots
+    - pipeline/cross_table_grid.py::Receipts
+    - pipeline/cross_table_grid.py::owed_words
+    - pipeline/cross_table_grid.py::clause_points
+    - pipeline/cross_table_grid.py::promotion_words
+    - pipeline/cross_table_notices.py::read_log
+    - pipeline/red_promoted.py::for_dataset
+    - pipeline/build_dashboard_data.py::build_one_table
+    - dashboard/qa-reporting-dashboard.template.html::crossTableGridRows
+    - dashboard/qa-reporting-dashboard.template.html::xtRowModel
+    - dashboard/qa-reporting-dashboard.template.html::xtCellText
+    - dashboard/qa-reporting-dashboard.template.html::crossTableGridHtml
+    - dashboard/qa-reporting-dashboard.template.html::xtAriaLabel
+    - dashboard/qa-reporting-dashboard.template.html::xtToolsPanelBlock
+    - dashboard/qa-reporting-dashboard.template.html::readAgainstText
+    - dashboard/qa-reporting-dashboard.template.html::warehouseClauseHtml
+    - dashboard/qa-reporting-dashboard.template.html::segmentsHtml
+    - dashboard/qa-reporting-dashboard.template.html::verdictLine
+    - dashboard/qa-reporting-dashboard.template.html::outcomeCell
+    - dashboard/qa-reporting-dashboard.template.html::renderDataset
+    - tests/test_dashboard_e2e.py::TestSupplyAndTableLevelSections
+    unmet_criteria:
+    - criterion: Criterion 17 - a gate application's re-evaluations shown as ONE re-check point labelled 're-checked against the <dataset>
+        in place in the warehouse', and a panel comparing a point with an earlier one only within one grid bucket.
+      why: The point key is already the run's cause ('gate:<application>', REQ-PIPE-279 as amended by REQ-PIPE-267 criterion 11), so
+        one application is one point showing its last round; the point's label and the compare default filtered to the current point's
+        bucket are not built. The compare default and ?cmp= share one function REQ-PIPE-279 owns (decision on this requirement), and
+        changing it was left for that function's own change rather than made beside it here.
+      owner: REQ-DASH-272 (a follow-up build)
+      blocked_by:
+        unowned: true
+    - criterion: Criterion 21 - the verdict line's four forms while a supply's gate is not yet applied or its application not settled
+        ('Being checked with its delivery', 'Checked, waiting for the rest of its delivery', 'Checked, being gated'), with no pill
+        and no results for an unchecked package member, and its test forms in criterion 24.
+      why: Needs, per supply and date, its package's files and which of them have a recorded run (the owed 'gate' item, qa.gate_application)
+        carried into the build; not built in this lane. In the bootstrapped history every package is gated at its arrival's instant,
+        so no page date shows these states; they arise in a build made mid-processing.
+      owner: REQ-DASH-272 (a follow-up build)
+      blocked_by:
+        unowned: true
+    - criterion: Criterion 24's tests for the inherited supply's clause (built, covered by tests/test_cross_table_grid.py::TestTheClause::test_an_inherited_supply_is_carried_forward
+        but not in a real browser), the 'Clients' trend after Order A keeps its 09:00 point', 'on a held table's page no red row sits
+        under a non-red cross-table pill' (built - the section pill follows the rows' pills - not asserted in a browser), and criterion
+        21's forms.
+      why: Not written in this lane; criterion 21 is not built.
+      owner: REQ-DASH-272 (a follow-up build)
+      blocked_by:
+        unowned: true
+    evidence:
+    - '2026-10-25, LANE L2 (worktree w1-l2), against a copy of the bootstrapped history (l2_probe), on this tree: tests/test_dashboard_e2e.py''s
+      TestWarehouseAndStagingViews (6, fixture histories driven through the real lifecycle on a pinned clock), TestAnotherTableCouldNotBeRead,
+      TestACrossTableCheckOnTS80, TestSupplyAndTableLevelSections, TestCrossTableChecks, TestNotInTheAgreementOnThePage, TestThePanelAsAtTheDateOnShow,
+      TestTheDataFilesLoadFromDisk, TestStatusMatchesEachToolsOwnVerdict, TestTheDisplayStandardHoldsInARealBrowser, TestTheKeyboardCanReachTheData,
+      TestEveryDatasetPageSurvivesItsOwnDrillDown, TestBuiltDashboardRenders, TestSupplyHistoryDrillDown, TestArrivedVersusPromoted,
+      TestASupersededRunOnTheDatesItWasCurrent, TestAHeldOrContestedDatasetReadsRed, with tests/test_red_promoted.py, test_cross_table_grid.py
+      (15), test_cross_table_notices.py, test_build_dashboard_data.py, test_build_dashboard_child_protection.py, test_dashboard_for_every_collection.py,
+      test_promotion_timeline.py and test_root_cause_shouts.py: 190 passed, 1 failed in 532s at -n 4 - the failure TestTheDataFilesLoadFromDisk''s
+      first-view budget (trends 5.0-6.6s against 6s) on a 4-core machine at load average 6-10 shared with two other build lanes; run
+      alone the same minute it passed (trends 3.6-4.5s). npm test 962 passed. An earlier full run of tests/test_dashboard_e2e.py on
+      this lane failed 29 tests that fail identically on the base c1563cb against l2_probe (TestTheAsAtScenarioChips, TestThePlantedPairsOnTheBuiltDashboard,
+      TestTheAsAtReadingsOnTheRealHistory, TestThePeriodComposition''s earlier-date test, TestInPlaceInTheWarehouse, TestScenariosTab''s
+      no-coordinates test - checked by running them in a worktree of c1563cb: 29 failed, 9 passed); the three it found of this change''s
+      own (test_red_promoted''s monkeypatched _cause, TestThePanelAsAtTheDateOnShow''s clause, the trends budget) are fixed and pass
+      above.'
+    - '2026-10-25, TEST-FIRST, SHOWN AFTER THE BUILD: against the base c1563cb''s product code (a worktree with the test files copied in, l2_probe): TestWarehouseAndStagingViews 5 of 6 failed - the one passing, test_after_a_rejection_the_page_reads_the_warehouse, is criterion 19, already today''s behaviour by the criterion''s own decision; tests/test_cross_table_grid.py failed to import; tests-js/cross-table-grid.test.js 2 of 2 failed.'
     decisions:
     - OPTION 2, A CLAUSE ON THE AWAITING LINE (Keith, 2026-10-21 morning). REJECTED sending the reader to supply history to
       find the warehouse's state, Keith's first guess.
@@ -42290,6 +42371,50 @@ requirements:
       = C''s separate points. Period-clarity''s Q3 = A row wording (''Not evaluated — Client Register has no 2025-Q2 supply'')
       extends this requirement''s cell notes and panel sentences through the same helper rather than adding a vocabulary of
       its own.'
+    - 'THE ANSWERS TRAVEL, NOT THE RULE (build, 2026-10-25): pipeline/cross_table_grid.py places every cross-table history entry about
+      a supply of the page''s table, at every instant anything it read changed place (the slot timelines'' held_as and holder, each
+      supply''s rejections and supersessions), into the staged cell, the warehouse cell or neither, with its note and its ''Read against''
+      sentence; the page takes the newest point on or before the date on show, groups a check''s dbt, Soda and datacontract-cli cards
+      into one row, and takes each cell''s newest result per tool by rank. The cell''s WORD is computed in the page through rollupStatuses,
+      as criterion 8 names it.'
+    - 'SENTENCES ARE SEGMENTS (criteria 15 and 22): a note or sentence is a list of {text} and {dataset} segments, named through cross_table_grid.named,
+      the one helper; the page sets text as text and turns a dataset into a real link keeping the date on show. Each page''s notes
+      and sentences are written once (xtPhrases) and a placed point names them by index - REJECTED repeating them per entry, which
+      made Child Protection''s data 55% bigger.'
+    - 'THE CLAUSE NAMES THE PANEL''S SUPPLY (criterion 1, built): the supply in place is the one the promotion panel names - the most
+      recently promoted, REQ-DASH-197 criterion 13 - or the supply the period stands on where it is inherited or substituted (criterion
+      4), from promotion_timeline''s points and standing; its status is red_promoted''s counted timeline. REJECTED, after a failing
+      test: the holder of the waiting supply''s own period''s slot, which says ''Nothing is in place'' on the first day of a new period
+      while the panel names last period''s promoted supply. Computed only while the supply can be awaiting (up to its first promotion
+      or withdrawal).'
+    - 'A PERSON NAMED (criterion 3): red_promoted''s timeline step carries `by`, the person whose decision caused the run, by display
+      name (''a person'' for an email), beside the cause words every other reader already uses unchanged.'
+    - '''WHY IT IS HELD BACK'' (criterion 9, as built): both cells hold a result, their words differ, and the gate''s reading is the
+      warehouse one - counted toward the supply, or (staggered Order B, where the staged result is the newer and counted) the warehouse
+      result is the worse - and then the row''s pill takes the warehouse result too, and the section''s pill follows its rows'' pills,
+      so no red row sits under a non-red section pill. PROVISIONAL, for Keith: the waiting supply''s counted result in Order B is the
+      staged one, and the gate''s hold-back is read off the warehouse cell rather than from the gate entry''s structured `against`.'
+    - 'WHERE A RESULT CAME FROM ANOTHER TABLE''S RUN (REQ-DASH-264 criterion 7 as amended): the row no longer says it; the panel says
+      it under that tool and the row''s accessible name carries it. The TS-80 tests in TestACrossTableCheckOnTS80 were moved onto the
+      accessible name accordingly (one row per check, three on the Client Register''s page where there were nine).'
+    - 'THE PANEL (criterion 12, as built): an ''Each tool''s result'' section - each tool''s pill and, for each of its cells, the full
+      sentence, the could-not-run clause and where the result came from - and the compare list''s options end with the entry''s ''Read
+      against'' sentence as at the date on show, which is where a result in neither cell is found.'
+    - 'THE JOINT-PROMOTION ROW (criterion 20): a rule promotion whose decision names promoted_with reads ''Promoted <time> with the
+      <dataset> supply received <instant>, ... by the rule'' (past three, the first two and ''and <n> more''); one whose supply has
+      a run caused by its own gate application (''gate:<n>'') and a package-mate not promoted in it reads the re-check form. ''Held
+      back'' there covers a package-mate refused on its own data as well as one held back by another.'
+    - 'PROVISIONAL WORDING, for Keith: the cell words Pass / Warn / Fail / No result; marks ✓ ✗ ! and ''–'' for a tool that has the
+      check but no result in that cell (· only for a tool with no such check); a note''s day is fmtDay''s full form (''Investigations
+      received Monday, 5 August 2024''), where the mock-up showed ''2 Oct''; the key line is prefixed with the marks themselves; the
+      accessible name ends ''View each tool''s full result.''; the panel section is headed ''Each tool''s result''; the grid''s columns
+      stack below 600px.'
+    - 'PLACEMENTS BESIDE THE ENTRIES, NOT IN THEM (build, 2026-10-25, found by TestTheDataFilesLoadFromDisk''s budget going red): with
+      `placed` (and REQ-DASH-204''s `unreadable`) on some history entries and not others, the page''s weekly trends - which clip every
+      dataset on every week since 2013 - took about twice as long (5.5s against 2.8s), the entries having more than one shape. Each
+      card now carries `placed` keyed by the entry''s rank, and the fields only the build reads are dropped before the file is written;
+      measured after, the first view''s trends and 300 dates of buildDatasetsOn within noise of the base (3.6-3.9s and 0.5-0.7s against
+      3.6-4.2s and 0.5-0.7s, same machine, interleaved). COST: Child Protection''s dashboard data about 11% bigger.'
     open_questions: []
   - id: REQ-GEN-273
     title: Target agreement compares a targeted supply with its own checks, and a few scenarios pin what the package gate decides
@@ -42471,7 +42596,7 @@ requirements:
       the root where the chain is longer - and the collection card to say it once per delivery, so that I go to the one decision
       that clears the delivery instead of hunting through this dataset's checks.
     moscow: must
-    status: not_started
+    status: built
     signed_off:
       by: Keith
       date: '2026-10-23'
@@ -42546,6 +42671,43 @@ requirements:
     - REQ-DASH-272
     - REQ-DASH-277
     - REQ-PIPE-279
+    linked_tests:
+    - tests/test_dashboard_e2e.py::TestHeldBackWithItsDelivery::test_s1_red_the_notice_its_links_and_the_root
+    - tests/test_dashboard_e2e.py::TestHeldBackWithItsDelivery::test_staggered_s1_red_the_joined_form
+    - tests/test_dashboard_e2e.py::TestHeldBackWithItsDelivery::test_s6_the_chain_the_root_and_the_card
+    - tests/test_dashboard_e2e.py::TestHeldBackWithItsDelivery::test_after_the_root_is_turned_down_then_replaced
+    - tests/test_dashboard_e2e.py::TestHeldBackWithItsDelivery::test_a_replaced_root
+    - tests/test_held_back_notices.py::TestTheNotice
+    - tests/test_held_back_notices.py::TestTheRoot
+    implemented_by:
+    - pipeline/held_back_notices.py::for_dataset
+    - pipeline/held_back_notices.py::involved
+    - pipeline/held_back_notices.py::chain_of
+    - pipeline/held_back_notices.py::_notice
+    - pipeline/held_back_notices.py::_holding
+    - pipeline/held_back_notices.py::_card
+    - pipeline/cross_table_notices.py::read_log
+    - pipeline/build_dashboard_data.py::build_one_table
+    - dashboard/qa-reporting-dashboard.template.html::heldBackNotice
+    - dashboard/qa-reporting-dashboard.template.html::heldBackHolding
+    - dashboard/qa-reporting-dashboard.template.html::heldBackMarker
+    - dashboard/qa-reporting-dashboard.template.html::heldBackDatasets
+    - dashboard/qa-reporting-dashboard.template.html::noPromotedMarker
+    - dashboard/qa-reporting-dashboard.template.html::verdictLine
+    - dashboard/qa-reporting-dashboard.template.html::renderDataset
+    evidence:
+    - '2026-10-25, LANE L2 (worktree w1-l2), against a copy of the bootstrapped history (l2_probe), on this tree: tests/test_dashboard_e2e.py''s
+      TestHeldBackWithItsDelivery (5, fixture histories through the real lifecycle on a pinned clock), TestWarehouseAndStagingViews,
+      TestAnotherTableCouldNotBeRead, TestBuiltDashboardRenders, TestTheDisplayStandardHoldsInARealBrowser, TestTheKeyboardCanReachTheData,
+      TestEveryDatasetPageSurvivesItsOwnDrillDown, TestDatasetsNotGreenOnCardsAndHeadings, TestTheExecutiveLegendCountsWhatIsActuallyThere,
+      TestTheDataFilesLoadFromDisk and TestStatusMatchesEachToolsOwnVerdict, with tests/test_held_back_notices.py (6), test_cross_table_grid.py,
+      test_cross_table_notices.py, test_build_dashboard_data.py, test_build_dashboard_child_protection.py and test_dashboard_for_every_collection.py:
+      143 passed in 382s at -n 4. On the bootstrapped page TS-82 (S1 red, 2017-Q3) reads, on 28 August 2017, ''Held back with the Notifications
+      received with it. That file (received 10:00am Tuesday, 15 August 2017) was held back, ... 3 cross-table checks fail against it.'',
+      the Notifications'' line ends ''Holding back with it: Client Register. If this file is turned down, the Client Register supply
+      needs its own decision.'', and the Child Protection card ''Held back together: Notifications and Client Register (one delivery,
+      received 10:00am Tuesday, 15 August 2017)''.'
+    - '2026-10-25, TEST-FIRST, SHOWN AFTER THE BUILD: against the base c1563cb''s product code (a worktree with the test files copied in, l2_probe): TestHeldBackWithItsDelivery 5 of 5 failed and tests/test_held_back_notices.py failed to import.'
     decisions:
     - 'A TOP-OF-PAGE NOTICE FOR S1 RED (Keith, 2026-10-22, A), with no ''not a fault'' clause. This settles the contradiction
       the dashboard review found in summary-v3 (D5: REQ-DASH-204 ''does not apply to S1''s red branch'' against a proposed ''Held
@@ -42581,6 +42743,27 @@ requirements:
     - 'THE EXEC VIEW''S EXTRA SENTENCE IS DROPPED KNOWINGLY (dashboard UX review v4, v3 shape item 4): the exec view has no
       explanation element of its own for a sentence to extend (renderExec), and the card line of criterion 4 already appears
       on the exec card.'
+    - 'THE ANSWERS TRAVEL, NOT THE RULE (build, 2026-10-25): pipeline/held_back_notices.py works out, per supply and per asset day
+      a hold-back or a decision about one of the supplies involved changed, the notice (as segments, named through cross_table_grid.named)
+      and, for a root, what it holds back and its card line; the page renders them, every name a link keeping the date on show and
+      every name set as text.'
+    - 'WHICH HOLD-BACK IS THIS NOTICE''S (criterion 1, as built): the supply''s newest gate entry by the date is a ''promotion-withheld''
+      whose structured detail says its re-check against the warehouse FAILED (gate.Cause.failed); a hold-back that could not be checked
+      is REQ-DASH-204''s package form. <n> is the entry''s `checks`.'
+    - THE CHAIN (criterion 2) walks held_back_by from entry to entry as at the date, NOT through root_cause.root_of, which stops at
+      a supply whose own re-check failed (Keith 3a) and so would name the Notifications, not the Investigations, as S6's root. The
+      tickets' root and the page's named root can therefore differ for S6 - PROVISIONAL, for Keith.
+    - '''HOLDING BACK WITH IT'' (criterion 3) lists every supply whose chain ends at the root on the date, could-not-be-checked hold-backs
+      included, ordered by receipt; it ends the root''s awaiting verdict line. The forewarning names the first supply whose re-check
+      failed.'
+    - THE CARD LINE (criterion 4) is on the collection block and the executive view's agency card; on the agency card, itself a link,
+      the names are text (no link inside a link) - PROVISIONAL. REQ-DASH-204's card line leaves out a cause in a held-back set (204
+      criterion 18).
+    - 'TURNED DOWN OR REPLACED (criterion 6): read off the partner''s own rejection or supersession as at the date, where the supply''s
+      newest gate entry is still that hold-back (nothing has re-gated it since); the notice then drops ''held back'' and ''checked
+      again once''. The replaced fixture is a Notifications v3 that supersedes v2 and whose own run stops before it can re-gate anything.'
+    - 'PROVISIONAL WORDING, for Keith: ''<n> cross-table check fails'' in the singular; the card line''s two instants on one day as
+      ''9:00am and 9:05am, Monday, 5 August 2024''; the root''s holding list as ''Holding back with it: <links>.'''
     open_questions: []
   - id: REQ-PIPE-276
     title: 'The terminal says what a package gate did: what was held back and by what, what to decide first, and what an override
@@ -43386,7 +43569,7 @@ requirements:
       it, so that I go to the one decision or arrival that clears it instead of hunting through this dataset's checks for a
       fault it does not have.
     moscow: must
-    status: not_started
+    status: built
     signed_off:
       by: Keith
       date: '2026-10-23'
@@ -43500,6 +43683,52 @@ requirements:
     - REQ-DASH-277
     - REQ-PIPE-279
     - REQ-DASH-275
+    linked_tests:
+    - tests/test_dashboard_e2e.py::TestAnotherTableCouldNotBeRead::test_a_reader_shows_one_line_while_the_pair_is_open_and_none_after
+    - tests/test_dashboard_e2e.py::TestAnotherTableCouldNotBeRead::test_the_package_form_turned_down_on_notifications_page
+    - tests/test_dashboard_e2e.py::TestAnotherTableCouldNotBeRead::test_a_replaced_partner_reads_has_been_replaced
+    - tests/test_dashboard_e2e.py::TestAnotherTableCouldNotBeRead::test_a_partner_not_due_yet_and_then_overdue
+    - tests/test_dashboard_e2e.py::TestAnotherTableCouldNotBeRead::test_the_owed_re_check_has_its_own_wording
+    - tests/test_cross_table_notices.py::TestBlockingTables
+    - tests/test_cross_table_notices.py::TestTheLines
+    - tests-js/another-table.test.js
+    implemented_by:
+    - pipeline/cross_table_notices.py::no_promoted
+    - pipeline/cross_table_notices.py::read_log
+    - pipeline/cross_table_notices.py::Log
+    - qa_tools/common/root_cause.py::blocking_tables
+    - pipeline/build_dashboard_data.py::build_one_table
+    - dashboard/qa-reporting-dashboard.template.html::noPromotedNotice
+    - dashboard/qa-reporting-dashboard.template.html::noPromotedLineHtml
+    - dashboard/qa-reporting-dashboard.template.html::otherTablesVerdict
+    - dashboard/qa-reporting-dashboard.template.html::verdictLine
+    - dashboard/qa-reporting-dashboard.template.html::noPromotedNote
+    - dashboard/qa-reporting-dashboard.template.html::noPromotedMarker
+    - dashboard/qa-reporting-dashboard.template.html::readersWaitingOn
+    - dashboard/qa-reporting-dashboard.template.html::affectsReaders
+    - dashboard/qa-reporting-dashboard.template.html::notDueYetLine
+    - dashboard/qa-reporting-dashboard.template.html::clipDatasetToInPlaceOn
+    - dashboard/qa-reporting-dashboard.template.html::renderDataset
+    - plans/supply-model.md
+    unmet_criteria:
+    - criterion: Criterion 16's outstanding-item half - the reader's own item in the page's outstanding queue saying nothing needs
+        deciding (or the overdue / turned-down forms), and offering no promote or reject.
+      why: The page's outstanding item for a waiting supply is the terminal's own queue (outstanding._from_awaiting_decisions reads
+        filing_queue.awaiting), which REQ-PIPE-210 changes - built in parallel in wave 1 lane L1. Changing it here would be a second
+        definition of the queue. The verdict-line half is built, from the same structured lines.
+      owner: REQ-PIPE-210 (wave 1, lane L1)
+      blocked_by:
+        requirements:
+        - REQ-PIPE-210
+    evidence:
+    - '2026-10-25, LANE L2 (worktree w1-l2 from c1563cb), against a copy of the bootstrapped history (l2_probe): tests/test_dashboard_e2e.py::TestAnotherTableCouldNotBeRead
+      (5 tests), tests/test_cross_table_notices.py (10), tests/test_root_cause_shouts.py, tests/test_build_dashboard_data.py and tests/test_build_dashboard_child_protection.py
+      - 58 passed in 234.60s (-n 3). The e2e class drives TS-42 and TS-80 on the bootstrapped page and four fixture histories through
+      the real lifecycle (tests/gate_support.py) on a pinned clock (MOTHMAN_PINNED_NOW), each built by the real builders. tests-js/another-table.test.js
+      6 passed. A defect found on the way, fixed test-first: fmtInt(null) threw inside renderAgency for a dataset whose newest run
+      measured no rows (a held Case Workers), so the whole collection page failed to draw - tests-js/fmt-int.test.js failed (1 of 2)
+      before the guard, passes after.'
+    - '2026-10-25, TEST-FIRST, SHOWN AFTER THE BUILD: this change''s tests run against the base c1563cb''s product code (a worktree of it with only the test files copied in, l2_probe): TestAnotherTableCouldNotBeRead 5 of 5 failed, tests/test_cross_table_notices.py failed to import (the module did not exist), tests-js/another-table.test.js 6 of 6 and tests-js/fmt-int.test.js 1 of 2 failed. The tests were written alongside the code, not strictly before it; this run is the evidence that each can fail.'
     decisions:
     - 'A NEW REQUIREMENT NOW (Keith, 2026-10-13): a top-of-page line on the reader naming the other table. REJECTED leaving
       it for a later road-testing sighting.'
@@ -43554,10 +43783,43 @@ requirements:
     - 'THE PAGE AGREES WITH THE QUEUE ON E = B (delivery-scoper, 2026-10-23, following Keith''s E = B): a supply the terminal
       counts as a decision waiting on a person is not told on its page that nothing needs deciding. A reading of E = B, to confirm
       with Keith if wrong.'
+    - 'THE ANSWERS TRAVEL, NOT THE RULE (build, 2026-10-25): pipeline/cross_table_notices.py works out, per supply and per asset day
+      anything changed, each line''s table, period, count, form and instants - from the cross-table cards'' structured `unreadable`
+      fields and REQ-PIPE-269''s counted points, and the decision log - and the page looks the newest up and words it. Names are links
+      the page builds (navHref keeps the date on show), instants go through fmtInstant, so the words are assembled in the page. REJECTED
+      building the sentences as HTML in Python: they would carry links the page could not keep the date on.'
+    - 'THE ONE STRUCTURED READING (criterion 10): root_cause.blocking_tables(record) names the unreadable tables and their codes -
+      per-table codes, a record written before them by its single unrunnable_code, a held record by held_tables - and root_cause._absent_table_root
+      now uses it too. WHICH partner was held back comes from the supply''s own ''promotion-withheld'' entry (held_back_by, held_back_detail.came/by_received)
+      AS AT EACH DATE, not through root_of, which reads the log as it stands now and stops at a failed re-check (Keith 3a); the page
+      needs every date. Read as satisfying criterion 10''s ''through the one function'' for the table and cause; PROVISIONAL, for Keith.'
+    - 'THE OWED FORM IS AN IN-WAREHOUSE READER''S (criterion 7, as built): REQ-PIPE-269 criterion 5 owes a re-check only to a supply
+      in the warehouse, so a WAITING reader whose partner is promoted keeps its counted could-not-run result (and its ''No promoted''
+      line) until re-evaluated; the owed form shows on an in-warehouse reader. The fixture for it is a Clients v2 whose own run stopped,
+      promoted by a person - the knock-on owed and not run.'
+    - 'OVERDUE FROM THE DUE DAY (criterion 16): a not-yet-due partner''s recorded due instant (unrunnable_due_at, the partner''s own
+      window) is a change point, and from that asset day the cause has no item of its own in the terminal''s queue, so the verdict
+      line says a person can decide. ''past-due'' and ''rejected'' codes are such causes from the start.'
+    - '''AFFECTS'' ENDS THE NOTICE THE CAUSING PAGE SHOWS ON THE DATE (criterion 17; the open question''s check at build): the blocked
+      banner (held, contested, could not be loaded), the waiting-blocker banner, the closed-with-no-supply banner, or - for a supply
+      awaiting a decision, including a held-back root - its awaiting verdict line; a partner not yet due shows the muted ''Not due
+      until'' line instead. TWO CAUSES HAVE NO NOTICE, recorded for Keith and given none: an overdue slot not yet closed (only the
+      collection table''s ''Late, still open'' note) and a period whose file a person turned down with none replacing it.'
+    - 'THE CARD LINE LEAVES OUT A HELD-BACK DELIVERY''S CAUSE (criterion 18): lines in the package and joined forms are REQ-DASH-275
+      criterion 4''s one line; turned-down and replaced forms are no longer a held-back delivery and take a 204 card line.'
+    - 'PROVISIONAL WORDING, for Keith: the singular forms (''One of this supply''s checks needs it, so it could not run.''); the verdict
+      line ''Nothing needs deciding on this supply - the results below are the newest supply, received <instant>, which is not in place
+      in the warehouse yet. Its checks run again, and the gate is applied again, by themselves once a <period> <dataset> supply is
+      promoted.''; the overdue sentence ''<n> of this supply''s checks could not run because <dataset> for <period> is overdue. A person
+      can decide on this supply, or wait for that supply to be promoted.''; the row note ''No promoted <dataset> for <period>''; the
+      card line ''No promoted <dataset>: holds <n> datasets red''; the not-due line names several readers as a comma list (''the Notifications,
+      Investigations, Placements are waiting on it''); and criterion 7''s settled line drops ''(REQ-PIPE-211)'', a citation rather
+      than page text.'
     open_questions:
-    - '1. CHECK AT BUILD (not a question for Keith): criterion 17 assumes the causing dataset''s page shows a notice for each
-      cause for ''Affects'' to end. Not yet due now has criterion 17''s muted line; for an overdue supply, confirm which notice
-      or outstanding item carries it, and bring any cause with none back to Keith rather than inventing a banner.'
+    - '1. ANSWERED AT BUILD, FOR KEITH (2026-10-25): two causes have no notice on the causing dataset''s page for ''Affects'' to end
+      - an overdue slot that has not closed yet (the page says nothing; the collection table shows ''Late, still open''), and a period
+      whose file a person turned down with none replacing it. Neither was given a banner. Should either get one, or is the readers''
+      own line enough?'
   - id: REQ-PIPE-210
     title: The terminal's queue lists a supply held back only by another table beneath that table's own item, says nothing needs
       deciding on it, and does not count it

@@ -175,9 +175,7 @@ def _absent_table_root(conn, dataset_id: str, supply: str, period: str) -> Root 
     for r in failing:
         if not carried.not_evaluated_reason(r) or r.get("warehouse_reason"):
             return None  # a failure of its own (or an owed re-check, its own red)
-        named = r.get("unrunnable_tables") or ([r["unrunnable_table"]]
-                                              if r.get("unrunnable_table") else [])
-        named = named or r.get("held_tables") or []
+        named = blocking_tables(r)
         if not named:
             return None
         tables.update(named)
@@ -190,6 +188,27 @@ def _absent_table_root(conn, dataset_id: str, supply: str, period: str) -> Root 
         return None
     return Root("slot", absent, period, reason=sorted(c for c in codes if c)[0]
                 if any(codes) else None)
+
+
+def blocking_tables(record: dict) -> dict[str, str | None]:
+    """{table: its reason code} for every table a not-evaluated record names
+    as the one it could not read - from the record's STRUCTURED fields alone
+    (REQ-DASH-204 criterion 10), never its reason's prose: each table's own
+    code (REQ-PIPE-270 criterion 4), a record written before per-table codes
+    by its single `unrunnable_code`, and a held-supply record's `held_tables`
+    as 'held'. Empty for a record that names none - a real verdict.
+
+    THE ONE READING, shared by this module's root and the dashboard's
+    REQ-DASH-204 and REQ-DASH-275 lines."""
+    from qa_tools.common import period_schema
+
+    named = record.get("unrunnable_tables") or (
+        [record["unrunnable_table"]] if record.get("unrunnable_table") else [])
+    if named:
+        codes = record.get("unrunnable_codes") or {}
+        return {t: codes.get(t) or record.get("unrunnable_code") for t in named}
+    held = record.get("held_tables") or []
+    return {t: record.get("unrunnable_code") or period_schema.HELD for t in held}
 
 
 def held_back_by_roots(conn, states) -> tuple[dict[str, list], set[str]]:
