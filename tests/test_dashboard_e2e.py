@@ -1851,7 +1851,10 @@ class TestSupplyAndTableLevelSections:
             status: s.querySelector('.head .pill').textContent.trim(),
             rows: [...s.querySelectorAll('.scope-check')].map(r => ({
                 name: r.querySelector('.nm').textContent,
-                tool: r.querySelector('.tr').textContent,
+                // A cross-table GRID row is one check, every tool's result in
+                // its cells (REQ-DASH-272), so it names no single tool.
+                tool: (r.querySelector('.tr') || {}).textContent || null,
+                between: (r.querySelector('.bt') || {}).textContent || null,
             })),
         }))""")
 
@@ -1945,12 +1948,22 @@ class TestSupplyAndTableLevelSections:
         the section reads as three identical rows."""
         _goto(clean_page, built_dashboard_html, self._CP)
 
-        rows = [r for s in self._sections(clean_page) for r in s["rows"]]
+        sections = self._sections(clean_page)
+        # THE CROSS-TABLE SECTION IS ONE ROW PER CHECK (REQ-DASH-272 criterion
+        # 6, amending REQ-DASH-264 criterion 2): the three tools' results sit
+        # in the row's cells as marks, so no two rows share a name AND tables.
+        (cross,) = [s for s in sections if s["scope"] == "cross-table"]
+        keys = [(r["name"], r["between"]) for r in cross["rows"]]
+        assert keys and len(keys) == len(set(keys)), keys
+        rows = [r for s in sections if s["scope"] != "cross-table" for r in s["rows"]]
         by_name: dict[str, list[str]] = {}
         for row in rows:
             by_name.setdefault(row["name"], []).append(row["tool"])
         shared = {name: tools for name, tools in by_name.items() if len(tools) > 1}
-        assert shared, "expected at least one name shared across tools"
+        if not shared:
+            # Every name the tools share on this page is a cross-table check's,
+            # which the grid shows once, its tools as marks.
+            return
         # Per NAME, not across the whole section. Two differently-named
         # rows may legitimately share a tool - "Client reference" and
         # "Carer reference" are both soda:relationships - and an
@@ -5895,22 +5908,30 @@ class TestACrossTableCheckOnTS80:
         section = page.locator('.scope-section[data-scope="cross-table"]')
         return [" ".join(t.split()) for t in section.locator(".scope-check").all_inner_texts()]
 
+    def _labels(self, page) -> list[str]:
+        return page.locator('.scope-section[data-scope="cross-table"] .scope-check').evaluate_all(
+            "els => els.map(e => e.getAttribute('aria-label') || '')")
+
     def test_the_readers_client_reference_is_green_after_the_settlement(
             self, clean_page, built_dashboard_html):
         rows = [r for r in self._rows(clean_page, built_dashboard_html, "cp-notifications",
                                       "2020-11-03")
                 if r.startswith("Client reference")]
-        assert len(rows) == 3, rows
-        assert all("Notifications → Client Register" in r and "Green" in r for r in rows), rows
-        # Criterion 7: the row says where its result came from.
-        assert all("Re-checked 11:00am Monday, 2 November 2020, when the Client Register was "
-                   "re-checked." in r for r in rows), rows
+        # ONE ROW FOR THE CHECK, its three tools as marks (REQ-DASH-272
+        # criterion 6, amending REQ-DASH-264 criterion 2).
+        assert len(rows) == 1, rows
+        assert "Notifications → Client Register" in rows[0] and "Green" in rows[0], rows
+        # Criterion 7 as amended by REQ-DASH-272: where the result came from is
+        # said in the row's accessible name (and the panel), every time.
+        labels = [x for x in self._labels(clean_page) if x.startswith("Client reference")]
+        assert len(labels) == 1 and ("Re-checked 11:00am Monday, 2 November 2020, when the "
+                                     "Client Register was re-checked") in labels[0], labels
 
     def test_the_panel_says_latest_result_and_where_it_came_from(self, clean_page, built_dashboard_html):
         """Criterion 8."""
         self._rows(clean_page, built_dashboard_html, "cp-notifications", "2020-11-03")
         clean_page.locator('.scope-section[data-scope="cross-table"] .scope-check',
-                           has_text="Client reference").filter(has_text="dbt:relationships").first.click()
+                           has_text="Client reference").first.click()
         clean_page.wait_for_selector("[data-recheck-note]")
         panel = " ".join(clean_page.locator("[data-recheck-note]")
                          .locator("xpath=ancestor::aside[1]").inner_text().split())
@@ -5928,7 +5949,7 @@ class TestACrossTableCheckOnTS80:
         one side of a comparison with no hint of the other."""
         self._rows(clean_page, built_dashboard_html, "cp-notifications", "2020-11-03")
         clean_page.locator('.scope-section[data-scope="cross-table"] .scope-check',
-                           has_text="Client reference").filter(has_text="dbt:relationships").first.click()
+                           has_text="Client reference").first.click()
         clean_page.wait_for_selector(".check-panel .compare-col")
         boxes = clean_page.evaluate("""() => {
           const panel = document.querySelector('.check-panel').getBoundingClientRect();
@@ -5946,7 +5967,7 @@ class TestACrossTableCheckOnTS80:
             self, clean_page, built_dashboard_html):
         rows = self._rows(clean_page, built_dashboard_html, "cp-clients", "2020-11-01")
         client_refs = [r for r in rows if r.startswith("Client reference")]
-        assert len(client_refs) == 9, rows
+        assert len(client_refs) == 3, rows
         assert any("Red" in r for r in client_refs), client_refs
         labels = clean_page.locator('.scope-section[data-scope="cross-table"] .scope-check .bt')
         assert {t for t in labels.all_inner_texts() if t.startswith(("Notif", "Invest", "Place"))} == {
@@ -5969,10 +5990,11 @@ class TestACrossTableCheckOnTS80:
                 "need its supply first.") in text
         # The row also says why (Keith 2026-10-24, on provisional #21): the
         # reason follows a colon where the sentence used to end.
+        labels = " ".join(self._labels(clean_page))
         assert ("Could not be checked 8:20am Sunday, 1 November 2020, when the Notifications "
                 "supply arrived: two Client Register files (cp_clients.csv, cp_clients_TEST.csv) "
-                "are waiting to be settled.") in text
-        assert "Checked 8:20am" not in text
+                "are waiting to be settled") in labels
+        assert "Checked 8:20am" not in labels
         # Criterion 5: the section's own pill follows its rows.
         head = clean_page.locator('.scope-section[data-scope="cross-table"] .head .pill')
         assert "Red" in head.inner_text(), head.inner_text()
@@ -5980,10 +6002,11 @@ class TestACrossTableCheckOnTS80:
     def test_a_row_that_could_not_be_checked_names_both_of_the_pairs_files(
             self, clean_page, built_dashboard_html):
         """Keith, 2026-10-24: the row says why, not only the banner."""
-        rows = self._rows(clean_page, built_dashboard_html, "cp-clients", "2020-11-01")
+        self._rows(clean_page, built_dashboard_html, "cp-clients", "2020-11-01")
+        labels = self._labels(clean_page)
         assert any("when the Notifications supply arrived: two Client Register files "
-                   "(cp_clients.csv, cp_clients_TEST.csv) are waiting to be settled." in r
-                   for r in rows), rows
+                   "(cp_clients.csv, cp_clients_TEST.csv) are waiting to be settled" in r
+                   for r in labels), labels
 
 
 class TestASupersededRunOnTheDatesItWasCurrent:
@@ -6848,3 +6871,261 @@ class TestAnotherTableCouldNotBeRead:
         assert "No promoted" not in line["text"]
         _goto(clean_page, page, state=_cp_state("cp-notifications"), in_place_on="2024-08-05")
         assert _shown(clean_page, "[data-no-promoted]") == [], "nothing owed the day before"
+
+
+def _s1(pages: _CpPages, *, red: bool = False) -> dict:
+    """S1 (REQ-PIPE-267): 2024-Q3 holding v1 of every table, then a zip of
+    Clients v2 and a Notifications v2 red on its own data. Green: Clients v2 is
+    re-checked against Notifications v1 and promoted. Red: that re-check fails
+    and Clients v2 is held back too."""
+    from gate_support import cross_red, own_red
+    from test_package_gate import established
+
+    pages.at("2024-07-25T10:30:00+08:00")
+    v1 = established(pages.sc)
+    pages.sc.rules.append(own_red("N2"))
+    if red:
+        pages.sc.rules.append(cross_red("cp-notifications", "cp_clients",
+                                        when={"cp_clients": "C2", "cp_notifications": "N1"}))
+    pages.at("2024-08-05T10:30:00+08:00")
+    v2 = pages.sc.deliver("2024-08-05T10:00:00+08:00", {"cp_clients": "C2", "cp_notifications": "N2"})
+    pages.sc.process()
+    return {**v1, **v2}
+
+
+def _grid(page) -> dict:
+    """The cross-table grid as a reader sees it: its column headings and, per
+    row, its name, tables, each cell's text and its pill."""
+    return page.evaluate("""() => {
+        const g = document.querySelector('.scope-section[data-scope="cross-table"] .xt-grid');
+        if(!g) return null;
+        const t = e => e ? e.textContent.replace(/\\s+/g, " ").trim() : null;
+        return {
+          heads: [...g.querySelectorAll('.xt-head span')].map(t).filter(Boolean),
+          rows: [...g.querySelectorAll('.xt-row')].map(r => ({
+            name: t(r.querySelector('.nm')), between: t(r.querySelector('.bt')),
+            staged: t(r.querySelector('.xt-cell[data-view="staged"]')),
+            warehouse: t(r.querySelector('.xt-cell[data-view="warehouse"]')),
+            empty: [...r.querySelectorAll('.xt-cell[data-empty]')].map(c => c.dataset.view),
+            pill: t(r.querySelector('.xt-pill')),
+            aria: r.getAttribute('aria-label') || "",
+            links: r.querySelectorAll('a').length})),
+          key: t(g.querySelector('.xt-key'))};
+    }""")
+
+
+def _row(grid: dict, name: str, between: str | None = None) -> dict:
+    found = [r for r in grid["rows"] if r["name"] == name and (between is None or r["between"] == between)]
+    assert len(found) == 1, (name, between, grid["rows"])
+    return found[0]
+
+
+class TestWarehouseAndStagingViews:
+    """REQ-DASH-272 criterion 24: a page awaiting a decision gives the
+    warehouse's status, and its cross-table checks show each result against
+    what's staged and against what's in the warehouse - one row per check,
+    against fixture histories driven through the real lifecycle on a pinned
+    clock and built by the real builders."""
+
+    N, C = _cp_state("cp-notifications"), _cp_state("cp-clients")
+
+    def test_s1_green_the_clause_the_caption_and_s4(self, clean_page, cp_pages):
+        """S1 green: Notifications' page reads 'Awaiting a decision' for v2 and
+        says the supply in the warehouse is v1 and Green, with its pill; the
+        grid is captioned as the waiting supply's results. S4: the Client
+        Register's page, its v2 promoted after Notifications v2's hold-back,
+        reads Green with one result column and no result from Notifications
+        v2's run; and at 375px every row's pill is inside the viewport and
+        each stacked result names its view."""
+        got = _s1(cp_pages)
+        assert cp_pages.sc.holder("cp-clients", "2024-Q3") == got["C2"], "precondition"
+        page = cp_pages.page()
+
+        _goto(clean_page, page, state=self.N, in_place_on="2024-08-05")
+        (verdict,) = _shown(clean_page, ".verdict-of")
+        assert verdict["text"].startswith("Awaiting a decision"), verdict
+        assert ("The supply in place in the warehouse is the one received 10:00am Thursday, 25 "
+                "July 2024, and is Green.") in verdict["text"], verdict
+        (clause,) = _shown(clean_page, ".verdict-of [data-wh-clause]")
+        assert clause["attrs"]["data-wh-clause"] == "green"
+        assert clean_page.locator(".verdict-of [data-wh-clause] .pill.green .ico").count() == 1, \
+            "the status in the legend's own word and icon, never colour alone"
+        (caption,) = _shown(clean_page, "[data-xt-caption]")
+        assert caption["text"] == ("Results for the supply received 10:00am Monday, 5 August "
+                                   "2024, awaiting a decision")
+        grid = _grid(clean_page)
+        assert grid["key"].endswith("The marks are dbt, Soda and datacontract-cli, in that "
+                                    "order; · means that tool has no such check. Select a check "
+                                    "for each tool's full result."), grid["key"]
+        assert all(r["links"] == 0 for r in grid["rows"]), "no link inside a row's button"
+
+        _goto(clean_page, page, state=self.C, in_place_on="2024-08-05")
+        # S4 READS GREEN ON WHAT THIS HISTORY DECIDES: the cross-table section
+        # and every row. (The page's own pill also reads the deployment's
+        # blockers, which a variant page embeds from the deployment.)
+        head = clean_page.locator('.scope-section[data-scope="cross-table"] .head .pill')
+        assert head.inner_text().strip() == "Green", "S4: Clients reads Green"
+        grid = _grid(clean_page)
+        assert all(r["pill"] == "Green" for r in grid["rows"]), grid["rows"]
+        assert grid["heads"] == ["Check", "Against what's in the warehouse"], grid["heads"]
+        assert not any(r["empty"] for r in grid["rows"]), "no column of dashes"
+        assert not any("5 August" in (r["warehouse"] or "") for r in grid["rows"]
+                       if r["between"] == "Notifications → Client Register"), \
+            "S4: nothing of Notifications v2's run counts on the Client Register's page"
+        ref = _row(grid, "Client reference", "Notifications → Client Register")
+        assert ref["warehouse"].startswith("In the warehouse: Pass ✓ ✓ ✓"), ref
+        assert "Notifications received Thursday, 25 July 2024" in ref["warehouse"], ref
+        # THE HISTORY ROWS (criterion 20): Clients v2 promoted by the rule after
+        # a re-check against the warehouse; v1 promoted with its delivery.
+        rows = [r["text"] for r in _shown(clean_page, "[data-promoted-with]")]
+        assert ("Promoted 10:30am Monday, 5 August 2024 by the rule, re-checked against the "
+                "Notifications in place in the warehouse (received 10:00am Thursday, 25 July 2024) "
+                "because the Notifications received with it was held back.") in rows, rows
+        _goto(clean_page, page, state=self.N, in_place_on="2024-08-05")
+        rows = [r["text"] for r in _shown(clean_page, "[data-promoted-with]")]
+        assert any(r.startswith("Promoted 10:30am Thursday, 25 July 2024 with the ")
+                   and r.endswith(" and 3 more, by the rule") for r in rows), rows
+
+        clean_page.set_viewport_size({"width": 375, "height": 800})
+        _goto(clean_page, page, state=self.N, in_place_on="2024-08-05")
+        boxes = clean_page.evaluate("""() => [...document.querySelectorAll('.xt-row')].map(r => {
+            const p = r.querySelector('.xt-pill').getBoundingClientRect();
+            const cells = [...r.querySelectorAll('.xt-cell')].filter(c => c.offsetParent !== null)
+                .map(c => c.textContent.replace(/\\s+/g, " ").trim());
+            return {left: p.left, right: p.right, width: window.innerWidth, cells}; })""")
+        assert boxes and all(0 <= b["left"] and b["right"] <= b["width"] for b in boxes), boxes
+        assert all(c.startswith(("Staged:", "In the warehouse:")) for b in boxes
+                   for c in b["cells"]), boxes
+        assert all(b["cells"] for b in boxes), "an empty view is omitted, never a bare dash"
+
+    def test_s6_a_dual_row_held_back_against_the_warehouse(self, clean_page, cp_pages):
+        """S6: Investigations v2 red on its own data is held back, so
+        Notifications v2's Escalation completeness is re-checked against
+        Investigations v1 and fails: ONE row, Pass against what's staged and
+        Fail '— why it is held back' against what's in the warehouse, a Red
+        pill, and both full sentences in its accessible name."""
+        from gate_support import cross_red, own_red
+        from test_package_gate import established
+
+        cp_pages.at("2024-07-25T10:30:00+08:00")
+        established(cp_pages.sc)
+        cp_pages.sc.rules += [own_red("I2"), cross_red("cp-notifications", "cp_investigations",
+                                                       when={"cp_investigations": "I1"})]
+        cp_pages.at("2024-08-05T10:30:00+08:00")
+        cp_pages.sc.deliver("2024-08-05T10:00:00+08:00", {
+            "cp_clients": "C2", "cp_notifications": "N2", "cp_investigations": "I2"})
+        cp_pages.sc.process()
+        page = cp_pages.page()
+        _goto(clean_page, page, state=self.N, in_place_on="2024-08-05")
+        grid = _grid(clean_page)
+        row = _row(grid, "Escalation completeness")
+        assert row["staged"] == ("Staged: Pass ✓ ✓ ✓ Investigations received Monday, 5 August "
+                                 "2024"), row
+        assert row["warehouse"] == ("In the warehouse: Fail ✗ ✗ ✗ Investigations received "
+                                    "Thursday, 25 July 2024 — why it is held back"), row
+        assert row["pill"] == "Red", row
+        assert ("Read against the Investigations supply received 10:00am Monday, 5 August 2024, "
+                "not in place in the warehouse yet") in row["aria"], row["aria"]
+        assert ("against the Investigations in place in the warehouse (received 10:00am Thursday, "
+                "25 July 2024): the Investigations received with this supply was held back.") \
+            in row["aria"], row["aria"]
+        # THE PANEL: each tool's full result, the names real links.
+        clean_page.locator(".xt-row", has_text="Escalation completeness").first.click()
+        clean_page.wait_for_selector("[data-xt-tools]")
+        tools = _shown(clean_page, "[data-xt-tools] .xt-tool")
+        assert [t["attrs"]["data-tool"] for t in tools] == ["dbt", "soda", "datacontract"], tools
+        assert all(any("in-place-on=2024-08-05" in a["href"] for a in t["links"]) for t in tools)
+
+    def test_staggered_a_result_whose_partner_left_is_in_neither_cell(self, clean_page, cp_pages):
+        """Dashboard UX v4 B1: Notifications v2 at 09:00 read against Clients
+        v1; Clients v2 at 09:05 promoted alone. Notifications v2's page shows
+        its 09:00 result in neither cell, its 09:05 result in the warehouse
+        cell, and the 09:00 one in the panel's history 'since replaced in the
+        warehouse'."""
+        from gate_support import own_red
+        from test_package_gate import established
+
+        cp_pages.at("2024-07-25T10:30:00+08:00")
+        established(cp_pages.sc)
+        cp_pages.sc.rules.append(own_red("N2"))
+        cp_pages.at("2024-08-05T09:01:00+08:00")
+        cp_pages.sc.deliver("2024-08-05T09:00:00+08:00", {"cp_notifications": "N2"})
+        cp_pages.sc.process()
+        cp_pages.at("2024-08-05T09:06:00+08:00")
+        c2 = cp_pages.sc.deliver("2024-08-05T09:05:00+08:00", {"cp_clients": "C2"})["C2"]
+        cp_pages.sc.process()
+        assert cp_pages.sc.holder("cp-clients", "2024-Q3") == c2, "precondition"
+        page = cp_pages.page()
+        _goto(clean_page, page, state=self.N, in_place_on="2024-08-05")
+        row = _row(_grid(clean_page), "Client reference", "Notifications → Client Register")
+        assert row["warehouse"].startswith("In the warehouse: Pass"), row
+        assert "Client Register received Monday, 5 August 2024" in row["warehouse"], row
+        assert "25 July" not in (row["staged"] or "") + (row["warehouse"] or ""), \
+            "the 09:00 result read Clients v1, since replaced: in neither cell"
+        clean_page.locator(".xt-row", has_text="Client reference").first.click()
+        clean_page.wait_for_selector("[data-xt-tools]")
+        options = clean_page.locator("#check-compare-select option").all_inner_texts()
+        assert any("since replaced in the warehouse by the one received 9:05am Monday, 5 August "
+                   "2024" in o for o in options), options
+
+    def test_staggered_order_b_red_shows_both_cells(self, clean_page, cp_pages):
+        """Staggered Order B red: Clients v2 at 09:00 fails Client reference
+        against Notifications v1; Notifications v2 at 09:05 is red on its own
+        data. The Client Register's row shows both cells, the warehouse one
+        ending '— why it is held back' though that result came from its own
+        09:00 arrival."""
+        from gate_support import cross_red, own_red
+        from test_package_gate import established
+
+        cp_pages.at("2024-07-25T10:30:00+08:00")
+        established(cp_pages.sc)
+        cp_pages.sc.rules += [own_red("N2"), cross_red(
+            "cp-notifications", "cp_clients", when={"cp_clients": "C2", "cp_notifications": "N1"})]
+        cp_pages.at("2024-08-05T09:01:00+08:00")
+        cp_pages.sc.deliver("2024-08-05T09:00:00+08:00", {"cp_clients": "C2"})
+        cp_pages.sc.process()
+        cp_pages.at("2024-08-05T09:06:00+08:00")
+        cp_pages.sc.deliver("2024-08-05T09:05:00+08:00", {"cp_notifications": "N2"})
+        cp_pages.sc.process()
+        page = cp_pages.page()
+        _goto(clean_page, page, state=self.C, in_place_on="2024-08-05")
+        row = _row(_grid(clean_page), "Client reference", "Notifications → Client Register")
+        assert row["staged"] and row["staged"].startswith("Staged:"), row
+        assert row["warehouse"].startswith("In the warehouse: Fail ✗ ✗ ✗"), row
+        assert row["warehouse"].endswith("— why it is held back"), row
+        assert row["pill"] == "Red", row
+
+    def test_the_owed_re_check_and_a_rejection(self, clean_page, cp_pages):
+        """The owed re-check (criterion 10): a Clients v2 whose run stopped is
+        promoted by a person, and the Notifications in the warehouse reads
+        'Not yet re-checked' in the warehouse cell, noting the promotion. And
+        after a rejection (criterion 19): S1's waiting Notifications v2 turned
+        down, its page reads the in-warehouse supply's verdict."""
+        from test_package_gate import established
+
+        cp_pages.at("2024-07-25T10:30:00+08:00")
+        established(cp_pages.sc)
+        cp_pages.sc.crash.add(("dbt", "cp_clients__20240805"))
+        cp_pages.at("2024-08-05T10:30:00+08:00")
+        c2 = cp_pages.sc.deliver("2024-08-05T10:00:00+08:00", {"cp_clients": "C2"})["C2"]
+        cp_pages.sc.process()
+        cp_pages.at("2024-08-06T10:30:00+08:00")
+        cp_pages.sc.promote_by_hand(c2, "2024-Q3", at="2024-08-06T10:00:00+08:00")
+        page = cp_pages.page()
+        _goto(clean_page, page, state=self.N, in_place_on="2024-08-06")
+        row = _row(_grid(clean_page), "Client reference", "Notifications → Client Register")
+        assert row["warehouse"] == ("In the warehouse: Not yet re-checked Client Register "
+                                    "promoted Tuesday, 6 August 2024"), row
+        assert ("Not yet re-checked against the Client Register promoted 10:00am Tuesday, 6 "
+                "August 2024; the re-check runs on the next processing pass.") in row["aria"]
+
+    def test_after_a_rejection_the_page_reads_the_warehouse(self, clean_page, cp_pages):
+        got = _s1(cp_pages)
+        cp_pages.reject(got["N2"], "2024-Q3", "2024-08-07T10:00:00+08:00")
+        page = cp_pages.page()
+        _goto(clean_page, page, state=self.N, in_place_on="2024-08-06")
+        assert _shown(clean_page, ".verdict-of")[0]["attrs"]["data-verdict-of"] == "awaiting"
+        _goto(clean_page, page, state=self.N, in_place_on="2024-08-07")
+        (verdict,) = _shown(clean_page, ".verdict-of")
+        assert verdict["attrs"]["data-verdict-of"] == "promoted", verdict
+        assert "received 10:00am Thursday, 25 July 2024" in verdict["text"], verdict

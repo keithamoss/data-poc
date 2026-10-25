@@ -41858,7 +41858,7 @@ requirements:
       and against what's in the warehouse, so that I can tell 'a bad file is waiting' from 'the warehouse is broken' at a glance,
       while an engineer can still read the full explanation.
     moscow: must
-    status: not_started
+    status: built
     signed_off:
       by: Keith
       date: '2026-10-23'
@@ -42023,6 +42023,86 @@ requirements:
     - REQ-DASH-277
     - REQ-PIPE-279
     - REQ-DASH-275
+    linked_tests:
+    - tests/test_dashboard_e2e.py::TestWarehouseAndStagingViews::test_s1_green_the_clause_the_caption_and_s4
+    - tests/test_dashboard_e2e.py::TestWarehouseAndStagingViews::test_s6_a_dual_row_held_back_against_the_warehouse
+    - tests/test_dashboard_e2e.py::TestWarehouseAndStagingViews::test_staggered_a_result_whose_partner_left_is_in_neither_cell
+    - tests/test_dashboard_e2e.py::TestWarehouseAndStagingViews::test_staggered_order_b_red_shows_both_cells
+    - tests/test_dashboard_e2e.py::TestWarehouseAndStagingViews::test_the_owed_re_check_and_a_rejection
+    - tests/test_dashboard_e2e.py::TestWarehouseAndStagingViews::test_after_a_rejection_the_page_reads_the_warehouse
+    - tests/test_dashboard_e2e.py::TestACrossTableCheckOnTS80
+    - tests/test_cross_table_grid.py::TestTheCell
+    - tests/test_cross_table_grid.py::TestTheClause
+    - tests/test_cross_table_grid.py::TestTheNames
+    - tests-js/cross-table-grid.test.js
+    implemented_by:
+    - pipeline/cross_table_grid.py::place
+    - pipeline/cross_table_grid.py::place_entries
+    - pipeline/cross_table_grid.py::named
+    - pipeline/cross_table_grid.py::Slots
+    - pipeline/cross_table_grid.py::Receipts
+    - pipeline/cross_table_grid.py::owed_words
+    - pipeline/cross_table_grid.py::clause_points
+    - pipeline/cross_table_grid.py::promotion_words
+    - pipeline/cross_table_notices.py::read_log
+    - pipeline/red_promoted.py::for_dataset
+    - pipeline/build_dashboard_data.py::build_one_table
+    - dashboard/qa-reporting-dashboard.template.html::crossTableGridRows
+    - dashboard/qa-reporting-dashboard.template.html::xtRowModel
+    - dashboard/qa-reporting-dashboard.template.html::xtCellText
+    - dashboard/qa-reporting-dashboard.template.html::crossTableGridHtml
+    - dashboard/qa-reporting-dashboard.template.html::xtAriaLabel
+    - dashboard/qa-reporting-dashboard.template.html::xtToolsPanelBlock
+    - dashboard/qa-reporting-dashboard.template.html::readAgainstText
+    - dashboard/qa-reporting-dashboard.template.html::warehouseClauseHtml
+    - dashboard/qa-reporting-dashboard.template.html::segmentsHtml
+    - dashboard/qa-reporting-dashboard.template.html::verdictLine
+    - dashboard/qa-reporting-dashboard.template.html::outcomeCell
+    - dashboard/qa-reporting-dashboard.template.html::renderDataset
+    - tests/test_dashboard_e2e.py::TestSupplyAndTableLevelSections
+    unmet_criteria:
+    - criterion: Criterion 17 - a gate application's re-evaluations shown as ONE re-check point labelled 're-checked against the <dataset>
+        in place in the warehouse', and a panel comparing a point with an earlier one only within one grid bucket.
+      why: The point key is already the run's cause ('gate:<application>', REQ-PIPE-279 as amended by REQ-PIPE-267 criterion 11), so
+        one application is one point showing its last round; the point's label and the compare default filtered to the current point's
+        bucket are not built. The compare default and ?cmp= share one function REQ-PIPE-279 owns (decision on this requirement), and
+        changing it was left for that function's own change rather than made beside it here.
+      owner: REQ-DASH-272 (a follow-up build)
+      blocked_by:
+        unowned: true
+    - criterion: Criterion 21 - the verdict line's four forms while a supply's gate is not yet applied or its application not settled
+        ('Being checked with its delivery', 'Checked, waiting for the rest of its delivery', 'Checked, being gated'), with no pill
+        and no results for an unchecked package member, and its test forms in criterion 24.
+      why: Needs, per supply and date, its package's files and which of them have a recorded run (the owed 'gate' item, qa.gate_application)
+        carried into the build; not built in this lane. In the bootstrapped history every package is gated at its arrival's instant,
+        so no page date shows these states; they arise in a build made mid-processing.
+      owner: REQ-DASH-272 (a follow-up build)
+      blocked_by:
+        unowned: true
+    - criterion: Criterion 24's tests for the inherited supply's clause (built, covered by tests/test_cross_table_grid.py::TestTheClause::test_an_inherited_supply_is_carried_forward
+        but not in a real browser), the 'Clients' trend after Order A keeps its 09:00 point', 'on a held table's page no red row sits
+        under a non-red cross-table pill' (built - the section pill follows the rows' pills - not asserted in a browser), and criterion
+        21's forms.
+      why: Not written in this lane; criterion 21 is not built.
+      owner: REQ-DASH-272 (a follow-up build)
+      blocked_by:
+        unowned: true
+    evidence:
+    - '2026-10-25, LANE L2 (worktree w1-l2), against a copy of the bootstrapped history (l2_probe), on this tree: tests/test_dashboard_e2e.py''s
+      TestWarehouseAndStagingViews (6, fixture histories driven through the real lifecycle on a pinned clock), TestAnotherTableCouldNotBeRead,
+      TestACrossTableCheckOnTS80, TestSupplyAndTableLevelSections, TestCrossTableChecks, TestNotInTheAgreementOnThePage, TestThePanelAsAtTheDateOnShow,
+      TestTheDataFilesLoadFromDisk, TestStatusMatchesEachToolsOwnVerdict, TestTheDisplayStandardHoldsInARealBrowser, TestTheKeyboardCanReachTheData,
+      TestEveryDatasetPageSurvivesItsOwnDrillDown, TestBuiltDashboardRenders, TestSupplyHistoryDrillDown, TestArrivedVersusPromoted,
+      TestASupersededRunOnTheDatesItWasCurrent, TestAHeldOrContestedDatasetReadsRed, with tests/test_red_promoted.py, test_cross_table_grid.py
+      (15), test_cross_table_notices.py, test_build_dashboard_data.py, test_build_dashboard_child_protection.py, test_dashboard_for_every_collection.py,
+      test_promotion_timeline.py and test_root_cause_shouts.py: 190 passed, 1 failed in 532s at -n 4 - the failure TestTheDataFilesLoadFromDisk''s
+      first-view budget (trends 5.0-6.6s against 6s) on a 4-core machine at load average 6-10 shared with two other build lanes; run
+      alone the same minute it passed (trends 3.6-4.5s). npm test 962 passed. An earlier full run of tests/test_dashboard_e2e.py on
+      this lane failed 29 tests that fail identically on the base c1563cb against l2_probe (TestTheAsAtScenarioChips, TestThePlantedPairsOnTheBuiltDashboard,
+      TestTheAsAtReadingsOnTheRealHistory, TestThePeriodComposition''s earlier-date test, TestInPlaceInTheWarehouse, TestScenariosTab''s
+      no-coordinates test - checked by running them in a worktree of c1563cb: 29 failed, 9 passed); the three it found of this change''s
+      own (test_red_promoted''s monkeypatched _cause, TestThePanelAsAtTheDateOnShow''s clause, the trends budget) are fixed and pass
+      above.'
     decisions:
     - OPTION 2, A CLAUSE ON THE AWAITING LINE (Keith, 2026-10-21 morning). REJECTED sending the reader to supply history to
       find the warehouse's state, Keith's first guess.
@@ -42124,6 +42204,50 @@ requirements:
       = C''s separate points. Period-clarity''s Q3 = A row wording (''Not evaluated — Client Register has no 2025-Q2 supply'')
       extends this requirement''s cell notes and panel sentences through the same helper rather than adding a vocabulary of
       its own.'
+    - 'THE ANSWERS TRAVEL, NOT THE RULE (build, 2026-10-25): pipeline/cross_table_grid.py places every cross-table history entry about
+      a supply of the page''s table, at every instant anything it read changed place (the slot timelines'' held_as and holder, each
+      supply''s rejections and supersessions), into the staged cell, the warehouse cell or neither, with its note and its ''Read against''
+      sentence; the page takes the newest point on or before the date on show, groups a check''s dbt, Soda and datacontract-cli cards
+      into one row, and takes each cell''s newest result per tool by rank. The cell''s WORD is computed in the page through rollupStatuses,
+      as criterion 8 names it.'
+    - 'SENTENCES ARE SEGMENTS (criteria 15 and 22): a note or sentence is a list of {text} and {dataset} segments, named through cross_table_grid.named,
+      the one helper; the page sets text as text and turns a dataset into a real link keeping the date on show. Each page''s notes
+      and sentences are written once (xtPhrases) and a placed point names them by index - REJECTED repeating them per entry, which
+      made Child Protection''s data 55% bigger.'
+    - 'THE CLAUSE NAMES THE PANEL''S SUPPLY (criterion 1, built): the supply in place is the one the promotion panel names - the most
+      recently promoted, REQ-DASH-197 criterion 13 - or the supply the period stands on where it is inherited or substituted (criterion
+      4), from promotion_timeline''s points and standing; its status is red_promoted''s counted timeline. REJECTED, after a failing
+      test: the holder of the waiting supply''s own period''s slot, which says ''Nothing is in place'' on the first day of a new period
+      while the panel names last period''s promoted supply. Computed only while the supply can be awaiting (up to its first promotion
+      or withdrawal).'
+    - 'A PERSON NAMED (criterion 3): red_promoted''s timeline step carries `by`, the person whose decision caused the run, by display
+      name (''a person'' for an email), beside the cause words every other reader already uses unchanged.'
+    - '''WHY IT IS HELD BACK'' (criterion 9, as built): both cells hold a result, their words differ, and the gate''s reading is the
+      warehouse one - counted toward the supply, or (staggered Order B, where the staged result is the newer and counted) the warehouse
+      result is the worse - and then the row''s pill takes the warehouse result too, and the section''s pill follows its rows'' pills,
+      so no red row sits under a non-red section pill. PROVISIONAL, for Keith: the waiting supply''s counted result in Order B is the
+      staged one, and the gate''s hold-back is read off the warehouse cell rather than from the gate entry''s structured `against`.'
+    - 'WHERE A RESULT CAME FROM ANOTHER TABLE''S RUN (REQ-DASH-264 criterion 7 as amended): the row no longer says it; the panel says
+      it under that tool and the row''s accessible name carries it. The TS-80 tests in TestACrossTableCheckOnTS80 were moved onto the
+      accessible name accordingly (one row per check, three on the Client Register''s page where there were nine).'
+    - 'THE PANEL (criterion 12, as built): an ''Each tool''s result'' section - each tool''s pill and, for each of its cells, the full
+      sentence, the could-not-run clause and where the result came from - and the compare list''s options end with the entry''s ''Read
+      against'' sentence as at the date on show, which is where a result in neither cell is found.'
+    - 'THE JOINT-PROMOTION ROW (criterion 20): a rule promotion whose decision names promoted_with reads ''Promoted <time> with the
+      <dataset> supply received <instant>, ... by the rule'' (past three, the first two and ''and <n> more''); one whose supply has
+      a run caused by its own gate application (''gate:<n>'') and a package-mate not promoted in it reads the re-check form. ''Held
+      back'' there covers a package-mate refused on its own data as well as one held back by another.'
+    - 'PROVISIONAL WORDING, for Keith: the cell words Pass / Warn / Fail / No result; marks ✓ ✗ ! and ''–'' for a tool that has the
+      check but no result in that cell (· only for a tool with no such check); a note''s day is fmtDay''s full form (''Investigations
+      received Monday, 5 August 2024''), where the mock-up showed ''2 Oct''; the key line is prefixed with the marks themselves; the
+      accessible name ends ''View each tool''s full result.''; the panel section is headed ''Each tool''s result''; the grid''s columns
+      stack below 600px.'
+    - 'PLACEMENTS BESIDE THE ENTRIES, NOT IN THEM (build, 2026-10-25, found by TestTheDataFilesLoadFromDisk''s budget going red): with
+      `placed` (and REQ-DASH-204''s `unreadable`) on some history entries and not others, the page''s weekly trends - which clip every
+      dataset on every week since 2013 - took about twice as long (5.5s against 2.8s), the entries having more than one shape. Each
+      card now carries `placed` keyed by the entry''s rank, and the fields only the build reads are dropped before the file is written;
+      measured after, the first view''s trends and 300 dates of buildDatasetsOn within noise of the base (3.6-3.9s and 0.5-0.7s against
+      3.6-4.2s and 0.5-0.7s, same machine, interleaved). COST: Child Protection''s dashboard data about 11% bigger.'
     open_questions: []
   - id: REQ-GEN-273
     title: Target agreement compares a targeted supply with its own checks, and a few scenarios pin what the package gate decides

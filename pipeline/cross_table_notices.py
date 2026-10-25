@@ -73,6 +73,28 @@ class Log:
     decisions: dict = field(default_factory=dict)
     #: [contested-pair Blocker]
     contests: list = field(default_factory=list)
+    #: {supply: [(instant, action, superseded_by)]}: states, by instant.
+    state_instants: dict = field(default_factory=dict)
+
+    def held_back_at(self, supply: str, when) -> dict | None:
+        """The supply's newest gate entry at or before `when`, where it is a
+        hold-back by another supply: {by, came, by_received}, else None."""
+        found = None
+        for at, action, by, detail in self.gate_instants.get(supply, ()):
+            if at <= when:
+                found = (action, by, detail)
+        if not found or found[0] != decision_log.PROMOTION_WITHHELD or not found[1]:
+            return None
+        detail = found[2] or {}
+        return {"by": found[1], "came": detail.get("came"), "by_received": detail.get("by_received"),
+                "failed": detail.get("failed"), "checks": detail.get("checks") or []}
+
+    #: {supply: [(instant, action, held_back_by, detail)]}
+    gate_instants: dict = field(default_factory=dict)
+    #: {supply: [(decision id, effective iso, actor kind, promoted_with, gate application)]}
+    promotes: dict = field(default_factory=dict)
+    #: {gate application: [(dataset, supply)]} - the supplies it did not promote.
+    withheld_in: dict = field(default_factory=dict)
 
     def gate_entry_on(self, supply: str, day: str):
         found = None
@@ -120,19 +142,30 @@ def read_log(conn, collection_id: str) -> Log:
     log = Log()
     actions = tuple(dict.fromkeys(_GATE_ACTIONS + _STATE_ACTIONS))
     for (decision_id, dataset_id, supply, action, at, by, detail,
-         newer) in conn.execute(
+         newer, actor_kind, promoted_with, application) in conn.execute(
             f"SELECT id, dataset_id, supply, action, effective_at, held_back_by, "
-            f"held_back_detail, superseded_by FROM {decision_log.TABLE} "
+            f"held_back_detail, superseded_by, actor_kind, promoted_with, gate_application "
+            f"FROM {decision_log.TABLE} "
             f"WHERE collection_id = ? AND action IN ({', '.join('?' * len(actions))}) "
             "ORDER BY effective_at, id", [collection_id, *actions]).fetchall():
         log.decisions[decision_id] = (dataset_id, supply, _iso(at))
         if not supply:
             continue
         day = _day(at)
+        if action == decision_log.PROMOTE:
+            log.promotes.setdefault(supply, []).append(
+                (decision_id, _iso(at), actor_kind, list(promoted_with or []), application))
+        # NOT PROMOTED IN THAT APPLICATION: held back by another, or refused on
+        # its own data - either way the supply received with it was held back.
+        if action in (decision_log.PROMOTION_WITHHELD, decision_log.PROMOTION_REFUSED) \
+                and application is not None:
+            log.withheld_in.setdefault(application, []).append((dataset_id, supply))
         if action in _GATE_ACTIONS:
             log.gate.setdefault(supply, []).append((day, action, by, detail or {}, _iso(at)))
+            log.gate_instants.setdefault(supply, []).append((at, action, by, detail or {}))
         if action in _STATE_ACTIONS:
             log.states.setdefault(supply, []).append((day, action, newer))
+            log.state_instants.setdefault(supply, []).append((at, action, newer))
     for supply, received in conn.execute(
             "SELECT supply_id, received_at FROM qa.supply_receipt").fetchall():
         log.receipts[supply] = _iso(received)

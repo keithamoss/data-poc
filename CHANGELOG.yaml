@@ -118,6 +118,13 @@ releases:
     changes:
       - category: New
         items:
+          - headline: Staged and warehouse, side by side
+            components: ["Dashboard UI"]
+            description: >
+              A dataset page's cross-table checks are now one row per check,
+              with what each found against the files still waiting and against
+              what is in the warehouse, and a page awaiting a decision says
+              whether the supply in the warehouse is still green.
           - headline: Red from another table, said up top
             components: ["Dashboard UI"]
             description: >

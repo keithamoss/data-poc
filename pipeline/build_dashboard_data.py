@@ -39,7 +39,8 @@ import os
 
 import yaml
 
-from pipeline import (acknowledgements, closed_slots, corrections, cross_table_notices, excuses,
+from pipeline import (acknowledgements, closed_slots, corrections, cross_table_grid,
+                      cross_table_notices, excuses,
                       file_check_panel, owed_nothing, placements, promotion_timeline,
                       recorded_arrival, red_promoted, slot_timeline, warehouse_counts)
 from pipeline.dashboard_check_labels import (dashboard_status, display_name, measure, pooled_url_key,
@@ -762,6 +763,54 @@ def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], da
     no_promoted = cross_table_notices.no_promoted(dataset_id, table, cross_cards, own_cards,
                                                   period_of, view["log"])
 
+    # WHERE EACH CROSS-TABLE RESULT SITS, WHAT IT READ, AND THE WAREHOUSE'S
+    # STATUS ON AN AWAITING LINE (REQ-DASH-272), as at every date: placed on
+    # each entry, the owed re-check's words on each counted point, the clause
+    # per supply - from the slot timelines and the decision log.
+    for d in coll.datasets:
+        if d.dataset_id not in slot_timelines:
+            slot_timelines[d.dataset_id] = slot_timeline.for_dataset(d.dataset_id)
+    if "slots" not in view:
+        view["slots"] = cross_table_grid.Slots(slot_timelines)
+        view["receipts"] = cross_table_grid.Receipts(view["log"].receipts)
+    page_cross = [ck for c in columns_out if c["name"] == CROSS_TABLE_PSEUDO_COLUMN
+                  for ck in c["checks"] if ck.get("check_id")]
+    phrases = cross_table_grid.Phrases()
+    cross_table_grid.place_entries(dataset_id, table, page_cross, period_of, slots=view["slots"],
+                                   log=view["log"], receipts=view["receipts"], phrases=phrases)
+    for ck in page_cross:
+        cross_table_grid.owed_words(ck, view["log"], view["receipts"])
+    if "runs_by_supply" not in view:
+        view["runs_by_supply"] = {}
+        for fact in facts.values():
+            if fact.get("supply_id"):
+                view["runs_by_supply"].setdefault(fact["supply_id"], []).append(fact)
+    promotion_words = cross_table_grid.promotion_words(
+        dataset_id, period_of, log=view["log"], slots=view["slots"], receipts=view["receipts"],
+        runs=view["runs_by_supply"])
+    # OFF THE HISTORY ENTRIES BEFORE THEY ARE WRITTEN: the page reads every
+    # entry on every date it draws (the weekly trends), and entries of more
+    # than one shape cost it twice the time - so each card carries its
+    # entries' placements BESIDE them, by rank, and the structured fields only
+    # the build reads go no further.
+    for c in columns_out:
+        for ck in c["checks"]:
+            side = {}
+            for h in [*ck.get("history", []), *ck.get("superseded", []),
+                      *ck.get("contested_reads", [])]:
+                if "placed" in h:
+                    side[str(h["rank"])] = h.pop("placed")
+                h.pop("unreadable", None)
+                h.pop("due_at", None)
+            if side:
+                ck["placed"] = side
+    health = red_promoted.for_dataset(dataset_id)
+    raw_slots = slot_timelines.get(dataset_id) or slot_timeline.for_dataset(dataset_id)
+    panel = promotion_timeline.for_dataset(dataset_id, raw_slots)
+    warehouse_clause = cross_table_grid.clause_points(
+        dataset_id, period_of, timeline=panel, health=health, run_of=own_by_supply,
+        log=view["log"], receipts=view["receipts"])
+
     presented = _presented(coll)
     # What each slot held, read once and shared by the embeds below.
     slot_timeline_raw = slot_timelines.get(dataset_id)
@@ -789,7 +838,16 @@ def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], da
         # EACH RUN'S SUPPLY, PROMOTED, AWAITING OR WITHDRAWN OVER TIME.
         "runStates": slot_timeline.run_states(dataset_id),
         # HOW EACH PROMOTED SUPPLY HAS DONE SINCE (REQ-DASH-126).
-        "promotedHealth": red_promoted.for_dataset(dataset_id),
+        "promotedHealth": health,
+        # THE AWAITING LINE'S WAREHOUSE CLAUSE (REQ-DASH-272 criteria 1 to 5):
+        # {supply: [{on, clause, status, tail}]}, looked up by date.
+        "warehouseClause": warehouse_clause,
+        # A JOINT OR RE-CHECKED RULE PROMOTION'S HISTORY ROW (REQ-DASH-272
+        # criterion 20): {decision id: segments}.
+        "promotionWords": promotion_words,
+        # THE GRID'S NOTES AND SENTENCES, each once (REQ-DASH-272): a cell's
+        # `placed` point names them by index.
+        "xtPhrases": phrases.items,
         # REQ-DASH-097: the file checks, BESIDE `columns` - never inside them,
         # which is what keeps them out of every roll-up.
         "fileChecks": file_check_panel.for_dataset(dataset_id),
@@ -815,7 +873,7 @@ def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], da
         "agreementRefusal": _agreement_refusal(dataset_id),
         # WHAT WAS PROMOTED AND WHAT HAD ARRIVED, AS AT EACH DATE (REQ-DASH-197,
         # REQ-DASH-198): change points, one walk of the slot timeline above.
-        "promotionTimeline": promotion_timeline.for_dataset(dataset_id, slot_timeline_raw),
+        "promotionTimeline": panel,
         # A NEWER SUPPLY THAT COULD BE CARRIED FORWARD (REQ-PIPE-271 criterion
         # 7): each warning with the days it stood, its words worked out here.
         "carryForwardWarnings": carry_forward.for_dashboard(dataset_id),
