@@ -2818,3 +2818,37 @@ one or more component tags, and a date.
      unmet criterion).
    - **STILL TO DO**: A3 (270+266+267+273+278, schema bump, bootstrap) is next
      in the agreed order - deliberately not started overnight, being large.
+
+10. **[in-progress, 2026-10-25]** **[Docs & process]** **Overnight 2026-10-25 to
+    26: both build waves after A3, then one push.**
+    - **THE PLAN, approved 2026-10-25 ~23:50 Perth** (Keith: "Usual
+      overnight policy applies, build, test and critique both waves and push
+      at the end once (full gate and CI check)"). WAVE 1, three builders in
+      their own worktrees from c1563cb, each with its own probe database: L1
+      REQ-PIPE-276 -> 210 -> 211 (+ REQ-PIPE-266 c17); L2 REQ-DASH-204 ->
+      272 -> 275; L3 REQ-QAC-176 -> REQ-PIPE-177 -> 178 (schema 48 -> 49).
+      WAVE 2 once wave 1 is merged: L4 the generator lane, REQ-GEN-235 ->
+      REQ-GEN-238 -> REQ-PIPE-250 plus post-build-review #276's staggered
+      hold-back fix; L5 REQ-PIPE-254; L2 again, REQ-DASH-221 then
+      REQ-TEST-282. Critics per lane, fixes before the next item, one full
+      gate on a fresh bootstrap, ONE push, then CI.
+    - **TERMS (the standing overnight policy)**: a check-in every ten
+      minutes; the recommended option on anything not already decided,
+      marked PROVISIONAL here; questions queued here, never acted on;
+      defects failing-test first; critic fixes before the next item; database
+      writes only to scratch probe databases, never `supply`. PUSHING: once,
+      at the end, after a full gate on that tree; then the CI run checked.
+    - **THE SESSION LIMIT, ~20:40**: L2, L3 and the #3 scoper stopped
+      mid-work at the account's session limit; resumed ~23:55 from their
+      saved state. L1 had already finished (w1-l1 @ 62e5f0d).
+    - **QUESTIONS FOR KEITH, queued**:
+      1. L1 followed your answer 3a (a re-check against the warehouse that
+         ran and failed is its own root) where it contradicts two examples
+         you signed earlier - REQ-PIPE-276 c6's layout and REQ-PIPE-210 c11's
+         "staggered S1 red" case. Confirm 3a wins (PROVISIONAL: it does).
+      2. Found by L1, pre-existing: `mothman cp qa --commit --run-id` on ONE
+         file of a zip files that arrival alone and gates it at once as a
+         one-file package. Leave, or scope a fix?
+    - **PROCESS NOTE**: L1 wrote its code before its tests, then showed 36 of
+      41 new tests failing on c1563cb. The evidence is equivalent, the order
+      is not the rule; written up in post-build-review with the L1 critic.
