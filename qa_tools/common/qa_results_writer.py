@@ -833,13 +833,17 @@ class Attempt:
                    qa_store.ERROR_MESSAGE_LIMIT characters
     """
 
-    def __init__(self, run_key: str, run_seq: int, lock,
-                 fingerprints: dict[str, str] | None = None) -> None:
+    def __init__(self, run_key: str, run_seq: int, lock, fingerprints: dict[str, str]) -> None:
+        if fingerprints is None:
+            # REFUSED, NEVER DEFAULTED (critic, 2026-10-25): an empty map would
+            # refuse every result the attempt records, far from the cause.
+            raise ValueError(f"run {run_key!r}: an attempt needs the fingerprints map taken "
+                             "when it opened (REQ-QAC-176 criterion 24)")
         self.run_key, self.run_seq, self._lock = run_key, run_seq, lock
         #: check id -> definition fingerprint, taken when the attempt opened
         #: (REQ-QAC-176 criterion 24) - what every result it records is
         #: stamped with.
-        self.fingerprints = fingerprints if fingerprints is not None else {}
+        self.fingerprints = fingerprints
         self.ended = False
         self._sigterm = _stop_on_sigterm()
 

@@ -689,6 +689,12 @@ def tidy_command(yes: bool) -> None:
 
     So this asks first, and names what it is about to drop.
 
+    A RE-CHECK TRIAL'S TOO (REQ-PIPE-178): `trial_rc_<stamp>` and its
+    `qa_trial_rc_...` views carry the trial prefix, so a hard-killed one -
+    whose own schema is made before its run - is listed and dropped here like
+    any other trial's. Its run, if one was recorded, is read by nothing:
+    qa.run_visible leaves every trial run out.
+
     A CRASHED TRIAL IS THE OTHER THING THIS CLEARS (REQ-PIPE-103). A
     trial drops all of its schemas in one transaction when it ends,
     so nothing is ever half-cleared - but `kill -9` still leaves the
@@ -886,6 +892,8 @@ def _say_bulk_rechecks(collection_id: str) -> None:
     console.print(line, style="bold yellow", markup=False, highlight=False, soft_wrap=True)
     for n in nudges:
         here = n.by_collection.get(collection_id, 0)
+        if not here:
+            continue  # another collection's check (critic polish, 2026-10-25)
         console.print(f"  {n.check_id} - {here} here, {n.total} in all, changed {n.changed}: "
                       f"{n.headline}", markup=False, highlight=False, soft_wrap=True)
     console.print("mothman supply recheck --check <check_id> --reason <why>", markup=False,
@@ -937,7 +945,8 @@ def _say_owed(owed_now: list) -> None:
                    "every supply it covers. A trial takes none.")
 @click.option("--yes", is_flag=True,
               help="Skip the confirmation. The real run also needs --acknowledge KEY, from "
-                   "its panel.")
+                   "its panel. Where the environment confirms changes (production) you are "
+                   "still asked to type its id - --yes does not stand in for that.")
 @click.option("--acknowledge", "acknowledged", default=None, metavar="KEY",
               help="Confirm what the bulk re-check covers, by the key its panel showed.")
 @click.option("--hand-off", "hand_off", is_flag=True,

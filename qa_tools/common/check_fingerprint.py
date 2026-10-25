@@ -186,16 +186,6 @@ def differs(stored: str, check) -> bool:
                                        check.hashed_settings, check_id=check.check_id)
 
 
-def current_by_scheme(checks: Iterable) -> dict[str, dict[str, str]]:
-    """{scheme: {check id: fingerprint}} for every kept scheme - what a
-    selection compares a stored fingerprint against, whatever scheme it
-    carries."""
-    checks = list(checks)
-    return {s: {c.check_id: fingerprint_under(s, c.tool, c.check_kind, c.hashed_settings,
-                                              check_id=c.check_id) for c in checks}
-            for s in SCHEMES}
-
-
 def stamp(fingerprints: Mapping[str, str], check_id: str | None, *, run_key: str) -> str:
     """The fingerprint to record with a result about `check_id`, or
     NoFingerprint (criterion 14)."""

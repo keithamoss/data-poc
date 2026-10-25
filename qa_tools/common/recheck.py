@@ -256,6 +256,10 @@ def execute(*, dataset_id: str, supply_id: str, run_key: str, purpose: dict,
 #: processing pass's own (processing_pass.PASS_LOCK_SPACE, ARRIVAL_LOCK_SPACE).
 OWED_CLAIM_SPACE = 51512
 
+#: What a runner says of an item another runner has already finished - a
+#: completed outcome with no verdict of its own.
+ALREADY_RUN = "already run"
+
 #: What a runner says when another runner already has the item.
 CLAIMED_ELSEWHERE = ("this is already being run elsewhere - it will finish there, and it "
                      "stays owed until it does")
@@ -294,7 +298,7 @@ def _run_claimed(owed_id: int, *, run_by: str | None = None, on_step=None) -> Ou
     with supply_db.connect(label="mothman:recheck") as conn:
         item, cleared_at = _owed_item(conn, owed_id)
         if cleared_at is not None:
-            return Outcome(item.id, item.run_key or "", True, "already run")
+            return Outcome(item.id, item.run_key or "", True, ALREADY_RUN)
         # A REFUSED DATASET IS FROZEN (Keith, 2026-10-11, morning-report (f)):
         # nothing about it moves until its undeclared change is restored or
         # declared, so a re-check or re-evaluation owed to it waits - still
@@ -498,22 +502,20 @@ def clear(owed_id: int, run_key: str, found_worse: bool | None = None) -> None:
 
 def run_all_owed(*, collection_id: str | None = None, kinds=(REEVALUATE,),
                  run_by: str | None = None, on_step=None, limit: int = 1000,
-                 ids=None, deadline: float | None = None) -> list[Outcome]:
+                 deadline: float | None = None) -> list[Outcome]:
     """Run what is owed, oldest first, until nothing of these kinds is left -
     a promotion a re-evaluation makes owes its own, which this picks up too
     (REQ-PIPE-121 criterion 11). Bounded: a supply promotes at most once, so
     a cascade ends; `limit` is a backstop, never the expected stop. An item
     that fails stays owed and is not retried in the same call.
 
-    `ids` runs only those owed items - a bulk re-check's own (REQ-PIPE-177
-    criterion 17). `deadline` (a time.monotonic() instant) is the processing
+    `deadline` (a time.monotonic() instant) is the processing
     pass's budget: once it has passed, NO NEW item is started and the rest
     stay owed for the next pass (criterion 24)."""
     import time
 
     from qa_tools.common import hierarchy
 
-    wanted = None if ids is None else set(ids)
     out: list[Outcome] = []
     tried: set[int] = set()
     while len(out) < limit:
@@ -525,7 +527,6 @@ def run_all_owed(*, collection_id: str | None = None, kinds=(REEVALUATE,),
             # prepared, owed_run does not exist yet.
             qa_store.ensure_schema(conn)
             pending = [o for o in owed(conn) if o.kind in kinds and o.id not in tried
-                       and (wanted is None or o.id in wanted)
                        and (collection_id is None
                             or _collection_of(hierarchy, o.dataset_id) == collection_id)]
         if not pending:
