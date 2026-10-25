@@ -211,10 +211,16 @@ def state_of(arrival, rec: Recorded) -> str:
 
 
 def _waiting_for_package(conn, arrival, gate_mod) -> str | None:
-    """The waiting line where this checked arrival's package gate is owed."""
+    """The waiting line where this checked arrival's package gate is owed.
+    An arrival with no receipt instant has no package to look up."""
+    from qa_tools.common import asset_time
+
+    received = getattr(arrival, "received_at", None)
+    if received is None:
+        return None
     for dataset_id in sorted(getattr(arrival, "files_by_dataset", {}) or {}):
-        key = supply_of(arrival)
-        package = gate_mod.package_of(conn, dataset_id, key[1])
+        supply = f"{dataset_id}@{asset_time.arrival_key(received)}"
+        package = gate_mod.package_of(conn, dataset_id, supply)
         if package is not None and gate_mod.owed_gate(conn, package) is not None:
             return gate_mod.waiting_words(package)
     return None

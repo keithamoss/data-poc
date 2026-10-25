@@ -783,3 +783,15 @@ def _reject(sc, supply: str, period: str) -> None:
 
 def test_every_table_is_named():
     assert set(V1) == set(TABLES)
+
+
+def test_the_period_lock_has_an_advisory_lock_space_of_its_own():
+    """Every advisory-lock space this project takes is its own: the period
+    lock shared 51513 with a run attempt's lock (qa_store.ATTEMPT_LOCK_SPACE),
+    so a hash collision between a period key and a run key would have read
+    one as the other."""
+    from qa_tools.common import gate, processing_pass, qa_store, recheck
+
+    spaces = [gate.PERIOD_LOCK_SPACE, qa_store.ATTEMPT_LOCK_SPACE, recheck.OWED_CLAIM_SPACE,
+              processing_pass.PASS_LOCK_SPACE, processing_pass.ARRIVAL_LOCK_SPACE]
+    assert len(set(spaces)) == len(spaces), spaces

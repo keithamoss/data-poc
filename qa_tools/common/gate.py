@@ -60,8 +60,9 @@ PACKAGE, RECHECK, KNOCK_ON, UNGATED = "package", "recheck", "knock-on", "ungated
 SETTLED, ABANDONED = "settled", "abandoned"
 
 #: The advisory-lock space of the per-(collection, period) lock - beside the
-#: processing pass's (51510, 51511) and an owed item's claim (51512).
-PERIOD_LOCK_SPACE = 51513
+#: processing pass's (51510, 51511), an owed item's claim (51512) and a run
+#: attempt's (51513, qa_store.ATTEMPT_LOCK_SPACE).
+PERIOD_LOCK_SPACE = 51514
 
 #: A person's decision refused while a gate holds its period (REQ-PIPE-266
 #: criterion 16).
@@ -331,7 +332,9 @@ def _held_by_a_run(conn, package: Package) -> bool:
     key = _lock_key(package.collection_id, package.period)
     rows = conn.execute(
         "SELECT 1 FROM pg_locks WHERE locktype = 'advisory' AND granted AND classid = ? "
-        "AND objid = hashtext(?)::oid LIMIT 1",
+        "AND objsubid = 2 AND objid = hashtext(?)::oid "
+        "AND database = (SELECT oid FROM pg_database WHERE datname = current_database()) "
+        "LIMIT 1",
         [PERIOD_LOCK_SPACE, key]).fetchall()
     if rows:
         return True
@@ -341,7 +344,9 @@ def _held_by_a_run(conn, package: Package) -> bool:
         run_id = supply_files.run_id_of(ds, sup)
         if conn.execute(
                 "SELECT 1 FROM pg_locks WHERE locktype = 'advisory' AND granted "
-                "AND classid = ? AND objid = hashtext(?)::oid LIMIT 1",
+                "AND classid = ? AND objsubid = 2 AND objid = hashtext(?)::oid "
+                "AND database = (SELECT oid FROM pg_database WHERE datname = current_database()) "
+                "LIMIT 1",
                 [processing_pass.ARRIVAL_LOCK_SPACE, run_id]).fetchall():
             return True
     return False

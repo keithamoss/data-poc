@@ -357,6 +357,8 @@ def apply_decision(*, operation: str, dataset_id: str, period: str | None,
     except filing_queue.LogUnreachable as exc:
         say_unreachable(exc)
         return None
+    except Exception:  # noqa: BLE001 - apply() checks again, under the locks, and says why
+        pass
     # REFUSED BEFORE THE REASON IS ASKED FOR, where it cannot happen at all
     # (#113): a reason typed for a decision about to be refused is wasted.
     try:
