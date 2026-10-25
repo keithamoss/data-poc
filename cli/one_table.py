@@ -457,7 +457,7 @@ def add_commands(group: click.Group, coll, *, with_target_trial: bool) -> None:
                     bucket, s3_key, s3_reference_key, run_by, on_step=on_step,
                     keep=common.keep_from_flags(commit, trial), originally=originally_received)
             cli_._finish_supply(results, filed, all_checks)
-            sys.exit(1 if cli_.has_failures(results) else 0)
+            sys.exit(cli_.exit_status(results, cli_.arrivals_filed(filed)))
 
         if file_path is not None:
             if run_id is not None:
@@ -469,7 +469,7 @@ def add_commands(group: click.Group, coll, *, with_target_trial: bool) -> None:
                     file_path, reference_file, run_by, on_step=on_step,
                     keep=common.keep_from_flags(commit, trial), originally=originally_received)
             cli_._finish_supply(results, filed, all_checks)
-            sys.exit(1 if cli_.has_failures(results) else 0)
+            sys.exit(cli_.exit_status(results, cli_.arrivals_filed(filed)))
 
         if run_id is None:
             if not (sys.stdin.isatty() and sys.stdout.isatty()):
@@ -483,4 +483,4 @@ def add_commands(group: click.Group, coll, *, with_target_trial: bool) -> None:
             results, recorded_run_id = cli_.run_check(
                 run_id, run_by, reference_run_id=reference_run_id, on_step=on_step, keep=keep)
         cli_._report_synthetic(results, recorded_run_id, keep, interactive=False)
-        sys.exit(1 if cli_.has_failures(results) else 0)
+        sys.exit(cli_.exit_status(results, cli_.arrivals_kept(recorded_run_id) if keep else ()))

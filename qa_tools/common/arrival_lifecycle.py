@@ -78,7 +78,7 @@ def process(arrival, *, steps: Steps, among: Sequence, run_timestamp: str,
     except Exception as exc:
         # WHICH ARRIVAL, WHICH STAGE, AND WHAT HAD COMPLETED (REQ-TEST-150
         # criterion 7) - the original exception chained, nothing swallowed.
-        raise StageFailed(arrival.run_id, stage, tuple(done), exc) from exc
+        raise StageFailed(arrival.run_id, stage, tuple(done), exc, arrival=arrival) from exc
     return got
 
 
@@ -88,11 +88,16 @@ FILING, CHECKING, GATING = "filing and overlay", "checks", "promotion gate"
 class StageFailed(RuntimeError):
     """One arrival's lifecycle stopped at a named stage."""
 
-    def __init__(self, run_id: str, stage: str, completed: tuple[str, ...], cause):
+    def __init__(self, run_id: str, stage: str, completed: tuple[str, ...], cause, *,
+                 arrival=None):
         super().__init__(f"{run_id}: the {stage} stage failed ({type(cause).__name__}: "
                          f"{cause})" + (f" after {', '.join(completed)} completed"
                                         if completed else " before anything completed"))
         self.run_id, self.stage, self.completed, self.cause = run_id, stage, completed, cause
+        #: The arrival itself, where the stage wrapper had it - so the
+        #: terminal can say what its package-mates now wait for (REQ-PIPE-276
+        #: criterion 17).
+        self.arrival = arrival
 
 
 class ArrivalBusy(RuntimeError):

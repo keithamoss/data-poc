@@ -300,6 +300,10 @@ def _refused(exc: Exception, operation: str, *, flag_route: bool) -> None:
                             for f in exc.files)
                  + " --reason '<why>'")
     _show(text, title=f"{operation} refused", style="red")
+    if flag_route and getattr(exc, "exit_code", None) == filing_decisions.EXIT_TRY_LATER:
+        # NOTHING CHANGED, TRY LATER (REQ-PIPE-276 criterion 20): a lock wait
+        # that timed out exits 75 as every other 'try later' refusal does.
+        raise SystemExit(filing_decisions.EXIT_TRY_LATER)
 
 
 def _gate_busy(exc, operation: str, *, flag_route: bool) -> None:
@@ -359,6 +363,16 @@ def apply_decision(*, operation: str, dataset_id: str, period: str | None,
         return None
     except Exception:  # noqa: BLE001 - apply() checks again, under the locks, and says why
         pass
+    if flag_route and supply and period and operation in (
+            filing_decisions.PROMOTE, filing_decisions.REJECT, filing_decisions.SUPERSEDE):
+        # REACHED BY NAMING IT, IT SAYS THE SAME AS THE DOOR (REQ-PIPE-210
+        # criterion 4) before anything is decided - its own decisions stay
+        # available on the same terms.
+        note, _nothing = door_note(slot_state.SlotState(
+            dataset_id=dataset_id, period=period, state=slot_state.AWAITING_DECISION,
+            supply=supply))
+        if note:
+            _show(note, title=f"{dataset_id} {period}", style="yellow")
     # REFUSED BEFORE THE REASON IS ASKED FOR, where it cannot happen at all
     # (#113): a reason typed for a decision about to be refused is wasted.
     try:
@@ -421,7 +435,7 @@ def apply_decision(*, operation: str, dataset_id: str, period: str | None,
         try:
             shown = _consequences(request)
         except decision_log.DecisionRefused as exc:
-            _show(str(exc), title=f"{operation} refused", style="red")
+            _refused(exc, operation, flag_route=flag_route)
             return None
         if shown.lines:
             if previous:
@@ -596,10 +610,75 @@ def _follow_up(collection_id: str, *, carried=None) -> None:
             console.print(Panel(Text(outcome.message), title="Re-evaluation owed",
                                 border_style="yellow", expand=False))
         return
+    regated = [r for o in done if o.completed for r in (o.regated or ())]
+    if regated:
+        # EVERY SUPPLY THE KNOCK-ON RE-GATED, WITH ITS OUTCOME (REQ-PIPE-276
+        # criterion 10) - not only the ones left incomplete.
+        _show("\n".join(regated_lines(regated)), title="Re-gated after this decision",
+              style="green")
     for outcome in done:
         if not outcome.completed:
-            console.print(Panel(Text(outcome.message), title="Re-evaluation owed",
-                                border_style="yellow", expand=False))
+            # WHAT IT IS UNTIL THEN, AND WHAT FINISHES IT (criterion 14): each
+            # in-warehouse supply red only for the owed re-check, in
+            # REQ-DASH-204 criterion 7's sentence - never 're-checked worse'.
+            said = _owed_recheck_lines(outcome.owed_id)
+            _show("\n".join([outcome.message, *said]) if said else
+                  f"{outcome.message}\nThe re-check runs on the next processing pass:\n"
+                  f"mothman pipeline process", title="Re-evaluation owed", style="yellow")
+
+
+def _owed_recheck_lines(owed_id: int) -> list[str]:
+    """For an owed re-evaluation, each promoted reader of its period that
+    reads red only for 'recheck-owed': '<dataset>: Not yet re-checked against
+    the <dataset> promoted <instant>; the re-check runs on the next
+    processing pass:' and the command on a line of its own."""
+    from qa_tools.common import knock_on, promotion, recheck, supply_status
+
+    try:
+        with open_log() as conn:
+            item = next((o for o in recheck.owed(conn) if o.id == owed_id), None)
+            if item is None or not item.period:
+                return []
+            out = []
+            for r in knock_on.readers(conn, item.period, list(item.tables or []),
+                                      promotion._declared_reads()):
+                if r.waiting:
+                    continue
+                owed = supply_status.red_only_for_recheck_owed(conn, r.dataset_id, r.supply)
+                words = supply_status.recheck_owed_words(conn, owed) if owed else None
+                if words:
+                    out.append(f"{r.dataset_id}: {words}")
+    except Exception:  # noqa: BLE001 - the panel says what it can
+        return []
+    return out + ["mothman pipeline process"] if out else []
+
+
+def regated_lines(regated) -> list[str]:
+    """One line per resulting outcome - the status in words and the gate's
+    result in REQ-PIPE-276's words ('promoted by the rule', 'still held back
+    - <reason>', 'still promoted') - naming up to eight datasets, red lines
+    first (REQ-PIPE-276 criterion 10; REQ-PIPE-211 criterion 14). A red
+    owed only a re-check is said as not yet re-checked (criterion 14)."""
+    from cli import lifecycle_report
+    from qa_tools.common import root_cause, supply_status
+
+    outcomes: list[tuple[str, str, str]] = []
+    try:
+        with open_log() as conn:
+            for dataset_id, supply, _period, status, result in regated:
+                if result == "still held back":
+                    why = root_cause.holdback_reason(conn, dataset_id, supply)
+                    if why:
+                        result = f"still held back - {re.sub(r'^Held back[^:]*: ', '', why)}"
+                if status == "red" and supply_status.red_only_for_recheck_owed(
+                        conn, dataset_id, supply):
+                    status = "not yet re-checked"
+                outcomes.append((dataset_id, status, result))
+    except filing_queue.LogUnreachable:
+        outcomes = [(d, st, res) for d, _s, _p, st, res in regated]
+    # THE ONE RENDERER (lifecycle_report.outcome_lines), shared with a
+    # settlement's outcome panel.
+    return lifecycle_report.outcome_lines(outcomes)
 
 
 def _owed_for(period: str | None) -> set[int]:
@@ -717,16 +796,93 @@ def outcome_panel(operation: str, supply: str | None, period: str | None,
     lines = [f"{who} is filed to {where}, checked {got.status or 'without a verdict'}."]
     if operation == filing_decisions.PLACE:
         lines.append(f"It had not been checked in {where} before.")
+    step = None
     if got.promoted:
         lines.append(f"The promotion gate promoted it into {where}.")
+        why = _rule_promotion_words(who, got.period or period)
+        if why:
+            lines.append(f"It was {why}.")
     else:
+        step = next_step(who, where)
         lines.append(f"It is waiting in {where}: filed, and nothing is lost. The promotion "
-                     f"gate did not promote it - {_gate_words(got.waits_because or 'it waits for a person')}. "
-                     f"Promote or reject it next, at Filing decisions > Supplies waiting on a "
-                     f"decision.")
+                     f"gate did not promote it - {_gate_words(got.waits_because or 'it waits for a person')}."
+                     + ("" if step else " Promote or reject it next, at Filing decisions > "
+                        "Supplies waiting on a decision."))
     style = ("green" if got.status in ("green", "amber") else
              "red" if got.status == "red" else "yellow")
-    return " ".join(lines), "Where it stands now", style
+    # THE NEXT STEP NEVER THROUGH _gate_words (REQ-PIPE-276 criterion 2):
+    # 'turned down' is a person's decision, not a gate's outcome.
+    return " ".join(lines) + (f"\n{step}" if step else ""), "Where it stands now", style
+
+
+def _rule_promotion_words(supply: str | None, period: str | None) -> str | None:
+    """REQ-PIPE-276 criterion 15 in the outcome panel - the kept report's
+    own words (lifecycle_report.rechecked_promotion_words), never a copy."""
+    from cli import lifecycle_report
+
+    if not supply or "@" not in supply:
+        return None
+    try:
+        with open_log() as conn:
+            why = lifecycle_report.rechecked_promotion_words(
+                conn, supply.split("@", 1)[0], supply)
+    except Exception:  # noqa: BLE001 - the panel says what it can
+        return None
+    return f"promoted by the rule - {why}" if why else None
+
+
+def next_step(supply: str | None, period: str | None) -> str | None:
+    """REQ-PIPE-276 criteria 2 and 4 (REQ-PIPE-210 criteria 4 and 6): for a
+    supply held back because of another supply, the next step - while that
+    other supply is waiting, ITS decision first, that nothing needs deciding
+    on this one where its red is wholly that supply's doing, and the
+    override as a complete command on a line of its own; once that supply
+    has been turned down or replaced, this supply's own decision, worded
+    from the decision log as it stands. None where it was held back by no
+    other supply. A `mothman` line is printed below the panel by _show."""
+    from qa_tools.common import display_time, filing, root_cause
+
+    if not supply or "@" not in supply or not period:
+        return None
+    dataset_id = supply.split("@", 1)[0]
+    try:
+        with open_log() as conn:
+            by = root_cause.held_back_by(conn, dataset_id, supply)
+            if by is None:
+                return None
+            by_ds, by_supply, _came = by
+            head = root_cause.turned_down_words(conn, dataset_id, supply)
+            if head:
+                return (head + " Promote or reject it next, at Filing decisions > Supplies "
+                        "waiting on a decision.")
+            if decision_log.promoted_into(conn, by_ds, period) == by_supply:
+                # ITS CAUSE IS IN THE WAREHOUSE NOW and the re-check it owes this
+                # supply has not run (REQ-PIPE-276 criterion 4): nothing to
+                # decide first - the processing pass re-checks and re-gates it.
+                got = filing.received_at_of(by_ds, by_supply, conn=conn)
+                when = display_time.format_instant(got) if got else by_supply
+                return (f"The {by_ds} it was held back by (received {when}) has been "
+                        f"promoted into {period}; its re-check against it is owed and runs "
+                        f"on the next processing pass:\nmothman pipeline process")
+            wholly = root_cause.root_of(conn, dataset_id, supply, period) is not None
+            got = filing.received_at_of(by_ds, by_supply, conn=conn)
+            when = display_time.format_instant(got) if got else by_supply
+    except filing_queue.LogUnreachable:
+        return None
+    lines = [f"Decide {by_ds} {period} (received {when}) - promoting it re-checks this one."]
+    if wholly:
+        lines.append("Nothing needs deciding on this supply.")
+    lines.append("To override:")
+    lines.append(override_command(dataset_id, period, supply))
+    lines.append(f"or from the {period} door.")
+    return "\n".join(lines)
+
+
+def override_command(dataset_id: str, period: str, supply: str) -> str:
+    """The override, complete but for the reason (REQ-PIPE-276 criterion 4;
+    REQ-PIPE-210 criterion 3) - real dataset, period and supply."""
+    return (f"mothman supply decide --operation promote --dataset {dataset_id} "
+            f"--period {period} --supply {supply} --reason '<why>'")
 
 
 def _recheck_panel(who: str, where: str, got) -> tuple[str, str, str]:
@@ -748,12 +904,18 @@ def _recheck_panel(who: str, where: str, got) -> tuple[str, str, str]:
                      f"{_dataset_of(who)} --period {where} --supply {who} --reason '<why>'")
     elif got.promoted:
         lines.append(f"The promotion gate promoted it into {where}.")
+        why = _rule_promotion_words(who, where)
+        if why:
+            lines.append(f"It was {why}.")
         text = " ".join(lines)
     else:
+        step = next_step(who, where)
         lines.append(f"It is waiting in {where}. The promotion gate did not promote it - "
-                     f"{_gate_words(got.waits_because or 'it waits for a person')}. Promote or "
-                     f"reject it next, at Filing decisions > Supplies waiting on a decision.")
-        text = " ".join(lines)
+                     f"{_gate_words(got.waits_because or 'it waits for a person')}."
+                     + ("" if step else " Promote or reject it next, at Filing decisions > "
+                        "Supplies waiting on a decision."))
+        # NEVER THROUGH _gate_words (REQ-PIPE-276 criterion 2).
+        text = " ".join(lines) + (f"\n{step}" if step else "")
     style = ("green" if got.status in ("green", "amber") else
              "red" if got.status == "red" else "yellow")
     return text, "Where it stands now", style
@@ -842,6 +1004,131 @@ def queue_table(states) -> Table:
                        escape(s.reason) if s.state == filing_queue.RECHECKED_WORSE
                        and s.reason else _HOW_IT_READS.get(s.state, s.state))
     return table
+
+
+def _own_red_words(conn, state) -> str:
+    """'red - 3 of its own checks fail' for a root's own line (REQ-PIPE-276
+    criterion 6), from its counted results - the slot's state in words where
+    none of its own checks fails."""
+    from qa_tools.common import promotion, supply_status
+
+    words = re.sub(r"\[/?[a-z ]+\]", "", _HOW_IT_READS.get(state.state, state.state))
+    if not state.supply:
+        return words
+    try:
+        latest = supply_status.latest_results(conn, state.dataset_id, state.supply)
+    except Exception:  # noqa: BLE001 - the state words stand
+        return words
+    own = [r for r in promotion._contributing_records(state.dataset_id, latest,
+                                                      promotion._declared_reads())
+           if not r.get("reads") and (r.get("status") or "") in ("fail", "error")]
+    if not own:
+        return words
+    return ("red - 1 of its own checks fails" if len(own) == 1
+            else f"red - {len(own)} of its own checks fail")
+
+
+def queue_groups(conn, waiting, *, held=()):
+    """The queue split once for every surface that shows it (REQ-PIPE-210
+    criteria 7 and 8): root_cause.group_queue, the one function."""
+    from qa_tools.common import root_cause
+
+    try:
+        return root_cause.group_queue(conn, waiting, held=held)
+    except Exception as exc:  # noqa: BLE001 - the queue is still shown, every row counted
+        # SAID, NEVER A BLANK QUEUE: a grouping that cannot be read leaves
+        # every supply its own counted row, as before REQ-PIPE-210.
+        console.print(f"The queue could not be grouped by cause ({type(exc).__name__}: "
+                      f"{exc}); every supply is listed as its own row.", style="dim",
+                      markup=False, highlight=False)
+        return root_cause.QueueGroups(rows=list(waiting))
+
+
+#: The supplier hint beneath a supply held back by a joined supply
+#: (REQ-PIPE-276 criterion 19).
+SUPPLIER_HINT = ("Files sent separately are gated as each arrives; sent as one zip they are "
+                 "gated together (supplier guidance, REQ-DOCS-274).")
+
+
+def say_queue(conn, groups, collection_id: str) -> None:
+    """THE ONE RENDERER the Filing decisions queue and `mothman supply queue`
+    share (REQ-PIPE-276 criteria 6 and 12; REQ-PIPE-210 criteria 1 to 3, 5,
+    8 and 9): the counted rows in their table; beneath each root's item, the
+    supplies it holds back, through lifecycle_report.beneath_lines, each with
+    its override on a line of its own below the table; the lines a counted
+    row carries; and each delivery still being gated as one quiet,
+    uncounted line. Words, never colour alone; no Rich markup in any line
+    that names a state (criterion 21)."""
+    from cli import lifecycle_report
+    from qa_tools.common import root_cause
+
+    name = _collection_name(collection_id)
+    plain = dict(markup=False, highlight=False)
+    if groups.rows:
+        head = (f"{groups.count} {'supply' if groups.count == 1 else 'supplies'} waiting "
+                f"on a decision in {name}")
+        if groups.listed_beneath:
+            came = ("joined" if any(b.traced.came == "joined"
+                                     for v in groups.beneath.values() for b in v)
+                    else "package-mate")
+            head += " " + lifecycle_report.header_more(groups.listed_beneath, came)
+        console.print(head + "\n", **plain)
+        console.print(queue_table(groups.rows))
+        console.print()
+    by_key = {root_cause.row_key(r): r for r in groups.rows}
+    for key, lines in groups.lines.items():
+        row = by_key.get(key)
+        if row is None:
+            continue
+        for line in lines:
+            console.print(f"{row.dataset_id}  {row.period}: {line}", **plain)
+    if groups.lines:
+        console.print()
+    for key, members in groups.beneath.items():
+        root = by_key.get(key)
+        if root is None:
+            # A HELD ROOT (filing_queue.HeldRow) - its own group above.
+            root_line = f"{members[0].traced.root.dataset_id}  held - no period yet"
+            root_name = members[0].traced.root.dataset_id
+        else:
+            root_line = (f"{root.dataset_id}  {root.period}  received {arrived(root.supply)}"
+                         f"  {_own_red_words(conn, root)}")
+            root_name = root.dataset_id
+        rows = []
+        for b in members:
+            why = (b.reason or "").strip()
+            why = re.sub(r"^Held back(, not judged)?: ", "", why).rstrip(".")
+            why = why or f"its checks of {b.traced.root.dataset_id} could not run"
+            rows.append((lifecycle_report.label_for(b.traced.came), b.state.dataset_id,
+                         f"nothing needs deciding on this supply - {why}. Deciding "
+                         f"{root_name} settles it: its checks run again and the gate is "
+                         f"applied again once that decision is made or a "
+                         f"{b.state.period} {b.traced.root.dataset_id} supply is promoted. "
+                         f"To override:",
+                         [ds for ds, _s in b.traced.via]))
+        for line in lifecycle_report.beneath_lines(root_line, rows, root_name=root_name):
+            console.print(line, **plain)
+        # EACH OVERRIDE WHOLE, ON A LINE OF ITS OWN, OUTSIDE ANY TABLE
+        # (criterion 21; _show's convention, post-build-review #112).
+        for b in members:
+            console.print(override_command(b.state.dataset_id, b.state.period,
+                                           b.state.supply), soft_wrap=True, **plain)
+            console.print(f"or from the {b.state.period} door.", **plain)
+        if any(b.traced.came == "joined" for b in members):
+            console.print(SUPPLIER_HINT, style="dim", **plain)
+        console.print()
+    say_gating(groups)
+
+
+def say_gating(groups) -> None:
+    """Each delivery still being checked or gated, as ONE dim line of its
+    own - never counted, never offered (REQ-PIPE-276 criterion 12)."""
+    from qa_tools.common import gate
+
+    for package, _states in groups.gating:
+        console.print(gate.gating_words(package), style="dim", markup=False, highlight=False)
+    if groups.gating:
+        console.print()
 
 
 def _label(state: slot_state.SlotState, count: int = 0) -> str:
@@ -967,6 +1254,14 @@ def _decide_on(state: slot_state.SlotState, *, offer: tuple[str, ...]) -> None:
     if not offer:
         console.print("There is nothing to decide about this one.", style="dim")
         return
+    # WHAT IS SAID BEFORE ANY DECISION IS OFFERED (REQ-PIPE-276 criteria 11,
+    # 14 and 16; REQ-PIPE-210 criterion 4).
+    note, offer_nothing = door_note(state)
+    if note:
+        _show(note, title=f"{state.dataset_id} {state.period}",
+              style="dim" if offer_nothing else "yellow")
+    if offer_nothing:
+        return
     if state.state == slot_state.TWO_FILES:
         _settle_on(state)
         return
@@ -1063,6 +1358,78 @@ def _decide_on(state: slot_state.SlotState, *, offer: tuple[str, ...]) -> None:
                     through_period=through_period)
 
 
+def door_note(state: slot_state.SlotState) -> tuple[str | None, bool]:
+    """(what the door says about this supply before offering anything,
+    whether it offers nothing at all):
+
+      - a supply of a delivery still being checked or gated reads 'checking
+        with its delivery (<n> of <m> files checked)' and is offered no
+        decision - the refusal is the flag route's backstop only (REQ-PIPE-276
+        criterion 11);
+      - a supply held back because of another supply names that supply's
+        decision first, and keeps its own decisions on the same terms
+        (REQ-PIPE-210 criterion 4; REQ-PIPE-276 criterion 4);
+      - a red in-warehouse supply owed only a re-check is worded as not yet
+        re-checked, never as re-checked worse (criterion 14);
+      - the Order B link (criterion 16)."""
+    from qa_tools.common import gate, root_cause, supply_status
+
+    if not state.supply:
+        return None, False
+    lines: list[str] = []
+    try:
+        with open_log() as conn:
+            if conn is None:
+                return None, False
+            package = gate.being_gated(conn, state.dataset_id, state.supply)
+            if package is not None:
+                return (f"{state.dataset_id} {state.period}: {gate.door_words(package)}. "
+                        f"It is decided once its delivery is gated.", True)
+            owed = supply_status.red_only_for_recheck_owed(conn, state.dataset_id,
+                                                          state.supply)
+            if owed:
+                said = supply_status.recheck_owed_words(conn, owed)
+                if said:
+                    lines += [said, "mothman pipeline process"]
+            link = root_cause.order_b_link(conn, state.dataset_id, state.supply,
+                                           state.period)
+            if link:
+                lines.append(link)
+            slot_line = _slot_root_words(conn, state)
+            if slot_line:
+                lines.append(slot_line)
+    except filing_queue.LogUnreachable:
+        return None, False
+    step = next_step(state.supply, state.period)
+    if step:
+        lines.append(step)
+    return ("\n".join(lines) or None), False
+
+
+def _slot_root_words(conn, state) -> str | None:
+    """For a supply red wholly for want of another table (REQ-PIPE-210
+    criteria 4 and 9): where that table's slot has an item of its own - an
+    open pair, a supply waiting on a decision - its decision first and that
+    nothing needs deciding on this supply; where it has none, the counted
+    row's own line naming the root, never 'nothing needs deciding'."""
+    from qa_tools.common import root_cause
+
+    traced = root_cause.trace(conn, state.dataset_id, state.supply, state.period)
+    if traced is None or traced.root.kind != "slot":
+        return None
+    root = traced.root
+    items = [s for s in filing_queue.slots_of(
+        conn, hierarchy.dataset(root.dataset_id).collection_id, dataset_id=root.dataset_id)
+        if s.period == root.period and s.state in filing_queue.WITH_A_SUPPLY]
+    if not items:
+        return root_cause._overdue_words(root)
+    what = ("settle its pair of files" if items[0].state == slot_state.TWO_FILES
+            else "decide its supply")
+    return (f"Nothing needs deciding on this supply - its checks of {root.dataset_id} could "
+            f"not run. {root.dataset_id} {root.period}: {what} first - that re-checks this "
+            f"one.")
+
+
 def _settle_on(state: slot_state.SlotState) -> None:
     """An open pair offers exactly two things (REQ-PIPE-194 criterion 4):
     settle, or reject both - the second a settlement too, through the same
@@ -1101,9 +1468,22 @@ def queue_flow(collection_id: str) -> None:
             gaps = filing_queue.closed_gaps(conn, collection_id)
             held = filing_queue.held_in(conn, collection_id)
             carry = carry_forward_warnings(conn, collection_id)
+            # ONE ROW PER CAUSE (REQ-PIPE-210; REQ-PIPE-276 criteria 6 and 12).
+            groups = queue_groups(conn, waiting,
+                                  held=[h for h in held if not h.turned_off])
+            shown = _queue_screen(conn, collection_id, gaps=gaps, held=held, carry=carry,
+                                  groups=groups)
     except filing_queue.LogUnreachable as exc:
         say_unreachable(exc)
         return
+    if shown is not None:
+        _queue_choice(collection_id, *shown)
+
+
+def _queue_screen(conn, collection_id: str, *, gaps, held, carry, groups):
+    """queue_flow's screen, over one open log - then (rows, held, quiet,
+    carry) for the choice, or None where there is nothing to choose."""
+    waiting = groups.rows
     # RECEIVED WHILE TURNED OFF (REQ-PIPE-179 criterion 34): a quiet last
     # group, after the slot rows and outside every count of what waits on a
     # decision - one row per dataset.
@@ -1147,23 +1527,32 @@ def queue_flow(collection_id: str) -> None:
     if rechecks:
         console.print(rechecks, style="bold yellow", markup=False, highlight=False)
         console.print()
-    if not waiting and not held:
-        if not gaps:
-            console.print(f"Nothing is waiting on a person in "
-                           f"{_collection_name(collection_id)}.", style="green")
-        if not quiet and not carry and not rechecks:
-            return
-    if waiting:
-        console.print(f"[bold]{len(waiting)}[/bold] supply/supplies waiting on a "
-                       f"decision in {_collection_name(collection_id)}\n")
-        console.print(queue_table(waiting))
-        console.print()
+    if not waiting and not held and not gaps:
+        console.print(f"Nothing is waiting on a person in "
+                       f"{_collection_name(collection_id)}.", style="green")
+    # WHATEVER IS COUNTED (post-build critic D3): the counted rows, the supplies
+    # beneath a root - a held one included - and a delivery being gated, as
+    # one quiet line beneath the rest and never asked about (REQ-PIPE-276
+    # criterion 12): no 'Which one?' when it is all there is.
+    say_queue(conn, groups, collection_id)
+    if not waiting and not held and not quiet and not carry and not rechecks:
+        return None
     if quiet:
         total = sum(len(g.rows) for g in quiet)
         console.print(f"[dim]Received while turned off ({total})[/dim]")
         for g in quiet:
             console.print(f"[dim]  {g.line}[/dim]", markup=True)
         console.print()
+    return waiting, held, quiet, carry, rechecks, nudges
+
+
+def _queue_choice(collection_id: str, waiting, held, quiet, carry, rechecks=None,
+                  nudges=None) -> None:
+    """'Which one?' over what the screen counted - never a supply listed
+    beneath its cause, nor a delivery being gated (REQ-PIPE-210 criterion
+    3; REQ-PIPE-276 criterion 12)."""
+    from cli import bulk_recheck_tui
+
     if held or quiet or carry or rechecks:
         labels = {_held_label(h): h for h in held}
         labels.update({_label(s): s for s in waiting})
@@ -1579,6 +1968,25 @@ def _owed_nothing_door(collection_id: str, state: slot_state.SlotState) -> None:
 _THE_PERIOD_ITSELF = "The period itself"
 
 
+def _being_gated_words(entries) -> dict[str, str]:
+    """{supply: 'checking with its delivery (<n> of <m> files checked)'} for
+    each listed supply whose delivery is still being checked or gated."""
+    from qa_tools.common import gate
+
+    out = {}
+    try:
+        with open_log() as conn:
+            for e in entries:
+                if not e.state.supply:
+                    continue
+                package = gate.being_gated(conn, e.state.dataset_id, e.state.supply)
+                if package is not None:
+                    out[e.state.supply] = gate.door_words(package)
+    except filing_queue.LogUnreachable:
+        return {}
+    return out
+
+
 def _choose_a_supply(state: slot_state.SlotState, period_scoped: tuple[str, ...]) -> None:
     """Every supply filed to the period, then the one the decision is about
     (REQ-GHUB-229 criteria 1, 6, 7, 8 and 9)."""
@@ -1591,9 +1999,11 @@ def _choose_a_supply(state: slot_state.SlotState, period_scoped: tuple[str, ...]
     if state.state in (slot_state.SUBSTITUTED, slot_state.INHERITED) and state.stands_on:
         # CRITERION 6: the supply in place is not one filed to this period.
         console.print(stands_on_line(state), style="cyan")
+    gating = _being_gated_words(entries)
     table = Table("Arrived", "Where it stands", "Verdict", box=None, pad_edge=False)
     for e in entries:
-        table.add_row(arrived(e.state.supply), escape(listed_words(e)), e.verdict)
+        table.add_row(arrived(e.state.supply),
+                      escape(gating.get(e.state.supply) or listed_words(e)), e.verdict)
     console.print(f"[bold]{len(entries)}[/bold] supplies filed to {state.dataset_id} "
                   f"{state.period}\n")
     console.print(table)
@@ -1605,7 +2015,9 @@ def _choose_a_supply(state: slot_state.SlotState, period_scoped: tuple[str, ...]
         choosable = pair
         period_scoped = ()
     else:
-        choosable = entries
+        # NOTHING OFFERED ON A SUPPLY STILL BEING CHECKED WITH ITS DELIVERY
+        # (REQ-PIPE-276 criterion 11): listed, never choosable.
+        choosable = [e for e in entries if e.state.supply not in gating]
     console.print()
     by_label = {_supply_line(e): e for e in choosable}
     if period_scoped:

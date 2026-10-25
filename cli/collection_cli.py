@@ -163,6 +163,52 @@ class CollectionCLI:
     def has_failures(results: list[dict]) -> bool:
         return any(r.get("status") in ("fail", "error") for r in results)
 
+    def arrivals_kept(self, run_id: str) -> list:
+        """The kept synthetic arrival, for the gate's part of the exit status."""
+        from cli import common
+
+        try:
+            return [common.kept_arrival(self.collection_id, self.run_prefix, run_id)]
+        except click.ClickException:
+            return []
+
+    def arrivals_filed(self, filed) -> list:
+        """The arrivals a kept hand-filed supply became - none for a trial."""
+        from qa_tools.common import hand_filing
+
+        if not getattr(filed, "delivery_name", None):
+            return []
+        return hand_filing.arrivals_of(filed, self.collection_id, self.run_prefix)
+
+    def exit_status(self, results: list[dict], arrivals=()) -> int:
+        """`mothman <short> qa`'s exit status, FED BY THE GATE (REQ-PIPE-276
+        criterion 3): its own run's results, and - for a kept run - whether
+        a supply of its package ends held back on a red, a re-check against
+        the warehouse included, whose results it prints as a table headed
+        're-checked against the warehouse'. 1 where anything is red, else 0;
+        a failed stage has already exited 2. NEVER 3 (PROVISIONAL, option B
+        of the post-build critic's call): exit 3's meanings are not widened
+        to qa - an agreement backstop refusal is said by the run's own output
+        and by `mothman pipeline process` - so qa never asks the backstop."""
+        from qa_tools.common import gate, processing_pass, supply_db
+
+        red = self.has_failures(results)
+        if arrivals:
+            try:
+                with supply_db.connect(read_only=True, label="mothman:qa-exit") as conn:
+                    got = gate.touched(conn, gate.supplies_of_arrivals(
+                        conn, arrivals, with_package=True))
+            except Exception as exc:  # noqa: BLE001 - the run's own results still say red
+                console.print(f"The gate's outcome could not be read ({exc}); the exit "
+                              f"status is the run's own results'.", style="yellow",
+                              markup=False, highlight=False)
+                got = gate.Touched()
+            if got.rechecks:
+                console.print(self.report_table(got.rechecks,
+                                                "re-checked against the warehouse"))
+            red = red or got.red
+        return processing_pass.EXIT_RED if red else processing_pass.EXIT_OK
+
     @staticmethod
     def run_id_from_choice(choice: str) -> str:
         return choice.split()[0]

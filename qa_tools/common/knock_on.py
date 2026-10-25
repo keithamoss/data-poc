@@ -204,10 +204,13 @@ def complete(item, *, run_by: str | None = None, on_step=None):
         before = {(r.dataset_id, r.supply): _failing_checks(conn, r.dataset_id, r.supply)
                   for r in touched if r.waiting}
     last_key = ""
+    stale = [r for r in touched if r.stale]
     try:
-        for reader in touched:
-            if not reader.stale:
-                continue
+        for n, reader in enumerate(stale, 1):
+            if on_step is not None:
+                # WHICH RE-CHECK OF HOW MANY (REQ-PIPE-211 criterion 13), said
+                # through the caller's own progress line.
+                on_step(f"re-check {n} of {len(stale)} - {reader.dataset_id} for {period}")
             with supply_db.connect(label="mothman:knock-on") as conn:
                 last_key = recheck.mint_run_id(conn, reader.dataset_id, reader.supply)
             recheck.execute(
@@ -266,6 +269,7 @@ def complete(item, *, run_by: str | None = None, on_step=None):
     from qa_tools.common import gate
 
     still_not_judged: list[str] = []
+    outcomes: dict[tuple[str, str], str] = {}
     for collection_id, items in sorted(by_collection.items()):
         applied = gate.apply(collection_id, period, entry=gate.KNOCK_ON, checked=items,
                              effective_at=now, run_by=run_by)
@@ -292,6 +296,17 @@ def complete(item, *, run_by: str | None = None, on_step=None):
             if why and _fails_the_rules(why) and reader.dataset_id not in {
                     d for d, _s, _w in failing}:
                 failing.append((reader.dataset_id, reader.supply, why))
+            # WHAT THE RE-GATING LEFT IT AS (REQ-PIPE-276 criterion 10), in the
+            # gate's own words: never 'rejected' or 'refused' for a gate outcome.
+            if reader.dataset_id in applied.promoted:
+                outcomes[(reader.dataset_id, reader.supply)] = "promoted by the rule"
+            elif reader.dataset_id in applied.held_back:
+                outcomes[(reader.dataset_id, reader.supply)] = "still held back"
+            elif reader.dataset_id in applied.frozen:
+                outcomes[(reader.dataset_id, reader.supply)] = (
+                    "still waiting - refused by the agreement backstop")
+            else:
+                outcomes[(reader.dataset_id, reader.supply)] = "still waiting for a person"
         # STILL NOT JUDGED, AND THIS ITEM IS ITS RETRY (Keith, 2026-10-25,
         # answer 1a; gate._owe_not_judged): a reader whose re-run check still
         # records nothing that counts keeps this item owed - retried by the
@@ -324,7 +339,27 @@ def complete(item, *, run_by: str | None = None, on_step=None):
     return recheck.Outcome(
         item.id, last_key, True,
         f"{period}: {len(touched)} reader(s) re-evaluated"
-        + (f"; still failing: {names}" if failing else ""))
+        + (f"; still failing: {names}" if failing else ""),
+        regated=_regated(touched, outcomes, period))
+
+
+def _regated(touched, outcomes: dict, period: str) -> tuple:
+    """(dataset, supply, period, status, gate result) for every reader a
+    re-evaluation touched - each waiting one with what its re-gating did,
+    each promoted one 'still promoted' (criterion 6: never demoted)."""
+    from qa_tools.common import supply_status
+
+    out = []
+    with supply_db.connect(read_only=True, label="mothman:knock-on") as conn:
+        for r in touched:
+            try:
+                status = supply_status.status(conn, r.dataset_id, r.supply) or "no verdict"
+            except Exception:  # noqa: BLE001 - said, never a traceback
+                status = "verdict could not be read"
+            result = outcomes.get((r.dataset_id, r.supply)) if r.waiting else "still promoted"
+            out.append((r.dataset_id, r.supply, period, status,
+                        result or "still waiting for a person"))
+    return tuple(out)
 
 
 def _fails_the_rules(why: str) -> bool:

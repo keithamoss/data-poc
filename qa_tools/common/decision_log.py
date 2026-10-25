@@ -1021,6 +1021,16 @@ RUN_IN_PROGRESS = ("Something is using these tables right now - most often a QA 
                    "Nothing was done; retry in a minute.")
 
 
+class RunInProgress(DecisionRefused):
+    """A decision transaction's lock wait timed out (criterion 16): nothing
+    was done, and the same command later goes through - so on the flag route
+    it exits 75, as every 'nothing was changed, try later' refusal does
+    (REQ-PIPE-129 criterion 16 as amended by REQ-PIPE-276; Keith, 2026-10-22,
+    V5-Q2 = A)."""
+
+    exit_code = 75
+
+
 @contextmanager
 def decision_transaction(conn: supply_db.SupplyConnection) -> Iterator[None]:
     """A transaction whose lock waits are bounded (criterion 16): a wait
@@ -1045,7 +1055,7 @@ def decision_transaction(conn: supply_db.SupplyConnection) -> Iterator[None]:
 
                 knock_on.owe(conn, conn._period_moves)
     except psycopg.errors.LockNotAvailable as exc:
-        raise DecisionRefused(RUN_IN_PROGRESS) from exc
+        raise RunInProgress(RUN_IN_PROGRESS) from exc
     finally:
         if outermost:
             conn._period_moves = None
@@ -1089,6 +1099,12 @@ def apply_decision(conn: supply_db.SupplyConnection,
         # is SEEN rather than inferred from the action (REQ-PIPE-121
         # criterion 8): one mechanism, whatever decision moved the table.
         before = {slot: _holding(conn, decision.dataset_id, slot) for slot in decision.slots}
+        # A SETTLEMENT THAT ENDS A CONTEST (REQ-PIPE-211 criterion 2): seen by
+        # comparing the one open-contest judgement before and after - for a
+        # choose-file decision only, the one person's action that can end one.
+        contested = ({slot: open_contest_in(conn, decision.dataset_id, slot)
+                      for slot in decision.slots}
+                     if decision.action == CHOOSE_FILE else {})
         entry_id = _insert(conn, decision)
         # A DECISION ABOUT A HELD SUPPLY ENDS ITS HOLD (REQ-PIPE-078
         # criterion 6), and it happens HERE because this is the one
@@ -1115,6 +1131,44 @@ def apply_decision(conn: supply_db.SupplyConnection,
         for slot, was in before.items():
             if _holding(conn, decision.dataset_id, slot) != was:
                 conn._period_moves.append((entry_id, decision.dataset_id, slot))
+            elif contested.get(slot) and not open_contest_in(conn, decision.dataset_id, slot) \
+                    and not _a_file_of_it_stays(conn, decision, slot, entry_id):
+                # IT ENDED THE CONTEST AND LEFT NO FILE OF THE PAIR AS THE
+                # PERIOD'S SUPPLY (REQ-PIPE-211 criterion 1): the readers the
+                # contest stopped are owed their re-evaluation through the one
+                # handler, in this transaction, as a move would owe it.
+                conn._period_moves.append((entry_id, decision.dataset_id, slot))
+
+
+def open_contest_in(conn, dataset_id: str, period: str) -> bool:
+    """Whether a contested pair of this dataset is open in this period - by
+    dataset_blockers' one open-contest judgement (REQ-PIPE-194 criterion 9),
+    scoped to the dataset and period (REQ-PIPE-211 criterion 2). Never from
+    a supply id, a route or an outcome's text."""
+    from qa_tools.common import dataset_blockers, supply_files
+
+    for blocker in dataset_blockers.contests(conn):
+        if blocker.dataset_id != dataset_id or not blocker.is_open:
+            continue
+        found = supply_files.resolve(conn, dataset_id, blocker.supply)
+        if found is not None and found.period == period:
+            return True
+    return False
+
+
+def _a_file_of_it_stays(conn, decision: Decision, period: str, entry_id: int) -> bool:
+    """Whether a file of the settled pair is now a supply waiting in this
+    period - its own owed run re-checks the readers (REQ-PIPE-193 criterion
+    21), so nothing more is owed (REQ-PIPE-211, Keith Q1 = A)."""
+    from qa_tools.common import qa_store, supersession
+
+    # THE PAIR'S OWN SUPPLIES, as the settlement recorded them per file
+    # (qa.decision_file) - never worked out from a '#1'/'#2' shape.
+    files = {r[0] for r in conn.execute(
+        f'SELECT supply_id FROM "{qa_store.SCHEMA}".decision_file WHERE decision_id = ?',
+        [entry_id]).fetchall()} | {decision.supply}
+    waiting = set(supersession.waiting_in(conn, decision.dataset_id, period))
+    return bool(files & waiting)
 
 
 def _holding(conn, dataset_id: str, slot: str) -> tuple:

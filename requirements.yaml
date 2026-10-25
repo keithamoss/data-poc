@@ -40790,6 +40790,9 @@ requirements:
     - 'tests/test_package_gate.py::TestAFileWaitingForItsDelivery::test_a_contested_pair_waiting_for_its_package_is_not_a_failure'
     - 'tests/test_package_gate.py::TestAFiledSupplyWithNoReceipt::test_it_is_reported_not_skipped'
     - tests/test_package_gate.py::TestFirstTimePackage::test_a_hold_back_is_said_once_until_something_moves
+    - tests/test_cli_package_gate.py::TestConsequences::test_a_promotion_whose_read_supply_moved_raises_the_consequences_refusal
+    - tests/test_cli_package_gate.py::TestCriticFindings::test_a_vanished_warning_still_refuses_a_stale_key
+    - tests/test_cli_package_gate.py::TestCriticFindings::test_a_moved_warehouse_holder_changes_the_key
     implemented_by:
     - "qa_tools/common/gate.py::Package"
     - "qa_tools/common/gate.py::package_of"
@@ -40819,11 +40822,26 @@ requirements:
     - "docs/aws-event-driven-mvp-design.md"
     - qa_tools/common/gate.py::_red_only_for_want_of
     - qa_tools/common/promotion.py::latest_outcome
+    - qa_tools/common/filing_decisions.py::_held_back_consequences
     evidence:
     - "2026-10-25, THE GATE MODULES on tree 2e781d1 (tests/test_package_gate.py, tests/test_root_cause_shouts.py, tests/test_strict_cross_table.py): 59 passed in 295.46s. Built with the gate rather than strictly before it: tests/gate_support.py needs qa.gate_application and the 'gate' owed kind to exist, so a run against base 80023b7 fails at the schema rather than at the behaviour; mid-build runs went red on the behaviour (4 failed / 21 passed in test_package_gate at one point, on the S2, backstop, knock-on and failed-move cases) before the code met them. TestTheFixedPointEnds was seen to hang without its bound and pass with it."
     - "2026-10-25, A FRESH BOOTSTRAP FROM EMPTY ON 2e781d1's CODE (a3_probe, schema 48, branch a3-build). Three small fixes came after it, in the register commit, and are covered by the module runs, not by this bootstrap: cli/filing_tui.py's pre-check, processing_pass._waiting_for_package, and the period lock's advisory space moved from 51513 to 51514 with its pg_locks reads scoped to the database: rc 0 in 1572s (Birth Registrations 537s, Child Protection and Emergency Department 1433s side by side; the last comparable figure, f861ee4 on 2026-10-24, was 1610s). 250 package applications, 14 re-check and 17 knock-on applications, all settled, none abandoned; 44 'gate', 239 'reevaluate' and 14 'recheck' owed items, every one cleared. Target agreement passed with no reported difference. REQ-PIPE-262 criterion 12's four pins hold: cp-case-workers 2021-Q4 inherits cp-case-workers@202108010104000000, cp-carers 2022-Q1 and 2022-Q2 inherit cp-carers@202201051000000800 (TS-63), ed-presentations 2015-Q4 inherits ed-presentations@201507221000000800 (REQ-GEN-251 criterion 3). All 89 scripted decisions applied. Then, after mothman dashboard build-data, the deployment tests of the 20 modules that carry them (-m needs_deployment: arrivals, arrivals_from_records, as_at_scenarios, asset_time_semantics, build_results_from_history, cross_table_scope, embed_dashboard_data, evidently_recorded_reference, history_rekey, knock_on, manifest, no_calendar, promotion_timeline, publish, scenario_injection, scenario_map, scripted_decisions, status_parity, target_agreement, warehouse_counts) 123 passed, 1 xfailed, 0 skipped."
     - "2026-10-25, THE AFFECTED MODULES' FAST HALF (-m 'not needs_deployment' over the 229 test modules importing any module this change touched, tests/test_dashboard_e2e.py excluded): 4 failed, 4791 passed in 649.85s. Two were defects of this change and are fixed in the register commit - filing_tui's period-lock pre-check let a database refusal escape before the typed production id was asked (test_cli_filing_tui's TestProductionTypesItsIdIntoTheRealFlows), and processing_pass._waiting_for_package assumed every arrival carried a receipt instant (test_refused_dataset_freezes, 2 tests); tests/test_tools_beside.py::test_they_actually_overlap failed under the load of the full run and passed alone. After the fixes, and after the period lock's own advisory space (tests/test_package_gate.py::test_the_period_lock_has_an_advisory_lock_space_of_its_own, seen to fail first, 4 == 5), on the final code: the three gate modules plus test_cli_filing_tui, test_refused_dataset_freezes, test_tools_beside, test_carry_forward, test_checkpoints, test_recheck, test_recheck_decision, test_knock_on, test_promotion_actor, test_target_agreement, test_warehouse_view, test_unrunnable, test_check_readiness_supply_states, test_left_out_reconciliation, test_filing_decisions and test_processing_pass, both halves against a3_probe: 429 passed in 327.99s. The full mothman check was not run here (the caller runs it after merging); ruff clean."
     - '2026-10-25 (post-build-review #274 D5): a contested pair waiting for its package was failed by the pass - test_a_contested_pair_waiting_for_its_package_is_not_a_failure raised RuntimeError at 1bc2902 and passes after processing_pass._waiting_for_package reads the arrival''s supplies from qa.supply_receipt. MODULE RUN on the fixed tree: tests/test_package_gate.py, test_root_cause_shouts.py, test_strict_cross_table.py, test_knock_on.py, test_processing_pass.py, test_ticket_reconciler.py, test_recheck.py, test_orchestrate_shared.py, test_promotion_waits_for_next_receipt.py, test_promotion_effective_at.py, test_cp_pair.py, test_arrival_lifecycle.py, test_promotion_step.py: 268 passed, 1 xfailed (D2), 0 skipped in 318.98s, both halves, deployment tests read-only against a3_probe.'
+    - '2026-10-25, CRITERION 17 - THE NEW TESTS AGAINST THE TREE BEFORE THIS CHANGE (c1563cb, a scratch worktree with the three new modules copied in): 36 failed,
+      5 passed. The five that passed were already true: REQ-PIPE-266 criteria 15 and 16''s refusals (test_mid_gate_decision_is_refused_before_the_reason_prompt,
+      test_a_persons_decision_refused_while_a_gate_runs_exits_75), REQ-PIPE-211 criterion 11''s two regression tests, and test_a_promotion_whose_read_supply_moved_raises_the_consequences_refusal
+      (see REQ-PIPE-266''s decision). Said plainly: the code was written first and the tests then shown failing against the old tree, not the other way round.
+      On the new tree the three modules: 41 passed.'
+    - '2026-10-25, THE AFFECTED MODULES, BOTH HALVES, against that bootstrap after mothman dashboard build-data, on the code of the commit that marks this built
+      (the three new modules plus test_arrival_lifecycle, carry_forward(+review, cli), cli_filing_tui, cli_supply, collection_cli, contested_staging, cp_pair,
+      decision_log, filing_decisions, filing_queue, knock_on, lifecycle_report, outstanding, package_gate, period_opening, processing_pass, promotion_after_run,
+      promotion_gate, recheck(+decision), reevaluation, refile_decision, refiling, reload_owes_a_recheck, root_cause_shouts, settle_tui, strict_cross_table,
+      ticket_reconciler, unrunnable, and the 19 deployment modules arrivals to warehouse_counts): 1295 passed, 1 xfailed, 1 failed in 1486s. The failure is
+      tests/test_no_calendar.py::TestItIsInNoRollup::test_the_two_implementations_agree, which shells out to node and could not import jsdom from this worktree''s
+      partial node_modules - an environment gap, not this change. A test_knock_on.py end-to-end test went red once in an earlier, differently composed run,
+      from another module''s owed item on the shared worker database (RecheckRefused: ''filed to no period'', carry-forward fixtures); it passed alone and beside
+      the pair modules.'
     decisions:
     - 'GATED TOGETHER, AFTER ALL ARE CHECKED (Keith, 2026-10-20/21): ''A package of files is gated together, after every file
       in it has been checked.'' REJECTED today''s behaviour, gating each file straight after its own run (arrival_lifecycle.process
@@ -40924,12 +40942,21 @@ requirements:
     - "THE CLOUD PATH (criterion 6): docs/aws-event-driven-mvp-design.md gains 'Known limitation: on the cloud path every file is a package of one', pointing at plans/running-thoughts.md #114 and plans/supply-thoughts.md for a manifest or end marker."
     - "AMENDMENTS (criterion 19) were applied to REQ-PIPE-105 criterion 1, REQ-PIPE-121 criterion 9 and REQ-TEST-159 criterion 1 at sign-off, 2026-10-23, and stand as built here."
     - 'A WAITING ARRIVAL''S SUPPLIES ARE READ, NOT REBUILT (post-build-review #274 D5): a contested pair''s supply is #1/#2, which no id rebuilt from the receipt instant is. A FILED SUPPLY WITH NO RECEIPT ROW is reported as a failure of that supply by the gate, never skipped in silence.'
-    unmet_criteria:
-    - criterion: "Criterion 17 and its test in criterion 24 (test_a_promotion_whose_read_supply_moved_raises_the_consequences_refusal) - comparing, under the period and slot locks, the supplies a person's promotion's counted verdicts read with the read holders its consequences showed, and raising ConsequencesNotAcknowledged when one moved."
-      why: "The read holders a person was shown are REQ-PIPE-276's consequences (criteria 7 to 9), which are not built: there is nothing yet to compare against. The period lock that makes the comparison safe is built (criterion 16), so a moved read supply can only come from a decision made before the lock, which is the case 276's consequences close."
-      owner: "REQ-PIPE-276, the terminal's account of a package gate"
-      blocked_by:
-        requirements: ["REQ-PIPE-276"]
+    - 'CRITERION 17 IS THE KEY, COMPARED UNDER THE PERIOD LOCK (build, 2026-10-25): the read holders a person was shown are REQ-PIPE-276 criteria 7 to 9''s
+      consequence lines, keyed with the rest; filing_decisions._apply_held works the consequences out again under the period''s gate lock and refuses a key
+      that no longer matches with the existing ConsequencesNotAcknowledged - interactively re-asked once, with --yes exit 1 naming the new key. No gate application
+      is started. The slot locks are taken by the move itself (promotion.promote) inside the same decision; a person''s other table-moving decisions in the
+      period are excluded by the period try-lock (criterion 16), so the comparison cannot be overtaken between the check and the move. NOTE, said plainly: the
+      test also passed on c1563cb, before REQ-PIPE-276, because in that scenario the warning already changed when Notifications v2 was promoted; criteria 7
+      to 9 make the comparison cover a moved read holder that changes no other line.'
+    - 'CRITERION 17''s TWO EDGES (post-build critic, 2026-10-25): (a) a key confirmed for a warning that has since vanished is refused, not applied - _apply_held
+      compares whenever a key was given or lines stand; (b) criterion 7''s line names the warehouse''s holder of the table read as well as the supply read,
+      so a moved holder changes the key even where every other line stands still (test_a_moved_warehouse_holder_changes_the_key, which stands the holder in
+      at knock_on._now_holds because every real way to move it in that scenario also moves the waiting supply read).'
+    - 'A FILE KEPT ALONE BY --run-id IS GATED AS A PACKAGE OF ONE (found at REQ-PIPE-276''s build; PROVISIONAL, accepted as a known limit, Keith away): `mothman
+      cp qa --commit --run-id` on one file of a zip files that arrival alone, so its package counts one file and it is gated at once instead of waiting for
+      the rest of its delivery. The processing pass and the hand-filed folder route file the whole delivery first and are not affected. Not a criterion change;
+      to put to Keith.'
     open_questions: []
   - id: REQ-PIPE-267
     title: A supply is promoted only on cross-table verdicts about what the warehouse will hold, and supplies that depend on
@@ -42564,7 +42591,7 @@ requirements:
       and what my own decision will set off, so that I decide the one thing that matters and am never surprised by what the
       rule does next.
     moscow: must
-    status: not_started
+    status: built
     signed_off:
       by: Keith
       date: '2026-10-23'
@@ -42714,6 +42741,105 @@ requirements:
     - REQ-DASH-204
     - REQ-DASH-275
     - REQ-PIPE-129
+    linked_tests:
+    - tests/test_cli_package_gate.py::TestExitCodes::test_s1_red_qa_commit_exits_1_and_shows_the_recheck
+    - tests/test_cli_package_gate.py::TestExitCodes::test_waiting_first_file_exits_as_its_own_results_say
+    - tests/test_cli_package_gate.py::TestVocabulary::test_every_promotion_withheld_says_held_back
+    - tests/test_cli_package_gate.py::TestVocabulary::test_turned_down_never_says_rejected
+    - tests/test_cli_package_gate.py::TestVocabulary::test_next_step_names_the_package_mate_then_the_supply_after_rejection
+    - tests/test_cli_package_gate.py::TestGroupedByRoot::test_grouped_by_root_prints_final_states_only
+    - tests/test_cli_package_gate.py::TestGroupedByRoot::test_supply_queue_shows_grouping_gating_and_the_carry_forward_warning
+    - tests/test_cli_package_gate.py::TestConsequences::test_override_lists_the_worse_recheck_consequence
+    - tests/test_cli_package_gate.py::TestConsequences::test_override_over_a_not_yet_due_check_says_so
+    - tests/test_cli_package_gate.py::TestConsequences::test_order_b_red_links_the_two_rows
+    - tests/test_cli_package_gate.py::TestFollowUp::test_follow_up_lists_every_regated_supply
+    - tests/test_cli_package_gate.py::TestADeliveryBeingChecked::test_mid_gate_decision_is_refused_before_the_reason_prompt
+    - tests/test_cli_package_gate.py::TestADeliveryBeingChecked::test_a_delivery_being_gated_is_a_quiet_uncounted_group
+    - tests/test_cli_package_gate.py::TestADeliveryBeingChecked::test_owed_gate_item_is_worded_in_supply_queue
+    - tests/test_cli_package_gate.py::TestADeliveryBeingChecked::test_the_door_offers_no_decision_while_checking
+    - tests/test_cli_package_gate.py::TestTryLater::test_a_lock_timeout_refusal_exits_75
+    - tests/test_cli_package_gate.py::TestTryLater::test_a_persons_decision_refused_while_a_gate_runs_exits_75
+    - tests/test_cli_package_gate.py::TestTryLater::test_the_documented_exit_codes_name_75s_three_causes
+    - tests/test_cli_package_gate.py::TestWhatTheRuleDid::test_owed_recheck_is_never_shown_as_rechecked_worse
+    - tests/test_cli_package_gate.py::TestWhatTheRuleDid::test_rule_promotion_after_a_warehouse_recheck_says_why
+    - tests/test_cli_package_gate.py::TestWhatTheRuleDid::test_crashed_sibling_wording
+    - tests/test_cli_package_gate.py::TestWhatTheRuleDid::test_partial_refile_warns
+    - tests/test_cli_package_gate.py::TestWhatTheRuleDid::test_a_joined_supply_carries_the_supplier_hint
+    - tests/test_cli_package_gate.py::TestCriticFindings::test_the_pass_counts_a_package_mate_held_back_on_red
+    - tests/test_cli_package_gate.py::TestCriticFindings::test_a_consequence_is_said_once_per_logical_check
+    - tests/test_cli_package_gate.py::TestCriticFindings::test_the_gating_line_and_a_held_roots_supplies_show_beside_held_rows
+    - tests/test_cli_package_gate.py::TestCriticFindings::test_qa_never_asks_the_backstop_and_never_exits_3
+    - tests/test_cli_package_gate.py::TestCriticFindings::test_next_step_says_the_recheck_is_owed_once_the_cause_is_promoted
+    - tests/test_cli_package_gate.py::TestCheapPaths::test_the_period_door_lists_a_supply_being_checked_and_offers_nothing_on_it
+    - tests/test_cli_package_gate.py::TestCheapPaths::test_the_owed_recheck_and_still_held_back_words
+    - tests/test_cli_package_gate.py::TestCheapPaths::test_the_settle_flows_owed_panels
+    implemented_by:
+    - cli/lifecycle_report.py::_gate_line
+    - cli/lifecycle_report.py::rechecked_promotion_words
+    - cli/lifecycle_report.py::beneath_lines
+    - cli/lifecycle_report.py::outcome_lines
+    - cli/lifecycle_report.py::_grouped
+    - cli/lifecycle_report.py::stage_failure
+    - cli/filing_tui.py::say_queue
+    - cli/filing_tui.py::say_gating
+    - cli/filing_tui.py::queue_groups
+    - cli/filing_tui.py::queue_flow
+    - cli/filing_tui.py::door_note
+    - cli/filing_tui.py::next_step
+    - cli/filing_tui.py::override_command
+    - cli/filing_tui.py::outcome_panel
+    - cli/filing_tui.py::_recheck_panel
+    - cli/filing_tui.py::_follow_up
+    - cli/filing_tui.py::regated_lines
+    - cli/filing_tui.py::_refused
+    - cli/filing_tui.py::apply_decision
+    - cli/supply.py::queue_command
+    - cli/supply.py::_owed_words
+    - cli/supply.py::decide_command
+    - cli/collection_cli.py::CollectionCLI::exit_status
+    - cli/one_table.py::add_commands
+    - cli/many_tables.py::add_commands
+    - cli/settle_tui.py::settle
+    - qa_tools/common/gate.py::being_gated
+    - qa_tools/common/gate.py::gating_words
+    - qa_tools/common/gate.py::door_words
+    - qa_tools/common/gate.py::crashed_sibling_lines
+    - qa_tools/common/gate.py::touched
+    - qa_tools/common/gate.py::supplies_of_arrivals
+    - qa_tools/common/filing_decisions.py::_held_back_consequences
+    - qa_tools/common/filing_decisions.py::_left_behind
+    - qa_tools/common/filing_decisions.py::consequences
+    - qa_tools/common/decision_log.py::RunInProgress
+    - qa_tools/common/knock_on.py::complete
+    - qa_tools/common/recheck.py::Outcome
+    - qa_tools/common/rechecking.py::worse_than_promoted
+    - qa_tools/common/supply_status.py::red_only_for_recheck_owed
+    - qa_tools/common/supply_status.py::recheck_owed_words
+    - qa_tools/common/root_cause.py::trace
+    - qa_tools/common/root_cause.py::order_b_link
+    - qa_tools/common/processing_pass.py::_one
+    - qa_tools/common/arrival_lifecycle.py::StageFailed
+    evidence:
+    - '2026-10-25, THE NEW TESTS AGAINST THE TREE BEFORE THIS CHANGE (c1563cb, a scratch worktree with the three new modules copied in): 36 failed, 5 passed.
+      The five that passed were already true: REQ-PIPE-266 criteria 15 and 16''s refusals (test_mid_gate_decision_is_refused_before_the_reason_prompt, test_a_persons_decision_refused_while_a_gate_runs_exits_75),
+      REQ-PIPE-211 criterion 11''s two regression tests, and test_a_promotion_whose_read_supply_moved_raises_the_consequences_refusal (see REQ-PIPE-266''s decision).
+      Said plainly: the code was written first and the tests then shown failing against the old tree, not the other way round. On the new tree the three modules:
+      41 passed.'
+    - '2026-10-25, A FRESH BOOTSTRAP FROM EMPTY on bfaac33''s code (l1_probe dropped, recreated and marked sandbox; branch w1-l1), run while test modules ran
+      beside it: rc 0 in 2886s (Birth Registrations 949s, Child Protection and Emergency Department 2622s side by side). 254 package, 14 re-check and 20 knock-on
+      gate applications, all settled, none abandoned; 47 ''gate'', 243 ''reevaluate'' and 14 ''recheck'' owed items, every one cleared - two of the re-evaluations
+      owed by a Birth Registrations settlement that left its period with no file (REQ-PIPE-211). Target agreement passed with no reported difference. REQ-PIPE-262
+      criterion 12''s four pins hold: cp-case-workers 2021-Q4 inherits cp-case-workers@202108010104000000, cp-carers 2022-Q1 and 2022-Q2 inherit cp-carers@202201051000000800,
+      ed-presentations 2015-Q4 inherits ed-presentations@201507221000000800.'
+    - '2026-10-25, THE AFFECTED MODULES, BOTH HALVES, against that bootstrap after mothman dashboard build-data, on the code of the commit that marks this built
+      (the three new modules plus test_arrival_lifecycle, carry_forward(+review, cli), cli_filing_tui, cli_supply, collection_cli, contested_staging, cp_pair,
+      decision_log, filing_decisions, filing_queue, knock_on, lifecycle_report, outstanding, package_gate, period_opening, processing_pass, promotion_after_run,
+      promotion_gate, recheck(+decision), reevaluation, refile_decision, refiling, reload_owes_a_recheck, root_cause_shouts, settle_tui, strict_cross_table,
+      ticket_reconciler, unrunnable, and the 19 deployment modules arrivals to warehouse_counts): 1295 passed, 1 xfailed, 1 failed in 1486s. The failure is
+      tests/test_no_calendar.py::TestItIsInNoRollup::test_the_two_implementations_agree, which shells out to node and could not import jsdom from this worktree''s
+      partial node_modules - an environment gap, not this change. A test_knock_on.py end-to-end test went red once in an earlier, differently composed run,
+      from another module''s owed item on the shared worker database (RecheckRefused: ''filed to no period'', carry-forward fixtures); it passed alone and beside
+      the pair modules.'
     decisions:
     - 'SEPARATED FROM THE GATE (delivery-scoper, 2026-10-22): v3 carried the terminal''s wording inside REQ-PIPE-267; it is
       its own small requirement now, with the CLI review''s corrections, so the gate and its wording can be reviewed apart.'
@@ -42774,6 +42900,57 @@ requirements:
       the backstop on pipeline process) are pre-existing and not widened.'
     - 'ONE PHRASE (CLI review v5 note): ''nothing needs deciding on this supply'' (REQ-PIPE-210''s) everywhere; v5''s layout
       said ''nothing to decide here''.'
+    - 'READ THROUGH KEITH''S LATER 3a (2026-10-25, post-build-review #274 Q3; build, PROVISIONAL): criterion 6''s example layout is S1 red, where Clients v2
+      is listed beneath Notifications v2. Under 3a a re-check against the warehouse that RAN AND FAILED is its own root, so in S1 red Clients v2 is a counted
+      row of its own; its outcome panel and door still name Notifications v2''s decision first (criterion 4), without ''nothing needs deciding''. The grouping
+      beneath a root applies where root_cause.trace finds one - could not be checked, or counted nothing - and is tested on S2 strict and a zip of a red Clients
+      v2 with two readers. To confirm with Keith if he wants the walk-through''s layout for a failed re-check instead.'
+    - 'NO CHILD PROTECTION CHAIN DEEPER THAN ONE UNDER 3a (build): every three-table could-not-check chain in Child Protection''s declared reads also links
+      its last supply straight to the root, and a failed link is its own root, so ''what it traces through'' is pinned on trace() itself rather than on a scenario.'
+    - 'THE QUEUE KEEPS ITS TABLE (build, PROVISIONAL): the counted rows stay in queue_table(); each root''s block - its own line, the label, one line per resulting
+      outcome, then each override whole on a line of its own and ''or from the <period> door'' - prints beneath the table through lifecycle_report.beneath_lines,
+      so the root heads its block and is also a row in the table. The same renderer (filing_tui.say_queue) serves the Filing decisions queue and mothman supply
+      queue.'
+    - 'CRITERION 7''s LINE IS KEYED (build, PROVISIONAL): a counted verdict that read a supply not in the warehouse is a consequence line, not a note, because
+      it is what REQ-PIPE-266 criterion 17 compares under the locks; the promotion stays available, needing --acknowledge with --yes as every consequence does
+      (NFR NO SURPRISE OVERRIDES).'
+    - 'THE RULE''S ACTOR STAYS ON CRITERION 15''s LINE (build, PROVISIONAL): ''promoted by the rule (<actor>), not by you - <check> re-checked against the <dataset>
+      in place in the warehouse (received <instant>), green, because ...'', keeping REQ-TEST-150 criterion 5''s ''not by you''; the check is named by gate._check_words,
+      as the hold-back''s own entry names it.'
+    - 'OWED RE-CHECK WORDS NAME THE DECISION AS decision_words SAYS IT (build, PROVISIONAL): REQ-DASH-204 criterion 7''s ''against the <dataset> promoted <instant>''
+      reads ''demoted'', ''carried forward instead'' and so on where the decision that owes it was not a promotion. A red owed only a re-check is left off rechecking.worse_than_promoted,
+      so it is never ''Promoted, then re-checked worse''.'
+    - 'STAGE NAMES ARE THE LIFECYCLE''S (build): criterion 17''s ''<stage>'' is arrival_lifecycle''s own stage (''checks'', ''filing and overlay'', ''promotion
+      gate''), carried on StageFailed with the arrival so the terminal and the pass can name the waiting package-mates; the tool that broke is already in the
+      STOPPED line.'
+    - 'THE PARTIAL RE-FILE WARNING IS A NOTE (build): it changes nothing the re-file does, so it is shown before the one confirmation and never keyed - the
+      re-file stays available on the same terms (criterion 18).'
+    - 'A LOCK TIMEOUT IS decision_log.RunInProgress (build): a DecisionRefused with exit_code 75, so every refusal route on the flag form - filing_tui._refused
+      and the settle flow - exits 75 for it, and the TUI shows it as before.'
+    - 'THE CARRY-FORWARD WARNING IN mothman supply queue IS REQ-PIPE-271''s TO TEST (build): test_supply_queue_shows_grouping_gating_and_the_carry_forward_warning
+      asserts the grouping and the gating line through the shared renderer; REQ-PIPE-271''s TestCarryForwardWarning already asserts the warning in that command''s
+      output.'
+    - 'qa NEVER EXITS 3 (post-build critic, 2026-10-25; PROVISIONAL, option B, taken while Keith was away - to confirm): this requirement''s own decision says
+      exit 3''s meanings are not widened, so `mothman cp qa`/`mothman bdm qa` exit 0, 1 or 2 only - 1 where its own results or the gate''s outcome for any supply
+      of its package are red (held back, or a re-check against the warehouse that failed), 2 for a failed stage. An agreement backstop refusal stays visible
+      in the run''s output and in `mothman pipeline process`''s exit 3, and qa never asks the backstop at all - which also closes the critic''s D4 (an empty
+      dataset list read as ''the whole asset''). REPLACES the build''s ''qa''s exit follows exit_status''s order'' decision, which gave qa a 3. REJECTED option
+      A, keeping qa''s 3.'
+    - 'THE PASS AND qa COUNT THE WHOLE PACKAGE (post-build critic D1): a package''s last arrival gates every member inline, so the pass and qa read the gate''s
+      outcome for every supply of the package (gate.supplies_of_arrivals with_package), not only the arrival just handled - a green first file held back when
+      its amber package-mate completed the package used to leave the pass at exit 0.'
+    - '3a SUPERSEDES THE SIGNED EXAMPLE LAYOUT PENDING KEITH (post-build critic, 2026-10-25; PROVISIONAL): criterion 6''s example (S1 red''s Clients v2 beneath
+      Notifications v2) and REQ-PIPE-210 criterion 11''s staggered S1 red case are kept met as built under Keith''s later answer 3a - a failed re-check is its
+      own counted row - and the criteria''s text is NOT changed: that needs Keith''s sign-off. Queued for him with the build''s first decision.'
+    - 'THE NEXT STEP ONCE THE CAUSE IS PROMOTED (post-build critic, criterion 4): where the supply that held this one back has since been promoted and the knock-on''s
+      re-check is still owed, the panel and door say the re-check is owed and runs on the next processing pass (with the command), never ''Decide <cause> ...
+      promoting it re-checks this one''.'
+    - 'ONE LINE PER LOGICAL CHECK (post-build critic D2): dbt, Soda and datacontract each record the same check and the line names it without the tool, so _held_back_consequences
+      says each line once and the key is built from the lines as said. The queue header says ''1 supply'' and ''<n> supplies'', and criterion 17''s wording
+      is ''<dataset>''s run'' as signed. The Filing decisions queue and mothman supply queue render the supplies beneath a held root and the gating line whatever
+      is counted (D3). The settlement panel says the backstop ''kept waiting'' a reader, never ''refused'' (D5, REQ-PIPE-211 criterion 14).'
+    - 'NO_COLOR AND 80 COLUMNS, FOR REAL (post-build critic): the module-level Consoles are built at import, before a test''s NO_COLOR, so the terminal tests
+      replace each with a Console built with no colour at 80 columns, and assert no colour code reaches the output; the piped CliRunner output is the pipe.'
     open_questions: []
   - id: REQ-DASH-277
     title: '''In place'' reads ''in place in the warehouse'' wherever it is shown to a person'
@@ -43390,7 +43567,7 @@ requirements:
       own item, saying that nothing needs deciding on it and which decision clears it, so that I deal with the one item that
       clears it instead of rejecting or promoting a supply with nothing wrong in its own data.
     moscow: should
-    status: not_started
+    status: built
     signed_off:
       by: Keith
       date: '2026-10-23'
@@ -43473,6 +43650,49 @@ requirements:
     - REQ-PIPE-276
     - REQ-PIPE-278
     - REQ-PIPE-279
+    linked_tests:
+    - tests/test_queue_beneath.py::TestListedBeneathItsCause::test_a_contested_pair_lists_its_three_readers_once_beneath_it
+    - tests/test_queue_beneath.py::TestListedBeneathItsCause::test_s2_strict_lists_notifications_beneath_clients_with_the_override
+    - tests/test_queue_beneath.py::TestListedBeneathItsCause::test_once_clients_is_turned_down_notifications_is_its_own_counted_row
+    - tests/test_queue_beneath.py::TestListedBeneathItsCause::test_a_joined_supply_is_listed_as_held_back_by_it
+    - tests/test_queue_beneath.py::TestListedBeneathItsCause::test_staggered_s1_red_is_two_counted_rows_under_3a
+    - tests/test_queue_beneath.py::TestNothingToSitBeneath::test_red_only_because_clients_is_overdue_is_an_ordinary_counted_row
+    - tests/test_queue_beneath.py::TestAFaultOfItsOwn::test_a_reader_failing_a_check_of_its_own_is_listed_and_counted
+    implemented_by:
+    - qa_tools/common/root_cause.py::group_queue
+    - qa_tools/common/root_cause.py::QueueGroups
+    - qa_tools/common/root_cause.py::trace
+    - qa_tools/common/root_cause.py::turned_down_words
+    - qa_tools/common/root_cause.py::holdback_reason
+    - qa_tools/common/root_cause.py::order_b_partner
+    - qa_tools/common/outstanding.py::_from_awaiting_decisions
+    - cli/filing_tui.py::queue_flow
+    - cli/filing_tui.py::say_queue
+    - cli/filing_tui.py::door_note
+    - cli/filing_tui.py::_slot_root_words
+    - cli/filing_tui.py::apply_decision
+    - cli/supply.py::queue_command
+    evidence:
+    - '2026-10-25, THE NEW TESTS AGAINST THE TREE BEFORE THIS CHANGE (c1563cb, a scratch worktree with the three new modules copied in): 36 failed, 5 passed.
+      The five that passed were already true: REQ-PIPE-266 criteria 15 and 16''s refusals (test_mid_gate_decision_is_refused_before_the_reason_prompt, test_a_persons_decision_refused_while_a_gate_runs_exits_75),
+      REQ-PIPE-211 criterion 11''s two regression tests, and test_a_promotion_whose_read_supply_moved_raises_the_consequences_refusal (see REQ-PIPE-266''s decision).
+      Said plainly: the code was written first and the tests then shown failing against the old tree, not the other way round. On the new tree the three modules:
+      41 passed.'
+    - '2026-10-25, A FRESH BOOTSTRAP FROM EMPTY on bfaac33''s code (l1_probe dropped, recreated and marked sandbox; branch w1-l1), run while test modules ran
+      beside it: rc 0 in 2886s (Birth Registrations 949s, Child Protection and Emergency Department 2622s side by side). 254 package, 14 re-check and 20 knock-on
+      gate applications, all settled, none abandoned; 47 ''gate'', 243 ''reevaluate'' and 14 ''recheck'' owed items, every one cleared - two of the re-evaluations
+      owed by a Birth Registrations settlement that left its period with no file (REQ-PIPE-211). Target agreement passed with no reported difference. REQ-PIPE-262
+      criterion 12''s four pins hold: cp-case-workers 2021-Q4 inherits cp-case-workers@202108010104000000, cp-carers 2022-Q1 and 2022-Q2 inherit cp-carers@202201051000000800,
+      ed-presentations 2015-Q4 inherits ed-presentations@201507221000000800.'
+    - '2026-10-25, THE AFFECTED MODULES, BOTH HALVES, against that bootstrap after mothman dashboard build-data, on the code of the commit that marks this built
+      (the three new modules plus test_arrival_lifecycle, carry_forward(+review, cli), cli_filing_tui, cli_supply, collection_cli, contested_staging, cp_pair,
+      decision_log, filing_decisions, filing_queue, knock_on, lifecycle_report, outstanding, package_gate, period_opening, processing_pass, promotion_after_run,
+      promotion_gate, recheck(+decision), reevaluation, refile_decision, refiling, reload_owes_a_recheck, root_cause_shouts, settle_tui, strict_cross_table,
+      ticket_reconciler, unrunnable, and the 19 deployment modules arrivals to warehouse_counts): 1295 passed, 1 xfailed, 1 failed in 1486s. The failure is
+      tests/test_no_calendar.py::TestItIsInNoRollup::test_the_two_implementations_agree, which shells out to node and could not import jsdom from this worktree''s
+      partial node_modules - an environment gap, not this change. A test_knock_on.py end-to-end test went red once in an earlier, differently composed run,
+      from another module''s owed item on the shared worker database (RecheckRefused: ''filed to no period'', carry-forward fixtures); it passed alone and beside
+      the pair modules.'
     decisions:
     - THE TERMINAL GETS ITS OWN REQUIREMENT (Keith, 2026-10-14, close-out Q19 = A). REJECTED the page half only, and leaving
       both.
@@ -43499,6 +43719,17 @@ requirements:
       - so it is pickable and its line does not say nothing needs deciding. REJECTED E = A, not counted, with a line under the
       count saying how many supplies wait on another table. The dashboard''s cards count the same way through the same function
       (E''s second part, read as standing; to confirm with Keith if wrong).'
+    - 'STAGGERED S1 RED IS TWO COUNTED ROWS (build, PROVISIONAL, from Keith''s 3a of 2026-10-25): criterion 11''s ''staggered S1 red (Clients v2 beneath Notifications
+      v2 as held back by it)'' predates 3a, under which Clients v2''s failed re-check is its own root. The ''held back by it'' layout is tested on staggered
+      S2 (Clients v2 red at 9:00, Notifications v2 at 9:05 that cannot be checked without it); staggered S1 red is tested as two counted rows, Clients v2''s
+      door naming Notifications v2''s decision first. Through the one function (criterion 7), so the page and tickets agree.'
+    - 'A HELD ROOT HAS AN ITEM (build): a supply held back by a held supply sits beneath that held row; and a red wholly for want of a table whose slot has
+      an item of its own (an open pair, a waiting supply) sits beneath that item, its door saying to settle the pair or decide the supply first. With no item
+      - the overdue partner of criterion 9 - it is a counted, pickable row naming the root (Keith, E = B).'
+    - 'A DELIVERY STILL BEING GATED IS NOT COUNTED ANYWHERE (build): root_cause.group_queue takes those supplies out of the rows before anything else (REQ-PIPE-276
+      criterion 12), so the terminal''s counts and the dashboard''s card counts (outstanding._from_awaiting_decisions, through group_queue) leave them out alike.'
+    - 'THE GROUPING NEVER HIDES THE QUEUE (build): where grouping cannot be read, filing_tui.queue_groups says so in a dim line and lists every supply as its
+      own counted row, as before this requirement.'
     open_questions: []
   - id: REQ-GEN-206
     title: The last planted scenarios of REQ-GEN-136 and REQ-GEN-137 - Case Workers' held gap arrival, a reader re-checked after
@@ -43754,7 +43985,7 @@ requirements:
     date_written: "2026-10-14"
     story: "As the person who settles a contested pair, I want the datasets whose cross-table checks could not run because of the pair to be re-checked when my settlement leaves the period with no file of the pair to run - 'reject both' above all - so that they do not stay red for good on a contest that has ended."
     moscow: must
-    status: not_started
+    status: built
     signed_off:
       by: Keith
       date: "2026-10-24"
@@ -43799,6 +44030,56 @@ requirements:
     - REQ-PIPE-267
     - REQ-PIPE-270
     - REQ-PIPE-276
+    linked_tests:
+    - tests/test_settlement_rechecks_readers.py::TestTheReadersAreReCheckedWhenNoFileStays::test_reject_both_rechecks_the_readers_as_rejected
+    - tests/test_settlement_rechecks_readers.py::TestTheReadersAreReCheckedWhenNoFileStays::test_one_rejected_and_one_refiled_rechecks_the_readers
+    - tests/test_settlement_rechecks_readers.py::TestTheReadersAreReCheckedWhenNoFileStays::test_both_refiled_out_gives_the_clocks_reason
+    - tests/test_settlement_rechecks_readers.py::TestTheOtherOutcomesAlreadyReCheck::test_a_file_chosen_as_the_supply_rechecks_the_waiting_readers
+    - tests/test_settlement_rechecks_readers.py::TestTheOtherOutcomesAlreadyReCheck::test_a_later_file_superseding_the_pair_rechecks_the_waiting_readers
+    - tests/test_settlement_rechecks_readers.py::TestTheOtherOutcomesAlreadyReCheck::test_a_settlements_owed_runs_come_before_its_reevaluation
+    - tests/test_settlement_rechecks_readers.py::TestTheTerminal::test_the_warning_names_the_readers_rechecked_while_you_wait
+    - tests/test_settlement_rechecks_readers.py::TestTheTerminal::test_reject_both_in_the_settle_flow_rechecks_before_the_outcome_panel
+    - tests/test_settlement_rechecks_readers.py::TestTheTerminal::test_reject_both_with_the_flag_form_rechecks_and_exits_0
+    - tests/test_settlement_rechecks_readers.py::TestTheTerminal::test_a_ctrl_c_during_the_recheck_leaves_it_owed_and_exits_3
+    implemented_by:
+    - qa_tools/common/decision_log.py::apply_decision
+    - qa_tools/common/decision_log.py::open_contest_in
+    - qa_tools/common/decision_log.py::_a_file_of_it_stays
+    - qa_tools/common/knock_on.py::owe
+    - qa_tools/common/knock_on.py::complete
+    - qa_tools/common/unrunnable.py::_STATE_TO_REASON
+    - qa_tools/common/filing_decisions.py::_settlement_consequences
+    - qa_tools/common/filing_decisions.py::leaves_no_supply
+    - qa_tools/common/filing_decisions.py::settlement_readers
+    - cli/settle_tui.py::settle
+    - cli/settle_tui.py::_recheck_readers
+    - cli/settle_tui.py::_say_recheck_owed
+    - cli/settle_tui.py::_closing_panel
+    - cli/settle_tui.py::reader_lines
+    - cli/settle_tui.py::_run_what_it_owed
+    - cli/lifecycle_report.py::outcome_lines
+    - cli/supply.py::decide_command
+    evidence:
+    - '2026-10-25, THE NEW TESTS AGAINST THE TREE BEFORE THIS CHANGE (c1563cb, a scratch worktree with the three new modules copied in): 36 failed, 5 passed.
+      The five that passed were already true: REQ-PIPE-266 criteria 15 and 16''s refusals (test_mid_gate_decision_is_refused_before_the_reason_prompt, test_a_persons_decision_refused_while_a_gate_runs_exits_75),
+      REQ-PIPE-211 criterion 11''s two regression tests, and test_a_promotion_whose_read_supply_moved_raises_the_consequences_refusal (see REQ-PIPE-266''s decision).
+      Said plainly: the code was written first and the tests then shown failing against the old tree, not the other way round. On the new tree the three modules:
+      41 passed.'
+    - '2026-10-25, A FRESH BOOTSTRAP FROM EMPTY on bfaac33''s code (l1_probe dropped, recreated and marked sandbox; branch w1-l1), run while test modules ran
+      beside it: rc 0 in 2886s (Birth Registrations 949s, Child Protection and Emergency Department 2622s side by side). 254 package, 14 re-check and 20 knock-on
+      gate applications, all settled, none abandoned; 47 ''gate'', 243 ''reevaluate'' and 14 ''recheck'' owed items, every one cleared - two of the re-evaluations
+      owed by a Birth Registrations settlement that left its period with no file (REQ-PIPE-211). Target agreement passed with no reported difference. REQ-PIPE-262
+      criterion 12''s four pins hold: cp-case-workers 2021-Q4 inherits cp-case-workers@202108010104000000, cp-carers 2022-Q1 and 2022-Q2 inherit cp-carers@202201051000000800,
+      ed-presentations 2015-Q4 inherits ed-presentations@201507221000000800.'
+    - '2026-10-25, THE AFFECTED MODULES, BOTH HALVES, against that bootstrap after mothman dashboard build-data, on the code of the commit that marks this built
+      (the three new modules plus test_arrival_lifecycle, carry_forward(+review, cli), cli_filing_tui, cli_supply, collection_cli, contested_staging, cp_pair,
+      decision_log, filing_decisions, filing_queue, knock_on, lifecycle_report, outstanding, package_gate, period_opening, processing_pass, promotion_after_run,
+      promotion_gate, recheck(+decision), reevaluation, refile_decision, refiling, reload_owes_a_recheck, root_cause_shouts, settle_tui, strict_cross_table,
+      ticket_reconciler, unrunnable, and the 19 deployment modules arrivals to warehouse_counts): 1295 passed, 1 xfailed, 1 failed in 1486s. The failure is
+      tests/test_no_calendar.py::TestItIsInNoRollup::test_the_two_implementations_agree, which shells out to node and could not import jsdom from this worktree''s
+      partial node_modules - an environment gap, not this change. A test_knock_on.py end-to-end test went red once in an earlier, differently composed run,
+      from another module''s owed item on the shared worker database (RecheckRefused: ''filed to no period'', carry-forward fixtures); it passed alone and beside
+      the pair modules.'
     decisions:
     - "THE READERS ARE RE-CHECKED AFTER 'REJECT BOTH' (Keith, 2026-10-14, close-out Q21, option A, the architect's recommendation): otherwise they stay red for good. REJECTED leaving them for the next supply or a person's re-check (REQ-PIPE-164), with REQ-DASH-204's line saying so."
     - "NARROWED TO SETTLEMENTS THAT LEAVE NO RUN IN THE PERIOD (Keith, 2026-10-24, Q1 = A): the trigger is a settlement after which no file of the pair is this period's supply - 'reject both', or every file rejected or re-filed. The architect's review (B1) found today's code already re-checks the waiting readers in the other outcomes: a file chosen as this period's supply has its own owed run (REQ-PIPE-193 criterion 21), which keeps reading checks in scope, and a later file superseding the pair has its own arrival run (REQ-PIPE-079 criterion 6). Those two are kept as regression tests (criterion 11), not fail-first tests. SUPERSEDES the 2026-10-14 decisions 'EVERY OUTCOME, NOT ONLY REJECT BOTH' (delivery-scoper) and 'A PAIR ENDED BY A LATER FILE ALSO RE-CHECKS THE READERS' (Keith, follow-up F5). REJECTED keeping the every-outcome trigger and the supersession trigger: each duplicates a run that already happens."
@@ -43824,6 +44105,27 @@ requirements:
     - "CHECK AT BUILD, carried from the open questions at sign-off (not a question for Keith): confirm that a settlement re-filing BOTH files out leaves the slot read by slot_state.left_by_refile, so the readers get the clock's reason rather than RETURNED's 'staged awaiting decision', which would be wrong with nothing staged; if it reads RETURNED, bring it back to Keith before building criterion 4."
     - "THE FLAG FORM'S PRE-EXISTING EXIT-CODE GAP IS NOT THIS REQUIREMENT'S (CLI UX review S5, 2026-10-24): REQ-PIPE-193's flag form exits 0 when its own owed runs are left owed. Logged at sign-off as plans/post-build-review.md #263; criterion 15's exit 3 covers only this requirement's re-check."
     - "CRITERION 9's AMENDMENTS WERE APPLIED AT SIGN-OFF, NOT AT BUILD (Keith, 2026-10-24): he approved the nine wordings in amendments.md and asked for them applied with the sign-off, so REQ-PIPE-121 criteria 1, 9, 15 and decision 14, REQ-PIPE-193 criterion 23, REQ-PIPE-270 criteria 4, 5 and 12 and REQ-PIPE-202 criterion 6 carry them from 2026-10-24, each marked 'AMENDED 2026-10-24 by REQ-PIPE-211 criterion 9'. Criterion 9's 'in the same change' is met by that change; the build has nothing left to amend, only to make the amended criteria true."
+    - 'CHECKED AT BUILD, AS SIGN-OFF ASKED: a settlement re-filing BOTH files out leaves the slot read by slot_state.left_by_refile, so the readers get the
+      clock''s reason (past due or not yet due), never RETURNED''s ''staged awaiting decision'' - test_both_refiled_out_gives_the_clocks_reason. Nothing to
+      bring back to Keith.'
+    - 'THE CONTEST''S END JOINS THE TRANSACTION''S MOVES (build): decision_log.apply_decision compares open_contest_in before and after a choose-file decision
+      only, and where the contest ended with no file of the pair waiting in the period (_a_file_of_it_stays) appends that (decision, dataset, period) to the
+      outermost decision transaction''s period moves - so the re-evaluation is owed by the one handler (knock_on.owe), in the same transaction, once per period,
+      caused by the choose-file entry, exactly as a move owes one.'
+    - 'CRITERION 4 WAS ALREADY TRUE (build): unrunnable._STATE_TO_REASON maps slot_state.REJECTED to ''rejected'' since REQ-PIPE-270''s amendment, so the build
+      only proves it (test_reject_both_rechecks_the_readers_as_rejected).'
+    - 'A Ctrl-C IN THE SETTLEMENT''S OWN RUNS ALSO EXITS 3 ON THE FLAG FORM (build, PROVISIONAL): the re-check is not started and both are owed, which the ''Re-check
+      owed'' panel says; the flag form then exits 3 as it does when the re-check itself is interrupted. post-build-review #263''s gap for the settlement''s
+      own runs alone is unchanged.'
+    - '''ALSO FINISHED'' COUNTS THE COLLECTION''S OTHER OWED RE-CHECKS RUN RIGHT AFTER (build): once the settlement''s own re-evaluation completes, the collection''s
+      follow-up (knock_on.follow_up) runs, its completed outcomes are counted for the ''Also finished <n> other owed re-checks in <collection>'' line, and the
+      separate follow-up panel is not shown again.'
+    - 'WHAT IS SAID AS RED FOR WANT OF THE TABLE (build): a reader is worded ''red - could not run: <period> holds no <dataset>'' where every failing check
+      counted toward it is a could-not-run naming the settled table; any other red is said as ''red''. The datasets'' gate results use REQ-PIPE-276''s words
+      through lifecycle_report.outcome_lines.'
+    - 'THE BACKSTOP IN THE SETTLEMENT PANEL (post-build critic D5): a reader the knock-on left waiting on the agreement backstop is said as ''kept waiting by
+      the agreement backstop until its dataset matches the agreement again'' - the meaning kept, never ''refused'' (criterion 14). And the settled pair''s own
+      supplies are read from qa.decision_file, never worked out from a ''#1''/''#2'' shape.'
     open_questions: []
   - id: REQ-TEST-281
     title: "The browser-test module runs across every test worker, each worker building its own dashboard into its own output path"

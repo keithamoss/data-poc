@@ -29,7 +29,7 @@ From recorded results and the decision log only; never supply rows.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from qa_tools.common import decision_log
 
@@ -54,6 +54,28 @@ class Root:
 def root_of(conn, dataset_id: str, supply: str, period: str, *, _seen=None) -> Root | None:
     """The root cause of this waiting supply's red, where the red is wholly
     another table's doing - else None (its red is its own)."""
+    found = trace(conn, dataset_id, supply, period, _seen=_seen)
+    return found.root if found is not None else None
+
+
+@dataclass(frozen=True)
+class Traced:
+    """A root, and how a held-back supply reaches it (REQ-PIPE-276 criterion
+    6; REQ-PIPE-210 criterion 2): the supplies it traces through on the way,
+    nearest first, as (dataset, supply), and how it came to be held back -
+    'package-mate' where every link is a supply received with it, 'joined'
+    where a link is a supply already waiting, 'slot' where the root is the
+    slot of an absent table and nothing lies between."""
+    root: Root
+    via: tuple[tuple[str, str], ...] = ()
+    came: str = "slot"
+
+
+def trace(conn, dataset_id: str, supply: str, period: str, *, _seen=None) -> Traced | None:
+    """root_of with the path to the root - the ONE walk of the chain of
+    structured causes (REQ-PIPE-278 criterion 1), never a second: the queue
+    (REQ-PIPE-210), the terminal's grouping (REQ-PIPE-276) and the tickets
+    all read it."""
     seen = set(_seen or ())
     if (dataset_id, supply) in seen:
         return None
@@ -67,9 +89,34 @@ def root_of(conn, dataset_id: str, supply: str, period: str, *, _seen=None) -> R
         by_dataset = by.split("@", 1)[0]
         if _turned_down(conn, by_dataset, by):
             return None  # the root was turned down or replaced: its own root now
-        deeper = root_of(conn, by_dataset, by, period, _seen=seen)
-        return deeper or Root("supply", by_dataset, period, supply=by)
-    return _absent_table_root(conn, dataset_id, supply, period)
+        came = (entry["held_back_detail"] or {}).get("came") or "package-mate"
+        deeper = trace(conn, by_dataset, by, period, _seen=seen)
+        if deeper is None:
+            return Traced(Root("supply", by_dataset, period, supply=by), (), came)
+        link = "joined" if "joined" in (came, deeper.came) else "package-mate"
+        return Traced(deeper.root, ((by_dataset, by),) + deeper.via,
+                      link if deeper.came != "slot" else came)
+    root = _absent_table_root(conn, dataset_id, supply, period)
+    return Traced(root) if root is not None else None
+
+
+def held_back_by(conn, dataset_id: str, supply: str) -> tuple[str, str, str] | None:
+    """(dataset, supply, came) of the supply this one's latest gate outcome
+    says held it back, whatever has become of that supply since - from the
+    structured cause, never the reason's prose - else None."""
+    entry = _latest_gate_entry(conn, dataset_id, supply)
+    if entry is None or entry["action"] != decision_log.PROMOTION_WITHHELD \
+            or not entry["held_back_by"]:
+        return None
+    by = entry["held_back_by"]
+    return by.split("@", 1)[0], by, (entry["held_back_detail"] or {}).get("came") \
+        or "package-mate"
+
+
+def turned_down(conn, dataset_id: str, supply: str) -> bool:
+    """Whether a person turned this supply down (and has not promoted it
+    since), or it was superseded - the reading root_of stops a chain on."""
+    return _turned_down(conn, dataset_id, supply)
 
 
 def _latest_gate_entry(conn, dataset_id: str, supply: str) -> dict | None:
@@ -271,3 +318,242 @@ def beside_its_own(conn, dataset_id: str, supply: str) -> str | None:
         return None
     return ("Also held back for want of " + ", ".join(wanted)
             + ": its cross-table checks of them could not run.")
+
+
+# ---------------------------------------------------------------------------
+# The queue, one row per cause (REQ-PIPE-210; REQ-PIPE-276 criteria 6, 12, 16)
+# ---------------------------------------------------------------------------
+
+@dataclass(frozen=True)
+class Beneath:
+    """A supply listed beneath its root's item rather than counted: every red
+    on it is another table's doing, and that table has an item of its own."""
+    state: object
+    traced: Traced
+    #: How its latest gate outcome words why it is held back (REQ-PIPE-276
+    #: criterion 5), or None where it has none.
+    reason: str | None = None
+
+
+@dataclass
+class QueueGroups:
+    """What the terminal's queue shows, worked out once for every surface
+    that shows it - the Filing decisions queue, `mothman supply queue`, and
+    the dashboard's card counts (REQ-PIPE-210 criteria 7, 8 and 10)."""
+    #: The rows that are a decision of their own, counted and pickable.
+    rows: list = field(default_factory=list)
+    #: {row key: [Beneath]} - supplies listed beneath that row's item.
+    beneath: dict = field(default_factory=dict)
+    #: {row key: [line]} - what else a counted row says: the root of a red
+    #: that is another table's doing with nothing to sit beneath (REQ-PIPE-210
+    #: criterion 9), what else holds back a supply red on its own (criterion
+    #: 5), the Order B link (REQ-PIPE-276 criterion 16).
+    lines: dict = field(default_factory=dict)
+    #: [(package, [states])] - a delivery still being checked or gated: one
+    #: quiet line, never counted, never pickable (REQ-PIPE-276 criterion 12).
+    gating: list = field(default_factory=list)
+
+    @property
+    def count(self) -> int:
+        """The number of things to decide (REQ-PIPE-210 criterion 8)."""
+        return len(self.rows)
+
+    @property
+    def listed_beneath(self) -> int:
+        return sum(len(v) for v in self.beneath.values())
+
+
+def row_key(state) -> tuple:
+    return (state.dataset_id, state.period, state.supply)
+
+
+def _root_matches(root: Root, state) -> bool:
+    if root.kind == "supply":
+        return state.dataset_id == root.dataset_id and state.supply == root.supply
+    return state.dataset_id == root.dataset_id and state.period == root.period
+
+
+def holdback_reason(conn, dataset_id: str, supply: str) -> str | None:
+    """The latest 'promotion-withheld' entry's own words for this supply."""
+    rows = conn.execute(
+        f"SELECT action, reason FROM {decision_log.TABLE} WHERE dataset_id = ? AND supply = ? "
+        "AND action IN (?, ?, ?) ORDER BY id DESC LIMIT 1",
+        [dataset_id, supply, decision_log.PROMOTE, decision_log.PROMOTION_WITHHELD,
+         decision_log.PROMOTION_REFUSED]).fetchall()
+    if rows and rows[0][0] == decision_log.PROMOTION_WITHHELD:
+        return (rows[0][1] or "").strip() or None
+    return None
+
+
+def _overdue_words(root: Root) -> str:
+    """'red because cp-clients for 2024-Q4 is overdue; its checks run again
+    once one is promoted' (REQ-PIPE-210 criterion 9) - in the reason's own
+    words where it is not one of the clock's two."""
+    from qa_tools.common import period_schema, unrunnable
+
+    if root.kind == "supply":
+        return (f"red because {root.dataset_id}'s supply for {root.period} is held back; "
+                f"its checks run again once one is promoted")
+    how = {period_schema.PAST_DUE: "is overdue",
+           period_schema.NOT_YET_DUE: "is not yet due"}.get(root.reason or "")
+    if how is None:
+        try:
+            how = "is " + unrunnable.words_for(root.reason) if root.reason else "is not in place"
+        except KeyError:
+            how = "is not in place"
+    return (f"red because {root.dataset_id} for {root.period} {how}; its checks run again "
+            f"once one is promoted")
+
+
+def group_queue(conn, states, *, held=()) -> QueueGroups:
+    """Split the queue's states into counted rows, supplies listed beneath
+    their root's item, and deliveries still being gated (REQ-PIPE-210
+    criteria 1, 2, 5, 8 and 9; REQ-PIPE-276 criteria 6 and 12), through
+    trace() - the one root - and never a supply row or a reason's prose.
+
+    `held` are the queue's held rows (filing_queue.HeldRow): a held supply
+    has an item of its own, so a supply held back by it sits beneath it."""
+    from qa_tools.common import gate
+
+    out = QueueGroups()
+    rest = []
+    for s in states:
+        package = gate.being_gated(conn, s.dataset_id, s.supply) if s.supply else None
+        if package is not None:
+            for got in out.gating:
+                if got[0] == package:
+                    got[1].append(s)
+                    break
+            else:
+                out.gating.append((package, [s]))
+            continue
+        rest.append(s)
+    traced = {}
+    for s in rest:
+        if not s.supply:
+            continue
+        found = trace(conn, s.dataset_id, s.supply, s.period)
+        if found is not None and not (found.root.kind == "supply"
+                                      and found.root.supply == s.supply):
+            traced[row_key(s)] = found
+    roots = [s for s in rest if row_key(s) not in traced]
+    held_items = list(held)
+    for s in rest:
+        found = traced.get(row_key(s))
+        if found is None:
+            out.rows.append(s)
+            continue
+        at = next((r for r in roots if _root_matches(found.root, r)), None)
+        if at is None and found.root.kind == "supply":
+            at = next((h for h in held_items if h.dataset_id == found.root.dataset_id
+                       and h.supply == found.root.supply), None)
+        if at is None:
+            # NOTHING TO SIT BENEATH (criterion 9; Keith, 2026-10-23, E = B): an
+            # ordinary counted row naming its root, never 'nothing needs
+            # deciding'.
+            out.rows.append(s)
+            out.lines.setdefault(row_key(s), []).append(_overdue_words(found.root))
+            continue
+        out.beneath.setdefault(row_key(at), []).append(
+            Beneath(s, found, holdback_reason(conn, s.dataset_id, s.supply)))
+    for s in out.rows:
+        if not s.supply:
+            continue
+        gone = turned_down_words(conn, s.dataset_id, s.supply)
+        if gone:
+            # ITS OWN COUNTED ROW ONCE ITS ROOT IS TURNED DOWN OR REPLACED
+            # (REQ-PIPE-210 criterion 6), worded from the decision log as it
+            # stands - never a 'waiting for' that can no longer happen.
+            out.lines.setdefault(row_key(s), []).append(gone)
+        also = beside_its_own(conn, s.dataset_id, s.supply)
+        if also:
+            out.lines.setdefault(row_key(s), []).append(also)
+        link = order_b_link(conn, s.dataset_id, s.supply, s.period)
+        if link:
+            out.lines.setdefault(row_key(s), []).append(link)
+    return out
+
+
+def order_b_partner(conn, dataset_id: str, supply: str, period: str):
+    """REQ-PIPE-276 criterion 16 (staggered Order B red): (check, the waiting
+    supply) where a cross-table check counted toward this waiting supply
+    failed reading the warehouse's supply of another table, and a LATER
+    result of the same check that read this supply and a WAITING supply of
+    that table in its place passed - so promoting that one re-checks this
+    one. From what each result recorded reading; None where there is none."""
+    from qa_tools.common import hierarchy, knock_on, supersession, supply_status
+
+    try:
+        shown = supply_status.results_about(conn, dataset_id, supply,
+                                            view=supply_status.View()).shown
+    except Exception:  # noqa: BLE001 - nothing readable links nothing
+        return None
+    table = hierarchy.dataset(dataset_id).table
+    by_check: dict[str, dict[str, list]] = {}
+    for r in shown:
+        if r.get("reads") and knock_on.read_as(r, table) == supply:
+            for t in r["reads"]:
+                if t != table:
+                    by_check.setdefault(r["check_id"], {}).setdefault(t, []).append(r)
+    for check, by_table in sorted(by_check.items()):
+        for t, records in sorted(by_table.items()):
+            other_ds = supply_status.dataset_of(t)
+            if other_ds is None:
+                continue
+            holder = knock_on._now_holds(conn, t, period)
+            failed = [i for i, r in enumerate(records) if holder
+                      and knock_on.read_as(r, t) == holder
+                      and (r.get("status") or "") in ("fail", "error")]
+            if not failed:
+                continue
+            waiting = set(supersession.waiting_in(conn, other_ds, period))
+            later = [r for r in records[failed[-1] + 1:]
+                     if knock_on.read_as(r, t) in waiting
+                     and (r.get("status") or "") == "pass"]
+            if later:
+                return check, knock_on.read_as(later[-1], t)
+    return None
+
+
+def order_b_link(conn, dataset_id: str, supply: str, period: str) -> str | None:
+    """Criterion 16's line on the waiting supply's queue row and door: 'Client
+    reference passes against the cp-notifications waiting for a decision
+    (received <instant>); promoting that one re-checks this one.'"""
+    from qa_tools.common import display_time, filing, gate
+
+    found = order_b_partner(conn, dataset_id, supply, period)
+    if found is None:
+        return None
+    check, other = found
+    other_ds = other.split("@", 1)[0]
+    got = filing.received_at_of(other_ds, other, conn=conn)
+    when = display_time.format_instant(got) if got else other
+    words = gate._check_words(check)
+    words = words[:1].upper() + words[1:]
+    return (f"{words} passes against the {other_ds} waiting for a decision "
+            f"(received {when}); promoting that one re-checks this one.")
+
+
+def turned_down_words(conn, dataset_id: str, supply: str) -> str | None:
+    """REQ-PIPE-210 criterion 6 (REQ-DASH-275 criterion 6's wording): where
+    the supply that held this one back has since been turned down - 'The
+    <dataset> file received with it was turned down; this supply now needs
+    its own decision.' - or replaced - 'The <dataset> received with it has
+    been replaced by the one received <instant>; ...' - else None."""
+    from qa_tools.common import display_time, filing, supersession
+
+    by = held_back_by(conn, dataset_id, supply)
+    if by is None:
+        return None
+    by_ds, by_supply, _came = by
+    if not _turned_down(conn, by_ds, by_supply):
+        return None
+    newer = (supersession.superseded_by(conn, by_ds, by_supply)
+             if supersession.is_superseded(conn, by_ds, by_supply) else None)
+    if newer:
+        got = filing.received_at_of(by_ds, newer, conn=conn)
+        when = display_time.format_instant(got) if got else newer
+        return (f"The {by_ds} received with it has been replaced by the one received "
+                f"{when}; this supply now needs its own decision.")
+    return (f"The {by_ds} file received with it was turned down; this supply now needs its "
+            f"own decision.")

@@ -323,9 +323,11 @@ def collect(dataset_id: str, period: str, files, *,
 def settle(dataset_id: str, period: str, supply: str, *,
            answers: list[settlement.Answer] | None = None, reason: str | None = None,
            yes: bool = False, acknowledged: str | None = None,
-           actor: dict | None = None, summary: bool = True) -> filing_decisions.Outcome | None:
+           actor: dict | None = None, summary: bool = True,
+           flag_route: bool = False) -> filing_decisions.Outcome | None:
     """The whole flow, from the files to the runs. None where nothing was
-    recorded."""
+    recorded. On the flag route a lock wait that timed out exits 75
+    (REQ-PIPE-276 criterion 20)."""
     from cli import filing_tui
 
     try:
@@ -381,7 +383,8 @@ def settle(dataset_id: str, period: str, supply: str, *,
         # once per change, never left at a bare refusal.
         while True:
             outcome = _confirm_and_apply(request, shown, name=name, period=period,
-                                         actor=actor, yes=yes, acknowledged=acknowledged)
+                                         actor=actor, yes=yes, acknowledged=acknowledged,
+                                         flag_route=flag_route)
             if not isinstance(outcome, _Changed):
                 break
             filing_tui._show(outcome.said, title="What this settlement does has changed",
@@ -394,11 +397,160 @@ def settle(dataset_id: str, period: str, supply: str, *,
     applied, runs = outcome.outcome, outcome.runs
     console.print(Panel(Text(applied.message, style="bold green"), title="Recorded",
                         border_style="green", expand=False))
+    collection_id = hierarchy.dataset(dataset_id).collection_id
     results = _run_what_it_owed(applied, runs, period)
-    _closing_panel(chosen, results, period)
-    filing_tui._follow_up(hierarchy.dataset(dataset_id).collection_id)
-    filing_decisions.reconcile_after(applied, hierarchy.dataset(dataset_id).collection_id)
+    stopped = getattr(results, "stopped", False)
+    # THE DATASETS THE CONTEST STOPPED, RE-CHECKED WHILE YOU WAIT, AFTER THE
+    # SETTLEMENT'S OWN RUNS AND BEFORE ITS OUTCOME PANEL (REQ-PIPE-211
+    # criteria 13 to 15) - never started after a Ctrl-C during those runs.
+    readers = _recheck_readers(dataset_id, period, supply, collection_id, stopped=stopped)
+    if readers is None:
+        # THE FOLLOW-UP BEFORE THE OUTCOME PANEL (criterion 13), as every
+        # decision's; where the settlement owed its readers' re-check, that
+        # and the collection's other owed re-checks already ran above.
+        filing_tui._follow_up(collection_id)
+    _closing_panel(chosen, results, period, readers=readers)
+    filing_decisions.reconcile_after(applied, collection_id)
+    if readers is not None and not readers.finished:
+        applied = dataclasses.replace(applied, checks_finished=False)
     return applied
+
+
+@dataclass
+class _Readers:
+    """The settlement's own re-evaluation of the datasets that read its
+    table (REQ-PIPE-211): what it re-gated, and how it ended."""
+    dataset_id: str
+    period: str
+    collection_id: str
+    regated: tuple = ()
+    others: int = 0
+    finished: bool = True
+    #: Why it did not finish: 'failed', 'stopped' (Ctrl-C), 'locked', or
+    #: 'not-started' (a Ctrl-C during the settlement's own runs).
+    why: str | None = None
+    message: str = ""
+
+
+def _owed_by(entry_id: int | None, period: str) -> list:
+    from qa_tools.common import recheck
+
+    if entry_id is None:
+        return []
+    from cli import filing_tui
+
+    with filing_tui.open_log() as conn:
+        return [o for o in recheck.owed(conn) if o.kind == recheck.REEVALUATE
+                and o.caused_by_decision == entry_id and o.period == period]
+
+
+def _settlement_entry(dataset_id: str, supply: str) -> int | None:
+    """The choose-file entry just recorded for this pair."""
+    from cli import filing_tui
+    from qa_tools.common import supply_files
+
+    with filing_tui.open_log() as conn:
+        rows = conn.execute(
+            f"SELECT max(id) FROM {decision_log.TABLE} WHERE dataset_id = ? AND supply = ? "
+            "AND action = ?", [dataset_id, supply_files.pair_supply(supply),
+                               decision_log.CHOOSE_FILE]).fetchall()
+    return rows[0][0] if rows and rows[0][0] is not None else None
+
+
+def _recheck_readers(dataset_id: str, period: str, supply: str, collection_id: str, *,
+                     stopped: bool) -> "_Readers | None":
+    """Run the re-evaluation this settlement owes while the person waits
+    (criterion 13) - one dim wait line, then 're-check N of M - <dataset>
+    for <period>' - and the other owed re-checks of the collection after it.
+    None where the settlement owes none (criterion 1's settlements only).
+    A failure, a Ctrl-C or a held period lock leaves it owed and says so in
+    a 'Re-check owed' panel, never a traceback (criterion 15)."""
+    import contextlib
+    import io
+
+    from cli import filing_tui
+    from qa_tools.common import knock_on, recheck
+
+    try:
+        entry = _settlement_entry(dataset_id, supply)
+        mine = _owed_by(entry, period)
+    except Exception as exc:  # noqa: BLE001 - the settlement stands; the pass finishes it
+        console.print(f"Whether this settlement owes a re-check could not be read "
+                      f"({type(exc).__name__}: {exc}); anything it owes is finished by the "
+                      f"next processing pass.", style="dim", markup=False, highlight=False)
+        return None
+    if not mine:
+        return None
+    got = _Readers(dataset_id, period, collection_id)
+    if stopped:
+        # NOT STARTED AFTER A Ctrl-C IN THE SETTLEMENT'S OWN RUNS: both owed.
+        got.finished, got.why = False, "not-started"
+        _say_recheck_owed(got)
+        return got
+    with filing_tui.open_log() as conn:
+        n = len(filing_decisions.settlement_readers(conn, dataset_id, period))
+    console.print(f"Re-checking the {n} dataset{'s' if n != 1 else ''} that read {dataset_id} "
+                  f"in {period}. Ctrl-C stops it; the settlement stands either way.",
+                  style="dim", markup=False, highlight=False)
+    import sys
+
+    # THE PROGRESS LINE GOES TO THE PERSON'S OWN OUTPUT, the pipeline's own
+    # lines ('knock-on: ...', a gate's report) to nowhere - what happened is
+    # said in the outcome panel (criterion 14).
+    progress = Console(file=sys.stdout)
+
+    def on_step(label: str) -> None:
+        if label.startswith("re-check "):
+            progress.print(f"  {label}", style="dim", markup=False, highlight=False)
+    regated = []
+    try:
+        for item in mine:
+            with contextlib.redirect_stdout(io.StringIO()):
+                done = recheck.run(item.id, on_step=on_step)
+            if not done.completed:
+                got.finished = False
+                got.why = "locked" if done.contended else "failed"
+                got.message = done.message
+                break
+            regated += list(done.regated or ())
+    except KeyboardInterrupt:
+        got.finished, got.why = False, "stopped"
+    except Exception as exc:  # noqa: BLE001 - said, never a traceback
+        got.finished, got.why, got.message = False, "failed", f"{type(exc).__name__}: {exc}"
+    got.regated = tuple(regated)
+    if not got.finished:
+        _say_recheck_owed(got)
+        return got
+    # ALSO FINISHED: whatever else the collection owed, run as the follow-up.
+    try:
+        with contextlib.redirect_stdout(io.StringIO()):
+            others = knock_on.follow_up(collection_id)
+        got.others = sum(1 for o in others if o.completed)
+    except Exception:  # noqa: BLE001 - those stay owed for the processing pass
+        got.others = 0
+    return got
+
+
+def _say_recheck_owed(got: "_Readers") -> None:
+    """Criterion 15's panel, after the settle flow's 'Run owed' panel."""
+    from cli import filing_tui
+
+    if got.why == "not-started":
+        text = (f"The settlement is recorded. Its QA runs and the re-check of the datasets "
+                f"that read {got.dataset_id} did not finish, so both are owed - until then "
+                f"those datasets keep the result recorded while the two files were waiting "
+                f"to be settled. They are finished by Process what has arrived (mothman "
+                f"pipeline process) or the next processing pass.")
+    else:
+        text = (f"The settlement is recorded. The re-check of the datasets that read "
+                f"{got.dataset_id} did not finish, so it is owed - until then they keep the "
+                f"result recorded while the two files were waiting to be settled. It is "
+                f"finished by Process what has arrived (mothman pipeline process) or the "
+                f"next processing pass.")
+    if got.why == "locked":
+        text += f" Another decision or gate is working on {got.period}."
+    filing_tui._show(text + "\nmothman pipeline process", title="Re-check owed",
+                     style="yellow")
 
 
 @dataclass(frozen=True)
@@ -431,7 +583,7 @@ def _refusal_of(dataset_id: str, supply: str, chosen) -> str | None:
 
 
 def _confirm_and_apply(request, shown, *, name: str, period: str, actor: dict, yes: bool,
-                       acknowledged: str | None):
+                       acknowledged: str | None, flag_route: bool = False):
     """One warning, one confirmation, the apply: an _Applied, a _Changed,
     or None where nothing was recorded."""
     from cli import filing_tui
@@ -479,25 +631,40 @@ def _confirm_and_apply(request, shown, *, name: str, period: str, actor: dict, y
     except (decision_log.DecisionRefused, filing_decisions.NotOffered,
             people.UnknownActor) as exc:
         filing_tui._show(str(exc), title=REFUSED_TITLE, style="red")
+        if flag_route and getattr(exc, "exit_code", None) == filing_decisions.EXIT_TRY_LATER:
+            raise SystemExit(filing_decisions.EXIT_TRY_LATER) from None
         return None
     return _Applied(outcome, runs)
+
+
+class _Results(dict):
+    """{filename: what came of it}, and whether a Ctrl-C stopped the runs."""
+    stopped = False
 
 
 def _run_what_it_owed(outcome, runs: list[tuple[str, str]], period: str) -> dict[str, str]:
     """The QA runs the settlement owed, one at a time while the person waits,
     with the QA wizard's own progress display labelled 'run N of M -
-    {filename} for {period}' (criterion 20). Returns {filename: what came of
-    it}. A run that fails says the settlement is recorded and the run owed -
-    never to settle again."""
+    {filename} for {period}' (criterion 20). Returns ({filename: what came of
+    it}, with .stopped where a Ctrl-C stopped them). A run that fails says
+    the settlement is recorded and the run owed - never to settle again; a
+    Ctrl-C stops the rest, which stay owed (REQ-PIPE-211 criterion 13)."""
     from qa_tools.common import recheck
 
-    out: dict[str, str] = {}
+    out = _Results()
+    stopped = False
     total = len(outcome.owed)
     for n, (owed_id, (filename, target)) in enumerate(zip(outcome.owed, runs), 1):
         label = f"run {n} of {total} - {filename} for {target}"
+        if stopped:
+            out[filename] = "not checked yet - owed"
+            continue
         try:
             with common.chain_progress(label) as on_step:
                 got = recheck.run(owed_id, on_step=on_step)
+        except KeyboardInterrupt:
+            stopped = True
+            got = recheck.Outcome(owed_id, "", False, "stopped with Ctrl-C")
         except Exception as exc:  # noqa: BLE001 - said, and left owed
             got = recheck.Outcome(owed_id, "", False, f"{type(exc).__name__}: {exc}")
         if got.completed:
@@ -513,20 +680,77 @@ def _run_what_it_owed(outcome, runs: list[tuple[str, str]], period: str) -> dict
             body.append(f"\n\nDetail: {got.message}", style="dim")
             console.print(Panel(body, title="Run owed", border_style="yellow",
                                 expand=False))
+    out.stopped = stopped
     return out
 
 
-def _closing_panel(chosen, results: dict[str, str], period: str) -> None:
+def _closing_panel(chosen, results: dict[str, str], period: str, *, readers=None) -> None:
     """One panel: each file's outcome, its QA status and what the gate did
-    (criterion 20)."""
+    (criterion 20) - and, where the settlement re-checked the datasets that
+    read its table, what each came out as (REQ-PIPE-211 criterion 14),
+    statuses in words since the border is green whatever they are (criterion
+    16)."""
     lines = []
     for a in chosen:
         line = f"{a.filename}: {said(a, period)}"
         if a.filename in results:
             line += f" - {results[a.filename]}"
         lines.append(line)
+    if readers is not None and readers.finished:
+        lines += ["", f"Datasets that read {readers.dataset_id} in {period}, re-checked:"]
+        lines += reader_lines(readers)
+        if readers.others:
+            from cli import filing_tui
+
+            lines.append(f"Also finished {readers.others} other owed re-check"
+                         f"{'s' if readers.others != 1 else ''} in "
+                         f"{filing_tui._collection_name(readers.collection_id)}")
     console.print(Panel(Text("\n".join(lines)), title="Settled", border_style="green",
                         expand=False))
+
+
+def reader_lines(readers: "_Readers") -> list[str]:
+    """Criterion 14's lines, through the one renderer (lifecycle_report.
+    outcome_lines): red first, one per resulting outcome, up to eight
+    dataset ids then 'and <n> more', a truncated red line pointing to the
+    queue, and a red for want of the table worded 'red - could not run:
+    <period> holds no <dataset>'. Never 'contested', 'rejected' or
+    'refused', nor a raw 'knock-on:' line."""
+    import re
+
+    from cli import filing_tui, lifecycle_report
+    from qa_tools.common import carried, hierarchy, promotion, root_cause, supply_status
+
+    table = hierarchy.dataset(readers.dataset_id).table
+    outcomes = []
+    with filing_tui.open_log() as conn:
+        for ds, sup, _period, status, result in readers.regated:
+            words = status
+            if status == "red":
+                try:
+                    latest = supply_status.latest_results(conn, ds, sup)
+                    failing = [r for r in promotion._contributing_records(
+                        ds, latest, promotion._declared_reads())
+                        if (r.get("status") or "") in ("fail", "error")]
+                except Exception:  # noqa: BLE001 - said as red
+                    failing = []
+                if failing and all(carried.not_evaluated_reason(r) and table in (
+                        r.get("unrunnable_tables") or [r.get("unrunnable_table")])
+                        for r in failing):
+                    words = f"red - could not run: {readers.period} holds no {readers.dataset_id}"
+            if result == "still held back":
+                why = root_cause.holdback_reason(conn, ds, sup)
+                if why:
+                    result = f"still held back - {re.sub(r'^Held back[^:]*: ', '', why)}"
+            # NEVER 'refused' HERE (criterion 14; post-build critic D5): the
+            # backstop's hold, in words that keep its meaning.
+            result = result.replace("refused by the agreement backstop",
+                                    "kept waiting by the agreement backstop until its "
+                                    "dataset matches the agreement again")
+            outcomes.append((ds, words, result))
+    pointer = (f"see Filing decisions > {filing_tui._collection_name(readers.collection_id)} "
+               f"> Supplies waiting on a decision")
+    return lifecycle_report.outcome_lines(outcomes, more=pointer)
 
 
 def parse_outcome(token: str, filenames: list[str]) -> settlement.Answer:
