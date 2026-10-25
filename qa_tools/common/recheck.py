@@ -38,6 +38,9 @@ from qa_tools.common import qa_store, supply_db
 
 RECHECK = "recheck"
 REEVALUATE = "reevaluate"
+#: A gate application owed from recorded results (REQ-PIPE-266 criterion 3):
+#: never a re-run of any tool - gate.run_owed applies it.
+GATE = "gate"
 TABLE = f'"{qa_store.SCHEMA}".owed_run'
 
 #: The shared orchestrator (qa_tools/tools/orchestrate.py, REQ-PIPE-243) is
@@ -62,6 +65,10 @@ class Owed:
     last_failure: str | None
     #: The tables a re-evaluation is for (REQ-PIPE-121) - empty for a re-check.
     tables: list | None = None
+    #: A 'gate' item's package and the application it retries (REQ-PIPE-266).
+    caused_by_application: int | None = None
+    delivery: str | None = None
+    package_instant: object = None
 
 
 @dataclass(frozen=True)
@@ -86,10 +93,17 @@ class Outcome:
     stays_promoted: bool = False
     #: Its status before the run, for the panel's before and after (criterion 17).
     before: str | None = None
+    #: Left owed because another gate application holds its period, or the
+    #: period changed under it (REQ-PIPE-267 criterion 17) - contention,
+    #: never a failure of the pass.
+    contended: bool = False
+    #: A 'gate' item whose package is still being checked (REQ-PIPE-266).
+    waiting: bool = False
 
 
 _OWED_COLUMNS = ("id", "kind", "dataset_id", "supply_id", "period", "caused_by_decision",
-                 "caused_by_load", "run_key", "attempts", "last_failure", "tables")
+                 "caused_by_load", "run_key", "attempts", "last_failure", "tables",
+                 "caused_by_application", "delivery", "package_instant")
 
 
 def owe(conn: supply_db.SupplyConnection, *, dataset_id: str, supply_id: str,
@@ -173,7 +187,7 @@ def mint_run_id(conn, dataset_id: str, supply_id: str, *, owed_id: int | None = 
 
 
 def execute(*, dataset_id: str, supply_id: str, run_key: str, purpose: dict,
-            run_by: str | None = None, on_step=None):
+            run_by: str | None = None, on_step=None, warehouse_for=()):
     """THE ONE EXECUTOR (NFR 1): run the collection's own tools over a staged,
     filed supply, as a run of its own, against its filed period's overlay -
     exactly as an arrival's run is built. Returns (arrival, results). Raises
@@ -208,7 +222,10 @@ def execute(*, dataset_id: str, supply_id: str, run_key: str, purpose: dict,
         # criterion 13): a settled pair's supply has its own file's receipt,
         # whose key names no table, so nothing downstream may rebuild the
         # supply, its period or its table from `received_at`.
-        supply_ids={dataset_id: supply_id})
+        supply_ids={dataset_id: supply_id},
+        # A GATE APPLICATION'S RE-CHECK (REQ-PIPE-267 criterion 6) reads these
+        # tables from the warehouse, as the period will stand.
+        warehouse_for=tuple(warehouse_for))
     # NO run_index (REQ-PIPE-279 criterion 19): the results rebuild orders runs
     # by run_seq, and a re-check was stamped with its arrival's run_index only
     # so the old order had something to sort it by (post-build-review #161).
@@ -268,7 +285,7 @@ def _run_claimed(owed_id: int, *, run_by: str | None = None, on_step=None) -> Ou
     checks again, then the gate) or a re-evaluation (REQ-PIPE-121's knock-on,
     knock_on.complete) - and clear it. Read only after the claim, so an item
     another runner finished meanwhile reads as already run."""
-    from qa_tools.common import decision_log, hierarchy, promotion
+    from qa_tools.common import decision_log, hierarchy
 
     with supply_db.connect(label="mothman:recheck") as conn:
         item, cleared_at = _owed_item(conn, owed_id)
@@ -296,6 +313,8 @@ def _run_claimed(owed_id: int, *, run_by: str | None = None, on_step=None) -> Ou
             from qa_tools.common import knock_on
 
             return knock_on.complete(item, run_by=run_by, on_step=on_step)
+        if item.kind == GATE:
+            return _run_gate(item)
         filed = conn.execute(
             f"SELECT slot FROM {_filing_current()} WHERE dataset_id = ? AND supply_id = ?",
             [item.dataset_id, item.supply_id]).fetchall()
@@ -343,12 +362,28 @@ def _run_claimed(owed_id: int, *, run_by: str | None = None, on_step=None) -> Ou
     if promoted_here:
         return _promoted_outcome(item, run_key, period, before)
     # THE GATE, AS FOR AN ARRIVAL (REQ-PIPE-141 criterion 7) - under the
-    # settings in force now, which after_runs reads at this instant.
-    gated = promotion.after_runs(
-        [arrival], results, agency_id=entry_ds.agency_id,
-        collection_id=entry_ds.collection_id, actor=promotion.RULE_ACTOR,
-        actor_kind=decision_log.RULE, effective_at=_cause_instant(item))
-    promotion.report(gated)
+    # settings in force now - AS A GATE APPLICATION (REQ-PIPE-267 criterion 2):
+    # this owed-item runner is a gate entry, so a re-filed partner waiting in
+    # the period is gated with it. Contended, the re-check stays owed and its
+    # results stand; the next pass gates it without running a tool again.
+    from qa_tools.common import filing, gate
+
+    del arrival, results, entry_ds
+    with supply_db.connect(label="mothman:recheck") as conn:
+        items = [i for i in filing.supplies_of(conn, SimpleNamespace(
+            received_at=filing.received_at_of(item.dataset_id, item.supply_id),
+            files_by_dataset={item.dataset_id: (item.supply_id,)},
+            supply_ids={item.dataset_id: item.supply_id}))]
+    applied = gate.apply(hierarchy.dataset(item.dataset_id).collection_id, period,
+                         entry=gate.RECHECK, checked=items, effective_at=_cause_instant(item),
+                         run_by=run_by)
+    gate.report(applied)
+    if applied.contended:
+        return Outcome(item.id, run_key, False,
+                       f"Checked against {period}; another gate holds {period}, so its gate "
+                       f"is applied by the next pass - still owed.", period=period,
+                       contended=True)
+    gated = applied.as_after_run()
     from qa_tools.common import supply_status
 
     clear(item.id, run_key)
@@ -366,6 +401,29 @@ def _run_claimed(owed_id: int, *, run_by: str | None = None, on_step=None) -> Ou
                    f"Checked against {period}: {verdict or 'no verdict'}. {then}",
                    status=verdict, period=period, promoted=promoted, waits_because=why,
                    before=before)
+
+
+def _run_gate(item) -> Outcome:
+    """An owed 'gate' item (REQ-PIPE-266 criterion 3): applied from recorded
+    results by gate.run_owed - no tool runs - and left owed while its
+    package is still being checked or its period is held by another gate."""
+    from qa_tools.common import gate
+
+    applied = gate.run_owed(item)
+    gate.report(applied)
+    if applied.waiting:
+        return Outcome(item.id, "", False, f"gate owed: {applied.waiting}", waiting=True)
+    if applied.contended:
+        return Outcome(item.id, "", False, f"another gate holds {item.period}; the gate is "
+                       f"still owed", period=item.period, contended=True)
+    if applied.failed:
+        message = "; ".join(f"{d}: {w}" for d, w in sorted(applied.failed.items()))
+        fail(item.id, message)
+        return Outcome(item.id, "", False, f"the gate of {item.period} did not complete "
+                       f"({message}); it is still owed", period=item.period)
+    return Outcome(item.id, f"gate/{applied.application}", True,
+                   f"{item.period}: gated - promoted {', '.join(applied.promoted) or 'nothing'}",
+                   period=item.period)
 
 
 def _promoted_outcome(item, run_key: str, period: str, before: str | None) -> Outcome:

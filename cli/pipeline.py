@@ -392,6 +392,15 @@ def generated_targets():
     return targets.written()
 
 
+def generated_gate_outcomes():
+    """The gate outcomes the scripted scenarios declare (REQ-GEN-273
+    criterion 3), from the generator's placements - for the comparison after
+    a replay, which may not read the generator's records itself."""
+    from generator import targets
+
+    return targets.gate_outcomes()
+
+
 @pipeline_group.command("cache-key")
 def cache_key_command() -> None:
     """Print the key CI caches a bootstrapped database under (REQ-TEST-117):

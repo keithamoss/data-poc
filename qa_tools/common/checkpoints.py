@@ -275,6 +275,22 @@ def snapped(arrivals: list, before: int) -> int:
             f"a checkpoint before arrival {before} is not possible - this collection has "
             f"{len(arrivals)} arrivals, and the first must be processed before one is taken "
             f"(choose 2 to {len(arrivals)})")
+    # NEVER BETWEEN TWO ARRIVALS OF ONE PACKAGE (REQ-PIPE-266 criterion 18;
+    # REQ-TEST-159 criterion 1 as amended): a package - files sharing one
+    # receipt instant - is gated together once all of it is checked, so a
+    # checkpoint inside one would hold a package checked in part and owed its
+    # gate. Refused, naming where the package begins, rather than moved.
+    target = arrivals[before - 1]
+    if before >= 2 and arrivals[before - 2].received_at == target.received_at:
+        first = next(i for i, a in enumerate(arrivals, start=1)
+                     if a.received_at == target.received_at)
+        raise CheckpointRefused(
+            f"arrival {before} is not the first of its package - the files received with "
+            f"it at one instant are gated together - so no checkpoint is taken inside it. "
+            f"Its package begins at arrival {first}"
+            + (f" ({arrivals[first - 1].run_id})" if getattr(arrivals[first - 1], "run_id",
+                                                              None) else "")
+            + f"; choose --checkpoint-before {first}.")
     group = [arrivals[before - 1]]
 
     def together(a) -> bool:

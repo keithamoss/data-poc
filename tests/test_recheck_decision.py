@@ -180,11 +180,15 @@ class TestThroughTheRealExecutor:
     def _run(self, conn, minted, monkeypatch, build):
         from qa_tools.common import promotion
 
+        from qa_tools.common import gate
+
         asked = []
         monkeypatch.setattr(recheck, "execute", lambda **k: (object(), []))
-        monkeypatch.setattr(promotion, "after_runs", lambda *a, **k: asked.append(k) or
-                            promotion.AfterRun(promoted=(), refused={}, failed={}))
-        monkeypatch.setattr(promotion, "report", lambda o: None)
+        # THE GATE, AS A GATE APPLICATION (REQ-PIPE-267 criterion 2): the
+        # owed-item runner is a gate entry.
+        monkeypatch.setattr(gate, "apply", lambda *a, **k: asked.append(k) or gate.Applied())
+        monkeypatch.setattr(gate, "report", lambda o: None)
+        del promotion
         state, supply = build(conn, minted)
         got = _recheck(conn, state.period, supply)
         (cause,) = conn.execute(f"SELECT max(id) FROM {dl.TABLE} WHERE supply = ?",
@@ -605,10 +609,12 @@ class TestCriticFindingsOn192:
             with supply_db.connect(label="test-f7") as c:
                 _person(c, fd.DEMOTE, period=state.period, supply=supply)
             return object(), []
+        from qa_tools.common import gate
+
         asked = []
         monkeypatch.setattr(recheck, "execute", run_and_demote)
-        monkeypatch.setattr(promotion, "after_runs", lambda *a, **k: asked.append(1) or
-                            promotion.AfterRun(promoted=(), refused={}, failed={}))
-        monkeypatch.setattr(promotion, "report", lambda o: None)
+        monkeypatch.setattr(gate, "apply", lambda *a, **k: asked.append(1) or gate.Applied())
+        monkeypatch.setattr(gate, "report", lambda o: None)
+        del promotion
         done = recheck.run(got.owed[0], run_by="pytest@example.org")
         assert asked == [1] and not done.stays_promoted

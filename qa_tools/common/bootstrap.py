@@ -416,7 +416,19 @@ def targets_agree(names) -> tuple[str, ...]:
         # not a traceback (post-build-review #157 finding 7).
         return (f"what the generator built could not be read: {exc}",)
     with supply_db.connect(label="mothman:bootstrap") as conn:
-        return tuple(str(d) for d in target_agreement.after_replay(conn, built))
+        failing, reported = target_agreement.replay_report(conn, built)
+        # REPORTED, NEVER A FAILURE (REQ-GEN-273 criterion 2): a supply whose
+        # own checks matched its target, read otherwise only because a
+        # package-mate was held back or a table could not be read.
+        for r in reported:
+            print(f"note: {r}")
+        # AND EACH DECLARED GATE OUTCOME (criterion 3), a failure where the
+        # record differs - declared by the scenarios, by way of cli/.
+        from cli.pipeline import generated_gate_outcomes
+
+        declared = [o for o in generated_gate_outcomes() if o.dataset_id in wanted]
+        failing = [*failing, *target_agreement.gate_outcome_differences(conn, declared)]
+        return tuple(str(d) for d in failing)
 
 
 def _confirm_corrections(say) -> None:

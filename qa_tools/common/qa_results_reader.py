@@ -321,6 +321,31 @@ def read_raw(agency: str, collection: str, run_id: str, tool: str,
             conn.close()
 
 
+def read_not_in_agreement(agency: str, collection: str, conn=None) -> dict[str, dict]:
+    """{run id: {check id: why it was out of that run's scope}} for every
+    complete run that left a check out because a table it reads is not part
+    of the agreement for the run's period (REQ-PIPE-270 criterion 9) - from
+    the run's recorded left_out output, so the page can say why it did not
+    run. Recorded QA metadata only."""
+    conn, mine = _conn(conn)
+    try:
+        rows = conn.execute(
+            f'SELECT t.run_key, t.raw_output FROM "{qa_store.SCHEMA}".tool_output_visible t '
+            f'JOIN "{qa_store.SCHEMA}".run_visible r ON r.run_key = t.run_key '
+            "WHERE t.tool = 'left_out' AND r.agency_id = ? AND r.collection_id = ? "
+            "ORDER BY r.run_seq", [agency, collection]).fetchall()
+    finally:
+        if mine:
+            conn.close()
+    out = {}
+    for run_key, raw in rows:
+        payload = raw.get("raw_output", raw) if isinstance(raw, dict) else {}
+        found = (payload or {}).get("not_in_agreement") or {}
+        if found:
+            out[run_key] = dict(sorted(found.items()))
+    return out
+
+
 def list_run_ids(agency: str, collection: str,
                  conn=None) -> list[str]:
     """Every COMPLETE run recorded under this agency/collection, in the
@@ -357,7 +382,7 @@ def run_facts(agency: str, collection: str, conn=None) -> dict[str, dict]:
     try:
         rows = conn.execute(
             f'SELECT r.run_key, r.dataset_id, r.scope, r.supply_id, r.caused_by_decision, '
-            f'r.caused_by_load, rc.delivery, rc.received_instant '
+            f'r.caused_by_load, rc.delivery, rc.received_instant, r.gate_application '
             f'FROM "{qa_store.SCHEMA}".run_visible r '
             f'LEFT JOIN "{qa_store.SCHEMA}".supply_receipt rc '
             "ON rc.dataset_id = r.dataset_id AND rc.supply_id = r.supply_id "
@@ -367,10 +392,15 @@ def run_facts(agency: str, collection: str, conn=None) -> dict[str, dict]:
         if mine:
             conn.close()
     out = {}
-    for rank, (key, dataset_id, scope, supply, decision, load, delivery, instant) in enumerate(
-            rows, start=1):
+    for rank, (key, dataset_id, scope, supply, decision, load, delivery, instant,
+               application) in enumerate(rows, start=1):
         if supply is None:
             cause = None
+        elif application is not None:
+            # EVERY RUN INSIDE A GATE APPLICATION IS ONE POINT, keyed on the
+            # application (REQ-PIPE-267 criterion 10, amending REQ-PIPE-279's
+            # point key): its last round's result per check is the one shown.
+            cause = f"gate:{application}"
         elif decision is not None:
             cause = f"decision:{decision}"
         elif load is not None:

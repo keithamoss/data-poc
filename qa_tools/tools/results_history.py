@@ -50,7 +50,8 @@ def results_path(collection_id: str) -> str:
 
 def write_results_file(collection_id: str, *, runs: list[dict], dataset_stats: dict,
                        results: list[dict], generated_at: str, source: str = "",
-                       facts: dict[str, dict] | None = None) -> dict:
+                       facts: dict[str, dict] | None = None,
+                       not_in_agreement: dict[str, dict] | None = None) -> dict:
     """The results file, whole or not at all (another process may be reading
     it), with its summary - and THE FIFTH VERDICT (REQ-QAC-108 criterion 5):
     a check with no reference measured nothing, so it is counted as `nodata`
@@ -71,6 +72,10 @@ def write_results_file(collection_id: str, *, runs: list[dict], dataset_stats: d
         "run_facts": facts or {},
         "dataset_stats": dataset_stats,
         "results": results,
+        # WHAT EACH RUN LEFT OUT OF ITS SCOPE BECAUSE A TABLE IT READS IS NOT
+        # PART OF THE AGREEMENT FOR ITS PERIOD (REQ-PIPE-270 criterion 9) -
+        # {run id: {check id: why}}, so the page can say why it did not run.
+        "not_in_agreement": not_in_agreement or {},
         "summary": {"total_checks": len(results), **counts,
                     "engines": sorted(set(r["engine"] for r in results))},
     }
@@ -122,7 +127,10 @@ def build_results_from_history(collection_id: str, *, generated_at: str | None =
     reads = read_check_reads(coll.agency_id, coll.id)
     results += [{**r, "reads": reads[(r["run_id"], r["check_id"])]}
                 for r in read_cross_table_results(coll.agency_id, coll.id, supply_state=None)]
+    from qa_tools.common.qa_results_reader import read_not_in_agreement
+
     return write_results_file(collection_id, runs=manifest, dataset_stats=stats_by_run,
                               results=results,
                               generated_at=generated_at or asset_time.now().isoformat(),
-                              source=source, facts=facts)
+                              source=source, facts=facts,
+                              not_in_agreement=read_not_in_agreement(coll.agency_id, coll.id))

@@ -210,6 +210,22 @@ def state_of(arrival, rec: Recorded) -> str:
     return PROCESSED if key in rec.gated or key in rec.held else UNGATED
 
 
+def _waiting_for_package(conn, arrival, gate_mod) -> str | None:
+    """The waiting line where this checked arrival's package gate is owed.
+    An arrival with no receipt instant has no package to look up."""
+    from qa_tools.common import asset_time
+
+    received = getattr(arrival, "received_at", None)
+    if received is None:
+        return None
+    for dataset_id in sorted(getattr(arrival, "files_by_dataset", {}) or {}):
+        supply = f"{dataset_id}@{asset_time.arrival_key(received)}"
+        package = gate_mod.package_of(conn, dataset_id, supply)
+        if package is not None and gate_mod.owed_gate(conn, package) is not None:
+            return gate_mod.waiting_words(package)
+    return None
+
+
 def all_arrivals(deliveries_dir=None, receipts_dir=None) -> list:
     """Every collection's arrivals in ONE receipt order (criterion 9).
 
@@ -272,6 +288,10 @@ class PassReport:
     #: 2026-10-11, (f); delivery-critic finding 4) - waiting, not failed, and
     #: holding back nothing else in their collection.
     left_frozen: list = field(default_factory=list)
+    #: Arrivals CHECKED, WAITING FOR THEIR PACKAGE (REQ-PIPE-266 criterion
+    #: 3) - not a failure, and holding back nothing else; the last file of
+    #: the package gates it whole.
+    left_waiting: list = field(default_factory=list)
     #: Declared calendar corrections awaiting the asset manager (REQ-PIPE-170
     #: criterion 20) - noted, never computed: their moves are worked out when
     #: one is opened.
@@ -285,7 +305,8 @@ class PassReport:
         return not (self.processed or self.gated_only or self.left_locked or self.refiled
                     or self.refiled_cleared or self.refused or self.parked_moved
                     or self.left_behind_failure or self.left_behind_locked
-                    or self.left_for_budget or self.failures or self.owed)
+                    or self.left_for_budget or self.failures or self.owed
+                    or self.left_waiting)
 
     @property
     def exit_status(self) -> int:
@@ -302,8 +323,12 @@ class PassReport:
 
 def _owed_failure(outcome) -> bool:
     """An owed item that did not complete is a failure of the pass - unless
-    it waited on a refused dataset, which is the backstop working."""
-    return not outcome.completed and not getattr(outcome, "frozen", False)
+    it waited on a refused dataset, which is the backstop working; another
+    gate held its period, which is contention (REQ-PIPE-267 criterion 17);
+    or it is a package gate still waiting for a file (REQ-PIPE-266)."""
+    return (not outcome.completed and not getattr(outcome, "frozen", False)
+            and not getattr(outcome, "contended", False)
+            and not getattr(outcome, "waiting", False))
 
 
 def _red(results) -> bool:
@@ -519,7 +544,8 @@ def run_pass(*, run_by: str | None = None, say=print, deadline: float | None = N
     # OWED WORK (criterion 11): re-evaluations and re-checks alike, each
     # cleared only when its work completes; a failure stays owed.
     try:
-        for outcome in recheck.run_all_owed(kinds=(recheck.REEVALUATE, recheck.RECHECK),
+        for outcome in recheck.run_all_owed(kinds=(recheck.REEVALUATE, recheck.RECHECK,
+                                                   recheck.GATE),
                                             run_by=run_by):
             report.owed.append(outcome)
             if _owed_failure(outcome):
@@ -561,6 +587,8 @@ def _one(arrival, among, run_timestamp, run_by, report: PassReport, say) -> None
     if state == PROCESSED:
         return
     steps = _steps(arrival.collection_id)
+    from qa_tools.common import gate as gate_mod
+
     if state == UNGATED:
         # CHECKED BUT NOT GATED: its recorded results, the gate, nothing
         # re-run - a second set of results under the same run id is what
@@ -580,6 +608,8 @@ def _one(arrival, among, run_timestamp, run_by, report: PassReport, say) -> None
         for record in results:
             record.setdefault("run_id", record.get("run_key"))
         say(f"{arrival.run_id}: checked earlier - applying the gate")
+        # THE UNGATED PATH IS A GATE ENTRY (REQ-PIPE-267 criterion 2) and goes
+        # through the one package gate (REQ-PIPE-266 criterion 2).
         steps.promote_after(arrival, results, run_by)
         report.gated_only.append(arrival.run_id)
         if _red(results):
@@ -593,6 +623,13 @@ def _one(arrival, among, run_timestamp, run_by, report: PassReport, say) -> None
             report.red = True
     with supply_db.connect(read_only=True, label="mothman:process") as conn:
         after = state_of(arrival, recorded(conn))
+        waiting = _waiting_for_package(conn, arrival, gate_mod) if after != PROCESSED else None
+    if waiting:
+        # CHECKED, WAITING FOR ITS PACKAGE (REQ-PIPE-266 criterion 3): not a
+        # failure, and nothing later is held back for it.
+        report.left_waiting.append(arrival.run_id)
+        say(f"{arrival.run_id}: {waiting}")
+        return
     if after != PROCESSED:
         # LEFT UNGATED BY THE FREEZE is waiting, not failing (delivery-critic
         # on (f)-(i), finding 4): the first pass after the refusal clears

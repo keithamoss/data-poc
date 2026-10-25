@@ -264,6 +264,24 @@ is a real cost, and the real tool chain is the expensive part of a run.
 Accepted deliberately, and noted here so nobody re-derives it as a
 surprise.
 
+### Known limitation: on the cloud path every file is a package of one
+
+**Added 2026-10-25 (REQ-PIPE-266 criterion 6).** Files that arrive together
+are gated together, once every one of them has been checked - and "together"
+means one PACKAGE: the arrivals of one collection that share a receipt
+instant and are filed to one period, which today means one zip. The cloud
+ingest path records each S3 object as its own delivery at its own storage
+instant (`qa_tools/common/s3_arrival.record_object`), so there every file is
+a package of one and is gated on its own. An early file whose cross-table
+checks need a later one reads red until the later one arrives and is
+promoted - the accepted flicker (Keith, 2026-10-20), whose remedy is supplier
+guidance to upload one zip (REQ-DOCS-274).
+
+A cloud package boundary - a manifest, or an end marker - is transport-layer
+work, deliberately not designed here (Keith, 2026-10-22, Q9 = A, "B later"):
+it is to be scoped in `plans/running-thoughts.md` #114 and
+`plans/supply-thoughts.md`.
+
 ## Lambda-context `run_by` attribution
 
 Already built and verified this session, ahead of the rest of this

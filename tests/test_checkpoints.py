@@ -31,10 +31,15 @@ class TestWhereACheckpointCanBe:
     def test_between_two_instants_it_stays(self):
         assert checkpoints.snapped(_at(0, 1, 2, 3), 3) == 3
 
-    def test_inside_a_zip_it_moves_back_to_where_the_zip_begins(self):
-        """A zip's files are filed together, so a checkpoint between them
-        would hold half a filing - earlier is the safe direction."""
-        assert checkpoints.snapped(_at(0, 5, 5, 5, 9), 4) == 2
+    def test_inside_a_package_is_refused_naming_its_first_arrival(self):
+        """A zip's files are gated together once all are checked (REQ-PIPE-266
+        criterion 18; REQ-TEST-159 criterion 1 as amended): a checkpoint
+        between them is refused, naming where the package begins - it used
+        to move back there silently."""
+        with pytest.raises(checkpoints.CheckpointRefused,
+                           match="not the first of its package.*begins at arrival 2"):
+            checkpoints.snapped(_at(0, 5, 5, 5, 9), 4)
+        assert checkpoints.snapped(_at(0, 5, 5, 5, 9), 2) == 2
 
     def test_inside_a_delivery_landing_over_minutes_it_moves_back_too(self):
         """A delivery's files can land minutes apart and are staged together
@@ -49,7 +54,7 @@ class TestWhereACheckpointCanBe:
             checkpoints.snapped(_at(0, 1, 2, 3, 4), before)
 
     def test_a_zip_from_the_first_arrival_has_no_point_inside_it(self):
-        with pytest.raises(checkpoints.CheckpointRefused, match="no point"):
+        with pytest.raises(checkpoints.CheckpointRefused, match="begins at arrival 1"):
             checkpoints.snapped(_at(0, 0, 0, 0), 3)
 
 
@@ -241,7 +246,12 @@ class TestARefusalChangesNothing:
             self, scratch_source, monkeypatch, no_generating):
         monkeypatch.setenv(supply_db.SUPPLY_DSN_ENV, scratch_source)
         monkeypatch.setattr(bootstrap, "staged_table_count", lambda conn: 33)
-        got = bootstrap.bootstrap(collection="cp", checkpoint_before=60)
+        # AN ARRIVAL THAT BEGINS ITS PACKAGE (REQ-PIPE-266 criterion 18): one
+        # inside a package is refused before the database is looked at.
+        found = checkpoints.arrivals_of("child-protection")
+        before = next(n for n in range(60, 1, -1)
+                      if found[n - 2].received_at != found[n - 1].received_at)
+        got = bootstrap.bootstrap(collection="cp", checkpoint_before=before)
         assert got.refused and "empty database" in got.reason and "env mark" in got.reason
 
     def test_an_unreadable_checkpoint_is_refused_not_crashed(self, scratch_source, monkeypatch):

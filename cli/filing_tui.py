@@ -302,6 +302,15 @@ def _refused(exc: Exception, operation: str, *, flag_route: bool) -> None:
     _show(text, title=f"{operation} refused", style="red")
 
 
+def _gate_busy(exc, operation: str, *, flag_route: bool) -> None:
+    """A decision a gate is deciding right now: said, nothing recorded, and
+    on the flag route exit 75 (REQ-PIPE-266 criteria 15 and 16) - a script
+    can tell 'wait and retry' from 'no'."""
+    _show(str(exc), title=f"{operation} not recorded", style="yellow")
+    if flag_route:
+        raise SystemExit(filing_decisions.EXIT_TRY_LATER)
+
+
 def apply_decision(*, operation: str, dataset_id: str, period: str | None,
                    supply: str | None = None, stands_on: str | None = None,
                    to_period: str | None = None, reason: str | None = None,
@@ -334,6 +343,22 @@ def apply_decision(*, operation: str, dataset_id: str, period: str | None,
         _show(str(exc), title=f"{operation} refused", style="red")
         return None
 
+    # NOT YET - A GATE IS DECIDING IT (REQ-PIPE-266 criteria 15 and 16):
+    # refused before a reason is asked for, recording nothing; on the flag
+    # route with exit 75, the 'try later' the processing pass already uses.
+    try:
+        filing_decisions.refuse_while_gated(filing_decisions.Request(
+            operation=operation, dataset_id=dataset_id, actor=actor, reason="",
+            period=period, to_period=to_period, supply=supply, stands_on=stands_on,
+            through_period=through_period))
+    except filing_decisions.GateBusy as exc:
+        _gate_busy(exc, operation, flag_route=flag_route)
+        return None
+    except filing_queue.LogUnreachable as exc:
+        say_unreachable(exc)
+        return None
+    except Exception:  # noqa: BLE001 - apply() checks again, under the locks, and says why
+        pass
     # REFUSED BEFORE THE REASON IS ASKED FOR, where it cannot happen at all
     # (#113): a reason typed for a decision about to be refused is wasted.
     try:
@@ -458,6 +483,9 @@ def apply_decision(*, operation: str, dataset_id: str, period: str | None,
                 _show(body, title=f"{operation} refused", style="red")
                 return None
             continue
+        except filing_decisions.GateBusy as exc:
+            _gate_busy(exc, operation, flag_route=flag_route)
+            return None
         except (decision_log.DecisionRefused, filing_decisions.NotOffered,
                 people.UnknownActor, substitution.SubstitutionRefused,
                 inheritance.InheritanceRefused) as exc:

@@ -311,7 +311,8 @@ def _owed(record: dict, dataset_id: str, periods: list[str], holdings: Holdings)
 
 
 def count(dataset_id: str, supply: str, shown: list[dict], *, holdings: Holdings,
-          owed: Owing | None, at=None, period: str | None = None) -> list[dict]:
+          owed: Owing | None, at=None, period: str | None = None,
+          stand_ins: bool = True) -> list[dict]:
     """The results that COUNT toward `supply` in the warehouse `holdings`
     describe, oldest first, then one red stand-in per owed check with none -
     so the last record per check is the one it reads.
@@ -331,8 +332,9 @@ def count(dataset_id: str, supply: str, shown: list[dict], *, holdings: Holdings
     if not periods:
         return [r for r in shown if counts_toward(r, dataset_id, [], holdings)]
     if len(periods) == 1:
-        return _count_in(dataset_id, shown, periods[0], holdings, owed, at)
-    readings = [_count_in(dataset_id, shown, p, holdings, owed, at) for p in periods]
+        return _count_in(dataset_id, shown, periods[0], holdings, owed, at, stand_ins)
+    readings = [_count_in(dataset_id, shown, p, holdings, owed, at, stand_ins)
+                for p in periods]
     position = {id(r): i for i, r in enumerate(shown)}
     worst: dict[str, dict] = {}
     for got in readings:
@@ -347,10 +349,16 @@ def count(dataset_id: str, supply: str, shown: list[dict], *, holdings: Holdings
 
 
 def _count_in(dataset_id: str, shown: list[dict], period: str, holdings: Holdings,
-              owed: Owing | None, at) -> list[dict]:
-    """count() for one period the supply stands in."""
+              owed: Owing | None, at, stand_ins: bool = True) -> list[dict]:
+    """count() for one period the supply stands in. `stand_ins` False leaves
+    an owed check with no counted result uncounted rather than red - the
+    promotion gate's reading of the warehouse as it WILL stand (REQ-PIPE-267
+    criteria 1 and 6), where such a check is re-evaluated, or decided
+    without where its result could count toward nothing."""
     periods = [period]
     counted = [r for r in shown if counts_toward(r, dataset_id, periods, holdings)]
+    if not stand_ins:
+        return counted
     have = {r["check_id"] for r in counted}
     newest: dict[str, dict] = {}
     for r in shown:
@@ -392,7 +400,7 @@ def stand_in(record: dict, cause) -> dict:
 
 # ---- the one function -------------------------------------------------------------
 
-def _shown(conn, dataset_id: str, supply: str) -> list[dict]:
+def _shown(conn, dataset_id: str, supply: str, *, application: int | None = None) -> list[dict]:
     """Every completed, agreed result about `supply` of `dataset_id`, oldest
     first by run_seq and then as each run recorded them, each cross-table
     one carrying what it recorded reading (`reads`).
@@ -424,6 +432,10 @@ def _shown(conn, dataset_id: str, supply: str) -> list[dict]:
     TIE-BREAK: none is needed. run_seq is unique per run; within a run, the
     order the run recorded its results (qa.check_result.id), exactly as one
     run's own reader reads them.
+
+    `application`: a GATE APPLICATION reading its own re-evaluations, which
+    count toward nothing else until it settles (REQ-PIPE-267 criterion 12) -
+    the runs every reader sees, and that application's own.
     """
     from qa_tools.common import hierarchy
     from qa_tools.common import qa_results_reader as reader
@@ -441,16 +453,25 @@ def _shown(conn, dataset_id: str, supply: str) -> list[dict]:
         by_file_params = [dataset_id, found.delivery, files]
     else:
         by_file, by_file_params = own, [dataset_id, supply]
+    if application is None:
+        results_from = (f'"{s}".check_result_visible c '
+                        f'JOIN "{s}".run_visible r ON r.run_key = c.run_key')
+        mine: list = []
+    else:
+        results_from = (f'"{s}".check_result c JOIN (SELECT * FROM "{s}".run_visible '
+                        f'UNION ALL SELECT * FROM "{s}".run WHERE completed_at IS NOT NULL '
+                        "AND gate_application = ?) r ON r.run_key = c.run_key")
+        mine = [application]
     cursor = conn.execute(
-        f'SELECT c.*, c.id AS result_row FROM "{s}".check_result_visible c '
-        f'JOIN "{s}".run_visible r ON r.run_key = c.run_key '
+        f'SELECT c.*, c.id AS result_row FROM {results_from} '
         "WHERE c.supply_state = ? AND ("
         f"(c.scope NOT IN (?, ?) AND {own}) "
         f"OR (c.scope = ? AND {by_file}) "
         f'OR EXISTS (SELECT 1 FROM "{s}".check_read k WHERE k.check_result_id = c.id '
         "AND k.logical_table = ? AND k.state = ? AND k.supply_id = ?)) "
         "ORDER BY r.run_seq, c.id",
-        [qa_store.AGREED, qa_store.CROSS_TABLE_SCOPE, qa_store.FILE_SCOPE, dataset_id, supply,
+        [*mine, qa_store.AGREED, qa_store.CROSS_TABLE_SCOPE, qa_store.FILE_SCOPE, dataset_id,
+         supply,
          qa_store.FILE_SCOPE, *by_file_params, table, qa_store.READ, supply])
     records = reader.records_from(cursor.description, cursor.fetchall())
     ids = [r["result_row"] for r in records]

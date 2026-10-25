@@ -99,15 +99,30 @@ class TestTheRun:
             ran.append(kw)
         monkeypatch.setattr(recheck, "execute", execute)
 
-        def after_run(conn, **kw):
-            item = kw["supplies"][0]
-            gated.append(item["supply"])
-            why = (refused or {}).get(item["supply"])
-            return promotion.AfterRun(promoted=() if why else (item["dataset_id"],),
-                                      refused={item["dataset_id"]: why} if why else {},
-                                      failed={})
-        monkeypatch.setattr(promotion, "after_run", after_run)
-        monkeypatch.setattr(promotion, "report", lambda o: None)
+        from qa_tools.common import gate
+
+        def apply(collection_id, period, *, checked, **kw):
+            # THE WAITING READERS, RE-GATED AS ONE GATE APPLICATION
+            # (REQ-PIPE-267 criterion 2).
+            out = gate.Applied()
+            for item in checked:
+                gated.append(item["supply"])
+                why = (refused or {}).get(item["supply"])
+                if why:
+                    out.refused[item["dataset_id"]] = why
+                else:
+                    out.promoted = (*out.promoted, item["dataset_id"])
+            return out
+        monkeypatch.setattr(gate, "apply", apply)
+        monkeypatch.setattr(gate, "report", lambda o: None)
+        # A FAILURE THE RE-EVALUATION CHANGED (REQ-PIPE-278 criterion 4): each
+        # reader's failing set before the run differs from after it.
+        seen: dict = {}
+
+        def failing_checks(conn, dataset_id, supply):
+            seen[supply] = seen.get(supply, 0) + 1
+            return frozenset() if seen[supply] == 1 else frozenset({"a-check"})
+        monkeypatch.setattr(knock_on, "_failing_checks", failing_checks)
         monkeypatch.setattr(recheck, "clear", lambda i, k: cleared.append(i))
         monkeypatch.setattr(recheck, "fail", lambda i, m: failed.append(m))
         monkeypatch.setattr(knock_on, "_shout", lambda conn, item, p, f, **k: shouted.append(f))

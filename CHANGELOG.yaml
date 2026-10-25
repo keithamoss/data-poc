@@ -111,8 +111,10 @@ intro: >
 releases:
   - date: "2026-10-25"
     summary: >
-      The dashboard appears in under half a second again, and a data file
-      that did not load is named plainly without hiding everything else.
+      The dashboard appears in under half a second again, a data file that
+      did not load is named without hiding everything else, and the files of
+      a delivery are now judged together, so no table goes in green against a
+      partner that nobody checked.
     changes:
       - category: Fixed
         items:
@@ -156,6 +158,33 @@ releases:
               a complete page somewhere else without touching your local
               dashboard. The browser tests use it to run on every core at
               once, and no longer overwrite your local dashboard when they run.
+          - headline: A delivery is judged as one
+            components: ["Pipeline & publishing", "QA checks & contract"]
+            description: >
+              The files of one delivery are checked first and then judged
+              together, so a table goes into the warehouse only with the
+              tables it was checked against. If one file is held back, the
+              others are re-checked against what is already in the warehouse,
+              and they go in if they still pass.
+          - headline: No unchecked green
+            components: ["QA checks & contract", "Pipeline & publishing"]
+            description: >
+              A cross-table check that could not read its partner table is now
+              red whatever the reason, including a partner not due yet, and
+              the record says why. A table that only joins the agreement in a
+              later period leaves the check out instead.
+          - headline: One ticket per cause
+            components: ["GitHub workflow & people"]
+            description: >
+              A supply held back only by another table's problem gets no
+              ticket of its own. The ticket for the table that caused it lists
+              it under "Also held back by this".
+          - headline: Try again in a moment
+            components: ["Pipeline & publishing"]
+            description: >
+              A decision that moves a table into or out of a period is refused
+              while that period's delivery is being judged. Nothing is changed,
+              and `mothman supply decide` exits 75 so that you can retry.
   - date: "2026-10-24"
     summary: >
       Every result now sits on the delivery it actually read, in the order it

@@ -523,8 +523,14 @@ def from_run(conn: supply_db.SupplyConnection, collection_id: str, run_key: str,
     keys = {parts[1] for parts in (supply_db.split_staged(str(r[0])) for r in rows) if parts}
     if not keys:
         return []
+    # NOTHING IS OFFERED FOR A SUPPLY WHOSE PACKAGE IS STILL BEING CHECKED OR
+    # GATED (REQ-PIPE-266 criterion 5): it is decided by the gate once the
+    # rest of its delivery is checked, and a decision now would be refused.
+    from qa_tools.common import gate
+
     return [s for s in awaiting(conn, collection_id, now=now)
-            if s.supply and arrival_key_of(s.supply) in keys]
+            if s.supply and arrival_key_of(s.supply) in keys
+            and gate.still_being_gated(conn, s.dataset_id, s.supply) is None]
 
 
 def excuse_offers(conn, state: slot_state.SlotState) -> tuple[str, ...]:

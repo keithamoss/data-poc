@@ -98,8 +98,9 @@ class TestEachSlotStateRecordsItsOwnReason:
     four real tools."""
 
     @pytest.mark.parametrize("received,carers_filed,code,status", [
-        # Before cp-carers is due for 2027-Q3 (due 2027-08-01).
-        ("2027-07-25T03:00:00+00:00", False, "not-yet-due", "nodata"),
+        # Before cp-carers is due for 2027-Q3 (due 2027-08-01) - red since
+        # REQ-PIPE-270, its own reason kept.
+        ("2027-07-25T03:00:00+00:00", False, "not-yet-due", "fail"),
         # Well after it was due, with nothing filed.
         ("2027-09-01T03:00:00+00:00", False, "past-due", "fail"),
         # After it was due, with a supply filed and not yet decided.

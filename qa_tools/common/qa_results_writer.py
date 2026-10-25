@@ -289,6 +289,9 @@ def _scope_to_run(verified: list[dict], run_id: str) -> None:
         # table (REQ-PIPE-121 criteria 1 and 2) - never its own table and
         # column checks, which would be duplicate results that look like news.
         keep = _readers_of(moved, dataset_id, run_id)
+        narrowed = _readers_checks(run_id)
+        if narrowed is not None:
+            keep &= narrowed
         readers, contested = frozenset(keep), True
     # WHAT THIS RUN CARRIES IS NOT ITS OWN (REQ-PIPE-265): the sibling that
     # evaluated it holds the one record.
@@ -376,6 +379,9 @@ def base_scope_of_run(run_id: str):
         # A READERS-ONLY RUN (REQ-PIPE-121 criterion 2): only its dataset's
         # checks reading a moved table are this run's.
         keep = _readers_of(moved, dataset_id, run_id)
+        narrowed = _readers_checks(run_id)
+        if narrowed is not None:
+            keep &= narrowed
         return lambda check: check in keep
 
     def in_scope(check: str) -> bool:
@@ -401,6 +407,22 @@ def _readers_scope(run_id: str) -> list[str] | None:
     if not rows or rows[0][0] != "readers":
         return None
     return [t for t in (rows[0][1] or "").split(",") if t]
+
+
+def _readers_checks(run_id: str) -> frozenset[str] | None:
+    """The checks a gate application's re-evaluation narrowed a readers-only
+    run to (REQ-PIPE-267 criterion 6), or None for every reading check."""
+    from qa_tools.common import qa_store, supply_db
+
+    if not supply_db.split_run(run_id)[1]:
+        return None
+    conn = supply_db.connect(read_only=True, label="mothman:run-scope")
+    try:
+        rows = conn.execute(f'SELECT readers_checks FROM "{qa_store.SCHEMA}".run '
+                            "WHERE run_key = ?", [run_id]).fetchall()
+    finally:
+        conn.close()
+    return frozenset(rows[0][0]) if rows and rows[0][0] is not None else None
 
 
 def _readers_of(tables: list[str], dataset_id: str, run_id: str) -> set[str]:
@@ -735,7 +757,11 @@ def open_run(agency: str, collection: str, run_id: str, run_timestamp: str,
             qa_store.reopen_run(lock, run_id)
             # WHAT THE RUN IS FOR (REQ-PIPE-140). A re-run's executor states
             # it; an arrival's run is the supply its id names, where filed.
-            qa_store.set_run_purpose(lock, run_id, **(purpose or _arrival_purpose(
+            # WHAT A GATE APPLICATION'S RE-CHECK READS FROM THE WAREHOUSE is the
+            # orchestrator's to use, not a column (REQ-PIPE-267 criterion 6):
+            # qa.check_read records what each result read.
+            stated = {k: v for k, v in (purpose or {}).items() if k != "held_back_tables"}
+            qa_store.set_run_purpose(lock, run_id, **(stated or _arrival_purpose(
                 lock, run_id, dataset_id, delivery=delivery, received_at=received_at)))
             qa_store.set_run_seq(lock, run_id, run_seq)
     except BaseException:

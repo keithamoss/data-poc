@@ -235,14 +235,12 @@ class TestTheGateTakesEffectWhenItsCauseDid:
     wall clock, so a replayed un-supersede in 2024 promoted in 2026."""
 
     def test_it(self, owed_one, monkeypatch):
-        from qa_tools.common import promotion
+        from qa_tools.common import gate
 
         seen = {}
         monkeypatch.setattr(recheck, "execute", lambda **k: (object(), []))
-        monkeypatch.setattr(promotion, "after_runs",
-                            lambda arrivals, results, **k: seen.update(k) or
-                            promotion.AfterRun(promoted=(), refused={}, failed={}))
-        monkeypatch.setattr(promotion, "report", lambda o: None)
+        monkeypatch.setattr(gate, "apply", lambda *a, **k: seen.update(k) or gate.Applied())
+        monkeypatch.setattr(gate, "report", lambda o: None)
         owed_id, decision_id = owed_one
         recheck.run(owed_id, run_by="pytest@example.org")
         with supply_db.connect(label="test-recheck") as conn:

@@ -104,6 +104,13 @@ def _gate_line(conn, dataset_id: str, supply: str) -> str:
         [dataset_id, supply, decision_log.RULE, decision_log.PROMOTE,
          decision_log.PROMOTION_WITHHELD, decision_log.PROMOTION_REFUSED]).fetchall()
     if not rows:
+        # WAITING FOR ITS PACKAGE IS NOT OWED TO THE NEXT PASS (REQ-PIPE-266
+        # criterion 5): it is gated by the rest of its delivery's last check.
+        from qa_tools.common import gate
+
+        package = gate.package_of(conn, dataset_id, supply)
+        if package is not None and not package.complete and len(package.supplies) > 1:
+            return gate.waiting_words(package)
         return "no gate outcome is recorded yet - it is owed to the next processing pass"
     action, reason, actor = rows[0]
     said = {decision_log.PROMOTE: "promoted",
