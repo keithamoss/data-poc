@@ -12266,6 +12266,10 @@ twice. It deliberately did not re-find the `TypeError`.
      its COLLECTION (any file), or floor a joined member's promotion at its
      own latest decision. Not built - it changes every staggered pair's
      instants in the replayed history.
+     **DEFERRED (Keith, 2026-10-25, option b)**: log it and fix it with the next
+     change that alters the generated history anyway (likely REQ-GEN-235/238 in
+     wave 2), so the rebuild is paid once. Outcomes are right; only the
+     instants around a staggered package's promotion are out of order.
 
 277. **[done, 2026-10-25]** **[Testing & dev tooling]** **Two generator tests
      read REQ-GEN-273's new scenario deliveries as invariant breaks.** Found by
