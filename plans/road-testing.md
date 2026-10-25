@@ -80,7 +80,8 @@ built. Ordered by value to a busy data-team leader at the dashboard.
   rather than making today's results readable, and its values need
   sprints 1 and 3's displays.
 - **To scope first:** #3 (data arriving now that belongs in the NEXT period's schema), reopened by Keith 2026-10-12 - a concept of its own, not REQ-PIPE-167.
-- **Not scheduled:** #12 stays parked (Keith, 2026-10-06). #16 is built and
+- **To scope (Keith, 2026-10-25):** #12, unparked, with a synthetic geocoding dataset (one row per source record per census year); #19 as decided in its entry.
+- **Not scheduled:** #16 is built and
   waits only on checking its remaining decisions into the requirements
   that own the rest before its ~1,100 lines go.
 
@@ -126,6 +127,8 @@ Still to settle by driving the page: #8 and #17 - both since closed
 
 - **You told us:** Some datasets deliver for the following period - data arriving in January fills Q2, not Q1.
 - **What we heard:** Whether a supply is for this period or the next is a property of the dataset, not a one-off.
+
+   **From the road-test participant, not Keith** (Keith, 2026-10-25): the "Keith's own ask" below records who relayed it.
 
    **The DESIGN QUESTION is settled; the WORK is not, and is
    deliberately not in these sprints.** Corrected 2026-09-24 after this
@@ -214,6 +217,8 @@ Still to settle by driving the page: #8 and #17 - both since closed
 - **What we heard:** A drift check on the count of distinct values, with amber and red bands, separate from today's proportion drift.
 - **Evidence:** sprint 4
 
+   **From the road-test participant, not Keith** (Keith, 2026-10-25): the "Keith's own ask" below records who relayed it.
+
    **This is a genuinely different check from the drift we have**, which
    matters because the obvious move is to point the existing one at
    suburb and call it done. Today's drift check
@@ -283,6 +288,8 @@ Still to settle by driving the page: #8 and #17 - both since closed
 - **What we heard:** A declared list of known-bad dates and ranges with tiered percentage bands, beside the check that tolerates no unknown bad date.
 - **Evidence:** sprint 4
 
+   **From the road-test participant, not Keith** (Keith, 2026-10-25): the "Keith's own ask" below records who relayed it.
+
    **The semantics to hold on to, because the wording cuts both ways.**
    These are values known to be BAD, and we TOLERATE them up to a
    threshold. That is a different check from the plausible-range one
@@ -350,6 +357,8 @@ Still to settle by driving the page: #8 and #17 - both since closed
 - **What we heard:** A side-by-side distribution in the drill-down - a picture for reassurance, not another check to configure.
 - **Evidence:** sprint 3
 
+   **From the road-test participant, not Keith** (Keith, 2026-10-25): the "Keith's own ask" below records who relayed it.
+
    **His own framing of why, and it is the part worth keeping**: this is
    a HUMAN COMFORT feature, not a check. Drift detection will exist for
    the variables that warrant it, but we will not want a drift check on
@@ -394,6 +403,8 @@ Still to settle by driving the page: #8 and #17 - both since closed
 - **You told us:** When values are invalid, say which values they were and how many of each.
 - **What we heard:** The breakdown already exists for six columns; every check that can have one should, and a check that cannot should say so.
 - **Evidence:** sprint 3
+
+   **From the road-test participant, not Keith** (Keith, 2026-10-25): the "Keith's own ask" below records who relayed it.
 
     **It already exists, which reframes this from "build it" to "why did
     you not see it".** `aggregateValuesBlock()` in the template renders,
@@ -460,7 +471,7 @@ Still to settle by driving the page: #8 and #17 - both since closed
     breakdown should also show the compared run, which is item 9's
     question arriving from the other direction.
 
-12. **[parked, 2026-09-24]** **[QA checks & contract]** **A completeness
+12. **[todo, 2026-09-24]** **[QA checks & contract]** **A completeness
     check for a TALL dataset: every event must have exactly one row per
     expected category.** Keith's own ask, 2026-09-24, with his own
     worked example - a geocoding dataset holding one row per geocoding
@@ -470,8 +481,8 @@ Still to settle by driving the page: #8 and #17 - both since closed
 
 - **You told us:** In a tall dataset every event should have exactly one row per expected category - one per census year, say.
 - **What we heard:** A check that every key has exactly one row for each member of a declared set, reporting missing, duplicate and unexpected members separately.
-- **What we built:** Nothing yet - parked until the 30-dataset asset is closer and holds a real tall dataset to build it against.
-- **Card status:** parked
+
+    **UNPARKED (Keith, 2026-10-25)**, from the road-test participant: scope it now, WITH a synthetic geocoding dataset to build it against - addresses geocoded, one row per source record per ABS census year. Goes to delivery-scoper.
 
     **The generalisable rule underneath it**, which is what makes this
     worth building rather than one bespoke query: *for every key, there
@@ -1719,6 +1730,8 @@ Still to settle by driving the page: #8 and #17 - both since closed
 - **We noticed:** On a past date, the supply history still lists supplies that arrived after it.
 - **What we heard:** Whether the history should stop at the date on show, mark later rows, or stay as it is, is still open.
 - **Evidence:** [Client Register on 5 Aug 2023](?in-place-on=2023-08-05#/agency/child-protection-family-support/collection/child-protection/dataset/cp-clients)
+
+    **DECIDED (Keith, 2026-10-25)**: keep the whole history and MARK supplies that arrived after the date on show as "arrived after this date", rather than clipping or leaving them. Goes to delivery-scoper as a small requirement.
 
 20. **[todo, 2026-10-20]** **[Dashboard UI]** **The "awaiting a correction"
     line's border ignores the theme.** Seen by delivery-dashboard-ux while

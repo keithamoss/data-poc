@@ -16,7 +16,6 @@ Retired check files are not run, so they are not checked.
 """
 from __future__ import annotations
 
-import glob
 import os
 import sys
 
@@ -27,8 +26,12 @@ _CLOUD_ONLY = ("change ", "anomaly score", "anomaly detection")
 
 
 def check_files() -> list[str]:
-    return sorted(p for p in glob.glob(os.path.join(ROOT, "contract", "*-soda-checks.yml"))
-                  if not p.endswith("-retired.yml"))
+    """Every collection's live Soda checks file, found by convention through
+    the registry (REQ-QAC-241) - a glob of contract/ itself found none once
+    they moved under contract/<agency-id>/ (post-build-review #273)."""
+    from qa_tools.common import soda_common
+
+    return sorted(soda_common.soda_check_files())
 
 
 def problems(paths=None) -> list[str]:

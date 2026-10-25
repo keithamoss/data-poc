@@ -5875,3 +5875,29 @@ could never have computed it), and it belongs with batch 5's check work.
      refusal when an attempt's end updates no row (small); a heartbeat
      column the next attempt checks (bigger, also covers a hung process).
      Decide when the AWS build is scoped.
+
+125. **[todo, 2026-10-25]** **[Docs & process]** **[Testing & dev tooling]**
+     **A real builder agent, if delegated building stays.** Over the week of
+     2026-10-18 the main session drifted into handing coding work to
+     general-purpose agents ("builders") and keeping orchestration - gates,
+     pushes, CI, morning reports - for itself. It was never agreed or
+     written down (nothing in CLAUDE.md or docs/agent-orchestration.md), and
+     Keith noticed it on 2026-10-25. His call: "if we were to keep this
+     practice, we'd want to actually build a builder agent". Until then:
+     small things the main session builds itself, larger things go to a
+     builder.
+     What the main session told him it buys: its own context stays clear of
+     diffs and test logs across a long or overnight run; two builders can
+     run in separate worktrees (A3 beside the morning answers, 2026-10-25);
+     the main session stays free to answer, check CI and gate. What it
+     costs: detail lost both ways in the hand-off (a false "f861ee4 passed a
+     full gate" was carried through one on 2026-10-24); a builder's report
+     is a claim to re-verify, not proof; more tokens; and it sits outside
+     the `delivery-*` pipeline the project actually designed.
+     A builder agent would make that explicit: a `.claude/agents/` file
+     whose brief carries the standing rules (failing test first, register
+     fields at `built`, commit claims only from runs of that tree, never the
+     real `supply` database, a scratch DSN and MOTHMAN_TEST_DB_TAG, no push,
+     no full gate), what it must report, and where it sits in
+     docs/agent-orchestration.md relative to the scoper, architect and
+     critics. Not scoped - goes to the scoper first.
