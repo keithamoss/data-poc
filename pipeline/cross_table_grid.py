@@ -422,12 +422,13 @@ def clause_points(dataset_id: str, period_of: dict[str, str | None], *, timeline
             when = asset_time.end_of_day(date.fromisoformat(day))
             if stand and stand.get("supply"):
                 holder, stands_on = stand["supply"], stand.get("standsOn")
+                kind = stand.get("kind")
             elif promoted and promoted.get("supply"):
-                holder, stands_on = promoted["supply"], None
+                holder, stands_on, kind = promoted["supply"], None, None
             else:
-                holder, stands_on = None, None
+                holder, stands_on, kind = None, None, None
             p = {"on": day, **_clause(dataset_id, supply, holder, stands_on, when, health,
-                                      run_of, receipts)}
+                                      run_of, receipts, kind=kind)}
             if points and {k: v for k, v in points[-1].items() if k != "on"} == \
                     {k: v for k, v in p.items() if k != "on"}:
                 continue
@@ -440,7 +441,8 @@ _ENDS_WAITING = (decision_log.PROMOTE, decision_log.REJECT, decision_log.SUPERSE
                  decision_log.DEMOTE)
 
 
-def _clause(dataset_id, supply, holder, stands_on, when, health, run_of, receipts) -> dict:
+def _clause(dataset_id, supply, holder, stands_on, when, health, run_of, receipts,
+            kind=None) -> dict:
     if not holder:
         return {"clause": [text("Nothing is in place in the warehouse for this period yet.")],
                 "status": None}
@@ -453,17 +455,25 @@ def _clause(dataset_id, supply, holder, stands_on, when, health, run_of, receipt
             if not (status == "red" and step["status"] == "red"):
                 since = step
             status = step["status"]
-    status = status or h.get("promotedOn") or "green"
+    # AN UNKNOWN STATUS IS NOT GREEN (functional critic on 7093c20): with no
+    # recorded health for the holder the clause names it and gives no status.
+    status = status or h.get("promotedOn")
     promoted_at = h.get("promotedAt")
     if status == "red" and since is not None and promoted_at:
         went_red = _instant(since["at"]) <= _instant(promoted_at)
     if stands_on:
-        lead = [text("The supply in place in the warehouse is the one carried forward from "
+        # THE PAGE'S OWN WORD FOR IT (UX critic on 7093c20, P4, PROVISIONAL):
+        # the standing-in badge says "Substituted from" for a substitution.
+        how = "substituted from" if kind == "substituted" else "carried forward from"
+        lead = [text(f"The supply in place in the warehouse is the one {how} "
                      f"{_period(stands_on)} ("), *named(dataset_id, holder, receipts,
                                                         style="received"), text("), and is ")]
     else:
         lead = [text("The supply in place in the warehouse is the one "),
                 *named(dataset_id, holder, receipts, style="received"), text(", and is ")]
+    if status is None:
+        lead[-1] = text(".")
+        return {"clause": lead, "status": None, "tail": []}
     if status != "red":
         tail = [text(".")]
     elif went_red or since is None:
@@ -478,11 +488,19 @@ def _clause(dataset_id, supply, holder, stands_on, when, health, run_of, receipt
 
 # ---- the supply-history row of a joint promotion (criterion 20) ---------------
 
+def _plain_list(names: list[str]) -> str:
+    return names[0] if len(names) == 1 else f"{', '.join(names[:-1])} and {names[-1]}"
+
+
 def _names(segs_list: list[list[dict]]) -> list[dict]:
     """'a', 'a and b', 'a, b and c'; past three, the first two and 'and <n> more'."""
     if len(segs_list) > 3:
         rest = len(segs_list) - 2
-        segs_list = segs_list[:2] + [[text(f"{rest} more")]]
+        # THE OTHERS ON DEMAND (UX critic on 7093c20, P6 and P7): "<n> more"
+        # carries every name it stands for, for the page's tooltip and its
+        # accessible name.
+        hidden = _plain_list([words_of(segs) for segs in segs_list[2:]])
+        segs_list = segs_list[:2] + [[{"text": f"{rest} more", "more": hidden}]]
     out: list[dict] = []
     for i, segs in enumerate(segs_list):
         if i:
@@ -491,12 +509,21 @@ def _names(segs_list: list[list[dict]]) -> list[dict]:
     return out
 
 
+def _order(dataset_id: str) -> int:
+    ids = [d.dataset_id for d in hierarchy.all_datasets()]
+    return ids.index(dataset_id) if dataset_id in ids else len(ids)
+
+
 def promotion_words(dataset_id: str, period_of: dict[str, str | None], *, log, slots: Slots,
-                    receipts: Receipts, runs: dict[str, list[dict]]) -> dict[str, list[dict]]:
+                    receipts: Receipts, runs: dict[str, list[dict]],
+                    related: set[str] | None = None) -> dict[str, list[dict]]:
     """{decision id: segments} for each rule promotion of this dataset's
     supplies that was made with others in one gate application, or after a
     re-check against the warehouse because a supply received with it was held
-    back. `runs` is {supply: [its runs' facts]}, each with a `cause`."""
+    back. `runs` is {supply: [its runs' facts]}, each with a `cause`;
+    `related` the datasets this dataset's cross-table checks are between -
+    the re-check read one of those, never another held supply of the
+    application (functional critic on 7093c20, D3)."""
     out: dict[str, list[dict]] = {}
     for supply in period_of:
         for decision_id, at, kind, with_, application in log.promotes.get(supply, ()):
@@ -505,7 +532,8 @@ def promotion_words(dataset_id: str, period_of: dict[str, str | None], *, log, s
             when = display_time.format_instant(at)
             rechecked = application is not None and any(
                 str(r.get("cause")) == f"gate:{application}" for r in runs.get(supply, ()))
-            held = [s for _d, s in log.withheld_in.get(application, ()) if s != supply] \
+            held = [s for _d, s in log.withheld_in.get(application, ()) if s != supply
+                    and (related is None or s.split("@", 1)[0] in related)] \
                 if application is not None else []
             if rechecked and held:
                 by = held[0]
@@ -518,10 +546,23 @@ def promotion_words(dataset_id: str, period_of: dict[str, str | None], *, log, s
                     text(") because the "), dataset_segment(by_ds),
                     text(" received with it was held back.")]
             elif with_:
-                others = [[text("the "), dataset_segment(s.split("@", 1)[0]), text(" supply "),
-                           *named(s.split("@", 1)[0], s, receipts, style="received")]
-                          for s in with_ if s != supply]
+                # SHORT ON THE ROW (UX critic on 7093c20, P6): a supply received
+                # with this one is named without its receipt, as "of its
+                # delivery"; one received apart keeps it.
+                mine = receipts.at(supply)
+                together = [s for s in with_ if s != supply and receipts.at(s) == mine]
+                apart = [s for s in with_ if s != supply and receipts.at(s) != mine]
+                others = [[dataset_segment(s.split("@", 1)[0])] for s in sorted(
+                    together, key=lambda s: _order(s.split("@", 1)[0]))]
+                words = [text(f"Promoted {when} with ")]
                 if others:
-                    out[str(decision_id)] = [text(f"Promoted {when} with "), *_names(others),
-                                             text(", by the rule")]
+                    words += [text("the "), *_names(others),
+                              text(" supply of its delivery" if len(others) == 1
+                                   else " supplies of its delivery")]
+                for i, s in enumerate(apart):
+                    words += [text(" and the " if others or i else "the "),
+                              dataset_segment(s.split("@", 1)[0]), text(" supply "),
+                              *named(s.split("@", 1)[0], s, receipts, style="received")]
+                if others or apart:
+                    out[str(decision_id)] = words + [text(", by the rule")]
     return out

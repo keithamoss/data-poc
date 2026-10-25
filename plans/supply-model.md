@@ -3674,13 +3674,15 @@ a person resolves it" (REQ-DASH-264), naming cp_clients.csv (received 8:30am) an
 cp_clients_v2.csv, and the gate refuses its promotion.
 The three readers each say so at the top of their page (REQ-DASH-204
 criterion 13, as the page words it on 1 November 2019, on the bootstrap of
-2026-10-25): Notifications "No promoted Client Register for 2019-Q4. 3 of
-this supply's checks need it, so they could not run. That is not a fault in
-this supply's own data. They run again by themselves once a 2019-Q4 Client
-Register supply is promoted."; Investigations the same with "6 of this
-supply's checks"; Placements the same with "3 of this supply's checks". The
-Client Register's own banner ends "Affects Notifications, Investigations,
-Placements".
+2026-10-25): Notifications "No promoted Client Register for 2019-Q4. One of
+this supply's checks needs it, so it could not run. That is not a fault in
+this supply's own data." (when it runs again is said once, on the verdict
+line above it: "Nothing needs deciding on this supply"); Investigations the
+same with "2 of this supply's checks need it, so they could not run";
+Placements the same as Notifications. Checks are counted as the grid's rows,
+one per check however many tools ran it (UX critic on 7093c20, B2). The
+Client Register's own banner ends "Affects Notifications, Investigations and
+Placements.".
 **Breaks as**: one of the two files taken as the quarter's supply, or the
 three readers' cross-table checks evaluated against either.
 
@@ -3719,11 +3721,13 @@ re-check it owed runs at 11:00 and the gate promotes it; the knock-on
 re-evaluates the three readers and promotes them at the same instant
 (post-build-review #251). On 1 November 2020 each reader says so at the top
 of its page (REQ-DASH-204 criterion 13, as the page words it on the bootstrap
-of 2026-10-25): Notifications "No promoted Client Register for 2020-Q4. 3 of
-this supply's checks need it, so they could not run. That is not a fault in
-this supply's own data. They run again by themselves once a 2020-Q4 Client
-Register supply is promoted."; Investigations the same with "6 of this
-supply's checks"; Placements the same with "3 of this supply's checks". From
+of 2026-10-25): Notifications "No promoted Client Register for 2020-Q4. One of
+this supply's checks needs it, so it could not run. That is not a fault in
+this supply's own data." (when it runs again is said once, on the verdict
+line above it: "Nothing needs deciding on this supply"); Investigations the
+same with "2 of this supply's checks need it, so they could not run";
+Placements the same as Notifications. Checks are counted as the grid's rows,
+one per check however many tools ran it (UX critic on 7093c20, B2). From
 2 November, once re-evaluated, none of the three shows the line. On the page (REQ-DASH-264): on 1 November
 cp-clients' own checks read "No data" and its cross-table rows red, each
 named "<reader> → Client Register", with the banner saying the cross-table
@@ -4221,7 +4225,8 @@ The same placement, on 1 September. **Expect** (REQ-DASH-197 criterion 13),
 the verdict line above the results: "Awaiting a decision — the results
 below are the newest supply, received 2:00pm Tuesday, 1 September 2026,
 which is not in place in the warehouse yet. The supply in place in the
-warehouse is the one received 2:00pm Sunday, 30 August 2026." - naming D's
+warehouse is the one received 2:00pm Sunday, 30 August 2026, and is Amber." -
+the warehouse's status in the legend's word since REQ-DASH-272 - naming D's
 supply, not D+1's, which is newer by
 receipt. **Breaks as**: the verdict line naming 31 August's supply as in
 place in the warehouse.

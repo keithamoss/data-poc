@@ -164,6 +164,18 @@ button{font:inherit; color:inherit;}
 .crumb{color:var(--ink-muted);}
 .dataset-link{color:inherit; text-decoration:none;}
 .dataset-link:hover{text-decoration:underline;}
+/* A NAME IN A SENTENCE IS A LINK THAT LOOKS LIKE ONE (UX critic on 7093c20,
+   S1): in the cross-table, held-back and affects lines a dataset link is
+   underlined in the accent colour, even inside a bold heading - unlike a
+   table row's name, where the whole row reads as the way in. */
+.np-line .dataset-link, [data-held-back] .dataset-link, [data-holding-back] .dataset-link,
+[data-affects-readers] .dataset-link, [data-cause-note] .dataset-link, .verdict-of .dataset-link,
+[data-not-due-yet] .dataset-link, .xt-sentence .dataset-link, [data-promoted-with] .dataset-link,
+.held-back-marker .dataset-link, .wh-clause .dataset-link{
+  color:var(--accent); text-decoration:underline; text-underline-offset:2px; font-weight:inherit;}
+.np-line .dataset-link:hover, [data-held-back] .dataset-link:hover, .verdict-of .dataset-link:hover{text-decoration-thickness:2px;}
+/* A PILL MID-SENTENCE KEEPS ITS FULL STOP (P3). */
+.wh-clause .pill-stop{white-space:nowrap;}
 .crumb.current{background:var(--accent-soft); color:var(--accent-ink); border-color:var(--accent-soft-line);}
 .crumb .tier{font-size:10px; letter-spacing:.08em; text-transform:uppercase; opacity:.7; font-weight:700;}
 .sep{color:var(--line-strong);}
@@ -775,14 +787,21 @@ span.scenario-subject-label{display:inline-block; margin:0 6px 0 0;}
 /* REQ-DASH-272: the cross-table GRID - one row per check, a cell for each
    view (Keith, 2026-10-22, Option C), the row still the one .scope-check
    button that opens its panel. */
-.xt-grid .xt-head, .xt-grid .scope-check.xt-row{display:grid; grid-template-columns:minmax(0,1.3fr) minmax(0,1fr) minmax(0,1fr) auto; gap:4px 16px; align-items:start;}
-.xt-grid[data-columns="1"] .xt-head, .xt-grid[data-columns="1"] .scope-check.xt-row{grid-template-columns:minmax(0,1.3fr) minmax(0,2fr) auto;}
+/* ONE COLUMN TEMPLATE FOR THE HEAD AND EVERY ROW (UX critic on 7093c20, P1):
+   the status column is a fixed width, so an empty head cell and a row's pill
+   take the same room and the headings sit over their columns. */
+.xt-grid{--xt-pill-col:84px;}
+.xt-grid .xt-head, .xt-grid .scope-check.xt-row{display:grid; grid-template-columns:minmax(0,1.3fr) minmax(0,1fr) minmax(0,1fr) var(--xt-pill-col); gap:4px 16px; align-items:start;}
+.xt-grid[data-columns="1"] .xt-head, .xt-grid[data-columns="1"] .scope-check.xt-row{grid-template-columns:minmax(0,1.3fr) minmax(0,2fr) var(--xt-pill-col);}
+.xt-view-block{margin:6px 0 10px;}
+.xt-view-label{font-size:11.5px; font-weight:600; letter-spacing:.04em; text-transform:uppercase; color:var(--ink-muted); margin-bottom:4px;}
 .xt-grid .xt-head{font-size:12px; font-weight:600; color:var(--ink-muted); padding:4px 2px;}
 .xt-row .xt-cell{font-size:12.5px; min-width:0;}
 .xt-row .xt-cell .xt-view{display:none; font-weight:600; color:var(--ink-muted); margin-right:4px;}
 .xt-row .xt-word{font-weight:600;}
 .xt-row .xt-word[data-status="green"]{color:var(--good);}
 .xt-row .xt-word[data-status="red"]{color:var(--bad);}
+.xt-row .xt-word[data-status="not-evaluated"]{color:var(--ink); font-weight:600;}
 .xt-row .xt-marks{margin-left:6px; letter-spacing:.12em; font-family:"IBM Plex Mono",monospace;}
 .xt-row .xt-note{display:block; font-size:12px; color:var(--ink-muted); margin-top:2px; overflow-wrap:anywhere;}
 .xt-row .xt-pill{justify-self:end;}
@@ -5160,7 +5179,7 @@ function promotionSplit(ds){
           ${arrivedSub}
         </div>
       </div>
-      <div class="promo-why">${escHtml(st.explanation || "")}</div>
+      <div class="promo-why">${escHtml(promoWhy(ds, st))}</div>
     </div>`;
 }
 
@@ -5603,11 +5622,22 @@ function crossTableRowOrder(col, rows){
 const XT_TOOLS = [["dbt", "dbt"], ["soda", "Soda"], ["datacontract", "datacontract-cli"]];
 const XT_WORD = {green: "Pass", amber: "Warn", red: "Fail", nodata: "No result", inactive: "No result"};
 function xtTool(ck){ return String((ck && ck.tool_ref) || "").split(":")[0]; }
-function xtMark(status){ return status === "green" ? "✓" : status === "red" ? "✗" : status === "amber" ? "!" : "–"; }
+// A RESULT THAT COULD NOT BE EVALUATED is no verdict on the data (UX critic on
+// 7093c20, B1; Keith Q1 = a, PROVISIONAL): its own mark, never ✗.
+function xtMark(h){
+  if(h && notEvaluated(h)) return "○";
+  const status = h && h.status;
+  return status === "green" ? "✓" : status === "red" ? "✗" : status === "amber" ? "!" : "–";
+}
 // A SENTENCE OF SEGMENTS (criterion 22): text set as text, a dataset as a
 // real link keeping the date on show (criterion 15).
-function segmentsHtml(segs){
-  return (segs || []).map(s=> ("text" in s) ? escHtml(s.text) : datasetRefLink({datasetId: s.dataset})).join("");
+function segmentsHtml(segs, asText){
+  // "<n> more" names everyone it stands for, on hover and to a screen reader
+  // (UX critic on 7093c20, P6 and P7).
+  return (segs || []).map(s=> ("text" in s)
+    ? (s.more ? `<span class="names-more" title="${escHtml(s.more)}">${escHtml(s.text)}<span class="sr-only"> (${escHtml(s.more)})</span></span>` : escHtml(s.text))
+    : asText ? escHtml(((realDatasetIndex()[s.dataset] || {}).raw || {}).name || s.dataset)
+    : datasetRefLink({datasetId: s.dataset})).join("");
 }
 // A PLACED POINT'S NOTE OR SENTENCE: an index into its dataset's phrases (the
 // build writes each once), or the segments themselves.
@@ -5627,7 +5657,7 @@ function supplyOnShow(ds){
 }
 // ONE ROW'S MODEL: each tool's newest result in each cell, the gate's reading
 // per tool, and whether the counted result is the warehouse one (criterion 9).
-function xtRowModel(col, cards, run, dateStr, datasetId){
+function xtRowModel(col, cards, run, dateStr, datasetId, heldChecks){
   const supply = run && run.supply_id;
   const tools = {}, counted = {};
   const cells = {staged: {}, warehouse: {}};
@@ -5649,17 +5679,20 @@ function xtRowModel(col, cards, run, dateStr, datasetId){
     // THE OWED RE-CHECK (criterion 10): the warehouse cell says so.
     if(c && c.rank == null && c.reason === "recheck-owed") owed = owed || c;
   });
-  // HELD BACK ON THE WAREHOUSE RESULT (criterion 9): the two cells differ and
-  // the gate's reading is the warehouse one - counted toward the supply, or,
-  // where the staged result is newer, the worse result the gate holds it on
-  // while its partner is not promoting (staggered Order B).
+  // HELD BACK ON THE WAREHOUSE RESULT (criterion 9), ONLY WHERE THE GATE SAYS
+  // SO (functional critic on 7093c20, D1; Keith Q2 = A, PROVISIONAL): the
+  // supply's hold-back as at the date on show - its structured 'promotion-
+  // withheld' entry, a failed re-check - names this check. A warehouse cell
+  // that is merely worse than the staged one is not a hold-back.
   const worst = view => rollupStatuses(Object.values(cells[view]).map(x=> x.h.status || "nodata"));
-  const both = Object.keys(cells.staged).length > 0 && Object.keys(cells.warehouse).length > 0;
-  const heldBack = both && worst("staged") !== worst("warehouse") && (XT_TOOLS.some(([t])=>
-    cells.warehouse[t] && counted[t] && counted[t].rank != null && counted[t].rank === cells.warehouse[t].h.rank)
-    || worst("warehouse") === rollupStatuses([worst("staged"), worst("warehouse")]));
+  const heldBack = Object.keys(cells.warehouse).length > 0 && !!heldChecks
+    && cards.some(ck=> heldChecks.has(ck.check_id));
+  // THE ROW COUNTS WHAT THE GATE COUNTS (REQ-PIPE-269): where a tool's counted
+  // result is its warehouse cell's, that result is in the row's status.
+  const countsWarehouse = XT_TOOLS.some(([t])=> cells.warehouse[t] && counted[t]
+    && counted[t].rank != null && counted[t].rank === cells.warehouse[t].h.rank);
   let status = rollupStatuses(cards.map(checkStatus));
-  if(heldBack) status = rollupStatuses([status, worst("warehouse")]);
+  if(heldBack || countsWarehouse) status = rollupStatuses([status, worst("warehouse")]);
   // WHERE A RESULT CAME FROM ANOTHER TABLE'S RUN (REQ-DASH-264 criterion 7 as
   // amended by REQ-DASH-272): said under that tool in the panel, and in the
   // row's accessible name - no longer on the row itself.
@@ -5670,6 +5703,11 @@ function xtRowModel(col, cards, run, dateStr, datasetId){
 }
 // The rows of a page's cross-table section, in crossTableRowOrder's
 // relationship-then-name order, one per check however many tools ran it.
+// The checks the gate held this supply back on, as at the date on show (D1).
+function heldChecksOn(ds){
+  const n = ds && ds.heldBackOn && ds.heldBackOn.notice;
+  return new Set((n && n.checks) || []);
+}
 function crossTableGridRows(col, ds, listed, dateStr){
   const run = supplyOnShow(ds);
   const groups = [], byKey = new Map();
@@ -5678,7 +5716,8 @@ function crossTableGridRows(col, ds, listed, dateStr){
     if(!byKey.has(key)){ const g = {c: r.c, cards: []}; byKey.set(key, g); groups.push(g); }
     byKey.get(key).cards.push(r.ck);
   });
-  return groups.map(g=> ({c: g.c, ...xtRowModel(col, g.cards, run, dateStr, ds.id)}));
+  const held = heldChecksOn(ds);
+  return groups.map(g=> ({c: g.c, ...xtRowModel(col, g.cards, run, dateStr, ds.id, held)}));
 }
 function xtCellText(row, view){
   const cell = row.cells[view];
@@ -5688,9 +5727,16 @@ function xtCellText(row, view){
   const present = XT_TOOLS.map(([t])=> cell[t]).filter(Boolean);
   if(!present.length) return null;
   const status = rollupStatuses(present.map(x=> x.h.status || "nodata"));
-  const marks = XT_TOOLS.map(([t])=> !row.tools[t] ? "·" : cell[t] ? xtMark(cell[t].h.status) : "–").join(" ");
+  const marks = XT_TOOLS.map(([t])=> !row.tools[t] ? "·" : cell[t] ? xtMark(cell[t].h) : "–").join(" ");
   const noteSegs = present[0].p.note || [];
-  return {word: XT_WORD[status] || STATUS_LABEL[status] || status, status, marks, noteSegs,
+  // THE WORD IS THE WORST EVALUATED RESULT; where nothing in the cell could be
+  // evaluated, it says so - the cell keeps its status (red, it counts) but
+  // never reads "Fail".
+  const evaluated = present.filter(x=> !notEvaluated(x.h));
+  const word = evaluated.length
+    ? (XT_WORD[rollupStatuses(evaluated.map(x=> x.h.status || "nodata"))] || STATUS_LABEL[status] || status)
+    : "Not evaluated";
+  return {word, status: evaluated.length ? status : "not-evaluated", marks, noteSegs,
           heldBack: view === "warehouse" && row.heldBack};
 }
 const XT_VIEW = {staged: "Staged:", warehouse: "In the warehouse:"};
@@ -5708,7 +5754,8 @@ function xtAriaLabel(row, views){
     if(!c) return;
     const label = view === "staged" ? "Against what's staged" : "Against what's in the warehouse";
     const tools = XT_TOOLS.map(([t, name])=> !row.tools[t] ? `${name} has no such check`
-      : row.cells[view][t] ? `${name} ${(XT_WORD[row.cells[view][t].h.status] || "no result").toLowerCase()}`
+      : row.cells[view][t] ? (notEvaluated(row.cells[view][t].h) ? `${name} could not be evaluated`
+        : `${name} ${(XT_WORD[row.cells[view][t].h.status] || "no result").toLowerCase()}`)
       : `${name} no result`).join(", ");
     const sentences = [...new Set(Object.values(row.cells[view]).map(x=> segmentsText(x.p.sentence)).filter(Boolean))];
     if(c.owed) sentences.push(segmentsText(row.owed.owedSentence));
@@ -5717,7 +5764,9 @@ function xtAriaLabel(row, views){
   const notes = [...new Set(Object.values(row.recheck || {}))];
   if(notes.length) parts.push(notes.join(" ").replace(/\.$/, ""));
   parts.push(`Status ${STATUS_LABEL[row.status] || row.status}`);
-  return parts.join(". ") + ".";
+  // ONE FULL STOP between sentences (UX critic on 7093c20, S6): a sentence
+  // that already ends in one is not given a second.
+  return parts.map(x=> String(x).trim().replace(/[.]+$/, "")).join(". ") + ".";
 }
 // THE SECTION'S BODY: the head, one button per row, the key line - with a
 // view no row holds a result in left out (criterion 6), never a column of dashes.
@@ -5732,7 +5781,7 @@ function crossTableGridHtml(rows){
         <span class="xt-pill">${pill(r.status, "sm")}</span>
       </button>`).join("");
   return {views: shown, html: `<div class="xt-grid" data-columns="${shown.length}">${head}${body}
-      <div class="xt-key"><span class="xt-marks">✓ ✗ ·</span> The marks are dbt, Soda and datacontract-cli, in that order; · means that tool has no such check. Select a check for each tool's full result.</div></div>`};
+      <div class="xt-key">The marks are dbt, Soda and datacontract-cli, in that order: <span class="xt-marks">✓</span> passed, <span class="xt-marks">✗</span> failed, <span class="xt-marks">○</span> could not be evaluated, and a middle dot (<span class="xt-marks">·</span>) means that tool has no such check. Select a check for each tool's full result.</div></div>`};
 }
 // WHAT A HISTORY ENTRY READ, as at the date on show (criterion 12): the same
 // sentence the panel gives, for the compare list - a result in neither cell
@@ -5749,16 +5798,33 @@ function xtToolsPanelBlock(col, ds, column, check){
   const cards = (column.checks || []).filter(ck=> !ck.retired && ck.name === check.name
     && crossTableBetween(col, ck) === between);
   if(!cards.length) return "";
-  const row = xtRowModel(col, cards, supplyOnShow(ds), CURRENT_IN_PLACE_ON, ds.id);
-  const lines = XT_TOOLS.filter(([t])=> row.tools[t]).map(([t, name])=>{
-    const ck = row.tools[t];
-    const said = ["staged", "warehouse"].flatMap(view=> row.cells[view][t] ? [row.cells[view][t]] : [])
-      .map(x=> `<div class="xt-sentence">${segmentsHtml(x.p.sentence)}${notEvaluated(x.h) ? " It could not run, so it counts only against the table that asks the question." : ""}</div>`).join("");
-    const owed = row.owed && !row.cells.warehouse[t] ? `<div class="xt-sentence">${segmentsHtml(row.owed.owedSentence)}</div>` : "";
-    const from = row.recheck[t] ? `<div class="xt-sentence recheck-note">${escHtml(row.recheck[t])}</div>` : "";
-    return `<div class="xt-tool" data-tool="${t}"><b style="display:inline">${escHtml(name)}</b> ${pill(checkStatus(ck), "sm")}${said}${owed}${from}</div>`;
+  const row = xtRowModel(col, cards, supplyOnShow(ds), CURRENT_IN_PLACE_ON, ds.id, heldChecksOn(ds));
+  // ONE BLOCK PER VIEW, LABELLED AS THE GRID'S PHONE CELLS ARE, AND TOOLS THAT
+  // AGREE SAID ONCE (UX critic on 7093c20, S6): "dbt, Soda and datacontract-cli"
+  // with one pill and one sentence where their results read the same.
+  const sentenceOf = x=> {
+    const html = segmentsHtml(x.p.sentence);
+    if(!notEvaluated(x.h)) return html;
+    const stop = !html || /[.!?]$/.test(segmentsText(x.p.sentence).trim()) ? "" : ".";
+    return `${html}${stop} It could not run, so it counts only against the table that asks the question.`;
+  };
+  const views = ["staged", "warehouse"].map(view=>{
+    const groups = [], byKey = new Map();
+    XT_TOOLS.filter(([t])=> row.tools[t]).forEach(([t, name])=>{
+      const x = row.cells[view][t];
+      if(!x) return;
+      const status = x.h.status || "nodata";
+      const key = `${status}|${segmentsText(x.p.sentence)}|${row.recheck[t] || ""}`;
+      if(!byKey.has(key)){ const g = {tools: [], names: [], x, status, recheck: row.recheck[t]}; byKey.set(key, g); groups.push(g); }
+      byKey.get(key).tools.push(t); byKey.get(key).names.push(name);
+    });
+    let html = groups.map(g=> `<div class="xt-tool" data-tool="${escHtml(g.tools.join(" "))}"><b style="display:inline">${escHtml(andList(g.names))}</b> ${pill(g.status, "sm")}<div class="xt-sentence">${sentenceOf(g.x)}</div>${g.recheck ? `<div class="xt-sentence recheck-note">${escHtml(g.recheck)}</div>` : ""}</div>`).join("");
+    if(view === "warehouse" && row.owed && !groups.length){
+      html = `<div class="xt-tool" data-tool="owed"><div class="xt-sentence">${segmentsHtml(row.owed.owedSentence)}</div></div>`;
+    }
+    return html ? `<div class="xt-view-block" data-xt-view="${view}"><div class="xt-view-label">${XT_VIEW[view].replace(/:$/, "")}</div>${html}</div>` : "";
   }).join("");
-  return `<div class="drawer-section" data-xt-tools><h4>Each tool's result</h4>${lines}</div>`;
+  return `<div class="drawer-section" data-xt-tools><h4>Each tool's result</h4>${views}</div>`;
 }
 // LEFT OUT FOR THE AGREEMENT (REQ-PIPE-270 criterion 9): the cross-table checks
 // the supply on show was NOT run against, because a table they read is not part
@@ -6935,14 +7001,29 @@ function verdictLine(ds){
   const extra = others ? ` ${others.sentence}` : "";
   return `<div class="verdict-of" data-verdict-of="awaiting" style="font-size:12.5px; color:var(--ink); margin:-6px 0 8px;"><b style="display:inline">Awaiting a decision</b> — the results below are the newest supply, received ${fmtInstant(ds.lastArrival.arrivedAt)}, which is not in place in the warehouse yet. ${inPlace}${extra}${heldBackHolding(ds)}${affectsOnVerdictLine(ds)}</div>`;
 }
+// THE PANEL'S "WHY NOT PROMOTED", agreeing with the verdict line: a supply
+// waiting only on another table's supply is not "nobody had decided about it"
+// (UX critic on 7093c20, S4, PROVISIONAL) - the sentence is promotion_state's.
+function promoWhy(ds, st){
+  const others = otherTablesVerdict(ds);
+  if(others && others.kind === "nothing" && st && st.whyNot === "awaiting-decision"){
+    const w = (WHY_NOT_SENTENCES["waiting-on-another-table"] || {})[st.past ? "past" : "present"];
+    if(w) return w;
+  }
+  return (st && st.explanation) || "";
+}
 // THE WAREHOUSE'S STATUS ON AN AWAITING LINE (REQ-DASH-272 criteria 1 to 5):
 // the build's clause for the supply on show and date, its status in the
 // legend's own word and icon, on its own line at phone width.
 function warehouseClauseHtml(ds){
   const p = ds && ds.warehouseClauseOn;
   if(!p || !p.clause) return "";
-  const status = p.status ? `${pill(p.status, "sm")}` : "";
-  return `<span class="wh-clause" data-wh-clause="${escHtml(p.status || "none")}">${segmentsHtml(p.clause)}${status}${segmentsHtml(p.tail || [])}</span>`;
+  // THE PILL AND ITS FULL STOP STAY TOGETHER (UX critic on 7093c20, P3): the
+  // tail's first word or mark is kept on the pill's line.
+  const tail = segmentsHtml(p.tail || []);
+  const m = /^([^\s<]*)(.*)$/s.exec(tail);
+  const status = p.status ? `<span class="pill-stop">${pill(p.status, "sm")}${m[1]}</span>${m[2]}` : tail;
+  return `<span class="wh-clause" data-wh-clause="${escHtml(p.status || "none")}">${segmentsHtml(p.clause)}${status}</span>`;
 }
 // ---- HELD BACK WITH ITS DELIVERY (REQ-DASH-275) ----------------------------
 // The build works out, per supply and date, whether it was held back because
@@ -6970,7 +7051,7 @@ function heldBackMarker(scope, asText){
     const h = ds.heldBackOn && ds.heldBackOn.holding;
     if(h && h.card) lines.push({root: ds.id, card: h.card});
   }));
-  return lines.map(l=> `<div class="held-back-marker" data-held-back-marker="${escHtml(l.root)}" style="margin-top:4px; font-size:12px; color:var(--ink); display:flex; align-items:center; gap:5px;">${pill("red","sm")}<span>${asText ? escHtml(segmentsText(l.card)) : segmentsHtml(l.card)}</span></div>`).join("");
+  return lines.map(l=> `<div class="held-back-marker" data-held-back-marker="${escHtml(l.root)}" style="margin-top:4px; font-size:12px; color:var(--ink); display:flex; align-items:center; gap:5px;">${pill("red","sm")}<span>${segmentsHtml(l.card, asText)}</span></div>`).join("");
 }
 // The datasets a root's held-back set names on the date - REQ-DASH-204's card
 // line leaves their causes to this one (204 criterion 18).
@@ -7006,6 +7087,8 @@ function agencyOfCollection(collectionId){
   const ag = ((HIERARCHY && HIERARCHY.agencies) || []).find(a=> (a.collections || []).some(c=> c.id === collectionId));
   return ag ? ag.id : null;
 }
+// "Notifications'" not "Notifications's" (UX critic on 7093c20, P5).
+function possessive(html, name){ return /s$/i.test(String(name || "")) ? `${html}'` : `${html}'s`; }
 function capFirst(text){ return text ? text.charAt(0).toUpperCase() + text.slice(1) : ""; }
 function checksCount(n){
   return n === 1 ? "one of this supply's checks" : `${n} of this supply's checks`;
@@ -7013,13 +7096,18 @@ function checksCount(n){
 // ONE WORDING FOR EVERY CAUSE (criteria 2 and 15), the package forms and
 // criterion 7's two lines apart. "That is not a fault in this supply's own
 // data" is left out where the supply has a red check of its own (criterion 3).
-function noPromotedLineHtml(line, ownRed){
+// `said`: the verdict line already says when the checks run again, so the
+// line does not say it twice (UX critic on 7093c20, S4, PROVISIONAL).
+function noPromotedLineHtml(line, ownRed, said){
   const link = datasetRefLink(line);
   const period = escHtml(fmtPeriodOrDay(String(line.period || "this period")));
   const n = Number(line.n) || 0;
   const one = n === 1;
   const notFault = ownRed ? "" : " That is not a fault in this supply's own data.";
-  const again = ` ${one ? "It runs" : "They run"} again by ${one ? "itself" : "themselves"} once a ${period} ${link} supply is promoted.`;
+  // A TURNED-DOWN OR REPLACED PARTNER NEEDS A PERSON, so "runs again by
+  // itself" is not said beside "needs its own decision" (S4, PROVISIONAL).
+  const again = said || line.form === "turned-down" || line.form === "replaced" ? ""
+    : ` ${one ? "It runs" : "They run"} again by ${one ? "itself" : "themselves"} once a ${period} ${link} supply is promoted.`;
   const head = `<b style="display:inline">No promoted ${link} for ${period}.</b>`;
   const couldNot = `so ${checksCount(n)} could not run.`;
   const partner = line.partnerReceived ? fmtInstant(line.partnerReceived) : "";
@@ -7027,7 +7115,7 @@ function noPromotedLineHtml(line, ownRed){
     case "owed":
       return `<b style="display:inline">Not yet re-checked against the ${link} promoted ${fmtInstant(line.promotedAt)}.</b> ${capFirst(checksCount(n))} ${one ? "reads" : "read"} it; the re-check runs on the next processing pass.`;
     case "settled":
-      return `<b style="display:inline">${link}'s pair for ${period} was settled on ${escHtml(fmtDay(line.settledOn))}.</b> ${capFirst(checksCount(n))} ${one ? "has" : "have"} not run again since; the re-check runs on the next processing pass.`;
+      return `<b style="display:inline">${possessive(link, line.name)} pair for ${period} was settled on ${escHtml(fmtDay(line.settledOn))}.</b> ${capFirst(checksCount(n))} ${one ? "has" : "have"} not run again since; the re-check runs on the next processing pass.`;
     case "package":
       return `${head} The ${link} received with this supply (${partner}) was held back, ${couldNot}${notFault}${again}`;
     case "joined":
@@ -7046,7 +7134,9 @@ function noPromotedNotice(ds){
   const lines = noPromotedLines(ds);
   if(!lines.length) return "";
   const ownRed = !!(ds.noPromotedOn && ds.noPromotedOn.ownRed);
-  const body = lines.map(l=> `<div class="np-line" data-np-dataset="${escHtml(l.datasetId)}" data-np-form="${escHtml(l.form)}">${noPromotedLineHtml(l, ownRed)}</div>`).join("");
+  const others = otherTablesVerdict(ds);
+  const said = !!(others && others.kind === "nothing" && ds.verdictOf && ds.verdictOf.state === "awaiting");
+  const body = lines.map(l=> `<div class="np-line" data-np-dataset="${escHtml(l.datasetId)}" data-np-form="${escHtml(l.form)}">${noPromotedLineHtml(l, ownRed, said)}</div>`).join("");
   return `<div class="notice-exhausted" role="status" data-no-promoted="${lines.length}">${body}</div>`;
 }
 // CRITERION 16's verdict-line half, from the build's lines: null where the
@@ -7127,22 +7217,54 @@ function notDueYetLine(ds){
     .find(at=> notDueYetOn(at, CURRENT_IN_PLACE_ON));
   if(!due || !readers.length) return "";
   const waiting = readers.filter(r=> r.lines.some(l=> l.dueAt && notDueYetOn(l.dueAt, CURRENT_IN_PLACE_ON)));
-  const links = waiting.map(r=> datasetRefLink(r)).join(", ");
-  return `<div class="late-open-note" data-not-due-yet style="font-size:12.5px; color:var(--ink-muted); margin:-4px 0 12px;">Not due until ${fmtInstant(due)} — the ${links} ${waiting.length === 1 ? "is" : "are"} waiting on it</div>`;
+  const links = andList(waiting.map(r=> datasetRefLink(r)));
+  return `<div class="late-open-note" data-not-due-yet style="font-size:12.5px; color:var(--ink-muted); margin:-4px 0 12px;">Not due until ${fmtInstant(due)} — ${links} ${waiting.length === 1 ? "is" : "are"} waiting on it.</div>`;
 }
 // "Affects <reader links>" (criterion 17), ending the one notice this page
 // shows for the cause. A cause whose page shows no notice - an overdue slot
 // still open, a period whose file was turned down - gets none: it is not
 // given a banner of its own here (REQ-DASH-204 open question 1, for Keith).
+function readersNotYetDue(readers){
+  return readers.some(r=> r.lines.some(l=> l.dueAt && notDueYetOn(l.dueAt, CURRENT_IN_PLACE_ON)));
+}
+// "a, b and c" - one join for every list of names this page writes.
+function andList(items){
+  return items.length < 2 ? items.join("") : `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
+}
+// "Affects ..." ENDS A SENTENCE (UX critic on 7093c20, S2): a full stop after
+// the last name, in the hierarchy's order as every list of datasets is.
 function affectsReaders(ds){
   const readers = readersWaitingOn(ds);
-  if(!readers.length) return "";
-  if(readers.some(r=> r.lines.some(l=> l.dueAt && notDueYetOn(l.dueAt, CURRENT_IN_PLACE_ON)))) return "";
-  return affectsLinks({affects: readers}).replace('<div style="', '<div data-affects-readers style="');
+  if(!readers.length || readersNotYetDue(readers)) return "";
+  return `<div data-affects-readers style="margin-top:4px; font-size:13px;">Affects ${andList(readers.map(datasetRefLink))}.</div>`;
 }
+// ON THE AWAITING LINE, INSIDE ITS SENTENCES (S2) - and left out for readers
+// the line's "Holding back with it" already names (S3, Keith Q3 = a,
+// PROVISIONAL).
 function affectsOnVerdictLine(ds){
   if(ds.blocked || ds.waitingBlocker || noSupplyShown(ds)) return "";
-  return affectsReaders(ds);
+  const held = new Set(((ds.heldBackOn && ds.heldBackOn.holding) || {}).datasets || []);
+  const readers = readersWaitingOn(ds).filter(r=> !held.has(r.datasetId));
+  if(!readers.length || readersNotYetDue(readers)) return "";
+  return ` <span data-affects-readers>Affects ${andList(readers.map(datasetRefLink))}.</span>`;
+}
+// A CAUSE WITH NO NOTICE OF ITS OWN (REQ-DASH-204 open question 1; UX critic on
+// 7093c20, S2; Keith Q4 = a, PROVISIONAL): an overdue slot, or a period whose
+// file was turned down with nothing replacing it, gets one muted line naming
+// its readers, so "Affects" is never left without a sentence to belong to.
+function causeNote(ds){
+  if(ds.blocked || ds.waitingBlocker || noSupplyShown(ds)) return "";
+  if(ds.verdictOf && ds.verdictOf.state === "awaiting" && ds.lastArrival && !ds.noDataInPlaceOn) return "";
+  const readers = readersWaitingOn(ds);
+  if(!readers.length || readersNotYetDue(readers)) return "";
+  const lines = readers.flatMap(r=> r.lines);
+  const line = lines.find(l=> l.cause === "turned-down") || lines[0];
+  const period = escHtml(fmtPeriodOrDay(String(line.period || "")));
+  const who = `${andList(readers.map(datasetRefLink))} ${readers.length === 1 ? "is" : "are"} waiting on it.`;
+  const what = line.cause === "turned-down"
+    ? `The ${period} file was turned down and nothing has replaced it — ${who}`
+    : `Overdue for ${period} — ${who}`;
+  return `<div class="late-open-note" data-cause-note="${escHtml(line.cause || "overdue")}" style="font-size:12.5px; color:var(--ink-muted); margin:-4px 0 12px;">${what}</div>`;
 }
 // THE CENSUS AS AT THE DATE ON SHOW (REQ-PIPE-081 criteria 14 and 15): the
 // last recorded census taken on or before the end of that day - never the
@@ -7564,6 +7686,7 @@ function renderExec(view){
       ${outstandingMarker("agency", ag.id, undefined, ag.noSupplyCount)}
       ${redPromotedMarker(ag)}
       ${heldBackMarker(ag, true)}
+      ${noPromotedMarker(ag)}
       ${acceptedGapsMarker(ag.acceptedCount)}
       <div class="card-meta"><span><b>${ag.collections.length}</b> ${pluralize(ag.collections.length,"collection")}</span><span><b>${nDatasets}</b> ${pluralize(nDatasets,"dataset")}</span></div>
     </a>`;
@@ -8777,6 +8900,7 @@ function renderDataset(view, agencyId, collectionId, datasetId){
       </div>
       ${arrivalBanner(ds)}
       ${notDueYetLine(ds)}
+      ${causeNote(ds)}
       ${noSupplyBanner}
       ${acceptedGapsNote}
       ${outstandingQueue("dataset", ds.id)}
@@ -8821,6 +8945,7 @@ function renderDataset(view, agencyId, collectionId, datasetId){
       </div>
       ${arrivalBanner(ds)}
       ${notDueYetLine(ds)}
+      ${causeNote(ds)}
       ${slaInPlaceOn(rawRealDatasetById(ds.id) || ds, CURRENT_IN_PLACE_ON).notOwedYet
         ? `<div class="sla-strip">${slaTileHtml(rawRealDatasetById(ds.id) || ds, CURRENT_IN_PLACE_ON)}</div>` : ""}
       ${neverSuppliedNotice(rawRealDatasetById(ds.id) || ds, CURRENT_IN_PLACE_ON)}
@@ -8855,6 +8980,7 @@ function renderDataset(view, agencyId, collectionId, datasetId){
     ${awaitingCorrectionLine(ds.id)}
     ${keptHeldLine(ds.id)}
     ${notDueYetLine(ds)}
+    ${causeNote(ds)}
     ${blockedBanner}
     ${refusedBesideBanner(ds)}
     ${waitingBanner}

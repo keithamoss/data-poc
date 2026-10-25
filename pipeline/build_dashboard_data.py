@@ -221,6 +221,14 @@ def _disambiguate_pooled_keys(cards: list[dict]) -> None:
                 card["key"] = f"{parsed.dataset}.{card['key']}"
 
 
+def _declaring_dataset(check_id: str) -> str | None:
+    """The dataset a check is declared on, by the check id's own layout
+    (asset.agency.collection.dataset.column.check_tool) - one reading of it,
+    for every caller (functional critic on 7093c20)."""
+    parts = check_id.split(".")
+    return parts[3] if len(parts) >= 5 else None
+
+
 def _between(check_id: str, reads: dict | None) -> dict | None:
     """The tables a cross-table check is between, by dataset id (post-build-
     review #253, Keith 2026-10-19): "Client reference" on the Client
@@ -230,8 +238,7 @@ def _between(check_id: str, reads: dict | None) -> dict | None:
     check that read only its own table."""
     if not reads:
         return None
-    # A check id names its declaring dataset: asset.agency.collection.dataset...
-    declared_on = check_id.split(".")[3]
+    declared_on = _declaring_dataset(check_id)
     others = sorted({hierarchy.dataset_for_table(t).dataset_id for t in reads}
                     - {declared_on})
     return {"declared_on": declared_on, "reads": others} if others else None
@@ -755,7 +762,7 @@ def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], da
             view["log"] = cross_table_notices.read_log(conn, coll.id)
     cross_cards = [ck for c in columns_out if c["name"] == CROSS_TABLE_PSEUDO_COLUMN
                    for ck in c["checks"] if ck.get("check_id")
-                   and ck["check_id"].count(".") >= 4 and ck["check_id"].split(".")[3] == dataset_id]
+                   and _declaring_dataset(ck["check_id"]) == dataset_id]
     own_cards = [ck for c in columns_out if c["name"] != CROSS_TABLE_PSEUDO_COLUMN
                  for ck in c["checks"] if ck.get("check_id")]
     period_of = {facts[r]["supply_id"]: arrival_by_run.get(r, {}).get("slot")
@@ -787,7 +794,9 @@ def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], da
                 view["runs_by_supply"].setdefault(fact["supply_id"], []).append(fact)
     promotion_words = cross_table_grid.promotion_words(
         dataset_id, period_of, log=view["log"], slots=view["slots"], receipts=view["receipts"],
-        runs=view["runs_by_supply"])
+        runs=view["runs_by_supply"],
+        related={d for ck in page_cross for b in [ck.get("between") or {}]
+                 for d in [b.get("declared_on"), *(b.get("reads") or ())] if d and d != dataset_id})
     # HELD BACK WITH ITS DELIVERY (REQ-DASH-275): the notice, the chain to its
     # root and what a root holds back, per supply and date, from the decision
     # log's 'promotion-withheld' entries.
