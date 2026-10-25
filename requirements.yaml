@@ -42103,6 +42103,7 @@ requirements:
       no-coordinates test - checked by running them in a worktree of c1563cb: 29 failed, 9 passed); the three it found of this change''s
       own (test_red_promoted''s monkeypatched _cause, TestThePanelAsAtTheDateOnShow''s clause, the trends budget) are fixed and pass
       above.'
+    - '2026-10-25, TEST-FIRST, SHOWN AFTER THE BUILD: against the base c1563cb''s product code (a worktree with the test files copied in, l2_probe): TestWarehouseAndStagingViews 5 of 6 failed - the one passing, test_after_a_rejection_the_page_reads_the_warehouse, is criterion 19, already today''s behaviour by the criterion''s own decision; tests/test_cross_table_grid.py failed to import; tests-js/cross-table-grid.test.js 2 of 2 failed.'
     decisions:
     - OPTION 2, A CLAUSE ON THE AWAITING LINE (Keith, 2026-10-21 morning). REJECTED sending the reader to supply history to
       find the warehouse's state, Keith's first guess.
@@ -42531,6 +42532,7 @@ requirements:
       the Notifications'' line ends ''Holding back with it: Client Register. If this file is turned down, the Client Register supply
       needs its own decision.'', and the Child Protection card ''Held back together: Notifications and Client Register (one delivery,
       received 10:00am Tuesday, 15 August 2017)''.'
+    - '2026-10-25, TEST-FIRST, SHOWN AFTER THE BUILD: against the base c1563cb''s product code (a worktree with the test files copied in, l2_probe): TestHeldBackWithItsDelivery 5 of 5 failed and tests/test_held_back_notices.py failed to import.'
     decisions:
     - 'A TOP-OF-PAGE NOTICE FOR S1 RED (Keith, 2026-10-22, A), with no ''not a fault'' clause. This settles the contradiction
       the dashboard review found in summary-v3 (D5: REQ-DASH-204 ''does not apply to S1''s red branch'' against a proposed ''Held
@@ -43401,6 +43403,7 @@ requirements:
       6 passed. A defect found on the way, fixed test-first: fmtInt(null) threw inside renderAgency for a dataset whose newest run
       measured no rows (a held Case Workers), so the whole collection page failed to draw - tests-js/fmt-int.test.js failed (1 of 2)
       before the guard, passes after.'
+    - '2026-10-25, TEST-FIRST, SHOWN AFTER THE BUILD: this change''s tests run against the base c1563cb''s product code (a worktree of it with only the test files copied in, l2_probe): TestAnotherTableCouldNotBeRead 5 of 5 failed, tests/test_cross_table_notices.py failed to import (the module did not exist), tests-js/another-table.test.js 6 of 6 and tests-js/fmt-int.test.js 1 of 2 failed. The tests were written alongside the code, not strictly before it; this run is the evidence that each can fail.'
     decisions:
     - 'A NEW REQUIREMENT NOW (Keith, 2026-10-13): a top-of-page line on the reader naming the other table. REJECTED leaving
       it for a later road-testing sighting.'
