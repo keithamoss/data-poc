@@ -12306,3 +12306,60 @@ twice. It deliberately did not re-find the `TypeError`.
      mode. The other five keep exactly what they rendered (their fallbacks,
      written directly), so nothing else on the page moves. Minor under the
      standing rule (styling; a guard added).
+
+279. **[done, 2026-10-26]** **[Pipeline & publishing]** **[Developer tooling]**
+     **Lane L1's build (REQ-PIPE-276, 210, 211, 266 c17): five defects and a
+     terminal UX review, all fixed test-first.** delivery-critic on 62e5f0d
+     reproduced D1 (`mothman pipeline process` exited 0 when a package-mate
+     ended held back - the pass counted only the arrival it had just handled)
+     and D2 (the held-back consequence line printed once per tool), and found
+     by reading D3 (the queue lost its "Checking a delivery" line when held rows
+     existed), D4 (`qa` could ask the backstop about the whole asset) and D5
+     ('refused' reaching the settlement panel). Fixed in a122520. The CLI UX
+     critic then drove the real screens: no blockers; the held-back door named
+     the next step but not WHY, printed its override after the panel and put
+     the cursor on promote right after "Nothing needs deciding"; a failed
+     warehouse re-check's reason never said it failed; staggered S1's two rows
+     looked identical. Fixed in 07e9390 with nine polish items. Significant
+     enough for Keith on three PROVISIONAL calls (morning report #10): `qa`
+     keeps exits 0/1/2; 3a supersedes two signed examples, pending him;
+     `--run-id` filing one file of a zip as a package of one is a known limit.
+     Process note: the builder wrote code before tests, then showed 36 of 41
+     new tests failing on the base - ~13 of those failed only on a missing
+     function, so they never reached the behaviour.
+
+280. **[done, 2026-10-26]** **[Pipeline & publishing]** **[QA checks &
+     contract]** **Lane L3's build (REQ-QAC-176, REQ-PIPE-177, 178): three
+     bulk re-check defects, fixed test-first.** delivery-critic on 64f9f09
+     reproduced D1 (an owed re-check already run elsewhere reported as "verdict
+     changed… now no verdict"), D2 (an all-left-out bulk run said "nothing to
+     cover" and hid the panel the criteria require) and D3 (the queue line
+     counted the asset's stale checks, not this collection's); a hard-killed
+     trial left its schema. Fixed in 9ba947c with four PROVISIONAL calls for
+     Keith (already-owed supplies left out; a file check's refusal prints no
+     command; a trial's gate prediction says the real gate judges the package;
+     the nudge is cached so its cost stops growing with every check ever
+     fixed), the trial test now comparing every qa table by content, and dead
+     code removed. Also flagged: the builder's `pkill -f "pytest -q -m"` could
+     have killed other lanes' runs (kill by PID only), and its REQ-GHUB-082 c3
+     amendment, which signed REQ-PIPE-177 c21 required, for Keith to confirm.
+
+281. **[done, 2026-10-26]** **[Dashboard UI]** **Lane L2's build (REQ-DASH-204,
+     272, 275): false held-back reds, could-not-run shown as Fail, a stale
+     chain, the wrong partner named.** The dashboard UX critic found two
+     blockers on 7093c20 - the grid said "Fail ✗ ✗ ✗" for checks the notice and
+     panel said could not run, and the notices counted tool results where the
+     grid shows one row per check - plus eight should-fix items. The functional
+     critic reproduced D1 (the "why it is held back" suffix and red pills on 24
+     dataset-days where nothing was held back - the worse-cell rule), D2 (a
+     chain notice stale once its root was rejected), D3 (the joint-promotion
+     row naming the wrong partner table) and D4 (a quote test this change broke,
+     hidden inside "29 environmental failures" that were really a worktree with
+     no scenario placements). Fixed in 8edcd4d. PROVISIONAL for Keith: the page
+     follows 3a as the tickets do (REQ-DASH-275 c2/c3 recorded unmet pending
+     him); could-not-run reads "Not evaluated"; notices count checks; the
+     causing page gets a muted line for an overdue or turned-down period.
+     Still open: one shared root function for page and tickets (the page walks
+     the chain as at each date, the tickets' function reads the database now);
+     no fixture yet shows both notices on one page; REQ-DASH-272 c21's
+     12-day "being gated" gap, now a question for Keith.
