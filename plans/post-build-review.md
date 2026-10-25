@@ -12073,13 +12073,14 @@ twice. It deliberately did not re-find the `TypeError`.
      Minor under the standing rule (no product behaviour or verdict
      changes; the files were already valid).
 
-274. **[in-progress, 2026-10-25]** **[Pipeline & publishing]** **[Testing & dev
+274. **[done, 2026-10-25]** **[Pipeline & publishing]** **[Testing & dev
      tooling]** **Sprint A3's post-build critic (REQ-PIPE-266/267/270/278,
      REQ-GEN-273), on a3-build at 1bc2902.** Each finding was checked against
      the code before it was acted on - the critic's own probe tests were re-run
      first, and every defect below got a test that was run against the unfixed
-     tree and seen to fail before the fix. In-progress because D2, D3 and Q3
-     wait on Keith. Tests are `tests/test_package_gate.py` (gate) and
+     tree and seen to fail before the fix. D2, D3 and Q3 went to Keith and are
+     RESOLVED by his answers of 2026-10-25 (1a, 2a, 3a below), built the same
+     day; nothing is left open here. Tests are `tests/test_package_gate.py` (gate) and
      `tests/test_root_cause_shouts.py` (roots) unless named otherwise.
      **FLAGGED FOR KEITH under the standing rule**: D1, D4, D5, D6 and the
      criterion-5 finding are significant defects (a wrong instant in a
@@ -12118,13 +12119,22 @@ twice. It deliberately did not re-find the `TypeError`.
      Register check never counted. The fixed point's bound decides such a
      check "without" on purpose (TestTheFixedPointEnds, the 247-run hang), so
      this is a product question, not a slip: **should a supply whose
-     re-evaluation never counts be not promoting instead?** Behaviour
-     unchanged; gate's `test_a_check_whose_reevaluation_never_counts_does_not_
-     promote_without_it` pins Keith's likely answer as a strict xfail.
+     re-evaluation never counts be not promoting instead?** RESOLVED (Keith,
+     2026-10-25, 1a): it is HELD BACK NOT JUDGED until the check counts -
+     'promotion-withheld' with `not_counted`, owed a 'reevaluate' item the
+     knock-on retries, which stays owed while it still counts nothing (red,
+     never a failure). The xfail is gone and passes; REQ-PIPE-267 carries the
+     decision and what was rejected.
 
      **D3. The PROVISIONAL 'promotion-refused' against 'promotion-withheld'
-     choice (promotion.py ~1057, gate.py ~999) - HELD FOR KEITH**, as the
-     builder's own PROVISIONAL note already asks. Nothing changed.
+     choice (promotion.py ~1057, gate.py ~999) - RESOLVED (Keith, 2026-10-25,
+     2a)**: 'promotion-withheld' for every hold-back another table, the
+     package or another period caused - including the stood-on replacement,
+     which the gate path recorded as 'promotion-refused' (test first:
+     `tests/test_replacement_setting.py::TestStoodOnThroughTheGate`), and a red
+     only for want of another table; 'promotion-refused' only for a supply's
+     own checks failing. Every reader of the word checked (REQ-PIPE-266's
+     decision lists them); none needed changing beyond its tests.
 
      **D4. A held-back supply folded into a root whose slot raises no ticket -
      VERIFIED, FIXED (NFR 3, NO FALSE QUIET).** `root_cause.held_back_by_
@@ -12213,8 +12223,12 @@ twice. It deliberately did not re-find the `TypeError`.
      Clients v2 (`held_back_by`), so the root is Clients v2 and Notifications
      v2 gets no ticket of its own where Clients v2's slot is ticketed. The
      other reading is that a failed re-check against the warehouse is
-     Notifications v2's own red, making it its own root. Unchanged pending his
-     answer.
+     Notifications v2's own red, making it its own root. RESOLVED (Keith,
+     2026-10-25, 3a): the root is the supply whose OWN check failed, together
+     or staggered - `held_back_detail.failed`, read by `root_cause`; roots'
+     `test_a_failed_recheck_against_the_warehouse_is_its_own_root` (seen to
+     fail first) and D4's rule now pinned on the rule itself. REQ-PIPE-278
+     carries it.
 
 275. **[done, 2026-10-25]** **[Testing & dev tooling]** **The equivalence
      compare test assumed two commits behind HEAD~2.** Found by the full
@@ -12226,3 +12240,29 @@ twice. It deliberately did not re-find the `TypeError`.
      against git's own count, after asserting there are at least two. Minor
      under the standing rule (a test, no product change); the gate run is the
      failing-first evidence.
+
+276. **[todo, 2026-10-25]** **[Pipeline & publishing]** **A staggered file's
+     hold-back can take effect AFTER the promotion that ended it - FOUND, NOT
+     FIXED, FOR KEITH (a wrong instant in a replayed history, so significant
+     under the standing rule).** Seen in the bootstrap of Keith's A3 answers
+     (a3c_probe, 022e891), in TS-84 - REQ-GEN-273's S10 chain, one delivery
+     with Notifications at 08:40, Placements 08:50, Investigations 09:00 and
+     the Client Register at 09:20 on 1 November 2015. The decisions are right
+     and in the right ORDER of recording (each early file's 'promotion-withheld',
+     then the one application at 09:20 promoting all four), but their
+     EFFECTIVE instants are not: Notifications' hold-back is effective 12
+     November 05:48, Placements' 6 November 15:47 and Investigations' 2
+     November 04:02, while the promotion of all four is effective 2 November
+     02:55. So read by effective time - as the as-at view and the history read
+     it - a supply is promoted and then, days later, "held back".
+     The cause, as read rather than run: orchestrate.effective_at_of gives
+     each arrival its receipt plus a seeded lag, bounded by the next receipt
+     of the SAME dataset and by the claim window - so an early file's
+     own lag can run past the later file whose application promotes it. D1's
+     floor (decision_log.follows) applies to a retried gate, not to a member
+     joined by another arrival's application. A unit test (gate_support)
+     cannot see it: its effective instants are not the replay's lags.
+     Possible fixes, for Keith: bound an arrival's lag by the next receipt of
+     its COLLECTION (any file), or floor a joined member's promotion at its
+     own latest decision. Not built - it changes every staggered pair's
+     instants in the replayed history.

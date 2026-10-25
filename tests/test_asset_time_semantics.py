@@ -261,6 +261,19 @@ class TestEveryCommittedArrivalKeepsItsVerdict:
     ordinary amber delivery, and 2026-Q3, now TS-56 - because their receipt
     instants moved; and TS-14's corrected Client Register, planted in 421e9f4
     without this pin being re-captured. 453 arrivals (441 before REQ-GEN-044's evening-before era added 12).
+
+    RE-CAPTURED 2026-10-25 FOR REQ-GEN-273 criterion 4 (TS-81 to TS-85, the
+    package gate's declared outcomes, planted in five grown quarters). The
+    procedure first: 229 deliveries, zero `handfiled-*`, a bootstrap from
+    empty and `mothman dashboard build-data` before the capture. Old entries
+    matched to new by run id: zero verdicts and zero instants moved. What
+    changed, all of it the five quarters 2015-Q4, 2016-Q1, 2016-Q3, 2017-Q2
+    and 2017-Q3: their on-time arrivals now arrive at the scenario's stated
+    times (five ids per table each way, three for Case Workers, which sends in
+    February and August only), and the quarters gain their scenarios' second
+    files - S1's zips on 15 May and 15 August 2017, TS-83's resend of the
+    Client Register and its three readers on 29 August 2016 and TS-85's
+    corrected Placements on 29 February 2016. 466 arrivals (457 before).
     """
 
     def test_the_golden_covers_every_dataset_and_run_that_exists_now(self):
@@ -487,8 +500,17 @@ class TestEveryCommittedArrivalKeepsItsVerdict:
         # two cp-carers supplies in TS-63's turned-off quarters, 2022-Q1 and
         # 2022-Q2, went on time -> unfiled (REQ-GEN-218: received while turned
         # off). No other arrival in both captures changed its verdict or instant.
-        assert counts == {"on_time": 342, "early": 59, "late": 44, "unfiled": 12}
-        assert sum(counts.values()) == 457
+        # 339 / 62 / 53 / 12 over 466 FOR REQ-GEN-273 criterion 4 (2026-10-25),
+        # TS-81 to TS-85, each move accounted for by hand. Out: the 28 routine
+        # arrivals of 2015-Q4, 2016-Q1, 2016-Q3, 2017-Q2 and 2017-Q3 (all on
+        # time). In: those quarters' scenario arrivals - 25 on time; TS-84's
+        # Carer Register, Notifications and Placements at 08:30, 08:40 and
+        # 08:50, before their 09:00 due, early; and the nine second files, all
+        # after the due day, late (S1's two zips, TS-83's resend of four and
+        # TS-85's corrected Placements). No arrival in both captures changed
+        # its verdict or instant.
+        assert counts == {"on_time": 339, "early": 62, "late": 53, "unfiled": 12}
+        assert sum(counts.values()) == 466
 
 
 class TestTheClassificationBoundaries:

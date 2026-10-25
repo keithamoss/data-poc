@@ -186,6 +186,27 @@ releases:
               A decision that moves a table into or out of a period is refused
               while that period's delivery is being judged. Nothing is changed,
               and `mothman supply decide` exits 75 so that you can retry.
+          - headline: Held back is not refused
+            components: ["Pipeline & publishing", "GitHub workflow & people"]
+            description: >
+              A supply kept out because of another table, such as a missing
+              partner or a later period that relies on the supply it would
+              replace, is now recorded as held back. Refused now means its own
+              checks failed, and a supply whose own re-check fails gets its own
+              ticket.
+          - headline: Five scenarios pin the gate
+            components: ["Data generation", "Testing & dev tooling"]
+            description: >
+              The synthetic history now plays out five ways a delivery can be
+              judged as one, from a resupply replacing a promoted table to
+              three staggered files promoted together. Every rebuild checks
+              that each is still decided the way it says.
+          - headline: Never in without its check
+            components: ["Pipeline & publishing", "QA checks & contract"]
+            description: >
+              If a re-run cross-table check still gives no result, the supply
+              is held back until it does, and each processing pass tries it
+              again. It is never promoted without that check.
   - date: "2026-10-24"
     summary: >
       Every result now sits on the delivery it actually read, in the order it

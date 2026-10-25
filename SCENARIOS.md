@@ -30,7 +30,7 @@ A scenario marked **not injected** has no generated data behind it.
 Either it is a pure unit test with nothing to look at, or it is meant
 for injection and has not been placed yet.
 
-**56 of 66 scenarios marked for injection have data behind them today.** 103 scenarios are registered in all; the rest are unit tests with nothing to look at.
+**61 of 71 scenarios marked for injection have data behind them today.** 108 scenarios are registered in all; the rest are unit tests with nothing to look at.
 
 ## Slot assignment
 
@@ -810,6 +810,81 @@ PLANTED by REQ-GEN-203 (2026-10-18) in a grown quarter (REQ-GEN-207): a stray te
 | Period | 2020-Q4 |
 | Set "in the warehouse on" to | 2020-11-01 |
 | Built to | green, the 2020-11-01 08:30 arrival |
+
+### TS-81 - S1 green - a clean Client Register promoted beside the warehouse's Notifications, its package-mate held back
+
+**What it demonstrates.** Notifications v2 is held back (refused on its own data); Clients v2's Notifications -> Client Register check is re-run against Notifications v1 in the warehouse, passes, and Clients v2 replaces Clients v1 under the green setting (REQ-PIPE-267 criterion 6, REQ-PIPE-123).
+
+**What it would look like if the rule were wrong.** Clients v2 held back with its package-mate, or promoted on a verdict that read the held-back Notifications v2.
+
+*Config: quarterly, Feb/May/Aug/Nov, due 09:00 on the 1st; Child Protection's replacement setting is green for 2017-Q2 and 2017-Q3 (contract/data-asset.yaml, Keith 2026-10-25). 2017-Q2's five tables arrive on time, clean, and are promoted; on 15 May 2017 at 10:00 a zip of a clean cp_clients and a cp_notifications red on its own data arrives. A scripted person rejects that Notifications three weeks later (contract/ scripted_decisions.yaml, "TS-81 reject"), so it waits on no later page.*
+
+| Where to look | |
+|---|---|
+| Dataset | cp-clients |
+| Supplies | `cp_clients__201705010900000800`, `cp_clients__201705151000000800` |
+| Period | 2017-Q2 |
+| Set "in the warehouse on" to | 2017-05-15 |
+
+### TS-82 - S1 red - a Client Register re-checked against the warehouse's Notifications and held back
+
+**What it demonstrates.** Notifications v2 is held back on its own data; Clients v2's re-check against Notifications v1 fails, so Clients v2 is held back ('promotion-withheld' naming Notifications v2, re-checked against Notifications v1) and Clients v1 stays. Its root is Clients v2 itself - its own check failed (Keith, 2026-10-25, answer 3a).
+
+**What it would look like if the rule were wrong.** Clients v2 promoted, or refused without the re-check.
+
+*Config: as TS-81, in 2017-Q3, the zip's cp_clients missing the five clients only the quarter's Notifications point at (no Investigation or Placement does). A scripted person rejects both files of the zip three weeks later.*
+
+| Where to look | |
+|---|---|
+| Dataset | cp-clients |
+| Supplies | `cp_clients__201708010900000800`, `cp_clients__201708151000000800` |
+| Period | 2017-Q3 |
+| Set "in the warehouse on" to | 2017-08-15 |
+
+### TS-83 - S2 strict as re-cast - a red Client Register holds its whole first-time package back
+
+**What it demonstrates.** Clients is held back on its own data; Notifications, Investigations and Placements are re-checked against no Client Register in the warehouse and held back with it ('promotion-withheld', could not be checked); Carer Register and Case Workers are promoted. The resend is gated as one package and all four are promoted, superseding the first four.
+
+**What it would look like if the rule were wrong.** Notifications judged alone and promoted, or held back without the re-check.
+
+*Config: quarterly, Feb/May/Aug/Nov, due 09:00 on the 1st. 2016-Q3's six tables arrive together on time, the quarter's first supply, cp_clients red on its own data and the other five clean. On 29 August a corrected cp_clients and its three readers are resent together.*
+
+| Where to look | |
+|---|---|
+| Dataset | cp-clients |
+| Supplies | `cp_clients__201608010900000800`, `cp_clients__201608291000000800` |
+| Period | 2016-Q3 |
+| Set "in the warehouse on" to | 2016-08-29 |
+
+### TS-84 - The S10 chain re-ordered - three staggered files promoted together at the last one's arrival
+
+**What it demonstrates.** Carer Register is promoted at 08:30; Notifications, Placements and Investigations each wait red for want of a Client Register ('promotion-withheld'); at 09:20 the Client Register's arrival gates them with it and all four are promoted together (REQ-PIPE-267 criterion 2).
+
+**What it would look like if the rule were wrong.** Any of the three left waiting after the Client Register, or Clients promoted alone.
+
+*Config: quarterly, Feb/May/Aug/Nov, due 09:00 on the 1st, 8 hours' grace. 2015-Q4's one delivery, the quarter's first, each file its own receipt: Carer Register 08:30, Notifications 08:40, Placements 08:50, Investigations 09:00, Client Register 09:20, all clean.*
+
+| Where to look | |
+|---|---|
+| Dataset | cp-clients |
+| Supplies | `cp_clients__201511010920000800` |
+| Period | 2015-Q4 |
+| Set "in the warehouse on" to | 2015-11-01 |
+
+### TS-85 - S14 - a red Placements held back alone in a first-time package
+
+**What it demonstrates.** Placements is held back on its own data; Client Register, Notifications, Investigations, Carer Register and Case Workers are promoted - no check they count reads a Placements the period will hold. The corrected Placements is promoted, superseding the first.
+
+**What it would look like if the rule were wrong.** A reader of Placements held back with it.
+
+*Config: quarterly, Feb/May/Aug/Nov, due 09:00 on the 1st. 2016-Q1's six tables arrive together on time, the quarter's first supply, cp_placements red on its own data and the other five clean. On 29 February a corrected cp_placements arrives alone.*
+
+| Where to look | |
+|---|---|
+| Dataset | cp-placements |
+| Supplies | `cp_placements__201602010900000800`, `cp_placements__201602291000000800` |
+| Period | 2016-Q1 |
+| Set "in the warehouse on" to | 2016-02-29 |
 
 ## Calendar corrections
 
@@ -3272,6 +3347,118 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
       "moved": []
      }
     ],
+    "subject": "supply-history-row"
+   }
+  },
+  {
+   "id": "TS-81",
+   "mode": "INJECT",
+   "title": "S1 green - a clean Client Register promoted beside the warehouse's Notifications, its package-mate held back",
+   "section": "The option A and period-closing batch, planted (REQ-GEN-136, REQ-GEN-137)",
+   "demonstrates": "Notifications v2 is held back (refused on its own data); Clients v2's Notifications -> Client Register check is re-run against Notifications v1 in the warehouse, passes, and Clients v2 replaces Clients v1 under the green setting (REQ-PIPE-267 criterion 6, REQ-PIPE-123).",
+   "breaksAs": "Clients v2 held back with its package-mate, or promoted on a verdict that read the held-back Notifications v2.",
+   "config": "Config: quarterly, Feb/May/Aug/Nov, due 09:00 on the 1st; Child Protection's replacement setting is green for 2017-Q2 and 2017-Q3 (contract/data-asset.yaml, Keith 2026-10-25). 2017-Q2's five tables arrive on time, clean, and are promoted; on 15 May 2017 at 10:00 a zip of a clean cp_clients and a cp_notifications red on its own data arrives. A scripted person rejects that Notifications three weeks later (contract/ scripted_decisions.yaml, \"TS-81 reject\"), so it waits on no later page.",
+   "requirements": [
+    "REQ-PIPE-267",
+    "REQ-PIPE-123",
+    "REQ-GEN-273"
+   ],
+   "coordinates": {
+    "dataset": "cp-clients",
+    "supplies": [
+     "cp_clients__201705010900000800",
+     "cp_clients__201705151000000800"
+    ],
+    "period": "2017-Q2",
+    "inPlaceOn": "2017-05-15",
+    "subject": "supply-history-row"
+   }
+  },
+  {
+   "id": "TS-82",
+   "mode": "INJECT",
+   "title": "S1 red - a Client Register re-checked against the warehouse's Notifications and held back",
+   "section": "The option A and period-closing batch, planted (REQ-GEN-136, REQ-GEN-137)",
+   "demonstrates": "Notifications v2 is held back on its own data; Clients v2's re-check against Notifications v1 fails, so Clients v2 is held back ('promotion-withheld' naming Notifications v2, re-checked against Notifications v1) and Clients v1 stays. Its root is Clients v2 itself - its own check failed (Keith, 2026-10-25, answer 3a).",
+   "breaksAs": "Clients v2 promoted, or refused without the re-check.",
+   "config": "Config: as TS-81, in 2017-Q3, the zip's cp_clients missing the five clients only the quarter's Notifications point at (no Investigation or Placement does). A scripted person rejects both files of the zip three weeks later.",
+   "requirements": [
+    "REQ-GEN-273"
+   ],
+   "coordinates": {
+    "dataset": "cp-clients",
+    "supplies": [
+     "cp_clients__201708010900000800",
+     "cp_clients__201708151000000800"
+    ],
+    "period": "2017-Q3",
+    "inPlaceOn": "2017-08-15",
+    "subject": "supply-history-row"
+   }
+  },
+  {
+   "id": "TS-83",
+   "mode": "INJECT",
+   "title": "S2 strict as re-cast - a red Client Register holds its whole first-time package back",
+   "section": "The option A and period-closing batch, planted (REQ-GEN-136, REQ-GEN-137)",
+   "demonstrates": "Clients is held back on its own data; Notifications, Investigations and Placements are re-checked against no Client Register in the warehouse and held back with it ('promotion-withheld', could not be checked); Carer Register and Case Workers are promoted. The resend is gated as one package and all four are promoted, superseding the first four.",
+   "breaksAs": "Notifications judged alone and promoted, or held back without the re-check.",
+   "config": "Config: quarterly, Feb/May/Aug/Nov, due 09:00 on the 1st. 2016-Q3's six tables arrive together on time, the quarter's first supply, cp_clients red on its own data and the other five clean. On 29 August a corrected cp_clients and its three readers are resent together.",
+   "requirements": [
+    "REQ-GEN-273"
+   ],
+   "coordinates": {
+    "dataset": "cp-clients",
+    "supplies": [
+     "cp_clients__201608010900000800",
+     "cp_clients__201608291000000800"
+    ],
+    "period": "2016-Q3",
+    "inPlaceOn": "2016-08-29",
+    "subject": "supply-history-row"
+   }
+  },
+  {
+   "id": "TS-84",
+   "mode": "INJECT",
+   "title": "The S10 chain re-ordered - three staggered files promoted together at the last one's arrival",
+   "section": "The option A and period-closing batch, planted (REQ-GEN-136, REQ-GEN-137)",
+   "demonstrates": "Carer Register is promoted at 08:30; Notifications, Placements and Investigations each wait red for want of a Client Register ('promotion-withheld'); at 09:20 the Client Register's arrival gates them with it and all four are promoted together (REQ-PIPE-267 criterion 2).",
+   "breaksAs": "Any of the three left waiting after the Client Register, or Clients promoted alone.",
+   "config": "Config: quarterly, Feb/May/Aug/Nov, due 09:00 on the 1st, 8 hours' grace. 2015-Q4's one delivery, the quarter's first, each file its own receipt: Carer Register 08:30, Notifications 08:40, Placements 08:50, Investigations 09:00, Client Register 09:20, all clean.",
+   "requirements": [
+    "REQ-PIPE-267",
+    "REQ-GEN-273"
+   ],
+   "coordinates": {
+    "dataset": "cp-clients",
+    "supplies": [
+     "cp_clients__201511010920000800"
+    ],
+    "period": "2015-Q4",
+    "inPlaceOn": "2015-11-01",
+    "subject": "supply-history-row"
+   }
+  },
+  {
+   "id": "TS-85",
+   "mode": "INJECT",
+   "title": "S14 - a red Placements held back alone in a first-time package",
+   "section": "The option A and period-closing batch, planted (REQ-GEN-136, REQ-GEN-137)",
+   "demonstrates": "Placements is held back on its own data; Client Register, Notifications, Investigations, Carer Register and Case Workers are promoted - no check they count reads a Placements the period will hold. The corrected Placements is promoted, superseding the first.",
+   "breaksAs": "A reader of Placements held back with it.",
+   "config": "Config: quarterly, Feb/May/Aug/Nov, due 09:00 on the 1st. 2016-Q1's six tables arrive together on time, the quarter's first supply, cp_placements red on its own data and the other five clean. On 29 February a corrected cp_placements arrives alone.",
+   "requirements": [
+    "REQ-GEN-273"
+   ],
+   "coordinates": {
+    "dataset": "cp-placements",
+    "supplies": [
+     "cp_placements__201602010900000800",
+     "cp_placements__201602291000000800"
+    ],
+    "period": "2016-Q1",
+    "inPlaceOn": "2016-02-29",
     "subject": "supply-history-row"
    }
   }
