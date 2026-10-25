@@ -207,6 +207,27 @@ releases:
               If a re-run cross-table check still gives no result, the supply
               is held back until it does, and each processing pass tries it
               again. It is never promoted without that check.
+          - headline: The terminal says what the gate did
+            components: ["Pipeline & publishing", "Testing & dev tooling"]
+            description: >
+              The terminal now says which supply held another back, which
+              decision clears it, and what your own decision will set off,
+              before you confirm it. `mothman cp qa` exits 1 when a re-check
+              against the warehouse fails, even if the file's own checks
+              passed.
+          - headline: One row per thing to decide
+            components: ["Pipeline & publishing", "Dashboard UI"]
+            description: >
+              A supply held back only by another supply is listed beneath it
+              in the queue, with the command to override it, and is not
+              counted. A delivery still being checked shows as one quiet line.
+              The dashboard's cards count the same way.
+          - headline: Rejecting both files re-checks their readers
+            components: ["Pipeline & publishing", "QA checks & contract"]
+            description: >
+              Settling a pair of files so that neither is the period's supply
+              now re-checks the datasets that read that table, while you wait.
+              They are no longer left red as two files waiting to be settled.
   - date: "2026-10-24"
     summary: >
       Every result now sits on the delivery it actually read, in the order it

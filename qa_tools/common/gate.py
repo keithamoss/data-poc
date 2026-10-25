@@ -300,16 +300,79 @@ def waiting_words(package: Package) -> str:
     return f"checked, waiting for the rest of its delivery ({n} of {m} files checked)"
 
 
+def being_gated(conn, dataset_id: str, supply: str) -> Package | None:
+    """The package of more than one file this supply belongs to while it is
+    still being checked or gated - its 'gate' item owed and not cleared - or
+    None. The one reading REQ-PIPE-266 criterion 15's refusal, the queue's
+    quiet gating line and the door's 'checking with its delivery' share
+    (REQ-PIPE-276 criteria 11 and 12)."""
+    package = package_of(conn, dataset_id, supply)
+    if package is None or len(package.supplies) < 2:
+        return None
+    return package if owed_gate(conn, package) is not None else None
+
+
+def gating_words(package: Package) -> str:
+    """REQ-PIPE-276 criterion 12: the queue's one dim line for a delivery
+    whose 'gate' item is owed."""
+    from qa_tools.common import display_time
+
+    n, m = package.counts
+    when = display_time.format_instant(package.received)
+    if package.complete:
+        return f"Gating a delivery received {when} ({m} of {m} files checked)"
+    return f"Checking a delivery received {when} ({n} of {m} files checked)"
+
+
+def door_words(package: Package) -> str:
+    """REQ-PIPE-276 criterion 11: how the period's door lists a supply of a
+    delivery still being checked or gated - offering no decision on it."""
+    n, m = package.counts
+    return f"checking with its delivery ({n} of {m} files checked)"
+
+
+def crashed_sibling_lines(exc) -> list[str]:
+    """REQ-PIPE-276 criterion 17: an arrival of a package whose run stopped
+    (arrival_lifecycle.StageFailed) leaves its checked package-mates waiting -
+    'checked, waiting for its package - <dataset>'s run stopped at the <stage>
+    stage; the next pass re-runs it and gates both' ('gates them all' for
+    more than two), then 'mothman pipeline process' on a line of its own.
+    Nothing where it has no package-mate already checked, or nothing can be
+    read - the stop itself is said by the caller either way."""
+    from qa_tools.common import filing
+
+    arrival = getattr(exc, "arrival", None)
+    if arrival is None or len(getattr(arrival, "files_by_dataset", None) or {}) != 1:
+        return []
+    try:
+        (dataset_id,) = list(arrival.files_by_dataset)
+        supply = filing._supply_id_for(arrival, dataset_id)
+        with supply_db.connect(read_only=True, label="mothman:gate") as conn:
+            package = package_of(conn, dataset_id, supply)
+    except Exception:  # noqa: BLE001 - see the docstring
+        return []
+    if package is None or len(package.supplies) < 2:
+        return []
+    mates = list(dict.fromkeys(ds for ds, sup in package.supplies
+                               if (ds, sup) in package.checked and sup != supply))
+    if not mates:
+        return []
+    shown = ", ".join(mates[:8]) + (f" and {len(mates) - 8} more" if len(mates) > 8 else "")
+    gates = "gates both" if len(package.supplies) == 2 else "gates them all"
+    whose = f"{dataset_id}'" if dataset_id.endswith("s") else f"{dataset_id}'s"
+    return [f"{shown}: checked, waiting for its package - {whose} run stopped at the "
+            f"{exc.stage} stage; the next pass re-runs it and {gates}",
+            "mothman pipeline process"]
+
+
 def still_being_gated(conn, dataset_id: str, supply: str) -> str | None:
     """REQ-PIPE-266 criterion 15: the refusal for a person's decision on a
     supply whose package is still being checked or gated - its 'gate' item
     owed and not cleared - or None."""
     from qa_tools.common import display_time
 
-    package = package_of(conn, dataset_id, supply)
-    if package is None or len(package.supplies) < 2:
-        return None
-    if owed_gate(conn, package) is None:
+    package = being_gated(conn, dataset_id, supply)
+    if package is None:
         return None
     n, m = package.counts
     when = display_time.format_instant(package.received)
@@ -1575,6 +1638,67 @@ def _merge(out: Applied, more: Applied) -> None:
     out.contended = out.contended or more.contended
     out.reevaluations += more.reevaluations
     out.waiting = out.waiting or more.waiting
+
+
+@dataclass
+class Touched:
+    """What the gate left the supplies a run touched as (REQ-PIPE-276
+    criterion 3): those held back on a red - a re-check against the
+    warehouse that failed, or a check that could not be checked - and the
+    results of every re-check its latest gate application ran for them."""
+    held_back: list = field(default_factory=list)
+    rechecks: list = field(default_factory=list)
+
+    @property
+    def red(self) -> bool:
+        return bool(self.held_back) or any(
+            (r.get("status") or "") in ("fail", "error") for r in self.rechecks)
+
+
+def touched(conn, supplies) -> Touched:
+    """For [(dataset, supply)]: each one's latest gate outcome, and the
+    readers-only runs that outcome's application made for it - from the
+    decision log and the recorded runs, never a supply row."""
+    from qa_tools.common import decision_log
+    from qa_tools.common import qa_results_reader as reader
+
+    out = Touched()
+    for dataset_id, supply in supplies:
+        rows = conn.execute(
+            f"SELECT action, held_back_by, gate_application FROM {decision_log.TABLE} "
+            "WHERE dataset_id = ? AND supply = ? AND action IN (?, ?, ?) "
+            "ORDER BY id DESC LIMIT 1",
+            [dataset_id, supply, decision_log.PROMOTE, decision_log.PROMOTION_WITHHELD,
+             decision_log.PROMOTION_REFUSED]).fetchall()
+        if not rows:
+            continue
+        action, by, application = rows[0]
+        if action == decision_log.PROMOTION_WITHHELD and by:
+            out.held_back.append((dataset_id, supply))
+        if application is None:
+            continue
+        cursor = conn.execute(
+            f'SELECT c.* FROM "{qa_store.SCHEMA}".check_result c JOIN "{qa_store.SCHEMA}".run r '
+            "ON r.run_key = c.run_key WHERE r.dataset_id = ? AND r.supply_id = ? "
+            "AND r.scope = 'readers' AND r.gate_application = ? "
+            "AND r.completed_at IS NOT NULL ORDER BY r.run_seq, c.id",
+            [dataset_id, supply, application])
+        out.rechecks += reader.records_from(cursor.description, cursor.fetchall())
+    return out
+
+
+def supplies_of_arrivals(conn, arrivals) -> list[tuple[str, str]]:
+    """[(dataset, supply)] of every supply these arrivals became (filing.
+    supplies_of, the one reading)."""
+    from qa_tools.common import filing
+
+    out = []
+    for a in arrivals:
+        try:
+            out += [(i["dataset_id"], i["supply"]) for i in filing.supplies_of(conn, a)]
+        except Exception:  # noqa: BLE001 - an arrival never filed touched nothing
+            continue
+    return out
 
 
 def report(applied: Applied) -> None:

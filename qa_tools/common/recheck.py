@@ -103,6 +103,11 @@ class Outcome:
     #: still records nothing that counts (Keith, 2026-10-25, post-build-review
     #: #274 D2): left owed for the next pass, and a red, never a failure.
     not_judged: bool = False
+    #: What a re-evaluation's re-gating left each reader as (REQ-PIPE-276
+    #: criterion 10; REQ-PIPE-211 criterion 14): (dataset, supply, period,
+    #: status, the gate's result in words) for every reader it touched -
+    #: promoted, still held back, still waiting or still promoted.
+    regated: tuple = ()
 
 
 _OWED_COLUMNS = ("id", "kind", "dataset_id", "supply_id", "period", "caused_by_decision",
@@ -400,7 +405,15 @@ def _run_claimed(owed_id: int, *, run_by: str | None = None, on_step=None) -> Ou
     # THE OUTCOME, NOT TWO IDS (post-build-review #115, D5): what it came out
     # as against which period, and whether the gate promoted it.
     promoted = item.dataset_id in gated.promoted
-    why = None if promoted else (gated.refused.get(item.dataset_id) or "it waits for a person")
+    why = None if promoted else gated.refused.get(item.dataset_id)
+    if not promoted and why is None:
+        # HELD BACK, IN ITS ENTRY'S OWN WORDS (REQ-PIPE-276 criterion 5): a
+        # hold-back is no refusal, so it was 'it waits for a person' here.
+        from qa_tools.common import root_cause
+
+        with supply_db.connect(read_only=True, label="mothman:recheck") as conn:
+            why = root_cause.holdback_reason(conn, item.dataset_id, item.supply_id)
+    why = why or (None if promoted else "it waits for a person")
     then = f"Promoted into {period}." if promoted else f"Not promoted - {why}."
     return Outcome(item.id, run_key, True,
                    f"Checked against {period}: {verdict or 'no verdict'}. {then}",
@@ -426,9 +439,11 @@ def _run_gate(item) -> Outcome:
         fail(item.id, message)
         return Outcome(item.id, "", False, f"the gate of {item.period} did not complete "
                        f"({message}); it is still owed", period=item.period)
+    # A SUPPLY IT LEFT HELD BACK ON A RED IS A RED OF THE PASS (REQ-PIPE-276
+    # criterion 3): its own run may have been green.
     return Outcome(item.id, f"gate/{applied.application}", True,
                    f"{item.period}: gated - promoted {', '.join(applied.promoted) or 'nothing'}",
-                   period=item.period)
+                   period=item.period, status="red" if applied.held_back else None)
 
 
 def _promoted_outcome(item, run_key: str, period: str, before: str | None) -> Outcome:

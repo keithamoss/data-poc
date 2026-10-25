@@ -550,8 +550,18 @@ def _from_awaiting_decisions(conn=None) -> list[Item]:
             # dearest thing the survey does, so it is not paid for nothing.
             if not db.execute("SELECT 1 FROM qa.filing LIMIT 1").fetchall():
                 return []
+            from qa_tools.common import root_cause
+
             for collection in sorted({d.collection_id for d in hierarchy.all_datasets()}):
-                for state in filing_queue.awaiting(db, collection):
+                # COUNTED AS THE TERMINAL COUNTS (REQ-PIPE-210 criterion 10),
+                # through the same one function: a supply listed beneath its
+                # cause is not counted, one with nothing to sit beneath is, and
+                # a delivery still being gated is not (REQ-PIPE-276 criterion 12).
+                counted = root_cause.group_queue(
+                    db, filing_queue.awaiting(db, collection),
+                    held=[h for h in filing_queue.held_in(db, collection)
+                          if not h.turned_off]).rows
+                for state in counted:
                     if state.state in skip or not state.supply:
                         continue
                     by_dataset.setdefault(state.dataset_id, []).append(state)

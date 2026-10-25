@@ -358,6 +358,16 @@ def consequences(conn, request: Request) -> Consequences:
     if request.operation == PLACE:
         lines, done = _place_consequences(conn, request)
     notes: list[str] = []
+    if request.operation == REFILE and request.supply and request.to_period:
+        # A PACKAGE SPLIT ACROSS PERIODS IS SAID BEFORE CONFIRMING (REQ-PIPE-276
+        # criterion 18), and the re-file stays available on the same terms -
+        # so a note, never part of the key.
+        left = _left_behind(conn, request)
+        if left:
+            notes.append(f"{request.supply} came in one delivery with "
+                         f"{', '.join(left)}. Re-filing it alone leaves "
+                         f"{'it' if len(left) == 1 else 'them'} in {request.period}: the "
+                         f"delivery is then gated in two periods, not together.")
     if request.operation == CHOOSE_FILE:
         lines, done, notes = _settlement_consequences(conn, request)
     if request.operation == EXCUSE_LATENESS and request.through_period:
@@ -380,6 +390,12 @@ def consequences(conn, request: Request) -> Consequences:
                 f"readers with no table, carry it forward instead - one decision, no gap:\n"
                 f"mothman supply decide --operation carry-forward --dataset "
                 f"{request.dataset_id} --period {request.period} --reason '<why>'")
+    # WHAT THE GATE'S RULES WILL SET OFF (REQ-PIPE-276 criteria 7 to 9), keyed
+    # with the rest - so the read holders a person was shown are what a
+    # promotion is compared against under the locks (REQ-PIPE-266 criterion
+    # 17): a moved read supply changes the key and raises the existing
+    # consequences-changed refusal.
+    lines += _held_back_consequences(conn, request)
     readers = _readers_rechecked(conn, request)
     if readers:
         lines += readers
@@ -397,6 +413,182 @@ def consequences(conn, request: Request) -> Consequences:
 
 #: These move a table only where the supply named is the one the period holds.
 _MOVES_IF_HELD = (DEMOTE, REJECT, REFILE)
+
+
+def _received_words(conn, dataset_id: str, supply: str) -> str:
+    from qa_tools.common import display_time, filing
+
+    got = filing.received_at_of(dataset_id, supply, conn=conn)
+    return display_time.format_instant(got) if got else supply
+
+
+def _held_back_consequences(conn, request: Request) -> list[str]:
+    """REQ-PIPE-276 criteria 7, 8 and 9, as consequence lines naming both
+    ends and the state each will very likely be left in:
+
+      7. promoting a supply whose counted cross-table verdict read a supply
+         not in the warehouse - that supply named, and the check re-run
+         against the warehouse once it is promoted (REQ-PIPE-121);
+      8. promoting a supply whose knock-on re-runs a check already recorded
+         red for the same pair (T13, S5) - the in-warehouse reader very
+         likely 'Promoted, then re-checked worse';
+      9. promoting a supply whose promotion would change a waiting supply's
+         counted verdict - one it holds back, or one whose verdict against
+         it passes (Order B) - which it re-checks, and the rule promotes it
+         if green; rejecting or superseding such a root, that the waiting
+         supply is not re-checked and becomes a decision of its own; and
+         promoting over a could-not-run whose table is not yet due.
+
+    From recorded results and the decision log only."""
+    from qa_tools.common import (carried, hierarchy, knock_on, period_schema, promotion,
+                                 qa_store, supply_status)
+
+    op, ds, period, supply = (request.operation, request.dataset_id, request.period,
+                              request.supply)
+    if not (period and supply) or op not in (PROMOTE, REJECT, SUPERSEDE):
+        return []
+    table = hierarchy.dataset(ds).table
+    reads = promotion._declared_reads()
+    out: list[str] = []
+    if op in (REJECT, SUPERSEDE):
+        for w_ds, w_supply in _held_back_by_this(conn, ds, supply, period):
+            out.append(f"{w_ds} (received {_received_words(conn, w_ds, w_supply)}) is not "
+                       f"re-checked; it becomes a decision of its own in the queue.")
+        return out
+    try:
+        latest = supply_status.latest_results(conn, ds, supply)
+    except Exception:  # noqa: BLE001 - nothing readable adds nothing
+        latest = []
+    # 7 - and the not-yet-due could-not-run (9's third case).
+    for r in latest:
+        if carried.not_evaluated_reason(r):
+            codes = r.get("unrunnable_codes") or {}
+            for t in r.get("unrunnable_tables") or ():
+                code = codes.get(t) or r.get("unrunnable_code")
+                t_ds = supply_status.dataset_of(t)
+                if code == period_schema.NOT_YET_DUE and t_ds and t_ds != ds:
+                    due = r.get("unrunnable_due_at")
+                    from qa_tools.common import display_time
+
+                    when = display_time.format_instant(due) if due else "its due date"
+                    out.append(f"{_check_name(r)} could not run: {t_ds} is not due until "
+                               f"{when}. Promoting now promotes on a check nobody could run; "
+                               f"it is re-checked when {t_ds} is promoted.")
+            continue
+        for t, read in (r.get("reads") or {}).items():
+            t_ds = supply_status.dataset_of(t)
+            if t == table or t_ds is None or read.get("state") != qa_store.READ:
+                continue
+            other = read.get("supply_id")
+            holder = knock_on._now_holds(conn, t, period)
+            if other and other != holder:
+                out.append(f"{_check_name(r)} counted for this supply read the {t_ds} "
+                           f"received {_received_words(conn, t_ds, other)}, which is not in "
+                           f"the warehouse. The check is re-run against the warehouse once "
+                           f"that {t_ds} is promoted (REQ-PIPE-121).")
+    # 8: in-warehouse readers whose check against this supply already failed.
+    for reader in knock_on.readers(conn, period, [table], reads):
+        if reader.dataset_id == ds:
+            continue
+        if reader.waiting:
+            continue
+        failed = _failed_for_pair(conn, reader, table, supply)
+        if failed is not None:
+            check, at = failed
+            out.append(f"{reader.dataset_id} (in the warehouse, received "
+                       f"{_received_words(conn, reader.dataset_id, reader.supply)}) is "
+                       f"re-checked against this supply. {check} already failed for that pair "
+                       f"(re-check {at}), so {reader.dataset_id} will very likely become "
+                       f"\"Promoted, then re-checked worse\".")
+    # 9: waiting supplies whose counted verdict this promotion changes.
+    seen = set()
+    for w_ds, w_supply in _held_back_by_this(conn, ds, supply, period) + \
+            _passing_against_this(conn, ds, supply, period):
+        if (w_ds, w_supply) in seen:
+            continue
+        seen.add((w_ds, w_supply))
+        out.append(f"re-checks {w_ds}' waiting supply received "
+                   f"{_received_words(conn, w_ds, w_supply)}; if it is green, the rule "
+                   f"promotes it.")
+    return out
+
+
+def _left_behind(conn, request: Request) -> list[str]:
+    """The other supplies of a re-filed supply's package (gate.package_of),
+    by dataset id - the ones a re-file of it alone leaves behind."""
+    from qa_tools.common import gate
+
+    try:
+        package = gate.package_of(conn, request.dataset_id, request.supply)
+    except Exception:  # noqa: BLE001 - no package read is no warning
+        return []
+    if package is None:
+        return []
+    return [ds for ds, sup in package.supplies if sup != request.supply]
+
+
+def _check_name(record: dict) -> str:
+    from qa_tools.common import gate
+
+    words = gate._check_words(record.get("check_id") or "")
+    return words[:1].upper() + words[1:]
+
+
+def _held_back_by_this(conn, dataset_id: str, supply: str, period: str) -> list:
+    """[(dataset, supply)] of each supply waiting in `period` whose latest gate
+    outcome is a hold-back caused by this supply."""
+    rows = conn.execute(
+        f"SELECT DISTINCT ON (dataset_id, supply) dataset_id, supply, action, held_back_by "
+        f"FROM {decision_log.TABLE} WHERE to_slot = ? AND action IN (?, ?, ?) "
+        "AND supply IN (SELECT supply FROM qa.decision WHERE held_back_by = ?) "
+        "ORDER BY dataset_id, supply, id DESC",
+        [period, decision_log.PROMOTE, decision_log.PROMOTION_WITHHELD,
+         decision_log.PROMOTION_REFUSED, supply]).fetchall()
+    from qa_tools.common import supersession
+
+    out = []
+    for ds, sup, action, by in rows:
+        if action == decision_log.PROMOTION_WITHHELD and by == supply \
+                and sup in supersession.waiting_in(conn, ds, period):
+            out.append((ds, sup))
+    return out
+
+
+def _passing_against_this(conn, dataset_id: str, supply: str, period: str) -> list:
+    """[(dataset, supply)] of each waiting supply in `period` whose counted
+    verdict against the warehouse fails a check that passed reading THIS
+    supply in its place (Order B; root_cause.order_b_partner, the one
+    reading)."""
+    from qa_tools.common import knock_on, promotion, root_cause
+
+    table = hierarchy.dataset(dataset_id).table
+    out = []
+    for reader in knock_on.readers(conn, period, [table], promotion._declared_reads()):
+        if reader.dataset_id == dataset_id or not reader.waiting:
+            continue
+        found = root_cause.order_b_partner(conn, reader.dataset_id, reader.supply, period)
+        if found is not None and found[1] == supply:
+            out.append((reader.dataset_id, reader.supply))
+    return out
+
+
+def _failed_for_pair(conn, reader, table: str, supply: str):
+    """(check words, when) of this reader's newest result reading `table` as
+    `supply` that failed - from what each check recorded reading - or None."""
+    from qa_tools.common import display_time, knock_on, qa_store, supply_status
+
+    last: dict[str, dict] = {}
+    for r in supply_status.results_about(conn, reader.dataset_id, reader.supply,
+                                         view=supply_status.View()).shown:
+        if knock_on.read_as(r, table) == supply:
+            last[r.get("check_id")] = r
+    for check, r in last.items():
+        if r.get("status") in ("fail", "error"):
+            rows = conn.execute(f'SELECT run_instant FROM "{qa_store.SCHEMA}".run '
+                                "WHERE run_key = ?", [r.get("run_id")]).fetchall()
+            at = display_time.format_instant(rows[0][0]) if rows else "recorded"
+            return _check_name(r), at
+    return None
 
 
 def _readers_rechecked(conn, request: Request) -> list[str]:
@@ -735,7 +927,41 @@ def _settlement_consequences(conn, request: Request
             + ["  A supply that comes out green may be promoted by the promotion gate "
                "with no further decision."]))
         done.append(f"{runs} owed.")
+    # THE DATASETS THE CONTEST STOPPED, RE-CHECKED WHILE YOU WAIT (REQ-PIPE-211
+    # criterion 12): shaped like the QA-runs note and never keyed; only where
+    # the settlement leaves no file of the pair as this period's supply, and
+    # only where something reads the table in that period. No time estimate.
+    if leaves_no_supply(p):
+        readers = settlement_readers(conn, request.dataset_id, p.period)
+        if readers:
+            shown = ", ".join(readers[:8]) + (f" and {len(readers) - 8} more"
+                                              if len(readers) > 8 else "")
+            notes.append(f"Then re-checks the cross-table checks of {len(readers)} "
+                         f"dataset{'s' if len(readers) != 1 else ''} that read "
+                         f"{request.dataset_id} in {p.period}, while you wait - not their "
+                         f"own tables:\n    {shown}")
     return lines, done, notes
+
+
+def leaves_no_supply(p) -> bool:
+    """Whether a settlement plan leaves no file of the pair as its period's
+    supply - 'reject both', or every file rejected or re-filed (REQ-PIPE-211
+    criterion 1): a file kept as the supply is checked by its own owed run."""
+    from qa_tools.common import settlement
+
+    return not any(f.outcome == settlement.SUPPLY and not f.held
+                   and f.period_after == p.period for f in p.files)
+
+
+def settlement_readers(conn, dataset_id: str, period: str) -> list[str]:
+    """The ids of the other datasets with a supply in `period` whose
+    cross-table checks read this dataset's table - knock_on.readers, the
+    re-evaluation's own answer."""
+    from qa_tools.common import knock_on, promotion
+
+    table = hierarchy.dataset(dataset_id).table
+    return sorted({r.dataset_id for r in knock_on.readers(
+        conn, period, [table], promotion._declared_reads()) if r.dataset_id != dataset_id})
 
 
 def _spoken(operation: str) -> str:

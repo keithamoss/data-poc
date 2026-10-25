@@ -196,6 +196,10 @@ def worse_than_promoted(conn, dataset_id: str | None = None,
             now = supply_status.status(conn, ds, held_supply)
         except Exception:  # noqa: BLE001 - an unreadable verdict is not "worse"
             continue
+        if now == "red" and supply_status.red_only_for_recheck_owed(conn, ds, held_supply):
+            # AN OWED RE-CHECK IS NEVER 'RE-CHECKED WORSE' (REQ-PIPE-276
+            # criterion 14; #113): it clears by itself on the next pass.
+            continue
         if is_worse(promoted_on, now):
             out.append(Worse(ds, held_supply, period, promoted_on, now, recheck_id,
                              at.isoformat() if hasattr(at, "isoformat") else str(at)))

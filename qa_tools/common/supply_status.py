@@ -562,3 +562,46 @@ def _iso(value):
     if value is None:
         return None
     return value.isoformat() if hasattr(value, "isoformat") else str(value)
+
+
+def red_only_for_recheck_owed(conn, dataset_id: str, supply: str, *,
+                              view: View = View()) -> list[dict]:
+    """The 'recheck-owed' stand-ins (criterion 5) where they are the WHOLE of
+    this supply's red - every failing check counted toward it reads red only
+    because a re-check a decision owes has not run - else []. What lets the
+    terminal word such a red as not yet re-checked rather than 're-checked
+    worse' (REQ-PIPE-276 criterion 14; #113, NO FLICKERING REDS)."""
+    from qa_tools.common import promotion
+
+    try:
+        latest = latest_results(conn, dataset_id, supply, view=view)
+    except Exception:  # noqa: BLE001 - nothing readable is no owed red
+        return []
+    failing = [r for r in promotion._contributing_records(
+                   dataset_id, latest, promotion._declared_reads())
+               if (r.get("status") or "") in ("fail", "error")]
+    if not failing or any(r.get("warehouse_reason") != RECHECK_OWED for r in failing):
+        return []
+    return failing
+
+
+def recheck_owed_words(conn, records: list[dict]) -> str | None:
+    """REQ-DASH-204 criterion 7's sentence for the terminal (REQ-PIPE-276
+    criterion 14): 'Not yet re-checked against the <dataset> promoted
+    <instant>; the re-check runs on the next processing pass:' - naming the
+    decision that owes it, from the stand-in's own fields."""
+    from qa_tools.common import decision_log, display_time
+
+    ids = sorted({r.get("owed_by_decision") for r in records if r.get("owed_by_decision")})
+    if not ids:
+        return None
+    rows = conn.execute(f"SELECT dataset_id, action, effective_at FROM {decision_log.TABLE} "
+                        "WHERE id = ?", [ids[-1]]).fetchall()
+    if not rows:
+        return None
+    from qa_tools.common import decision_words
+
+    ds, action, at = rows[0]
+    verb = decision_words.said(action)
+    return (f"Not yet re-checked against the {ds} {verb} {display_time.format_instant(at)}; "
+            f"the re-check runs on the next processing pass:")

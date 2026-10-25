@@ -412,6 +412,11 @@ def run_pass(*, run_by: str | None = None, say=print, deadline: float | None = N
         report.failures.append((arrival.run_id, f"{type(exc).__name__}: {exc}"))
         say(f"{arrival.run_id}: FAILED - {type(exc).__name__}: {exc}; it and every "
             f"later {arrival.collection_id} arrival are left for the next pass")
+        # WHAT ITS PACKAGE-MATES WAIT FOR (REQ-PIPE-276 criterion 17).
+        from qa_tools.common import gate as gate_words
+
+        for line in gate_words.crashed_sibling_lines(exc):
+            say(line)
 
     # HELD UNTIL DATES EXISTED (REQ-PIPE-154 criterion 7): re-filed by the
     # rule BEFORE this pass's new arrivals, which were all received later -
@@ -638,6 +643,11 @@ def _one(arrival, among, run_timestamp, run_by, report: PassReport, say) -> None
     with supply_db.connect(read_only=True, label="mothman:process") as conn:
         after = state_of(arrival, recorded(conn))
         waiting = _waiting_for_package(conn, arrival, gate_mod) if after != PROCESSED else None
+        # HELD BACK ON A RED COUNTS (REQ-PIPE-276 criterion 3): a supply whose
+        # own run was green and whose re-check against the warehouse failed
+        # is a red result of this pass.
+        if gate_mod.touched(conn, gate_mod.supplies_of_arrivals(conn, [arrival])).red:
+            report.red = True
     if waiting:
         # CHECKED, WAITING FOR ITS PACKAGE (REQ-PIPE-266 criterion 3): not a
         # failure, and nothing later is held back for it.

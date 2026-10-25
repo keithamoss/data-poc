@@ -854,18 +854,23 @@ def queue_command(collection_id: str) -> None:
             waiting = filing_queue.awaiting(conn, collection_id)
             owed_now = _owed_in(conn, collection_id)
             carry = filing_tui.carry_forward_warnings(conn, collection_id)
+            held = [h for h in filing_queue.held_in(conn, collection_id) if not h.turned_off]
+            # THE SAME GROUPING AND THE SAME RENDERER AS THE FILING DECISIONS
+            # QUEUE (REQ-PIPE-276 criteria 6 and 12; REQ-PIPE-210 criterion 8).
+            groups = filing_tui.queue_groups(conn, waiting, held=held)
+            # A NEWER SUPPLY THAT COULD BE CARRIED FORWARD (REQ-PIPE-271
+            # criterion 7), above the supplies and not counted among them.
+            filing_tui.say_carry_forward_warnings(carry)
+            if not groups.rows:
+                console.print(f"Nothing is waiting on a person in "
+                              f"{filing_tui._collection_name(collection_id)}.", style="green")
+                filing_tui.say_gating(groups)
+            else:
+                filing_tui.say_queue(conn, groups, collection_id)
+            _say_owed(owed_now, conn)
     except filing_queue.LogUnreachable as exc:
         filing_tui.say_unreachable(exc)
         raise SystemExit(1) from exc
-    # A NEWER SUPPLY THAT COULD BE CARRIED FORWARD (REQ-PIPE-271 criterion 7),
-    # above the supplies and not counted among them.
-    filing_tui.say_carry_forward_warnings(carry)
-    if not waiting:
-        console.print("Nothing is waiting on a person.", style="green")
-    else:
-        console.print(f"[bold]{len(waiting)}[/bold] supply/supplies waiting on a decision\n")
-        console.print(filing_tui.queue_table(waiting))
-    _say_owed(owed_now)
 
 
 def _owed_in(conn, collection_id: str) -> list:
@@ -877,7 +882,7 @@ def _owed_in(conn, collection_id: str) -> list:
     return [o for o in recheck.owed(conn) if o.dataset_id in mine]
 
 
-def _say_owed(owed_now: list) -> None:
+def _say_owed(owed_now: list, conn=None) -> None:
     """WHILE OWED, SHOWN AS OWED (REQ-PIPE-121 criterion 16): a re-check a
     run left undone is otherwise invisible until the processing pass
     finishes it (REQ-PIPE-151)."""
@@ -886,10 +891,40 @@ def _say_owed(owed_now: list) -> None:
     console.print(f"\n[bold yellow]{len(owed_now)}[/bold yellow] QA run(s) owed, not yet "
                   "done - the processing pass completes them:")
     for o in owed_now:
-        what = (f"re-check of {o.supply_id}" if o.kind == "recheck"
-                else f"re-evaluation of {o.period}'s readers of {', '.join(o.tables or [])}")
+        what = _owed_words(o, conn)
+        cause = (f"owed to decision {o.caused_by_decision}" if o.caused_by_decision
+                 else f"owed to gate application {o.caused_by_application}"
+                 if getattr(o, "caused_by_application", None)
+                 else "owed to its delivery's last file")
         why = f" - last attempt: {o.last_failure}" if o.last_failure else ""
-        console.print(f"  {what} (owed to decision {o.caused_by_decision}){why}")
+        console.print(f"  {what} ({cause}){why}", markup=False, highlight=False)
+
+
+def _owed_words(o, conn=None) -> str:
+    """One owed item in words. A 'gate' item is the delivery it gates
+    (REQ-PIPE-276 criterion 13) - 'gate of the delivery received <instant>
+    (<n> of <m> files checked)', or 'gate of <period>, re-applied from
+    recorded results' for a retried application - never a re-evaluation of
+    a period's readers."""
+    from qa_tools.common import display_time, gate, hierarchy, recheck
+
+    if o.kind == recheck.RECHECK:
+        return f"re-check of {o.supply_id}"
+    if o.kind == recheck.GATE:
+        if getattr(o, "caused_by_application", None):
+            return f"gate of {o.period}, re-applied from recorded results"
+        try:
+            package = gate.package_at(conn, hierarchy.dataset(o.dataset_id).collection_id,
+                                      o.period, o.delivery, o.package_instant)
+            n, m = package.counts
+            return (f"gate of the delivery received "
+                    f"{display_time.format_instant(package.received)} "
+                    f"({n} of {m} files checked)")
+        except Exception:  # noqa: BLE001 - said without its counts
+            when = (display_time.format_instant(o.package_instant)
+                    if o.package_instant else "for its period")
+            return f"gate of the delivery received {when}"
+    return f"re-evaluation of {o.period}'s readers of {', '.join(o.tables or [])}"
 
 
 @supply_group.command("slots")
@@ -1030,9 +1065,12 @@ def decide_command(operation: str, dataset_id: str, period: str | None,
     Exit statuses:
       0   recorded, or already so
       1   refused - nothing was recorded
-      3   recorded, but the checks it owes did not finish (--wait)
-      75  a gate is deciding this supply or its period right now - nothing
-          was changed; the same command later goes through
+      3   recorded, but the checks it owes did not finish (--wait); for
+          choose-file, the re-check of the datasets that read the table did
+          not finish and is owed to the processing pass
+      75  nothing was changed; the same command later goes through. One
+          of three causes: the delivery is still being checked, a gate is
+          running for the period, or a lock wait timed out
 
     \b
     carry-forward: inherit the newest promoted supply, replacing what this
@@ -1098,6 +1136,10 @@ def decide_command(operation: str, dataset_id: str, period: str | None,
                                      yes=yes, acknowledged=acknowledged)
         if outcome is None:
             raise SystemExit(1)
+        if outcome.checks_finished is False:
+            # THE RE-CHECK OF THE DATASETS THAT READ THE TABLE IS OWED
+            # (REQ-PIPE-211 criterion 15).
+            raise SystemExit(filing_tui.CHECKS_STILL_OWED_EXIT)
         return
     if file_outcomes:
         raise click.UsageError("--file-outcome is for --operation choose-file only.")
@@ -1254,7 +1296,7 @@ def _settle_from_flags(dataset_id: str, period: str, tokens: tuple[str, ...], *,
     # A FILE GIVEN ALONE IS KEPT, and only the other asked (criterion 15, #170).
     return settle_tui.settle(dataset_id, period, pair, answers=answers or None,
                              reason=reason, yes=yes, acknowledged=acknowledged,
-                             summary=bool(missing))
+                             summary=bool(missing), flag_route=True)
 
 
 @supply_group.command("corrections")
