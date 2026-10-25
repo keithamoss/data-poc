@@ -42625,6 +42625,20 @@ requirements:
     - tests/test_cli_package_gate.py::TestCheapPaths::test_the_period_door_lists_a_supply_being_checked_and_offers_nothing_on_it
     - tests/test_cli_package_gate.py::TestCheapPaths::test_the_owed_recheck_and_still_held_back_words
     - tests/test_cli_package_gate.py::TestCheapPaths::test_the_settle_flows_owed_panels
+    - tests/test_cli_package_gate.py::TestCliUxReview::test_the_override_lead_in_comes_straight_before_its_command
+    - tests/test_cli_package_gate.py::TestCliUxReview::test_the_door_says_why_it_is_held_back_first
+    - tests/test_cli_package_gate.py::TestCliUxReview::test_a_failed_recheck_says_it_failed
+    - tests/test_cli_package_gate.py::TestCliUxReview::test_the_tui_queue_says_nothing_waits_beside_a_delivery_being_checked
+    - tests/test_cli_package_gate.py::TestCliUxReview::test_a_failed_recheck_row_points_at_the_cause_and_beats_another_version
+    - tests/test_cli_package_gate.py::TestCliUxReview::test_the_gating_line_says_who_finishes_it
+    - tests/test_cli_package_gate.py::TestCliUxReview::test_a_door_with_nothing_to_decide_defaults_to_back
+    - tests/test_cli_package_gate.py::TestCliUxReview::test_after_a_rejection_the_queue_says_turned_down_only
+    - tests/test_cli_package_gate.py::TestCliUxReview::test_the_wrapped_lines_of_a_group_keep_their_indent
+    - tests/test_cli_package_gate.py::TestCliUxReview::test_the_promote_warning_says_each_thing_once_in_plain_words
+    - tests/test_cli_package_gate.py::TestCliUxReview::test_the_owed_list_words_a_gate_plainly
+    - tests/test_cli_package_gate.py::TestCliUxReview::test_the_settle_summary_tables_are_labelled
+    - tests/test_cli_package_gate.py::TestCliUxReview::test_help_and_refusals_speak_to_the_person
+    - tests/test_cli_package_gate.py::TestCliUxReview::test_a_contested_roots_line_is_one_accurate_sentence
     implemented_by:
     - cli/lifecycle_report.py::_gate_line
     - cli/lifecycle_report.py::rechecked_promotion_words
@@ -42803,6 +42817,28 @@ requirements:
       is counted (D3). The settlement panel says the backstop ''kept waiting'' a reader, never ''refused'' (D5, REQ-PIPE-211 criterion 14).'
     - 'NO_COLOR AND 80 COLUMNS, FOR REAL (post-build critic): the module-level Consoles are built at import, before a test''s NO_COLOR, so the terminal tests
       replace each with a Console built with no colour at 80 columns, and assert no colour code reaches the output; the piped CliRunner output is the pipe.'
+    - 'THE CLI UX REVIEW OF a122520 (2026-10-25), each screen change pinned by a test that asserts the text: the override''s lead-in is the last prose line,
+      straight above the command (''To override:'' in the door, which names no door; ''To override, from the <period> door or with:'' elsewhere), and the warning
+      lists the consequences that carry commands last so ''then promote it again:'' leads straight into them; the door says WHY first - the hold-back''s own
+      reason, its own checks passing included; the Filing decisions queue and mothman supply queue say ''No supply is waiting on a decision in <collection>.''
+      (beside period items or held supplies) or ''Nothing is waiting on a person in <collection>.'' from the one renderer; a person''s rejection reads ''turned
+      down'' in the queue''s State cell too; wrapped lines under a grouped row keep their indent; the promote warning names supplies by dataset and arrival,
+      one date style, no requirement number, and a waiting reader criterion 9 names is not listed again; the owed list calls a gate a gate, with the command
+      on a line of its own; the settle summary''s two tables are labelled ''As they arrived'' and ''As you are settling them''; developer prose is cut from
+      `supply queue`/`supply decide` --help; the no-terminal refusal says ''Give it on the command line instead''.'
+    - 'A FAILED RE-CHECK IS SAID AS FAILED, ON SCREEN ONLY (CLI UX review S3; PROVISIONAL): the terminal says ''... in place in the warehouse (received <instant>),
+      failed, because ...'' where held_back_detail.failed is true; the recorded ''promotion-withheld'' reason keeps REQ-PIPE-267 criterion 13''s signed wording,
+      which a change would need Keith''s sign-off for, and the recorded history is unchanged.'
+    - 'A FAILED RE-CHECK''S ROW POINTS AT ITS CAUSE (CLI UX review S5; PROVISIONAL, Keith Q1 = a, taken while he was away): staggered S1 red''s Clients v2,
+      its own counted row under 3a, carries ''red - <check> failed against the warehouse; decide <dataset> (received <instant>) first'' while the cause still
+      waits, and its State cell says ''held back - see below'' over ''another version waiting'' (REQ-PIPE-210 criterion 3).'
+    - 'WHO FINISHES A DELIVERY BEING CHECKED (PROVISIONAL, Keith Q2 = a): where no run holds it, the quiet gating line adds ''- finished by the next processing
+      pass'' and `mothman pipeline process` on a line of its own; a delivery a run holds says nothing more.'
+    - 'WHERE NOTHING NEEDS DECIDING THE CURSOR STARTS ON BACK (PROVISIONAL, Keith Q3 = a): the door that says ''Nothing needs deciding on this supply'' offers
+      its decisions with the override (promote) last and the cursor on ''<- Back''.'
+    - 'NO INHERIT ON AN ARRIVED SUPPLY''S DOOR (CLI UX review P9; PROVISIONAL): filing_queue.operations_for no longer offers inherit for a slot holding a waiting
+      supply - inheritance.inherit_one_refusal refuses it wherever the dataset owes a supply (REQ-PIPE-098), so it could only be refused. Substitute stays offered:
+      standing on an earlier period''s supply is a decision a person may make there.'
     open_questions: []
   - id: REQ-DASH-277
     title: '''In place'' reads ''in place in the warehouse'' wherever it is shown to a person'
@@ -43582,6 +43618,9 @@ requirements:
       criterion 12), so the terminal''s counts and the dashboard''s card counts (outstanding._from_awaiting_decisions, through group_queue) leave them out alike.'
     - 'THE GROUPING NEVER HIDES THE QUEUE (build): where grouping cannot be read, filing_tui.queue_groups says so in a dim line and lists every supply as its
       own counted row, as before this requirement.'
+    - 'ONE ACCURATE SENTENCE BENEATH AN OPEN PAIR (CLI UX review P3): a supply listed beneath a contested pair reads ''its checks of <dataset> cannot run while
+      two <dataset> files wait to be settled; settling them re-checks it'' - never that the table ''arrives'' - and a supply root''s line says once that deciding
+      it settles this one.'
     open_questions: []
   - id: REQ-GEN-206
     title: The last planted scenarios of REQ-GEN-136 and REQ-GEN-137 - Case Workers' held gap arrival, a reader re-checked after
@@ -43978,6 +44017,9 @@ requirements:
     - 'THE BACKSTOP IN THE SETTLEMENT PANEL (post-build critic D5): a reader the knock-on left waiting on the agreement backstop is said as ''kept waiting by
       the agreement backstop until its dataset matches the agreement again'' - the meaning kept, never ''refused'' (criterion 14). And the settled pair''s own
       supplies are read from qa.decision_file, never worked out from a ''#1''/''#2'' shape.'
+    - 'THE SETTLEMENT NOTE WARNS BEFORE THE CONFIRMATION (CLI UX review P7): ''After settling, the cross-table checks of <n> datasets that read <dataset> in
+      <period> are re-checked while you wait - not their own tables:'' and, where the period will hold no file of the table, ''With no <dataset> file left in
+      <period>, they will very likely turn red: those checks cannot run until one is promoted.'' Still a note, never keyed.'
     open_questions: []
   - id: REQ-TEST-281
     title: "The browser-test module runs across every test worker, each worker building its own dashboard into its own output path"

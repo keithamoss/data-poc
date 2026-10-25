@@ -773,6 +773,13 @@ def operations_for(state: slot_state.SlotState) -> tuple[tuple[str, ...], tuple[
         period_scoped = (filing_decisions.CARRY_FORWARD,)
     elif state.state == slot_state.PROMOTED:
         period_scoped = ()
+    elif state.supply and state.state in (slot_state.AWAITING_DECISION, slot_state.RETURNED,
+                                          slot_state.AMBER_WAITING):
+        # A SUPPLY ARRIVED: INHERITING IS REFUSED where the dataset owes one
+        # (inheritance.inherit_one_refusal - "inheriting is what you do when
+        # there is no arrival"), so it is not offered (CLI UX review P9,
+        # PROVISIONAL). Standing on an earlier period's supply stays offered.
+        period_scoped = (filing_decisions.SUBSTITUTE,)
     else:
         period_scoped = (filing_decisions.SUBSTITUTE, filing_decisions.INHERIT)
     return supply_scoped, period_scoped

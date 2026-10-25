@@ -352,6 +352,10 @@ class QueueGroups:
     #: [(package, [states])] - a delivery still being checked or gated: one
     #: quiet line, never counted, never pickable (REQ-PIPE-276 criterion 12).
     gating: list = field(default_factory=list)
+    #: Keys of counted rows held back because of another supply - whose
+    #: State cell says so, over 'another version waiting' (REQ-PIPE-210
+    #: criterion 3).
+    held: set = field(default_factory=set)
 
     @property
     def count(self) -> int:
@@ -374,15 +378,70 @@ def _root_matches(root: Root, state) -> bool:
 
 
 def holdback_reason(conn, dataset_id: str, supply: str) -> str | None:
-    """The latest 'promotion-withheld' entry's own words for this supply."""
+    """The latest 'promotion-withheld' entry's own words for this supply, as
+    the terminal says them: where its re-check against the warehouse RAN AND
+    FAILED (held_back_detail.failed), '..., re-checked against the <dataset>
+    in place in the warehouse (received <instant>), failed, because ...' -
+    the result said, as a rule promotion's line says 'green' (CLI UX review,
+    S3). The recorded entry keeps REQ-PIPE-267 criterion 13's own wording."""
+    import re
+
     rows = conn.execute(
-        f"SELECT action, reason FROM {decision_log.TABLE} WHERE dataset_id = ? AND supply = ? "
+        f"SELECT action, reason, held_back_detail FROM {decision_log.TABLE} "
+        "WHERE dataset_id = ? AND supply = ? "
         "AND action IN (?, ?, ?) ORDER BY id DESC LIMIT 1",
         [dataset_id, supply, decision_log.PROMOTE, decision_log.PROMOTION_WITHHELD,
          decision_log.PROMOTION_REFUSED]).fetchall()
-    if rows and rows[0][0] == decision_log.PROMOTION_WITHHELD:
-        return (rows[0][1] or "").strip() or None
-    return None
+    if not rows or rows[0][0] != decision_log.PROMOTION_WITHHELD:
+        return None
+    reason = (rows[0][1] or "").strip() or None
+    if reason and _failed_on_its_own(rows[0][2]) and ", failed, because" not in reason:
+        reason = re.sub(r"(in place in the warehouse \(received [^)]*\)) because",
+                        r"\1, failed, because", reason, count=1)
+    return reason
+
+
+def own_checks_passed(conn, dataset_id: str, supply: str) -> bool:
+    """Whether every counted check of this supply's own data passed or
+    warned - none read another table."""
+    from qa_tools.common import promotion, supply_status
+
+    try:
+        latest = supply_status.latest_results(conn, dataset_id, supply)
+    except Exception:  # noqa: BLE001 - unreadable is not 'passed'
+        return False
+    own = [r for r in promotion._contributing_records(dataset_id, latest,
+                                                      promotion._declared_reads())
+           if not r.get("reads") and not r.get("unrunnable_tables")]
+    return bool(own) and all((r.get("status") or "") in ("pass", "warn") for r in own)
+
+
+def failed_recheck_words(conn, dataset_id: str, supply: str) -> str | None:
+    """CLI UX review S5 (PROVISIONAL, Keith Q1 = a): a counted row whose
+    re-check against the warehouse failed while the supply that caused that
+    re-check still waits - 'red - <check> failed against the warehouse;
+    decide <dataset> (received <instant>) first'."""
+    from qa_tools.common import display_time, filing, gate, supersession
+
+    entry = _latest_gate_entry(conn, dataset_id, supply)
+    if entry is None or entry["action"] != decision_log.PROMOTION_WITHHELD \
+            or not entry["held_back_by"] or not _failed_on_its_own(entry["held_back_detail"]):
+        return None
+    by = entry["held_back_by"]
+    by_ds = by.split("@", 1)[0]
+    if _turned_down(conn, by_ds, by):
+        return None
+    from qa_tools.common import supply_files
+
+    found = supply_files.resolve(conn, by_ds, by)
+    if found is None or not found.period \
+            or by not in supersession.waiting_in(conn, by_ds, found.period):
+        return None
+    checks = (entry["held_back_detail"] or {}).get("checks") or []
+    words = gate._check_words(checks[0]) if checks else "a cross-table check"
+    got = filing.received_at_of(by_ds, by, conn=conn)
+    when = display_time.format_instant(got) if got else by
+    return f"red - {words} failed against the warehouse; decide {by_ds} (received {when}) first"
 
 
 def _overdue_words(root: Root) -> str:
@@ -459,6 +518,10 @@ def group_queue(conn, states, *, held=()) -> QueueGroups:
     for s in out.rows:
         if not s.supply:
             continue
+        failed = failed_recheck_words(conn, s.dataset_id, s.supply)
+        if failed:
+            out.lines.setdefault(row_key(s), []).append(failed)
+            out.held.add(row_key(s))
         gone = turned_down_words(conn, s.dataset_id, s.supply)
         if gone:
             # ITS OWN COUNTED ROW ONCE ITS ROOT IS TURNED DOWN OR REPLACED

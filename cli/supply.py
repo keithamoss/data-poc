@@ -841,6 +841,7 @@ def queue_command(collection_id: str) -> None:
     them and not counted among them, each period a newer supply could be
     carried forward into (REQ-PIPE-271), with the command that does it.
 
+    \f
     THE SAME DEFINITION THE TICKET POLICY USES, never a second one -
     `slot_state.NEEDS_ACTION`, filtered to the states that hold a
     supply. A terminal and a ticket disagreeing about what is
@@ -861,9 +862,6 @@ def queue_command(collection_id: str) -> None:
             # A NEWER SUPPLY THAT COULD BE CARRIED FORWARD (REQ-PIPE-271
             # criterion 7), above the supplies and not counted among them.
             filing_tui.say_carry_forward_warnings(carry)
-            if not groups.rows:
-                console.print(f"Nothing is waiting on a person in "
-                              f"{filing_tui._collection_name(collection_id)}.", style="green")
             # WHATEVER IS COUNTED (post-build critic D3): beneath a held root
             # and the gating line too.
             filing_tui.say_queue(conn, groups, collection_id)
@@ -888,16 +886,17 @@ def _say_owed(owed_now: list, conn=None) -> None:
     finishes it (REQ-PIPE-151)."""
     if not owed_now:
         return
-    console.print(f"\n[bold yellow]{len(owed_now)}[/bold yellow] QA run(s) owed, not yet "
-                  "done - the processing pass completes them:")
+    # A GATE IS NOT A QA RUN, said plainly, and the command on a line of its
+    # own (CLI UX review P6).
+    console.print(f"\n[bold yellow]{len(owed_now)}[/bold yellow] owed and not yet done - "
+                  "re-checks, re-evaluations and gates the processing pass completes:")
     for o in owed_now:
         what = _owed_words(o, conn)
-        cause = (f"owed to decision {o.caused_by_decision}" if o.caused_by_decision
-                 else f"owed to gate application {o.caused_by_application}"
-                 if getattr(o, "caused_by_application", None)
-                 else "owed to its delivery's last file")
+        cause = (f" (owed to decision {o.caused_by_decision})" if o.caused_by_decision
+                 else "")
         why = f" - last attempt: {o.last_failure}" if o.last_failure else ""
-        console.print(f"  {what} ({cause}){why}", markup=False, highlight=False)
+        console.print(f"  {what}{cause}{why}", markup=False, highlight=False)
+    console.print("mothman pipeline process", soft_wrap=True, markup=False, highlight=False)
 
 
 def _owed_words(o, conn=None) -> str:
@@ -1085,6 +1084,7 @@ def decide_command(operation: str, dataset_id: str, period: str | None,
       mothman supply decide --operation place --dataset cp-carers \\
         --supply 'cp-carers@<key>' --to-period 2026-Q3 --reason '<why>'
 
+    \f
     THE FLAG FORM OF THE WIZARD, calling the same implementation the
     GitHub route calls. The actor is whoever `git config user.email`
     says, checked against contract/people.yaml - there is no way to
