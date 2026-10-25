@@ -111,8 +111,8 @@ intro: >
 releases:
   - date: "2026-10-25"
     summary: >
-      The dashboard appears in under half a second again, and a page whose
-      data files did not load says exactly which and why.
+      The dashboard appears in under half a second again, and a data file
+      that did not load is named plainly without hiding everything else.
     changes:
       - category: Fixed
         items:
@@ -128,8 +128,27 @@ releases:
               When a data file is missing or from another build, the page now
               says which, and the published site no longer keeps files from
               earlier builds.
+          - headline: One broken collection, not a broken page
+            components: ["Dashboard UI"]
+            description: >
+              If one collection's data file does not load, the rest of the
+              dashboard still shows. One notice names what is missing and
+              tells you to reload first, and Plans, Demo and Feedback carry
+              on as normal.
       - category: Improved
         items:
+          - headline: Waits that hold still
+            components: ["Dashboard UI", "Pipeline & publishing"]
+            description: >
+              How long a supply has waited for a decision is now counted to
+              when the page was built, so everyone reading the same page sees
+              the same figure, and an unchanged history builds unchanged files.
+          - headline: Archived pages, properly dressed
+            components: ["Dashboard UI", "Pipeline & publishing"]
+            description: >
+              Published snapshots now find their fonts beside them, and no
+              longer show a Demo button they cannot play. The site also tells
+              browsers its data files are not for other websites to load.
           - headline: A build of your own
             components: ["Testing & dev tooling", "Pipeline & publishing"]
             description: >

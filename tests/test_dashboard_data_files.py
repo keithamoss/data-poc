@@ -273,13 +273,25 @@ class TestPartsAreFilledBelowTheBudget:
         assert len(written) > 2 and all(len(c) < 4096 for c in written.values())
 
 
-def _fingerprint(tmp_path, *, payload=None, built_at="2026-10-24T00:00:00Z", font=b"font"):
+def _github_links(sha: str, path: str = "contract/x/y-soda-checks.yml") -> str:
+    """GITHUB_LINKS as the build writes it: every link pinned to a commit."""
+    import json
+
+    return json.dumps({"checks": {"c1": f"https://github.com/o/r/blob/{sha}/{path}#L3"},
+                       "agencies": {"a": f"https://github.com/o/r/tree/{sha}/contract/a"},
+                       "datasets": {}, "titles": {"agencies": {}, "datasets": {}}},
+                      separators=(",", ":"))
+
+
+def _fingerprint(tmp_path, *, payload=None, built_at="2026-10-24T00:00:00Z", font=b"font",
+                 links=None):
     """A built page and a fonts/ and vendor/ beside it, fingerprinted."""
     work = tmp_path / f"fp{len(list(tmp_path.iterdir()))}"
     work.mkdir()
     page = _built_page(work, _files(payload or _payload()))
+    links = links or _github_links("a" * 40)
     page.write_text(page.read_text().replace(
-        "<script>\n", f'<script>\nconst BUILT_AT = "{built_at}";\n', 1))
+        "<script>\n", f'<script>\nconst BUILT_AT = "{built_at}";\nconst GITHUB_LINKS = {links};\n', 1))
     (work / "fonts").mkdir()
     (work / "fonts" / "a.woff2").write_bytes(font)
     (work / "vendor").mkdir()
@@ -300,6 +312,16 @@ class TestTheFingerprint:
 
     def test_it_covers_fonts_and_vendor(self, tmp_path):
         assert _fingerprint(tmp_path) != _fingerprint(tmp_path, font=b"another font")
+
+    def test_it_ignores_the_commit_the_github_links_are_pinned_to(self, tmp_path):
+        """Keith, 2026-10-25 (post-build-review #268 (d)): every source link
+        names the commit the build ran at, so a code-only commit that renders
+        identically would otherwise read as changed and publish."""
+        assert _fingerprint(tmp_path) == _fingerprint(tmp_path, links=_github_links("b" * 40))
+
+    def test_it_still_sees_a_link_to_another_file(self, tmp_path):
+        assert _fingerprint(tmp_path) != _fingerprint(
+            tmp_path, links=_github_links("a" * 40, path="contract/x/z-soda-checks.yml"))
 
 
 class TestTheListLineIsFoundOutsideTheBlocks:

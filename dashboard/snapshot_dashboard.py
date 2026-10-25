@@ -327,7 +327,7 @@ def prepare_deploy_site(site_dir: Path, html_path: Path = DASHBOARD_HTML,
     # every publish after - content-hashed names mean a changed file always
     # leaves its predecessor behind. Only these names: prepare-site takes any
     # directory a person names, so nothing else in it is touched.
-    for name in ("index.html", data_files.DATA_DIR, "snapshots", "fonts", "vendor"):
+    for name in ("index.html", data_files.DATA_DIR, "snapshots", "fonts", "vendor", HEADERS_FILE):
         stale = site_dir / name
         if stale.is_dir() and not stale.is_symlink():
             shutil.rmtree(stale)
@@ -348,6 +348,8 @@ def prepare_deploy_site(site_dir: Path, html_path: Path = DASHBOARD_HTML,
             (site_dir / data_files.DATA_DIR / name).write_bytes(content)
     (site_dir / "index.html").write_bytes(html.encode("utf-8"))
 
+    (site_dir / HEADERS_FILE).write_text(headers_file())
+
     for static_dir, dest_name in ((fonts_dir, "fonts"), (vendor_dir, "vendor")):
         if static_dir.exists():
             shutil.copytree(static_dir, site_dir / dest_name, dirs_exist_ok=True)
@@ -356,6 +358,16 @@ def prepare_deploy_site(site_dir: Path, html_path: Path = DASHBOARD_HTML,
         return
     site_snapshots_dir = site_dir / "snapshots"
     site_snapshots_dir.mkdir(parents=True, exist_ok=True)
+    # FONTS AND THE PLAYER BESIDE THE SNAPSHOTS TOO (Keith, 2026-10-25,
+    # post-build-review #268 (c)). A snapshot at snapshots/<name>.html asks
+    # for fonts/ and vendor/ relative to itself, and they sat only at the
+    # site root, so every published snapshot fell back to a system font and
+    # logged each as a failed load. Copied, not inlined into the archive
+    # (#268 E2): wrangler uploads by content hash, so the second copy costs
+    # nothing to send.
+    for static_dir, dest_name in ((fonts_dir, "fonts"), (vendor_dir, "vendor")):
+        if static_dir.exists():
+            shutil.copytree(static_dir, site_snapshots_dir / dest_name, dirs_exist_ok=True)
     for gz_path in sorted(snapshots_dir.glob("*.html.gz")):
         dest_name = gz_path.with_suffix("").name  # strips only the trailing .gz
         _place_snapshot(gz_path, site_snapshots_dir, dest_name, budget)
@@ -363,6 +375,48 @@ def prepare_deploy_site(site_dir: Path, html_path: Path = DASHBOARD_HTML,
     manifest_path = snapshots_dir / "manifest.json"
     if manifest_path.exists():
         (site_snapshots_dir / "manifest.json").write_bytes(manifest_path.read_bytes())
+
+
+#: Cloudflare Pages' own per-path response headers file, at the site root.
+HEADERS_FILE = "_headers"
+
+#: THE DATA IS NOT FOR OTHER SITES (Keith, 2026-10-25, post-build-review #268
+#: (b)). Since REQ-DASH-291 a data file is a script, and any other website can
+#: include a script with a <script> tag and read what it defines.
+#: Cross-Origin-Resource-Policy: same-origin makes the browser refuse that
+#: cross-site load, and nosniff stops a file being run as anything other than
+#: the type it is served as. Beside REQ-PIPE-257's SameSite=Lax on the Access
+#: cookie, not instead of it. /snapshots/* covers each split snapshot's own
+#: <name>.data/ files, and its fonts and player.
+SITE_HEADERS = {
+    path: {"Cross-Origin-Resource-Policy": "same-origin", "X-Content-Type-Options": "nosniff"}
+    for path in (f"/{data_files.DATA_DIR}/*", "/snapshots/*")
+}
+
+
+def headers_file() -> str:
+    """SITE_HEADERS in Cloudflare Pages' _headers format: a path pattern,
+    then each header indented beneath it."""
+    out = []
+    for path, headers in SITE_HEADERS.items():
+        out.append(path)
+        out.extend(f"  {name}: {value}" for name, value in headers.items())
+    return "\n".join(out) + "\n"
+
+
+def parse_headers(text: str) -> dict:
+    """A _headers file read back into {path: {header: value}}."""
+    rules, current = {}, None
+    for line in text.splitlines():
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        if line[0].isspace():
+            name, _, value = line.strip().partition(":")
+            rules[current][name.strip()] = value.strip()
+        else:
+            current = line.strip()
+            rules[current] = {}
+    return rules
 
 
 def _append_manifest_entry(snapshots_dir: Path, entry: dict) -> list:

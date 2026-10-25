@@ -87,21 +87,37 @@ describe("REQ-DASH-291: assembling COLLECTION_DATA from the data files", () => {
   });
 });
 
-describe("REQ-DASH-291 criterion 8: a missing or other-build file is a page-level error", () => {
-  it("names a file the page lists that never registers, and renders no tier", () => {
-    const w = load({
-      files: [entry("civil-registration", 1, 1, "b1"), entry("child-protection", 1, 1, "b2")],
-      registrations: [register("collection-civil-registration", 1, "b1", JSON.stringify(PAYLOAD["civil-registration"]))],
-    });
+// CRITERION 8 AS AMENDED (Keith, 2026-10-25, post-build-review #268 (g)): one
+// collection's bad file no longer blocks the page. The healthy collections
+// are shown, one notice names every broken one, a page inside a broken
+// collection shows its own error, and the tabs needing no collection data
+// work as ever. The advice is #268 (f)'s: reload first, then rebuild, and on
+// the published site tell the data team.
+describe("REQ-DASH-291 criterion 8: a broken collection file is named, and the rest is shown", () => {
+  const crOnly = () => [register("collection-civil-registration", 1, "b1", JSON.stringify(PAYLOAD["civil-registration"]))];
+  const both = [entry("civil-registration", 1, 1, "b1"), entry("child-protection", 1, 1, "b2")];
+  const notices = w => w.document.querySelectorAll('[data-testid="data-file-error"]');
+
+  it("shows the healthy collections and one notice naming the file that never registered", () => {
+    const w = load({files: both, registrations: crOnly()});
+    expect(notices(w).length).toBe(1);
     const box = errorBox(w);
-    expect(box).not.toBeNull();
     expect(box.textContent).toContain("collection-child-protection.aaaaaaaaaaaa.js");
     expect(box.textContent).toMatch(/missing/i);
     expect(box.textContent).not.toContain("collection-civil-registration.aaaaaaaaaaaa.js");
-    expect(box.textContent).toContain("mothman dashboard embed");
-    expect(box.textContent).toMatch(/publish is incomplete/i);
-    expect(view(w).children.length, "nothing but the error is rendered").toBe(1);
-    expect(view(w).textContent).not.toContain("Registry Services");
+    expect(box.getAttribute("data-broken-collections")).toBe("child-protection");
+    expect(w.rawRealDatasets().map(d => d.id)).toEqual(["birth-registrations"]);
+    expect(view(w).textContent).toContain("Registry Services");
+    expect(dashboard.errors).toEqual([]);
+  });
+
+  it("advises reloading first, then the rebuild, and on the site telling the data team (#268 (f))", () => {
+    const text = errorBox(load({files: both, registrations: crOnly()})).textContent.replace(/\s+/g, " ");
+    const reload = text.indexOf("Reload the page"), rebuild = text.indexOf("mothman dashboard embed");
+    expect(reload).toBeGreaterThan(-1);
+    expect(rebuild).toBeGreaterThan(reload);
+    expect(text).toMatch(/on the published site, tell the data team/);
+    expect(text).not.toMatch(/publish is incomplete/i);
   });
 
   it("names a file registered under another build", () => {
@@ -114,21 +130,29 @@ describe("REQ-DASH-291 criterion 8: a missing or other-build file is a page-leve
     expect(box.textContent).toMatch(/another build/i);
   });
 
-  it("says which in its heading, never just 'not right' (post-build-review #268)", () => {
+  it("says which collection and which kind in its heading (post-build-review #268)", () => {
     const heading = files => {
       const w = load({files, registrations: [
         register("collection-civil-registration", 1, "zz", JSON.stringify(PAYLOAD["civil-registration"]))]});
       return errorBox(w).querySelector("h2").textContent;
     };
     expect(heading([entry("child-protection", 1, 1, "b2")]))
-      .toBe("This dashboard cannot be shown: one of its data files is missing");
+      .toBe("Child Protection cannot be shown: its data file is missing");
     expect(heading([entry("civil-registration", 1, 1, "b1")]))
-      .toBe("This dashboard cannot be shown: one of its data files is from another build");
-    expect(heading([entry("civil-registration", 1, 1, "b1"), entry("child-protection", 1, 1, "b2")]))
-      .toBe("This dashboard cannot be shown: some of its data files are from another build or missing");
+      .toBe("Civil Registration cannot be shown: its data file is from another build");
+    expect(heading(both)).toBe("2 collections cannot be shown: Civil Registration and Child Protection");
   });
 
-  it("is styled by the stylesheet in the page's own tokens, not an inline --red (#268 V1, V4)", () => {
+  it("is one notice however many collections are broken, its files folded away once there are many", () => {
+    const w = load({files: [entry("civil-registration", 1, 2, "b1"), entry("civil-registration", 2, 2, "b1"),
+      entry("child-protection", 1, 2, "b2"), entry("child-protection", 2, 2, "b2")]});
+    expect(notices(w).length).toBe(1);
+    const box = errorBox(w);
+    expect(box.querySelector("details summary").textContent).toBe("The 4 files");
+    expect(box.querySelectorAll("details li").length).toBe(4);
+  });
+
+  it("is styled by the stylesheet in the page's own tokens, the border --bad as decided (#268 V1, V4, (i))", () => {
     const w = load({files: [entry("child-protection", 1, 1, "b2")]});
     const box = errorBox(w);
     expect(box.getAttribute("style")).toBeNull();
@@ -147,13 +171,41 @@ describe("REQ-DASH-291 criterion 8: a missing or other-build file is a page-leve
     const box = errorBox(w);
     expect(box.textContent).toContain("collection-child-protection.part2.aaaaaaaaaaaa.js");
     expect(box.textContent).not.toContain("part1");
+    expect(dashboard.errors, "a broken part is never parsed").toEqual([]);
   });
 
-  it("stays the error on every tier the address could name", () => {
-    const w = load({files: [entry("civil-registration", 1, 1, "b1")],
-      url: "http://localhost/agency/registry-services"});
-    expect(errorBox(w)).not.toBeNull();
-    expect(view(w).children.length).toBe(1);
+  it("says so where the broken collection's table would be on its agency's page", () => {
+    const w = load({files: both, registrations: crOnly(),
+      url: "http://localhost/#/agency/child-protection-family-support"});
+    expect(notices(w).length).toBe(1);
+    expect(view(w).querySelector('[data-testid="collection-not-loaded"]')).not.toBeNull();
+    expect(view(w).querySelector('[data-collection-not-loaded="child-protection"] table')).toBeNull();
+  });
+
+  it("shows the collection's own error on a page inside it, and no second notice", () => {
+    const w = load({files: both, registrations: crOnly(),
+      url: "http://localhost/#/agency/child-protection-family-support/collection/child-protection/dataset/cp-clients"});
+    expect(notices(w).length).toBe(1);
+    expect(errorBox(w).querySelector("h2").textContent)
+      .toBe("Child Protection cannot be shown: one of its data files is missing");
+    expect(w.document.getElementById("rail").textContent).toContain("Child Protection");
+  });
+
+  it("leaves a healthy collection's dataset page as it is, with the notice above it", () => {
+    const w = load({files: both, registrations: crOnly(),
+      url: "http://localhost/#/agency/registry-services/collection/civil-registration/dataset/birth-registrations"});
+    expect(notices(w).length).toBe(1);
+    expect(errorBox(w).getAttribute("data-broken-collections")).toBe("child-protection");
+    expect(view(w).textContent).toContain("Birth Registrations");
+  });
+
+  it("leaves Plans, Demo and Feedback working, with no notice (#268 (g))", () => {
+    for (const tab of ["plans", "demo", "feedback"]) {
+      const w = load({files: both, registrations: crOnly(), url: `http://localhost/#/${tab}`});
+      expect(w.eval("STATE.tier"), tab).toBe(tab);
+      expect(notices(w).length, tab).toBe(0);
+      dashboard.close(); dashboard = undefined;
+    }
   });
 });
 
@@ -265,5 +317,34 @@ describe("post-build-review #268: the Demo tab says which half is missing", () =
 
   it("still says there is no recording when there is none", () => {
     expect(demo(null)).toMatch(/No demo recording embedded yet/);
+  });
+});
+
+describe("post-build-review #268 (h): no Demo button in a snapshot", () => {
+  const button = html => {
+    dashboard = loadDashboard({html, hierarchy: MINIMAL_HIERARCHY});
+    return dashboard.window.document.getElementById("demo-btn");
+  };
+  const marker = "<!-- mothman:data-files -->\n";
+  const page = (block) => readFileSync(TEMPLATE_PATH, "utf-8")
+    .replace("const DATA_FILES = null;\n", `const DATA_FILES = ${JSON.stringify({build: "p", files: [REQS]})};\n`)
+    .replace(marker, marker + block);
+
+  it("hides it in an archived snapshot, which carries its data inline", () => {
+    const b = button(page(`<script type="text/plain" data-mothman-key="requirements-plans" ` +
+      `data-mothman-file="${REQS.name}">${register("requirements-plans", 1, REQS.build, "{}")}</script>\n`));
+    expect(b.style.display).toBe("none");
+  });
+
+  it("hides it in a snapshot's split form, which loads from its own .data/ directory", () => {
+    const b = button(page(`<script src="20261025T000000Z_abc1234.data/collection-x.aaaaaaaaaaaa.js" ` +
+      `data-mothman-key="collection-x" data-mothman-file="collection-x.aaaaaaaaaaaa.js"></script>\n`));
+    expect(b.style.display).toBe("none");
+  });
+
+  it("keeps it on the live page, which loads from data/", () => {
+    const b = button(page(`<script src="data/collection-x.aaaaaaaaaaaa.js" ` +
+      `data-mothman-key="collection-x" data-mothman-file="collection-x.aaaaaaaaaaaa.js"></script>\n`));
+    expect(b.style.display).toBe("");
   });
 });

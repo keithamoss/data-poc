@@ -383,9 +383,9 @@ button{font:inherit; color:inherit;}
 /* A DATA FILE THAT DID NOT LOAD (REQ-DASH-291 criteria 8 and 9; post-build-
    review #268 V1, V2, V4). A notice like the two above, in the page's own
    tokens - its inline style named a --red the page never defined, and fell
-   back to a hex that reached 2.78:1 in dark mode. --bad is PROVISIONAL: red
-   means failing data everywhere else here, and a neutral border may suit a
-   page that cannot show any data at all better; the question is Keith's. */
+   back to a hex that reached 2.78:1 in dark mode. --bad, DECIDED (Keith,
+   2026-10-25, post-build-review #268 (i)): kept red over a neutral
+   --ink-muted border, although red means failing data elsewhere here. */
 .data-file-error{border:1px solid var(--bad); background:var(--bad-soft); border-radius:var(--radius-sm);
   padding:12px 14px; margin:12px 0; font-size:13.5px; color:var(--ink); max-width:72ch;}
 .data-file-error h2{font-size:16px; margin:0 0 8px;}
@@ -1767,11 +1767,25 @@ function receivedTitle(e){
 // once, against its own today, so on a past date a supply promoted later read
 // as already decided and an open wait counted to today. On the default date
 // the built figure stands.
+//
+// AN OPEN WAIT IS MEASURED TO BUILT_AT (Keith, 2026-10-25, post-build-review
+// #268 (a)): the build writes no figure for it, because one measured to the
+// build step's own now changed on every build from unchanged results. The
+// build's instant, never the reader's clock, so the figure is about the
+// build and two readers of one page see the same one. A figure the build did
+// write - a closed wait, or a page built before this - stands.
+function builtWaitSeconds(e){
+  if(e.waitedSeconds !== null && e.waitedSeconds !== undefined) return e.waitedSeconds;
+  if(!e.awaiting || !e.arrivedAt || typeof BUILT_AT === "undefined" || !BUILT_AT) return null;
+  const s = (Date.parse(BUILT_AT) - Date.parse(e.arrivedAt)) / 1000;
+  return Number.isFinite(s) ? s : null;
+}
 function waitedInPlaceOn(e){
-  const built = {seconds: e.waitedSeconds, awaiting: e.awaiting};
+  const built = {seconds: builtWaitSeconds(e), awaiting: e.awaiting};
   if(typeof CURRENT_IN_PLACE_ON === "undefined" || !CURRENT_IN_PLACE_ON || !e.arrivedAt) return built;
   const end = assetEndOfDay(CURRENT_IN_PLACE_ON);
-  if(!(end < new Date())) return built;
+  const builtAt = typeof BUILT_AT !== "undefined" && BUILT_AT ? new Date(BUILT_AT) : new Date();
+  if(!(end < builtAt)) return built;
   const arrived = Date.parse(e.arrivedAt), filled = e.filledAt ? Date.parse(e.filledAt) : null;
   if(!(arrived <= end.getTime())) return built;
   if(filled !== null && filled <= end.getTime()) return built;
@@ -2228,17 +2242,18 @@ function dataFileProblems(kind){
   const reg = dataFileRegistry();
   return dataFilesOf(kind).flatMap(f=>{
     const got = reg[`${f.key}#${f.part}`];
-    if(!got) return [{name: f.name, why: "missing"}];
-    if(got.build !== f.build) return [{name: f.name, why: "other-build"}];
+    if(!got) return [{name: f.name, why: "missing", collection: f.collection || null}];
+    if(got.build !== f.build) return [{name: f.name, why: "other-build", collection: f.collection || null}];
     return [];
   });
 }
 // {key: parsed payload}: a key's parts joined in the list's order and the
 // joined text parsed ONCE (REQ-DASH-293 criterion 3).
-function assembleDataFiles(kind){
+function assembleDataFiles(kind, skip){
   const reg = dataFileRegistry();
   const parts = {};
-  dataFilesOf(kind).forEach(f=> (parts[f.key] = parts[f.key] || []).push(f));
+  dataFilesOf(kind).filter(f=> !(skip && skip(f)))
+    .forEach(f=> (parts[f.key] = parts[f.key] || []).push(f));
   const out = {};
   for(const [key, list] of Object.entries(parts)){
     out[key] = JSON.parse(list.slice().sort((a,b)=> a.part - b.part)
@@ -2247,14 +2262,22 @@ function assembleDataFiles(kind){
   return out;
 }
 const DATA_FILE_PROBLEMS = dataFileProblems("collection");
-// The built page's COLLECTION_DATA. Empty rather than null when a file is
-// missing, so nothing falls back to the raw template's own empty state:
-// render() shows the page-level error instead of any tier.
+// ONE BAD FILE NO LONGER BLOCKS THE PAGE (Keith, 2026-10-25, post-build-review
+// #268 (g), amending REQ-DASH-291 criterion 8): the collections whose files
+// all loaded are shown, each broken one is named in one notice above the
+// page, and the tabs that need no collection data work as ever. In the
+// order the list gives them, each once.
+const BROKEN_COLLECTIONS = [...new Set(DATA_FILE_PROBLEMS.map(p=> p.collection).filter(Boolean))];
+function collectionBroken(collectionId){ return BROKEN_COLLECTIONS.includes(collectionId); }
+// The built page's COLLECTION_DATA: every collection whose files all loaded.
+// Empty rather than null when none did, so nothing falls back to the raw
+// template's own empty state.
 function assembleCollectionData(){
-  if(DATA_FILE_PROBLEMS.length) return {};
-  const byKey = assembleDataFiles("collection");
+  const byKey = assembleDataFiles("collection", f=> collectionBroken(f.collection));
   const out = {};
-  dataFilesOf("collection").forEach(f=>{ if(!(f.collection in out)) out[f.collection] = byKey[f.key]; });
+  dataFilesOf("collection").forEach(f=>{
+    if(!collectionBroken(f.collection) && !(f.collection in out)) out[f.collection] = byKey[f.key];
+  });
   // When the data is assembled, for REQ-DASH-291 criterion 18's timing.
   try{ performance.mark("mothman:data-assembled"); }catch(e){}
   return out;
@@ -5932,23 +5955,72 @@ function describeRoute(){
 // THE WORDS SAY WHICH, and the box is the stylesheet's (post-build-review
 // #268): "not right" told the reader nothing the list below did not, and an
 // inline style named a --red token the page never defined.
-function dataFileErrorHtml(problems, where){
-  const items = problems.map(p=> `<li><code class="data-file-name">${escHtml(p.name)}</code>: ${p.why === "missing"
+// RELOAD FIRST, THEN REBUILD; AND ON THE SITE, TELL THE DATA TEAM (Keith,
+// 2026-10-25, post-build-review #268 (f)). A file can fail to load on its own,
+// so the cheapest thing comes first; a reader of the published site cannot
+// rebuild anything, and "the publish is incomplete" told them nothing to do.
+const DATA_FILE_ADVICE = `<p>Reload the page first — a file can fail to load on its own.</p>
+    <p>If it still does not load: opened from disk, run <code>mothman dashboard embed</code> to write the page and its files again; on the published site, tell the data team.</p>`;
+function dataFileItems(problems){
+  return problems.map(p=> `<li><code class="data-file-name">${escHtml(p.name)}</code>: ${p.why === "missing"
     ? "missing — the page lists it and it did not load"
     : "from another build — it is from a different build than this page"}</li>`).join("");
+}
+function dataFileWhat(problems){
   const kinds = new Set(problems.map(p=> p.why === "missing" ? "missing" : "from another build"));
-  const what = [...kinds].join(" or ");
+  return [...kinds].join(" or ");
+}
+function dataFileErrorHtml(problems, where){
+  const what = dataFileWhat(problems);
   return `<div class="data-file-error" role="alert" data-testid="data-file-error">
     <h2>${escHtml(where)} cannot be shown: ${problems.length === 1 ? `one of its data files is ${what}` : `some of its data files are ${what}`}</h2>
-    <ul>${items}</ul>
-    <p>Opened from disk: run <code>mothman dashboard embed</code> to write the page and its files again.</p>
-    <p>On the published site: the publish is incomplete — the page arrived without the files it lists.</p>
+    <ul>${dataFileItems(problems)}</ul>
+    ${DATA_FILE_ADVICE}
   </div>`;
 }
-function renderDataFileProblems(view){
-  setRail([]);
-  view.innerHTML = dataFileErrorHtml(DATA_FILE_PROBLEMS, "This dashboard");
+function collectionNameOf(collectionId){
+  for(const ag of (HIERARCHY && HIERARCHY.agencies) || []){
+    const col = (ag.collections || []).find(c=> c.id === collectionId);
+    if(col) return col.name;
+  }
+  return collectionId;
 }
+function joinNames(names){
+  return names.length < 2 ? names.join("") : names.slice(0, -1).join(", ") + " and " + names[names.length - 1];
+}
+// ONE NOTICE FOR EVERY BROKEN COLLECTION, NOT ONE EACH (#268 (g)). At about
+// thirty collections a notice per collection is a wall people learn to scroll
+// past; one names them all, and its file list folds away once it is long.
+// `except` is the collection a page is already showing its own error for.
+function brokenCollectionsBannerHtml(except){
+  const ids = BROKEN_COLLECTIONS.filter(id=> id !== except);
+  if(!ids.length) return "";
+  const problems = DATA_FILE_PROBLEMS.filter(p=> ids.includes(p.collection));
+  const names = ids.map(collectionNameOf);
+  const what = dataFileWhat(problems);
+  const head = ids.length === 1
+    ? `${escHtml(names[0])} cannot be shown: ${problems.length === 1 ? `its data file is ${what}` : `some of its data files are ${what}`}`
+    : `${ids.length} collections cannot be shown: ${escHtml(joinNames(names))}`;
+  const list = `<ul>${dataFileItems(problems)}</ul>`;
+  return `<div class="data-file-error" role="alert" data-testid="data-file-error" data-broken-collections="${escHtml(ids.join(" "))}">
+    <h2>${head}</h2>
+    ${problems.length > 3 ? `<details><summary>The ${problems.length} files</summary>${list}</details>` : list}
+    <p>Every other collection is shown. ${ids.length === 1 ? "Its datasets read No data, and no status on this page counts them" : "Their datasets read No data, and no status on this page counts them"} until ${ids.length === 1 ? "it loads" : "they load"}.</p>
+    ${DATA_FILE_ADVICE}
+  </div>`;
+}
+// INSIDE THE BROKEN COLLECTION ITSELF (#268 (g)): its own error in place of
+// a page, the rail kept so the reader can step back out.
+function renderBrokenCollection(view, ag, collectionId){
+  setRail([{tier:"Tier 1", label:"Agencies", nav:{tier:"exec"}},
+    {tier:"Tier 2", label:escHtml(ag.name), nav:{tier:"agency", agencyId:ag.id}},
+    {tier:"Tier 3", label:escHtml(collectionNameOf(collectionId)), nav:{tier:"agency", agencyId:ag.id}}]);
+  view.innerHTML = dataFileErrorHtml(DATA_FILE_PROBLEMS.filter(p=> p.collection === collectionId),
+    collectionNameOf(collectionId));
+}
+// The tiers that show collection data, and so carry the notice; Plans, Demo,
+// Feedback and the Requirements panel need none and are left as they are.
+const COLLECTION_TIERS = new Set(["exec", "agency", "dataset", "period", "scenarios"]);
 // THE REQUIREMENTS AND PLANS DATA, ON DEMAND (REQ-DASH-291 criterion 7):
 // about 6 MiB that a reader who never opens the Plans tab or the
 // Requirements panel never loads. Inserted as classic script elements -
@@ -6045,9 +6117,22 @@ function render(){
     if(el.dataset.renderCount === "1"){ try{ performance.mark("mothman:first-render"); }catch(e){} }
     return r;
   };
-  // No tier at all while a collection file is missing or from another
-  // build (REQ-DASH-291 criterion 8) - one page-level error instead.
-  if(DATA_FILE_PROBLEMS.length) return done(renderDataFileProblems(view));
+  // A BROKEN COLLECTION FILE NO LONGER STOPS EVERY TIER (REQ-DASH-291
+  // criterion 8 as amended, Keith 2026-10-25): the notice goes above the
+  // tiers that show collection data, and a page inside the broken collection
+  // shows that collection's own error instead.
+  if(BROKEN_COLLECTIONS.length && COLLECTION_TIERS.has(STATE.tier)){
+    const inside = (STATE.tier === "dataset" || STATE.tier === "period") && collectionBroken(STATE.collectionId)
+      ? STATE.collectionId : null;
+    const ag = inside && DATA.agencies.find(a=> a.id === STATE.agencyId);
+    const banner = ()=> view.insertAdjacentHTML("afterbegin", brokenCollectionsBannerHtml(inside));
+    if(ag){ renderBrokenCollection(view, ag, inside); banner(); return done(); }
+    const inner = done;
+    return renderTier(view, r=>{ banner(); return inner(r); });
+  }
+  return renderTier(view, done);
+}
+function renderTier(view, done){
   if(STATE.tier==="exec") return done(renderExec(view));
   if(STATE.tier==="plans"){ PLANS_FILTER = plansFilterFromUrl(); return done(renderPlans(view)); }
   if(STATE.tier==="demo") return done(renderDemo(view));
@@ -7047,7 +7132,13 @@ function renderAgency(view, agencyId){
     <div id="collections"></div>
   `;
   const wrap = document.getElementById("collections");
-  wrap.innerHTML = ag.collections.map(col=>`
+  // A BROKEN COLLECTION SAYS SO WHERE ITS TABLE WOULD BE (#268 (g)), pointing
+  // at the one notice above rather than repeating it.
+  wrap.innerHTML = ag.collections.map(col=> collectionBroken(col.id) ? `
+    <div class="collection-block" data-collection-not-loaded="${escHtml(col.id)}">
+      <div class="collection-title"><h3>${escHtml(col.name)}</h3></div>
+      <p class="view-sub" data-testid="collection-not-loaded">Its data did not load, so its datasets are not shown here and no status counts them. The notice above names the file.</p>
+    </div>` : `
     <div class="collection-block">
       <div class="collection-title"><h3>${col.name}</h3>${pill(col.status,"sm")}${exhaustedMarker(col.exhaustedCount, col.status)}${refusedMarker(col.refusedCount)}</div>${(ng => `<div class="collection-not-green" data-collection="${col.id}">${datasetsTrendSlot(col.datasets.map(d=>d.id), !ng)}${ng}</div>`)(datasetsNotGreenLine(col.datasets, col.status))}${notCountedMarker(col.status, col.datasets)}${collectionTurnOffLine(col)}${collectionCarryForwardLines(col, CURRENT_IN_PLACE_ON)}
       ${outstandingMarker("collection", col.id, undefined, col.noSupplyCount)}
@@ -10597,6 +10688,17 @@ function renderDemo(view){
   );
 }
 document.getElementById("demo-btn").addEventListener("click", ()=> navigate({tier:"demo"}));
+// NO DEMO BUTTON IN A SNAPSHOT (Keith, 2026-10-25, post-build-review #268
+// (h)): an archived copy carries the recording and not the player, so the
+// button led only to a message saying so. A snapshot is told apart by its
+// data: inlined blocks (the archived file, REQ-DASH-292 criterion 1) or files
+// from its own <name>.data/ directory (its split form on the site). The tab's
+// own message stays for anyone who reaches /demo by its address.
+function isSnapshotPage(){
+  if(document.querySelector("script[data-mothman-file]:not([src])")) return true;
+  return /\.data\/$/.test(dataFileDir());
+}
+if(isSnapshotPage()) document.getElementById("demo-btn").style.display = "none";
 document.getElementById("wordmark-btn").addEventListener("click", ()=> navigate({tier:"exec"}));
 
 // Thread C - as-of date picker. rebuildData() throws the current DATA

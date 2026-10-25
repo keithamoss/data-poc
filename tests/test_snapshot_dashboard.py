@@ -624,3 +624,50 @@ def test_clearing_the_site_touches_nothing_it_does_not_write(tmp_path):
     (site / "keep.txt").write_text("not ours")
     snapshot_dashboard.prepare_deploy_site(site, html_path=page, snapshots_dir=tmp_path / "snapshots")
     assert (site / "keep.txt").read_text() == "not ours"
+
+
+def _site_with_fonts_vendor_and_a_snapshot(tmp_path):
+    page, _files = _split_built_page(tmp_path)
+    snapshots = tmp_path / "snapshots"
+    snapshot_dashboard.take_snapshot(html_path=page, snapshots_dir=snapshots)
+    fonts_dir, vendor_dir = tmp_path / "fonts", tmp_path / "vendor"
+    fonts_dir.mkdir()
+    (fonts_dir / "public-sans-regular.woff2").write_bytes(b"fake-woff2-bytes")
+    vendor_dir.mkdir()
+    (vendor_dir / "asciinema-player.min.js").write_text("/* fake player */")
+    site = tmp_path / "_site"
+    snapshot_dashboard.prepare_deploy_site(site, html_path=page, snapshots_dir=snapshots,
+                                           fonts_dir=fonts_dir, vendor_dir=vendor_dir)
+    return site
+
+
+def test_a_snapshot_on_the_site_finds_its_fonts_and_player_beside_it(tmp_path):
+    """Keith, 2026-10-25 (post-build-review #268 (c)): a snapshot at
+    snapshots/<name>.html asks for fonts/ and vendor/ relative to itself, and
+    those sat only at the site root, so every published snapshot fell back to
+    a system font and failed to load the player."""
+    site = _site_with_fonts_vendor_and_a_snapshot(tmp_path)
+    assert (site / "snapshots" / "fonts" / "public-sans-regular.woff2").read_bytes() == b"fake-woff2-bytes"
+    assert (site / "snapshots" / "vendor" / "asciinema-player.min.js").read_text() == "/* fake player */"
+    assert (site / "fonts" / "public-sans-regular.woff2").is_file(), "the live page's own copy stays"
+
+
+def test_the_site_tells_the_browser_its_data_is_not_for_other_sites(tmp_path):
+    """Keith, 2026-10-25 (post-build-review #268 (b)): a data file is a script
+    any other website could include with a <script> tag, so the site's
+    Cloudflare Pages _headers marks /data/* and /snapshots/* same-origin and
+    no-sniff."""
+    site = _site_with_fonts_vendor_and_a_snapshot(tmp_path)
+    rules = snapshot_dashboard.parse_headers((site / "_headers").read_text())
+    want = {"Cross-Origin-Resource-Policy": "same-origin", "X-Content-Type-Options": "nosniff"}
+    assert rules == {"/data/*": want, "/snapshots/*": want}
+
+
+def test_a_reused_site_directory_gets_its_headers_written_afresh(tmp_path):
+    site = _site_with_fonts_vendor_and_a_snapshot(tmp_path)
+    (site / "_headers").write_text("/*\n  X-Stale: yes\n")
+    (tmp_path / "again").mkdir()
+    page, _ = _split_built_page(tmp_path / "again")
+    snapshot_dashboard.prepare_deploy_site(site, html_path=page, snapshots_dir=tmp_path / "none")
+    assert "X-Stale" not in (site / "_headers").read_text()
+    assert not (site / "snapshots").exists(), "the earlier snapshots/ was cleared"

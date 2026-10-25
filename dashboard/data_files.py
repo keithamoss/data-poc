@@ -29,8 +29,8 @@ two builds of the same content write the same names and any change makes a
 new one. A stale cached file can never stand in for a new one, and wrangler
 re-sends only what changed.
 
-THE BUILD ID IS THE PAYLOAD'S, NOT THE PAGE'S (PROVISIONAL, not put to
-Keith). Each file carries the id of the payload it was written for - the
+THE BUILD ID IS THE PAYLOAD'S, NOT THE PAGE'S (Keith, 2026-10-25,
+post-build-review #268 (e): REQ-DASH-291's wording amended to say so). Each file carries the id of the payload it was written for - the
 first 12 hex digits of the SHA-256 of that payload's whole text, shared by
 its parts - and the page's list names the id it expects for each file. An
 id taken from the whole build would change every file whenever any one
@@ -481,10 +481,24 @@ def size_report(page: Path, files: list[Path]) -> list[tuple[str, str]]:
 VOLATILE_CONSTS = ("BUILT_AT", "BUILD_PROVENANCE", "SNAPSHOT_MANIFEST")
 
 
+#: The commit every GITHUB_LINKS address is pinned to (Keith, 2026-10-25,
+#: post-build-review #268 (d)). It names the code the build ran at, as the
+#: build stamp does, so a code-only commit that renders the same page would
+#: otherwise read as changed and publish. Only the commit is blanked: a link
+#: to another file or line still changes the fingerprint.
+_GITHUB_LINK_SHA = re.compile(r"(https://github\.com/[^/\"]+/[^/\"]+/(?:blob|tree)/)[0-9a-f]{7,40}(?=/)")
+
+
+def _blank_github_link_shas(html: str) -> str:
+    return re.sub(r"const GITHUB_LINKS = .*?;\n",
+                  lambda m: _GITHUB_LINK_SHA.sub(r"\1<commit>", m.group(0)), html, count=1)
+
+
 def _normalised(html: str) -> str:
     html = _strip_data_elements(html)
     for name in VOLATILE_CONSTS:
         html = re.sub(rf"const {name} = .*?;\n", f'const {name} = "<volatile>";\n', html, count=1)
+    html = _blank_github_link_shas(html)
     return re.sub(r'"generated_at":"[^"]*"', '"generated_at":"<volatile>"', html)
 
 

@@ -567,23 +567,21 @@ class TestDarkModeToggle:
         assert after_click in ("light", "dark")
 
         clean_page.reload()
-        # WAITED FOR, NOT SLEPT FOR (2026-10-02). A fixed 300ms read the
-        # attribute before the reloaded ~8MB page had applied the stored
-        # theme when the full gate had every core busy - 'light' where
-        # 'dark' was stored, green alone and red under load. Waiting for
-        # the condition keeps the assertion exactly as strict: if the
-        # theme never comes back, this times out and the assert below
-        # reports what it found.
-        try:
-            clean_page.wait_for_function(
-                "t => document.documentElement.getAttribute('data-theme') === t",
-                arg=after_click, timeout=10_000)
-        except Exception:  # noqa: BLE001 - the assert below says what was found
-            pass
+        # WAITED ON THE PAGE'S OWN SIGNAL, NOT A CLOCK (Keith, 2026-10-25,
+        # morning report #9 (k)). A fixed 300ms read the attribute before the
+        # reloaded page had applied the stored theme under a busy gate, and
+        # the 10-second wait that replaced it ran out once in six module
+        # runs. The render counter is set only after the main script's
+        # applyTheme() has run, and the stored theme is applied before that
+        # by the head script, so once the page has rendered the theme is
+        # either applied or never will be - nothing is left to wait for.
+        _wait_rendered(clean_page)
         after_reload = clean_page.evaluate("document.documentElement.getAttribute('data-theme')")
 
         assert after_reload == after_click
         assert clean_page.evaluate("localStorage.getItem('theme')") == after_click
+        assert clean_page.locator("#theme-btn").inner_text() == (
+            "☀️ Light mode" if after_click == "dark" else "🌙 Dark mode"), "applyTheme() ran with it"
 
     def test_dark_mode_actually_renders_dark(self, clean_page, built_dashboard_html):
         """The two tests either side of this one check that an ATTRIBUTE
@@ -5519,24 +5517,27 @@ class TestTheAsAtScenarioChips:
         on_screen()
 
 
-class TestEveryScenarioJumpLands:
-    """post-build-review #202 - the REQ-DASH-208 critic's findings, on the
-    real built history: every placed chip lands on its subject with the
-    accent rule (F1, F5); Back after a date change still restores the date
-    (F2); a reload under an open panel leaves focus to the panel (F3); the
-    browser's own scroll restoration comes back after a reloaded jump (F8);
-    and a mixed-case parameter is rewritten lowercase (F9)."""
+def _scenario_chip(page, html, sid):
+    """Open the Scenarios tab and follow scenario `sid`'s chip (post-build-review
+    #202), waiting until it has landed or said there is nothing to show."""
+    page.set_viewport_size({"width": 1280, "height": 800})
+    _goto(page, html)
+    page.locator("#scenarios-btn").click()
+    page.wait_for_timeout(300)
+    index = page.evaluate(f"SCENARIO_MAP.findIndex(e => e.id === '{sid}')")
+    assert index >= 0, f"{sid} is not in the embedded map"
+    page.locator(f'a[data-scenario="{index}"]').click()
+    page.wait_for_selector("[data-scenario-label], [data-scenario-not-found]",
+                           timeout=10000)
 
-    def _chip(self, page, html, sid):
-        page.set_viewport_size({"width": 1280, "height": 800})
-        _goto(page, html)
-        page.locator("#scenarios-btn").click()
-        page.wait_for_timeout(300)
-        index = page.evaluate(f"SCENARIO_MAP.findIndex(e => e.id === '{sid}')")
-        assert index >= 0, f"{sid} is not in the embedded map"
-        page.locator(f'a[data-scenario="{index}"]').click()
-        page.wait_for_selector("[data-scenario-label], [data-scenario-not-found]",
-                               timeout=10000)
+
+class TestEveryPlacedScenarioChipLandsRuled:
+    """post-build-review #202 F1, F5: every placed chip lands on its subject
+    with the accent rule. ONE TEST TO A CLASS, with the one below (Keith,
+    2026-10-25, morning report #9 (j)): the two walk every placed scenario,
+    ~400-500s each, and `--dist loadgroup` keeps a class on one worker, so
+    together in TestEveryScenarioJumpLands they were the module's floor
+    (REQ-TEST-281 NFR 7)."""
 
     def test_every_placed_chip_lands_with_the_accent_rule(self, clean_page,
                                                           built_dashboard_html):
@@ -5546,7 +5547,7 @@ class TestEveryScenarioJumpLands:
         assert ids, "no placed scenario to follow"
         missed, unruled = [], []
         for sid in ids:
-            self._chip(clean_page, built_dashboard_html, sid)
+            _scenario_chip(clean_page, built_dashboard_html, sid)
             if clean_page.locator("[data-scenario-not-found]").count():
                 missed.append(sid)
                 continue
@@ -5557,6 +5558,11 @@ class TestEveryScenarioJumpLands:
                 unruled.append((sid, width))
         assert not missed, f"chips that said 'nothing to show': {missed}"
         assert not unruled, f"subjects without the 3px accent rule: {unruled}"
+
+
+class TestEveryScenarioSubjectLandsCentred:
+    """post-build-review #202 F7, alone in its class for the reason given
+    on the class above."""
 
     def test_every_subject_lands_centred(self, clean_page, built_dashboard_html):
         """#202 F7 (Keith, 2026-10-15): the subject lands centred rather than
@@ -5572,7 +5578,7 @@ class TestEveryScenarioJumpLands:
         assert ids, "no placed scenario to follow"
         off = []
         for sid in ids:
-            self._chip(clean_page, built_dashboard_html, sid)
+            _scenario_chip(clean_page, built_dashboard_html, sid)
             if clean_page.locator("[data-scenario-not-found]").count():
                 continue
             got = clean_page.evaluate("""() => {
@@ -5597,6 +5603,15 @@ class TestEveryScenarioJumpLands:
                 off.append((sid, got))
         assert not off, f"subjects not centred: {off}"
 
+
+class TestEveryScenarioJumpLands:
+    """post-build-review #202 - the REQ-DASH-208 critic's findings, on the
+    real built history (every placed chip and every centred subject are the
+    two classes above, split out for REQ-TEST-281's module target): Back
+    after a date change still restores the date (F2); a reload under an open panel leaves focus to the panel (F3); the
+    browser's own scroll restoration comes back after a reloaded jump (F8);
+    and a mixed-case parameter is rewritten lowercase (F9)."""
+
     def test_the_page_head_stays_in_view_when_it_fits_beside_the_subject(
             self, clean_page, built_dashboard_html):
         """REQ-DASH-208 decision (Keith, 2026-10-15): the jump centres its subject,
@@ -5605,7 +5620,7 @@ class TestEveryScenarioJumpLands:
         between them is sized so the pill and the subject span 700px of the
         800px window, so the test does not depend on how long the queue above
         happens to be."""
-        self._chip(clean_page, built_dashboard_html, "TS-76")
+        _scenario_chip(clean_page, built_dashboard_html, "TS-76")
         got = clean_page.evaluate("""() => {
             const head = document.querySelector('#view .view-head');
             const span = document.querySelector('#view .scenario-subject').getBoundingClientRect().bottom
@@ -5623,7 +5638,7 @@ class TestEveryScenarioJumpLands:
 
     def test_back_after_a_date_change_restores_the_date(self, clean_page,
                                                         built_dashboard_html):
-        self._chip(clean_page, built_dashboard_html, "TS-75a")
+        _scenario_chip(clean_page, built_dashboard_html, "TS-75a")
         clean_page.evaluate("applyInPlaceOn('2024-03-01')")
         clean_page.go_back()
         clean_page.wait_for_timeout(400)
@@ -5633,7 +5648,7 @@ class TestEveryScenarioJumpLands:
 
     def test_a_reload_under_an_open_panel_leaves_focus_to_it(self, clean_page,
                                                              built_dashboard_html):
-        self._chip(clean_page, built_dashboard_html, "TS-75a")
+        _scenario_chip(clean_page, built_dashboard_html, "TS-75a")
         clean_page.evaluate("openPanel('activity')")
         clean_page.reload()
         clean_page.wait_for_function(
@@ -5644,7 +5659,7 @@ class TestEveryScenarioJumpLands:
 
     def test_scroll_restoration_comes_back_after_a_reloaded_jump(self, clean_page,
                                                                  built_dashboard_html):
-        self._chip(clean_page, built_dashboard_html, "TS-75a")
+        _scenario_chip(clean_page, built_dashboard_html, "TS-75a")
         clean_page.reload()
         clean_page.wait_for_selector("[data-scenario-label]", timeout=10000)
         clean_page.wait_for_timeout(500)
@@ -5652,7 +5667,7 @@ class TestEveryScenarioJumpLands:
 
     def test_a_mixed_case_parameter_is_rewritten_lowercase(self, clean_page,
                                                           built_dashboard_html):
-        self._chip(clean_page, built_dashboard_html, "TS-75a")
+        _scenario_chip(clean_page, built_dashboard_html, "TS-75a")
         url = clean_page.url.replace("scenario=ts-75a", "SCENARIO=Ts-75A")
         clean_page.goto(url)
         clean_page.wait_for_selector("[data-scenario-label]", timeout=10000)
@@ -6071,18 +6086,31 @@ class TestTheDataFilesLoadFromDisk:
         for agency in clean_page.evaluate("() => HIERARCHY.agencies.map(a => a.name)"):
             assert agency in clean_page.locator("#view").inner_text()
 
-    def test_a_deleted_collection_file_is_named_and_no_tier_is_rendered(
+    def test_a_deleted_collection_file_is_named_and_the_rest_is_shown(
             self, page, built_dashboard_html, tmp_path):
+        """Criterion 8 as amended (Keith, 2026-10-25, post-build-review #268
+        (g)): one broken collection no longer blocks the page. The others
+        render, one notice names the broken one, its own pages show its
+        error, and Plans needs no collection data at all."""
         copy = _copy_of_the_built_page(built_dashboard_html, tmp_path / "site")
         gone = _data_file(copy, "collection")
         (copy.parent / "data" / gone["name"]).unlink()
         page.goto(f"file://{copy}")
         _wait_rendered(page)
         error = page.locator('[data-testid="data-file-error"]')
+        assert error.count() == 1
         text = error.inner_text()
         assert gone["name"] in text and "missing" in text
-        assert "mothman dashboard embed" in text and "publish is incomplete" in text
-        assert page.locator("#view > *").count() == 1
+        assert text.index("Reload the page") < text.index("mothman dashboard embed")
+        assert "tell the data team" in text and "publish is incomplete" not in text
+        assert error.get_attribute("data-broken-collections") == gone["collection"]
+        healthy = [c.id for c in _registry.all_collections() if c.id != gone["collection"]]
+        assert page.evaluate("() => Object.keys(COLLECTION_DATA)") == healthy
+        agencies = page.evaluate("() => HIERARCHY.agencies.map(a => a.name)")
+        assert all(name in page.locator("#view").inner_text() for name in agencies)
+        page.locator("#plans-btn").click()
+        page.wait_for_selector("#plans-list .plans-entry")
+        assert page.locator('[data-testid="data-file-error"]').count() == 0
 
     def test_a_file_from_another_build_is_named(self, page, built_dashboard_html, tmp_path):
         from dashboard import data_files
@@ -6311,12 +6339,15 @@ def _agencies_and_plans(page, url) -> dict:
 
 
 def _not_fonts_or_vendor(errors: list) -> list:
-    """A snapshot carries its DATA, never fonts/ or vendor/ (REQ-DASH-292 is
-    about the data files; PROVISIONAL, not put to Keith): alone in an empty
-    directory its @font-face files and the Demo tab's vendored player are not
-    there, the browser logs each as a failed resource, and the page falls back
-    to a system font. Those failures are told apart by the address that
-    failed; every other console error still fails the test."""
+    """A snapshot carries its DATA, never fonts/ or vendor/ (Keith, 2026-10-25,
+    post-build-review #268 E2: not inlined). On the site they now sit beside
+    the snapshots (#268 (c)), so the split form is held to no console error at
+    all. ALONE IN AN EMPTY DIRECTORY they cannot be there, the browser logs
+    each as a failed resource, and the page falls back to a system font - so
+    REQ-DASH-292 criterion 9's 'no console error' cannot hold for that case
+    without inlining them, which Keith declined; that is back with him
+    (#268). Until then this filter applies to the alone case only, told apart
+    by the address that failed; every other console error still fails it."""
     return [(text, url) for text, url in errors
             if not (text.startswith("Failed to load resource")
                     and re.search(r"/(fonts|vendor)/[^/]+$", url))]
@@ -6352,6 +6383,8 @@ class TestASnapshotOpensAloneAndPublishesSplit:
             sorted(e["name"] for e in files), "the split form loads each of its files"
         keys = ("agencies", "collections", "plans")
         assert {k: served[k] for k in keys} == {k: alone[k] for k in keys}
-        # The site carries fonts/ and vendor/ at its root, not beside a
-        # snapshot, so the same resources fail here as alone - nothing else.
-        assert _not_fonts_or_vendor(served["errors"]) == []
+        # FONTS AND THE PLAYER ARE BESIDE THE SNAPSHOTS ON THE SITE (Keith,
+        # 2026-10-25, #268 (c)), so nothing is filtered here: no console
+        # error at all, and the fonts were actually asked for and found.
+        assert served["errors"] == []
+        assert any("/snapshots/fonts/" in u for u in served["requests"]), served["requests"]

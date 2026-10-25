@@ -51,9 +51,18 @@ def for_run(dataset_id: str, received_at, supply: str | None = None) -> dict:
     supplier delivered, the other when we acted on it.
 
     `waitedSeconds` IS OPEN WHERE NOTHING HAS PROMOTED THE SUPPLY
-    (criterion 10) - measured to now, with `awaiting` saying so. Absent
-    or zero would both read as "dealt with instantly", which is the
-    opposite of what is true of a supply nobody has decided on.
+    (criterion 10), with `awaiting` saying so. Absent or zero would both
+    read as "dealt with instantly", which is the opposite of what is true
+    of a supply nobody has decided on.
+
+    AN OPEN WAIT CARRIES NO FIGURE HERE (Keith, 2026-10-25,
+    post-build-review #268 (a)): the page measures it from the arrival to
+    BUILT_AT, the build's own instant, never the reader's clock. Measured
+    here, to this step's own now, it changed on every build from unchanged
+    results, so every collection's data file got a new name each time
+    (REQ-DASH-291 criterion 16, REQ-PIPE-255 criterion 23). `awaiting` and
+    `arrivedAt` are all the page needs, and BUILT_AT is blanked by the
+    fingerprint already.
     """
     # THE SUPPLY THE RUN SAYS IT IS ABOUT, where it says one (REQ-PIPE-193
     # criterion 13; post-build-review #171 B): a settled pair's two files
@@ -74,7 +83,8 @@ def for_run(dataset_id: str, received_at, supply: str | None = None) -> dict:
         # would be a second naming scheme for no gain.
         "arrivalStatus": record.classification or UNKNOWN,
         "filledAt": record.filled_at.isoformat() if record.filled_at else None,
-        "waitedSeconds": waited.total_seconds() if waited is not None else None,
+        "waitedSeconds": (waited.total_seconds() if waited is not None and not record.awaiting
+                          else None),
         "awaiting": record.awaiting,
         # REQ-PIPE-103 criterion 19 and REQ-PIPE-147 criterion 7: shown
         # BESIDE the receipt, labelled as the filer's statement, and who

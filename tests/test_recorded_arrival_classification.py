@@ -189,6 +189,20 @@ class TestTheIntervalFromReceiptToPromotion:
         assert got.awaiting is True
         assert got.waited is not None and got.waited > timedelta(0)
 
+    def test_the_build_writes_no_figure_for_an_open_wait(self, clean):
+        """Criterion 10 as Keith decided it, 2026-10-25 (post-build-review
+        #268 (a)): the page measures an open wait to BUILT_AT, so the
+        build's arrival block carries `awaiting` and the receipt and no
+        number. Measured here to the build step's own now, it changed on
+        every build from unchanged results (REQ-DASH-291 criterion 16)."""
+        from pipeline import recorded_arrival
+
+        _file()
+        first = recorded_arrival.for_run(DATASET, ARRIVED, supply="s")
+        assert first["awaiting"] is True and first["arrivedAt"], first
+        assert first["waitedSeconds"] is None, first
+        assert recorded_arrival.for_run(DATASET, ARRIVED, supply="s") == first
+
     def test_the_two_instants_are_separate_fields(self, clean):
         """Criterion 11, structurally: neither may stand in for the
         other, so neither may be the only one present."""

@@ -2810,5 +2810,11 @@ one or more component tags, and a date.
      wait) and passed in every gate. Not loosened, because the 3s budget is
      your #268 guard - if CI shows them, wait on a signal in the reload test
      and give the budget class a quieter slot?
+   - **YOUR ANSWERS, 2026-10-25 MORNING, BUILT** (local, not pushed): (a)-(i)
+     per post-build-review #268, which records each; (j) the scenario class
+     split, module 673.57s -> 581.49s; (k) the reload test waits on the render
+     counter. One conflict back with you: (c) cannot hold for a snapshot
+     copied ALONE to an empty directory without inlining (#268, REQ-DASH-292
+     unmet criterion).
    - **STILL TO DO**: A3 (270+266+267+273+278, schema bump, bootstrap) is next
      in the agreed order - deliberately not started overnight, being large.

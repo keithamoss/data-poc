@@ -11809,7 +11809,7 @@ twice. It deliberately did not re-find the `TypeError`.
        tokens" (failed first).
      - **V5.** The "its" agreement, above.
 
-     **For Keith** - each with a recommendation; nothing here is decided:
+     **For Keith** - each with a recommendation (answered 2026-10-25, below):
      - **(a) REQ-DASH-291 criterion 16 and `waitedSeconds`.** Recommend the
        page measures how long it has waited for a file against BUILT_AT, so
        the figure is about the build rather than the clock of whoever opened
@@ -11842,6 +11842,65 @@ twice. It deliberately did not re-find the `TypeError`.
        failing data everywhere else on this dashboard, and a page that cannot
        show any data is not failing data. A neutral `--ink-muted` border is
        the alternative.
+
+     **KEITH'S ANSWERS, 2026-10-25 morning, and what was built.** Each in
+     the register with "(Keith, 2026-10-25)".
+     - **(a) BUILT.** An open wait is measured from the receipt to BUILT_AT,
+       never the reader's clock: `pipeline/recorded_arrival.py` writes no
+       `waitedSeconds` while `awaiting`, and the template's
+       `builtWaitSeconds()` measures it (an as-of date before the build also
+       compares with BUILT_AT now). REQ-PIPE-080 criterion 10 amended.
+       `tests/test_recorded_arrival_classification.py::...::test_the_build_writes_no_figure_for_an_open_wait`
+       and two tests-js `recorded-arrival` tests failed first. REQ-DASH-291's
+       criterion 16 unmet entry: see the register for what is left.
+     - **(b) BUILT.** `prepare_deploy_site()` writes `_site/_headers` with
+       `Cross-Origin-Resource-Policy: same-origin` and
+       `X-Content-Type-Options: nosniff` on `/data/*` and `/snapshots/*`,
+       afresh on every prepare. A new last criterion on REQ-PIPE-255 (still
+       not_started; built ahead). Snapshot tests failed first.
+     - **(c) PARTLY BUILT, ONE CONFLICT BACK WITH KEITH.** fonts/ and vendor/
+       are copied under `_site/snapshots/` too, and the split-form e2e test
+       now asserts no console error at all, with no filter. But REQ-DASH-292
+       criterion 9 is about a snapshot copied ALONE to an empty directory,
+       where nothing can sit beside it, and E2 declines inlining - so the
+       three answers together cannot all hold for that case. Its test keeps
+       the fonts/vendor filter for the alone case only, recorded as an unmet
+       criterion on 292 for Keith: amend criterion 9 to the site case, or to
+       "no console error other than the fonts and player", or inline them.
+     - **(d) BUILT.** The fingerprint blanks the commit in every
+       GITHUB_LINKS `blob/`/`tree/` address; a link to another file still
+       moves it. Data_files `test_it_ignores_the_commit_the_github_links_are_pinned_to`
+       failed first. REQ-PIPE-255 criterion 22 amended.
+     - **(e) DONE.** REQ-DASH-291 criteria 4, 5 and 8 say the build id is
+       per payload; `data_files.py`'s docstring is no longer PROVISIONAL.
+     - **(f) BUILT.** Every data-file error advises "Reload the page" first,
+       then `mothman dashboard embed` from disk, and on the published site
+       "tell the data team".
+     - **(g) BUILT, AMENDING REQ-DASH-291 CRITERION 8.** One broken
+       collection no longer blocks the page: the healthy collections render,
+       ONE notice above the tiers that show collection data names every
+       broken collection (its file list folds into a `<details>` past three
+       files, so thirty broken collections are still one notice), the agency
+       page says so where the collection's table would be, a dataset or
+       period page inside it shows that collection's own error, and Plans,
+       Demo, Feedback and the Requirements panel are untouched. Its datasets
+       read No data and no status counts them, which the notice says. Keeps
+       `data-testid="data-file-error"`, so the render gate still fails it.
+       Js criterion-8 block rewritten (the new tests failed against the old
+       template), e2e `test_a_deleted_collection_file_is_named_and_the_rest_is_shown`.
+     - **(h) BUILT.** The Demo button is hidden in a snapshot, told apart by
+       its inlined blocks or its `<name>.data/` directory (no marker added,
+       which would break equal fingerprints). Three js tests.
+     - **(i) DECIDED.** The error box stays `--bad`; comment and decision
+       updated.
+     - **(j) and (k)**, morning report #9, BUILT: `TestEveryScenarioJumpLands`'s
+       two slow tests are one-test classes of their own; the module went
+       673.57s -> 581.49s at default workers (one run each, 326 passed both),
+       inside its 10-minute target. The dark-mode reload test waits on the
+       render counter instead of a 10s timeout; the 3s budget is unchanged.
+       Recorded on REQ-TEST-281.
+     - **Left open**: (c)'s alone-in-a-directory case of REQ-DASH-292
+       criterion 9 (above), so this entry stays in-progress.
 
      <!-- The visual critic's findings above are as the coordinator relayed
      them; the main session adds anything further here. -->
@@ -11990,3 +12049,21 @@ twice. It deliberately did not re-find the `TypeError`.
      and red outranks the quiet state the class is about. Same reproduction,
      with the ticket and in-parts classes beside it: 10 passed. Minor under
      the standing rule: tests only, no product change.
+
+273. **[done, 2026-10-25]** **[QA checks & contract]** **[Testing & dev tooling]**
+     **The validate-soda gate checked nothing.** Found by delivery-scoper
+     while scoping road-testing sprint 4, verified the same hour:
+     `qa_tools/common/validate_soda.py`'s `check_files()` globbed
+     `contract/*-soda-checks.yml`, and since REQ-QAC-241 moved every Soda
+     file under `contract/<agency-id>/` it returned `[]` - so `mothman
+     dashboard validate-soda` and `mothman check`'s `soda` gate passed with
+     zero files read, and `tests/test_validate_soda.py::
+     test_the_real_check_files_pass` asserted `[] == []` (CLAUDE.md's test
+     rule 3). A real defect: the road-testing #7 refusals (Soda Cloud-only
+     kinds, `valid sql`, `valid min` on a date) had not been enforced since
+     REQ-QAC-241. Fixed test-first: the test now asserts the gate finds
+     exactly the registry's Soda files (it failed on `[]` before the fix),
+     and `check_files()` reads them through `soda_common.soda_check_files()`
+     as every other reader does. The three real files pass the gate.
+     Minor under the standing rule (no product behaviour or verdict
+     changes; the files were already valid).

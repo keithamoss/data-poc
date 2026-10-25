@@ -7,6 +7,8 @@
  * them. These cover the part a reader can actually be misled by.
  */
 import { afterEach, describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { loadDashboard } from "./support/loadDashboard.js";
 
 let dashboard;
@@ -96,6 +98,39 @@ describe("waitedChip", () => {
       arrivedAt: "2026-08-01T09:00:00+08:00", filledAt: null,
     });
     expect(html).toContain("waiting 4d");   // 1 Aug 09:00 to the end of 4 Aug
+  });
+
+  // AN OPEN WAIT IS MEASURED TO BUILT_AT (Keith, 2026-10-25, post-build-review
+  // #268 (a)): the build writes no figure for it, and the page counts from the
+  // receipt to the build's own instant, never the reader's clock.
+  function loadBuiltAt(builtAt) {
+    const file = fileURLToPath(new URL("../dashboard/qa-reporting-dashboard.template.html", import.meta.url));
+    const html = readFileSync(file, "utf-8")
+      .replace("const BUILT_AT = null;", `const BUILT_AT = ${JSON.stringify(builtAt)};`);
+    dashboard = loadDashboard({ html });
+    return dashboard.window;
+  }
+
+  it("measures an open wait the build wrote no figure for to BUILT_AT", () => {
+    const win = loadBuiltAt("2026-08-04T09:00:00+08:00");
+    const html = win.waitedChip({
+      waitedSeconds: null, awaiting: true,
+      arrivedAt: "2026-08-01T09:00:00+08:00", filledAt: null,
+    });
+    expect(html).toContain("waiting 3d");
+    expect(html).toContain("Nothing has promoted it yet");
+  });
+
+  it("gives the same figure whatever the reader's clock says", () => {
+    const win = loadBuiltAt("2026-08-04T09:00:00+08:00");
+    const e = { waitedSeconds: null, awaiting: true, arrivedAt: "2026-08-01T09:00:00+08:00", filledAt: null };
+    expect(win.builtWaitSeconds(e)).toBe(3 * 86400);
+  });
+
+  it("shows nothing for an open wait in the raw template, which has no build instant", () => {
+    const win = load();
+    expect(win.waitedChip({ waitedSeconds: null, awaiting: true,
+      arrivedAt: "2026-08-01T09:00:00+08:00", filledAt: null })).toBe("");
   });
 
   it("is empty rather than an empty chip where there is no wait", () => {
