@@ -753,6 +753,22 @@ span.scenario-subject-label{display:inline-block; margin:0 6px 0 0;}
 .scope-check .label .rc{font-size:12px; color:var(--ink-muted); margin-left:8px;}
 .scope-check .label .rc:empty{display:none;}
 .recheck-note{font-size:12.5px; color:var(--ink-muted); margin-top:8px;}
+/* REQ-PIPE-270 criterion 9: a cross-table check left out of the supply's run
+   because a table it reads is not part of the agreement for the period. Not a
+   row of results - nothing to open, no status pill - so not a .scope-check. */
+.not-in-agreement{border-top:1px solid var(--line); padding:9px 2px 2px;}
+.not-in-agreement .nia-head{font-size:12px; font-weight:600; color:var(--ink-muted); text-transform:uppercase; letter-spacing:.04em; margin-bottom:4px;}
+.not-in-agreement .nia-row{display:flex; align-items:baseline; justify-content:space-between; gap:12px; padding:6px 0;}
+.not-in-agreement .nia-row .label{min-width:0;}
+.not-in-agreement .nia-row .nm{font-weight:600; font-size:13px;}
+.not-in-agreement .nia-row .bt{font-size:12.5px; color:var(--ink-muted); margin-left:8px; white-space:nowrap;}
+.not-in-agreement .nia-row .bt:empty{display:none;}
+.not-in-agreement .nia-row .tr{font-size:11px; color:var(--ink-faint); font-family:"IBM Plex Mono",monospace; margin-left:8px; overflow-wrap:anywhere;}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .not-in-agreement .nia-row .tr{color:var(--ink-muted);} }
+:root[data-theme="dark"] .not-in-agreement .nia-row .tr{color:var(--ink-muted);}
+.not-in-agreement .nia-row .why{display:block; font-size:12px; color:var(--ink-muted); margin-top:2px;}
+.not-in-agreement .nia-tag{flex:none; font-size:10.5px; font-weight:600; letter-spacing:.02em; text-transform:uppercase; color:var(--ink-muted); border:1px solid var(--line-strong); border-radius:4px; padding:0 5px;}
+.not-in-agreement .nia-note{font-size:12px; color:var(--ink-muted); margin-top:4px; max-width:70ch;}
 .red-promoted{display:inline-flex; flex-direction:column; align-items:flex-start; gap:2px; vertical-align:top; max-width:46ch;}
 .red-promoted .rp-why{font-size:11.5px; color:var(--ink-muted); white-space:normal; line-height:1.35;}
 .scope-check .label .ds{display:block; font-size:12px; color:var(--ink-muted); margin-top:2px;}
@@ -5538,6 +5554,63 @@ function crossTableRowOrder(col, rows){
     return (_TOOL_RANK[tool(a)] ?? 9) - (_TOOL_RANK[tool(b)] ?? 9);
   });
 }
+// LEFT OUT FOR THE AGREEMENT (REQ-PIPE-270 criterion 9): the cross-table checks
+// the supply on show was NOT run against, because a table they read is not part
+// of the collection's agreement for its period - a dataset that joins later.
+// They are neither red nor a result (the build records no result for them), so
+// they have no history before that table joins and the as-of clip drops them
+// from the section altogether; without this the page says nothing about them.
+// From the build's per-dataset notInAgreement list, for the run on show only
+// (the newest eligible one, as the verdict line reads); each entry with its
+// check as the RAW dataset carries it - name, tables and tool - in the order
+// the section's rows use. A check the raw dataset does not carry keeps its id
+// as its name rather than being dropped.
+function notInAgreementShown(col, ds){
+  const raw = rawRealDatasetById(ds.id) || ds;
+  const runs = ds.runs || [];
+  const runId = runs.length ? runs[runs.length - 1].run_id : null;
+  const entries = ((raw && raw.notInAgreement) || []).filter(e=> runId && e.runId === runId);
+  if(!entries.length) return [];
+  const byId = {};
+  ((raw && raw.columns) || []).forEach(c=> (c.checks || []).forEach(ck=>{
+    if(ck.check_id) byId[ck.check_id] = ck;
+  }));
+  const rows = entries.map(e=> ({entry: e,
+    ck: byId[e.checkId] || {check_id: e.checkId, key: e.checkId, name: e.checkId}}));
+  return crossTableRowOrder(col, rows);
+}
+// "not part of the agreement for 2013-Q2" -> "Not part of the agreement for 2013-Q2."
+function notInAgreementReason(reason){
+  const r = String(reason || "").trim();
+  if(!r) return "";
+  return r.charAt(0).toUpperCase() + r.slice(1) + (/[.!?]$/.test(r) ? "" : ".");
+}
+function notInAgreementBlock(rows){
+  if(!rows.length) return "";
+  const lines = rows.map((r, i)=> `
+      <div class="nia-row" data-nia="${i}" data-check-id="${escHtml(r.entry.checkId)}">
+        <span class="label"><span class="nm"></span><span class="bt"></span><span class="tr"></span><span class="why"></span></span>
+        <span class="nia-tag">Not run</span>
+      </div>`).join("");
+  return `<div class="not-in-agreement" data-not-in-agreement="${rows.length}">
+      <div class="nia-head">Not run for this supply</div>
+      ${lines}
+      <div class="nia-note">${rows.length === 1 ? "This check reads a table" : "These checks read a table"} that is not part
+        of this collection's delivery agreement for the supply's period, so ${rows.length === 1 ? "it was" : "they were"} left out of
+        its run. ${rows.length === 1 ? "It is" : "They are"} neither red nor a result, and ${rows.length === 1 ? "does" : "do"} not count toward this dataset's status.</div>
+    </div>`;
+}
+// Authored prose set as text, never interpolated (REQ-DASH-026).
+function wireNotInAgreement(scopeWrap, col, rows){
+  scopeWrap.querySelectorAll(".not-in-agreement .nia-row").forEach(el=>{
+    const r = rows[Number(el.dataset.nia)];
+    if(!r) return;
+    el.querySelector(".nm").textContent = r.ck.name || r.entry.checkId;
+    el.querySelector(".bt").textContent = crossTableBetween(col, r.ck);
+    el.querySelector(".tr").textContent = r.ck.tool_ref || "";
+    el.querySelector(".why").textContent = notInAgreementReason(r.entry.reason);
+  });
+}
 // A history row's source, where it was another table's run.
 // Its cause, as words (criterion 13): an arrival's run, or a re-check - a
 // decision's or a load's. A run with no cause (no supply) says what qa.run's
@@ -8420,10 +8493,15 @@ function renderDataset(view, agencyId, collectionId, datasetId){
   // that, and the extra click was the thing that made these read as
   // one more column.
   const scopeWrap = document.getElementById("scope-sections");
+  // REQ-PIPE-270 criterion 9: the cross-table checks this supply's run left
+  // out for the agreement, said in the cross-table section - which appears for
+  // them even where they are the only cross-table checks the page has.
+  const notInAgreement = notInAgreementShown(col, ds);
   scopeWrap.innerHTML = COLUMN_SCOPES.map(sc=>{
     const columns = scopedColumns(ds, sc.scope);
     const checks = columns.flatMap(c=> (c.checks||[]).filter(ck=> !ck.retired));
-    if(!checks.length) return "";
+    const outside = sc.scope === "cross-table" ? notInAgreement : [];
+    if(!checks.length && !outside.length) return "";
     // rollupStatuses(), not a reduce over STATUS_ORDER - and that is
     // the whole point rather than a tidy-up. A check may carry
     // `inactive`, which STATUS_ORDER has no entry for, so `undefined >
@@ -8452,11 +8530,13 @@ function renderDataset(view, agencyId, collectionId, datasetId){
         ${pill(checkStatus(ck),"sm")}
       </button>`).join("");
     return `<div class="scope-section" data-scope="${sc.scope}">
-      <div class="head"><h3>${sc.title}</h3>${pill(worst,"sm")}</div>
+      <div class="head"><h3>${sc.title}</h3>${checks.length ? pill(worst,"sm") : ""}</div>
       <div class="blurb">${sc.blurb}</div>
       ${rows}
+      ${notInAgreementBlock(outside)}
     </div>`;
   }).join("");
+  wireNotInAgreement(scopeWrap, col, notInAgreement);
   // REQ-DASH-097: the file section, in a container of its OWN above the
   // data checks' sections - it is about what arrived, before anything was
   // checked of its data, and is not one of them.

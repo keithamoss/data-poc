@@ -6388,3 +6388,173 @@ class TestASnapshotOpensAloneAndPublishesSplit:
         # error at all, and the fonts were actually asked for and found.
         assert served["errors"] == []
         assert any("/snapshots/fonts/" in u for u in served["requests"]), served["requests"]
+
+
+class TestNotInTheAgreementOnThePage:
+    """REQ-PIPE-270 criterion 9, the page half: a dataset page says why a
+    cross-table check left out of the run on show - because a table it reads
+    is not part of the agreement for the run's period - did not run.
+
+    Against the real built page: the corpus's own early Child Protection
+    supplies, whose Assigned worker references read a Case Workers that joins
+    the agreement later, carry it. Found from the build's notInAgreement list
+    rather than named, so the test follows the corpus."""
+
+    CP_AGENCY = "child-protection-family-support"
+
+    def _left_out(self, page) -> list[dict]:
+        return page.evaluate("""() => {
+            const cp = COLLECTION_DATA["child-protection"];
+            return (cp.datasets || []).flatMap(d=> (d.notInAgreement || []).map(e=> {
+                const runs = d.runs || [];
+                const i = runs.findIndex(r=> r.run_id === e.runId);
+                return {...e, datasetId: d.id, runDate: i >= 0 ? runs[i].run_date : null,
+                        nextRunDate: i >= 0 && i + 1 < runs.length ? runs[i + 1].run_date : null};
+            }));
+        }""")
+
+    def _section(self, page, built, dataset_id, on):
+        _goto(page, built, state={"tier": "dataset", "agencyId": self.CP_AGENCY,
+                                  "collectionId": "child-protection", "datasetId": dataset_id},
+              in_place_on=on)
+        return page.locator('.scope-section[data-scope="cross-table"] .not-in-agreement')
+
+    def test_the_run_on_show_says_which_checks_it_left_out_and_why(
+            self, clean_page, built_dashboard_html):
+        _goto(clean_page, built_dashboard_html)
+        left = self._left_out(clean_page)
+        assert left, "the corpus has no check left out for the agreement - nothing to show"
+        first = left[0]
+        assert first["runDate"], first
+        mine = [e for e in left if e["runId"] == first["runId"]]
+        block = self._section(clean_page, built_dashboard_html, first["datasetId"],
+                              first["runDate"])
+        assert block.count() == 1, "the cross-table section says nothing about the left-out checks"
+        rows = block.locator(".nia-row")
+        assert rows.count() == len(mine)
+        assert sorted(rows.evaluate_all("els => els.map(e => e.dataset.checkId)")) == \
+            sorted(e["checkId"] for e in mine)
+        whys = rows.locator(".why").all_inner_texts()
+        reason = mine[0]["reason"]
+        assert whys == [reason[0].upper() + reason[1:] + "."] * len(mine), whys
+        # NEITHER RED NOR A RESULT: no status pill on a left-out row, and the
+        # check is not among the section's result rows.
+        assert block.locator(".pill").count() == 0
+        listed = clean_page.locator('.scope-section[data-scope="cross-table"] button.scope-check')
+        keys = listed.evaluate_all("els => els.map(e => e.dataset.check)")
+        assert not ({e["checkId"].rsplit(".", 2)[-2] + "." + e["checkId"].rsplit(".", 1)[-1]
+                     for e in mine} & set(keys)), keys
+        assert "neither red nor a result" in block.inner_text()
+
+    def test_a_later_run_that_ran_them_says_nothing(self, clean_page, built_dashboard_html):
+        _goto(clean_page, built_dashboard_html)
+        left = self._left_out(clean_page)
+        assert left, "the corpus has no check left out for the agreement - nothing to show"
+        later = [e for e in left if e["nextRunDate"]
+                 and not any(o["runDate"] == e["nextRunDate"] and o["datasetId"] == e["datasetId"]
+                             for o in left)]
+        assert later, left
+        e = later[0]
+        assert self._section(clean_page, built_dashboard_html, e["datasetId"],
+                             e["nextRunDate"]).count() == 0
+
+
+class TestAnUnsettledApplicationNeverReachesThePage:
+    """REQ-PIPE-267 criterion 12, the page half: the results a gate
+    application's re-evaluations record reach the dataset page only once the
+    application SETTLES, and an ABANDONED application's never.
+
+    Through the real chain: a Child Protection history driven through the
+    real lifecycle (tests/gate_support.py - the four tools' evaluation stood
+    in for, everything else real) in a database of this test's own, so a
+    package gate re-evaluates Notifications' Client reference for Clients v2
+    against Notifications v1 in a readers-only run; that run's application is
+    then left unsettled or abandoned, the results file and dashboard data are
+    built from the database by the real builders, and the page is embedded
+    and opened in a real browser. The settled case is the control, so the
+    test can fail."""
+
+    CLIENTS = {"tier": "dataset", "agencyId": "child-protection-family-support",
+               "collectionId": "child-protection", "datasetId": "cp-clients"}
+    V1 = {"cp_clients": "C1", "cp_notifications": "N1", "cp_investigations": "I1",
+          "cp_placements": "P1", "cp_carers": "K1", "cp_case_workers": "W1"}
+
+    def _page_for(self, how, *, private_supply_dsn, cp_raw_dir, tmp_path, monkeypatch,
+                  built_dashboard_html):
+        from gate_support import CP, Scenario, install_fake_tools, own_red, pin_replacement_setting
+
+        from pipeline import build_dashboard_data as bdd
+        from qa_tools.common import gate, qa_store, supply_db
+        from qa_tools.tools import results_history
+
+        # THIS TEST'S OWN DATABASE IS THE `test` ENVIRONMENT'S, where this
+        # module's autouse fixture says the deployment's; _embed_variant
+        # reads the deployment again for what reports/ does not carry.
+        from qa_tools.common import environments
+        monkeypatch.setenv(environments.ENVIRONMENT_ENV, "test")
+        sc = Scenario(root=tmp_path / "scenario", raw_dir=Path(cp_raw_dir))
+        install_fake_tools(monkeypatch, sc)
+        pin_replacement_setting(monkeypatch)
+        sc.deliver("2024-07-25T10:00:00+08:00", self.V1)
+        sc.process()
+        sc.rules.append(own_red("N2"))
+        v2 = sc.deliver("2024-08-05T10:00:00+08:00",
+                        {"cp_clients": "C2", "cp_notifications": "N2"})
+        sc.process()
+        (rerun,) = [r for r in sc.runs(v2["C2"]) if r["scope"] == "readers"]
+        key = rerun["run_key"]
+        if how != gate.SETTLED:
+            with supply_db.connect(label="pytest") as conn:
+                app = gate.start(conn, collection_id=CP, period="2024-Q3", entry=gate.RECHECK)
+                if how == gate.ABANDONED:
+                    gate.abandon(conn, app)
+                conn.execute(f'UPDATE "{qa_store.SCHEMA}".run SET gate_application = ? '
+                             "WHERE run_key = ?", [app, key])
+
+        results = tmp_path / "results.json"
+        monkeypatch.setattr(results_history, "results_path", lambda _cid: str(results))
+        monkeypatch.setattr(bdd, "results_path", lambda _cid: str(results))
+        results_history.build_results_from_history(CP)
+        coll = _registry.by_id(CP)
+        reports = {coll.dashboard_file: bdd.build(CP),
+                   coll.results_file: json.loads(results.read_text())}
+        page = _embed_variant(built_dashboard_html, tmp_path / "site", reports=reports)
+        return page, key
+
+    def _seen(self, page, key) -> dict:
+        return page.evaluate("""(key) => {
+            const raw = rawRealDatasetById("cp-clients");
+            const cp = DATA.agencies.flatMap(a=>a.collections).find(c=>c.id==="child-protection");
+            const ds = cp.datasets.find(d=>d.id==="cp-clients");
+            const inHistory = cols => cols.flatMap(c=>(c.checks||[]).flatMap(ck=>
+                [...(ck.history||[]), ...(ck.superseded||[])]
+                    .filter(h=> h.run_id === key)
+                    .map(h=> `${ck.key} @ ${h.recorded_at || h.run_date}`)));
+            const everywhere = Object.values(COLLECTION_DATA).flatMap(e=> e.datasets || [])
+                .flatMap(d=> inHistory(d.columns || []));
+            return {raw: inHistory(raw.columns || []), shown: inHistory(ds.columns || []),
+                    everywhere};
+        }""", key)
+
+    @pytest.mark.parametrize("how", ["settled", "unsettled", "abandoned"])
+    def test_only_a_settled_application_reaches_the_dataset_page(
+            self, how, clean_page, built_dashboard_html, private_supply_dsn, cp_raw_dir,
+            tmp_path, monkeypatch):
+        from qa_tools.common import gate
+
+        state = {"settled": gate.SETTLED, "unsettled": None, "abandoned": gate.ABANDONED}[how]
+        page, key = self._page_for(state, private_supply_dsn=private_supply_dsn,
+                                   cp_raw_dir=cp_raw_dir, tmp_path=tmp_path,
+                                   monkeypatch=monkeypatch,
+                                   built_dashboard_html=built_dashboard_html)
+        # TODAY, THE PAGE'S DEFAULT: the re-evaluation is recorded when it ran,
+        # on the real clock, whatever the scenario's receipt instants say.
+        _goto(clean_page, page, state=self.CLIENTS)
+        seen = self._seen(clean_page, key)
+        if how == "settled":
+            assert seen["raw"] and seen["shown"], (
+                "the control: a settled application's re-evaluation is on the page", seen)
+        else:
+            assert seen["everywhere"] == [], (
+                f"an {how} application's re-evaluation reached the page", seen["everywhere"])
+            assert seen["shown"] == []
