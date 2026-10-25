@@ -12215,3 +12215,14 @@ twice. It deliberately did not re-find the `TypeError`.
      other reading is that a failed re-check against the warehouse is
      Notifications v2's own red, making it its own root. Unchanged pending his
      answer.
+
+275. **[done, 2026-10-25]** **[Testing & dev tooling]** **The equivalence
+     compare test assumed two commits behind HEAD~2.** Found by the full
+     `mothman check` on 75f5730 (the only failure in 6,331): `test_it_prints_
+     both_commits_and_the_commits_between` asserted "commits between: 2", but
+     HEAD~2 follows first parents, and with A3's two merge commits on top
+     `git rev-list --count HEAD~2..HEAD` is 3. The command was right; the
+     test depended on the shape of the repository's history. It now compares
+     against git's own count, after asserting there are at least two. Minor
+     under the standing rule (a test, no product change); the gate run is the
+     failing-first evidence.

@@ -107,10 +107,17 @@ class TestCompare:
         assert "difference +30s" in _words(result)
 
     def test_it_prints_both_commits_and_the_commits_between(self, baselines):
+        """The count is git's own for A..B: HEAD~2 follows first parents, so
+        behind a merge commit there are more than two (post-build-review #275)."""
+        import subprocess
+
         baselines("a", commit="HEAD~2")
         baselines("b")
+        between = int(subprocess.run(["git", "rev-list", "--count", "HEAD~2..HEAD"],
+                                     capture_output=True, text=True, check=True).stdout)
+        assert between >= 2
         result = _runner.invoke(cli, ["debug", "equivalence", "compare", "a", "b"])
-        assert "commits between: 2" in _words(result)
+        assert f"commits between: {between}" in _words(result)
 
     def test_s1_rows_only_on_one_side_are_shown(self, baselines):
         baselines("a")
