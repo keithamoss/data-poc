@@ -39,14 +39,15 @@ import os
 
 import yaml
 
-from pipeline import (acknowledgements, closed_slots, corrections, excuses, file_check_panel,
-                      owed_nothing, placements, promotion_timeline, recorded_arrival, red_promoted,
-                      slot_timeline, warehouse_counts)
+from pipeline import (acknowledgements, closed_slots, corrections, cross_table_notices, excuses,
+                      file_check_panel, owed_nothing, placements, promotion_timeline,
+                      recorded_arrival, red_promoted, slot_timeline, warehouse_counts)
 from pipeline.dashboard_check_labels import (dashboard_status, display_name, measure, pooled_url_key,
                                              rank_for_headline, tool_ref, url_key)
 from qa_tools import collections
 from qa_tools.common import (agreement, amber_setting, asset_time, build_output, carry_forward, census,
-                             drift_reference, hierarchy, qa_store, schedule_ended, supply_db, supply_status, turned_off)
+                             drift_reference, hierarchy, qa_store, root_cause, schedule_ended, supply_db,
+                             supply_status, turned_off)
 from qa_tools.common.validate_check_lifecycle import collect_checks
 
 ROOT = os.path.join(os.path.dirname(__file__), "..")
@@ -436,10 +437,16 @@ def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], da
             "dimension": r["dimension"], "label": r.get("label"), "check_id": r["check_id"],
             "by_run": {}, "row_count_total": {}, "row_count_invalid": {}, "failing_sample_keys": {},
             "status_by_run": {}, "reference": {}, "not_evaluated": {}, "at": {}, "reads": {},
+            "unreadable": {}, "due_at": {},
         })
         slot["reads"][r["run_id"]] = r.get("reads")
         slot["at"][r["run_id"]] = r.get("run_timestamp")
         slot["not_evaluated"][r["run_id"]] = _not_evaluated_reason(r)
+        # WHICH TABLE IT COULD NOT READ, AND WHY, from the record's structured
+        # fields (REQ-DASH-204 criterion 10) - the one reading root_cause has.
+        if slot["not_evaluated"][r["run_id"]]:
+            slot["unreadable"][r["run_id"]] = root_cause.blocking_tables(r) or None
+            slot["due_at"][r["run_id"]] = r.get("unrunnable_due_at")
         slot["by_run"][r["run_id"]] = r["metric_value"]
         # item 74 Bug A: the tool's own verdict, carried through rather than
         # dropped here and re-derived from thresholds downstream.
@@ -565,6 +572,11 @@ def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], da
                     "status": slot["status_by_run"].get(run_id),
                     "reference": slot["reference"].get(run_id),
                     "not_evaluated": not_evaluated,
+                    # THE TABLES IT COULD NOT READ AND THEIR CODES, and when a
+                    # not-yet-due one falls due (REQ-DASH-204 criterion 10).
+                    **({"unreadable": slot["unreadable"][run_id]}
+                       if slot["unreadable"].get(run_id) else {}),
+                    **({"due_at": slot["due_at"][run_id]} if slot["due_at"].get(run_id) else {}),
                     **({"contested_files": this_read["contested_files"]}
                        if into is contested_reads else {}),
                 })
@@ -735,6 +747,21 @@ def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], da
     last_arrival = ({"run_date": _run_date(latest_entry), "run_id": latest_entry.get("run_id"),
                      **arrival_by_run[latest_run]} if latest_entry else None)
 
+    # THE LINES SAYING ANOTHER TABLE COULD NOT BE READ (REQ-DASH-204), per
+    # supply and date, from the cards above and the decision log.
+    if "log" not in view:
+        with supply_db.connect(read_only=True, label="mothman:cross-table-notices") as conn:
+            view["log"] = cross_table_notices.read_log(conn, coll.id)
+    cross_cards = [ck for c in columns_out if c["name"] == CROSS_TABLE_PSEUDO_COLUMN
+                   for ck in c["checks"] if ck.get("check_id")
+                   and ck["check_id"].count(".") >= 4 and ck["check_id"].split(".")[3] == dataset_id]
+    own_cards = [ck for c in columns_out if c["name"] != CROSS_TABLE_PSEUDO_COLUMN
+                 for ck in c["checks"] if ck.get("check_id")]
+    period_of = {facts[r]["supply_id"]: arrival_by_run.get(r, {}).get("slot")
+                 for r in run_ids_in_order if facts[r]["supply_id"] is not None}
+    no_promoted = cross_table_notices.no_promoted(dataset_id, table, cross_cards, own_cards,
+                                                  period_of, view["log"])
+
     presented = _presented(coll)
     # What each slot held, read once and shared by the embeds below.
     slot_timeline_raw = slot_timelines.get(dataset_id)
@@ -796,6 +823,9 @@ def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], da
         # AGREEMENT FOR ITS PERIOD (REQ-PIPE-270 criterion 9): neither red nor a
         # result, so the page says why each did not run - per run of this
         # dataset, by check, with its period and the recorded reason.
+        # ANOTHER TABLE THIS SUPPLY'S CROSS-TABLE CHECKS COULD NOT READ
+        # (REQ-DASH-204): {supply: [{on, lines, ownRed}]}, looked up by date.
+        "noPromoted": no_promoted,
         "notInAgreement": [
             {"runId": run_id, "supplyId": facts[run_id]["supply_id"], "checkId": check,
              "reason": why}

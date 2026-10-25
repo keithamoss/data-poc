@@ -6558,3 +6558,293 @@ class TestAnUnsettledApplicationNeverReachesThePage:
             assert seen["everywhere"] == [], (
                 f"an {how} application's re-evaluation reached the page", seen["everywhere"])
             assert seen["shown"] == []
+
+
+# ---- A Child Protection scenario's page, as at each of its dates --------------
+
+CP_AGENCY = "child-protection-family-support"
+
+
+def _cp_state(dataset_id: str) -> dict:
+    return {"tier": "dataset", "agencyId": CP_AGENCY, "collectionId": "child-protection",
+            "datasetId": dataset_id}
+
+
+class _CpPages:
+    """A Child Protection history driven through the REAL per-arrival lifecycle
+    (tests/gate_support.py - each tool's evaluation stood in for, everything
+    else real) in this test's own database, ON A PINNED CLOCK so every gate
+    decision and re-check is stamped at the scenario's own instants and the
+    page can be read as at each of them; then built by the real builders and
+    embedded as a variant of this worker's page. `page()` may be called after
+    each step: each call is its own build."""
+
+    def __init__(self, *, tmp_path, monkeypatch, cp_raw_dir, built):
+        from gate_support import Scenario, install_fake_tools, pin_replacement_setting
+
+        from qa_tools.common import environments
+
+        monkeypatch.setenv(environments.ENVIRONMENT_ENV, "test")
+        self.tmp_path, self.monkeypatch, self.built = tmp_path, monkeypatch, built
+        self.sc = Scenario(root=tmp_path / "scenario", raw_dir=Path(cp_raw_dir))
+        install_fake_tools(monkeypatch, self.sc)
+        pin_replacement_setting(monkeypatch)
+        self.builds = 0
+
+    def at(self, instant: str) -> None:
+        """Now is `instant` - as replay_clock's simulated clock would make it."""
+        from qa_tools.common import asset_time
+
+        self.monkeypatch.setenv(asset_time.PINNED_NOW_VARIABLE, instant)
+
+    def reject(self, supply: str, period: str, at: str) -> None:
+        from qa_tools.common import hierarchy, rejection, supply_db, supply_files
+
+        self.at(at)
+        dataset_id = supply.split("@", 1)[0]
+        ds = hierarchy.dataset(dataset_id)
+        with supply_db.connect(label="pytest-reject") as conn:
+            rejection.reject(conn, agency_id=ds.agency_id, collection_id=ds.collection_id,
+                             dataset_id=dataset_id, supply=supply,
+                             physical_tables=supply_files.tables_in(
+                                 conn, dataset_id, supply, supply_db.STAGING_SCHEMA),
+                             actor="fixture@example.org", reason="test: turned down",
+                             effective_at=at, from_slot=period)
+
+    def page(self) -> Path:
+        from pipeline import build_dashboard_data as bdd
+        from qa_tools.tools import results_history
+
+        self.builds += 1
+        out = self.tmp_path / f"build-{self.builds}"
+        out.mkdir()
+        results = out / "results.json"
+        self.monkeypatch.setattr(results_history, "results_path", lambda _cid: str(results))
+        self.monkeypatch.setattr(bdd, "results_path", lambda _cid: str(results))
+        results_history.build_results_from_history("child-protection")
+        coll = _registry.by_id("child-protection")
+        reports = {coll.dashboard_file: bdd.build("child-protection"),
+                   coll.results_file: json.loads(results.read_text())}
+        return _embed_variant(self.built, out / "site", reports=reports)
+
+
+@pytest.fixture
+def cp_pages(private_supply_dsn, cp_raw_dir, tmp_path, monkeypatch, built_dashboard_html):
+    return _CpPages(tmp_path=tmp_path, monkeypatch=monkeypatch, cp_raw_dir=cp_raw_dir,
+                    built=built_dashboard_html)
+
+
+def _first_time_q4(pages: _CpPages) -> None:
+    """2024-Q4 holding Case Workers, Carers, Investigations and Placements in
+    the warehouse, no Clients or Notifications ever supplied (tests/
+    test_package_gate.py's first_time, on the pinned clock)."""
+    from test_package_gate import first_time
+
+    pages.at("2024-10-25T10:30:00+08:00")
+    first_time(pages.sc)
+
+
+def _s2_strict(pages: _CpPages) -> dict:
+    """S2 strict as re-cast (REQ-PIPE-267, V4-Q1 = A): Clients v2 red on its own
+    data is held back, so Notifications v2's Client reference cannot run and
+    Notifications v2 is held back with it."""
+    from gate_support import own_red
+
+    _first_time_q4(pages)
+    pages.sc.rules.append(own_red("C2"))
+    pages.at("2024-11-03T10:30:00+08:00")
+    got = pages.sc.deliver("2024-11-03T10:00:00+08:00",
+                           {"cp_clients": "C2", "cp_notifications": "N2"})
+    pages.sc.process()
+    return got
+
+
+def _shown(page, selector: str) -> list[dict]:
+    return page.evaluate("""(sel) => [...document.querySelectorAll(sel)].map(e => ({
+        text: e.textContent.replace(/\\s+/g, " ").trim(),
+        attrs: Object.fromEntries([...e.attributes].map(a => [a.name, a.value])),
+        links: [...e.querySelectorAll("a")].map(a => ({text: a.textContent, href: a.href})),
+        top: e.getBoundingClientRect().top}))""", selector)
+
+
+class TestAnotherTableCouldNotBeRead:
+    """REQ-DASH-204 criterion 12: a dataset turned red because another table it
+    reads could not be read says so at the top of its page, naming that table
+    and what clears it - against the deployment's TS-80 and fixture histories
+    driven through the real lifecycle."""
+
+    READERS = ("cp-notifications", "cp-investigations", "cp-placements")
+
+    #: (arrival day, period, the day after it was re-evaluated) for TS-42 and
+    #: TS-80, and how many of each reader's checks read the Client Register.
+    PAIRS = (("2019-11-01", "2019-Q4", "2019-11-29"), ("2020-11-01", "2020-Q4", "2020-11-02"))
+    NEED = {"cp-notifications": 3, "cp-investigations": 6, "cp-placements": 3}
+
+    def test_a_reader_shows_one_line_while_the_pair_is_open_and_none_after(
+            self, clean_page, built_dashboard_html):
+        """TS-42 and TS-80 (criteria 12 and 13): on the pair's arrival day
+        each of the contested Client Register's three readers shows ONE line
+        naming it - though three or six of its checks read it - worded as the
+        register entries quote it, with links that keep the date on show; the
+        Client Register's own notice ends 'Affects' naming the three; and once
+        the readers are re-evaluated, no line at all."""
+        for day, period, after in self.PAIRS:
+            for reader, n in self.NEED.items():
+                _goto(clean_page, built_dashboard_html, state=_cp_state(reader), in_place_on=day)
+                (notice,) = _shown(clean_page, "[data-no-promoted]")
+                lines = _shown(clean_page, "[data-no-promoted] .np-line")
+                assert len(lines) == 1, (reader, lines)
+                assert lines[0]["attrs"]["data-np-dataset"] == "cp-clients"
+                assert lines[0]["text"] == (
+                    f"No promoted Client Register for {period}. {n} of this supply's checks need "
+                    f"it, so they could not run. That is not a fault in this supply's own data. "
+                    f"They run again by themselves once a {period} Client Register supply is "
+                    f"promoted."), (reader, lines)
+                assert notice["attrs"].get("role") == "status"
+                assert lines[0]["links"] and all(
+                    f"in-place-on={day}" in a["href"] and "/dataset/cp-clients" in a["href"]
+                    for a in lines[0]["links"]), lines[0]["links"]
+                _goto(clean_page, built_dashboard_html, state=_cp_state(reader), in_place_on=after)
+                assert _shown(clean_page, "[data-no-promoted]") == [], (reader, after)
+            _goto(clean_page, built_dashboard_html, state=_cp_state("cp-clients"), in_place_on=day)
+            (affects,) = _shown(clean_page, "[data-blocked] [data-affects-readers]")
+            assert affects["text"].startswith("Affects ")
+            assert {a["text"] for a in affects["links"]} == {"Notifications", "Investigations",
+                                                             "Placements"}
+            assert _shown(clean_page, "[data-no-promoted]") == [], "never on the causing page"
+
+    def test_the_package_form_turned_down_on_notifications_page(self, clean_page, cp_pages):
+        """S2 strict as re-cast: Notifications' page shows the package form
+        naming the held-back Client Register, carrying data-no-promoted, and
+        says nothing needs deciding on it; after Clients v2 is rejected it reads
+        'was turned down' and a person is needed - judged as at the date on
+        show, so the day before the rejection still reads 'was held back'."""
+        got = _s2_strict(cp_pages)
+        cp_pages.reject(got["C2"], "2024-Q4", "2024-11-05T10:00:00+08:00")
+        page = cp_pages.page()
+        n = _cp_state("cp-notifications")
+
+        _goto(clean_page, page, state=n, in_place_on="2024-11-04")
+        (line,) = _shown(clean_page, "[data-no-promoted] .np-line")
+        assert line["text"] == (
+            "No promoted Client Register for 2024-Q4. The Client Register received with this "
+            "supply (10:00am Sunday, 3 November 2024) was held back, so 3 of this supply's checks "
+            "could not run. That is not a fault in this supply's own data. They run again by "
+            "themselves once a 2024-Q4 Client Register supply is promoted."), line
+        (verdict,) = _shown(clean_page, ".verdict-of")
+        assert verdict["text"].startswith("Nothing needs deciding on this supply"), verdict
+        assert "Awaiting a decision" not in verdict["text"]
+        held = _shown(clean_page, "[data-held-back]")
+        if held:
+            assert held[0]["top"] < line["top"], "after any REQ-DASH-275 notice"
+        assert clean_page.locator(".view-head .pill.red").count() >= 1, "the red stays"
+
+        _goto(clean_page, page, state=n, in_place_on="2024-11-05")
+        (line,) = _shown(clean_page, "[data-no-promoted] .np-line")
+        assert ("The Client Register received with this supply (10:00am Sunday, 3 November "
+                "2024) was turned down, so 3 of this supply's checks could not run.") in line["text"]
+        assert "held back" not in line["text"]
+        (verdict,) = _shown(clean_page, ".verdict-of")
+        assert verdict["text"].startswith("Awaiting a decision"), verdict
+        assert verdict["text"].endswith(
+            "The Client Register file received with it was turned down; this supply now needs "
+            "its own decision."), verdict
+
+    def test_a_replaced_partner_reads_has_been_replaced(self, clean_page, cp_pages):
+        """S2 strict as re-cast, then a Clients v3 that supersedes Clients v2 and
+        whose own run stops before it can re-check Notifications v2: the line
+        reads 'has been replaced by the one received <instant>'."""
+        got = _s2_strict(cp_pages)
+        cp_pages.sc.crash.add(("soda", "cp_clients__20241107"))
+        cp_pages.at("2024-11-07T10:30:00+08:00")
+        cp_pages.sc.deliver("2024-11-07T10:00:00+08:00", {"cp_clients": "C3"})
+        cp_pages.sc.process()
+        assert cp_pages.sc.failures, "precondition: Clients v3's run stopped"
+        assert "supersede" in cp_pages.sc.actions(got["C2"]), "precondition: v2 superseded"
+        page = cp_pages.page()
+        _goto(clean_page, page, state=_cp_state("cp-notifications"), in_place_on="2024-11-07")
+        (line,) = _shown(clean_page, "[data-no-promoted] .np-line")
+        assert ("The Client Register received with this supply (10:00am Sunday, 3 November "
+                "2024) has been replaced by the one received 10:00am Thursday, 7 November 2024, "
+                "so 3 of this supply's checks could not run.") in line["text"], line
+        assert "was held back" not in line["text"]
+
+    def test_a_partner_not_due_yet_and_then_overdue(self, clean_page, cp_pages):
+        """Notifications v2 alone on 30 October, Clients due 9:00am 1 November:
+        Notifications' page shows the line, its red unchanged, and the Client
+        Register's page the muted 'Not due until' line naming its readers; the
+        collection shows the quiet row note and ONE card line for the Client
+        Register. On 2 November Clients is overdue, which has no item of its own
+        in the terminal's queue: the verdict line says a person can decide."""
+        _first_time_q4(cp_pages)
+        cp_pages.at("2024-10-30T10:30:00+08:00")
+        cp_pages.sc.deliver("2024-10-30T10:00:00+08:00", {"cp_notifications": "N2"})
+        cp_pages.sc.process()
+        page = cp_pages.page()
+
+        _goto(clean_page, page, state=_cp_state("cp-notifications"), in_place_on="2024-10-30")
+        lines = _shown(clean_page, "[data-no-promoted] .np-line")
+        assert [ln["attrs"]["data-np-dataset"] for ln in lines] == ["cp-clients"], lines
+        assert lines[0]["text"].startswith("No promoted Client Register for 2024-Q4. 3 of this "
+                                           "supply's checks need it")
+        assert clean_page.locator(".view-head .pill.red").count() >= 1
+
+        _goto(clean_page, page, state=_cp_state("cp-clients"), in_place_on="2024-10-30")
+        (muted,) = _shown(clean_page, "[data-not-due-yet]")
+        assert muted["text"].startswith("Not due until 9:00am Friday, 1 November 2024 — the "), muted
+        assert muted["text"].endswith("are waiting on it"), muted
+        assert "Notifications" in {a["text"] for a in muted["links"]}
+        assert "late-open-note" in muted["attrs"]["class"]
+        assert all("in-place-on=2024-10-30" in a["href"] for a in muted["links"])
+
+        _goto(clean_page, page, state={"tier": "agency", "agencyId": CP_AGENCY},
+              in_place_on="2024-10-30")
+        notes = _shown(clean_page, ".no-promoted-note")
+        assert any(n["text"] == "No promoted Client Register for 2024-Q4" for n in notes), notes
+        # ONE LINE PER CAUSING TABLE: the Client Register, which its three
+        # readers wait on (Investigations also waits on Notifications, whose v2
+        # is not in the warehouse - a second cause, a second line).
+        markers = {m["attrs"]["data-no-promoted-marker"]: m["text"]
+                   for m in _shown(clean_page, "[data-no-promoted-marker]")}
+        assert markers["cp-clients"].endswith("No promoted Client Register: holds 3 datasets red"), \
+            markers
+        assert "Placements" not in markers["cp-clients"], "never each reader on the card"
+        assert len(_shown(clean_page, '[data-no-promoted-marker="cp-clients"]')) == 1
+
+        _goto(clean_page, page, state=_cp_state("cp-notifications"), in_place_on="2024-11-02")
+        (verdict,) = _shown(clean_page, ".verdict-of")
+        assert "could not run because Client Register for 2024-Q4 is overdue" in verdict["text"], \
+            verdict
+        assert "A person can decide on this supply, or wait for that supply to be promoted." \
+            in verdict["text"]
+        assert "Nothing needs deciding" not in verdict["text"]
+        _goto(clean_page, page, state=_cp_state("cp-clients"), in_place_on="2024-11-02")
+        assert _shown(clean_page, "[data-not-due-yet]") == []
+
+    def test_the_owed_re_check_has_its_own_wording(self, clean_page, cp_pages):
+        """2024-Q3 holding v1 of every table; a Clients v2 whose run stops
+        before it checks anything is promoted by a person, so the Notifications
+        in the warehouse owes a re-check against it that has not run: its line
+        says so (criterion 7) - never 'No promoted'."""
+        from test_package_gate import established
+
+        cp_pages.at("2024-07-25T10:30:00+08:00")
+        established(cp_pages.sc)
+        cp_pages.sc.crash.add(("dbt", "cp_clients__20240805"))
+        cp_pages.at("2024-08-05T10:30:00+08:00")
+        c2 = cp_pages.sc.deliver("2024-08-05T10:00:00+08:00", {"cp_clients": "C2"})["C2"]
+        cp_pages.sc.process()
+        assert cp_pages.sc.failures, "precondition: Clients v2's run stopped"
+        cp_pages.at("2024-08-06T10:30:00+08:00")
+        cp_pages.sc.promote_by_hand(c2, "2024-Q3", at="2024-08-06T10:00:00+08:00")
+        assert cp_pages.sc.owed("reevaluate"), "precondition: the knock-on is owed, not run"
+        page = cp_pages.page()
+        _goto(clean_page, page, state=_cp_state("cp-notifications"), in_place_on="2024-08-06")
+        (line,) = _shown(clean_page, "[data-no-promoted] .np-line")
+        assert line["text"] == (
+            "Not yet re-checked against the Client Register promoted 10:00am Tuesday, 6 August "
+            "2024. 3 of this supply's checks read it; the re-check runs on the next processing "
+            "pass."), line
+        assert "No promoted" not in line["text"]
+        _goto(clean_page, page, state=_cp_state("cp-notifications"), in_place_on="2024-08-05")
+        assert _shown(clean_page, "[data-no-promoted]") == [], "nothing owed the day before"

@@ -43061,7 +43061,7 @@ requirements:
       it, so that I go to the one decision or arrival that clears it instead of hunting through this dataset's checks for a
       fault it does not have.
     moscow: must
-    status: not_started
+    status: built
     signed_off:
       by: Keith
       date: '2026-10-23'
@@ -43175,6 +43175,51 @@ requirements:
     - REQ-DASH-277
     - REQ-PIPE-279
     - REQ-DASH-275
+    linked_tests:
+    - tests/test_dashboard_e2e.py::TestAnotherTableCouldNotBeRead::test_a_reader_shows_one_line_while_the_pair_is_open_and_none_after
+    - tests/test_dashboard_e2e.py::TestAnotherTableCouldNotBeRead::test_the_package_form_turned_down_on_notifications_page
+    - tests/test_dashboard_e2e.py::TestAnotherTableCouldNotBeRead::test_a_replaced_partner_reads_has_been_replaced
+    - tests/test_dashboard_e2e.py::TestAnotherTableCouldNotBeRead::test_a_partner_not_due_yet_and_then_overdue
+    - tests/test_dashboard_e2e.py::TestAnotherTableCouldNotBeRead::test_the_owed_re_check_has_its_own_wording
+    - tests/test_cross_table_notices.py::TestBlockingTables
+    - tests/test_cross_table_notices.py::TestTheLines
+    - tests-js/another-table.test.js
+    implemented_by:
+    - pipeline/cross_table_notices.py::no_promoted
+    - pipeline/cross_table_notices.py::read_log
+    - pipeline/cross_table_notices.py::Log
+    - qa_tools/common/root_cause.py::blocking_tables
+    - pipeline/build_dashboard_data.py::build_one_table
+    - dashboard/qa-reporting-dashboard.template.html::noPromotedNotice
+    - dashboard/qa-reporting-dashboard.template.html::noPromotedLineHtml
+    - dashboard/qa-reporting-dashboard.template.html::otherTablesVerdict
+    - dashboard/qa-reporting-dashboard.template.html::verdictLine
+    - dashboard/qa-reporting-dashboard.template.html::noPromotedNote
+    - dashboard/qa-reporting-dashboard.template.html::noPromotedMarker
+    - dashboard/qa-reporting-dashboard.template.html::readersWaitingOn
+    - dashboard/qa-reporting-dashboard.template.html::affectsReaders
+    - dashboard/qa-reporting-dashboard.template.html::notDueYetLine
+    - dashboard/qa-reporting-dashboard.template.html::clipDatasetToInPlaceOn
+    - dashboard/qa-reporting-dashboard.template.html::renderDataset
+    - plans/supply-model.md
+    unmet_criteria:
+    - criterion: Criterion 16's outstanding-item half - the reader's own item in the page's outstanding queue saying nothing needs
+        deciding (or the overdue / turned-down forms), and offering no promote or reject.
+      why: The page's outstanding item for a waiting supply is the terminal's own queue (outstanding._from_awaiting_decisions reads
+        filing_queue.awaiting), which REQ-PIPE-210 changes - built in parallel in wave 1 lane L1. Changing it here would be a second
+        definition of the queue. The verdict-line half is built, from the same structured lines.
+      owner: REQ-PIPE-210 (wave 1, lane L1)
+      blocked_by:
+        requirements:
+        - REQ-PIPE-210
+    evidence:
+    - '2026-10-25, LANE L2 (worktree w1-l2 from c1563cb), against a copy of the bootstrapped history (l2_probe): tests/test_dashboard_e2e.py::TestAnotherTableCouldNotBeRead
+      (5 tests), tests/test_cross_table_notices.py (10), tests/test_root_cause_shouts.py, tests/test_build_dashboard_data.py and tests/test_build_dashboard_child_protection.py
+      - 58 passed in 234.60s (-n 3). The e2e class drives TS-42 and TS-80 on the bootstrapped page and four fixture histories through
+      the real lifecycle (tests/gate_support.py) on a pinned clock (MOTHMAN_PINNED_NOW), each built by the real builders. tests-js/another-table.test.js
+      6 passed. A defect found on the way, fixed test-first: fmtInt(null) threw inside renderAgency for a dataset whose newest run
+      measured no rows (a held Case Workers), so the whole collection page failed to draw - tests-js/fmt-int.test.js failed (1 of 2)
+      before the guard, passes after.'
     decisions:
     - 'A NEW REQUIREMENT NOW (Keith, 2026-10-13): a top-of-page line on the reader naming the other table. REJECTED leaving
       it for a later road-testing sighting.'
@@ -43229,10 +43274,43 @@ requirements:
     - 'THE PAGE AGREES WITH THE QUEUE ON E = B (delivery-scoper, 2026-10-23, following Keith''s E = B): a supply the terminal
       counts as a decision waiting on a person is not told on its page that nothing needs deciding. A reading of E = B, to confirm
       with Keith if wrong.'
+    - 'THE ANSWERS TRAVEL, NOT THE RULE (build, 2026-10-25): pipeline/cross_table_notices.py works out, per supply and per asset day
+      anything changed, each line''s table, period, count, form and instants - from the cross-table cards'' structured `unreadable`
+      fields and REQ-PIPE-269''s counted points, and the decision log - and the page looks the newest up and words it. Names are links
+      the page builds (navHref keeps the date on show), instants go through fmtInstant, so the words are assembled in the page. REJECTED
+      building the sentences as HTML in Python: they would carry links the page could not keep the date on.'
+    - 'THE ONE STRUCTURED READING (criterion 10): root_cause.blocking_tables(record) names the unreadable tables and their codes -
+      per-table codes, a record written before them by its single unrunnable_code, a held record by held_tables - and root_cause._absent_table_root
+      now uses it too. WHICH partner was held back comes from the supply''s own ''promotion-withheld'' entry (held_back_by, held_back_detail.came/by_received)
+      AS AT EACH DATE, not through root_of, which reads the log as it stands now and stops at a failed re-check (Keith 3a); the page
+      needs every date. Read as satisfying criterion 10''s ''through the one function'' for the table and cause; PROVISIONAL, for Keith.'
+    - 'THE OWED FORM IS AN IN-WAREHOUSE READER''S (criterion 7, as built): REQ-PIPE-269 criterion 5 owes a re-check only to a supply
+      in the warehouse, so a WAITING reader whose partner is promoted keeps its counted could-not-run result (and its ''No promoted''
+      line) until re-evaluated; the owed form shows on an in-warehouse reader. The fixture for it is a Clients v2 whose own run stopped,
+      promoted by a person - the knock-on owed and not run.'
+    - 'OVERDUE FROM THE DUE DAY (criterion 16): a not-yet-due partner''s recorded due instant (unrunnable_due_at, the partner''s own
+      window) is a change point, and from that asset day the cause has no item of its own in the terminal''s queue, so the verdict
+      line says a person can decide. ''past-due'' and ''rejected'' codes are such causes from the start.'
+    - '''AFFECTS'' ENDS THE NOTICE THE CAUSING PAGE SHOWS ON THE DATE (criterion 17; the open question''s check at build): the blocked
+      banner (held, contested, could not be loaded), the waiting-blocker banner, the closed-with-no-supply banner, or - for a supply
+      awaiting a decision, including a held-back root - its awaiting verdict line; a partner not yet due shows the muted ''Not due
+      until'' line instead. TWO CAUSES HAVE NO NOTICE, recorded for Keith and given none: an overdue slot not yet closed (only the
+      collection table''s ''Late, still open'' note) and a period whose file a person turned down with none replacing it.'
+    - 'THE CARD LINE LEAVES OUT A HELD-BACK DELIVERY''S CAUSE (criterion 18): lines in the package and joined forms are REQ-DASH-275
+      criterion 4''s one line; turned-down and replaced forms are no longer a held-back delivery and take a 204 card line.'
+    - 'PROVISIONAL WORDING, for Keith: the singular forms (''One of this supply''s checks needs it, so it could not run.''); the verdict
+      line ''Nothing needs deciding on this supply - the results below are the newest supply, received <instant>, which is not in place
+      in the warehouse yet. Its checks run again, and the gate is applied again, by themselves once a <period> <dataset> supply is
+      promoted.''; the overdue sentence ''<n> of this supply''s checks could not run because <dataset> for <period> is overdue. A person
+      can decide on this supply, or wait for that supply to be promoted.''; the row note ''No promoted <dataset> for <period>''; the
+      card line ''No promoted <dataset>: holds <n> datasets red''; the not-due line names several readers as a comma list (''the Notifications,
+      Investigations, Placements are waiting on it''); and criterion 7''s settled line drops ''(REQ-PIPE-211)'', a citation rather
+      than page text.'
     open_questions:
-    - '1. CHECK AT BUILD (not a question for Keith): criterion 17 assumes the causing dataset''s page shows a notice for each
-      cause for ''Affects'' to end. Not yet due now has criterion 17''s muted line; for an overdue supply, confirm which notice
-      or outstanding item carries it, and bring any cause with none back to Keith rather than inventing a banner.'
+    - '1. ANSWERED AT BUILD, FOR KEITH (2026-10-25): two causes have no notice on the causing dataset''s page for ''Affects'' to end
+      - an overdue slot that has not closed yet (the page says nothing; the collection table shows ''Late, still open''), and a period
+      whose file a person turned down with none replacing it. Neither was given a banner. Should either get one, or is the readers''
+      own line enough?'
   - id: REQ-PIPE-210
     title: The terminal's queue lists a supply held back only by another table beneath that table's own item, says nothing needs
       deciding on it, and does not count it

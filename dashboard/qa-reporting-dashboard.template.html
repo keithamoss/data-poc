@@ -1506,7 +1506,8 @@ function inPlaceOnNow(){
 
 function fmtDate(d){ return fmtDay(d); }
 function fmtDateShort(d){ return fmtDay(d); }
-function fmtInt(x){ return x.toLocaleString("en-US"); }
+// NO NUMBER RECORDED IS A DASH, never a crash (found building REQ-DASH-204).
+function fmtInt(x){ return x == null ? "—" : x.toLocaleString("en-US"); }
 
 // WHICH failing rows the example keys are, in one line under them
 // (post-build-review #129, Keith 2026-10-07: "note that in the fine print").
@@ -2549,6 +2550,8 @@ function buildRealDataset(d){
     // REQ-PIPE-081 criterion 1 as amended: whether the verdict's supply is
     // in place or awaiting a decision, and what is in place if not it.
     verdictOf: d.verdictOf || null,
+    // REQ-DASH-204: the build's lines for the supply on show, carried whole.
+    noPromotedOn: d.noPromotedOn || null,
     // REQ-PIPE-122 NFR 1: the amber setting over time, in words. Carried,
     // never derived here - the page only picks the one in force.
     amberSetting: d.amberSetting || [],
@@ -3186,6 +3189,9 @@ function clipDatasetToInPlaceOn(d, inPlaceOnDateStr){
     staleInPlaceOn,
     verdictOf,
     promotionState,
+    // ANOTHER TABLE THE SUPPLY ON SHOW COULD NOT READ (REQ-DASH-204): the
+    // build's answer for this supply on this date, looked up, never derived.
+    noPromotedOn: newestOnOrBefore((d.noPromoted || {})[effectiveRun.supply_id], inPlaceOnDateStr),
   };
 }
 
@@ -6718,7 +6724,176 @@ function verdictLine(ds){
   const inPlace = v.inPlaceRunDate
     ? `The supply in place in the warehouse is the one received ${v.inPlaceReceivedAt ? fmtInstant(v.inPlaceReceivedAt) : escHtml(fmtDay(String(v.inPlaceRunDate).slice(0,10)))}.`
     : "Nothing is in place in the warehouse for this period yet.";
-  return `<div class="verdict-of" data-verdict-of="awaiting" style="font-size:12.5px; color:var(--ink); margin:-6px 0 8px;"><b style="display:inline">Awaiting a decision</b> — the results below are the newest supply, received ${fmtInstant(ds.lastArrival.arrivedAt)}, which is not in place in the warehouse yet. ${inPlace}</div>`;
+  // ANOTHER TABLE'S DOING (REQ-DASH-204 criterion 16): where every red check
+  // on this waiting supply could not run for want of another table, nothing
+  // needs deciding on it - unless that table was turned down, or its cause
+  // has no item of its own (an overdue partner), when a person is needed.
+  const others = otherTablesVerdict(ds);
+  if(others && others.kind === "nothing"){
+    return `<div class="verdict-of" data-verdict-of="awaiting" data-nothing-to-decide style="font-size:12.5px; color:var(--ink); margin:-6px 0 8px;"><b style="display:inline">Nothing needs deciding on this supply</b> — the results below are the newest supply, received ${fmtInstant(ds.lastArrival.arrivedAt)}, which is not in place in the warehouse yet. Its checks run again, and the gate is applied again, by themselves once ${others.once} is promoted. ${inPlace}</div>`;
+  }
+  const extra = others ? ` ${others.sentence}` : "";
+  return `<div class="verdict-of" data-verdict-of="awaiting" style="font-size:12.5px; color:var(--ink); margin:-6px 0 8px;"><b style="display:inline">Awaiting a decision</b> — the results below are the newest supply, received ${fmtInstant(ds.lastArrival.arrivedAt)}, which is not in place in the warehouse yet. ${inPlace}${extra}${affectsOnVerdictLine(ds)}</div>`;
+}
+// ---- ANOTHER TABLE COULD NOT BE READ (REQ-DASH-204) ------------------------
+// The build works out, for each supply and date, one line per table its
+// cross-table checks could not read (pipeline/cross_table_notices.py); the
+// page only looks the answer up and words it. Every name is a real link that
+// keeps the date on show, and every name is set as text.
+function noPromotedLines(ds){
+  const on = ds && ds.noPromotedOn;
+  return on && Array.isArray(on.lines) ? on.lines : [];
+}
+function datasetRefLink(ref){
+  if(!ref) return "";
+  const found = realDatasetIndex()[ref.datasetId] || {};
+  const raw = found.raw || {};
+  const collectionId = ref.collectionId || found.collectionId;
+  const agencyId = ref.agencyId || agencyOfCollection(collectionId);
+  const name = ref.name || raw.name || ref.datasetId;
+  if(!agencyId || !collectionId) return escHtml(name);
+  const nav = {tier:"dataset", agencyId, collectionId, datasetId: ref.datasetId};
+  return `<a class="dataset-name dataset-link" href="${navHref(nav)}" data-nav='${JSON.stringify(nav)}'>${escHtml(name)}</a>`;
+}
+function agencyOfCollection(collectionId){
+  const ag = ((HIERARCHY && HIERARCHY.agencies) || []).find(a=> (a.collections || []).some(c=> c.id === collectionId));
+  return ag ? ag.id : null;
+}
+function capFirst(text){ return text ? text.charAt(0).toUpperCase() + text.slice(1) : ""; }
+function checksCount(n){
+  return n === 1 ? "one of this supply's checks" : `${n} of this supply's checks`;
+}
+// ONE WORDING FOR EVERY CAUSE (criteria 2 and 15), the package forms and
+// criterion 7's two lines apart. "That is not a fault in this supply's own
+// data" is left out where the supply has a red check of its own (criterion 3).
+function noPromotedLineHtml(line, ownRed){
+  const link = datasetRefLink(line);
+  const period = escHtml(fmtPeriodOrDay(String(line.period || "this period")));
+  const n = Number(line.n) || 0;
+  const one = n === 1;
+  const notFault = ownRed ? "" : " That is not a fault in this supply's own data.";
+  const again = ` ${one ? "It runs" : "They run"} again by ${one ? "itself" : "themselves"} once a ${period} ${link} supply is promoted.`;
+  const head = `<b style="display:inline">No promoted ${link} for ${period}.</b>`;
+  const couldNot = `so ${checksCount(n)} could not run.`;
+  const partner = line.partnerReceived ? fmtInstant(line.partnerReceived) : "";
+  switch(line.form){
+    case "owed":
+      return `<b style="display:inline">Not yet re-checked against the ${link} promoted ${fmtInstant(line.promotedAt)}.</b> ${capFirst(checksCount(n))} ${one ? "reads" : "read"} it; the re-check runs on the next processing pass.`;
+    case "settled":
+      return `<b style="display:inline">${link}'s pair for ${period} was settled on ${escHtml(fmtDay(line.settledOn))}.</b> ${capFirst(checksCount(n))} ${one ? "has" : "have"} not run again since; the re-check runs on the next processing pass.`;
+    case "package":
+      return `${head} The ${link} received with this supply (${partner}) was held back, ${couldNot}${notFault}${again}`;
+    case "joined":
+      return `${head} The ${link} waiting for a decision (received ${partner}) is held back, ${couldNot}${notFault}${again}`;
+    case "turned-down":
+      return `${head} The ${link} received with this supply (${partner}) was turned down, ${couldNot}${notFault}${again}`;
+    case "replaced":
+      return `${head} The ${link} received with this supply (${partner}) has been replaced by the one received ${fmtInstant(line.replacedReceived)}, ${couldNot}${notFault}${again}`;
+    default:
+      return `${head} ${capFirst(checksCount(n))} ${one ? "needs" : "need"} it, so ${one ? "it" : "they"} could not run.${notFault}${again}`;
+  }
+}
+// THE NOTICE (criterion 1): one, in the .notice-exhausted structure, one line
+// per table however many checks read it (criterion 4).
+function noPromotedNotice(ds){
+  const lines = noPromotedLines(ds);
+  if(!lines.length) return "";
+  const ownRed = !!(ds.noPromotedOn && ds.noPromotedOn.ownRed);
+  const body = lines.map(l=> `<div class="np-line" data-np-dataset="${escHtml(l.datasetId)}" data-np-form="${escHtml(l.form)}">${noPromotedLineHtml(l, ownRed)}</div>`).join("");
+  return `<div class="notice-exhausted" role="status" data-no-promoted="${lines.length}">${body}</div>`;
+}
+// CRITERION 16's verdict-line half, from the build's lines: null where the
+// supply has a red check of its own, or no line at all.
+function otherTablesVerdict(ds){
+  const on = ds && ds.noPromotedOn;
+  const lines = noPromotedLines(ds).filter(l=> l.form !== "owed" && l.form !== "settled");
+  if(!on || on.ownRed || !lines.length) return null;
+  const turned = lines.find(l=> l.form === "turned-down");
+  if(turned){
+    return {kind: "turned-down", sentence: `The ${datasetRefLink(turned)} file received with it was turned down; this supply now needs its own decision.`};
+  }
+  const overdue = lines.filter(l=> l.noItem);
+  if(overdue.length){
+    const n = overdue.reduce((s, l)=> s + (Number(l.n) || 0), 0);
+    const which = overdue.map(l=> `${datasetRefLink(l)} for ${escHtml(fmtPeriodOrDay(String(l.period || "")))}`).join(" and ");
+    return {kind: "overdue", sentence: `${capFirst(checksCount(n))} could not run because ${which} ${overdue.length === 1 ? "is" : "are"} overdue. A person can decide on this supply, or wait for ${overdue.length === 1 ? "that supply" : "those supplies"} to be promoted.`};
+  }
+  const once = lines.map(l=> `a ${escHtml(fmtPeriodOrDay(String(l.period || "")))} ${datasetRefLink(l)} supply`).join(" and ");
+  return {kind: "nothing", once};
+}
+// THE QUIET NOTE IN THE COLLECTION TABLE (criterion 18), under the reader's
+// status pill, in noSupplyNote()'s shape - naming the causing table.
+function noPromotedNote(ds){
+  const lines = noPromotedLines(ds).filter(l=> l.form !== "owed" && l.form !== "settled");
+  if(!lines.length) return "";
+  const text = lines.map(l=> `No promoted ${l.name || l.datasetId} for ${fmtPeriodOrDay(String(l.period || ""))}`).join("; ");
+  return `<div class="no-promoted-note" data-no-promoted-note="${lines.length}" style="font-size:11.5px; color:var(--ink); margin-top:3px;">${escHtml(text)}</div>`;
+}
+// ONE CARD LINE PER CAUSING TABLE (criterion 18), in redPromotedMarker()'s
+// shape, naming it once with the number of readers it holds red - never each
+// reader. A cause held back with its delivery is REQ-DASH-275's one line.
+function noPromotedMarker(scope){
+  const by = new Map();
+  (scope.collections || [scope]).forEach(col=> (col.datasets || []).forEach(ds=>{
+    noPromotedLines(ds).forEach(l=>{
+      if(l.form === "owed" || l.form === "settled" || l.form === "package" || l.form === "joined") return;
+      const key = l.datasetId;
+      if(!by.has(key)) by.set(key, {line: l, readers: new Set()});
+      by.get(key).readers.add(ds.id);
+    });
+  }));
+  if(!by.size) return "";
+  return [...by.values()].map(({line, readers})=> `<div class="no-promoted-marker" data-no-promoted-marker="${escHtml(line.datasetId)}" style="margin-top:4px; font-size:12px; color:var(--ink); display:flex; align-items:center; gap:5px;">${pill("red","sm")}<span>${escHtml(`No promoted ${line.name || line.datasetId}: holds ${readers.size} ${readers.size === 1 ? "dataset" : "datasets"} red`)}</span></div>`).join("");
+}
+// THE READERS A CAUSING DATASET'S OWN NOTICE ENDS WITH (criterion 17): every
+// dataset of its collection whose line names it on the date on show.
+function readersWaitingOn(ds){
+  const found = realDatasetIndex()[ds && ds.id];
+  if(!found || typeof DATA === "undefined" || !DATA) return [];
+  const out = [];
+  DATA.agencies.forEach(ag=> ag.collections.forEach(col=>{
+    if(col.id !== found.collectionId) return;
+    (col.datasets || []).forEach(r=>{
+      if(r.id === ds.id) return;
+      const lines = noPromotedLines(r).filter(l=> l.datasetId === ds.id && l.form !== "owed" && l.form !== "settled");
+      if(lines.length) out.push({agencyId: ag.id, collectionId: col.id, datasetId: r.id, name: r.name, lines});
+    });
+  }));
+  return out;
+}
+// NOT DUE YET ON THE DATE ON SHOW: the readers' recorded due instant - this
+// dataset's own window - still ahead, judged at the build instant on the
+// build's own date as lateOpenInPlaceOn() is.
+function notDueYetOn(dueAt, inPlaceOnDateStr){
+  if(!dueAt) return false;
+  const built = typeof BUILT_AT !== "undefined" ? BUILT_AT : null;
+  if(built && inPlaceOnDateStr === assetDateStrOf(built)) return Date.parse(dueAt) > Date.parse(built);
+  return assetDateStrOf(dueAt) > inPlaceOnDateStr;
+}
+// A PARTNER NOT DUE YET (criterion 17, Keith N1 = A): a muted line on its own
+// page, in noSupplyNote()'s .late-open-note shape; the readers' red unchanged.
+function notDueYetLine(ds){
+  const readers = readersWaitingOn(ds);
+  const due = readers.flatMap(r=> r.lines).map(l=> l.dueAt).filter(Boolean)
+    .find(at=> notDueYetOn(at, CURRENT_IN_PLACE_ON));
+  if(!due || !readers.length) return "";
+  const waiting = readers.filter(r=> r.lines.some(l=> l.dueAt && notDueYetOn(l.dueAt, CURRENT_IN_PLACE_ON)));
+  const links = waiting.map(r=> datasetRefLink(r)).join(", ");
+  return `<div class="late-open-note" data-not-due-yet style="font-size:12.5px; color:var(--ink-muted); margin:-4px 0 12px;">Not due until ${fmtInstant(due)} — the ${links} ${waiting.length === 1 ? "is" : "are"} waiting on it</div>`;
+}
+// "Affects <reader links>" (criterion 17), ending the one notice this page
+// shows for the cause. A cause whose page shows no notice - an overdue slot
+// still open, a period whose file was turned down - gets none: it is not
+// given a banner of its own here (REQ-DASH-204 open question 1, for Keith).
+function affectsReaders(ds){
+  const readers = readersWaitingOn(ds);
+  if(!readers.length) return "";
+  if(readers.some(r=> r.lines.some(l=> l.dueAt && notDueYetOn(l.dueAt, CURRENT_IN_PLACE_ON)))) return "";
+  return affectsLinks({affects: readers}).replace('<div style="', '<div data-affects-readers style="');
+}
+function affectsOnVerdictLine(ds){
+  if(ds.blocked || ds.waitingBlocker || noSupplyShown(ds)) return "";
+  return affectsReaders(ds);
 }
 // THE CENSUS AS AT THE DATE ON SHOW (REQ-PIPE-081 criteria 14 and 15): the
 // last recorded census taken on or before the end of that day - never the
@@ -7216,6 +7391,7 @@ function renderAgency(view, agencyId){
       <div class="collection-title"><h3>${col.name}</h3>${pill(col.status,"sm")}${exhaustedMarker(col.exhaustedCount, col.status)}${refusedMarker(col.refusedCount)}</div>${(ng => `<div class="collection-not-green" data-collection="${col.id}">${datasetsTrendSlot(col.datasets.map(d=>d.id), !ng)}${ng}</div>`)(datasetsNotGreenLine(col.datasets, col.status))}${notCountedMarker(col.status, col.datasets)}${collectionTurnOffLine(col)}${collectionCarryForwardLines(col, CURRENT_IN_PLACE_ON)}
       ${outstandingMarker("collection", col.id, undefined, col.noSupplyCount)}
       ${redPromotedMarker(col)}
+      ${noPromotedMarker(col)}
       ${acceptedGapsMarker(col.acceptedCount)}
       ${collectionCrossTableSection(ag, col)}
       ${columnsNotGreenKey()}
@@ -7281,7 +7457,7 @@ function renderAgency(view, agencyId){
                                               {col, ds});
           return `<tr tabindex="0" data-nav='${JSON.stringify({tier:"dataset", agencyId:ag.id, collectionId:col.id, datasetId:ds.id})}'>
             <td>${datasetLink(ag, col, ds)}<div class="dataset-provider">${ds.provider}</div></td>
-            <td>${statusPill(ds,"sm")} ${ticketBadge(ds.id,"sm")} ${turnOffMarker(rawRealDatasetById(ds.id) || ds, CURRENT_IN_PLACE_ON)} ${unagreedMarker(ds)}${noSupplyNote(ds)}</td>
+            <td>${statusPill(ds,"sm")} ${ticketBadge(ds.id,"sm")} ${turnOffMarker(rawRealDatasetById(ds.id) || ds, CURRENT_IN_PLACE_ON)} ${unagreedMarker(ds)}${noSupplyNote(ds)}${noPromotedNote(ds)}</td>
             <td><span title="${ARRIVAL_FOLLOWS_FILING}">${arrivalPillHtml}</span> <span class="mono" style="color:var(--ink-muted); font-size:11.5px;" title="When we received this supply">${fmtArrival(ds.lastArrival)}</span> ${waitedChip(ds.lastArrival)}</td>
             <td class="mono">${fmtInt(ds.rowCount)}</td>
             <td class="mono" style="color:var(--ink-muted);">${fmtDate(ds.lastArrival.date)}</td>
@@ -8296,7 +8472,7 @@ function renderDataset(view, agencyId, collectionId, datasetId){
           ${ds.blocked.kind === "agreement-refused" ? "New supplies are held and not checked" : ds.blocked.count > 1 ? `${ds.blocked.count} supplies are waiting - ${escHtml(blockerReceivedText(ds.blocked))}` : `Received <b style="display:inline">${fmtInstant(ds.blocked.openedAt)}</b>`}. Every
           check on this dataset's own data reads <b style="display:inline">No data</b> for this
           period: none of them ran, and no earlier supply's result stands in for it.${heldCrossTableSentence(ds)}
-        </div>
+        </div>${affectsReaders(ds)}
       </div>` : "";
   // WAITING, BUT NOT THIS PERIOD'S OWN SUPPLY (REQ-PIPE-115 criteria 10
   // and 11 as amended 2026-10-05): red and in words, with the checks below
@@ -8309,7 +8485,7 @@ function renderDataset(view, agencyId, collectionId, datasetId){
           ${ds.waitingBlocker.count > 1 ? `${ds.waitingBlocker.count} supplies are waiting — ${escHtml(blockerReceivedText(ds.waitingBlocker))}` : `Received <b style="display:inline">${fmtInstant(ds.waitingBlocker.openedAt)}</b>`}.
           The dataset stays red ${blockerUntil(ds.waitingBlocker)}. The checks below are the
           latest supply that could be checked, received ${fmtInstant(ds.lastArrival.arrivedAt)}.
-        </div>
+        </div>${affectsReaders(ds)}
       </div>` : "";
   // CLOSED WITH NO SUPPLY, and accepted gaps (REQ-DASH-133 criteria 1,
   // 2, 7 and 11): in words, red for an unmarked gap, quiet for one a
@@ -8325,7 +8501,7 @@ function renderDataset(view, agencyId, collectionId, datasetId){
           (run <code>mothman</code> and choose <i>Filing decisions</i>), which offers all three:
           substitute an earlier period's supply, re-file a late file into it, or accept it as
           not supplied.
-        </div>
+        </div>${ds.blocked || ds.waitingBlocker ? "" : affectsReaders(ds)}
       </div>` : "";
   const acceptedGapsNote = ds.acceptedGaps ? `
       <div class="accepted-gaps-note" style="margin:-4px 0 16px; color:var(--ink-muted); font-size:13px; max-width:70ch;">
@@ -8342,6 +8518,7 @@ function renderDataset(view, agencyId, collectionId, datasetId){
         <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">${statusPill(ds)} ${ticketBadge(ds.id)} ${githubFolderLink("datasets", ds.id)} ${assignmentBadge("datasets", ds.id)}</div>
       </div>
       ${arrivalBanner(ds)}
+      ${notDueYetLine(ds)}
       ${noSupplyBanner}
       ${acceptedGapsNote}
       ${outstandingQueue("dataset", ds.id)}
@@ -8385,6 +8562,7 @@ function renderDataset(view, agencyId, collectionId, datasetId){
         <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">${statusPill({...ds, status:"nodata"})} ${ticketBadge(ds.id)} ${githubFolderLink("datasets", ds.id)} ${assignmentBadge("datasets", ds.id)}</div>
       </div>
       ${arrivalBanner(ds)}
+      ${notDueYetLine(ds)}
       ${slaInPlaceOn(rawRealDatasetById(ds.id) || ds, CURRENT_IN_PLACE_ON).notOwedYet
         ? `<div class="sla-strip">${slaTileHtml(rawRealDatasetById(ds.id) || ds, CURRENT_IN_PLACE_ON)}</div>` : ""}
       ${neverSuppliedNotice(rawRealDatasetById(ds.id) || ds, CURRENT_IN_PLACE_ON)}
@@ -8418,9 +8596,11 @@ function renderDataset(view, agencyId, collectionId, datasetId){
     ${arrivalBanner(ds)}
     ${awaitingCorrectionLine(ds.id)}
     ${keptHeldLine(ds.id)}
+    ${notDueYetLine(ds)}
     ${blockedBanner}
     ${refusedBesideBanner(ds)}
     ${waitingBanner}
+    ${noPromotedNotice(ds)}
     ${exhaustedBanner}
     ${noSupplyBanner}
     ${acceptedGapsNote}

@@ -3672,6 +3672,15 @@ quarter (2019-Q3) and before a green one (2020-Q1).*
 "Two files for one table — this dataset's own supply is not checked until
 a person resolves it" (REQ-DASH-264), naming cp_clients.csv (received 8:30am) and
 cp_clients_v2.csv, and the gate refuses its promotion.
+The three readers each say so at the top of their page (REQ-DASH-204
+criterion 13, as the page words it on 1 November 2019, on the bootstrap of
+2026-10-25): Notifications "No promoted Client Register for 2019-Q4. 3 of
+this supply's checks need it, so they could not run. That is not a fault in
+this supply's own data. They run again by themselves once a 2019-Q4 Client
+Register supply is promoted."; Investigations the same with "6 of this
+supply's checks"; Placements the same with "3 of this supply's checks". The
+Client Register's own banner ends "Affects Notifications, Investigations,
+Placements".
 **Breaks as**: one of the two files taken as the quarter's supply, or the
 three readers' cross-table checks evaluated against either.
 
@@ -3708,7 +3717,14 @@ table — settled by Robin Hale, 11:00am Monday, 2 November 2020",
 cp_clients_TEST.csv rejected and cp_clients.csv the quarter's supply. The
 re-check it owed runs at 11:00 and the gate promotes it; the knock-on
 re-evaluates the three readers and promotes them at the same instant
-(post-build-review #251). On the page (REQ-DASH-264): on 1 November
+(post-build-review #251). On 1 November 2020 each reader says so at the top
+of its page (REQ-DASH-204 criterion 13, as the page words it on the bootstrap
+of 2026-10-25): Notifications "No promoted Client Register for 2020-Q4. 3 of
+this supply's checks need it, so they could not run. That is not a fault in
+this supply's own data. They run again by themselves once a 2020-Q4 Client
+Register supply is promoted."; Investigations the same with "6 of this
+supply's checks"; Placements the same with "3 of this supply's checks". From
+2 November, once re-evaluated, none of the three shows the line. On the page (REQ-DASH-264): on 1 November
 cp-clients' own checks read "No data" and its cross-table rows red, each
 named "<reader> → Client Register", with the banner saying the cross-table
 checks did run; from 2 November the readers' Client reference reads green,

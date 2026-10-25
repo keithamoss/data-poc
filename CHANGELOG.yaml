@@ -116,8 +116,22 @@ releases:
       a delivery are now judged together, so no table goes in green against a
       partner that nobody checked.
     changes:
+      - category: New
+        items:
+          - headline: Red from another table, said up top
+            components: ["Dashboard UI"]
+            description: >
+              When a dataset is red only because a table its checks read could
+              not be read, the top of its page now says which table and period,
+              and that the checks run again once a supply of it is promoted.
+              The other table's page names the datasets waiting on it.
       - category: Fixed
         items:
+          - headline: A collection page with an unmeasured table
+            components: ["Dashboard UI"]
+            description: >
+              A collection page no longer fails to draw when one of its
+              datasets' newest runs counted no rows; the row shows a dash.
           - headline: Opens in a blink
             components: ["Dashboard UI"]
             description: >
