@@ -11990,3 +11990,146 @@ twice. It deliberately did not re-find the `TypeError`.
      and red outranks the quiet state the class is about. Same reproduction,
      with the ticket and in-parts classes beside it: 10 passed. Minor under
      the standing rule: tests only, no product change.
+
+274. **[in-progress, 2026-10-25]** **[Pipeline & publishing]** **[Testing & dev
+     tooling]** **Sprint A3's post-build critic (REQ-PIPE-266/267/270/278,
+     REQ-GEN-273), on a3-build at 1bc2902.** Each finding was checked against
+     the code before it was acted on - the critic's own probe tests were re-run
+     first, and every defect below got a test that was run against the unfixed
+     tree and seen to fail before the fix. In-progress because D2, D3 and Q3
+     wait on Keith. Tests are `tests/test_package_gate.py` (gate) and
+     `tests/test_root_cause_shouts.py` (roots) unless named otherwise.
+     **FLAGGED FOR KEITH under the standing rule**: D1, D4, D5, D6 and the
+     criterion-5 finding are significant defects (a wrong instant in a
+     replayed history, a supply nobody is told about, a waiting file failed,
+     a supply left decided by nothing, a ticket for a red that clears by
+     itself). They were fixed before his sign-off on the coordinator's
+     instruction, as clear defects in a sprint not yet pushed; he should know
+     the gate did each of these.
+
+     **D1. A retried 'gate' item promoted at the wall clock - VERIFIED, FIXED.**
+     `gate.run_owed` stamped an item caused by a load or by the application it
+     retries with `asset_time.now()`: the critic's probe showed a failed move's
+     retry promoting Clients v2 and Notifications v2 at 2026-10-25 against a
+     package received 2024-08-05, so two bootstraps differ and a replayed
+     history promotes "today". Test: gate's `test_a_failed_move_promotes_
+     nothing`, now asserting both retried promotions take effect at the
+     instant the arrival path gives the arrival that completed the package -
+     failed at 1bc2902 (2026-10-25 03:44 UTC against 2024-08-08 13:01 +08:00).
+     Fix: `gate._completing_instant` - the newest-opened arrival run of the
+     package, rebuilt from the delivery records, through
+     `orchestrate.effective_at_of` (the one rule, now shared with
+     `promote_after`); never before the newest decision already recorded in
+     the period (`decision_log.follows`), so a retried knock-on's readers take
+     effect after the promotion that caused it; the replay clock where no
+     arrival can be named. ANSWERING THE COORDINATOR: this moves the
+     effective instant of DECISIONS a retried or resumed 'gate' item makes,
+     and nothing else - a run's or re-check's `run_instant`/`recorded_at` is
+     still stamped by `replay_clock.now()` as before, and a package gated in
+     line by its last arrival (S1 through the real lifecycle) never goes
+     through `run_owed`, so its stamps are unchanged.
+
+     **D2. A check whose re-evaluation still does not count is dropped from
+     the verdict (gate.py `_settle_fixed_point` and `_verdicts`) - VERIFIED,
+     HELD FOR KEITH.** The critic's probe: with `_reevaluate` made to record
+     nothing, Clients v2 promoted although its Notifications -> Client
+     Register check never counted. The fixed point's bound decides such a
+     check "without" on purpose (TestTheFixedPointEnds, the 247-run hang), so
+     this is a product question, not a slip: **should a supply whose
+     re-evaluation never counts be not promoting instead?** Behaviour
+     unchanged; gate's `test_a_check_whose_reevaluation_never_counts_does_not_
+     promote_without_it` pins Keith's likely answer as a strict xfail.
+
+     **D3. The PROVISIONAL 'promotion-refused' against 'promotion-withheld'
+     choice (promotion.py ~1057, gate.py ~999) - HELD FOR KEITH**, as the
+     builder's own PROVISIONAL note already asks. Nothing changed.
+
+     **D4. A held-back supply folded into a root whose slot raises no ticket -
+     VERIFIED, FIXED (NFR 3, NO FALSE QUIET).** `root_cause.held_back_by_
+     roots` folded every held-back supply into its root's ticket, so where the
+     root's slot raises none - a red resupply beside a promoted supply (slot
+     PROMOTED), a period marked not supplied - nobody was told. Test: roots'
+     `test_a_root_whose_slot_raises_nothing_leaves_what_it_holds_back_
+     ticketed` (Clients v1 promoted into 2024-Q4, a zip of a red Clients v2
+     and a Notifications v2 that fails against v1): failed at 1bc2902, no
+     ticket for cp-notifications/2024-Q4. Fix: a supply is folded only into a
+     root that is ticketed, or not yet due (criterion 3's exemption, and a
+     root slot not among the states, which is the same case); otherwise it is
+     ticketed on its own.
+
+     **D5. A contested pair waiting for its package was failed - VERIFIED,
+     FIXED (REQ-PIPE-266 criterion 3).** `processing_pass._waiting_for_
+     package` rebuilt the supply id from the receipt instant, without the
+     pair's `#1`, so `package_of` found nothing and `_one` raised "its gate
+     outcome was not recorded", which the pass reports as a failure. Test:
+     gate's `test_a_contested_pair_waiting_for_its_package_is_not_a_failure`
+     (two Client Register files and a Notifications file in one zip, the pair
+     checked first) - raised that RuntimeError at 1bc2902. Fix: the
+     dataset's supplies are read from qa.supply_receipt for the arrival, the
+     pair's suffixes included.
+
+     **D6. A failed move in a knock-on re-owed only the first reader's
+     package, and the knock-on cleared its own item anyway - VERIFIED,
+     FIXED.** Test: gate's `test_a_failed_move_in_a_knock_on_is_owed_for_
+     every_reader` (Notifications v2 and Placements v2 waiting in 2024-Q4 from
+     two deliveries, read by no verdict of each other; a person promotes
+     Clients v2 and the knock-on's second move fails) - at 1bc2902 the next
+     pass promoted Notifications only. Fix: `gate._owe_retry` owes a 'gate'
+     item for every distinct package the entry checked, and `knock_on.
+     complete` leaves its 'reevaluate' item owed, with the failure recorded,
+     when the application failed. The test also asserts the retried
+     promotions take effect after the cause (D1's floor).
+
+     **C5. REQ-PIPE-278 criterion 5 was recorded met and was not - VERIFIED,
+     FIXED, the register corrected.** `test_owed_recheck_raises_nothing` ran
+     over an all-promoted period, where no slot needs a person, and stubbed
+     the knock-on, so it could not fail. Rewritten on an unfilled period
+     (Notifications v2 waiting for want of a Client Register; a red Clients v2
+     promoted by a person; the knock-on that would re-gate Notifications made
+     to fail), it failed at 1bc2902: Notifications v2 reads green but its
+     slot is still awaiting a decision, and a ticket opened. Fix: `root_
+     cause.red_only_owed` - a waiting supply none of whose failing checks is
+     its own, each covered by an uncleared owed item (a 'recheck' of it
+     covers everything, a 'reevaluate' of its period the cross-table checks
+     reading one of its tables, a 'gate' of its package only a supply nothing
+     fails now) raises nothing and names nothing. The counter-case, roots'
+     `test_an_owed_recheck_does_not_quiet_a_failure_of_its_own`, passes before
+     and after: an own red under the same owed item is still ticketed.
+
+     **Test weaknesses, strengthened (minor - tests only).**
+     `test_a_persons_decision_while_a_gate_holds_the_period_is_refused` now
+     counts every decision, filing, owed item and gate application, and
+     asserts all six tables' holders in 2024-Q3 unchanged (REQ-PIPE-266
+     criterion 16), not only the two v2 supplies' decisions.
+     `TestTheFixedPointEnds` pins the outcome it can - Notifications v2
+     refused, the application settled, nothing owed - and leaves Clients v2's
+     to D2's xfail. `test_a_cascade_shows_only_its_last_round` now builds a
+     real second round (Investigations v2 red on its own, Notifications v2
+     failing against Investigations v1, so Clients v2 is re-checked twice),
+     asserts both of Clients v2's runs share one point and that each re-run
+     check reads as the newest round that ran it, the second against
+     Notifications v1. `test_a_failed_move_promotes_nothing` asserts the
+     retry's instant (D1) and that Notifications v2 promotes too.
+
+     **Polish, each with a test seen to fail first (minor).**
+     `recheck.py`'s comment said a contended re-check's next pass gates "without
+     running a tool again"; it re-runs `execute()`, and now says so.
+     `gate._same_holdback` ignored `against`, so a hold-back re-checked against
+     a different warehouse supply read as a repeat and went unrecorded -
+     gate's `test_a_hold_back_against_another_supply_is_not_a_repeat`. A filed
+     supply with no receipt row was skipped in silence by `gate.after_arrival`;
+     it is now a failure naming the supply - gate's `TestAFiledSupplyWithNo
+     Receipt`. `root_cause._turned_down` ignored a later un-reject (a person's
+     promotion from the rejected schema); it now reads `refiling._since_
+     unrejected` - roots' `test_a_root_promoted_after_its_rejection_is_the_
+     root_again`.
+
+     **Q3, FOR KEITH: which supply is the root when a zip mate's re-check
+     fails?** In D4's scenario Notifications v2 is held back because its
+     re-check against Clients v1 in the warehouse FAILED, which happened only
+     because its package-mate Clients v2 was red. The structured cause names
+     Clients v2 (`held_back_by`), so the root is Clients v2 and Notifications
+     v2 gets no ticket of its own where Clients v2's slot is ticketed. The
+     other reading is that a failed re-check against the warehouse is
+     Notifications v2's own red, making it its own root. Unchanged pending his
+     answer.

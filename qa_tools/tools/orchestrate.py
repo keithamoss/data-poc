@@ -456,6 +456,17 @@ def _claim_window(collection_id: str, arrival):
     return min((schedule.claim_window(d, on=on) for d in datasets), default=None)
 
 
+def effective_at_of(collection_id: str, arrival) -> str:
+    """WHEN A GATE REACHED FROM THIS ARRIVAL TAKES EFFECT (REQ-PIPE-081): its
+    receipt plus the seeded lag, never past the next receipt nor the claim
+    window - live, simply now. The one rule, so a retried package gate
+    (gate.run_owed) takes effect when its first attempt would have
+    (post-build-review #274 D1), never at the wall clock of the retry."""
+    return promotion.effective_at_for(
+        arrival.received_at, seed=arrival.run_id, before=promotion.next_receipt(arrival),
+        within=_claim_window(collection_id, arrival)).isoformat()
+
+
 def promote_after(collection_id: str, arrival, got: list[dict], run_by: str,
                   entry: str | None = None):
     """PROMOTION FOLLOWS THE RUN (REQ-PIPE-075 criteria 1 and 13), and is
@@ -474,10 +485,7 @@ def promote_after(collection_id: str, arrival, got: list[dict], run_by: str,
     coll = collections.by_id(collection_id)
     applied = gate.after_arrival(
         coll.id, arrival, run_by=run_by, entry=entry or gate.PACKAGE,
-        effective_at=promotion.effective_at_for(
-            arrival.received_at, seed=arrival.run_id,
-            before=promotion.next_receipt(arrival),
-            within=_claim_window(coll.id, arrival)).isoformat())
+        effective_at=effective_at_of(coll.id, arrival))
     gate.report(applied)
     knock_on.follow_up_stream(coll.id, run_by=run_by)
     return applied

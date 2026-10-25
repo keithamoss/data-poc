@@ -212,17 +212,28 @@ def state_of(arrival, rec: Recorded) -> str:
 
 def _waiting_for_package(conn, arrival, gate_mod) -> str | None:
     """The waiting line where this checked arrival's package gate is owed.
-    An arrival with no receipt instant has no package to look up."""
-    from qa_tools.common import asset_time
+    An arrival with no receipt instant has no package to look up.
+
+    ITS SUPPLIES AS RECORDED - every receipt of its dataset from its arrival,
+    a contested pair's '#1' and '#2' too (post-build-review #274 D5). The id
+    was rebuilt from the receipt instant alone, which no pair's supply is, so
+    a pair waiting for its package was reported as a failure."""
+    from qa_tools.common import asset_time, qa_store
 
     received = getattr(arrival, "received_at", None)
     if received is None:
         return None
     for dataset_id in sorted(getattr(arrival, "files_by_dataset", {}) or {}):
-        supply = f"{dataset_id}@{asset_time.arrival_key(received)}"
-        package = gate_mod.package_of(conn, dataset_id, supply)
-        if package is not None and gate_mod.owed_gate(conn, package) is not None:
-            return gate_mod.waiting_words(package)
+        base = f"{dataset_id}@{asset_time.arrival_key(received)}"
+        supplies = sorted(sup for (sup,) in conn.execute(
+            f'SELECT supply_id FROM "{qa_store.SCHEMA}".supply_receipt '
+            "WHERE dataset_id = ? AND (supply_id = ? OR supply_id LIKE ?)",
+            [dataset_id, base, base.replace("_", r"\_") + "#%"]).fetchall()
+            if _base(sup) == base) or [base]
+        for supply in supplies:
+            package = gate_mod.package_of(conn, dataset_id, supply)
+            if package is not None and gate_mod.owed_gate(conn, package) is not None:
+                return gate_mod.waiting_words(package)
     return None
 
 

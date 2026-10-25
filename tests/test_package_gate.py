@@ -161,6 +161,38 @@ class TestAFileWaitingForItsDelivery:
         assert [s for s in offered if s.supply == v2["C2"]] == []
 
 
+    def test_a_contested_pair_waiting_for_its_package_is_not_a_failure(self, sc):
+        """REQ-PIPE-266 criterion 3 for a CONTESTED PAIR (post-build-review
+        #274 D5): two Client Register files and a Notifications file received
+        together, the pair checked and Notifications not yet. The pass reports
+        the pair as checked, waiting for its package - never a failure. It
+        rebuilt the supply id without the pair's '#1', so the package lookup
+        found nothing and the waiting pair was failed."""
+        from gate_support import CP_REF_RUN_ID
+        from qa_tools.common import asset_time, delivery, processing_pass
+
+        established(sc)
+        at = asset_time.parse_instant("2024-08-05T10:00:00+08:00", "test")
+        source = sc.raw_dir / CP_REF_RUN_ID
+        clients = (source / "cp_clients.csv").read_text()
+        files = {"cp_clients.csv": clients, "cp_clients_part2.csv": clients,
+                 "cp_notifications.csv": (source / "cp_notifications.csv").read_text()}
+        delivery.write_delivery("cp-pair-zip", files, received_at={n: at for n in files},
+                                deliveries_dir=sc.deliveries, receipts_dir=sc.receipts)
+        sc.labels[f"cp-notifications@{asset_time.arrival_key(at)}"] = "N2"
+        sc.process(stop_before="N2")
+        found = sc.arrivals()
+        (pair,) = [a for a in found if a.delivery_name == "cp-pair-zip"
+                   and "cp-clients" in a.files_by_dataset]
+        assert len(pair.files_by_dataset["cp-clients"]) == 2, "precondition: a pair"
+        assert len(sc.owed("gate")) == 1, "precondition: its package's gate is owed"
+        report = processing_pass.PassReport()
+        processing_pass._one(pair, found, at.isoformat(), "pytest@example.org", report,
+                             lambda *a: None)
+        assert report.left_waiting == [pair.run_id]
+        assert report.failures == []
+
+
 class TestInterruptedPackage:
 
     def test_a_part_checked_package_is_finished_and_gated_whole(self, sc):
@@ -291,13 +323,17 @@ class TestDecisionDuringTheGate:
         sc.rules.append(own_red("N2"))
         sc.process()
         extra = tuple(v2.get(x, x) for x in extra)
-        before = len([d for s in (*v2.values(),) for d in sc.decisions(s)])
+        before, held = _everything_recorded(), _warehouse(sc, Q3)
         with gate.period_lock(CP, Q3):
             code, out = decide("--operation", operation, "--dataset", dataset,
                                "--period", Q3, *extra)
         assert code == 75, out
         assert "A gate is running for 2024-Q3. Nothing was changed. Try again in a moment." in out
-        assert len([d for s in v2.values() for d in sc.decisions(s)]) == before
+        # NOTHING RECORDED ANYWHERE - no decision, filing, owed item or
+        # not-supplied mark about any supply - and the warehouse holds exactly
+        # what it held (criterion 16).
+        assert _everything_recorded() == before
+        assert _warehouse(sc, Q3) == held
 
 
 # ---------------------------------------------------------------------------
@@ -350,6 +386,34 @@ class TestPackageMateHeldBack:
         assert "in place in the warehouse (received" in entry["reason"]
         assert entry["reason"].rstrip().endswith(
             "received with it was held back. This supply's checks of its own data passed.")
+
+    def test_a_hold_back_against_another_supply_is_not_a_repeat(self, sc):
+        """REQ-PIPE-266 criterion 9's repeat is judged on the entry's
+        structured fields - ALL of them that say what it was checked against
+        (post-build-review #274): the same cause and checks, re-checked against
+        a different supply in the warehouse, is a new hold-back."""
+        from qa_tools.common import gate, supply_db
+
+        v1 = established(sc)
+        sc.rules += [own_red("N2"), cross_red("cp-notifications", "cp_clients",
+                                              when={"cp_clients": "C2",
+                                                    "cp_notifications": "N1"})]
+        v2 = sc.deliver("2024-08-05T10:00:00+08:00",
+                        {"cp_clients": "C2", "cp_notifications": "N2"})
+        sc.process()
+        detail = _withheld(sc, v2["C2"])["held_back_detail"]
+        member = gate.Member(item={"dataset_id": "cp-clients", "supply": v2["C2"]},
+                             checked_now=True)
+
+        def cause(against):
+            return gate.Cause(checks=tuple(detail["checks"]), against=against,
+                              by=detail["by"], by_dataset=detail["by_dataset"],
+                              by_received=detail["by_received"], came=detail["came"])
+        with supply_db.connect(read_only=True, label="pytest") as conn:
+            assert gate._same_holdback(conn, member, cause(detail["against"]))
+            moved = {c: "cp-notifications@202408010000000800" for c in detail["against"]}
+            assert moved != detail["against"] and v1
+            assert not gate._same_holdback(conn, member, cause(moved))
 
     def test_rejecting_the_held_back_package_mate_changes_nothing(self, sc):
         """S1 step 4 (characterization): a person rejecting Notifications v2
@@ -642,6 +706,36 @@ class TestTheFixedPointEnds:
         sc.process()
         assert len(calls) == 1, calls
         assert calls[0][0] == v2["C2"]
+        # THE OUTCOME, not only the count: Notifications v2 is refused on its
+        # own red, the application settles, and nothing is left owed for it.
+        # Whether Clients v2 may promote with its re-evaluation never counted
+        # is post-build-review #274 D2, waiting on Keith - pinned apart, below.
+        assert _gated(sc, v2["N2"]) == ["promotion-refused"]
+        assert sc.holder("cp-notifications", Q3) != v2["N2"]
+        assert sc.owed("gate") == [] and sc.owed("recheck") == []
+        from qa_tools.common import gate, qa_store, supply_db
+
+        with supply_db.connect(read_only=True, label="pytest") as conn:
+            ended = {e for (e,) in conn.execute(
+                f'SELECT ended FROM "{qa_store.SCHEMA}".gate_application')}
+        assert ended == {gate.SETTLED}
+
+    @pytest.mark.xfail(strict=True, reason=(
+        "post-build-review #274 D2, HELD for Keith: a check whose re-evaluation "
+        "still does not count is dropped from the verdict, so Clients v2 promotes "
+        "without its Notifications -> Client Register check. Should that supply "
+        "be not promoting instead?"))
+    def test_a_check_whose_reevaluation_never_counts_does_not_promote_without_it(
+            self, sc, monkeypatch):
+        from qa_tools.common import gate
+
+        established(sc)
+        sc.rules.append(own_red("N2"))
+        monkeypatch.setattr(gate, "_reevaluate", lambda *a, **k: None)
+        v2 = sc.deliver("2024-08-05T10:00:00+08:00",
+                        {"cp_clients": "C2", "cp_notifications": "N2"})
+        sc.process()
+        assert sc.holder("cp-clients", Q3) != v2["C2"]
 
 
 class TestOnePeriodOneApplication:
@@ -695,9 +789,62 @@ class TestOnePeriodOneApplication:
         monkeypatch.setattr(promotion, "promote", real)
         sc.run_owed()
         assert sc.holder("cp-clients", Q3) == v2["C2"]
+        assert sc.holder("cp-notifications", Q3) == v2["N2"]
         with supply_db.connect(read_only=True, label="pytest") as conn:
             assert conn.execute(f'SELECT count(*) FROM "{qa_store.SCHEMA}".run'
                                 ).fetchone()[0] == runs
+        # THE RETRY TAKES EFFECT WHEN THE FIRST ATTEMPT WOULD HAVE (post-build-
+        # review #274 D1): at the instant the arrival that completed the
+        # package gives - never the wall clock, which made a replayed history
+        # promote "today" and differ between two bootstraps.
+        assert _promotion(sc, v2["C2"])["effective_at"] == _promotion(
+            sc, v2["N2"])["effective_at"] == _first_attempts_instant(sc, v2)
+
+    def test_a_failed_move_in_a_knock_on_is_owed_for_every_reader(self, sc, monkeypatch):
+        """Post-build-review #274 D6: a knock-on re-gating two waiting readers
+        from different deliveries, its second move failing. Nothing promotes,
+        and BOTH are gated again by the next pass - the retry was owed over the
+        first reader's package only, and the knock-on cleared its own item
+        without looking at the failure, so the second reader waited forever."""
+        from qa_tools.common import decision_log, promotion
+
+        # NOTIFICATIONS AND PLACEMENTS both read the Client Register and
+        # neither reads the other, so no verdict joins them into one package's
+        # retry - each has to be owed its own.
+        first_time(sc)
+        n = sc.deliver("2024-11-01T10:00:00+08:00", {"cp_notifications": "N2"})
+        p = sc.deliver("2024-11-02T10:00:00+08:00", {"cp_placements": "P2"})
+        sc.process()
+        p1 = sc.holder("cp-placements", Q4)
+        assert sc.holder("cp-notifications", Q4) is None, "precondition: N2 waits"
+        assert p1 != p["P2"], "precondition: P2 waits"
+        c = sc.deliver("2024-11-03T10:00:00+08:00", {"cp_clients": "C2"})
+        sc.rules.append(own_red("C2"))
+        sc.process()
+        real = promotion.promote
+        moves = []
+
+        def flaky(conn, **kw):
+            if kw.get("actor_kind") == decision_log.RULE:
+                moves.append(kw["supply"])
+                if len(moves) == 2:
+                    raise RuntimeError("the second move failed (test)")
+            return real(conn, **kw)
+        monkeypatch.setattr(promotion, "promote", flaky)
+        sc.promote_by_hand(c["C2"], Q4, at="2024-11-10T10:00:00+08:00", follow_up=True)
+        assert len(moves) == 2, f"precondition: the knock-on moved two readers, {moves}"
+        assert sc.holder("cp-notifications", Q4) is None
+        assert sc.holder("cp-placements", Q4) == p1
+        monkeypatch.setattr(promotion, "promote", real)
+        sc.run_owed()
+        assert sc.holder("cp-notifications", Q4) == n["N2"]
+        assert sc.holder("cp-placements", Q4) == p["P2"]
+        assert sc.owed() == []
+        # AFTER THE PROMOTION THAT CAUSED THE KNOCK-ON, never at the readers'
+        # own earlier arrivals (post-build-review #274 D1's rule, for a retry).
+        cause = _promotion(sc, c["C2"])["effective_at"]
+        assert _promotion(sc, n["N2"])["effective_at"] >= cause
+        assert _promotion(sc, p["P2"])["effective_at"] >= cause
 
     def test_the_knock_on_is_not_blocked_by_its_own_application(self, sc):
         """After an application promotes Clients v2, its knock-on takes the
@@ -712,20 +859,46 @@ class TestOnePeriodOneApplication:
         (REQ-PIPE-279's point key, amended)."""
         from qa_tools.common import qa_results_reader, qa_store, supply_db
 
+        from qa_tools.common import supply_status
+
         established(sc)
-        sc.rules.append(own_red("I2"))
-        sc.deliver("2024-08-05T10:00:00+08:00", {"cp_clients": "C2", "cp_notifications": "N2",
-                                                  "cp_investigations": "I2"})
+        # TWO ROUNDS: Investigations v2 is red on its own, so round one
+        # re-checks Clients v2 and Notifications v2 against Investigations v1;
+        # Notifications v2 fails that and is held back, so round two re-checks
+        # Clients v2 again, against Notifications v1.
+        sc.rules += [own_red("I2"), cross_red("cp-notifications", "cp_investigations",
+                                              when={"cp_investigations": "I1",
+                                                    "cp_notifications": "N2"})]
+        v2 = sc.deliver("2024-08-05T10:00:00+08:00", {
+            "cp_clients": "C2", "cp_notifications": "N2", "cp_investigations": "I2"})
         sc.process()
         with supply_db.connect(read_only=True, label="pytest") as conn:
-            apps = {k: a for k, a in conn.execute(
-                f'SELECT run_key, gate_application FROM "{qa_store.SCHEMA}".run '
-                "WHERE gate_application IS NOT NULL").fetchall()}
+            runs = conn.execute(
+                f'SELECT run_key, supply_id, gate_application, readers_checks FROM '
+                f'"{qa_store.SCHEMA}".run WHERE gate_application IS NOT NULL '
+                "ORDER BY run_seq").fetchall()
             facts = qa_results_reader.run_facts("child-protection-family-support", CP,
                                                 conn=conn)
-        assert apps, "precondition: the cascade re-checked something"
-        for key, app in apps.items():
+            newest = {r["check_id"]: r for r in supply_status.latest_results(
+                conn, "cp-clients", v2["C2"])}
+        rounds = [r for r in runs if r[1] == v2["C2"]]
+        assert len(rounds) == 2, f"precondition: Clients v2 re-checked twice, {runs}"
+        # ONE POINT PER SUPPLY: every run of the application shares its cause.
+        for key, supply, app, _checks in runs:
             assert facts[key]["cause"] == f"gate:{app}"
+        assert len({facts[k]["cause"] for k, *_ in rounds}) == 1
+        # THE LAST ROUND SHOWN: each check either round re-ran reads as the
+        # newest round that ran it, the second against Notifications v1.
+        last = {}
+        for key, _supply, _app, checks in rounds:
+            for check in checks:
+                last[check] = key
+        assert last
+        for check, key in last.items():
+            assert newest[check]["run_id"] == key, check
+        for check in rounds[1][3]:
+            assert newest[check]["reads"]["cp_notifications"]["supply_id"] == sc.holder(
+                "cp-notifications", Q3) != v2["N2"]
 
 
 class TestAnApplicationCountsOnlyOnceSettled:
@@ -765,6 +938,54 @@ class TestAnApplicationCountsOnlyOnceSettled:
                 assert gate.counted(conn, app) is False
             gate.settle(conn, app)  # an abandoned one stays abandoned
             assert not visible(conn)
+
+
+class TestAFiledSupplyWithNoReceipt:
+
+    def test_it_is_reported_not_skipped(self, sc, monkeypatch):
+        """A supply filed to a period whose receipt row is missing has no
+        package to read: the gate says so as a failure of that supply rather
+        than skipping it in silence (post-build-review #274)."""
+        from qa_tools.common import gate
+
+        established(sc)
+        v2 = sc.deliver("2024-08-05T10:00:00+08:00", {"cp_clients": "C2"})
+        monkeypatch.setattr(gate, "package_of", lambda *a, **k: None)
+        sc.process()
+        (arrival,) = [a for a in sc.arrivals() if sc.label_of(a) == "C2"]
+        got = gate.after_arrival(CP, arrival, effective_at="2024-08-06T10:00:00+08:00")
+        assert "no receipt is recorded" in got.failed["cp-clients"]
+        assert v2["C2"] in got.failed["cp-clients"]
+
+
+def _first_attempts_instant(sc, supplies: dict):
+    """The effective instant the gate gives the package `supplies` came in,
+    by the arrival path's own rule, for the arrival processed last."""
+    from qa_tools.common import asset_time, promotion
+    from qa_tools.tools import orchestrate
+
+    mine = set(supplies.values())
+    (last,) = [a for a in sorted(sc.arrivals(), key=lambda a: (a.received_at, a.sequence,
+                                                                a.run_id))
+               if f"{next(iter(a.files_by_dataset))}@"
+               f"{asset_time.arrival_key(a.received_at)}" in mine][-1:]
+    return promotion.effective_at_for(
+        last.received_at, seed=last.run_id, before=promotion.next_receipt(last),
+        within=orchestrate._claim_window(CP, last))
+
+
+def _everything_recorded() -> dict:
+    """How many rows each record a decision can write holds."""
+    from qa_tools.common import qa_store, supply_db
+
+    s = qa_store.SCHEMA
+    with supply_db.connect(read_only=True, label="pytest") as conn:
+        return {t: conn.execute(f'SELECT count(*) FROM "{s}".{t}').fetchone()[0]
+                for t in ("decision", "filing", "owed_run", "gate_application")}
+
+
+def _warehouse(sc, period: str) -> dict:
+    return {t: sc.holder("cp-" + t[3:].replace("_", "-"), period) for t in TABLES}
 
 
 def _reject(sc, supply: str, period: str) -> None:
