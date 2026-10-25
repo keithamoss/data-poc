@@ -2291,20 +2291,23 @@ INJECTIONS: tuple[Injection, ...] = (
     Injection(
         scenario_id="TS-85",
         dataset_id="cp-placements",
-        anchor=-46,
-        config="quarterly, Feb/May/Aug/Nov, due 09:00 on the 1st. The quarter's five "
+        # 2016-Q1: 2015-Q2, its first quarter, is emptied by Emergency
+        # Department's correction, so nothing was written there.
+        anchor=-43,
+        config="quarterly, Feb/May/Aug/Nov, due 09:00 on the 1st. The quarter's six "
                "tables arrive together on time, the first supply of the quarter, "
-               "Placements red on its own data and the other four clean.",
+               "Placements red on its own data and the other five clean.",
         arrivals=(
             ExtraArrival(0, "09:00", "red",
-                         "the quarter's five tables on time, cp_placements red on its own "
-                         "data and the other four clean", severity_tables=("cp_placements",)),
+                         "the quarter's six tables on time, cp_placements red on its own "
+                         "data and the other five clean", severity_tables=("cp_placements",)),
         ),
         gate_outcomes=(GateOutcome("cp-placements", 0, "held back"),
                        GateOutcome("cp-clients", 0, "promoted"),
                        GateOutcome("cp-notifications", 0, "promoted"),
                        GateOutcome("cp-investigations", 0, "promoted"),
-                       GateOutcome("cp-carers", 0, "promoted")),
+                       GateOutcome("cp-carers", 0, "promoted"),
+                       GateOutcome("cp-case-workers", 0, "promoted")),
     ),
     Injection(
         scenario_id="TS-78a",

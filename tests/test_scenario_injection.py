@@ -878,3 +878,25 @@ class TestTheGateOutcomeScenarios:
     def test_a_file_time_before_the_delivery_is_refused(self):
         with pytest.raises(si.CannotPlace, match="earliest"):
             si.ExtraArrival(0, "09:00", file_times=(("cp_clients", "08:00"),))
+
+    def test_a_scenario_in_a_quarter_another_collections_correction_empties_is_refused(
+            self, monkeypatch):
+        """A quarter another collection's declared correction empties carries
+        no Child Protection supply (REQ-GEN-237 criterion 3), so an injection
+        anchored there was written as nothing at all - TS-85's first placement,
+        2015-Q2, whose bootstrap marked every table not supplied (found
+        building REQ-GEN-273 criterion 4, 2026-10-25). Refused, naming the
+        scenario: criterion 4's silent absence."""
+        from generator.collections import child_protection as cp
+
+        periods = cp.generated_periods()
+        emptied = sorted(cp._foreign_altered())
+        assert emptied, "precondition: some quarter is emptied"
+        index = [p.name for p in periods].index(emptied[0]) - len(periods)
+        # BESIDE THE REAL ONES: the emptying correction is another
+        # collection's scenario's, so it has to stay declared.
+        monkeypatch.setattr(si, "INJECTIONS", (*si.INJECTIONS, si.Injection(
+            "TS-x", "cp-placements", index, "cfg",
+            arrivals=(si.ExtraArrival(0, "09:00"),))))
+        with pytest.raises(si.CannotPlace, match="TS-x"):
+            cp._plan_injections(periods)

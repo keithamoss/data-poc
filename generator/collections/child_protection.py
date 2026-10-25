@@ -757,6 +757,18 @@ def _plan_injections(periods):
             for target in extra.targets:
                 targeting.check_target(target, injection.dataset_id,
                                        f"{injection.scenario_id}, its {extra.at} arrival")
+    # NOT IN A QUARTER ANOTHER COLLECTION'S CORRECTION EMPTIES (REQ-GEN-237
+    # criterion 3): slot() writes no Child Protection supply there, so the
+    # scenario would be in the history as nothing at all - refused, naming it
+    # (criterion 4; found building REQ-GEN-273 criterion 4, 2026-10-25).
+    emptied = _foreign_altered()
+    for injection, placement in resolved:
+        hit = [name for name in (placement.period, *placement.covered) if name in emptied]
+        if hit:
+            raise scenario_injection.CannotPlace(
+                f"{injection.scenario_id}: {', '.join(hit)} is emptied by another "
+                f"collection's declared correction, so no Child Protection supply is "
+                f"written there - move its anchor to a quarter that carries one")
     by_period = {placement.period: (injection, placement)
                  for injection, placement in resolved}
     # A DRAWN RED ON A KEEPS-DRAWN QUARTER IS REFUSED (the critic's G2): the

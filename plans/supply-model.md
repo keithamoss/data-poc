@@ -3775,12 +3775,12 @@ Clients promoted alone.
 
 **TS-85 `[INJECT]` S14 - a red Placements held back alone in a first-time
 package.** PLANTED by REQ-GEN-273 criterion 4 (2026-10-25), Q13's case.
-*Config: quarterly, Feb/May/Aug/Nov, due 09:00 on the 1st. 2015-Q2's five
+*Config: quarterly, Feb/May/Aug/Nov, due 09:00 on the 1st. 2016-Q1's six
 tables arrive together on time, the quarter's first supply, cp_placements
-red on its own data and the other four clean.*
+red on its own data and the other five clean.*
 **Expect**: Placements is held back on its own data; Client Register,
-Notifications, Investigations and Carer Register are promoted - no check
-they count reads a Placements the period will hold.
+Notifications, Investigations, Carer Register and Case Workers are promoted
+- no check they count reads a Placements the period will hold.
 **Breaks as**: a reader of Placements held back with it.
 
 **TS-43 `[INJECT]` An amber supply held under hold.**
