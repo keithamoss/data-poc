@@ -7129,3 +7129,156 @@ class TestWarehouseAndStagingViews:
         (verdict,) = _shown(clean_page, ".verdict-of")
         assert verdict["attrs"]["data-verdict-of"] == "promoted", verdict
         assert "received 10:00am Thursday, 25 July 2024" in verdict["text"], verdict
+
+
+def _s6(pages: _CpPages) -> dict:
+    """S6: a zip of Clients, Notifications and Investigations v2 over the v1s,
+    Investigations v2 red on its own data. Notifications v2's Escalation
+    completeness is re-checked against Investigations v1 and fails, so it is
+    held back; Clients v2's Client reference is re-checked against
+    Notifications v1 and fails, so it is held back too - a chain with
+    Investigations v2 at its root."""
+    from gate_support import cross_red, own_red
+    from test_package_gate import established
+
+    pages.at("2024-07-25T10:30:00+08:00")
+    v1 = established(pages.sc)
+    pages.sc.rules += [own_red("I2"),
+                       cross_red("cp-notifications", "cp_investigations",
+                                 when={"cp_investigations": "I1"}),
+                       cross_red("cp-notifications", "cp_clients",
+                                 when={"cp_clients": "C2", "cp_notifications": "N1"})]
+    pages.at("2024-08-05T10:30:00+08:00")
+    v2 = pages.sc.deliver("2024-08-05T10:00:00+08:00", {
+        "cp_clients": "C2", "cp_notifications": "N2", "cp_investigations": "I2"})
+    pages.sc.process()
+    return {**v1, **v2}
+
+
+class TestHeldBackWithItsDelivery:
+    """REQ-DASH-275 criterion 9: a supply held back with its delivery says so
+    at the top of its page, names the root of the chain, and the card says it
+    once per delivery - against fixture histories driven through the real
+    lifecycle on a pinned clock, built by the real builders."""
+
+    N, C, I = _cp_state("cp-notifications"), _cp_state("cp-clients"), _cp_state("cp-investigations")
+
+    def test_s1_red_the_notice_its_links_and_the_root(self, clean_page, cp_pages):
+        """S1 red: the Client Register's page shows the notice naming the
+        Notifications received with it, carrying data-held-back, before any
+        REQ-DASH-204 notice, its links keeping the date on show; the
+        Notifications' own awaiting line ends with what it holds back."""
+        got = _s1(cp_pages, red=True)
+        assert cp_pages.sc.holder("cp-clients", "2024-Q3") != got["C2"], "precondition"
+        page = cp_pages.page()
+        _goto(clean_page, page, state=self.C, in_place_on="2024-08-05")
+        (notice,) = _shown(clean_page, "[data-held-back]")
+        assert notice["attrs"]["data-held-back"] == "package"
+        assert notice["attrs"].get("role") == "status" and "notice-exhausted" in notice["attrs"]["class"]
+        assert notice["text"] == (
+            "Held back with the Notifications received with it. That file (received 10:00am "
+            "Monday, 5 August 2024) was held back, so this supply was re-checked against the "
+            "Notifications in place in the warehouse, and 3 cross-table checks fail against it. "
+            "It is checked again by itself once a Notifications supply is promoted."), notice
+        assert "not a fault" not in notice["text"]
+        assert notice["links"] and all("in-place-on=2024-08-05" in a["href"]
+                                       and "/dataset/cp-notifications" in a["href"]
+                                       for a in notice["links"]), notice["links"]
+        later = _shown(clean_page, "[data-no-promoted]")
+        if later:
+            assert notice["top"] < later[0]["top"], "before any REQ-DASH-204 notice"
+        _goto(clean_page, page, state=self.N, in_place_on="2024-08-05")
+        (verdict,) = _shown(clean_page, ".verdict-of")
+        assert "Holding back with it: Client Register." in verdict["text"], verdict
+        assert ("If this file is turned down, the Client Register supply needs its own decision."
+                in verdict["text"]), verdict
+
+    def test_staggered_s1_red_the_joined_form(self, clean_page, cp_pages):
+        """Notifications v2 red on its own data at 09:00 waits; Clients v2 at
+        09:05 joins it, is re-checked against Notifications v1 and fails."""
+        from gate_support import cross_red, own_red
+        from test_package_gate import established
+
+        cp_pages.at("2024-07-25T10:30:00+08:00")
+        established(cp_pages.sc)
+        cp_pages.sc.rules += [own_red("N2"), cross_red(
+            "cp-notifications", "cp_clients", when={"cp_clients": "C2", "cp_notifications": "N1"})]
+        cp_pages.at("2024-08-05T09:01:00+08:00")
+        cp_pages.sc.deliver("2024-08-05T09:00:00+08:00", {"cp_notifications": "N2"})
+        cp_pages.sc.process()
+        cp_pages.at("2024-08-05T09:06:00+08:00")
+        cp_pages.sc.deliver("2024-08-05T09:05:00+08:00", {"cp_clients": "C2"})
+        cp_pages.sc.process()
+        page = cp_pages.page()
+        _goto(clean_page, page, state=self.C, in_place_on="2024-08-05")
+        (notice,) = _shown(clean_page, "[data-held-back]")
+        assert notice["attrs"]["data-held-back"] == "joined", notice
+        assert notice["text"].startswith(
+            "Held back by the Notifications waiting for a decision. That file (received 9:00am "
+            "Monday, 5 August 2024) is held back, so this supply was re-checked against the "
+            "Notifications in place in the warehouse"), notice
+        _goto(clean_page, page, state={"tier": "agency", "agencyId": CP_AGENCY},
+              in_place_on="2024-08-05")
+        (card,) = _shown(clean_page, '[data-held-back-marker="cp-notifications"]')
+        assert card["text"].endswith("Held back together: Notifications and Client Register "
+                                     "(received 9:00am and 9:05am, Monday, 5 August 2024)"), card
+
+    def test_s6_the_chain_the_root_and_the_card(self, clean_page, cp_pages):
+        """S6: the Client Register's page names the Investigations root and the
+        chain; the Notifications page names the Investigations; the
+        Investigations page lists Notifications and Client Register under
+        'Holding back with it'; the Child Protection card shows ONE 'Held back
+        together' line for the delivery and no REQ-DASH-204 line for it."""
+        _s6(cp_pages)
+        page = cp_pages.page()
+        _goto(clean_page, page, state=self.C, in_place_on="2024-08-05")
+        (notice,) = _shown(clean_page, "[data-held-back]")
+        assert notice["attrs"]["data-held-back"] == "chain", notice
+        assert notice["text"].startswith(
+            "Held back with its delivery: the Investigations file was held back, and the "
+            "Notifications with it. That file"), notice
+        _goto(clean_page, page, state=self.N, in_place_on="2024-08-05")
+        (notice,) = _shown(clean_page, "[data-held-back]")
+        assert notice["text"].startswith("Held back with the Investigations received with it."), notice
+        _goto(clean_page, page, state=self.I, in_place_on="2024-08-05")
+        (holding,) = _shown(clean_page, "[data-holding-back]")
+        assert holding["text"].startswith("Holding back with it: Client Register, Notifications."), \
+            holding
+        assert {a["text"] for a in holding["links"]} >= {"Client Register", "Notifications"}
+        _goto(clean_page, page, state={"tier": "agency", "agencyId": CP_AGENCY},
+              in_place_on="2024-08-05")
+        cards = _shown(clean_page, "[data-held-back-marker]")
+        assert [c["attrs"]["data-held-back-marker"] for c in cards] == ["cp-investigations"], cards
+        assert cards[0]["text"].endswith("Held back together: Investigations, Client Register and "
+                                         "Notifications (one delivery, received 10:00am Monday, 5 "
+                                         "August 2024)"), cards
+        assert not _shown(clean_page, '[data-no-promoted-marker="cp-investigations"]')
+
+    def test_after_the_root_is_turned_down_then_replaced(self, clean_page, cp_pages):
+        """S1 red, then the root Notifications v2 rejected: the notice reads
+        'turned down'; S1 red in a second history, then a Notifications v3 that
+        supersedes v2 and whose own run stops: 'has been replaced'. Neither
+        says 'checked again once' or 'held back'."""
+        got = _s1(cp_pages, red=True)
+        cp_pages.reject(got["N2"], "2024-Q3", "2024-08-07T10:00:00+08:00")
+        page = cp_pages.page()
+        _goto(clean_page, page, state=self.C, in_place_on="2024-08-07")
+        (notice,) = _shown(clean_page, "[data-held-back]")
+        assert notice["text"] == ("The Notifications file received with it was turned down; this "
+                                  "supply now needs its own decision."), notice
+        _goto(clean_page, page, state=self.C, in_place_on="2024-08-06")
+        assert "checked again by itself once" in _shown(clean_page, "[data-held-back]")[0]["text"]
+
+    def test_a_replaced_root(self, clean_page, cp_pages):
+        _s1(cp_pages, red=True)
+        cp_pages.sc.crash.add(("soda", "cp_notifications__20240807"))
+        cp_pages.at("2024-08-07T10:30:00+08:00")
+        cp_pages.sc.deliver("2024-08-07T10:00:00+08:00", {"cp_notifications": "N3"})
+        cp_pages.sc.process()
+        page = cp_pages.page()
+        _goto(clean_page, page, state=self.C, in_place_on="2024-08-07")
+        (notice,) = _shown(clean_page, "[data-held-back]")
+        assert notice["text"] == ("The Notifications received with it has been replaced by the "
+                                  "one received 10:00am Wednesday, 7 August 2024; this supply "
+                                  "now needs its own decision."), notice
+        assert "checked again once" not in notice["text"] and "held back" not in notice["text"]

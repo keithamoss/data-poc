@@ -42420,7 +42420,7 @@ requirements:
       the root where the chain is longer - and the collection card to say it once per delivery, so that I go to the one decision
       that clears the delivery instead of hunting through this dataset's checks.
     moscow: must
-    status: not_started
+    status: built
     signed_off:
       by: Keith
       date: '2026-10-23'
@@ -42495,6 +42495,42 @@ requirements:
     - REQ-DASH-272
     - REQ-DASH-277
     - REQ-PIPE-279
+    linked_tests:
+    - tests/test_dashboard_e2e.py::TestHeldBackWithItsDelivery::test_s1_red_the_notice_its_links_and_the_root
+    - tests/test_dashboard_e2e.py::TestHeldBackWithItsDelivery::test_staggered_s1_red_the_joined_form
+    - tests/test_dashboard_e2e.py::TestHeldBackWithItsDelivery::test_s6_the_chain_the_root_and_the_card
+    - tests/test_dashboard_e2e.py::TestHeldBackWithItsDelivery::test_after_the_root_is_turned_down_then_replaced
+    - tests/test_dashboard_e2e.py::TestHeldBackWithItsDelivery::test_a_replaced_root
+    - tests/test_held_back_notices.py::TestTheNotice
+    - tests/test_held_back_notices.py::TestTheRoot
+    implemented_by:
+    - pipeline/held_back_notices.py::for_dataset
+    - pipeline/held_back_notices.py::involved
+    - pipeline/held_back_notices.py::chain_of
+    - pipeline/held_back_notices.py::_notice
+    - pipeline/held_back_notices.py::_holding
+    - pipeline/held_back_notices.py::_card
+    - pipeline/cross_table_notices.py::read_log
+    - pipeline/build_dashboard_data.py::build_one_table
+    - dashboard/qa-reporting-dashboard.template.html::heldBackNotice
+    - dashboard/qa-reporting-dashboard.template.html::heldBackHolding
+    - dashboard/qa-reporting-dashboard.template.html::heldBackMarker
+    - dashboard/qa-reporting-dashboard.template.html::heldBackDatasets
+    - dashboard/qa-reporting-dashboard.template.html::noPromotedMarker
+    - dashboard/qa-reporting-dashboard.template.html::verdictLine
+    - dashboard/qa-reporting-dashboard.template.html::renderDataset
+    evidence:
+    - '2026-10-25, LANE L2 (worktree w1-l2), against a copy of the bootstrapped history (l2_probe), on this tree: tests/test_dashboard_e2e.py''s
+      TestHeldBackWithItsDelivery (5, fixture histories through the real lifecycle on a pinned clock), TestWarehouseAndStagingViews,
+      TestAnotherTableCouldNotBeRead, TestBuiltDashboardRenders, TestTheDisplayStandardHoldsInARealBrowser, TestTheKeyboardCanReachTheData,
+      TestEveryDatasetPageSurvivesItsOwnDrillDown, TestDatasetsNotGreenOnCardsAndHeadings, TestTheExecutiveLegendCountsWhatIsActuallyThere,
+      TestTheDataFilesLoadFromDisk and TestStatusMatchesEachToolsOwnVerdict, with tests/test_held_back_notices.py (6), test_cross_table_grid.py,
+      test_cross_table_notices.py, test_build_dashboard_data.py, test_build_dashboard_child_protection.py and test_dashboard_for_every_collection.py:
+      143 passed in 382s at -n 4. On the bootstrapped page TS-82 (S1 red, 2017-Q3) reads, on 28 August 2017, ''Held back with the Notifications
+      received with it. That file (received 10:00am Tuesday, 15 August 2017) was held back, ... 3 cross-table checks fail against it.'',
+      the Notifications'' line ends ''Holding back with it: Client Register. If this file is turned down, the Client Register supply
+      needs its own decision.'', and the Child Protection card ''Held back together: Notifications and Client Register (one delivery,
+      received 10:00am Tuesday, 15 August 2017)''.'
     decisions:
     - 'A TOP-OF-PAGE NOTICE FOR S1 RED (Keith, 2026-10-22, A), with no ''not a fault'' clause. This settles the contradiction
       the dashboard review found in summary-v3 (D5: REQ-DASH-204 ''does not apply to S1''s red branch'' against a proposed ''Held
@@ -42530,6 +42566,27 @@ requirements:
     - 'THE EXEC VIEW''S EXTRA SENTENCE IS DROPPED KNOWINGLY (dashboard UX review v4, v3 shape item 4): the exec view has no
       explanation element of its own for a sentence to extend (renderExec), and the card line of criterion 4 already appears
       on the exec card.'
+    - 'THE ANSWERS TRAVEL, NOT THE RULE (build, 2026-10-25): pipeline/held_back_notices.py works out, per supply and per asset day
+      a hold-back or a decision about one of the supplies involved changed, the notice (as segments, named through cross_table_grid.named)
+      and, for a root, what it holds back and its card line; the page renders them, every name a link keeping the date on show and
+      every name set as text.'
+    - 'WHICH HOLD-BACK IS THIS NOTICE''S (criterion 1, as built): the supply''s newest gate entry by the date is a ''promotion-withheld''
+      whose structured detail says its re-check against the warehouse FAILED (gate.Cause.failed); a hold-back that could not be checked
+      is REQ-DASH-204''s package form. <n> is the entry''s `checks`.'
+    - THE CHAIN (criterion 2) walks held_back_by from entry to entry as at the date, NOT through root_cause.root_of, which stops at
+      a supply whose own re-check failed (Keith 3a) and so would name the Notifications, not the Investigations, as S6's root. The
+      tickets' root and the page's named root can therefore differ for S6 - PROVISIONAL, for Keith.
+    - '''HOLDING BACK WITH IT'' (criterion 3) lists every supply whose chain ends at the root on the date, could-not-be-checked hold-backs
+      included, ordered by receipt; it ends the root''s awaiting verdict line. The forewarning names the first supply whose re-check
+      failed.'
+    - THE CARD LINE (criterion 4) is on the collection block and the executive view's agency card; on the agency card, itself a link,
+      the names are text (no link inside a link) - PROVISIONAL. REQ-DASH-204's card line leaves out a cause in a held-back set (204
+      criterion 18).
+    - 'TURNED DOWN OR REPLACED (criterion 6): read off the partner''s own rejection or supersession as at the date, where the supply''s
+      newest gate entry is still that hold-back (nothing has re-gated it since); the notice then drops ''held back'' and ''checked
+      again once''. The replaced fixture is a Notifications v3 that supersedes v2 and whose own run stops before it can re-gate anything.'
+    - 'PROVISIONAL WORDING, for Keith: ''<n> cross-table check fails'' in the singular; the card line''s two instants on one day as
+      ''9:00am and 9:05am, Monday, 5 August 2024''; the root''s holding list as ''Holding back with it: <links>.'''
     open_questions: []
   - id: REQ-PIPE-276
     title: 'The terminal says what a package gate did: what was held back and by what, what to decide first, and what an override

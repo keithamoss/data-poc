@@ -2579,6 +2579,7 @@ function buildRealDataset(d){
     // REQ-DASH-204: the build's lines for the supply on show, carried whole.
     noPromotedOn: d.noPromotedOn || null,
     warehouseClauseOn: d.warehouseClauseOn || null,
+    heldBackOn: d.heldBackOn || null,
     // REQ-PIPE-122 NFR 1: the amber setting over time, in words. Carried,
     // never derived here - the page only picks the one in force.
     amberSetting: d.amberSetting || [],
@@ -3221,6 +3222,9 @@ function clipDatasetToInPlaceOn(d, inPlaceOnDateStr){
     noPromotedOn: newestOnOrBefore((d.noPromoted || {})[effectiveRun.supply_id], inPlaceOnDateStr),
     // REQ-DASH-272: the build's warehouse clause for this supply on this date.
     warehouseClauseOn: newestOnOrBefore((d.warehouseClause || {})[effectiveRun.supply_id], inPlaceOnDateStr),
+    // REQ-DASH-275: the build's held-back notice and holding list for this
+    // supply on this date.
+    heldBackOn: newestOnOrBefore((d.heldBack || {})[effectiveRun.supply_id], inPlaceOnDateStr),
   };
 }
 
@@ -6929,7 +6933,7 @@ function verdictLine(ds){
     return `<div class="verdict-of" data-verdict-of="awaiting" data-nothing-to-decide style="font-size:12.5px; color:var(--ink); margin:-6px 0 8px;"><b style="display:inline">Nothing needs deciding on this supply</b> — the results below are the newest supply, received ${fmtInstant(ds.lastArrival.arrivedAt)}, which is not in place in the warehouse yet. Its checks run again, and the gate is applied again, by themselves once ${others.once} is promoted. ${inPlace}</div>`;
   }
   const extra = others ? ` ${others.sentence}` : "";
-  return `<div class="verdict-of" data-verdict-of="awaiting" style="font-size:12.5px; color:var(--ink); margin:-6px 0 8px;"><b style="display:inline">Awaiting a decision</b> — the results below are the newest supply, received ${fmtInstant(ds.lastArrival.arrivedAt)}, which is not in place in the warehouse yet. ${inPlace}${extra}${affectsOnVerdictLine(ds)}</div>`;
+  return `<div class="verdict-of" data-verdict-of="awaiting" style="font-size:12.5px; color:var(--ink); margin:-6px 0 8px;"><b style="display:inline">Awaiting a decision</b> — the results below are the newest supply, received ${fmtInstant(ds.lastArrival.arrivedAt)}, which is not in place in the warehouse yet. ${inPlace}${extra}${heldBackHolding(ds)}${affectsOnVerdictLine(ds)}</div>`;
 }
 // THE WAREHOUSE'S STATUS ON AN AWAITING LINE (REQ-DASH-272 criteria 1 to 5):
 // the build's clause for the supply on show and date, its status in the
@@ -6939,6 +6943,44 @@ function warehouseClauseHtml(ds){
   if(!p || !p.clause) return "";
   const status = p.status ? `${pill(p.status, "sm")}` : "";
   return `<span class="wh-clause" data-wh-clause="${escHtml(p.status || "none")}">${segmentsHtml(p.clause)}${status}${segmentsHtml(p.tail || [])}</span>`;
+}
+// ---- HELD BACK WITH ITS DELIVERY (REQ-DASH-275) ----------------------------
+// The build works out, per supply and date, whether it was held back because
+// another supply of its gate application was not promoting and its re-check
+// against the warehouse failed, the chain to its root, and what a root holds
+// back (pipeline/held_back_notices.py); the page renders the segments - every
+// name a real link that keeps the date on show, every name set as text.
+function heldBackNotice(ds){
+  const n = ds && ds.heldBackOn && ds.heldBackOn.notice;
+  if(!n) return "";
+  const head = (n.head || []).length ? `<b style="display:inline">${segmentsHtml(n.head)}</b>` : "";
+  return `<div class="notice-exhausted" role="status" data-held-back="${escHtml(n.form || "")}">${head}${segmentsHtml(n.body)}</div>`;
+}
+// THE ROOT'S OWN AWAITING LINE ENDS WITH WHAT IT HOLDS BACK (criterion 3).
+function heldBackHolding(ds){
+  const h = ds && ds.heldBackOn && ds.heldBackOn.holding;
+  return h ? ` <span data-holding-back>${segmentsHtml(h.tail)}</span>` : "";
+}
+// ONE CARD LINE PER ROOT'S HELD-BACK SET (criterion 4), in redPromotedMarker()'s
+// shape. On a card that is itself a link the names are text, never a link
+// inside a link.
+function heldBackMarker(scope, asText){
+  const lines = [];
+  (scope.collections || [scope]).forEach(col=> (col.datasets || []).forEach(ds=>{
+    const h = ds.heldBackOn && ds.heldBackOn.holding;
+    if(h && h.card) lines.push({root: ds.id, card: h.card});
+  }));
+  return lines.map(l=> `<div class="held-back-marker" data-held-back-marker="${escHtml(l.root)}" style="margin-top:4px; font-size:12px; color:var(--ink); display:flex; align-items:center; gap:5px;">${pill("red","sm")}<span>${asText ? escHtml(segmentsText(l.card)) : segmentsHtml(l.card)}</span></div>`).join("");
+}
+// The datasets a root's held-back set names on the date - REQ-DASH-204's card
+// line leaves their causes to this one (204 criterion 18).
+function heldBackDatasets(scope){
+  const out = new Set();
+  (scope.collections || [scope]).forEach(col=> (col.datasets || []).forEach(ds=>{
+    const h = ds.heldBackOn && ds.heldBackOn.holding;
+    if(h){ out.add(ds.id); (h.datasets || []).forEach(d=> out.add(d)); }
+  }));
+  return out;
 }
 // ---- ANOTHER TABLE COULD NOT BE READ (REQ-DASH-204) ------------------------
 // The build works out, for each supply and date, one line per table its
@@ -7039,9 +7081,11 @@ function noPromotedNote(ds){
 // reader. A cause held back with its delivery is REQ-DASH-275's one line.
 function noPromotedMarker(scope){
   const by = new Map();
+  const held = heldBackDatasets(scope);
   (scope.collections || [scope]).forEach(col=> (col.datasets || []).forEach(ds=>{
     noPromotedLines(ds).forEach(l=>{
       if(l.form === "owed" || l.form === "settled" || l.form === "package" || l.form === "joined") return;
+      if(held.has(l.datasetId) && held.has(ds.id)) return;
       const key = l.datasetId;
       if(!by.has(key)) by.set(key, {line: l, readers: new Set()});
       by.get(key).readers.add(ds.id);
@@ -7519,6 +7563,7 @@ function renderExec(view){
       ${notCountedMarker(ag.status, agDatasets)}
       ${outstandingMarker("agency", ag.id, undefined, ag.noSupplyCount)}
       ${redPromotedMarker(ag)}
+      ${heldBackMarker(ag, true)}
       ${acceptedGapsMarker(ag.acceptedCount)}
       <div class="card-meta"><span><b>${ag.collections.length}</b> ${pluralize(ag.collections.length,"collection")}</span><span><b>${nDatasets}</b> ${pluralize(nDatasets,"dataset")}</span></div>
     </a>`;
@@ -7596,6 +7641,7 @@ function renderAgency(view, agencyId){
       <div class="collection-title"><h3>${col.name}</h3>${pill(col.status,"sm")}${exhaustedMarker(col.exhaustedCount, col.status)}${refusedMarker(col.refusedCount)}</div>${(ng => `<div class="collection-not-green" data-collection="${col.id}">${datasetsTrendSlot(col.datasets.map(d=>d.id), !ng)}${ng}</div>`)(datasetsNotGreenLine(col.datasets, col.status))}${notCountedMarker(col.status, col.datasets)}${collectionTurnOffLine(col)}${collectionCarryForwardLines(col, CURRENT_IN_PLACE_ON)}
       ${outstandingMarker("collection", col.id, undefined, col.noSupplyCount)}
       ${redPromotedMarker(col)}
+      ${heldBackMarker(col)}
       ${noPromotedMarker(col)}
       ${acceptedGapsMarker(col.acceptedCount)}
       ${collectionCrossTableSection(ag, col)}
@@ -8812,6 +8858,7 @@ function renderDataset(view, agencyId, collectionId, datasetId){
     ${blockedBanner}
     ${refusedBesideBanner(ds)}
     ${waitingBanner}
+    ${heldBackNotice(ds)}
     ${noPromotedNotice(ds)}
     ${exhaustedBanner}
     ${noSupplyBanner}

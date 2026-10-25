@@ -40,7 +40,7 @@ import os
 import yaml
 
 from pipeline import (acknowledgements, closed_slots, corrections, cross_table_grid,
-                      cross_table_notices, excuses,
+                      cross_table_notices, excuses, held_back_notices,
                       file_check_panel, owed_nothing, placements, promotion_timeline,
                       recorded_arrival, red_promoted, slot_timeline, warehouse_counts)
 from pipeline.dashboard_check_labels import (dashboard_status, display_name, measure, pooled_url_key,
@@ -788,6 +788,13 @@ def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], da
     promotion_words = cross_table_grid.promotion_words(
         dataset_id, period_of, log=view["log"], slots=view["slots"], receipts=view["receipts"],
         runs=view["runs_by_supply"])
+    # HELD BACK WITH ITS DELIVERY (REQ-DASH-275): the notice, the chain to its
+    # root and what a root holds back, per supply and date, from the decision
+    # log's 'promotion-withheld' entries.
+    if "involvement" not in view:
+        view["involvement"] = held_back_notices.involved(view["log"])
+    held_back = held_back_notices.for_dataset(dataset_id, list(period_of), view["log"],
+                                              view["receipts"], view["involvement"])
     # OFF THE HISTORY ENTRIES BEFORE THEY ARE WRITTEN: the page reads every
     # entry on every date it draws (the weekly trends), and entries of more
     # than one shape cost it twice the time - so each card carries its
@@ -848,6 +855,9 @@ def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], da
         # THE GRID'S NOTES AND SENTENCES, each once (REQ-DASH-272): a cell's
         # `placed` point names them by index.
         "xtPhrases": phrases.items,
+        # HELD BACK WITH ITS DELIVERY (REQ-DASH-275): {supply: [{on, notice,
+        # holding}]}, looked up by date.
+        "heldBack": held_back,
         # REQ-DASH-097: the file checks, BESIDE `columns` - never inside them,
         # which is what keeps them out of every roll-up.
         "fileChecks": file_check_panel.for_dataset(dataset_id),
