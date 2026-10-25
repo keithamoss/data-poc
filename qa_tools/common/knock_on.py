@@ -275,6 +275,17 @@ def complete(item, *, run_by: str | None = None, on_step=None):
                 f"{period}: {len(touched)} reader(s) re-evaluated; another gate holds "
                 f"{period}, so they are re-gated by the next pass - still owed",
                 contended=True)
+        if applied.failed:
+            # A FAILED APPLICATION IS NOT A COMPLETED KNOCK-ON (post-build-review
+            # #274 D6): it was abandoned and promoted nothing, so the item stays
+            # owed and reported (criterion 14) - its readers' packages are owed
+            # their gate too (gate._owe_retry), and whichever runs first gates them.
+            message = "; ".join(f"{d}: {w}" for d, w in sorted(applied.failed.items()))
+            recheck.fail(item.id, message)
+            return recheck.Outcome(
+                item.id, last_key, False,
+                f"{period}: {len(touched)} reader(s) re-evaluated; their gate did not "
+                f"complete ({message}) - still owed")
         for reader in waiting:
             why = applied.refused.get(reader.dataset_id)
             if why and _fails_the_rules(why) and reader.dataset_id not in {

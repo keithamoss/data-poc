@@ -519,15 +519,23 @@ def _package_waiting(conn, item: dict) -> bool:
 def _owe_retry(collection_id, period, application, members, package_instant) -> None:
     """A failed or contended application is owed again as a 'gate' item -
     never a 'recheck', which would re-run that supply's full QA (criterion
-    17) - over the package of its first checked supply."""
-    first = next((m for m in sorted(members.values(), key=lambda m: m.key)
-                  if m.checked_now), None)
-    if first is None:
-        return
+    17) - over the package of EVERY supply its entry checked, once each. A
+    knock-on or re-check entry gates readers from several deliveries, and
+    owing only the first one's package left the rest decided by nothing
+    (post-build-review #274 D6)."""
+    seen = set()
     with supply_db.connect(label="mothman:gate") as conn:
-        package = package_of(conn, first.dataset_id, first.supply)
-        if package is not None:
-            owe_gate(conn, package, dataset_id=first.dataset_id, retries=application)
+        for m in sorted(members.values(), key=lambda m: m.key):
+            if not m.checked_now:
+                continue
+            package = package_of(conn, m.dataset_id, m.supply)
+            if package is None:
+                continue
+            ident = (package.period, package.delivery, _iso(package.received))
+            if ident in seen:
+                continue
+            seen.add(ident)
+            owe_gate(conn, package, dataset_id=m.dataset_id, retries=application)
 
 
 def _receipt(conn, dataset_id: str, supply: str):
@@ -1043,8 +1051,12 @@ def _same_holdback(conn, m: Member, cause: Cause) -> bool:
     if not rows:
         return False
     action, by, detail = rows[0]
+    # WHAT IT WAS CHECKED AGAINST TOO (post-build-review #274): the same cause
+    # against a different supply in the warehouse is a new hold-back, whose
+    # entry - and wording - names the supply it was re-checked against.
     return (action == decision_log.PROMOTION_WITHHELD and by == cause.by
-            and sorted((detail or {}).get("checks") or []) == sorted(cause.checks))
+            and sorted((detail or {}).get("checks") or []) == sorted(cause.checks)
+            and ((detail or {}).get("against") or {}) == (cause.against or {}))
 
 
 def held_back_words(conn, m: Member, cause: Cause) -> str:
@@ -1243,6 +1255,13 @@ def after_arrival(collection_id: str, arrival, *, effective_at: str, run_by: str
         with supply_db.connect(label="mothman:gate") as conn:
             package = package_of(conn, item["dataset_id"], item["supply"])
             if package is None:
+                # FILED, BUT NO RECEIPT RECORDED: its package cannot be read,
+                # so it cannot be gated - said, never skipped in silence
+                # (post-build-review #274).
+                out.failed[item["dataset_id"]] = (
+                    f"{item['supply']} is filed to {item['period']} but no receipt is "
+                    f"recorded for it, so its delivery's package cannot be read and it "
+                    f"is not gated")
                 continue
             if not package.complete:
                 owe_gate(conn, package, dataset_id=item["dataset_id"])
@@ -1277,7 +1296,7 @@ def run_owed(item) -> "Applied":
     """An owed 'gate' item (REQ-PIPE-266 criterion 3): its package, gated
     once every file of it is checked - from recorded results, never by
     re-running tools. Still waiting leaves it owed."""
-    from qa_tools.common import asset_time, decision_log, hierarchy, recheck
+    from qa_tools.common import decision_log, hierarchy, recheck
 
     with supply_db.connect(label="mothman:gate") as conn:
         collection_id = hierarchy.dataset(item.dataset_id).collection_id
@@ -1291,13 +1310,56 @@ def run_owed(item) -> "Applied":
         members = [x for x in (_member_item(conn, ds, sup) for ds, sup in package.supplies)
                    if x is not None]
         effective = decision_log.follows(conn, item.caused_by_decision) \
-            if item.caused_by_decision else asset_time.isoformat(asset_time.now())
+            if item.caused_by_decision else _completing_instant(conn, package)
     applied = apply(collection_id, package.period, entry=PACKAGE, checked=members,
                     effective_at=effective, delivery=package.delivery,
                     package_instant=package.received, retries=item.caused_by_application)
     if not applied.contended and not applied.failed:
         recheck.clear(item.id, f"gate/{applied.application}")
     return applied
+
+
+def _completing_instant(conn, package: Package) -> str:
+    """WHEN A RETRIED OR RESUMED PACKAGE GATE TAKES EFFECT - one caused by a
+    load or by the application it retries (post-build-review #274 D1): when
+    its first attempt did, the effective instant of the arrival whose run
+    completed the package (orchestrate.effective_at_of, the rule that
+    attempt used), so a replay stamps the same instant however many attempts
+    it took. It used to be the wall clock, which put a replayed history's
+    promotion today. The replay clock where no arrival can be named.
+
+    NEVER BEFORE A DECISION ALREADY IN EFFECT IN ITS PERIOD: a retried
+    knock-on's readers are gated against the promotion that caused it, so
+    they take effect after it (decision_log.follows), not at their own
+    arrival's earlier instant."""
+    from qa_tools.common import arrivals, asset_time, decision_log, replay_clock
+    from qa_tools.tools import orchestrate
+
+    rows = conn.execute(
+        f"SELECT id FROM {decision_log.TABLE} WHERE collection_id = ? "
+        "AND (to_slot = ? OR from_slot = ?) ORDER BY effective_at DESC, id DESC LIMIT 1",
+        [package.collection_id, package.period, package.period]).fetchall()
+    floor = decision_log.follows(conn, rows[0][0]) if rows else None
+
+    def at_least_floor(text: str) -> str:
+        if floor is None:
+            return text
+        return max(text, floor, key=lambda t: asset_time.parse_instant(t, "gate retry"))
+
+    keys = [r[0] for r in conn.execute(
+        f'SELECT run_key FROM "{qa_store.SCHEMA}".run WHERE completed_at IS NOT NULL '
+        "AND scope = 'arrival' AND (dataset_id, supply_id) IN "
+        "(SELECT * FROM unnest(?::text[], ?::text[])) "
+        "ORDER BY run_seq NULLS FIRST, completed_at",
+        [[ds for ds, _s in package.supplies], [s for _ds, s in package.supplies]]
+    ).fetchall()]
+    if keys:
+        found = {a.run_id: a for a in arrivals.arrivals_from_records(
+            package.collection_id, conn=conn)}
+        if keys[-1] in found:
+            return at_least_floor(orchestrate.effective_at_of(package.collection_id,
+                                                              found[keys[-1]]))
+    return replay_clock.now().isoformat()
 
 
 def _member_item(conn, dataset_id: str, supply: str) -> dict | None:

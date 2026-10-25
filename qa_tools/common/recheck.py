@@ -365,7 +365,8 @@ def _run_claimed(owed_id: int, *, run_by: str | None = None, on_step=None) -> Ou
     # settings in force now - AS A GATE APPLICATION (REQ-PIPE-267 criterion 2):
     # this owed-item runner is a gate entry, so a re-filed partner waiting in
     # the period is gated with it. Contended, the re-check stays owed and its
-    # results stand; the next pass gates it without running a tool again.
+    # results stand - but the next pass runs it WHOLE again, tools and all
+    # (execute() above), since a 'recheck' item has no gate-only retry.
     from qa_tools.common import filing, gate
 
     del arrival, results, entry_ds

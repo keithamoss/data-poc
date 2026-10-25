@@ -90,6 +90,38 @@ def test_a_supply_whose_root_was_turned_down_is_its_own_root(sc):
     assert "(cp-notifications)" not in after.bodies.get(f"cp-clients/{Q4}", "")
 
 
+def test_a_root_promoted_after_its_rejection_is_the_root_again(sc):
+    """A rejection a later promotion reversed has not turned the root down
+    (refiling._since_unrejected, the one reading of an un-reject - post-build-
+    review #274): the held-back supply's root is Clients v2 again."""
+    from qa_tools.common import root_cause, supply_db
+
+    first_time(sc)
+    sc.rules.append(own_red("C2"))
+    v2 = sc.deliver("2024-11-03T10:00:00+08:00", {"cp_clients": "C2", "cp_notifications": "N2"})
+    sc.process()
+    _reject(sc, v2["C2"], Q4)
+    with supply_db.connect(read_only=True, label="pytest") as conn:
+        assert root_cause.root_of(conn, "cp-notifications", v2["N2"], Q4) is None
+    from qa_tools.common import decision_log, promotion, supply_files
+
+    with supply_db.connect(label="pytest-unreject") as conn:
+        # A PERSON'S PROMOTION FROM THE REJECTED SCHEMA is how a rejection is
+        # reversed (filing_decisions._promotable).
+        promotion.promote(
+            conn, agency_id="child-protection-family-support", collection_id=CP,
+            dataset_id="cp-clients", supply=v2["C2"], period=Q4,
+            physical_tables=supply_files.tables_in(conn, "cp-clients", v2["C2"],
+                                                   supply_db.REJECTED_SCHEMA),
+            from_schema=supply_db.REJECTED_SCHEMA, actor="fixture@example.org",
+            actor_kind=decision_log.PERSON, effective_at="2024-11-21T10:00:00+08:00",
+            reason="test: un-rejected", supply_is_red=True)
+    assert sc.holder("cp-clients", Q4) == v2["C2"], "precondition: un-rejected"
+    with supply_db.connect(read_only=True, label="pytest") as conn:
+        root = root_cause.root_of(conn, "cp-notifications", v2["N2"], Q4)
+    assert root is not None and root.supply == v2["C2"]
+
+
 def test_staggered_order_b_red_raises_two_tickets(sc):
     """Clients v2's 9:00 hold-back is a real failure against Notifications v1
     naming no other supply; Notifications v2 at 9:05 is red on its own data.
@@ -163,25 +195,82 @@ def test_not_yet_due_root_raises_no_ticket_until_overdue(sc):
 def test_owed_recheck_raises_nothing(sc, monkeypatch):
     """A supply whose only red is an owed re-check - the knock-on of a
     person's promotion made to fail - gets no ticket and no still-failing
-    record."""
-    from qa_tools.common import knock_on
+    record. ON AN UNFILLED PERIOD, where a waiting supply's slot does raise a
+    ticket (post-build-review #274: written over an all-promoted period this
+    test could not fail, since no slot there needs a person). Notifications v2
+    waits, red for want of a Client Register; Clients v2 arrives red and a
+    person promotes it, and the knock-on that would re-gate Notifications v2
+    is made to fail - so its red is one the owed re-evaluation clears."""
+    from qa_tools.common import knock_on, recheck
 
-    established(sc)
-    v2 = sc.deliver("2024-08-05T10:00:00+08:00", {"cp_notifications": "N2"})
-    sc.rules.append(own_red("N2"))
+    first_time(sc)
+    n = sc.deliver("2024-11-03T10:00:00+08:00", {"cp_notifications": "N2"})
     sc.process()
+    assert _tickets(now="2024-11-03T12:00:00+08:00").tickets.get(f"cp-clients/{Q4}"), \
+        "precondition: a Client Register is owed and overdue, so this period is ticketed"
+    c = sc.deliver("2024-11-04T10:00:00+08:00", {"cp_clients": "C2"})
+    sc.rules.append(own_red("C2"))
+    sc.process()
+    before = len(_still_failing(sc))
 
     def broken(item, **kw):
-        from qa_tools.common import recheck
-
         recheck.fail(item.id, "made to fail (test)")
         return recheck.Outcome(item.id, "", False, "made to fail (test)")
     monkeypatch.setattr(knock_on, "complete", broken)
-    sc.promote_by_hand(v2["N2"], Q3, at="2024-09-20T10:00:00+08:00", follow_up=True)
-    assert sc.owed("reevaluate"), "precondition: the re-check is owed"
-    service = _tickets()
-    assert not [k for k in service.tickets if k.endswith(Q3)]
-    assert _still_failing(sc) == []
+    sc.promote_by_hand(c["C2"], Q4, at="2024-11-10T10:00:00+08:00", follow_up=True)
+    assert [o.period for o in sc.owed("reevaluate")] == [Q4], "precondition: owed"
+    assert sc.holder("cp-notifications", Q4) is None, "precondition: N2 still waits"
+    assert sc.actions(n["N2"])[-1] == "promotion-refused"
+    service = _tickets(now="2024-11-20T10:00:00+08:00")
+    assert f"cp-notifications/{Q4}" not in service.tickets
+    assert len(_still_failing(sc)) == before
+
+
+def test_an_owed_recheck_does_not_quiet_a_failure_of_its_own(sc, monkeypatch):
+    """NO FALSE QUIET (NFR 3): the same owed re-evaluation, but Notifications
+    v2 is ALSO red on its own data - its ticket is raised as today."""
+    from qa_tools.common import knock_on, recheck
+
+    first_time(sc)
+    sc.rules.append(own_red("N2"))
+    sc.deliver("2024-11-03T10:00:00+08:00", {"cp_notifications": "N2"})
+    sc.process()
+    c = sc.deliver("2024-11-04T10:00:00+08:00", {"cp_clients": "C2"})
+    sc.rules.append(own_red("C2"))
+    sc.process()
+
+    def broken(item, **kw):
+        recheck.fail(item.id, "made to fail (test)")
+        return recheck.Outcome(item.id, "", False, "made to fail (test)")
+    monkeypatch.setattr(knock_on, "complete", broken)
+    sc.promote_by_hand(c["C2"], Q4, at="2024-11-10T10:00:00+08:00", follow_up=True)
+    assert sc.owed("reevaluate"), "precondition: owed"
+    assert f"cp-notifications/{Q4}" in _tickets(now="2024-11-20T10:00:00+08:00").tickets
+
+
+def test_a_root_whose_slot_raises_nothing_leaves_what_it_holds_back_ticketed(sc):
+    """NO FALSE QUIET (NFR 3; post-build-review #274 D4): Notifications v2 is
+    held back by a red Clients v2 resupply whose own slot reads PROMOTED - it
+    raises no ticket - so folding Notifications v2 into it told nobody. Only a
+    root not yet due (criterion 3) holds a supply back with no ticket."""
+    from qa_tools.common import root_cause, supply_db
+
+    first_time(sc)
+    c1 = sc.deliver("2024-10-26T10:00:00+08:00", {"cp_clients": "C1"})["C1"]
+    sc.process()
+    sc.promote_by_hand(c1, Q4, at="2024-10-27T10:00:00+08:00")
+    sc.rules += [own_red("C2"), cross_red("cp-notifications", "cp_clients",
+                                          when={"cp_clients": "C1",
+                                                "cp_notifications": "N2"})]
+    v2 = sc.deliver("2024-11-03T10:00:00+08:00", {"cp_clients": "C2", "cp_notifications": "N2"})
+    sc.process()
+    assert sc.holder("cp-clients", Q4) == c1
+    with supply_db.connect(read_only=True, label="pytest") as conn:
+        root = root_cause.root_of(conn, "cp-notifications", v2["N2"], Q4)
+    assert root is not None and root.supply == v2["C2"], "precondition: C2 is its root"
+    service = _tickets(now="2024-11-04T10:00:00+08:00")
+    assert f"cp-clients/{Q4}" not in service.tickets, "precondition: the root raises nothing"
+    assert f"cp-notifications/{Q4}" in service.tickets
 
 
 def test_a_failure_of_its_own_is_ticketed_naming_what_else_holds_it_back(sc):

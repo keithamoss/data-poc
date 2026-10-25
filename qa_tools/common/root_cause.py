@@ -74,12 +74,16 @@ def _latest_gate_entry(conn, dataset_id: str, supply: str) -> dict | None:
 
 
 def _turned_down(conn, dataset_id: str, supply: str) -> bool:
-    from qa_tools.common import supersession
+    """Rejected and not promoted since (refiling._since_unrejected, the one
+    reading of an un-reject - post-build-review #274), or superseded."""
+    from qa_tools.common import refiling, supersession
 
     rows = conn.execute(
         f"SELECT 1 FROM {decision_log.TABLE} WHERE dataset_id = ? AND supply = ? "
         "AND action = ? LIMIT 1", [dataset_id, supply, decision_log.REJECT]).fetchall()
-    return bool(rows) or supersession.is_superseded(conn, dataset_id, supply)
+    if rows and not refiling._since_unrejected(conn, dataset_id, supply):
+        return True
+    return supersession.is_superseded(conn, dataset_id, supply)
 
 
 def _absent_table_root(conn, dataset_id: str, supply: str, period: str) -> Root | None:
@@ -121,25 +125,91 @@ def held_back_by_roots(conn, states) -> tuple[dict[str, list], set[str]]:
     """For every waiting slot whose supply is red by another table's doing:
     ({root slot key: [the states it holds back]}, {keys of those states}).
     A root that is not yet due holds them back with no ticket at all
-    (criterion 3) - they are in the second set and in no root's list."""
+    (criterion 3) - they are in the second set and in no root's list. So does
+    a red that only an owed re-check stands behind (criterion 5).
+
+    FOLDED ONLY INTO A ROOT THAT IS TICKETED, OR NOT YET DUE (NFR 3, NO FALSE
+    QUIET; post-build-review #274 D4): a root whose slot raises nothing for
+    another reason - a resupply beside a promoted supply, a period marked not
+    supplied - would carry the held-back supply's 'Also held back by this'
+    line into no ticket at all, and nobody would be told. Such a supply is
+    ticketed on its own."""
     from qa_tools.common import slot_state
 
+    by_key = {s.key: s for s in states}
     holding: dict[str, list] = {}
     folded: set[str] = set()
     for s in states:
         if not s.supply or s.state not in (slot_state.AWAITING_DECISION,
                                            slot_state.AMBER_WAITING):
             continue
+        if red_only_owed(conn, s.dataset_id, s.supply, s.period):
+            # CRITERION 5: an owed re-check or re-evaluation clears this red by
+            # itself, so it raises nothing - and nothing names it.
+            folded.add(s.key)
+            continue
         root = root_of(conn, s.dataset_id, s.supply, s.period)
         if root is None or (root.kind == "supply" and root.supply == s.supply):
             continue
+        at_root = by_key.get(root.key)
+        if at_root is not None and not at_root.needs_action \
+                and at_root.state != slot_state.NOT_YET_DUE:
+            continue  # its root raises nothing: ticketed on its own
         folded.add(s.key)
         # A ROOT NOT YET DUE raises nothing (criterion 3): its slot is not one
         # that needs a person, so the reconciler opens no ticket for it, and
         # these are folded into nothing until it is overdue - when its own
-        # ticket names them.
+        # ticket names them. A root slot not among `states` is one nobody owes
+        # yet, the same case.
         holding.setdefault(root.key, []).append(s)
     return holding, folded
+
+
+def red_only_owed(conn, dataset_id: str, supply: str, period: str) -> bool:
+    """REQ-PIPE-278 criterion 5: whether this waiting supply's red is only an
+    owed re-check - an uncleared item that will run again what fails it, or
+    re-gate it where nothing counted fails it now - and none of its own.
+
+    COVERED: an owed 'recheck' of the supply covers every check; an owed
+    'reevaluate' of its period covers the cross-table checks reading one of
+    the tables it is owed for; an owed 'gate' of its package re-gates it but
+    runs nothing, so it covers only a supply nothing counted fails now. A
+    failing check of its own, or one no owed item will run again, is a red
+    that will not clear by itself (NFR 3, NO FALSE QUIET)."""
+    from qa_tools.common import carried, gate, promotion, recheck, reevaluation, supply_status
+
+    reads = promotion._declared_reads()
+    owed = recheck.owed(conn)
+    full = any(o.kind == recheck.RECHECK and o.dataset_id == dataset_id
+               and o.supply_id == supply for o in owed)
+    tables: set[str] = set()
+    for o in owed:
+        if o.kind == recheck.REEVALUATE and o.period == period:
+            for t in o.tables or ():
+                if any(dataset_id in reevaluation.counts_toward(c, table=t, reads=reads)
+                       for c in reevaluation.reading_checks(table=t, period=period,
+                                                           reads=reads)):
+                    tables.add(t)
+    package = gate.package_of(conn, dataset_id, supply)
+    regated = package is not None and gate.owed_gate(conn, package) is not None
+    if not (full or tables or regated):
+        return False
+    try:
+        latest = supply_status.latest_results(conn, dataset_id, supply)
+    except Exception:  # noqa: BLE001 - nothing readable is not a red that clears
+        return False
+    failing = [r for r in promotion._contributing_records(dataset_id, latest, reads)
+               if (r.get("status") or "") in ("fail", "error")]
+    for r in failing:
+        if full:
+            continue
+        wanted = set(r.get("reads") or ()) | set(r.get("unrunnable_tables") or ()) \
+            | set(r.get("held_tables") or ())
+        if not r.get("reads") and not carried.not_evaluated_reason(r):
+            return False  # a failure of its own
+        if not (wanted & tables):
+            return False
+    return True
 
 
 def also_lines(held: list) -> list[str]:
