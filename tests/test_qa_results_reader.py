@@ -21,6 +21,9 @@ from qa_tools.common.qa_results_reader import list_run_ids, read_one, read_qa_re
 from qa_tools.common.qa_results_writer import (
     finish_run, open_run, write_qa_result)
 
+#: Results about invented check ids (REQ-QAC-176 criterion 14 refuses them otherwise).
+pytestmark = pytest.mark.usefixtures("invented_check_ids")
+
 
 @pytest.fixture(autouse=True)
 def clean_history(supply_dsn):

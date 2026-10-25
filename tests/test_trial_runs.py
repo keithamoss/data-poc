@@ -338,7 +338,7 @@ class TestARealTrialStagesAndVanishes:
                 [run_id]).fetchall()
             assert run_id not in qa_store.incomplete_runs(conn)
 
-    def test_a_completed_trials_own_results_go_with_it(self, supply_dsn):
+    def test_a_completed_trials_own_results_go_with_it(self, supply_dsn, invented_check_ids):
         """REQ-PIPE-103 criterion 6 - Keith, 2026-10-06 (post-build-review
         #120 Q6): discard KEPT a trial's own recorded checks on purpose, so a
         completed trial run and its results outlived it, visible to anything

@@ -23,6 +23,7 @@ from qa_tools.common import carry_forward, filing_decisions as fd, inheritance, 
 from qa_tools.common import decision_log as dl
 from qa_tools.common import people, qa_store, recheck, supply_status
 from test_results_about import _read, _result, _run
+from attempt_support import ANY_CHECK
 
 REAL_PERSON = "fpycnkgvmt@privaterelay.appleid.com"
 
@@ -129,7 +130,7 @@ class TestCarryForward:
             qa_store.record_results(
                 conn, run_key, [_result(ASSIGNED_WORKER, "cp-notifications", "pass")],
                 tool="dbt", **KEYS, scope=qa_store.CROSS_TABLE_SCOPE,
-                reads=[(_read("cp_case_workers", q3), _read("cp_notifications", n))])
+                reads=[(_read("cp_case_workers", q3), _read("cp_notifications", n))], fingerprints=ANY_CHECK)
             attempt_support.opened(conn, run_key)
             qa_store.complete_run(conn, run_key)
         monkeypatch.setattr(recheck, "execute", execute)

@@ -932,6 +932,18 @@ def run_schema(run_id: str) -> str:
 #: qa_tools/common/trial.py possible without a record to consult.
 TRIAL_SCHEMA_PREFIX = "trial_"
 
+#: A RE-CHECK TRIAL's run (REQ-PIPE-178 criterion 3): a trial in that it owns
+#: its own schemas and leaves nothing behind - so every `trial_` rule here
+#: applies - but it reads REAL supplies where they lie rather than staging
+#: files of its own, so trial.is_trial(), which means "a file nobody kept",
+#: is false for it.
+RECHECK_TRIAL_PREFIX = "trial_rc_"
+
+
+def is_recheck_trial(run_id: str) -> bool:
+    """Is this a re-check trial's run (REQ-PIPE-178)?"""
+    return run_id.startswith(RECHECK_TRIAL_PREFIX)
+
 
 def is_trial_run(run_id: str) -> bool:
     """Is this the id of a check nobody chose to keep?

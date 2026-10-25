@@ -912,7 +912,8 @@ class TestTheSharedOrchestratorStatsAndRebuild:
         assert stats["value_counts"] == {} and stats["check_aggregates"] == {}
 
     def test_the_rebuild_writes_a_third_collections_results_file(
-            self, third_collection, clean_qa_history, tmp_path, monkeypatch):
+            self, third_collection, clean_qa_history, tmp_path, monkeypatch,
+            invented_check_ids):
         import rebuild_support
 
         rebuild_support.record_run(FAKE_ID, f"{FAKE_PREFIX}001", 1, {

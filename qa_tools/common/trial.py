@@ -77,8 +77,14 @@ def trial_run_id(reference: bool = False) -> str:
 
 def is_trial(run_id: str) -> bool:
     """Is this the id of a run nobody kept? Reads the id rather than
-    asking a caller to remember - see supply_db.is_trial_run()."""
-    return supply_db.is_trial_run(run_id)
+    asking a caller to remember - see supply_db.is_trial_run().
+
+    A RE-CHECK TRIAL (REQ-PIPE-178) IS NOT ONE OF THESE: it stages no file
+    and reads real supplies where they lie, through the real re-check's
+    own steps, so it follows every branch a real re-check does. It is a
+    trial only in owning its schemas and leaving nothing behind -
+    supply_db.is_trial_run(), which schemas_of() and discard() ask."""
+    return supply_db.is_trial_run(run_id) and not supply_db.is_recheck_trial(run_id)
 
 
 class NotATrial(ValueError):
@@ -140,7 +146,7 @@ def schemas_of(conn, run_id: str) -> list[str]:
     tidy". A trial that failed before staging owns nothing and gets an
     empty list.
     """
-    if not is_trial(run_id):
+    if not supply_db.is_trial_run(run_id):
         return []
     mine = {
         supply_db.staging_schema_for(run_id),
@@ -201,7 +207,7 @@ def discard(conn, run_id: str) -> list[str]:
     because a trial never writes into shared staging, so there is
     nothing of anyone else's inside the schemas it drops.
     """
-    if not is_trial(run_id):
+    if not supply_db.is_trial_run(run_id):
         raise supply_db.SupplyDbError(
             f"{run_id!r} is not a trial - refusing to discard a run that "
             "was kept")

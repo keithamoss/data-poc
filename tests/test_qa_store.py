@@ -34,6 +34,7 @@ import pytest
 
 import attempt_support
 from qa_tools.common import qa_store, supply_db
+from attempt_support import ANY_CHECK
 
 
 @pytest.fixture
@@ -87,14 +88,14 @@ class TestARunIsNotObservableUntilItIsComplete:
 
     def test_results_of_an_unfinished_run_are_not_returned(self, db):
         run_key = _run(db)
-        qa_store.record_results(db, run_key, [_result("not_null_id")], tool="dbt", **_KEYS)
+        qa_store.record_results(db, run_key, [_result("not_null_id")], tool="dbt", **_KEYS, fingerprints=ANY_CHECK)
 
         assert qa_store.results_for_run(db, run_key) == [], \
             "a run nobody marked complete handed out its results anyway"
 
     def test_completing_the_run_makes_them_observable(self, db):
         run_key = _run(db)
-        qa_store.record_results(db, run_key, [_result("not_null_id")], tool="dbt", **_KEYS)
+        qa_store.record_results(db, run_key, [_result("not_null_id")], tool="dbt", **_KEYS, fingerprints=ANY_CHECK)
         attempt_support.opened(db, run_key)
         qa_store.complete_run(db, run_key)
 
@@ -104,7 +105,7 @@ class TestARunIsNotObservableUntilItIsComplete:
         """Re-running a run is a real thing this pipeline does. The
         completeness marker has to survive it rather than latch."""
         run_key = _run(db)
-        qa_store.record_results(db, run_key, [_result("not_null_id")], tool="dbt", **_KEYS)
+        qa_store.record_results(db, run_key, [_result("not_null_id")], tool="dbt", **_KEYS, fingerprints=ANY_CHECK)
         attempt_support.opened(db, run_key)
         qa_store.complete_run(db, run_key)
         qa_store.reopen_run(db, run_key)
@@ -115,7 +116,7 @@ class TestARunIsNotObservableUntilItIsComplete:
         """Invisible to a reader of results is not invisible full stop -
         an operator has to be able to see the wreckage of a crashed run."""
         run_key = _run(db)
-        qa_store.record_results(db, run_key, [_result("not_null_id")], tool="dbt", **_KEYS)
+        qa_store.record_results(db, run_key, [_result("not_null_id")], tool="dbt", **_KEYS, fingerprints=ANY_CHECK)
 
         assert run_key in qa_store.incomplete_runs(db)
         attempt_support.opened(db, run_key)
@@ -129,9 +130,9 @@ class TestTwoToolsInOneRunDoNotDeleteEachOther:
 
     def test_soda_writing_after_dbt_leaves_dbts_verdicts_alone(self, db):
         run_key = _run(db)
-        qa_store.record_results(db, run_key, [_result("dbt_not_null")], tool="dbt", **_KEYS)
+        qa_store.record_results(db, run_key, [_result("dbt_not_null")], tool="dbt", **_KEYS, fingerprints=ANY_CHECK)
         qa_store.record_results(db, run_key, [_result("soda_row_count", tool="soda", **_KEYS)],
-                                tool="soda", **_KEYS)
+                                tool="soda", **_KEYS, fingerprints=ANY_CHECK)
         attempt_support.opened(db, run_key)
         qa_store.complete_run(db, run_key)
 
@@ -142,9 +143,9 @@ class TestTwoToolsInOneRunDoNotDeleteEachOther:
     def test_re_running_one_tool_replaces_only_its_own_results(self, db):
         """Idempotence per tool, which is what the overwritten file gave."""
         run_key = _run(db)
-        qa_store.record_results(db, run_key, [_result("a"), _result("b")], tool="dbt", **_KEYS)
-        qa_store.record_results(db, run_key, [_result("soda_x", tool="soda", **_KEYS)], tool="soda", **_KEYS)
-        qa_store.record_results(db, run_key, [_result("a")], tool="dbt", **_KEYS)
+        qa_store.record_results(db, run_key, [_result("a"), _result("b")], tool="dbt", **_KEYS, fingerprints=ANY_CHECK)
+        qa_store.record_results(db, run_key, [_result("soda_x", tool="soda", **_KEYS)], tool="soda", **_KEYS, fingerprints=ANY_CHECK)
+        qa_store.record_results(db, run_key, [_result("a")], tool="dbt", **_KEYS, fingerprints=ANY_CHECK)
         attempt_support.opened(db, run_key)
         qa_store.complete_run(db, run_key)
 
@@ -158,11 +159,11 @@ class TestRecordsThatSpanDatasetsStayDistinguishable:
 
     def test_a_cross_table_result_is_not_returned_as_a_datasets_own(self, db):
         run_key = _run(db)
-        qa_store.record_results(db, run_key, [_result("own_check")], tool="dbt", **_KEYS)
+        qa_store.record_results(db, run_key, [_result("own_check")], tool="dbt", **_KEYS, fingerprints=ANY_CHECK)
         qa_store.record_results(
             db, run_key, [_result("spanning_check", dataset_id=None)],
             tool="dbt", **_KEYS, scope=qa_store.CROSS_TABLE_SCOPE,
-            reads=[(qa_store.CheckRead("births", qa_store.READ, "births@1"),)])
+            reads=[(qa_store.CheckRead("births", qa_store.READ, "births@1"),)], fingerprints=ANY_CHECK)
         attempt_support.opened(db, run_key)
         qa_store.complete_run(db, run_key)
 
@@ -179,7 +180,7 @@ class TestADatasetStillInDevelopmentIsMarked:
 
     def test_results_default_to_an_agreed_supply(self, db):
         run_key = _run(db)
-        qa_store.record_results(db, run_key, [_result("a")], tool="dbt", **_KEYS)
+        qa_store.record_results(db, run_key, [_result("a")], tool="dbt", **_KEYS, fingerprints=ANY_CHECK)
         attempt_support.opened(db, run_key)
         qa_store.complete_run(db, run_key)
 
@@ -187,9 +188,9 @@ class TestADatasetStillInDevelopmentIsMarked:
 
     def test_development_results_are_left_out_of_the_real_history(self, db):
         run_key = _run(db)
-        qa_store.record_results(db, run_key, [_result("real_one")], tool="dbt", **_KEYS)
+        qa_store.record_results(db, run_key, [_result("real_one")], tool="dbt", **_KEYS, fingerprints=ANY_CHECK)
         qa_store.record_results(db, run_key, [_result("draft_one")], tool="dbt", **_KEYS,
-                                supply_state=qa_store.IN_DEVELOPMENT)
+                                supply_state=qa_store.IN_DEVELOPMENT, fingerprints=ANY_CHECK)
         attempt_support.opened(db, run_key)
         qa_store.complete_run(db, run_key)
 
@@ -200,7 +201,7 @@ class TestADatasetStillInDevelopmentIsMarked:
         check is real work and the person doing it has to see it."""
         run_key = _run(db)
         qa_store.record_results(db, run_key, [_result("draft_one")], tool="dbt", **_KEYS,
-                                supply_state=qa_store.IN_DEVELOPMENT)
+                                supply_state=qa_store.IN_DEVELOPMENT, fingerprints=ANY_CHECK)
         attempt_support.opened(db, run_key)
         qa_store.complete_run(db, run_key)
 
@@ -242,7 +243,7 @@ class TestEachToolsOwnOutputIsKeptWholeAndApart:
         """Structural rather than measured: the verdict query names one
         table, and the payload is not in it."""
         run_key = _run(db)
-        qa_store.record_results(db, run_key, [_result("a")], tool="dbt", **_KEYS)
+        qa_store.record_results(db, run_key, [_result("a")], tool="dbt", **_KEYS, fingerprints=ANY_CHECK)
         qa_store.record_tool_output(db, run_key, "dbt", {"big": "x" * 10_000})
         attempt_support.opened(db, run_key)
         qa_store.complete_run(db, run_key)
@@ -265,7 +266,7 @@ class TestAFinishedRunSaysWhoRanIt:
         qa_store.record_run(db, run_key="anon", agency_id="bdm",
                             collection_id="birth-registrations",
                             run_timestamp="2026-09-27T10:00:00+08:00")
-        qa_store.record_results(db, "anon", [_result("a")], tool="dbt", **_KEYS)
+        qa_store.record_results(db, "anon", [_result("a")], tool="dbt", **_KEYS, fingerprints=ANY_CHECK)
 
         with pytest.raises(qa_store.UnattributedRun):
             attempt_support.opened(db, "anon")
@@ -276,7 +277,7 @@ class TestAFinishedRunSaysWhoRanIt:
         qa_store.record_run(db, run_key="anon", agency_id="bdm",
                             collection_id="birth-registrations",
                             run_timestamp="2026-09-27T10:00:00+08:00")
-        qa_store.record_results(db, "anon", [_result("a")], tool="dbt", **_KEYS)
+        qa_store.record_results(db, "anon", [_result("a")], tool="dbt", **_KEYS, fingerprints=ANY_CHECK)
         with pytest.raises(qa_store.UnattributedRun):
             attempt_support.opened(db, "anon")
             qa_store.complete_run(db, "anon")

@@ -122,7 +122,9 @@ def discard_run_schemas(run_id: str) -> None:
         shutil.rmtree(supply_db.dbt_target_path(run_id), ignore_errors=True)
         conn = supply_db.connect(label="mothman:discard-run-schemas")
         try:
-            if trial.is_trial(run_id):
+            # A RE-CHECK TRIAL TOO (REQ-PIPE-178 NFR 4): every trial owns its
+            # schemas, and its run and results go with them.
+            if supply_db.is_trial_run(run_id):
                 trial.discard(conn, run_id)
             else:
                 supply_db.drop_run_schemas(conn, run_id)

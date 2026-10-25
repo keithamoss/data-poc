@@ -30,6 +30,7 @@ import rebuild_support
 from qa_tools.common import qa_results_reader as reader
 from qa_tools.common import tables_read as tr
 from qa_tools.common.qa_results_writer import write_qa_result
+from attempt_support import ANY_CHECK
 
 # NEEDS A BOOTSTRAPPED DEPLOYMENT (plans/tooling.md #27). This module
 # reads `reports/*.json`, which is built from the deployment's recorded
@@ -37,6 +38,8 @@ from qa_tools.common.qa_results_writer import write_qa_result
 # in a signature says so, which is why the mark is here rather than
 # derived; tests/test_publish.py asserts it is not forgotten.
 pytestmark = pytest.mark.needs_deployment
+# Results about invented check ids (REQ-QAC-176 criterion 14 refuses them otherwise).
+pytestmark = [pytestmark, pytest.mark.usefixtures("invented_check_ids")]
 
 
 #: A real instant rather than the bare "t" these fixtures used to pass.
@@ -423,7 +426,7 @@ def test_a_dataset_with_only_file_checks_is_not_missing_its_data_tools(
           "check_id": "data-asset-1.child-protection-family-support.child-protection."
                       "cp-placements.fields_per_row_file"}],
         agency_id=AGENCY, collection_id=COLLECTION, supply_state="staged",
-        load_attempt=1, delivery="d", filename="cp_placements.csv")
+        load_attempt=1, delivery="d", filename="cp_placements.csv", fingerprints=ANY_CHECK)
     finish_runs("r1", agency=AGENCY, collection=COLLECTION, when=_WHEN, run_by="a@b.c")
     missing = reader.missing_tools(AGENCY, COLLECTION, "r1")
     assert not [m for m in missing if m.startswith("cp-placements/")], missing

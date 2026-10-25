@@ -220,8 +220,13 @@ def run_owner(run_id: str) -> tuple[str, str] | None:
     the id rather than taking an argument is what lets all eight tool
     callers stay as they are.
     """
-    from qa_tools.common import hierarchy, supply_db
+    from qa_tools.common import bulk_recheck, hierarchy, supply_db
 
+    # A RE-CHECK TRIAL'S (REQ-PIPE-178): its id names no table, and its owner
+    # is the supply the trial is re-checking, held where it runs.
+    tried = bulk_recheck.trial_owner(run_id)
+    if tried is not None:
+        return tried
     parts = supply_db.split_staged(run_id)
     if parts is None:
         return None
@@ -696,7 +701,8 @@ def _record_in_database(agency: str, collection: str, run_id: str, run_timestamp
         # that graduates between two runs records nothing in-development on
         # the second, and the first run's in-development verdicts have to be
         # cleared rather than left standing beside the real ones.
-        keys = {"tool": tool, "agency_id": agency, "collection_id": collection}
+        keys = {"tool": tool, "agency_id": agency, "collection_id": collection,
+                "fingerprints": fingerprints_for(run_id)}
         for state, group in own_by_state.items():
             qa_store.record_results(conn, run_id, group, **keys, supply_state=state)
         for state, group in spanning_by_state.items():
@@ -704,6 +710,20 @@ def _record_in_database(agency: str, collection: str, run_id: str, run_timestamp
                                     scope=qa_store.CROSS_TABLE_SCOPE,
                                     supply_state=state,
                                     reads=(reads_by_state or {}).get(state))
+
+
+def fingerprints_for(run_id: str) -> dict[str, str]:
+    """The fingerprints map a write about `run_id` is stamped from
+    (REQ-QAC-176 criterion 24): the one this process's open attempt at it
+    took when it opened, or - for every other write, a file check's results
+    at staging or a bare `mothman debug run-*` included - the map current at
+    this write."""
+    attempt = _open_attempts.get(run_id)
+    if attempt is not None:
+        return attempt.fingerprints
+    from qa_tools.common import tables_read
+
+    return tables_read.definition_fingerprints()
 
 
 def open_run(agency: str, collection: str, run_id: str, run_timestamp: str,
@@ -732,8 +752,15 @@ def open_run(agency: str, collection: str, run_id: str, run_timestamp: str,
     provisional #23) - never read off the run id. A run given none and no
     purpose is a trial's or a fixture's, about no dataset.
     """
-    from qa_tools.common import environments, qa_store, supply_db
+    from qa_tools.common import environments, qa_store, supply_db, tables_read
 
+    # ONE SET OF DEFINITIONS FOR THE WHOLE ATTEMPT (REQ-QAC-176 criterion 24):
+    # the fingerprints map is taken here, once, and every result the attempt
+    # records is stamped from it - so an edit to a check file mid-attempt can
+    # only make the attempt look checked under an OLDER definition, the safe
+    # direction (Keith, 2026-10-24). Taken before the lock, so a check file
+    # that will not parse refuses the run before any attempt is opened.
+    fingerprints = tables_read.definition_fingerprints()
     lock = supply_db.connect(reuse=False, label="mothman:qa-run-attempt")
     try:
         qa_store.ensure_schema(lock)
@@ -767,7 +794,7 @@ def open_run(agency: str, collection: str, run_id: str, run_timestamp: str,
     except BaseException:
         lock.close()
         raise
-    attempt = Attempt(run_id, run_seq, lock)
+    attempt = Attempt(run_id, run_seq, lock, fingerprints)
     _open_attempts[run_id] = attempt
     return attempt
 
@@ -806,8 +833,13 @@ class Attempt:
                    qa_store.ERROR_MESSAGE_LIMIT characters
     """
 
-    def __init__(self, run_key: str, run_seq: int, lock) -> None:
+    def __init__(self, run_key: str, run_seq: int, lock,
+                 fingerprints: dict[str, str] | None = None) -> None:
         self.run_key, self.run_seq, self._lock = run_key, run_seq, lock
+        #: check id -> definition fingerprint, taken when the attempt opened
+        #: (REQ-QAC-176 criterion 24) - what every result it records is
+        #: stamped with.
+        self.fingerprints = fingerprints if fingerprints is not None else {}
         self.ended = False
         self._sigterm = _stop_on_sigterm()
 

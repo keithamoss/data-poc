@@ -558,9 +558,12 @@ def run_pass(*, run_by: str | None = None, say=print, deadline: float | None = N
     # OWED WORK (criterion 11): re-evaluations and re-checks alike, each
     # cleared only when its work completes; a failure stays owed.
     try:
+        # WITHIN THE PASS'S BUDGET (REQ-PIPE-177 criterion 24): no new owed
+        # item is started once the deadline has passed - a bulk re-check of
+        # hundreds of supplies is finished by later passes, never overrun.
         for outcome in recheck.run_all_owed(kinds=(recheck.REEVALUATE, recheck.RECHECK,
                                                    recheck.GATE),
-                                            run_by=run_by):
+                                            run_by=run_by, deadline=deadline):
             report.owed.append(outcome)
             if _owed_failure(outcome):
                 report.failures.append((f"owed #{outcome.owed_id}", outcome.message))

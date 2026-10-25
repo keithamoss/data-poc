@@ -27,6 +27,9 @@ import pytest
 import attempt_support
 from qa_tools.common import qa_results_writer, qa_store, supply_db
 
+#: Results about invented check ids (REQ-QAC-176 criterion 14 refuses them otherwise).
+pytestmark = pytest.mark.usefixtures("invented_check_ids")
+
 AGENCY = "registry-services"
 COLLECTION = "civil-registration"
 RUN = "fanout_run_01"

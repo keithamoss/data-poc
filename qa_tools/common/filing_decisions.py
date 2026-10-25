@@ -103,7 +103,11 @@ OPERATIONS = (PROMOTE, REJECT, DEMOTE, REFILE, SUBSTITUTE, DE_SUBSTITUTE,
 #: 16; Keith, 2026-10-13: "given the complexity of this, the choices and the
 #: options here ... just via the terminal"). Placing too (REQ-PIPE-163
 #: criterion 14), which offers its periods as a choice.
-TERMINAL_ONLY = (CHOOSE_FILE, PLACE)
+#: A BULK RE-CHECK (REQ-PIPE-177 criterion 21): every supply a fixed check
+#: judged under an old definition, across many slots, so it has no ticket to
+#: be raised on - `mothman supply recheck --check`, never a slot's decision.
+BULK_RECHECK = "bulk-recheck"
+TERMINAL_ONLY = (CHOOSE_FILE, PLACE, BULK_RECHECK)
 
 #: The four that act on a SUPPLY - "what do I do with this thing that
 #: arrived" - and so belong in the queue of supplies awaiting a decision
@@ -650,6 +654,12 @@ def terminal_only_reply(dataset_id: str, period: str | None,
     criterion 36), in the same terms."""
     from qa_tools.common import dataset_blockers, supply_files
 
+    if operation == BULK_RECHECK:
+        return ("A bulk re-check - every supply a fixed check judged under its old "
+                "definition, across every period it touches - is made in the terminal, not "
+                "on GitHub: it spans many periods, so no one ticket can carry it. It is made "
+                "with `mothman supply recheck --check <check_id> --reason <why>`, or from "
+                "the filing-decisions door.")
     if operation == PLACE:
         return (f"Placing a held supply into a period is made in the terminal, not on "
                 f"GitHub - it offers the periods it can go into as a choice. It is made at "

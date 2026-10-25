@@ -175,7 +175,7 @@ class TestTheGateOnlyPathFeedsTheGateItsResults:
     result was dropped."""
 
     def test_the_recorded_results_reach_the_gate(self, clean_qa_history, finish_runs,
-                                                 monkeypatch):
+                                                 monkeypatch, invented_check_ids):
         from qa_tools.common.qa_results_writer import write_qa_result
 
         a = _arrival(run_id=f"cp_clients__{uuid.uuid4().int % 10**16:016d}")

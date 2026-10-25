@@ -32,6 +32,10 @@ def _clear():
     hierarchy_mod._load.cache_clear()
 
 
+#: Results about invented check ids (REQ-QAC-176 criterion 14 refuses them otherwise).
+pytestmark = pytest.mark.usefixtures("invented_check_ids")
+
+
 @pytest.fixture(autouse=True)
 def _clear_caches():
     _clear()

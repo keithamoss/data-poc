@@ -646,7 +646,11 @@ def _run_timestamp(conn, run_id: str):
 #: of a value that is `agreed` in every one. So it follows
 #: `reference_run_id`'s precedent below: present only where it says
 #: something.
-_NOT_IN_A_RECORD = ("id", "run_key", "tool", "scope")
+#: `definition_fingerprint` (REQ-QAC-176) is stamped by the writer and read
+#: where a selection needs it (REQ-PIPE-177's), never carried in a record:
+#: a live run's records are the tools' own, which never held it, and a
+#: rebuild must produce the same file.
+_NOT_IN_A_RECORD = ("id", "run_key", "tool", "scope", "definition_fingerprint")
 
 #: Present only where the tool actually set it - Evidently's reference
 #: run, which the other three have no concept of. A column because it is

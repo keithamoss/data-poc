@@ -110,7 +110,7 @@ def _place_supply_rows(conn) -> None:
 
 
 @pytest.fixture
-def publisher(supply_dsn, worker_id, clean_qa_history, monkeypatch):
+def publisher(supply_dsn, worker_id, clean_qa_history, monkeypatch, invented_check_ids):
     """This worker's database with a small history, and every connection
     from here on made as the publisher role. Yields that role's own
     connection, for the readers that take one."""

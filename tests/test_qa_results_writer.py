@@ -23,6 +23,10 @@ from __future__ import annotations
 
 from qa_tools.common import qa_results_reader as reader
 from qa_tools.common.qa_results_writer import write_qa_result
+import pytest
+
+#: Results about invented check ids (REQ-QAC-176 criterion 14 refuses them otherwise).
+pytestmark = pytest.mark.usefixtures("invented_check_ids")
 
 AGENCY = "registry-services"
 COLLECTION = "civil-registration"

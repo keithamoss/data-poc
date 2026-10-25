@@ -8744,7 +8744,7 @@ twice. It deliberately did not re-find the `TypeError`.
     cross-table check that could not be judged (identical before and after
     the fix) - running-thoughts #95's subject, not this one.
 
-179. **[todo, 2026-10-14]** **[Pipeline & publishing]** **A Lambda
+179. **[done, 2026-10-25]** **[Pipeline & publishing]** **A Lambda
      processing pass stops taking arrivals at its 10-minute budget, but
      then runs ALL owed work with no budget at all.** Found by
      delivery-scoper while re-scoping REQ-PIPE-177 (2026-10-14), verified
@@ -8767,7 +8767,10 @@ twice. It deliberately did not re-find the `TypeError`.
      saying why. **Keith, 2026-10-14: leave it to REQ-PIPE-177** - it only
      bites once bulk re-checks exist, and 177 criterion 24 carries the fix
      (pass the pass's deadline into the owed work, test first). Stays todo
-     until 177 is built.
+     until 177 is built. **CLOSED 2026-10-25 by REQ-PIPE-177 criterion 24**:
+     `recheck.run_all_owed` takes `deadline=` and starts no new owed item
+     once it has passed, and `run_pass` passes its own
+     (tests/test_bulk_recheck.py::TestRunning).
 
 180. **[done, 2026-10-14]** **[Dashboard UI]** **Closing a side panel the
      page was opened with leaves the dashboard (or cannot close at all).**

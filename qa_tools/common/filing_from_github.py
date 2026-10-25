@@ -111,7 +111,8 @@ def read(comment: Comment) -> filing_decisions.Request:
     half-obeyed.
     """
     found = [m for m in _COMMAND.finditer(comment.body or "")
-             if m.group("name") in filing_decisions.OPERATIONS]
+             if m.group("name") in filing_decisions.OPERATIONS
+             or m.group("name") in filing_decisions.TERMINAL_ONLY]
     if not found:
         raise NoDecisionHere(
             "no line in this comment begins with a known filing command.")

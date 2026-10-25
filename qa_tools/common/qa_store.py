@@ -200,7 +200,7 @@ _KEY_COLUMNS = ("agency_id", "collection_id", "tool", "scope", "supply_state")
 #: Bumped whenever the DDL below changes shape. `ensure_schema` reads
 #: it and does nothing when it already matches, which is what keeps
 #: migration DDL off the hot write path - see that function.
-SCHEMA_VERSION = 48
+SCHEMA_VERSION = 49
 
 #: The version at which REQ-PIPE-144 RESHAPED qa.filing and qa.delivery
 #: (a column removed, a column replaced by a foreign key). `CREATE TABLE
@@ -360,6 +360,14 @@ CREATE TABLE IF NOT EXISTS "{SCHEMA}".check_result (
     on_fail_action    text,
     engine            text,
     reference_run_id  text,
+    -- THE CHECK'S DEFINITION AS IT STOOD WHEN THIS WAS RECORDED (REQ-QAC-176,
+    -- schema 49): its scheme and the full 64-hex SHA-256, from
+    -- check_fingerprint - the writer the changelog gate compares. Stamped by
+    -- record_results and record_file_results on every row, never passed in by
+    -- a tool. NOT NULL with no default: a database whose results predate it is
+    -- refused by the version check and rebuilt, so none is ever without one.
+    definition_fingerprint text NOT NULL
+                      CHECK (definition_fingerprint ~ '^v[0-9]+:[0-9a-f]{{64}}$'),
     extra             jsonb NOT NULL DEFAULT '{{}}'
 );
 
@@ -384,6 +392,14 @@ ALTER TABLE "{SCHEMA}".check_result ADD COLUMN IF NOT EXISTS filename text;
 --   the check-history question this whole change is for
 CREATE INDEX IF NOT EXISTS check_result_check_history
     ON "{SCHEMA}".check_result (check_id, run_key);
+--   the bulk re-check's selection and the queue's nudge (REQ-PIPE-177
+--   criterion 2, NFR 3; REQ-QAC-176 NFR 2): which definitions each check's
+--   results were recorded under, read by a LOOSE INDEX SCAN that visits one
+--   entry per distinct (check, fingerprint) - checks times definitions,
+--   never the results - so it costs the same at thirty collections and years
+--   of history as it does today (bulk_recheck.stale_fingerprints).
+CREATE INDEX IF NOT EXISTS check_result_fingerprint
+    ON "{SCHEMA}".check_result (check_id, definition_fingerprint);
 --   one dataset's results for one run, which is every dashboard page
 CREATE INDEX IF NOT EXISTS check_result_dataset_run
     ON "{SCHEMA}".check_result (dataset_id, run_key);
@@ -1456,8 +1472,17 @@ ALTER TABLE "{SCHEMA}".run ADD COLUMN IF NOT EXISTS readers_checks text[];
 -- toward no status, page, count, ticket or notification. Filtered HERE, so
 -- every reader of a completed run gets it; the gate itself reads its own
 -- application's runs through gate.py.
+-- A RE-CHECK TRIAL'S RUN (REQ-PIPE-178 criterion 7; schema 49): recorded
+-- with no supply and the arrival scope, and KEPT OUT OF EVERY READER BY THIS
+-- FACT, never by its run id's text - from its recording until its discard,
+-- since its cross-table results name the real supplies they read.
+ALTER TABLE "{SCHEMA}".run ADD COLUMN IF NOT EXISTS trial boolean NOT NULL DEFAULT false;
+ALTER TABLE "{SCHEMA}".run DROP CONSTRAINT IF EXISTS run_trial_shape;
+ALTER TABLE "{SCHEMA}".run ADD CONSTRAINT run_trial_shape
+    CHECK (NOT trial OR (supply_id IS NULL AND scope = 'arrival'));
+
 CREATE OR REPLACE VIEW "{SCHEMA}".run_visible AS
-    SELECT * FROM "{SCHEMA}".run r WHERE r.completed_at IS NOT NULL
+    SELECT * FROM "{SCHEMA}".run r WHERE r.completed_at IS NOT NULL AND NOT r.trial
     AND (r.gate_application IS NULL OR EXISTS (
         SELECT 1 FROM "{SCHEMA}".gate_application g
         WHERE g.id = r.gate_application AND g.ended = 'settled'));
@@ -1558,6 +1583,39 @@ ALTER TABLE "{SCHEMA}".decision ADD COLUMN IF NOT EXISTS held_back_detail jsonb;
 -- reads, since the view cannot compute a supply's current verdict. NULL for
 -- every other item.
 ALTER TABLE "{SCHEMA}".owed_run ADD COLUMN IF NOT EXISTS found_worse boolean;
+
+-- A BULK RE-CHECK (REQ-PIPE-177 criteria 1 and 7; schema 49): one person's
+-- re-check of every supply a fixed check judged under an old definition. Its
+-- re-check decisions - one per supply, in qa.decision - name it, the check
+-- (in a column of its own), the check's changelog entry and the reason; this
+-- row is what they share, so the owed list can say 'k of N re-checks for
+-- <check> still owed (raised <date>)' (criterion 29). Written in the same
+-- transaction as them, before any of it runs.
+CREATE TABLE IF NOT EXISTS "{SCHEMA}".bulk_recheck (
+    id               bigserial PRIMARY KEY,
+    check_id         text NOT NULL,
+    -- the check's definition fingerprint when it was raised (REQ-QAC-176)
+    fingerprint      text NOT NULL,
+    changelog_date   text,
+    changelog_note   text,
+    reason           text NOT NULL CHECK (reason <> ''),
+    actor            text NOT NULL CHECK (actor <> ''),
+    raised_at        timestamptz NOT NULL,
+    supplies         integer NOT NULL CHECK (supplies > 0),
+    -- handed to the processing pass rather than run where it was raised
+    handed_off       boolean NOT NULL DEFAULT false
+);
+ALTER TABLE "{SCHEMA}".decision ADD COLUMN IF NOT EXISTS bulk_recheck bigint;
+ALTER TABLE "{SCHEMA}".decision ADD COLUMN IF NOT EXISTS check_id text;
+ALTER TABLE "{SCHEMA}".decision ADD COLUMN IF NOT EXISTS check_changelog_date text;
+ALTER TABLE "{SCHEMA}".decision ADD COLUMN IF NOT EXISTS check_changelog_note text;
+ALTER TABLE "{SCHEMA}".decision DROP CONSTRAINT IF EXISTS decision_bulk_recheck_shape;
+ALTER TABLE "{SCHEMA}".decision ADD CONSTRAINT decision_bulk_recheck_shape
+    CHECK ((bulk_recheck IS NULL) = (check_id IS NULL)
+           AND (bulk_recheck IS NULL OR (action = 're-check' AND actor_kind = 'person'
+                                         AND reason IS NOT NULL)));
+CREATE INDEX IF NOT EXISTS decision_bulk_recheck
+    ON "{SCHEMA}".decision (bulk_recheck) WHERE bulk_recheck IS NOT NULL;
 
 --   "what is owed", the only question asked of it routinely
 CREATE INDEX IF NOT EXISTS owed_run_open
@@ -1992,19 +2050,24 @@ def set_run_purpose(conn: supply_db.SupplyConnection, run_key: str, *,
                     reads_table: str | None = None, caused_by_decision: int | None = None,
                     caused_by_load: int | None = None,
                     gate_application: int | None = None,
-                    readers_checks: list[str] | None = None) -> None:
+                    readers_checks: list[str] | None = None,
+                    trial: bool = False) -> None:
     """What a run is for (REQ-PIPE-140): whose supply, which scope, and -
     for a re-run - what caused it. Stated on the run rather than read off
     its id, which says whose table it is and nothing more. A re-evaluation
     inside a gate application names the application (REQ-PIPE-267 criterion
-    12), which keeps its results out of every count until it settles."""
+    12), which keeps its results out of every count until it settles.
+
+    A RE-CHECK TRIAL'S RUN says so (`trial`, REQ-PIPE-178 criterion 7): no
+    supply, the arrival scope, and out of every reader by qa.run_visible."""
     conn.execute(
         f'UPDATE "{SCHEMA}".run SET dataset_id = ?, supply_id = ?, scope = ?, period = ?, '
         "reads_table = ?, caused_by_decision = ?, caused_by_load = ?, gate_application = ?, "
-        "readers_checks = ? WHERE run_key = ?",
+        "readers_checks = ?, trial = ? WHERE run_key = ?",
         [dataset_id, supply_id, scope, period, reads_table, caused_by_decision,
          caused_by_load, gate_application,
-         sorted(readers_checks) if readers_checks is not None else None, run_key])
+         sorted(readers_checks) if readers_checks is not None else None, bool(trial),
+         run_key])
 
 
 def current_run(conn: supply_db.SupplyConnection, dataset_id: str,
@@ -2117,6 +2180,7 @@ def reopen_run(conn: supply_db.SupplyConnection, run_key: str) -> None:
 def record_results(conn: supply_db.SupplyConnection, run_key: str,
                    results: Sequence[Mapping[str, Any]], *, tool: str,
                    agency_id: str, collection_id: str,
+                   fingerprints: Mapping[str, str],
                    scope: str = DATASET_SCOPE,
                    supply_state: str = AGREED,
                    reads: Sequence[Sequence[CheckRead]] | None = None) -> int:
@@ -2134,8 +2198,16 @@ def record_results(conn: supply_db.SupplyConnection, run_key: str,
     replaces both. A SINGLE-TABLE RESULT is about its run's own supply
     (criterion 3), so one naming another dataset than the run's is refused;
     a run with no dataset (a trial's, a fixture's) covers its collection.
+
+    EVERY ROW IS STAMPED WITH ITS CHECK'S DEFINITION FINGERPRINT (REQ-QAC-176
+    criterion 13) from `fingerprints` - check id to fingerprint, required:
+    the one map the run's attempt took when it opened, or for a write outside
+    an attempt the map current at that write (criterion 24). A result whose
+    check id the map does not hold is refused before anything is written
+    (criterion 14).
     """
     refuse_outside_an_attempt(conn, run_key)
+    stamps = _stamps(fingerprints, results, run_key)
     if scope == CROSS_TABLE_SCOPE and results and (
             reads is None or len(reads) != len(results) or not all(reads)):
         raise UnrecordableRead(
@@ -2147,8 +2219,21 @@ def record_results(conn: supply_db.SupplyConnection, run_key: str,
     with conn.raw.transaction():
         return _replace_results(conn, run_key, results, tool=tool, agency_id=agency_id,
                                 collection_id=collection_id, scope=scope,
-                                supply_state=supply_state,
+                                supply_state=supply_state, stamps=stamps,
                                 reads=reads if scope == CROSS_TABLE_SCOPE else None)
+
+
+def _stamps(fingerprints: Mapping[str, str], results: Sequence[Mapping[str, Any]],
+            run_key: str) -> list[str]:
+    """Each result's definition fingerprint, in order - or NoFingerprint
+    naming the first check the map does not hold (REQ-QAC-176 criterion 14)."""
+    from qa_tools.common import check_fingerprint
+
+    if fingerprints is None:
+        raise TypeError("record_results and record_file_results take a fingerprints mapping "
+                        "(REQ-QAC-176 criterion 13)")
+    return [check_fingerprint.stamp(fingerprints, r.get("check_id"), run_key=run_key)
+            for r in results]
 
 
 def _refuse_another_datasets(conn: supply_db.SupplyConnection, run_key: str,
@@ -2168,20 +2253,21 @@ def _refuse_another_datasets(conn: supply_db.SupplyConnection, run_key: str,
 
 def _replace_results(conn: supply_db.SupplyConnection, run_key: str,
                      results: Sequence[Mapping[str, Any]], *, tool: str, agency_id: str,
-                     collection_id: str, scope: str, supply_state: str,
+                     collection_id: str, scope: str, supply_state: str, stamps: Sequence[str],
                      reads: Sequence[Sequence[CheckRead]] | None) -> int:
     conn.execute(
         f'DELETE FROM "{SCHEMA}".check_result '
         "WHERE run_key = ? AND tool = ? AND scope = ? AND supply_state = ?",
         [run_key, tool, scope, supply_state])
-    columns = ("run_key", *_RESULT_COLUMNS, *_KEY_COLUMNS, "extra")
+    columns = ("run_key", *_RESULT_COLUMNS, *_KEY_COLUMNS, "definition_fingerprint", "extra")
     placeholders = ", ".join(["?"] * len(columns))
     keys = (agency_id, collection_id, tool, scope, supply_state)
     # A record that names its own agency, collection or tool has those
     # DROPPED rather than carried into `extra`: they are the same fact
     # the invocation already stated, and keeping a second copy is how
     # the two come to disagree.
-    ignored = set(_RESULT_COLUMNS) | set(_KEY_COLUMNS) | {"run_id", "run_timestamp"}
+    ignored = (set(_RESULT_COLUMNS) | set(_KEY_COLUMNS)
+               | {"run_id", "run_timestamp", "definition_fingerprint"})
     rows = 0
     for index, record in enumerate(results):
         values = [record.get(name) for name in _RESULT_COLUMNS]
@@ -2189,7 +2275,7 @@ def _replace_results(conn: supply_db.SupplyConnection, run_key: str,
         (result_id,) = conn.execute(
             f'INSERT INTO "{SCHEMA}".check_result ({", ".join(columns)}) '
             f"VALUES ({placeholders}) RETURNING id",
-            [run_key, *values, *keys, json.dumps(extra, default=str)]).fetchone()
+            [run_key, *values, *keys, stamps[index], json.dumps(extra, default=str)]).fetchone()
         for read in (reads[index] if reads is not None else ()):
             conn.execute(
                 f'INSERT INTO "{SCHEMA}".check_read (check_result_id, logical_table, state, '
@@ -2216,7 +2302,8 @@ def register_run_if_absent(conn: supply_db.SupplyConnection, *, run_key: str,
 def record_file_results(conn: supply_db.SupplyConnection, run_key: str,
                         results: Sequence[Mapping[str, Any]], *, agency_id: str,
                         collection_id: str, supply_state: str, load_attempt: int,
-                        delivery: str, filename: str) -> int:
+                        delivery: str, filename: str,
+                        fingerprints: Mapping[str, str]) -> int:
     """Record one load attempt's file-check results (REQ-QAC-096).
 
     APPENDS, NEVER REPLACES - the one writer here that does not delete
@@ -2230,20 +2317,25 @@ def record_file_results(conn: supply_db.SupplyConnection, run_key: str,
     record_results are (REQ-PIPE-279 criterion 8; post-build-review #262
     F5). At staging, before the run is opened, it has no run_seq and is
     written freely.
+
+    STAMPED like record_results (REQ-QAC-176 criterion 13): a file check's
+    results are written at staging, outside any attempt, so the caller passes
+    the map current at this write (criterion 24).
     """
     refuse_outside_an_attempt(conn, run_key)
+    stamps = _stamps(fingerprints, results, run_key)
     columns = ("run_key", *_RESULT_COLUMNS, *_KEY_COLUMNS, "load_attempt", "delivery",
-               "filename", "extra")
+               "filename", "definition_fingerprint", "extra")
     placeholders = ", ".join(["?"] * len(columns))
     keys = (agency_id, collection_id, "file", FILE_SCOPE, supply_state)
-    ignored = set(_RESULT_COLUMNS) | set(_KEY_COLUMNS)
-    for record in results:
+    ignored = set(_RESULT_COLUMNS) | set(_KEY_COLUMNS) | {"definition_fingerprint"}
+    for record, stamped in zip(results, stamps):
         values = [record.get(name) for name in _RESULT_COLUMNS]
         extra = {k: v for k, v in record.items() if k not in ignored}
         conn.execute(
             f'INSERT INTO "{SCHEMA}".check_result ({", ".join(columns)}) '
             f"VALUES ({placeholders})",
-            [run_key, *values, *keys, load_attempt, delivery, filename,
+            [run_key, *values, *keys, load_attempt, delivery, filename, stamped,
              json.dumps(extra, default=str)])
     return len(results)
 

@@ -15087,7 +15087,7 @@ requirements:
       - >
         THE SYSTEM SHALL offer every one of those operations in the
         mothman TUI.
-      - 'THE SYSTEM SHALL write an identical decision-log entry whichever route raised the decision, and SHALL NOT give either route an operation the other lacks, except the confirmation of a calendar correction''s moves and the keeps it records, which is offered on the terminal route only (REQ-PIPE-170 criterion 10), settling a contested pair (choose-file), which is offered on the terminal route only (REQ-PIPE-193 criteria 1 and 16), and placing a held supply (place), which is offered on the terminal route only (REQ-PIPE-163 criteria 14 and 36). AMENDED 2026-10-11 by REQ-PIPE-170 criterion 11, 2026-10-13 by REQ-PIPE-193 criterion 29, and 2026-10-14 by REQ-PIPE-163 criterion 14.
+      - 'THE SYSTEM SHALL write an identical decision-log entry whichever route raised the decision, and SHALL NOT give either route an operation the other lacks, except the confirmation of a calendar correction''s moves and the keeps it records, which is offered on the terminal route only (REQ-PIPE-170 criterion 10), settling a contested pair (choose-file), which is offered on the terminal route only (REQ-PIPE-193 criteria 1 and 16), placing a held supply (place), which is offered on the terminal route only (REQ-PIPE-163 criteria 14 and 36), and a bulk re-check of every supply a fixed check judged under its old definition, which is offered on the terminal route only (REQ-PIPE-177 criterion 21). AMENDED 2026-10-11 by REQ-PIPE-170 criterion 11, 2026-10-13 by REQ-PIPE-193 criterion 29, 2026-10-14 by REQ-PIPE-163 criterion 14, and 2026-10-25 by REQ-PIPE-177 criterion 21.
       
         '
       - >
@@ -26812,7 +26812,7 @@ requirements:
     date_written: '2026-10-10'
     story: "As the person who fixes a check, I want every recorded result to carry a fingerprint of the check's definition as it stood when it ran, so that the system can say exactly which supplies were judged under an old definition - without a date anyone typed, and without every supply looking stale each time the system grows a new setting."
     moscow: should
-    status: not_started
+    status: built
     signed_off:
       by: Keith
       date: "2026-10-24"
@@ -26953,12 +26953,63 @@ requirements:
     - "REVIEW FOLDED, 2026-10-24 (delivery-architect, six should-fix items): (1) both writers take a required fingerprints mapping, held on the Attempt, with every write outside an attempt given the map current at that write - criteria 13 and 24; (2) a new frozen-default entry is refused where any check at the diff base writes that value, enforced by the lifecycle gate - criterion 11; (3) hashed_settings kept on CheckMetadata, outside the hash - criterion 12; (4) criterion 7 normalises 'the settings it hashes'; (5) NFR 2 no longer prescribes an index; (6) the column is definition_fingerprint, NOT NULL - criteria 13 and 18."
     - "CODE-QUALITY EXPECTATIONS FOR THE BUILD (delivery-architect, 2026-10-24; for the post-build critic to hold the build to): ONE writer replaces check_lifecycle._config_hash - the changelog gate and the stored fingerprint are the same function, never a second gate-only or store-only hash; frozen defaults are compared by type AND value, so True does not equal 1 and 1 does not equal 1.0 unless the entry says so; every refusal (an unknown type, a missing check id, a frozen-default entry) names the check id and the setting's path; the rfc8785 package is pinned in pyproject.toml and uv.lock, its upgrades caught by criterion 15's golden test."
     - "THREE SIGNED REQUIREMENTS AMENDED FOR THIS REFRESH (Keith, 2026-10-24, approved as the delivery-architect worded them): REQ-PIPE-177 criterion 2 now selects by the newest result about each supply as supply_status.results_about answers it (REQ-PIPE-279 criterion 21), dropping 'SHALL NOT consult readers-only runs', and its NFR 3 names the same function; REQ-PIPE-178 criterion 7 keeps a trial's results out of the results about any supply by a fact recorded on the run; REQ-PIPE-178 NFR 4 names orchestrate.discard_run_schemas. Old and new texts are in amendments.md beside this draft."
+    - "BUILT 2026-10-25 - ONE WRITER: qa_tools/common/check_fingerprint.py. Every parser in check_lifecycle sets config_hash through _definition(), which calls check_fingerprint.fingerprint, so the changelog gate's comparison and the stamp on every result are the same function; check_lifecycle._config_hash (json.dumps, 16 hex) is deleted. The changelog gate passed on the switch (both sides are re-hashed by the current writer, as decision 'A WRITER CHANGE IS INVISIBLE' said), and the 326 checks partition into the same 174 distinct hashes under v1 as they did under the old writer."
+    - "PROVISIONAL (builder): FROZEN_DEFAULTS IS EMPTY AT v1, in qa_tools/common/frozen_defaults.py as a literal tuple of dicts the gate reads with ast.literal_eval at any git ref. v1 is the first fingerprint, so no setting has yet been added after a result was recorded; the first entry is appended the day a check file grows a setting at a value the system already used."
+    - "PROVISIONAL (builder): A CHECK'S KIND, what a frozen default may be scoped to (criterion 8), is the dbt test type ('singular' for a singular test), the ODCS rule's type, the Evidently method and the file check's name; Soda checks have none. hashed_settings are the settings normalised but BEFORE frozen defaults are dropped, so any scheme's writer can be applied to them (criterion 12)."
+    - "THE GATE'S FROZEN-DEFAULT RULES (criterion 11), in validate_check_lifecycle.frozen_default_errors: append-only is judged by position - the entry at each index of the diff base's list must be unchanged - and each entry after them is checked against the diff base's checks parsed by today's parsers; a malformed entry (missing a field, a path that is not a list, a scheme this checkout does not keep) is refused too."
+    - "NORMALISATION REFUSES (criterion 7) a datetime, NaN or infinity, a map key that is not a string, and any type but map, list, string, integer, float, boolean, null and plain date - each naming the check id and the setting's path. No real check holds any of them, as NFR 6 predicted: the switch moved no partition."
+    - "THE MAP (criterion 14) is a third member of tables_read._collected's once-per-sources entry, {check id: config_hash}; tables_read.definition_fingerprints() hands back a copy and raises when collect_checks raises. qa_results_writer.open_run takes it BEFORE taking the attempt lock and holds it on the Attempt (criterion 24); qa_results_writer.fingerprints_for(run_id) is the one source every writer asks - this process's open attempt's map, else the map current at the write (file checks at staging, a bare `mothman debug run-*`)."
+    - "THE READER LEAVES THE COLUMN OUT OF EVERY READ-BACK RECORD (qa_results_reader._NOT_IN_A_RECORD): a live run's records are the tools' own and never held it, so carrying it would make a rebuild and a live run produce different reports/ files. The bulk re-check's selection reads the column directly."
+    - "THE INDEX (NFR 2): check_result_fingerprint ON (check_id, definition_fingerprint), read by a recursive loose index scan of the distinct (check, fingerprint) pairs (bulk_recheck.stale_fingerprints) - one index entry per pair, never the results. check_result_check_history is unchanged. REJECTED an INCLUDE on check_history: the selection would still scan every result of a check."
+    - "TESTS THAT RECORD RESULTS ABOUT INVENTED CHECK IDS take the `invented_check_ids` fixture (tests/conftest.py), or pass attempt_support.ANY_CHECK straight to qa_store's writers: real checks keep real fingerprints and any other id gets one fixed fingerprint. A test about the fingerprint passes a real map."
+    - "ONE BUMP FOR THE BATCH: schema 49 also carries REQ-PIPE-177's qa.bulk_recheck table and decision columns and REQ-PIPE-178's qa.run.trial, so one regeneration covers all three (this lane was the only one changing the qa schema in wave 1)."
+    linked_tests:
+    - "tests/test_check_fingerprint.py::TestTheGolden"
+    - "tests/test_check_fingerprint.py::TestNormalisation"
+    - "tests/test_check_fingerprint.py::TestFrozenDefaults"
+    - "tests/test_check_fingerprint.py::TestRealChecks"
+    - "tests/test_check_fingerprint.py::TestComparison"
+    - "tests/test_check_fingerprint.py::TestTheGateKeepsThemFrozen"
+    - "tests/test_check_fingerprint.py::TestTheStamp"
+    - "tests/test_check_fingerprint.py::TestAnOlderDatabaseIsRefused"
+    - "tests/test_check_fingerprint.py::TestOneMapPerAttempt"
+    - "tests/test_check_lifecycle.py"
+    implemented_by:
+    - "qa_tools/common/check_fingerprint.py::fingerprint"
+    - "qa_tools/common/check_fingerprint.py::fingerprint_under"
+    - "qa_tools/common/check_fingerprint.py::normalise"
+    - "qa_tools/common/check_fingerprint.py::drop_defaults"
+    - "qa_tools/common/check_fingerprint.py::defaults_for"
+    - "qa_tools/common/check_fingerprint.py::canonical"
+    - "qa_tools/common/check_fingerprint.py::differs"
+    - "qa_tools/common/check_fingerprint.py::stamp"
+    - "qa_tools/common/frozen_defaults.py::FROZEN_DEFAULTS"
+    - "qa_tools/common/check_lifecycle.py::_definition"
+    - "qa_tools/common/check_lifecycle.py::CheckMetadata"
+    - "qa_tools/common/validate_check_lifecycle.py::frozen_default_errors"
+    - "qa_tools/common/validate_check_lifecycle.py::frozen_defaults_at"
+    - "qa_tools/common/qa_store.py::record_results"
+    - "qa_tools/common/qa_store.py::record_file_results"
+    - "qa_tools/common/qa_store.py::_stamps"
+    - "qa_tools/common/qa_store.py::SCHEMA_VERSION"
+    - "qa_tools/common/tables_read.py::definition_fingerprints"
+    - "qa_tools/common/qa_results_writer.py::open_run"
+    - "qa_tools/common/qa_results_writer.py::fingerprints_for"
+    - "qa_tools/common/qa_results_writer.py::Attempt"
+    - "qa_tools/common/file_checks.py::record"
+    - "qa_tools/common/qa_results_reader.py::_NOT_IN_A_RECORD"
+    evidence:
+    - "2026-10-25, branch w1-l3: tests/test_check_fingerprint.py (50 tests) written beside the writer, run with tests/test_bulk_recheck.py and tests/test_recheck_trial.py against l3_probe: 122 passed. The changelog gate (python -m qa_tools.common.validate_check_lifecycle) passed on the switch, and the 326 checks fall into the same 174 distinct hashes under v1 as under the 16-hex json.dumps hash it replaced."
+    - "2026-10-25, NFR 3 re-run before building criterion 14's refusal: on l3_probe at schema 48, all 325 distinct recorded check ids were among the 326 collect_checks(None) finds. Then a FRESH BOOTSTRAP FROM EMPTY at schema 49 (l3_probe, from a copy of this tree): rc 0 in 3047s wall (Birth Registrations 801s, Child Protection and Emergency Department 2878s side by side) - nearly twice a3_probe's 1572s, but run while this session's own test modules ran beside it on the same 4 cores, so not a like-for-like figure; 22,328 results, every one stamped, 325 distinct check ids all in the map, and NONE of them differing from its check's current fingerprint. 288 gate applications all settled; 14 recheck, 47 gate and 241 reevaluate owed items all cleared. 'Comparing every targeted supply's recorded verdict' reported no difference. REQ-PIPE-262 criterion 12's four pins hold: cp-case-workers 2021-Q4 inherits cp-case-workers@202108010104000000, cp-carers 2022-Q1 and 2022-Q2 inherit cp-carers@202201051000000800, ed-presentations 2015-Q4 inherits ed-presentations@201507221000000800."
+    - "NFR 2, measured on that bootstrap: the loose index scan of distinct (check, fingerprint) pairs runs in 1.9ms (EXPLAIN ANALYZE) and bulk_recheck.stale_fingerprints in 15ms with nothing stale; the queue's nudges() in 55ms with nothing stale and 0.14s with one check's 22,328-row history made stale inside a rolled-back transaction."
+    - "2026-10-25, BOTH HALVES OF THE SUITE against l3_probe at schema 49 (MOTHMAN_SUPPLY_DSN=l3_probe, after mothman dashboard rebuild-results and build-data): -m needs_deployment 457 passed, 1 xfailed in 1228s; -m 'not needs_deployment' first 22 failed and 6 errors - tests recording results about invented check ids, one hand-inserted check_result without the new column, a test calling the deleted _config_hash, a stale plans/INDEX.md, and the thirty-collection TUI test, whose tree copy (git ls-files) had not yet seen the untracked cli/bulk_recheck_tui.py - then, fixed, on the checkpoint-committed tree 6007 passed, 0 skipped, 0 failed in 1781s. The eight modules fixed between the two runs, re-run on their own after the fix: 239 passed."
+
   - id: REQ-PIPE-177
     title: "A person can have every supply checked under an old definition of a fixed check re-checked at once"
     date_written: '2026-10-10'
     story: "As the person who has just fixed a check that was wrong, I want every supply that check judged under its old definition re-checked in one action, across every dataset and period it touches, so that no verdict our mistake produced is left standing and I do not have to find them one by one."
     moscow: should
-    status: not_started
+    status: built
     signed_off:
       by: Keith
       date: '2026-10-14'
@@ -27050,13 +27101,67 @@ requirements:
     - "`mothman supply queue` LISTS ONE LINE PER CHECK BENEATH THE COUNT (delivery-cli-ux H2, 2026-10-14; PUT TO KEITH AT SIGN-OFF - docs/drafts/unsigned-triage/summary.md, 'Ready for sign-off'): the aggregate line alone left the person needing a --check value the screen never showed. Each line is a check_id ready to paste, as `mothman supply superseded` does for what it lists. The terminal's queue keeps Keith's 2026-10-10 aggregate line and chooser (decision 'THE QUEUE NUDGE AGGREGATES' above), whose reason - a batch of fixes burying the queue - is about a menu rather than a command's printed list of the checks that changed. REJECTED keeping the one aggregate line with no check named."
     - "AMENDED 2026-10-24 (Keith, approving the delivery-architect's wording on the REQ-QAC-176 refresh): criterion 2 and NFR 3 now select through supply_status.results_about (REQ-PIPE-279 criterion 21), because a supply's result for a check can be recorded under another table's run or carried from a sibling (REQ-PIPE-265), which the current-run reading missed. 'SHALL NOT consult readers-only runs' is dropped. WAS criterion 2: THE SYSTEM SHALL choose the supplies a bulk re-check covers as every supply, in any dataset and any period, that is filed and waiting or promoted and whose result for that check in its current run (qa.supply_current_run) carries a fingerprint (REQ-QAC-176) different from the check's current one, compared as REQ-QAC-176 criterion 12 says, SHALL NOT consult readers-only runs, and SHALL include none other. WAS NFR 3: The selection and the queue nudge read one shared query, and the nudge reads it once, grouped by check, rather than once per check; neither re-implements the 'current result' rule."
     - "EMPTY FINGERPRINTS ARE MOOT, OPEN QUESTION CLOSED (Keith, 2026-10-24, REQ-QAC-176 Q2 = C): the open question asked how criterion 2 treats results recorded before fingerprints with an empty one, which arises only if #89's migrations were adopted. Under C a database without fingerprints is refused until regenerated, as the 'NOT BLOCKED ANY MORE' decision assumed, so none ever reaches the selection. The hold behind #89 is lifted with it. As it read: '(HELD with REQ-QAC-176 criterion 18, 2026-10-14) If #89's migrations are adopted, results recorded before fingerprints carry an empty one; criterion 2 as written selects only a fingerprint DIFFERENT from today's. Whether an empty one is left out, counted in the panel, or selectable is REQ-QAC-176's held question and settles with it; the 'NOT BLOCKED ANY MORE' decision assumed the refusal Keith has now held.'"
+    - "BUILT 2026-10-25: qa_tools/common/bulk_recheck.py holds the plan, the nudges, the recording, the owed groups and the run of one supply; cli/bulk_recheck_tui.py the panel, the door and both routes; `mothman supply recheck` is in cli/supply.py."
+    - "THE SELECTION (criterion 2, NFR 3): a loose index scan finds each check's recorded fingerprints that differ from its current one under their own scheme; only for those, the supplies a stale result is about by results_about's two attributions for a non-file result (the run's own supply, and each supply a cross-table result recorded READING) are asked results_about, and the newest result for the check decides - its fingerprint read by (run, check), which names one result for any check but a file check. The nudge is the same function over every stale check, so the two cannot disagree."
+    - "PROVISIONAL (builder): THE RECORD'S SHAPE - one row in qa.bulk_recheck (the check, its fingerprint when raised, the changelog entry's date and description, the reason, the person, when, how many supplies, whether handed off), and on each re-check decision bulk_recheck, check_id, check_changelog_date and check_changelog_note, held to a person's re-check with a reason by decision_bulk_recheck_shape. The check's 'current changelog entry' is its newest by date."
+    - "bulk_recheck.record RE-PLANS INSIDE ITS OWN TRANSACTION and refuses where the key differs from the one confirmed, so the panel and the record cannot disagree (criterion 12). PROVISIONAL: the key is a 10-hex SHA-1 over the check's fingerprint and every covered (dataset, period, supply), as filing_decisions.Consequences keys are."
+    - "PROVISIONAL (builder): A FILE CHECK'S REFUSAL (criterion 5) prints `mothman supply load --collection <id>` - staging again is what runs a file check."
+    - "RUNNING: the terminal runs the bulk re-check's own owed ids one at a time through bulk_recheck.run_one -> recheck.run (claimed, gated or kept promoted exactly as a single re-check), and recheck.run_all_owed gained ids= (criterion 17) and deadline= (criterion 24), which processing_pass.run_pass now passes - closing post-build-review #179. A partial foreground run exits filing_tui.CHECKS_STILL_OWED_EXIT, REQ-PIPE-163 criterion 28's 3."
+    - "PROVISIONAL (builder): 'THE CHECKS WHOSE RESULTS CHANGED' (criterion 15) are those whose newest result about the supply has another status after the re-check than before it, read with results_about each side of the run."
+    - "A PROMOTED SUPPLY BACK WORSE (criterion 9) is listed under REQ-PIPE-164's 'Promoted, then re-checked <verdict>' heading by that requirement's own worse_than_promoted - every covered supply is a person's re-check decision - and the summary names it in the same words."
+    - "TERMINAL ONLY (criterion 21): filing_decisions.BULK_RECHECK is in TERMINAL_ONLY and NOT in OPERATIONS, since it is no one slot's decision; the GitHub intake now recognises TERMINAL_ONLY names as well as OPERATIONS, so `/bulk-recheck` on a ticket is refused naming the terminal rather than ignored. REQ-GHUB-082 criterion 3 amended in the same change."
+    - "PROVISIONAL (builder): THE DOOR asks 'Re-check them all, or try it on a few first?' after the panel and before the reason, and above ten supplies 'How should it run?' with the hand-off first. A backstopped dataset's left-out supplies stay in the nudge's count (criterion 28)."
+    linked_tests:
+    - "tests/test_bulk_recheck.py::TestWhichSuppliesAreCovered"
+    - "tests/test_bulk_recheck.py::TestAnOpenPairIsLeftOut"
+    - "tests/test_bulk_recheck.py::TestRefusals"
+    - "tests/test_bulk_recheck.py::TestRecording"
+    - "tests/test_bulk_recheck.py::TestRunning"
+    - "tests/test_bulk_recheck.py::TestTheNudgeAndTheOwedList"
+    - "tests/test_bulk_recheck.py::TestTheFlagRoute"
+    - "tests/test_bulk_recheck.py::TestTerminalOnly"
+    - "tests/test_bulk_recheck.py::TestTheSharedQuery"
+    - "tests/test_bulk_recheck.py::TestTheDoor"
+    - "tests/test_recheck.py::TestTwoRunnersNeverRunOneOwedItem"
+    - "tests/test_door_flag_parity.py::TestTheTerminalOnlyOnesNeverReachGitHub"
+    implemented_by:
+    - "qa_tools/common/bulk_recheck.py::plan"
+    - "qa_tools/common/bulk_recheck.py::stale_fingerprints"
+    - "qa_tools/common/bulk_recheck.py::newest_fingerprint"
+    - "qa_tools/common/bulk_recheck.py::the_check"
+    - "qa_tools/common/bulk_recheck.py::nudges"
+    - "qa_tools/common/bulk_recheck.py::nudge_line"
+    - "qa_tools/common/bulk_recheck.py::record"
+    - "qa_tools/common/bulk_recheck.py::owed_groups"
+    - "qa_tools/common/bulk_recheck.py::run_one"
+    - "qa_tools/common/bulk_recheck.py::summary_lines"
+    - "qa_tools/common/recheck.py::run_all_owed"
+    - "qa_tools/common/processing_pass.py::run_pass"
+    - "qa_tools/common/filing_decisions.py::TERMINAL_ONLY"
+    - "qa_tools/common/filing_decisions.py::terminal_only_reply"
+    - "qa_tools/common/filing_from_github.py::read"
+    - "qa_tools/common/decision_log.py::Decision"
+    - "cli/bulk_recheck_tui.py::panel_lines"
+    - "cli/bulk_recheck_tui.py::flow"
+    - "cli/bulk_recheck_tui.py::door"
+    - "cli/bulk_recheck_tui.py::from_flags"
+    - "cli/bulk_recheck_tui.py::run_foreground"
+    - "cli/supply.py::recheck_command"
+    - "cli/supply.py::_say_bulk_rechecks"
+    - "cli/supply.py::_say_owed"
+    - "cli/filing_tui.py::filing_menu"
+    - "cli/filing_tui.py::queue_flow"
+    evidence:
+    - "2026-10-25, branch w1-l3: tests/test_bulk_recheck.py (50 tests, one of them needs_deployment) against l3_probe, with tests/test_check_fingerprint.py and tests/test_recheck_trial.py: 122 passed; tests/test_door_flag_parity.py, test_filing_from_github.py, test_withdrawal.py, test_recheck_decision.py and test_recheck.py: 180 passed."
+    - "Measured on the schema-49 bootstrap with cp-carers' row_count_soda made stale inside a rolled-back transaction: the plan covers 46 supplies (44 promoted) and counts 2 superseded ones as not covered, in 5.1s - most of it the current verdict of each covered supply for the panel; the queue's nudge for the same state 0.14s. The first draft asked results_about once per candidate supply and took 16.7s for the plan and 14.1s for the nudge; newest_by_supply's set form replaced it, held to results_about by TestTheSetFormIsResultsAbout and, on the deployment, TestTheSetFormHoldsOnTheDeployment."
+    - "2026-10-25, BOTH HALVES OF THE SUITE against l3_probe at schema 49 (MOTHMAN_SUPPLY_DSN=l3_probe, after mothman dashboard rebuild-results and build-data): -m needs_deployment 457 passed, 1 xfailed in 1228s; -m 'not needs_deployment' first 22 failed and 6 errors - tests recording results about invented check ids, one hand-inserted check_result without the new column, a test calling the deleted _config_hash, a stale plans/INDEX.md, and the thirty-collection TUI test, whose tree copy (git ls-files) had not yet seen the untracked cli/bulk_recheck_tui.py - then, fixed, on the checkpoint-committed tree 6007 passed, 0 skipped, 0 failed in 1781s. The eight modules fixed between the two runs, re-run on their own after the fix: 239 passed."
 
   - id: REQ-PIPE-178
     title: "A person can try a bulk re-check on a few supplies first, and nothing is recorded"
     date_written: '2026-10-10'
     story: "As the person who has just fixed a check, I want to see what the fix does to a few of the supplies it will re-check before I re-check them all, so that I can be confident the fix is right without putting anything on the record."
     moscow: should
-    status: not_started
+    status: built
     signed_off:
       by: Keith
       date: '2026-10-14'
@@ -27105,6 +27210,37 @@ requirements:
     - "NOT A FILING DECISION, SO REQ-GHUB-082 IS NOT AMENDED (delivery-scoper, 2026-10-14): a trial records nothing, so criterion 3 of REQ-GHUB-082 (no route lacks an operation the other has) does not reach it; criterion 13 here keeps it off GitHub on its own terms."
     - "REVIEWS FOLDED, 2026-10-14: added 18 (a trial ends by pointing at the real run - delivery-cli-ux M6); criterion 17 already carries M3's non-terminal refusal. Was held behind #89 with REQ-PIPE-177 and REQ-QAC-176 (delivery-architect); HOLD LIFTED 2026-10-24 by Keith's REQ-QAC-176 Q2 = C (a plain schema bump past 46 with the existing refusal, so #89's migrations no longer stand in the way)."
     - "AMENDED 2026-10-24 (Keith, approving the delivery-architect's wording on the REQ-QAC-176 refresh): criterion 7 now keeps a trial's results out of the results about any supply, since REQ-PIPE-279 makes a result about a supply by what it recorded reading, and a re-check trial reads real supplies; NFR 4 names the shared orchestrator's discard_run_schemas (REQ-PIPE-243). WAS criterion 7: THE SYSTEM SHALL record a trial's run with no supply and the arrival scope, so that it can never be any supply's current run at any instant, including between the trial finishing and its results being discarded. WAS NFR 4: LEAVES NOTHING BEHIND (CLAUDE.md, data/ accumulates): its schema and dbt scratch are dropped when it ends, as a run's own are (orchestrators' _discard_this_runs_schemas), Ctrl-C included."
+    - "BUILT 2026-10-25: the trial is recheck.execute - the real re-check's one executor - under a RE-CHECK TRIAL run id, `trial_rc_<UTC stamp>`. supply_db.is_trial_run is true for it, so its resolution record goes to a schema of its own and its run, results, attempts, census and schemas go with trial.discard (now keyed on is_trial_run, as orchestrate.discard_run_schemas is); trial.is_trial is false for it, so it follows every branch a real re-check takes - the real load records, the reconciliation, the could-not-run records - rather than REQ-PIPE-103's file trial's."
+    - "ITS OWNER (the dataset and table it re-checks) is held in bulk_recheck._TRIAL_OWNERS and answered by qa_results_writer.run_owner, because its id names no table; the tools run in threads of the one process, so every reader sees it."
+    - "CRITERION 7 AS A FACT ON THE RUN: qa.run.trial (schema 49), set by set_run_purpose(trial=True), held to no supply and the arrival scope by run_trial_shape; qa.run_visible leaves trial runs out, so results_about, the gate, the dashboard build and the bulk selection never read one. Never the run id's text."
+    - "THE GATE'S PREDICTION (criterion 5) is promotion.judge with record=False - the promotion gate's plan step, already split from the step that applies a judgement and writing nothing - given the trial run's own results through promotion.status_of. A promoted supply 'would stay promoted'. PROVISIONAL (builder): the supply is judged alone, not as a gate application with package partners, since a trial runs one supply; the screen says the real run may differ."
+    - "NOTHING IS LEFT BEHIND, checked rather than assumed: tests/test_recheck_trial.py::TestARealTrialLeavesNothing runs a real promoted and a real waiting cp-carers supply of the bootstrapped deployment through the real tools and compares every qa table's row count, every schema and every table in staging, period and rejected schemas before and after."
+    linked_tests:
+    - "tests/test_recheck_trial.py::TestChoosing"
+    - "tests/test_recheck_trial.py::TestATrialsRunIsReadByNothing"
+    - "tests/test_recheck_trial.py::TestThePrediction"
+    - "tests/test_recheck_trial.py::TestTheFlags"
+    - "tests/test_recheck_trial.py::TestARealTrialLeavesNothing"
+    - "tests/test_bulk_recheck.py::TestTheDoor"
+    implemented_by:
+    - "qa_tools/common/bulk_recheck.py::try_one"
+    - "qa_tools/common/bulk_recheck.py::predict"
+    - "qa_tools/common/bulk_recheck.py::choose"
+    - "qa_tools/common/bulk_recheck.py::trial_run_id"
+    - "qa_tools/common/bulk_recheck.py::trial_owner"
+    - "qa_tools/common/bulk_recheck.py::trial_lines"
+    - "qa_tools/common/supply_db.py::is_recheck_trial"
+    - "qa_tools/common/trial.py::is_trial"
+    - "qa_tools/common/trial.py::discard"
+    - "qa_tools/common/qa_store.py::set_run_purpose"
+    - "qa_tools/common/qa_results_writer.py::run_owner"
+    - "qa_tools/tools/orchestrate.py::discard_run_schemas"
+    - "cli/bulk_recheck_tui.py::trial_from_flags"
+    - "cli/bulk_recheck_tui.py::trial_flow"
+    - "cli/bulk_recheck_tui.py::run_trial"
+    evidence:
+    - "2026-10-25, branch w1-l3: tests/test_recheck_trial.py (22 tests) against l3_probe at schema 49, with tests/test_bulk_recheck.py and tests/test_check_fingerprint.py: 122 passed. TestARealTrialLeavesNothing ran a real promoted (cp-carers 2013-Q2) and a real waiting (cp-carers 2024-Q3) supply through the four real tools, each reaching a verdict and a prediction, with every qa table's row count, every schema and every staging/period/rejected table identical before and after. Its first run failed - the trial's own schema for its resolution record did not exist yet - and try_one now creates it before the overlay."
+    - "2026-10-25, BOTH HALVES OF THE SUITE against l3_probe at schema 49 (MOTHMAN_SUPPLY_DSN=l3_probe, after mothman dashboard rebuild-results and build-data): -m needs_deployment 457 passed, 1 xfailed in 1228s; -m 'not needs_deployment' first 22 failed and 6 errors - tests recording results about invented check ids, one hand-inserted check_result without the new column, a test calling the deleted _config_hash, a stale plans/INDEX.md, and the thirty-collection TUI test, whose tree copy (git ls-files) had not yet seen the untracked cli/bulk_recheck_tui.py - then, fixed, on the checkpoint-committed tree 6007 passed, 0 skipped, 0 failed in 1781s. The eight modules fixed between the two runs, re-run on their own after the fix: 239 passed."
 
   - id: REQ-DASH-175
     title: "The dashboard says when a supply was placed by hand"

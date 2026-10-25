@@ -331,6 +331,14 @@ class Decision:
     promoted_with: tuple[str, ...] | None = None
     held_back_by: str | None = None
     held_back_detail: dict | None = None
+    #: A BULK RE-CHECK's entry (REQ-PIPE-177 criterion 7): the bulk re-check
+    #: it belongs to, the check it re-checks for - in a column of its own,
+    #: never prose in the reason - and that check's changelog entry current
+    #: when it was raised.
+    bulk_recheck: int | None = None
+    check_id: str | None = None
+    check_changelog_date: str | None = None
+    check_changelog_note: str | None = None
 
     @property
     def slots(self) -> tuple[str, ...]:
@@ -972,9 +980,10 @@ def _insert(conn: supply_db.SupplyConnection, decision: Decision) -> int:
         "amber_setting, amber_level, amber_version, superseded_by, table_name, "
         "promoted_status, replaces, replacement_setting, replacement_level, "
         "replacement_version, caused_by_decision, caused_by_supply, recorded_at, "
-        "gate_application, package_instant, promoted_with, held_back_by, held_back_detail) "
+        "gate_application, package_instant, promoted_with, held_back_by, held_back_detail, "
+        "bulk_recheck, check_id, check_changelog_date, check_changelog_note) "
         "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, "
-        "?, ?, ?, ?, ?) RETURNING id",
+        "?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
         [decision.agency_id, decision.collection_id, decision.dataset_id,
          decision.action, decision.supply or None, decision.from_slot, decision.to_slot,
          decision.actor.strip(), decision.actor_kind,
@@ -987,7 +996,8 @@ def _insert(conn: supply_db.SupplyConnection, decision: Decision) -> int:
          _recorded_at(decision), decision.gate_application, decision.package_instant,
          list(decision.promoted_with) if decision.promoted_with is not None else None,
          decision.held_back_by,
-         _json(decision.held_back_detail)]).fetchall()
+         _json(decision.held_back_detail), decision.bulk_recheck, decision.check_id,
+         decision.check_changelog_date, decision.check_changelog_note]).fetchall()
     return int(rows[0][0])
 
 

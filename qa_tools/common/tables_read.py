@@ -117,7 +117,7 @@ def declared_reads() -> dict[str, list[str]]:
     cannot be collected, and nothing is remembered (criterion 4) - what to
     do then is the caller's: promotion's fail-safe is an empty mapping that
     can refuse a promotion but never grant one."""
-    reads, _active = _collected()
+    reads, _active, _fingerprints = _collected()
     return {check: list(tables) for check, tables in reads.items()}
 
 
@@ -125,8 +125,22 @@ def active_checks(collection_id: str, tool: str) -> list[str]:
     """Every active (unretired) check id of `tool`'s segment in
     `collection_id`, sorted - from the same once-per-tree collection as
     `declared_reads()`, and a copy the caller may keep (REQ-PIPE-188)."""
-    _reads, active = _collected()
+    _reads, active, _fingerprints = _collected()
     return list(active.get((collection_id, tool), ()))
+
+
+def definition_fingerprints() -> dict[str, str]:
+    """`check_id` -> its definition fingerprint (REQ-QAC-176 criterion 14),
+    for every check on the working tree - from the same once-per-tree
+    collection as `declared_reads()`, keyed on
+    validate_check_lifecycle.sources_fingerprint(), so an edited check
+    source is seen at once and an unchanged one costs a hash of its bytes.
+
+    RAISES rather than handing back a partial map when any check definition
+    fails to parse - a result stamped from a map missing its check would be
+    refused by the writer anyway, and a map missing a whole file's checks is
+    one nobody should record from. Every caller gets its own copy."""
+    return dict(_collected()[2])
 
 
 def _collected():
@@ -137,7 +151,8 @@ def _collected():
         hit = _declared.get(key)
     if hit is None:
         checks = vcl.collect_checks(None)
-        hit = (declared_by_check_id(checks), _active_by_collection_and_tool(checks))
+        hit = (declared_by_check_id(checks), _active_by_collection_and_tool(checks),
+               {c.check_id: c.config_hash for c in checks})
         with _declared_lock:
             _declared[key] = hit
             while len(_declared) > _DECLARED_KEEP:
