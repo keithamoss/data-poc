@@ -185,8 +185,8 @@ Reframed from daily during Keith's review: the original example (22:00 due, 21:5
 
 | Where to look | |
 |---|---|
-| Dataset | cp-clients |
-| Supplies | `cp_clients__202404221000000800` |
+| Dataset | ed-presentations |
+| Supplies | `ed_presentations__202404221000000800` |
 | Period | 2024-Q2 |
 | Set "in the warehouse on" to | 2024-05-01 |
 
@@ -226,12 +226,12 @@ Reframed from daily during Keith's review: the original example (22:00 due, 21:5
 
 **What it would look like if the rule were wrong.** Treated as a resupply of 2025-Q2, as if the window counted from somewhere else.
 
-*Config: as TS-9 - Child Protection, quarterly, due 09:00 on the 1st, claim window 14 days. 2025-Q3 (1 August) arrives 19 July at 10:00, thirteen days early, a day after its window opened at 09:00 on 18 July.*
+*Config: as TS-9 - Emergency Department, one file, quarterly, due 09:00 on the 1st, claim window 14 days. 2025-Q3 (1 August) arrives 19 July at 10:00, thirteen days early, a day after its window opened at 09:00 on 18 July.*
 
 | Where to look | |
 |---|---|
-| Dataset | cp-clients |
-| Supplies | `cp_clients__202507191000000800` |
+| Dataset | ed-presentations |
+| Supplies | `ed_presentations__202507191000000800` |
 | Period | 2025-Q3 |
 | Set "in the warehouse on" to | 2025-08-01 |
 
@@ -241,12 +241,12 @@ Reframed from daily during Keith's review: the original example (22:00 due, 21:5
 
 **What it would look like if the rule were wrong.** Shown as anything more alarming than early.
 
-*Config: as TS-9. 2025-Q4 (1 November) arrives 30 October at 10:00.*
+*Config: as TS-9 - Emergency Department, one file. 2025-Q4 (1 November) arrives 30 October at 10:00.*
 
 | Where to look | |
 |---|---|
-| Dataset | cp-clients |
-| Supplies | `cp_clients__202510301000000800` |
+| Dataset | ed-presentations |
+| Supplies | `ed_presentations__202510301000000800` |
 | Period | 2025-Q4 |
 | Set "in the warehouse on" to | 2025-11-01 |
 
@@ -256,12 +256,12 @@ Reframed from daily during Keith's review: the original example (22:00 due, 21:5
 
 **What it would look like if the rule were wrong.** Assigned 2023-Q4 by the RULE because it was obviously meant for it; or 2023-Q4 left empty once the person has re-filed it.
 
-*Config: as TS-9. 2023-Q4 (1 November) is due 09:00 that day and its window opens 09:00 on 18 October; the supply arrives 12 October at 10:00, twenty days early and six days before the window. 2023-Q3, before it, is an ordinary quarter whose own supply has arrived.*
+*Config: as TS-9 - Emergency Department, one file. 2023-Q4 (1 November) is due 09:00 that day and its window opens 09:00 on 18 October; the supply arrives 12 October at 10:00, twenty days early and six days before the window. 2023-Q3, before it, is an ordinary quarter whose own supply has arrived.*
 
 | Where to look | |
 |---|---|
-| Dataset | cp-clients |
-| Supplies | `cp_clients__202310121000000800` |
+| Dataset | ed-presentations |
+| Supplies | `ed_presentations__202310121000000800` |
 | Period | 2023-Q4 |
 | Set "in the warehouse on" to | 2023-11-01 |
 
@@ -1470,12 +1470,13 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "config": null,
    "requirements": [
     "REQ-PIPE-131",
-    "REQ-GEN-195"
+    "REQ-GEN-195",
+    "REQ-GEN-235"
    ],
    "coordinates": {
-    "dataset": "cp-clients",
+    "dataset": "ed-presentations",
     "supplies": [
-     "cp_clients__202404221000000800"
+     "ed_presentations__202404221000000800"
     ],
     "period": "2024-Q2",
     "inPlaceOn": "2024-05-01",
@@ -2710,14 +2711,14 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "section": "Arrival classification",
    "demonstrates": "Assigned **2025-Q3** and classified **early by 13 days**, exactly as TS-9 - the window is a boundary, and a supply inside it by a day is as early-and-fine as one inside it by a week (REQ-PIPE-131).",
    "breaksAs": "Treated as a resupply of 2025-Q2, as if the window counted from somewhere else.",
-   "config": "Config: as TS-9 - Child Protection, quarterly, due 09:00 on the 1st, claim window 14 days. 2025-Q3 (1 August) arrives 19 July at 10:00, thirteen days early, a day after its window opened at 09:00 on 18 July.",
+   "config": "Config: as TS-9 - Emergency Department, one file, quarterly, due 09:00 on the 1st, claim window 14 days. 2025-Q3 (1 August) arrives 19 July at 10:00, thirteen days early, a day after its window opened at 09:00 on 18 July.",
    "requirements": [
     "REQ-PIPE-131"
    ],
    "coordinates": {
-    "dataset": "cp-clients",
+    "dataset": "ed-presentations",
     "supplies": [
-     "cp_clients__202507191000000800"
+     "ed_presentations__202507191000000800"
     ],
     "period": "2025-Q3",
     "inPlaceOn": "2025-08-01",
@@ -2731,12 +2732,12 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "section": "Arrival classification",
    "demonstrates": "Assigned **2025-Q4**, classified **early by 2 days**, and otherwise unremarkable - it fills and promotes like an on-time supply.",
    "breaksAs": "Shown as anything more alarming than early.",
-   "config": "Config: as TS-9. 2025-Q4 (1 November) arrives 30 October at 10:00.",
+   "config": "Config: as TS-9 - Emergency Department, one file. 2025-Q4 (1 November) arrives 30 October at 10:00.",
    "requirements": [],
    "coordinates": {
-    "dataset": "cp-clients",
+    "dataset": "ed-presentations",
     "supplies": [
-     "cp_clients__202510301000000800"
+     "ed_presentations__202510301000000800"
     ],
     "period": "2025-Q4",
     "inPlaceOn": "2025-11-01",
@@ -2750,16 +2751,16 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "section": "Arrival classification",
    "demonstrates": "It cannot claim 2023-Q4, whose window has not opened - nothing claims forward (REQ-PIPE-062 criterion 5). The open period when it arrives is 2023-Q3, so it files there as a **resupply of 2023-Q3** (REQ-PIPE-131), and the rule refuses to promote it over 2023-Q3's accepted supply. Then a PERSON re-files it to 2023-Q4 (a scripted decision, REQ-GEN-135, at 10:00 on 21 October, once Q4's window is open), so 2023-Q4 is not left with no supply. Keith, 2026-10-12: \"plus one too early\" - the case people will ask about - and \"have it refiled to Q4 by a synthetic human making a decision\".",
    "breaksAs": "Assigned 2023-Q4 by the RULE because it was obviously meant for it; or 2023-Q4 left empty once the person has re-filed it.",
-   "config": "Config: as TS-9. 2023-Q4 (1 November) is due 09:00 that day and its window opens 09:00 on 18 October; the supply arrives 12 October at 10:00, twenty days early and six days before the window. 2023-Q3, before it, is an ordinary quarter whose own supply has arrived.",
+   "config": "Config: as TS-9 - Emergency Department, one file. 2023-Q4 (1 November) is due 09:00 that day and its window opens 09:00 on 18 October; the supply arrives 12 October at 10:00, twenty days early and six days before the window. 2023-Q3, before it, is an ordinary quarter whose own supply has arrived.",
    "requirements": [
     "REQ-PIPE-062",
     "REQ-PIPE-131",
     "REQ-GEN-135"
    ],
    "coordinates": {
-    "dataset": "cp-clients",
+    "dataset": "ed-presentations",
     "supplies": [
-     "cp_clients__202310121000000800"
+     "ed_presentations__202310121000000800"
     ],
     "period": "2023-Q4",
     "inPlaceOn": "2023-11-01",

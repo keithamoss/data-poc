@@ -12244,7 +12244,7 @@ twice. It deliberately did not re-find the `TypeError`.
      under the standing rule (a test, no product change); the gate run is the
      failing-first evidence.
 
-276. **[todo, 2026-10-25]** **[Pipeline & publishing]** **A staggered file's
+276. **[in-progress, 2026-10-26]** **[Pipeline & publishing]** **A staggered file's
      hold-back can take effect AFTER the promotion that ended it - FOUND, NOT
      FIXED, FOR KEITH (a wrong instant in a replayed history, so significant
      under the standing rule).** Seen in the bootstrap of Keith's A3 answers
@@ -12273,6 +12273,29 @@ twice. It deliberately did not re-find the `TypeError`.
      change that alters the generated history anyway (likely REQ-GEN-235/238 in
      wave 2), so the rebuild is paid once. Outcomes are right; only the
      instants around a staggered package's promotion are out of order.
+     **FIXED 2026-10-26 (lane L4, with REQ-GEN-235 and REQ-GEN-238's history
+     change), PROVISIONALLY by the first-named fix**: promotion.next_receipt
+     bounds the lag by the next receipt of any file of the collection; a file
+     at the same instant does not cap it. Test-first: two unit tests in
+     tests/test_promotion_waits_for_next_receipt.py failed on the old bound,
+     and a history test (no 'promotion-withheld' effective after the promote
+     of the same supply) failed on the pre-fix bootstrap (l4_base, 3279bc8:
+     11 such supplies, TS-84's three among them). Recorded as a PROVISIONAL
+     decision on REQ-PIPE-266 for Keith to confirm.
+     **WHAT THE FIX COSTS, FOR KEITH (found on the one bootstrap, l4_probe,
+     2026-10-26):** an ordinary Child Protection delivery's files carry receipts
+     a minute or so apart, so bounding by the collection's next file bounds
+     nearly every file of a delivery to the next one's receipt - the package's
+     promotion, made at its last file, lands within a second of receipt
+     whenever another file of the delivery follows it (2020-Q1: promoted 1
+     February 01:09:16, where it had been 12 February). Rule promotions' lag,
+     Child Protection: p10 29.8h -> 6.0h, median 168.5h -> 168.4h, p90
+     unchanged. One browser test moved with it (TestTheUxCriticsFindingsOn7093c20
+     ::test_affects_ends_a_sentence_on_the_awaiting_line, whose 7 February 2020
+     "Affects Placements" line no longer exists). The second fix #276 named -
+     floor a joined member's promotion at its own latest decision - keeps the
+     spread and only reorders; RECOMMENDED instead, and it needs a second
+     bootstrap, which is Keith's call. Not changed: left as built pending that.
 
 277. **[done, 2026-10-25]** **[Testing & dev tooling]** **Two generator tests
      read REQ-GEN-273's new scenario deliveries as invariant breaks.** Found by

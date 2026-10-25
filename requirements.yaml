@@ -40796,6 +40796,8 @@ requirements:
     - REQ-PIPE-279
     - REQ-PIPE-276
     linked_tests:
+    - "tests/test_promotion_waits_for_next_receipt.py::TestTheNextReceiptIsTheCollectionsNotTheDatasets"
+    - "tests/test_promotion_waits_for_next_receipt.py::test_no_supply_is_held_back_after_the_promotion_that_ended_it"
     - "tests/test_package_gate.py::TestGatedTogether::test_no_sibling_is_gated_before_the_last_is_checked"
     - "tests/test_package_gate.py::TestGatedTogether::test_a_package_promoted_whole_owes_one_reevaluation"
     - "tests/test_package_gate.py::TestAFileWaitingForItsDelivery::test_the_kept_report_says_it_waits_and_offers_no_decision"
@@ -40814,6 +40816,7 @@ requirements:
     - tests/test_cli_package_gate.py::TestCriticFindings::test_a_vanished_warning_still_refuses_a_stale_key
     - tests/test_cli_package_gate.py::TestCriticFindings::test_a_moved_warehouse_holder_changes_the_key
     implemented_by:
+    - "qa_tools/common/promotion.py::next_receipt"
     - "qa_tools/common/gate.py::Package"
     - "qa_tools/common/gate.py::package_of"
     - "qa_tools/common/gate.py::package_at"
@@ -40977,6 +40980,7 @@ requirements:
       cp qa --commit --run-id` on one file of a zip files that arrival alone, so its package counts one file and it is gated at once instead of waiting for
       the rest of its delivery. The processing pass and the hand-filed folder route file the whole delivery first and are not affected. Not a criterion change;
       to put to Keith.'
+    - 'A STAGGERED FILE''S HOLD-BACK TAKES EFFECT BEFORE THE APPLICATION THAT PROMOTES IT (post-build-review #276; PROVISIONAL, its first-named fix, taken overnight 2026-10-26 under the standing policy for Keith to confirm): promotion.next_receipt now bounds an arrival''s seeded lag by the next receipt of ANY file of its COLLECTION, not only of its own dataset, so an early file''s ''promotion-withheld'' always takes effect before the later file whose application promotes the package. A file received at the same instant does not cap it. REJECTED for now the second fix #276 named, flooring a joined member''s promotion at its own latest decision: it leaves the early file''s hold-back instant days late, and only moves the promotion after it. Changes every staggered package''s effective instants in the replayed history, so it landed with REQ-GEN-235 and REQ-GEN-238, whose history change it rides (Keith, 2026-10-25, option b).'
     open_questions: []
   - id: REQ-PIPE-267
     title: A supply is promoted only on cross-table verdicts about what the warehouse will hold, and supplies that depend on
