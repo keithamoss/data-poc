@@ -5902,3 +5902,14 @@ could never have computed it), and it belongs with batch 5's check work.
      no full gate), what it must report, and where it sits in
      docs/agent-orchestration.md relative to the scoper, architect and
      critics. Not scoped - goes to the scoper first.
+
+126. **[todo, 2026-10-25]** **[Data generation]** **The next synthetic
+     dataset uses more than one identifier.** Keith, 2026-10-25, while
+     scoping the linkage product: Linkage Keys carries `id_1` .. `id_n`,
+     one per identifier column of the source dataset, because some real
+     datasets are keyed by more than one. Both synthetic linked datasets
+     (Client Register, ED Presentations) have a single key, and he chose not
+     to invent a second one for ED. So the several-id case is proven only by
+     fake datasets and a planted scenario until the next real synthetic
+     dataset is added - which should be keyed by two or more columns on
+     purpose, so a real page shows it.
