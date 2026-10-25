@@ -618,11 +618,39 @@ def _follow_up(collection_id: str, *, carried=None) -> None:
               style="green")
     for outcome in done:
         if not outcome.completed:
-            # WHAT IT IS UNTIL THEN, AND WHAT FINISHES IT (criterion 14).
-            _show(f"{outcome.message}\nUntil it runs, a check it owes reads 'not yet "
-                  f"re-checked' - never 're-checked worse'. The re-check runs on the next "
-                  f"processing pass:\nmothman pipeline process",
-                  title="Re-evaluation owed", style="yellow")
+            # WHAT IT IS UNTIL THEN, AND WHAT FINISHES IT (criterion 14): each
+            # in-warehouse supply red only for the owed re-check, in
+            # REQ-DASH-204 criterion 7's sentence - never 're-checked worse'.
+            said = _owed_recheck_lines(outcome.owed_id)
+            _show("\n".join([outcome.message, *said]) if said else
+                  f"{outcome.message}\nThe re-check runs on the next processing pass:\n"
+                  f"mothman pipeline process", title="Re-evaluation owed", style="yellow")
+
+
+def _owed_recheck_lines(owed_id: int) -> list[str]:
+    """For an owed re-evaluation, each promoted reader of its period that
+    reads red only for 'recheck-owed': '<dataset>: Not yet re-checked against
+    the <dataset> promoted <instant>; the re-check runs on the next
+    processing pass:' and the command on a line of its own."""
+    from qa_tools.common import knock_on, promotion, recheck, supply_status
+
+    try:
+        with open_log() as conn:
+            item = next((o for o in recheck.owed(conn) if o.id == owed_id), None)
+            if item is None or not item.period:
+                return []
+            out = []
+            for r in knock_on.readers(conn, item.period, list(item.tables or []),
+                                      promotion._declared_reads()):
+                if r.waiting:
+                    continue
+                owed = supply_status.red_only_for_recheck_owed(conn, r.dataset_id, r.supply)
+                words = supply_status.recheck_owed_words(conn, owed) if owed else None
+                if words:
+                    out.append(f"{r.dataset_id}: {words}")
+    except Exception:  # noqa: BLE001 - the panel says what it can
+        return []
+    return out + ["mothman pipeline process"] if out else []
 
 
 def regated_lines(regated) -> list[str]:
@@ -1067,7 +1095,10 @@ def say_queue(conn, groups, collection_id: str, *, with_header: bool = True) -> 
             why = why or f"its checks of {b.traced.root.dataset_id} could not run"
             rows.append((lifecycle_report.label_for(b.traced.came), b.state.dataset_id,
                          f"nothing needs deciding on this supply - {why}. Deciding "
-                         f"{root_name} settles it. To override:",
+                         f"{root_name} settles it: its checks run again and the gate is "
+                         f"applied again once that decision is made or a "
+                         f"{b.state.period} {b.traced.root.dataset_id} supply is promoted. "
+                         f"To override:",
                          [ds for ds, _s in b.traced.via]))
         for line in lifecycle_report.beneath_lines(root_line, rows, root_name=root_name):
             console.print(line, **plain)
