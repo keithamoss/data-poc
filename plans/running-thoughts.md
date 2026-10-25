@@ -5863,6 +5863,17 @@ could never have computed it), and it belongs with batch 5's check work.
      docs/agent-orchestration.md relative to the scoper, architect and
      critics. Not scoped - goes to the scoper first.
 
+     **KEITH, 2026-10-26 morning, after the overnight run: discontinue
+     working builder agents in parallel.** That night ran five builders and up
+     to four critics at once; the load reached ~28 on 4 cores, the account hit
+     its session limit twice (about three hours lost, every background run
+     killed when PostgreSQL restarted), and the lanes collided - a builder's
+     pattern `pkill` able to kill other lanes' tests, an `npm ci` through
+     symlinked worktrees emptying the main checkout's node_modules, and
+     hand-resolved merges of the same terminal-queue code three times. From
+     here on: one builder at a time. Also his call the same morning: hold the
+     next push until all the queued work is done.
+
 126. **[todo, 2026-10-25]** **[Data generation]** **The next synthetic
      dataset uses more than one identifier.** Keith, 2026-10-25, while
      scoping the linkage product: Linkage Keys carries `id_1` .. `id_n`,
