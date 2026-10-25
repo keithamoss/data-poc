@@ -1171,7 +1171,7 @@ DECISION state, not a QA verdict. X rejected-as-a-LABEL in the promoted
 schema, because "a filter every query must remember to apply is a
 false-green generator". Why the rejected schema is global. Retention
 explicitly out of scope. The four-version scenario and there being NO
-superseded state. X promoting the loser as a non-current version.
+superseded state (overturned by REQ-PIPE-118). X promoting the loser as a non-current version.
 Red never auto-promotes. An unexpected table is INFORMATIONAL.
 
 **Thread D - arrival classification (sprint 10, no requirement).** Every
@@ -4531,7 +4531,10 @@ was neither promote nor reject. That is not the same state as "nobody
 has looked".
 
 **There is no SUPERSEDED state, and the reason is worth keeping**
-(Keith, 2026-09-23, correcting this session). Reading the scenario
+(Keith, 2026-09-23, correcting this session). **OVERTURNED 2026-10-03 by
+REQ-PIPE-118** (option A, Keith; see its decisions): staging did not drain
+fast enough, so a newer file now supersedes earlier unaccepted versions
+into a per-period superseded schema. Kept as the history of that call. Reading the scenario
 above, it looks as though the third version is orphaned once the fourth
 is promoted: not rejected, since nothing was decided against it, but
 left in staging, which is the dumping-ground problem returning by the

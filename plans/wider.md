@@ -1556,5 +1556,6 @@ check_lifecycle.py`'s own `check_id` convention.
     contract-declared date outliers, cardinality drift, one histogram); the
     four critics on a17d6e8 (plans/post-build-review.md); and clearing
     road-testing #16's design log once its decisions are confirmed on
-    REQ-PIPE-118 to 127.
+    REQ-PIPE-118 to 127 (DONE 2026-10-25: its decisions are on REQ-PIPE-118
+    onward and the log is deleted, its card kept).
 

@@ -4486,7 +4486,8 @@ could never have computed it), and it belongs with batch 5's check work.
 
 60. **[todo, 2026-10-04]** **[Pipeline & publishing]** **Retention for
     superseded supplies (and probably the original delivery files).**
-    Deferred from option A (plans/road-testing.md #16). Superseded is now
+    Deferred from option A (REQ-PIPE-123's decisions, which name this
+    entry; REQ-PIPE-118 made superseded per period). Superseded is now
     per period, so a retention decision applies to whole periods. Keith's
     shape: the data asset defines a period-level retention, overridable at
     collection or dataset level - "two years is fine for a quarterly
