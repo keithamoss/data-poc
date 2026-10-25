@@ -200,6 +200,13 @@ def run_plan() -> list[tuple[int, str | None]]:
 # run plan, seeds and slot ids of their own afterwards. The same mix as the
 # original plan (Keith): about a quarter amber, two reds, the oldest clean.
 GROWN_QUARTERS = 40
+# THE OLDEST TWO OF THEM DROPPED (REQ-GEN-238, Keith, 2026-10-15 Q4): once
+# the scenarios that need nothing Child Protection has moved to Emergency
+# Department, a fresh dry run of the ones that stayed (TS-84 at 2015-Q4 the
+# oldest) needs eight of the ten years. The plan is still DRAWN over all forty
+# and placed over all forty, then the dropped quarters are left out - so every
+# kept quarter's severity, seed, slot id and delivery name is REQ-GEN-207's.
+GROWN_DROPPED = 8
 _GROWN_PLAN_SEED = 29000   # disjoint from _RUN_PLAN_SEED and every BASE_SEED offset
 GROWN_BASE_SEED = 30000    # seeds 30001.. and their +500/+800/+900 offsets
 @functools.cache
@@ -699,9 +706,23 @@ def _pair_problems(injection) -> list[str]:
 
 def generated_periods() -> list:
     """The periods this generator writes, oldest first - one delivery each:
-    the grown quarters, then the original fifteen (REQ-GEN-207)."""
+    the grown quarters it keeps, then the original fifteen (REQ-GEN-207,
+    REQ-GEN-238)."""
     return schedule.periods_for_dataset(
-        DATASET_ID, until=get_anchor_date())[-(len(grown_run_plan()) + len(run_plan())):]
+        DATASET_ID, until=get_anchor_date())[-(_kept_grown() + len(run_plan())):]
+
+
+def _kept_grown() -> int:
+    return len(grown_run_plan()) - GROWN_DROPPED
+
+
+def drawn_grown_periods() -> list:
+    """ALL FORTY quarters REQ-GEN-207's grown plan was drawn and placed over,
+    oldest first, the dropped ones included (REQ-GEN-238 criterion 2) - from
+    the quarterly calendar itself, because the datasets no longer owe the
+    dropped ones."""
+    n = len(grown_run_plan()) + len(run_plan())
+    return schedule.periods_for_calendar("quarterly", until=get_anchor_date())[-n:-len(run_plan())]
 
 
 def original_periods() -> list:
@@ -715,11 +736,13 @@ def grown_periods() -> list:
 
 
 def _drawn_by_period(periods) -> dict:
-    """Each period's drawn severity by name, from whichever plan owns it."""
+    """Each period's drawn severity by name, from whichever plan owns it -
+    the grown plan by the quarters it was drawn over (REQ-GEN-238)."""
     plan, grown_plan = run_plan(), grown_run_plan()
     names = [p.name for p in periods]
-    grown, original = names[:-len(plan)], names[-len(plan):]
-    return {**dict(zip(grown[-len(grown_plan):], (s for _q, s in grown_plan))),
+    original = names[-len(plan):]
+    drawn = [p.name for p in drawn_grown_periods()]
+    return {**dict(zip(drawn, (s for _q, s in grown_plan))),
             **dict(zip(original, (s for _q, s in plan)))}
 
 
@@ -784,7 +807,7 @@ def _plan_injections(periods):
     return resolved, by_period
 
 
-def _severities(plan, periods, injected_by_period) -> list:
+def _severities(plan, periods, injected_by_period, dropped=frozenset()) -> list:
     """Each drawn severity, with every ordinary amber that cannot be
     generated where it was drawn - in a `hold` amber-setting era, or on a
     period an injected scenario owns, whose chain ignores the drawn
@@ -804,7 +827,8 @@ def _severities(plan, periods, injected_by_period) -> list:
     unavailable = frozenset(i for i, p in enumerate(periods)
                             if (p.name in injected_by_period
                                 and not injected_by_period[p.name][0].keeps_drawn_severity)
-                            or p.name in green or p.name in emptied)
+                            or p.name in green or p.name in emptied
+                            or p.name in dropped)
     out = targeting.outside_hold([sev for _q, sev in plan[:len(periods)]],
                                  [p.date for p in periods], "cp-clients",
                                  keep_clean=frozenset({0}), unavailable=unavailable)
@@ -837,13 +861,24 @@ def _grown_severities(periods, injected_by_period) -> list:
     quarter, its lead-in and following quarters clean (REQ-GEN-203 and 218
     plant scenarios here; post-build-review #207 D3 refused one until then).
 
+    PLACED OVER ALL FORTY, THEN THE KEPT ONES RETURNED (REQ-GEN-238 criterion
+    2): an amber drawn in a dropped quarter was moved into a kept one, and
+    placing over the kept quarters alone would move the rest differently.
+    `periods` are the kept quarters, the newest of the forty.
+
     A DRAWN RED ON A SCENARIO'S QUARTER, OR ITS LEAD-IN OR FOLLOWING ONE, IS
     REFUSED naming the scenario: outside_hold moves ambers only, and the red
     chain would be swallowed by the scenario's own arrivals."""
     from generator import scenario_injection
 
     plan = grown_run_plan()
-    drawn = {p.name: sev for p, (_q, sev) in zip(periods, plan)}
+    drawn_over = drawn_grown_periods()
+    kept = [p.name for p in periods]
+    if [p.name for p in drawn_over[-len(kept):]] != kept:
+        raise scenario_injection.CannotPlace(
+            f"the kept grown quarters {kept[:1]}..{kept[-1:]} are not the newest of the "
+            f"quarters the grown plan was drawn over")
+    drawn = {p.name: sev for p, (_q, sev) in zip(drawn_over, plan)}
     for period, (injection, placement) in injected_by_period.items():
         for name in (period, *placement.built_green):
             if drawn.get(name) == "red":
@@ -851,7 +886,10 @@ def _grown_severities(periods, injected_by_period) -> list:
                     f"{injection.scenario_id}: an ordinary red is drawn for the grown quarter "
                     f"{name}, which the scenario needs to itself - move its anchor to a "
                     f"quarter whose own and lead-in quarters are drawn clean or amber")
-    return _severities(plan, periods, injected_by_period)
+    # A DROPPED QUARTER CARRIES NOTHING, so it takes no amber - as the emptied
+    # ones among them already did not.
+    dropped = frozenset(p.name for p in drawn_over[:-len(kept)])
+    return _severities(plan, drawn_over, injected_by_period, dropped)[-len(kept):]
 
 
 #: The largest offset any derivation adds to a slot's own seed: generate()'s
@@ -882,7 +920,8 @@ class ChildProtection(Provider):
     target_datasets = (DATASET_ID,)
     target_levers = "client-postcodes"
     amber_dataset = DATASET_ID
-    generating_note = f"population=70,000, {N_QUARTERS + GROWN_QUARTERS} quarterly snapshots"
+    generating_note = (f"population=70,000, "
+                       f"{N_QUARTERS + GROWN_QUARTERS - GROWN_DROPPED} quarterly snapshots")
     suppresses_others_corrections = True
 
     def seed_schedule(self) -> list[tuple[str, int, int]]:
@@ -893,7 +932,8 @@ class ChildProtection(Provider):
         out += [(f"cp_slot_{i:02d}", BASE_SEED + i, BASE_SEED + i + SEED_SPAN)
                 for i in range(1, N_QUARTERS + 1)]
         out += [(f"cp_slot_{N_QUARTERS + j:02d}", GROWN_BASE_SEED + j,
-                 GROWN_BASE_SEED + j + SEED_SPAN) for j in range(1, GROWN_QUARTERS + 1)]
+                 GROWN_BASE_SEED + j + SEED_SPAN)
+                for j in range(GROWN_DROPPED + 1, GROWN_QUARTERS + 1)]
         return out
 
     def generated_periods(self) -> list:
@@ -926,8 +966,11 @@ class ChildProtection(Provider):
         # then the grown quarters (REQ-GEN-207 criterion 4).
         jobs = [Job(f"cp_slot_{i:02d}", BASE_SEED + i, severity, period)
                 for i, (severity, period) in enumerate(zip(severities, original), start=1)]
+        # Numbered from the first DRAWN grown quarter (REQ-GEN-238 criterion 2),
+        # so a kept quarter keeps its slot id and seed.
         jobs += [Job(f"cp_slot_{len(original) + j:02d}", GROWN_BASE_SEED + j, severity, period)
-                 for j, (severity, period) in enumerate(zip(grown_severities, grown), start=1)]
+                 for j, (severity, period) in enumerate(zip(grown_severities, grown),
+                                                        start=GROWN_DROPPED + 1)]
         return Plan(jobs=jobs, resolved=resolved_injections, injected_by_period=injected_by_period,
                     state={"provider": ChildProtectionProvider(base_tables), "original": original,
                            # A GROWN QUARTER CASE WORKERS OWES NOTHING IN CARRIES

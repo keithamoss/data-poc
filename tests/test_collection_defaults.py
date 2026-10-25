@@ -505,8 +505,9 @@ class TestWhereEachValueCameFrom:
         got = CliRunner().invoke(schedule_cli.schedule_group,
                                  ["show", "--dataset", "cp-clients", "--on", "2010-06-01"])
         assert got.exit_code == 0, got.output
-        # The real history starts in 2013 since REQ-GEN-207's growth.
-        assert "not yet owing - first version takes effect 1 Jan 2013" in got.output
+        # The real history starts in 2015 since REQ-GEN-238 re-sized
+        # REQ-GEN-207's growth.
+        assert "not yet owing - first version takes effect 1 Jan 2015" in got.output
 
     def test_the_calendar_entry_uses_the_same_renderer(self, supply_dsn, monkeypatch):
         from cli import common

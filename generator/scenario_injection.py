@@ -1685,54 +1685,56 @@ INJECTIONS: tuple[Injection, ...] = (
         ),
     ),
     # EARLY ARRIVALS, AND ONE TOO EARLY (REQ-GEN-195, Keith 2026-10-12: "3 or
-    # 4 plus one too early"). Child Protection's quarterly calendar lets a
-    # supply arrive up to 14 days before it is due (claim_window: 14d), and
-    # until now no generated delivery ever did, so the window could not be
-    # seen working on a real page. Each is a whole collection delivery -
-    # all six tables arrive together - placed in a clean quarter, and the
-    # too-early one after an ordinary quarter so what it lands in is not
-    # another scenario. Shapes only; the assignment rule decides.
+    # 4 plus one too early"). The quarterly calendar lets a supply arrive up
+    # to 14 days before it is due (claim_window: 14d), and until then no
+    # generated delivery ever did, so the window could not be seen working on
+    # a real page. ON EMERGENCY DEPARTMENT SINCE REQ-GEN-235 (Keith,
+    # 2026-10-15: they need nothing Child Protection has): each is one file,
+    # in the same quarter at the same instant as when it was a whole Child
+    # Protection delivery, and the too-early one after an ordinary quarter so
+    # what it lands in is not another scenario. Shapes only; the assignment
+    # rule decides.
     Injection(
         scenario_id="TS-9",
-        dataset_id="cp-clients",
+        dataset_id="ed-presentations",
         anchor=-10,
         config="quarterly, Feb/May/Aug/Nov, due 09:00 on the 1st, claim window 14 days. "
                "The supply arrives 9 days before the quarter's date, inside its window.",
         arrivals=(
             ExtraArrival(-9, "10:00", None,
-                          "the whole collection, nine days early - inside the window"),
+                          "the supply, nine days early - inside the window"),
         ),
     ),
     Injection(
         scenario_id="TS-65",
-        dataset_id="cp-clients",
+        dataset_id="ed-presentations",
         anchor=-5,
         config="as TS-9. The window opens 14 days before 09:00 on the 1st; this supply "
                "arrives 13 days before, a day after it opened.",
         arrivals=(
             ExtraArrival(-13, "10:00", None,
-                          "the whole collection, thirteen days early - just inside the window"),
+                          "the supply, thirteen days early - just inside the window"),
         ),
     ),
     Injection(
         scenario_id="TS-66",
-        dataset_id="cp-clients",
+        dataset_id="ed-presentations",
         anchor=-4,
         config="as TS-9. The everyday case: a supplier who sends a couple of days ahead.",
         arrivals=(
-            ExtraArrival(-2, "10:00", None, "the whole collection, two days early"),
+            ExtraArrival(-2, "10:00", None, "the supply, two days early"),
         ),
     ),
     Injection(
         scenario_id="TS-67",
-        dataset_id="cp-clients",
+        dataset_id="ed-presentations",
         anchor=-12,
         config="as TS-9. The supply arrives 20 days before the quarter's date - six days "
                "before its window opens - so the quarter it was meant for is not yet "
                "open, and the previous quarter (an ordinary one) still is.",
         arrivals=(
             ExtraArrival(-20, "10:00", None,
-                          "the whole collection, twenty days early - before its window"),
+                          "the supply, twenty days early - before its window"),
         ),
     ),
     # ONE DAY OUTSIDE A QUARTERLY CLAIM WINDOW (REQ-GEN-236, Keith 2026-10-15:

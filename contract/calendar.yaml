@@ -367,8 +367,9 @@ collections:
     # dataset takes its due time and grace from here unless it states its own.
     participation_defaults:
       versions:
-        # TEN EARLIER YEARS (REQ-GEN-207) - see the quarterly calendar above.
-        - effective_from: "2013-01-01"
+        # TEN EARLIER YEARS (REQ-GEN-207), EIGHT SINCE REQ-GEN-238 - see the
+        # quarterly calendar above.
+        - effective_from: "2015-01-01"
           expected_time: "09:00"
           grace: 8h
           changelog:
@@ -378,6 +379,12 @@ collections:
                 Child Protection owes supplies from 2013-01-01, ten years earlier -
                 the synthetic history grows at its old end. The same due time and
                 grace as the version after it.
+            - date: "2026-10-26"
+              author: REQ-GEN-238
+              change: >-
+                Owed from 2015-01-01 rather than 2013-01-01 - the two oldest grown
+                years are dropped, because the scenarios that stayed on Child
+                Protection need only eight.
         - effective_from: "2023-01-01"
           expected_time: "09:00"
           grace: 8h
@@ -500,11 +507,14 @@ datasets:
       versions:
         # TEN EARLIER YEARS (REQ-GEN-207) - see the quarterly calendar above.
         - &cp_grown_participation
-          effective_from: "2013-01-01"
+          effective_from: "2015-01-01"
           changelog:
             - date: "2026-10-15"
               author: REQ-GEN-207
               change: Owes supplies from 2013-01-01, ten years earlier - the synthetic history grows at its old end. Due time and grace from Child Protection's participation_defaults, as after it.
+            - date: "2026-10-26"
+              author: REQ-GEN-238
+              change: Owed from 2015-01-01 rather than 2013-01-01 - the two oldest grown years are dropped, because the scenarios that stayed on Child Protection need only eight.
         - &cp_participation
           effective_from: "2023-01-01"
           changelog:
@@ -589,7 +599,7 @@ datasets:
       # the alias it replaces stated; nothing resolves differently outside the
       # gap.
       versions:
-        - effective_from: "2013-01-01"
+        - effective_from: "2015-01-01"
           effective_to: "2021-12-31"
           turned_off_reason: >-
             A fictional pause, made to demonstrate a dataset turned off and back on
@@ -599,6 +609,9 @@ datasets:
             - date: "2026-10-15"
               author: REQ-GEN-207
               change: Owes supplies from 2013-01-01, ten years earlier - the synthetic history grows at its old end. Due time and grace from Child Protection's participation_defaults, as after it.
+            - date: "2026-10-26"
+              author: REQ-GEN-238
+              change: Owed from 2015-01-01 rather than 2013-01-01 - the two oldest grown years are dropped, because the scenarios that stayed on Child Protection need only eight.
             - date: "2021-12-15"
               author: REQ-GEN-218
               change: Turned off after 31 December 2021 - a fictional correction for this synthetic asset's TS-63.
@@ -635,7 +648,7 @@ datasets:
           on in this synthetic asset: Carer Register is not owed for 2022-Q1
           or 2022-Q2.
         changes:
-          - item: dataset cp-carers participation 2013-01-01 effective_to
+          - item: dataset cp-carers participation 2015-01-01 effective_to
             old: null
             new:
               effective_to: "2021-12-31"
@@ -648,7 +661,7 @@ datasets:
       versions:
         # TEN EARLIER YEARS (REQ-GEN-207) - the same months and reason as the
         # version after it.
-        - effective_from: "2013-01-01"
+        - effective_from: "2015-01-01"
           participates: [February, August]
           reason: >-
             A staffing register rather than casework, so it is resupplied twice a
@@ -657,6 +670,9 @@ datasets:
             - date: "2026-10-15"
               author: REQ-GEN-207
               change: Owes supplies from 2013-01-01, ten years earlier - the synthetic history grows at its old end. The same months and reason as the version after it.
+            - date: "2026-10-26"
+              author: REQ-GEN-238
+              change: Owed from 2015-01-01 rather than 2013-01-01 - the two oldest grown years are dropped, because the scenarios that stayed on Child Protection need only eight.
         - effective_from: "2023-01-01"
           # The worked example of partial participation. Month NAMES, in
           # full, never numbers or positions - an index breaks silently the

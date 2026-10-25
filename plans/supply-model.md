@@ -3004,9 +3004,11 @@ pick up first - non-determinism nothing would ever flag.
 *Config: quarterly, Feb 2 / May 1 / Aug 3 / Nov 2, early window 14 days.
 Feb and May filled. Supply arrives 25 July - 9 days early, inside
 August's window, which opened 20 July.* PLANTED 2026-10-12 (REQ-GEN-195)
-on Child Protection's real calendar - Feb/May/Aug/Nov on the 1st, due
-09:00, 14-day window - as 2024-Q2, arriving 22 April, nine days early:
-the same shape, with the dates the configuration actually has. (Corrected 2026-10-04: this used
+on the real quarterly calendar - Feb/May/Aug/Nov on the 1st, due 09:00,
+14-day window - as 2024-Q2, arriving 22 April, nine days early: the same
+shape, with the dates the configuration actually has. On Emergency
+Department since REQ-GEN-235 (it was a whole Child Protection delivery):
+one file, ed_presentations.csv, in the same quarter at the same instant. (Corrected 2026-10-04: this used
 to say 13 July and "21 days early, inside August's window", which a
 14-day window cannot be - and under REQ-PIPE-131 a 13 July arrival is
 in MAY's open interval, a resupply of May.)
@@ -3019,9 +3021,9 @@ the 1 May anchor and reports the supply ~12 weeks LATE for a quarter
 that was filled months ago.
 
 **TS-65 `[INJECT]` Early, at the edge of the window.**
-*Config: as TS-9 - Child Protection, quarterly, due 09:00 on the 1st, claim
-window 14 days. 2025-Q3 (1 August) arrives 19 July at 10:00, thirteen days
-early, a day after its window opened at 09:00 on 18 July.*
+*Config: as TS-9 - Emergency Department, one file, quarterly, due 09:00 on
+the 1st, claim window 14 days. 2025-Q3 (1 August) arrives 19 July at 10:00,
+thirteen days early, a day after its window opened at 09:00 on 18 July.*
 **Expect**: assigned **2025-Q3** and classified **early by 13 days**,
 exactly as TS-9 - the window is a boundary, and a supply inside it by a day
 is as early-and-fine as one inside it by a week (REQ-PIPE-131).
@@ -3029,16 +3031,18 @@ is as early-and-fine as one inside it by a week (REQ-PIPE-131).
 from somewhere else.
 
 **TS-66 `[INJECT]` A couple of days early - the everyday case.**
-*Config: as TS-9. 2025-Q4 (1 November) arrives 30 October at 10:00.*
+*Config: as TS-9 - Emergency Department, one file. 2025-Q4 (1 November)
+arrives 30 October at 10:00.*
 **Expect**: assigned **2025-Q4**, classified **early by 2 days**, and
 otherwise unremarkable - it fills and promotes like an on-time supply.
 **Breaks as**: shown as anything more alarming than early.
 
 **TS-67 `[INJECT]` A quarterly supply sent too early.**
-*Config: as TS-9. 2023-Q4 (1 November) is due 09:00 that day and its window
-opens 09:00 on 18 October; the supply arrives 12 October at 10:00, twenty
-days early and six days before the window. 2023-Q3, before it, is an
-ordinary quarter whose own supply has arrived.*
+*Config: as TS-9 - Emergency Department, one file. 2023-Q4 (1 November) is
+due 09:00 that day and its window opens 09:00 on 18 October; the supply
+arrives 12 October at 10:00, twenty days early and six days before the
+window. 2023-Q3, before it, is an ordinary quarter whose own supply has
+arrived.*
 **Expect**: it cannot claim 2023-Q4, whose window has not opened - nothing
 claims forward (REQ-PIPE-062 criterion 5). The open period when it arrives
 is 2023-Q3, so it files there as a **resupply of 2023-Q3** (REQ-PIPE-131),

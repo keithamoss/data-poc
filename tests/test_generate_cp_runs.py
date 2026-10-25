@@ -107,7 +107,7 @@ def test_manifest_has_one_entry_per_scheduled_slot_at_minimum(manifest):
     delivery_ids = {e["slot_id"] for e in manifest}
     # THE GROWN QUARTERS TOO (REQ-GEN-207): one slot per generated period,
     # less the quarters another collection's correction empties.
-    assert len(delivery_ids) == (len(cp_provider.RUN_PLAN) + len(cp_provider.GROWN_RUN_PLAN)
+    assert len(delivery_ids) == (len(cp_provider.RUN_PLAN) + len(cp_provider.grown_periods())
                                  - len(_emptied()))
 
 
@@ -165,7 +165,7 @@ def test_severity_counts_match_run_plan(manifest):
     for e in sorted(manifest, key=lambda e: e["run_index"]):
         first_by_slot.setdefault(e["slot_id"], e)
     emptied = _emptied()
-    assert len(first_by_slot) == (len(cp_provider.RUN_PLAN) + len(cp_provider.GROWN_RUN_PLAN)
+    assert len(first_by_slot) == (len(cp_provider.RUN_PLAN) + len(cp_provider.grown_periods())
                                   - len(emptied))
 
     # AN INJECTED SLOT FOLLOWS ITS INJECTION, not the run plan (REQ-GEN-044):
@@ -588,7 +588,8 @@ def test_the_original_fifteen_keep_their_slots_and_come_first(manifest):
     first, from a seed range of their own."""
     original = [p.name for p in cp_provider.original_periods()]
     grown = [p.name for p in cp_provider.grown_periods()]
-    assert len(grown) == cp_provider.GROWN_QUARTERS
+    # The quarters REQ-GEN-238 kept, the newest of the forty drawn.
+    assert len(grown) == cp_provider.GROWN_QUARTERS - cp_provider.GROWN_DROPPED
     first = {}
     for e in sorted(manifest, key=lambda e: e["run_index"]):
         first.setdefault(e["slot_id"], e)
@@ -657,8 +658,14 @@ class TestAScenarioInAGrownQuarter:
     def _index(grown, name):
         return [p.name for p in grown].index(name)
 
+    @staticmethod
+    def _kept_draw():
+        """The drawn severity of each kept grown quarter, by its index among
+        the kept ones (REQ-GEN-238 dropped the oldest)."""
+        return [sev for _q, sev in cp_provider.grown_run_plan()[cp_provider.GROWN_DROPPED:]]
+
     def test_a_drawn_amber_moves_off_the_scenarios_quarter(self):
-        drawn = [i for i, (_q, sev) in enumerate(cp_provider.grown_run_plan()) if sev == "amber"]
+        drawn = [i for i, sev in enumerate(self._kept_draw()) if sev == "amber"]
         grown, placed, before, after = self._plan(drawn[0])
         assert after[self._index(grown, placed.period)] is None
         assert after.count("amber") == before.count("amber")
@@ -673,17 +680,24 @@ class TestAScenarioInAGrownQuarter:
     def test_its_lead_in_and_following_quarters_are_clean(self):
         from generator import scenario_injection as si
 
-        drawn = [i for i, (_q, sev) in enumerate(cp_provider.grown_run_plan()) if sev == "amber"]
+        drawn = [i for i, sev in enumerate(self._kept_draw()) if sev == "amber"]
         grown, placed, _before, after = self._plan(
             drawn[2] + 1, arrivals=(si.ExtraArrival(0, "08:00", target=si.Target("green")),), lead_in=1)
         assert placed.built_green
         for name in placed.built_green:
             assert after[self._index(grown, name)] is None, name
 
-    def test_a_drawn_red_there_is_refused_naming_the_scenario(self):
+    def test_a_drawn_red_there_is_refused_naming_the_scenario(self, monkeypatch):
         from generator import scenario_injection as si
 
-        red = next(i for i, (_q, sev) in enumerate(cp_provider.grown_run_plan()) if sev == "red")
+        # BOTH REDS WERE DRAWN IN THE YEARS REQ-GEN-238 DROPPED, so one is
+        # drawn here into a kept quarter the real draw left clean.
+        plan = list(cp_provider.grown_run_plan())
+        kept = cp_provider.GROWN_DROPPED
+        red = next(i for i, sev in enumerate(self._kept_draw()) if sev is None and i > 3
+                   and cp_provider.grown_periods()[i].name not in _emptied())
+        plan[kept + red] = (plan[kept + red][0], "red")
+        monkeypatch.setattr(cp_provider, "grown_run_plan", lambda: plan)
         with pytest.raises(si.CannotPlace) as refused:
             self._plan(red)
         assert "TS-99" in str(refused.value) and "red" in str(refused.value)

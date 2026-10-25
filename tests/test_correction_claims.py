@@ -124,9 +124,11 @@ class TestAnotherCollectionsCorrectionEmptiesItsQuarters:
     counts those quarters as suppressed."""
 
     def test_the_quarters_are_the_correction_s_altered_ones(self):
+        # Only the quarters Child Protection still owes since REQ-GEN-238
+        # dropped 2013 and 2014: of the correction's, 2015-Q1 and 2015-Q3.
         got = cc.foreign_altered("child-protection")
-        assert {"2013-Q1", "2013-Q4", "2014-Q3", "2015-Q1", "2015-Q3"} <= got
-        assert "2016-Q1" not in got and not any(q.startswith("2021") for q in got)
+        assert {"2015-Q1", "2015-Q3"} <= got
+        assert not any(q.startswith(("2013", "2014", "2016", "2021")) for q in got), got
 
     def test_a_collection_riding_the_correction_suppresses_nothing_for_it(self):
         assert cc.foreign_altered("emergency-department") == set()

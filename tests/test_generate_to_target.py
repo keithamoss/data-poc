@@ -862,7 +862,7 @@ class TestRefusals156:
 
         grown = cp.grown_periods()
         # A GROWN QUARTER DRAWN CLEAN, with its neighbours drawn clean too.
-        plan = [s for _q, s in cp.grown_run_plan()]
+        plan = [s for _q, s in cp.grown_run_plan()[cp.GROWN_DROPPED:]]
         k = next(i for i in range(2, len(grown) - 1)
                  if plan[i - 2] is None and plan[i - 1] is None and plan[i] is None
                  and plan[i + 1] is None)

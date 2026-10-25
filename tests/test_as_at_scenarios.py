@@ -43,6 +43,12 @@ def _cp_all_periods():
     return cp_provider.generated_periods()
 
 
+def _ed_periods():
+    from generator.collections import emergency_department as ed_provider
+
+    return ed_provider.generated_periods()
+
+
 def _bdm_periods():
     from generator.collections import civil_registration as generate_runs
 
@@ -156,24 +162,25 @@ class TestTheHoldEraIsNotLeft:
 
 class TestAnEarlyArrivalClaimsTheQuarterItFilesInto:
     """Criterion 28: TS-67 arrives before its quarter's window, files into
-    the quarter before (-13), and claims it."""
+    the quarter before (-13), and claims it - on Emergency Department since
+    REQ-GEN-235."""
 
     def test_ts_67_claims_the_quarter_before_its_anchor(self):
-        periods = _cp_periods()
+        periods = _ed_periods()
         placement = si.resolve(_injection("TS-67"), periods)
         assert si.filed_early_into(_injection("TS-67"), placement, periods) == ("2023-Q3",)
 
     def test_an_arrival_inside_its_window_claims_nothing_more(self):
-        periods = _cp_periods()
+        periods = _ed_periods()
         placement = si.resolve(_injection("TS-65"), periods)
         assert si.filed_early_into(_injection("TS-65"), placement, periods) == ()
 
     def test_a_scenario_placed_where_ts_67_files_is_refused(self):
-        periods = _cp_periods()
-        other = si.Injection("TS-x", "cp-clients", -13, "cfg")
+        periods = _ed_periods()
+        other = si.Injection("TS-x", "ed-presentations", -13, "cfg")
         with pytest.raises(si.CannotPlace, match="2023-Q3"):
             si.no_two_scenarios_share_a_period([_injection("TS-67"), other],
-                                               {"cp-clients": periods})
+                                               {"ed-presentations": periods})
 
 
 class TestWhereTheNewChildProtectionScenariosSit:
