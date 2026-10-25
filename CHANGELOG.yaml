@@ -116,6 +116,28 @@ releases:
       a delivery are now judged together, so no table goes in green against a
       partner that nobody checked.
     changes:
+      - category: New
+        items:
+          - headline: Results remember their check
+            components: ["QA checks & contract", "Pipeline & publishing"]
+            description: >
+              Every check result now records a fingerprint of the check as it
+              stood when it ran. Adding a setting the system already used
+              moves no fingerprint, so a supply looks out of date only when
+              its check really changed.
+          - headline: Re-check after a fix
+            components: ["Pipeline & publishing", "Testing & dev tooling"]
+            description: >
+              `mothman supply recheck --check <id>` re-checks every supply a
+              fixed check judged under its old definition, across every period,
+              after one panel and one confirmation. The queue says how many are
+              waiting, and a large run can go to the processing pass.
+          - headline: Try a fix first
+            components: ["Pipeline & publishing"]
+            description: >
+              Add `--trial` to run that re-check on a few supplies first. You
+              see each new verdict beside the current one and what the gate
+              would do, and nothing is recorded.
       - category: Fixed
         items:
           - headline: Opens in a blink

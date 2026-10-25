@@ -35,6 +35,7 @@ import pytest
 
 from qa_tools.common import qa_results_writer, qa_store, supply_db
 from qa_tools.common import tables_read as tr
+from attempt_support import ANY_CHECK
 
 ROOT = Path(__file__).resolve().parent.parent
 AGENCY = "child-protection-family-support"
@@ -212,7 +213,7 @@ class TestACrossTableResultWithNoReadIsRefused:
         with pytest.raises(qa_store.UnrecordableRead):
             qa_store.record_results(conn, "r279", [_result(CLIENT_REF)], tool="dbt",
                                     agency_id="a", collection_id="b",
-                                    scope=qa_store.CROSS_TABLE_SCOPE)
+                                    scope=qa_store.CROSS_TABLE_SCOPE, fingerprints=ANY_CHECK)
 
 
 class TestAStagedTablesSupplyDoesNotRenameWhatWasRead:
@@ -271,14 +272,14 @@ class TestASingleTableResultIsAboutItsRunsOwnDataset:
         qa_store.set_run_purpose(conn, "r279b", dataset_id="cp-notifications", supply_id=None)
         with pytest.raises(qa_store.WrongDataset, match="cp-clients"):
             qa_store.record_results(conn, "r279b", [_result("x.y", dataset_id="cp-clients")],
-                                    tool="dbt", agency_id="a", collection_id="b")
+                                    tool="dbt", agency_id="a", collection_id="b", fingerprints=ANY_CHECK)
 
     def test_its_own_datasets_is_recorded(self, conn):
         qa_store.record_run(conn, run_key="r279c", agency_id="a", collection_id="b",
                             run_timestamp=WHEN)
         qa_store.set_run_purpose(conn, "r279c", dataset_id="cp-clients", supply_id=None)
         assert qa_store.record_results(conn, "r279c", [_result("x.y", dataset_id="cp-clients")],
-                                       tool="dbt", agency_id="a", collection_id="b") == 1
+                                       tool="dbt", agency_id="a", collection_id="b", fingerprints=ANY_CHECK) == 1
 
 
 # ---------------------------------------------------------------------------
@@ -706,7 +707,7 @@ class TestTheOtherWritersAndReadersOfAnAttempt:
             qa_store.record_file_results(
                 conn, run_id, [_result(f"{CHECK}.cp-notifications.x.encoding_file")],
                 agency_id=AGENCY, collection_id=COLLECTION, supply_state=qa_store.AGREED,
-                load_attempt=-1, delivery="d", filename="f.csv")
+                load_attempt=-1, delivery="d", filename="f.csv", fingerprints=ANY_CHECK)
 
     def test_a_file_check_write_before_the_run_is_opened_is_allowed(self, conn):
         """At staging, as the pipeline writes them: no run_seq yet."""
@@ -716,7 +717,7 @@ class TestTheOtherWritersAndReadersOfAnAttempt:
         assert qa_store.record_file_results(
             conn, run_id, [_result(f"{CHECK}.cp-notifications.x.encoding_file")],
             agency_id=AGENCY, collection_id=COLLECTION, supply_state=qa_store.AGREED,
-            load_attempt=-1, delivery="d", filename="f.csv") == 1
+            load_attempt=-1, delivery="d", filename="f.csv", fingerprints=ANY_CHECK) == 1
 
     def test_a_debug_runner_is_refused_while_another_process_holds_the_attempt(
             self, conn, monkeypatch):

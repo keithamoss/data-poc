@@ -860,12 +860,37 @@ def queue_command(collection_id: str) -> None:
     # A NEWER SUPPLY THAT COULD BE CARRIED FORWARD (REQ-PIPE-271 criterion 7),
     # above the supplies and not counted among them.
     filing_tui.say_carry_forward_warnings(carry)
+    # SUPPLIES CHECKED BEFORE A CHECK CHANGED (REQ-PIPE-177 criterion 20): the
+    # collection's line, then one paste-ready line per check beneath it.
+    _say_bulk_rechecks(collection_id)
     if not waiting:
         console.print("Nothing is waiting on a person.", style="green")
     else:
         console.print(f"[bold]{len(waiting)}[/bold] supply/supplies waiting on a decision\n")
         console.print(filing_tui.queue_table(waiting))
     _say_owed(owed_now)
+
+
+def _say_bulk_rechecks(collection_id: str) -> None:
+    """Criterion 19's line for this collection and, beneath it, each check
+    with supplies to cover - its check_id as pasted after --check, its count
+    here and in all, the date it changed and its changelog headline -
+    followed by the command on a line of its own."""
+    from cli import bulk_recheck_tui
+    from qa_tools.common import bulk_recheck
+
+    nudges = bulk_recheck_tui.nudges_or_none()
+    line = bulk_recheck.nudge_line(nudges, collection_id)
+    if line is None:
+        return
+    console.print(line, style="bold yellow", markup=False, highlight=False, soft_wrap=True)
+    for n in nudges:
+        here = n.by_collection.get(collection_id, 0)
+        console.print(f"  {n.check_id} - {here} here, {n.total} in all, changed {n.changed}: "
+                      f"{n.headline}", markup=False, highlight=False, soft_wrap=True)
+    console.print("mothman supply recheck --check <check_id> --reason <why>", markup=False,
+                  highlight=False, soft_wrap=True)
+    console.print()
 
 
 def _owed_in(conn, collection_id: str) -> list:
@@ -885,11 +910,95 @@ def _say_owed(owed_now: list) -> None:
         return
     console.print(f"\n[bold yellow]{len(owed_now)}[/bold yellow] QA run(s) owed, not yet "
                   "done - the processing pass completes them:")
+    # ONE LINE PER BULK RE-CHECK (REQ-PIPE-177 criterion 29), which is also the
+    # progress view of a handed-off one.
+    from qa_tools.common import bulk_recheck
+
+    try:
+        with supply_db.connect(read_only=True, label="mothman:owed") as conn:
+            groups, owed_now = bulk_recheck.owed_groups(conn, owed_now)
+    except Exception:  # noqa: BLE001 - listed one per line, as before
+        groups = []
+    for g in groups:
+        console.print(f"  {bulk_recheck.owed_line(g)}", markup=False, highlight=False)
     for o in owed_now:
         what = (f"re-check of {o.supply_id}" if o.kind == "recheck"
                 else f"re-evaluation of {o.period}'s readers of {', '.join(o.tables or [])}")
         why = f" - last attempt: {o.last_failure}" if o.last_failure else ""
         console.print(f"  {what} (owed to decision {o.caused_by_decision}){why}")
+
+
+@supply_group.command("recheck")
+@click.option("--check", "check_id", required=True, metavar="CHECK_ID",
+              help="The check that was fixed, by its check_id - as `mothman supply queue` "
+                   "lists it.")
+@click.option("--reason", default=None,
+              help="Why. Required for the real run, and published on the dashboard against "
+                   "every supply it covers. A trial takes none.")
+@click.option("--yes", is_flag=True,
+              help="Skip the confirmation. The real run also needs --acknowledge KEY, from "
+                   "its panel.")
+@click.option("--acknowledge", "acknowledged", default=None, metavar="KEY",
+              help="Confirm what the bulk re-check covers, by the key its panel showed.")
+@click.option("--hand-off", "hand_off", is_flag=True,
+              help="Record every re-check and run none - the processing pass runs them.")
+@click.option("--list", "listing", is_flag=True,
+              help="List the supplies the bulk re-check would cover, and record nothing.")
+@click.option("--trial", is_flag=True,
+              help="Run the re-check on a few supplies first, and record nothing. Takes "
+                   "--supply, or --dataset with --from-period and --through-period.")
+@click.option("--supply", "supplies", multiple=True, metavar="SUPPLY",
+              help="For --trial: a supply to try, from --list. Repeatable.")
+@click.option("--dataset", "dataset_id", default=None,
+              help="For --trial over a period range: the dataset whose periods it names.")
+@click.option("--from-period", "from_period", default=None,
+              help="For --trial over a range: the first period.")
+@click.option("--through-period", "through_period", default=None,
+              help="For --trial over a range: the last period, inclusive.")
+def recheck_command(check_id: str, reason: str | None, yes: bool, acknowledged: str | None,
+                    hand_off: bool, listing: bool, trial: bool, supplies: tuple[str, ...],
+                    dataset_id: str | None, from_period: str | None,
+                    through_period: str | None) -> None:
+    """Re-check every supply a fixed check judged under its old definition
+    (REQ-PIPE-177) - every dataset and period it touches, with no range.
+
+    It runs in the foreground, one line per supply, unless --hand-off is
+    given: then every re-check is recorded and the processing pass runs them.
+    --trial runs it on a few supplies first and records nothing (REQ-PIPE-178).
+
+    \b
+    Exit statuses:
+      0   every re-check ran, or every one was handed off (a trial: it ran)
+      1   refused - nothing was recorded
+      3   recorded, but some re-checks are still owed (Ctrl-C included)
+    """
+    from cli import bulk_recheck_tui
+
+    if trial:
+        # A TRIAL RECORDS NOTHING (REQ-PIPE-178 criterion 12), so it takes
+        # nothing that records.
+        for flag, value in (("--reason", reason), ("--acknowledge", acknowledged),
+                            ("--hand-off", hand_off)):
+            if value:
+                console.print(f"{flag} cannot be used with --trial: a trial records nothing, "
+                              f"so there is nothing to give a reason for, acknowledge or hand "
+                              f"off.", style="red", markup=False)
+                raise SystemExit(1)
+        raise SystemExit(bulk_recheck_tui.trial_from_flags(
+            check_id=check_id, supplies=supplies, dataset_id=dataset_id,
+            from_period=from_period, through_period=through_period, yes=yes))
+    for flag, value in (("--supply", supplies), ("--dataset", dataset_id),
+                        ("--from-period", from_period), ("--through-period", through_period)):
+        if value:
+            # NO RANGE ON THE REAL RUN (criterion 1): it covers everything the
+            # check touches; a range is a trial's.
+            console.print(f"{flag} is for --trial only: the real bulk re-check covers every "
+                          f"supply the check touches, with no range.", style="red",
+                          markup=False)
+            raise SystemExit(1)
+    raise SystemExit(bulk_recheck_tui.from_flags(
+        check_id=check_id, reason=reason, yes=yes, acknowledged=acknowledged,
+        hand_off=hand_off, listing=listing))
 
 
 @supply_group.command("slots")

@@ -21,6 +21,8 @@ from qa_tools.common import tables_read as tr
 # in a signature says so, which is why the mark is here rather than
 # derived; tests/test_publish.py asserts it is not forgotten.
 pytestmark = pytest.mark.needs_deployment
+# Results about invented check ids (REQ-QAC-176 criterion 14 refuses them otherwise).
+pytestmark = [pytestmark, pytest.mark.usefixtures("invented_check_ids")]
 
 
 AGENCY = "child-protection-family-support"

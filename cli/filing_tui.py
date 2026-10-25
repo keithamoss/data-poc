@@ -1136,11 +1136,22 @@ def queue_flow(collection_id: str) -> None:
                       f"period chosen, or rejecting")
         console.print(held_table(held))
         console.print()
+    # SUPPLIES CHECKED BEFORE A CHECK CHANGED (REQ-PIPE-177 criterion 19): this
+    # collection's own count, and how many more elsewhere - a choice leading
+    # to the asset-wide entry the door's first menu offers.
+    from cli import bulk_recheck_tui
+    from qa_tools.common import bulk_recheck
+
+    nudges = bulk_recheck_tui.nudges_or_none()
+    rechecks = bulk_recheck.nudge_line(nudges, collection_id)
+    if rechecks:
+        console.print(rechecks, style="bold yellow", markup=False, highlight=False)
+        console.print()
     if not waiting and not held:
         if not gaps:
             console.print(f"Nothing is waiting on a person in "
                            f"{_collection_name(collection_id)}.", style="green")
-        if not quiet and not carry:
+        if not quiet and not carry and not rechecks:
             return
     if waiting:
         console.print(f"[bold]{len(waiting)}[/bold] supply/supplies waiting on a "
@@ -1153,7 +1164,7 @@ def queue_flow(collection_id: str) -> None:
         for g in quiet:
             console.print(f"[dim]  {g.line}[/dim]", markup=True)
         console.print()
-    if held or quiet or carry:
+    if held or quiet or carry or rechecks:
         labels = {_held_label(h): h for h in held}
         labels.update({_label(s): s for s in waiting})
         labels.update({g.line: g for g in quiet})
@@ -1162,10 +1173,15 @@ def queue_flow(collection_id: str) -> None:
         # still outside every count of what waits on a decision.
         if carry:
             labels[f"{CARRY_FORWARD_ITEM} ({len(carry)})"] = _CARRY
+        if rechecks:
+            labels[rechecks] = _RECHECKS
         picked = common.select("Which one?", list(labels), flag_hint=_FLAG_HINT)
         if picked is None:
             return
         chosen = labels[picked]
+        if chosen is _RECHECKS:
+            bulk_recheck_tui.door(nudges)
+            return
         if chosen is _CARRY:
             carry_forward_flow(collection_id, carry)
             return
@@ -1187,6 +1203,8 @@ def queue_flow(collection_id: str) -> None:
 #: The queue's one selectable item for the warnings (K3), and its marker.
 CARRY_FORWARD_ITEM = "Could be carried forward"
 _CARRY = object()
+#: The queue's line for supplies checked before a check changed (REQ-PIPE-177).
+_RECHECKS = object()
 
 
 def carry_forward_warnings(conn, collection_id: str, dataset_id: str | None = None,
@@ -1702,13 +1720,20 @@ def filing_menu() -> None:
     # Its PARKED moves likewise (Keith, 2026-10-11, (p)).
     waiting = _pending_corrections()
     parked = _parked_moves()
-    if waiting or parked:
+    # SUPPLIES CHECKED BEFORE A CHECK CHANGED (REQ-PIPE-177 criterion 13),
+    # beside the corrections: a bulk re-check covers every dataset its check
+    # touches, so it is asset-wide too, and N counts every collection.
+    from cli import bulk_recheck_tui
+
+    nudges = bulk_recheck_tui.nudges_or_none()
+    if waiting or parked or nudges:
         if waiting:
             console.print(f"{len(waiting)} calendar correction(s) await the data asset's "
                           f"manager: {', '.join(p.reference for p in waiting)}.",
                           style="yellow", markup=False)
         entries = ([f"{_MENU_CORRECTIONS} ({len(waiting)})"] if waiting else []) \
-            + ([f"{_MENU_PARKED} ({len(parked)})"] if parked else [])
+            + ([f"{_MENU_PARKED} ({len(parked)})"] if parked else []) \
+            + ([bulk_recheck_tui.menu_label(nudges)] if nudges else [])
         picked = common.grouped_select("Which collection - or the corrections?", grouped,
                                        flag_hint=_FLAG_HINT, many=common.many_collections(),
                                        top=tuple(entries), terms=terms)
@@ -1717,6 +1742,9 @@ def filing_menu() -> None:
             return
         if picked and picked.startswith(_MENU_PARKED):
             parked_flow(parked)
+            return
+        if picked and picked.startswith(bulk_recheck_tui.MENU_ENTRY):
+            bulk_recheck_tui.door(nudges)
             return
         collection_id = by_name.get(picked)
     else:

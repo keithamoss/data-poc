@@ -7,6 +7,7 @@ import attempt_support
 import test_supersession as _base
 from qa_tools.common import decision_log as dl, qa_store, supply_status
 from test_supersession import DS, _filed
+from attempt_support import ANY_CHECK
 
 conn = _base.conn
 period = _base.period
@@ -25,7 +26,7 @@ def _run(conn, key, *, instant, supply, status, scope="arrival", cause=None):
         "VALUES (?, 'a', 'c', ?, ?, now(), 't', 'test', ?, ?, ?, ?)",
         [key, instant, instant, DS, supply, scope, cause])
     qa_store.record_results(conn, key, [{"dataset_id": DS, "check_id": "x", "status": status}],
-                            tool="dbt", agency_id="a", collection_id="c")
+                            tool="dbt", agency_id="a", collection_id="c", fingerprints=ANY_CHECK)
     attempt_support.opened(conn, key)
 
 

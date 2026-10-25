@@ -32,7 +32,6 @@ check would "change" the moment its description got proofread.
 """
 from __future__ import annotations
 
-import hashlib
 import json
 import re
 from dataclasses import dataclass, field
@@ -206,19 +205,30 @@ class CheckMetadata:
     # (their TEXT is in it); the gate uses the paths to report one edited
     # file once rather than once per check (criterion 7).
     definition_files: tuple[str, ...] = ()
+    # THE SETTINGS THE FINGERPRINT HASHES, as the writer hashes them
+    # (REQ-QAC-176 criterion 12) - kept OUTSIDE the hash, so a stored
+    # fingerprint can be compared with this check fingerprinted under the
+    # stored one's own scheme (check_fingerprint.differs). `check_kind` is
+    # what a frozen default may be scoped to (criterion 8): a dbt test type,
+    # an ODCS rule type, an Evidently method, a file check's name.
+    hashed_settings: dict = field(default_factory=dict)
+    check_kind: str | None = None
 
 
 #: dbt generic tests whose rule is SQL rather than one column's property.
 _SQL_BODIED_DBT = ("relationships", "dbt_utils.expression_is_true")
 
 
-def _config_hash(config: dict) -> str:
-    """A stable fingerprint of "what the check actually does" - sorted
-    keys so field-reordering in the YAML never looks like a real change,
-    `default=str` so any odd YAML-native type (dates, etc.) doesn't
-    crash the hash."""
-    canonical = json.dumps(config, sort_keys=True, default=str)
-    return hashlib.sha256(canonical.encode()).hexdigest()[:16]
+def _definition(tool: str, kind: str | None, settings: dict, check_id: str) -> dict:
+    """The CheckMetadata fields one check's definition gives it: its
+    fingerprint - THE ONE WRITER, check_fingerprint.fingerprint, which the
+    changelog gate compares and every recorded result carries (REQ-QAC-176
+    criterion 2) - and the settings it hashed, kept beside it."""
+    from qa_tools.common import check_fingerprint
+
+    hashed = check_fingerprint.normalise(settings, check_id=check_id)
+    return {"config_hash": check_fingerprint.fingerprint(tool, kind, hashed, check_id=check_id),
+            "hashed_settings": hashed, "check_kind": kind}
 
 
 def _require_category(meta: dict, error_prefix: str) -> str:
@@ -350,7 +360,8 @@ def _parse_dbt_test(test: Any, source: str, location: str,
     category = _require_category(meta, f"{source}: {location}: dbt test {test_type!r} (check_id={check_id!r})")
     hashed, files = _with_definition(test_config, definition, "generic", test_type)
     return [CheckMetadata(
-        check_id=check_id, category=category, tool="dbt", config_hash=_config_hash(hashed),
+        check_id=check_id, category=category, tool="dbt",
+        **_definition("dbt", test_type, hashed, check_id),
         source_file=source, sql_bodied=test_type in _SQL_BODIED_DBT, definition_files=files,
         **_lifecycle_fields(meta),
     )]
@@ -374,7 +385,8 @@ def _parse_dbt_singular_test(entry: dict, source: str,
     category = _require_category(meta, f"{source}: singular test {name!r} (check_id={check_id!r})")
     hashed, files = _with_definition(config, definition, "singular", name)
     return [CheckMetadata(
-        check_id=check_id, category=category, tool="dbt", config_hash=_config_hash(hashed),
+        check_id=check_id, category=category, tool="dbt",
+        **_definition("dbt", "singular", hashed, check_id),
         source_file=source, sql_bodied=True, definition_files=files, **_lifecycle_fields(meta),
     )]
 
@@ -509,7 +521,7 @@ def _parse_soda_check(check: Any, source: str, location: str) -> list[CheckMetad
     # because the expression is the YAML key and only its value was hashed.
     return [CheckMetadata(
         check_id=check_id, category=category, tool="soda",
-        config_hash=_config_hash({"check": check_expr, **check_config}),
+        **_definition("soda", None, {"check": check_expr, **check_config}, check_id),
         source_file=source, sql_bodied=str(check_expr).startswith("failed rows"),
         **_lifecycle_fields(attributes),
     )]
@@ -618,7 +630,8 @@ def _parse_contract_quality_rule(rule: dict, source: str, location: str, *,
     # a JSON string and has already been decoded above.
     fields["changelog"] = changelog or []
     return [CheckMetadata(
-        check_id=check_id, category=category, tool="datacontract", config_hash=_config_hash(rule),
+        check_id=check_id, category=category, tool="datacontract",
+        **_definition("datacontract", rule.get("type"), rule, check_id),
         source_file=source, sql_bodied=rule.get("type") == "sql", **fields,
     )]
 
@@ -723,10 +736,15 @@ def parse_file_check_metadata(file_checks_yaml_path: Path | str) -> list[CheckMe
             raise MissingCheckIdError(f"{source}: a file check has no `check` name")
         category = _require_category(meta, f"{source}: file check {name!r}")
         config = {k: v for k, v in meta.items() if k not in _NON_CONFIG_FIELDS}
+        # ONE DEFINITION, ONE FINGERPRINT FOR EVERY DATASET'S COPY
+        # (REQ-QAC-176 criterion 22): worked out once, from the definition
+        # alone - never from the dataset - so a change to it moves every
+        # copy at once and no other check.
+        defined = _definition(file_checks.TOOL, name, config, f"file check {name!r}")
         for dataset in hierarchy.all_datasets():
             out.append(CheckMetadata(
                 check_id=file_checks.check_id_for(dataset, name), category=category,
-                tool=file_checks.TOOL, config_hash=_config_hash(config),
+                tool=file_checks.TOOL, **defined,
                 source_file=source, **_lifecycle_fields(meta)))
     return out
 
@@ -785,7 +803,8 @@ def parse_evidently_check_metadata(check_lifecycle: dict, source: str) -> list[C
         category = _require_category(meta, f"{source}: evidently check (check_id={check_id!r})")
         config = {k: v for k, v in meta.items() if k not in _NON_CONFIG_FIELDS}
         out.append(CheckMetadata(
-            check_id=check_id, category=category, tool="evidently", config_hash=_config_hash(config),
+            check_id=check_id, category=category, tool="evidently",
+            **_definition("evidently", config.get("method"), config, check_id),
             source_file=source, **_lifecycle_fields(meta),
         ))
     return out

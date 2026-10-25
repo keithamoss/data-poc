@@ -67,7 +67,10 @@ class TestEveryRuleHasAnId:
         doc = config_yaml.parse((ROOT / CONTRACTS[0]).read_text())
         _, rule = next(iter(_rules(doc)))
         with_id = check_lifecycle._parse_contract_quality_rule(dict(rule), "x", "y")[0]
-        assert with_id.config_hash == check_lifecycle._config_hash(
+        from qa_tools.common import check_fingerprint
+
+        assert with_id.config_hash == check_fingerprint.fingerprint(
+            "datacontract", rule.get("type"),
             {k: v for k, v in rule.items() if k not in ("customProperties", "description", "id")})
 
 

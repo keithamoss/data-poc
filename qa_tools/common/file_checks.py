@@ -400,7 +400,7 @@ def record(findings: list[Finding], *, run_id: str, dataset_id: str, delivery: s
     """
     if load_attempt is None or not findings:
         return 0
-    from qa_tools.common import qa_store, replay_clock, sample_data, supply_db
+    from qa_tools.common import qa_results_writer, qa_store, replay_clock, sample_data, supply_db
 
     dataset = _dataset(dataset_id)
     by_check = {d.check: d for d in definitions()}
@@ -415,7 +415,10 @@ def record(findings: list[Finding], *, run_id: str, dataset_id: str, delivery: s
             db, run_id, rows, agency_id=dataset.agency_id,
             collection_id=dataset.collection_id,
             supply_state=sample_data.supply_state(dataset.dataset_id),
-            load_attempt=load_attempt.id, delivery=delivery, filename=filename)
+            load_attempt=load_attempt.id, delivery=delivery, filename=filename,
+            # Written at staging, before any attempt opens: the map current
+            # at this write (REQ-QAC-176 criterion 24).
+            fingerprints=qa_results_writer.fingerprints_for(run_id))
     if conn is not None:
         return write(conn)
     with supply_db.connect(label="mothman:file-checks") as opened:

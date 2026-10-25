@@ -1092,3 +1092,22 @@ def _minted_periods_are_on_the_calendar(monkeypatch):
     monkeypatch.setattr(refiling, "_on_calendar",
                         lambda dataset_id, period: period.startswith("2099-")
                         or real(dataset_id, period))
+
+
+@pytest.fixture
+def invented_check_ids(monkeypatch):
+    """For a test that records results about INVENTED check ids through the
+    real writer (REQ-QAC-176 criterion 14 refuses a check id the fingerprints
+    map does not hold): every real check keeps its real fingerprint, and any
+    other id is stamped with attempt_support.ANY_CHECK's fixed one. A test
+    ABOUT the fingerprint never uses this."""
+    import attempt_support
+    from qa_tools.common import tables_read
+
+    real = tables_read.definition_fingerprints
+
+    class _RealOrAny(dict):
+        def get(self, key, default=None):
+            return dict.get(self, key) or attempt_support.ANY_CHECK.get(key, default)
+
+    monkeypatch.setattr(tables_read, "definition_fingerprints", lambda: _RealOrAny(real()))

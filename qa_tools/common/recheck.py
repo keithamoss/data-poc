@@ -497,23 +497,35 @@ def clear(owed_id: int, run_key: str, found_worse: bool | None = None) -> None:
 
 
 def run_all_owed(*, collection_id: str | None = None, kinds=(REEVALUATE,),
-                 run_by: str | None = None, on_step=None, limit: int = 1000) -> list[Outcome]:
+                 run_by: str | None = None, on_step=None, limit: int = 1000,
+                 ids=None, deadline: float | None = None) -> list[Outcome]:
     """Run what is owed, oldest first, until nothing of these kinds is left -
     a promotion a re-evaluation makes owes its own, which this picks up too
     (REQ-PIPE-121 criterion 11). Bounded: a supply promotes at most once, so
     a cascade ends; `limit` is a backstop, never the expected stop. An item
-    that fails stays owed and is not retried in the same call."""
+    that fails stays owed and is not retried in the same call.
+
+    `ids` runs only those owed items - a bulk re-check's own (REQ-PIPE-177
+    criterion 17). `deadline` (a time.monotonic() instant) is the processing
+    pass's budget: once it has passed, NO NEW item is started and the rest
+    stay owed for the next pass (criterion 24)."""
+    import time
+
     from qa_tools.common import hierarchy
 
+    wanted = None if ids is None else set(ids)
     out: list[Outcome] = []
     tried: set[int] = set()
     while len(out) < limit:
+        if deadline is not None and time.monotonic() >= deadline:
+            return out
         with supply_db.connect(label="mothman:recheck") as conn:
             # Its own connection, so its own schema check: every
             # promote_after ends here, and on a database nothing else has
             # prepared, owed_run does not exist yet.
             qa_store.ensure_schema(conn)
             pending = [o for o in owed(conn) if o.kind in kinds and o.id not in tried
+                       and (wanted is None or o.id in wanted)
                        and (collection_id is None
                             or _collection_of(hierarchy, o.dataset_id) == collection_id)]
         if not pending:

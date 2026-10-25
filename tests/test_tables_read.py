@@ -17,6 +17,7 @@ import dbsupport
 
 from qa_tools.common import qa_results_reader, qa_results_writer, supply_db
 from qa_tools.common import tables_read as tr
+from attempt_support import ANY_CHECK
 
 
 def _result(check_id, dataset_id="cp-placements", **extra):
@@ -199,7 +200,7 @@ class TestItReachesTheRecordedResult:
         assert cross[0][tr.RESULT_FIELD] == {"cp_carers": "cp_carers__20260801010000"}
 
     def test_a_run_with_no_recorded_resolution_records_no_tables_read(
-            self, monkeypatch, finish_runs):
+            self, monkeypatch, finish_runs, invented_check_ids):
         """Quiet on purpose, and safe to be: the run-level tables_read
         record carries the same resolution for the whole run, so an
         absence here is visible against something always recorded."""
@@ -246,7 +247,7 @@ class TestAPartialRunIsNotRecordedAsACompleteOne:
             qa_store.record_results(
                 conn, run_id,
                 [{"dataset_id": dataset, "check_id": "x", "status": "pass"}],
-                tool="soda", agency_id="a", collection_id="b")
+                tool="soda", agency_id="a", collection_id="b", fingerprints=ANY_CHECK)
 
     def test_a_run_missing_a_tool_says_which(self, clean_qa_history):
         """`missing_tools` SURVIVES as the per-tool diagnostic. What it

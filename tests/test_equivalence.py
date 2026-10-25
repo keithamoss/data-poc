@@ -18,6 +18,9 @@ from click.testing import CliRunner
 from cli.app import cli
 from qa_tools.common import equivalence as eq
 
+#: A well-formed definition fingerprint (REQ-QAC-176) for a hand-inserted result.
+ANY_FINGERPRINT = "v1:" + "0" * 64
+
 #: A real commit from before `mothman env mark` existed (cli/env.py arrived
 #: in 0d071d6), so its "mark" stage fails for real.
 BEFORE_ENV_MARK = "58791fc"
@@ -399,8 +402,8 @@ class TestTheRecordOfREQPIPE279IsComparedByWhatItSays:
     def _result_reading(self, conn, supply):
         [(rid,)] = conn.execute(
             "INSERT INTO qa.check_result (run_key, agency_id, collection_id, dataset_id, tool, "
-            "check_id, status) VALUES ('r1', 'a', 'c1', 'd1', 'soda', 'x_ref', 'fail') "
-            "RETURNING id").fetchall()
+            "check_id, status, definition_fingerprint) VALUES ('r1', 'a', 'c1', 'd1', 'soda', "
+            "'x_ref', 'fail', ?) RETURNING id", [ANY_FINGERPRINT]).fetchall()
         conn.execute("INSERT INTO qa.check_read (check_result_id, logical_table, state, "
                      "supply_id) VALUES (?, 'clients', 'READ', ?)", [rid, supply])
 

@@ -25,6 +25,7 @@ import pytest
 
 import attempt_support
 from qa_tools.common import carried, filing, promotion, qa_store, supply_db, supply_status
+from attempt_support import ANY_CHECK
 
 CHECK = "data-asset-1.child-protection-family-support.child-protection"
 CLIENT_REF = f"{CHECK}.cp-notifications.cp_client_id.relationships_dbt"
@@ -65,11 +66,11 @@ def _run(conn, key: str, *, dataset_id: str, supply: str | None, at: str,
     qa_store.set_run_purpose(conn, key, dataset_id=dataset_id, supply_id=supply, scope=scope,
                              caused_by_decision=decision)
     if own:
-        qa_store.record_results(conn, key, list(own), tool="dbt", **KEYS)
+        qa_store.record_results(conn, key, list(own), tool="dbt", **KEYS, fingerprints=ANY_CHECK)
     if cross:
         qa_store.record_results(conn, key, [r for r, _ in cross], tool="dbt", **KEYS,
                                 scope=qa_store.CROSS_TABLE_SCOPE,
-                                reads=[reads for _, reads in cross])
+                                reads=[reads for _, reads in cross], fingerprints=ANY_CHECK)
     if physical:
         qa_store.record_tables_read(conn, key, {t: p for t, (p, _s) in physical.items()},
                                     {t: s for t, (_p, s) in physical.items() if s})
@@ -379,7 +380,7 @@ class TestAPairsFileChecksAreAboutTheFileEachSupplyIs:
                 conn, run, [_result(f"{CHECK}.{sf.DATASET}.{filename.rsplit('.', 1)[0]}.encoding_file",
                                     sf.DATASET, "pass")],
                 **KEYS, supply_state=qa_store.AGREED, load_attempt=-n - 1,
-                delivery=delivery, filename=filename)
+                delivery=delivery, filename=filename, fingerprints=ANY_CHECK)
         # As the pipeline records it at the arrival: the open pair's #1.
         qa_store.set_run_purpose(conn, run, dataset_id=sf.DATASET, supply_id=one,
                                  scope="arrival")

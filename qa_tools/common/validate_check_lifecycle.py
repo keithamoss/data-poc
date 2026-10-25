@@ -366,6 +366,82 @@ def _by_source_file(errors: list[str], old_checks, new_checks, base) -> list[str
     return grouped + kept
 
 
+#: The frozen-defaults table (REQ-QAC-176 criterion 10), read as text at
+#: either ref so the gate can compare the two sides without importing either.
+FROZEN_DEFAULTS_FILE = "qa_tools/common/frozen_defaults.py"
+
+
+def frozen_defaults_at(ref: str | None) -> tuple[dict, ...]:
+    """FROZEN_DEFAULTS as the file stood at `ref` (None: the working tree),
+    read with ast.literal_eval - empty where the file did not exist yet."""
+    import ast
+
+    text = _old_file_content(FROZEN_DEFAULTS_FILE, ref)
+    if text is None:
+        return ()
+    for node in ast.parse(text).body:
+        target = (node.target if isinstance(node, ast.AnnAssign) else
+                  node.targets[0] if isinstance(node, ast.Assign) and len(node.targets) == 1
+                  else None)
+        if isinstance(target, ast.Name) and target.id == "FROZEN_DEFAULTS":
+            return tuple(ast.literal_eval(node.value))
+    raise ValueError(f"{FROZEN_DEFAULTS_FILE} at {ref or 'the working tree'} defines no "
+                     "FROZEN_DEFAULTS literal")
+
+
+def _setting_at(settings: dict, path) -> tuple[bool, object]:
+    here: object = settings
+    for key in path:
+        if not isinstance(here, dict) or key not in here:
+            return False, None
+        here = here[key]
+    return True, here
+
+
+def _describe_entry(index: int, entry: dict) -> str:
+    return (f"frozen default #{index} ({entry.get('tool')} {'.'.join(map(str, entry.get('path') or []))}"
+            f"{' for ' + str(entry['kind']) if entry.get('kind') else ''} = {entry.get('value')!r}, "
+            f"{entry.get('scheme')})")
+
+
+def frozen_default_errors(old_table, new_table, old_checks) -> list[str]:
+    """REQ-QAC-176 criterion 11, both refusals, each naming the entry: an
+    existing entry changed or removed, except as a new entry under a new
+    scheme version; and a new entry naming a setting some check at the diff
+    base writes at that same value, naming each check it would move."""
+    from qa_tools.common import check_fingerprint as fp
+
+    errors: list[str] = []
+    for i, entry in enumerate(new_table):
+        missing = [k for k in ("tool", "path", "kind", "value", "scheme") if k not in entry]
+        if missing or entry.get("scheme") not in fp.SCHEMES or not isinstance(entry.get("path"), list):
+            errors.append(f"{_describe_entry(i, entry)} is malformed - each entry gives tool, "
+                          f"path (a list of keys), kind, value and a kept scheme "
+                          f"({', '.join(fp.SCHEMES)})")
+    kept = 0
+    for i, entry in enumerate(old_table):
+        if i < len(new_table) and fp.same(new_table[i], entry):
+            kept += 1
+            continue
+        errors.append(f"{_describe_entry(i, entry)} was changed or removed - the frozen "
+                      f"defaults are append-only; change a default by appending a new entry "
+                      f"under a new scheme version ({FROZEN_DEFAULTS_FILE})")
+    for i, entry in enumerate(new_table[kept:], start=kept):
+        if any(fp.same(entry, old) for old in old_table) or "path" not in entry:
+            continue
+        moved = sorted(c.check_id for c in old_checks
+                       if c.tool == entry.get("tool")
+                       and (entry.get("kind") is None or entry["kind"] == c.check_kind)
+                       and (lambda found: found[0] and fp.same(found[1], entry.get("value")))(
+                           _setting_at(c.hashed_settings, entry["path"])))
+        if moved:
+            errors.append(f"{_describe_entry(i, entry)} is refused: {len(moved)} check(s) at "
+                          f"the diff base already write that setting at that value, so dropping "
+                          f"it would move their stored fingerprints: "
+                          + ", ".join(repr(m) for m in moved))
+    return errors
+
+
 def main(require_explanations: bool = False) -> int:
     # Not a literal "HEAD~1" - a push of several commits would then
     # only ever be checked on its last one, and every retroactive edit
@@ -375,6 +451,9 @@ def main(require_explanations: bool = False) -> int:
     old_checks = collect_checks(base)
     new_checks = collect_checks(None)
     errors = _by_source_file(cl.validate(old_checks, new_checks), old_checks, new_checks, base)
+    # REQ-QAC-176 criterion 11: the frozen defaults stay frozen.
+    errors += frozen_default_errors(frozen_defaults_at(base), frozen_defaults_at(None),
+                                    old_checks)
     errors += _check_id_errors(new_checks)
     # REQ-GEN-183 criteria 9 and 10: every SQL-bodied check names the
     # columns its SQL reads, in the contract's own table names.

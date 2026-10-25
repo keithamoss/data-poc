@@ -20,3 +20,24 @@ def opened(conn, run_key: str) -> int:
     qa_store.set_run_seq(conn, run_key, run_seq)
     qa_store.end_attempt(conn, run_key, run_seq, qa_store.COMPLETED)
     return run_seq
+
+
+class _AnyCheck(dict):
+    """A fingerprints map (REQ-QAC-176 criterion 13) that names every check
+    id with one fixed, well-formed fingerprint - for a test that writes
+    results about invented check ids straight into the store and is not
+    about the fingerprint. A test ABOUT the fingerprint passes a real map."""
+
+    FINGERPRINT = "v1:" + "0" * 64
+
+    def get(self, key, default=None):
+        return self.FINGERPRINT if key else default
+
+    def __getitem__(self, key):
+        return self.FINGERPRINT
+
+    def __contains__(self, key):
+        return bool(key)
+
+
+ANY_CHECK = _AnyCheck()

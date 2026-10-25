@@ -30,6 +30,9 @@ dependencies = [
     "questionary>=2.1", # mothman CLI's real interactive arrow-key menus - chosen
     # over InquirerPy/PyInquirer on project-health grounds, see plans/tooling.md #1
     "pyfiglet>=1.0", # mothman CLI's splash-screen wordmark - plans/tooling.md #1
+    "rfc8785==0.1.4", # RFC 8785 canonical JSON for a check's definition fingerprint
+    # (REQ-QAC-176). PINNED EXACTLY: an upgrade that changed its output would
+    # move every stored fingerprint, which tests/test_check_fingerprint.py's golden catches
 ]
 
 [project.optional-dependencies]
