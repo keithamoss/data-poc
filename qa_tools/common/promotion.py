@@ -1120,6 +1120,19 @@ def _record_withheld(conn, *, agency_id: str, collection_id: str, dataset_id: st
         pass
 
 
+def latest_outcome(conn, dataset_id: str, supply: str) -> tuple[str, str] | None:
+    """(action, reason) of this supply's LATEST gate outcome or move - what
+    'once since the supply last moved' reads (post-build-review #120 D7) -
+    or None."""
+    actions = (decision_log.PROMOTE, decision_log.PROMOTION_WITHHELD,
+               decision_log.PROMOTION_REFUSED, *decision_log.MOVES_A_SUPPLY)
+    rows = conn.execute(
+        f"SELECT action, reason FROM {decision_log.TABLE} WHERE dataset_id = ? AND supply = ? "
+        f"AND action IN ({', '.join('?' for _ in actions)}) ORDER BY id DESC LIMIT 1",
+        [dataset_id, supply, *actions]).fetchall()
+    return (rows[0][0], rows[0][1]) if rows else None
+
+
 def _record_refused(conn, *, agency_id: str, collection_id: str, dataset_id: str,
                     supply: str, period, reason: str, effective_at: str,
                     gate: dict | None = None) -> None:
@@ -1137,14 +1150,9 @@ def _record_refused(conn, *, agency_id: str, collection_id: str, dataset_id: str
     """
     if not supply:
         return
-    actions = (decision_log.PROMOTE, decision_log.PROMOTION_WITHHELD,
-               decision_log.PROMOTION_REFUSED, *decision_log.MOVES_A_SUPPLY)
-    latest = conn.execute(
-        f"SELECT action, reason FROM {decision_log.TABLE} WHERE dataset_id = ? AND supply = ? "
-        f"AND action IN ({', '.join('?' for _ in actions)}) ORDER BY id DESC LIMIT 1",
-        [dataset_id, supply, *actions]).fetchall()
+    latest = latest_outcome(conn, dataset_id, supply)
     if latest:
-        action, said = latest[0]
+        action, said = latest
         if action in (decision_log.PROMOTE, decision_log.PROMOTION_WITHHELD):
             return
         if action == decision_log.PROMOTION_REFUSED and said == reason:

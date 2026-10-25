@@ -1055,6 +1055,14 @@ def _record_holdback(conn, application: int, m: Member, members, effective_at: s
             return
         wanted = _red_only_for_want_of(m)
         if wanted:
+            # ONCE SINCE THE SUPPLY LAST MOVED, as a refusal is
+            # (promotion._record_refused): a re-gate that finds it still held
+            # back - the knock-on of its package-mates' promotion right after
+            # its own hold-back - says nothing more.
+            latest = promotion.latest_outcome(conn, m.dataset_id, m.supply)
+            if latest and latest[0] in (decision_log.PROMOTE,
+                                        decision_log.PROMOTION_WITHHELD):
+                return
             # RED ONLY BECAUSE ANOTHER TABLE IS ABSENT - could not run is red
             # (REQ-PIPE-270), but it is another table's doing, not a check of
             # its own failing, so it is 'promotion-withheld' (Keith,

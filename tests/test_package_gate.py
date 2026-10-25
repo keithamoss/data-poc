@@ -479,6 +479,25 @@ class TestFirstTimePackage:
         sc.promote_by_hand(v2["C2"], Q4, at="2024-12-20T10:00:00+08:00", follow_up=True)
         assert sc.holder("cp-notifications", Q4) == v2["N2"]
 
+    def test_a_hold_back_is_said_once_until_something_moves(self, sc):
+        """A re-gate that finds a held-back supply still red only for want of a
+        table writes nothing more (Keith, 2026-10-25, answer 2a, as
+        promotion._record_refused kept 'once since the supply last moved'):
+        TS-75's Notifications got a second, differently worded note from the
+        knock-on right after its package's hold-back."""
+        sc.rules.append(own_red("C2"))
+        # A FIRST-TIME ZIP OF ALL SIX (TS-75's shape): Carers and Case Workers
+        # promote, and the knock-on their promotion owes re-gates the readers.
+        got = sc.deliver("2024-07-25T10:00:00+08:00", {
+            "cp_clients": "C2", "cp_notifications": "N2", "cp_investigations": "I2",
+            "cp_placements": "P2", "cp_carers": "K2", "cp_case_workers": "W2"})
+        sc.process()
+        sc.run_owed()
+        assert sc.holder("cp-carers", Q3) == got["K2"], "precondition: a move to knock on"
+        for label in ("N2", "I2", "P2"):
+            assert _gated(sc, got[label]) == ["promotion-withheld"], (label,
+                                                                      sc.actions(got[label]))
+
     def test_clients_promotes_alone_when_only_its_reader_is_held_back(self, sc):
         """V4-Q1: Notifications v2 red on its own data is held back, no
         readers-only run is recorded for Clients v2, and Clients v2 is
