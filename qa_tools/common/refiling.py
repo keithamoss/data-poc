@@ -243,6 +243,12 @@ def _received(conn, dataset_id: str, supply: str) -> str:
     return at.isoformat() if at else ""
 
 
+def unrejected_since(conn, dataset_id: str, supply: str) -> bool:
+    """Whether a promotion has reversed the supply's rejection since - the
+    public name for _since_unrejected."""
+    return _since_unrejected(conn, dataset_id, supply)
+
+
 def _since_unrejected(conn, dataset_id: str, supply: str) -> bool:
     """Whether a promotion has reversed the rejection since."""
     rows = conn.execute(

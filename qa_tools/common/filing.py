@@ -1002,6 +1002,23 @@ def classification_of(dataset_id: str, supply_id: str, arrived_at,
     return arrival_classification.classify(arrived_at, slot)
 
 
+@dataclass(frozen=True)
+class _OneSupply:
+    """An already-filed supply, in the shape supplies_of reads an arrival."""
+    received_at: object
+    files_by_dataset: dict
+    supply_ids: dict
+
+
+def supply_item(conn, dataset_id: str, supply: str) -> dict | None:
+    """supplies_of()'s one dict for an already-filed supply, named by its id -
+    for a reader judging it again outside its arrival (REQ-PIPE-178's trial
+    prediction). None where nothing comes back for its dataset."""
+    one = _OneSupply(received_at=received_at_of(dataset_id, supply, conn=conn),
+                     files_by_dataset={dataset_id: (supply,)}, supply_ids={dataset_id: supply})
+    return next((i for i in supplies_of(conn, one) if i.get("dataset_id") == dataset_id), None)
+
+
 def supplies_of(conn, arrival) -> list[dict]:
     """What this arrival brought, in the shape the promotion step reads.
 

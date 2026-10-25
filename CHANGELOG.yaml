@@ -144,8 +144,41 @@ releases:
               Add `--trial` to run that re-check on a few supplies first. You
               see each new verdict beside the current one and what the gate
               would do, and nothing is recorded.
+          - headline: Staged and warehouse, side by side
+            components: ["Dashboard UI"]
+            description: >
+              A dataset page's cross-table checks are now one row per check,
+              with what each found against the files still waiting and against
+              what is in the warehouse, and a page awaiting a decision says
+              whether the supply in the warehouse is still green.
+          - headline: Held back with its delivery
+            components: ["Dashboard UI"]
+            description: >
+              A supply held back because another file of its delivery was
+              now says so at the top of its page, naming that file and the
+              root of the chain, and the collection card shows one line for
+              the whole held-back delivery.
+          - headline: Red from another table, said up top
+            components: ["Dashboard UI"]
+            description: >
+              When a dataset is red only because a table its checks read could
+              not be read, the top of its page now says which table and period,
+              and that the checks run again once a supply of it is promoted.
+              The other table's page names the datasets waiting on it.
       - category: Fixed
         items:
+          - headline: A collection page with an unmeasured table
+            components: ["Dashboard UI"]
+            description: >
+              A collection page no longer fails to draw when one of its
+              datasets' newest runs counted no rows; the row shows a dash.
+          - headline: Could not run, never Fail
+            components: ["Dashboard UI"]
+            description: >
+              A cross-table check that could not run for want of another table
+              now reads "Not evaluated" with its own mark, where it read Fail,
+              and the notices count checks as the grid's rows rather than each
+              tool's result.
           - headline: Opens in a blink
             components: ["Dashboard UI"]
             description: >

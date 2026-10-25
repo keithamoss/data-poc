@@ -29,6 +29,12 @@ TRY_FIRST = "Try it on a few supplies first - nothing is recorded"
 RECHECK_ALL = "Re-check them all"
 PROCESS = "mothman pipeline process"
 
+#: How many period rows the panel shows, and how many supplies the trial's
+#: chooser lists, before a count line stands in for the rest - at thirty
+#: collections one fix can cover hundreds.
+PANEL_ROWS = 20
+CHOOSER_ROWS = 40
+
 FLAG_HINT = ("mothman supply recheck --check <check_id> --reason '<why>' --yes "
              "--acknowledge <key>")
 
@@ -41,8 +47,10 @@ def _show(text: str, *, title: str, style: str) -> None:
     """A panel, with any line that is a command printed below it on a line
     of its own, so it can be copied whole."""
     lines = text.split("\n")
-    commands = [ln.strip() for ln in lines if ln.strip().startswith("mothman ")]
-    body = "\n".join(ln for ln in lines if not ln.strip().startswith("mothman "))
+    # ONLY A COMMAND ON A LINE OF ITS OWN is lifted out; an indented one sits
+    # under its own heading inside the panel (critic polish, 2026-10-25).
+    commands = [ln for ln in lines if ln.startswith("mothman ")]
+    body = "\n".join(ln for ln in lines if not ln.startswith("mothman "))
     console.print(Panel(Text(body), title=title, border_style=style, expand=False))
     for c in commands:
         console.print(c, markup=False, highlight=False, soft_wrap=True)
@@ -56,11 +64,16 @@ def panel_lines(p: bulk.Plan, *, flag_route: bool) -> list[str]:
     lines = [f"Check: {p.check_id}",
              f"Its current changelog entry ({bulk.changed_on(entry)}): {bulk.headline(entry)}",
              f"Supplies it covers: {n}, {p.promoted} of them promoted."]
-    for ds, period, count in p.by_dataset_period():
+    rows = p.by_dataset_period()
+    for ds, period, count in rows[:PANEL_ROWS]:
         lines.append(f"  {ds} {period}: {count}")
+    if len(rows) > PANEL_ROWS:
+        rest = sum(n for _ds, _p, n in rows[PANEL_ROWS:])
+        lines.append(f"  ... and {rest} more in {len(rows) - PANEL_ROWS} more period(s) - "
+                     f"`--list` lists every one")
     pairs = p.left_out_as("open-pair")
     if pairs:
-        lines.append(f"Left out: {len(pairs)} file(s) of an open contested pair - settling the "
+        lines.append(f"Left out: {len(pairs)} supply/supplies of an open contested pair - settling the "
                      f"pair checks each file under the check's current definition.")
     for ds, refusal in sorted(p.refused.items()):
         count = sum(1 for x in p.left_out_as("backstop") if x.dataset_id == ds)
@@ -68,6 +81,11 @@ def panel_lines(p: bulk.Plan, *, flag_route: bool) -> list[str]:
                      f"without a declared correction. They are covered once the correction "
                      f"is declared:")
         lines.extend(f"  {line}" for line in refusal.message().split("\n"))
+    owed = p.left_out_as("already-owed")
+    if owed:
+        lines.append(f"Left out: {len(owed)} supply/supplies already owe a re-check, recorded "
+                     f"and waiting to run - the processing pass runs them, or "
+                     f"`mothman pipeline process`.")
     rejected, superseded = p.left_out_as("rejected"), p.left_out_as("superseded")
     if rejected or superseded:
         lines.append(f"Not covered: {len(rejected)} rejected and {len(superseded)} superseded "
@@ -140,6 +158,9 @@ def run_foreground(recorded: bulk.Recorded) -> bulk.Summary:
             if not r.completed:
                 console.print(f"    did not finish - still owed: {r.outcome.message}",
                               markup=False, style="yellow")
+            elif r.elsewhere:
+                console.print("    already run elsewhere - its verdict is that run's",
+                              markup=False)
             elif r.changed:
                 console.print(f"    now {r.now or 'no verdict'}, was {c.status or 'no verdict'}",
                               markup=False, style="bold")
@@ -256,7 +277,11 @@ def flow(check_id: str) -> None:
                 _show(str(exc), title="Bulk re-check refused", style="red")
                 return
         if not p.covered:
-            _show(bulk.nothing_to_cover(p), title="Nothing to re-check", style="blue")
+            # WHAT WAS LEFT OUT IS SHOWN (critic D2): where the old definition's
+            # supplies were all left out, the panel says which and why.
+            if p.left_out:
+                show_panel(p, flag_route=False)
+            _show(bulk.nothing_to_cover(p), title="Nothing to re-check now", style="blue")
             return
         show_panel(p, flag_route=False)
         choice = common.select("Re-check them all, or try it on a few first?",
@@ -296,7 +321,8 @@ def _record_and_go(p: bulk.Plan, *, actor, reason: str, hand_off: bool,
         with supply_db.connect(label="mothman:bulk-recheck") as conn:
             recorded = bulk.record(conn, p.check_id, actor=actor, reason=reason,
                                    effective_at=bulk.now_iso(),
-                                   acknowledged=acknowledged or p.key, handed_off=hand_off)
+                                   acknowledged=acknowledged or p.key, handed_off=hand_off,
+                                   shown=p)
     except decision_log.DecisionRefused as exc:
         _show(str(exc), title="Bulk re-check refused", style="red")
         return 1
@@ -313,7 +339,10 @@ def trial_flow(p: bulk.Plan) -> None:
     """Choose supplies from a list, or one dataset's period range, from what
     the real run would cover; confirm the count; run; nothing recorded."""
     by_label = {f"{c.dataset_id} {c.period} - {c.supply} ({c.status or 'no verdict'})": c
-                for c in p.covered}
+                for c in p.covered[:CHOOSER_ROWS]}
+    if len(p.covered) > CHOOSER_ROWS:
+        console.print(f"Listing the first {CHOOSER_ROWS} of {len(p.covered)} supplies - a "
+                      f"period range reaches the rest.", markup=False)
     chosen: list[bulk.Covered] = []
     while True:
         left = [label for label, c in by_label.items() if c not in chosen]
@@ -375,6 +404,8 @@ def from_flags(*, check_id: str, reason: str | None, yes: bool, acknowledged: st
         say_list(p)
         return 0
     if not p.covered:
+        if p.left_out:
+            show_panel(p, flag_route=True)
         _show(bulk.nothing_to_cover(p), title="Bulk re-check refused", style="red")
         return 1
     show_panel(p, flag_route=True)

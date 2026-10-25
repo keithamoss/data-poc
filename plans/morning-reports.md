@@ -2849,6 +2849,142 @@ one or more component tags, and a date.
       2. Found by L1, pre-existing: `mothman cp qa --commit --run-id` on ONE
          file of a zip files that arrival alone and gates it at once as a
          one-file package. Leave, or scope a fix?
+    - **L1 CRITIC (~00:15)**: five defects, two reproduced (`pipeline
+      process` exits 0 when a package-mate ends held back; the held-back
+      consequence line printed once per tool), plus criterion gaps and test
+      weaknesses; full list in post-build-review at merge. Sent back to L1's
+      builder test-first. PROVISIONAL calls, for you to keep or reverse:
+      (a) `cp qa`/`bdm qa` keep exits 0/1/2 - REQ-PIPE-276's own decision says
+      exit 3 is not widened; (b) 3a stands, with the two signed examples
+      recorded as superseded pending your confirmation (question 1 above);
+      (c) `--run-id` on one file of a zip filing a package of one is recorded
+      as a known limit on REQ-PIPE-266 (question 2 above).
+    - **L3 DONE (~00:35)**, w1-l3 @ 64f9f09: REQ-QAC-176, REQ-PIPE-177,
+      REQ-PIPE-178 built, schema 49. Its probe bootstrapped from empty in
+      3047s on a contended machine (a3_probe was 1572s - to re-measure quiet);
+      fast half 6007 passed 0 skipped, deployment half 457 passed 1 xfailed.
+      QUESTION 3 FOR KEITH: it amended SIGNED REQ-GHUB-082 c3 to say bulk
+      re-check is terminal-only - keep, or reverse? PROVISIONAL (its own):
+      the frozen-defaults list starts empty; a frozen default is scoped to a
+      dbt test type, contract rule type, Evidently method or file check name
+      (none for Soda); the confirmation key is a 10-hex SHA-1 over the
+      fingerprint and the covered supplies; above ten supplies "hand it to the
+      processing pass" is offered first; a trial's gate prediction judges the
+      supply alone, not with its delivery. Critic running.
+    - **L1 FIXES (~00:50)**, a122520: all five defects fixed, each test seen
+      failing first; the provisional calls above applied. **L1 + L3 MERGED**
+      (~00:58) into w1-merge in /home/user/m-wt (3279bc8): CHANGELOG and
+      plans/INDEX conflicts trivial; cli/filing_tui.py and cli/supply.py
+      resolved by hand to keep L3's bulk re-check nudge inside L1's new queue
+      screen. The conflict-area tests are running on it.
+    - **L3 CRITIC (~01:00)**: three defects reproduced in bulk re-check (an
+      owed re-check already run elsewhere reported as "verdict changed"; an
+      all-left-out bulk run says "nothing to cover" and hides the panel; the
+      queue line counts the asset's stale checks rather than this
+      collection's), plus test weaknesses. Sent back test-first. PROVISIONAL,
+      for you: (Q-a) a bulk re-check leaves out supplies that already owe a
+      re-check, counted as "already owed"; (Q-b) a file check's refusal says
+      file checks re-run only when the supply is resent, with no command to
+      paste; (Q-c) a trial's gate prediction for a waiting supply says the
+      real gate judges it with its package partners; (Q-d) the queue nudge
+      is bounded to checks whose newest results are still stale, so its cost
+      stops growing with every check ever fixed. QUESTION 3's amendment of
+      REQ-GHUB-082 c3 was REQUIRED by signed REQ-PIPE-177 c21 and its wording
+      matches - only confirm it.
+    - **WAVE 2 STARTED (~01:00)**: L4, the generator lane, in /home/user/l4-wt
+      from w1-merge: REQ-GEN-235, REQ-GEN-238, REQ-PIPE-250 and
+      post-build-review #276's fix. PROVISIONAL: #276 takes the first fix it
+      names - an arrival's lag is bounded by the next receipt of its
+      COLLECTION, not only of its own dataset.
+    - **DISK (~00:55)**: down to 5.3GB free; dropped ~400 stale scratch and
+      test databases from earlier sessions (none in use) - 8GB free.
+    - **L2 DONE (~01:15)**, w1-l2 @ 7093c20: REQ-DASH-204 (unmet: c16's
+      outstanding-queue half, which depends on L1's REQ-PIPE-210), REQ-DASH-272
+      (unmet: c17, c21 and part of c24), REQ-DASH-275 built; tests written
+      beside the code, then shown failing on c1563cb (15 of 16 new browser
+      tests). npm test 962 passed. Merged into w1-merge (03a7f82, CHANGELOG
+      only). Watch-points: the first-view trends budget failed under load
+      (5.0-6.6s against 6s; 3.6-4.5s alone) with Child Protection's data 11%
+      bigger; 29 e2e failures it says also fail on c1563cb against l2_probe -
+      the full gate on a fresh bootstrap will say. QUESTION 4 FOR KEITH
+      (REQ-DASH-204's open check-at-build question): two causes have no
+      notice on the causing page for "Affects" to end - an overdue slot not
+      yet closed, and a period whose file was turned down with nothing
+      replacing it. No banner added; add one? PROVISIONAL wording calls are in
+      each requirement's decisions (verdict line, cell words Pass/Warn/Fail/
+      No result, full-day dates in the grid, 275's chain naming Investigations
+      as root where the tickets' root function stops at Notifications).
+      Functional and UX critics running (no Playwright MCP this session; they
+      drive Python playwright).
+    - **L1 TERMINAL UX CRITIC (~01:25)**: no blockers; five should-fix (the
+      held-back door names the next step but not WHY it is held back, prints
+      its override command after the panel, and defaults the cursor to
+      promote straight after "Nothing needs deciding"; a failed warehouse
+      re-check's reason never says it failed; staggered S1's two rows look
+      identical and unlinked) and nine polish items. Sent back to L1.
+      PROVISIONAL, for you: (U-a) a supply whose warehouse re-check failed
+      carries a cross-reference on its queue row - "decide cp-notifications
+      (received 5 Aug 08:40) first"; (U-b) the "Checking a delivery" line adds
+      "finished by the next processing pass" when no run holds it; (U-c) a
+      door that says "Nothing needs deciding" defaults its cursor to Back.
+    - **L2 DASHBOARD UX CRITIC (~01:35)**: two blocking - the grid showed
+      "Fail ✗ ✗ ✗" for checks the notice and panel say could not run, and the
+      notices counted tool results ("3 cross-table checks") where the grid
+      shows one row per check - plus eight should-fix (links that look like
+      bold text, an orphan "Affects" line, the same lists twice in three
+      orders, repeated or contradicting sentences) and polish. Sent back to
+      L2, which then continues with REQ-DASH-221 and REQ-TEST-282 on top of
+      w1-merge. PROVISIONAL, for you: (D-a) a could-not-run cell uses the
+      page's not-evaluated word and mark, no ✗; (D-b) notices count checks,
+      not tool results; (D-c) "Affects" is left out when "Holding back with
+      it" already names every reader; (D-d) answering QUESTION 4 above for
+      now: the causing page gets a one-line muted notice for an overdue slot
+      or a turned-down period, so "Affects" always ends a sentence.
+    - **SECOND SESSION LIMIT, ~01:50 to 04:50**: every agent stopped at once
+      (L1, L2, L3 fixing; L4 and L5 building; L2's functional critic) and
+      PostgreSQL was restarted with the container, so every background run
+      was lost. Three hours gone. The 10-minute chain could not fire through
+      it; the hourly backstop did, and was read on resumption. At ~05:00
+      resumed L1, L2 and L3's fixes and L2's critic, and PAUSED L4 (generator)
+      and L5 (caches): the one push needs a fresh bootstrap and a full gate on
+      the merged tree, about 75-90 minutes on a quiet machine, and running
+      everything at once is what pushed the load to ~28 and the account to
+      its limit. Wave 2 resumes after the push's gate if time allows;
+      otherwise it waits for your next go.
+    - **L2 FUNCTIONAL CRITIC (~05:05)**: four defects, all reproduced - the
+      grid's "why it is held back" and red pills appeared on 24 dataset-days
+      where nothing was held back (the worse-cell rule); a chain notice goes
+      stale once its root is rejected; the joint-promotion history row names
+      the wrong partner table; and a register-quote test this change broke was
+      hidden inside the "29 environmental failures" (the worktree had no
+      scenario placements, so those tests could not run on either tree). Sent
+      to L2 with the UX batch. PROVISIONAL: (D-e) the page follows your 3a, as
+      the tickets do - a supply whose warehouse re-check failed is its own
+      root, so page and tickets use one root function (REQ-PIPE-278 c1);
+      (D-f) "why it is held back" comes only from the gate entry's recorded
+      fields. QUESTION 5 FOR KEITH: REQ-DASH-272 c21 ("checked, being gated")
+      was deferred on the claim that no page date shows it - false: TS-82's
+      Client Register reads "Awaiting a decision… Green" with a staged Fail
+      for 12 days before its gate settles. Pull c21 into the next build? (rec:
+      yes.)
+    - **L1 UX FIXES (~05:15)**, 07e9390: all five should-fix items and the
+      polish, 14 new tests each seen failing first; merged (17b7da3, the
+      terminal-queue conflicts with L3 resolved by hand once more - and a
+      reused connection variable in the owed list caught and fixed in the
+      merge). Conflict-area modules on the merge: 176 passed.
+    - **L3 FIXES (~05:35)**, 9ba947c: the three bulk re-check defects and
+      the four provisional calls, each test seen failing first; lane plus
+      affected modules 1036 passed, deployment half 457 passed 1 xfailed.
+      The queue nudge is now cached (253ms first open with a whole history
+      stale, 4ms reopen). running-thoughts #72 and #74 deleted, their content
+      already in REQ-PIPE-177/178's decisions. Merge waits for the gate's
+      bootstrap, which runs from the merge tree.
+    - **THE GATE'S BOOTSTRAP**: started 05:27 from empty into its own
+      `gate_probe` (a first attempt died in a minute: the merge worktree had
+      never had `dbt deps`). The main checkout's node_modules had been emptied
+      AGAIN - a builder's `npm ci` through a chain of symlinked worktrees
+      (l1-wt -> ed-wt -> data-poc) - restored, and the merge tree now has its
+      own copy rather than a symlink.
     - **PROCESS NOTE**: L1 wrote its code before its tests, then showed 36 of
       41 new tests failing on c1563cb. The evidence is equivalent, the order
       is not the rule; written up in post-build-review with the L1 critic.

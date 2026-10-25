@@ -46,6 +46,22 @@ def _cause(conn, run_key: str) -> tuple[str, str]:
     return at, f"the arrival of {_name(run_ds)}"
 
 
+def _by(conn, run_key: str) -> str | None:
+    """The PERSON whose decision caused a run, by display name - None for the
+    rule's or an arrival (REQ-DASH-272 criterion 3) - beside _cause's words,
+    which every other reader words as they were."""
+    from qa_tools.common import people
+
+    rows = conn.execute(
+        f'SELECT d.actor, d.actor_kind FROM "{qa_store.SCHEMA}".run r '
+        f'JOIN "{qa_store.SCHEMA}".decision d ON d.id = r.caused_by_decision '
+        "WHERE r.run_key = ?", [run_key]).fetchall()
+    if not rows or rows[0][1] != decision_log.PERSON or not rows[0][0]:
+        return None
+    shown = people.display_name(rows[0][0])
+    return "a person" if not shown or "@" in shown else shown
+
+
 def for_dataset(dataset_id: str, conn=None) -> dict[str, dict]:
     """{run id: {promotedOn, promotedAt, timeline: [{at, status, cause}]}} for
     every supply of this dataset that was ever promoted, keyed by the run
@@ -107,14 +123,16 @@ def for_dataset(dataset_id: str, conn=None) -> dict[str, dict]:
             run_key = record["run_id"]
             if run_key not in place:
                 at, cause = _cause(conn, run_key)
+                by = _by(conn, run_key)
                 when = supply_status.instant(at) if at else None
                 place[run_key] = (when, order) if when is not None else None
                 if when is not None:
-                    steps[(when, order)] = (at, cause)
+                    steps[(when, order)] = (at, cause, by)
         for ds in sorted(involved):
             for entry in timelines[ds]:
                 when = supply_status.instant(entry["at"])
-                steps.setdefault((when, last), (entry["at"], f"the {entry['action']} of {_name(ds)}"))
+                steps.setdefault((when, last), (entry["at"], f"the {entry['action']} of {_name(ds)}",
+                                                _person(entry)))
         # AND WHERE AN OWED RE-CHECK CLEARS (post-build-review #266 D2): owed
         # until the run that cleared it, which need record nothing about this
         # supply - so the badge steps there as the card does.
@@ -122,8 +140,9 @@ def for_dataset(dataset_id: str, conn=None) -> dict[str, dict]:
         for when, run_key in owed.changes(tables_read):
             if run_key:
                 at, cause = _cause(conn, run_key)
+                by = _by(conn, run_key)
                 if at:
-                    steps.setdefault((when, last), (at, cause))
+                    steps.setdefault((when, last), (at, cause, by))
         timeline: list[dict] = []
         for step in sorted(steps):
             when = step[0]
@@ -141,12 +160,26 @@ def for_dataset(dataset_id: str, conn=None) -> dict[str, dict]:
                 continue
             if timeline and timeline[-1]["status"] == status:
                 continue
-            at, cause = steps[step]
-            timeline.append({"at": at, "status": status, "cause": cause})
+            at, cause, by = steps[step]
+            timeline.append({"at": at, "status": status, "cause": cause,
+                             # WHO, where the cause is a person's decision
+                             # (REQ-DASH-272 criterion 3) - beside the cause,
+                             # which every other reader words as it was.
+                             **({"by": by} if by else {})})
         out[run] = {"promotedOn": promoted_on,
                     "promotedAt": promoted_at.isoformat() if promoted_at else None,
                     "timeline": timeline}
     return out
+
+
+def _person(entry: dict) -> str | None:
+    """A slot timeline entry's person, by display name, or None."""
+    from qa_tools.common import people
+
+    if entry.get("actor_kind") != decision_log.PERSON or not entry.get("actor"):
+        return None
+    shown = people.display_name(entry["actor"])
+    return "a person" if not shown or "@" in shown else shown
 
 
 def _name(ds: str) -> str:

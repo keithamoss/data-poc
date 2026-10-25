@@ -133,8 +133,11 @@ def said(answer: settlement.Answer, period: str) -> str:
 
 def summary_table(files, answers, period: str) -> Table:
     # A FILENAME FOLDS, NEVER TRUNCATES (#170): its end - `-resend` - is
-    # often all that tells the two apart.
-    table = Table(box=None, pad_edge=False)
+    # often all that tells the two apart. LABELLED (CLI UX review P8): the
+    # files as they arrived, then as the person is settling them.
+    table = Table(box=None, pad_edge=False,
+                  title="As you are settling them" if answers else "As they arrived",
+                  title_justify="left")
     table.add_column("File", overflow="fold")
     table.add_column("Received")
     table.add_column("What it is")

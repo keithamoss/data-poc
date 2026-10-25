@@ -269,7 +269,7 @@ class TestVocabulary:
         command = (f"mothman supply decide --operation promote --dataset cp-notifications "
                    f"--period {Q4} --supply {v2['N2']} --reason '<why>'")
         assert command in lines and "<id>" not in text
-        assert f"or from the {Q4} door." in lines
+        assert _prose(text)[-1] == f"To override, from the {Q4} door or with:", text
         _reject(sc, v2["C2"], Q4)
         text, _t, _s = filing_tui.outcome_panel("re-check", v2["N2"], Q4, got)
         assert "turned down; this supply now needs its own decision" in text
@@ -972,7 +972,7 @@ class TestCriticFindings:
         from qa_tools.common import filing_decisions as fd, knock_on, supply_db
 
         _v1, _c2, n2 = _order_b(sc)
-        monkeypatch.setattr(fd, "_readers_rechecked", lambda conn, request: [])
+        monkeypatch.setattr(fd, "_readers_rechecked", lambda conn, request, **k: [])
         with supply_db.connect(read_only=True, label="pytest") as conn:
             before = fd.consequences(conn, _promote_n2(n2))
         real = knock_on._now_holds
@@ -1065,3 +1065,256 @@ class TestCheapPaths:
         assert "Another decision or gate is working on 2024-Q4." in locked
         assert "Another decision" not in failed
         assert locked.splitlines()[-1] == "mothman pipeline process"
+
+
+# ---------------------------------------------------------------------------
+# The CLI UX critic's review of a122520 - the screen text, written first
+# ---------------------------------------------------------------------------
+
+def _staggered_s1_red(sc):
+    """Notifications v2 at 8:40 red on its own data; Clients v2 at 9:00
+    re-checked against Notifications v1 and FAILED - its own root (3a)."""
+    v1 = established(sc)
+    sc.rules += [own_red("N2"), cross_red("cp-notifications", "cp_clients",
+                                          when={"cp_clients": "C2", "cp_notifications": "N1"})]
+    n2 = sc.deliver("2024-08-05T08:40:00+08:00", {"cp_notifications": "N2"})["N2"]
+    sc.process()
+    c2 = sc.deliver("2024-08-05T09:00:00+08:00", {"cp_clients": "C2"})["C2"]
+    sc.process()
+    return v1, c2, n2
+
+
+def _prose(text: str) -> list[str]:
+    return [line for line in text.splitlines() if line.strip()
+            and not line.strip().startswith("mothman ")]
+
+
+class TestCliUxReview:
+
+    def test_the_override_lead_in_comes_straight_before_its_command(self, sc):
+        """S1: the panel's last prose line leads into the command printed
+        below it; inside the door there is no 'or from the <period> door'."""
+        from cli import filing_tui
+        from qa_tools.common import recheck
+
+        v2 = s2_strict(sc)
+        got = recheck.Outcome(1, "r", True, "", status="red", period=Q4, promoted=False,
+                              waits_because="Held back: test")
+        text, _t, _s = filing_tui.outcome_panel("re-check", v2["N2"], Q4, got)
+        assert _prose(text)[-1].startswith("To override"), text
+        assert "door" in _prose(text)[-1], text
+        note, _nothing = filing_tui.door_note(_state("cp-notifications", Q4, v2["N2"]))
+        assert _prose(note)[-1] == "To override:", note
+        assert "or from the" not in note, note
+
+    def test_the_door_says_why_it_is_held_back_first(self, sc):
+        """S2: before any decision, the door says why - the hold-back's own
+        reason, its own checks passing included."""
+        from cli import filing_tui
+
+        v2 = s2_strict(sc)
+        note, _nothing = filing_tui.door_note(_state("cp-notifications", Q4, v2["N2"]))
+        first = note.splitlines()[0]
+        assert first.startswith("Held back: "), note
+        assert "This supply's checks of its own data passed." in note, note
+
+    def test_a_failed_recheck_says_it_failed(self, sc):
+        """S3 (said by the terminal; the recorded reason stays REQ-PIPE-267
+        criterion 13's): staggered S1 red's Clients v2 - '..., failed,
+        because ...'."""
+        from cli import filing_tui
+
+        _v1, c2, _n2 = _staggered_s1_red(sc)
+        note, _nothing = filing_tui.door_note(_state("cp-clients", Q3, c2))
+        assert re.search(r"in place in the warehouse \(received [^)]*\), failed, because ",
+                         note), note
+
+    def test_the_tui_queue_says_nothing_waits_beside_a_delivery_being_checked(
+            self, sc, monkeypatch, capsys):
+        """S4: with the period items shown and only a delivery being checked,
+        the queue still says that no supply waits on a decision."""
+        from cli import common, filing_tui
+
+        part_checked(sc)
+        monkeypatch.setattr(common, "select", lambda *a, **k: None)
+        filing_tui.queue_flow(CP)
+        flat = _flat(capsys.readouterr().out)
+        assert "No supply is waiting on a decision in Child Protection." in flat, flat
+        assert "Checking a delivery received" in flat
+
+    def test_a_failed_recheck_row_points_at_the_cause_and_beats_another_version(
+            self, sc, capsys):
+        """S5 (PROVISIONAL, Keith Q1 = a): the counted row of staggered S1
+        red's Clients v2 says its check failed against the warehouse and to
+        decide Notifications v2 first - and its State cell says held back,
+        not 'another version waiting'."""
+        from cli import filing_tui
+        from qa_tools.common import filing_queue, supply_db
+
+        _v1, c2, _n2 = _staggered_s1_red(sc)
+        with supply_db.connect(read_only=True, label="pytest") as conn:
+            groups = filing_tui.queue_groups(conn, filing_queue.awaiting(conn, CP))
+            capsys.readouterr()
+            filing_tui.say_queue(conn, groups, CP)
+        out = capsys.readouterr().out
+        flat = _flat(out)
+        assert re.search(r"red - .* failed against the warehouse; decide cp-notifications "
+                         r"\(received [^)]*\) first", flat), flat
+        row = next(line for line in out.splitlines() if "cp-clients" in line
+                   and "2024-Q3" in line)
+        assert "held back" in row and "another version" not in row, row
+        del c2
+
+    def test_the_gating_line_says_who_finishes_it(self, sc):
+        """Q2 (PROVISIONAL, Keith Q2 = a): no run holds the delivery, so the
+        quiet line adds that the next processing pass finishes it, the command
+        on a line of its own."""
+        from cli.supply import supply_group
+
+        part_checked(sc)
+        _code, out = _cli(supply_group, ["queue", "--collection", CP])
+        flat = _flat(out)
+        assert "(1 of 2 files checked) - finished by the next processing pass" in flat, out
+        assert any(line.strip() == "mothman pipeline process" for line in out.splitlines())
+
+    def test_a_door_with_nothing_to_decide_defaults_to_back(self, sc, monkeypatch):
+        """Q3 (PROVISIONAL, Keith Q3 = a): where nothing needs deciding, the
+        cursor starts on '<- Back' and the override is the last choice."""
+        from cli import common, filing_tui
+
+        v2 = s2_strict(sc)
+        asked = {}
+
+        def select(msg, choices, **k):
+            asked.update(choices=choices, default=k.get("default"))
+            return None
+        monkeypatch.setattr(common, "select", select)
+        filing_tui._decide_on(_state("cp-notifications", Q4, v2["N2"]),
+                              offer=("promote", "reject", "refile", "supersede", "re-check"))
+        assert asked["default"] == common.BACK, asked
+        assert asked["choices"][-1].startswith("promote"), asked
+
+    def test_after_a_rejection_the_queue_says_turned_down_only(self, sc, monkeypatch,
+                                                                capsys):
+        """P1 and P2: once Clients v2 is turned down, nothing printed says
+        'rejected', and the door does not send the person to the menu they
+        are in, saying instead that its own checks passed."""
+        from cli import common, filing_tui
+        from qa_tools.common import filing_queue
+
+        v2 = s2_strict(sc)
+        _reject(sc, v2["C2"], Q4)
+        monkeypatch.setattr(common, "select", lambda *a, **k: None)
+        monkeypatch.setattr(filing_queue, "closed_gaps", lambda *a, **k: [])
+        capsys.readouterr()  # the fixture's own processing, not the queue
+        filing_tui.queue_flow(CP)
+        out = capsys.readouterr().out
+        assert "rejected" not in out.lower(), out
+        assert "turned down" in out
+        note, _nothing = filing_tui.door_note(_state("cp-notifications", Q4, v2["N2"]))
+        assert "Promote or reject it next, at Filing decisions" not in note, note
+        assert "Its own checks passed." in note, note
+
+    def test_the_wrapped_lines_of_a_group_keep_their_indent(self, sc, monkeypatch, capsys):
+        """P4: at 80 columns every line of a root's block after its first is
+        indented - a wrapped continuation never runs back to column 0."""
+        from rich.console import Console
+
+        from cli import filing_tui
+        from qa_tools.common import filing_queue, supply_db
+
+        s2_strict(sc)
+        monkeypatch.setattr(filing_tui, "console", Console(no_color=True, width=80))
+        with supply_db.connect(read_only=True, label="pytest") as conn:
+            groups = filing_tui.queue_groups(conn, filing_queue.awaiting(conn, CP))
+            capsys.readouterr()
+            filing_tui.say_queue(conn, groups, CP)
+        lines = capsys.readouterr().out.splitlines()
+        start = next(i for i, line in enumerate(lines)
+                     if line.strip().startswith("held back with it (same delivery)"))
+        block = []
+        for line in lines[start:]:
+            if line.strip().startswith(("mothman ", "or from the")) or not line.strip():
+                break
+            block.append(line)
+        assert len(block) > 2, lines
+        assert all(line.startswith("  ") for line in block), block
+
+    def test_the_promote_warning_says_each_thing_once_in_plain_words(self, sc):
+        """P5: no requirement number, no raw supply id in the prose, one date
+        style, each consequence once - and 'then promote it again:' is the
+        last prose before the commands it leads into (S1)."""
+        from cli import filing_tui
+        from qa_tools.common import filing_decisions as fd, supply_db
+
+        _v1, _c2, n2 = _order_b(sc)
+        with supply_db.connect(read_only=True, label="pytest") as conn:
+            got = fd.consequences(conn, _promote_n2(n2))
+        text = filing_tui.warning_text(got)
+        prose = _prose(text)
+        assert "REQ-" not in text
+        assert not any("@" in line for line in prose), prose
+        assert not re.search(r"received \d+ \w+ \d{4}", text), text
+        assert sum("cp-clients" in line and "re-check" in line for line in prose) <= 1, prose
+        assert prose[-1].rstrip().endswith("then promote it again:"), prose
+
+    def test_the_owed_list_words_a_gate_plainly(self, sc):
+        """P6: a gate is not a QA run; no 'owed to its delivery's last file';
+        the command on a line of its own."""
+        from cli.supply import supply_group
+
+        part_checked(sc)
+        _code, out = _cli(supply_group, ["queue", "--collection", CP])
+        assert "QA run(s) owed" not in out and "delivery's last file" not in out, out
+        assert sum(line.strip() == "mothman pipeline process"
+                   for line in out.splitlines()) >= 1
+
+    def test_the_settle_summary_tables_are_labelled(self):
+        """P8: the files as they arrived, and as they are being settled."""
+        from datetime import datetime
+
+        from cli import settle_tui
+        from qa_tools.common import settlement
+
+        files = [settlement.PairFile(filename="a.csv", received_at=datetime.fromisoformat("2024-08-05T10:00:00+08:00"),
+                                     table="t", refused=False)]
+        before = settle_tui.summary_table(files, [], Q4)
+        after = settle_tui.summary_table(files, [settlement.Answer("a.csv", "reject")], Q4)
+        assert before.title == "As they arrived" and after.title == "As you are settling them"
+
+    def test_help_and_refusals_speak_to_the_person(self):
+        """P9: no developer prose in `supply queue`/`supply decide` --help,
+        and a missing answer on the flag form names the flag, not 'the
+        flag-based form'; and the door offers no inherit on a supply that
+        arrived (REQ-PIPE-098: inheriting is refused where a supply is owed)."""
+        from cli import common
+        from cli.supply import supply_group
+        from qa_tools.common import filing_decisions as fd, filing_queue, slot_state
+
+        _code, queue_help = _cli(supply_group, ["queue", "--help"])
+        _code, decide_help = _cli(supply_group, ["decide", "--help"])
+        for text in ("THE SAME DEFINITION", "NEEDS_ACTION"):
+            assert text not in queue_help, queue_help
+        for text in ("THE FLAG FORM OF THE WIZARD", "criterion 30"):
+            assert text not in decide_help, decide_help
+        assert "flag-based form" not in str(common.NotInteractive("--reason <why>"))
+        _supply, period = filing_queue.operations_for(slot_state.SlotState(
+            dataset_id="cp-clients", period=Q3, state=slot_state.AWAITING_DECISION,
+            supply="cp-clients@1"))
+        assert fd.INHERIT not in period, period
+
+    def test_a_contested_roots_line_is_one_accurate_sentence(self, sc, capsys):
+        """P3: a supply beneath an open pair is not told the table 'arrives' -
+        it arrived twice - and says it once."""
+        from cli import filing_tui
+        from qa_tools.common import filing_queue, supply_db
+        from test_queue_beneath import _pair_with
+
+        _pair_with(sc, {"cp_notifications": "N2"})
+        with supply_db.connect(read_only=True, label="pytest") as conn:
+            groups = filing_tui.queue_groups(conn, filing_queue.awaiting(conn, CP))
+            capsys.readouterr()
+            filing_tui.say_queue(conn, groups, CP)
+        flat = _flat(capsys.readouterr().out)
+        assert "arrives" not in flat, flat
+        assert "two cp-clients files wait to be settled" in flat, flat
