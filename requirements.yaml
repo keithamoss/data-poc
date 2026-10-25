@@ -43798,7 +43798,7 @@ requirements:
     unmet_criteria:
       - criterion: "Criterion 9 as written, for a snapshot copied alone to an empty directory: it renders every collection and the Plans tab, but logs a failed load for each @font-face file and the vendored player, which are not beside it."
         why: "Keith's 2026-10-25 answers (post-build-review #268 (c) and E2) keep criterion 9 as written, remove the test's fonts/vendor filter and decline inlining the fonts and player into snapshots. The site case now holds with no filter, because fonts/ and vendor/ sit beside the published snapshots; the alone case cannot, because nothing can be beside a file copied alone except what it inlines. The alone test keeps its filter until Keith chooses: amend criterion 9 to the site case (or to 'no console error other than the fonts and player'), or inline them after all."
-        owner: "Keith - which of the three, raised in post-build-review #268"
+        owner: "Keith decided 2026-10-25: leave criterion 9 as written and this case unmet - a snapshot copied alone loses only its typeface and player, never its data, and snapshots in dashboard/snapshots/ and on the site now carry both (4ecb149)."
         blocked_by:
           unowned: true
     open_questions: []

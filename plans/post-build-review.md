@@ -11662,7 +11662,7 @@ twice. It deliberately did not re-find the `TypeError`.
 
      **For Keith:** none new.
 
-268. **[in-progress, 2026-10-25]** **[Dashboard UI]** **[Pipeline & publishing]**
+268. **[done, 2026-10-25]** **[Dashboard UI]** **[Pipeline & publishing]**
      **[Testing & dev tooling]** **REQ-DASH-291/292/293 post-build critics.**
      delivery-critic (functional), the dashboard UX critic and the dashboard
      visual critic on sprint E, the dashboard split, read-only against
@@ -11901,6 +11901,11 @@ twice. It deliberately did not re-find the `TypeError`.
        Recorded on REQ-TEST-281.
      - **Left open**: (c)'s alone-in-a-directory case of REQ-DASH-292
        criterion 9 (above), so this entry stays in-progress.
+
+     **(c) SETTLED (Keith, 2026-10-25)**: local snapshots now get fonts/ and
+     vendor/ beside them too (4ecb149); criterion 9 stays as written and the
+     copied-alone case stays a recorded gap on REQ-DASH-292 - only the
+     typeface and player are missing there, never the data.
 
      <!-- The visual critic's findings above are as the coordinator relayed
      them; the main session adds anything further here. -->
