@@ -789,7 +789,7 @@ def outcome_panel(operation: str, supply: str | None, period: str | None,
 
     decision = _STANDS.get(operation, "decision")
     who = supply or "The supply"
-    if got.completed and got.message == "already run":
+    if got.completed and got.message == recheck.ALREADY_RUN:
         return (f"Its checks had already run, elsewhere. The {decision} stands; "
                 f"`mothman supply decisions` shows what the gate did.", "Already checked", "blue")
     if not got.completed and got.message == recheck.CLAIMED_ELSEWHERE:

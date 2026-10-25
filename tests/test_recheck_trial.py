@@ -126,6 +126,8 @@ class TestThePrediction:
                                     [{"dataset_id": DS, "check_id": CHECK, "status": "pass"}])
         assert conn.execute(f"SELECT count(*) FROM {dl.TABLE}").fetchone()[0] == before
         assert said.startswith(("the gate would promote it", "it would wait for a person"))
+        # Q3 (PROVISIONAL): the real gate judges it with its package partners.
+        assert "judges it with its package partners" in said and "may decide differently" in said
         assert "rejected" not in said and "refused" not in said
 
 
@@ -198,6 +200,24 @@ class TestTheFlags:
         assert [x.covered.supply for x in tried] == ["a"]
         assert "Traceback" not in out and "nothing was recorded" in out
 
+    def test_a_trial_with_nothing_chosen_is_told_what_it_takes(self):
+        with pytest.raises(bulk.Refused, match="takes the supplies to try: --supply"):
+            bulk.choose(_plan(_c("a", "2024-Q1")))
+
+    def test_a_hard_killed_trials_schemas_are_listed_by_tidy(self, supply_dsn):
+        from qa_tools.common import trial
+
+        rid = bulk.trial_run_id()
+        with supply_db.connect(label="test-recheck-trial") as c:
+            c.execute(f'CREATE SCHEMA "{supply_db.staging_schema_for(rid)}"')
+            c.execute(f'CREATE SCHEMA "{supply_db.run_schema(rid)}"')
+            try:
+                assert {supply_db.staging_schema_for(rid), supply_db.run_schema(rid)} <= set(
+                    trial.orphan_schemas(c))
+            finally:
+                trial.discard(c, rid)
+            assert not set(trial.orphan_schemas(c)) & {supply_db.staging_schema_for(rid)}
+
     def test_it_is_not_a_filing_decision_on_any_route(self):
         assert "trial" not in " ".join(fd.OPERATIONS) and "trial" not in fd.TERMINAL_ONLY
 
@@ -207,27 +227,39 @@ class TestTheFlags:
 @pytest.mark.needs_deployment
 class TestARealTrialLeavesNothing:
     """A real supply of the bootstrapped deployment, through the real tools,
-    and afterwards everything as it was: no run, result, decision, owed
-    re-check, census or attempt of it, no schema of its own and no dbt
-    scratch - and no table moved in any staging, period or rejected schema."""
+    and afterwards everything as it was: every qa table's CONTENTS, every
+    schema, and every staging, period and rejected table's contents."""
 
-    TABLES = ("run", "check_result", "check_read", "decision", "owed_run", "census",
-              "run_attempt", "tool_output", "tables_read", "dataset_stats", "carried_check",
-              "bulk_recheck", "asked_tool")
+    def _contents(self, c, schemas_where: str) -> dict[str, str]:
+        """{schema.table: an md5 of its every row} for every base table the
+        catalog lists under `schemas_where` - enumerated, never a named list,
+        so a table added later is compared too (critic T1)."""
+        tables = [(r[0], r[1]) for r in c.execute(
+            "SELECT table_schema, table_name FROM information_schema.tables "
+            f"WHERE table_type = 'BASE TABLE' AND ({schemas_where}) "
+            "ORDER BY 1, 2").fetchall()]
+        assert tables, f"no table matched {schemas_where} - the comparison would prove nothing"
+        out = {}
+        for schema, table in tables:
+            (digest,) = c.execute(
+                f'SELECT md5(coalesce(string_agg(t::text, chr(10) ORDER BY t::text), \'\')) '
+                f'FROM "{schema}"."{table}" t').fetchone()
+            out[f"{schema}.{table}"] = digest
+        return out
 
-    def _counts(self, c):
-        return {n: c.execute(f'SELECT count(*) FROM "{qa_store.SCHEMA}".{n}').fetchone()[0]
-                for n in self.TABLES}
+    def _qa(self, c):
+        return self._contents(c, f"table_schema = '{qa_store.SCHEMA}'")
+
+    def _supplies(self, c):
+        return self._contents(c, "table_schema = 'staging' OR table_schema LIKE 'period\\_%' "
+                                 "OR table_schema LIKE 'rejected%'")
 
     def _schemas(self, c):
+        # Another session's temporary schemas come and go; they are not ours.
         return sorted(r[0] for r in c.execute(
-            "SELECT schema_name FROM information_schema.schemata").fetchall())
-
-    def _tables(self, c):
-        return sorted(r[0] + "." + r[1] for r in c.execute(
-            "SELECT table_schema, table_name FROM information_schema.tables WHERE "
-            "table_schema = 'staging' OR table_schema LIKE 'period_%' "
-            "OR table_schema LIKE 'rejected%'").fetchall())
+            "SELECT schema_name FROM information_schema.schemata "
+            "WHERE schema_name NOT LIKE 'pg\\_temp\\_%' "
+            "AND schema_name NOT LIKE 'pg\\_toast\\_temp\\_%'").fetchall())
 
     def _a_supply(self, c, promoted: bool):
         from qa_tools.common import rechecking
@@ -250,14 +282,18 @@ class TestARealTrialLeavesNothing:
 
         with supply_db.connect(read_only=True, label="test-recheck-trial") as c:
             covered = self._a_supply(c, promoted)
-            before = (self._counts(c), self._schemas(c), self._tables(c))
+            before = (self._qa(c), self._schemas(c), self._supplies(c))
         tried = bulk.try_one(covered)
         assert tried.ran, tried.error
         assert tried.status in ("green", "amber", "red")
         assert tried.prediction
         with supply_db.connect(read_only=True, label="test-recheck-trial") as c:
-            after = (self._counts(c), self._schemas(c), self._tables(c))
+            after = (self._qa(c), self._schemas(c), self._supplies(c))
             assert not trial.orphan_schemas(c)
-        assert after == before
+        assert after[1] == before[1], "a schema was left behind or removed"
+        changed = sorted(k for k in set(before[0]) | set(after[0])
+                         if before[0].get(k) != after[0].get(k))
+        assert not changed, f"qa tables changed by a trial: {changed}"
+        assert after[2] == before[2], "a staging, period or rejected table changed"
         if promoted:
             assert tried.prediction.startswith("it would stay promoted")

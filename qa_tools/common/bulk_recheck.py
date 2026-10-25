@@ -41,9 +41,6 @@ WARN_ABOVE = 10
 #: as information only.
 MINUTES_PER_SUPPLY = 1
 
-#: What reprocesses a supply, so its file checks run again (criterion 5).
-REPROCESS = "mothman supply load --collection {collection}"
-
 
 class Refused(decision_log.DecisionRefused):
     """A bulk re-check or a trial that cannot be raised, saying why. Nothing
@@ -77,7 +74,7 @@ class LeftOut:
     dataset_id: str
     supply: str
     period: str | None
-    #: 'rejected', 'superseded', 'open-pair' or 'backstop'
+    #: 'rejected', 'superseded', 'open-pair', 'backstop' or 'already-owed'
     why: str
     files: tuple[str, ...] = ()
 
@@ -138,7 +135,6 @@ def current_checks() -> dict:
 def the_check(check_id: str, checks: dict | None = None):
     """The check a bulk re-check names, or Refused: unknown, retired
     (criterion 4) or a file check (criterion 5)."""
-    from qa_tools.common import check_id as check_id_mod
     from qa_tools.common import file_checks
 
     checks = checks if checks is not None else current_checks()
@@ -152,12 +148,12 @@ def the_check(check_id: str, checks: dict | None = None):
                       f"check's results no longer judge any supply, so there is nothing to "
                       f"re-check them for. Nothing was recorded.")
     if check.tool == file_checks.TOOL:
-        parsed = check_id_mod.try_parse(check_id)
-        collection = parsed.collection if parsed is not None else "<collection>"
+        # NO COMMAND TO PASTE (PROVISIONAL, coordinator for Keith, 2026-10-25,
+        # Q2 = B): staging an unchanged delivery again records nothing, so the
+        # only thing that runs a file check again is the supply being resent.
         raise Refused(f"{check_id} is a file check, and file checks run only when a supply's "
-                      f"file is staged, so a re-check cannot run it. Reprocessing the supply "
-                      f"runs it again. Nothing was recorded.\n"
-                      + REPROCESS.format(collection=collection))
+                      f"file arrives, so a re-check cannot run it. They run again only when "
+                      f"the supply is resent. Nothing was recorded.")
     return check
 
 
@@ -281,26 +277,6 @@ def newest_by_supply(conn, check) -> dict[tuple[str, str], str]:
     return {key: fp_ for key, (_rank, fp_) in newest.items()}
 
 
-def newest_fingerprint(conn, dataset_id: str, supply: str, check_id: str) -> str | None:
-    """The fingerprint on the newest result for `check_id` among the results
-    about this supply (supply_status.results_about, last in run_seq order),
-    or None where none is about it - results_about itself, one supply at a
-    time, which newest_by_supply is held to."""
-    from qa_tools.common import supply_status
-
-    shown = supply_status.results_about(conn, dataset_id, supply, view=supply_status.View()).shown
-    newest = next((r for r in reversed(shown) if r.get("check_id") == check_id), None)
-    if newest is None:
-        return None
-    # (run, check) names one result for any check but a file check, which is
-    # never re-checked in bulk (criterion 5).
-    rows = conn.execute(
-        f'SELECT definition_fingerprint FROM "{qa_store.SCHEMA}".check_result '
-        "WHERE run_key = ? AND check_id = ? ORDER BY id DESC LIMIT 1",
-        [newest["run_id"], check_id]).fetchall()
-    return rows[0][0] if rows else None
-
-
 def _open_contests(conn) -> dict[tuple[str, str], tuple[str, ...]]:
     """{(dataset, pair supply): its files} for every OPEN contested pair, by
     dataset_blockers' one judgement (REQ-PIPE-194 criteria 8 and 9) - read
@@ -322,13 +298,22 @@ def _where(conn, dataset_id: str, supply: str):
     period = rows[0][0] if rows else None
     if period and supersession.is_superseded(conn, dataset_id, supply):
         return "superseded", period
-    if period and (supersession._rejected(conn, dataset_id, supply)
-                   and not refiling._since_unrejected(conn, dataset_id, supply)):
+    if period and (supersession.ever_rejected(conn, dataset_id, supply)
+                   and not refiling.unrejected_since(conn, dataset_id, supply)):
         return "rejected", period
     try:
         return "covered", rechecking.standing(conn, dataset_id, supply)
     except decision_log.DecisionRefused:
         return None, period
+
+
+def _owing_a_recheck(conn) -> set[tuple[str, str]]:
+    """(dataset, supply) for every supply owing an uncleared re-check."""
+    from qa_tools.common import recheck
+
+    return {(ds, sup) for ds, sup in conn.execute(
+        f"SELECT dataset_id, supply_id FROM {recheck.TABLE} WHERE kind = ? "
+        "AND cleared_at IS NULL AND supply_id IS NOT NULL", [recheck.RECHECK]).fetchall()}
 
 
 def plan(conn, check_id: str, *, checks: dict | None = None,
@@ -354,6 +339,7 @@ def plan(conn, check_id: str, *, checks: dict | None = None,
     from qa_tools.common import supply_files as _files
 
     pairs = None
+    owing = _owing_a_recheck(conn)
     for (dataset_id, supply), got in sorted(newest_by_supply(conn, check).items()):
         if got not in mine:
             continue
@@ -368,6 +354,13 @@ def plan(conn, check_id: str, *, checks: dict | None = None,
         files = pairs.get((dataset_id, _files.pair_supply(supply)))
         if files is not None:
             found.left_out.append(LeftOut(dataset_id, supply, where.period, "open-pair", files))
+            continue
+        if (dataset_id, supply) in owing:
+            # ALREADY OWED (PROVISIONAL, coordinator for Keith, 2026-10-25, Q1 =
+            # A): its re-check is recorded and waits to run - a handed-off bulk
+            # re-check's, or a person's single one - so a second bulk re-check
+            # would only record it twice, and the nudge would never go quiet.
+            found.left_out.append(LeftOut(dataset_id, supply, where.period, "already-owed"))
             continue
         if dataset_id in backstop:
             found.refused[dataset_id] = backstop[dataset_id]
@@ -395,10 +388,49 @@ class Nudge:
     headline: str
 
 
+#: nudges() worked out once while nothing it reads has changed (Q4, below).
+_NUDGES: dict[tuple, list] = {}
+
+
+def _state_token(conn) -> tuple:
+    """What a nudge depends on in the database, as one cheap row: the newest
+    run opened, decision taken, owed item recorded or cleared, and filing."""
+    from qa_tools.common import filing
+
+    s = qa_store.SCHEMA
+    return tuple(conn.execute(
+        f'SELECT (SELECT max(run_seq) FROM "{s}".run), '
+        f'(SELECT count(*) FROM "{s}".run WHERE completed_at IS NOT NULL), '
+        f"(SELECT max(id) FROM {decision_log.TABLE}), "
+        f'(SELECT max(id) FROM "{s}".owed_run), '
+        f'(SELECT count(*) FROM "{s}".owed_run WHERE cleared_at IS NOT NULL), '
+        f"(SELECT max(id) FROM {filing.TABLE})").fetchone())
+
+
 def nudges(conn) -> list[Nudge]:
     """Every check with supplies a bulk re-check would cover, by check id -
     the one shared query, read once and grouped by check (NFR 3). A supply of
-    a dataset the backstop refuses stays in the count (criterion 28)."""
+    a dataset the backstop refuses stays in the count (criterion 28).
+
+    BOUNDED (PROVISIONAL, coordinator for Keith, 2026-10-25, Q4 = A): the
+    answer is kept for this process while neither the check sources
+    (validate_check_lifecycle.sources_fingerprint) nor the database's state
+    token moves, so reopening the queue costs two cheap reads however many
+    checks have ever been fixed; any run, decision, owed item or filing
+    recomputes it."""
+    from qa_tools.common import validate_check_lifecycle as vcl
+
+    key = (supply_db.supply_db_dsn(), vcl.sources_fingerprint(), _state_token(conn))
+    hit = _NUDGES.get(key)
+    if hit is not None:
+        return list(hit)
+    got = _nudges(conn)
+    _NUDGES.clear()
+    _NUDGES[key] = got
+    return list(got)
+
+
+def _nudges(conn) -> list[Nudge]:
     checks = current_checks()
     stale = stale_fingerprints(conn, checks)
     out = []
@@ -427,8 +459,10 @@ def nudge_line(nudges_: list[Nudge], collection_id: str) -> str | None:
         return None
     here = sum(n.by_collection[collection_id] for n in mine)
     elsewhere = sum(n.total for n in nudges_) - here
-    subject = (mine[0].check_id if len(mine) == 1 and len(nudges_) == 1
-               else f"{len(nudges_)} checks")
+    # THIS COLLECTION'S CHECKS (critic D3, 2026-10-25): K counts the checks
+    # with supplies here, never the asset's - the other collections' are the
+    # count in brackets.
+    subject = mine[0].check_id if len(mine) == 1 else f"{len(mine)} checks"
     line = (f"{here} supplies were checked before {subject} changed" if here != 1
             else f"1 supply was checked before {subject} changed")
     if elsewhere:
@@ -446,12 +480,15 @@ class Recorded:
 
 
 def record(conn, check_id: str, *, actor: dict, reason: str, effective_at: str,
-           acknowledged: str, handed_off: bool = False) -> Recorded:
+           acknowledged: str, handed_off: bool = False, shown: "Plan | None" = None) -> Recorded:
     """Record a bulk re-check in ONE transaction, before any of it runs: its
     own row, then one re-check decision and one owed re-check per covered
     supply, each naming the check, its changelog entry and the reason, in
     sorted slot order. Refused where what it covers is not what was shown -
-    `acknowledged` is the key the person confirmed (criterion 12)."""
+    `acknowledged` is the key the person confirmed (criterion 12). The re-plan
+    inside the transaction reads no verdicts (the key does not depend on them);
+    each covered supply's verdict is carried over from `shown`, the plan the
+    person confirmed."""
     from qa_tools.common import hierarchy, people, recheck
 
     reason = (reason or "").strip()
@@ -460,7 +497,7 @@ def record(conn, check_id: str, *, actor: dict, reason: str, effective_at: str,
                       "against every supply it covers. Nothing was recorded.")
     name = people.actor_name(actor) if isinstance(actor, dict) else str(actor)
     with decision_log.decision_transaction(conn):
-        p = plan(conn, check_id)
+        p = plan(conn, check_id, with_status=False)
         if not p.covered:
             raise Refused(nothing_to_cover(p))
         if p.key != acknowledged:
@@ -488,11 +525,20 @@ def record(conn, check_id: str, *, actor: dict, reason: str, effective_at: str,
                     check_changelog_note=entry.get("description"))) as decision_id:
                 owed.append(recheck.owe(conn, dataset_id=c.dataset_id, supply_id=c.supply,
                                         decision_id=decision_id))
-    return Recorded(int(bulk_id), tuple(owed), tuple(p.covered))
+    was = {c.key: c.status for c in (shown.covered if shown is not None else ())}
+    covered = tuple(Covered(c.dataset_id, c.supply, c.period, c.state, was.get(c.key), c.stale)
+                    for c in p.covered)
+    return Recorded(int(bulk_id), tuple(owed), covered)
 
 
 def nothing_to_cover(p: Plan) -> str:
-    """Criterion 3's refusal."""
+    """Criterion 3's refusal - and, where every supply judged under the old
+    definition was LEFT OUT (critic D2), a refusal saying that instead, since
+    'already checked under its current definition' would then be false."""
+    if p.left_out:
+        return (f"None of the {len(p.left_out)} supplies {p.check_id}'s old definition "
+                f"judged can be re-checked in bulk now - each is left out, as the panel "
+                f"says. Nothing was recorded.")
     return (f"Every supply {p.check_id} touches was already checked under its current "
             f"definition, so a bulk re-check would cover no supply. Nothing was recorded.")
 
@@ -559,8 +605,16 @@ class Ran:
         return getattr(self.outcome, "status", None)
 
     @property
+    def elsewhere(self) -> bool:
+        """Another runner had already finished it (recheck.ALREADY_RUN): done,
+        with no verdict of this run's to compare (critic D1)."""
+        from qa_tools.common import recheck
+
+        return self.completed and getattr(self.outcome, "message", None) == recheck.ALREADY_RUN
+
+    @property
     def changed(self) -> bool:
-        return self.completed and self.now != self.covered.status
+        return self.completed and not self.elsewhere and self.now != self.covered.status
 
     @property
     def worse_promoted(self) -> bool:
@@ -612,7 +666,11 @@ class Summary:
 
     @property
     def same(self) -> int:
-        return sum(1 for r in self.ran if r.completed and not r.changed)
+        return sum(1 for r in self.ran if r.completed and not r.changed and not r.elsewhere)
+
+    @property
+    def elsewhere(self) -> int:
+        return sum(1 for r in self.ran if r.elsewhere)
 
     @property
     def still_owed(self) -> int:
@@ -623,7 +681,8 @@ def summary_lines(s: Summary) -> list[str]:
     """Criterion 15's summary - never the words rejected or refused for a
     gate outcome."""
     lines = [f"{len(s.changed)} verdict(s) changed, {s.same} stayed the same, "
-             f"{s.still_owed} still owed."]
+             f"{s.still_owed} still owed."
+             + (f" {s.elsewhere} already run elsewhere." if s.elsewhere else "")]
     for r in s.changed:
         c = r.covered
         what = ", ".join(r.checks_changed) or "no single check's result"
@@ -645,10 +704,6 @@ def estimate(n: int) -> str:
         return f"roughly {minutes} minute{'s' if minutes != 1 else ''}"
     hours = round(minutes / 60)
     return f"roughly {hours} hour{'s' if hours != 1 else ''}"
-
-
-def mark_handed_off(conn, bulk_id: int) -> None:
-    conn.execute(f"UPDATE {TABLE} SET handed_off = true WHERE id = ?", [bulk_id])
 
 
 def now_iso() -> str:
@@ -707,6 +762,10 @@ def choose(p: Plan, *, supplies=(), dataset_id: str | None = None,
     would cover. Refused for anything outside that."""
     if not p.covered:
         raise Refused(nothing_to_cover(p) + " There is nothing to try either.")
+    if not supplies and dataset_id is None and from_period is None and through_period is None:
+        raise Refused(f"A trial takes the supplies to try: --supply, repeated (`mothman supply "
+                      f"recheck --check {p.check_id} --list` lists them), or --dataset with "
+                      f"--from-period and --through-period. Nothing was run.")
     if supplies:
         wanted = list(dict.fromkeys(supplies))
         known = {c.supply: c for c in p.covered}
@@ -741,12 +800,10 @@ def predict(conn, covered: Covered, results: list[dict]) -> tuple[str | None, st
     promotion gate's own plan step, promotion.judge with record=False, which
     is split from the step that applies a judgement and writes nothing
     (criterion 5). From the trial run's own results, which nothing else reads."""
-    from types import SimpleNamespace
-
     from qa_tools.common import agreement_drift, filing, hierarchy, promotion, rechecking
     from qa_tools.common import supply_status
 
-    reads = promotion._declared_reads()
+    reads = promotion.declared_reads()
     newest = supply_status.newest_per_check([r for r in results if r.get("check_id")])
     try:
         status = promotion.status_of(covered.dataset_id, newest, reads=reads)
@@ -755,23 +812,25 @@ def predict(conn, covered: Covered, results: list[dict]) -> tuple[str | None, st
     if covered.state == rechecking.PROMOTED:
         return status, f"it would stay promoted - {covered.period} keeps it"
     ds = hierarchy.dataset(covered.dataset_id)
-    items = [i for i in filing.supplies_of(conn, SimpleNamespace(
-        received_at=filing.received_at_of(covered.dataset_id, covered.supply, conn=conn),
-        files_by_dataset={covered.dataset_id: (covered.supply,)},
-        supply_ids={covered.dataset_id: covered.supply}))
-        if i.get("dataset_id") == covered.dataset_id]
-    if not items:
-        return status, "it would wait for a person"
+    item = filing.supply_item(conn, covered.dataset_id, covered.supply)
+    if item is None:
+        return status, "it would wait for a person" + PARTNERS
     try:
         barred = agreement_drift.refusals(conn, [covered.dataset_id])
     except Exception:  # noqa: BLE001 - an unevaluable backstop refuses nothing
         barred = {}
-    judged = promotion.judge(conn, items[0], status, results=newest, reads=reads,
+    judged = promotion.judge(conn, item, status, results=newest, reads=reads,
                              effective_at=now_iso(), barred=barred, agency_id=ds.agency_id,
                              collection_id=ds.collection_id, record=False)
     if judged.work is not None:
-        return status, f"the gate would promote it into {covered.period}"
-    return status, f"it would wait for a person - {judged.why or 'not promoted'}"
+        return status, f"the gate would promote it into {covered.period}" + PARTNERS
+    return status, f"it would wait for a person - {judged.why or 'not promoted'}" + PARTNERS
+
+
+#: Said of every waiting supply's prediction (PROVISIONAL, coordinator for
+#: Keith, 2026-10-25, Q3 = A): the trial judges the supply alone.
+PARTNERS = (". The real gate judges it with its package partners, so it may decide "
+            "differently")
 
 
 def try_one(covered: Covered, *, run_by: str | None = None, on_step=None) -> Tried:
