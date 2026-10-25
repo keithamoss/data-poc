@@ -120,14 +120,34 @@ Still to settle by driving the page: #8 and #17 - both since closed
 (2026-10-12 and 2026-10-13).
 
 3. **[todo, 2026-09-24]** **[Pipeline & publishing]** **A
-   regularly scheduled dataset whose supplies are FOR THE FOLLOWING
-   PERIOD.** Keith's own worked example, 2026-09-24: data arriving in
-   January does not fill Q1 - it fills **Q2**. Operational reality is
-   that some datasets deliver for the current period and some for the
-   next, and this is a per-dataset property.
+   collection whose files go into the period AFTER the one they arrive
+   in.** Restated by Keith 2026-10-25 (below); the original wording -
+   data arriving in January fills Q2, not Q1, a per-dataset property -
+   was read too narrowly.
 
-- **You told us:** Some datasets deliver for the following period - data arriving in January fills Q2, not Q1.
-- **What we heard:** Whether a supply is for this period or the next is a property of the dataset, not a one-off.
+- **You told us:** Most files arrive not yet linked and belong to the next period's release; files already linked belong to the current period.
+- **What we heard:** Which period a collection's files go into - this one, or N after - is a property of the collection, with "next period" the usual case.
+
+   **RESTATED BY KEITH, 2026-10-25 - this supersedes the reading below and
+   the scoper drafts REQ-*-320 to 324, which are not applicable.** In
+   production there are two classes of files, often from one supplier and
+   arriving around the same time. NOT-YET-LINKED files - most suppliers,
+   roughly 70-80% of files - go into the NEXT period: a file arriving on
+   1 February belongs to the next period because the linkage product for
+   that period, produced about three months later, is that period's
+   release. ALREADY-LINKED files go into the CURRENT period. A COLLECTION
+   ALWAYS GOES TO THE SAME PERIOD. The offset is +1 today and could be +2 or
+   more in future. Linkage products are a SEPARATE dataset with their own
+   files, never replacing the data already loaded, and they WILL have
+   cross-table checks with the data in that period. There are no checks
+   across periods, and none are in scope. For the synthetic history:
+   Department of Health (Emergency Department) goes into the current
+   period; every other collection goes into the next - "that's how it
+   works in production now". Keith asked how to model it: a configuration
+   flag or something else. Open with him (2026-10-25): what "next period"
+   means for a daily collection; whether synthetic linkage products come
+   now or later; refusing a change of offset until a period is declared
+   not owed; and the page's wording.
 
    **From the road-test participant, not Keith** (Keith, 2026-10-25): the "Keith's own ask" below records who relayed it.
 
