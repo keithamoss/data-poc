@@ -146,6 +146,13 @@ releases:
             description: >
               A collection page no longer fails to draw when one of its
               datasets' newest runs counted no rows; the row shows a dash.
+          - headline: Could not run, never Fail
+            components: ["Dashboard UI"]
+            description: >
+              A cross-table check that could not run for want of another table
+              now reads "Not evaluated" with its own mark, where it read Fail,
+              and the notices count checks as the grid's rows rather than each
+              tool's result.
           - headline: Opens in a blink
             components: ["Dashboard UI"]
             description: >

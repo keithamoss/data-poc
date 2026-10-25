@@ -42035,6 +42035,10 @@ requirements:
     - tests/test_cross_table_grid.py::TestTheClause
     - tests/test_cross_table_grid.py::TestTheNames
     - tests-js/cross-table-grid.test.js
+    - tests/test_dashboard_e2e.py::TestTheUxCriticsFindingsOn7093c20
+    - tests/test_cross_table_grid.py::TestPromotionWords
+    - tests/test_cross_table_grid.py::TestOwedWords
+    - tests-js/cross-table-grid.test.js
     implemented_by:
     - pipeline/cross_table_grid.py::place
     - pipeline/cross_table_grid.py::place_entries
@@ -42074,8 +42078,11 @@ requirements:
         ('Being checked with its delivery', 'Checked, waiting for the rest of its delivery', 'Checked, being gated'), with no pill
         and no results for an unchecked package member, and its test forms in criterion 24.
       why: Needs, per supply and date, its package's files and which of them have a recorded run (the owed 'gate' item, qa.gate_application)
-        carried into the build; not built in this lane. In the bootstrapped history every package is gated at its arrival's instant,
-        so no page date shows these states; they arise in a build made mid-processing.
+        carried into the build; not built in this lane. CORRECTED 2026-10-26 (functional critic on 7093c20) - the bootstrapped
+        history DOES have multi-day gating gaps - TS-82's delivery arrives 15 August 2017 and its gate application settles on
+        27 August, so for 12 days the Client Register's page reads "Awaiting a decision ... Green" over a staged Fail with no
+        notice saying it is still being gated. The earlier reason here ("every package is gated at its arrival's instant")
+        was wrong. Left for Keith as open question 1 rather than built overnight.
       owner: REQ-DASH-272 (a follow-up build)
       blocked_by:
         unowned: true
@@ -42103,7 +42110,14 @@ requirements:
       no-coordinates test - checked by running them in a worktree of c1563cb: 29 failed, 9 passed); the three it found of this change''s
       own (test_red_promoted''s monkeypatched _cause, TestThePanelAsAtTheDateOnShow''s clause, the trends budget) are fixed and pass
       above.'
-    - '2026-10-25, TEST-FIRST, SHOWN AFTER THE BUILD: against the base c1563cb''s product code (a worktree with the test files copied in, l2_probe): TestWarehouseAndStagingViews 5 of 6 failed - the one passing, test_after_a_rejection_the_page_reads_the_warehouse, is criterion 19, already today''s behaviour by the criterion''s own decision; tests/test_cross_table_grid.py failed to import; tests-js/cross-table-grid.test.js 2 of 2 failed.'
+    - '2026-10-25, TEST-FIRST, SHOWN AFTER THE BUILD: against the base c1563cb''s product code (a worktree with the test files copied
+      in, l2_probe): TestWarehouseAndStagingViews 5 of 6 failed - the one passing, test_after_a_rejection_the_page_reads_the_warehouse,
+      is criterion 19, already today''s behaviour by the criterion''s own decision; tests/test_cross_table_grid.py failed to import;
+      tests-js/cross-table-grid.test.js 2 of 2 failed.'
+    - '2026-10-26: D1 (the grid''s ''why it is held back'' from the gate''s hold-back only) failed first in tests-js/cross-table-grid.test.js
+      (''is not held back, and keeps its own status'' - 1 failed, 5 passed) and in a real browser (test_nothing_held_back_says_nothing_held_back
+      against 7093c20''s code); D3 and P6 failed first in tests/test_cross_table_grid.py::TestPromotionWords against 7093c20''s cross_table_grid.py
+      (2 failed).'
     decisions:
     - OPTION 2, A CLAUSE ON THE AWAITING LINE (Keith, 2026-10-21 morning). REJECTED sending the reader to supply history to
       find the warehouse's state, Keith's first guess.
@@ -42249,7 +42263,25 @@ requirements:
       card now carries `placed` keyed by the entry''s rank, and the fields only the build reads are dropped before the file is written;
       measured after, the first view''s trends and 300 dates of buildDatasetsOn within noise of the base (3.6-3.9s and 0.5-0.7s against
       3.6-4.2s and 0.5-0.7s, same machine, interleaved). COST: Child Protection''s dashboard data about 11% bigger.'
-    open_questions: []
+    - 'PROVISIONAL (UX critic on 7093c20, B1; Keith Q1 = a): a cross-table result that could not be evaluated reads ''Not evaluated''
+      with its own mark ○ in the grid, never ''Fail ✗''; the cell keeps its status (it counts) and the key line names all four marks
+      in words.'
+    - 'PROVISIONAL (functional critic on 7093c20, D1; Keith Q2 = A): ''— why it is held back'' and the red it brings come ONLY from
+      the supply''s hold-back as at the date - its structured promotion-withheld entry with a failed re-check, whose checks the notice
+      carries - never from the warehouse cell being worse than the staged one. cp-placements on 2 February 2020 read Red over a green
+      dataset with nothing held back.'
+    - 'UX critic, S6: the row panel''s ''Each tool''s result'' is one block per view, labelled Staged and In the warehouse as the phone
+      cells are, and tools that agree are said once (''dbt, Soda and datacontract-cli''). P1: the grid''s head and rows share one column
+      template with a fixed status column. P3: the warehouse clause''s pill keeps its full stop. P4: a substituted supply''s clause
+      says ''substituted from'', the badge''s own word. P6/P7: a joint promotion''s row names the supplies of its delivery without
+      their receipts, and ''<n> more'' carries every name it stands for (tooltip and screen-reader text).'
+    - 'Functional critic on 7093c20, D3: a rule promotion after a re-check names a table this dataset''s cross-table checks are between,
+      never the first supply the application held back. An unknown warehouse status gives the clause no status rather than ''Green''.'
+    open_questions:
+    - '1. FOR KEITH (2026-10-26, functional critic on 7093c20): criterion 21''s ''being gated'' forms are not built, and the bootstrapped
+      history does show the state they are for - TS-82''s Client Register reads ''Awaiting a decision ... Green'' for 12 days (15 to
+      27 August 2017) over a staged Fail with no notice, while its delivery''s gate application has not settled. Build criterion 21
+      next (it needs the package''s files and their recorded runs carried into the build), or accept the gap until then?'
   - id: REQ-GEN-273
     title: Target agreement compares a targeted supply with its own checks, and a few scenarios pin what the package gate decides
     date_written: '2026-10-21'
@@ -42499,7 +42531,10 @@ requirements:
     linked_tests:
     - tests/test_dashboard_e2e.py::TestHeldBackWithItsDelivery::test_s1_red_the_notice_its_links_and_the_root
     - tests/test_dashboard_e2e.py::TestHeldBackWithItsDelivery::test_staggered_s1_red_the_joined_form
-    - tests/test_dashboard_e2e.py::TestHeldBackWithItsDelivery::test_s6_the_chain_the_root_and_the_card
+    - tests/test_dashboard_e2e.py::TestHeldBackWithItsDelivery::test_s6_each_failed_re_check_is_its_own_root
+    - tests/test_dashboard_e2e.py::TestTheUxCriticsFindingsOn7093c20::test_ts82_a_failed_re_check_is_its_own_root
+    - tests/test_held_back_notices.py::TestTheRoot::test_a_rejected_root_holds_nothing_back
+    - tests/test_held_back_notices.py::TestForDataset
     - tests/test_dashboard_e2e.py::TestHeldBackWithItsDelivery::test_after_the_root_is_turned_down_then_replaced
     - tests/test_dashboard_e2e.py::TestHeldBackWithItsDelivery::test_a_replaced_root
     - tests/test_held_back_notices.py::TestTheNotice
@@ -42507,7 +42542,7 @@ requirements:
     implemented_by:
     - pipeline/held_back_notices.py::for_dataset
     - pipeline/held_back_notices.py::involved
-    - pipeline/held_back_notices.py::chain_of
+    - pipeline/held_back_notices.py::root_as_at
     - pipeline/held_back_notices.py::_notice
     - pipeline/held_back_notices.py::_holding
     - pipeline/held_back_notices.py::_card
@@ -42532,7 +42567,19 @@ requirements:
       the Notifications'' line ends ''Holding back with it: Client Register. If this file is turned down, the Client Register supply
       needs its own decision.'', and the Child Protection card ''Held back together: Notifications and Client Register (one delivery,
       received 10:00am Tuesday, 15 August 2017)''.'
-    - '2026-10-25, TEST-FIRST, SHOWN AFTER THE BUILD: against the base c1563cb''s product code (a worktree with the test files copied in, l2_probe): TestHeldBackWithItsDelivery 5 of 5 failed and tests/test_held_back_notices.py failed to import.'
+    - '2026-10-25, TEST-FIRST, SHOWN AFTER THE BUILD: against the base c1563cb''s product code (a worktree with the test files copied
+      in, l2_probe): TestHeldBackWithItsDelivery 5 of 5 failed and tests/test_held_back_notices.py failed to import.'
+    - '2026-10-26: root naming A and D2 failed first in tests/test_held_back_notices.py against 7093c20''s held_back_notices.py (7
+      failed, 2 passed), and in a real browser (test_s6_each_failed_re_check_is_its_own_root, test_ts82_a_failed_re_check_is_its_own_root
+      against 7093c20''s code).'
+    unmet_criteria:
+    - blocked_by:
+        unowned: true
+      criterion: Criterion 2 (the chain form) and criterion 3's 'If this file is turned down' half - read PROVISIONALLY by Keith's
+        Q1 = A (a failed re-check is its own root), so neither shows.
+      owner: REQ-DASH-275 (Keith to confirm, open question 1)
+      why: The page follows the tickets' root rule (root_cause.root_of, answer 3a) pending Keith's confirmation; if he confirms, the
+        criteria are reworded to match and this entry goes; if he keeps the chain (B), it is rebuilt.
     decisions:
     - 'A TOP-OF-PAGE NOTICE FOR S1 RED (Keith, 2026-10-22, A), with no ''not a fault'' clause. This settles the contradiction
       the dashboard review found in summary-v3 (D5: REQ-DASH-204 ''does not apply to S1''s red branch'' against a proposed ''Held
@@ -42589,7 +42636,18 @@ requirements:
       again once''. The replaced fixture is a Notifications v3 that supersedes v2 and whose own run stops before it can re-gate anything.'
     - 'PROVISIONAL WORDING, for Keith: ''<n> cross-table check fails'' in the singular; the card line''s two instants on one day as
       ''9:00am and 9:05am, Monday, 5 August 2024''; the root''s holding list as ''Holding back with it: <links>.'''
-    open_questions: []
+    - 'PROVISIONAL, CHANGES CRITERIA 2 AND 3 (functional critic on 7093c20; Keith Q1 = A, following his answer 3a as the tickets do):
+      the page names the root by the tickets'' rule (root_cause.root_of, REQ-PIPE-278 criterion 1), as at the date (held_back_notices.root_as_at).
+      A supply whose re-check against the warehouse FAILED is its own root, and its notice names its immediate package-mate - so there
+      is no chain form; a root''s ''Holding back with it'' and the card''s ''Held back together'' cover only what it holds back that
+      could not be checked; a root since turned down or replaced is no root (D2 - a chain notice used to go stale once the root was
+      rejected). TS-82 on 28 August 2017 no longer names the Notifications as the Client Register''s root.'
+    - 'PROVISIONAL (UX critic on 7093c20, B2; Keith Q2 = a): the notice counts checks as the grid''s rows - ''one cross-table check
+      fails'' - never tool results; the article agrees with the name (''once an Investigations supply is promoted'').'
+    open_questions:
+    - '1. FOR KEITH TO CONFIRM (2026-10-26): criteria 2 and 3 are read PROVISIONALLY by his Q1 = A as relayed - a failed re-check is
+      its own root, so the chain form and the failed half of criterion 3''s ''Holding back with it'' never show. Confirm, and the criteria
+      are reworded to match; or keep the chain on the page while the tickets follow 3a (B)?'
   - id: REQ-PIPE-276
     title: 'The terminal says what a package gate did: what was held back and by what, what to decide first, and what an override
       will set off'
@@ -43367,6 +43425,7 @@ requirements:
     - tests/test_cross_table_notices.py::TestBlockingTables
     - tests/test_cross_table_notices.py::TestTheLines
     - tests-js/another-table.test.js
+    - tests/test_dashboard_e2e.py::TestTheUxCriticsFindingsOn7093c20
     implemented_by:
     - pipeline/cross_table_notices.py::no_promoted
     - pipeline/cross_table_notices.py::read_log
@@ -43403,7 +43462,16 @@ requirements:
       6 passed. A defect found on the way, fixed test-first: fmtInt(null) threw inside renderAgency for a dataset whose newest run
       measured no rows (a held Case Workers), so the whole collection page failed to draw - tests-js/fmt-int.test.js failed (1 of 2)
       before the guard, passes after.'
-    - '2026-10-25, TEST-FIRST, SHOWN AFTER THE BUILD: this change''s tests run against the base c1563cb''s product code (a worktree of it with only the test files copied in, l2_probe): TestAnotherTableCouldNotBeRead 5 of 5 failed, tests/test_cross_table_notices.py failed to import (the module did not exist), tests-js/another-table.test.js 6 of 6 and tests-js/fmt-int.test.js 1 of 2 failed. The tests were written alongside the code, not strictly before it; this run is the evidence that each can fail.'
+    - '2026-10-25, TEST-FIRST, SHOWN AFTER THE BUILD: this change''s tests run against the base c1563cb''s product code (a worktree
+      of it with only the test files copied in, l2_probe): TestAnotherTableCouldNotBeRead 5 of 5 failed, tests/test_cross_table_notices.py
+      failed to import (the module did not exist), tests-js/another-table.test.js 6 of 6 and tests-js/fmt-int.test.js 1 of 2 failed.
+      The tests were written alongside the code, not strictly before it; this run is the evidence that each can fail.'
+    - '2026-10-26, the UX and functional critics'' fixes on 7093c20 (uncommitted tree, then this commit): the new class TestTheUxCriticsFindingsOn7093c20
+      (10 tests) and test_s6_each_failed_re_check_is_its_own_root were run against 7093c20''s product code with this tree''s tests
+      in a separate worktree on l2_probe - 12 failed, 1 passed (test_a_check_three_tools_ask_is_one_row, a rewritten test asserting
+      existing behaviour); on this tree the affected e2e classes (TestTheUxCriticsFindingsOn7093c20, TestAnotherTableCouldNotBeRead,
+      TestWarehouseAndStagingViews, TestHeldBackWithItsDelivery, TestSupplyAndTableLevelSections, TestACrossTableCheckOnTS80, TestTheAsAtScenarioChips,
+      TestScenariosTab) are the commit''s own run, named in its message.'
     decisions:
     - 'A NEW REQUIREMENT NOW (Keith, 2026-10-13): a top-of-page line on the reader naming the other table. REJECTED leaving
       it for a later road-testing sighting.'
@@ -43490,11 +43558,25 @@ requirements:
       card line ''No promoted <dataset>: holds <n> datasets red''; the not-due line names several readers as a comma list (''the Notifications,
       Investigations, Placements are waiting on it''); and criterion 7''s settled line drops ''(REQ-PIPE-211)'', a citation rather
       than page text.'
+    - 'PROVISIONAL (UX critic on 7093c20, B2; Keith Q2 = a): a line counts CHECKS as the grid''s rows do - one per check name and the
+      tables it is between, however many tools ran it (cross_table_notices.check_key) - never each tool''s result. TS-42''s Investigations
+      reads ''2 of this supply''s checks'', where it read 6 against a grid of two rows.'
+    - 'PROVISIONAL (UX critic, S4): where the verdict line already says the checks run again by themselves (''Nothing needs deciding
+      on this supply''), the line does not say it again; a turned-down or replaced partner never says ''runs again by itself'' beside
+      ''needs its own decision''; and the promotion panel''s ''why not promoted'' for such a supply is promotion_state''s ''waits for
+      another table''s supply to be promoted - nothing needs deciding on it'', never ''nobody had decided about it yet''.'
+    - 'PROVISIONAL (UX critic, S2; Keith Q4 = a; open question 1 answered): a cause with no notice of its own - an overdue slot, or
+      a period whose file was turned down with nothing replacing it - gets one muted .late-open-note line on its own page (''Overdue
+      for 2021-Q4 — Placements is waiting on it.''), and ''Affects'' always ends a sentence: on the awaiting line inside it, in a banner
+      with a full stop.'
+    - 'PROVISIONAL (UX critic, S3; Keith Q3 = a): the awaiting line leaves out ''Affects'' for readers its ''Holding back with it''
+      already names; every list of datasets is in the hierarchy''s order and joined ''a, b and c''.'
+    - 'UX critic, S1 and S8: a dataset name in these sentences is underlined in the accent colour, even inside a bold heading; the
+      executive tier''s agency card carries the ''No promoted'' marker, as text, the card being a link.'
     open_questions:
-    - '1. ANSWERED AT BUILD, FOR KEITH (2026-10-25): two causes have no notice on the causing dataset''s page for ''Affects'' to end
-      - an overdue slot that has not closed yet (the page says nothing; the collection table shows ''Late, still open''), and a period
-      whose file a person turned down with none replacing it. Neither was given a banner. Should either get one, or is the readers''
-      own line enough?'
+    - '1. ANSWERED PROVISIONALLY, FOR KEITH TO CONFIRM (2026-10-26, UX critic on 7093c20, his Q4 = a as relayed): an overdue slot not
+      yet closed, and a period whose file was turned down with none replacing it, now get one muted line on the causing page naming
+      the readers waiting on it. Confirm, or prefer no line and no ''Affects'' there (b)?'
   - id: REQ-PIPE-210
     title: The terminal's queue lists a supply held back only by another table beneath that table's own item, says nothing needs
       deciding on it, and does not count it

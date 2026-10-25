@@ -169,10 +169,9 @@ def read_log(conn, collection_id: str) -> Log:
     for supply, received in conn.execute(
             "SELECT supply_id, received_at FROM qa.supply_receipt").fetchall():
         log.receipts[supply] = _iso(received)
-    try:
-        log.contests = list(dataset_blockers.contests(conn))
-    except Exception:  # noqa: BLE001 - no contest record names no settlement
-        log.contests = []
+    # THE CONTESTS, read as recorded - a failure to read them is a failure of
+    # the build, never "no contest" (functional critic on 7093c20).
+    log.contests = list(dataset_blockers.contests(conn))
     return log
 
 
@@ -183,6 +182,15 @@ def _dataset_ref(dataset_id: str) -> dict:
         return {"datasetId": dataset_id, "name": dataset_id}
     return {"datasetId": dataset_id, "name": ds.dataset_name, "agencyId": ds.agency_id,
             "collectionId": ds.collection_id}
+
+
+def check_key(card: dict) -> tuple:
+    """ONE CHECK, however many tools ran it (UX critic on 7093c20, B2; Keith
+    Q2 = a, PROVISIONAL): a line counts checks as the grid shows them - one row
+    per check name and the tables it is between - never tool results."""
+    between = card.get("between") or {}
+    return (card.get("name") or card.get("check_id"), between.get("declared_on"),
+            tuple(between.get("reads") or ()))
 
 
 def _entries_by_rank(card: dict) -> dict:
@@ -297,7 +305,7 @@ def _lines_on(dataset_id, table, supply, day, cross_cards, by_rank, own_cards, p
                 by_dataset, by_supply, at = log.decisions[p["owedBy"]]
                 g = owed.setdefault(by_dataset, {"checks": set(), "promotedAt": at,
                                                  "supply": by_supply})
-                g["checks"].add(c["check_id"])
+                g["checks"].add(check_key(c))
             continue
         e = by_rank[id(c)].get(p["rank"])
         if e is None:
@@ -310,7 +318,7 @@ def _lines_on(dataset_id, table, supply, day, cross_cards, by_rank, own_cards, p
         for t, code in unreadable.items():
             g = groups.setdefault(t, {"checks": set(), "codes": set(), "dueAt": None,
                                       "at": None})
-            g["checks"].add(c["check_id"])
+            g["checks"].add(check_key(c))
             g["codes"].add(code or "")
             g["dueAt"] = g["dueAt"] or e.get("due_at")
             g["at"] = g["at"] or e.get("recorded_at")
@@ -334,6 +342,9 @@ def _lines_on(dataset_id, table, supply, day, cross_cards, by_rank, own_cards, p
         # slot past due - by its recorded code, or not due when checked and due
         # by the date on show - or one a person rejected.
         due_day = _day(g["dueAt"])
+        # WHICH CAUSE WITHOUT AN ITEM (UX critic on 7093c20, S2): the causing
+        # page says "turned down" or "overdue" in its one muted line.
+        line["cause"] = "turned-down" if period_schema.REJECTED in g["codes"] else "overdue"
         line["noItem"] = line["form"] == GENERAL and (
             bool(set(_NO_ITEM_CODES) & g["codes"])
             or (period_schema.NOT_YET_DUE in g["codes"] and bool(due_day) and due_day <= day))

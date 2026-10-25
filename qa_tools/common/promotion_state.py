@@ -47,6 +47,18 @@ PROMOTED_ELSEWHERE = "promoted-into-its-own-period"
 #: here rather than in the template because the same words belong in a
 #: ticket and in a terminal, and three copies of a sentence drift.
 #: `{period}` is the one placeholder, a period's name, filled by the reader.
+#: AWAITING, BUT NOTHING NEEDS DECIDING (REQ-DASH-204 criterion 16; UX critic on
+#: 7093c20, S4, PROVISIONAL): a supply whose every red check could not run
+#: for want of another table waits on that table, not on a person - said in
+#: place of AWAITING_DECISION's sentence, which would contradict the verdict
+#: line's "Nothing needs deciding on this supply".
+WAITING_ON_ANOTHER_TABLE = "waiting-on-another-table"
+WAITING_ON_ANOTHER_TABLE_WORDS = (
+    "this supply is staged and waits for another table's supply to be promoted - nothing "
+    "needs deciding on it",
+    "this supply was staged and waited for another table's supply to be promoted - nothing "
+    "needed deciding on it")
+
 WHY_NOT = {
     AWAITING_DECISION: (
         "this supply is staged and nobody has decided about it yet",

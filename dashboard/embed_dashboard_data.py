@@ -460,7 +460,10 @@ def embed() -> None:
     from qa_tools.common import promotion_state
     html = _replace_const(html, "WHY_NOT_SENTENCES", json.dumps(
         {code: {"present": present, "past": past}
-         for code, (present, past) in promotion_state.WHY_NOT.items()},
+         for code, (present, past) in {
+             **promotion_state.WHY_NOT,
+             promotion_state.WAITING_ON_ANOTHER_TABLE:
+                 promotion_state.WAITING_ON_ANOTHER_TABLE_WORDS}.items()},
         separators=(",", ":")))
 
     # BUILD_PROVENANCE - REQ-PIPE-092 criteria 7 and 17. WHICH environment
