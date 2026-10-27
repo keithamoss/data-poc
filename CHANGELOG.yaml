@@ -109,7 +109,7 @@ intro: >
   all three.
 
 releases:
-  - date: "2026-10-26"
+  - date: "2026-10-28"
     summary: >
       The early-arrival examples now live on Emergency Department, Child
       Protection's history starts two years later, and a bootstrap reports its
@@ -142,7 +142,7 @@ releases:
             description: >
               When a delivery's files arrived minutes apart, an early file's
               "held back" could take effect days after the later file promoted
-              it. It now always takes effect before the next file arrives.
+              it. Its promotion now never takes effect before its hold-back.
   - date: "2026-10-25"
     summary: >
       The dashboard appears in under half a second again, a data file that

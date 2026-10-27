@@ -132,66 +132,12 @@ class TestWithinTheClaimWindowInAReplay:
         assert seen["within"] == expected
 
 
-class TestTheNextReceiptIsTheCollectionsNotTheDatasets:
-    """post-build-review #276 (PROVISIONAL, its first-named fix): a staggered
-    delivery's early file - TS-84's Notifications at 08:40 - had its lag
-    bounded only by the next receipt of ITS OWN dataset, so its hold-back took
-    effect days after the 09:20 Client Register's application promoted it. The
-    bound is the next receipt of any file of the COLLECTION."""
-
-    def _tree(self, root, rows):
-        import json
-
-        for seq, (name, filename, received) in enumerate(rows, start=1):
-            (root / "deliveries" / name).mkdir(parents=True, exist_ok=True)
-            (root / "receipts" / name).mkdir(parents=True, exist_ok=True)
-            (root / "deliveries" / name / filename).write_text("id,x\n1,a\n")
-            (root / "receipts" / name / f"{filename}.json").write_text(json.dumps({
-                "delivery": name, "file": filename, "received_at": received,
-                "received_from": "storage", "sequence": seq,
-                "filed_by": {"kind": "automated"}}))
-
-    def test_a_later_file_of_another_dataset_caps_the_lag(
-            self, tmp_path, monkeypatch, clean_delivery_log):
-        from qa_tools.common import arrivals, delivery
-
-        self._tree(tmp_path, [
-            ("Extract A", "cp_notifications.csv", "2015-11-01T00:40:00+00:00"),
-            ("Extract A", "cp_clients.csv", "2015-11-01T01:20:00+00:00"),
-            ("Extract B", "cp_notifications.csv", "2016-02-01T00:40:00+00:00")])
-        monkeypatch.setattr(delivery, "DELIVERIES_DIR", tmp_path / "deliveries")
-        monkeypatch.setattr(delivery, "RECEIPTS_DIR", tmp_path / "receipts")
-        found = sorted(arrivals.arrivals_for("child-protection", ""),
-                       key=lambda a: a.received_at)
-        early = next(a for a in found if "cp-notifications" in a.files_by_dataset)
-        clients = next(a for a in found if "cp-clients" in a.files_by_dataset)
-        assert promotion.next_receipt(early) == clients.received_at
-
-    def test_a_file_received_at_the_same_instant_does_not_cap_it(
-            self, tmp_path, monkeypatch, clean_delivery_log):
-        """A delivery's files that share one receipt are not each other's NEXT
-        receipt - the bound is the collection's next LATER file."""
-        from qa_tools.common import arrivals, delivery
-
-        self._tree(tmp_path, [
-            ("Extract A", "cp_notifications.csv", "2015-11-01T00:40:00+00:00"),
-            ("Extract A", "cp_clients.csv", "2015-11-01T00:40:00+00:00"),
-            ("Extract B", "cp_carers.csv", "2015-11-01T01:00:00+00:00")])
-        monkeypatch.setattr(delivery, "DELIVERIES_DIR", tmp_path / "deliveries")
-        monkeypatch.setattr(delivery, "RECEIPTS_DIR", tmp_path / "receipts")
-        found = arrivals.arrivals_for("child-protection", "")
-        notifications = next(a for a in found if "cp-notifications" in a.files_by_dataset)
-        carers = next(a for a in found if "cp-carers" in a.files_by_dataset)
-        assert promotion.next_receipt(notifications) == carers.received_at
-        assert promotion.next_receipt(carers) is None
-
-
 def test_no_supply_is_held_back_after_the_promotion_that_ended_it(deployment_history):
     """post-build-review #276, on the bootstrapped history: read by effective
     time, as the as-at view and the history read it, a staggered file's
     'promotion-withheld' never takes effect after the later application that
-    promoted it. Eleven did on the bootstrap before the fix, TS-84's three
-    among them."""
+    promoted it. Eleven did on the bootstrap before the fix (3279bc8), TS-84's
+    three among them; Keith's option (b), 2026-10-27, floors the promotion."""
     from qa_tools.common import supply_db
 
     with supply_db.connect(read_only=True, label="test-276") as conn:
