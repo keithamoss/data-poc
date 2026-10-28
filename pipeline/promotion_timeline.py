@@ -234,9 +234,9 @@ def for_dataset(dataset_id: str, timeline: list[dict],
             if now == last_standing.get(period):
                 continue
             entry = {"on": day.isoformat(), "period": period, "standingIn": now,
-                     "decisions": h.decisions_on(day)}
+                     "decisions": h.decisions_on(day, zones)}
             if now:
-                entry["earnedOn"] = _earned_on(h, now["standsOn"], now["supply"])
+                entry["earnedOn"] = _earned_on(h, now["standsOn"], now["supply"], zones)
             # HOW THE STAND-IN BEFORE IT ENDED, said on that one (criterion 3):
             # replaced where the period now holds something, removed where it
             # holds nothing. The page reads it; it never works it out.
@@ -253,13 +253,13 @@ def for_dataset(dataset_id: str, timeline: list[dict],
     return {"points": points, "standing": standing}
 
 
-def _earned_on(h: _History, period: str, supply: str) -> str | None:
+def _earned_on(h: _History, period: str, supply: str, zones=None) -> str | None:
     """The asset day the named supply was promoted into the period that
     earned the results - where REQ-DASH-198 criterion 14's drill lands, so
     those results are on the page."""
     for e in h.slots:
         if e["slot"] == period and e.get("held_as") == PROMOTED and e["holder"] == supply:
-            return asset_time.local_date(e["_at"]).isoformat()
+            return asset_time.local_date(e["_at"], zones).isoformat()
     return None
 
 

@@ -117,21 +117,33 @@ def read(path) -> str:
     """A configuration file's text, read now. A missing or unreadable file
     raises as reading it would - on every call, since nothing is remembered
     about a failure."""
-    # THE OPERATING SYSTEM'S OWN READ, then decoded: the same text and the
-    # same errors as read_text, at about half its cost, on a path that runs
-    # tens of thousands of times in one dashboard build (REQ-PIPE-254
-    # criterion 19). Still the whole content, every call (criterion 15).
+    # THE OPERATING SYSTEM'S OWN READ, then decoded, at about half
+    # read_text's cost, on a path that runs tens of thousands of times in one
+    # dashboard build (REQ-PIPE-254 criterion 19). Still the whole content,
+    # every call (criterion 15). It answers as read_text(encoding="utf-8")
+    # does, which is what tests/test_config_yaml.py's TestReadIsReadText
+    # holds it to: newlines translated as text mode translates them, and an
+    # error raised while reading (a directory opens and then fails to read)
+    # names the path, as open()'s would (post-build-review #282).
     fd = os.open(path, os.O_RDONLY)
     try:
         chunks = []
         while True:
-            chunk = os.read(fd, 1 << 16)
+            try:
+                chunk = os.read(fd, 1 << 16)
+            except OSError as exc:
+                if exc.filename is not None:
+                    raise
+                raise type(exc)(exc.errno, exc.strerror, os.fspath(path)) from None
             if not chunk:
                 break
             chunks.append(chunk)
     finally:
         os.close(fd)
-    return b"".join(chunks).decode("utf-8")
+    text = b"".join(chunks).decode("utf-8")
+    if "\r" in text:
+        text = text.replace("\r\n", "\n").replace("\r", "\n")
+    return text
 
 
 #: How many built values a `Built` store keeps for one file (NFR MEMORY): a

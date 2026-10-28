@@ -13,8 +13,10 @@ list, kept by nobody.
 
 WHAT IT FAILS. A function under qa_tools/ or pipeline/ carrying lru_cache or
 cache from functools - by any spelling of the import: `functools.lru_cache`,
-`import functools as ft` then `ft.cache`, `from functools import cache`, or
-an alias of either - that is not on ALLOWLIST below. It reads only committed
+`import functools as ft` then `ft.cache`, `from functools import cache` or
+`*`, an alias of either by import or by assignment (`memo =
+functools.lru_cache`), or a wrap by assignment, plain, annotated or onto an
+attribute - that is not on ALLOWLIST below. It reads only committed
 source, with `ast`, so it needs no database and no import of what it scans.
 An allowlist entry that names no cache fails too, so the list cannot outlive
 what it excuses.
@@ -59,7 +61,9 @@ ALLOWLIST: dict[tuple[str, str], str] = {
 
 def _names(tree: ast.AST) -> tuple[set[str], set[str]]:
     """(names bound to the functools module, names bound to lru_cache or
-    cache themselves) by this file's own imports."""
+    cache themselves) by this file's own imports - a star import of functools
+    binds both - and by plain assignment of either (`memo =
+    functools.lru_cache`), followed until nothing new is bound."""
     modules, direct = set(), set()
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
@@ -68,9 +72,45 @@ def _names(tree: ast.AST) -> tuple[set[str], set[str]]:
                     modules.add(alias.asname or "functools")
         elif isinstance(node, ast.ImportFrom) and node.module == "functools":
             for alias in node.names:
-                if alias.name in CACHING:
+                if alias.name == "*":
+                    direct |= CACHING
+                elif alias.name in CACHING:
                     direct.add(alias.asname or alias.name)
+    aliases = [(targets, node.value) for node in ast.walk(tree)
+               for targets in [_targets(node)] if targets and node.value is not None
+               and not isinstance(node.value, ast.Call)]
+    grew = True
+    while grew:
+        grew = False
+        for targets, value in aliases:
+            if isinstance(value, ast.Name) and value.id in modules:
+                new = {t for t in targets if t not in modules}
+                modules |= new
+            elif _is_caching(value, modules, direct):
+                new = {t for t in targets if t not in direct}
+                direct |= new
+            else:
+                continue
+            grew = grew or bool(new)
     return modules, direct
+
+
+def _targets(node: ast.AST) -> list[str]:
+    """The names an assignment binds - plain, annotated, or onto an attribute
+    (`A.f = ...`, named by the attribute) - or [] for anything else."""
+    if isinstance(node, ast.Assign):
+        targets = node.targets
+    elif isinstance(node, ast.AnnAssign):
+        targets = [node.target]
+    else:
+        return []
+    out = []
+    for target in targets:
+        if isinstance(target, ast.Name):
+            out.append(target.id)
+        elif isinstance(target, ast.Attribute):
+            out.append(target.attr)
+    return out
 
 
 def _is_caching(expr: ast.AST, modules: set[str], direct: set[str]) -> bool:
@@ -88,7 +128,8 @@ def _is_caching(expr: ast.AST, modules: set[str], direct: set[str]) -> bool:
 
 def caches_in(path: Path) -> list[tuple[str, int]]:
     """(function name, line) for every cached function in one file -
-    decorated, or wrapped by assignment (`f = functools.cache(g)`)."""
+    decorated, or wrapped by assignment (`f = functools.cache(g)`, annotated
+    or onto an attribute)."""
     tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
     modules, direct = _names(tree)
     found = []
@@ -96,15 +137,13 @@ def caches_in(path: Path) -> list[tuple[str, int]]:
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             if any(_is_caching(d, modules, direct) for d in node.decorator_list):
                 found.append((node.name, node.lineno))
-        elif isinstance(node, ast.Assign) and isinstance(node.value, ast.Call):
+        elif _targets(node) and isinstance(node.value, ast.Call):
             call = node.value
             wrapped = (_is_caching(call.func, modules, direct)
                        or (isinstance(call.func, ast.Call)
                            and _is_caching(call.func.func, modules, direct)))
             if wrapped:
-                for target in node.targets:
-                    if isinstance(target, ast.Name):
-                        found.append((target.id, node.lineno))
+                found.extend((name, node.lineno) for name in _targets(node))
     return found
 
 

@@ -676,8 +676,9 @@ def calendar_menu() -> None:
                           markup=False)
             continue
         try:
-            # THE WORKING COPY, read fresh (F9): the agreement cached at start
-            # would mix with a preview read from disk after an edit.
+            # THE WORKING COPY, read fresh (F9), and built from that one read,
+            # so the preview and the values beside it answer for the same
+            # version of the file mid-edit (an unreadable copy is said below).
             fresh = agreement.from_doc(correction_trial.working()[0])
             _show_in_force(correction_trial.in_force(dataset_id, on, fresh))
             from qa_tools.common import participation_view

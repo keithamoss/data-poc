@@ -39,6 +39,12 @@ PLANTED = {
     "an aliased module": "import functools as ft\n\n@ft.lru_cache()\ndef planted():\n    return 1\n",
     "an aliased name": "from functools import lru_cache as memo\n\n@memo\ndef planted():\n    return 1\n",
     "a wrap by assignment": "import functools\n\ndef _g():\n    return 1\n\nplanted = functools.cache(_g)\n",
+    # post-build-review #282 (L5 critic, 1): four spellings the first gate
+    # read past.
+    "a star import": "from functools import *\n\n@cache\ndef planted():\n    return 1\n",
+    "an alias by assignment": "import functools\n\nmemo = functools.lru_cache\n\n@memo\ndef planted():\n    return 1\n",
+    "an annotated wrap": "import functools\nfrom typing import Callable\n\ndef _g():\n    return 1\n\nplanted: Callable = functools.cache(_g)\n",
+    "a wrap onto an attribute": "import functools\n\nclass A:\n    pass\n\ndef _g():\n    return 1\n\nA.planted = functools.lru_cache(maxsize=2)(_g)\n",
 }
 
 

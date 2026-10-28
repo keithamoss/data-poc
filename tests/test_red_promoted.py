@@ -83,3 +83,30 @@ class TestRedPromoted:
         got = red_promoted.for_dataset(DS, conn=conn)["run-a"]
         assert [(t["status"], t["cause"]) for t in got["timeline"]] == [
             ("green", "the arrival of Case Workers"), ("red", "the arrival of Notifications")]
+
+
+class TestItTakesTheTableIndexOnce:
+    """REQ-PIPE-254 criterion 19, decision 21 (post-build-review #282, L5
+    critic 2): one hierarchy read for the dataset however many supplies it
+    has, and every table lookup given it."""
+
+    def test_two_promoted_supplies_one_read(self, conn, period, monkeypatch):
+        from test_config_content_keying import watching
+
+        a, a_table = _filed(conn, period, "2026-05-01T01:00:00+00:00")
+        _promote(conn, a, a_table, period, status="green")
+        b, b_table = _filed(conn, period, "2026-06-01T01:00:00+00:00")
+        _promote(conn, b, b_table, period, status="green", kind=dl.PERSON)
+        runs = {a: "run-a", b: "run-b"}
+        monkeypatch.setattr(slot_timeline, "_run_for", lambda c, d, s: runs.get(s))
+        about = [{"run_id": "arrival", "dataset_id": DS, "check_id": "x", "status": "pass",
+                  "reads": {"cp_carers": {"state": "READ", "supply_id": a}}}]
+        monkeypatch.setattr(supply_status, "results_about",
+                            lambda c, d, s, view: supply_status.About(
+                                about if s in runs else [], about if s in runs else []))
+        monkeypatch.setattr(red_promoted, "_cause",
+                            lambda c, k: ("2026-05-01T01:00:00+00:00", "the arrival of Carers"))
+        seen = watching(monkeypatch, "pipeline.red_promoted")
+        got = red_promoted.for_dataset(DS, conn=conn)
+        assert {"run-a", "run-b"} <= set(got), "precondition: both supplies were answered"
+        assert seen.reads.get("by_table") == 1 and not seen.unpassed, vars(seen)

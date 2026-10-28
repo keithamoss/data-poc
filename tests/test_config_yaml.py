@@ -145,3 +145,33 @@ class TestASlipNamesItsFile:
         with open(f) as stream, pytest.raises(yaml.MarkedYAMLError) as by_stream:
             config_yaml.parse(stream)
         assert str(f) in str(by_stream.value)
+
+
+class TestReadIsReadText:
+    """config_yaml.read answers as Path.read_text(encoding='utf-8') would -
+    the same text and the same errors - by the operating system's own read
+    (REQ-PIPE-254 criterion 19). post-build-review #282 (L5 critic, 4): it
+    lost the path from a directory's error and kept a file's CRLFs, which
+    read_text translates."""
+
+    @pytest.mark.parametrize("raw", [b"a: 1\r\nb: 2\r\n", b"a: 1\rb: 2\r", b"a: 1\r\nb: 2\nc: 3\r",
+                                     b"plain: text\n", b""],
+                             ids=["crlf", "lone-cr", "mixed", "lf", "empty"])
+    def test_the_same_text(self, tmp_path, raw):
+        f = tmp_path / "c.yaml"
+        f.write_bytes(raw)
+        assert config_yaml.read(f) == f.read_text(encoding="utf-8")
+
+    @pytest.mark.parametrize("make", ["directory", "missing", "undecodable"])
+    def test_the_same_error(self, tmp_path, make):
+        f = tmp_path / "c.yaml"
+        if make == "directory":
+            f.mkdir()
+        elif make == "undecodable":
+            f.write_bytes(b"a: \xff\n")
+        with pytest.raises(Exception) as theirs:
+            f.read_text(encoding="utf-8")
+        with pytest.raises(Exception) as ours:
+            config_yaml.read(f)
+        assert type(ours.value) is type(theirs.value)
+        assert str(ours.value) == str(theirs.value)

@@ -306,32 +306,57 @@ class TestNoCallersChangeReachesAnother:
 
 class TestThreadsDuringAReplacement:
 
-    def test_every_value_is_wholly_one_version(self, asset):
+    @pytest.mark.parametrize("reading", ["registry", "hierarchy"])
+    def test_every_value_is_wholly_one_version(self, asset, reading):
+        """Readers run until each has seen BOTH versions (post-build-review
+        #282, L5 critic 3: it passed when every read saw one version, which
+        proves nothing about a replacement), through the registry and the
+        hierarchy beneath it."""
+        import time
+
         text = asset.read_text()
         versions = [text.replace("name: Child Protection\n", f"name: Child Protection {n}\n", 1)
                     .replace("name: Client Register\n", f"name: Client Register {n}\n", 1)
                     for n in "AB"]
         assert all(v != text for v in versions)
         stop = threading.Event()
-        bad, seen = [], set()
+        bad, seen_by = [], []
+        writes = [0]
 
         def writer():
             i = 0
             while not stop.is_set():
-                tmp = asset.with_suffix(".tmp")
+                tmp = asset.with_suffix(f".tmp{i % 2}")
                 tmp.write_text(versions[i % 2])
                 os.replace(tmp, asset)
                 i += 1
+                writes[0] = i
+
+        def one_read() -> str:
+            if reading == "registry":
+                coll = next(c for c in collections._load() if c.id == "child-protection")
+                tag, datasets = coll.name[-1], coll.datasets
+                names = {d.collection_name for d in datasets}
+                if names != {coll.name}:
+                    bad.append((coll.name, names))
+            else:
+                datasets = [d for d in hierarchy.all_datasets()
+                            if d.collection_id == "child-protection"]
+                names = {d.collection_name for d in datasets}
+                if len(names) != 1:
+                    bad.append(names)
+                tag = next(iter(names))[-1]
+            client = next(d for d in datasets if d.dataset_id == "cp-clients")
+            if not client.dataset_name.endswith(tag):
+                bad.append((tag, client.dataset_name))
+            return tag
 
         def reader():
-            for _ in range(150):
-                coll = next(c for c in collections._load() if c.id == "child-protection")
-                tag = coll.name[-1]
-                seen.add(tag)
-                names = {d.collection_name for d in coll.datasets}
-                client = next(d for d in coll.datasets if d.dataset_id == "cp-clients")
-                if names != {coll.name} or not client.dataset_name.endswith(tag):
-                    bad.append((coll.name, names, client.dataset_name))
+            seen, deadline, reads = set(), time.monotonic() + 20, 0
+            while (seen != {"A", "B"} or reads < 1000) and time.monotonic() < deadline:
+                seen.add(one_read())
+                reads += 1
+            seen_by.append(seen)
 
         asset.write_text(versions[0])
         w = threading.Thread(target=writer)
@@ -343,8 +368,9 @@ class TestThreadsDuringAReplacement:
             t.join()
         stop.set()
         w.join()
+        assert writes[0] > 2, "the file was replaced while the readers ran"
         assert not bad, bad[:3]
-        assert seen <= {"A", "B"} and seen
+        assert len(seen_by) == 6 and all(seen == {"A", "B"} for seen in seen_by), seen_by
 
 
 # ---- criterion 9: a failure is raised every time and never remembered --------
@@ -474,3 +500,141 @@ class TestAValuePassedDownAnswersForTheReadItCameFrom:
         for _ in range(5):
             assert supply_status._matches(holdings, record["reads"], "2024-Q1")
         assert len(reads) == 1
+
+
+# ---- criterion 19's hot sites, each taking its value once ---------------------
+#
+# post-build-review #282 (L5 critic, 2): only Holdings' read count was tested.
+# `watching` records, while one module's code runs, every zone or table lookup
+# that module makes WITHOUT the value passed down (so the callee reads the
+# file again) and every direct read it makes of the value itself. A hot site
+# that has taken its value once shows no unpassed lookups and one read.
+
+PASSED_DOWN = ((asset_time, ("zone_on", "zone_at", "localise", "start_of_day", "end_of_day",
+                             "local_date")),
+               (hierarchy, ("dataset_for_table",)))
+READS = ((asset_time, "timezone_versions"), (hierarchy, "by_table"))
+
+
+class Watched:
+    def __init__(self):
+        self.unpassed: list[tuple[str, int]] = []
+        self.reads: dict[str, int] = {}
+
+
+def watching(monkeypatch, module_name: str) -> Watched:
+    import sys
+
+    from qa_tools.common import supply_status
+
+    seen = Watched()
+
+    def wrap(mod, name, *, passed_at=1):
+        real = getattr(mod, name)
+
+        def wrapped(*args, **kwargs):
+            caller = sys._getframe(1)
+            if caller.f_globals.get("__name__") == module_name:
+                passed = (len(args) > passed_at and args[passed_at] is not None) or any(
+                    v is not None for v in kwargs.values())
+                if not passed:
+                    seen.unpassed.append((name, caller.f_lineno))
+            return real(*args, **kwargs)
+        monkeypatch.setattr(mod, name, wrapped)
+
+    for mod, names in PASSED_DOWN:
+        for name in names:
+            wrap(mod, name)
+    wrap(supply_status, "dataset_of")
+    for mod, name in READS:
+        real = getattr(mod, name)
+
+        def counted(*args, _real=real, _name=name, **kwargs):
+            if sys._getframe(1).f_globals.get("__name__") == module_name:
+                seen.reads[_name] = seen.reads.get(_name, 0) + 1
+            return _real(*args, **kwargs)
+        monkeypatch.setattr(mod, name, counted)
+    return seen
+
+
+class TestEachHotSiteTakesItsValueOnce:
+    """Decision 21's list, each driven through its real entry point."""
+
+    def test_a_holdings_timeline_reads_the_hierarchy_once_for_every_holdings(self, monkeypatch):
+        from qa_tools.common import supply_status
+
+        timeline = supply_status.HoldingsTimeline({"cp-clients": [
+            {"at": f"2099-0{m}-01T10:00:00+08:00", "slot": f"P{m}", "held_as": "promoted",
+             "holder": f"cp-clients@{m}"} for m in range(1, 6)]})
+        seen = watching(monkeypatch, "qa_tools.common.supply_status")
+        made = [timeline.at(supply_status.instant(f"2099-0{m}-02T10:00:00+08:00"))
+                for m in range(1, 6)]
+        assert len({id(h) for h in made}) == 5, "precondition: five Holdings were made"
+        assert all(h._tables is timeline.tables for h in made)
+        assert seen.reads == {"by_table": 1} and not seen.unpassed, vars(seen)
+
+    def test_warehouse_counts_points(self, monkeypatch):
+        from pipeline import warehouse_counts
+        from test_warehouse_counts import CLIENT_REF, _entry, _held, _timeline
+
+        c1, n1 = "cp-clients@1", "cp-notifications@1"
+        history = [_entry(f"r{i}", i, supply=c1, at=f"2099-04-0{i + 2}T09:00:00+08:00",
+                          reads={"cp_clients": c1, "cp_notifications": n1}) for i in range(5)]
+        warehouse = _timeline(_held("Q1", c1, "2099-04-01T10:00:00+08:00", "cp-clients"),
+                              _held("Q1", n1, "2099-04-01T10:00:00+08:00", "cp-notifications"))
+        seen = watching(monkeypatch, "pipeline.warehouse_counts")
+        got = warehouse_counts.points("cp-clients", CLIENT_REF, history, warehouse=warehouse,
+                                      owed=None)
+        assert got[c1], "precondition: points were made"
+        assert seen.reads == {"timezone_versions": 1} and not seen.unpassed, vars(seen)
+
+    def test_cross_table_grid_receipts(self, monkeypatch):
+        from pipeline import cross_table_grid as g
+
+        seen = watching(monkeypatch, "pipeline.cross_table_grid")
+        receipts = g.Receipts({f"cp-clients@{d}": f"2024-07-{d}T10:00:00+08:00"
+                               for d in range(10, 20)})
+        assert not any(receipts.shares_a_day(f"cp-clients@{d}") for d in range(10, 20))
+        assert seen.reads == {"timezone_versions": 1} and not seen.unpassed, vars(seen)
+
+    def test_cross_table_grid_place_entries(self, monkeypatch):
+        from pipeline import cross_table_grid as g
+        from pipeline import cross_table_notices as ctn
+        from test_cross_table_grid import C1, N2, P, RECEIPTS, _entry, _slots
+
+        cards = [{"history": [_entry(C1, rank=r, recorded_at=f"2024-08-0{r}T10:00:00+08:00")
+                              for r in range(5, 9)]}]
+        seen = watching(monkeypatch, "pipeline.cross_table_grid")
+        g.place_entries("cp-notifications", "cp_notifications", cards, {N2: P}, slots=_slots(),
+                        log=ctn.Log(), receipts=RECEIPTS)
+        assert all(e.get("placed") for e in cards[0]["history"]), "precondition: placed"
+        assert seen.reads == {"timezone_versions": 1, "by_table": 1}, vars(seen)
+        assert not seen.unpassed, vars(seen)
+
+    def test_cross_table_grid_clause_points(self, monkeypatch):
+        from pipeline import cross_table_grid as g
+        from pipeline import cross_table_notices as ctn
+        from test_cross_table_grid import C1, C2, P, RECEIPTS
+
+        timeline = {"points": [{"on": "2024-07-25", "promoted": {"supply": C1}}],
+                    "standing": [{"on": f"2024-08-{d:02d}", "period": P, "standingIn": {
+                        "supply": C1, "standsOn": "2024-Q2"} if d % 2 else None}
+                        for d in range(6, 12)]}
+        seen = watching(monkeypatch, "pipeline.cross_table_grid")
+        pts = g.clause_points("cp-clients", {C2: P}, timeline=timeline,
+                              health={"run-c1": {"promotedOn": "green", "timeline": []}},
+                              run_of={C1: "run-c1"}, log=ctn.Log(), receipts=RECEIPTS)[C2]
+        assert len(pts) > 2, "precondition: several days were answered"
+        assert seen.reads == {"timezone_versions": 1} and not seen.unpassed, vars(seen)
+
+    def test_cross_table_notices_own_red(self, monkeypatch):
+        from pipeline import cross_table_notices as ctn
+        from test_cross_table_notices import CHECK, N2
+
+        own = [{"check_id": f"{CHECK}.notification_id.not_null_dbt",
+                "history": [{"rank": r, "supply_id": N2, "status": "red",
+                             "recorded_at": f"2024-11-0{r - 3}T10:00:00+08:00"}
+                            for r in range(4, 8)]}]
+        seen = watching(monkeypatch, "pipeline.cross_table_notices")
+        assert ctn._own_red(own, N2, "2024-11-05") is True
+        assert seen.reads == {"timezone_versions": 1} and not seen.unpassed, vars(seen)

@@ -81,6 +81,10 @@ def for_dataset(dataset_id: str, conn=None) -> dict[str, dict]:
     from qa_tools.common import hierarchy, promotion, supply_status
 
     reads = promotion._declared_reads()
+    # The hierarchy's table index, read once for the dataset and given to
+    # every supply's lookups (REQ-PIPE-254 criterion 19; post-build-review
+    # #282 - it was read once per supply).
+    known = hierarchy.by_table()
     out: dict[str, dict] = {}
     timelines: dict[str, list[dict]] = {}
     warehouses: dict[frozenset, supply_status.HoldingsTimeline] = {}
@@ -97,7 +101,6 @@ def for_dataset(dataset_id: str, conn=None) -> dict[str, dict]:
         # this supply, in the order their runs were opened.
         shown = supply_status.results_about(conn, dataset_id, supply,
                                             view=supply_status.View()).shown
-        known = hierarchy.by_table()
         involved = {dataset_id, *(d for r in shown for d in (
             supply_status.dataset_of(t, known) for t in (r.get("reads") or {})) if d)}
         for ds in involved:

@@ -278,3 +278,24 @@ class TestTheWalkCoversEveryReason:
         got = _timeline(conn, dataset)
         _assert_agrees(conn, dataset, got)
         assert got["points"][-1]["whyNot"] == promotion_state.SUPERSEDED
+
+
+class TestItTakesTheZonesOnce:
+    """REQ-PIPE-254 criterion 19, decision 21 (post-build-review #282, L5
+    critic 2): the asset's zones read once for the dataset and given to
+    every per-day question - the panel's and the stand-in's alike."""
+
+    def test_one_read_and_every_day_given_it(self, conn, dataset, periods, monkeypatch):
+        from test_config_content_keying import watching
+
+        first, second, _ = periods
+        _file(dataset, f"{dataset}@1", first, _at(1))
+        _promote(conn, dataset, f"{dataset}@1", first, _at(2))
+        _substitute(conn, dataset, second, first, f"{dataset}@1", _at(4))
+        _de_substitute(conn, dataset, second, _at(6))
+        timeline = slot_timeline.for_dataset(dataset, conn=conn)
+        seen = watching(monkeypatch, "pipeline.promotion_timeline")
+        got = promotion_timeline.for_dataset(dataset, timeline, conn=conn)
+        assert got["points"] and got["standing"], "precondition: points and stand-ins"
+        assert seen.reads.get("timezone_versions") == 1, vars(seen)
+        assert not seen.unpassed, vars(seen)
