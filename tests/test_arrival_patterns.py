@@ -16,16 +16,6 @@ import pytest
 from qa_tools.common import arrival_patterns, delivery, hierarchy, validate_arrival_patterns
 
 
-@pytest.fixture(autouse=True)
-def _fresh_patterns():
-    """compiled_patterns() is cached for the life of the process, which
-    is right in production and wrong across tests that rewrite the
-    configuration."""
-    arrival_patterns.compiled_patterns.cache_clear()
-    yield
-    arrival_patterns.compiled_patterns.cache_clear()
-
-
 def _patterns(monkeypatch, mapping: dict[str, str]):
     """Stand in a hand-built set of dataset patterns."""
     entries = [
@@ -37,7 +27,6 @@ def _patterns(monkeypatch, mapping: dict[str, str]):
         for dataset_id, pattern in mapping.items()
     ]
     monkeypatch.setattr(hierarchy, "all_datasets", lambda: entries)
-    arrival_patterns.compiled_patterns.cache_clear()
     return entries
 
 

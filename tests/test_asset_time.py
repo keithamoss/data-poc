@@ -16,18 +16,10 @@ import pytest
 from qa_tools.common import asset_time
 
 
-@pytest.fixture(autouse=True)
-def _clear_cache():
-    asset_time.timezone_versions.cache_clear()
-    yield
-    asset_time.timezone_versions.cache_clear()
-
-
 def _repoint(tmp_path, monkeypatch, text):
     path = tmp_path / "data-asset.yaml"
     path.write_text(text)
     monkeypatch.setattr(asset_time, "DATA_ASSET_YAML", path)
-    asset_time.timezone_versions.cache_clear()
 
 
 def _versions(*pairs) -> str:

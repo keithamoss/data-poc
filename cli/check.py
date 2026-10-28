@@ -85,6 +85,11 @@ _GATES: tuple[tuple[str, list[str], str, bool], ...] = (
     # would draw the same rows.
     ("providers", ["uv", "run", "python3", "-m", "generator.validate_providers"],
      "every generator provider's seeds are disjoint from every other's", False),
+    # REQ-PIPE-254 criteria 16 to 18: a value held for the whole process
+    # answers an edited or swapped configuration file stale, so a new
+    # lru_cache or cache needs a reviewed reason.
+    ("caches", ["uv", "run", "python3", "-m", "qa_tools.common.validate_caches"],
+     "no unreviewed functools cache under qa_tools/ or pipeline/", False),
     # The one gate with a warning state today: REQ-PIPE-053's low
     # runway, which must be visible without failing the build.
     ("schedule", ["uv", "run", "mothman", "schedule", "validate"],

@@ -8,17 +8,9 @@ that nothing had noticed.
 """
 from __future__ import annotations
 
-import pytest
 import yaml
 
 from qa_tools.common import hierarchy, validate_hierarchy
-
-
-@pytest.fixture(autouse=True)
-def _clear_cache():
-    hierarchy._load.cache_clear()
-    yield
-    hierarchy._load.cache_clear()
 
 
 def _contract(tmp_path, monkeypatch, filename, doc, describes):

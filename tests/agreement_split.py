@@ -154,19 +154,6 @@ def write(contract_dir: Path, merged: dict, base: dict | None = None) -> None:
     cal_path.write_text(yaml.safe_dump(cal, sort_keys=False))
 
 
-def clear_caches() -> None:
-    """Forget every parsed copy of either file - the collection registry's
-    included, which is built from the hierarchy and would otherwise outlive
-    a test that swapped it (REQ-QAC-242)."""
-    from qa_tools import collections
-    from qa_tools.common import agreement, asset_time, hierarchy
-
-    agreement.current.cache_clear()
-    hierarchy._load.cache_clear()
-    collections._load.cache_clear()
-    asset_time.timezone_versions.cache_clear()
-
-
 def repoint(monkeypatch, directory: Path, merged: dict, base: dict | None = None) -> Path:
     """Write `merged` as the two files into `directory` and point every
     reader at them - the hierarchy at the asset file, the agreement at the
@@ -178,7 +165,6 @@ def repoint(monkeypatch, directory: Path, merged: dict, base: dict | None = None
     asset_path = directory / "data-asset.yaml"
     monkeypatch.setattr(hierarchy, "DATA_ASSET_YAML", asset_path)
     monkeypatch.setattr(agreement, "CALENDAR_YAML", directory / "calendar.yaml")
-    clear_caches()
     return asset_path
 
 

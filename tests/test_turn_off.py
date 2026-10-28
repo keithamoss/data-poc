@@ -388,10 +388,8 @@ def using(monkeypatch, tmp_path):
         path = tmp_path / "calendar.yaml"
         path.write_text(yaml.safe_dump(doc, sort_keys=False))
         monkeypatch.setattr(agreement, "CALENDAR_YAML", path)
-        agreement.current.cache_clear()
         return agreement.current()
     yield apply
-    agreement.current.cache_clear()
 
 
 class TestTheLastOwedSlotBeforeAGap:

@@ -22,7 +22,6 @@ READS CONFIGURATION AND NOTHING ELSE: no connection is opened here.
 """
 from __future__ import annotations
 
-import functools
 import importlib
 import re
 from dataclasses import dataclass
@@ -157,14 +156,28 @@ def collections_in(doc: dict) -> list[Collection]:
     return found
 
 
-@functools.lru_cache(maxsize=1)
+_BUILT = config_yaml.Built()
+
+
 def _load() -> tuple[Collection, ...]:
-    # BY PATH, so a slip in the file names it and its line rather than
-    # `<unicode string>` (tests/test_cli_config_unreadable.py): the CLI
-    # modules reach this registry while they import.
-    doc = config_yaml.load(hierarchy.DATA_ASSET_YAML) or {}
+    """Every collection, built from data-asset.yaml as it reads now and
+    keyed on its content (REQ-PIPE-254): an edited or swapped hierarchy is
+    seen on the next call, an unchanged one is not built again."""
+    path = hierarchy.DATA_ASSET_YAML
+    text = config_yaml.read(path)
+    return _BUILT.get(str(path), text, lambda: _build(path, text))
+
+
+def _build(path, text: str) -> tuple[Collection, ...]:
+    # ONE READ FOR BOTH HALVES (REQ-PIPE-254 criterion 6): the collections
+    # and the datasets inside them come from the same text, never from two
+    # reads that could see two versions of the file. Named by its path, so a
+    # slip names the file and its line rather than `<unicode string>`
+    # (tests/test_cli_config_unreadable.py): the CLI modules reach this
+    # registry while they import.
+    doc = config_yaml.parse(text, name=str(path)) or {}
     by_collection: dict[str, list[hierarchy.Dataset]] = {}
-    for d in hierarchy.all_datasets():
+    for d in hierarchy._from_text(path, text)[1].values():
         by_collection.setdefault(d.collection_id, []).append(d)
     found = []
     for agency in ((doc.get("hierarchy") or {}).get("agencies") or []):

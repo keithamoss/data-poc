@@ -31,9 +31,7 @@ def sydney(tmp_path, monkeypatch):
     path = tmp_path / "data-asset.yaml"
     path.write_text(yaml.safe_dump(doc))
     monkeypatch.setattr(asset_time, "DATA_ASSET_YAML", path)
-    asset_time.timezone_versions.cache_clear()
     yield
-    asset_time.timezone_versions.cache_clear()
 
 
 def _expected_time(monkeypatch, hhmm):

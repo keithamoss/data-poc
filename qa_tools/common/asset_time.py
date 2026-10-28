@@ -40,8 +40,6 @@ from __future__ import annotations
 
 import os
 import re
-
-import functools
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, time, timedelta
 from pathlib import Path
@@ -114,20 +112,22 @@ def parse_timezone_versions(doc: dict, where: str = "contract/data-asset.yaml") 
     return tuple(out)
 
 
-@functools.lru_cache(maxsize=1)
+_BUILT = config_yaml.Built()
+
+
 def timezone_versions() -> tuple[ZoneVersion, ...]:
     """Every timezone version the asset carries, oldest first.
 
-    Cached like the hierarchy next door, and for the same reason: every
-    consumer is a short-lived CLI or build process, and the file cannot
-    change mid-run. THERE IS NO BARE LOOKUP (criterion 6, NFR 2): every
+    Keyed on data-asset.yaml's content like the hierarchy next door
+    (REQ-PIPE-254): read on every call, built again only when its text has
+    changed. THERE IS NO BARE LOOKUP (criterion 6, NFR 2): every
     caller asks `zone_on(day)`, `zone_at(instant)` or `zone_now()`, so a
     caller that has not thought about 'as at when' cannot quietly get
     today's zone for a date in 2024.
     """
-    with open(DATA_ASSET_YAML) as f:
-        doc = config_yaml.parse(f) or {}
-    return parse_timezone_versions(doc, str(DATA_ASSET_YAML))
+    path = DATA_ASSET_YAML
+    return _BUILT.from_file(path, lambda text: parse_timezone_versions(
+        config_yaml.parse(text, name=str(path)) or {}, str(path)))
 
 
 def zone_on(day: date) -> ZoneInfo:

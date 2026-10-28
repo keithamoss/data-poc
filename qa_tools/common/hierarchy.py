@@ -25,11 +25,14 @@ same file. A dataset naming a calendar and a dataset naming its
 collection then resolve through one file rather than two mechanisms.
 Keith's call, 2026-09-23.
 
-READ ONCE, CACHED. Every consumer here is a short-lived CLI or build
-process, and the file cannot change mid-run - so the parse happens once
-and the result is reused. That also makes this safe to import at module
-scope in the tool scripts, which is how they used to use their
-constants.
+KEYED ON THE FILE'S CONTENT (REQ-PIPE-254). The file is read on every
+call and the tree is built again only when its text has changed, so an
+edited or swapped hierarchy is answered for what it says now - a dataset
+graduating out of sample data is a configuration change a running process
+must see (plans/post-build-review.md #217) - and an unchanged one costs a
+read and a lookup rather than a parse. The registry and the arrival
+patterns, which are built from this tree, build it from the same one read
+of the file through `_from_text()`.
 
 NO FALLBACKS, DELIBERATELY. An unknown dataset id raises rather than
 returning None or an empty scope. Every caller here is asking "where
@@ -40,9 +43,9 @@ fallback" stance the rest of this package takes.
 """
 from __future__ import annotations
 
-import functools
 from dataclasses import dataclass
 from pathlib import Path
+from types import MappingProxyType
 
 from qa_tools.common import config_yaml
 
@@ -133,10 +136,24 @@ def _require(node: dict, key: str, where: str):
     return node[key]
 
 
-@functools.lru_cache(maxsize=1)
-def _load() -> tuple[str, dict[str, Dataset]]:
-    with open(DATA_ASSET_YAML) as f:
-        doc = config_yaml.parse(f) or {}
+_BUILT = config_yaml.Built()
+
+
+def _load() -> tuple[str, "MappingProxyType[str, Dataset]"]:
+    """(data_asset_id, {dataset id: Dataset}) for the file as it reads now."""
+    path = DATA_ASSET_YAML
+    return _from_text(path, config_yaml.read(path))
+
+
+def _from_text(path: Path, text: str) -> tuple[str, "MappingProxyType[str, Dataset]"]:
+    """The tree built from one read of `path` - what the registry and the
+    arrival patterns build from, so their value and the tree's are always
+    the same version of the file (REQ-PIPE-254 criterion 6)."""
+    return _BUILT.get(str(path), text, lambda: _build(path, text))
+
+
+def _build(path: Path, text: str) -> tuple[str, "MappingProxyType[str, Dataset]"]:
+    doc = config_yaml.parse(text, name=str(path)) or {}
 
     data_asset_id = doc.get("data_asset_id")
     if not data_asset_id:
@@ -172,7 +189,7 @@ def _load() -> tuple[str, dict[str, Dataset]]:
 
     if not datasets:
         raise ValueError(f"{DATA_ASSET_YAML} defines no datasets under hierarchy.agencies")
-    return data_asset_id, datasets
+    return data_asset_id, MappingProxyType(datasets)
 
 
 def data_asset_id() -> str:

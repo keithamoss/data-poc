@@ -43,24 +43,6 @@ def _asset_with(datasets: list[dict], tmp_path, monkeypatch):
     return agreement_split.repoint(monkeypatch, tmp_path, doc)
 
 
-def _clear():
-    """Every cache holding a parsed copy of either file - the
-    agreement (contract/calendar.yaml) and the hierarchy - since missing one
-    is how a fixture silently tests the real asset instead of its own.
-    """
-    from qa_tools.common import hierarchy as hierarchy_mod
-
-    agreement_split.clear_caches()
-    hierarchy_mod._load.cache_clear()
-
-
-@pytest.fixture(autouse=True)
-def _clear_caches():
-    _clear()
-    yield
-    _clear()
-
-
 SAMPLE = {"id": "cp-referrals", "name": "Referrals", "table": "cp_referrals",
           "no_calendar": "not-yet-agreed", "arrival_pattern": r"cp_referrals\.csv"}
 PROJECT = {"id": "one-off-extract", "name": "A Project Extract",

@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import yaml
 
-from qa_tools.common import agreement, inheritance, schedule
+from qa_tools.common import agreement, inheritance
 
 ED = "ed-presentations"
 
@@ -31,9 +31,6 @@ def _with_gap(tmp_path, monkeypatch):
     path = tmp_path / "calendar.yaml"
     path.write_text(yaml.safe_dump(raw, sort_keys=False))
     monkeypatch.setattr(agreement, "CALENDAR_YAML", path)
-    for fn in vars(schedule).values():
-        if hasattr(fn, "cache_clear"):
-            fn.cache_clear()
 
 
 def test_the_gap_quarter_is_owed_nothing(tmp_path, monkeypatch):

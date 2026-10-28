@@ -12,7 +12,7 @@ from datetime import date, datetime, timedelta, timezone
 import pytest
 
 import agreement_split
-from qa_tools.common import hierarchy, schedule, slots
+from qa_tools.common import schedule, slots
 
 PERTH = timezone(timedelta(hours=8))
 CP_DATASETS = ["cp-clients", "cp-notifications", "cp-investigations",
@@ -175,12 +175,8 @@ class TestTheClaimWindowOpensEarlyAndClosesWithTheNextPeriod:
         agreement_split.repoint(monkeypatch, tmp_path / "contract",
                                 agreement_split.merged_view(agreement_split.REAL_CONTRACT_DIR),
                                 base=base)
-        try:
-            slot = slots.slots_for_dataset("cp-clients")[0]
-            assert slot.claim_opens_at == slot.due_at - timedelta(hours=2)
-        finally:
-            agreement_split.clear_caches()
-            hierarchy._load.cache_clear()
+        slot = slots.slots_for_dataset("cp-clients")[0]
+        assert slot.claim_opens_at == slot.due_at - timedelta(hours=2)
 
 
 class TestNotExpectedMeansNoSlot:
@@ -206,17 +202,13 @@ class TestNotExpectedMeansNoSlot:
                         dataset["not_expected"] = [
                             {"period": "2026-Q1", "reason": "agency shutdown"}]
         agreement_split.repoint(monkeypatch, contract_dir, doc)
-        try:
-            names = [s.name for s in slots.slots_for_dataset("cp-clients")]
-            assert "2026-Q1" not in names
-            # But the PERIOD is still there, flagged - the dashboard has
-            # to be able to say "agreed, no supply" rather than show a gap.
-            periods = {p.name: p for p in schedule.periods_for_dataset("cp-clients")}
-            assert periods["2026-Q1"].expected is False
-            assert periods["2026-Q1"].not_expected_reason == "agency shutdown"
-        finally:
-            agreement_split.clear_caches()
-            hierarchy._load.cache_clear()
+        names = [s.name for s in slots.slots_for_dataset("cp-clients")]
+        assert "2026-Q1" not in names
+        # But the PERIOD is still there, flagged - the dashboard has
+        # to be able to say "agreed, no supply" rather than show a gap.
+        periods = {p.name: p for p in schedule.periods_for_dataset("cp-clients")}
+        assert periods["2026-Q1"].expected is False
+        assert periods["2026-Q1"].not_expected_reason == "agency shutdown"
 
 
 class TestOverdueIsAskedNotRecorded:
@@ -313,27 +305,19 @@ class TestTheClaimWindowIsEffectiveDated:
     def test_a_past_slot_keeps_the_window_that_was_in_force_on_its_own_date(
             self, tmp_path, monkeypatch):
         self._repoint(tmp_path, monkeypatch)
-        try:
-            by_period = {s.name: s for s in slots.slots_for_dataset("d")}
-            old = by_period["2024-Q1"]
-            assert old.claim_opens_at == old.due_at - timedelta(days=14), (
-                "the 2024 slot took the 2027 version's 7-day window - authoring a new "
-                "calendar version moved a claim window that history was filed under")
-        finally:
-            agreement_split.clear_caches()
-            hierarchy._load.cache_clear()
+        by_period = {s.name: s for s in slots.slots_for_dataset("d")}
+        old = by_period["2024-Q1"]
+        assert old.claim_opens_at == old.due_at - timedelta(days=14), (
+            "the 2024 slot took the 2027 version's 7-day window - authoring a new "
+            "calendar version moved a claim window that history was filed under")
 
     def test_a_current_slot_takes_the_current_version(self, tmp_path, monkeypatch):
         """The other half - effective-dating must not freeze the window
         at the oldest version either."""
         self._repoint(tmp_path, monkeypatch)
-        try:
-            by_period = {s.name: s for s in slots.slots_for_dataset("d")}
-            new = by_period["2027-Q1"]
-            assert new.claim_opens_at == new.due_at - timedelta(days=7)
-        finally:
-            agreement_split.clear_caches()
-            hierarchy._load.cache_clear()
+        by_period = {s.name: s for s in slots.slots_for_dataset("d")}
+        new = by_period["2027-Q1"]
+        assert new.claim_opens_at == new.due_at - timedelta(days=7)
 
     def test_a_participation_override_wins_at_every_date(self, tmp_path, monkeypatch):
         """Criterion 10's override, on the dataset's participation version
@@ -341,9 +325,5 @@ class TestTheClaimWindowIsEffectiveDated:
         overlaps."""
         self._repoint(tmp_path, monkeypatch,
                       base=agreement_split.participation("d", claim_window="2h"))
-        try:
-            for slot in slots.slots_for_dataset("d"):
-                assert slot.claim_opens_at == slot.due_at - timedelta(hours=2)
-        finally:
-            agreement_split.clear_caches()
-            hierarchy._load.cache_clear()
+        for slot in slots.slots_for_dataset("d"):
+            assert slot.claim_opens_at == slot.due_at - timedelta(hours=2)

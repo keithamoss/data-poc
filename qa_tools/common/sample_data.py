@@ -21,11 +21,11 @@ RECORD carries `supply_state = in-development`, which is what keeps it out
 of every read a viewer would take as real history, since `qa_store`'s
 reads default to AGREED and a caller has to ask for the other.
 
-NOTHING HERE IS CACHED, deliberately. It reads `schedule`, which caches
-the parsed asset itself - so adding a second cache layer would be a second
-thing a test fixture has to clear, and this project has already been bitten
-by exactly that: three `lru_cache`es hold the parsed `data-asset.yaml`, and
-missing one makes a fixture silently test the real asset.
+NOTHING HERE IS CACHED, deliberately. It asks the hierarchy and the
+agreement (through `schedule`), which keep what they build keyed on their
+files' content (REQ-PIPE-254) - so an edited or swapped file is seen on the
+next call with nothing to clear, and a cache of its own here would be one
+more value that could answer for a file as it used to read.
 """
 from __future__ import annotations
 

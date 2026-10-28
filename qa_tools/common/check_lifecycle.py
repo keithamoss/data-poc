@@ -428,7 +428,8 @@ def parse_dbt_check_metadata(schema_yml_path: Path | str, *,
     return out
 
 
-def dbt_check_id_lookup(schema_yml_path: Path | str) -> dict[tuple[str | None, str | None, str], str]:
+def dbt_check_id_lookup(schema_yml_path: Path | str, *,
+                        text: str | None = None) -> dict[tuple[str | None, str | None, str], str]:
     """`{(model_or_None, column_or_None, dbt_test_type_or_singular_name):
     check_id}` for every real dbt check in this file - built directly
     from schema.yml, NOT dbt's compiled manifest (verified empirically,
@@ -454,9 +455,14 @@ def dbt_check_id_lookup(schema_yml_path: Path | str) -> dict[tuple[str | None, s
     (its own dataset's one constant model name, or
     cp_common.TABLE_DATASET_ID's `f"stg_{table}"` via `_table_for_test()`)
     - used to tag each real check result with its own check_id at write
-    time, not reconstructed from the check_id naming convention."""
-    with open(schema_yml_path) as f:
-        doc = config_yaml.parse(f) or {}
+    time, not reconstructed from the check_id naming convention.
+
+    `text`, where given, is the file's content as the caller already read it
+    - run_dbt's content-keyed lookup builds from its own one read
+    (REQ-PIPE-254 criterion 6)."""
+    if text is None:
+        text = config_yaml.read(schema_yml_path)
+    doc = config_yaml.parse(text, name=str(schema_yml_path)) or {}
     lookup: dict[tuple[str | None, str | None, str], str] = {}
 
     def _record(test: Any, model: str, column: str | None) -> None:
@@ -680,9 +686,13 @@ def contract_rule_attachments(contract_yaml_path: Path | str) -> list[tuple[str,
 
 
 def parse_contract_check_metadata(contract_yaml_path: Path | str, *,
-                                  past: bool = False) -> list[CheckMetadata]:
-    with open(contract_yaml_path) as f:
-        doc = config_yaml.parse(f) or {}
+                                  past: bool = False,
+                                  text: str | None = None) -> list[CheckMetadata]:
+    """`text`, where given, is the contract's content as the caller already
+    read it (REQ-PIPE-254 criterion 6)."""
+    if text is None:
+        text = config_yaml.read(contract_yaml_path)
+    doc = config_yaml.parse(text, name=str(contract_yaml_path)) or {}
     out: list[CheckMetadata] = []
     errors: list[str] = []
     source = str(contract_yaml_path)

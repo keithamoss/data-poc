@@ -22,18 +22,6 @@ import agreement_split
 from qa_tools.common import asset_time, hierarchy, schedule, slots
 
 
-def _clear():
-    agreement_split.clear_caches()
-    hierarchy._load.cache_clear()
-
-
-@pytest.fixture(autouse=True)
-def _clear_caches():
-    _clear()
-    yield
-    _clear()
-
-
 def _repoint(tmp_path, monkeypatch, doc):
     """Repoints BOTH readers at a synthetic config.
 

@@ -162,12 +162,8 @@ class TestItWarnsOncePerCalendarNotOncePerDataset:
         doc["hierarchy"]["agencies"][0]["collections"][0]["datasets"].append(
             {"id": "extra", "name": "Extra", "table": "extra", "calendar": "annual"})
         agreement_split.repoint(monkeypatch, contract_dir, doc)
-        try:
-            note = runway.summary(date(2026, 9, 23))
-            assert "2 calendar(s) low on runway" in note
-        finally:
-            agreement_split.clear_caches()
-            hierarchy._load.cache_clear()
+        note = runway.summary(date(2026, 9, 23))
+        assert "2 calendar(s) low on runway" in note
 
 
 class TestAnExhaustedScheduleIsScopedToItsOwnDatasets:
@@ -212,12 +208,8 @@ class TestTheThresholdIsConfigurable:
         doc = agreement_split.merged_view(contract_dir)
         next(c for c in doc["calendars"] if c["name"] == "quarterly")["runway_warning_slots"] = 1
         agreement_split.repoint(monkeypatch, contract_dir, doc)
-        try:
-            # Two slots left, threshold now 1 - so no longer low.
-            assert runway.low_runway(date(2026, 9, 23)) == []
-        finally:
-            agreement_split.clear_caches()
-            hierarchy._load.cache_clear()
+        # Two slots left, threshold now 1 - so no longer low.
+        assert runway.low_runway(date(2026, 9, 23)) == []
 
     def test_a_threshold_of_zero_is_rejected(self, tmp_path, monkeypatch):
         """A threshold that only fires once the schedule has already run
@@ -230,11 +222,8 @@ class TestTheThresholdIsConfigurable:
         doc = agreement_split.merged_view(contract_dir)
         next(c for c in doc["calendars"] if c["name"] == "quarterly")["runway_warning_slots"] = 0
         agreement_split.repoint(monkeypatch, contract_dir, doc)
-        try:
-            with pytest.raises(schedule.ScheduleConfigError, match="runway_warning_slots"):
-                schedule.calendars()
-        finally:
-            agreement_split.clear_caches()
+        with pytest.raises(schedule.ScheduleConfigError, match="runway_warning_slots"):
+            schedule.calendars()
 
 
 class TestItTouchesNoData:

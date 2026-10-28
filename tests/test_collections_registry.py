@@ -310,8 +310,6 @@ def _edit(edit) -> None:
     doc = yaml.safe_load(hierarchy.DATA_ASSET_YAML.read_text())
     edit(doc["hierarchy"]["agencies"][-1]["collections"][0], doc)
     hierarchy.DATA_ASSET_YAML.write_text(yaml.safe_dump(doc, sort_keys=False))
-    hierarchy._load.cache_clear()
-    collections._load.cache_clear()
 
 
 class TestTheConfigurationGate:

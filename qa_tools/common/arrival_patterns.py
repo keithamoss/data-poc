@@ -33,7 +33,8 @@ than silent. On top of that, three things here are structural:
 
   - every filename is length-capped BEFORE matching (anything over 255
     characters is already invalid on every filesystem this runs on),
-  - every pattern is compiled ONCE, at config load, and a bad one raises
+  - every pattern is compiled at config load - again only when the
+    file's text has changed (REQ-PIPE-254) - and a bad one raises
     a named configuration error rather than a stack trace at
     recognition time, and
   - matching is `re.fullmatch`, so criterion 5's anchoring holds whether
@@ -48,11 +49,11 @@ REQ-PIPE-059's hold rather than anything here.
 """
 from __future__ import annotations
 
-import functools
 import re
 from dataclasses import dataclass
+from types import MappingProxyType
 
-from qa_tools.common import hierarchy
+from qa_tools.common import config_yaml, hierarchy
 
 #: Longer than any filesystem this runs on will accept, so a name over
 #: this is already not a real file. Capping before the match is what
@@ -116,20 +117,31 @@ def _compile(dataset_id: str, pattern: str) -> re.Pattern:
             f"usable regular expression ({exc}): {pattern}") from exc
 
 
-@functools.lru_cache(maxsize=1)
-def compiled_patterns() -> dict[str, re.Pattern]:
-    """Every declared pattern, compiled once, keyed by dataset id.
+_BUILT = config_yaml.Built()
+
+
+def compiled_patterns() -> "MappingProxyType[str, re.Pattern]":
+    """Every declared pattern, compiled, keyed by dataset id.
+
+    KEYED ON WHAT IT IS BUILT FROM (REQ-PIPE-254): the declared (dataset id,
+    pattern) pairs, read through the hierarchy on every call - and the
+    hierarchy reads data-asset.yaml on every call and is keyed on its text.
+    So an edited pattern is compiled on the next call, an unchanged set is
+    not compiled again, and every pair comes from one read of the file.
 
     Datasets that declare none are simply absent. Whether that is
     allowed is the configuration gate's question (criterion 7), not
     this function's - a dataset with no pattern attributes nothing,
     which is a coherent state to be in while one is being added.
     """
-    out: dict[str, re.Pattern] = {}
-    for entry in hierarchy.all_datasets():
-        if entry.arrival_pattern:
-            out[entry.dataset_id] = _compile(entry.dataset_id, entry.arrival_pattern)
-    return out
+    declared = tuple((entry.dataset_id, entry.arrival_pattern)
+                     for entry in hierarchy.all_datasets() if entry.arrival_pattern)
+    return _BUILT.get("arrival_patterns", declared, lambda: _build(declared))
+
+
+def _build(declared) -> "MappingProxyType[str, re.Pattern]":
+    return MappingProxyType({dataset_id: _compile(dataset_id, pattern)
+                             for dataset_id, pattern in declared})
 
 
 def attribute(filename: str) -> Attribution:

@@ -112,8 +112,6 @@ def _install(monkeypatch, tmp_path, *, bare: bool) -> list:
     from qa_tools.common import agreement
 
     monkeypatch.setattr(agreement, "CALENDAR_YAML", tmp_path / "contract" / "calendar.yaml")
-    hierarchy._load.cache_clear()
-    collections._load.cache_clear()
     calls: list = []
     monkeypatch.setitem(sys.modules, PROVIDER_MODULE, _provider(calls))
     adapter = types.ModuleType("qa_tools.collections.fake_collection")
@@ -131,8 +129,6 @@ def third_collection(monkeypatch, tmp_path):
     list every call into its code is recorded in."""
     calls = _install(monkeypatch, tmp_path, bare=False)
     yield calls
-    hierarchy._load.cache_clear()
-    collections._load.cache_clear()
 
 
 @pytest.fixture
@@ -140,5 +136,3 @@ def without_adapter(monkeypatch, tmp_path):
     """As third_collection, plus a fourth collection with no adapter."""
     calls = _install(monkeypatch, tmp_path, bare=True)
     yield calls
-    hierarchy._load.cache_clear()
-    collections._load.cache_clear()

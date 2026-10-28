@@ -31,12 +31,12 @@ carries only the offending FK value.
 """
 from __future__ import annotations
 
-import functools
 import json
 import os
+from types import MappingProxyType
 
 from qa_tools import collections
-from qa_tools.common import asked_for, hierarchy, left_out, supply_db
+from qa_tools.common import asked_for, config_yaml, hierarchy, left_out, supply_db
 from qa_tools.common.check_lifecycle import dbt_check_id_lookup
 from qa_tools.common.dbt_common import (
     ENGINE_TAG, NothingLeftToBuild, exclude_unreadable, failing_sample_keys_direct,
@@ -64,12 +64,17 @@ def _models(coll) -> list[str]:
     return [f"stg_{d.table}" for d in coll.datasets]
 
 
-@functools.lru_cache(maxsize=None)
-def _check_ids(schema_path: str) -> dict:
-    """Built once per schema file from the file itself, not the compiled
-    manifest - see dbt_check_id_lookup(). Only the ACTIVE file: a retired
-    check never produces a result."""
-    return dbt_check_id_lookup(schema_path)
+_CHECK_IDS = config_yaml.Built()
+
+
+def _check_ids(schema_path: str) -> "MappingProxyType":
+    """Built from the schema file itself, not the compiled manifest - see
+    dbt_check_id_lookup() - and keyed on the file's content (REQ-PIPE-254),
+    so an edited schema file is read for what it says now. Read-only, since
+    every caller shares it. Only the ACTIVE file: a retired check never
+    produces a result."""
+    return _CHECK_IDS.from_file(schema_path, lambda text: MappingProxyType(
+        dbt_check_id_lookup(schema_path, text=text)))
 
 
 def _table_for_test(coll, spec, node: dict) -> str | None:

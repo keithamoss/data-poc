@@ -8,19 +8,20 @@ any build (criterion 8).
 """
 from __future__ import annotations
 
-import functools
 from pathlib import Path
 
-import yaml
+from qa_tools.common import config_yaml
 
 #: What every collection's entry must carry.
 COLLECTION_KEYS = ("provider", "delivery_format", "provenance")
 
 
-@functools.cache
 def _load(path: Path) -> dict:
-    with open(path) as f:
-        return yaml.safe_load(f) or {}
+    """The file as it reads now, parsed only when its text has changed, and
+    the caller's own copy (REQ-PIPE-254): config_yaml keys the parse on the
+    content and deep-copies what it hands out, so an edited file is seen on
+    the next call and no caller's change reaches another's."""
+    return config_yaml.load(path) or {}
 
 
 def _default() -> Path:

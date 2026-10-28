@@ -23,24 +23,8 @@ from qa_tools.common.qa_results_writer import write_qa_result
 from staging_support import stage_bdm, stage_cp
 
 
-def _clear():
-    """Every lru_cache that holds a parsed data-asset.yaml - see
-    tests/test_no_calendar.py's identical helper for why there are three."""
-    from qa_tools.common import hierarchy as hierarchy_mod
-
-    agreement_split.clear_caches()
-    hierarchy_mod._load.cache_clear()
-
-
 #: Results about invented check ids (REQ-QAC-176 criterion 14 refuses them otherwise).
 pytestmark = pytest.mark.usefixtures("invented_check_ids")
-
-
-@pytest.fixture(autouse=True)
-def _clear_caches():
-    _clear()
-    yield
-    _clear()
 
 
 SAMPLE = {"id": "cp-referrals", "name": "Referrals", "table": "cp_referrals",

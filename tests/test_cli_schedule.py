@@ -415,11 +415,8 @@ class TestAnOwedNothingPeriodSaysWhatKindAndWhy:
                         dataset["not_expected"] = [
                             {"period": "2024-Q2", "reason": "agency shutdown"}]
         agreement_split.repoint(monkeypatch, tmp_path, doc)
-        try:
-            result = _runner.invoke(schedule_cli.schedule_group,
-                                    ["show", "--dataset", "cp-clients", "--all"])
-        finally:
-            agreement_split.clear_caches()
+        result = _runner.invoke(schedule_cli.schedule_group,
+                                ["show", "--dataset", "cp-clients", "--all"])
         assert result.exit_code == 0, result.output
         assert "not expected" in result.output and "agency shutdown" in result.output
 

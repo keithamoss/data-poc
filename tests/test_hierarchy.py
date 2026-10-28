@@ -20,15 +20,6 @@ import yaml
 from qa_tools.common import hierarchy
 
 
-@pytest.fixture(autouse=True)
-def _clear_cache():
-    """The loader is lru_cached, so a test that repoints DATA_ASSET_YAML
-    would otherwise see the previous test's tree."""
-    hierarchy._load.cache_clear()
-    yield
-    hierarchy._load.cache_clear()
-
-
 class TestAgainstTheRealConfig:
     def test_every_dataset_resolves_to_a_full_path_through_the_tree(self):
         for entry in hierarchy.all_datasets():
@@ -104,7 +95,6 @@ class TestFailsLoudly:
         path = tmp_path / "data-asset.yaml"
         path.write_text(yaml.safe_dump(doc))
         monkeypatch.setattr(hierarchy, "DATA_ASSET_YAML", path)
-        hierarchy._load.cache_clear()
 
     def test_a_duplicate_dataset_id_is_an_error_not_a_last_one_wins(self, tmp_path, monkeypatch):
         self._write(tmp_path, monkeypatch, {

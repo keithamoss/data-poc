@@ -1,4 +1,4 @@
-"""The delivery agreement, read once into one immutable value (REQ-PIPE-110).
+"""The delivery agreement, read into one immutable value (REQ-PIPE-110).
 
 ONE FILE, contract/calendar.yaml, holds an asset's whole delivery
 agreement: the named calendars, which calendar each collection and dataset
@@ -9,20 +9,20 @@ dates, and the deliberate no-calendar declaration (REQ-PIPE-106).
 
 ONE LOADER, ONE VALUE, PASSED AS AN ARGUMENT (criterion 31; delivery-
 architect B1). `load(path)` reads a file into an `Agreement`; `current()` is
-the committed file's, read once per process. Every consumer takes an
+the committed file's as it reads now, built again only when its text has
+changed (REQ-PIPE-254). Every consumer takes an
 `agreement=` argument that defaults to `current()`, so two values - the
 agreement before and after a change - can be held side by side in one
 process, which REQ-PIPE-111's freeze, REQ-PIPE-169's impact preview and
 REQ-PIPE-173's backstop all need. Before this, schedule._load,
-asset_time and slots._timing each read a fixed path behind
-lru_cache, and no process could hold two.
+asset_time and slots._timing each read a fixed path, each holding one value
+for the process, and no process could hold two.
 
 THIS IS CONFIGURATION ONLY (criterion 23): no database, no warehouse
 schema, nothing under data/.
 """
 from __future__ import annotations
 
-import functools
 from dataclasses import dataclass, field, replace
 from datetime import date, timedelta
 from pathlib import Path
@@ -509,20 +509,20 @@ def from_doc(doc: dict, path: Path | str = "contract/calendar.yaml") -> Agreemen
                      defaults=MappingProxyType({k: v for k, v in defaults.items() if v}))
 
 
+_BUILT = config_yaml.Built()
+
+
 def current() -> Agreement:
-    """The committed agreement, read once per process.
+    """The committed agreement, for calendar.yaml as it reads now.
 
-    Keyed by the path, so a test that points CALENDAR_YAML elsewhere gets
-    that file and the committed one is not left shadowed afterwards."""
-    return _load_once(CALENDAR_YAML)
-
-
-@functools.lru_cache(maxsize=4)
-def _load_once(path: Path) -> Agreement:
-    return load(path)
-
-
-current.cache_clear = _load_once.cache_clear
+    KEYED ON THE PATH AND THE FILE'S TEXT (REQ-PIPE-254): the file is read
+    on every call and the Agreement built again only when its text has
+    changed, so an edited file, or a test pointing CALENDAR_YAML elsewhere,
+    is answered on the next call with nothing to clear, and the committed
+    file is answered again once the patch is undone."""
+    path = CALENDAR_YAML
+    return _BUILT.from_file(path, lambda text: from_doc(
+        config_yaml.parse(text, name=str(path)) or {}, path))
 
 
 def cadence(dataset_id: str, agreement: Agreement | None = None) -> dict:

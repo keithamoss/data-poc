@@ -109,6 +109,20 @@ intro: >
   all three.
 
 releases:
+  - date: "2026-10-26"
+    summary: >
+      A configuration file you edit is read for what it says now, even by a
+      process that was already running.
+    changes:
+      - category: Improved
+        items:
+          - headline: Edits are seen straight away
+            components: ["Pipeline & publishing", "Testing & dev tooling"]
+            description: >
+              Change the hierarchy, the calendar, a contract or the dashboard's
+              wording and the next thing that reads it sees the change, with no
+              restart. `mothman check` now refuses a new cache that could
+              answer from an old copy.
   - date: "2026-10-25"
     summary: >
       The dashboard appears in under half a second again, a data file that

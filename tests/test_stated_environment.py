@@ -270,7 +270,6 @@ class TestDroppingThingsNeedsTheTypedId:
             with supply_db.connect(label="test-discard-sample") as conn:
                 conn.execute(
                     f'DROP TABLE IF EXISTS "{supply_db.SAMPLE_SCHEMA}"."{waiting}" CASCADE')
-            agreement_split.clear_caches()
 
 
 class TestInProductionTheTypedIdIsTheKeepDecision:

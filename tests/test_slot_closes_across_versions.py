@@ -11,7 +11,7 @@ from datetime import date, datetime, timedelta, timezone
 import pytest
 
 import agreement_split
-from qa_tools.common import hierarchy, slots
+from qa_tools.common import slots
 
 PERTH = timezone(timedelta(hours=8))
 
@@ -30,8 +30,6 @@ def calendar(tmp_path, monkeypatch):
             base={})
 
     yield use
-    agreement_split.clear_caches()
-    hierarchy._load.cache_clear()
 
 
 AUTHORED_THEN_DAILY = [

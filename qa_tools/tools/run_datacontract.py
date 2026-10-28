@@ -19,11 +19,11 @@ gap noted rather than hidden.
 """
 from __future__ import annotations
 
-import functools
 import os
+from types import MappingProxyType
 
 from qa_tools import collections
-from qa_tools.common import asked_for, hierarchy, left_out, supply_db
+from qa_tools.common import asked_for, config_yaml, hierarchy, left_out, supply_db
 from qa_tools.common.check_lifecycle import name_by_check_id, parse_contract_check_metadata
 from qa_tools.common.datacontract_common import (
     DIMENSION_BY_METRIC, ENGINE_TAG, LABEL_BY_METRIC, SAMPLEABLE_METRICS,
@@ -51,11 +51,15 @@ def contract_path(collection_id: str) -> str:
     return os.path.join(ROOT, collections.by_id(collection_id).check_file("contract"))
 
 
-@functools.lru_cache(maxsize=None)
-def _authored_names(path: str) -> dict:
-    """Each SQL rule's authored display name, read once per contract from the
-    same parse category_by_check_id() uses (REQ-QAC-023)."""
-    return name_by_check_id(parse_contract_check_metadata(path))
+_AUTHORED_NAMES = config_yaml.Built()
+
+
+def _authored_names(path: str) -> "MappingProxyType":
+    """Each SQL rule's authored display name, from the same parse
+    category_by_check_id() uses (REQ-QAC-023), keyed on the contract's
+    content (REQ-PIPE-254) and read-only, since every caller shares it."""
+    return _AUTHORED_NAMES.from_file(path, lambda text: MappingProxyType(
+        name_by_check_id(parse_contract_check_metadata(path, text=text))))
 
 
 def _unreadable_in(run_id: str, tables) -> frozenset[str]:

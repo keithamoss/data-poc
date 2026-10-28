@@ -33,11 +33,8 @@ as never supplied or not owed yet - never as a missing collection.
 """
 from __future__ import annotations
 
-import functools
 import json
 import os
-
-import yaml
 
 from pipeline import (acknowledgements, closed_slots, corrections, cross_table_grid,
                       cross_table_notices, excuses, held_back_notices,
@@ -47,8 +44,8 @@ from pipeline.dashboard_check_labels import (dashboard_status, display_name, mea
                                              rank_for_headline, tool_ref, url_key)
 from qa_tools import collections
 from qa_tools.common import (agreement, amber_setting, asset_time, build_output, carry_forward, census,
-                             drift_reference, hierarchy, qa_store, root_cause, schedule_ended, supply_db,
-                             supply_status, turned_off)
+                             config_yaml, drift_reference, hierarchy, qa_store, root_cause,
+                             schedule_ended, supply_db, supply_status, turned_off)
 from qa_tools.common.validate_check_lifecycle import collect_checks
 
 ROOT = os.path.join(os.path.dirname(__file__), "..")
@@ -133,10 +130,11 @@ def _contract(contract: str) -> dict:
     return _contract_at(str(hierarchy.DATA_ASSET_YAML.parent / contract))
 
 
-@functools.cache
 def _contract_at(path: str) -> dict:
-    with open(path) as f:
-        return yaml.safe_load(f)
+    """The contract as it reads now, parsed only when its text has changed,
+    and the caller's own copy (REQ-PIPE-254) - through config_yaml, which
+    keys the parse on the content and deep-copies what it hands out."""
+    return config_yaml.load(path)
 
 
 def _type(prop: dict) -> str:

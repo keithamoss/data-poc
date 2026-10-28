@@ -104,26 +104,31 @@ class TestItIsWhatTheRunPathReads:
     with PyYAML's own safe_load made to fail, everything on the run path that
     reads configuration still works, because none of it calls safe_load."""
 
-    def test_the_run_path_never_calls_safe_load(self, monkeypatch):
+    def test_the_run_path_never_calls_safe_load(self, monkeypatch, tmp_path):
+        import shutil
         from datetime import date
 
         from qa_tools.common import (agreement, asset_time, environments, hierarchy,
                                      postgres_version, slots)
 
+        # FRESH COPIES, so nothing built earlier in this process can answer
+        # (REQ-PIPE-254 keys every built value on its file's path and text).
+        for name, module, attr in (("data-asset.yaml", hierarchy, "DATA_ASSET_YAML"),
+                                   ("data-asset.yaml", asset_time, "DATA_ASSET_YAML"),
+                                   ("calendar.yaml", agreement, "CALENDAR_YAML")):
+            copy = tmp_path / name
+            shutil.copyfile(getattr(module, attr), copy)
+            monkeypatch.setattr(module, attr, copy)
+
         def refuse(*a, **k):
             raise AssertionError("yaml.safe_load was called on the run path")
         monkeypatch.setattr(yaml, "safe_load", refuse)
-        for cached in (hierarchy._load, agreement.current, asset_time.timezone_versions):
-            cached.cache_clear()
-        try:
-            assert slots.slots_for_dataset("cp-clients", until=date(2024, 1, 1))
-            assert slots.claimable_until("cp-clients", date(2024, 1, 1))
-            assert environments.for_connection()
-            postgres_version.declared_major()
-            assert asset_time.timezone_versions()
-        finally:
-            for cached in (hierarchy._load, agreement.current, asset_time.timezone_versions):
-                cached.cache_clear()
+        assert slots.slots_for_dataset("cp-clients", until=date(2024, 1, 1))
+        assert slots.claimable_until("cp-clients", date(2024, 1, 1))
+        assert environments.for_connection()
+        postgres_version.declared_major()
+        assert asset_time.timezone_versions()
+        assert agreement.current().datasets and hierarchy.all_datasets()
 
     def test_it_uses_the_c_loader_where_it_exists(self):
         assert config_yaml.LOADER is getattr(yaml, "CSafeLoader", yaml.SafeLoader)

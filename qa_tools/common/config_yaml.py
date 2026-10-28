@@ -26,6 +26,21 @@ results, measured 2026-10-06. The pure-Python loader where it is not.
 BOUNDED and THREAD-SAFE: a run's four tools read configuration from worker
 threads, so the cache is behind a lock and holds the most recently used
 documents only.
+
+VALUES BUILT FROM A FILE ARE KEYED THE SAME WAY (REQ-PIPE-254, signed by
+Keith 2026-10-24). A module that turns a configuration file into something
+richer - the hierarchy's Dataset records, the agreement, compiled patterns,
+a check-id lookup - keeps what it built in a `Built` store, keyed on the
+file's path AND its text as read on this call. So an edited or swapped file
+is answered for what it says now, with nothing to clear, and an unchanged one
+is answered without being parsed or built again. The file is READ ON EVERY
+CALL and never skipped on its modification time, size or inode (criterion
+15): a same-size edit inside one clock tick keeps all three. Before this, nine
+such values sat behind functools.lru_cache, one per process or per path, and
+a test that swapped a file had to know every cache to clear
+(plans/post-build-review.md #217 is the one it missed). `mothman check`'s
+`caches` gate now fails an lru_cache or cache under qa_tools/ or pipeline/
+that is not on its allowlist (qa_tools/common/validate_caches.py).
 """
 from __future__ import annotations
 
@@ -95,6 +110,75 @@ def load(path) -> object:
     """A configuration file, read fresh and parsed at most once per distinct
     content. A missing file raises as reading it would."""
     return parse(Path(path).read_text(encoding="utf-8"), name=str(path))
+
+
+def read(path) -> str:
+    """A configuration file's text, read now. A missing or unreadable file
+    raises as reading it would - on every call, since nothing is remembered
+    about a failure."""
+    return Path(path).read_text(encoding="utf-8")
+
+
+#: How many built values a `Built` store keeps for one file (NFR MEMORY): a
+#: long-running process that sees a file edited again and again holds only
+#: its most recent versions.
+VERSIONS_PER_FILE = 4
+
+
+class Built:
+    """Values built from configuration files, keyed on each file's path and
+    current text (REQ-PIPE-254).
+
+    `get(key, text, build)` returns the value built from exactly `text`,
+    calling `build()` only when this key has no value for that text - which
+    may be any hashable statement of the content a value is built from, as
+    arrival_patterns' declared patterns are. The
+    caller reads the text ONCE and builds from that one read, so a value can
+    never combine two versions of a file (criterion 6), and two threads
+    reading during a replacement each get a value built wholly from the
+    version they read (criterion 8).
+
+    THE SAME PATTERN AS THE DOCUMENT CACHE ABOVE: the store behind one lock,
+    building outside it, so two threads may both build the first value and
+    the second write is the same value. A build that raises stores nothing,
+    so a corrected file is read on the next call (criterion 9).
+
+    A STORED VALUE IS SHARED between callers, so what a store holds must be
+    immutable - frozen records, tuples, MappingProxyType (criterion 7). A
+    module whose value is a plain document returns `load()`'s own copy
+    instead of using a store.
+    """
+
+    def __init__(self, *, versions: int = VERSIONS_PER_FILE, files: int = MAX_DOCUMENTS):
+        self._versions = versions
+        self._files = files
+        self._store: "OrderedDict[object, OrderedDict[object, object]]" = OrderedDict()
+        self._lock = threading.Lock()
+
+    def get(self, key, text, build):
+        with self._lock:
+            held = self._store.get(key)
+            if held is not None and text in held:
+                held.move_to_end(text)
+                self._store.move_to_end(key)
+                return held[text]
+        value = build()
+        with self._lock:
+            held = self._store.setdefault(key, OrderedDict())
+            self._store.move_to_end(key)
+            held[text] = value
+            held.move_to_end(text)
+            while len(held) > self._versions:
+                held.popitem(last=False)
+            while len(self._store) > self._files:
+                self._store.popitem(last=False)
+        return value
+
+    def from_file(self, path, build):
+        """The value built from `path` as it reads now: `build(text)` is
+        called with the one read this call made, only when it is new."""
+        text = read(path)
+        return self.get(str(path), text, lambda: build(text))
 
 
 def clear() -> None:
