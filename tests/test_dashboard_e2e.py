@@ -335,9 +335,23 @@ def _shared_page(browser, browser_context_args):
 
 #: Back to a known state (criterion 2): storage cleared and the theme read
 #: again from it, the date picker closed. The route is _soft_goto's.
+#: ALSO WHAT A LOAD RESETS AND STORAGE DOES NOT HOLD (post-build-review #283):
+#: the requirements panel's status filter, the plans tab's filter and
+#: expanded entries, the panel opener - and any embedded data a test patched,
+#: which it undoes by pushing a function onto window.__e2eUndo (DATA is then
+#: rebuilt from the restored source, as a load builds it).
 _RESET_JS = """() => {
     try { localStorage.clear(); } catch (e) {}
     try { sessionStorage.clear(); } catch (e) {}
+    const undo = (window.__e2eUndo || []).reverse();
+    window.__e2eUndo = [];
+    for (const f of undo) { try { f(); } catch (e) {} }
+    if (undo.length) { try { DATA = buildData(CURRENT_IN_PLACE_ON); } catch (e) {} }
+    try {
+        REQ_STATUS_FILTER = "all"; REQ_OPENER = null; CLOSE_PANEL_AFTER_POP = false;
+        PLANS_FILTER = {query:"", statuses:new Set(), components:new Set(), files:new Set()};
+        PLANS_EXPANDED.clear();
+    } catch (e) {}
     try { applyTheme(currentTheme()); } catch (e) {}
 }"""
 
@@ -387,11 +401,25 @@ def _reset_shared_page(page, *, fresh: bool) -> None:
         page.set_viewport_size(st["viewport"])
     if fresh or not st["token"]:
         # A FRESH LOAD (criterion 3): the document is forgotten, so this test's
-        # first _goto loads one of its own - the reload it is marked for.
+        # first _goto loads one of its own - the reload it is marked for. Its
+        # storage is cleared first: storage is the origin's, not the
+        # document's, so a reload reads what the last test left (#283).
+        if st["token"]:
+            page.evaluate(_RESET_JS)
         st["doc"] = st["token"] = None
         return
     page.evaluate(_RESET_JS)
     _soft_goto(page, "")
+
+
+def _settle(page) -> None:
+    """Let the page run what it has queued - timers due now and the frames
+    after them - so an error it raises lands while this test still listens."""
+    try:
+        page.evaluate("() => new Promise(r => setTimeout(() => requestAnimationFrame("
+                      "() => setTimeout(r, 0)), 0))")
+    except Exception:  # noqa: BLE001 - a page mid-navigation has nothing queued to wait for
+        pass
 
 
 def _check_the_shared_document(page, nodeid: str) -> None:
@@ -451,6 +479,11 @@ def clean_page(request):
     if shared:
         _reset_shared_page(page, fresh=request.node.get_closest_marker("fresh_load") is not None)
     yield page
+    if shared:
+        # WHAT THE PAGE HAS QUEUED is this test's (criterion 5; #283): let it
+        # run before the listeners go, so an error it raises is not the next
+        # test's.
+        _settle(page)
     page.remove_listener("console", on_console)
     page.remove_listener("pageerror", on_error)
     if shared:
@@ -647,6 +680,42 @@ class TestOnePagePerClass:
         assert clean_page.locator(".side-panel.open, .drawer.open, #check-panel.open").count() == 0
         assert _SHARED[id(clean_page)]["loads"] == loads
 
+    def test_the_pages_own_filters_and_patched_data_are_put_back(self, clean_page,
+                                                                  built_dashboard_html):
+        """Criterion 2 beyond storage (post-build-review #283, L2 wave-2 critic
+        2 and 3): the in-page filters a test can set - the requirements
+        panel's status, the plans tab's filter and expanded entries - and any
+        embedded data a test patched are back as a load leaves them."""
+        _goto(clean_page, built_dashboard_html)
+        clean_page.evaluate("""() => {
+            REQ_STATUS_FILTER = "built"; PLANS_EXPANDED.add("x");
+            PLANS_FILTER = {query: "q", statuses: new Set(["done"]), components: new Set(),
+                            files: new Set()};
+            const d = rawRealDatasetById("cp-carers");
+            const was = d.promotionTimeline;
+            d.promotionTimeline = {points: [], standing: [], patched: true};
+            (window.__e2eUndo = window.__e2eUndo || []).push(() => { d.promotionTimeline = was; });
+        }""")
+        _reset_shared_page(clean_page, fresh=False)
+        assert clean_page.evaluate("""() => [REQ_STATUS_FILTER, PLANS_EXPANDED.size,
+            PLANS_FILTER.query, PLANS_FILTER.statuses.size,
+            !!(rawRealDatasetById("cp-carers").promotionTimeline || {}).patched]""") == [
+            "all", 0, "", 0, False]
+
+    def test_a_fresh_load_does_not_inherit_the_last_tests_storage(self, clean_page,
+                                                                 built_dashboard_html):
+        """Criterion 3 (post-build-review #283, L2 wave-2 critic 3): storage
+        is per origin, not per document, so a fresh load read what the test
+        before it left there."""
+        _goto(clean_page, built_dashboard_html)
+        clean_page.evaluate("() => { localStorage.setItem('theme', 'dark'); "
+                            "sessionStorage.setItem('x', '1'); }")
+        _reset_shared_page(clean_page, fresh=True)
+        assert clean_page.evaluate(
+            "() => [localStorage.length, sessionStorage.length]") == [0, 0]
+        _goto(clean_page, built_dashboard_html)
+        assert clean_page.evaluate("() => document.documentElement.dataset.theme") == "light"
+
     @pytest.mark.fresh_load
     def test_a_marked_test_gets_a_document_of_its_own(self, clean_page, built_dashboard_html):
         """Criterion 3: its first navigation loads the page afresh."""
@@ -654,6 +723,29 @@ class TestOnePagePerClass:
         loads = st["loads"]
         _goto(clean_page, built_dashboard_html)
         assert st["loads"] == loads + 1
+
+    def test_a_real_replacement_of_the_document_is_caught(self, clean_page,
+                                                          built_dashboard_html):
+        """Criterion 6 on the class's real page (post-build-review #283, L2
+        wave-2 critic 10 - the guard was only ever shown a stand-in): a load
+        made behind the shared-page machinery's back is a different
+        document, and the check names the test that made it."""
+        _goto(clean_page, built_dashboard_html)
+        clean_page.goto(built_dashboard_html.resolve().as_uri() + "?replaced=1")
+        with pytest.raises(pytest.fail.Exception, match="tests/x.py::T::t replaced"):
+            _check_the_shared_document(clean_page, "tests/x.py::T::t")
+
+    def test_an_error_raised_after_a_test_returns_is_still_that_tests(self, clean_page,
+                                                                      built_dashboard_html):
+        """Criterion 5 (post-build-review #283, L2 wave-2 critic 11): a test's
+        listener is removed in its teardown, so an error the page raises a
+        moment after the test's last step reached the NEXT test's collector.
+        The teardown first lets the page finish what is queued - shown here by
+        what a queued error reaches before the listener is removed."""
+        _goto(clean_page, built_dashboard_html)
+        clean_page.evaluate("() => { setTimeout(() => { window.__e2eQueued = true; }, 0); }")
+        _settle(clean_page)
+        assert clean_page.evaluate("() => window.__e2eQueued === true")
 
     def test_a_document_replaced_by_an_unmarked_test_fails_that_test(self):
         """Criterion 6, against a stand-in page: a test that left the class's
@@ -4072,6 +4164,9 @@ class TestArrivedVersusPromoted:
 
 
 @pytest.mark.shared_page
+# EVERY TEST HERE REWRITES THE PAGE'S DATA IN PLACE, so each loads its own
+# document (REQ-TEST-282 criterion 4; post-build-review #283, L2 wave-2 critic 2).
+@pytest.mark.fresh_load
 class TestAPeriodStandingInOnAnEarlierOne:
     """REQ-DASH-085 and REQ-DASH-100, in a real browser.
 
@@ -4109,12 +4204,14 @@ class TestAPeriodStandingInOnAnEarlierOne:
                                   "agencyId": "child-protection-family-support",
                                   "collectionId": "child-protection",
                                   "datasetId": "cp-carers"})
+        # PATCHED ON DATA, so the reset rebuilds DATA after this test (#283).
         page.evaluate(
             """(st) => {
                  const ds = DATA.agencies.flatMap(a=>a.collections)
                    .flatMap(c=>c.datasets).find(d=>d.id === "cp-carers");
                  ds.promotionState = Object.assign({}, ds.promotionState,
                                                     {standingIn: st});
+                 (window.__e2eUndo = window.__e2eUndo || []).push(() => {});
                  render();
                }""", standing_in)
 
@@ -4178,6 +4275,9 @@ class TestAPeriodStandingInOnAnEarlierOne:
 
 
 @pytest.mark.shared_page
+# EVERY TEST HERE REWRITES THE PAGE'S DATA IN PLACE, so each loads its own
+# document (REQ-TEST-282 criterion 4; post-build-review #283, L2 wave-2 critic 2).
+@pytest.mark.fresh_load
 class TestDrillingThroughToThePeriodThatEarnedTheResults:
     """REQ-DASH-085 criteria 9-11 and REQ-DASH-100 criteria 8-10.
 
@@ -4218,6 +4318,11 @@ class TestDrillingThroughToThePeriodThatEarnedTheResults:
             page.evaluate(
                 """(st) => {
                      const d = rawRealDatasetById("cp-carers");
+                     const was = d.promotionTimeline;
+                     // UNDONE BY THE RESET, so the next test reads the
+                     // embedded source as built (#283).
+                     (window.__e2eUndo = window.__e2eUndo || []).push(
+                       () => { d.promotionTimeline = was; });
                      const tl = d.promotionTimeline || {points: [], standing: []};
                      d.promotionTimeline = {...tl, standing: [...tl.standing,
                        {on: "2026-08-01", period: st.period, standingIn: st, decisions: []}]};
@@ -5893,6 +5998,22 @@ class TestEveryScenarioSubjectLandsCentred:
             if not ok:
                 off.append((sid, got))
         assert not off, f"subjects not centred: {off}"
+
+
+class TestTheEarlyEmergencyDepartmentScenariosLandOnItsPage:
+    """REQ-GEN-235 criterion 6 (post-build-review #284, the L4 critic 5): on
+    the bootstrapped history each of the four scenarios moved to Emergency
+    Department opens on that dataset's page, with its subject found - the
+    walkers above only ever asserted 'not nothing to show', on whatever
+    page a jump reached."""
+
+    @pytest.mark.parametrize("sid", ["TS-9", "TS-65", "TS-66", "TS-67"])
+    def test_it_lands_on_ed_presentations(self, clean_page, built_dashboard_html, sid):
+        _scenario_chip(clean_page, built_dashboard_html, sid)
+        assert clean_page.locator("[data-scenario-not-found]").count() == 0, sid
+        got = clean_page.evaluate("() => [STATE.tier, STATE.datasetId]")
+        assert got == ["dataset", "ed-presentations"], (sid, got)
+        assert clean_page.locator("#view [data-scenario-label]").count() >= 1, sid
 
 
 class TestEveryScenarioJumpLands:
@@ -7619,10 +7740,32 @@ class TestRecheckedAfterWeFixedACheck:
         _goto(clean_page, page, state=self.N, in_place_on="2024-08-09")
         (tag,) = _shown(clean_page, ".view-head [data-rechecked-amber]")
         assert tag["text"] == "Amber, promoted - re-checked, awaiting acknowledgement", tag
-        order = clean_page.evaluate("""() => [...document.querySelector('.view-head')
-            .querySelectorAll('.pill, [data-rechecked-amber]')].map(e =>
-            e.matches('[data-rechecked-amber]') ? 'tag' : 'pill')""")
-        assert order.index("tag") > 0, "after the status pill"
+        # RIGHT AFTER THE STATUS PILL AND BEFORE THE TURN-OFF MARKER (criterion
+        # 9; post-build-review #283, L2 wave-2 critic 4 - "after any pill" held
+        # whatever the order, the header carrying other pills before it). The
+        # real configuration turns nothing off, so one is added to the
+        # embedded source for this reading, and undone by the reset.
+        order = clean_page.evaluate("""() => {
+            const raw = rawRealDatasetById('cp-notifications');
+            const was = raw.turnOffs;
+            (window.__e2eUndo = window.__e2eUndo || []).push(() => { raw.turnOffs = was; });
+            raw.turnOffs = [{effectiveTo: '2024-08-01', until: null, reason: 'paused',
+              level: 'dataset', versionFrom: '2023-01-01', authoredOn: '2024-07-01',
+              authoredBy: 'changelog', collection: 'Child Protection',
+              lastOwed: {period: '2024-Q3', dueAt: '2024-08-01T01:00:00+00:00',
+                         closesAt: '2024-10-20T16:00:00+00:00'}}];
+            DATA = buildData(CURRENT_IN_PLACE_ON);
+            renderFromState();
+            const tag = document.querySelector('.view-head [data-rechecked-amber]');
+            const kids = [...tag.parentElement.children];
+            const marker = tag.parentElement.querySelector('[data-turn-off]');
+            return {status: kids.indexOf(tag.previousElementSibling),
+                    statusIsPill: tag.previousElementSibling.matches('.pill'),
+                    tag: kids.indexOf(tag), marker: marker ? kids.indexOf(marker) : null};
+        }""")
+        assert order["status"] == 0 and order["statusIsPill"], order
+        assert order["marker"] is not None, f"precondition: a turn-off marker shown {order}"
+        assert order["tag"] == 1 and order["marker"] > order["tag"], order
         row = _row_of(clean_page, self.KEY_N1)
         assert "Amber, promoted - re-checked, awaiting acknowledgement" in row["status"], row
         cp_pages.at("2024-08-10T10:30:00+08:00")

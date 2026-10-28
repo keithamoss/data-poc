@@ -3012,13 +3012,18 @@ one file, ed_presentations.csv, in the same quarter at the same instant. (Correc
 to say 13 July and "21 days early, inside August's window", which a
 14-day window cannot be - and under REQ-PIPE-131 a 13 July arrival is
 in MAY's open interval, a resupply of May.)
-**Expect**: assigned **August**, the period open when it arrived
-(REQ-PIPE-131), classified **early by 9 days**. Note nothing measures how
-early it is in order to assign it - earliness is a reported consequence
-of the assignment.
+**Expect**: assigned **2024-Q2** (due 09:00 1 May), the period open when
+it arrived (REQ-PIPE-131), classified **early**, and filled by the rule.
+Re-quoted 2026-10-28 from the bootstrapped build (REQ-GEN-235 criterion 4;
+post-build-review #284): Emergency Department's supply received 10:00 22
+April 2024 is filed to slot 2024-Q2, arrival status early, filled at 04:06
+2 May, filed automatically. Until then this said "assigned August" and
+"the 1 May anchor" - the dates of the original config above, never of the
+planted case. Note nothing measures how early it is in order to assign it
+- earliness is a reported consequence of the assignment.
 **Breaks as**: `cycle_start()` only looks backwards, so it resolves to
-the 1 May anchor and reports the supply ~12 weeks LATE for a quarter
-that was filled months ago.
+the 1 February anchor and reports the supply ~12 weeks LATE for 2024-Q1,
+a quarter that was filled months ago.
 
 **TS-65 `[INJECT]` Early, at the edge of the window.**
 *Config: as TS-9 - Emergency Department, one file, quarterly, due 09:00 on

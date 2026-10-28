@@ -144,8 +144,10 @@ releases:
             components: ["Testing & dev tooling"]
             description: >
               Most browser-test classes now load the dashboard once and share
-              that page between their tests, each starting from a clean state,
-              so the browser tests take about four minutes less.
+              that page between their tests, each returned to the start page
+              with its storage and filters cleared, so the browser tests take
+              a few minutes less. A test that rewrites the page's data still
+              loads its own copy.
           - headline: The bootstrap's budget line
             components: ["Testing & dev tooling"]
             description: >
@@ -167,6 +169,13 @@ releases:
               When a delivery's files arrived minutes apart, an early file's
               "held back" could take effect days after the later file promoted
               it. Its promotion now never takes effect before its hold-back.
+          - headline: Acknowledged, then re-checked again
+            components: ["Dashboard UI"]
+            description: >
+              A promoted supply acknowledged after a re-check, then re-checked
+              red again, no longer says "acknowledged" while the queue lists
+              it as waiting for a person. Its marker on a card now says
+              "re-checked red" or "re-checked amber", as the queue does.
   - date: "2026-10-25"
     summary: >
       The dashboard appears in under half a second again, a data file that

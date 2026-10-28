@@ -676,3 +676,24 @@ class TestASyntheticAssetMayLaterDateAPastVersion:
         found = freeze.check(cal, new_cal, asset, asset, people, instant_of=lambda key: NOW,
                              today=NOW.date(), base_codeowners=CODEOWNERS)
         assert found == [], _text(found)
+
+    # post-build-review #284 (the L4 critic, 7): the rename is allowed only to
+    # follow a version this change later-dated, and only on a synthetic asset.
+
+    def test_on_a_real_asset_the_renamed_correction_is_still_append_only(self):
+        found = self._check_shrink(synthetic=False)
+        assert any("append-only" in f.problem for f in found), _text(found)
+
+    def test_a_correction_renamed_to_a_date_nothing_moved_to_is_refused(self):
+        def misname(cal):
+            hits = 0
+            for d in cal["datasets"]:
+                for corr in d.get("corrections") or []:
+                    for change in corr.get("changes") or []:
+                        if "participation 2015-01-01" in str(change["item"]):
+                            change["item"] = str(change["item"]).replace(
+                                "participation 2015-01-01", "participation 2016-01-01")
+                            hits += 1
+            assert hits, "precondition - a correction names a later-dated version"
+        found = self._check_shrink(extra=misname)
+        assert any("append-only" in f.problem for f in found), _text(found)

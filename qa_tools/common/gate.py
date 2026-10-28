@@ -1435,11 +1435,14 @@ def _not_before_its_own(conn, supply: str, effective_at: str) -> str:
     its own seeded lag (orchestrate.effective_at_of), so an early file's
     'promotion-withheld' can take effect after the instant of the later file's
     application that promotes it; read by effective time it would be promoted
-    and then held back. Its promotion is floored at that decision - order
-    only: a member whose decisions all came earlier keeps the application's
-    instant. REJECTED (a), bounding every lag by the collection's next
-    receipt: it shortened the promotion lag across the whole history (Child
-    Protection's p10 29.8h -> 6.0h)."""
+    and then held back. Its promotion is floored at that decision, so it takes
+    effect at THAT decision's instant, not the application's: a member whose
+    decisions all came earlier keeps the application's instant, and the
+    members of one application can then be promoted at different instants
+    (post-build-review #284, the L4 critic's finding 1 - against REQ-PIPE-266
+    criterion 4's one effective instant, with Keith). REJECTED (a), bounding
+    every lag by the collection's next receipt: it shortened the promotion lag
+    across the whole history (Child Protection's p10 29.8h -> 6.0h)."""
     rows = conn.execute(f"SELECT max(effective_at) FROM {_decisions()} WHERE supply = ?",
                         [supply]).fetchall()
     latest = rows[0][0] if rows else None

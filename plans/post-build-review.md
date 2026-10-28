@@ -12287,6 +12287,9 @@ twice. It deliberately did not re-find the `TypeError`.
      second of receipt (Child Protection rule promotions' lag p10 29.8h ->
      6.0h) and erased page states such as 2020-Q1 awaiting its Client
      Register. Recorded on REQ-PIPE-266's decisions.
+     **REOPENED 2026-10-28 by #284 (1)**: flooring each member separately
+     promotes one application at several instants, against REQ-PIPE-266
+     criterion 4 - for Keith there.
 
 277. **[done, 2026-10-25]** **[Testing & dev tooling]** **Two generator tests
      read REQ-GEN-273's new scenario deliveries as invariant breaks.** Found by
@@ -12377,3 +12380,151 @@ twice. It deliberately did not re-find the `TypeError`.
      the chain as at each date, the tickets' function reads the database now);
      no fixture yet shows both notices on one page; REQ-DASH-272 c21's
      12-day "being gated" gap, now a question for Keith.
+
+282. **[done, 2026-10-28]** **[Pipeline & publishing]** **[Testing & dev tooling]**
+     **Lane L5's REQ-PIPE-254 (configuration caches keyed on content): a
+     caches gate with gaps, two hot sites still re-reading, two weak tests,
+     a register overclaim - all minor, fixed test-first.** delivery-critic on
+     1d89fe9 found no stale answer and called the threading safe. (1) The
+     `caches` gate missed `from functools import *` then `@cache`, an alias
+     by assignment (`memo = functools.lru_cache`), an annotated wrap and a
+     wrap onto an attribute; the four planted in
+     tests/test_validate_caches.py failed (8 cases) and pass. (2) Only
+     Holdings' single read was tested. A watcher per hot site
+     (tests/test_config_content_keying.py's TestEachHotSiteTakesItsValueOnce,
+     and one each in test_red_promoted.py and test_promotion_timeline.py)
+     records every zone or table lookup made without the value passed down;
+     two failed first and were fixed: red_promoted.for_dataset read the table
+     index once per promoted supply, and promotion_timeline's stand-in loop
+     asked decisions_on and _earned_on without its zones. Mutation-checked:
+     dropping `zones` at three other sites fails its test. (3) The threads
+     test passed when every read saw one version; it now runs readers until
+     each has seen both, through the registry and the hierarchy. A race test
+     is probabilistic: against a planted two-read build it failed 2 runs in
+     5. (4) config_yaml.read kept CRLFs (read_text translates them) and a
+     directory's error named no path; TestReadIsReadText compared the two
+     and failed on both, now passes. Decision 20's "same text and the same
+     errors" was untrue as built and is corrected in the register, with a
+     new decision for (2). (5) cli/schedule.py's comment about "the
+     agreement cached at start" was stale; reworded. (6) Judgement, no
+     change: HoldingsTimeline's table index lives per instance, which is
+     the passed-down rule. (7) FOR KEITH, out of this requirement's scope
+     and not changed: generator/collections/emergency_department.py's
+     `@functools.cache` run_plan() reads the calendar once per process (the
+     gate scans qa_tools/ and pipeline/ only), and ticket_sync.DATASET_SCOPE
+     is built from the hierarchy at import time - both answer an edited file
+     stale in a long-lived process. Whether the guard should reach
+     generator/ is a scope call.
+
+283. **[done, 2026-10-28]** **[Dashboard UI]** **[Testing & dev tooling]** **Lane
+     L2's wave 2 (REQ-DASH-221 re-checks on the page, REQ-TEST-282 one page per
+     browser-test class): a badge that said acknowledged when the queue said
+     outstanding, unescaped quotes, and a shared page that leaked state - fixed
+     test-first; two wordings left open for Keith.** delivery-critic on 000bc7b.
+     (1) DEFECT, minor: redPromotedBadge looked for an acknowledgement after
+     the re-check that TURNED the supply red, while the queue
+     (rechecking.worse_than_promoted) and the amber tag look after the NEWEST
+     re-check that has run - re-checked red, acknowledged, re-checked red
+     again, the badge said "acknowledged by" beside a queue listing it
+     outstanding. tests-js/rechecks.test.js failed on that and passes. (8)
+     title="${escHtml(...)}" did not escape quotes: every double-quoted
+     attribute in the template now goes through escAttr (24 sites, the same
+     output unless a value holds a quote); two tests on a reason with quotes
+     failed and pass. (6) The outstanding marker named the kind with no item
+     ("re-checked worse") where the queue heading says "re-checked red";
+     failed first, fixed. (9) INVESTIGATED, NOT REPRODUCED: outstanding.py
+     drops a supply group_queue lists beneath a cause. The likeliest real
+     route - the partner demoted out of the period, a new partner waiting
+     there, the promoted supply re-checked red - was driven through the real
+     lifecycle: its red carries the warehouse's reason, trace() stops on it,
+     and it is listed under its own heading. Kept as a guard test in
+     tests/test_rechecks.py. For a promoted supply the only other route to a
+     root is a newer gate entry than its promotion, which a promotion
+     precludes. (5) Criterion 13's guard history had no re-check, so
+     pipeline/re_checks returned before reading anything; a test in
+     tests/test_readers_read_no_supply_rows.py records one as the owner and
+     runs the reader as the publisher past that return. (2, 3) REQ-TEST-282:
+     two classes rewrite the page's data in place and were not marked
+     `fresh_load` as criterion 4 says - now marked; the reset also runs undo
+     hooks a test registers, resets the requirements and plans filters, and
+     clears storage before a fresh load (storage is the origin's, so a reload
+     read the previous test's) - two self-tests failed on both and pass. (4)
+     The amber tag's order assertion held whatever the order; it now asserts
+     the tag is the status pill's next element and before a turn-off marker
+     added for the reading. (10) Criterion 6's guard was shown only a
+     stand-in; a test now replaces the real shared page behind the
+     machinery's back. (11) An error raised just after a test's last step
+     reached the next test's collector; the teardown now lets the page run
+     what it has queued first. (12) Criterion 12's marker count is now
+     tested; its "whether or not turned off" half has no turned-off filter in
+     the marker to test against. OBSERVATION, not changed: the collection
+     table's three reason rows (blocked, no supply, schedule ended) carry the
+     red-promoted badge but not the amber tag; ordinary rows carry neither,
+     so it is not clearly criterion 9's "where the red-promoted badge sits".
+     OPEN FOR KEITH, with REQ-DASH-221's provisional wordings: (7) the
+     red-promoted row repeats the badge's sentence verbatim; the UX read
+     suggests "(corrected <date>)", "Re-checked <instant>: became Green -
+     <reason>", "Promoted green, re-checked amber - awaiting acknowledgement"
+     and a marker reading "1 re-checked red after promotion".
+
+284. **[todo, 2026-10-28]** **[Pipeline & publishing]** **[Data generation]**
+     **Lane L4 (REQ-GEN-235/238, REQ-PIPE-250 progress, #276's fix): one
+     application promoted at several instants, three decisions taking effect
+     before the refusal they follow - TWO FOR KEITH, one waiting for the next
+     bootstrap; the rest fixed.** delivery-critic on 56a7bd5, verified here
+     against l2w2_probe (a copy of L4's bootstrap). (1) HIGH, FOR KEITH:
+     #276's option (b) floors each joined member separately, so one gate
+     application promotes at different instants - four applications on this
+     history (26, 2015-Q4, spread 10 days; 173, 2020-Q1, 5 days; 205,
+     2021-Q3, 5 days; 216, 2022-Q1, 36h). That breaks REQ-PIPE-266 criterion
+     4 (one effective instant per application), which the register says is
+     met; the decision text "only the order changes" is wrong, and the new
+     test asserts against criterion 4. Options: (a) amend criterion 4 to
+     allow the split, or (b') floor the whole application at the latest
+     decision across its members (one instant kept; the completing file loses
+     its own). Either is a failing test first and likely a re-bootstrap. Not
+     changed; gate._not_before_its_own's docstring no longer says "order
+     only". #276 is reopened by this. (2) MED-HIGH DEFECT, NOT FIXED - it
+     changes the bootstrapped history, so it waits for the next bootstrap:
+     three decisions recorded after a rule's refusal take effect before it -
+     TS-67 (ed-presentations, the person's re-file effective 10:00 21 October
+     2023, the refusal 21:57 the same day), TS-77a (cp-placements, a person's
+     promotion 9 June 2023 against a refusal effective 14 June) and TS-80
+     (cp-clients, choose-file 2 November 2020 against 8 November). Exactly
+     these three on this history. PROPOSED FIX: the rule of #276 (b), once,
+     in the decision log: no decision takes effect before the latest
+     decision already recorded about its supply (decision_log.follows
+     generalised), test-first on a scripted decision after a lagged
+     refusal, then the history test extended from withheld/promote to every
+     pair. (3) The repointed Affects test's subject (cp-notifications
+     2021-08-08) exists only because of (1); it changes with whatever Keith
+     decides there. (4) MED, FOR KEITH: REQ-PIPE-111 criterion 9's unmet
+     entry was removed, but later-dating a CALENDAR version is still refused
+     on a synthetic asset - each period's cal_date is not exempt. Extend the
+     exemption, or restore a narrower unmet entry. (5) FIXED: REQ-GEN-235
+     criterion 4 - TS-9's Expect still said "assigned August" and "the 1 May
+     anchor"; re-quoted from the bootstrapped build (2024-Q2, early, filled
+     by the rule) in plans/supply-model.md, and the change beyond the
+     dataset's name is this report to Keith. Criterion 6 - a test now
+     follows each of the four scenarios' chips and asserts it lands on
+     ed-presentations' page with its subject found
+     (TestTheEarlyEmergencyDepartmentScenariosLandOnItsPage). (6) LOW, FOR
+     KEITH, PROPOSED WORDING: REQ-GEN-238 criterion 2 says every kept quarter
+     is "byte-identical by REQ-TEST-239's S4", but the receipts' sequence
+     numbers moved (-17), which Keith accepted 2026-10-27. Proposed: "...so
+     that every kept quarter's data files are byte-identical by REQ-TEST-239's
+     S4 and its receipts differ at most in their sequence numbers." The
+     signed criterion is unchanged. (7) Tests: the redated-correction
+     allowance's two negative cases (a real asset; a rename to a date nothing
+     moved to) added to tests/test_agreement_freeze.py - the first fails when
+     the rename is allowed on a real asset, which the existing real-asset
+     test did not. The history test's widening waits on (2). The critic's
+     "one test non-discriminating" is not named in its summary and was not
+     identified; the TS-67 decision test asserting membership rather than
+     order is the likeliest, and also waits on (2). (8) FIXED: the TUI's
+     bootstrap menu printed the budget line as a dimmed step ("...over....");
+     it is now a result line, bold red over and green within, failing first
+     in tests/test_bootstrap.py. tests/before_growth.py derives 2015-01-01
+     from the provider's GROWN_DROPPED rather than writing it twice.
+     REQ-PIPE-250's profile stays in decisions (evidence is only allowed on a
+     built requirement); a stale decision there is marked so.

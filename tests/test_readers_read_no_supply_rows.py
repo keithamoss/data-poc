@@ -261,3 +261,38 @@ class TestEachReaderOnItsOwnEntryPoint:
         slot_timeline.run_states(DATASET, conn)
         promotion_state.state_for(DATASET, conn)
         _assert_only_the_publisher_read(role, statements)
+
+    def test_re_checks_past_its_early_return(self, publisher, statements, supply_dsn,
+                                             monkeypatch):
+        """REQ-DASH-221 criterion 13 on the re-check path (post-build-review
+        #283, L2 wave-2 critic 5): the build's history held no re-check, so
+        pipeline.re_checks returned before reading anything. A person's
+        re-check of the filed supply, and a run it caused, are recorded as
+        the owner first; the reader then runs as the publisher past that
+        return - verdicts either side and the acknowledgements read."""
+        from pipeline import re_checks
+        from qa_tools.common import decision_log
+
+        role, conn = publisher
+        as_publisher = supply_db.connection_fields()
+        agency, collection = rebuild_support.ids(CP)
+        monkeypatch.setenv(supply_db.SUPPLY_DSN_ENV, supply_dsn)
+        with supply_db.connect(label="test-readers-owner") as owner:
+            # RECORDED AS THE DOOR RECORDS IT, without the door: a re-check
+            # needs staged tables, and these supply rows are a probe table.
+            (decision_id,), = owner.execute(
+                f"INSERT INTO {decision_log.TABLE} (agency_id, collection_id, dataset_id, "
+                "action, supply, to_slot, actor, actor_kind, effective_at, reason) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
+                [agency, collection, DATASET, decision_log.RECHECK, SUPPLY, SLOT,
+                 "keith@example.gov.au", decision_log.PERSON, "2023-08-02T12:00:00+08:00",
+                 "our check was wrong"]).fetchall()
+            owner.execute(f'UPDATE "{qa_store.SCHEMA}".run SET caused_by_decision = ? '
+                          "WHERE run_key = 'readers_cp_run_1'", [decision_id])
+        dsn = (f"postgresql://{role}:{PASSWORD}@{as_publisher['host']}:{as_publisher['port']}"
+               f"/{as_publisher['dbname']}")
+        monkeypatch.setenv(supply_db.SUPPLY_DSN_ENV, dsn)
+        statements.clear()
+        found = re_checks.for_collection(conn, CP)
+        assert SUPPLY in found.by_supply, "precondition: the reader went past its early return"
+        _assert_only_the_publisher_read(role, statements)

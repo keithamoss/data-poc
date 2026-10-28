@@ -306,3 +306,26 @@ class TestTheBudgetLine:
         result = boot.bootstrap(collection="all", on_step=said.append)
         assert said[-1] == boot.budget_line(result.wall_seconds)
         assert result.wall_seconds >= result.timings["total"]
+
+    @pytest.mark.parametrize("seconds,style", [(1303.0, "bold red"), (611.4, "green")])
+    def test_the_tui_says_it_as_a_sentence_and_over_budget_is_not_dimmed(
+            self, monkeypatch, seconds, style):
+        """post-build-review #284 (the L4 critic, 8): the menu printed every
+        step as '<step>...' in dim, so the budget line read 'over....' and an
+        OVER BUDGET was the quietest line on the screen."""
+        from cli import app, common
+
+        line = boot.budget_line(seconds)
+
+        def bootstrap(on_step=None, **_k):
+            on_step("Generating synthetic data")
+            on_step(line)
+            return boot.BootstrapResult(populated=True, staged_before=0, staged_after=3)
+        monkeypatch.setattr(boot, "bootstrap", bootstrap)
+        monkeypatch.setattr(common, "confirm", lambda *a, **k: True)
+        said = []
+        monkeypatch.setattr(app.console, "print",
+                            lambda text="", *a, style=None, **k: said.append((str(text), style)))
+        app._bootstrap_menu()
+        assert ("Generating synthetic data...", "dim") in said
+        assert (line, style) in said, said

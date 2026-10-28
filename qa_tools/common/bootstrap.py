@@ -128,13 +128,18 @@ def already_populated(conn) -> bool:
 BUDGET_SECONDS = 12 * 60
 
 
+#: How budget_line begins, so a screen can tell it from a step (cli/app.py).
+OVER_BUDGET, WITHIN_BUDGET = "OVER BUDGET", "Within budget"
+
+
 def budget_line(seconds: float) -> str:
     """The wall clock against the 12-minute budget, plainly over or within
     (REQ-PIPE-250 criterion 3)."""
     took = f"{seconds:.0f}s of wall clock against the 12-minute budget ({BUDGET_SECONDS}s)"
     if seconds > BUDGET_SECONDS:
-        return f"OVER BUDGET: this bootstrap took {took} - {seconds - BUDGET_SECONDS:.0f}s over."
-    return f"Within budget: this bootstrap took {took}."
+        return (f"{OVER_BUDGET}: this bootstrap took {took} - "
+                f"{seconds - BUDGET_SECONDS:.0f}s over.")
+    return f"{WITHIN_BUDGET}: this bootstrap took {took}."
 
 
 def bootstrap(collection: str = "all", force: bool = False,

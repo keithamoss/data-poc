@@ -200,7 +200,7 @@ def _bootstrap_menu() -> None:
     """The first thing a newcomer needs, and the one they would not know
     to ask for by name - which is why it is on the main menu rather than
     only behind a flag."""
-    from qa_tools.common.bootstrap import bootstrap
+    from qa_tools.common import bootstrap as boot
 
     console.print("Setting up this environment - generating synthetic data and "
                    "running the real checks over it.", style="dim")
@@ -209,7 +209,17 @@ def _bootstrap_menu() -> None:
     if not common.confirm("This takes a few minutes. Continue?", yes=False, default=True):
         console.print("Not run.", style="yellow")
         return
-    result = bootstrap(on_step=lambda msg: console.print(f"{msg}...", style="dim"))
+    def step(msg: str) -> None:
+        # THE BUDGET LINE IS A SENTENCE AND A RESULT, not a step under way
+        # (post-build-review #284): no '...', and over budget is the loudest
+        # line here rather than the quietest.
+        if msg.startswith(boot.OVER_BUDGET):
+            console.print(msg, style="bold red")
+        elif msg.startswith(boot.WITHIN_BUDGET):
+            console.print(msg, style="green")
+        else:
+            console.print(f"{msg}...", style="dim")
+    result = boot.bootstrap(on_step=step)
     if not result.populated:
         console.print(result.reason, style="yellow")
         return

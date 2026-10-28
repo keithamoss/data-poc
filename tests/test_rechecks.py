@@ -170,3 +170,40 @@ class TestABulkRecheck:
         mine = found.for_dataset("cp-clients", [check])
         assert set(mine["supplies"]) <= {got["C1"], got["C2"]} and check in mine["lines"]
         assert found.for_dataset("cp-carers", []) == {}
+
+    def test_red_for_want_of_a_partner_with_a_partner_waiting_it_is_still_listed(self, sc):
+        """post-build-review #283 (L2 wave-2 critic, 9): the outstanding
+        survey drops a supply root_cause.group_queue lists beneath a cause.
+        The likeliest way for a re-checked-worse supply to have one: its
+        partner is demoted out of the period and a new partner waits there
+        for a decision. It is red for want of the partner, not beneath it -
+        that red is the warehouse's own reason, which trace() stops on - so
+        it is still listed under its own heading, beside the partner's."""
+        import dataclasses
+
+        from qa_tools.common import filing_decisions as fd
+        from qa_tools.common import outstanding, people, supply_db
+        from test_carry_forward import REAL_PERSON
+
+        sc.at("2024-07-25T10:30:00+08:00")
+        v1 = established(sc)
+        demote = fd.Request(operation=fd.DEMOTE, dataset_id="cp-clients",
+                            actor=people.person_by_email(REAL_PERSON), reason="t", period=Q3,
+                            supply=v1["C1"], confirmed=True)
+        with supply_db.connect(read_only=True, label="pytest") as conn:
+            key = fd.consequences(conn, demote).key
+        sc.at("2024-08-20T10:30:00+08:00")
+        fd.apply(dataclasses.replace(demote, acknowledged=key or None),
+                 effective_at="2024-08-20T10:00:00+08:00")
+        sc.run_owed()
+        assert sc.holder("cp-clients", Q3) is None, "precondition: no Clients in 2024-Q3"
+        sc.rules.append(own_red("C2"))
+        sc.at("2024-08-25T10:30:00+08:00")
+        c2 = sc.deliver("2024-08-25T10:00:00+08:00", {"cp_clients": "C2"})
+        sc.process()
+        assert sc.actions(c2["C2"]) == ["promotion-refused"], "precondition: a partner waits"
+        sc.at("2024-08-28T10:30:00+08:00")
+        sc.recheck(v1["N1"], Q3, at="2024-08-28T10:30:00+08:00", reason="the fix found more")
+        kinds = {(i.kind, i.dataset_id) for i in outstanding.survey().items}
+        assert (outstanding.RECHECKED_WORSE, "cp-notifications") in kinds, kinds
+        assert (outstanding.AWAITING_DECISION, "cp-clients") in kinds, kinds

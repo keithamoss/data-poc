@@ -16,12 +16,16 @@ filtered or silently kept - and every block filtered must lose at least one.
 """
 from __future__ import annotations
 
+from generator.collections import child_protection as _cp
+
 #: The quarterly calendar's grown version, which Emergency Department's
 #: history still uses, and the amber and replacement settings' (REQ-GEN-207
 #: criterion 5; left in place by REQ-GEN-238 criterion 3).
 GROWN_FROM = "2013-01-01"
-#: Child Protection's earliest participation and defaults since REQ-GEN-238.
-CP_GROWN_FROM = "2015-01-01"
+#: Child Protection's earliest participation and defaults since REQ-GEN-238:
+#: the grown start moved on by the whole years the provider drops, read from
+#: the provider rather than written twice (post-build-review #284).
+CP_GROWN_FROM = f"{int(GROWN_FROM[:4]) + _cp.GROWN_DROPPED // 4}-01-01"
 #: Every grown version's date: the two above, cp-carers' turn back on after
 #: TS-63 (REQ-GEN-218) and Emergency Department's gap (REQ-GEN-251).
 GROWN_DATES = frozenset({GROWN_FROM, CP_GROWN_FROM, "2022-06-01", "2015-10-01", "2015-12-01"})
