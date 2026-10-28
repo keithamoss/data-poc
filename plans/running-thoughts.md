@@ -5886,3 +5886,19 @@ could never have computed it), and it belongs with batch 5's check work.
      fake datasets and a planted scenario until the next real synthetic
      dataset is added - which should be keyed by two or more columns on
      purpose, so a real page shows it.
+
+127. **[todo, 2026-10-26]** **[Pipeline & publishing]** **[QA checks &
+     contract]** **Re-run FILE checks after a file check's bug is fixed,
+     without asking the supplier to resend.** Keith, 2026-10-26, on the L3
+     critic's provisional call that a bulk re-check of a fixed FILE check
+     refuses and says file checks run again only when the supply is resent:
+     "if we fix the bug in how we parse ... I'm not going to ask the guys to
+     resend it. You already have the file or files. We can just re-trigger it
+     ourselves." Probably the same shape as REQ-PIPE-177's bulk re-check for
+     table checks, possibly its own interface, terminal first. Re-running the
+     pipeline does NOT do it today: re-staging an unchanged delivery writes no
+     new load record (`load_log.record_load` is silent on a repeat, by design)
+     and `file_checks.record` writes nothing without a load attempt, and
+     `mothman pipeline run` refuses over recorded history anyway. The files are
+     kept (data/deliveries, the S3 bucket in the cloud design), so the inputs
+     exist. Needs scoping before building.
