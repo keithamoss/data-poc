@@ -217,6 +217,18 @@ without asking" default for this project specifically):**
   as late as **23:26** Perth, with the hour-by-hour distribution
   tailing off after 21:00 (10 commits) into 22:00 (3) and 23:00 (3).
 
+- **While any agent is running, keep a 10-minute repeating wake-up
+  scheduled - Keith's own standing ask, 2026-10-28** (`plans/running-
+  thoughts.md` #128), after the container slept twice in one day and
+  stopped a builder and its test run each time. Arm it when the first
+  agent starts (a recurring scheduled task firing into THIS session),
+  and delete it when the last one finishes. On each wake: check which
+  agents are still running; resume any the container stopped
+  (SendMessage to its id, telling it what was killed); and otherwise
+  say nothing. A wake-up does not keep the container awake - it makes
+  the session come back within ten minutes rather than sitting dead
+  until Keith looks. Pair it with agents committing local checkpoints
+  as they go, so a stop costs minutes, not hours.
 - **Proactively suggest closing out and starting a fresh session when a
   natural chunk of work completes** (not because a long session is
   inherently bad - Keith's own words, he doesn't mind running one) **or

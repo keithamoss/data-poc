@@ -5902,3 +5902,15 @@ could never have computed it), and it belongs with batch 5's check work.
      `mothman pipeline run` refuses over recorded history anyway. The files are
      kept (data/deliveries, the S3 bucket in the cloud design), so the inputs
      exist. Needs scoping before building.
+
+128. **[done, 2026-10-28]** **[Docs & process]** **A 10-minute repeating
+     wake-up while any agent is running.** Keith, 2026-10-28, after the
+     container went to sleep twice in one day and stopped a running builder
+     and its test run each time: "Set a policy of having a 10 minute wake up
+     on scheduled repeat while an agent is running, so we don't lose work."
+     Written into CLAUDE.md's working-style conventions the same day. A
+     wake-up does not stop the container sleeping; what it buys is that the
+     session comes back within ten minutes and resumes the stopped agent
+     (SendMessage to its id) instead of the work sitting dead until Keith
+     next looks. Agents also commit local checkpoints as they go, so a stop
+     loses minutes rather than hours.
