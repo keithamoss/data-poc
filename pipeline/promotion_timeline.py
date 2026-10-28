@@ -176,7 +176,7 @@ class _History:
                                                 held, bool(files))
         return answer, self.standing(held)
 
-    def decisions_on(self, day) -> list[dict]:
+    def decisions_on(self, day, zones=None) -> list[dict]:
         """The decisions that took effect on this asset day - what produced a
         change point (criterion 9), each with both instants so the page can
         tell a decision recorded after the date on show."""
@@ -184,7 +184,7 @@ class _History:
 
         out = []
         for d in self.decisions:
-            if asset_time.local_date(d["_at"]) != day:
+            if asset_time.local_date(d["_at"], zones) != day:
                 continue
             entry = {"id": d["id"], "action": d["action"], "supply": d["supply"],
                      "at": _iso(d["effective_at"]), "recordedAt": _iso(d["recorded_at"])}
@@ -212,18 +212,21 @@ def for_dataset(dataset_id: str, timeline: list[dict],
             return for_dataset(dataset_id, timeline, conn=c)
 
     h = _History(conn, dataset_id, timeline)
-    days = sorted({asset_time.local_date(i) for i in h.instants()})
+    # The asset's zones, read once and passed down to every per-day and
+    # per-decision question below (REQ-PIPE-254 criterion 19).
+    zones = asset_time.timezone_versions()
+    days = sorted({asset_time.local_date(i, zones) for i in h.instants()})
     points: list[dict] = []
     standing: list[dict] = []
     last_panel = None
     last_standing: dict[str, dict | None] = {}
     last_entry: dict[str, dict] = {}
     for day in days:
-        end = asset_time.end_of_day(day)
+        end = asset_time.end_of_day(day, zones)
         answer, stands = h.panel(end)
         if answer != last_panel:
             points.append({"on": day.isoformat(), **answer,
-                           "decisions": h.decisions_on(day)})
+                           "decisions": h.decisions_on(day, zones)})
             last_panel = answer
         held = h.held(end)
         for period in sorted(set(last_standing) | set(stands)):

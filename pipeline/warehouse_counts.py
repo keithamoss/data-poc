@@ -63,6 +63,7 @@ def points(dataset_id: str, check_id: str, history: list[dict], *,
     toward the supply - or, with no rank, nothing does and `reason` says why.
     `history` is the card's entries, in rank order."""
     declared_on = check_id.split(".")[3] if check_id.count(".") >= 4 else dataset_id
+    zones = asset_time.timezone_versions()  # once, not per point (REQ-PIPE-254 criterion 19)
     by_supply: dict[str, list[dict]] = {}
     for entry in history:
         supply = _about(entry)
@@ -72,7 +73,8 @@ def points(dataset_id: str, check_id: str, history: list[dict], *,
     for supply, entries in sorted(by_supply.items()):
         records = [(_at(e), _record(e, check_id, declared_on)) for e in entries]
         tables = {t for e in entries for t in (e.get("reads") or {})}
-        involved = {dataset_id, *(d for d in map(supply_status.dataset_of, tables) if d)}
+        involved = {dataset_id, *(d for d in (supply_status.dataset_of(t, warehouse.tables)
+                                              for t in tables) if d)}
         first = min((at for at, _r in records if at is not None), default=None)
         # AND WHERE 'OWED' BEGINS OR ENDS (post-build-review #266 D2): the run
         # that clears a re-check need record nothing on this card.
@@ -88,7 +90,7 @@ def points(dataset_id: str, check_id: str, history: list[dict], *,
             counted = supply_status.count(dataset_id, supply, got, holdings=warehouse.at(when),
                                           owed=owed, at=when)
             point = _point(counted[-1] if counted else None)
-            point["on"] = asset_time.local_date(when).isoformat()
+            point["on"] = asset_time.local_date(when, zones).isoformat()
             if found and found[-1]["on"] == point["on"]:
                 found.pop()
             if found and {k: v for k, v in found[-1].items() if k != "on"} == \

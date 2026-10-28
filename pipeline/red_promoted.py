@@ -78,7 +78,7 @@ def for_dataset(dataset_id: str, conn=None) -> dict[str, dict]:
         with supply_db.connect(read_only=True, label="mothman:red-promoted") as opened:
             return for_dataset(dataset_id, conn=opened)
     from pipeline import slot_timeline
-    from qa_tools.common import promotion, supply_status
+    from qa_tools.common import hierarchy, promotion, supply_status
 
     reads = promotion._declared_reads()
     out: dict[str, dict] = {}
@@ -97,8 +97,9 @@ def for_dataset(dataset_id: str, conn=None) -> dict[str, dict]:
         # this supply, in the order their runs were opened.
         shown = supply_status.results_about(conn, dataset_id, supply,
                                             view=supply_status.View()).shown
-        involved = {dataset_id, *(d for r in shown for d in map(
-            supply_status.dataset_of, r.get("reads") or {}) if d)}
+        known = hierarchy.by_table()
+        involved = {dataset_id, *(d for r in shown for d in (
+            supply_status.dataset_of(t, known) for t in (r.get("reads") or {})) if d)}
         for ds in involved:
             if ds not in timelines:
                 timelines[ds] = slot_timeline.for_dataset(ds, conn=conn)
@@ -129,9 +130,10 @@ def for_dataset(dataset_id: str, conn=None) -> dict[str, dict]:
                 if when is not None:
                     steps[(when, order)] = (at, cause, by)
         for ds in sorted(involved):
+            name = _name(ds)  # once per dataset, not per entry (REQ-PIPE-254 criterion 19)
             for entry in timelines[ds]:
                 when = supply_status.instant(entry["at"])
-                steps.setdefault((when, last), (entry["at"], f"the {entry['action']} of {_name(ds)}",
+                steps.setdefault((when, last), (entry["at"], f"the {entry['action']} of {name}",
                                                 _person(entry)))
         # AND WHERE AN OWED RE-CHECK CLEARS (post-build-review #266 D2): owed
         # until the run that cleared it, which need record nothing about this

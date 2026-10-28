@@ -130,31 +130,39 @@ def timezone_versions() -> tuple[ZoneVersion, ...]:
         config_yaml.parse(text, name=str(path)) or {}, str(path)))
 
 
-def zone_on(day: date) -> ZoneInfo:
+def zone_on(day: date, versions: tuple[ZoneVersion, ...] | None = None) -> ZoneInfo:
     """The zone in force ON a date - for reading a wall-clock time on that
-    date as an instant (criterion 3)."""
+    date as an instant (criterion 3).
+
+    `versions`, here and on every function below that takes it, is a
+    `timezone_versions()` the caller already holds: a caller asking about
+    many instants takes it once and passes it down rather than reading the
+    file for each (REQ-PIPE-254 criterion 19). Without it the file is read
+    now."""
     from qa_tools.common import in_force
 
-    found = in_force.version_on(timezone_versions(), day)
+    versions = timezone_versions() if versions is None else versions
+    found = in_force.version_on(versions, day)
     if found is None:
         raise NoTimezoneVersion(
             f"no timezone version covers {day.isoformat()} - the earliest starts "
-            f"{timezone_versions()[0].effective_from.isoformat()}. Not falling back to it.")
+            f"{versions[0].effective_from.isoformat()}. Not falling back to it.")
     return found.zone
 
 
-def zone_at(instant: datetime) -> ZoneInfo:
+def zone_at(instant: datetime, versions: tuple[ZoneVersion, ...] | None = None) -> ZoneInfo:
     """The zone in force AT an instant - for showing it, or reducing it to
     a date (criterion 4)."""
     if instant.tzinfo is None or instant.utcoffset() is None:
         raise NaiveTimestampError(f"zone_at(): {instant!r} carries no UTC offset")
     from qa_tools.common import in_force
 
-    found = in_force.version_on(timezone_versions(), instant, key=lambda v: v.starts_at)
+    versions = timezone_versions() if versions is None else versions
+    found = in_force.version_on(versions, instant, key=lambda v: v.starts_at)
     if found is None:
         raise NoTimezoneVersion(
             f"no timezone version covers {instant.isoformat()} - the earliest starts "
-            f"{timezone_versions()[0].starts_at.isoformat()}. Not falling back to it.")
+            f"{versions[0].starts_at.isoformat()}. Not falling back to it.")
     return found.zone
 
 
@@ -238,7 +246,7 @@ def parse_instant(value, where: str) -> datetime:
     return parsed
 
 
-def localise(value: datetime) -> datetime:
+def localise(value: datetime, versions: tuple[ZoneVersion, ...] | None = None) -> datetime:
     """An aware instant as the asset's own wall clock.
 
     The instant is unchanged - this only decides which clock it is read
@@ -246,7 +254,7 @@ def localise(value: datetime) -> datetime:
     comparable without either being rewritten.
     """
     instant = parse_instant(value, "localise()")
-    return instant.astimezone(zone_at(instant))
+    return instant.astimezone(zone_at(instant, versions))
 
 
 def wall_clock(day: date, hhmm: str) -> datetime:
@@ -288,12 +296,12 @@ def wall_clock_problem(day: date, hhmm: str) -> str | None:
     return None
 
 
-def start_of_day(day: date) -> datetime:
+def start_of_day(day: date, versions: tuple[ZoneVersion, ...] | None = None) -> datetime:
     """The first instant of a date, in the zone in force on that date."""
-    return datetime.combine(day, time.min, tzinfo=zone_on(day))
+    return datetime.combine(day, time.min, tzinfo=zone_on(day, versions))
 
 
-def end_of_day(day: date) -> datetime:
+def end_of_day(day: date, versions: tuple[ZoneVersion, ...] | None = None) -> datetime:
     """The last instant of a date, in the asset's zone.
 
     The meaning of a bare date used as a point in time (criterion 6).
@@ -302,10 +310,10 @@ def end_of_day(day: date) -> datetime:
     microsecond, and so it is still right on a day that daylight saving
     makes 23 or 25 hours long.
     """
-    return start_of_day(day + timedelta(days=1)) - timedelta(microseconds=1)
+    return start_of_day(day + timedelta(days=1), versions) - timedelta(microseconds=1)
 
 
-def local_date(value) -> date:
+def local_date(value, versions: tuple[ZoneVersion, ...] | None = None) -> date:
     """The calendar date an instant falls on, ON THE ASSET'S CLOCK.
 
     The bridge between the supply model's receipt INSTANT and every
@@ -315,7 +323,7 @@ def local_date(value) -> date:
     which for a 10pm Perth arrival stored as UTC is the following day -
     the exact bug REQ-PIPE-048 is named for, reintroduced one layer up.
     """
-    return localise(parse_instant(value, "local_date()")).date()
+    return localise(parse_instant(value, "local_date()"), versions).date()
 
 
 def isoformat(value: datetime) -> str:

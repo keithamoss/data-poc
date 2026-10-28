@@ -116,7 +116,11 @@ def read(path) -> str:
     """A configuration file's text, read now. A missing or unreadable file
     raises as reading it would - on every call, since nothing is remembered
     about a failure."""
-    return Path(path).read_text(encoding="utf-8")
+    # Bytes, then decoded: the same text and the same errors as read_text,
+    # without the text layer, on a path that runs hundreds of thousands of
+    # times in one dashboard build (REQ-PIPE-254 criterion 19).
+    with open(path, "rb") as f:
+        return f.read().decode("utf-8")
 
 
 #: How many built values a `Built` store keeps for one file (NFR MEMORY): a
@@ -153,14 +157,24 @@ class Built:
         self._versions = versions
         self._files = files
         self._store: "OrderedDict[object, OrderedDict[object, object]]" = OrderedDict()
+        # The version each key was last answered for, as one (text, value)
+        # pair: the common case - a file unchanged since the last call - is an
+        # equality test of the text just read against it, with no hash of the
+        # text and no lock (REQ-PIPE-254 criterion 19). The pair is replaced
+        # whole, never edited, so a reader sees one version or the other.
+        self._newest: dict[object, tuple[object, object]] = {}
         self._lock = threading.Lock()
 
     def get(self, key, text, build):
+        newest = self._newest.get(key)
+        if newest is not None and newest[0] == text:
+            return newest[1]
         with self._lock:
             held = self._store.get(key)
             if held is not None and text in held:
                 held.move_to_end(text)
                 self._store.move_to_end(key)
+                self._newest[key] = (text, held[text])
                 return held[text]
         value = build()
         with self._lock:
@@ -168,10 +182,12 @@ class Built:
             self._store.move_to_end(key)
             held[text] = value
             held.move_to_end(text)
+            self._newest[key] = (text, value)
             while len(held) > self._versions:
                 held.popitem(last=False)
             while len(self._store) > self._files:
-                self._store.popitem(last=False)
+                gone, _ = self._store.popitem(last=False)
+                self._newest.pop(gone, None)
         return value
 
     def from_file(self, path, build):

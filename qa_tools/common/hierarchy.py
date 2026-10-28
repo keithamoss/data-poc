@@ -139,20 +139,23 @@ def _require(node: dict, key: str, where: str):
 _BUILT = config_yaml.Built()
 
 
-def _load() -> tuple[str, "MappingProxyType[str, Dataset]"]:
-    """(data_asset_id, {dataset id: Dataset}) for the file as it reads now."""
+def _load() -> tuple[str, "MappingProxyType[str, Dataset]", "MappingProxyType[str, Dataset]"]:
+    """(data_asset_id, {dataset id: Dataset}, {table: Dataset}) for the file
+    as it reads now."""
     path = DATA_ASSET_YAML
     return _from_text(path, config_yaml.read(path))
 
 
-def _from_text(path: Path, text: str) -> tuple[str, "MappingProxyType[str, Dataset]"]:
+def _from_text(path: Path, text: str) -> tuple[str, "MappingProxyType[str, Dataset]",
+                                               "MappingProxyType[str, Dataset]"]:
     """The tree built from one read of `path` - what the registry and the
     arrival patterns build from, so their value and the tree's are always
     the same version of the file (REQ-PIPE-254 criterion 6)."""
     return _BUILT.get(str(path), text, lambda: _build(path, text))
 
 
-def _build(path: Path, text: str) -> tuple[str, "MappingProxyType[str, Dataset]"]:
+def _build(path: Path, text: str) -> tuple[str, "MappingProxyType[str, Dataset]",
+                                           "MappingProxyType[str, Dataset]"]:
     doc = config_yaml.parse(text, name=str(path)) or {}
 
     data_asset_id = doc.get("data_asset_id")
@@ -189,7 +192,10 @@ def _build(path: Path, text: str) -> tuple[str, "MappingProxyType[str, Dataset]"
 
     if not datasets:
         raise ValueError(f"{DATA_ASSET_YAML} defines no datasets under hierarchy.agencies")
-    return data_asset_id, MappingProxyType(datasets)
+    by_table: dict[str, Dataset] = {}
+    for entry in datasets.values():
+        by_table.setdefault(entry.table, entry)
+    return data_asset_id, MappingProxyType(datasets), MappingProxyType(by_table)
 
 
 def data_asset_id() -> str:
@@ -208,7 +214,7 @@ def dataset(dataset_id: str) -> Dataset:
     miss - an underscore for a hyphen, or a table name where a dataset
     id belongs - and a bare KeyError makes that guesswork.
     """
-    _, datasets = _load()
+    datasets = _load()[1]
     try:
         return datasets[dataset_id]
     except KeyError:
@@ -218,20 +224,31 @@ def dataset(dataset_id: str) -> Dataset:
         ) from None
 
 
-def dataset_for_table(table: str) -> Dataset:
+def by_table() -> "MappingProxyType[str, Dataset]":
+    """{table: Dataset}, read-only, for the file as it reads now - the value
+    a caller that maps many tables takes once and passes down, rather than
+    reading the file once per table (REQ-PIPE-254 criterion 19)."""
+    return _load()[2]
+
+
+def dataset_for_table(table: str, tables: "MappingProxyType[str, Dataset] | None" = None) -> Dataset:
     """The dataset a physical table belongs to.
 
     Replaces `cp_common.TABLE_DATASET_ID`. A dataset maps to exactly one
     logical table by construction under the supply model (Thread F), so
     this is a real inverse rather than a lookup that might miss.
+
+    `tables` is a `by_table()` the caller already holds; without one the
+    file is read now.
     """
-    for entry in all_datasets():
-        if entry.table == table:
-            return entry
-    raise UnknownDatasetError(
-        f"no dataset maps to table {table!r} in {DATA_ASSET_YAML.name}. "
-        f"Known tables: {', '.join(sorted(d.table for d in all_datasets()))}"
-    )
+    tables = by_table() if tables is None else tables
+    try:
+        return tables[table]
+    except KeyError:
+        raise UnknownDatasetError(
+            f"no dataset maps to table {table!r} in {DATA_ASSET_YAML.name}. "
+            f"Known tables: {', '.join(sorted(tables))}"
+        ) from None
 
 
 def contract_path(collection_id: str) -> Path:

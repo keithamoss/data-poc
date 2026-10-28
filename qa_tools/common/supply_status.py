@@ -80,8 +80,12 @@ class About:
 class Holdings:
     """What each (dataset, period) holds in the warehouse at one instant."""
 
-    def __init__(self, held: dict[tuple[str, str], str]):
+    def __init__(self, held: dict[tuple[str, str], str], *, tables=None):
         self._held = held
+        # The hierarchy's {table: Dataset}, taken once for this instance and
+        # passed down to the many per-table lookups the counting rule makes
+        # (REQ-PIPE-254 criterion 19). Read on first use when not given.
+        self._tables = tables
         self._periods: dict[tuple[str, str], list[str]] = {}
         for (ds, period), supply in held.items():
             self._periods.setdefault((ds, supply), []).append(period)
@@ -91,6 +95,14 @@ class Holdings:
 
     def periods_of(self, dataset_id: str, supply: str) -> list[str]:
         return sorted(self._periods.get((dataset_id, supply), ()))
+
+    @property
+    def tables(self):
+        if self._tables is None:
+            from qa_tools.common import hierarchy
+
+            self._tables = hierarchy.by_table()
+        return self._tables
 
 
 def holdings_at(conn, dataset_ids, as_at=None) -> Holdings:
@@ -136,11 +148,22 @@ class HoldingsTimeline:
                 self._ends.append(i + 1)
         self._made: dict[int, Holdings] = {}
         self._cursor, self._held = 0, {}
+        self._tables = None
+
+    @property
+    def tables(self):
+        """The hierarchy's {table: Dataset}, read once for this timeline and
+        handed to every Holdings it makes (REQ-PIPE-254 criterion 19)."""
+        if self._tables is None:
+            from qa_tools.common import hierarchy
+
+            self._tables = hierarchy.by_table()
+        return self._tables
 
     def at(self, when) -> Holdings:
         i = bisect.bisect_right(self._instants, instant(when)) - 1
         if i < 0:
-            return Holdings({})
+            return Holdings({}, tables=self.tables)
         if i not in self._made:
             end = self._ends[i]
             if end < self._cursor:
@@ -148,7 +171,8 @@ class HoldingsTimeline:
             for _at, ds, slot, holder in self._changes[self._cursor:end]:
                 self._held[(ds, slot)] = holder
             self._cursor = end
-            self._made[i] = Holdings({k: v for k, v in self._held.items() if v})
+            self._made[i] = Holdings({k: v for k, v in self._held.items() if v},
+                                     tables=self.tables)
         return self._made[i]
 
     def instants(self, dataset_ids) -> list[datetime]:
@@ -252,15 +276,15 @@ def declared_on(record: dict) -> str | None:
     return parsed.dataset if parsed else record.get("dataset_id")
 
 
-def dataset_of(table: str) -> str | None:
+def dataset_of(table: str, tables=None) -> str | None:
     """The dataset a logical table belongs to, or None for one the hierarchy
-    does not know (a sample's or a trial's)."""
+    does not know (a sample's or a trial's). `tables` is a
+    hierarchy.by_table() the caller already holds (REQ-PIPE-254 criterion
+    19); without one the hierarchy is read now."""
     from qa_tools.common import hierarchy
 
-    try:
-        return hierarchy.dataset_for_table(table).dataset_id
-    except hierarchy.UnknownDatasetError:
-        return None
+    entry = (hierarchy.by_table() if tables is None else tables).get(table)
+    return entry.dataset_id if entry is not None else None
 
 
 def _matches(holdings: Holdings, reads: dict, period: str) -> bool:
@@ -271,7 +295,7 @@ def _matches(holdings: Holdings, reads: dict, period: str) -> bool:
         state = read.get("state")
         if state == qa_store.NO_SUPPLY:
             continue
-        ds = dataset_of(table)
+        ds = dataset_of(table, holdings.tables)
         if ds is None:
             continue
         held = holdings.holder(ds, period)
@@ -305,9 +329,10 @@ def _owed(record: dict, dataset_id: str, periods: list[str], holdings: Holdings)
     each have a supply in the warehouse in one of its periods."""
     if declared_on(record) == dataset_id:
         return True
+    known = holdings.tables
     tables = [t for t, r in (record.get("reads") or {}).items()
-              if r.get("state") != qa_store.NO_SUPPLY and dataset_of(t)]
-    return any(all(holdings.holder(dataset_of(t), p) for t in tables) for p in periods)
+              if r.get("state") != qa_store.NO_SUPPLY and dataset_of(t, known)]
+    return any(all(holdings.holder(dataset_of(t, known), p) for t in tables) for p in periods)
 
 
 def count(dataset_id: str, supply: str, shown: list[dict], *, holdings: Holdings,
