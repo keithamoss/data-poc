@@ -853,6 +853,14 @@ def check(old_cal: dict | None, new_cal: dict, old_asset: dict | None, new_asset
         # the new date's added, which the clause above already lets through.
         if new is None and synthetic and item.kind in _VERSION_KINDS:
             continue
+        # AND THE PERIOD DATES OF A CALENDAR VERSION IT REMOVES OR LATER-DATES
+        # (post-build-review #284 (4); Keith, 2026-10-29, option a): they go
+        # with their version, as a version's dates arrive with it when one is
+        # added. A date removed from a version that stays is still refused.
+        if new is None and synthetic and item.kind == "cal_date" and \
+                f"calendar {item.ctx['calendar']} version {item.ctx['version']}" \
+                not in new_items:
+            continue
         needs.setdefault(item.owner, []).append((item, old, new, frozen_at))
 
     for owner, rows in needs.items():

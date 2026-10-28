@@ -296,3 +296,16 @@ class TestEachReaderOnItsOwnEntryPoint:
         found = re_checks.for_collection(conn, CP)
         assert SUPPLY in found.by_supply, "precondition: the reader went past its early return"
         _assert_only_the_publisher_read(role, statements)
+
+    def test_package_gating_reads_only_the_record(self, publisher, statements):
+        """REQ-DASH-272 criterion 21 (Keith's option b): every query the
+        package-gating reader makes - receipts, filings, runs and their
+        attempts, owed gates, applications and the decision log - runs as the
+        publisher, before any package is judged."""
+        from pipeline import package_gating
+
+        role, conn = publisher
+        statements.clear()
+        package_gating.for_collection(conn, CP)
+        assert statements, "precondition: the reader issued its queries"
+        _assert_only_the_publisher_read(role, statements)

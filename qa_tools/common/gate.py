@@ -544,6 +544,7 @@ def _apply_locked(collection_id, period, *, entry, checked, effective_at, run_by
         _join(conn, members, period)
         for m in members.values():
             m.delivery, m.received = _receipt(conn, m.dataset_id, m.supply)
+        effective_at = _not_before_any_members(conn, members, effective_at)
         try:
             barred = agreement_drift.refusals(conn, sorted({m.dataset_id
                                                             for m in members.values()}))
@@ -1414,7 +1415,7 @@ def _decide(collection_id, period, application, members, reads, barred, warehous
                     period=item.get("period") or period,
                     physical_tables=item["physical_tables"], actor=promotion.RULE_ACTOR,
                     actor_kind=decision_log.RULE,
-                    effective_at=_not_before_its_own(conn, m.supply, effective_at),
+                    effective_at=effective_at,
                     reason=item.get("reason"), amber=item.get("amber"),
                     status=item.get("status"), replacing=item.get("replacing"),
                     census_after=False,
@@ -1429,22 +1430,28 @@ def _decide(collection_id, period, application, members, reads, barred, warehous
             census.after_move(conn, trigger="promote", period=p)
 
 
-def _not_before_its_own(conn, supply: str, effective_at: str) -> str:
-    """A JOINED MEMBER IS NEVER PROMOTED BEFORE ITS OWN LATEST DECISION
-    (post-build-review #276; Keith, 2026-10-27, option b). Every arrival keeps
-    its own seeded lag (orchestrate.effective_at_of), so an early file's
-    'promotion-withheld' can take effect after the instant of the later file's
-    application that promotes it; read by effective time it would be promoted
-    and then held back. Its promotion is floored at that decision, so it takes
-    effect at THAT decision's instant, not the application's: a member whose
-    decisions all came earlier keeps the application's instant, and the
-    members of one application can then be promoted at different instants
-    (post-build-review #284, the L4 critic's finding 1 - against REQ-PIPE-266
-    criterion 4's one effective instant, with Keith). REJECTED (a), bounding
-    every lag by the collection's next receipt: it shortened the promotion lag
-    across the whole history (Child Protection's p10 29.8h -> 6.0h)."""
-    rows = conn.execute(f"SELECT max(effective_at) FROM {_decisions()} WHERE supply = ?",
-                        [supply]).fetchall()
+def _not_before_any_members(conn, members, effective_at: str) -> str:
+    """ONE INSTANT FOR THE WHOLE APPLICATION, NEVER BEFORE ANY MEMBER'S OWN
+    LATEST DECISION (post-build-review #284 (1); Keith, 2026-10-29, option b).
+    Every arrival keeps its own seeded lag (orchestrate.effective_at_of), so
+    an early file's 'promotion-withheld' can take effect after the instant of
+    the later file's application that promotes it; read by effective time it
+    would be promoted and then held back. The application is floored at the
+    latest decision already recorded across ALL its members, and every
+    promotion and hold-back it writes takes that one instant (REQ-PIPE-266
+    criterion 4), so the completing file gives up its own instant when an
+    earlier member's decision is later. REJECTED: flooring each member at its
+    own latest decision (#276 option b as first built), which promoted one
+    application at several instants - four on the bootstrapped history,
+    spread up to ten days. REJECTED (#276 a): bounding every lag by the
+    collection's next receipt, which shortened the promotion lag across the
+    whole history (Child Protection's p10 29.8h -> 6.0h)."""
+    pairs = sorted({(m.dataset_id, m.supply) for m in members.values() if m.supply})
+    if not pairs:
+        return effective_at
+    where = " OR ".join("(dataset_id = ? AND supply = ?)" for _ in pairs)
+    rows = conn.execute(f"SELECT max(effective_at) FROM {_decisions()} WHERE {where}",
+                        [v for pair in pairs for v in pair]).fetchall()
     latest = rows[0][0] if rows else None
     if latest is None:
         return effective_at
@@ -1552,7 +1559,7 @@ def after_arrival(collection_id: str, arrival, *, effective_at: str, run_by: str
                         retries=owed.caused_by_application if owed else None)
         if applied.contended:
             with supply_db.connect(label="mothman:gate") as conn:
-                owe_gate(conn, package, dataset_id=item["dataset_id"])
+                _found_contended(conn, owe_gate(conn, package, dataset_id=item["dataset_id"]))
         elif owed is not None and not applied.failed:
             from qa_tools.common import recheck
 
@@ -1583,9 +1590,23 @@ def run_owed(item) -> "Applied":
     applied = apply(collection_id, package.period, entry=PACKAGE, checked=members,
                     effective_at=effective, delivery=package.delivery,
                     package_instant=package.received, retries=item.caused_by_application)
-    if not applied.contended and not applied.failed:
+    if applied.contended:
+        with supply_db.connect(label="mothman:gate") as conn:
+            _found_contended(conn, item.id)
+    elif not applied.failed:
         recheck.clear(item.id, f"gate/{applied.application}")
     return applied
+
+
+def _found_contended(conn, owed_id: int) -> None:
+    """RECORDED: this package's gate found its period lock held and was left
+    owed (REQ-DASH-272 criterion 21, Keith 2026-10-29, option b) - counted on
+    the 'gate' item's attempts, which a clearing keeps, so a page built later
+    can tell a gate that genuinely waited from the replay's seeded lag."""
+    from qa_tools.common import recheck
+
+    conn.execute(f"UPDATE {recheck.TABLE} SET attempts = attempts + 1 WHERE id = ?",
+                 [owed_id])
 
 
 def _completing_instant(conn, package: Package) -> str:

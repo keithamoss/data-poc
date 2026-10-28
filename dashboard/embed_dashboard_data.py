@@ -200,7 +200,7 @@ from qa_tools.common.github_links import build_check_source_links, build_folder_
 from qa_tools.common.leaderboard import build_leaderboard
 from qa_tools.common.people import PEOPLE_YAML, assignees_for, parse_people_config
 from qa_tools.common.ticket_status import parse_open_tickets
-from qa_tools.common.ticket_sync import DATASET_AGENCY
+from qa_tools.common import ticket_sync
 
 ROOT = os.path.join(os.path.dirname(__file__), "..")
 TEMPLATE_HTML = os.path.join(os.path.dirname(__file__), "qa-reporting-dashboard.template.html")
@@ -705,7 +705,8 @@ def embed() -> None:
 
     people_config = parse_people_config(PEOPLE_YAML)
     dataset_assignments = {}
-    for dataset_id, agency_id in DATASET_AGENCY.items():
+    dataset_agency = ticket_sync.DATASET_AGENCY
+    for dataset_id, agency_id in dataset_agency.items():
         records = assignees_for(dataset_id, agency_id, people_config)
         if records:
             dataset_assignments[dataset_id] = [_public(r) for r in records]
@@ -721,7 +722,7 @@ def embed() -> None:
             raw_ticket_resolutions = json.load(f)
     else:
         raw_ticket_resolutions = []
-    leaderboard_rows = build_leaderboard(raw_ticket_resolutions, people_config, DATASET_AGENCY)
+    leaderboard_rows = build_leaderboard(raw_ticket_resolutions, people_config, dataset_agency)
     html = _replace_const(html, "LEADERBOARD", json.dumps(leaderboard_rows, separators=(",", ":")))
     print(f"Re-embedded LEADERBOARD = {len(leaderboard_rows)} real streak row(s)"
           + ("" if os.path.exists(ticket_resolutions_json) else " (no reports/ticket_resolutions.json - local build, embedding empty)"))

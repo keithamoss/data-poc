@@ -119,8 +119,12 @@ N_CASE_WORKERS = 60
 BASE_SEED = 5000  # distinct range from civil_registration.py's 1000s and generate.py's demo seeds
 
 # The six CP tables, in the order contract/data-asset.yaml declares
-# them - resolved, not restated (REQ-QAC-039).
-TABLES = [d.table for d in hierarchy.datasets_in_collection("child-protection")]
+# them - resolved, not restated (REQ-QAC-039). READ WHEN ASKED FOR, NOT AT
+# IMPORT (post-build-review #282 (7)): `TABLES` is answered by the module's
+# __getattr__ below from the hierarchy as it stands, and this module asks
+# _tables().
+def _tables() -> list[str]:
+    return [d.table for d in hierarchy.datasets_in_collection("child-protection")]
 
 # Resupply timing - deliberately NOT Birth Registrations' own curve
 # (mostly 1-3 business days, tailing to 10): a corrected full quarterly
@@ -217,7 +221,10 @@ def grown_run_plan() -> list[tuple[int, str | None]]:
 
 def __getattr__(name: str):
     """The plans and the delay curve as module attributes, computed when
-    first asked for rather than at import (criterion 7)."""
+    first asked for rather than at import (criterion 7) - and the tables,
+    from the hierarchy every time (post-build-review #282 (7))."""
+    if name == "TABLES":
+        return _tables()
     if name == "RUN_PLAN":
         return run_plan()
     if name == "GROWN_RUN_PLAN":
@@ -309,7 +316,7 @@ def _pick_dirty_tables(seed: int, available: list[str] | None = None) -> set[str
     single-table one must come back clean."""
     import numpy as np
 
-    tables = list(TABLES if available is None else available)
+    tables = list(_tables() if available is None else available)
     rng = np.random.default_rng(seed)
     n_dirty = min(int(rng.integers(2, 4)), len(tables))  # 2 or 3, or all of a smaller delivery
     return set(rng.choice(tables, size=n_dirty, replace=False))
@@ -365,7 +372,7 @@ class ChildProtectionProvider:
         # near-duplicate rows, and the MIN/MAX arrival-lag stats are
         # unaffected by a duplicate sharing an already-present value).
         return {name: _add_extract_timestamp(self.base_tables[name], run_date, None, seed=seed + 5000)
-                for name in TABLES}
+                for name in _tables()}
 
     def dirty(self, payload: dict[str, pd.DataFrame], severity: str, seed: int,
               previous_row_count: int | None) -> dict[str, pd.DataFrame]:
@@ -380,7 +387,7 @@ class ChildProtectionProvider:
         # resupply has only the tables being resent (REQ-GEN-040).
         from generator import dirty as dirty_mod
 
-        present = [t for t in TABLES if t in payload]
+        present = [t for t in _tables() if t in payload]
         dirty_tables = _pick_dirty_tables(seed, present)
         tables = dict(payload)
         base = self.base_tables
@@ -436,7 +443,7 @@ class ChildProtectionProvider:
         provider shared across every slot must not carry per-chain
         state.
         """
-        present = [t for t in TABLES if t in payload]
+        present = [t for t in _tables() if t in payload]
         failed = sorted(_pick_dirty_tables(previous_dirty_seed, present))
         if not failed:  # defensive - a chain only resupplies what went red
             return payload
@@ -500,7 +507,7 @@ def _cp_received_at(payload: dict, received_date: date, where: str) -> str:
     import pandas as pd
 
     earliest = None
-    for name in TABLES:
+    for name in _tables():
         df = payload[name]
         if "extract_timestamp" not in df.columns:
             continue
@@ -541,7 +548,7 @@ def _cp_manifest_entries_for_slot(deliveries: list, slot_id: str, period: str,
             "received_at": None,  # filled in by received_at(), via the driver
             "dirty_severity": delivery_obj.severity,  # None | "amber" | "red" - this ARRIVAL's own outcome
             "seed": seed,
-            "row_counts": {name: int(len(delivery_obj.payload[name])) for name in TABLES},
+            "row_counts": {name: int(len(delivery_obj.payload[name])) for name in _tables()},
         })
     return entries
 
@@ -692,9 +699,9 @@ def _pair_problems(injection) -> list[str]:
             out.append(f"{where}: the delivery's `at` is its earliest file's receipt, and "
                        f"its files arrive from {min(f.at for f in extra.files)}")
         for k, f in enumerate(extra.files, 1):
-            if f.table not in TABLES:
+            if f.table not in _tables():
                 out.append(f"{where}, file {k}: names table {f.table!r}, which is not one "
-                           f"of {', '.join(TABLES)}")
+                           f"of {', '.join(_tables())}")
             if f.content not in PAIR_CONTENTS:
                 out.append(f"{where}, file {k}: {f.content!r} is not a Child Protection "
                            f"pair file's content - one of {', '.join(PAIR_CONTENTS)}")
@@ -948,7 +955,7 @@ class ChildProtection(Provider):
         pop = generate_population(POPULATION_N, seed=BASE_SEED)
         base_tables = generate_child_protection_collection(pop, seed=BASE_SEED + 1000,
                                                            n_case_workers=N_CASE_WORKERS)
-        for name in TABLES:
+        for name in _tables():
             print(f"  {name}: {len(base_tables[name]):,} rows")
         # The same quarterly calendar the pipeline judges these supplies
         # against - not a private copy of the cadence (REQ-GEN-042).
@@ -1038,7 +1045,7 @@ class ChildProtection(Provider):
         # (REQ-GEN-043 criterion 11). Each filename matches its own dataset's
         # configured arrivalPattern.
         csvs = {}
-        for table in TABLES:
+        for table in _tables():
             df = delivery_obj.payload[table]
             cols = [c for c in df.columns if not c.startswith("_")]
             csvs[f"{table}.csv"] = df[cols].to_csv(index=False)

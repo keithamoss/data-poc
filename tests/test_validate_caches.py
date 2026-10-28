@@ -29,6 +29,7 @@ def tree(tmp_path) -> Path:
         dest.parent.mkdir(parents=True, exist_ok=True)
         dest.write_text((ROOT / rel).read_text())
     (tmp_path / "pipeline").mkdir(exist_ok=True)
+    (tmp_path / "generator").mkdir(exist_ok=True)
     return tmp_path
 
 
@@ -51,7 +52,8 @@ PLANTED = {
 class TestItFailsOnAPlantedCache:
 
     @pytest.mark.parametrize("source", PLANTED.values(), ids=PLANTED.keys())
-    @pytest.mark.parametrize("where", ["qa_tools/common/planted.py", "pipeline/planted.py"])
+    @pytest.mark.parametrize("where", ["qa_tools/common/planted.py", "pipeline/planted.py",
+                                       "generator/planted.py"])
     def test_it_fails_naming_the_function_and_its_file(self, tree, where, source):
         (tree / where).write_text(source)
         done = _gate(tree)
@@ -71,6 +73,45 @@ class TestItFailsOnAPlantedCache:
         assert done.returncode == 1 and "excuses" in done.stdout and rel in done.stdout
 
 
+#: post-build-review #282 (7), Keith 2026-10-29, option (a): a value BUILT
+#: FROM CONFIGURATION AT IMPORT is held for the process as surely as a cache -
+#: ticket_sync.DATASET_SCOPE was the hierarchy as it stood when the module was
+#: first imported.
+IMPORT_TIME = {
+    "a comprehension over the hierarchy": "from qa_tools.common import hierarchy\n\n"
+        "SCOPE = {d.dataset_id: d.agency_id for d in hierarchy.all_datasets()}\n",
+    "a plain call into the registry": "from qa_tools import collections\n\n"
+        "PLANTED = collections.all_collections()\n",
+    "an annotated read of the calendar": "from qa_tools.common import agreement\n\n"
+        "PLANTED: object = agreement.current()\n",
+}
+
+
+class TestItFailsOnAValueBuiltFromConfigurationAtImport:
+
+    @pytest.mark.parametrize("source", IMPORT_TIME.values(), ids=IMPORT_TIME.keys())
+    @pytest.mark.parametrize("where", ["qa_tools/common/planted.py", "generator/planted.py"])
+    def test_it_fails_naming_the_line_and_its_file(self, tree, where, source):
+        (tree / where).write_text(source)
+        done = _gate(tree)
+        assert done.returncode == 1, done.stdout + done.stderr
+        assert f"{where}:3" in done.stdout and "at import" in done.stdout, done.stdout
+
+    def test_a_read_inside_a_function_is_not_one(self, tree):
+        (tree / "qa_tools/common/planted.py").write_text(
+            "from qa_tools.common import hierarchy\n\n"
+            "def scope():\n    return {d.dataset_id for d in hierarchy.all_datasets()}\n"
+            "PLANTED = lambda: hierarchy.all_datasets()\n"
+            "if __name__ == \"__main__\":\n    print(hierarchy.all_datasets())\n")
+        done = _gate(tree)
+        assert done.returncode == 0, done.stdout
+
+    def test_a_content_keyed_store_is_not_one(self, tree):
+        (tree / "qa_tools/common/planted.py").write_text(
+            "from qa_tools.common import config_yaml\n\n_BUILT = config_yaml.Built()\n")
+        assert _gate(tree).returncode == 0
+
+
 class TestItPassesOnTheCommittedTree:
 
     def test_the_scan_is_not_empty_and_every_cache_is_allowlisted(self):
@@ -88,3 +129,41 @@ class TestItPassesOnTheCommittedTree:
     def test_mothman_check_runs_it(self):
         [argv] = [argv for label, argv, *_ in check_cli._GATES if label == "caches"]
         assert argv[-1] == "qa_tools.common.validate_caches"
+
+
+class TestTheValuesTheWideningFoundFollowTheirFile:
+    """post-build-review #282 (7), Keith 2026-10-29, option (a): the three
+    values the widened gate found held configuration for the process. Each
+    now answers for its file as it stands when asked."""
+
+    def test_emergency_departments_run_plan_follows_the_calendar(self, monkeypatch):
+        from generator.collections import emergency_department as ed
+
+        monkeypatch.setattr(ed, "generated_periods", lambda: list(range(12)))
+        first = len(ed.run_plan())
+        monkeypatch.setattr(ed, "generated_periods", lambda: list(range(20)))
+        assert (first, len(ed.run_plan())) == (12, 20)
+
+    def test_ticket_syncs_dataset_scope_follows_the_hierarchy(self, monkeypatch):
+        from types import SimpleNamespace
+
+        from qa_tools.common import hierarchy, ticket_sync
+
+        assert ticket_sync.DATASET_SCOPE, "precondition - the real hierarchy has datasets"
+        planted = [SimpleNamespace(dataset_id="planted-ds", agency_id="planted-agency",
+                                   collection_id="planted-collection")]
+        monkeypatch.setattr(hierarchy, "all_datasets", lambda: planted)
+        assert ticket_sync.DATASET_SCOPE == {"planted-ds": ("planted-agency",
+                                                             "planted-collection")}
+        assert ticket_sync.DATASET_AGENCY == {"planted-ds": "planted-agency"}
+
+    def test_child_protections_tables_follow_the_hierarchy(self, monkeypatch):
+        from types import SimpleNamespace
+
+        from generator.collections import child_protection as cp
+        from qa_tools.common import hierarchy
+
+        assert "cp_clients" in cp.TABLES, "precondition - the real hierarchy's tables"
+        monkeypatch.setattr(hierarchy, "datasets_in_collection",
+                            lambda collection_id: [SimpleNamespace(table="planted_table")])
+        assert cp.TABLES == ["planted_table"]

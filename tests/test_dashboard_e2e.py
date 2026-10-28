@@ -7652,8 +7652,8 @@ class TestRecheckedAfterWeFixedACheck:
         _goto(clean_page, page, state=self.C, in_place_on="2024-08-06")
         row = _row_of(clean_page, self.KEY_C2)
         assert row["pill"].strip() == "Red", "the verdict that stood then"
-        assert ("Re-checked later - 10:30am Wednesday, 7 August 2024, now Green, after a "
-                "re-check by Keith Moss - our check was wrong") in row["status"], row
+        assert ("Re-checked 10:30am Wednesday, 7 August 2024: became Green - our check was "
+                "wrong") in row["status"], row
         assert "Arrived" not in row["status"], row
         since = " ".join(t["text"] for t in _shown(clean_page, "[data-changed-since]"))
         assert "re-check" not in since, since
@@ -7700,6 +7700,9 @@ class TestRecheckedAfterWeFixedACheck:
                                  "- the fix found more."), badge
         row = _row_of(clean_page, self.KEY_N1)
         assert "Red promoted" in row["status"] and row["outcome"].startswith("Promoted"), row
+        # THE ROW DOES NOT REPEAT THE BADGE'S SENTENCE (Keith, 2026-10-29).
+        assert row["status"].lower().count("re-checked friday, 9 august 2024 by keith moss") \
+            == 1, row
         _goto(clean_page, page, state={"tier": "agency", "agencyId": CP_AGENCY},
               in_place_on="2024-08-09")
         markers = " ".join(m["text"] for m in _shown(clean_page, ".red-promoted-marker"))
@@ -7709,8 +7712,8 @@ class TestRecheckedAfterWeFixedACheck:
         assert _shown(clean_page, ".view-head [data-red-promoted]") == []
         assert _shown(clean_page, "[data-turns-red-later]") == []
         (later,) = _shown(clean_page, ".view-head [data-rechecked-later]")
-        assert later["text"] == ("Re-checked later - 10:30am Friday, 9 August 2024, now Red, "
-                                 "after a re-check by Keith Moss - the fix found more"), later
+        assert later["text"] == ("Re-checked 10:30am Friday, 9 August 2024: became Red - "
+                                 "the fix found more"), later
 
         cp_pages.at("2024-08-10T10:30:00+08:00")
         cp_pages.sc.acknowledge(v1["N1"], "2024-Q3", at="2024-08-10T10:30:00+08:00")
@@ -7739,7 +7742,7 @@ class TestRecheckedAfterWeFixedACheck:
         page = cp_pages.page()
         _goto(clean_page, page, state=self.N, in_place_on="2024-08-09")
         (tag,) = _shown(clean_page, ".view-head [data-rechecked-amber]")
-        assert tag["text"] == "Amber, promoted - re-checked, awaiting acknowledgement", tag
+        assert tag["text"] == "Promoted green, re-checked amber - awaiting acknowledgement", tag
         # RIGHT AFTER THE STATUS PILL AND BEFORE THE TURN-OFF MARKER (criterion
         # 9; post-build-review #283, L2 wave-2 critic 4 - "after any pill" held
         # whatever the order, the header carrying other pills before it). The
@@ -7767,13 +7770,13 @@ class TestRecheckedAfterWeFixedACheck:
         assert order["marker"] is not None, f"precondition: a turn-off marker shown {order}"
         assert order["tag"] == 1 and order["marker"] > order["tag"], order
         row = _row_of(clean_page, self.KEY_N1)
-        assert "Amber, promoted - re-checked, awaiting acknowledgement" in row["status"], row
+        assert "Promoted green, re-checked amber - awaiting acknowledgement" in row["status"], row
         cp_pages.at("2024-08-10T10:30:00+08:00")
         cp_pages.sc.acknowledge(v1["N1"], "2024-Q3", at="2024-08-10T10:30:00+08:00")
         page = cp_pages.page()
         _goto(clean_page, page, state=self.N, in_place_on="2024-08-10")
         (tag,) = _shown(clean_page, ".view-head [data-rechecked-amber]")
-        assert tag["text"] == "Amber, promoted - re-checked, acknowledged by Keith Moss", tag
+        assert tag["text"] == "Promoted green, re-checked amber - acknowledged by Keith Moss", tag
 
     def test_a_bulk_recheck_names_the_check_and_its_drawer_has_one_line(
             self, clean_page, cp_pages):
@@ -7817,7 +7820,7 @@ class TestRecheckedAfterWeFixedACheck:
         assert _shown(clean_page, "#check-panel [data-bulk-recheck]") == []
         row = _row_of(clean_page, self.KEY_C2)
         assert row["pill"].strip() == "Red", row
-        assert "Re-checked later - 10:30am Thursday, 8 August 2024, now Green, after we " \
+        assert "Re-checked 10:30am Thursday, 8 August 2024: became Green - we " \
                f"corrected {name}" in row["status"], row
 
 
@@ -8085,3 +8088,38 @@ class TestHeldBackWithItsDelivery:
                                   "one received 10:00am Wednesday, 7 August 2024; this supply "
                                   "now needs its own decision."), notice
         assert "checked again once" not in notice["text"] and "held back" not in notice["text"]
+
+
+class TestAGateThatDidNotFinishIsSaidSo:
+    """REQ-DASH-272 criterion 21 (Keith, 2026-10-29, option b), in a real
+    browser: where a pass stopped part-way through a delivery, the checked
+    file's page reads 'Checked, waiting for the rest of its delivery' with an
+    AMBER pill - never 'Awaiting a decision' or green - and once the rest is
+    checked and gated nothing of the kind is said."""
+
+    def test_a_stopped_pass_reads_waiting_for_the_rest_with_an_amber_pill(
+            self, clean_page, cp_pages):
+        from test_package_gate import empty_but_workers
+
+        cp_pages.at("2024-10-25T10:30:00+08:00")
+        empty_but_workers(cp_pages.sc)
+        cp_pages.at("2024-11-01T09:30:00+08:00")
+        cp_pages.sc.deliver("2024-11-01T09:00:00+08:00",
+                            {"cp_clients": "C2", "cp_notifications": "N2"})
+        cp_pages.sc.process(stop_before="N2")
+        page = cp_pages.page()
+        _goto(clean_page, page, state=_cp_state("cp-clients"), in_place_on="2024-11-01")
+        (verdict,) = _shown(clean_page, ".verdict-of")
+        assert verdict["attrs"].get("data-gating") == "waiting", verdict
+        assert verdict["text"] == (
+            "Amber Checked, waiting for the rest of its delivery (received 9:00am Friday, "
+            "1 November 2024): 1 of 2 files checked. Nothing needs deciding yet."), verdict
+        assert "Awaiting a decision" not in verdict["text"]
+        assert clean_page.locator(".view-head .pill.amber").count() >= 1, "the pill is amber"
+        assert clean_page.locator(".view-head .pill.green").count() == 0, "never green"
+
+        cp_pages.at("2024-11-02T10:00:00+08:00")
+        cp_pages.sc.process()
+        page = cp_pages.page()
+        _goto(clean_page, page, state=_cp_state("cp-clients"), in_place_on="2024-11-02")
+        assert _shown(clean_page, '.verdict-of[data-verdict-of="gating"]') == []

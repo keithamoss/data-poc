@@ -50,7 +50,7 @@ describe("a re-check in words", () => {
       at: "2024-08-08T02:30:00+00:00", person: "Keith Moss", reason: "fixed",
       before: "red", after: "green",
       bulk: { checkId: "not-on-this-page", changelogDate: "2024-08-01", others: true } }, true);
-    expect(words).toBe("re-checked after we corrected not-on-this-page (Thursday, 1 August 2024)"
+    expect(words).toBe("re-checked after we corrected not-on-this-page (corrected Thursday, 1 August 2024)"
       + " and other checks");
   });
 });
@@ -138,10 +138,11 @@ describe("an acknowledgement's reason in a title attribute", () => {
 });
 
 // post-build-review #283 (L2 wave-2 critic, 6): the outstanding marker on a
-// card names the kind as the queue heading does - "re-checked red" - rather
-// than the item-less "re-checked worse".
-describe("the outstanding marker names a re-checked-worse supply as the queue does", () => {
-  it("counts it under 'promoted, then re-checked <verdict>'", () => {
+// card names the kind with its verdict - "re-checked red" - rather than the
+// item-less "re-checked worse"; worded '1 re-checked red after promotion'
+// (Keith, 2026-10-29).
+describe("the outstanding marker names a re-checked-worse supply with its verdict", () => {
+  it("counts it under 're-checked <verdict> after promotion'", () => {
     dashboard = loadDashboard();
     const other = { kind: "awaiting-decision", severity: "needs-action", blocking: false,
       agencyId: ITEM.agencyId, collectionId: ITEM.collectionId, datasetId: "cp-carers" };
@@ -149,8 +150,8 @@ describe("the outstanding marker names a re-checked-worse supply as the queue do
     const div = dashboard.window.document.createElement("div");
     div.innerHTML = dashboard.window.outstandingMarker("agency", ITEM.agencyId,
       { items: [ITEM, amber, other], blockers: [] });
-    expect(div.textContent).toContain("1 promoted, then re-checked red");
-    expect(div.textContent).toContain("1 promoted, then re-checked amber");
+    expect(div.textContent).toContain("1 re-checked red after promotion");
+    expect(div.textContent).toContain("1 re-checked amber after promotion");
     expect(div.textContent).not.toContain("re-checked worse");
   });
 });

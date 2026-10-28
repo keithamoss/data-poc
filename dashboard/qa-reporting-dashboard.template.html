@@ -2600,6 +2600,7 @@ function buildRealDataset(d){
     noPromotedOn: d.noPromotedOn || null,
     warehouseClauseOn: d.warehouseClauseOn || null,
     heldBackOn: d.heldBackOn || null,
+    packageGatingOn: d.packageGatingOn || null,
     // REQ-PIPE-122 NFR 1: the amber setting over time, in words. Carried,
     // never derived here - the page only picks the one in force.
     amberSetting: d.amberSetting || [],
@@ -3245,7 +3246,23 @@ function clipDatasetToInPlaceOn(d, inPlaceOnDateStr){
     // REQ-DASH-275: the build's held-back notice and holding list for this
     // supply on this date.
     heldBackOn: newestOnOrBefore((d.heldBack || {})[effectiveRun.supply_id], inPlaceOnDateStr),
+    // REQ-DASH-272 criterion 21: a package of this dataset still being checked
+    // or gated on this date, where its gate genuinely did not finish.
+    packageGatingOn: packageGatingOn(d, inPlaceOnDateStr),
   };
+}
+// STILL BEING CHECKED OR GATED WITH ITS DELIVERY (REQ-DASH-272 criterion 21,
+// Keith 2026-10-29, option b): the build's point for each supply whose
+// package's gate genuinely did not finish - after a crash, a time-budget stop
+// or a contended lock, never the replay's seeded lag - looked up by date; of
+// those in one of the forms on the date on show, the newest received.
+function packageGatingOn(d, dateStr){
+  let found = null;
+  Object.values((d && d.packageGating) || {}).forEach(points=>{
+    const p = newestOnOrBefore(points, dateStr);
+    if(p && p.form && (!found || String(p.received) > String(found.received))) found = p;
+  });
+  return found;
 }
 
 // A dataset with no run at or before the as-of date - a real, distinct
@@ -3808,7 +3825,10 @@ function buildDatasetsOn(inPlaceOnDateStr){
           // ITS OWN STATUS IS ITS REAL VERDICT even where no schedule is
           // agreed (REQ-PIPE-106 criterion 7) - what changes is that
           // `rollup()` above leaves it out of the collection.
-          ds.status = rollupStatuses(ds.columns.map(c=>c.status));
+          // STILL BEING CHECKED OR GATED (REQ-DASH-272 criterion 21, Keith
+          // 2026-10-29): AMBER, never green, until its gate is applied.
+          ds.status = ds.packageGatingOn && ds.packageGatingOn.form ? "amber"
+            : rollupStatuses(ds.columns.map(c=>c.status));
         }
       });
     });
@@ -6673,6 +6693,14 @@ const OUTSTANDING_KIND_LABEL = {
   "carry-forward-possible":"A newer supply could be carried forward",
   "pending-correction":"Calendar correction to confirm",
   "parked-correction-move":"Correction move waiting"};
+// THE MARKER'S OWN WORDS FOR A SUPPLY RE-CHECKED WORSE (REQ-DASH-221, Keith
+// 2026-10-29): '1 re-checked red after promotion' - the queue keeps the
+// terminal's heading.
+function markerKindLabel(item){
+  if(item && item.kind === "promoted-then-rechecked")
+    return `re-checked ${item.verdict || "worse"} after promotion`;
+  return outstandingKindLabel(item && item.kind, item);
+}
 function outstandingKindLabel(kind, item){
   // THE TERMINAL'S OWN HEADING, naming the new verdict (REQ-DASH-221 criterion 12).
   if(kind === "promoted-then-rechecked") return `Promoted, then re-checked ${(item && item.verdict) || "worse"}`;
@@ -7009,6 +7037,12 @@ function verdictLine(ds){
   // results below to be about, and the banner says so.
   // NOR WHERE THE DATE ON SHOW BLANKS THEM (#123 A5) - the other cause.
   if(!v || !ds.lastArrival || ds.blocked || ds.noDataInPlaceOn) return "";
+  // A GATE THAT GENUINELY DID NOT FINISH (REQ-DASH-272 criterion 21): its
+  // form, never 'Awaiting a decision' or green, with an amber pill.
+  const g = ds.packageGatingOn;
+  if(g && g.form){
+    return `<div class="verdict-of" data-verdict-of="gating" data-gating="${escAttr(g.form)}" style="font-size:12.5px; color:var(--ink); margin:-6px 0 8px;">${pill("amber", "sm")} <b style="display:inline">${escHtml(g.lead)}</b>${segmentsHtml(g.words)}</div>`;
+  }
   if(v.state === "promoted"){
     return `<div class="verdict-of" data-verdict-of="promoted" style="font-size:12.5px; color:var(--ink-muted); margin:-6px 0 8px;">The results below are the supply in place in the warehouse, received ${fmtInstant(ds.lastArrival.arrivedAt)}.</div>`;
   }
@@ -7482,7 +7516,7 @@ function outstandingMarker(scope, id, source, noSupply){
   const severity = (blocking || gaps || items.some(i=> i.severity === "needs-action")) ? "needs-action"
     : items.some(i=>i.severity==="warning") ? "warning" : "informational";
   const byKind = {};
-  items.forEach(i=>{ const k = outstandingKindLabel(i.kind, i).toLowerCase(); byKind[k] = (byKind[k]||0) + 1; });
+  items.forEach(i=>{ const k = markerKindLabel(i).toLowerCase(); byKind[k] = (byKind[k]||0) + 1; });
   const parts = [...(gaps ? [`${gaps} no supply`] : []),
     ...Object.entries(byKind).sort((a,b)=> b[1]-a[1] || a[0].localeCompare(b[0])).map(([k,n])=>countedKind(k, n))];
   const breakdown = parts.length > 1 || gaps ? `: ${parts.join(", ")}` : "";
@@ -8253,7 +8287,7 @@ function recheckCheckLink(checkId, asText){
 // corrected and its changelog entry's date.
 function recheckWords(e, asText){
   if(e.bulk){
-    const date = e.bulk.changelogDate ? ` (${escHtml(fmtDay(e.bulk.changelogDate))})` : "";
+    const date = e.bulk.changelogDate ? ` (corrected ${escHtml(fmtDay(e.bulk.changelogDate))})` : "";
     return `re-checked after we corrected ${recheckCheckLink(e.bulk.checkId, asText)}${date}${e.bulk.others ? " and other checks" : ""}`;
   }
   return `re-checked ${escHtml(fmtDay(e.at))} by ${escHtml(e.person)} - ${escHtml(e.reason)}`;
@@ -8261,10 +8295,11 @@ function recheckWords(e, asText){
 // What a later re-check came after, for the forward note (criterion 5).
 function recheckCause(e, asText){
   return e.bulk ? `we corrected ${recheckCheckLink(e.bulk.checkId, asText)}`
-    : `a re-check by ${escHtml(e.person)} - ${escHtml(e.reason)}`;
+    : escHtml(e.reason);
 }
+// 'Re-checked <instant>: became <status> - <reason>' (Keith, 2026-10-29).
 function recheckedLaterTag(e){
-  return `<span class="pill tag sm" data-rechecked-later style="color:var(--ink-muted);"><span class="ico"></span>Re-checked later - ${fmtInstant(e.at)}, now ${escHtml(STATUS_LABEL[e.after] || e.after)}, after ${recheckCause(e)}</span>`;
+  return `<span class="pill tag sm" data-rechecked-later style="color:var(--ink-muted);"><span class="ico"></span>Re-checked ${fmtInstant(e.at)}: became ${escHtml(STATUS_LABEL[e.after] || e.after)} - ${recheckCause(e)}</span>`;
 }
 function sameInstant(a, b){ return !!a && !!b && new Date(a).getTime() === new Date(b).getTime(); }
 // A ROW WHOSE SUPPLY WAS RE-CHECKED (criteria 1 to 6): the verdict that stood
@@ -8292,7 +8327,14 @@ function recheckedRowStatus(datasetId, entry, on){
   }
   const notes = [];
   if(shown !== arrived && STATUS_LABEL[arrived]) notes.push(`Arrived ${STATUS_LABEL[arrived]}`);
-  done.forEach(e=>{ if(!e.bulk || e.before !== e.after) notes.push(recheckWords(e)); });
+  // A RED-PROMOTED ROW DOES NOT REPEAT ITS BADGE (Keith, 2026-10-29): the
+  // re-check that turned a supply in place red is the red-promoted badge's
+  // sentence beside this note, so it is not said twice.
+  const badged = promoted && shown === "red";
+  done.forEach(e=>{
+    if(badged && e.after === "red") return;
+    if(!e.bulk || e.before !== e.after) notes.push(recheckWords(e));
+  });
   if(changed) notes.push(`changed ${escHtml(fmtDay(changed.at))} after ${escHtml(changed.cause || "a later check")}`);
   const later = rc.find(e=> !by(e.at) && e.before && e.after && e.before !== e.after);
   // THE NOTE REPLACES THE TURNED-RED-LATER TAG (criterion 5): for a supply in
@@ -8319,8 +8361,8 @@ function recheckedAmberTag(datasetId, runId, inPlaceOnDateStr){
   if(now !== "amber") return "";
   const ack = recheckAcknowledged(datasetId, runId, last, on);
   return ack
-    ? `<span class="pill tag sm" data-rechecked-amber="acknowledged" title="${escAttr(ack.reason)}"><span class="ico"></span>Amber, promoted - re-checked, acknowledged by ${escHtml(ack.actor)}</span>`
-    : `<span class="pill tag sm" data-rechecked-amber="awaiting"><span class="ico"></span>Amber, promoted - re-checked, awaiting acknowledgement</span>`;
+    ? `<span class="pill tag sm" data-rechecked-amber="acknowledged" title="${escAttr(ack.reason)}"><span class="ico"></span>Promoted green, re-checked amber - acknowledged by ${escHtml(ack.actor)}</span>`
+    : `<span class="pill tag sm" data-rechecked-amber="awaiting"><span class="ico"></span>Promoted green, re-checked amber - awaiting acknowledgement</span>`;
 }
 // The standing acknowledgement given after a re-check, as at the date on show.
 function recheckAcknowledged(datasetId, runId, e, on){

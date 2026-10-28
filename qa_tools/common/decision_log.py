@@ -55,7 +55,7 @@ lives, which makes it plausibly more reachable than GitHub was.
 from __future__ import annotations
 
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Iterator
 
 from qa_tools.common import qa_store, supply_db, supply_holds
@@ -1061,6 +1061,34 @@ def decision_transaction(conn: supply_db.SupplyConnection) -> Iterator[None]:
             conn._period_moves = None
 
 
+def _not_before_its_supplys_latest(conn: supply_db.SupplyConnection,
+                                   decision: Decision) -> Decision:
+    """NO DECISION TAKES EFFECT BEFORE THE LATEST DECISION ALREADY RECORDED
+    ABOUT ITS SUPPLY (post-build-review #284 (2), the rule of #276 (b) once,
+    here, where every decision passes). A rule's refusal keeps its seeded lag
+    (orchestrate.effective_at_of), so a person's decision recorded after it -
+    a scripted re-file, promotion or choose-file in the replay - could carry
+    an instant before it, and read by effective time the supply was decided
+    and then refused (TS-67, TS-77a and TS-80 on the 2026-10-28 history).
+    Floored at that latest instant, the order of the log is the order of
+    effect. Live, a decision takes effect when it is recorded and nothing is
+    recorded ahead of the clock, so this changes nothing there."""
+    if not decision.supply or not decision.effective_at:
+        return decision
+    from qa_tools.common import supply_status
+
+    rows = conn.execute(f"SELECT max(effective_at) FROM {TABLE} "
+                        "WHERE dataset_id = ? AND supply = ?",
+                        [decision.dataset_id, decision.supply]).fetchall()
+    latest = rows[0][0] if rows else None
+    if latest is None:
+        return decision
+    at = supply_status.instant(decision.effective_at)
+    if at >= latest:
+        return decision
+    return replace(decision, effective_at=latest.astimezone(at.tzinfo).isoformat())
+
+
 @contextmanager
 def apply_decision(conn: supply_db.SupplyConnection,
                     decision: Decision) -> Iterator[int]:
@@ -1094,6 +1122,7 @@ def apply_decision(conn: supply_db.SupplyConnection,
     # exception escaping the block. Its lock waits are bounded.
     with decision_transaction(conn):
         _lock(conn, decision)
+        decision = _not_before_its_supplys_latest(conn, decision)
         _judge(conn, decision)
         # HOW EACH OF ITS PERIODS WAS HELD BEFORE, so that afterwards a change
         # is SEEN rather than inferred from the action (REQ-PIPE-121

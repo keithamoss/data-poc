@@ -1,4 +1,4 @@
-"""No process-long cache under qa_tools/ or pipeline/ that nobody reviewed
+"""No process-long cache under qa_tools/, pipeline/ or generator/ that nobody reviewed
 (REQ-PIPE-254 criteria 16 to 18, signed by Keith 2026-10-24).
 
 WHY A GATE. Nine values built from configuration files sat behind
@@ -21,6 +21,12 @@ source, with `ast`, so it needs no database and no import of what it scans.
 An allowlist entry that names no cache fails too, so the list cannot outlive
 what it excuses.
 
+AND A VALUE BUILT FROM CONFIGURATION AT IMPORT (post-build-review #282 (7),
+Keith 2026-10-29): a top-level statement calling into one of CONFIG_READERS
+- `DATASET_SCOPE = {... for d in hierarchy.all_datasets()}` - holds what the
+file said when the module was first imported, for the process. It has no
+allowlist: such a value is read when it is asked for instead.
+
 WHAT IT DOES NOT. functools.cached_property is not in it (Keith, at
 sign-off): it holds a value per instance for that instance's life, so a
 swapped file is seen by the next instance.
@@ -35,8 +41,18 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 
-#: Where the gate looks, relative to the repository root.
-SCANNED = ("qa_tools", "pipeline")
+#: Where the gate looks, relative to the repository root. generator/ joined
+#: 2026-10-29 (post-build-review #282 (7), Keith's option a):
+#: emergency_department.run_plan held the calendar for the process.
+SCANNED = ("qa_tools", "pipeline", "generator")
+
+#: THE MODULES WHOSE CALLS READ CONFIGURATION, by the name a file binds them
+#: to: a call into one at import builds a value from the file as it stood
+#: then, and holds it for the process as surely as a cache does
+#: (ticket_sync.DATASET_SCOPE, post-build-review #282 (7)). config_yaml is
+#: not one - config_yaml.Built() at import is the content-keyed store itself.
+CONFIG_READERS = frozenset({"hierarchy", "collections", "agreement", "asset_time",
+                            "arrival_patterns", "presentation", "schedule", "slots"})
 
 #: The functools names that hold a value for the life of the process.
 CACHING = frozenset({"lru_cache", "cache"})
@@ -56,6 +72,18 @@ ALLOWLIST: dict[tuple[str, str], str] = {
     ("qa_tools/common/validate_requirements.py", "_sprint_numbers"):
         "a short-lived validator off the run path, reading the delivery plan "
         "once per run (settled by REQ-TEST-253)",
+    # generator/, scanned from 2026-10-29: each built from module constants
+    # and a fixed seed alone, reading no file, so nothing can go stale.
+    ("generator/collections/child_protection.py", "_cp_delay"):
+        "a fixed resupply-delay curve from numpy constants; reads no file",
+    ("generator/collections/child_protection.py", "run_plan"):
+        "drawn from N_QUARTERS and a fixed seed; reads no file",
+    ("generator/collections/child_protection.py", "grown_run_plan"):
+        "drawn from GROWN_QUARTERS and a fixed seed; reads no file",
+    ("generator/collections/civil_registration.py", "run_plan"):
+        "drawn from N_DELIVERIES and a fixed seed; reads no file",
+    ("generator/collections/emergency_department.py", "_postcodes"):
+        "the postcodes of generator/names_au.py's SUBURBS constant; reads no file",
 }
 
 
@@ -147,6 +175,43 @@ def caches_in(path: Path) -> list[tuple[str, int]]:
     return found
 
 
+def _calls_a_reader(node: ast.AST) -> bool:
+    """Whether evaluating `node` at import calls into a configuration reader -
+    never looking inside a function, class or lambda, which run later."""
+    if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.Lambda)):
+        return False
+    if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) \
+            and isinstance(node.func.value, ast.Name) and node.func.value.id in CONFIG_READERS:
+        return True
+    return any(_calls_a_reader(child) for child in ast.iter_child_nodes(node))
+
+
+def import_time_reads(path: Path) -> list[int]:
+    """The line of each top-level statement in one file that builds a value
+    from configuration as the module is imported."""
+    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    return [node.lineno for node in tree.body
+            if not isinstance(node, (ast.Import, ast.ImportFrom)) and not _is_main(node)
+            and _calls_a_reader(node)]
+
+
+def _is_main(node: ast.AST) -> bool:
+    """`if __name__ == "__main__":` - run as a script, never on import."""
+    return (isinstance(node, ast.If) and isinstance(node.test, ast.Compare)
+            and isinstance(node.test.left, ast.Name) and node.test.left.id == "__name__"
+            and any(isinstance(c, ast.Constant) and c.value == "__main__"
+                    for c in node.test.comparators))
+
+
+def scan_import_time(root: Path = ROOT) -> list[tuple[str, int]]:
+    out = []
+    for top in SCANNED:
+        for path in sorted((Path(root) / top).rglob("*.py")):
+            rel = path.relative_to(root).as_posix()
+            out.extend((rel, line) for line in import_time_reads(path))
+    return out
+
+
 def scan(root: Path = ROOT) -> list[tuple[str, str, int]]:
     """(file relative to root, function, line) for every cache under the
     scanned trees."""
@@ -167,6 +232,11 @@ def problems(root: Path = ROOT, allowlist: dict | None = None) -> list[str]:
            f"the file's content with config_yaml.Built (REQ-PIPE-254), or allowlist it with "
            f"the reason it is safe."
            for rel, name, line in found if (rel, name) not in allowlist]
+    out += [f"{rel}:{line}: builds a value from configuration at import, which holds it "
+            f"for the process as a cache would - an edited or swapped file is answered for "
+            f"what it said when the module was first imported. Read it when it is asked for "
+            f"(post-build-review #282 (7))."
+            for rel, line in scan_import_time(root)]
     present = {(rel, name) for rel, name, _ in found}
     out += [f"{rel}: the ALLOWLIST excuses {name}(), which carries no lru_cache or cache - "
             f"remove the entry, so the list cannot outlive what it excuses."

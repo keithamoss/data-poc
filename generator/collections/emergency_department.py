@@ -122,9 +122,10 @@ class Rows:
         return payload
 
 
-@functools.cache
 def run_plan() -> tuple:
-    """Each period's drawn severity, oldest first: Child Protection's mix."""
+    """Each period's drawn severity, oldest first: Child Protection's mix.
+    Drawn on every call, never cached (post-build-review #282 (7)): its length
+    is the calendar's, which a long-lived process may see edited."""
     import numpy as np
 
     n = len(generated_periods())

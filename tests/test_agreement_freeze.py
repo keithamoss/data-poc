@@ -697,3 +697,45 @@ class TestASyntheticAssetMayLaterDateAPastVersion:
             assert hits, "precondition - a correction names a later-dated version"
         found = self._check_shrink(extra=misname)
         assert any("append-only" in f.problem for f in found), _text(found)
+
+
+class TestASyntheticAssetMayLaterDateACalendarVersion:
+    """post-build-review #284 (4), Keith 2026-10-29, option (a): REQ-PIPE-111
+    criterion 9 lets a synthetic asset remove or later-date a calendar
+    version, and the period dates that version held go with it - the
+    critic's probe, the quarterly 2013-01-01 version moved to 2014-01-01,
+    was refused for each 2013 period's date. A real asset still needs a
+    declared correction."""
+
+    def _later_dated(self, synthetic: bool):
+        cal, asset, people = TestASyntheticAssetMayLaterDateAPastVersion._raw()
+        new_cal = copy.deepcopy(cal)
+        moved = [v for v in _quarterly(new_cal)["versions"]
+                 if str(v["effective_from"]) == "2013-01-01"]
+        assert moved, "precondition - the quarterly calendar has a 2013-01-01 version"
+        moved[0]["effective_from"] = "2014-01-01"
+        assert any(str(d["date"]) < "2014-01-01" for d in moved[0].get("dates") or []), \
+            "precondition - the version holds 2013 dates the later-dating takes out of force"
+        old_asset, new_asset = copy.deepcopy(asset), copy.deepcopy(asset)
+        old_asset["synthetic"] = new_asset["synthetic"] = synthetic
+        return freeze.check(cal, new_cal, old_asset, new_asset, people,
+                            instant_of=lambda key: NOW, today=NOW.date(),
+                            base_codeowners=CODEOWNERS)
+
+    def test_on_a_synthetic_asset_it_needs_no_correction(self):
+        found = self._later_dated(synthetic=True)
+        assert found == [], _text(found)
+
+    def test_on_a_real_asset_it_needs_one(self):
+        found = self._later_dated(synthetic=False)
+        assert any("calendar quarterly period 2013" in (f.scope or "") for f in found), \
+            _text(found)
+
+    def test_removing_a_date_from_a_version_that_stays_is_still_refused(self):
+        cal, asset, people = TestASyntheticAssetMayLaterDateAPastVersion._raw()
+        new_cal = copy.deepcopy(cal)
+        version, entry = _date_entry(new_cal, PAST)
+        version["dates"].remove(entry)
+        found = freeze.check(cal, new_cal, asset, asset, people, instant_of=lambda key: NOW,
+                             today=NOW.date(), base_codeowners=CODEOWNERS)
+        assert any(PAST in (f.scope or "") for f in found), _text(found)

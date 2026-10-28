@@ -150,3 +150,46 @@ def test_no_supply_is_held_back_after_the_promotion_that_ended_it(deployment_his
             "AND w.effective_at > p.effective_at ORDER BY w.supply").fetchall()
     assert withheld, "the history holds no withheld promotion - the test would prove nothing"
     assert not late, late
+
+
+def test_no_decision_about_a_supply_takes_effect_before_one_recorded_earlier(
+        deployment_history):
+    """post-build-review #284 (2), on the bootstrapped history: for EVERY
+    ordered pair of decisions about one supply, the one recorded later never
+    takes effect before the one recorded earlier - so the order the log was
+    written in is the order read by effective time. The 2026-10-28 history had
+    three inversions, each a person's decision recorded after a rule's lagged
+    refusal: TS-67's re-file, TS-77a's promotion and TS-80's choose-file."""
+    from qa_tools.common import supply_db
+
+    with supply_db.connect(read_only=True, label="test-284") as conn:
+        about_a_supply = conn.execute(
+            "SELECT count(*) FROM qa.decision WHERE supply IS NOT NULL").fetchone()[0]
+        inverted = conn.execute(
+            "SELECT a.supply, a.action, a.effective_at, b.action, b.effective_at "
+            "FROM qa.decision a JOIN qa.decision b ON b.dataset_id = a.dataset_id "
+            "AND b.supply = a.supply AND b.id > a.id "
+            "WHERE b.effective_at < a.effective_at ORDER BY a.supply, a.id, b.id").fetchall()
+    assert about_a_supply, "the history holds no decision about a supply - nothing proved"
+    assert not inverted, inverted
+
+
+def test_every_gate_application_takes_one_instant(deployment_history):
+    """post-build-review #284 (1), Keith's option (b), on the bootstrapped
+    history: every promotion and hold-back one gate application writes takes
+    ONE effective instant (REQ-PIPE-266 criterion 4). The per-member floor
+    split four applications on the 2026-10-28 history (26, 173, 205, 216)."""
+    from qa_tools.common import supply_db
+
+    with supply_db.connect(read_only=True, label="test-284") as conn:
+        applications = conn.execute(
+            "SELECT count(DISTINCT gate_application) FROM qa.decision "
+            "WHERE gate_application IS NOT NULL").fetchone()[0]
+        split = conn.execute(
+            "SELECT gate_application, count(DISTINCT effective_at), min(effective_at), "
+            "max(effective_at) FROM qa.decision WHERE gate_application IS NOT NULL "
+            "AND action IN ('promote', 'promotion-withheld', 'promotion-refused') "
+            "GROUP BY gate_application "
+            "HAVING count(DISTINCT effective_at) > 1 ORDER BY 1").fetchall()
+    assert applications, "the history holds no gate application - nothing proved"
+    assert not split, split

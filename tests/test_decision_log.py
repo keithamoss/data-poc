@@ -721,3 +721,54 @@ class TestWhenWorkFollowingADecisionTakesEffect:
         from qa_tools.common import asset_time
 
         assert asset_time.parse_instant(dl.follows(conn, None), "t") <= asset_time.now()
+
+
+class TestNoDecisionTakesEffectBeforeOneAlreadyRecorded:
+    """post-build-review #284 (2): a rule's refusal keeps its seeded lag, so
+    a person's decision recorded after it could take effect before it - TS-67's
+    re-file, TS-77a's promotion and TS-80's choose-file on the 2026-10-28
+    history. No decision takes effect before the latest decision already
+    recorded about its supply; one recorded later is floored at it."""
+
+    def _effective(self, conn, dataset, supply):
+        return [r[0] for r in conn.execute(
+            f"SELECT effective_at FROM {dl.TABLE} WHERE dataset_id = ? AND supply = ? "
+            "ORDER BY id", [dataset, supply]).fetchall()]
+
+    def test_a_decision_after_a_lagged_refusal_takes_effect_with_it(self, conn, dataset):
+        from qa_tools.common import supply_status
+
+        with dl.apply_decision(conn, a_decision(
+                dataset, action=dl.PROMOTION_REFUSED, supply="late", actor="promotion rule",
+                actor_kind=dl.RULE, effective_at=LATER, reason="its own checks failed")):
+            pass
+        with dl.apply_decision(conn, a_decision(
+                dataset, action=dl.REJECT, supply="late", to_slot=None,
+                from_slot="2026-Q3", effective_at=WHEN, reason="a bad file")):
+            pass
+        refused, rejected = self._effective(conn, dataset, "late")
+        assert rejected == refused == supply_status.instant(LATER), (refused, rejected)
+
+    def test_a_later_decision_keeps_its_own_instant(self, conn, dataset):
+        from qa_tools.common import supply_status
+
+        with dl.apply_decision(conn, a_decision(
+                dataset, action=dl.PROMOTION_REFUSED, supply="late", actor="promotion rule",
+                actor_kind=dl.RULE, effective_at=WHEN, reason="its own checks failed")):
+            pass
+        with dl.apply_decision(conn, a_decision(
+                dataset, action=dl.REJECT, supply="late", to_slot=None,
+                from_slot="2026-Q3", effective_at=LATER, reason="a bad file")):
+            pass
+        assert self._effective(conn, dataset, "late")[1] == supply_status.instant(LATER)
+
+    def test_another_supplys_decisions_do_not_floor_it(self, conn, dataset):
+        from qa_tools.common import supply_status
+
+        with dl.apply_decision(conn, a_decision(
+                dataset, action=dl.PROMOTION_REFUSED, supply="other", actor="promotion rule",
+                actor_kind=dl.RULE, effective_at=LATER, reason="its own checks failed")):
+            pass
+        with dl.apply_decision(conn, a_decision(dataset, supply="first", effective_at=WHEN)):
+            pass
+        assert self._effective(conn, dataset, "first") == [supply_status.instant(WHEN)]

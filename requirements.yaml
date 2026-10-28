@@ -25979,6 +25979,7 @@ requirements:
     linked_tests:
     - tests/test_agreement_freeze.py
     - tests/test_agreement_freeze.py::TestASyntheticAssetMayLaterDateAPastVersion
+    - tests/test_agreement_freeze.py::TestASyntheticAssetMayLaterDateACalendarVersion
     - tests/test_agreement.py
     - tests/test_validate_schedule.py
     - tests/test_collection_defaults.py
@@ -26070,6 +26071,7 @@ requirements:
     - REQ-PIPE-050
     decisions:
     - 'A CORRECTION FOLLOWS A VERSION LATER-DATED IN THE SAME CHANGE (Keith, 2026-10-27, accepted after REQ-GEN-238 hit it): corrections are append-only, and REQ-GEN-218''s correction names cp-carers'' participation by the 2013-01-01 date REQ-GEN-238 later-dates. On a synthetic asset an existing correction may change only by naming such a version - one removed and one added for the same owner and kind with the same value - by its new date; any other edit to it is still refused.'
+    - 'A CALENDAR VERSION''S PERIOD DATES GO WITH IT (post-build-review #284 (4); Keith, 2026-10-29, option a): on an asset synthetic before and after the change, removing or later-dating a calendar version is accepted with the period dates it held - agreement_freeze exempts a removed date whose own version this change removed or later-dated, as a version''s dates already arrive with it when one is added - so criterion 9''s REMOVING or LATER-DATING holds for calendar versions as it did for participation and timezone ones. A date removed from a version that stays still needs a declared correction, and a real asset still needs one for any of it. Before this the critic''s probe (the quarterly 2013-01-01 version moved to 2014-01-01) was refused for each 2013 period''s date. REJECTED (b), restoring a narrower unmet entry for calendar dates.'
     - 'CRITERION 9 AMENDED AGAIN 2026-10-16 (Keith''s approved wording, ~06:30 Perth, "Approved."): a synthetic
       asset may RESTATE, on a frozen version, a value that version left out, at that value''s default. Why:
       REQ-GEN-044''s evening-before era states days_before: 1 on a version before the frozen ones, and
@@ -36758,7 +36760,7 @@ requirements:
     - "NAMED pipeline/re_checks.py, NOT pipeline/rechecks.py: tests/test_recheck.py's import-graph rule (REQ-PIPE-140 criterion 6) flags any import on a build path whose name contains 'recheck', to keep the executor off it. This module imports no executor; the name keeps the rule mechanical rather than adding an exception to it."
     - "THE QUEUE ITEM (criterion 12, as built): one item per supply, kind 'promoted-then-rechecked' - filing_queue.RECHECKED_WORSE's own value - carrying its new verdict, which the page's kind heading names ('Promoted, then re-checked red'); observed from its re-check's run, so an earlier date does not list it; taken OUT of the dataset's 'Awaiting a decision' item, which counted it before, so it is counted once. REJECTED grouping them per dataset as 'Awaiting a decision' does: the terminal lists each under its own heading. Its page half is a JS test, not a browser one: a fixture variant's page embeds the deployment's queue, never the test's (post-build-review #272)."
     - "A LINK TO A CHECK'S DRAWER (criteria 2 and 10, as built): a real href to the drawer's own path, opened through renderFromState() - navigate() renders the page and never opens a drawer from state - so a click, a reload and a shared address open the same drawer, with the date on show kept; a click on it inside a supply-history row does not also apply the row's date."
-    - "PROVISIONAL WORDING, for Keith: the forward note's cause - 'Re-checked later - <instant>, now <status>, after a re-check by <person> - <reason>', or '... after we corrected <check>' - shown only for a later re-check that CHANGES the verdict; the red-promoted badge's sentence 'Went in green, re-checked <day> by <person> - <reason>' (a bulk one '... re-checked after we corrected <check> (<date>)'), adding '; acknowledged by <who>, <instant>' once acknowledged; the amber tag once acknowledged, 'Amber, promoted - re-checked, acknowledged by <who>'; the drawer line 'Re-checked <n> supplies across <m> datasets on <day> by <person>: <k> changed - <reason>', one whose changelog date matches no listed entry going after the entries; the queue item's line '<dataset>, <period>' under its heading."
+    - "THE WORDING (Keith, 2026-10-29, taking the UX read's proposed column, post-build-review #283 (7)): the forward note for a later re-check that CHANGES the verdict, 'Re-checked <instant>: became <status> - <reason>' (a bulk one's reason 'we corrected <check>'); the red-promoted badge's sentence 'Went in green, re-checked <day> by <person> - <reason>' (a bulk one '... re-checked after we corrected <check> (corrected <date>)'), adding '; acknowledged by <who>, <instant>' once acknowledged, and a red-promoted supply-history row no longer repeats that sentence beside the badge; the amber tag 'Promoted green, re-checked amber - awaiting acknowledgement', and once acknowledged 'Promoted green, re-checked amber - acknowledged by <who>'; a card's outstanding marker counting '1 re-checked red after promotion' (or 'amber after promotion'), while the queue keeps the terminal's heading 'Promoted, then re-checked <verdict>'; the drawer line 'Re-checked <n> supplies across <m> datasets on <day> by <person>: <k> changed - <reason>', one whose changelog date matches no listed entry going after the entries; the queue item's line '<dataset>, <period>' under its heading. WAS (provisional until then): 'Re-checked later - <instant>, now <status>, after a re-check by <person> - <reason>' or '... after we corrected <check>'; '(<date>)' after the corrected check; 'Amber, promoted - re-checked, awaiting acknowledgement' / '..., acknowledged by <who>'; the marker 'promoted, then re-checked <verdict>'."
     - "NO PLANS PROSE TO DELETE: this requirement's design lived in docs/drafts/unsigned-triage/summary.md and its own decisions above; no plans/*.md entry describes it (plans/running-thoughts.md #89 names it only as once held behind #89)."
   - id: REQ-DASH-224
     title: "One function decides whether a column or a check is red, amber, green or not counted on a QA run, and every count and trend line uses it"
@@ -39521,7 +39523,7 @@ requirements:
     source: "Keith, plans/running-thoughts.md #99 and plans/data-generation.md #12 Q4. Amendment wording on REQ-GEN-207 delegated by Keith to the main session. Re-drafted 2026-10-16. SIGNED OFF by Keith 2026-10-18 ('You have my authority to proceed past 248 and into building the new Emergency Department dataset overnight as well'), the ten drafts as they stood, with wording stale against the registry updated as recorded in decisions; moved into requirements.yaml the same night."
     acceptance_criteria:
       - "THE SYSTEM SHALL re-run REQ-GEN-207 criterion 2's dry run over only the Child Protection scenarios still planned once REQ-GEN-235, REQ-GEN-236 and REQ-GEN-237 are applied - TS-42 and TS-80 with their lead-ins (REQ-GEN-203), TS-63 and its correction (REQ-GEN-218), TS-50, TS-55 and TS-81 (REQ-GEN-206) - and SHALL keep the fewest whole years that leave it with no refusal, recording the count and the output in this requirement's evidence."
-      - "THE SYSTEM SHALL remove the grown quarters older than that count, keeping the original fifteen and the remaining grown quarters' run plan, seeds, slot ids and delivery names as REQ-GEN-207 drew them, so that every kept quarter is byte-identical by REQ-TEST-239's S4."
+      - "THE SYSTEM SHALL remove the grown quarters older than that count, keeping the original fifteen and the remaining grown quarters' run plan, seeds, slot ids and delivery names as REQ-GEN-207 drew them, so that every kept quarter's data files are byte-identical, and its receipts differ at most in their sequence numbers. AMENDED 2026-10-29 by Keith's approval (post-build-review #284 item 6)"
       - "THE SYSTEM SHALL move the effective_from of Child Protection's earliest participation_defaults version and each dataset's earliest participation version forward to the first kept quarter, each with a changelog line saying why, and SHALL leave the amber_setting and replacement_setting 2013 versions, and the quarterly calendar's 2013 version wherever Emergency Department's history still uses its dates, in place."
       - "THE SYSTEM SHALL make tests/before_growth.py remove the grown versions by their dates after this change, and SHALL make it assert that each block it filters lost at least one version."
       - "THE SYSTEM SHALL leave every Birth Registrations delivery and receipt byte-identical."
@@ -40898,7 +40900,10 @@ requirements:
     - REQ-PIPE-279
     - REQ-PIPE-276
     linked_tests:
-    - "tests/test_package_gate.py::TestTransitiveGate::test_a_joined_member_is_never_promoted_before_its_own_hold_back"
+    - "tests/test_package_gate.py::TestTransitiveGate::test_one_application_promotes_at_one_instant_after_every_members_decision"
+    - "tests/test_decision_log.py::TestNoDecisionTakesEffectBeforeOneAlreadyRecorded"
+    - "tests/test_promotion_waits_for_next_receipt.py::test_no_decision_about_a_supply_takes_effect_before_one_recorded_earlier"
+    - "tests/test_promotion_waits_for_next_receipt.py::test_every_gate_application_takes_one_instant"
     - "tests/test_promotion_waits_for_next_receipt.py::test_no_supply_is_held_back_after_the_promotion_that_ended_it"
     - "tests/test_package_gate.py::TestGatedTogether::test_no_sibling_is_gated_before_the_last_is_checked"
     - "tests/test_package_gate.py::TestGatedTogether::test_a_package_promoted_whole_owes_one_reevaluation"
@@ -40918,7 +40923,8 @@ requirements:
     - tests/test_cli_package_gate.py::TestCriticFindings::test_a_vanished_warning_still_refuses_a_stale_key
     - tests/test_cli_package_gate.py::TestCriticFindings::test_a_moved_warehouse_holder_changes_the_key
     implemented_by:
-    - "qa_tools/common/gate.py::_not_before_its_own"
+    - "qa_tools/common/gate.py::_not_before_any_members"
+    - "qa_tools/common/decision_log.py::_not_before_its_supplys_latest"
     - "qa_tools/common/gate.py::Package"
     - "qa_tools/common/gate.py::package_of"
     - "qa_tools/common/gate.py::package_at"
@@ -41083,7 +41089,8 @@ requirements:
       cp qa --commit --run-id` on one file of a zip files that arrival alone, so its package counts one file and it is gated at once instead of waiting for
       the rest of its delivery. The processing pass and the hand-filed folder route file the whole delivery first and are not affected. Not a criterion change;
       to put to Keith.'
-    - 'A JOINED MEMBER IS NEVER PROMOTED BEFORE ITS OWN LATEST DECISION (post-build-review #276; Keith, 2026-10-27, option b): every arrival keeps its own seeded lag, bounded as before by the next receipt of its own dataset and the claim window, so an early file''s ''promotion-withheld'' could take effect after the later file whose application promoted the package - read by effective time, promoted and then held back (11 supplies on the bootstrap of 3279bc8, TS-84''s three among them). gate._decide now floors each member''s promotion at that member''s own latest decision; a member with no later decision keeps the application''s instant, so only the order changes. REJECTED option (a), bounding every arrival''s lag by the next receipt of any file of its collection (built first that night, PROVISIONALLY, and bootstrapped): an ordinary Child Protection delivery''s files arrive about a minute apart, so it collapsed most packages'' promotions to within a second of receipt and shortened the promotion-lag distribution across the whole history - Child Protection rule promotions'' p10 29.8h -> 6.0h - and erased page states such as 2020-Q1''s seven days awaiting the Client Register.'
+    - 'A JOINED MEMBER IS NEVER PROMOTED BEFORE ITS OWN LATEST DECISION (post-build-review #276; Keith, 2026-10-27, option b): every arrival keeps its own seeded lag, bounded as before by the next receipt of its own dataset and the claim window, so an early file''s ''promotion-withheld'' could take effect after the later file whose application promoted the package - read by effective time, promoted and then held back (11 supplies on the bootstrap of 3279bc8, TS-84''s three among them). As first built, gate._decide floored each member''s promotion at that member''s own latest decision, and this decision said a member with no later decision kept the application''s instant, ''so only the order changes'' - WRONG (post-build-review #284 (1), the L4 critic): one application then promoted at several instants, four on the 2026-10-28 history (26, 173, 205 and 216, spread up to ten days), against criterion 4''s one effective instant; superseded by the next decision. REJECTED option (a), bounding every arrival''s lag by the next receipt of any file of its collection (built first that night, PROVISIONALLY, and bootstrapped): an ordinary Child Protection delivery''s files arrive about a minute apart, so it collapsed most packages'' promotions to within a second of receipt and shortened the promotion-lag distribution across the whole history - Child Protection rule promotions'' p10 29.8h -> 6.0h - and erased page states such as 2020-Q1''s seven days awaiting the Client Register.'
+    - 'ONE INSTANT FOR THE WHOLE APPLICATION (post-build-review #284 (1); Keith, 2026-10-29, option b): gate._not_before_any_members floors the whole application, before any of it is decided, at the latest decision already recorded across ALL its members, and every promotion and hold-back it writes takes that one instant, so criterion 4 holds as signed; the completing file gives up its own instant when an earlier member''s decision is later. REJECTED: the per-member floor of #276 (b) as first built (gate._not_before_its_own), which split applications across instants; and REJECTED (a), amending criterion 4 to allow the split. Behind it, the decision log''s own rule (post-build-review #284 (2)): no decision takes effect before the latest decision already recorded about its supply (decision_log._not_before_its_supplys_latest).'
     open_questions: []
   - id: REQ-PIPE-267
     title: A supply is promoted only on cross-table verdicts about what the warehouse will hold, and supplies that depend on
@@ -42332,7 +42339,13 @@ requirements:
     - tests/test_cross_table_grid.py::TestPromotionWords
     - tests/test_cross_table_grid.py::TestOwedWords
     - tests-js/cross-table-grid.test.js
+    - tests/test_package_gating.py
+    - tests/test_dashboard_e2e.py::TestAGateThatDidNotFinishIsSaidSo
+    - tests/test_readers_read_no_supply_rows.py::TestEachReaderOnItsOwnEntryPoint::test_package_gating_reads_only_the_record
     implemented_by:
+    - pipeline/package_gating.py::for_collection
+    - qa_tools/common/gate.py::_found_contended
+    - dashboard/qa-reporting-dashboard.template.html::packageGatingOn
     - pipeline/cross_table_grid.py::place
     - pipeline/cross_table_grid.py::place_entries
     - pipeline/cross_table_grid.py::named
@@ -42367,23 +42380,11 @@ requirements:
       owner: REQ-DASH-272 (a follow-up build)
       blocked_by:
         unowned: true
-    - criterion: Criterion 21 - the verdict line's four forms while a supply's gate is not yet applied or its application not settled
-        ('Being checked with its delivery', 'Checked, waiting for the rest of its delivery', 'Checked, being gated'), with no pill
-        and no results for an unchecked package member, and its test forms in criterion 24.
-      why: Needs, per supply and date, its package's files and which of them have a recorded run (the owed 'gate' item, qa.gate_application)
-        carried into the build; not built in this lane. CORRECTED 2026-10-26 (functional critic on 7093c20) - the bootstrapped
-        history DOES have multi-day gating gaps - TS-82's delivery arrives 15 August 2017 and its gate application settles on
-        27 August, so for 12 days the Client Register's page reads "Awaiting a decision ... Green" over a staged Fail with no
-        notice saying it is still being gated. The earlier reason here ("every package is gated at its arrival's instant")
-        was wrong. Left for Keith as open question 1 rather than built overnight.
-      owner: REQ-DASH-272 (a follow-up build)
-      blocked_by:
-        unowned: true
     - criterion: Criterion 24's tests for the inherited supply's clause (built, covered by tests/test_cross_table_grid.py::TestTheClause::test_an_inherited_supply_is_carried_forward
         but not in a real browser), the 'Clients' trend after Order A keeps its 09:00 point', 'on a held table's page no red row sits
-        under a non-red cross-table pill' (built - the section pill follows the rows' pills - not asserted in a browser), and criterion
-        21's forms.
-      why: Not written in this lane; criterion 21 is not built.
+        under a non-red cross-table pill' (built - the section pill follows the rows' pills - not asserted in a browser). Criterion
+        21's forms are tested since 2026-10-29 (tests/test_package_gating.py, and in a real browser TestAGateThatDidNotFinishIsSaidSo).
+      why: Not written in this lane.
       owner: REQ-DASH-272 (a follow-up build)
       blocked_by:
         unowned: true
@@ -42570,21 +42571,7 @@ requirements:
       their receipts, and ''<n> more'' carries every name it stands for (tooltip and screen-reader text).'
     - 'Functional critic on 7093c20, D3: a rule promotion after a re-check names a table this dataset''s cross-table checks are between,
       never the first supply the application held back. An unknown warehouse status gives the clause no status rather than ''Green''.'
-    open_questions:
-    - '1. FOR KEITH (2026-10-26, functional critic on 7093c20): criterion 21''s ''being gated'' forms are not built, and the bootstrapped
-      history does show the state they are for - TS-82''s Client Register reads ''Awaiting a decision ... Green'' for 12 days (15 to
-      27 August 2017) over a staged Fail with no notice, while its delivery''s gate application has not settled. Build criterion 21
-      next (it needs the package''s files and their recorded runs carried into the build), or accept the gap until then? FOUND
-      2026-10-28 (lane L2, wave 2, which stopped before building it): the gap is not TS-82''s alone. In a synthetic replay a
-      package application is stamped as started at the receipt and settled at the receipt plus its seeded promotion lag (orchestrate.effective_at_of),
-      and its ''gate'' item is owed and cleared at the same two instants, so criterion 21 as written reads ''Checked, being gated''
-      through every lag - measured on a copy of the bootstrapped history, 248 Child Protection supplies for 1,873 dataset-days,
-      52 Emergency Department supplies for 385 and 6 Birth Registrations supplies for 6, where the page reads ''Awaiting a decision''
-      today; ''waiting for the rest of its delivery'' 28 days and ''being checked'' 1. Keith to choose: (a) build it as written,
-      so the lag reads ''being gated'' everywhere and ''Awaiting a decision'' only once the gate has decided; (b) treat the replay''s
-      lag as the gate having decided at once, so only a crash, a budget stop or a contended lock shows the forms; or (c) have
-      the replay stamp an application at its effective instant (REQ-PIPE-081''s replay clock). Also open with it: which pill
-      the page shows while a supply is in these forms (criterion 21 says only ''not green'').'
+    - 'CRITERION 21''S FORMS ONLY FOR A GATE THAT GENUINELY DID NOT FINISH (Keith, 2026-10-29, open question 1, option b): in the synthetic replay the seeded promotion lag reads as a person taking their time - ''Awaiting a decision'', as the page always read it - not as a gate in progress. ''Being checked with its delivery'', ''Checked, waiting for the rest of its delivery'' and ''Checked, being gated'' show only for a package whose record shows its gate genuinely unfinished (pipeline/package_gating._interrupted): a run of one of its files ended other than COMPLETED (a crash, or a time budget stopping it); an application of it abandoned or never ended; its ''gate'' item found the period lock held (gate._found_contended counts it on the item''s attempts, which a clearing keeps); or a file of it with no completed run as the build reads it (the pass stopped before it). Their pill is AMBER (Keith), and the dataset''s status with it, never green. LIMIT, recorded: a pass that stopped between a delivery''s files leaves no mark once the rest is checked, so a later build reads those days as the replay''s would. REJECTED (a), building criterion 21 as written, which read ''Checked, being gated'' through every seeded lag (on the 2026-10-28 history 248 Child Protection supplies for 1,873 dataset-days, 52 Emergency Department for 385, 6 Birth Registrations for 6); and (c), stamping the replay''s application at its effective instant, which would change the recorded history. FOR KEITH: criterion 21 says an unchecked package member shows ''no status pill other than that line''; as built every form carries the amber pill he chose.'
   - id: REQ-GEN-273
     title: Target agreement compares a targeted supply with its own checks, and a few scenarios pin what the package gate decides
     date_written: '2026-10-21'

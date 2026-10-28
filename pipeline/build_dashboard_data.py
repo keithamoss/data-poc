@@ -826,6 +826,15 @@ def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], da
     if "rechecks" not in view:
         with supply_db.connect(read_only=True, label="mothman:rechecks") as conn:
             view["rechecks"] = re_checks.for_collection(conn, coll.id)
+    # A PACKAGE WHOSE GATE GENUINELY DID NOT FINISH (REQ-DASH-272 criterion 21,
+    # Keith's option b): {supply: [{on, form, lead, words, received}]} - read
+    # once per collection, and absent for nearly every dataset.
+    if "package_gating" not in view:
+        from pipeline import package_gating
+
+        with supply_db.connect(read_only=True, label="mothman:package-gating") as conn:
+            view["package_gating"] = package_gating.for_collection(conn, coll.id)
+    gating = view["package_gating"].get(dataset_id) or {}
     rechecked = view["rechecks"].for_dataset(
         dataset_id, [ck["check_id"] for c in columns_out for ck in c["checks"] if ck.get("check_id")])
     raw_slots = slot_timelines.get(dataset_id) or slot_timeline.for_dataset(dataset_id)
@@ -869,6 +878,10 @@ def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], da
         # THE AWAITING LINE'S WAREHOUSE CLAUSE (REQ-DASH-272 criteria 1 to 5):
         # {supply: [{on, clause, status, tail}]}, looked up by date.
         "warehouseClause": warehouse_clause,
+        # STILL BEING CHECKED OR GATED WITH ITS DELIVERY (REQ-DASH-272
+        # criterion 21): {supply: [{on, form, lead, words, received}]}, looked
+        # up by date - absent where no package's gate was ever left unfinished.
+        **({"packageGating": gating} if gating else {}),
         # A JOINT OR RE-CHECKED RULE PROMOTION'S HISTORY ROW (REQ-DASH-272
         # criterion 20): {decision id: segments}.
         "promotionWords": promotion_words,

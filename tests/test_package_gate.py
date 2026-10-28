@@ -583,14 +583,17 @@ class TestTransitiveGate:
         assert len(apps) == 1 and None not in apps
         assert all(_readers_runs(sc, s) == [] for s in (n2, i2, c2))
 
-    def test_a_joined_member_is_never_promoted_before_its_own_hold_back(
+    def test_one_application_promotes_at_one_instant_after_every_members_decision(
             self, sc, monkeypatch):
-        """post-build-review #276 (Keith, 2026-10-27, option b): each arrival
-        keeps its own seeded lag, so an early file's hold-back may take effect
-        AFTER the later file whose application promotes it - read by effective
-        time, promoted and then "held back". The joined member's promotion is
-        floored at its own latest decision; the order is fixed, and the
-        promotion that completed the package keeps its own instant."""
+        """post-build-review #284 (1), Keith 2026-10-29, option (b): each
+        arrival keeps its own seeded lag, so an early file's hold-back may take
+        effect AFTER the later file whose application promotes it. The WHOLE
+        application is floored at the latest decision already recorded across
+        all its members, so every promotion in it shares ONE effective instant
+        (REQ-PIPE-266 criterion 4) and none comes before a member's own
+        hold-back; the completing file gives up its own instant. REJECTED: the
+        per-member floor of #276 (b), which split one application across
+        several instants."""
         from datetime import timedelta
 
         from qa_tools.common import supply_status
@@ -607,14 +610,17 @@ class TestTransitiveGate:
         sc.process()
         c2 = sc.deliver("2024-11-01T09:20:00+08:00", {"cp_clients": "C2"})["C2"]
         sc.process()
-        def at(value, _where):
+
+        def at(value):
             return supply_status.instant(value)
-        for supply in (n2, i2):
-            withheld, promoted = _withheld(sc, supply), _promotion(sc, supply)
-            assert at(promoted["effective_at"], supply) >= at(withheld["effective_at"], supply), \
-                (supply, withheld["effective_at"], promoted["effective_at"])
-        assert at(_promotion(sc, c2)["effective_at"], c2) == \
-            at("2024-11-01T10:20:00+08:00", c2), "the completing file keeps its own instant"
+        promoted = {s: _promotion(sc, s) for s in (n2, i2, c2)}
+        assert len({p["gate_application"] for p in promoted.values()}) == 1
+        instants = {at(p["effective_at"]) for p in promoted.values()}
+        assert len(instants) == 1, {s: p["effective_at"] for s, p in promoted.items()}
+        latest = max(at(_withheld(sc, s)["effective_at"]) for s in (n2, i2))
+        assert instants == {latest}, (instants, latest)
+        assert latest == at("2024-11-06T10:00:00+08:00"), \
+            "Investigations' hold-back, the latest decision across the members"
 
     def test_three_staggered_files_in_the_original_order(self, sc):
         """S10 in its original order: Clients v2 promotes alone at 09:00, and

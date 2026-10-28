@@ -100,9 +100,22 @@ TICKET_LABEL = "qa-ticket"
 # QA_RESULTS_SCOPE_FOR_DATASET - and that four was the trigger for
 # consolidating them. REQ-QAC-039 is that consolidation: all four now
 # resolve through the one hierarchy in contract/data-asset.yaml.
-DATASET_SCOPE = {d.dataset_id: (d.agency_id, d.collection_id) for d in hierarchy.all_datasets()}
+#
+# READ WHEN ASKED FOR, NOT AT IMPORT (post-build-review #282 (7), Keith
+# 2026-10-29): built at import, both held the hierarchy as it stood when the
+# module was first imported, for the life of the process. A module-level
+# __getattr__ keeps the two names and builds each from the hierarchy as it
+# stands, every time one is read.
+def _dataset_scope() -> dict[str, tuple[str, str]]:
+    return {d.dataset_id: (d.agency_id, d.collection_id) for d in hierarchy.all_datasets()}
 
-DATASET_AGENCY = {dataset: agency for dataset, (agency, _collection) in DATASET_SCOPE.items()}
+
+def __getattr__(name: str):
+    if name == "DATASET_SCOPE":
+        return _dataset_scope()
+    if name == "DATASET_AGENCY":
+        return {dataset: agency for dataset, (agency, _c) in _dataset_scope().items()}
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 @dataclass
