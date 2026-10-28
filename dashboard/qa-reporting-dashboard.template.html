@@ -1811,7 +1811,7 @@ function filedNote(e){
   const by = e && e.filedBy;
   if (!by || by.kind !== "person") return "";
   const title = "Filed by hand (" + (FILING_ROUTE_LABEL[by.route] || by.route) + ") by " + by.who;
-  return `<div class="filed-note" title="${escHtml(title)}" style="color:var(--ink-muted); font-size:11.5px;">by hand · ${escHtml(by.who)}</div>`;
+  return `<div class="filed-note" title="${escAttr(title)}" style="color:var(--ink-muted); font-size:11.5px;">by hand · ${escHtml(by.who)}</div>`;
 }
 // THE FILER'S STATEMENT OF THE ORIGINAL ARRIVAL, beside the receipt (REQ-PIPE-103
 // criterion 19), labelled as stated.
@@ -1821,7 +1821,7 @@ function statedNote(e){
   const stated = e.statedOriginal === "not-known" ? "originally: not known (stated)"
     : "originally " + fmtInstant(e.statedOriginal) + " (stated)";
   const title = "The original arrival is " + by.who + "'s statement - recorded, never used to file or judge this supply.";
-  return `<span data-stated-original title="${escHtml(title)}" style="color:var(--ink-muted); font-size:11.5px;">${escHtml(stated)}</span>`;
+  return `<span data-stated-original title="${escAttr(title)}" style="color:var(--ink-muted); font-size:11.5px;">${escHtml(stated)}</span>`;
 }
 function receivedTitle(e){
   return e && e.filedBy && e.filedBy.kind === "automated" ? "Received automatically" : "When we received this supply";
@@ -5229,7 +5229,7 @@ function githubFolderLink(kind, id){
   if(!url) return "";
   const title = (GITHUB_LINKS.titles && GITHUB_LINKS.titles[kind] && GITHUB_LINKS.titles[kind][id])
     || "View on GitHub";
-  return `<a href="${url}" target="_blank" rel="noopener" class="pill tag sm" title="${escHtml(title)}" onclick="event.stopPropagation()"><span class="ico"></span>View on GitHub</a>`;
+  return `<a href="${url}" target="_blank" rel="noopener" class="pill tag sm" title="${escAttr(title)}" onclick="event.stopPropagation()"><span class="ico"></span>View on GitHub</a>`;
 }
 // running-thoughts.md #2 ("data-asset-level people/roles config",
 // 2026-09-18, scoped via AskUserQuestion) - real people assigned to
@@ -5656,7 +5656,7 @@ function segmentsHtml(segs, asText){
   // "<n> more" names everyone it stands for, on hover and to a screen reader
   // (UX critic on 7093c20, P6 and P7).
   return (segs || []).map(s=> ("text" in s)
-    ? (s.more ? `<span class="names-more" title="${escHtml(s.more)}">${escHtml(s.text)}<span class="sr-only"> (${escHtml(s.more)})</span></span>` : escHtml(s.text))
+    ? (s.more ? `<span class="names-more" title="${escAttr(s.more)}">${escHtml(s.text)}<span class="sr-only"> (${escHtml(s.more)})</span></span>` : escHtml(s.text))
     : asText ? escHtml(((realDatasetIndex()[s.dataset] || {}).raw || {}).name || s.dataset)
     : datasetRefLink({datasetId: s.dataset})).join("");
 }
@@ -5839,7 +5839,7 @@ function xtToolsPanelBlock(col, ds, column, check){
       if(!byKey.has(key)){ const g = {tools: [], names: [], x, status, recheck: row.recheck[t]}; byKey.set(key, g); groups.push(g); }
       byKey.get(key).tools.push(t); byKey.get(key).names.push(name);
     });
-    let html = groups.map(g=> `<div class="xt-tool" data-tool="${escHtml(g.tools.join(" "))}"><b style="display:inline">${escHtml(andList(g.names))}</b> ${pill(g.status, "sm")}<div class="xt-sentence">${sentenceOf(g.x)}</div>${g.recheck ? `<div class="xt-sentence recheck-note">${escHtml(g.recheck)}</div>` : ""}</div>`).join("");
+    let html = groups.map(g=> `<div class="xt-tool" data-tool="${escAttr(g.tools.join(" "))}"><b style="display:inline">${escHtml(andList(g.names))}</b> ${pill(g.status, "sm")}<div class="xt-sentence">${sentenceOf(g.x)}</div>${g.recheck ? `<div class="xt-sentence recheck-note">${escHtml(g.recheck)}</div>` : ""}</div>`).join("");
     if(view === "warehouse" && row.owed && !groups.length){
       html = `<div class="xt-tool" data-tool="owed"><div class="xt-sentence">${segmentsHtml(row.owed.owedSentence)}</div></div>`;
     }
@@ -5881,7 +5881,7 @@ function notInAgreementReason(reason){
 function notInAgreementBlock(rows){
   if(!rows.length) return "";
   const lines = rows.map((r, i)=> `
-      <div class="nia-row" data-nia="${i}" data-check-id="${escHtml(r.entry.checkId)}">
+      <div class="nia-row" data-nia="${i}" data-check-id="${escAttr(r.entry.checkId)}">
         <span class="label"><span class="nm"></span><span class="bt"></span><span class="tr"></span><span class="why"></span></span>
         <span class="nia-tag">Not run</span>
       </div>`).join("");
@@ -6021,8 +6021,8 @@ function fileSectionHtml(ds, inPlaceOnDateStr){
   const notPassed = shown.results.filter(r=> r.point.status !== "green");
   const refused = notPassed.some(r=> r.point.status === "red" && r.check.severity === "failure");
   const row = r=> `
-    <button class="scope-check file-check" data-col="${FILE_COLUMN_KEY}" data-check="${escHtml(r.check.key)}"
-            data-file-status="${escHtml(r.point.status)}">
+    <button class="scope-check file-check" data-col="${FILE_COLUMN_KEY}" data-check="${escAttr(r.check.key)}"
+            data-file-status="${escAttr(r.point.status)}">
       <span class="label"><span class="kind-tag">File check</span><span class="nm">${escHtml(r.check.name)}</span>
         <span class="ds">${r.point.status === "green" ? "" : escHtml(sentenceCase(r.point.finding || ""))}</span></span>
       ${pill(r.point.status,"sm")}
@@ -6368,7 +6368,7 @@ function brokenCollectionsBannerHtml(except){
     ? `${escHtml(names[0])} cannot be shown: ${problems.length === 1 ? `its data file is ${what}` : `some of its data files are ${what}`}`
     : `${ids.length} collections cannot be shown: ${escHtml(joinNames(names))}`;
   const list = `<ul>${dataFileItems(problems)}</ul>`;
-  return `<div class="data-file-error" role="alert" data-testid="data-file-error" data-broken-collections="${escHtml(ids.join(" "))}">
+  return `<div class="data-file-error" role="alert" data-testid="data-file-error" data-broken-collections="${escAttr(ids.join(" "))}">
     <h2>${head}</h2>
     ${problems.length > 3 ? `<details><summary>The ${problems.length} files</summary>${list}</details>` : list}
     <p>Every other collection is shown. ${ids.length === 1 ? "Its datasets read No data, and no status on this page counts them" : "Their datasets read No data, and no status on this page counts them"} until ${ids.length === 1 ? "it loads" : "they load"}.</p>
@@ -7048,7 +7048,7 @@ function warehouseClauseHtml(ds){
   const tail = segmentsHtml(p.tail || []);
   const m = /^([^\s<]*)(.*)$/s.exec(tail);
   const status = p.status ? `<span class="pill-stop">${pill(p.status, "sm")}${m[1]}</span>${m[2]}` : tail;
-  return `<span class="wh-clause" data-wh-clause="${escHtml(p.status || "none")}">${segmentsHtml(p.clause)}${status}</span>`;
+  return `<span class="wh-clause" data-wh-clause="${escAttr(p.status || "none")}">${segmentsHtml(p.clause)}${status}</span>`;
 }
 // ---- HELD BACK WITH ITS DELIVERY (REQ-DASH-275) ----------------------------
 // The build works out, per supply and date, whether it was held back because
@@ -7060,7 +7060,7 @@ function heldBackNotice(ds){
   const n = ds && ds.heldBackOn && ds.heldBackOn.notice;
   if(!n) return "";
   const head = (n.head || []).length ? `<b style="display:inline">${segmentsHtml(n.head)}</b>` : "";
-  return `<div class="notice-exhausted" role="status" data-held-back="${escHtml(n.form || "")}">${head}${segmentsHtml(n.body)}</div>`;
+  return `<div class="notice-exhausted" role="status" data-held-back="${escAttr(n.form || "")}">${head}${segmentsHtml(n.body)}</div>`;
 }
 // THE ROOT'S OWN AWAITING LINE ENDS WITH WHAT IT HOLDS BACK (criterion 3).
 function heldBackHolding(ds){
@@ -7076,7 +7076,7 @@ function heldBackMarker(scope, asText){
     const h = ds.heldBackOn && ds.heldBackOn.holding;
     if(h && h.card) lines.push({root: ds.id, card: h.card});
   }));
-  return lines.map(l=> `<div class="held-back-marker" data-held-back-marker="${escHtml(l.root)}" style="margin-top:4px; font-size:12px; color:var(--ink); display:flex; align-items:center; gap:5px;">${pill("red","sm")}<span>${segmentsHtml(l.card, asText)}</span></div>`).join("");
+  return lines.map(l=> `<div class="held-back-marker" data-held-back-marker="${escAttr(l.root)}" style="margin-top:4px; font-size:12px; color:var(--ink); display:flex; align-items:center; gap:5px;">${pill("red","sm")}<span>${segmentsHtml(l.card, asText)}</span></div>`).join("");
 }
 // The datasets a root's held-back set names on the date - REQ-DASH-204's card
 // line leaves their causes to this one (204 criterion 18).
@@ -7161,7 +7161,7 @@ function noPromotedNotice(ds){
   const ownRed = !!(ds.noPromotedOn && ds.noPromotedOn.ownRed);
   const others = otherTablesVerdict(ds);
   const said = !!(others && others.kind === "nothing" && ds.verdictOf && ds.verdictOf.state === "awaiting");
-  const body = lines.map(l=> `<div class="np-line" data-np-dataset="${escHtml(l.datasetId)}" data-np-form="${escHtml(l.form)}">${noPromotedLineHtml(l, ownRed, said)}</div>`).join("");
+  const body = lines.map(l=> `<div class="np-line" data-np-dataset="${escAttr(l.datasetId)}" data-np-form="${escAttr(l.form)}">${noPromotedLineHtml(l, ownRed, said)}</div>`).join("");
   return `<div class="notice-exhausted" role="status" data-no-promoted="${lines.length}">${body}</div>`;
 }
 // CRITERION 16's verdict-line half, from the build's lines: null where the
@@ -7207,7 +7207,7 @@ function noPromotedMarker(scope){
     });
   }));
   if(!by.size) return "";
-  return [...by.values()].map(({line, readers})=> `<div class="no-promoted-marker" data-no-promoted-marker="${escHtml(line.datasetId)}" style="margin-top:4px; font-size:12px; color:var(--ink); display:flex; align-items:center; gap:5px;">${pill("red","sm")}<span>${escHtml(`No promoted ${line.name || line.datasetId}: holds ${readers.size} ${readers.size === 1 ? "dataset" : "datasets"} red`)}</span></div>`).join("");
+  return [...by.values()].map(({line, readers})=> `<div class="no-promoted-marker" data-no-promoted-marker="${escAttr(line.datasetId)}" style="margin-top:4px; font-size:12px; color:var(--ink); display:flex; align-items:center; gap:5px;">${pill("red","sm")}<span>${escHtml(`No promoted ${line.name || line.datasetId}: holds ${readers.size} ${readers.size === 1 ? "dataset" : "datasets"} red`)}</span></div>`).join("");
 }
 // THE READERS A CAUSING DATASET'S OWN NOTICE ENDS WITH (criterion 17): every
 // dataset of its collection whose line names it on the date on show.
@@ -7289,7 +7289,7 @@ function causeNote(ds){
   const what = line.cause === "turned-down"
     ? `The ${period} file was turned down and nothing has replaced it — ${who}`
     : `Overdue for ${period} — ${who}`;
-  return `<div class="late-open-note" data-cause-note="${escHtml(line.cause || "overdue")}" style="font-size:12.5px; color:var(--ink-muted); margin:-4px 0 12px;">${what}</div>`;
+  return `<div class="late-open-note" data-cause-note="${escAttr(line.cause || "overdue")}" style="font-size:12.5px; color:var(--ink-muted); margin:-4px 0 12px;">${what}</div>`;
 }
 // THE CENSUS AS AT THE DATE ON SHOW (REQ-PIPE-081 criteria 14 and 15): the
 // last recorded census taken on or before the end of that day - never the
@@ -7314,7 +7314,7 @@ function censusBanner(ds, inPlaceOnDateStr){
 function amberSettingLine(ds, inPlaceOnDateStr){
   const a = amberSettingInPlaceOn(ds, inPlaceOnDateStr);
   if(!a) return "";
-  return `<div class="amber-setting-line" data-amber-setting="${escHtml(a.value)}" style="font-size:12.5px; color:var(--ink-muted); margin:-6px 0 14px;" title="What happens to a supply whose checks come back amber, and where that was set">Amber setting: ${escHtml(a.text)}</div>`;
+  return `<div class="amber-setting-line" data-amber-setting="${escAttr(a.value)}" style="font-size:12.5px; color:var(--ink-muted); margin:-6px 0 14px;" title="What happens to a supply whose checks come back amber, and where that was set">Amber setting: ${escHtml(a.text)}</div>`;
 }
 // THE NEWEST SLOT LATE BUT STILL OPEN on the date on show (REQ-DASH-133,
 // Keith 2026-10-05): past its late instant, no file yet, not yet closed.
@@ -7344,7 +7344,7 @@ function lateOpenInPlaceOn(ds, inPlaceOnDateStr, builtAt){
 function noSupplyNote(ds){
   const late = lateOpenInPlaceOn(ds, CURRENT_IN_PLACE_ON);
   const lateNote = late
-    ? `<div class="late-open-note" data-late-open="${escHtml(late.period)}" style="font-size:11.5px; color:var(--ink); margin-top:3px;">Late, still open: ${escHtml(fmtPeriodOrDay(late.period))} — no file yet</div>`
+    ? `<div class="late-open-note" data-late-open="${escAttr(late.period)}" style="font-size:11.5px; color:var(--ink); margin-top:3px;">Late, still open: ${escHtml(fmtPeriodOrDay(late.period))} — no file yet</div>`
     : "";
   const waiting = ds.waitingBlocker
     ? `<div class="waiting-blocker-note" data-waiting-blocker="${ds.waitingBlocker.kind}" style="font-size:11.5px; color:var(--ink); margin-top:3px;">${escHtml(blockerReasonText(ds.waitingBlocker))} — ${blockerReceivedText(ds.waitingBlocker)}</div>`
@@ -7482,7 +7482,7 @@ function outstandingMarker(scope, id, source, noSupply){
   const severity = (blocking || gaps || items.some(i=> i.severity === "needs-action")) ? "needs-action"
     : items.some(i=>i.severity==="warning") ? "warning" : "informational";
   const byKind = {};
-  items.forEach(i=>{ const k = outstandingKindLabel(i.kind).toLowerCase(); byKind[k] = (byKind[k]||0) + 1; });
+  items.forEach(i=>{ const k = outstandingKindLabel(i.kind, i).toLowerCase(); byKind[k] = (byKind[k]||0) + 1; });
   const parts = [...(gaps ? [`${gaps} no supply`] : []),
     ...Object.entries(byKind).sort((a,b)=> b[1]-a[1] || a[0].localeCompare(b[0])).map(([k,n])=>countedKind(k, n))];
   const breakdown = parts.length > 1 || gaps ? `: ${parts.join(", ")}` : "";
@@ -7781,7 +7781,7 @@ function renderAgency(view, agencyId){
   // A BROKEN COLLECTION SAYS SO WHERE ITS TABLE WOULD BE (#268 (g)), pointing
   // at the one notice above rather than repeating it.
   wrap.innerHTML = ag.collections.map(col=> collectionBroken(col.id) ? `
-    <div class="collection-block" data-collection-not-loaded="${escHtml(col.id)}">
+    <div class="collection-block" data-collection-not-loaded="${escAttr(col.id)}">
       <div class="collection-title"><h3>${escHtml(col.name)}</h3></div>
       <p class="view-sub" data-testid="collection-not-loaded">Its data did not load, so its datasets are not shown here and no status counts them. The notice above names the file.</p>
     </div>` : `
@@ -8072,7 +8072,7 @@ function acknowledgementBadge(datasetId, runId, inPlaceOnDateStr){
     `<div class="excuse-note" data-acknowledgement-withdrawn>Acknowledged by ${escHtml(k.actor)}, ${fmtInstant(k.at)}: ${escHtml(k.reason)} · withdrawn by ${escHtml(k.withdrawn.actor)}, ${fmtInstant(k.withdrawn.at)}: ${escHtml(k.withdrawn.reason)}</div>`).join("");
   if(standing){
     // THE REASON AS VISIBLE TEXT, not only a title (criterion 16).
-    return `<span class="pill tag sm" data-acknowledged title="${escHtml(standing.reason)}"><span class="ico"></span>✓ Acknowledged by ${escHtml(standing.actor)}, ${fmtInstant(standing.at)}</span><div class="excuse-note" data-acknowledgement-reason>${escHtml(standing.reason)}</div>${withdrawn}`;
+    return `<span class="pill tag sm" data-acknowledged title="${escAttr(standing.reason)}"><span class="ico"></span>✓ Acknowledged by ${escHtml(standing.actor)}, ${fmtInstant(standing.at)}</span><div class="excuse-note" data-acknowledgement-reason>${escHtml(standing.reason)}</div>${withdrawn}`;
   }
   if(a.lapsedAt && by(a.lapsedAt)) return "";
   return `<span class="pill tag sm" data-awaiting-acknowledgement><span class="ico"></span>Amber, promoted - awaiting acknowledgement</span>${withdrawn}`;
@@ -8157,7 +8157,12 @@ function redPromotedBadge(datasetId, runId, inPlaceOnDateStr){
     // after acknowledgement, naming who.
     const rc = recheckEvents(datasetId, runId).find(e=> sameInstant(e.at, since.at));
     if(rc && !before){
-      const ack = recheckAcknowledged(datasetId, runId, rc, on);
+      // ACKNOWLEDGED AFTER THE NEWEST RE-CHECK THAT HAS RUN, as the queue
+      // (rechecking.worse_than_promoted) and the amber tag read it - not
+      // after the one that turned it red: re-checked red again after an
+      // acknowledgement, it is outstanding again (post-build-review #283).
+      const done = recheckEvents(datasetId, runId).filter(e=> !on || assetDateStrOf(e.at) <= on);
+      const ack = recheckAcknowledged(datasetId, runId, done[done.length-1] || rc, on);
       const acked = ack ? `; acknowledged by ${escHtml(ack.actor)}, ${fmtInstant(ack.at)}` : "";
       return `<span class="red-promoted" data-red-promoted data-red-promoted-recheck><span class="pill red sm"><span class="ico"></span>Red promoted</span><span class="rp-why" data-red-promoted-why>${sentenceCase(`${wentRed ? "" : went}${recheckWords(rc)}${acked}`)}</span></span>`;
     }
@@ -8314,7 +8319,7 @@ function recheckedAmberTag(datasetId, runId, inPlaceOnDateStr){
   if(now !== "amber") return "";
   const ack = recheckAcknowledged(datasetId, runId, last, on);
   return ack
-    ? `<span class="pill tag sm" data-rechecked-amber="acknowledged" title="${escHtml(ack.reason)}"><span class="ico"></span>Amber, promoted - re-checked, acknowledged by ${escHtml(ack.actor)}</span>`
+    ? `<span class="pill tag sm" data-rechecked-amber="acknowledged" title="${escAttr(ack.reason)}"><span class="ico"></span>Amber, promoted - re-checked, acknowledged by ${escHtml(ack.actor)}</span>`
     : `<span class="pill tag sm" data-rechecked-amber="awaiting"><span class="ico"></span>Amber, promoted - re-checked, awaiting acknowledgement</span>`;
 }
 // The standing acknowledgement given after a re-check, as at the date on show.
@@ -8335,7 +8340,7 @@ function bulkRecheckLines(datasetId, checkId, inPlaceOnDateStr){
   const by = v=> !on || assetDateStrOf(v) <= on;
   return lines.filter(l=> by(l.at)).map(l=>{
     const changed = (l.changes || []).filter(by).length;
-    return {changelogDate: l.changelogDate, html: `<div class="bulk-recheck-line" data-bulk-recheck="${escHtml(String(l.id))}">Re-checked ${l.supplies} ${pluralize(l.supplies, "supply", "supplies")} across ${l.datasets} ${pluralize(l.datasets, "dataset")} on ${escHtml(fmtDay(l.at))} by ${escHtml(l.person)}: ${changed} changed - ${escHtml(l.reason)}</div>`};
+    return {changelogDate: l.changelogDate, html: `<div class="bulk-recheck-line" data-bulk-recheck="${escAttr(String(l.id))}">Re-checked ${l.supplies} ${pluralize(l.supplies, "supply", "supplies")} across ${l.datasets} ${pluralize(l.datasets, "dataset")} on ${escHtml(fmtDay(l.at))} by ${escHtml(l.person)}: ${changed} changed - ${escHtml(l.reason)}</div>`};
   });
 }
 // RED PROMOTED AS A KIND ON THE AGENCY AND COLLECTION CARDS (#123 A1, Keith
@@ -8687,7 +8692,7 @@ function renderSupplyHistorySection(ds, cycles, currentCycleStart){
   // muted, no pill, no table - quieter than a red 'No supply' or an
   // 'Accepted' tag, and never under 'Periods with no supply'.
   const owedBlock = r => `
-    <div class="supply-cycle owed-nothing" data-owed-nothing="${escHtml(r.kind)}">
+    <div class="supply-cycle owed-nothing" data-owed-nothing="${escAttr(r.kind)}">
       <div class="supply-cycle-label">
         <b>${periodLinkFor(ds.id, r.periods[0], cycleLabel(ds.sla.cadence, r.firstDate, ds.id))}</b>
         ${r.current ? CURRENT_TAG : ""}
@@ -10919,7 +10924,7 @@ const SCENARIO_MODE_LABEL = {INJECT:"In the data", unit:"Unit test", both:"Unit 
 function scenarioModePill(entry, target){
   const label = (entry.mode === "INJECT" && !target) ? "Planned for the data"
     : (SCENARIO_MODE_LABEL[entry.mode] || entry.mode);
-  return `<span class="pill tag sm" data-scenario-mode="${escHtml(entry.mode)}"><span class="ico"></span>${escHtml(label)}</span>`;
+  return `<span class="pill tag sm" data-scenario-mode="${escAttr(entry.mode)}"><span class="ico"></span>${escHtml(label)}</span>`;
 }
 // ONE SCENARIO ENTRY: what it demonstrates, by requirement, and where it is
 // in the data or that nothing is behind it yet (REQ-DASH-139 criterion 3).
