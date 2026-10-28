@@ -6004,23 +6004,28 @@ class TestACrossTableCheckOnTS80:
 
 class TestASupersededRunOnTheDatesItWasCurrent:
     """post-build-review #266, Keith 2026-10-24 (answer A), on the bootstrapped
-    history. Child Protection's 12 October 2023 delivery was re-checked in full
-    on 21 October. A page listed each supply by its current run only, so as at
-    15 October the Client Register had no result at all - its own checks and
-    its cross-table rows alike - while the gate counted the arrival's. The page
-    now keeps a superseded run's results for the dates they were current."""
+    history. TS-67's supply - 10:00am 12 October 2023 - was re-filed and
+    re-checked in full on 21 October. A page listed each supply by its current
+    run only, so as at 15 October it had no result at all while the gate
+    counted the arrival's. The page now keeps a superseded run's results for
+    the dates they were current.
 
-    AG, COL = "child-protection-family-support", "child-protection"
-    WHERE = {"tier": "dataset", "agencyId": AG, "collectionId": COL, "datasetId": "cp-clients"}
-    #: The Client Register received 10:00am 12 October 2023, re-checked in full
-    #: on 21 October with the rest of its delivery (the seeded history).
-    SUPPLY = "cp-clients@202310121000000800"
+    ON EMERGENCY DEPARTMENT SINCE REQ-GEN-235 moved TS-67 there (Keith,
+    2026-10-27: repoint). It was Child Protection's Client Register, whose
+    cross-table rows the page also kept; Emergency Department has none, so
+    this now proves the dataset's own checks only."""
+
+    AG, COL = "department-of-health", "emergency-department"
+    WHERE = {"tier": "dataset", "agencyId": AG, "collectionId": COL,
+             "datasetId": "ed-presentations"}
+    #: TS-67's supply, re-checked in full on 21 October with its re-file.
+    SUPPLY = "ed-presentations@202310121000000800"
 
     def _shown(self, page, html, on):
         _goto(page, html, state=self.WHERE, in_place_on=on)
         return page.evaluate("""() => {
             const ds = DATA.agencies.flatMap(a => a.collections).flatMap(c => c.datasets)
-                           .find(d => d.id === "cp-clients");
+                           .find(d => d.id === "ed-presentations");
             // A section with no rule has a synthesized card, dated by nothing.
             const of = c => c.checks.filter(ck => ck.key !== "no_rule_defined").map(ck => {
               const last = (ck.history || []).at(-1) || {};
@@ -6028,22 +6033,17 @@ class TestASupersededRunOnTheDatesItWasCurrent:
                       runs: (ck.history || []).map(h => h.run_id),
                       supply: last.supply_id || null, recorded: last.recorded_at || null};
             });
-            return {own: ds.columns.filter(c => c.scope !== "cross-table").flatMap(of),
-                    cross: ds.columns.filter(c => c.scope === "cross-table").flatMap(of)};
+            return {own: ds.columns.filter(c => c.scope !== "cross-table").flatMap(of)};
         }""")
 
     def test_between_the_arrival_and_the_recheck_the_arrivals_results_are_shown(
             self, clean_page, built_dashboard_html):
         """Before the fix the own checks showed the PREVIOUS supply's results
-        as the newest, and every Client reference row read No data."""
+        as the newest."""
         shown = self._shown(clean_page, built_dashboard_html, "2023-10-15")
         assert shown["own"], shown
         assert {c["supply"] for c in shown["own"]} == {self.SUPPLY}, shown["own"][:3]
-        refs = [c for c in shown["cross"] if c["name"] == "Client reference"]
-        assert refs, shown["cross"]
-        assert {c["supply"] for c in refs} == {self.SUPPLY}, refs
-        assert all(c["recorded"][:10] <= "2023-10-15" for c in refs), refs
-        assert "nodata" not in {c["status"] for c in refs}, refs
+        assert all(c["recorded"][:10] <= "2023-10-15" for c in shown["own"]), shown["own"][:3]
 
     def test_after_the_recheck_only_its_results_are_shown(self, clean_page, built_dashboard_html):
         before = self._shown(clean_page, built_dashboard_html, "2023-10-15")
@@ -7224,15 +7224,23 @@ class TestTheUxCriticsFindingsOn7093c20:
         assert style["color"] != style["bold"], style
 
     def test_affects_ends_a_sentence_on_the_awaiting_line(self, clean_page, built_dashboard_html):
-        """S2: on the Client Register's page for 7 February 2020 "Affects" is
-        part of the awaiting line and ends with a full stop - never a line of its
-        own with nothing before it."""
-        _goto(clean_page, built_dashboard_html, state=_cp_state("cp-clients"),
-              in_place_on="2020-02-07")
+        """S2: on Notifications' page for 8 August 2021 "Affects" is part of
+        the awaiting line and ends with a full stop - never a line of its own
+        with nothing before it.
+
+        REPOINTED 2026-10-28 (Keith: repoint rather than delete): it read the
+        Client Register's page for 7 February 2020, where Placements had been
+        promoted on 6 February and then "held back" on 12 February - the
+        out-of-order instants post-build-review #276 fixed. With Placements'
+        promotion floored at its hold-back, no Client Register page shows the
+        state; a scan of every day of every Child Protection page found it on
+        Notifications' (2021-08-08 and 2022-02-04)."""
+        _goto(clean_page, built_dashboard_html, state=_cp_state("cp-notifications"),
+              in_place_on="2021-08-08")
         (verdict,) = _shown(clean_page, ".verdict-of")
         (affects,) = _shown(clean_page, "[data-affects-readers]")
-        assert affects["text"] == "Affects Placements.", affects
-        assert verdict["text"].endswith("Affects Placements."), verdict
+        assert affects["text"] == "Affects Investigations.", affects
+        assert verdict["text"].endswith("Affects Investigations."), verdict
 
     def test_an_overdue_cause_says_so_on_its_own_page(self, clean_page, built_dashboard_html):
         """S2 and REQ-DASH-204 open question 1 (Keith Q4 = a, PROVISIONAL): the
