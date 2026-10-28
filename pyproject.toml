@@ -161,6 +161,8 @@ markers = [
     "on_demand: deselected unless --run-on-demand is given (slow; run when its subject changes)",
     "full_capture: deselected unless --run-full-capture is given (two full bootstraps; never in CI)",
     "closed_periods: opts a test back in to REQ-PIPE-132's closed-period queue items (tests/test_outstanding.py)",
+    "shared_page: a browser-test class whose tests share one loaded dashboard page (REQ-TEST-282)",
+    "fresh_load: a test in a shared_page class that needs a document load of its own (REQ-TEST-282)",
 ]
 
 [tool.coverage.run]

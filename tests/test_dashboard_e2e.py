@@ -299,16 +299,162 @@ def _report_document_loads(worker_id):
             f.write(f"{worker_id} {_DOCUMENT_LOADS['n']}\n")
 
 
+# ---- one page per class (REQ-TEST-282) ----------------------------------------
+#
+# A class marked `shared_page` opens ONE browser context and page and loads the
+# dashboard in it once; every test of the class is handed that page, returned
+# first to a known state - storage cleared, the theme back to its default,
+# every panel and drawer closed, the starting route reached by a same-document
+# navigation (_soft_goto) - and each `_goto` to the same document after that is
+# a same-document navigation too, which is the cost removed: a reload parses the
+# multi-megabyte page again. A test marked `fresh_load` gets a document of its
+# own: its every `_goto` loads one. Any other test that replaces the document
+# fails, named, rather than leave the next test on a page it did not expect.
+
+#: {id(page): {"doc", "token", "fresh", "replaced", "viewport"}} for each shared page.
+_SHARED: dict[int, dict] = {}
+
+
+@pytest.fixture(scope="class")
+def _shared_page(browser, browser_context_args):
+    """The one context and page of a `shared_page` class - built on
+    pytest-playwright's own session-scoped browser (NFR 3)."""
+    context = browser.new_context(**browser_context_args)
+    page = context.new_page()
+    _count_loads(page)
+    st = _SHARED[id(page)] = {"doc": None, "token": None, "fresh": False, "replaced": False,
+                              "viewport": page.viewport_size, "loads": 0}
+
+    def loaded(*_):
+        st["loads"] += 1
+    page.on("load", loaded)
+    yield page
+    _SHARED.pop(id(page), None)
+    context.close()
+
+
+#: Back to a known state (criterion 2): storage cleared and the theme read
+#: again from it, the date picker closed. The route is _soft_goto's.
+_RESET_JS = """() => {
+    try { localStorage.clear(); } catch (e) {}
+    try { sessionStorage.clear(); } catch (e) {}
+    try { applyTheme(currentTheme()); } catch (e) {}
+}"""
+
+#: A SAME-DOCUMENT NAVIGATION to `rel` (a query and fragment, as _goto builds
+#: them), worked the way a load of that address works: the address replaced,
+#: every panel and drawer closed, the date on show read from it - the page's
+#: data rebuilt only where the date changed - the state read from it, and the
+#: page rendered from that state (renderFromState, the load's own last step).
+_SOFT_GOTO_JS = """(rel) => {
+    window.__e2eMark = true;
+    const before = Number(document.documentElement.dataset.renderCount || 0);
+    const base = location.href.split("#")[0].split("?")[0];
+    const url = new URL(rel || "#/", base);
+    history.replaceState(null, "", url.pathname + url.search + url.hash);
+    hideCheckPanel(); hideDrawer(); hideAllPanelsDom();
+    const picker = document.getElementById("in-place-on-panel");
+    if (picker && picker.classList.contains("open")) closeInPlaceOnPanel();
+    const on = inPlaceOnFromUrl() || DEFAULT_IN_PLACE_ON;
+    if (on !== CURRENT_IN_PLACE_ON) setInPlaceOnQuietly(on);
+    ARRIVAL_FROM = null; ARRIVAL_FROM_ON = null; ARRIVAL_VIA = null;
+    STATE = stateFromLocation();
+    history.replaceState(STATE, "", location.pathname + location.search + stateToHash(STATE));
+    renderFromState();
+    window.scrollTo(0, 0);
+    return before;
+}"""
+
+
+def _soft_goto(page, rel: str) -> None:
+    before = page.evaluate(_SOFT_GOTO_JS, rel)
+    page.wait_for_function(
+        "(before) => Number(document.documentElement.dataset.renderCount || 0) > before",
+        arg=before)
+
+
+def _same_document(page, token: str) -> bool:
+    try:
+        return bool(page.evaluate("(t) => window.__sharedDoc === t", token))
+    except Exception:  # noqa: BLE001 - a page mid-navigation is not the same document
+        return False
+
+
+def _reset_shared_page(page, *, fresh: bool) -> None:
+    st = _SHARED[id(page)]
+    st["fresh"], st["replaced"] = fresh, False
+    if st["viewport"]:
+        page.set_viewport_size(st["viewport"])
+    if fresh or not st["token"]:
+        # A FRESH LOAD (criterion 3): the document is forgotten, so this test's
+        # first _goto loads one of its own - the reload it is marked for.
+        st["doc"] = st["token"] = None
+        return
+    page.evaluate(_RESET_JS)
+    _soft_goto(page, "")
+
+
+def _check_the_shared_document(page, nodeid: str) -> None:
+    """Criterion 6: the document a test was handed is still the one the class
+    shares - or the test was marked to load its own."""
+    st = _SHARED[id(page)]
+    if st["fresh"]:
+        st["fresh"] = False
+        return
+    replaced = st["replaced"] or (st["token"] is not None and not _same_document(page, st["token"]))
+    if replaced:
+        st["doc"] = st["token"] = None
+        pytest.fail(f"{nodeid} replaced its class's shared page with a document of its own - "
+                    f"mark it @pytest.mark.fresh_load, or keep it to same-document navigation",
+                    pytrace=False)
+
+
+def _mark_document(page, html_path: Path) -> None:
+    """After a real load on a shared page: this is the document the class now
+    shares, tagged so a later replacement can be told apart."""
+    import uuid
+
+    st = _SHARED.get(id(page))
+    if st is None:
+        return
+    if st["token"] and not st["fresh"]:
+        st["replaced"] = True
+    st["doc"], st["token"] = str(html_path.resolve()), uuid.uuid4().hex
+    page.evaluate("(t) => { window.__sharedDoc = t; }", st["token"])
+
+
 @pytest.fixture
-def clean_page(page):
+def clean_page(request):
     """Wraps pytest-playwright's own `page` fixture with a real console-
     error/uncaught-exception collector, asserted empty in THIS fixture's
     own teardown - applies to every test that uses it, not just one
-    dedicated test, per Keith's own confirmed design for this suite."""
+    dedicated test, per Keith's own confirmed design for this suite.
+
+    IN A `shared_page` CLASS (REQ-TEST-282) the page is the class's one page,
+    returned to a known state first; the collector is still this test's own,
+    attached for its run and removed after it, so an error is attributed to
+    the test it was raised in (criterion 5), and the test fails if it replaced
+    the shared document without being marked `fresh_load` (criterion 6)."""
+    shared = request.cls is not None and request.node.get_closest_marker("shared_page") is not None
+    page = request.getfixturevalue("_shared_page" if shared else "page")
     errors = []
-    page.on("console", lambda msg: errors.append(msg.text) if msg.type == "error" else None)
-    page.on("pageerror", lambda exc: errors.append(str(exc)))
+
+    def on_console(msg):
+        if msg.type == "error":
+            errors.append(msg.text)
+
+    def on_error(exc):
+        errors.append(str(exc))
+
+    page.on("console", on_console)
+    page.on("pageerror", on_error)
+    if shared:
+        _reset_shared_page(page, fresh=request.node.get_closest_marker("fresh_load") is not None)
     yield page
+    page.remove_listener("console", on_console)
+    page.remove_listener("pageerror", on_error)
+    if shared:
+        _check_the_shared_document(page, request.node.nodeid)
     assert errors == [], f"real console errors during this test: {errors}"
 
 
@@ -373,6 +519,13 @@ def _goto(page, html_path: Path, state: dict | None = None, in_place_on: str | N
     url = f"file://{html_path.resolve()}"
     query = f"?in-place-on={in_place_on}" if in_place_on else ""
     fragment = f"#{_state_to_path(state)}" if state else ""
+    # ON A CLASS'S SHARED PAGE, THE SAME DOCUMENT IS NEVER LOADED AGAIN
+    # (REQ-TEST-282): a same-document navigation to the address instead.
+    shared = _SHARED.get(id(page))
+    if shared is not None and not shared["fresh"] and shared["token"] \
+            and shared["doc"] == str(html_path.resolve()) and _same_document(page, shared["token"]):
+        _soft_goto(page, query + (fragment or "#/"))
+        return
     try:
         before = page.evaluate(
             "() => { window.__e2eMark = true;"
@@ -387,6 +540,7 @@ def _goto(page, html_path: Path, state: dict | None = None, in_place_on: str | N
              return !window.__e2eMark || n > before;
            }""",
         arg=before)
+    _mark_document(page, html_path)
 
 
 class TestBuiltDashboardRenders:
@@ -451,6 +605,74 @@ class TestInPlaceOnDatePicking:
         assert not any(word in head for word in ("Green", "Amber", "Red"))
 
 
+@pytest.mark.shared_page
+class TestOnePagePerClass:
+    """REQ-TEST-282: a `shared_page` class's tests share one loaded page,
+    returned to a known state for each, and a test may ask for a document of
+    its own - each test passes alone and in any order."""
+
+    def test_same_document_navigation_never_loads_the_page_again(self, clean_page,
+                                                                built_dashboard_html):
+        """Criterion 1: after the class's one load, a change of route and of
+        date on show is a same-document navigation - rendered, never loaded."""
+        _goto(clean_page, built_dashboard_html)
+        st = _SHARED[id(clean_page)]
+        loads = st["loads"]
+        assert loads >= 1, "the class's page was never loaded - this test proves nothing"
+        _goto(clean_page, built_dashboard_html, state={"tier": "agency", "agencyId": CP_AGENCY},
+              in_place_on="2024-08-05")
+        assert clean_page.evaluate("() => CURRENT_IN_PLACE_ON") == "2024-08-05"
+        assert clean_page.evaluate("() => STATE.tier") == "agency"
+        _goto(clean_page, built_dashboard_html, state={"tier": "feedback"})
+        assert clean_page.evaluate("() => STATE.tier") == "feedback"
+        assert clean_page.evaluate("() => CURRENT_IN_PLACE_ON") == clean_page.evaluate(
+            "() => DEFAULT_IN_PLACE_ON"), "no date in the address is the default date"
+        assert st["loads"] == loads, "a same-document navigation loaded the page"
+
+    def test_each_test_starts_from_a_known_state(self, clean_page, built_dashboard_html):
+        """Criterion 2: storage cleared, the theme back to its default, every
+        panel closed, the starting route reached - by a same-document
+        navigation."""
+        _goto(clean_page, built_dashboard_html, state={"tier": "agency", "agencyId": CP_AGENCY})
+        clean_page.click("#theme-btn")
+        assert clean_page.evaluate("() => localStorage.getItem('theme')"), "precondition"
+        clean_page.evaluate("() => sessionStorage.setItem('x', '1')")
+        clean_page.evaluate("() => openPanel('activity')")
+        assert clean_page.locator("#activity-panel.open").count() == 1, "precondition"
+        loads = _SHARED[id(clean_page)]["loads"]
+        _reset_shared_page(clean_page, fresh=False)
+        assert clean_page.evaluate("() => [localStorage.length, sessionStorage.length]") == [0, 0]
+        assert clean_page.evaluate("() => document.documentElement.dataset.theme") == "light"
+        assert clean_page.evaluate("() => STATE.tier") == "exec"
+        assert clean_page.locator(".side-panel.open, .drawer.open, #check-panel.open").count() == 0
+        assert _SHARED[id(clean_page)]["loads"] == loads
+
+    @pytest.mark.fresh_load
+    def test_a_marked_test_gets_a_document_of_its_own(self, clean_page, built_dashboard_html):
+        """Criterion 3: its first navigation loads the page afresh."""
+        st = _SHARED[id(clean_page)]
+        loads = st["loads"]
+        _goto(clean_page, built_dashboard_html)
+        assert st["loads"] == loads + 1
+
+    def test_a_document_replaced_by_an_unmarked_test_fails_that_test(self):
+        """Criterion 6, against a stand-in page: a test that left the class's
+        page on a document it did not share fails, naming itself."""
+        class Gone:
+            def evaluate(self, *_a):
+                return False
+        page = Gone()
+        _SHARED[id(page)] = {"doc": "x", "token": "t", "fresh": False, "replaced": False}
+        try:
+            with pytest.raises(pytest.fail.Exception, match="tests/x.py::T::t replaced"):
+                _check_the_shared_document(page, "tests/x.py::T::t")
+            _SHARED[id(page)].update(token="t", fresh=True)
+            _check_the_shared_document(page, "tests/x.py::T::t")  # marked: no failure
+        finally:
+            _SHARED.pop(id(page), None)
+
+
+@pytest.mark.shared_page
 class TestTheInPlaceOnPanelSaysWhichPeriod:
     """REQ-DASH-054 criteria 6, 8, 9 and 10, at the layer a reader sees.
 
@@ -677,6 +899,7 @@ class TestDarkModeToggle:
         assert clean_page.evaluate("document.documentElement.getAttribute('data-theme')") == "light"
 
 
+@pytest.mark.shared_page
 class TestRequirementsPanel:
     def test_opening_it_shows_real_requirements_with_badges_and_linked_tests(self, clean_page, built_dashboard_html):
         _goto(clean_page, built_dashboard_html)
@@ -1044,6 +1267,7 @@ def dashboard_html_with_ticket(built_dashboard_html, tmp_path_factory) -> Path:
         }]})
 
 
+@pytest.mark.shared_page
 class TestTicketBadge:
     def test_an_open_ticket_shows_a_linked_badge_at_tier2_and_tier3(self, clean_page, dashboard_html_with_ticket):
         badge_selector = "a.pill.tag[href='https://github.com/keithamoss/data-poc/issues/999']"
@@ -1306,6 +1530,7 @@ class TestAcknowledgementBadge:
         assert "awaiting acknowledgement" not in after
 
 
+@pytest.mark.shared_page
 class TestDemoTab:
     """plans/tooling.md #1 Phase 6 - a real recording of the actual
     mothman CLI/TUI, played back by the vendored asciinema-player widget.
@@ -1340,6 +1565,7 @@ class TestDemoTab:
         assert clean_page.locator("h2", has_text="Demo").count() > 0
 
 
+@pytest.mark.shared_page
 class TestStatusMatchesEachToolsOwnVerdict:
     """plans/qa-pipeline.md item 74's own follow-up, 2026-09-19 - the
     test that would have caught the two bugs that shipped.
@@ -1594,6 +1820,7 @@ def _rewrite_checks(page, fields: dict):
     page.wait_for_timeout(300)
 
 
+@pytest.mark.shared_page
 class TestCheckCardReadsAsPlainEnglish:
     def test_the_headline_is_the_authored_name_with_description_and_tool_beneath(
             self, clean_page, built_dashboard_html):
@@ -1637,6 +1864,7 @@ class TestCheckCardReadsAsPlainEnglish:
             assert card.get_attribute("href").endswith(f"/check/{terse}_{tool}")
 
 
+@pytest.mark.shared_page
 class TestCheckCardIsARealLink:
     def test_it_is_an_anchor_carrying_the_checks_own_deep_link(
             self, clean_page, built_dashboard_html):
@@ -1772,6 +2000,7 @@ class TestAuthoredProseCannotAlterTheCard:
         assert label.startswith(self._HOSTILE["name"])
 
 
+@pytest.mark.shared_page
 class TestAuthoredProseCannotAlterTheDetailPanel:
     """The card's own version of this is above. The panel has six more
     hand-authored fields, and one of them is why an esc() helper was the
@@ -1865,6 +2094,7 @@ class TestAuthoredProseCannotAlterTheDetailPanel:
             assert t.endswith(self._QUOTED)
 
 
+@pytest.mark.shared_page
 class TestSupplyAndTableLevelSections:
     """REQ-DASH-033. Driven in a real browser because most of what this
     requirement asks for only exists in a layout: where a section sits
@@ -2026,6 +2256,7 @@ class TestSupplyAndTableLevelSections:
 # dead URL - failing silently, in the direction that looks fine.
 # =====================================================================
 
+@pytest.mark.shared_page
 class TestTheRenderedTreeComesFromTheHierarchy:
     def _config_tree(self):
         from qa_tools.common import hierarchy
@@ -2355,6 +2586,7 @@ class TestQuietStatesAreVisiblyBuilt:
             f"its label is {text_contrast:.2f}:1 - a border nobody can see is not a distinction")
 
 
+@pytest.mark.shared_page
 class TestTheExecutiveLegendCountsWhatIsActuallyThere:
     """post-build-review #1, Keith's option (b), 2026-09-24.
 
@@ -2425,6 +2657,7 @@ def _open_a_drawer(page):
     page.wait_for_timeout(300)
 
 
+@pytest.mark.shared_page
 class TestTheKeyboardCanReachTheData:
     """The accessibility cluster: post-build-review #8, #9, #10 and #55,
     signed off together 2026-09-25.
@@ -2553,6 +2786,7 @@ class TestTheKeyboardCanReachTheData:
         assert announced.strip(), "nothing was announced for the route change"
 
 
+@pytest.mark.shared_page
 class TestEveryDatasetPageSurvivesItsOwnDrillDown:
     """post-build-review #5, signed off 2026-09-25.
 
@@ -2621,6 +2855,7 @@ class TestEveryDatasetPageSurvivesItsOwnDrillDown:
         assert not missing, f"checks with no key, so no deep link and no Back: {missing}"
 
 
+@pytest.mark.shared_page
 class TestAStaleDeepLinkSaysSo:
     """post-build-review #11, and the half tests-js cannot cover.
 
@@ -2687,6 +2922,7 @@ class TestAStaleDeepLinkSaysSo:
         assert clean_page.locator(".column-tile, .col-tile").count() > 0
 
 
+@pytest.mark.shared_page
 class TestTheLowRunwayWarningIsOnThePage:
     """post-build-review #2 - REQ-PIPE-053's own criterion says the
     warning appears "both in the dashboard and as a non-fatal warning in
@@ -2724,6 +2960,7 @@ class TestTheLowRunwayWarningIsOnThePage:
         assert "nothing has failed" in text or "not failing" in text
 
 
+@pytest.mark.shared_page
 class TestAnUncheckedColumnSaysSoAtEveryLevel:
     """post-build-review #4, signed off 2026-09-25 with Keith's own
     direction: "a grey, as in a disabled kind of grey colour - kind of
@@ -2808,6 +3045,7 @@ class TestAnUncheckedColumnSaysSoAtEveryLevel:
         assert clean_page.evaluate("() => STATUS_LABEL.inactive") == "No rule defined"
 
 
+@pytest.mark.shared_page
 class TestNavigationUsesRealLinks:
     """post-build-review #10, Keith's own principle: "there should be
     links everywhere. Everything should be an actual link. Nothing
@@ -2867,6 +3105,7 @@ class TestNavigationUsesRealLinks:
             assert tag in (None, "BUTTON"), f"{control_id} is a {tag}"
 
 
+@pytest.mark.shared_page
 class TestAnExhaustedDatasetStillShowsItsHistory:
     """post-build-review #13, decided 2026-09-25: "keep the message
     prominent, and show the last known results below it".
@@ -2929,6 +3168,7 @@ class TestAnExhaustedDatasetStillShowsItsHistory:
         assert clean_page.locator("#view h2").count() == 1
 
 
+@pytest.mark.shared_page
 class TestTheQuietPillsSurviveBeingLookedAt:
     """post-build-review #48 and #50 - two visual defects that only a
     real browser can show, which is why both sat unnoticed.
@@ -3003,6 +3243,7 @@ class TestTheQuietPillsSurviveBeingLookedAt:
             "difference does not exist on this display")
 
 
+@pytest.mark.shared_page
 class TestABuiltRequirementShowsItsOwnHoles:
     """post-build-review #33, Keith: "I'm open to that. Give me a
     proposal" then "ship it".
@@ -3069,6 +3310,7 @@ class TestABuiltRequirementShowsItsOwnHoles:
         assert bad == [], bad
 
 
+@pytest.mark.shared_page
 class TestTheDependencyViewInThePlansTab:
     """REQ-DOCS-073 criterion 6, against the real built dashboard.
 
@@ -3146,6 +3388,7 @@ class TestTheDependencyViewInThePlansTab:
         assert errors == []
 
 
+@pytest.mark.shared_page
 class TestTheDisplayStandardHoldsInARealBrowser:
     """REQ-DASH-071, built 2026-09-25.
 
@@ -3270,6 +3513,7 @@ class TestTheDisplayStandardHoldsInARealBrowser:
             assert in_browser == display_time.format_instant(value), value
 
 
+@pytest.mark.shared_page
 class TestOutstandingDecisions:
     """REQ-DASH-070, asserted where a person actually looks.
 
@@ -3405,6 +3649,7 @@ def dashboard_html_with_divergent_arrivals(built_dashboard_html, tmp_path_factor
     return page
 
 
+@pytest.mark.shared_page
 class TestPerDatasetArrivals:
     """REQ-DASH-041, at the render layer in a real browser.
 
@@ -3486,6 +3731,7 @@ class TestPerDatasetArrivals:
         assert text.strip(), "the cut-short dataset's own page rendered nothing"
 
 
+@pytest.mark.shared_page
 class TestScenariosTab:
     """REQ-DASH-046's behaviours, kept, on REQ-DASH-139's top-level tab - in a
     real browser against the real built page.
@@ -3611,6 +3857,7 @@ class TestScenariosTab:
         assert "/scenarios" not in clean_page.url
 
 
+@pytest.mark.shared_page
 class TestCrossTableChecks:
     """REQ-QAC-037 criteria 6 and 7, in a real browser.
 
@@ -3728,6 +3975,7 @@ class TestCrossTableChecks:
         assert "cp_client_id" not in invented, invented
 
 
+@pytest.mark.shared_page
 class TestArrivedVersusPromoted:
     """REQ-DASH-056, in a real browser against the real built page.
 
@@ -3823,6 +4071,7 @@ class TestArrivedVersusPromoted:
         assert not raw, f"{dataset_id} shows a raw period code: {raw}"
 
 
+@pytest.mark.shared_page
 class TestAPeriodStandingInOnAnEarlierOne:
     """REQ-DASH-085 and REQ-DASH-100, in a real browser.
 
@@ -3928,6 +4177,7 @@ class TestAPeriodStandingInOnAnEarlierOne:
         assert errors == []
 
 
+@pytest.mark.shared_page
 class TestDrillingThroughToThePeriodThatEarnedTheResults:
     """REQ-DASH-085 criteria 9-11 and REQ-DASH-100 criteria 8-10.
 
@@ -4450,6 +4700,7 @@ class TestClosedWithNoSupply:
         assert note.count() == 1 and "9 September 2026" in note.inner_text()
 
 
+@pytest.mark.shared_page
 class TestFileChecksOnThePage:
     """REQ-DASH-097 criterion 12, against the bootstrapped history rather
     than a fixture (Keith's choice, 2026-10-04): TS-12 plants a Child
@@ -4571,6 +4822,7 @@ class TestAChecksChartNamesWhatItMeasures:
         assert header.inner_text().strip() == expected
 
 
+@pytest.mark.shared_page
 class TestAStaleDatasetsSectionsSayNoData:
     """post-build-review #183: on a date a dataset has nothing in its current
     period, its column tiles roll up to 'No data' (Phase 5g) but its check
@@ -4600,6 +4852,7 @@ class TestAStaleDatasetsSectionsSayNoData:
         assert seen["key"] == 0
 
 
+@pytest.mark.shared_page
 class TestColumnsNotGreenMatchesTheDatasetPage:
     """REQ-DASH-225 criterion 18: each ordinary row's 'Columns not green'
     count says what the dataset's own page shows - its red and amber column
@@ -4829,6 +5082,7 @@ class TestDatasetsNotGreenOnCardsAndHeadings:
             self._wait_trends(clean_page)
 
 
+@pytest.mark.shared_page
 class TestTheFeedbackTab:
     """REQ-DASH-220: one card per road-testing entry, with the status derived
     from the requirements it cites, reached at #/feedback."""
@@ -4947,6 +5201,7 @@ class TestClosingASidePanelReachedByItsUrl:
         clean_page.wait_for_function("() => STATE.panel === 'requirements'")
 
 
+@pytest.mark.shared_page
 class TestClosingAPanelReachedByItsUrl:
     """road-testing #8 (Keith, 2026-09-24): closing a check panel landed
     on the AGENCY view. Reproduced 2026-10-12: Close was always
@@ -5710,6 +5965,7 @@ class TestEveryScenarioJumpLands:
         assert "scenario=ts-75a" in clean_page.url and "SCENARIO" not in clean_page.url
 
 
+@pytest.mark.shared_page
 class TestThePeriodComposition:
     """REQ-DASH-209 on the real bootstrapped build: the view's rows agree with
     the period's own _manifest at the build's date, both ways (criterion 10),
@@ -5807,6 +6063,7 @@ class TestThePeriodComposition:
         assert clean_page.locator('#view [data-testid="period-composition"]').count() == 0
 
 
+@pytest.mark.shared_page
 class TestTheAsAtReadingsOnTheRealHistory:
     """REQ-GEN-199 criteria 30 and 31: REQ-DASH-197 criterion 16's
     awaiting-then-rejected reading and REQ-DASH-198 criterion 7's removed and
@@ -5858,6 +6115,7 @@ class TestTheAsAtReadingsOnTheRealHistory:
         assert since.count() == 1 and "Since replaced" in since.inner_text()
 
 
+@pytest.mark.shared_page
 class TestTheGitHubLinks:
     """REQ-DASH-244 criteria 12, 13 and 15, in a real browser: a dataset's
     'View on GitHub' opens its collection's ODCS contract at that dataset's
@@ -5893,6 +6151,7 @@ class TestTheGitHubLinks:
             assert f"contract/{agency_id}/" in title, (agency_id, title)
 
 
+@pytest.mark.shared_page
 class TestAPendingCorrectionIsANeedsActionItem:
     """REQ-DASH-263 criterion 5, on the bootstrapped history: Birth
     Registrations' page lists REQ-GEN-205-WINDOW among the things waiting for
@@ -5916,6 +6175,7 @@ class TestAPendingCorrectionIsANeedsActionItem:
         assert self._items(clean_page, built_dashboard_html, "2026-09-23") == []
 
 
+@pytest.mark.shared_page
 class TestACrossTableCheckOnTS80:
     """REQ-DASH-264 criterion 6, on the bootstrapped history (post-build-review
     #253, Keith 2026-10-19). TS-80: two Client Registers on 1 November 2020,
@@ -6032,6 +6292,7 @@ class TestACrossTableCheckOnTS80:
                    for r in labels), labels
 
 
+@pytest.mark.shared_page
 class TestASupersededRunOnTheDatesItWasCurrent:
     """post-build-review #266, Keith 2026-10-24 (answer A), on the bootstrapped
     history. TS-67's supply - 10:00am 12 October 2023 - was re-filed and
@@ -6436,6 +6697,7 @@ class TestASnapshotOpensAloneAndPublishesSplit:
         assert any("/snapshots/fonts/" in u for u in served["requests"]), served["requests"]
 
 
+@pytest.mark.shared_page
 class TestNotInTheAgreementOnThePage:
     """REQ-PIPE-270 criterion 9, the page half: a dataset page says why a
     cross-table check left out of the run on show - because a table it reads
@@ -7416,6 +7678,7 @@ class TestRecheckedAfterWeFixedACheck:
                f"corrected {name}" in row["status"], row
 
 
+@pytest.mark.shared_page
 class TestTheUxCriticsFindingsOn7093c20:
     """The dashboard UX critic's findings on REQ-DASH-204/272/275 (7093c20),
     each asserted where a reader sees it, on the deployment's own history."""
