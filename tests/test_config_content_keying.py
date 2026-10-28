@@ -426,3 +426,51 @@ class TestTheStoreIsBounded:
         assert store.get("f", "b", lambda: "rebuilt") == "B"
         assert store.get("f", "a", lambda: "rebuilt") == "rebuilt"
         assert builds == ["a", "b", "c"]
+
+
+# ---- criterion 19: a value taken once and passed down ------------------------
+
+class TestAValuePassedDownAnswersForTheReadItCameFrom:
+    """The hot call sites take the hierarchy's table index or the zone
+    versions once and pass them down, rather than reading the file for each
+    of tens of thousands of lookups. A value passed down answers for the
+    read it was taken from; without one, the file is read now."""
+
+    def test_the_table_index(self, asset):
+        from qa_tools.common import supply_status
+
+        taken = hierarchy.by_table()
+        assert taken["cp_clients"].dataset_name == DATASET_NAME[0]
+        edit_in_place(asset, *DATASET_NAME)
+        assert hierarchy.dataset_for_table("cp_clients", taken).dataset_name == DATASET_NAME[0]
+        assert hierarchy.dataset_for_table("cp_clients").dataset_name == DATASET_NAME[1]
+        assert supply_status.dataset_of("cp_clients", taken) == "cp-clients"
+        assert supply_status.dataset_of("no_such_table", taken) is None
+        with pytest.raises(hierarchy.UnknownDatasetError, match="no_such_table"):
+            hierarchy.dataset_for_table("no_such_table", taken)
+
+    def test_the_zone_versions(self, asset):
+        from datetime import UTC, date, datetime
+
+        taken = asset_time.timezone_versions()
+        edit_in_place(asset, *ZONE)
+        day, instant = date(2026, 1, 1), datetime(2026, 1, 1, 12, tzinfo=UTC)
+        assert asset_time.zone_on(day, taken).key == ZONE[0]
+        assert asset_time.zone_at(instant, taken).key == ZONE[0]
+        assert asset_time.zone_on(day).key == ZONE[1]
+        assert asset_time.localise(instant, taken).tzinfo.key == ZONE[0]
+        assert asset_time.end_of_day(day, taken).tzinfo.key == ZONE[0]
+
+    def test_a_holdings_reads_the_hierarchy_once(self, monkeypatch):
+        from qa_tools.common import supply_status
+
+        holdings = supply_status.Holdings({("cp-clients", "2024-Q1"): "s1"})
+        reads = []
+        real = config_yaml.read
+        monkeypatch.setattr(config_yaml, "read", lambda p: reads.append(p) or real(p))
+        from qa_tools.common import qa_store
+
+        record = {"reads": {"cp_clients": {"state": qa_store.READ, "supply_id": "s1"}}}
+        for _ in range(5):
+            assert supply_status._matches(holdings, record["reads"], "2024-Q1")
+        assert len(reads) == 1

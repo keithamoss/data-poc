@@ -112,8 +112,9 @@ releases:
   - date: "2026-10-28"
     summary: >
       The early-arrival examples now live on Emergency Department, Child
-      Protection's history starts two years later, and a bootstrap reports its
-      time against the 12-minute budget.
+      Protection's history starts two years later, a bootstrap reports its
+      time against the 12-minute budget, and an edited configuration file is
+      read for what it says now.
     changes:
       - category: Improved
         items:
@@ -135,6 +136,13 @@ releases:
               `mothman pipeline bootstrap` ends by printing its wall clock
               against the 12-minute budget, and says plainly when it went
               over.
+          - headline: Edits are seen straight away
+            components: ["Pipeline & publishing", "Testing & dev tooling"]
+            description: >
+              Change the hierarchy, the calendar, a contract or the dashboard's
+              wording and the next thing that reads it sees the change, with no
+              restart. `mothman check` now refuses a new cache that could
+              answer from an old copy.
       - category: Fixed
         items:
           - headline: Held back after it was promoted
@@ -143,20 +151,6 @@ releases:
               When a delivery's files arrived minutes apart, an early file's
               "held back" could take effect days after the later file promoted
               it. Its promotion now never takes effect before its hold-back.
-  - date: "2026-10-26"
-    summary: >
-      A configuration file you edit is read for what it says now, even by a
-      process that was already running.
-    changes:
-      - category: Improved
-        items:
-          - headline: Edits are seen straight away
-            components: ["Pipeline & publishing", "Testing & dev tooling"]
-            description: >
-              Change the hierarchy, the calendar, a contract or the dashboard's
-              wording and the next thing that reads it sees the change, with no
-              restart. `mothman check` now refuses a new cache that could
-              answer from an old copy.
   - date: "2026-10-25"
     summary: >
       The dashboard appears in under half a second again, a data file that

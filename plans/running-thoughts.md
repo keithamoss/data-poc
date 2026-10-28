@@ -5454,6 +5454,13 @@ could never have computed it), and it belongs with batch 5's check work.
     answers: N_LIST 9, the Collections/Tools help split at every size, and a
     new `mothman collections` command for the full list. Not yet signed.
 
+102. **[in-progress, 2026-10-16]** **[Pipeline & publishing]** **Key the
+     configuration caches on file content.** Drafted by delivery-scoper as
+     REQ-PIPE-254, signed off by Keith 2026-10-24 with every open question
+     answered. Built 2026-10-28 except criteria 13, 14 and 19, which need two
+     bootstraps from empty that nobody has approved yet (see the requirement's
+     unmet_criteria). Remove this entry once REQ-PIPE-254 is built.
+
 103. **[todo, 2026-10-16]** **[Testing & dev tooling]** **Three copies of
      the asset file's path.** Found by delivery-scoper drafting REQ-PIPE-254:
      `hierarchy`, `asset_time` and `validate_schedule` each hold their own
