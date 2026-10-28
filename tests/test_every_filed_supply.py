@@ -351,9 +351,14 @@ class TestTheDoorsOtherBranches:
         from contextlib import nullcontext
 
         from cli import filing_tui
+        from qa_tools.common import gate
 
         asked, decided = [], {}
         monkeypatch.setattr(filing_tui, "open_log", lambda: nullcontext(None))
+        # The log is a stand-in with nothing behind it, so the door's other
+        # question of it - is any listed supply still being checked with its
+        # delivery (REQ-PIPE-276 criterion 11) - is answered here too: none is.
+        monkeypatch.setattr(gate, "being_gated", lambda conn, dataset_id, supply: None)
         monkeypatch.setattr(filing_queue, "supplies_in", lambda c, s: entries)
         monkeypatch.setattr(filing_tui, "_offers", lambda s, scoped: scoped)
 
@@ -380,7 +385,9 @@ class TestTheDoorsOtherBranches:
         asked, decided = self._drive(monkeypatch, slot, entries,
                                      lambda cs: next(c for c in cs if c.startswith("The period")))
         assert sum(c.startswith("The period itself") for c in asked[0]) == 1
-        assert set(decided["offer"]) == {fd.SUBSTITUTE, fd.INHERIT}
+        # Substitute only: a period a supply has arrived for is not offered
+        # inheriting, which the log refuses there (CLI UX review P9, 07e9390).
+        assert set(decided["offer"]) == {fd.SUBSTITUTE}
 
     def test_an_open_pair_is_the_only_choice_and_says_so(self, monkeypatch, capsys):
         slot = slot_state.SlotState(dataset_id=DS, period="2099-x", state=slot_state.TWO_FILES,
