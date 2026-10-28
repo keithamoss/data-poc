@@ -221,8 +221,10 @@ without asking" default for this project specifically):**
   scheduled - Keith's own standing ask, 2026-10-28** (`plans/running-
   thoughts.md` #128), after the container slept twice in one day and
   stopped a builder and its test run each time. Arm it when the first
-  agent starts (a recurring scheduled task firing into THIS session),
-  and delete it when the last one finishes. On each wake: check which
+  agent starts. A recurring scheduled task cannot repeat more often
+  than hourly, so it is a CHAIN of 10-minute one-shot check-ins
+  (`send_later`), each one re-arming the next while any agent is still
+  running, and the chain stops when the last one finishes. On each wake: check which
   agents are still running; resume any the container stopped
   (SendMessage to its id, telling it what was killed); and otherwise
   say nothing. A wake-up does not keep the container awake - it makes
