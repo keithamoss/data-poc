@@ -179,9 +179,9 @@ Reframed from daily during Keith's review: the original example (22:00 due, 21:5
 
 ### TS-9 - A genuinely early quarterly supply
 
-**What it demonstrates.** Assigned **August**, the period open when it arrived (REQ-PIPE-131), classified **early by 9 days**. Note nothing measures how early it is in order to assign it - earliness is a reported consequence of the assignment.
+**What it demonstrates.** Assigned **2024-Q2** (due 09:00 1 May), the period open when it arrived (REQ-PIPE-131), classified **early**, and filled by the rule. Re-quoted 2026-10-28 from the bootstrapped build (REQ-GEN-235 criterion 4; post-build-review #284): Emergency Department's supply received 10:00 22 April 2024 is filed to slot 2024-Q2, arrival status early, filled at 04:06 2 May, filed automatically. Until then this said "assigned August" and "the 1 May anchor" - the dates of the original config above, never of the planted case. Note nothing measures how early it is in order to assign it - earliness is a reported consequence of the assignment.
 
-**What it would look like if the rule were wrong.** `cycle_start()` only looks backwards, so it resolves to the 1 May anchor and reports the supply ~12 weeks LATE for a quarter that was filled months ago.
+**What it would look like if the rule were wrong.** `cycle_start()` only looks backwards, so it resolves to the 1 February anchor and reports the supply ~12 weeks LATE for 2024-Q1, a quarter that was filled months ago.
 
 | Where to look | |
 |---|---|
@@ -1465,13 +1465,13 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "mode": "INJECT",
    "title": "A genuinely early quarterly supply",
    "section": "Arrival classification",
-   "demonstrates": "Assigned **August**, the period open when it arrived (REQ-PIPE-131), classified **early by 9 days**. Note nothing measures how early it is in order to assign it - earliness is a reported consequence of the assignment.",
-   "breaksAs": "`cycle_start()` only looks backwards, so it resolves to the 1 May anchor and reports the supply ~12 weeks LATE for a quarter that was filled months ago.",
+   "demonstrates": "Assigned **2024-Q2** (due 09:00 1 May), the period open when it arrived (REQ-PIPE-131), classified **early**, and filled by the rule. Re-quoted 2026-10-28 from the bootstrapped build (REQ-GEN-235 criterion 4; post-build-review #284): Emergency Department's supply received 10:00 22 April 2024 is filed to slot 2024-Q2, arrival status early, filled at 04:06 2 May, filed automatically. Until then this said \"assigned August\" and \"the 1 May anchor\" - the dates of the original config above, never of the planted case. Note nothing measures how early it is in order to assign it - earliness is a reported consequence of the assignment.",
+   "breaksAs": "`cycle_start()` only looks backwards, so it resolves to the 1 February anchor and reports the supply ~12 weeks LATE for 2024-Q1, a quarter that was filled months ago.",
    "config": null,
    "requirements": [
     "REQ-PIPE-131",
-    "REQ-GEN-195",
-    "REQ-GEN-235"
+    "REQ-GEN-235",
+    "REQ-GEN-195"
    ],
    "coordinates": {
     "dataset": "ed-presentations",
