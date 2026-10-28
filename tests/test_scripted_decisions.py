@@ -126,11 +126,23 @@ class TestPlayback:
             player.finish()
 
     def test_never_on_an_asset_that_is_not_synthetic(self, monkeypatch, tmp_path):
-        asset = tmp_path / "data-asset.yaml"
-        asset.write_text("synthetic: false\n")
-        monkeypatch.setattr("qa_tools.common.hierarchy.DATA_ASSET_YAML", asset)
+        monkeypatch.setattr("qa_tools.common.hierarchy.DATA_ASSET_YAML", _not_synthetic(tmp_path))
         with pytest.raises(sd.ScriptRefused, match="synthetic"):
             sd.Player("child-protection", scripts=[_script()], placements={})
+
+
+def _not_synthetic(tmp_path: Path) -> Path:
+    """The committed asset file with `synthetic: false` - the whole file, not
+    that one line: the hierarchy is read from the patched path too, and is
+    keyed on its content (REQ-PIPE-254), so a one-line asset is an asset
+    with no hierarchy, not one that is merely not synthetic."""
+    from qa_tools.common import hierarchy
+
+    text = Path(hierarchy.DATA_ASSET_YAML).read_text()
+    assert "\nsynthetic: true\n" in text
+    asset = tmp_path / "data-asset.yaml"
+    asset.write_text(text.replace("\nsynthetic: true\n", "\nsynthetic: false\n"))
+    return asset
 
 
 class TestNoBackDoor:
@@ -493,9 +505,7 @@ class TestAPeriodScopedDecisionIsPlayed:
 
     def test_refused_on_an_asset_that_is_not_synthetic(self, monkeypatch, tmp_path):
         """Criterion 11."""
-        asset = tmp_path / "data-asset.yaml"
-        asset.write_text("synthetic: false\n")
-        monkeypatch.setattr("qa_tools.common.hierarchy.DATA_ASSET_YAML", asset)
+        monkeypatch.setattr("qa_tools.common.hierarchy.DATA_ASSET_YAML", _not_synthetic(tmp_path))
         with pytest.raises(sd.ScriptRefused, match="synthetic"):
             sd.Player("child-protection", scripts=[_period_script()], placements={})
 
