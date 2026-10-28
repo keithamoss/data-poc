@@ -124,6 +124,11 @@ CARRY_FORWARD_POSSIBLE = "carry-forward-possible"
 #: 2026-10-06, post-build-review #123 B2). The dashboard used to leave
 #: them out while `mothman supply queue` listed about twenty.
 AWAITING_DECISION = "awaiting-decision"
+#: A promoted supply whose re-check came back worse than the verdict it was
+#: promoted on (REQ-DASH-221 criterion 12): one item per supply, under the
+#: terminal's own heading, 'Promoted, then re-checked <verdict>', until it is
+#: demoted or acknowledged - turned off or not (REQ-DASH-180 criterion 6).
+RECHECKED_WORSE = "promoted-then-rechecked"
 #: A declared calendar correction no one has confirmed yet (REQ-PIPE-170
 #: criteria 3 and 19): ASSET-WIDE, one item per correction, and needs-action
 #: until the asset manager confirms it - its affected supplies keep their
@@ -169,6 +174,9 @@ class Item:
     #: correction's own date, before which the page leaves it out
     #: (REQ-DASH-263 criterion 3).
     dated: str | None = None
+    #: A re-checked-worse item's new verdict, which its kind's heading names
+    #: ('Promoted, then re-checked <verdict>', REQ-DASH-221 criterion 12).
+    verdict: str | None = None
 
     def as_record(self) -> dict:
         return {"kind": self.kind, "severity": self.severity, "blocking": self.blocking,
@@ -177,6 +185,7 @@ class Item:
                 "datasetId": self.dataset_id, "observedAt": self.observed_at,
                 "responses": list(self.responses), "actionable": self.actionable,
                 "dated": self.dated,
+                **({"verdict": self.verdict} if self.verdict else {}),
                 "affects": [{"agencyId": a, "collectionId": c, "datasetId": d,
                              "name": _name_of(d)} for a, c, d in self.affects]}
 
@@ -544,6 +553,9 @@ def _from_awaiting_decisions(conn=None) -> list[Item]:
 
     skip = {slot_state.TWO_FILES, slot_state.REJECTED, filing_queue.COULD_NOT_LOAD}
     by_dataset: dict[str, list] = {}
+    worse: list = []
+    found_worse: list = []
+    ran_at: dict = {}
     try:
         with delivery_log._db(conn) as db:
             # NOTHING FILED, NOTHING AWAITING - and the slot walk below is the
@@ -571,14 +583,29 @@ def _from_awaiting_decisions(conn=None) -> list[Item]:
                 for state in counted:
                     if state.state in skip or not state.supply:
                         continue
+                    if state.state == filing_queue.RECHECKED_WORSE:
+                        worse.append(state)
+                        continue
                     by_dataset.setdefault(state.dataset_id, []).append(state)
+            from qa_tools.common import rechecking
+
+            found_worse = [w for w in (rechecking.worse_for(db, s.dataset_id, s.supply, s.period)
+                                       for s in worse) if w is not None]
+            # FROM WHEN ITS RE-CHECK RAN, the instant its verdict exists from.
+            ran_at = dict(db.execute(
+                "SELECT caused_by_decision, min(run_instant) FROM qa.run "
+                "WHERE caused_by_decision = ANY(?) AND completed_at IS NOT NULL "
+                "GROUP BY caused_by_decision", [[w.recheck_id for w in found_worse]]).fetchall()) \
+                if found_worse else {}
             received = {(r[0], r[1]): r[2] for r in db.execute(
                 "SELECT dataset_id, supply_id, received_at FROM qa.supply_receipt").fetchall()}
     except Exception as exc:  # noqa: BLE001 - the queue never fails on one producer
         print(f"note: could not read the supplies awaiting a decision "
               f"({type(exc).__name__}: {exc}) - the rest of the queue is unaffected.")
         return []
-    items = []
+    items = [_rechecked_worse_item(w, received.get((w.dataset_id, w.supply)),
+                                   ran_at.get(w.recheck_id))
+             for w in sorted(found_worse, key=lambda w: (w.dataset_id, w.period, w.supply))]
     for dataset_id, states in sorted(by_dataset.items()):
         agency, collection = _scope_of(dataset_id)
         n = len(states)
@@ -596,6 +623,29 @@ def _from_awaiting_decisions(conn=None) -> list[Item]:
             # THE SLOT STATE'S OWN RESPONSES, as the terminal offers them.
             responses=states[0].responses))
     return items
+
+
+def _rechecked_worse_item(w, received, ran_at=None) -> Item:
+    """REQ-DASH-221 criterion 12: one supply promoted and then re-checked
+    worse, under the terminal's own heading - observed from the re-check, so
+    an earlier date does not list it."""
+    agency, collection = _scope_of(w.dataset_id)
+    when = display_time.format_instant(received) if received else "on an unrecorded date"
+    return Item(
+        kind=RECHECKED_WORSE, severity=NEEDS_ACTION, blocking=False,
+        headline=f"{_name_of(w.dataset_id)}, {display_time.format_period(w.period)}",
+        verdict=w.now,
+        detail=(f"The supply received {when} was promoted into "
+                f"{display_time.format_period(w.period)} {w.promoted_on}; a re-check "
+                f"{display_time.format_instant(ran_at or w.recheck_at)} came back {w.now}. It stays "
+                f"promoted until a person demotes it, or acknowledges its new verdict."),
+        agency_id=agency, collection_id=collection, dataset_id=w.dataset_id,
+        observed_at=_iso_text(ran_at or w.recheck_at),
+        responses=("demote it", "acknowledge its new verdict"))
+
+
+def _iso_text(value) -> str | None:
+    return value.isoformat() if hasattr(value, "isoformat") else (str(value) if value else None)
 
 
 def _from_inheritance_refusals() -> list[Item]:

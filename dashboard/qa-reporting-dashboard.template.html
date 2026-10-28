@@ -765,6 +765,7 @@ span.scenario-subject-label{display:inline-block; margin:0 6px 0 0;}
 .scope-check .label .rc{font-size:12px; color:var(--ink-muted); margin-left:8px;}
 .scope-check .label .rc:empty{display:none;}
 .recheck-note{font-size:12.5px; color:var(--ink-muted); margin-top:8px;}
+.bulk-recheck-line{font-size:12.5px; color:var(--ink-muted); margin-top:6px;}
 /* REQ-PIPE-270 criterion 9: a cross-table check left out of the supply's run
    because a table it reads is not part of the agreement for the period. Not a
    row of results - nothing to open, no status pill - so not a .scope-check. */
@@ -6652,7 +6653,11 @@ const OUTSTANDING_KIND_LABEL = {
   "carry-forward-possible":"A newer supply could be carried forward",
   "pending-correction":"Calendar correction to confirm",
   "parked-correction-move":"Correction move waiting"};
-function outstandingKindLabel(kind){ return OUTSTANDING_KIND_LABEL[kind] || kind; }
+function outstandingKindLabel(kind, item){
+  // THE TERMINAL'S OWN HEADING, naming the new verdict (REQ-DASH-221 criterion 12).
+  if(kind === "promoted-then-rechecked") return `Promoted, then re-checked ${(item && item.verdict) || "worse"}`;
+  return OUTSTANDING_KIND_LABEL[kind] || kind;
+}
 
 // A SUPPLY NOBODY COULD PLACE, OR A TABLE TWO FILES CLAIM, MAKES ITS
 // DATASET RED (REQ-PIPE-115 criteria 10 to 12). Said ONCE, at dataset
@@ -7532,7 +7537,7 @@ function outstandingItemHtml(item){
   return `<div class="queue-item ${klass}">
     <div class="queue-head">
       ${eventSeverityPill(item.severity,"sm")}
-      <b style="font-weight:650;">${escHtml(outstandingKindLabel(item.kind))}</b>
+      <b style="font-weight:650;">${escHtml(outstandingKindLabel(item.kind, item))}</b>
       <span>${escHtml(item.headline||"")}</span>
       <span class="pill ${(item.blocking||item.redsDataset)?"ev ev-action":"ev ev-info"} sm"><span class="ico"></span>${item.blocking?"Blocks a supply":item.redsDataset?"Makes its dataset red":"Needs review"}</span>
       ${when}
@@ -8127,6 +8132,15 @@ function redPromotedBadge(datasetId, runId, inPlaceOnDateStr){
     const before = !!h.promotedAt && new Date(since.at) <= new Date(h.promotedAt);
     const wentRed = h.promotedOn === "red";
     const went = h.promotedOn ? `went in ${escHtml(h.promotedOn)}, ` : "";
+    // A RE-CHECK TURNED IT (REQ-DASH-221 criterion 8, amending REQ-DASH-126
+    // criterion 2): named as criteria 1 and 2 word it, and the badge stays
+    // after acknowledgement, naming who.
+    const rc = recheckEvents(datasetId, runId).find(e=> sameInstant(e.at, since.at));
+    if(rc && !before){
+      const ack = recheckAcknowledged(datasetId, runId, rc, on);
+      const acked = ack ? `; acknowledged by ${escHtml(ack.actor)}, ${fmtInstant(ack.at)}` : "";
+      return `<span class="red-promoted" data-red-promoted data-red-promoted-recheck><span class="pill red sm"><span class="ico"></span>Red promoted</span><span class="rp-why" data-red-promoted-why>${sentenceCase(`${wentRed ? "" : went}${recheckWords(rc)}${acked}`)}</span></span>`;
+    }
     const how = before
       ? `went in red. Red since ${escHtml(since.cause)}, ${fmtInstant(since.at)}; promoted ${fmtInstant(h.promotedAt)}`
       : wentRed ? "promoted while red"
@@ -8137,6 +8151,9 @@ function redPromotedBadge(datasetId, runId, inPlaceOnDateStr){
     return `<span class="red-promoted" data-red-promoted><span class="pill red sm"><span class="ico"></span>Red promoted</span><span class="rp-why" data-red-promoted-why>${sentenceCase(`${wentRed || before ? "" : went}${how}`)}</span></span>`;
   }
   if(later){
+    // A LATER RE-CHECK'S OWN NOTE IN PLACE OF THIS TAG (REQ-DASH-221 criterion 5).
+    const rc = recheckEvents(datasetId, runId).find(e=> sameInstant(e.at, later.at));
+    if(rc) return recheckedLaterTag(rc);
     return `<span class="pill tag sm" data-turns-red-later style="color:var(--ink-muted);"><span class="ico"></span>Turned red later - ${fmtInstant(later.at)}, after ${escHtml(later.cause)}</span>`;
   }
   return "";
@@ -8153,6 +8170,8 @@ function supplyRowStatus(datasetId, entry, inPlaceOnDateStr){
   const raw = rawRealDatasetById(datasetId);
   const h = raw && raw.promotedHealth && raw.promotedHealth[entry.run_id];
   const on = inPlaceOnDateStr || (typeof CURRENT_IN_PLACE_ON !== "undefined" ? CURRENT_IN_PLACE_ON : null);
+  // RE-CHECKED AFTER WE FIXED A CHECK (REQ-DASH-221): its own wording.
+  if(recheckEvents(datasetId, entry.run_id).length) return recheckedRowStatus(datasetId, entry, on);
   let shown = entry.status, changed = null;
   if(h && runStateInPlaceOn(raw, entry.run_id, on) === "promoted"){
     // ONLY A READING AFTER THE ARRIVAL moves the pill (post-build-review
@@ -8170,6 +8189,134 @@ function supplyRowStatus(datasetId, entry, inPlaceOnDateStr){
       + ` <span class="changed-by" data-changed-by style="color:var(--ink-muted); font-size:12px;">· changed ${escHtml(fmtDay(changed.at))} after ${escHtml(changed.cause || "a later check")}</span>`
     : "";
   return pill(changed ? shown : entry.status, "sm") + arrived;
+}
+// ---- RE-CHECKED AFTER WE FIXED A CHECK (REQ-DASH-221) --------------------
+// The build's events (pipeline/rechecks.py), oldest first, for the supply a
+// run checked: each re-check that has RUN - {at, person, reason, before,
+// after, bulk: {checkId, changelogDate, others}} - dated by its run, so a
+// re-check takes effect from its own instant and never changes what an
+// earlier date shows (Keith, 2026-10-10, option A).
+function recheckEvents(datasetId, runId){
+  const raw = rawRealDatasetById(datasetId);
+  const by = raw && raw.rechecks && raw.rechecks.supplies;
+  if(!by) return [];
+  const run = (raw.runs || []).find(r=> r.run_id === runId);
+  return (run && run.supply_id && by[run.supply_id]) || [];
+}
+const RECHECK_RANK = {green: 0, amber: 1, red: 2};
+function recheckWorse(was, now){ return was in RECHECK_RANK && now in RECHECK_RANK && RECHECK_RANK[now] > RECHECK_RANK[was]; }
+// THE CORRECTED CHECK BY NAME, A REAL LINK TO ITS DRAWER (criterion 2) - on
+// whichever page carries its card, the date on show kept by the navigation.
+function recheckCheckLink(checkId, asText){
+  for(const raw of rawRealDatasets()){
+    for(const col of raw.columns || []){
+      const ck = (col.checks || []).find(c=> c.check_id === checkId);
+      if(!ck) continue;
+      const found = realDatasetIndex()[raw.id] || {};
+      const agencyId = agencyOfCollection(found.collectionId);
+      const name = ck.name || checkId;
+      if(asText || !agencyId) return escHtml(name);
+      const nav = {tier:"dataset", agencyId, collectionId: found.collectionId, datasetId: raw.id,
+                   columnName: columnKey(col), checkKey: ck.key};
+      return `<a class="recheck-check" href="${navHref(nav)}" data-nav='${JSON.stringify(nav)}'>${escHtml(name)}</a>`;
+    }
+  }
+  return escHtml(checkId);
+}
+// A RE-CHECK IN WORDS THAT PLACE THE CHANGE WITH OUR CHECK (criteria 1 and 2):
+// a single one says who, when and why; a bulk one names the check we
+// corrected and its changelog entry's date.
+function recheckWords(e, asText){
+  if(e.bulk){
+    const date = e.bulk.changelogDate ? ` (${escHtml(fmtDay(e.bulk.changelogDate))})` : "";
+    return `re-checked after we corrected ${recheckCheckLink(e.bulk.checkId, asText)}${date}${e.bulk.others ? " and other checks" : ""}`;
+  }
+  return `re-checked ${escHtml(fmtDay(e.at))} by ${escHtml(e.person)} - ${escHtml(e.reason)}`;
+}
+// What a later re-check came after, for the forward note (criterion 5).
+function recheckCause(e, asText){
+  return e.bulk ? `we corrected ${recheckCheckLink(e.bulk.checkId, asText)}`
+    : `a re-check by ${escHtml(e.person)} - ${escHtml(e.reason)}`;
+}
+function recheckedLaterTag(e){
+  return `<span class="pill tag sm" data-rechecked-later style="color:var(--ink-muted);"><span class="ico"></span>Re-checked later - ${fmtInstant(e.at)}, now ${escHtml(STATUS_LABEL[e.after] || e.after)}, after ${recheckCause(e)}</span>`;
+}
+function sameInstant(a, b){ return !!a && !!b && new Date(a).getTime() === new Date(b).getTime(); }
+// A ROW WHOSE SUPPLY WAS RE-CHECKED (criteria 1 to 6): the verdict that stood
+// on the date on show - the one it arrived with before any re-check, each
+// re-check's from its run on - then 'Arrived <old>' where that differs, each
+// re-check that has run (a single one always, criterion 3; a bulk one only
+// where it changed the verdict, criterion 4), any later change that was not a
+// re-check, and a quiet forward note for a later re-check that changes it.
+function recheckedRowStatus(datasetId, entry, on){
+  const raw = rawRealDatasetById(datasetId);
+  const h = raw && raw.promotedHealth && raw.promotedHealth[entry.run_id];
+  const rc = recheckEvents(datasetId, entry.run_id);
+  const by = v=> !on || assetDateStrOf(v) <= on;
+  const done = rc.filter(e=> by(e.at));
+  const arrived = rc[0].before || entry.status;
+  let shown = done.length ? (done[done.length-1].after || arrived) : arrived;
+  let changed = null;
+  const promoted = !!h && runStateInPlaceOn(raw, entry.run_id, on) === "promoted";
+  if(promoted){
+    (h.timeline || []).filter(t=> t.at && t.status).slice(1).forEach(t=>{
+      if(by(t.at)){ shown = t.status; changed = t; }
+    });
+    // A STEP THAT IS A RE-CHECK IS SAID AS ONE, below, never as 'changed after'.
+    if(changed && (changed.status === arrived || rc.some(e=> sameInstant(e.at, changed.at)))) changed = null;
+  }
+  const notes = [];
+  if(shown !== arrived && STATUS_LABEL[arrived]) notes.push(`Arrived ${STATUS_LABEL[arrived]}`);
+  done.forEach(e=>{ if(!e.bulk || e.before !== e.after) notes.push(recheckWords(e)); });
+  if(changed) notes.push(`changed ${escHtml(fmtDay(changed.at))} after ${escHtml(changed.cause || "a later check")}`);
+  const later = rc.find(e=> !by(e.at) && e.before && e.after && e.before !== e.after);
+  // THE NOTE REPLACES THE TURNED-RED-LATER TAG (criterion 5): for a supply in
+  // place that a later re-check turns red, redPromotedBadge carries it.
+  const laterHere = later && !(promoted && later.after === "red") ? ` ${recheckedLaterTag(later)}` : "";
+  const text = notes.map((n, i)=> i ? n : n.charAt(0).toUpperCase() + n.slice(1)).join(" · ");
+  return pill(shown, "sm") + (text ? ` <span class="arrived-as rechecked" data-rechecked style="color:var(--ink-muted); font-size:12px;">${text}</span>` : "") + laterHere;
+}
+// A PROMOTED SUPPLY A RE-CHECK MADE AMBER, WORSE THAN IT WENT IN (criteria 8
+// and 9): the acknowledgement badge's form, where the red-promoted badge
+// sits, and kept after acknowledgement, naming who.
+function recheckedAmberTag(datasetId, runId, inPlaceOnDateStr){
+  const raw = rawRealDatasetById(datasetId);
+  const h = raw && raw.promotedHealth && runId && raw.promotedHealth[runId];
+  if(!h) return "";
+  const on = inPlaceOnDateStr || (typeof CURRENT_IN_PLACE_ON !== "undefined" ? CURRENT_IN_PLACE_ON : null);
+  if(runStateInPlaceOn(raw, runId, on) !== "promoted") return "";
+  const by = v=> !on || assetDateStrOf(v) <= on;
+  const done = recheckEvents(datasetId, runId).filter(e=> by(e.at));
+  const last = done[done.length-1];
+  if(!last || last.after !== "amber" || !recheckWorse(h.promotedOn, "amber")) return "";
+  let now = null;
+  (h.timeline || []).forEach(t=>{ if(t.at && t.status && by(t.at)) now = t.status; });
+  if(now !== "amber") return "";
+  const ack = recheckAcknowledged(datasetId, runId, last, on);
+  return ack
+    ? `<span class="pill tag sm" data-rechecked-amber="acknowledged" title="${escHtml(ack.reason)}"><span class="ico"></span>Amber, promoted - re-checked, acknowledged by ${escHtml(ack.actor)}</span>`
+    : `<span class="pill tag sm" data-rechecked-amber="awaiting"><span class="ico"></span>Amber, promoted - re-checked, awaiting acknowledgement</span>`;
+}
+// The standing acknowledgement given after a re-check, as at the date on show.
+function recheckAcknowledged(datasetId, runId, e, on){
+  const raw = rawRealDatasetById(datasetId);
+  const run = ((raw && raw.runs) || []).find(r=> r.run_id === runId);
+  const acks = ((raw && raw.rechecks && raw.rechecks.acks) || {})[run && run.supply_id] || [];
+  const by = v=> !on || assetDateStrOf(v) <= on;
+  return [...acks].reverse().find(a=> a.at && by(a.at) && new Date(a.at) >= new Date(e.at)
+    && !(a.withdrawn && by(a.withdrawn.at))) || null;
+}
+// ONE LINE PER BULK RE-CHECK OF A CHECK, for its drawer (criterion 4): from
+// its own instant on the date on show, its changes counted as at that date.
+function bulkRecheckLines(datasetId, checkId, inPlaceOnDateStr){
+  const raw = rawRealDatasetById(datasetId);
+  const lines = ((raw && raw.rechecks && raw.rechecks.lines) || {})[checkId] || [];
+  const on = inPlaceOnDateStr || (typeof CURRENT_IN_PLACE_ON !== "undefined" ? CURRENT_IN_PLACE_ON : null);
+  const by = v=> !on || assetDateStrOf(v) <= on;
+  return lines.filter(l=> by(l.at)).map(l=>{
+    const changed = (l.changes || []).filter(by).length;
+    return {changelogDate: l.changelogDate, html: `<div class="bulk-recheck-line" data-bulk-recheck="${escHtml(String(l.id))}">Re-checked ${l.supplies} ${pluralize(l.supplies, "supply", "supplies")} across ${l.datasets} ${pluralize(l.datasets, "dataset")} on ${escHtml(fmtDay(l.at))} by ${escHtml(l.person)}: ${changed} changed - ${escHtml(l.reason)}</div>`};
+  });
 }
 // RED PROMOTED AS A KIND ON THE AGENCY AND COLLECTION CARDS (#123 A1, Keith
 // 2026-10-06): a dataset whose newer supply awaits a decision reads Green on
@@ -8211,7 +8358,7 @@ function renderSupplyCycleRows(entries, datasetId, cycleStart){
     // dirtySeverity pill (a synthetic-generation-only concept no real
     // production dashboard would have - item 72).
     const statusBadge = supplyRowStatus(datasetId, e) + " " + acknowledgementBadge(datasetId, e.run_id)
-      + " " + redPromotedBadge(datasetId, e.run_id);
+      + " " + redPromotedBadge(datasetId, e.run_id) + " " + recheckedAmberTag(datasetId, e.run_id);
     // A resupply (any entry after the first in its chain) has no real
     // arrivalStatus (item 69's own reasoning, now keyed off real chain
     // position) - shows how long it's been since the previous supply/
@@ -8581,8 +8728,13 @@ function wireSupplyHistorySection(container){
     });
     toggle.dataset.collapsedLabel = toggle.textContent;
   }
+  // A LINK INSIDE A CLICKABLE ROW IS FOLLOWED ALONE (REQ-DASH-221 criterion
+  // 10): the row's own click is not also acted on.
   container.querySelectorAll(".supply-history tbody tr[data-run-date]").forEach(tr=>
-    tr.addEventListener("click", ()=> applyInPlaceOn(tr.dataset.runDate)));
+    tr.addEventListener("click", e=>{
+      if(e.target && e.target.closest && e.target.closest("a")) return;
+      applyInPlaceOn(tr.dataset.runDate);
+    }));
 }
 
 /* ---- A period's composition (REQ-DASH-209) ------------------------------
@@ -8970,7 +9122,7 @@ function renderDataset(view, agencyId, collectionId, datasetId){
         <h2>${ds.name}${ds.realRunCount?` <span class="pill tag"><span class="ico"></span>Real pipeline data — ${ds.realRunCount} computed ${pluralize(ds.realRunCount,"run")}</span>`:""}</h2>
         <div class="view-sub">${ds.provider} · ${col.name} · ${ag.name}${ds.realRunCount?" · figures below are computed by real dbt/Soda/datacontract-cli/Evidently tools against real generated runs — not fabricated in the browser.":""}</div>
       </div>
-      <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">${statusPill(ds)} ${redPromotedBadge(ds.id, ds.verdictOf && ds.verdictOf.inPlaceRunId)} ${turnOffMarker(rawRealDatasetById(ds.id) || ds, CURRENT_IN_PLACE_ON)} ${unagreedMarker(ds)} ${standingInMarker(ds)} ${ticketBadge(ds.id)} ${githubFolderLink("datasets", ds.id)} ${assignmentBadge("datasets", ds.id)}</div>
+      <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">${statusPill(ds)} ${redPromotedBadge(ds.id, ds.verdictOf && ds.verdictOf.inPlaceRunId)} ${recheckedAmberTag(ds.id, ds.verdictOf && ds.verdictOf.inPlaceRunId)} ${turnOffMarker(rawRealDatasetById(ds.id) || ds, CURRENT_IN_PLACE_ON)} ${unagreedMarker(ds)} ${standingInMarker(ds)} ${ticketBadge(ds.id)} ${githubFolderLink("datasets", ds.id)} ${assignmentBadge("datasets", ds.id)}</div>
     </div>
     ${verdictLine(ds)}
     ${turnOffReasonLine(ds)}
@@ -9833,10 +9985,21 @@ function openCheckPanel(ag, col, ds, column, check, opts){
   // just another entry here (see dbt_project/schema-retired.yml's real
   // example) rather than special-cased - the "Retired" badge in the
   // panel header (Phase 5b) already covers the current-state signal.
-  const changelogBlock = (check.changelog && check.changelog.length) ? `
+  // EACH BULK RE-CHECK OF THIS CHECK, ONE LINE BESIDE THE CHANGELOG ENTRY IT
+  // ACTED ON (REQ-DASH-221 criterion 4) - not counted in the heading's count
+  // of changes; one whose entry is not listed goes after them.
+  const bulkLines = bulkRecheckLines(ds.id, check.check_id);
+  const changes = check.changelog || [];
+  const entryDay = e=> e.date instanceof Date && !isNaN(e.date) ? e.date.toISOString().slice(0, 10) : String(e.date || "").slice(0, 10);
+  const placedLines = new Set();
+  const linesFor = e=> bulkLines.filter((l, i)=>{
+    if(placedLines.has(i) || !l.changelogDate || l.changelogDate !== entryDay(e)) return false;
+    placedLines.add(i); return true;
+  }).map(l=> l.html).join("");
+  const changelogBlock = (changes.length || bulkLines.length) ? `
     <div class="drawer-section">
-      <h4>Definition changelog (${check.changelog.length} ${pluralize(check.changelog.length,"change")})</h4>
-      ${check.changelog.slice().sort((a,b)=>b.date-a.date).map(e=> `
+      <h4>Definition changelog (${changes.length} ${pluralize(changes.length,"change")})</h4>
+      ${changes.slice().sort((a,b)=>b.date-a.date).map(e=> `
         <div class="changelog-entry ${e.breaking?'breaking':''}">
           <div class="changelog-entry-head">
             <span class="changelog-date">${fmtDate(e.date)}</span>
@@ -9846,7 +10009,9 @@ function openCheckPanel(ag, col, ds, column, check, opts){
           </div>
           <div class="changelog-desc"${authoredSlot(e.description)}></div>
           <div class="changelog-author">— <span${authoredSlot(e.author)}></span></div>
+          ${linesFor(e)}
         </div>`).join("")}
+      ${bulkLines.filter((l, i)=> !placedLines.has(i)).map(l=> l.html).join("")}
     </div>` : "";
 
   body.innerHTML = descBlock + whatItDoesBlock + failureMeansBlock + referenceNoteHtml(currentPoint) + xtToolsPanelBlock(col, ds, column, check) + compareBlock + rowDetailBlock + trendBlock + changelogBlock;

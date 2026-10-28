@@ -39,7 +39,8 @@ import os
 from pipeline import (acknowledgements, closed_slots, corrections, cross_table_grid,
                       cross_table_notices, excuses, held_back_notices,
                       file_check_panel, owed_nothing, placements, promotion_timeline,
-                      recorded_arrival, red_promoted, slot_timeline, warehouse_counts)
+                      recorded_arrival, rechecks, red_promoted, slot_timeline,
+                      warehouse_counts)
 from pipeline.dashboard_check_labels import (dashboard_status, display_name, measure, pooled_url_key,
                                              rank_for_headline, tool_ref, url_key)
 from qa_tools import collections
@@ -819,6 +820,14 @@ def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], da
             if side:
                 ck["placed"] = side
     health = red_promoted.for_dataset(dataset_id)
+    # RE-CHECKED AFTER WE FIXED A CHECK (REQ-DASH-221): each re-check that
+    # has run, with the verdict either side of it, and each bulk re-check's
+    # line for its check's drawer - read once per collection.
+    if "rechecks" not in view:
+        with supply_db.connect(read_only=True, label="mothman:rechecks") as conn:
+            view["rechecks"] = rechecks.for_collection(conn, coll.id)
+    rechecked = view["rechecks"].for_dataset(
+        dataset_id, [ck["check_id"] for c in columns_out for ck in c["checks"] if ck.get("check_id")])
     raw_slots = slot_timelines.get(dataset_id) or slot_timeline.for_dataset(dataset_id)
     panel = promotion_timeline.for_dataset(dataset_id, raw_slots)
     warehouse_clause = cross_table_grid.clause_points(
@@ -853,6 +862,10 @@ def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], da
         "runStates": slot_timeline.run_states(dataset_id),
         # HOW EACH PROMOTED SUPPLY HAS DONE SINCE (REQ-DASH-126).
         "promotedHealth": health,
+        # RE-CHECKED AFTER WE FIXED A CHECK (REQ-DASH-221): {supplies: {supply:
+        # [event]}, lines: {check id: [bulk line]}, acks: {supply: [...]}},
+        # looked up by date - absent where nothing was re-checked.
+        **({"rechecks": rechecked} if rechecked else {}),
         # THE AWAITING LINE'S WAREHOUSE CLAUSE (REQ-DASH-272 criteria 1 to 5):
         # {supply: [{on, clause, status, tail}]}, looked up by date.
         "warehouseClause": warehouse_clause,

@@ -39,6 +39,13 @@ from fixture_ids import CP_REF_RUN_ID  # noqa: E402
 
 TOOLS = ("dbt", "soda", "datacontract", "evidently")
 
+#: The person a scenario's decisions are made by - a real entry of
+#: contract/people.yaml, so the page names them.
+REAL_PERSON = "fpycnkgvmt@privaterelay.appleid.com"
+#: A definition fingerprint no check has (REQ-QAC-176's scheme, a value
+#: nobody's definition hashes to).
+OLD_DEFINITION = "v1:" + "a" * 64
+
 
 @dataclass
 class Ctx:
@@ -205,6 +212,60 @@ class Scenario:
                     reason="fixture: put in the warehouse", supply_is_red=True)
         if follow_up:
             knock_on.follow_up(CP, run_by="pytest@example.org")
+
+    # ---- re-checks (REQ-PIPE-164, REQ-PIPE-177) ---------------------------------
+
+    def recheck(self, supply: str, period: str, *, at, reason: str = "our check was wrong",
+                person: str | None = None, run: bool = True):
+        """A person's re-check of `supply` where it is filed, at `at`, through
+        the one decision entry point - then, unless `run` is False, the
+        owed re-check run as the processing pass runs it."""
+        from qa_tools.common import filing_decisions as fd
+        from qa_tools.common import people, supply_db
+
+        with supply_db.connect(label="pytest-recheck") as conn:
+            fd.apply(fd.Request(operation=fd.RECHECK, dataset_id=supply.split("@", 1)[0],
+                                actor=people.person_by_email(person or REAL_PERSON),
+                                reason=reason, confirmed=True, period=period, supply=supply),
+                     effective_at=_iso(at), conn=conn)
+        return self.run_owed() if run else []
+
+    def judged_under_an_old_definition(self, check_id: str, supplies) -> None:
+        """Every result of `check_id` about these supplies recorded under a
+        definition the check no longer has - as if the check had since been
+        corrected (REQ-QAC-176's fingerprint)."""
+        from qa_tools.common import qa_store, supply_db
+
+        with supply_db.connect(label="pytest-old-definition") as conn:
+            conn.execute(
+                f'UPDATE "{qa_store.SCHEMA}".check_result SET definition_fingerprint = ? '
+                f'WHERE check_id = ? AND run_key IN (SELECT run_key FROM "{qa_store.SCHEMA}".run '
+                "WHERE supply_id = ANY(?))", [OLD_DEFINITION, check_id, list(supplies)])
+
+    def bulk_recheck(self, check_id: str, *, at, reason: str = "we corrected the check",
+                     run: bool = True):
+        """A bulk re-check of `check_id`, recorded as the terminal records it
+        (the plan shown, then confirmed by its key), then run."""
+        from qa_tools.common import bulk_recheck, people, supply_db
+
+        with supply_db.connect(label="pytest-bulk-recheck") as conn:
+            shown = bulk_recheck.plan(conn, check_id)
+            got = bulk_recheck.record(conn, check_id, actor=people.person_by_email(REAL_PERSON),
+                                      reason=reason, effective_at=_iso(at),
+                                      acknowledged=shown.key, shown=shown)
+        if run:
+            self.run_owed()
+        return got
+
+    def acknowledge(self, supply: str, period: str, *, at, reason: str = "known, it stays"):
+        from qa_tools.common import filing_decisions as fd
+        from qa_tools.common import people, supply_db
+
+        with supply_db.connect(label="pytest-acknowledge") as conn:
+            fd.apply(fd.Request(operation=fd.ACKNOWLEDGE, dataset_id=supply.split("@", 1)[0],
+                                actor=people.person_by_email(REAL_PERSON), reason=reason,
+                                confirmed=True, period=period, supply=supply),
+                     effective_at=_iso(at), conn=conn)
 
     # ---- reading back --------------------------------------------------------
 
