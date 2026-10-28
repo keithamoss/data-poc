@@ -269,6 +269,36 @@ def _await_requirements_plans(page, *, start: bool = False) -> None:
         "() => !DATA_FILES || (REQ_PLANS_LOAD && REQ_PLANS_LOAD.state !== 'loading')")
 
 
+#: Every document load of every page this module drives on this worker
+#: (REQ-TEST-282 criterion 7) - counted from each page's own `load` event.
+_DOCUMENT_LOADS = {"n": 0}
+
+
+def _count_loads(page) -> None:
+    def loaded(*_):
+        _DOCUMENT_LOADS["n"] += 1
+    page.on("load", loaded)
+
+
+@pytest.fixture
+def page(page):
+    """pytest-playwright's own page, its document loads counted."""
+    _count_loads(page)
+    return page
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _report_document_loads(worker_id):
+    """Where E2E_DOCUMENT_LOADS_FILE names a file, append this worker's count
+    of document loads to it once the session ends - the measure REQ-TEST-282
+    criterion 7 reports, before and after."""
+    yield
+    out = os.environ.get("E2E_DOCUMENT_LOADS_FILE")
+    if out:
+        with open(out, "a") as f:
+            f.write(f"{worker_id} {_DOCUMENT_LOADS['n']}\n")
+
+
 @pytest.fixture
 def clean_page(page):
     """Wraps pytest-playwright's own `page` fixture with a real console-
