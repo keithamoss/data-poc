@@ -29467,12 +29467,12 @@ requirements:
     - tests/test_red_promoted.py
     source: 'Keith, 2026-10-03, ''OPTION A CONFIRMED'' - a promoted supply whose refreshed cross-table result has gone red must be shown, very clearly, as a RED PROMOTED supply (plans/road-testing.md #16). Scoped by delivery-scoper 2026-10-03.'
     acceptance_criteria:
-    - 'WHERE a promoted supply''s status, recomputed with its most recent cross-table results, is red, THE SYSTEM SHALL show it as RED PROMOTED on its dataset page and its agency card, distinctly from a red supply awaiting a decision and from a promoted supply that is not red. AMENDED 2026-10-13 (REQ-DASH-197 criteria 13 and 17): the promoted supply this label and the agency card''s count read is the verdict line''s in-place supply, which is now the one most recently promoted as at the date on show.'
-    - THE SYSTEM SHALL name, beside a red promoted supply, the arrival or promotion that caused the re-evaluation that turned it red.
+    - 'WHERE a promoted supply''s status, recomputed with its most recent cross-table results - or taken from its most recent re-check where that is newer (REQ-PIPE-164, REQ-PIPE-177) - is red, THE SYSTEM SHALL show it as RED PROMOTED on its dataset page and its agency card, distinctly from a red supply awaiting a decision and from a promoted supply that is not red. AMENDED 2026-10-13 (REQ-DASH-197 criteria 13 and 17): the promoted supply this label and the agency card''s count read is the verdict line''s in-place supply, which is now the one most recently promoted as at the date on show. AMENDED 2026-10-28 by REQ-DASH-221 criterion 14: a promoted supply a re-check turned red is red promoted too.'
+    - THE SYSTEM SHALL name, beside a red promoted supply, the arrival or promotion that caused the re-evaluation that turned it red, or the re-check that did (REQ-PIPE-164, REQ-PIPE-177), worded as REQ-DASH-221 criteria 1 and 2 word it. AMENDED 2026-10-28 by REQ-DASH-221 criterion 14.
     - THE SYSTEM SHALL NOT show a red promoted supply with the treatment of a green or amber one merely because it was promoted.
     - THE SYSTEM SHALL keep the verdict the supply was promoted on visible beside its current one, so a reader can tell it went in green and later turned red.
     - THE SYSTEM SHALL show red promoted as a label beside the existing status pill rather than as a new status, and SHALL show nothing extra beside a promoted supply that is not red.
-    - WHEN the dashboard is viewed as at an instant before a promoted supply turned red, THE SYSTEM SHALL show the supply as it was at that instant, with a note that it turned red on a named date after a named arrival or promotion, and SHALL NOT show the earlier view as red.
+    - WHEN the dashboard is viewed as at an instant before a promoted supply turned red, THE SYSTEM SHALL show the supply as it was at that instant, with a note that it turned red on a named date after a named arrival or promotion - or, where a re-check turned it, REQ-DASH-221 criterion 5's re-checked-later note in place of that note - and SHALL NOT show the earlier view as red. AMENDED 2026-10-28 by REQ-DASH-221 criterion 14.
     non_functional_requirements:
     - 'Assert at the layer a human sees (CLAUDE.md''s shape-change rule): a real-browser test drives the built dashboard and checks a red promoted supply is rendered red, because a promoted supply rendering green is the false-green direction.'
     - 'Rendering only: the status is computed upstream from recorded results; nothing here reads supply rows.'
@@ -36676,7 +36676,7 @@ requirements:
     date_written: '2026-10-14'
     story: "As a data team leader reading a dataset's supply history, I want a supply whose verdict changed because we fixed a check to say so - who, when, why and which check - so that I do not blame a supplier for a verdict our own check produced, and I can see at once a promoted supply our fixed check now judges worse."
     moscow: should
-    status: not_started
+    status: built
     signed_off:
       by: Keith
       date: '2026-10-14'
@@ -36711,6 +36711,36 @@ requirements:
     - REQ-DASH-071
     - REQ-DASH-180
     - REQ-PIPE-179
+    linked_tests:
+    - tests/test_rechecks.py::TestASingleRecheck
+    - tests/test_rechecks.py::TestAPromotedSupplyRecheckedWorse
+    - tests/test_rechecks.py::TestABulkRecheck
+    - tests/test_dashboard_e2e.py::TestRecheckedAfterWeFixedACheck
+    - tests-js/rechecks.test.js
+    implemented_by:
+    - pipeline/re_checks.py::for_collection
+    - pipeline/re_checks.py::Rechecks
+    - pipeline/build_dashboard_data.py::build_one_table
+    - qa_tools/common/outstanding.py::_from_awaiting_decisions
+    - qa_tools/common/outstanding.py::_rechecked_worse_item
+    - dashboard/qa-reporting-dashboard.template.html::recheckEvents
+    - dashboard/qa-reporting-dashboard.template.html::recheckWords
+    - dashboard/qa-reporting-dashboard.template.html::recheckCause
+    - dashboard/qa-reporting-dashboard.template.html::recheckCheckLink
+    - dashboard/qa-reporting-dashboard.template.html::recheckedLaterTag
+    - dashboard/qa-reporting-dashboard.template.html::recheckedRowStatus
+    - dashboard/qa-reporting-dashboard.template.html::recheckedAmberTag
+    - dashboard/qa-reporting-dashboard.template.html::recheckAcknowledged
+    - dashboard/qa-reporting-dashboard.template.html::bulkRecheckLines
+    - dashboard/qa-reporting-dashboard.template.html::wireCheckLinks
+    - dashboard/qa-reporting-dashboard.template.html::supplyRowStatus
+    - dashboard/qa-reporting-dashboard.template.html::redPromotedBadge
+    - dashboard/qa-reporting-dashboard.template.html::outstandingKindLabel
+    - dashboard/qa-reporting-dashboard.template.html::openCheckPanel
+    - dashboard/qa-reporting-dashboard.template.html::wireSupplyHistorySection
+    - dashboard/qa-reporting-dashboard.template.html::renderDataset
+    evidence:
+    - EVIDENCE_PLACEHOLDER
     decisions:
     - "A RE-CHECK'S CAUSE NAMES OUR CHECK (same review): the requirement's own story is 'our mistake, not the supplier's', so the words must not leave a supplier looking responsible for a verdict a fixed check produced."
     - "A RE-CHECK'S VERDICT TAKES EFFECT FROM THE RE-CHECK ONWARD (Keith, 2026-10-10, option A, 'in line with the approach we take for other things that use the as-of on the dashboard'): on any In place on date before the re-check, the dashboard shows the verdict that stood then, with a quiet forward note - 'Re-checked later - <instant>, now <status>, after <cause>' - reusing the existing turns-red-later muted tag; from the re-check's instant it shows the new verdict. A re-check therefore never changes what an earlier date shows, and is not listed in the 'decisions made since then' note. This is the as-of rule every other decision already follows (REQ-PIPE-081 criterion 5). REJECTED showing it retroactively: on earlier dates the new pill would contradict the outcome the gate actually reached on the old verdict."
@@ -36722,6 +36752,13 @@ requirements:
     - "ORDERED BESIDE THE TURN-OFF MARKER (delivery-scoper, 2026-10-14): REQ-DASH-180 criterion 13 (signed 2026-10-14) fixes the order pill, red-promoted badge, turn-off marker; criterion 9 puts the amber re-checked tag in the badge's place, so the two cannot be drawn in either order."
     - "COUNTED WHETHER OR NOT TURNED OFF (REQ-PIPE-179 criterion 23, REQ-DASH-180 criterion 6, both signed 2026-10-14, already name 'Promoted, then re-checked <verdict>' as counting): criterion 12 cites it."
     - "HOLD LIFTED 2026-10-24 (Keith, REQ-QAC-176 Q2 = C): this decision recorded that 221 was held behind #89; with 176's criterion 18 a plain schema bump, nothing waits on #89 any more, and 221 is ordered after REQ-PIPE-177 and REQ-PIPE-178 only. As it read - WAS HELD BEHIND #89 (delivery-architect, 2026-10-14, an ordering finding): this requirement depends on REQ-PIPE-177 (bulk re-check) and REQ-PIPE-178 (trial), both of which depend on REQ-QAC-176's stored fingerprint, held by Keith behind plans/running-thoughts.md #89 on 2026-10-14. So 221 waits with them whatever its own sign-off; nothing in it is wrong. Its single re-check half could be built earlier only by splitting it again, which is not proposed: one re-check wording for single and bulk is the point of criteria 1, 2 and 7. Delivery-dashboard-ux made no finding on it; the DECISION_DONE wording it adds (criterion 7) is covered by REQ-PIPE-166 criterion 18's test once both are built."
+    - "BUILT 2026-10-28 (lane L2, wave 2) - THE BUILD CARRIES EACH RE-CHECK THAT HAS RUN (pipeline/re_checks.py): who (the decision's person by display name, 'a person' for an address, as red_promoted names one), why (its reason), when (its RUN's recorded instant - the clock red_promoted and the card already use, post-build-review #266 D2 - so a re-check owed and not yet run shows nothing), and the supply's verdict just before and just after that run, each supply_status.latest_results as at the instant read for display (promotion.status_of, for_gate=False) - the one function, never a second derivation (REQ-PIPE-121 NFR 4). A bulk re-check adds its check, its changelog entry's date and whether any OTHER check's newest result moved in the same run ('and other checks'); its drawer line carries the instant each of its supplies changed, so the page counts 'how many changed' as at the date on show."
+    - "THE ROW READS THE VERDICT THAT STOOD (criterion 5, as built): a re-check's run replaces the arrival's as the supply's current run (qa.supply_current_run), so before this build a re-checked supply's row read the re-check's verdict on EVERY date, the past included. The row now takes the verdict it arrived with from the first re-check's 'before', and each re-check's 'after' from its own day on; a promoted supply keeps red_promoted's timeline, a step that IS a re-check said as one ('· re-checked ...'), never as 'changed after the re-check of ...'. A supply never re-checked renders exactly as before - its path is unchanged."
+    - "NAMED pipeline/re_checks.py, NOT pipeline/rechecks.py: tests/test_recheck.py's import-graph rule (REQ-PIPE-140 criterion 6) flags any import on a build path whose name contains 'recheck', to keep the executor off it. This module imports no executor; the name keeps the rule mechanical rather than adding an exception to it."
+    - "THE QUEUE ITEM (criterion 12, as built): one item per supply, kind 'promoted-then-rechecked' - filing_queue.RECHECKED_WORSE's own value - carrying its new verdict, which the page's kind heading names ('Promoted, then re-checked red'); observed from its re-check's run, so an earlier date does not list it; taken OUT of the dataset's 'Awaiting a decision' item, which counted it before, so it is counted once. REJECTED grouping them per dataset as 'Awaiting a decision' does: the terminal lists each under its own heading. Its page half is a JS test, not a browser one: a fixture variant's page embeds the deployment's queue, never the test's (post-build-review #272)."
+    - "A LINK TO A CHECK'S DRAWER (criteria 2 and 10, as built): a real href to the drawer's own path, opened through renderFromState() - navigate() renders the page and never opens a drawer from state - so a click, a reload and a shared address open the same drawer, with the date on show kept; a click on it inside a supply-history row does not also apply the row's date."
+    - "PROVISIONAL WORDING, for Keith: the forward note's cause - 'Re-checked later - <instant>, now <status>, after a re-check by <person> - <reason>', or '... after we corrected <check>' - shown only for a later re-check that CHANGES the verdict; the red-promoted badge's sentence 'Went in green, re-checked <day> by <person> - <reason>' (a bulk one '... re-checked after we corrected <check> (<date>)'), adding '; acknowledged by <who>, <instant>' once acknowledged; the amber tag once acknowledged, 'Amber, promoted - re-checked, acknowledged by <who>'; the drawer line 'Re-checked <n> supplies across <m> datasets on <day> by <person>: <k> changed - <reason>', one whose changelog date matches no listed entry going after the entries; the queue item's line '<dataset>, <period>' under its heading."
+    - "NO PLANS PROSE TO DELETE: this requirement's design lived in docs/drafts/unsigned-triage/summary.md and its own decisions above; no plans/*.md entry describes it (plans/running-thoughts.md #89 names it only as once held behind #89)."
   - id: REQ-DASH-224
     title: "One function decides whether a column or a check is red, amber, green or not counted on a QA run, and every count and trend line uses it"
     date_written: "2026-10-14"
@@ -42535,7 +42572,17 @@ requirements:
     - '1. FOR KEITH (2026-10-26, functional critic on 7093c20): criterion 21''s ''being gated'' forms are not built, and the bootstrapped
       history does show the state they are for - TS-82''s Client Register reads ''Awaiting a decision ... Green'' for 12 days (15 to
       27 August 2017) over a staged Fail with no notice, while its delivery''s gate application has not settled. Build criterion 21
-      next (it needs the package''s files and their recorded runs carried into the build), or accept the gap until then?'
+      next (it needs the package''s files and their recorded runs carried into the build), or accept the gap until then? FOUND
+      2026-10-28 (lane L2, wave 2, which stopped before building it): the gap is not TS-82''s alone. In a synthetic replay a
+      package application is stamped as started at the receipt and settled at the receipt plus its seeded promotion lag (orchestrate.effective_at_of),
+      and its ''gate'' item is owed and cleared at the same two instants, so criterion 21 as written reads ''Checked, being gated''
+      through every lag - measured on a copy of the bootstrapped history, 248 Child Protection supplies for 1,873 dataset-days,
+      52 Emergency Department supplies for 385 and 6 Birth Registrations supplies for 6, where the page reads ''Awaiting a decision''
+      today; ''waiting for the rest of its delivery'' 28 days and ''being checked'' 1. Keith to choose: (a) build it as written,
+      so the lag reads ''being gated'' everywhere and ''Awaiting a decision'' only once the gate has decided; (b) treat the replay''s
+      lag as the gate having decided at once, so only a crash, a budget stop or a contended lock shows the forms; or (c) have
+      the replay stamp an application at its effective instant (REQ-PIPE-081''s replay clock). Also open with it: which pill
+      the page shows while a supply is in these forms (criterion 21 says only ''not green'').'
   - id: REQ-GEN-273
     title: Target agreement compares a targeted supply with its own checks, and a few scenarios pin what the package gate decides
     date_written: '2026-10-21'

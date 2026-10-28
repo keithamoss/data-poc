@@ -114,8 +114,18 @@ releases:
       The early-arrival examples now live on Emergency Department, Child
       Protection's history starts two years later, a bootstrap reports its
       time against the 12-minute budget, and an edited configuration file is
-      read for what it says now.
+      read for what it says now. A supply re-checked after a fixed check now
+      says so.
     changes:
+      - category: New
+        items:
+          - headline: Re-checked, and why
+            components: ["Dashboard UI"]
+            description: >
+              A supply whose verdict changed because we fixed a check now says
+              who re-checked it, when and why, or which check we corrected. A
+              promoted supply that came back worse is flagged and listed as
+              waiting for a person.
       - category: Improved
         items:
           - headline: Early arrivals on Emergency Department
