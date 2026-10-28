@@ -72,9 +72,10 @@ class TestTheDeliveryTimeInForce:
 
     def test_a_partial_participant_names_its_own_months_and_reason(self):
         got = owed_nothing.sla_timeline("cp-case-workers")
-        # Two versions since REQ-GEN-207 grew the history back to 2013.
-        assert got["owesFrom"] == "2013-01-01"
-        assert [v["from"] for v in got["versions"]] == ["2013-01-01", "2023-01-01"]
+        # Two versions since REQ-GEN-207 grew the history back - to 2015 since
+        # REQ-GEN-238 dropped 2013 and 2014.
+        assert got["owesFrom"] == "2015-01-01"
+        assert [v["from"] for v in got["versions"]] == ["2015-01-01", "2023-01-01"]
         version = got["versions"][-1]
         cadence = version["cadence"]
         assert cadence["anchor_months"] == [2, 8] and cadence["day_of_month"] == 1
