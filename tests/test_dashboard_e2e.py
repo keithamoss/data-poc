@@ -7179,6 +7179,213 @@ def _s6(pages: _CpPages) -> dict:
     return {**v1, **v2}
 
 
+def _supply_rows(page) -> list[dict]:
+    """Every supply-history row on the page as a reader sees it: its run, its
+    status cell's text and pill, its outcome."""
+    return page.evaluate("""() => [...document.querySelectorAll('.supply-history tr[data-run-id]')]
+        .map(r => ({run: r.dataset.runId, date: r.dataset.runDate,
+                    status: r.children[1].textContent.replace(/\\s+/g, " ").trim(),
+                    pill: (r.querySelector('td:nth-child(2) .pill') || {}).textContent || "",
+                    outcome: (r.querySelector('.outcome') || {}).textContent || "",
+                    links: [...r.querySelectorAll('td:nth-child(2) a')].map(a => a.textContent)}))""")
+
+
+def _row_of(page, supply_key: str) -> dict:
+    found = [r for r in _supply_rows(page) if supply_key in r["run"]]
+    assert len(found) == 1, (supply_key, _supply_rows(page))
+    return found[0]
+
+
+class TestRecheckedAfterWeFixedACheck:
+    """REQ-DASH-221: a supply whose verdict changed because we fixed a check
+    says so - who, when, why and which check - and a promoted supply our
+    fixed check now judges worse is shown very clearly. Fixture histories
+    driven through the real lifecycle on a pinned clock (tests/gate_support.py),
+    re-checked through the real decision entry point and executor, built by
+    the real builders."""
+
+    C, N = _cp_state("cp-clients"), _cp_state("cp-notifications")
+    KEY_C2, KEY_N1 = "202408051000000800", "202407251000000800"
+
+    def _waiting_red(self, pages) -> dict:
+        from gate_support import own_red
+        from test_package_gate import established
+
+        pages.at("2024-07-25T10:30:00+08:00")
+        v1 = established(pages.sc)
+        pages.sc.rules.append(own_red("C2"))
+        pages.at("2024-08-05T10:30:00+08:00")
+        v2 = pages.sc.deliver("2024-08-05T10:00:00+08:00", {"cp_clients": "C2"})
+        pages.sc.process()
+        return {**v1, **v2}
+
+    def test_a_waiting_supply_rechecked_green_and_the_verdict_that_stood_before(
+            self, clean_page, cp_pages):
+        """Criteria 1, 5 and 7: from the re-check's instant the row reads the
+        new verdict, 'Arrived Red · re-checked <date> by <person> - <reason>';
+        on an earlier date it reads the verdict that stood then, with the quiet
+        forward note; and the re-check is never among the decisions made since."""
+        got = self._waiting_red(cp_pages)
+        cp_pages.sc.rules.clear()
+        cp_pages.at("2024-08-07T10:30:00+08:00")
+        cp_pages.sc.recheck(got["C2"], "2024-Q3", at="2024-08-07T10:30:00+08:00",
+                            reason="our check was wrong")
+        page = cp_pages.page()
+        _goto(clean_page, page, state=self.C, in_place_on="2024-08-07")
+        row = _row_of(clean_page, self.KEY_C2)
+        assert row["pill"].strip() == "Green", row
+        assert ("Arrived Red · re-checked Wednesday, 7 August 2024 by Keith Moss - our check "
+                "was wrong") in row["status"], row
+        _goto(clean_page, page, state=self.C, in_place_on="2024-08-06")
+        row = _row_of(clean_page, self.KEY_C2)
+        assert row["pill"].strip() == "Red", "the verdict that stood then"
+        assert ("Re-checked later - 10:30am Wednesday, 7 August 2024, now Green, after a "
+                "re-check by Keith Moss - our check was wrong") in row["status"], row
+        assert "Arrived" not in row["status"], row
+        since = " ".join(t["text"] for t in _shown(clean_page, "[data-changed-since]"))
+        assert "re-check" not in since, since
+
+    def test_a_recheck_that_changed_nothing_shows_and_the_outcome_stays(
+            self, clean_page, cp_pages):
+        """Criteria 3 and 6: a single re-check that changed nothing is on its
+        row with its person, date and reason; the Outcome cell is the
+        promotion state's, unchanged by the re-check."""
+        got = self._waiting_red(cp_pages)
+        cp_pages.at("2024-08-07T10:30:00+08:00")
+        cp_pages.sc.recheck(got["C2"], "2024-Q3", at="2024-08-07T10:30:00+08:00",
+                            reason="just to be sure")
+        page = cp_pages.page()
+        for on in ("2024-08-06", "2024-08-07"):
+            _goto(clean_page, page, state=self.C, in_place_on=on)
+            row = _row_of(clean_page, self.KEY_C2)
+            assert row["pill"].strip() == "Red", (on, row)
+            assert row["outcome"].strip() == "Waiting", (on, row)
+        assert ("Re-checked Wednesday, 7 August 2024 by Keith Moss - just to be sure"
+                in row["status"]), row
+        assert "Arrived" not in row["status"], "nothing changed, so no 'Arrived' note"
+
+    def test_a_promoted_supply_rechecked_red_is_red_promoted_naming_the_recheck(
+            self, clean_page, cp_pages):
+        """Criteria 5, 6, 8 and 14: the red-promoted badge names the re-check as
+        its cause, in the header and on the row, the collection's marker counts
+        it, an earlier date carries the re-checked-later note in place of the
+        turned-red-later tag, the Outcome stays Promoted, and the badge stays
+        after acknowledgement naming who."""
+        from gate_support import own_red
+        from test_package_gate import established
+
+        cp_pages.at("2024-07-25T10:30:00+08:00")
+        v1 = established(cp_pages.sc)
+        cp_pages.sc.rules.append(own_red("N1"))
+        cp_pages.at("2024-08-09T10:30:00+08:00")
+        cp_pages.sc.recheck(v1["N1"], "2024-Q3", at="2024-08-09T10:30:00+08:00",
+                            reason="the fix found more")
+        page = cp_pages.page()
+        _goto(clean_page, page, state=self.N, in_place_on="2024-08-09")
+        (badge,) = _shown(clean_page, ".view-head [data-red-promoted] [data-red-promoted-why]")
+        assert badge["text"] == ("Went in green, re-checked Friday, 9 August 2024 by Keith Moss "
+                                 "- the fix found more."), badge
+        row = _row_of(clean_page, self.KEY_N1)
+        assert "Red promoted" in row["status"] and row["outcome"].startswith("Promoted"), row
+        _goto(clean_page, page, state={"tier": "agency", "agencyId": CP_AGENCY},
+              in_place_on="2024-08-09")
+        markers = " ".join(m["text"] for m in _shown(clean_page, ".red-promoted-marker"))
+        assert "red promoted: Notifications" in markers, markers
+
+        _goto(clean_page, page, state=self.N, in_place_on="2024-08-08")
+        assert _shown(clean_page, ".view-head [data-red-promoted]") == []
+        assert _shown(clean_page, "[data-turns-red-later]") == []
+        (later,) = _shown(clean_page, ".view-head [data-rechecked-later]")
+        assert later["text"] == ("Re-checked later - 10:30am Friday, 9 August 2024, now Red, "
+                                 "after a re-check by Keith Moss - the fix found more"), later
+
+        cp_pages.at("2024-08-10T10:30:00+08:00")
+        cp_pages.sc.acknowledge(v1["N1"], "2024-Q3", at="2024-08-10T10:30:00+08:00")
+        page = cp_pages.page()
+        _goto(clean_page, page, state=self.N, in_place_on="2024-08-10")
+        (badge,) = _shown(clean_page, ".view-head [data-red-promoted] [data-red-promoted-why]")
+        assert badge["text"] == ("Went in green, re-checked Friday, 9 August 2024 by Keith Moss "
+                                 "- the fix found more; acknowledged by Keith Moss, 10:30am "
+                                 "Saturday, 10 August 2024."), badge
+
+    def test_a_promoted_supply_rechecked_amber_says_it_awaits_acknowledgement(
+            self, clean_page, cp_pages):
+        """Criteria 8 and 9: the acknowledgement badge's form, where the
+        red-promoted badge sits - after the status pill and before the turn-off
+        marker - in the header and on the row, kept after acknowledgement."""
+        from gate_support import _first_own
+        from test_package_gate import established
+
+        cp_pages.at("2024-07-25T10:30:00+08:00")
+        v1 = established(cp_pages.sc)
+        cp_pages.sc.rules.append(lambda ctx: "warn" if (not ctx.cross_table and ctx.own_label
+                                                         == "N1" and _first_own(ctx)) else None)
+        cp_pages.at("2024-08-09T10:30:00+08:00")
+        cp_pages.sc.recheck(v1["N1"], "2024-Q3", at="2024-08-09T10:30:00+08:00",
+                            reason="the fix found more")
+        page = cp_pages.page()
+        _goto(clean_page, page, state=self.N, in_place_on="2024-08-09")
+        (tag,) = _shown(clean_page, ".view-head [data-rechecked-amber]")
+        assert tag["text"] == "Amber, promoted - re-checked, awaiting acknowledgement", tag
+        order = clean_page.evaluate("""() => [...document.querySelector('.view-head')
+            .querySelectorAll('.pill, [data-rechecked-amber]')].map(e =>
+            e.matches('[data-rechecked-amber]') ? 'tag' : 'pill')""")
+        assert order.index("tag") > 0, "after the status pill"
+        row = _row_of(clean_page, self.KEY_N1)
+        assert "Amber, promoted - re-checked, awaiting acknowledgement" in row["status"], row
+        cp_pages.at("2024-08-10T10:30:00+08:00")
+        cp_pages.sc.acknowledge(v1["N1"], "2024-Q3", at="2024-08-10T10:30:00+08:00")
+        page = cp_pages.page()
+        _goto(clean_page, page, state=self.N, in_place_on="2024-08-10")
+        (tag,) = _shown(clean_page, ".view-head [data-rechecked-amber]")
+        assert tag["text"] == "Amber, promoted - re-checked, acknowledged by Keith Moss", tag
+
+    def test_a_bulk_recheck_names_the_check_and_its_drawer_has_one_line(
+            self, clean_page, cp_pages):
+        """Criteria 2, 4 and 10: a changed row says 're-checked after we
+        corrected <check>', the check's name a real link to its drawer that is
+        followed alone when clicked; the drawer carries one line for the bulk
+        re-check from its instant on, outside the heading's count of changes."""
+        from test_rechecks import _own_check
+
+        got = self._waiting_red(cp_pages)
+        check = _own_check("cp-clients")
+        cp_pages.sc.judged_under_an_old_definition(check, [got["C2"]])
+        cp_pages.sc.rules.clear()
+        cp_pages.at("2024-08-08T10:30:00+08:00")
+        cp_pages.sc.bulk_recheck(check, at="2024-08-08T10:30:00+08:00",
+                                 reason="the null rule was wrong")
+        page = cp_pages.page()
+        _goto(clean_page, page, state=self.C, in_place_on="2024-08-08")
+        row = _row_of(clean_page, self.KEY_C2)
+        assert row["pill"].strip() == "Green", row
+        (name,) = row["links"]
+        assert f"Arrived Red · re-checked after we corrected {name}" in row["status"], row
+        link = clean_page.locator(f'.supply-history tr[data-run-id*="{self.KEY_C2}"] a.recheck-check')
+        assert link.get_attribute("href").startswith("#/agency/")
+        link.click()
+        clean_page.wait_for_selector("#check-panel.open")
+        assert "in-place-on=2024-08-08" in clean_page.url, "the row's own click did not act"
+        lines = _shown(clean_page, "#check-panel [data-bulk-recheck]")
+        assert [x["text"] for x in lines] == [
+            "Re-checked 1 supply across 1 dataset on Thursday, 8 August 2024 by Keith Moss: "
+            "1 changed - the null rule was wrong"], lines
+        # OUTSIDE THE HEADING'S COUNT: the heading counts changelog entries only.
+        heading = _shown(clean_page, "#check-panel h4")[-1]
+        entries = clean_page.locator("#check-panel .changelog-entry").count()
+        assert heading["text"].startswith(f"Definition changelog ({entries} "), (heading, entries)
+        # NOT BEFORE ITS INSTANT: the same drawer the day before has no line,
+        # and the row reads the verdict that stood then.
+        href = link.get_attribute("href")
+        clean_page.goto(f"file://{page.resolve()}?in-place-on=2024-08-07{href}")
+        clean_page.wait_for_selector("#check-panel.open")
+        assert _shown(clean_page, "#check-panel [data-bulk-recheck]") == []
+        row = _row_of(clean_page, self.KEY_C2)
+        assert row["pill"].strip() == "Red", row
+        assert "Re-checked later - 10:30am Thursday, 8 August 2024, now Green, after we " \
+               f"corrected {name}" in row["status"], row
+
+
 class TestTheUxCriticsFindingsOn7093c20:
     """The dashboard UX critic's findings on REQ-DASH-204/272/275 (7093c20),
     each asserted where a reader sees it, on the deployment's own history."""

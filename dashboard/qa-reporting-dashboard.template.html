@@ -5273,7 +5273,27 @@ function navHref(nav){ return stateToHash(nav); }
 // button wearing an <a>, which is the thing this decision is against.
 // So: any modifier, or anything but the primary button, and we do
 // nothing at all - the href is real and the browser handles it.
+// A LINK TO A CHECK'S OWN DRAWER (REQ-DASH-221 criterion 2): navigate() renders
+// the page only, so the drawer is opened from the new state as a direct load
+// of the same address opens it - renderFromState(). The href is real, and the
+// browser keeps it for any modified click.
+function wireCheckLinks(root){
+  (root || document).querySelectorAll("a[data-check-nav]").forEach(el=>{
+    if(el.dataset.navWired) return;
+    el.dataset.navWired = "1";
+    el.addEventListener("click", e=>{
+      if(e.defaultPrevented) return;
+      if(e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      if(typeof e.button === "number" && e.button !== 0) return;
+      e.preventDefault();
+      STATE = JSON.parse(el.dataset.checkNav);
+      history.pushState(STATE, "", navUrl());
+      renderFromState();
+    });
+  });
+}
 function wireNavLinks(root){
+  wireCheckLinks(root);
   (root || document).querySelectorAll("a[data-nav]").forEach(el=>{
     if(el.dataset.navWired) return;
     el.dataset.navWired = "1";
@@ -8191,7 +8211,7 @@ function supplyRowStatus(datasetId, entry, inPlaceOnDateStr){
   return pill(changed ? shown : entry.status, "sm") + arrived;
 }
 // ---- RE-CHECKED AFTER WE FIXED A CHECK (REQ-DASH-221) --------------------
-// The build's events (pipeline/rechecks.py), oldest first, for the supply a
+// The build's events (pipeline/re_checks.py), oldest first, for the supply a
 // run checked: each re-check that has RUN - {at, person, reason, before,
 // after, bulk: {checkId, changelogDate, others}} - dated by its run, so a
 // re-check takes effect from its own instant and never changes what an
@@ -8218,7 +8238,7 @@ function recheckCheckLink(checkId, asText){
       if(asText || !agencyId) return escHtml(name);
       const nav = {tier:"dataset", agencyId, collectionId: found.collectionId, datasetId: raw.id,
                    columnName: columnKey(col), checkKey: ck.key};
-      return `<a class="recheck-check" href="${navHref(nav)}" data-nav='${JSON.stringify(nav)}'>${escHtml(name)}</a>`;
+      return `<a class="recheck-check" href="${navHref(nav)}" data-check-nav='${escHtml(JSON.stringify(nav))}'>${escHtml(name)}</a>`;
     }
   }
   return escHtml(checkId);

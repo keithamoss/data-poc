@@ -34,11 +34,11 @@ def _pinned() -> str:
 
 
 def _rechecks():
-    from pipeline import rechecks
+    from pipeline import re_checks
     from qa_tools.common import supply_db
 
     with supply_db.connect(read_only=True, label="pytest-rechecks") as conn:
-        return rechecks.for_collection(conn, CP)
+        return re_checks.for_collection(conn, CP)
 
 
 def _own_check(dataset_id: str) -> str:

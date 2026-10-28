@@ -39,7 +39,7 @@ import os
 from pipeline import (acknowledgements, closed_slots, corrections, cross_table_grid,
                       cross_table_notices, excuses, held_back_notices,
                       file_check_panel, owed_nothing, placements, promotion_timeline,
-                      recorded_arrival, rechecks, red_promoted, slot_timeline,
+                      recorded_arrival, re_checks, red_promoted, slot_timeline,
                       warehouse_counts)
 from pipeline.dashboard_check_labels import (dashboard_status, display_name, measure, pooled_url_key,
                                              rank_for_headline, tool_ref, url_key)
@@ -825,7 +825,7 @@ def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], da
     # line for its check's drawer - read once per collection.
     if "rechecks" not in view:
         with supply_db.connect(read_only=True, label="mothman:rechecks") as conn:
-            view["rechecks"] = rechecks.for_collection(conn, coll.id)
+            view["rechecks"] = re_checks.for_collection(conn, coll.id)
     rechecked = view["rechecks"].for_dataset(
         dataset_id, [ck["check_id"] for c in columns_out for ck in c["checks"] if ck.get("check_id")])
     raw_slots = slot_timelines.get(dataset_id) or slot_timeline.for_dataset(dataset_id)
