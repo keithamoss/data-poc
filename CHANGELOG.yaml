@@ -140,6 +140,12 @@ releases:
               Child Protection's synthetic history now starts in 2015 rather
               than 2013. The examples that stayed need only eight of the ten
               added years, and every quarter kept is generated as before.
+          - headline: Fewer page loads in the browser tests
+            components: ["Testing & dev tooling"]
+            description: >
+              Most browser-test classes now load the dashboard once and share
+              that page between their tests, each starting from a clean state,
+              so the browser tests take about four minutes less.
           - headline: The bootstrap's budget line
             components: ["Testing & dev tooling"]
             description: >
