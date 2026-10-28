@@ -109,6 +109,40 @@ intro: >
   all three.
 
 releases:
+  - date: "2026-10-28"
+    summary: >
+      The early-arrival examples now live on Emergency Department, Child
+      Protection's history starts two years later, and a bootstrap reports its
+      time against the 12-minute budget.
+    changes:
+      - category: Improved
+        items:
+          - headline: Early arrivals on Emergency Department
+            components: ["Data generation"]
+            description: >
+              The four early-arrival examples, one of them too early, are now
+              single Emergency Department files, in the same quarters at the
+              same times, so every date quoted for them still holds.
+          - headline: A shorter Child Protection history
+            components: ["Data generation"]
+            description: >
+              Child Protection's synthetic history now starts in 2015 rather
+              than 2013. The examples that stayed need only eight of the ten
+              added years, and every quarter kept is generated as before.
+          - headline: The bootstrap's budget line
+            components: ["Testing & dev tooling"]
+            description: >
+              `mothman pipeline bootstrap` ends by printing its wall clock
+              against the 12-minute budget, and says plainly when it went
+              over.
+      - category: Fixed
+        items:
+          - headline: Held back after it was promoted
+            components: ["Pipeline & publishing"]
+            description: >
+              When a delivery's files arrived minutes apart, an early file's
+              "held back" could take effect days after the later file promoted
+              it. Its promotion now never takes effect before its hold-back.
   - date: "2026-10-26"
     summary: >
       A configuration file you edit is read for what it says now, even by a
@@ -186,6 +220,13 @@ releases:
             description: >
               A collection page no longer fails to draw when one of its
               datasets' newest runs counted no rows; the row shows a dash.
+          - headline: Could not run, never Fail
+            components: ["Dashboard UI"]
+            description: >
+              A cross-table check that could not run for want of another table
+              now reads "Not evaluated" with its own mark, where it read Fail,
+              and the notices count checks as the grid's rows rather than each
+              tool's result.
           - headline: Opens in a blink
             components: ["Dashboard UI"]
             description: >

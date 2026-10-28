@@ -65,6 +65,9 @@ class BootstrapResult:
     #: was built to (REQ-GEN-186 criterion 3). Non-empty fails the
     #: bootstrap, though nothing it recorded is changed (criterion 6).
     disagreements: tuple[str, ...] = ()
+    #: The whole bootstrap's wall clock, generation to target agreement
+    #: (REQ-PIPE-250 criterion 3) - what the budget line is measured on.
+    wall_seconds: float = 0.0
 
 
 #: Why a re-run over recorded history is refused (REQ-PIPE-144 criteria
@@ -119,6 +122,21 @@ def already_populated(conn) -> bool:
     return staged_table_count(conn) > 0
 
 
+#: REQ-PIPE-250 (Keith, 2026-10-15): "a hard 12 minutes" from empty on this
+#: sandbox - an acceptance measurement and a printed line, never a CI gate
+#: (Keith, 2026-10-18), because a runner's timing varies by runner.
+BUDGET_SECONDS = 12 * 60
+
+
+def budget_line(seconds: float) -> str:
+    """The wall clock against the 12-minute budget, plainly over or within
+    (REQ-PIPE-250 criterion 3)."""
+    took = f"{seconds:.0f}s of wall clock against the 12-minute budget ({BUDGET_SECONDS}s)"
+    if seconds > BUDGET_SECONDS:
+        return f"OVER BUDGET: this bootstrap took {took} - {seconds - BUDGET_SECONDS:.0f}s over."
+    return f"Within budget: this bootstrap took {took}."
+
+
 def bootstrap(collection: str = "all", force: bool = False,
               sequential: bool = False,
               on_step: Callable[[str], None] | None = None,
@@ -133,6 +151,7 @@ def bootstrap(collection: str = "all", force: bool = False,
     wiping is `mothman env reset-synthetic`'s alone.
     """
     say = on_step or (lambda _msg: None)
+    wall_started = time.monotonic()
 
     # A CHECKPOINT IS OF ONE COLLECTION, on a synthetic asset (REQ-TEST-159):
     # both side by side are never both between arrivals at once.
@@ -279,9 +298,11 @@ def bootstrap(collection: str = "all", force: bool = False,
     disagreements = targets_agree(names)
     with supply_db.connect(label="mothman:bootstrap") as conn:
         after = staged_table_count(conn)
+    wall = time.monotonic() - wall_started
+    say(budget_line(wall))
     return BootstrapResult(populated=True, staged_before=before, staged_after=after,
                            timings=timings, checkpoint=taken[0] if taken else None,
-                           disagreements=disagreements)
+                           disagreements=disagreements, wall_seconds=wall)
 
 
 def _collection(short: str):

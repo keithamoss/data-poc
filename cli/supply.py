@@ -689,6 +689,12 @@ def tidy_command(yes: bool) -> None:
 
     So this asks first, and names what it is about to drop.
 
+    A RE-CHECK TRIAL'S TOO (REQ-PIPE-178): `trial_rc_<stamp>` and its
+    `qa_trial_rc_...` views carry the trial prefix, so a hard-killed one -
+    whose own schema is made before its run - is listed and dropped here like
+    any other trial's. Its run, if one was recorded, is read by nothing:
+    qa.run_visible leaves every trial run out.
+
     A CRASHED TRIAL IS THE OTHER THING THIS CLEARS (REQ-PIPE-103). A
     trial drops all of its schemas in one transaction when it ends,
     so nothing is ever half-cleared - but `kill -9` still leaves the
@@ -841,6 +847,7 @@ def queue_command(collection_id: str) -> None:
     them and not counted among them, each period a newer supply could be
     carried forward into (REQ-PIPE-271), with the command that does it.
 
+    \f
     THE SAME DEFINITION THE TICKET POLICY USES, never a second one -
     `slot_state.NEEDS_ACTION`, filtered to the states that hold a
     supply. A terminal and a ticket disagreeing about what is
@@ -864,9 +871,6 @@ def queue_command(collection_id: str) -> None:
             # SUPPLIES CHECKED BEFORE A CHECK CHANGED (REQ-PIPE-177 criterion
             # 20): the collection's line, then one paste-ready line per check.
             _say_bulk_rechecks(collection_id)
-            if not groups.rows:
-                console.print(f"Nothing is waiting on a person in "
-                              f"{filing_tui._collection_name(collection_id)}.", style="green")
             # WHATEVER IS COUNTED (post-build critic D3): beneath a held root
             # and the gating line too.
             filing_tui.say_queue(conn, groups, collection_id)
@@ -891,6 +895,8 @@ def _say_bulk_rechecks(collection_id: str) -> None:
     console.print(line, style="bold yellow", markup=False, highlight=False, soft_wrap=True)
     for n in nudges:
         here = n.by_collection.get(collection_id, 0)
+        if not here:
+            continue  # another collection's check (critic polish, 2026-10-25)
         console.print(f"  {n.check_id} - {here} here, {n.total} in all, changed {n.changed}: "
                       f"{n.headline}", markup=False, highlight=False, soft_wrap=True)
     console.print("mothman supply recheck --check <check_id> --reason <why>", markup=False,
@@ -913,27 +919,28 @@ def _say_owed(owed_now: list, conn=None) -> None:
     finishes it (REQ-PIPE-151)."""
     if not owed_now:
         return
-    console.print(f"\n[bold yellow]{len(owed_now)}[/bold yellow] QA run(s) owed, not yet "
-                  "done - the processing pass completes them:")
+    # A GATE IS NOT A QA RUN, said plainly, and the command on a line of its
+    # own (CLI UX review P6).
+    console.print(f"\n[bold yellow]{len(owed_now)}[/bold yellow] owed and not yet done - "
+                  "re-checks, re-evaluations and gates the processing pass completes:")
     # ONE LINE PER BULK RE-CHECK (REQ-PIPE-177 criterion 29), which is also the
     # progress view of a handed-off one.
     from qa_tools.common import bulk_recheck
 
     try:
-        with supply_db.connect(read_only=True, label="mothman:owed") as conn:
-            groups, owed_now = bulk_recheck.owed_groups(conn, owed_now)
+        with supply_db.connect(read_only=True, label="mothman:owed") as rconn:
+            groups, owed_now = bulk_recheck.owed_groups(rconn, owed_now)
     except Exception:  # noqa: BLE001 - listed one per line, as before
         groups = []
     for g in groups:
         console.print(f"  {bulk_recheck.owed_line(g)}", markup=False, highlight=False)
     for o in owed_now:
         what = _owed_words(o, conn)
-        cause = (f"owed to decision {o.caused_by_decision}" if o.caused_by_decision
-                 else f"owed to gate application {o.caused_by_application}"
-                 if getattr(o, "caused_by_application", None)
-                 else "owed to its delivery's last file")
+        cause = (f" (owed to decision {o.caused_by_decision})" if o.caused_by_decision
+                 else "")
         why = f" - last attempt: {o.last_failure}" if o.last_failure else ""
-        console.print(f"  {what} ({cause}){why}", markup=False, highlight=False)
+        console.print(f"  {what}{cause}{why}", markup=False, highlight=False)
+    console.print("mothman pipeline process", soft_wrap=True, markup=False, highlight=False)
 
 
 def _owed_words(o, conn=None) -> str:
@@ -972,7 +979,8 @@ def _owed_words(o, conn=None) -> str:
                    "every supply it covers. A trial takes none.")
 @click.option("--yes", is_flag=True,
               help="Skip the confirmation. The real run also needs --acknowledge KEY, from "
-                   "its panel.")
+                   "its panel. Where the environment confirms changes (production) you are "
+                   "still asked to type its id - --yes does not stand in for that.")
 @click.option("--acknowledge", "acknowledged", default=None, metavar="KEY",
               help="Confirm what the bulk re-check covers, by the key its panel showed.")
 @click.option("--hand-off", "hand_off", is_flag=True,
@@ -1194,6 +1202,7 @@ def decide_command(operation: str, dataset_id: str, period: str | None,
       mothman supply decide --operation place --dataset cp-carers \\
         --supply 'cp-carers@<key>' --to-period 2026-Q3 --reason '<why>'
 
+    \f
     THE FLAG FORM OF THE WIZARD, calling the same implementation the
     GitHub route calls. The actor is whoever `git config user.email`
     says, checked against contract/people.yaml - there is no way to

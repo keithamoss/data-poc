@@ -606,3 +606,73 @@ class TestOneEntryPerOwner:
         assert len(mine) == 1, _text(found)
         assert mine[0].fix.count("change_reference") == 1
         assert "participation 2023-01-01" in mine[0].fix and "not_expected 2023-Q3" in mine[0].fix
+
+
+class TestASyntheticAssetMayLaterDateAPastVersion:
+    """REQ-PIPE-111 criterion 9 as amended 2026-10-15 - REMOVING or
+    LATER-DATING a past version on a synthetic asset needs no declared
+    correction - built with REQ-GEN-238, whose shrink is the case: Child
+    Protection's 2013-01-01 participation versions later-dated to 2015-01-01.
+    The previous state is the committed files with that shrink undone."""
+
+    @staticmethod
+    def _raw():
+        return (yaml.safe_load((CONTRACT / "calendar.yaml").read_text()),
+                yaml.safe_load((CONTRACT / "data-asset.yaml").read_text()),
+                yaml.safe_load((CONTRACT / "people.yaml").read_text()))
+
+    @staticmethod
+    def _unshrunk(cal):
+        """The calendar as it stood before REQ-GEN-238: every 2015-01-01
+        version of Child Protection back at 2013-01-01, and the TS-63
+        correction naming the version by its old date."""
+        old = copy.deepcopy(cal)
+        moved = 0
+        for block in [c.get("participation_defaults") for c in old["collections"]] + \
+                     [d.get("participation") for d in old["datasets"]]:
+            for v in (block or {}).get("versions") or []:
+                if str(v.get("effective_from")) == "2015-01-01":
+                    v["effective_from"] = "2013-01-01"
+                    moved += 1
+        for d in old["datasets"]:
+            for corr in d.get("corrections") or []:
+                for change in corr.get("changes") or []:
+                    change["item"] = str(change["item"]).replace(
+                        "participation 2015-01-01", "participation 2013-01-01")
+        assert moved, "precondition - the committed calendar holds no 2015-01-01 version"
+        return old
+
+    def _check_shrink(self, synthetic=True, extra=None):
+        cal, asset, people = self._raw()
+        old_cal = self._unshrunk(cal)
+        old_asset, new_asset = copy.deepcopy(asset), copy.deepcopy(asset)
+        old_asset["synthetic"] = new_asset["synthetic"] = synthetic
+        if extra:
+            extra(cal)
+        return freeze.check(old_cal, cal, old_asset, new_asset, people,
+                            instant_of=lambda key: NOW, today=NOW.date(),
+                            base_codeowners=CODEOWNERS)
+
+    def test_the_shrink_needs_no_correction_on_a_synthetic_asset(self):
+        found = self._check_shrink()
+        assert found == [], _text(found)
+
+    def test_on_a_real_asset_it_needs_one(self):
+        found = self._check_shrink(synthetic=False)
+        assert any("was removed" in f.problem for f in found), _text(found)
+
+    def test_a_correction_changed_in_any_other_way_is_still_refused(self):
+        def reword(cal):
+            corr = next(d for d in cal["datasets"] if d["id"] == "cp-carers")["corrections"][-1]
+            corr["reason"] = corr["reason"] + " Reworded."
+        found = self._check_shrink(extra=reword)
+        assert any("append-only" in f.problem for f in found), _text(found)
+
+    def test_removing_a_past_version_is_free_on_a_synthetic_asset(self):
+        cal, asset, people = self._raw()
+        new_cal = copy.deepcopy(cal)
+        versions = _entry(new_cal, "ed-presentations")["participation"]["versions"]
+        versions[:] = [v for v in versions if str(v["effective_from"]) != "2015-10-01"]
+        found = freeze.check(cal, new_cal, asset, asset, people, instant_of=lambda key: NOW,
+                             today=NOW.date(), base_codeowners=CODEOWNERS)
+        assert found == [], _text(found)

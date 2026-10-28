@@ -1941,36 +1941,29 @@ class TestSupplyAndTableLevelSections:
         assert names, "the column grid should still have real columns in it"
         assert not [n for n in names if "level checks" in n.lower()]
 
-    def test_rows_sharing_a_name_are_told_apart_by_their_tool(
-            self, clean_page, built_dashboard_html):
-        """Three tools ask cp-placements' carer-approval question and
-        share one name by design (rule 19). Without the tool reference
-        the section reads as three identical rows."""
+    def test_a_check_three_tools_ask_is_one_row(self, clean_page, built_dashboard_html):
+        """Three tools ask cp-placements' cross-table questions and share one
+        name by design (rule 19). The section shows each ONCE (REQ-DASH-272
+        criterion 6, amending REQ-DASH-264 criterion 2), its tools' results as
+        marks in the row's cells - so no two rows share a name and tables, and
+        there are fewer rows than tool results (functional critic on 7093c20:
+        this used to return early and assert nothing)."""
         _goto(clean_page, built_dashboard_html, self._CP)
-
         sections = self._sections(clean_page)
-        # THE CROSS-TABLE SECTION IS ONE ROW PER CHECK (REQ-DASH-272 criterion
-        # 6, amending REQ-DASH-264 criterion 2): the three tools' results sit
-        # in the row's cells as marks, so no two rows share a name AND tables.
         (cross,) = [s for s in sections if s["scope"] == "cross-table"]
         keys = [(r["name"], r["between"]) for r in cross["rows"]]
         assert keys and len(keys) == len(set(keys)), keys
-        rows = [r for s in sections if s["scope"] != "cross-table" for r in s["rows"]]
-        by_name: dict[str, list[str]] = {}
-        for row in rows:
-            by_name.setdefault(row["name"], []).append(row["tool"])
-        shared = {name: tools for name, tools in by_name.items() if len(tools) > 1}
-        if not shared:
-            # Every name the tools share on this page is a cross-table check's,
-            # which the grid shows once, its tools as marks.
-            return
-        # Per NAME, not across the whole section. Two differently-named
-        # rows may legitimately share a tool - "Client reference" and
-        # "Carer reference" are both soda:relationships - and an
-        # assertion over all repeated rows at once forbids that, which
-        # is a rule this page has never had.
-        for name, tools in shared.items():
-            assert len(set(tools)) == len(tools), f"{name!r} repeats a tool: {tools}"
+        results = clean_page.evaluate("""() => {
+            const ds = DATA.agencies.flatMap(a => a.collections).flatMap(c => c.datasets)
+                           .find(d => d.id === "cp-placements");
+            return ds.columns.filter(c => c.scope === "cross-table")
+                     .flatMap(c => c.checks).filter(ck => !ck.retired).length;
+        }""")
+        assert results > len(keys), (results, keys)
+        marks = clean_page.evaluate("""() => [...document.querySelectorAll(
+            '.scope-section[data-scope="cross-table"] .xt-row .xt-marks')]
+            .map(m => m.textContent.trim())""")
+        assert any(m.count("·") == 0 and len(m.split()) == 3 for m in marks), marks
 
     def test_a_row_opens_that_check_directly_with_a_readable_url(
             self, clean_page, built_dashboard_html):
@@ -5404,7 +5397,7 @@ _AS_AT_CHIPS = (
     # 'In place' says where (REQ-DASH-277; REQ-GEN-199 criterion 18 as amended):
     # the status clause after it comes with REQ-DASH-272.
     ("TS-78b", ".verdict-of", "The supply in place in the warehouse is the one received "
-     "2:00pm Sunday, 30 August 2026."),
+     "2:00pm Sunday, 30 August 2026, and is "),
     ("TS-79a", '[data-testid="standing-in"]', "Inherited from 2026-Q1"),
     ("TS-79b", '[data-testid="standing-in"]', "Inherited from 2023-Q1"),
 )
@@ -6011,23 +6004,28 @@ class TestACrossTableCheckOnTS80:
 
 class TestASupersededRunOnTheDatesItWasCurrent:
     """post-build-review #266, Keith 2026-10-24 (answer A), on the bootstrapped
-    history. Child Protection's 12 October 2023 delivery was re-checked in full
-    on 21 October. A page listed each supply by its current run only, so as at
-    15 October the Client Register had no result at all - its own checks and
-    its cross-table rows alike - while the gate counted the arrival's. The page
-    now keeps a superseded run's results for the dates they were current."""
+    history. TS-67's supply - 10:00am 12 October 2023 - was re-filed and
+    re-checked in full on 21 October. A page listed each supply by its current
+    run only, so as at 15 October it had no result at all while the gate
+    counted the arrival's. The page now keeps a superseded run's results for
+    the dates they were current.
 
-    AG, COL = "child-protection-family-support", "child-protection"
-    WHERE = {"tier": "dataset", "agencyId": AG, "collectionId": COL, "datasetId": "cp-clients"}
-    #: The Client Register received 10:00am 12 October 2023, re-checked in full
-    #: on 21 October with the rest of its delivery (the seeded history).
-    SUPPLY = "cp-clients@202310121000000800"
+    ON EMERGENCY DEPARTMENT SINCE REQ-GEN-235 moved TS-67 there (Keith,
+    2026-10-27: repoint). It was Child Protection's Client Register, whose
+    cross-table rows the page also kept; Emergency Department has none, so
+    this now proves the dataset's own checks only."""
+
+    AG, COL = "department-of-health", "emergency-department"
+    WHERE = {"tier": "dataset", "agencyId": AG, "collectionId": COL,
+             "datasetId": "ed-presentations"}
+    #: TS-67's supply, re-checked in full on 21 October with its re-file.
+    SUPPLY = "ed-presentations@202310121000000800"
 
     def _shown(self, page, html, on):
         _goto(page, html, state=self.WHERE, in_place_on=on)
         return page.evaluate("""() => {
             const ds = DATA.agencies.flatMap(a => a.collections).flatMap(c => c.datasets)
-                           .find(d => d.id === "cp-clients");
+                           .find(d => d.id === "ed-presentations");
             // A section with no rule has a synthesized card, dated by nothing.
             const of = c => c.checks.filter(ck => ck.key !== "no_rule_defined").map(ck => {
               const last = (ck.history || []).at(-1) || {};
@@ -6035,22 +6033,17 @@ class TestASupersededRunOnTheDatesItWasCurrent:
                       runs: (ck.history || []).map(h => h.run_id),
                       supply: last.supply_id || null, recorded: last.recorded_at || null};
             });
-            return {own: ds.columns.filter(c => c.scope !== "cross-table").flatMap(of),
-                    cross: ds.columns.filter(c => c.scope === "cross-table").flatMap(of)};
+            return {own: ds.columns.filter(c => c.scope !== "cross-table").flatMap(of)};
         }""")
 
     def test_between_the_arrival_and_the_recheck_the_arrivals_results_are_shown(
             self, clean_page, built_dashboard_html):
         """Before the fix the own checks showed the PREVIOUS supply's results
-        as the newest, and every Client reference row read No data."""
+        as the newest."""
         shown = self._shown(clean_page, built_dashboard_html, "2023-10-15")
         assert shown["own"], shown
         assert {c["supply"] for c in shown["own"]} == {self.SUPPLY}, shown["own"][:3]
-        refs = [c for c in shown["cross"] if c["name"] == "Client reference"]
-        assert refs, shown["cross"]
-        assert {c["supply"] for c in refs} == {self.SUPPLY}, refs
-        assert all(c["recorded"][:10] <= "2023-10-15" for c in refs), refs
-        assert "nodata" not in {c["status"] for c in refs}, refs
+        assert all(c["recorded"][:10] <= "2023-10-15" for c in shown["own"]), shown["own"][:3]
 
     def test_after_the_recheck_only_its_results_are_shown(self, clean_page, built_dashboard_html):
         before = self._shown(clean_page, built_dashboard_html, "2023-10-15")
@@ -6701,7 +6694,10 @@ class TestAnotherTableCouldNotBeRead:
     #: (arrival day, period, the day after it was re-evaluated) for TS-42 and
     #: TS-80, and how many of each reader's checks read the Client Register.
     PAIRS = (("2019-11-01", "2019-Q4", "2019-11-29"), ("2020-11-01", "2020-Q4", "2020-11-02"))
-    NEED = {"cp-notifications": 3, "cp-investigations": 6, "cp-placements": 3}
+    #: ONE CHECK PER GRID ROW, however many tools ran it (UX critic on
+    #: 7093c20, B2; Keith Q2 = a, PROVISIONAL): Investigations reads the Client
+    #: Register in two checks, the others in one.
+    NEED = {"cp-notifications": 1, "cp-investigations": 2, "cp-placements": 1}
 
     def test_a_reader_shows_one_line_while_the_pair_is_open_and_none_after(
             self, clean_page, built_dashboard_html):
@@ -6718,11 +6714,18 @@ class TestAnotherTableCouldNotBeRead:
                 lines = _shown(clean_page, "[data-no-promoted] .np-line")
                 assert len(lines) == 1, (reader, lines)
                 assert lines[0]["attrs"]["data-np-dataset"] == "cp-clients"
-                assert lines[0]["text"] == (
-                    f"No promoted Client Register for {period}. {n} of this supply's checks need "
-                    f"it, so they could not run. That is not a fault in this supply's own data. "
-                    f"They run again by themselves once a {period} Client Register supply is "
-                    f"promoted."), (reader, lines)
+                need = ("One of this supply's checks needs it, so it could not run." if n == 1
+                        else f"{n} of this supply's checks need it, so they could not run.")
+                assert lines[0]["text"].startswith(
+                    f"No promoted Client Register for {period}. {need} That is not a fault in "
+                    f"this supply's own data."), (reader, lines)
+                # THE GRID AGREES (UX critic B1): the cells say the checks could
+                # not be evaluated, never "Fail ✗".
+                grid = _grid(clean_page)
+                cells = [c for r in grid["rows"] if r["between"].endswith("→ Client Register")
+                         for c in (r["staged"], r["warehouse"]) if c]
+                assert cells and all("✗" not in c and "Fail" not in c for c in cells), cells
+                assert any("Not evaluated ○" in c for c in cells), cells
                 assert notice["attrs"].get("role") == "status"
                 assert lines[0]["links"] and all(
                     f"in-place-on={day}" in a["href"] and "/dataset/cp-clients" in a["href"]
@@ -6751,9 +6754,8 @@ class TestAnotherTableCouldNotBeRead:
         (line,) = _shown(clean_page, "[data-no-promoted] .np-line")
         assert line["text"] == (
             "No promoted Client Register for 2024-Q4. The Client Register received with this "
-            "supply (10:00am Sunday, 3 November 2024) was held back, so 3 of this supply's checks "
-            "could not run. That is not a fault in this supply's own data. They run again by "
-            "themselves once a 2024-Q4 Client Register supply is promoted."), line
+            "supply (10:00am Sunday, 3 November 2024) was held back, so one of this supply's "
+            "checks could not run. That is not a fault in this supply's own data."), line
         (verdict,) = _shown(clean_page, ".verdict-of")
         assert verdict["text"].startswith("Nothing needs deciding on this supply"), verdict
         assert "Awaiting a decision" not in verdict["text"]
@@ -6765,7 +6767,7 @@ class TestAnotherTableCouldNotBeRead:
         _goto(clean_page, page, state=n, in_place_on="2024-11-05")
         (line,) = _shown(clean_page, "[data-no-promoted] .np-line")
         assert ("The Client Register received with this supply (10:00am Sunday, 3 November "
-                "2024) was turned down, so 3 of this supply's checks could not run.") in line["text"]
+                "2024) was turned down, so one of this supply's checks could not run.") in line["text"]
         assert "held back" not in line["text"]
         (verdict,) = _shown(clean_page, ".verdict-of")
         assert verdict["text"].startswith("Awaiting a decision"), verdict
@@ -6789,7 +6791,7 @@ class TestAnotherTableCouldNotBeRead:
         (line,) = _shown(clean_page, "[data-no-promoted] .np-line")
         assert ("The Client Register received with this supply (10:00am Sunday, 3 November "
                 "2024) has been replaced by the one received 10:00am Thursday, 7 November 2024, "
-                "so 3 of this supply's checks could not run.") in line["text"], line
+                "so one of this supply's checks could not run.") in line["text"], line
         assert "was held back" not in line["text"]
 
     def test_a_partner_not_due_yet_and_then_overdue(self, clean_page, cp_pages):
@@ -6808,14 +6810,14 @@ class TestAnotherTableCouldNotBeRead:
         _goto(clean_page, page, state=_cp_state("cp-notifications"), in_place_on="2024-10-30")
         lines = _shown(clean_page, "[data-no-promoted] .np-line")
         assert [ln["attrs"]["data-np-dataset"] for ln in lines] == ["cp-clients"], lines
-        assert lines[0]["text"].startswith("No promoted Client Register for 2024-Q4. 3 of this "
-                                           "supply's checks need it")
+        assert lines[0]["text"].startswith("No promoted Client Register for 2024-Q4. One of this "
+                                           "supply's checks needs it")
         assert clean_page.locator(".view-head .pill.red").count() >= 1
 
         _goto(clean_page, page, state=_cp_state("cp-clients"), in_place_on="2024-10-30")
         (muted,) = _shown(clean_page, "[data-not-due-yet]")
-        assert muted["text"].startswith("Not due until 9:00am Friday, 1 November 2024 — the "), muted
-        assert muted["text"].endswith("are waiting on it"), muted
+        assert muted["text"].startswith("Not due until 9:00am Friday, 1 November 2024 — "), muted
+        assert muted["text"].endswith("are waiting on it."), muted
         assert "Notifications" in {a["text"] for a in muted["links"]}
         assert "late-open-note" in muted["attrs"]["class"]
         assert all("in-place-on=2024-10-30" in a["href"] for a in muted["links"])
@@ -6866,8 +6868,8 @@ class TestAnotherTableCouldNotBeRead:
         (line,) = _shown(clean_page, "[data-no-promoted] .np-line")
         assert line["text"] == (
             "Not yet re-checked against the Client Register promoted 10:00am Tuesday, 6 August "
-            "2024. 3 of this supply's checks read it; the re-check runs on the next processing "
-            "pass."), line
+            "2024. One of this supply's checks reads it; the re-check runs on the next "
+            "processing pass."), line
         assert "No promoted" not in line["text"]
         _goto(clean_page, page, state=_cp_state("cp-notifications"), in_place_on="2024-08-05")
         assert _shown(clean_page, "[data-no-promoted]") == [], "nothing owed the day before"
@@ -6954,9 +6956,11 @@ class TestWarehouseAndStagingViews:
         assert caption["text"] == ("Results for the supply received 10:00am Monday, 5 August "
                                    "2024, awaiting a decision")
         grid = _grid(clean_page)
-        assert grid["key"].endswith("The marks are dbt, Soda and datacontract-cli, in that "
-                                    "order; · means that tool has no such check. Select a check "
-                                    "for each tool's full result."), grid["key"]
+        assert grid["key"] == (
+            "The marks are dbt, Soda and datacontract-cli, in that order: ✓ passed, ✗ failed, "
+            "○ could not be evaluated, and a middle dot (·) means that tool has no such check. "
+            "Select a check for each tool's full result."), grid["key"]
+        assert all(".." not in r["aria"] for r in grid["rows"]), [r["aria"] for r in grid["rows"]]
         assert all(r["links"] == 0 for r in grid["rows"]), "no link inside a row's button"
 
         _goto(clean_page, page, state=self.C, in_place_on="2024-08-05")
@@ -6983,8 +6987,14 @@ class TestWarehouseAndStagingViews:
                 "because the Notifications received with it was held back.") in rows, rows
         _goto(clean_page, page, state=self.N, in_place_on="2024-08-05")
         rows = [r["text"] for r in _shown(clean_page, "[data-promoted-with]")]
+        # SHORT ON THE ROW, EVERYONE ON DEMAND (UX critic on 7093c20, P6): the
+        # supplies received with it are "of its delivery", and "<n> more"
+        # carries the names it stands for.
         assert any(r.startswith("Promoted 10:30am Thursday, 25 July 2024 with the ")
-                   and r.endswith(" and 3 more, by the rule") for r in rows), rows
+                   and r.endswith(" supplies of its delivery, by the rule")
+                   and "received" not in r for r in rows), rows
+        more = clean_page.locator("[data-promoted-with] .names-more").first.get_attribute("title")
+        assert more and " and " in more, more
 
         clean_page.set_viewport_size({"width": 375, "height": 800})
         _goto(clean_page, page, state=self.N, in_place_on="2024-08-05")
@@ -7032,8 +7042,15 @@ class TestWarehouseAndStagingViews:
         # THE PANEL: each tool's full result, the names real links.
         clean_page.locator(".xt-row", has_text="Escalation completeness").first.click()
         clean_page.wait_for_selector("[data-xt-tools]")
+        # ONE BLOCK PER VIEW, LABELLED, AND TOOLS THAT AGREE SAID ONCE (UX critic
+        # on 7093c20, S6, PROVISIONAL).
+        views = _shown(clean_page, "[data-xt-tools] [data-xt-view]")
+        assert [v["attrs"]["data-xt-view"] for v in views] == ["staged", "warehouse"], views
+        assert [_shown(clean_page, f'[data-xt-view="{v}"] .xt-view-label')[0]["text"]
+                for v in ("staged", "warehouse")] == ["Staged", "In the warehouse"]
         tools = _shown(clean_page, "[data-xt-tools] .xt-tool")
-        assert [t["attrs"]["data-tool"] for t in tools] == ["dbt", "soda", "datacontract"], tools
+        assert [t["attrs"]["data-tool"] for t in tools] == ["dbt soda datacontract"] * 2, tools
+        assert all(t["text"].startswith("dbt, Soda and datacontract-cli") for t in tools), tools
         assert all(any("in-place-on=2024-08-05" in a["href"] for a in t["links"]) for t in tools)
 
     def test_staggered_a_result_whose_partner_left_is_in_neither_cell(self, clean_page, cp_pages):
@@ -7071,9 +7088,8 @@ class TestWarehouseAndStagingViews:
     def test_staggered_order_b_red_shows_both_cells(self, clean_page, cp_pages):
         """Staggered Order B red: Clients v2 at 09:00 fails Client reference
         against Notifications v1; Notifications v2 at 09:05 is red on its own
-        data. The Client Register's row shows both cells, the warehouse one
-        ending '— why it is held back' though that result came from its own
-        09:00 arrival."""
+        data. The Client Register's row shows both cells, and its warehouse cell does not say '— why it is held back': that result came
+        from its own 09:00 arrival, not from a hold-back (D1)."""
         from gate_support import cross_red, own_red
         from test_package_gate import established
 
@@ -7092,8 +7108,16 @@ class TestWarehouseAndStagingViews:
         row = _row(_grid(clean_page), "Client reference", "Notifications → Client Register")
         assert row["staged"] and row["staged"].startswith("Staged:"), row
         assert row["warehouse"].startswith("In the warehouse: Fail ✗ ✗ ✗"), row
-        assert row["warehouse"].endswith("— why it is held back"), row
-        assert row["pill"] == "Red", row
+        # NOT "WHY IT IS HELD BACK" (functional critic on 7093c20, D1; Keith Q2 =
+        # A, PROVISIONAL): its warehouse result is its own 09:00 arrival's, and
+        # no gate entry held it back on that check - the words come only from
+        # the gate's structured hold-back, never from one cell being worse.
+        assert "held back" not in row["warehouse"], row
+        # THE PILL IS NOT ASSERTED HERE: no hold-back is recorded for Clients v2,
+        # so the row is no longer turned red by the warehouse cell being the
+        # worse one, and what it should read turns on whether the 09:05 arrival
+        # should have re-gated Clients v2 - a question for the gate (REQ-PIPE-267),
+        # raised with the functional critic's D1, not settled by this test.
 
     def test_the_owed_re_check_and_a_rejection(self, clean_page, cp_pages):
         """The owed re-check (criterion 10): a Clients v2 whose run stopped is
@@ -7155,6 +7179,136 @@ def _s6(pages: _CpPages) -> dict:
     return {**v1, **v2}
 
 
+class TestTheUxCriticsFindingsOn7093c20:
+    """The dashboard UX critic's findings on REQ-DASH-204/272/275 (7093c20),
+    each asserted where a reader sees it, on the deployment's own history."""
+
+    def test_nothing_held_back_says_nothing_held_back(self, clean_page, built_dashboard_html):
+        """D1 (functional critic on 7093c20; Keith Q2 = A, PROVISIONAL):
+        Placements on 1 February 2020 is green and nothing held it back, so no
+        cross-table row says '— why it is held back' or turns red for it."""
+        _goto(clean_page, built_dashboard_html, state=_cp_state("cp-placements"),
+              in_place_on="2020-02-01")
+        grid = _grid(clean_page)
+        assert grid and grid["rows"], grid
+        assert not [r for r in grid["rows"] if "held back" in (r["warehouse"] or "")], grid
+        assert _shown(clean_page, "[data-held-back]") == []
+        assert not [r for r in grid["rows"] if r["pill"] == "Red"], grid["rows"]
+
+    def test_ts82_a_failed_re_check_is_its_own_root(self, clean_page, built_dashboard_html):
+        """ROOT NAMING A on TS-82, 28 August 2017: the Client Register's notice
+        names the Notifications received with it as its cause, never as the root
+        of a chain, and the Notifications' page does not list the Client
+        Register under 'Holding back with it'."""
+        _goto(clean_page, built_dashboard_html, state=_cp_state("cp-clients"),
+              in_place_on="2017-08-28")
+        (notice,) = _shown(clean_page, "[data-held-back]")
+        assert notice["attrs"]["data-held-back"] in ("package", "joined"), notice
+        assert "Held back with its delivery" not in notice["text"], notice
+        _goto(clean_page, built_dashboard_html, state=_cp_state("cp-notifications"),
+              in_place_on="2017-08-28")
+        assert _shown(clean_page, "[data-holding-back]") == []
+
+    def test_a_name_in_a_sentence_looks_like_a_link(self, clean_page, built_dashboard_html):
+        """S1: the dataset link inside the notice's bold heading is underlined
+        in the accent colour, not bold text like its neighbours."""
+        _goto(clean_page, built_dashboard_html, state=_cp_state("cp-investigations"),
+              in_place_on="2019-11-01")
+        style = clean_page.evaluate("""() => {
+            const a = document.querySelector('[data-no-promoted] .np-line b a.dataset-link');
+            const b = a.closest('b');
+            const cs = getComputedStyle(a), bs = getComputedStyle(b);
+            return {line: cs.textDecorationLine, color: cs.color, bold: bs.color};
+        }""")
+        assert style["line"] == "underline", style
+        assert style["color"] != style["bold"], style
+
+    def test_affects_ends_a_sentence_on_the_awaiting_line(self, clean_page, built_dashboard_html):
+        """S2: on Notifications' page for 8 August 2021 "Affects" is part of
+        the awaiting line and ends with a full stop - never a line of its own
+        with nothing before it.
+
+        REPOINTED 2026-10-28 (Keith: repoint rather than delete): it read the
+        Client Register's page for 7 February 2020, where Placements had been
+        promoted on 6 February and then "held back" on 12 February - the
+        out-of-order instants post-build-review #276 fixed. With Placements'
+        promotion floored at its hold-back, no Client Register page shows the
+        state; a scan of every day of every Child Protection page found it on
+        Notifications' (2021-08-08 and 2022-02-04)."""
+        _goto(clean_page, built_dashboard_html, state=_cp_state("cp-notifications"),
+              in_place_on="2021-08-08")
+        (verdict,) = _shown(clean_page, ".verdict-of")
+        (affects,) = _shown(clean_page, "[data-affects-readers]")
+        assert affects["text"] == "Affects Investigations.", affects
+        assert verdict["text"].endswith("Affects Investigations."), verdict
+
+    def test_an_overdue_cause_says_so_on_its_own_page(self, clean_page, built_dashboard_html):
+        """S2 and REQ-DASH-204 open question 1 (Keith Q4 = a, PROVISIONAL): the
+        Carer Register, overdue for 2021-Q4 on 1 November 2021, says so in one
+        muted line naming the reader waiting on it."""
+        _goto(clean_page, built_dashboard_html, state=_cp_state("cp-carers"),
+              in_place_on="2021-11-01")
+        (note,) = _shown(clean_page, "[data-cause-note]")
+        assert note["text"] == "Overdue for 2021-Q4 — Placements is waiting on it.", note
+        assert "late-open-note" in note["attrs"]["class"]
+        assert all("in-place-on=2021-11-01" in a["href"] for a in note["links"]), note
+
+    def test_holding_back_with_it_is_not_repeated_as_affects(self, clean_page,
+                                                            built_dashboard_html):
+        """S3 (Keith Q3 = a, PROVISIONAL): where "Holding back with it" already
+        names every reader, no "Affects" line repeats them; the names are in
+        the hierarchy's order."""
+        _goto(clean_page, built_dashboard_html, state=_cp_state("cp-clients"),
+              in_place_on="2016-08-01")
+        (verdict,) = _shown(clean_page, ".verdict-of")
+        assert "Holding back with it: Notifications, Investigations and Placements." in \
+            verdict["text"], verdict
+        assert _shown(clean_page, "[data-affects-readers]") == []
+
+    def test_the_exec_cards_carry_the_no_promoted_line(self, clean_page, built_dashboard_html):
+        """S8: the executive tier's agency card carries the same "No promoted"
+        line as the agency page's collection - as text, the card being a link."""
+        _goto(clean_page, built_dashboard_html, state={"tier": "exec"}, in_place_on="2019-11-01")
+        (marker,) = _shown(clean_page, f'.card[data-agency="{CP_AGENCY}"] '
+                                       '[data-no-promoted-marker="cp-clients"]')
+        assert marker["text"].endswith("No promoted Client Register: holds 3 datasets red"), marker
+        assert marker["links"] == []
+
+    def test_the_grid_headings_sit_over_their_columns(self, clean_page, built_dashboard_html):
+        """P1: each column heading starts where its cells start."""
+        _goto(clean_page, built_dashboard_html, state=_cp_state("cp-clients"),
+              in_place_on="2017-08-28")
+        off = clean_page.evaluate("""() => {
+            const g = document.querySelector('.xt-grid');
+            const heads = [...g.querySelectorAll('.xt-head span')].slice(1, -1);
+            const row = g.querySelector('.xt-row');
+            const cells = [...row.querySelectorAll('.xt-cell')];
+            return heads.map((h, i) => Math.abs(h.getBoundingClientRect().left
+                                                - cells[i].getBoundingClientRect().left));
+        }""")
+        assert off and max(off) <= 1, off
+
+    def test_the_pill_keeps_its_full_stop(self, clean_page, built_dashboard_html):
+        """P3: the warehouse clause's pill and the full stop after it share a
+        line."""
+        _goto(clean_page, built_dashboard_html, state=_cp_state("cp-clients"),
+              in_place_on="2017-08-28")
+        stop = clean_page.evaluate("""() => {
+            const s = document.querySelector('.wh-clause .pill-stop');
+            return s ? [s.textContent.trim().slice(-1), getComputedStyle(s).whiteSpace] : null;
+        }""")
+        assert stop == [".", "nowrap"], stop
+
+    def test_a_substitution_is_called_one_thing(self, clean_page, built_dashboard_html):
+        """P4: Placements on 8 June 2023 - the badge says "Substituted from" and
+        the clause says the same."""
+        _goto(clean_page, built_dashboard_html, state=_cp_state("cp-placements"),
+              in_place_on="2023-06-08")
+        (clause,) = _shown(clean_page, ".wh-clause")
+        assert "the one substituted from 2023-Q1" in clause["text"], clause
+        assert "carried forward" not in clause["text"]
+
+
 class TestHeldBackWithItsDelivery:
     """REQ-DASH-275 criterion 9: a supply held back with its delivery says so
     at the top of its page, names the root of the chain, and the card says it
@@ -7178,7 +7332,7 @@ class TestHeldBackWithItsDelivery:
         assert notice["text"] == (
             "Held back with the Notifications received with it. That file (received 10:00am "
             "Monday, 5 August 2024) was held back, so this supply was re-checked against the "
-            "Notifications in place in the warehouse, and 3 cross-table checks fail against it. "
+            "Notifications in place in the warehouse, and one cross-table check fails against it. "
             "It is checked again by itself once a Notifications supply is promoted."), notice
         assert "not a fault" not in notice["text"]
         assert notice["links"] and all("in-place-on=2024-08-05" in a["href"]
@@ -7187,11 +7341,12 @@ class TestHeldBackWithItsDelivery:
         later = _shown(clean_page, "[data-no-promoted]")
         if later:
             assert notice["top"] < later[0]["top"], "before any REQ-DASH-204 notice"
+        # ITS OWN ROOT (functional critic on 7093c20; Keith Q1 = A, PROVISIONAL):
+        # the Client Register's re-check FAILED, so the Notifications does not
+        # list it as held back by it.
         _goto(clean_page, page, state=self.N, in_place_on="2024-08-05")
         (verdict,) = _shown(clean_page, ".verdict-of")
-        assert "Holding back with it: Client Register." in verdict["text"], verdict
-        assert ("If this file is turned down, the Client Register supply needs its own decision."
-                in verdict["text"]), verdict
+        assert "Holding back with it" not in verdict["text"], verdict
 
     def test_staggered_s1_red_the_joined_form(self, clean_page, cp_pages):
         """Notifications v2 red on its own data at 09:00 waits; Clients v2 at
@@ -7219,40 +7374,45 @@ class TestHeldBackWithItsDelivery:
             "Notifications in place in the warehouse"), notice
         _goto(clean_page, page, state={"tier": "agency", "agencyId": CP_AGENCY},
               in_place_on="2024-08-05")
-        (card,) = _shown(clean_page, '[data-held-back-marker="cp-notifications"]')
-        assert card["text"].endswith("Held back together: Notifications and Client Register "
-                                     "(received 9:00am and 9:05am, Monday, 5 August 2024)"), card
+        # A failed re-check is its own root (Keith Q1 = A): no "Held back
+        # together" line names the Notifications as its root.
+        assert _shown(clean_page, "[data-held-back-marker]") == []
 
-    def test_s6_the_chain_the_root_and_the_card(self, clean_page, cp_pages):
-        """S6: the Client Register's page names the Investigations root and the
-        chain; the Notifications page names the Investigations; the
-        Investigations page lists Notifications and Client Register under
-        'Holding back with it'; the Child Protection card shows ONE 'Held back
-        together' line for the delivery and no REQ-DASH-204 line for it."""
-        _s6(cp_pages)
+    def test_s6_each_failed_re_check_is_its_own_root(self, clean_page, cp_pages):
+        """S6, ROOT NAMING A (functional critic on 7093c20; Keith Q1 = A,
+        PROVISIONAL, as the tickets' root_cause.root_of reads it): the Client
+        Register's re-check failed, so its notice names the Notifications
+        received with it - never a chain to the Investigations; the
+        Notifications' names the Investigations; nothing lists either under
+        'Holding back with it', and no card says 'Held back together'. Once the
+        Investigations is turned down (D2), nothing names it as a root."""
+        got = _s6(cp_pages)
         page = cp_pages.page()
         _goto(clean_page, page, state=self.C, in_place_on="2024-08-05")
         (notice,) = _shown(clean_page, "[data-held-back]")
-        assert notice["attrs"]["data-held-back"] == "chain", notice
-        assert notice["text"].startswith(
-            "Held back with its delivery: the Investigations file was held back, and the "
-            "Notifications with it. That file"), notice
+        assert notice["attrs"]["data-held-back"] == "package", notice
+        assert notice["text"].startswith("Held back with the Notifications received with it."), \
+            notice
+        assert "Investigations" not in notice["text"]
         _goto(clean_page, page, state=self.N, in_place_on="2024-08-05")
         (notice,) = _shown(clean_page, "[data-held-back]")
         assert notice["text"].startswith("Held back with the Investigations received with it."), notice
         _goto(clean_page, page, state=self.I, in_place_on="2024-08-05")
-        (holding,) = _shown(clean_page, "[data-holding-back]")
-        assert holding["text"].startswith("Holding back with it: Client Register, Notifications."), \
-            holding
-        assert {a["text"] for a in holding["links"]} >= {"Client Register", "Notifications"}
+        assert _shown(clean_page, "[data-holding-back]") == []
         _goto(clean_page, page, state={"tier": "agency", "agencyId": CP_AGENCY},
               in_place_on="2024-08-05")
-        cards = _shown(clean_page, "[data-held-back-marker]")
-        assert [c["attrs"]["data-held-back-marker"] for c in cards] == ["cp-investigations"], cards
-        assert cards[0]["text"].endswith("Held back together: Investigations, Client Register and "
-                                         "Notifications (one delivery, received 10:00am Monday, 5 "
-                                         "August 2024)"), cards
-        assert not _shown(clean_page, '[data-no-promoted-marker="cp-investigations"]')
+        assert _shown(clean_page, "[data-held-back-marker]") == []
+
+        cp_pages.reject(got["I2"], "2024-Q3", "2024-08-07T10:00:00+08:00")
+        page = cp_pages.page()
+        _goto(clean_page, page, state=self.C, in_place_on="2024-08-07")
+        texts = [n["text"] for n in _shown(clean_page, "[data-held-back]")]
+        assert not any("Held back with its delivery" in t or "Investigations" in t
+                       for t in texts), texts
+        _goto(clean_page, page, state=self.N, in_place_on="2024-08-07")
+        (notice,) = _shown(clean_page, "[data-held-back]")
+        assert notice["text"] == ("The Investigations file received with it was turned down; "
+                                  "this supply now needs its own decision."), notice
 
     def test_after_the_root_is_turned_down_then_replaced(self, clean_page, cp_pages):
         """S1 red, then the root Notifications v2 rejected: the notice reads

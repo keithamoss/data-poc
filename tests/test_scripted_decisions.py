@@ -644,12 +644,14 @@ class TestAnEmptiedQuarterIsMarkedNotSupplied:
     def test_it_is_timed_after_the_slot_closes(self):
         from qa_tools.common import slots
 
-        timed, why = sd._timed_chain(self._mark("2013-Q1", dataset_id="cp-clients"))
+        # 2015-Q1, an emptied quarter Child Protection still owes since
+        # REQ-GEN-238 dropped 2013 and 2014.
+        timed, why = sd._timed_chain(self._mark("2015-Q1", dataset_id="cp-clients"))
         assert timed is not None, why
-        slot = next(s for s in slots.slots_for_dataset("cp-clients", until=date(2014, 1, 1))
-                    if s.name == "2013-Q1")
+        slot = next(s for s in slots.slots_for_dataset("cp-clients", until=date(2016, 1, 1))
+                    if s.name == "2015-Q1")
         assert timed.at == slot.closes_at + timedelta(hours=24)
-        assert timed.supply is None and timed.period == "2013-Q1"
+        assert timed.supply is None and timed.period == "2015-Q1"
 
     def test_the_committed_marks_are_exactly_the_emptied_quarters(self):
         """From configuration alone, so they cannot go stale: every Child

@@ -166,8 +166,9 @@ class TestParticipation:
     def test_saying_nothing_means_every_period(self):
         """The reading that makes ~30 datasets tolerable to configure."""
         assert schedule.delivery_months("cp-clients") is None
-        # 40 grown quarters from 2013 (REQ-GEN-207) plus the 20 from 2023.
-        assert len(schedule.periods_for_dataset("cp-clients")) == 60
+        # 32 grown quarters from 2015 (REQ-GEN-207, re-sized by REQ-GEN-238)
+        # plus the 20 from 2023.
+        assert len(schedule.periods_for_dataset("cp-clients")) == 52
 
     def test_a_dataset_naming_months_gets_only_those(self):
         assert schedule.delivery_months("cp-case-workers") == (2, 8)

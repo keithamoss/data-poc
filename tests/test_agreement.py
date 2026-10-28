@@ -115,10 +115,12 @@ class TestParticipation:
     def test_saying_nothing_owes_every_period(self):
         """Criterion 6: a dataset that names no delivery months owes every
         period of its calendar - the AUTHORED ones, which since REQ-GEN-205's
-        correction include 2013-Q4 and 2014-Q3 on 20 October and 20 July."""
+        correction include 2013-Q4 and 2014-Q3 on 20 October and 20 July. Read
+        on Emergency Department, whose history still holds 2013 and 2014 since
+        REQ-GEN-238 dropped them from Child Protection's."""
         quarterly = schedule.calendar("quarterly")
         authored = {p.date.month for v in quarterly.versions for p in v.periods}
-        months = {p.date.month for p in schedule.periods_for_dataset("cp-clients")}
+        months = {p.date.month for p in schedule.periods_for_dataset("ed-presentations")}
         assert {2, 5, 8, 11} <= months == authored, (months, authored)
 
     def test_before_the_first_version_nothing_is_owed_yet(self, tmp_path):

@@ -130,3 +130,23 @@ class TestWithinTheClaimWindowInAReplay:
         orchestrate.promote_after(collection_id, arrival, [], "t@example.com")
         expected = schedule.claim_window(dataset, on=RECEIVED.date())
         assert seen["within"] == expected
+
+
+def test_no_supply_is_held_back_after_the_promotion_that_ended_it(deployment_history):
+    """post-build-review #276, on the bootstrapped history: read by effective
+    time, as the as-at view and the history read it, a staggered file's
+    'promotion-withheld' never takes effect after the later application that
+    promoted it. Eleven did on the bootstrap before the fix (3279bc8), TS-84's
+    three among them; Keith's option (b), 2026-10-27, floors the promotion."""
+    from qa_tools.common import supply_db
+
+    with supply_db.connect(read_only=True, label="test-276") as conn:
+        withheld = conn.execute(
+            "SELECT count(*) FROM qa.decision WHERE action = 'promotion-withheld'").fetchone()[0]
+        late = conn.execute(
+            "SELECT w.supply, w.effective_at, p.effective_at FROM qa.decision w "
+            "JOIN qa.decision p ON p.supply = w.supply AND p.action = 'promote' "
+            "WHERE w.action = 'promotion-withheld' AND w.id < p.id "
+            "AND w.effective_at > p.effective_at ORDER BY w.supply").fetchall()
+    assert withheld, "the history holds no withheld promotion - the test would prove nothing"
+    assert not late, late

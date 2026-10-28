@@ -25959,11 +25959,14 @@ requirements:
     moscow: must
     status: built
     evidence:
+    - "2026-10-26 (with REQ-GEN-238): CRITERION 9's REMOVING AND LATER-DATING HALF - the freeze gate refused Child Protection's shrink against w1-merge2 (8 errors: each 2013-01-01 participation version removed, and REQ-GEN-218's correction changed); with it built the gate passes against w1-merge2, 3279bc8 and c1563cb. tests/test_agreement_freeze.py TestASyntheticAssetMayLaterDateAPastVersion 4 passed, the shrink-free and the removal cases failing first (2 failed), and with test_validate_schedule 115 passed. Adding a new dataset's membership was already built (2026-10-18)."
     - '2026-10-11 (overnight #3): tests/test_agreement_freeze.py 30 passed, against the real committed calendar.yaml, data-asset.yaml and people.yaml with the commit instant fixed - unchanged, reordered and missing-previous states pass (criteria 14, 18); a future date edits freely (10); a past date moved or removed is refused with the item named in correction syntax, ''Nothing was committed'', a paste-ready entry, who may approve and the impact preview named (3, 15); a changelog line licenses nothing (6); a matching correction allows it, a mismatched one says ''you declared ... the file had ...'', a declared change the file does not make and one on the wrong owner are refused (3-5); a placeholder, a non-manager and an approver absent from the base people.yaml are refused (22, people half); editing a committed correction is refused (21); dates appended after the last are allowed late unless one would move a filed supply (8); a not_expected added for an open period is refused naming mark-not-supplied, ahead of it is free (decision 13); past participation versions and the daily calendar''s version are frozen, a synthetic asset may add a past-dated version and a non-synthetic one may not (6, 9, 17); a timezone version is corrected on the timezone in data-asset.yaml; nothing under data/ is opened (16); the settings guard dates by the committer instant floored at the base (28, failing first against the author-date code). tests/test_agreement.py: a correction missing any of its six fields is refused (4).'
     - '2026-10-11: the schedule gate including the freeze check runs in 2.9s against the hierarchy gate''s 2.5s (criterion 19). The real configuration passes against its base. Inside the pre-commit hook diff_base() returns HEAD, read from pre-commit''s own PRE_COMMIT=1, so the staged file is compared against HEAD (criterion 13, tested); CI already passes the push''s base.'
     - '2026-10-12 (deferrals re-tested once their blockers shipped): criterion 15''s naming of the impact preview - a refusal''s fix names `mothman schedule preview-correction` (tests/test_agreement_freeze.py, asserted). Criterion 2''s collection default participation - a changed past collection default is refused on the collection, a correction allows and reverts it (tests/test_collection_defaults.py, the REQ-PIPE-111 c4 section). Both met by REQ-PIPE-169 and REQ-PIPE-181''s builds; nothing built today.'
     implemented_by:
     - qa_tools/common/agreement_freeze.py::check
+    - qa_tools/common/agreement_freeze.py::_redated_versions
+    - qa_tools/common/agreement_freeze.py::_redate_items
     - qa_tools/common/agreement_freeze.py::flatten
     - qa_tools/common/agreement_freeze.py::freeze_instant
     - qa_tools/common/agreement_freeze.py::approvers
@@ -25975,6 +25978,7 @@ requirements:
     - qa_tools/common/diff_base.py::diff_base
     linked_tests:
     - tests/test_agreement_freeze.py
+    - tests/test_agreement_freeze.py::TestASyntheticAssetMayLaterDateAPastVersion
     - tests/test_agreement.py
     - tests/test_validate_schedule.py
     - tests/test_collection_defaults.py
@@ -26064,16 +26068,8 @@ requirements:
     - REQ-PIPE-110
     - REQ-PIPE-112
     - REQ-PIPE-050
-    unmet_criteria:
-    - criterion: Criterion 9's 2026-10-15 amendment - removing or later-dating a past version, and adding a new
-        dataset's calendar membership, on a synthetic asset. The original half (adding a past version) and
-        the 2026-10-16 restating clause are built.
-      why: Amended 2026-10-15 for the Child Protection shrink and the Emergency Department dataset; not yet built.
-      owner: the Emergency Department dataset and Child Protection shrink (plans/data-generation.md
-        12, drafts REQ-QAC-231 to REQ-GEN-238, not yet in the register)
-      blocked_by:
-        unowned: true
     decisions:
+    - 'A CORRECTION FOLLOWS A VERSION LATER-DATED IN THE SAME CHANGE (Keith, 2026-10-27, accepted after REQ-GEN-238 hit it): corrections are append-only, and REQ-GEN-218''s correction names cp-carers'' participation by the 2013-01-01 date REQ-GEN-238 later-dates. On a synthetic asset an existing correction may change only by naming such a version - one removed and one added for the same owner and kind with the same value - by its new date; any other edit to it is still refused.'
     - 'CRITERION 9 AMENDED AGAIN 2026-10-16 (Keith''s approved wording, ~06:30 Perth, "Approved."): a synthetic
       asset may RESTATE, on a frozen version, a value that version left out, at that value''s default. Why:
       REQ-GEN-044''s evening-before era states days_before: 1 on a version before the frozen ones, and
@@ -26963,6 +26959,8 @@ requirements:
     - "THE INDEX (NFR 2): check_result_fingerprint ON (check_id, definition_fingerprint), read by a recursive loose index scan of the distinct (check, fingerprint) pairs (bulk_recheck.stale_fingerprints) - one index entry per pair, never the results. check_result_check_history is unchanged. REJECTED an INCLUDE on check_history: the selection would still scan every result of a check."
     - "TESTS THAT RECORD RESULTS ABOUT INVENTED CHECK IDS take the `invented_check_ids` fixture (tests/conftest.py), or pass attempt_support.ANY_CHECK straight to qa_store's writers: real checks keep real fingerprints and any other id gets one fixed fingerprint. A test about the fingerprint passes a real map."
     - "ONE BUMP FOR THE BATCH: schema 49 also carries REQ-PIPE-177's qa.bulk_recheck table and decision columns and REQ-PIPE-178's qa.run.trial, so one regeneration covers all three (this lane was the only one changing the qa schema in wave 1)."
+    - "AN UNPARSEABLE CHECK FILE STOPS EVERY QA RUN, ASSET-WIDE (recorded 2026-10-25 at the critic's ask; criterion 14 left as specified): the fingerprints map is built from every collection's check files, and open_run takes it before any run, so one file that will not parse refuses every collection's runs until it is fixed. At thirty collections that is thirty teams stopped by one team's typo. The changelog gate (`mothman check`, CI) parses the same files and fails first, so it should never reach a deployment; if it ever does, narrowing the map to the run's own collection is the change to consider."
+    - "Attempt refuses to be made without its fingerprints map rather than defaulting to an empty one, which would have refused every result the attempt recorded, far from the cause (critic, 2026-10-25)."
     linked_tests:
     - "tests/test_check_fingerprint.py::TestTheGolden"
     - "tests/test_check_fingerprint.py::TestNormalisation"
@@ -27105,13 +27103,26 @@ requirements:
     - "THE SELECTION (criterion 2, NFR 3): a loose index scan finds each check's recorded fingerprints that differ from its current one under their own scheme; only for those, the supplies a stale result is about by results_about's two attributions for a non-file result (the run's own supply, and each supply a cross-table result recorded READING) are asked results_about, and the newest result for the check decides - its fingerprint read by (run, check), which names one result for any check but a file check. The nudge is the same function over every stale check, so the two cannot disagree."
     - "PROVISIONAL (builder): THE RECORD'S SHAPE - one row in qa.bulk_recheck (the check, its fingerprint when raised, the changelog entry's date and description, the reason, the person, when, how many supplies, whether handed off), and on each re-check decision bulk_recheck, check_id, check_changelog_date and check_changelog_note, held to a person's re-check with a reason by decision_bulk_recheck_shape. The check's 'current changelog entry' is its newest by date."
     - "bulk_recheck.record RE-PLANS INSIDE ITS OWN TRANSACTION and refuses where the key differs from the one confirmed, so the panel and the record cannot disagree (criterion 12). PROVISIONAL: the key is a 10-hex SHA-1 over the check's fingerprint and every covered (dataset, period, supply), as filing_decisions.Consequences keys are."
-    - "PROVISIONAL (builder): A FILE CHECK'S REFUSAL (criterion 5) prints `mothman supply load --collection <id>` - staging again is what runs a file check."
-    - "RUNNING: the terminal runs the bulk re-check's own owed ids one at a time through bulk_recheck.run_one -> recheck.run (claimed, gated or kept promoted exactly as a single re-check), and recheck.run_all_owed gained ids= (criterion 17) and deadline= (criterion 24), which processing_pass.run_pass now passes - closing post-build-review #179. A partial foreground run exits filing_tui.CHECKS_STILL_OWED_EXIT, REQ-PIPE-163 criterion 28's 3."
+    - "SUPERSEDED 2026-10-25 by the decision 'A FILE CHECK'S REFUSAL PRINTS NO COMMAND' below. WAS: PROVISIONAL (builder): A FILE CHECK'S REFUSAL (criterion 5) prints `mothman supply load --collection <id>` - staging again is what runs a file check."
+    - "RUNNING: the terminal runs the bulk re-check's own owed ids one at a time through bulk_recheck.run_one -> recheck.run (claimed, gated or kept promoted exactly as a single re-check), and recheck.run_all_owed gained deadline= (criterion 24), which processing_pass.run_owed_work passes from the pass's own deadline - closing post-build-review #179. A partial foreground run exits filing_tui.CHECKS_STILL_OWED_EXIT, REQ-PIPE-163 criterion 28's 3."
     - "PROVISIONAL (builder): 'THE CHECKS WHOSE RESULTS CHANGED' (criterion 15) are those whose newest result about the supply has another status after the re-check than before it, read with results_about each side of the run."
     - "A PROMOTED SUPPLY BACK WORSE (criterion 9) is listed under REQ-PIPE-164's 'Promoted, then re-checked <verdict>' heading by that requirement's own worse_than_promoted - every covered supply is a person's re-check decision - and the summary names it in the same words."
     - "TERMINAL ONLY (criterion 21): filing_decisions.BULK_RECHECK is in TERMINAL_ONLY and NOT in OPERATIONS, since it is no one slot's decision; the GitHub intake now recognises TERMINAL_ONLY names as well as OPERATIONS, so `/bulk-recheck` on a ticket is refused naming the terminal rather than ignored. REQ-GHUB-082 criterion 3 amended in the same change."
     - "PROVISIONAL (builder): THE DOOR asks 'Re-check them all, or try it on a few first?' after the panel and before the reason, and above ten supplies 'How should it run?' with the hand-off first. A backstopped dataset's left-out supplies stay in the nudge's count (criterion 28)."
+    - "POST-BUILD CRITIC, 2026-10-25 (each defect with a failing test first): D1 - a re-check recheck.run reports as already run elsewhere (recheck.ALREADY_RUN, completed with no verdict) was counted as a changed verdict 'now no verdict'; bulk_recheck.Ran.elsewhere now says so, it is neither changed nor the same, and the summary counts it apart. D2 - where every stale supply was LEFT OUT (backstop, rejected, superseded, open pair, already owed), both routes said 'already checked under its current definition', which was false and hid criteria 27, 28 and 33's panel; the panel is shown with what was left out and why, and the refusal says none can be re-checked now. D3 - the queue line's K counted the asset's stale checks; it counts this collection's, the rest being the count in brackets, and `mothman supply queue` lists only this collection's checks."
+    - "PROVISIONAL (coordinator for Keith, 2026-10-25, critic Q1 = A): plan() leaves out a supply that already owes an uncleared re-check, and the panel counts it as already owed - so a second bulk re-check after a hand-off records no duplicate decisions, and the queue's nudge goes quiet once everything is owed."
+    - "A FILE CHECK'S REFUSAL PRINTS NO COMMAND (PROVISIONAL, coordinator for Keith, 2026-10-25, critic Q2 = B): it says file checks run again only when the supply is resent. `mothman supply load` over an unchanged delivery records nothing, so the command it used to print was a promise it did not keep."
+    - "THE NUDGE IS BOUNDED (PROVISIONAL, coordinator for Keith, 2026-10-25, critic Q4 = A): nudges() keeps its answer for the process while neither the check sources (validate_check_lifecycle.sources_fingerprint) nor a one-row database state token (the newest run opened, completed runs, newest decision, owed items recorded and cleared, newest filing) moves - so reopening the queue costs two cheap reads however many checks have ever been fixed, and any run, decision, owed item or filing recomputes it. Measured on l3_probe: 72ms first then 6ms with nothing stale; with one check's whole history stale 253ms first then 4ms."
+    - "bulk_recheck.record re-plans WITHOUT verdicts inside its transaction (the key depends on none) and carries each covered supply's verdict over from the plan the person confirmed (`shown`). At scale the panel lists the first 20 dataset-period rows and the trial's chooser the first 40 supplies, a count line standing in for the rest. Removed as unused: bulk_recheck.mark_handed_off, check_fingerprint.current_by_scheme and recheck.run_all_owed's ids=; the terminal's own-owed-only rule (criterion 17) is run_foreground running exactly its Recorded.owed. The per-supply results_about oracle the set form is held to now lives in the test that holds it."
+    - "PUBLIC NAMES, NOT PRIVATE ONES ACROSS MODULES (critic, 2026-10-25): supersession.ever_rejected, refiling.unrejected_since and promotion.declared_reads stand in front of the private functions bulk_recheck used to reach for."
     linked_tests:
+    - "tests/test_bulk_recheck.py::TestAnItemAlreadyRunElsewhere"
+    - "tests/test_bulk_recheck.py::TestEverySupplyLeftOut"
+    - "tests/test_bulk_recheck.py::TestTheQueueLineCountsThisCollectionsChecks"
+    - "tests/test_bulk_recheck.py::TestASupplyAlreadyOwedIsLeftOut"
+    - "tests/test_bulk_recheck.py::TestTheFileCheckRefusal"
+    - "tests/test_bulk_recheck.py::TestTheFlagRouteInProduction"
+    - "tests/test_bulk_recheck.py::TestTheSetFormIsResultsAbout"
     - "tests/test_bulk_recheck.py::TestWhichSuppliesAreCovered"
     - "tests/test_bulk_recheck.py::TestAnOpenPairIsLeftOut"
     - "tests/test_bulk_recheck.py::TestRefusals"
@@ -27127,7 +27138,6 @@ requirements:
     implemented_by:
     - "qa_tools/common/bulk_recheck.py::plan"
     - "qa_tools/common/bulk_recheck.py::stale_fingerprints"
-    - "qa_tools/common/bulk_recheck.py::newest_fingerprint"
     - "qa_tools/common/bulk_recheck.py::the_check"
     - "qa_tools/common/bulk_recheck.py::nudges"
     - "qa_tools/common/bulk_recheck.py::nudge_line"
@@ -27136,7 +27146,7 @@ requirements:
     - "qa_tools/common/bulk_recheck.py::run_one"
     - "qa_tools/common/bulk_recheck.py::summary_lines"
     - "qa_tools/common/recheck.py::run_all_owed"
-    - "qa_tools/common/processing_pass.py::run_pass"
+    - "qa_tools/common/processing_pass.py::run_owed_work"
     - "qa_tools/common/filing_decisions.py::TERMINAL_ONLY"
     - "qa_tools/common/filing_decisions.py::terminal_only_reply"
     - "qa_tools/common/filing_from_github.py::read"
@@ -27155,6 +27165,7 @@ requirements:
     - "2026-10-25, branch w1-l3: tests/test_bulk_recheck.py (50 tests, one of them needs_deployment) against l3_probe, with tests/test_check_fingerprint.py and tests/test_recheck_trial.py: 122 passed; tests/test_door_flag_parity.py, test_filing_from_github.py, test_withdrawal.py, test_recheck_decision.py and test_recheck.py: 180 passed."
     - "Measured on the schema-49 bootstrap with cp-carers' row_count_soda made stale inside a rolled-back transaction: the plan covers 46 supplies (44 promoted) and counts 2 superseded ones as not covered, in 5.1s - most of it the current verdict of each covered supply for the panel; the queue's nudge for the same state 0.14s. The first draft asked results_about once per candidate supply and took 16.7s for the plan and 14.1s for the nudge; newest_by_supply's set form replaced it, held to results_about by TestTheSetFormIsResultsAbout and, on the deployment, TestTheSetFormHoldsOnTheDeployment."
     - "2026-10-25, BOTH HALVES OF THE SUITE against l3_probe at schema 49 (MOTHMAN_SUPPLY_DSN=l3_probe, after mothman dashboard rebuild-results and build-data): -m needs_deployment 457 passed, 1 xfailed in 1228s; -m 'not needs_deployment' first 22 failed and 6 errors - tests recording results about invented check ids, one hand-inserted check_result without the new column, a test calling the deleted _config_hash, a stale plans/INDEX.md, and the thirty-collection TUI test, whose tree copy (git ls-files) had not yet seen the untracked cli/bulk_recheck_tui.py - then, fixed, on the checkpoint-committed tree 6007 passed, 0 skipped, 0 failed in 1781s. The eight modules fixed between the two runs, re-run on their own after the fix: 239 passed."
+    - "2026-10-25, post-build critic fixes: the tests for D1, D2, D3, Q1, Q2 and Q3 were written first and each seen to fail on the old code for its own reason (D1: Ran.changed true and 'now no verdict' printed; D2: both routes said 'already checked under its current definition' with no panel; D3: 'before 2 checks changed' and another collection's check listed; Q1: both owed supplies covered again; Q2: the refusal printed `mothman supply load`; Q3: no package-partners line). Then, on the fixed tree against l3_probe: the lane and affected modules (43 files, both halves) 1036 passed; -m needs_deployment 457 passed, 1 xfailed; ruff clean; mothman check --no-pytest passed (npm test 952 passed; one pre-existing schedule warning)."
 
   - id: REQ-PIPE-178
     title: "A person can try a bulk re-check on a few supplies first, and nothing is recorded"
@@ -27201,7 +27212,7 @@ requirements:
     - "TRIAL SHAPE (Keith, 2026-10-08): supplies chosen from a list, several at once, or a period range; the verdict and the gate's outcome are shown; nothing is recorded. NO CAP on how many supplies a trial runs - Keith's reason: a trial that refuses past some number pushes people into the real run to get round it. The trial states how many it will run and asks the person to confirm, as the real run does. NO REASON REQUIRED on a trial (Keith, 2026-10-08): it records nothing and requires nothing. AGREED (Keith, 2026-10-08): the trial and the real run share one implementation, differing only in whether results are kept - 'that's actually perfect'."
     - "THE TRIAL LIVES ON `mothman supply recheck --trial` (Keith, 2026-10-10, on the delivery-cli-ux review), beside the real run and matching `mothman bdm qa --trial`, which already means 'the real tools ran, nothing was recorded'. A trial takes no reason, no --acknowledge and no production confirmation - only the count-and-confirm. REJECTED `mothman supply decide`, as the 2026-10-08 draft had it: decide exists to record a decision and always takes a reason, so a command that records nothing does not belong in it. The single re-check stays on decide --operation re-check."
     - "THE TRIAL OFFERS ONLY WHAT THE REAL RUN WOULD COVER (Keith, 2026-10-10, on the delivery-cli-ux review): the supplies whose stored check fingerprint differs from the check's current definition, so a trial is a true preview of the real run; its confirmation shows the real run's total beside the trial count. REJECTED offering any filed supply the check touches: a trial of supplies the real run will never re-check previews nothing."
-    - "A TRIAL IS A TRIAL RUN IDENTITY, NOT A ROLLED-BACK TRANSACTION (delivery-architect, 2026-10-08, citing supply_db.py's own measured note): the four tools open their own connections and cannot see uncommitted work, and dbt builds on a connection no rollback reaches. REJECTED the transaction idea the main session floated on 2026-10-08 (plans/running-thoughts.md #72)."
+    - "A TRIAL IS A TRIAL RUN IDENTITY, NOT A ROLLED-BACK TRANSACTION (delivery-architect, 2026-10-08, citing supply_db.py's own measured note): the four tools open their own connections and cannot see uncommitted work, and dbt builds on a connection no rollback reaches. REJECTED the transaction idea the main session floated on 2026-10-08 (once plans/running-thoughts.md #72, deleted 2026-10-25 once this requirement was built)."
     - "A RE-CHECK TRIAL NEEDS ITS OWN RUN IDENTITY, NOT REQ-PIPE-103's (delivery-architect 14, 2026-10-10, a blocker): REQ-PIPE-103's trial identity stages its own files into its own schema, so it cannot see the real supply's staged table. A re-check trial reads shared staging read-only and writes nothing there; the discard mechanism is shared."
     - "FOLDED 2026-10-10 (main session): the split review round's fixes are now criteria - the trial identity (architect 14); supply NULL and arrival scope so it can never be current (architect 15); the gate split into plan and apply so the prediction is the gate's own (architect 16); offered inside the bulk flow, with the current verdict beside the trial's (delivery-cli-ux 12-13); refusals for --reason, --acknowledge and --hand-off (delivery-cli-ux 14); refused when the real run would cover nothing (delivery-scoper 19)."
     - "ROUND 3 FOLDED, 2026-10-10 (main session): the trial reads a promoted supply from its period's schema, not staging, and keeps its resolution record and dbt scratch in a schema of its own, because record_resolution writes into the run's staging schema (delivery-architect 7); --yes on the flag route and its non-terminal refusal (delivery-cli-ux M11); a range needs --dataset, since one check spans calendars with different period names (M12); Ctrl-C (M7); --check named (L1); the word ban on the prediction (M8). Criterion numbers in decisions written before this fold refer to the list as it then stood."
@@ -27215,6 +27226,9 @@ requirements:
     - "CRITERION 7 AS A FACT ON THE RUN: qa.run.trial (schema 49), set by set_run_purpose(trial=True), held to no supply and the arrival scope by run_trial_shape; qa.run_visible leaves trial runs out, so results_about, the gate, the dashboard build and the bulk selection never read one. Never the run id's text."
     - "THE GATE'S PREDICTION (criterion 5) is promotion.judge with record=False - the promotion gate's plan step, already split from the step that applies a judgement and writing nothing - given the trial run's own results through promotion.status_of. A promoted supply 'would stay promoted'. PROVISIONAL (builder): the supply is judged alone, not as a gate application with package partners, since a trial runs one supply; the screen says the real run may differ."
     - "NOTHING IS LEFT BEHIND, checked rather than assumed: tests/test_recheck_trial.py::TestARealTrialLeavesNothing runs a real promoted and a real waiting cp-carers supply of the bootstrapped deployment through the real tools and compares every qa table's row count, every schema and every table in staging, period and rejected schemas before and after."
+    - "PROVISIONAL (coordinator for Keith, 2026-10-25, critic Q3 = A): every prediction for a WAITING supply ends 'The real gate judges it with its package partners, so it may decide differently' - the trial judges it alone (bulk_recheck.PARTNERS)."
+    - "POST-BUILD CRITIC, 2026-10-25: predict() reads the supply's gate item through filing.supply_item, a narrow helper over filing.supplies_of, rather than a fake arrival; TestARealTrialLeavesNothing compares the CONTENTS of every qa table the catalog lists, and every staging, period and rejected table, by md5, rather than a named list of counts; a trial with nothing chosen is told it takes --supply or a range rather than 'needs --dataset'."
+    - "A HARD-KILLED TRIAL'S SCHEMAS ARE TIDY'S: try_one makes its own schema before the run, so `kill -9` leaves it; `trial_rc_` and `qa_trial_rc_` carry the trial prefix, so trial.orphan_schemas - and so `mothman supply tidy` - lists and drops them, as its docstring now says (tests/test_recheck_trial.py::TestTheFlags::test_a_hard_killed_trials_schemas_are_listed_by_tidy). A recorded trial run left behind is read by nothing, since qa.run_visible leaves trial runs out."
     linked_tests:
     - "tests/test_recheck_trial.py::TestChoosing"
     - "tests/test_recheck_trial.py::TestATrialsRunIsReadByNothing"
@@ -27229,6 +27243,7 @@ requirements:
     - "qa_tools/common/bulk_recheck.py::trial_run_id"
     - "qa_tools/common/bulk_recheck.py::trial_owner"
     - "qa_tools/common/bulk_recheck.py::trial_lines"
+    - "qa_tools/common/filing.py::supply_item"
     - "qa_tools/common/supply_db.py::is_recheck_trial"
     - "qa_tools/common/trial.py::is_trial"
     - "qa_tools/common/trial.py::discard"
@@ -27241,6 +27256,7 @@ requirements:
     evidence:
     - "2026-10-25, branch w1-l3: tests/test_recheck_trial.py (22 tests) against l3_probe at schema 49, with tests/test_bulk_recheck.py and tests/test_check_fingerprint.py: 122 passed. TestARealTrialLeavesNothing ran a real promoted (cp-carers 2013-Q2) and a real waiting (cp-carers 2024-Q3) supply through the four real tools, each reaching a verdict and a prediction, with every qa table's row count, every schema and every staging/period/rejected table identical before and after. Its first run failed - the trial's own schema for its resolution record did not exist yet - and try_one now creates it before the overlay."
     - "2026-10-25, BOTH HALVES OF THE SUITE against l3_probe at schema 49 (MOTHMAN_SUPPLY_DSN=l3_probe, after mothman dashboard rebuild-results and build-data): -m needs_deployment 457 passed, 1 xfailed in 1228s; -m 'not needs_deployment' first 22 failed and 6 errors - tests recording results about invented check ids, one hand-inserted check_result without the new column, a test calling the deleted _config_hash, a stale plans/INDEX.md, and the thirty-collection TUI test, whose tree copy (git ls-files) had not yet seen the untracked cli/bulk_recheck_tui.py - then, fixed, on the checkpoint-committed tree 6007 passed, 0 skipped, 0 failed in 1781s. The eight modules fixed between the two runs, re-run on their own after the fix: 239 passed."
+    - "2026-10-25, post-build critic fixes: the tests for D1, D2, D3, Q1, Q2 and Q3 were written first and each seen to fail on the old code for its own reason (D1: Ran.changed true and 'now no verdict' printed; D2: both routes said 'already checked under its current definition' with no panel; D3: 'before 2 checks changed' and another collection's check listed; Q1: both owed supplies covered again; Q2: the refusal printed `mothman supply load`; Q3: no package-partners line). Then, on the fixed tree against l3_probe: the lane and affected modules (43 files, both halves) 1036 passed; -m needs_deployment 457 passed, 1 xfailed; ruff clean; mothman check --no-pytest passed (npm test 952 passed; one pre-existing schedule warning)."
 
   - id: REQ-DASH-175
     title: "The dashboard says when a supply was placed by hand"
@@ -33765,7 +33781,7 @@ requirements:
     - Each early delivery replaces its quarter's ordinary chain, so the number of deliveries a quarter receives is unchanged.
     dependencies: [REQ-GEN-040, REQ-GEN-044, REQ-PIPE-131, REQ-PIPE-062]
     linked_tests:
-    - tests/test_scenario_injection.py::TestTheEarlyChildProtectionSupplies
+    - tests/test_scenario_injection.py::TestTheEarlyEmergencyDepartmentSupplies
     implemented_by:
     - generator/scenario_injection.py::INJECTIONS
     - contract/scripted_decisions.yaml
@@ -34369,12 +34385,12 @@ requirements:
       14 while Keith was asleep; not yet reviewed as a requirement of its own. Keith confirmed it, 2026-10-14 (close-out Q1,
       option A): its own requirement, built first, every existing quarter byte-identical.'
     acceptance_criteria:
-    - THE SYSTEM SHALL add Child Protection quarters before 2023-Q1 at the old end - dated entries in a NEW, earlier quarterly
-      calendar version taking effect from the first added quarter (as the daily calendar grew), never inserted into the 2023-01-01
-      version, and new, earlier versions of the collection's participation_defaults and of each dataset's participation taking
-      effect from the same quarter - as Birth Registrations' history was grown (REQ-GEN-196), each with a changelog line saying
-      why.
-    - 'THE SYSTEM SHALL size the growth by a dry run of the generator''s collision refusal over every Child Protection scenario this batch plans, with every period each claims - TS-42 and TS-80 with the lead-in quarters their green targets need (REQ-GEN-203), the confirmed correction carrying TS-57 to TS-61 with every period it claims (REQ-GEN-205; TS-62, like TS-53, is on Birth Registrations), TS-63 and its correction (REQ-GEN-218), and TS-50 with its lead-ins and green-replacement era, TS-55 and TS-81, the pair with both files rejected (REQ-GEN-206), and TS-3a and TS-3b, a quarterly arrival just outside the claim window with the prior slot filled and unfilled (REQ-GEN-044) - adding the fewest whole years that leave the dry run with no refusal, and SHALL record the count and the dry run''s output in this requirement''s evidence. AMENDED 2026-10-14 by REQ-GEN-218 criterion 7.'
+    - THE SYSTEM SHALL add Child Protection quarters before 2023-Q1 - 8 years since REQ-GEN-238 re-sized it, from ten - at the
+      old end - dated entries in a NEW, earlier quarterly calendar version taking effect from the first added quarter (as the daily
+      calendar grew), never inserted into the 2023-01-01 version, and new, earlier versions of the collection's participation_defaults
+      and of each dataset's participation taking effect from the same quarter - as Birth Registrations' history was grown (REQ-GEN-196),
+      each with a changelog line saying why. AMENDED 2026-10-26 by REQ-GEN-238.
+    - 'THE SYSTEM SHALL size the growth by a dry run of the generator''s collision refusal over every Child Protection scenario this batch plans, with every period each claims - TS-42 and TS-80 with the lead-in quarters their green targets need (REQ-GEN-203), the confirmed correction carrying TS-57 to TS-61 with every period it claims (REQ-GEN-205; TS-62, like TS-53, is on Birth Registrations), TS-63 and its correction (REQ-GEN-218), and TS-50 with its lead-ins and green-replacement era, TS-55 and TS-81, the pair with both files rejected (REQ-GEN-206), and TS-3a and TS-3b, a quarterly arrival just outside the claim window with the prior slot filled and unfilled (REQ-GEN-044) - adding the fewest whole years that leave the dry run with no refusal, and SHALL record the count and the dry run''s output in this requirement''s evidence. AMENDED 2026-10-14 by REQ-GEN-218 criterion 7. AMENDED 2026-10-26 by REQ-GEN-238: TS-3a, TS-3b and TS-57 to TS-61 moved to Emergency Department (Keith, 2026-10-15), and the growth was re-sized by the same dry run over the scenarios that stayed, to 8 years, dropping the oldest.'
     - THE SYSTEM SHALL count the period a scenario's substitution stands on (stands_on) as claimed by that scenario under REQ-GEN-044's
       collision rule, so that 2023-Q1, which TS-77a stands on, is no longer read as free. The existing plan SHALL pass the widened
       rule unchanged (TS-76 stands on 2024-Q4, TS-77a on 2023-Q1); IF it does not, THEN generation SHALL refuse naming both
@@ -35081,7 +35097,7 @@ requirements:
       - this fills it'', ''holds a promoted supply - this one would wait as another version''). The real checks run after confirmation
       and the outcome panel reports the verdict. REJECTED offering a trial placement (''try it here first''): a real prediction
       runs all four tools, about a minute per try, and would extend the trial mechanism to unfiled supplies. This supersedes
-      the 2026-10-08 idea of a predicted verdict in the chooser (plans/running-thoughts.md #72).'
+      the 2026-10-08 idea of a predicted verdict in the chooser (once plans/running-thoughts.md #72, deleted 2026-10-25; the trial it described is REQ-PIPE-178).'
     - 'THE PERIOD CHOOSER OPENS NEAR THE SUPPLY''S ARRIVAL (Keith, 2026-10-10, on the delivery-cli-ux review): it opens on the
       periods whose claim windows were nearest the supply''s receipt instant, both sides, each marked closed or not yet open
       with its one-word current state (empty, promoted, inherited - un-inherit first, ...), and offers ''An earlier or later
@@ -39238,7 +39254,7 @@ requirements:
     date_written: "2026-10-15"
     story: "As Keith, I want the early-arrival scenarios, which need nothing Child Protection has, re-planted on Emergency Department in the same quarters with the same instants, so that they stop costing Child Protection runs while every quoted date stays true."
     moscow: "must"
-    status: "not_started"
+    status: "built"
     source: "Keith, plans/running-thoughts.md #99, naming TS-9, TS-65, TS-66 and TS-67 as moving. Re-drafted 2026-10-16. SIGNED OFF by Keith 2026-10-18 ('You have my authority to proceed past 248 and into building the new Emergency Department dataset overnight as well'), the ten drafts as they stood, with wording stale against the registry updated as recorded in decisions; moved into requirements.yaml the same night."
     acceptance_criteria:
       - "THE SYSTEM SHALL re-key the injections TS-9, TS-65, TS-66 and TS-67 to ed-presentations, each keeping its scenario id, its quarter (2024-Q2, 2025-Q3, 2025-Q4 and 2023-Q4) and its arrival instant relative to the quarter's date."
@@ -39259,8 +39275,27 @@ requirements:
       - "EVERYTHING THAT DOES NOT NEED CHILD PROTECTION MOVES AND KEEPS ITS TS NUMBER (Keith, 2026-10-15): a scenario stays only if it needs a supply of several files, a cross-table check, or several datasets in one collection."
       - "WHAT THE MOVE LOSES, ACCEPTED BY KEITH'S NAMING: TS-67 on Child Protection also showed cp-case-workers rejected in a quarter it is not delivered in, and each early scenario a whole six-table delivery. TS-52 and TS-79 keep the partial-participation shapes."
       - "PROPOSED, NOT KEITH'S - SAME QUARTERS: keeps TS-9's '22 April, nine days early' and TS-67's 12 and 21 October quotes true."
-    open_questions:
-      - "FOR KEITH (2026-10-19, raised overnight): criterion 3 - every other Child Protection delivery and receipt byte-identical once TS-9, TS-65, TS-66 and TS-67 leave - is the open one. Either amend criterion 3 to accept the predicted differences the move causes in Child Protection's generated history (replacing four injected quarters and TS-67's filed-early 2023-Q3 with ordinary deliveries changes what the severity planner moves and the runs that follow), or keep Child Protection's relocation frozen and leave the four scenarios where they are. Nothing of this requirement is built on ed-build: all four injections are still on cp-clients (generator/scenario_injection.py) and TS-67's six scripted decisions are unchanged."
+      - "THE STALE OPEN QUESTION IS ANSWERED, AND REMOVED (2026-10-28): it asked whether to amend criterion 3 or freeze Child Protection's relocation, and Keith amended criterion 3 on 2026-10-24 (option A) - the decision above."
+      - "ONE FILE ON EMERGENCY DEPARTMENT, SAME ANCHORS (2026-10-26): each injection keeps its negative anchor, which names the same quarter on Emergency Department's history because both end on the same anchor date, and its day offset and wall-clock time, so the arrival instants are the ones the register quotes. TS-67's previous quarter, 2023-Q3, is drawn amber on Emergency Department; under the 2023 settings (amber promotes, replacement never) it is still the accepted supply the rule refuses to replace, as the register says."
+      - "THE FIVE STATUS CHANGES, ACCEPTED (Keith, 2026-10-27): moving the four scenarios moved Emergency Department's ordinary ambers off their quarters and one Child Protection amber - cp-clients 2024-Q4 amber -> green (cp-placements' 2024-Q4, which TS-76 stands on, is unchanged), and ed-presentations 2013-Q2, 2024-Q1, 2024-Q4 and 2026-Q3 green -> amber."
+      - "THE ARRIVAL GOLDEN, RE-CAPTURED (Keith, 2026-10-27, accepting the move): 466 -> 449 arrivals with zero verdicts or instants changed on any arrival in both captures; tests/test_asset_time_semantics.py's distribution pin moved 339 / 62 / 53 / 12 -> 345 / 45 / 46 / 13, accounted for in that test."
+      - "#266 GAP A's BROWSER TEST NOW PROVES OWN CHECKS ONLY (2026-10-28, Keith: repoint): TestASupersededRunOnTheDatesItWasCurrent used TS-67's Child Protection Client Register, whose cross-table rows were the other half; it now reads TS-67's Emergency Department supply, which has none. No full re-check of a Child Protection supply with cross-table rows remains in the history (TS-80's pair is the only one, contested on its arrival day), so that half is no longer exercised on a bootstrapped history - a coverage gap, not a defect."
+    linked_tests:
+      - "tests/test_scenario_injection.py::TestTheEarlyEmergencyDepartmentSupplies"
+      - "tests/test_as_at_scenarios.py::TestAnEarlyArrivalClaimsTheQuarterItFilesInto"
+      - "tests/test_asset_time_semantics.py::TestEveryCommittedArrivalKeepsItsVerdict"
+      - "tests/test_dashboard_e2e.py::TestASupersededRunOnTheDatesItWasCurrent"
+      - "tests/test_dashboard_e2e.py::TestEveryScenarioJumpLands"
+      - "tests/test_scripted_decisions.py"
+    implemented_by:
+      - "generator/scenario_injection.py::INJECTIONS"
+      - "contract/scripted_decisions.yaml"
+      - "plans/supply-model.md"
+    evidence:
+      - "2026-10-28: BOOTSTRAP FROM EMPTY on 9777ce3's code (l4_probe, the one Keith approved for #276's option b): rc 0 in 1886s. On Emergency Department TS-9 filed 2024-Q2 early, TS-65 2025-Q3 early, TS-66 2025-Q4 early; TS-67 filed by the rule as a resupply of 2023-Q3, its promotion refused, then re-filed by the scripted person to 2023-Q4 (one decision, actor person) and judged early - tests/test_scenario_injection.py::TestTheEarlyEmergencyDepartmentSupplies, both deployment tests included, 15 passed with the #276 and target-agreement tests. Target agreement passed. REQ-PIPE-262 criterion 12's four pins held. Every Birth Registrations delivery and receipt byte-identical by a generation into scratch before and after (242 files)."
+      - "2026-10-28: CRITERION 5 - the arrival golden re-captured after mothman dashboard rebuild: 466 -> 449 arrivals, ZERO verdicts or instants changed on an arrival in both captures (identical to the capture of the first, option-a bootstrap of 2026-10-26). Child Protection verdicts that went: the 24 arrivals of the four moved scenarios (21 early, 1 late, 2 unfiled) - reported to Keith, who accepted them 2026-10-27. Every surviving supply's recorded status compared with the bootstrap of 3279bc8 (l4_base): 5 changed, as listed in decisions."
+      - "2026-10-28, BOTH TEST HALVES against l4_probe (the bootstrap above): -m needs_deployment on 45c5222, 484 passed, 1 xfailed, 0 skipped in 815.56s (the target-agreement test, which saw another test write to the deployment database mid-run on 2026-10-26, passed in the run and alone, 1 passed). -m 'not needs_deployment' on 45c5222 (-n 3): 6139 passed, 4 failed, 1 skipped (npm absent from that shell) in 1687.91s. Two of the four were this change's (tests/test_schedule.py and tests/test_owed_nothing.py pinning 2013 dates and 60 quarters), fixed and re-run - the two modules 72 passed. The other two, tests/test_every_filed_supply.py::TestTheDoorsOtherBranches, fail identically on w1-merge2 (2 failed, 2 passed there): a test double opening the log as None, which wave 1's gate.being_gated now queries - not this change's, reported."
+    open_questions: []
 
   - id: REQ-GEN-236
     title: "TS-3a and TS-3b are planted on Emergency Department - a quarterly arrival one day outside the claim window, with the prior slot filled and unfilled"
@@ -39430,7 +39465,7 @@ requirements:
     date_written: "2026-10-15"
     story: "As Keith, I want Child Protection's grown history cut back to the quarters its remaining scenarios need once the others have moved, so that the bootstrap gets back most of the 24 minutes the ten-year growth cost."
     moscow: "must"
-    status: "not_started"
+    status: "built"
     source: "Keith, plans/running-thoughts.md #99 and plans/data-generation.md #12 Q4. Amendment wording on REQ-GEN-207 delegated by Keith to the main session. Re-drafted 2026-10-16. SIGNED OFF by Keith 2026-10-18 ('You have my authority to proceed past 248 and into building the new Emergency Department dataset overnight as well'), the ten drafts as they stood, with wording stale against the registry updated as recorded in decisions; moved into requirements.yaml the same night."
     acceptance_criteria:
       - "THE SYSTEM SHALL re-run REQ-GEN-207 criterion 2's dry run over only the Child Protection scenarios still planned once REQ-GEN-235, REQ-GEN-236 and REQ-GEN-237 are applied - TS-42 and TS-80 with their lead-ins (REQ-GEN-203), TS-63 and its correction (REQ-GEN-218), TS-50, TS-55 and TS-81 (REQ-GEN-206) - and SHALL keep the fewest whole years that leave it with no refusal, recording the count and the output in this requirement's evidence."
@@ -39463,6 +39498,34 @@ requirements:
       - "AMENDMENT, FINAL TEXT - REQ-GEN-207 criterion 1: as signed, with 'add Child Protection quarters before 2023-Q1' followed by ' - <N> years since REQ-GEN-238 re-sized it, from ten -', and 'AMENDED <date applied> by REQ-GEN-238.'"
       - "CRITERION 7 WAITS FOR CRITERION 1 (2026-10-18, when this was moved into the register): its final amendment text carries <N>, the number of years criterion 1's dry run keeps, so REQ-GEN-207 is amended in the change that runs the dry run rather than the one that added this requirement. Departs from criterion 7's 'in the change that adds this requirement' only in timing, because the text cannot be written before the count exists."
       - "DEFERRED, NOT BUILT (2026-10-18 overnight, plans/morning-reports.md #6): criterion 1's dry run counts REQ-GEN-206's TS-50, TS-55 and TS-81, and REQ-GEN-206 is unsigned, so the fewest years cannot be sized. Keith's call is needed - sign REQ-GEN-206, or re-scope criterion 1 without it - before anything here starts. Until then Child Protection keeps all 55 quarters, and the nine 2013-2015 quarters REQ-GEN-237 empties stay in its history with their routine supply suppressed."
+      - "THE DRY RUN, RE-SCOPED WITHOUT REQ-GEN-206 (2026-10-26, PROVISIONAL then, and immaterial): TS-84 at 2015-Q4 (REQ-GEN-273) is the oldest scenario that stayed, so eight years is the fewest with no refusal whether or not TS-50 and TS-55 are counted - 2018 and 2019 hold enough clean grown quarters for them. The deferral above no longer blocks this; if REQ-GEN-206 is signed its scenarios fit without growing again."
+      - "PLACED OVER ALL FORTY, THEN DROPPED (2026-10-26): the grown plan is still drawn and its ambers placed over the forty quarters REQ-GEN-207 drew (generator/collections/child_protection.py::drawn_grown_periods, from the quarterly calendar because Child Protection no longer owes the dropped ones), the dropped quarters unavailable to an amber as the emptied ones already were, and only the newest 32 written. Placing over the kept quarters alone moved an amber off 2018-Q1. Slot ids and seeds count from the first drawn quarter (cp_slot_24 / 30009 is 2015-Q1)."
+      - "RECEIPTS' sequence SHIFTS IN KEPT QUARTERS (Keith, 2026-10-27, accepted): a receipt's sequence is the global write order, so every kept grown quarter's receipt, and Emergency Department's after it, moves down by the 17 receipts the dropped quarters wrote. Data files are byte-identical; nothing else in a receipt changes."
+      - "THE TS-63 CORRECTION FOLLOWS ITS RE-DATED VERSION (Keith, 2026-10-27, accepted): REQ-GEN-218's declared correction names 'dataset cp-carers participation 2013-01-01 effective_to', a version this change later-dates, and corrections are append-only. On a synthetic asset an existing correction may change only by naming a version this same change later-dated by its new date (qa_tools/common/agreement_freeze.py::_redate_items); any other edit is still refused."
+      - "REQ-PIPE-111 CRITERION 9's REMOVING AND LATER-DATING HALF BUILT HERE (2026-10-26): the freeze gate refused the shrink against its base until it was - its unmet criterion was owned by 'the Emergency Department dataset and Child Protection shrink'."
+      - "THE TWO GROWN RED CHAINS GO WITH 2013 AND 2014: both grown reds were drawn there (2013-Q3, emptied, and 2014-Q1), so contract/scripted_decisions.yaml's chain entries are removed, and the not-supplied marks cut to the emptied quarters Child Protection still owes (2015-Q1 to Q3; cp-case-workers 2015-Q1 and Q3)."
+    linked_tests:
+      - "tests/test_generate_cp_runs.py"
+      - "tests/test_generate_to_target.py"
+      - "tests/test_scripted_decisions.py"
+      - "tests/test_correction_claims.py"
+      - "tests/test_agreement_freeze.py::TestASyntheticAssetMayLaterDateAPastVersion"
+      - "tests/test_collection_defaults.py"
+      - "tests/test_agreement.py"
+    implemented_by:
+      - "generator/collections/child_protection.py::drawn_grown_periods"
+      - "generator/collections/child_protection.py::generated_periods"
+      - "generator/collections/child_protection.py::_grown_severities"
+      - "contract/calendar.yaml"
+      - "contract/scripted_decisions.yaml"
+      - "tests/before_growth.py::calendar"
+      - "qa_tools/common/agreement_freeze.py::_redated_versions"
+    evidence:
+      - "2026-10-26: CRITERION 1's DRY RUN, over every Child Protection scenario still planned (TS-12, TS-38, TS-42a, TS-56, TS-63a, TS-75a, TS-76, TS-77a, TS-80, TS-81, TS-82, TS-83, TS-84, TS-85), the generator's own planning (_plan_injections, _grown_severities, _ordinary_severities) for each count of kept grown years: 10, 9 and 8 years (2013-Q1, 2014-Q1, 2015-Q1 on) no refusal; 7 years REFUSED - 'TS-84: anchor -44 falls outside the 43 period(s) generated for cp-clients'; 6 TS-83, 5 and 4 TS-81, 3 and 2 TS-42a, 1 TS-63a. EIGHT YEARS KEPT, 2015-Q1 to 2022-Q4."
+      - "2026-10-26: CRITERIA 2 AND 5, by generating every collection into scratch before (post-235, pre-238) and after: Birth Registrations' 242 files byte-identical; Child Protection's 57 kept deliveries' data files byte-identical, its receipts differing only in sequence (-17, Keith accepted 2026-10-27); the plan's jobs for every kept quarter (slot id, seed, severity, period, date) identical."
+      - "2026-10-28: BOOTSTRAP FROM EMPTY on 9777ce3 (l4_probe): rc 0 in 1886s - Birth Registrations 652s, Child Protection and Emergency Department 1711s side by side - against 1572s for the last comparable ten-year run (a3_probe, 2e781d1: 537s and 1433s) and 1528s for this change's first bootstrap (2026-10-26, option a, a quieter container: 529s and 1392s). CP replayed 44 periods where it had 46. Every scripted decision applied; target agreement passed; the four REQ-PIPE-262 criterion 12 pins held. CRITERION 6: every surviving Child Protection supply's status compared with l4_base (3279bc8): one changed, cp-clients 2024-Q4 amber -> green (REQ-GEN-235's move; Keith accepted 2026-10-27)."
+      - "2026-10-26: the freeze gate (python -m qa_tools.common.validate_schedule, MOTHMAN_DIFF_BASE set) passes against w1-merge2, 3279bc8 and c1563cb; it refused against w1-merge2 before REQ-PIPE-111 criterion 9's later-dating half was built."
+      - "2026-10-28: the test halves as recorded on REQ-GEN-235 (one run covers both); this requirement's own modules - test_generate_cp_runs, test_generate_to_target, test_scripted_decisions, test_correction_claims, test_agreement_freeze, test_collection_defaults, test_agreement, test_schedule, test_owed_nothing - passed in that fast half or in the re-run after the two pins on 2013 were moved."
     open_questions: []
 
   - id: REQ-PIPE-250
@@ -39495,6 +39558,13 @@ requirements:
       - "IN PROGRESS, NOT MET (Keith, 2026-10-18: if 12 minutes is not reached overnight, ship the other nine and leave this in progress with the measured time, the profile and the next speed-ups written up). Measured: the last bootstrap from empty of the Emergency Department tree took 1303s (21m43s) - Birth Registrations 613s, Child Protection 1184s and Emergency Department 222s, side by side - against a budget of 720s (plans/morning-reports.md #6; before 880b6ec and 45c3347). Child Protection is the critical path; Emergency Department is not."
       - "NOT YET BUILT (2026-10-19, read on ed-build): criterion 1's profile by collection, stage and quarter has not been taken; criterion 3's budget line is not printed - qa_tools/common/bootstrap.bootstrap says 'Took <collection> Ns, ..., total Ns' with no budget; criterion 2's three runs and criterion 5's CI figure are not recorded. No speed-up has been made, so criterion 4 has nothing to show yet."
       - "THE NEXT SPEED-UP IS REQ-GEN-238'S SHRINK, which waits on REQ-GEN-206's sign-off: Child Protection's 55 quarters are the 1184s, and the shrink takes its grown years down to what TS-42, TS-80 and TS-63 need."
+      - "CRITERION 3 BUILT (2026-10-26): qa_tools/common/bootstrap.budget_line - 'OVER BUDGET: this bootstrap took Ns of wall clock against the 12-minute budget (720s) - Ns over.' or 'Within budget: ...' - printed as the bootstrap's last step and carried on the result as wall_seconds, generation to target agreement. Not a gate, as decided."
+      - "THE SHRINK WAS NOT MOST OF THE ANSWER (2026-10-28): REQ-GEN-238 kept eight of the ten grown years because REQ-GEN-273's TS-81 to TS-85 sit in 2015 to 2017, and six of the eight dropped quarters were already emptied by Emergency Department's correction, so it removed three Child Protection supplies' worth of replay. Re-packing those scenarios later was rejected by REQ-GEN-238's own decision."
+      - "NO SPEED-UP SHIPPED, SO CRITERION 4 HAS NOTHING TO SHOW: under Keith's one-bootstrap rule (2026-10-26) a speed-up could not be proved behaviour-preserving by REQ-TEST-239's compare, which takes two more captures. THE NEXT SPEED-UPS, from the profile: (1) recognise the delivery tree once per tree content rather than on every arrival and every next_receipt call - about a quarter of the stream's active time, and the term that grows with the history (overlaps REQ-PIPE-254's content-keyed caches); (2) run the four tools of one run side by side - they are independent reads, and are 864s to 1061s of the critical stream; (3) the dbt worker round trip, about half the stream's active samples."
+      - "PROFILE AND MEASUREMENTS, IN PROGRESS - 2026-10-26 to 28: CRITERION 1's PROFILE. By collection and stage, from qa.run_attempt (a run's four tools; began/ended advance by real elapsed time on the replay clock) against each stream's wall clock: on a quiet container (2026-10-26, l4_probe, 1528s) the four tools took 744s of Child Protection's 302 runs (2.5s each) and 120s of Emergency Department's 57 (2.1s), 864s of their stream's 1392s; the other ~530s is per-arrival work outside the runs - recognising the delivery tree, staging, filing, the package gate and knock-on. On 2026-10-28 (1886s, a slower container) the same is 917s + 144s of 1711s. py-spy on the Child Protection and Emergency Department stream for 240s (2026-10-26, 6,430 samples): waiting on the dbt worker 49%, datacontract 18%, recognising the whole delivery tree 25% (half of it inside promotion.next_receipt), soda 5%, recording results 5%, filing 3%, evidently 2%, staging 2%, the gate 1.5%. arrivals.arrivals_for scans the whole tree on each call - 0.6s on 229 deliveries - and is called several times per arrival."
+      - "PROFILE AND MEASUREMENTS, IN PROGRESS - 2026-10-26: WHY CHILD PROTECTION'S PER-QUARTER COST ROSE FROM ABOUT 21s TO ABOUT 33s WITH THE GROWTH: per-run tool time does not grow with the history (2.5s a run in both the grown and original quarters on a quiet container), but recognition does - every arrival re-reads every delivery in the tree, and the ten-year growth roughly quadrupled Child Protection's share of it, so each arrival pays more for the same work. By quarter (qa.run_attempt per period, 2026-10-28): the original fifteen 23.8s of tool time a quarter, the grown ones 13.3s (fewer files where Case Workers owes nothing)."
+      - "PROFILE AND MEASUREMENTS, IN PROGRESS - CRITERION 2, NOT MET: from-empty bootstraps on this sandbox, all three collections - 1528s (2026-10-26, Birth Registrations 529s, Child Protection and Emergency Department 1392s) and 1886s (2026-10-28, 652s and 1711s), against 720s. The last before the shrink was 1572s (a3_probe, 2026-10-25)."
+      - "STILL UNMET (2026-10-28): Criterion 2 - within 12 minutes from empty, all three collections, in each of three consecutive runs. Measured 1528s and 1886s on this change's two bootstraps against 720s; the shrink removed little (see decisions), and no speed-up has shipped. Keith, 2026-10-18: if 12 minutes is not reached, leave this in progress with the time, the profile and the next speed-ups written up - done in evidence and decisions. Criterion 4 - a speed-up shown by REQ-TEST-239's compare to change nothing a bootstrap records. No speed-up has been made, so there is nothing to compare; each one needs two captures, which waits on Keith's call on bootstrap budget. Criterion 5 - the CI deployment half's cache-miss bootstrap time, recorded alongside. Not measured: this work was not pushed (local commits only, Keith's terms), and a cache-miss CI run is the only source of the figure."
     open_questions: []
   - id: REQ-PIPE-262
     title: A bootstrap replays the collections that share a calendar as one receipt-ordered stream, as the live pass does, so who
@@ -40776,6 +40846,8 @@ requirements:
     - REQ-PIPE-279
     - REQ-PIPE-276
     linked_tests:
+    - "tests/test_package_gate.py::TestTransitiveGate::test_a_joined_member_is_never_promoted_before_its_own_hold_back"
+    - "tests/test_promotion_waits_for_next_receipt.py::test_no_supply_is_held_back_after_the_promotion_that_ended_it"
     - "tests/test_package_gate.py::TestGatedTogether::test_no_sibling_is_gated_before_the_last_is_checked"
     - "tests/test_package_gate.py::TestGatedTogether::test_a_package_promoted_whole_owes_one_reevaluation"
     - "tests/test_package_gate.py::TestAFileWaitingForItsDelivery::test_the_kept_report_says_it_waits_and_offers_no_decision"
@@ -40794,6 +40866,7 @@ requirements:
     - tests/test_cli_package_gate.py::TestCriticFindings::test_a_vanished_warning_still_refuses_a_stale_key
     - tests/test_cli_package_gate.py::TestCriticFindings::test_a_moved_warehouse_holder_changes_the_key
     implemented_by:
+    - "qa_tools/common/gate.py::_not_before_its_own"
     - "qa_tools/common/gate.py::Package"
     - "qa_tools/common/gate.py::package_of"
     - "qa_tools/common/gate.py::package_at"
@@ -40842,6 +40915,7 @@ requirements:
       partial node_modules - an environment gap, not this change. A test_knock_on.py end-to-end test went red once in an earlier, differently composed run,
       from another module''s owed item on the shared worker database (RecheckRefused: ''filed to no period'', carry-forward fixtures); it passed alone and beside
       the pair modules.'
+    - "2026-10-28 (post-build-review #276, Keith's option b): tests/test_package_gate.py::TestTransitiveGate::test_a_joined_member_is_never_promoted_before_its_own_hold_back failed on the old gate (Notifications promoted 1 November 02:20 UTC, held back 6 November) and passes with gate._not_before_its_own; the gate and promotion modules (test_package_gate, test_promotion_waits_for_next_receipt, test_promotion_effective_at, test_root_cause_shouts, test_strict_cross_table, test_knock_on, test_bootstrap, test_agreement_freeze) 186 passed. On a bootstrap from empty of 9777ce3 (l4_probe, 1886s) no 'promotion-withheld' takes effect after the same supply's promote - 0, where 3279bc8's bootstrap had 11 (tests/test_promotion_waits_for_next_receipt.py::test_no_supply_is_held_back_after_the_promotion_that_ended_it, failing on that history, passing on this one). Child Protection rule promotions' lag p10 40.5h, median 182.5h, p90 300.7h (option a had taken p10 to 6.0h)."
     decisions:
     - 'GATED TOGETHER, AFTER ALL ARE CHECKED (Keith, 2026-10-20/21): ''A package of files is gated together, after every file
       in it has been checked.'' REJECTED today''s behaviour, gating each file straight after its own run (arrival_lifecycle.process
@@ -40957,6 +41031,7 @@ requirements:
       cp qa --commit --run-id` on one file of a zip files that arrival alone, so its package counts one file and it is gated at once instead of waiting for
       the rest of its delivery. The processing pass and the hand-filed folder route file the whole delivery first and are not affected. Not a criterion change;
       to put to Keith.'
+    - 'A JOINED MEMBER IS NEVER PROMOTED BEFORE ITS OWN LATEST DECISION (post-build-review #276; Keith, 2026-10-27, option b): every arrival keeps its own seeded lag, bounded as before by the next receipt of its own dataset and the claim window, so an early file''s ''promotion-withheld'' could take effect after the later file whose application promoted the package - read by effective time, promoted and then held back (11 supplies on the bootstrap of 3279bc8, TS-84''s three among them). gate._decide now floors each member''s promotion at that member''s own latest decision; a member with no later decision keeps the application''s instant, so only the order changes. REJECTED option (a), bounding every arrival''s lag by the next receipt of any file of its collection (built first that night, PROVISIONALLY, and bootstrapped): an ordinary Child Protection delivery''s files arrive about a minute apart, so it collapsed most packages'' promotions to within a second of receipt and shortened the promotion-lag distribution across the whole history - Child Protection rule promotions'' p10 29.8h -> 6.0h - and erased page states such as 2020-Q1''s seven days awaiting the Client Register.'
     open_questions: []
   - id: REQ-PIPE-267
     title: A supply is promoted only on cross-table verdicts about what the warehouse will hold, and supplies that depend on
@@ -42201,6 +42276,10 @@ requirements:
     - tests/test_cross_table_grid.py::TestTheClause
     - tests/test_cross_table_grid.py::TestTheNames
     - tests-js/cross-table-grid.test.js
+    - tests/test_dashboard_e2e.py::TestTheUxCriticsFindingsOn7093c20
+    - tests/test_cross_table_grid.py::TestPromotionWords
+    - tests/test_cross_table_grid.py::TestOwedWords
+    - tests-js/cross-table-grid.test.js
     implemented_by:
     - pipeline/cross_table_grid.py::place
     - pipeline/cross_table_grid.py::place_entries
@@ -42240,8 +42319,11 @@ requirements:
         ('Being checked with its delivery', 'Checked, waiting for the rest of its delivery', 'Checked, being gated'), with no pill
         and no results for an unchecked package member, and its test forms in criterion 24.
       why: Needs, per supply and date, its package's files and which of them have a recorded run (the owed 'gate' item, qa.gate_application)
-        carried into the build; not built in this lane. In the bootstrapped history every package is gated at its arrival's instant,
-        so no page date shows these states; they arise in a build made mid-processing.
+        carried into the build; not built in this lane. CORRECTED 2026-10-26 (functional critic on 7093c20) - the bootstrapped
+        history DOES have multi-day gating gaps - TS-82's delivery arrives 15 August 2017 and its gate application settles on
+        27 August, so for 12 days the Client Register's page reads "Awaiting a decision ... Green" over a staged Fail with no
+        notice saying it is still being gated. The earlier reason here ("every package is gated at its arrival's instant")
+        was wrong. Left for Keith as open question 1 rather than built overnight.
       owner: REQ-DASH-272 (a follow-up build)
       blocked_by:
         unowned: true
@@ -42269,7 +42351,14 @@ requirements:
       no-coordinates test - checked by running them in a worktree of c1563cb: 29 failed, 9 passed); the three it found of this change''s
       own (test_red_promoted''s monkeypatched _cause, TestThePanelAsAtTheDateOnShow''s clause, the trends budget) are fixed and pass
       above.'
-    - '2026-10-25, TEST-FIRST, SHOWN AFTER THE BUILD: against the base c1563cb''s product code (a worktree with the test files copied in, l2_probe): TestWarehouseAndStagingViews 5 of 6 failed - the one passing, test_after_a_rejection_the_page_reads_the_warehouse, is criterion 19, already today''s behaviour by the criterion''s own decision; tests/test_cross_table_grid.py failed to import; tests-js/cross-table-grid.test.js 2 of 2 failed.'
+    - '2026-10-25, TEST-FIRST, SHOWN AFTER THE BUILD: against the base c1563cb''s product code (a worktree with the test files copied
+      in, l2_probe): TestWarehouseAndStagingViews 5 of 6 failed - the one passing, test_after_a_rejection_the_page_reads_the_warehouse,
+      is criterion 19, already today''s behaviour by the criterion''s own decision; tests/test_cross_table_grid.py failed to import;
+      tests-js/cross-table-grid.test.js 2 of 2 failed.'
+    - '2026-10-26: D1 (the grid''s ''why it is held back'' from the gate''s hold-back only) failed first in tests-js/cross-table-grid.test.js
+      (''is not held back, and keeps its own status'' - 1 failed, 5 passed) and in a real browser (test_nothing_held_back_says_nothing_held_back
+      against 7093c20''s code); D3 and P6 failed first in tests/test_cross_table_grid.py::TestPromotionWords against 7093c20''s cross_table_grid.py
+      (2 failed).'
     decisions:
     - OPTION 2, A CLAUSE ON THE AWAITING LINE (Keith, 2026-10-21 morning). REJECTED sending the reader to supply history to
       find the warehouse's state, Keith's first guess.
@@ -42415,7 +42504,25 @@ requirements:
       card now carries `placed` keyed by the entry''s rank, and the fields only the build reads are dropped before the file is written;
       measured after, the first view''s trends and 300 dates of buildDatasetsOn within noise of the base (3.6-3.9s and 0.5-0.7s against
       3.6-4.2s and 0.5-0.7s, same machine, interleaved). COST: Child Protection''s dashboard data about 11% bigger.'
-    open_questions: []
+    - 'PROVISIONAL (UX critic on 7093c20, B1; Keith Q1 = a): a cross-table result that could not be evaluated reads ''Not evaluated''
+      with its own mark ○ in the grid, never ''Fail ✗''; the cell keeps its status (it counts) and the key line names all four marks
+      in words.'
+    - 'PROVISIONAL (functional critic on 7093c20, D1; Keith Q2 = A): ''— why it is held back'' and the red it brings come ONLY from
+      the supply''s hold-back as at the date - its structured promotion-withheld entry with a failed re-check, whose checks the notice
+      carries - never from the warehouse cell being worse than the staged one. cp-placements on 2 February 2020 read Red over a green
+      dataset with nothing held back.'
+    - 'UX critic, S6: the row panel''s ''Each tool''s result'' is one block per view, labelled Staged and In the warehouse as the phone
+      cells are, and tools that agree are said once (''dbt, Soda and datacontract-cli''). P1: the grid''s head and rows share one column
+      template with a fixed status column. P3: the warehouse clause''s pill keeps its full stop. P4: a substituted supply''s clause
+      says ''substituted from'', the badge''s own word. P6/P7: a joint promotion''s row names the supplies of its delivery without
+      their receipts, and ''<n> more'' carries every name it stands for (tooltip and screen-reader text).'
+    - 'Functional critic on 7093c20, D3: a rule promotion after a re-check names a table this dataset''s cross-table checks are between,
+      never the first supply the application held back. An unknown warehouse status gives the clause no status rather than ''Green''.'
+    open_questions:
+    - '1. FOR KEITH (2026-10-26, functional critic on 7093c20): criterion 21''s ''being gated'' forms are not built, and the bootstrapped
+      history does show the state they are for - TS-82''s Client Register reads ''Awaiting a decision ... Green'' for 12 days (15 to
+      27 August 2017) over a staged Fail with no notice, while its delivery''s gate application has not settled. Build criterion 21
+      next (it needs the package''s files and their recorded runs carried into the build), or accept the gap until then?'
   - id: REQ-GEN-273
     title: Target agreement compares a targeted supply with its own checks, and a few scenarios pin what the package gate decides
     date_written: '2026-10-21'
@@ -42674,7 +42781,10 @@ requirements:
     linked_tests:
     - tests/test_dashboard_e2e.py::TestHeldBackWithItsDelivery::test_s1_red_the_notice_its_links_and_the_root
     - tests/test_dashboard_e2e.py::TestHeldBackWithItsDelivery::test_staggered_s1_red_the_joined_form
-    - tests/test_dashboard_e2e.py::TestHeldBackWithItsDelivery::test_s6_the_chain_the_root_and_the_card
+    - tests/test_dashboard_e2e.py::TestHeldBackWithItsDelivery::test_s6_each_failed_re_check_is_its_own_root
+    - tests/test_dashboard_e2e.py::TestTheUxCriticsFindingsOn7093c20::test_ts82_a_failed_re_check_is_its_own_root
+    - tests/test_held_back_notices.py::TestTheRoot::test_a_rejected_root_holds_nothing_back
+    - tests/test_held_back_notices.py::TestForDataset
     - tests/test_dashboard_e2e.py::TestHeldBackWithItsDelivery::test_after_the_root_is_turned_down_then_replaced
     - tests/test_dashboard_e2e.py::TestHeldBackWithItsDelivery::test_a_replaced_root
     - tests/test_held_back_notices.py::TestTheNotice
@@ -42682,7 +42792,7 @@ requirements:
     implemented_by:
     - pipeline/held_back_notices.py::for_dataset
     - pipeline/held_back_notices.py::involved
-    - pipeline/held_back_notices.py::chain_of
+    - pipeline/held_back_notices.py::root_as_at
     - pipeline/held_back_notices.py::_notice
     - pipeline/held_back_notices.py::_holding
     - pipeline/held_back_notices.py::_card
@@ -42707,7 +42817,19 @@ requirements:
       the Notifications'' line ends ''Holding back with it: Client Register. If this file is turned down, the Client Register supply
       needs its own decision.'', and the Child Protection card ''Held back together: Notifications and Client Register (one delivery,
       received 10:00am Tuesday, 15 August 2017)''.'
-    - '2026-10-25, TEST-FIRST, SHOWN AFTER THE BUILD: against the base c1563cb''s product code (a worktree with the test files copied in, l2_probe): TestHeldBackWithItsDelivery 5 of 5 failed and tests/test_held_back_notices.py failed to import.'
+    - '2026-10-25, TEST-FIRST, SHOWN AFTER THE BUILD: against the base c1563cb''s product code (a worktree with the test files copied
+      in, l2_probe): TestHeldBackWithItsDelivery 5 of 5 failed and tests/test_held_back_notices.py failed to import.'
+    - '2026-10-26: root naming A and D2 failed first in tests/test_held_back_notices.py against 7093c20''s held_back_notices.py (7
+      failed, 2 passed), and in a real browser (test_s6_each_failed_re_check_is_its_own_root, test_ts82_a_failed_re_check_is_its_own_root
+      against 7093c20''s code).'
+    unmet_criteria:
+    - blocked_by:
+        unowned: true
+      criterion: Criterion 2 (the chain form) and criterion 3's 'If this file is turned down' half - read PROVISIONALLY by Keith's
+        Q1 = A (a failed re-check is its own root), so neither shows.
+      owner: REQ-DASH-275 (Keith to confirm, open question 1)
+      why: The page follows the tickets' root rule (root_cause.root_of, answer 3a) pending Keith's confirmation; if he confirms, the
+        criteria are reworded to match and this entry goes; if he keeps the chain (B), it is rebuilt.
     decisions:
     - 'A TOP-OF-PAGE NOTICE FOR S1 RED (Keith, 2026-10-22, A), with no ''not a fault'' clause. This settles the contradiction
       the dashboard review found in summary-v3 (D5: REQ-DASH-204 ''does not apply to S1''s red branch'' against a proposed ''Held
@@ -42764,7 +42886,18 @@ requirements:
       again once''. The replaced fixture is a Notifications v3 that supersedes v2 and whose own run stops before it can re-gate anything.'
     - 'PROVISIONAL WORDING, for Keith: ''<n> cross-table check fails'' in the singular; the card line''s two instants on one day as
       ''9:00am and 9:05am, Monday, 5 August 2024''; the root''s holding list as ''Holding back with it: <links>.'''
-    open_questions: []
+    - 'PROVISIONAL, CHANGES CRITERIA 2 AND 3 (functional critic on 7093c20; Keith Q1 = A, following his answer 3a as the tickets do):
+      the page names the root by the tickets'' rule (root_cause.root_of, REQ-PIPE-278 criterion 1), as at the date (held_back_notices.root_as_at).
+      A supply whose re-check against the warehouse FAILED is its own root, and its notice names its immediate package-mate - so there
+      is no chain form; a root''s ''Holding back with it'' and the card''s ''Held back together'' cover only what it holds back that
+      could not be checked; a root since turned down or replaced is no root (D2 - a chain notice used to go stale once the root was
+      rejected). TS-82 on 28 August 2017 no longer names the Notifications as the Client Register''s root.'
+    - 'PROVISIONAL (UX critic on 7093c20, B2; Keith Q2 = a): the notice counts checks as the grid''s rows - ''one cross-table check
+      fails'' - never tool results; the article agrees with the name (''once an Investigations supply is promoted'').'
+    open_questions:
+    - '1. FOR KEITH TO CONFIRM (2026-10-26): criteria 2 and 3 are read PROVISIONALLY by his Q1 = A as relayed - a failed re-check is
+      its own root, so the chain form and the failed half of criterion 3''s ''Holding back with it'' never show. Confirm, and the criteria
+      are reworded to match; or keep the chain on the page while the tickets follow 3a (B)?'
   - id: REQ-PIPE-276
     title: 'The terminal says what a package gate did: what was held back and by what, what to decide first, and what an override
       will set off'
@@ -42956,6 +43089,20 @@ requirements:
     - tests/test_cli_package_gate.py::TestCheapPaths::test_the_period_door_lists_a_supply_being_checked_and_offers_nothing_on_it
     - tests/test_cli_package_gate.py::TestCheapPaths::test_the_owed_recheck_and_still_held_back_words
     - tests/test_cli_package_gate.py::TestCheapPaths::test_the_settle_flows_owed_panels
+    - tests/test_cli_package_gate.py::TestCliUxReview::test_the_override_lead_in_comes_straight_before_its_command
+    - tests/test_cli_package_gate.py::TestCliUxReview::test_the_door_says_why_it_is_held_back_first
+    - tests/test_cli_package_gate.py::TestCliUxReview::test_a_failed_recheck_says_it_failed
+    - tests/test_cli_package_gate.py::TestCliUxReview::test_the_tui_queue_says_nothing_waits_beside_a_delivery_being_checked
+    - tests/test_cli_package_gate.py::TestCliUxReview::test_a_failed_recheck_row_points_at_the_cause_and_beats_another_version
+    - tests/test_cli_package_gate.py::TestCliUxReview::test_the_gating_line_says_who_finishes_it
+    - tests/test_cli_package_gate.py::TestCliUxReview::test_a_door_with_nothing_to_decide_defaults_to_back
+    - tests/test_cli_package_gate.py::TestCliUxReview::test_after_a_rejection_the_queue_says_turned_down_only
+    - tests/test_cli_package_gate.py::TestCliUxReview::test_the_wrapped_lines_of_a_group_keep_their_indent
+    - tests/test_cli_package_gate.py::TestCliUxReview::test_the_promote_warning_says_each_thing_once_in_plain_words
+    - tests/test_cli_package_gate.py::TestCliUxReview::test_the_owed_list_words_a_gate_plainly
+    - tests/test_cli_package_gate.py::TestCliUxReview::test_the_settle_summary_tables_are_labelled
+    - tests/test_cli_package_gate.py::TestCliUxReview::test_help_and_refusals_speak_to_the_person
+    - tests/test_cli_package_gate.py::TestCliUxReview::test_a_contested_roots_line_is_one_accurate_sentence
     implemented_by:
     - cli/lifecycle_report.py::_gate_line
     - cli/lifecycle_report.py::rechecked_promotion_words
@@ -43134,6 +43281,28 @@ requirements:
       is counted (D3). The settlement panel says the backstop ''kept waiting'' a reader, never ''refused'' (D5, REQ-PIPE-211 criterion 14).'
     - 'NO_COLOR AND 80 COLUMNS, FOR REAL (post-build critic): the module-level Consoles are built at import, before a test''s NO_COLOR, so the terminal tests
       replace each with a Console built with no colour at 80 columns, and assert no colour code reaches the output; the piped CliRunner output is the pipe.'
+    - 'THE CLI UX REVIEW OF a122520 (2026-10-25), each screen change pinned by a test that asserts the text: the override''s lead-in is the last prose line,
+      straight above the command (''To override:'' in the door, which names no door; ''To override, from the <period> door or with:'' elsewhere), and the warning
+      lists the consequences that carry commands last so ''then promote it again:'' leads straight into them; the door says WHY first - the hold-back''s own
+      reason, its own checks passing included; the Filing decisions queue and mothman supply queue say ''No supply is waiting on a decision in <collection>.''
+      (beside period items or held supplies) or ''Nothing is waiting on a person in <collection>.'' from the one renderer; a person''s rejection reads ''turned
+      down'' in the queue''s State cell too; wrapped lines under a grouped row keep their indent; the promote warning names supplies by dataset and arrival,
+      one date style, no requirement number, and a waiting reader criterion 9 names is not listed again; the owed list calls a gate a gate, with the command
+      on a line of its own; the settle summary''s two tables are labelled ''As they arrived'' and ''As you are settling them''; developer prose is cut from
+      `supply queue`/`supply decide` --help; the no-terminal refusal says ''Give it on the command line instead''.'
+    - 'A FAILED RE-CHECK IS SAID AS FAILED, ON SCREEN ONLY (CLI UX review S3; PROVISIONAL): the terminal says ''... in place in the warehouse (received <instant>),
+      failed, because ...'' where held_back_detail.failed is true; the recorded ''promotion-withheld'' reason keeps REQ-PIPE-267 criterion 13''s signed wording,
+      which a change would need Keith''s sign-off for, and the recorded history is unchanged.'
+    - 'A FAILED RE-CHECK''S ROW POINTS AT ITS CAUSE (CLI UX review S5; PROVISIONAL, Keith Q1 = a, taken while he was away): staggered S1 red''s Clients v2,
+      its own counted row under 3a, carries ''red - <check> failed against the warehouse; decide <dataset> (received <instant>) first'' while the cause still
+      waits, and its State cell says ''held back - see below'' over ''another version waiting'' (REQ-PIPE-210 criterion 3).'
+    - 'WHO FINISHES A DELIVERY BEING CHECKED (PROVISIONAL, Keith Q2 = a): where no run holds it, the quiet gating line adds ''- finished by the next processing
+      pass'' and `mothman pipeline process` on a line of its own; a delivery a run holds says nothing more.'
+    - 'WHERE NOTHING NEEDS DECIDING THE CURSOR STARTS ON BACK (PROVISIONAL, Keith Q3 = a): the door that says ''Nothing needs deciding on this supply'' offers
+      its decisions with the override (promote) last and the cursor on ''<- Back''.'
+    - 'NO INHERIT ON AN ARRIVED SUPPLY''S DOOR (CLI UX review P9; PROVISIONAL): filing_queue.operations_for no longer offers inherit for a slot holding a waiting
+      supply - inheritance.inherit_one_refusal refuses it wherever the dataset owes a supply (REQ-PIPE-098), so it could only be refused. Substitute stays offered:
+      standing on an earlier period''s supply is a decision a person may make there.'
     open_questions: []
   - id: REQ-DASH-277
     title: '''In place'' reads ''in place in the warehouse'' wherever it is shown to a person'
@@ -43692,6 +43861,7 @@ requirements:
     - tests/test_cross_table_notices.py::TestBlockingTables
     - tests/test_cross_table_notices.py::TestTheLines
     - tests-js/another-table.test.js
+    - tests/test_dashboard_e2e.py::TestTheUxCriticsFindingsOn7093c20
     implemented_by:
     - pipeline/cross_table_notices.py::no_promoted
     - pipeline/cross_table_notices.py::read_log
@@ -43728,7 +43898,16 @@ requirements:
       6 passed. A defect found on the way, fixed test-first: fmtInt(null) threw inside renderAgency for a dataset whose newest run
       measured no rows (a held Case Workers), so the whole collection page failed to draw - tests-js/fmt-int.test.js failed (1 of 2)
       before the guard, passes after.'
-    - '2026-10-25, TEST-FIRST, SHOWN AFTER THE BUILD: this change''s tests run against the base c1563cb''s product code (a worktree of it with only the test files copied in, l2_probe): TestAnotherTableCouldNotBeRead 5 of 5 failed, tests/test_cross_table_notices.py failed to import (the module did not exist), tests-js/another-table.test.js 6 of 6 and tests-js/fmt-int.test.js 1 of 2 failed. The tests were written alongside the code, not strictly before it; this run is the evidence that each can fail.'
+    - '2026-10-25, TEST-FIRST, SHOWN AFTER THE BUILD: this change''s tests run against the base c1563cb''s product code (a worktree
+      of it with only the test files copied in, l2_probe): TestAnotherTableCouldNotBeRead 5 of 5 failed, tests/test_cross_table_notices.py
+      failed to import (the module did not exist), tests-js/another-table.test.js 6 of 6 and tests-js/fmt-int.test.js 1 of 2 failed.
+      The tests were written alongside the code, not strictly before it; this run is the evidence that each can fail.'
+    - '2026-10-26, the UX and functional critics'' fixes on 7093c20 (uncommitted tree, then this commit): the new class TestTheUxCriticsFindingsOn7093c20
+      (10 tests) and test_s6_each_failed_re_check_is_its_own_root were run against 7093c20''s product code with this tree''s tests
+      in a separate worktree on l2_probe - 12 failed, 1 passed (test_a_check_three_tools_ask_is_one_row, a rewritten test asserting
+      existing behaviour); on this tree the affected e2e classes (TestTheUxCriticsFindingsOn7093c20, TestAnotherTableCouldNotBeRead,
+      TestWarehouseAndStagingViews, TestHeldBackWithItsDelivery, TestSupplyAndTableLevelSections, TestACrossTableCheckOnTS80, TestTheAsAtScenarioChips,
+      TestScenariosTab) are the commit''s own run, named in its message.'
     decisions:
     - 'A NEW REQUIREMENT NOW (Keith, 2026-10-13): a top-of-page line on the reader naming the other table. REJECTED leaving
       it for a later road-testing sighting.'
@@ -43815,11 +43994,25 @@ requirements:
       card line ''No promoted <dataset>: holds <n> datasets red''; the not-due line names several readers as a comma list (''the Notifications,
       Investigations, Placements are waiting on it''); and criterion 7''s settled line drops ''(REQ-PIPE-211)'', a citation rather
       than page text.'
+    - 'PROVISIONAL (UX critic on 7093c20, B2; Keith Q2 = a): a line counts CHECKS as the grid''s rows do - one per check name and the
+      tables it is between, however many tools ran it (cross_table_notices.check_key) - never each tool''s result. TS-42''s Investigations
+      reads ''2 of this supply''s checks'', where it read 6 against a grid of two rows.'
+    - 'PROVISIONAL (UX critic, S4): where the verdict line already says the checks run again by themselves (''Nothing needs deciding
+      on this supply''), the line does not say it again; a turned-down or replaced partner never says ''runs again by itself'' beside
+      ''needs its own decision''; and the promotion panel''s ''why not promoted'' for such a supply is promotion_state''s ''waits for
+      another table''s supply to be promoted - nothing needs deciding on it'', never ''nobody had decided about it yet''.'
+    - 'PROVISIONAL (UX critic, S2; Keith Q4 = a; open question 1 answered): a cause with no notice of its own - an overdue slot, or
+      a period whose file was turned down with nothing replacing it - gets one muted .late-open-note line on its own page (''Overdue
+      for 2021-Q4 — Placements is waiting on it.''), and ''Affects'' always ends a sentence: on the awaiting line inside it, in a banner
+      with a full stop.'
+    - 'PROVISIONAL (UX critic, S3; Keith Q3 = a): the awaiting line leaves out ''Affects'' for readers its ''Holding back with it''
+      already names; every list of datasets is in the hierarchy''s order and joined ''a, b and c''.'
+    - 'UX critic, S1 and S8: a dataset name in these sentences is underlined in the accent colour, even inside a bold heading; the
+      executive tier''s agency card carries the ''No promoted'' marker, as text, the card being a link.'
     open_questions:
-    - '1. ANSWERED AT BUILD, FOR KEITH (2026-10-25): two causes have no notice on the causing dataset''s page for ''Affects'' to end
-      - an overdue slot that has not closed yet (the page says nothing; the collection table shows ''Late, still open''), and a period
-      whose file a person turned down with none replacing it. Neither was given a banner. Should either get one, or is the readers''
-      own line enough?'
+    - '1. ANSWERED PROVISIONALLY, FOR KEITH TO CONFIRM (2026-10-26, UX critic on 7093c20, his Q4 = a as relayed): an overdue slot not
+      yet closed, and a period whose file was turned down with none replacing it, now get one muted line on the causing page naming
+      the readers waiting on it. Confirm, or prefer no line and no ''Affects'' there (b)?'
   - id: REQ-PIPE-210
     title: The terminal's queue lists a supply held back only by another table beneath that table's own item, says nothing needs
       deciding on it, and does not count it
@@ -43992,6 +44185,9 @@ requirements:
       criterion 12), so the terminal''s counts and the dashboard''s card counts (outstanding._from_awaiting_decisions, through group_queue) leave them out alike.'
     - 'THE GROUPING NEVER HIDES THE QUEUE (build): where grouping cannot be read, filing_tui.queue_groups says so in a dim line and lists every supply as its
       own counted row, as before this requirement.'
+    - 'ONE ACCURATE SENTENCE BENEATH AN OPEN PAIR (CLI UX review P3): a supply listed beneath a contested pair reads ''its checks of <dataset> cannot run while
+      two <dataset> files wait to be settled; settling them re-checks it'' - never that the table ''arrives'' - and a supply root''s line says once that deciding
+      it settles this one.'
     open_questions: []
   - id: REQ-GEN-206
     title: The last planted scenarios of REQ-GEN-136 and REQ-GEN-137 - Case Workers' held gap arrival, a reader re-checked after
@@ -44388,6 +44584,9 @@ requirements:
     - 'THE BACKSTOP IN THE SETTLEMENT PANEL (post-build critic D5): a reader the knock-on left waiting on the agreement backstop is said as ''kept waiting by
       the agreement backstop until its dataset matches the agreement again'' - the meaning kept, never ''refused'' (criterion 14). And the settled pair''s own
       supplies are read from qa.decision_file, never worked out from a ''#1''/''#2'' shape.'
+    - 'THE SETTLEMENT NOTE WARNS BEFORE THE CONFIRMATION (CLI UX review P7): ''After settling, the cross-table checks of <n> datasets that read <dataset> in
+      <period> are re-checked while you wait - not their own tables:'' and, where the period will hold no file of the table, ''With no <dataset> file left in
+      <period>, they will very likely turn red: those checks cannot run until one is promoted.'' Still a note, never keyed.'
     open_questions: []
   - id: REQ-TEST-281
     title: "The browser-test module runs across every test worker, each worker building its own dashboard into its own output path"

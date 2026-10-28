@@ -92,6 +92,13 @@ def _receipt(conn, dataset_id: str, supply: str):
     return rows[0][0] if rows else None
 
 
+def ever_rejected(conn, dataset_id: str, supply: str) -> bool:
+    """Whether a person ever rejected this supply - the public name the bulk
+    re-check (REQ-PIPE-177 criterion 33) reads, rather than reaching for the
+    private one."""
+    return _rejected(conn, dataset_id, supply)
+
+
 def _rejected(conn, dataset_id: str, supply: str) -> bool:
     return bool(conn.execute(
         f"SELECT 1 FROM {decision_log.TABLE} WHERE dataset_id = ? AND supply = ? "

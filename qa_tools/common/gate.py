@@ -1413,7 +1413,8 @@ def _decide(collection_id, period, application, members, reads, barred, warehous
                     dataset_id=m.dataset_id, supply=m.supply,
                     period=item.get("period") or period,
                     physical_tables=item["physical_tables"], actor=promotion.RULE_ACTOR,
-                    actor_kind=decision_log.RULE, effective_at=effective_at,
+                    actor_kind=decision_log.RULE,
+                    effective_at=_not_before_its_own(conn, m.supply, effective_at),
                     reason=item.get("reason"), amber=item.get("amber"),
                     status=item.get("status"), replacing=item.get("replacing"),
                     census_after=False,
@@ -1426,6 +1427,38 @@ def _decide(collection_id, period, application, members, reads, barred, warehous
         out.promoted = tuple(m.dataset_id for m, _w, _v in work)
         for p in sorted(moved_periods):
             census.after_move(conn, trigger="promote", period=p)
+
+
+def _not_before_its_own(conn, supply: str, effective_at: str) -> str:
+    """A JOINED MEMBER IS NEVER PROMOTED BEFORE ITS OWN LATEST DECISION
+    (post-build-review #276; Keith, 2026-10-27, option b). Every arrival keeps
+    its own seeded lag (orchestrate.effective_at_of), so an early file's
+    'promotion-withheld' can take effect after the instant of the later file's
+    application that promotes it; read by effective time it would be promoted
+    and then held back. Its promotion is floored at that decision - order
+    only: a member whose decisions all came earlier keeps the application's
+    instant. REJECTED (a), bounding every lag by the collection's next
+    receipt: it shortened the promotion lag across the whole history (Child
+    Protection's p10 29.8h -> 6.0h)."""
+    rows = conn.execute(f"SELECT max(effective_at) FROM {_decisions()} WHERE supply = ?",
+                        [supply]).fetchall()
+    latest = rows[0][0] if rows else None
+    if latest is None:
+        return effective_at
+    at = _instant_of(effective_at)
+    return effective_at if at >= latest else latest.astimezone(at.tzinfo).isoformat()
+
+
+def _decisions() -> str:
+    from qa_tools.common import decision_log
+
+    return decision_log.TABLE
+
+
+def _instant_of(value):
+    from qa_tools.common import supply_status
+
+    return supply_status.instant(value)
 
 
 def _agency(m: Member) -> str:

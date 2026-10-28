@@ -185,8 +185,8 @@ Reframed from daily during Keith's review: the original example (22:00 due, 21:5
 
 | Where to look | |
 |---|---|
-| Dataset | cp-clients |
-| Supplies | `cp_clients__202404221000000800` |
+| Dataset | ed-presentations |
+| Supplies | `ed_presentations__202404221000000800` |
 | Period | 2024-Q2 |
 | Set "in the warehouse on" to | 2024-05-01 |
 
@@ -226,12 +226,12 @@ Reframed from daily during Keith's review: the original example (22:00 due, 21:5
 
 **What it would look like if the rule were wrong.** Treated as a resupply of 2025-Q2, as if the window counted from somewhere else.
 
-*Config: as TS-9 - Child Protection, quarterly, due 09:00 on the 1st, claim window 14 days. 2025-Q3 (1 August) arrives 19 July at 10:00, thirteen days early, a day after its window opened at 09:00 on 18 July.*
+*Config: as TS-9 - Emergency Department, one file, quarterly, due 09:00 on the 1st, claim window 14 days. 2025-Q3 (1 August) arrives 19 July at 10:00, thirteen days early, a day after its window opened at 09:00 on 18 July.*
 
 | Where to look | |
 |---|---|
-| Dataset | cp-clients |
-| Supplies | `cp_clients__202507191000000800` |
+| Dataset | ed-presentations |
+| Supplies | `ed_presentations__202507191000000800` |
 | Period | 2025-Q3 |
 | Set "in the warehouse on" to | 2025-08-01 |
 
@@ -241,12 +241,12 @@ Reframed from daily during Keith's review: the original example (22:00 due, 21:5
 
 **What it would look like if the rule were wrong.** Shown as anything more alarming than early.
 
-*Config: as TS-9. 2025-Q4 (1 November) arrives 30 October at 10:00.*
+*Config: as TS-9 - Emergency Department, one file. 2025-Q4 (1 November) arrives 30 October at 10:00.*
 
 | Where to look | |
 |---|---|
-| Dataset | cp-clients |
-| Supplies | `cp_clients__202510301000000800` |
+| Dataset | ed-presentations |
+| Supplies | `ed_presentations__202510301000000800` |
 | Period | 2025-Q4 |
 | Set "in the warehouse on" to | 2025-11-01 |
 
@@ -256,12 +256,12 @@ Reframed from daily during Keith's review: the original example (22:00 due, 21:5
 
 **What it would look like if the rule were wrong.** Assigned 2023-Q4 by the RULE because it was obviously meant for it; or 2023-Q4 left empty once the person has re-filed it.
 
-*Config: as TS-9. 2023-Q4 (1 November) is due 09:00 that day and its window opens 09:00 on 18 October; the supply arrives 12 October at 10:00, twenty days early and six days before the window. 2023-Q3, before it, is an ordinary quarter whose own supply has arrived.*
+*Config: as TS-9 - Emergency Department, one file. 2023-Q4 (1 November) is due 09:00 that day and its window opens 09:00 on 18 October; the supply arrives 12 October at 10:00, twenty days early and six days before the window. 2023-Q3, before it, is an ordinary quarter whose own supply has arrived.*
 
 | Where to look | |
 |---|---|
-| Dataset | cp-clients |
-| Supplies | `cp_clients__202310121000000800` |
+| Dataset | ed-presentations |
+| Supplies | `ed_presentations__202310121000000800` |
 | Period | 2023-Q4 |
 | Set "in the warehouse on" to | 2023-11-01 |
 
@@ -617,7 +617,7 @@ The negative case, and it exists for the same reason TS-33b does: the rejected d
 
 ### TS-42a - A contested pair of one Child Protection table, while it is contested
 
-PLANTED by REQ-GEN-203 (2026-10-18) in a grown quarter (REQ-GEN-207), after REQ-PIPE-202 widened `cp_clients`' pattern so two of its files in one delivery contest the table; `tests/test_cp_pair.py` drives the shape through the real orchestrator. Two lettered siblings share the one placement (REQ-GEN-201): this one's link opens on the pair's arrival day. *Config: quarterly, Feb/May/Aug/Nov, due 09:00 on the 1st, claim window 14 days. 2019-Q4's delivery carries the usual files and two Client Registers - cp_clients.csv at 08:30 and a re-export, cp_clients_v2.csv, at 08:40 whose rows differ (each re-pulled an hour later) - both before due; a clean cp_clients.csv follows alone on 29 November at 10:00, after due and before 2020-Q1's window opens, built green (REQ-GEN-184) after one green lead-in quarter (2019-Q3) and before a green one (2020-Q1).* **Expect** (bootstrap of 2026-10-19): on 1 November 2019 cp-clients reads "Two files for one table — this dataset's own supply is not checked until a person resolves it" (REQ-DASH-264), naming cp_clients.csv (received 8:30am) and cp_clients_v2.csv, and the gate refuses its promotion. **Breaks as**: one of the two files taken as the quarter's supply, or the three readers' cross-table checks evaluated against either.
+PLANTED by REQ-GEN-203 (2026-10-18) in a grown quarter (REQ-GEN-207), after REQ-PIPE-202 widened `cp_clients`' pattern so two of its files in one delivery contest the table; `tests/test_cp_pair.py` drives the shape through the real orchestrator. Two lettered siblings share the one placement (REQ-GEN-201): this one's link opens on the pair's arrival day. *Config: quarterly, Feb/May/Aug/Nov, due 09:00 on the 1st, claim window 14 days. 2019-Q4's delivery carries the usual files and two Client Registers - cp_clients.csv at 08:30 and a re-export, cp_clients_v2.csv, at 08:40 whose rows differ (each re-pulled an hour later) - both before due; a clean cp_clients.csv follows alone on 29 November at 10:00, after due and before 2020-Q1's window opens, built green (REQ-GEN-184) after one green lead-in quarter (2019-Q3) and before a green one (2020-Q1).* **Expect** (bootstrap of 2026-10-19): on 1 November 2019 cp-clients reads "Two files for one table — this dataset's own supply is not checked until a person resolves it" (REQ-DASH-264), naming cp_clients.csv (received 8:30am) and cp_clients_v2.csv, and the gate refuses its promotion. The three readers each say so at the top of their page (REQ-DASH-204 criterion 13, as the page words it on 1 November 2019, on the bootstrap of 2026-10-25): Notifications "No promoted Client Register for 2019-Q4. One of this supply's checks needs it, so it could not run. That is not a fault in this supply's own data." (when it runs again is said once, on the verdict line above it: "Nothing needs deciding on this supply"); Investigations the same with "2 of this supply's checks need it, so they could not run"; Placements the same as Notifications. Checks are counted as the grid's rows, one per check however many tools ran it (UX critic on 7093c20, B2). The Client Register's own banner ends "Affects Notifications, Investigations and Placements.". **Breaks as**: one of the two files taken as the quarter's supply, or the three readers' cross-table checks evaluated against either.
 
 **What it would look like if the rule were wrong.** One of the two files taken as the quarter's supply, or the three readers' cross-table checks evaluated against either.
 
@@ -797,7 +797,7 @@ NOT IN THE DATA YET: needs TS-54's substitution beside an inheritance in one per
 
 ### TS-80 - A contested pair of one Child Protection table, settled by a person
 
-PLANTED by REQ-GEN-203 (2026-10-18) in a grown quarter (REQ-GEN-207): a stray test file (TS-71's shape) beside the real Client Register, so a settlement can be seen clearing the cross-table readers the contest held, which only Child Protection has. Its link opens on the pair's arrival day. *Config: quarterly, Feb/May/Aug/Nov, due 09:00 on the 1st, claim window 14 days. 2020-Q4's delivery carries the usual files and two Client Registers - a stray test file, cp_clients_TEST.csv, every client named TEST, at 08:20 on the due day and the real cp_clients.csv at 08:30, both before 09:00 - after one green lead-in quarter (2020-Q3) and before a green one (2021-Q1), the real extract built green. A scripted person settles the pair at 11:00 the next day (contract/scripted_decisions.yaml, "TS-80 settle"): file one by receipt, the test file, rejected; file two, the real extract, the quarter's supply.* **Expect** (bootstrap of 2026-10-19): on 1 November 2020 cp-clients reads "Two files for one table"; from 2 November, "Settled · Two files for one table — settled by Robin Hale, 11:00am Monday, 2 November 2020", cp_clients_TEST.csv rejected and cp_clients.csv the quarter's supply. The re-check it owed runs at 11:00 and the gate promotes it; the knock-on re-evaluates the three readers and promotes them at the same instant (post-build-review #251). On the page (REQ-DASH-264): on 1 November cp-clients' own checks read "No data" and its cross-table rows red, each named "<reader> → Client Register", with the banner saying the cross-table checks did run; from 2 November the readers' Client reference reads green, the re-check's result shown though it was recorded under cp-clients' run. **Breaks as**: the test rows checked as the quarter's supply, the readers left contested after the settlement, or the file named by sorted name rather than by receipt position.
+PLANTED by REQ-GEN-203 (2026-10-18) in a grown quarter (REQ-GEN-207): a stray test file (TS-71's shape) beside the real Client Register, so a settlement can be seen clearing the cross-table readers the contest held, which only Child Protection has. Its link opens on the pair's arrival day. *Config: quarterly, Feb/May/Aug/Nov, due 09:00 on the 1st, claim window 14 days. 2020-Q4's delivery carries the usual files and two Client Registers - a stray test file, cp_clients_TEST.csv, every client named TEST, at 08:20 on the due day and the real cp_clients.csv at 08:30, both before 09:00 - after one green lead-in quarter (2020-Q3) and before a green one (2021-Q1), the real extract built green. A scripted person settles the pair at 11:00 the next day (contract/scripted_decisions.yaml, "TS-80 settle"): file one by receipt, the test file, rejected; file two, the real extract, the quarter's supply.* **Expect** (bootstrap of 2026-10-19): on 1 November 2020 cp-clients reads "Two files for one table"; from 2 November, "Settled · Two files for one table — settled by Robin Hale, 11:00am Monday, 2 November 2020", cp_clients_TEST.csv rejected and cp_clients.csv the quarter's supply. The re-check it owed runs at 11:00 and the gate promotes it; the knock-on re-evaluates the three readers and promotes them at the same instant (post-build-review #251). On 1 November 2020 each reader says so at the top of its page (REQ-DASH-204 criterion 13, as the page words it on the bootstrap of 2026-10-25): Notifications "No promoted Client Register for 2020-Q4. One of this supply's checks needs it, so it could not run. That is not a fault in this supply's own data." (when it runs again is said once, on the verdict line above it: "Nothing needs deciding on this supply"); Investigations the same with "2 of this supply's checks need it, so they could not run"; Placements the same as Notifications. Checks are counted as the grid's rows, one per check however many tools ran it (UX critic on 7093c20, B2). From 2 November, once re-evaluated, none of the three shows the line. On the page (REQ-DASH-264): on 1 November cp-clients' own checks read "No data" and its cross-table rows red, each named "<reader> → Client Register", with the banner saying the cross-table checks did run; from 2 November the readers' Client reference reads green, the re-check's result shown though it was recorded under cp-clients' run. **Breaks as**: the test rows checked as the quarter's supply, the readers left contested after the settlement, or the file named by sorted name rather than by receipt position.
 
 **What it would look like if the rule were wrong.** The test rows checked as the quarter's supply, the readers left contested after the settlement, or the file named by sorted name rather than by receipt position.
 
@@ -1176,7 +1176,7 @@ Birth Registrations, 30 August to 2 September 2026, inside the hold era: D's sup
 
 ### TS-78b - A supply promoted after a newer one - the day after
 
-The same placement, on 1 September. **Expect** (REQ-DASH-197 criterion 13), the verdict line above the results: "Awaiting a decision — the results below are the newest supply, received 2:00pm Tuesday, 1 September 2026, which is not in place in the warehouse yet. The supply in place in the warehouse is the one received 2:00pm Sunday, 30 August 2026." - naming D's supply, not D+1's, which is newer by receipt. **Breaks as**: the verdict line naming 31 August's supply as in place in the warehouse.
+The same placement, on 1 September. **Expect** (REQ-DASH-197 criterion 13), the verdict line above the results: "Awaiting a decision — the results below are the newest supply, received 2:00pm Tuesday, 1 September 2026, which is not in place in the warehouse yet. The supply in place in the warehouse is the one received 2:00pm Sunday, 30 August 2026, and is Amber." - the warehouse's status in the legend's word since REQ-DASH-272 - naming D's supply, not D+1's, which is newer by receipt. **Breaks as**: the verdict line naming 31 August's supply as in place in the warehouse.
 
 **What it would look like if the rule were wrong.** The verdict line naming 31 August's supply as in place in the warehouse.
 
@@ -1470,12 +1470,13 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "config": null,
    "requirements": [
     "REQ-PIPE-131",
-    "REQ-GEN-195"
+    "REQ-GEN-195",
+    "REQ-GEN-235"
    ],
    "coordinates": {
-    "dataset": "cp-clients",
+    "dataset": "ed-presentations",
     "supplies": [
-     "cp_clients__202404221000000800"
+     "ed_presentations__202404221000000800"
     ],
     "period": "2024-Q2",
     "inPlaceOn": "2024-05-01",
@@ -1992,7 +1993,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "mode": "INJECT",
    "title": "A contested pair of one Child Protection table, while it is contested",
    "section": "The option A and period-closing batch, planted (REQ-GEN-136, REQ-GEN-137)",
-   "demonstrates": "PLANTED by REQ-GEN-203 (2026-10-18) in a grown quarter (REQ-GEN-207), after REQ-PIPE-202 widened `cp_clients`' pattern so two of its files in one delivery contest the table; `tests/test_cp_pair.py` drives the shape through the real orchestrator. Two lettered siblings share the one placement (REQ-GEN-201): this one's link opens on the pair's arrival day. *Config: quarterly, Feb/May/Aug/Nov, due 09:00 on the 1st, claim window 14 days. 2019-Q4's delivery carries the usual files and two Client Registers - cp_clients.csv at 08:30 and a re-export, cp_clients_v2.csv, at 08:40 whose rows differ (each re-pulled an hour later) - both before due; a clean cp_clients.csv follows alone on 29 November at 10:00, after due and before 2020-Q1's window opens, built green (REQ-GEN-184) after one green lead-in quarter (2019-Q3) and before a green one (2020-Q1).* **Expect** (bootstrap of 2026-10-19): on 1 November 2019 cp-clients reads \"Two files for one table \u2014 this dataset's own supply is not checked until a person resolves it\" (REQ-DASH-264), naming cp_clients.csv (received 8:30am) and cp_clients_v2.csv, and the gate refuses its promotion. **Breaks as**: one of the two files taken as the quarter's supply, or the three readers' cross-table checks evaluated against either.",
+   "demonstrates": "PLANTED by REQ-GEN-203 (2026-10-18) in a grown quarter (REQ-GEN-207), after REQ-PIPE-202 widened `cp_clients`' pattern so two of its files in one delivery contest the table; `tests/test_cp_pair.py` drives the shape through the real orchestrator. Two lettered siblings share the one placement (REQ-GEN-201): this one's link opens on the pair's arrival day. *Config: quarterly, Feb/May/Aug/Nov, due 09:00 on the 1st, claim window 14 days. 2019-Q4's delivery carries the usual files and two Client Registers - cp_clients.csv at 08:30 and a re-export, cp_clients_v2.csv, at 08:40 whose rows differ (each re-pulled an hour later) - both before due; a clean cp_clients.csv follows alone on 29 November at 10:00, after due and before 2020-Q1's window opens, built green (REQ-GEN-184) after one green lead-in quarter (2019-Q3) and before a green one (2020-Q1).* **Expect** (bootstrap of 2026-10-19): on 1 November 2019 cp-clients reads \"Two files for one table \u2014 this dataset's own supply is not checked until a person resolves it\" (REQ-DASH-264), naming cp_clients.csv (received 8:30am) and cp_clients_v2.csv, and the gate refuses its promotion. The three readers each say so at the top of their page (REQ-DASH-204 criterion 13, as the page words it on 1 November 2019, on the bootstrap of 2026-10-25): Notifications \"No promoted Client Register for 2019-Q4. One of this supply's checks needs it, so it could not run. That is not a fault in this supply's own data.\" (when it runs again is said once, on the verdict line above it: \"Nothing needs deciding on this supply\"); Investigations the same with \"2 of this supply's checks need it, so they could not run\"; Placements the same as Notifications. Checks are counted as the grid's rows, one per check however many tools ran it (UX critic on 7093c20, B2). The Client Register's own banner ends \"Affects Notifications, Investigations and Placements.\". **Breaks as**: one of the two files taken as the quarter's supply, or the three readers' cross-table checks evaluated against either.",
    "breaksAs": "One of the two files taken as the quarter's supply, or the three readers' cross-table checks evaluated against either.",
    "config": "Config: quarterly, Feb/May/Aug/Nov, due 09:00 on the 1st, claim window 14 days. 2019-Q4's delivery carries the usual files and two Client Registers - cp_clients.csv at 08:30 and a re-export, cp_clients_v2.csv, at 08:40 whose rows differ (each re-pulled an hour later) - both before due; a clean cp_clients.csv follows alone on 29 November at 10:00, after due and before 2020-Q1's window opens, built green (REQ-GEN-184) after one green lead-in quarter (2019-Q3) and before a green one (2020-Q1).",
    "requirements": [
@@ -2001,7 +2002,8 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
     "REQ-GEN-207",
     "REQ-PIPE-202",
     "REQ-GEN-201",
-    "REQ-DASH-264"
+    "REQ-DASH-264",
+    "REQ-DASH-204"
    ],
    "coordinates": {
     "dataset": "cp-clients",
@@ -2709,14 +2711,14 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "section": "Arrival classification",
    "demonstrates": "Assigned **2025-Q3** and classified **early by 13 days**, exactly as TS-9 - the window is a boundary, and a supply inside it by a day is as early-and-fine as one inside it by a week (REQ-PIPE-131).",
    "breaksAs": "Treated as a resupply of 2025-Q2, as if the window counted from somewhere else.",
-   "config": "Config: as TS-9 - Child Protection, quarterly, due 09:00 on the 1st, claim window 14 days. 2025-Q3 (1 August) arrives 19 July at 10:00, thirteen days early, a day after its window opened at 09:00 on 18 July.",
+   "config": "Config: as TS-9 - Emergency Department, one file, quarterly, due 09:00 on the 1st, claim window 14 days. 2025-Q3 (1 August) arrives 19 July at 10:00, thirteen days early, a day after its window opened at 09:00 on 18 July.",
    "requirements": [
     "REQ-PIPE-131"
    ],
    "coordinates": {
-    "dataset": "cp-clients",
+    "dataset": "ed-presentations",
     "supplies": [
-     "cp_clients__202507191000000800"
+     "ed_presentations__202507191000000800"
     ],
     "period": "2025-Q3",
     "inPlaceOn": "2025-08-01",
@@ -2730,12 +2732,12 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "section": "Arrival classification",
    "demonstrates": "Assigned **2025-Q4**, classified **early by 2 days**, and otherwise unremarkable - it fills and promotes like an on-time supply.",
    "breaksAs": "Shown as anything more alarming than early.",
-   "config": "Config: as TS-9. 2025-Q4 (1 November) arrives 30 October at 10:00.",
+   "config": "Config: as TS-9 - Emergency Department, one file. 2025-Q4 (1 November) arrives 30 October at 10:00.",
    "requirements": [],
    "coordinates": {
-    "dataset": "cp-clients",
+    "dataset": "ed-presentations",
     "supplies": [
-     "cp_clients__202510301000000800"
+     "ed_presentations__202510301000000800"
     ],
     "period": "2025-Q4",
     "inPlaceOn": "2025-11-01",
@@ -2749,16 +2751,16 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "section": "Arrival classification",
    "demonstrates": "It cannot claim 2023-Q4, whose window has not opened - nothing claims forward (REQ-PIPE-062 criterion 5). The open period when it arrives is 2023-Q3, so it files there as a **resupply of 2023-Q3** (REQ-PIPE-131), and the rule refuses to promote it over 2023-Q3's accepted supply. Then a PERSON re-files it to 2023-Q4 (a scripted decision, REQ-GEN-135, at 10:00 on 21 October, once Q4's window is open), so 2023-Q4 is not left with no supply. Keith, 2026-10-12: \"plus one too early\" - the case people will ask about - and \"have it refiled to Q4 by a synthetic human making a decision\".",
    "breaksAs": "Assigned 2023-Q4 by the RULE because it was obviously meant for it; or 2023-Q4 left empty once the person has re-filed it.",
-   "config": "Config: as TS-9. 2023-Q4 (1 November) is due 09:00 that day and its window opens 09:00 on 18 October; the supply arrives 12 October at 10:00, twenty days early and six days before the window. 2023-Q3, before it, is an ordinary quarter whose own supply has arrived.",
+   "config": "Config: as TS-9 - Emergency Department, one file. 2023-Q4 (1 November) is due 09:00 that day and its window opens 09:00 on 18 October; the supply arrives 12 October at 10:00, twenty days early and six days before the window. 2023-Q3, before it, is an ordinary quarter whose own supply has arrived.",
    "requirements": [
     "REQ-PIPE-062",
     "REQ-PIPE-131",
     "REQ-GEN-135"
    ],
    "coordinates": {
-    "dataset": "cp-clients",
+    "dataset": "ed-presentations",
     "supplies": [
-     "cp_clients__202310121000000800"
+     "ed_presentations__202310121000000800"
     ],
     "period": "2023-Q4",
     "inPlaceOn": "2023-11-01",
@@ -3203,11 +3205,12 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "mode": "INJECT",
    "title": "A supply promoted after a newer one - the day after",
    "section": "Calendar corrections",
-   "demonstrates": "The same placement, on 1 September. **Expect** (REQ-DASH-197 criterion 13), the verdict line above the results: \"Awaiting a decision \u2014 the results below are the newest supply, received 2:00pm Tuesday, 1 September 2026, which is not in place in the warehouse yet. The supply in place in the warehouse is the one received 2:00pm Sunday, 30 August 2026.\" - naming D's supply, not D+1's, which is newer by receipt. **Breaks as**: the verdict line naming 31 August's supply as in place in the warehouse.",
+   "demonstrates": "The same placement, on 1 September. **Expect** (REQ-DASH-197 criterion 13), the verdict line above the results: \"Awaiting a decision \u2014 the results below are the newest supply, received 2:00pm Tuesday, 1 September 2026, which is not in place in the warehouse yet. The supply in place in the warehouse is the one received 2:00pm Sunday, 30 August 2026, and is Amber.\" - the warehouse's status in the legend's word since REQ-DASH-272 - naming D's supply, not D+1's, which is newer by receipt. **Breaks as**: the verdict line naming 31 August's supply as in place in the warehouse.",
    "breaksAs": "The verdict line naming 31 August's supply as in place in the warehouse.",
    "config": null,
    "requirements": [
-    "REQ-DASH-197"
+    "REQ-DASH-197",
+    "REQ-DASH-272"
    ],
    "coordinates": {
     "dataset": "birth-registrations",
@@ -3320,12 +3323,13 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "mode": "INJECT",
    "title": "A contested pair of one Child Protection table, settled by a person",
    "section": "The option A and period-closing batch, planted (REQ-GEN-136, REQ-GEN-137)",
-   "demonstrates": "PLANTED by REQ-GEN-203 (2026-10-18) in a grown quarter (REQ-GEN-207): a stray test file (TS-71's shape) beside the real Client Register, so a settlement can be seen clearing the cross-table readers the contest held, which only Child Protection has. Its link opens on the pair's arrival day. *Config: quarterly, Feb/May/Aug/Nov, due 09:00 on the 1st, claim window 14 days. 2020-Q4's delivery carries the usual files and two Client Registers - a stray test file, cp_clients_TEST.csv, every client named TEST, at 08:20 on the due day and the real cp_clients.csv at 08:30, both before 09:00 - after one green lead-in quarter (2020-Q3) and before a green one (2021-Q1), the real extract built green. A scripted person settles the pair at 11:00 the next day (contract/scripted_decisions.yaml, \"TS-80 settle\"): file one by receipt, the test file, rejected; file two, the real extract, the quarter's supply.* **Expect** (bootstrap of 2026-10-19): on 1 November 2020 cp-clients reads \"Two files for one table\"; from 2 November, \"Settled \u00b7 Two files for one table \u2014 settled by Robin Hale, 11:00am Monday, 2 November 2020\", cp_clients_TEST.csv rejected and cp_clients.csv the quarter's supply. The re-check it owed runs at 11:00 and the gate promotes it; the knock-on re-evaluates the three readers and promotes them at the same instant (post-build-review #251). On the page (REQ-DASH-264): on 1 November cp-clients' own checks read \"No data\" and its cross-table rows red, each named \"<reader> \u2192 Client Register\", with the banner saying the cross-table checks did run; from 2 November the readers' Client reference reads green, the re-check's result shown though it was recorded under cp-clients' run. **Breaks as**: the test rows checked as the quarter's supply, the readers left contested after the settlement, or the file named by sorted name rather than by receipt position.",
+   "demonstrates": "PLANTED by REQ-GEN-203 (2026-10-18) in a grown quarter (REQ-GEN-207): a stray test file (TS-71's shape) beside the real Client Register, so a settlement can be seen clearing the cross-table readers the contest held, which only Child Protection has. Its link opens on the pair's arrival day. *Config: quarterly, Feb/May/Aug/Nov, due 09:00 on the 1st, claim window 14 days. 2020-Q4's delivery carries the usual files and two Client Registers - a stray test file, cp_clients_TEST.csv, every client named TEST, at 08:20 on the due day and the real cp_clients.csv at 08:30, both before 09:00 - after one green lead-in quarter (2020-Q3) and before a green one (2021-Q1), the real extract built green. A scripted person settles the pair at 11:00 the next day (contract/scripted_decisions.yaml, \"TS-80 settle\"): file one by receipt, the test file, rejected; file two, the real extract, the quarter's supply.* **Expect** (bootstrap of 2026-10-19): on 1 November 2020 cp-clients reads \"Two files for one table\"; from 2 November, \"Settled \u00b7 Two files for one table \u2014 settled by Robin Hale, 11:00am Monday, 2 November 2020\", cp_clients_TEST.csv rejected and cp_clients.csv the quarter's supply. The re-check it owed runs at 11:00 and the gate promotes it; the knock-on re-evaluates the three readers and promotes them at the same instant (post-build-review #251). On 1 November 2020 each reader says so at the top of its page (REQ-DASH-204 criterion 13, as the page words it on the bootstrap of 2026-10-25): Notifications \"No promoted Client Register for 2020-Q4. One of this supply's checks needs it, so it could not run. That is not a fault in this supply's own data.\" (when it runs again is said once, on the verdict line above it: \"Nothing needs deciding on this supply\"); Investigations the same with \"2 of this supply's checks need it, so they could not run\"; Placements the same as Notifications. Checks are counted as the grid's rows, one per check however many tools ran it (UX critic on 7093c20, B2). From 2 November, once re-evaluated, none of the three shows the line. On the page (REQ-DASH-264): on 1 November cp-clients' own checks read \"No data\" and its cross-table rows red, each named \"<reader> \u2192 Client Register\", with the banner saying the cross-table checks did run; from 2 November the readers' Client reference reads green, the re-check's result shown though it was recorded under cp-clients' run. **Breaks as**: the test rows checked as the quarter's supply, the readers left contested after the settlement, or the file named by sorted name rather than by receipt position.",
    "breaksAs": "The test rows checked as the quarter's supply, the readers left contested after the settlement, or the file named by sorted name rather than by receipt position.",
    "config": "Config: quarterly, Feb/May/Aug/Nov, due 09:00 on the 1st, claim window 14 days. 2020-Q4's delivery carries the usual files and two Client Registers - a stray test file, cp_clients_TEST.csv, every client named TEST, at 08:20 on the due day and the real cp_clients.csv at 08:30, both before 09:00 - after one green lead-in quarter (2020-Q3) and before a green one (2021-Q1), the real extract built green. A scripted person settles the pair at 11:00 the next day (contract/scripted_decisions.yaml, \"TS-80 settle\"): file one by receipt, the test file, rejected; file two, the real extract, the quarter's supply.",
    "requirements": [
     "REQ-GEN-203",
     "REQ-GEN-207",
+    "REQ-DASH-204",
     "REQ-DASH-264"
    ],
    "coordinates": {

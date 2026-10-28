@@ -747,11 +747,17 @@ def check(old_cal: dict | None, new_cal: dict, old_asset: dict | None, new_asset
                                "removes the record of every governed change it holds. "
                                "Nothing was committed.",
                                "Keep the entry and its corrections."))
+    # A LATER-DATED VERSION KEEPS ITS CORRECTIONS (REQ-GEN-238, PROVISIONAL): on
+    # a synthetic asset criterion 9 lets a past version be later-dated, and a
+    # correction already naming it by its old date names it by its new one -
+    # the only edit an existing correction may take, and only for that version.
+    redated = _redated_versions(changes) if synthetic else {}
     for owner, entries in new_corr.items():
         before = old_corr.get(owner, [])
         file = "data-asset.yaml" if owner[0] == "timezone" else "calendar.yaml"
         where = owner[0] if owner[0] == "timezone" else f"{owner[0]} {owner[1]!r}"
-        if [_norm(e) for e in entries[:len(before)]] != [_norm(e) for e in before]:
+        if [_norm(e) for e in entries[:len(before)]] != \
+                [_norm(_redate_items(e, redated)) for e in before]:
             out.append(Finding(file, where,
                                "an existing declared correction was changed or removed - a "
                                "corrections list is append-only. Nothing was committed.",
@@ -842,6 +848,11 @@ def check(old_cal: dict | None, new_cal: dict, old_asset: dict | None, new_asset
             continue  # a date inside a version criterion 9 lets a synthetic asset add
         if synthetic and _restates_at_default(item, old, new, old_cal, old_asset):
             continue  # criterion 9, amended 2026-10-16
+        # REMOVING OR LATER-DATING ONE (criterion 9 as amended 2026-10-15, built
+        # with REQ-GEN-238): later-dating is the old date's version removed and
+        # the new date's added, which the clause above already lets through.
+        if new is None and synthetic and item.kind in _VERSION_KINDS:
+            continue
         needs.setdefault(item.owner, []).append((item, old, new, frozen_at))
 
     for owner, rows in needs.items():
@@ -887,6 +898,44 @@ def check(old_cal: dict | None, new_cal: dict, old_asset: dict | None, new_asset
             + ("it" if len(rows) == 1 else "them") + ". Nothing was committed.",
             fix))
     return out
+
+
+#: The version-level items criterion 9 lets a synthetic asset add, remove or
+#: later-date without a declared correction.
+_VERSION_KINDS = ("cal_version", "participation", "tz_version", "defaults")
+
+
+def _redated_versions(changes: dict) -> dict[str, str]:
+    """Each version this change later-dated, old key to new key: a version of
+    one owner and kind removed and another added with the same value - so
+    only its date moved."""
+    removed = [(item, old) for item, old, new, _f in changes.values()
+               if new is None and item.kind in _VERSION_KINDS]
+    added = [(item, new) for item, old, new, _f in changes.values()
+             if old is None and item.kind in _VERSION_KINDS]
+    out: dict[str, str] = {}
+    for gone, value in removed:
+        same = [item for item, v in added if item.owner == gone.owner
+                and item.kind == gone.kind and _norm(v) == _norm(value)
+                and item.key not in out.values()]
+        if len(same) == 1:
+            out[gone.key] = same[0].key
+    return out
+
+
+def _redate_items(entry, redated: dict[str, str]):
+    """`entry` (one declared correction) with each change naming a later-dated
+    version - the version itself, or an item of it - named by its new date."""
+    if not redated or not isinstance(entry, dict):
+        return entry
+    def rename(key: str) -> str:
+        for old, new in redated.items():
+            if key == old or key.startswith(old + " "):
+                return new + key[len(old):]
+        return key
+    changes = [{**c, "item": rename(str(c.get("item")))} if isinstance(c, dict) else c
+               for c in entry.get("changes") or []]
+    return {**entry, "changes": changes} if "changes" in entry else entry
 
 
 #: A participation value's own default, where it has one that is not

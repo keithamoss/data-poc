@@ -371,7 +371,7 @@ def run_pass(*, run_by: str | None = None, say=print, deadline: float | None = N
 
     def out_of_time() -> bool:
         return deadline is not None and time.monotonic() >= deadline
-    from qa_tools.common import (asset_time, delivery_log, qa_store, recheck,
+    from qa_tools.common import (asset_time, delivery_log, qa_store,
                                  ticket_reconciler)
     from qa_tools.common.git_identity import get_run_by
 
@@ -563,17 +563,7 @@ def run_pass(*, run_by: str | None = None, say=print, deadline: float | None = N
     # OWED WORK (criterion 11): re-evaluations and re-checks alike, each
     # cleared only when its work completes; a failure stays owed.
     try:
-        # WITHIN THE PASS'S BUDGET (REQ-PIPE-177 criterion 24): no new owed
-        # item is started once the deadline has passed - a bulk re-check of
-        # hundreds of supplies is finished by later passes, never overrun.
-        for outcome in recheck.run_all_owed(kinds=(recheck.REEVALUATE, recheck.RECHECK,
-                                                   recheck.GATE),
-                                            run_by=run_by, deadline=deadline):
-            report.owed.append(outcome)
-            if _owed_failure(outcome):
-                report.failures.append((f"owed #{outcome.owed_id}", outcome.message))
-            elif outcome.status == "red":
-                report.red = True
+        run_owed_work(report, run_by=run_by, deadline=deadline)
     except Exception as exc:  # noqa: BLE001 - it stays owed for the next pass
         failed("owed work", exc)
     # TICKETS LAST (criterion 12), and one line where none are configured.
@@ -597,6 +587,24 @@ def run_pass(*, run_by: str | None = None, say=print, deadline: float | None = N
     except Exception as exc:  # noqa: BLE001 - the slot state is durable; the next pass retries
         failed("ticket reconciliation", exc)
     return report
+
+
+def run_owed_work(report: "PassReport", *, run_by: str, deadline: float | None) -> None:
+    """The pass's owed work - re-evaluations, re-checks and gate applications,
+    each cleared only when its work completes - WITHIN THE PASS'S BUDGET
+    (REQ-PIPE-177 criterion 24): no new owed item is started once `deadline`
+    has passed, so a bulk re-check of hundreds of supplies is finished by
+    later passes, never overrun."""
+    from qa_tools.common import recheck
+
+    for outcome in recheck.run_all_owed(kinds=(recheck.REEVALUATE, recheck.RECHECK,
+                                               recheck.GATE),
+                                        run_by=run_by, deadline=deadline):
+        report.owed.append(outcome)
+        if _owed_failure(outcome):
+            report.failures.append((f"owed #{outcome.owed_id}", outcome.message))
+        elif outcome.status == "red":
+            report.red = True
 
 
 def _one(arrival, among, run_timestamp, run_by, report: PassReport, say) -> None:

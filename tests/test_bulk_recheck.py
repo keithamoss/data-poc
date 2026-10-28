@@ -140,7 +140,7 @@ class TestAnOpenPairIsLeftOut:
         p = bulk.plan(conn, CHECK)
         assert p.covered == [] and [(x.why, x.files) for x in p.left_out] == [
             ("open-pair", ("a.csv", "b.csv"))]
-        assert "1 file(s) of an open contested pair" in "\n".join(_panel(p))
+        assert "1 supply/supplies of an open contested pair" in "\n".join(_panel(p))
 
 
 def dl_reject(conn, supply, period):
@@ -168,12 +168,10 @@ class TestRefusals:
         with pytest.raises(bulk.Refused, match="retired check's results no longer judge"):
             bulk.plan(conn, retired.check_id)
 
-    def test_a_file_check_is_refused_with_the_reprocess_command_on_its_own_line(self, conn):
+    def test_a_file_check_is_refused_saying_why(self, conn):
         file_check = next(c for c in bulk.current_checks().values() if c.tool == "file")
-        with pytest.raises(bulk.Refused) as got:
+        with pytest.raises(bulk.Refused, match="file checks run only"):
             bulk.plan(conn, file_check.check_id)
-        assert "file checks run only" in str(got.value)
-        assert "\nmothman supply load --collection " in str(got.value)
 
     def test_an_unknown_check_is_refused(self, conn):
         with pytest.raises(bulk.Refused, match="No check has the id"):
@@ -238,7 +236,7 @@ def _recorded(conn, n=2):
         filed(conn, period=f"2099-S{i:04d}")
     p = bulk.plan(conn, CHECK)
     return p, bulk.record(conn, CHECK, actor=actor(), reason="fixed", effective_at=WHEN,
-                          acknowledged=p.key)
+                          acknowledged=p.key, shown=p)
 
 
 class TestRunning:
@@ -252,7 +250,28 @@ class TestRunning:
 
         s = bulk_recheck_tui.run_foreground(rec)
         assert ran == list(rec.owed)
-        assert len(s.changed) == 0 or all(r.now == "amber" for r in s.changed)
+        # T2: the recorded verdict was green; every one came back amber.
+        assert [r.now for r in s.changed] == ["amber", "amber"]
+        assert all(r.covered.status == "green" for r in s.changed)
+
+    def test_a_real_bulk_item_runs_through_recheck_run(self, conn, monkeypatch):
+        """T2: one covered supply's owed re-check through the real claim and
+        runner, recheck.run, with only the four tools' run and the gate
+        stubbed (they need real tables), as REQ-PIPE-164's own test does."""
+        from qa_tools.common import gate
+
+        _p, rec = _recorded(conn, 1)
+        executed = []
+        monkeypatch.setattr(recheck, "execute", lambda **k: executed.append(k) or (object(), []))
+        monkeypatch.setattr(gate, "apply", lambda *a, **k: gate.Applied())
+        monkeypatch.setattr(gate, "report", lambda o: None)
+        got = bulk.run_one(rec.covered[0], rec.owed[0])
+        assert got.completed, got.outcome.message
+        assert [k["supply_id"] for k in executed] == [rec.covered[0].supply]
+        assert executed[0]["purpose"]["scope"] == "full"
+        cleared = conn.execute(f"SELECT cleared_at FROM {recheck.TABLE} WHERE id = ?",
+                               [rec.owed[0]]).fetchone()[0]
+        assert cleared is not None
 
     def test_a_failed_rerun_stays_owed_and_the_rest_run(self, conn, monkeypatch, capsys):
         _p, rec = _recorded(conn, 3)
@@ -300,13 +319,19 @@ class TestRunning:
         assert "Promoted, then re-checked red" in text
         assert "rejected" not in text.lower() and "refused" not in text.lower()
 
-    def test_run_all_owed_takes_only_the_ids_it_is_given(self, conn, monkeypatch):
-        _p, rec = _recorded(conn)
+    def test_the_terminal_runs_only_its_own_owed_rechecks(self, conn, monkeypatch):
+        """Criterion 17: another item owed beside it is left to the pass."""
+        from cli import bulk_recheck_tui
+
+        _p, rec = _recorded(conn, 1)
+        other, _ = _filed(conn, "2099-Sother", WHEN)
+        (decision,) = conn.execute(f"SELECT max(id) FROM {dl.TABLE}").fetchone()
+        recheck.owe(conn, dataset_id=DS, supply_id=other, decision_id=decision)
         ran = []
         monkeypatch.setattr(recheck, "run", lambda owed_id, **k: ran.append(owed_id) or
-                            recheck.Outcome(owed_id, "r", True, "ok"))
-        recheck.run_all_owed(kinds=(recheck.RECHECK,), ids=[rec.owed[1]])
-        assert ran == [rec.owed[1]]
+                            recheck.Outcome(owed_id, "r", True, "ok", status="green"))
+        bulk_recheck_tui.run_foreground(rec)
+        assert ran == list(rec.owed)
 
     def test_no_new_owed_item_is_started_after_the_deadline(self, conn, monkeypatch):
         """Criterion 24."""
@@ -319,20 +344,14 @@ class TestRunning:
                                     deadline=time.monotonic() - 1) == []
         assert ran == []
 
-    def test_the_processing_pass_passes_its_deadline_to_the_owed_work(self, conn, monkeypatch):
-        import time
-
+    def test_the_processing_pass_passes_its_deadline_to_the_owed_work(self, monkeypatch):
+        """T4: at the seam, with no pass run over the delivery tree."""
         from qa_tools.common import processing_pass
 
         seen = {}
-
-        def owed(**k):
-            seen.update(k)
-            return []
-        monkeypatch.setattr(recheck, "run_all_owed", owed)
-        deadline = time.monotonic() - 1
-        processing_pass.run_pass(deadline=deadline, say=lambda *a, **k: None)
-        assert seen.get("deadline") == deadline
+        monkeypatch.setattr(recheck, "run_all_owed", lambda **k: seen.update(k) or [])
+        processing_pass.run_owed_work(processing_pass.PassReport(), run_by="x", deadline=12.5)
+        assert seen["deadline"] == 12.5
 
 
 # ---- criteria 13, 19, 20, 29: the nudge and the owed list --------------------------
@@ -582,9 +601,28 @@ class TestTheDoor:
 
 # ---- NFR 3: the set form is results_about's rule ---------------------------------
 
+def _newest_fingerprint(conn, dataset_id, supply, check_id):
+    """THE ORACLE: the fingerprint on the newest result for `check_id` among
+    the results about this supply, by supply_status.results_about itself, one
+    supply at a time - what bulk_recheck.newest_by_supply's set form is held
+    to. (run, check) names one result for any check but a file check."""
+    from qa_tools.common import supply_status
+
+    shown = supply_status.results_about(conn, dataset_id, supply,
+                                        view=supply_status.View()).shown
+    newest = next((r for r in reversed(shown) if r.get("check_id") == check_id), None)
+    if newest is None:
+        return None
+    rows = conn.execute(
+        f'SELECT definition_fingerprint FROM "{qa_store.SCHEMA}".check_result '
+        "WHERE run_key = ? AND check_id = ? ORDER BY id DESC LIMIT 1",
+        [newest["run_id"], check_id]).fetchall()
+    return rows[0][0] if rows else None
+
+
 def _newest_one_at_a_time(conn, check, keys):
     return {k: f for k in keys
-            if (f := bulk.newest_fingerprint(conn, k[0], k[1], check.check_id)) is not None}
+            if (f := _newest_fingerprint(conn, k[0], k[1], check.check_id)) is not None}
 
 
 class TestTheSetFormIsResultsAbout:
@@ -629,3 +667,131 @@ class TestTheSetFormHoldsOnTheDeployment:
                 got = bulk.newest_by_supply(c, check)
                 assert got, f"no result of {check.check_id} is about any supply"
                 assert got == _newest_one_at_a_time(c, check, set(got)), check.check_id
+
+
+# ---- the critic's defects (post-build, 2026-10-25), each failing first ---------
+
+class TestAnItemAlreadyRunElsewhere:
+    """D1: recheck.run says 'already run' for an item another runner finished
+    - completed, with no status. That is not a verdict that changed."""
+
+    def test_it_is_not_counted_as_a_changed_verdict(self):
+        c = bulk.Covered(DS, "s1", "2099-S1", "waiting", "green", STALE)
+        r = bulk.Ran(c, recheck.Outcome(1, "rk", True, recheck.ALREADY_RUN))
+        assert not r.changed and r.elsewhere
+        s = bulk.Summary(ran=[r])
+        text = "\n".join(bulk.summary_lines(s))
+        assert "0 verdict(s) changed" in text and "1 already run elsewhere" in text
+        assert "now no verdict" not in text
+
+    def test_the_terminal_says_so_rather_than_now_no_verdict(self, conn, monkeypatch, capsys):
+        from cli import bulk_recheck_tui
+
+        _p, rec = _recorded(conn, 1)
+        monkeypatch.setattr(recheck, "run", lambda owed_id, **k: recheck.Outcome(
+            owed_id, "rk", True, recheck.ALREADY_RUN))
+        bulk_recheck_tui.run_foreground(rec)
+        out = capsys.readouterr().out
+        assert "now no verdict" not in out and "already run elsewhere" in out
+
+
+class TestEverySupplyLeftOut:
+    """D2: where every stale supply is left out, the panel is shown with what
+    was left out and why - never 'already checked under its current
+    definition', which is then false."""
+
+    @pytest.fixture(autouse=True)
+    def _person(self, monkeypatch):
+        from cli import filing_tui
+
+        monkeypatch.setattr(filing_tui, "actor_at_the_keyboard", actor)
+
+    def _backstopped(self, conn, monkeypatch):
+        filed(conn)
+        refusal = SimpleNamespace(message=lambda: f"{DS} is refused: ...\n  To fix: declare it.")
+        monkeypatch.setattr(agreement_drift, "refusals", lambda *a, **k: {DS: refusal})
+
+    def test_the_flag_route_shows_the_panel_and_does_not_say_already_checked(
+            self, conn, monkeypatch):
+        self._backstopped(conn, monkeypatch)
+        got = _cli("--reason", "x", "--yes", "--acknowledge", "k")
+        flat = " ".join(got.output.replace("│", " ").split())
+        assert got.exit_code == 1
+        assert "already checked under its current" not in flat
+        assert f"{DS}'s 1 supply" in flat and "To fix: declare it." in flat
+
+    def test_the_door_shows_the_panel_and_does_not_say_already_checked(
+            self, conn, monkeypatch, capsys):
+        from cli import bulk_recheck_tui
+
+        self._backstopped(conn, monkeypatch)
+        bulk_recheck_tui.flow(CHECK)
+        flat = " ".join(capsys.readouterr().out.replace("│", " ").split())
+        assert "already checked under its current" not in flat
+        assert f"{DS}'s 1 supply" in flat
+
+
+class TestTheQueueLineCountsThisCollectionsChecks:
+    """D3: K is this collection's stale checks, never the asset's."""
+
+    def test_one_check_here_and_another_elsewhere(self):
+        a = bulk.Nudge("chkA", 5, {COL: 5}, "2026-10-01", "a")
+        b = bulk.Nudge("chkB", 3, {"civil-registration": 3}, "2026-10-02", "b")
+        assert bulk.nudge_line([a, b], COL) == (
+            "5 supplies were checked before chkA changed (3 more in other collections)")
+
+    def test_supply_queue_lists_only_this_collections_checks(self, conn, monkeypatch):
+        from cli import bulk_recheck_tui
+        from cli.supply import queue_command
+
+        here = bulk.Nudge(CHECK, 1, {COL: 1}, "2026-10-01", "a")
+        away = bulk.Nudge(OTHER, 2, {"civil-registration": 2}, "2026-10-02", "b")
+        monkeypatch.setattr(bulk_recheck_tui, "nudges_or_none", lambda: [here, away])
+        got = CliRunner().invoke(queue_command, ["--collection", COL], env={"COLUMNS": "400"})
+        assert f"1 supply was checked before {CHECK} changed (2 more in other collections)" \
+            in got.output
+        assert OTHER not in got.output
+
+
+class TestASupplyAlreadyOwedIsLeftOut:
+    """Q1 (PROVISIONAL, coordinator for Keith, 2026-10-25): a supply that
+    already owes an uncleared re-check is left out and counted as already
+    owed, so a second bulk re-check after a hand-off records no duplicate."""
+
+    def test_after_a_hand_off_nothing_is_covered_twice(self, conn):
+        _p, _rec = _recorded(conn, 2)
+        p = bulk.plan(conn, CHECK)
+        assert p.covered == [] and [x.why for x in p.left_out] == ["already-owed"] * 2
+        assert "2 supply/supplies already owe a re-check" in "\n".join(_panel(p))
+        assert bulk.nudges(conn) == []
+
+
+class TestTheFileCheckRefusal:
+    """Q2 (PROVISIONAL): no pasteable command - reprocessing an unchanged
+    delivery records nothing."""
+
+    def test_it_says_resend_and_prints_no_command(self, conn):
+        file_check = next(c for c in bulk.current_checks().values() if c.tool == "file")
+        with pytest.raises(bulk.Refused) as got:
+            bulk.plan(conn, file_check.check_id)
+        assert "resent" in str(got.value) and "mothman " not in str(got.value)
+
+
+class TestTheFlagRouteInProduction:
+    """T3: production asks for its id even with --yes, so with no terminal
+    nothing is recorded."""
+
+    def test_yes_and_the_key_do_not_stand_in_for_typing_the_id(self, conn, monkeypatch):
+        from cli import filing_tui
+        from qa_tools.common import environments
+
+        monkeypatch.setattr(filing_tui, "actor_at_the_keyboard", actor)
+        filed(conn)
+        key = bulk.plan(conn, CHECK).key
+        import dataclasses
+
+        prod = dataclasses.replace(environments.current(), confirm_changes=True)
+        monkeypatch.setattr(environments, "current", lambda: prod)
+        got = _cli("--reason", "x", "--yes", "--acknowledge", key)
+        assert got.exit_code == 1
+        assert conn.execute(f"SELECT count(*) FROM {bulk.TABLE}").fetchone()[0] == 0

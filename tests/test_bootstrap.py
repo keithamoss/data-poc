@@ -280,3 +280,29 @@ class TestCollectionsRunSideBySide:
         result = boot.bootstrap(collection="all")
         assert set(result.timings) == {*STREAMS, "total"}
         assert all(isinstance(v, float) for v in result.timings.values())
+
+
+class TestTheBudgetLine:
+    """REQ-PIPE-250 criterion 3: a bootstrap prints its wall clock against
+    the 12-minute budget, and says plainly when it is over."""
+
+    def test_within_the_budget(self):
+        line = boot.budget_line(611.4)
+        assert "611s" in line and "720s" in line and "12-minute" in line
+        assert line.startswith("Within budget") and "OVER" not in line
+
+    def test_over_the_budget_says_so_plainly(self):
+        line = boot.budget_line(1303.0)
+        assert line.startswith("OVER BUDGET")
+        assert "1303s" in line and "583s over" in line
+
+    def test_a_bootstrap_from_empty_prints_it_last(self, empty_db, monkeypatch):
+        monkeypatch.setattr("cli.pipeline.generate_collection", lambda cid, **_: None)
+        monkeypatch.setattr("qa_tools.tools.orchestrate.run_stream", lambda ids, **k: None)
+        monkeypatch.setattr(boot, "_record_deliveries", lambda: None)
+        monkeypatch.setattr("qa_tools.common.correction_replay.confirm_due", lambda **k: [])
+        _in_process(monkeypatch, [])
+        said = []
+        result = boot.bootstrap(collection="all", on_step=said.append)
+        assert said[-1] == boot.budget_line(result.wall_seconds)
+        assert result.wall_seconds >= result.timings["total"]

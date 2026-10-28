@@ -140,6 +140,13 @@ class TestTheClause:
                                            "cause": "the arrival of Client Register"}]}}
         assert g.words_of(self._clause(health)["tail"]) == ": it was promoted while red."
 
+    def test_an_unknown_status_is_not_called_green(self):
+        """Functional critic on 7093c20: with no recorded health for the holder
+        the clause gives no status rather than defaulting to green."""
+        got = self._clause({})
+        assert got["status"] is None
+        assert g.words_of(got["clause"]).endswith("received 10:00am Thursday, 25 July 2024.")
+
     def test_nothing_in_place(self):
         got = self._clause({}, holder=None)
         assert g.words_of(got["clause"]) == "Nothing is in place in the warehouse for this period yet."
@@ -150,6 +157,15 @@ class TestTheClause:
         assert g.words_of(got["clause"]) == (
             "The supply in place in the warehouse is the one carried forward from 2024-Q2 "
             "(received 10:00am Thursday, 25 July 2024), and is ")
+
+    def test_a_substituted_supply_says_substituted(self):
+        """P4 (UX critic on 7093c20, PROVISIONAL): the header badge's own word
+        for a substitution, never "carried forward" beside "Substituted from"."""
+        got = g._clause("cp-clients", C2, C1, "2024-Q2", _at("2024-08-05T12:00:00+08:00"),
+                        {"run-c1": {"promotedOn": "green", "timeline": []}},
+                        {C1: "run-c1", C2: "run-c2"}, RECEIPTS, kind="substituted")
+        assert g.words_of(got["clause"]).startswith(
+            "The supply in place in the warehouse is the one substituted from 2024-Q2 ")
 
     def test_the_clause_names_the_panels_supply_from_the_timeline(self):
         """The supply in place is the panel's, judged per day; a period that
@@ -176,3 +192,63 @@ class TestTheNames:
         names = [[g.text(x)] for x in "abcde"]
         assert g.words_of(g._names(names)) == "a, b and 3 more"
         assert g.words_of(g._names(names[:3])) == "a, b and c"
+
+
+class TestPromotionWords:
+    """A rule promotion's words in the supply history (REQ-DASH-272 criterion
+    20)."""
+
+    CARERS = "cp-carers@202408051000000800"
+
+    def _log(self):
+        log = ctn.Log()
+        log.promotes = {N2: [(7, "2024-08-05T02:30:00+00:00", "rule", [], 3)]}
+        # The application held back a Carer Register on its own data and the
+        # Client Register Notifications reads - in that order.
+        log.withheld_in = {3: [("cp-carers", self.CARERS), ("cp-clients", C2)]}
+        return log
+
+    def test_the_re_check_names_the_table_it_read(self):
+        """D3 (functional critic on 7093c20): the re-check against the
+        warehouse names a table this dataset's checks read, never the first
+        supply held back in the application."""
+        receipts = g.Receipts({N2: "2024-08-05T10:00:00+08:00", C2: "2024-08-05T10:00:00+08:00",
+                               self.CARERS: "2024-08-05T10:00:00+08:00"})
+        got = g.promotion_words("cp-notifications", {N2: P}, log=self._log(),
+                                slots=g.Slots({}), receipts=receipts,
+                                runs={N2: [{"cause": "gate:3"}]}, related={"cp-clients"})
+        words = g.words_of(got["7"])
+        assert "re-checked against the Client Register in place in the warehouse" in words, words
+        assert "Carer Register" not in words
+
+    def test_a_joint_promotion_is_short_on_the_row(self):
+        """P6 (UX critic on 7093c20): the supplies received with it are 'of its
+        delivery', and past three names '<n> more' carries the rest."""
+        others = [f"cp-{d}@202408051000000800" for d in
+                  ("clients", "investigations", "placements", "carers", "case-workers")]
+        log = ctn.Log()
+        log.promotes = {N2: [(8, "2024-08-05T02:30:00+00:00", "rule", [N2, *others], None)]}
+        receipts = g.Receipts({s: "2024-08-05T10:00:00+08:00" for s in [N2, *others]})
+        got = g.promotion_words("cp-notifications", {N2: P}, log=log, slots=g.Slots({}),
+                                receipts=receipts, runs={})
+        words = g.words_of(got["8"])
+        assert words == ("Promoted 10:30am Monday, 5 August 2024 with the Client Register, "
+                         "Investigations and 3 more supplies of its delivery, by the rule"), words
+        (more,) = [s for s in got["8"] if s.get("more")]
+        assert more["more"] == "Placements, Carer Register and Case Workers"
+
+
+class TestOwedWords:
+
+    def test_an_owed_point_names_the_promotion_it_owes(self):
+        log = ctn.Log()
+        log.decisions = {9: ("cp-clients", C2, "2024-08-06T02:00:00+00:00")}
+        card = {"counted": {"x": [{"reason": "recheck-owed", "owedBy": 9},
+                                  {"reason": "counted"}]}}
+        g.owed_words(card, log, RECEIPTS)
+        owed, plain = card["counted"]["x"]
+        assert g.words_of(owed["owedNote"]) == "Client Register promoted Tuesday, 6 August 2024"
+        assert g.words_of(owed["owedSentence"]) == (
+            "Not yet re-checked against the Client Register promoted 10:00am Tuesday, 6 August "
+            "2024; the re-check runs on the next processing pass.")
+        assert "owedNote" not in plain

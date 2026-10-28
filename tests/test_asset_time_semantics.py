@@ -509,8 +509,19 @@ class TestEveryCommittedArrivalKeepsItsVerdict:
         # after the due day, late (S1's two zips, TS-83's resend of four and
         # TS-85's corrected Placements). No arrival in both captures changed
         # its verdict or instant.
-        assert counts == {"on_time": 339, "early": 62, "late": 53, "unfiled": 12}
-        assert sum(counts.values()) == 466
+        # 345 / 45 / 46 / 13 over 449 FOR REQ-GEN-235 AND REQ-GEN-238
+        # (2026-10-28; the move accepted by Keith, 2026-10-27), each accounted
+        # for by hand. Out: Child Protection's 17 arrivals of 2013 and 2014,
+        # which REQ-GEN-238 dropped (11 on time, 6 late); the 24 Child
+        # Protection arrivals of TS-9, TS-65, TS-66 and TS-67, which moved (21
+        # early, 1 late, 2 unfiled - cp-case-workers'); and Emergency
+        # Department's 4 routine supplies of those quarters (on time). In: the
+        # 24 routine Child Protection arrivals of those quarters (21 on time, 3
+        # unfiled - cp-case-workers off-months) and the 4 scenarios on
+        # Emergency Department (early, TS-67 after its re-file). No arrival in
+        # both captures changed its verdict or instant.
+        assert counts == {"on_time": 345, "early": 45, "late": 46, "unfiled": 13}
+        assert sum(counts.values()) == 449
 
 
 class TestTheClassificationBoundaries:

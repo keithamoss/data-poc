@@ -1234,6 +1234,12 @@ def after_runs(found_arrivals, results: Sequence[dict], *,
                     failed=merged.failed, frozen=merged.frozen)
 
 
+def declared_reads() -> dict[str, list[str]]:
+    """The cross-table declarations with the promotion gate's fail-safe, by a
+    public name (REQ-PIPE-178's trial reads them as the gate does)."""
+    return _declared_reads()
+
+
 def _declared_reads() -> dict[str, list[str]]:
     """check_id -> the logical tables it declares it reads.
 

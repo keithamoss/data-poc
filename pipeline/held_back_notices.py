@@ -14,9 +14,13 @@ against the warehouse, and that re-check FAILED (the detail's `failed`) - a
 real failing verdict (S1 red, S6). One that could not be checked at all is
 REQ-DASH-204's notice instead.
 
-THE CHAIN (criterion 2) follows held_back_by from supply to supply as at the
-date, each step's own entry - so the Notifications held back by a held-back
-Investigations names Investigations as the root.
+THE ROOT (criterion 2, as PROVISIONALLY re-read 2026-10-26 - functional
+critic on 7093c20, Keith Q1 = A) follows the tickets' rule, root_cause.root_of
+(REQ-PIPE-278 criterion 1, Keith's answer 3a): a supply whose re-check FAILED
+is its own root, and its notice names its immediate package-mate; a root's
+holding list is what it holds back that could not be checked, followed through
+could-not-be-checked hold-backs; a root since turned down or replaced is no
+root (root_as_at). So there is no chain form.
 
 Every sentence is SEGMENTS (pipeline/cross_table_grid.py): text set as text,
 a dataset a real link the page builds, every supply named through
@@ -68,20 +72,65 @@ def _held_by(log, supply: str, when):
     return got[1], got[2]
 
 
-def chain_of(log, supply: str, when) -> list[str]:
-    """[the supply that held this one back, the one that held THAT back, ...],
-    root last, as at `when` - empty where it is not held back by another."""
-    out, seen, at = [], {supply}, supply
+def _failed(detail) -> bool:
+    """The re-check against the warehouse ran and FAILED - the tickets' own
+    reading (root_cause._failed_on_its_own, Keith's answer 3a)."""
+    from qa_tools.common.root_cause import _failed_on_its_own
+
+    return _failed_on_its_own(detail)
+
+
+def root_as_at(log, supply: str, when) -> str | None:
+    """THE ROOT, as at `when`, by the tickets' rule (REQ-PIPE-278 criterion 1;
+    functional critic on 7093c20, Keith Q1 = A, PROVISIONAL): following
+    could-not-be-checked hold-backs to the supply whose own failure held them;
+    a supply whose re-check FAILED is its own root (None here), and so is one
+    whose cause has since been turned down or replaced (D2)."""
+    seen, at, root = {supply}, supply, None
     while True:
         got = _held_by(log, at, when)
-        if got is None:
-            return out
+        if got is None or _failed(got[1]):
+            return root
         by = got[0]
-        if by in seen:
-            return out
-        out.append(by)
+        if by in seen or _withdrawn(log, by, when):
+            return None if at == supply else root
+        root, at = by, by
         seen.add(by)
-        at = by
+
+
+def _checks_counted(check_ids: list[str]) -> int:
+    """How many CHECKS these tool results are, as the grid shows them - one per
+    check name on its declaring dataset (UX critic on 7093c20, B2; Keith Q2 =
+    a, PROVISIONAL), from the check definitions' own names (configuration)."""
+    names = _check_names()
+    return len({(names.get(c) or c.rsplit("_", 1)[0], c.split(".")[3] if c.count(".") >= 4 else "")
+                for c in check_ids})
+
+
+_NAMES: dict[str, str] | None = None
+
+
+def _check_names() -> dict[str, str]:
+    global _NAMES
+    if _NAMES is None:
+        from qa_tools.common.validate_check_lifecycle import collect_checks
+
+        _NAMES = {c.check_id: c.name for c in collect_checks(None) if getattr(c, "name", None)}
+    return _NAMES
+
+
+def _order(dataset_id: str) -> int:
+    from qa_tools.common import hierarchy
+
+    ids = [d.dataset_id for d in hierarchy.all_datasets()]
+    return ids.index(dataset_id) if dataset_id in ids else len(ids)
+
+
+def _a(dataset_id: str) -> str:
+    """'a ' or 'an ', by the name that follows - "an Investigations supply"."""
+    from pipeline.cross_table_grid import _name_of
+
+    return "an " if _name_of(dataset_id)[:1].lower() in "aeiou" else "a "
 
 
 def _ds(supply: str) -> str:
@@ -96,8 +145,9 @@ def _notice(log, supply: str, when, receipts: Receipts) -> dict | None:
     if not detail.get("failed"):
         return None  # could not be checked: REQ-DASH-204's notice
     by_ds = _ds(by)
-    n = len(detail.get("checks") or [])
-    checks = f"{n} cross-table check{'s' if n != 1 else ''} {'fail' if n != 1 else 'fails'}"
+    n = _checks_counted(detail.get("checks") or [])
+    checks = ("one cross-table check fails" if n == 1
+              else f"{n} cross-table checks fail")
     gone = _withdrawn(log, by, when)
     if gone is not None:
         # THE PARTNER TURNED DOWN OR REPLACED (criterion 6), from the log as it
@@ -113,23 +163,11 @@ def _notice(log, supply: str, when, receipts: Receipts) -> dict | None:
                          text(" received with it has been replaced by the one "),
                          *named(by_ds, newer, receipts, style="received"),
                          text("; this supply now needs its own decision.")]}
-    chain = chain_of(log, supply, when)
+    # ITS OWN ROOT (Keith Q1 = A, PROVISIONAL): a failed re-check names its
+    # immediate package-mate and no chain to another root.
     joined = detail.get("came") == "joined"
     received = detail.get("by_received") or receipts.at(by)
     when_text = display_time.format_instant(received) if received else "on an unrecorded date"
-    if len(chain) > 1:
-        # THE ROOT AND THE CHAIN (criterion 2): root first, each step in order.
-        root, steps = chain[-1], list(reversed(chain[:-1]))
-        head = [text("Held back with its delivery:")]
-        lead = [text(" the "), dataset_segment(_ds(root)), text(" file was held back")]
-        for s in steps:
-            lead += [text(", and the "), dataset_segment(_ds(s))]
-        lead += [text(" with it.")]
-        body = [*lead, text(f" That file (received {when_text}) was held back, so this supply "
-                            "was re-checked against the "), dataset_segment(by_ds),
-                text(f" in place in the warehouse, and {checks} against it. It is checked again by "
-                     "itself once a "), dataset_segment(by_ds), text(" supply is promoted.")]
-        return {"form": "chain", "head": head, "body": body, "root": root}
     if joined:
         head = [text("Held back by the "), dataset_segment(by_ds), text(" waiting for a decision.")]
         verb = "is held back"
@@ -139,29 +177,29 @@ def _notice(log, supply: str, when, receipts: Receipts) -> dict | None:
     body = [text(f" That file (received {when_text}) {verb}, so this supply was re-checked against "
                  "the "), dataset_segment(by_ds),
             text(f" in place in the warehouse, and {checks} against it. It is checked again by "
-                 "itself once a "), dataset_segment(by_ds), text(" supply is promoted.")]
-    return {"form": "joined" if joined else "package", "head": head, "body": body, "root": by}
+                 f"itself once {_a(by_ds)}"), dataset_segment(by_ds), text(" supply is promoted.")]
+    return {"form": "joined" if joined else "package", "head": head, "body": body,
+            "root": supply, "checks": sorted(detail.get("checks") or [])}
 
 
 def _holding(log, root: str, when, receipts: Receipts, candidates) -> dict | None:
     """What a root's own page and card say it is holding back as at `when`."""
-    held = [s for s in sorted(candidates)
-            if s != root and (chain := chain_of(log, s, when)) and chain[-1] == root]
+    if _withdrawn(log, root, when):
+        return None
+    held = [s for s in sorted(candidates) if s != root and root_as_at(log, s, when) == root]
     if not held:
         return None
-    held.sort(key=lambda s: (receipts.at(s) or "", s))
+    # ONE ORDER FOR EVERY LIST OF DATASETS (UX critic on 7093c20, S3): the
+    # hierarchy's, as the page's own lists are.
+    held.sort(key=lambda s: (_order(_ds(s)), receipts.at(s) or "", s))
     links = []
     for i, s in enumerate(held):
         if i:
-            links.append(text(", "))
+            links.append(text(" and " if i == len(held) - 1 else ", "))
         links.append(dataset_segment(_ds(s)))
     tail = [text("Holding back with it: "), *links, text(".")]
-    failed = [s for s in held if (_held_by(log, s, when) or (None, {}))[1].get("failed")]
-    if failed:
-        tail += [text(" If this file is turned down, the "), dataset_segment(_ds(failed[0])),
-                 text(" supply needs its own decision.")]
     return {"tail": tail, "card": _card(root, held, log, when, receipts),
-            "datasets": sorted({_ds(s) for s in held})}
+            "datasets": sorted({_ds(s) for s in held}, key=_order)}
 
 
 def _card(root: str, held: list[str], log, when, receipts: Receipts) -> list[dict]:
@@ -170,7 +208,7 @@ def _card(root: str, held: list[str], log, when, receipts: Receipts) -> list[dic
     (criterion 4) - up to three names, then the first two and 'and <n> more'."""
     from pipeline.cross_table_grid import _names
 
-    supplies = [root, *held]
+    supplies = sorted([root, *held], key=lambda s: (_order(_ds(s)), s))
     names = _names([[dataset_segment(_ds(s))] for s in supplies])
     joined = any(((_held_by(log, s, when) or (None, {}))[1]).get("came") == "joined" for s in held)
     instants = sorted({receipts.at(s) for s in supplies if receipts.at(s)})
