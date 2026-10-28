@@ -47,10 +47,11 @@ RECHECK_OWED = "recheck-owed"
 _NO_ITEM_CODES = (period_schema.PAST_DUE, period_schema.REJECTED)
 
 
-def _day(value) -> str | None:
+def _day(value, zones=None) -> str | None:
     if not value:
         return None
-    return asset_time.local_date(asset_time.parse_instant(str(value), "notice")).isoformat()
+    return asset_time.local_date(asset_time.parse_instant(str(value), "notice"),
+                                 zones).isoformat()
 
 
 def _iso(value) -> str | None:
@@ -232,12 +233,14 @@ def _settled_on(log: Log, dataset_id: str, at: str | None, day: str) -> str | No
 def _own_red(own_cards: list[dict], supply: str, day: str) -> bool:
     """Whether the supply's newest own (non-cross-table) result of any check,
     recorded by `day`, is red."""
+    zones = asset_time.timezone_versions()  # once (REQ-PIPE-254 criterion 19)
     for card in own_cards:
         newest = None
         for h in card.get("history", []):
             if h.get("supply_id") != supply or not isinstance(h.get("rank"), int):
                 continue
-            if _day(h.get("recorded_at")) and _day(h.get("recorded_at")) > day:
+            recorded = _day(h.get("recorded_at"), zones)
+            if recorded and recorded > day:
                 continue
             if newest is None or h["rank"] > newest["rank"]:
                 newest = h

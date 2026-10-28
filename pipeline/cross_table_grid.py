@@ -44,8 +44,8 @@ def _instant(value) -> datetime:
                                     "grid")
 
 
-def _day(value) -> str:
-    return asset_time.local_date(_instant(value)).isoformat()
+def _day(value, zones=None) -> str:
+    return asset_time.local_date(_instant(value), zones).isoformat()
 
 
 # ---- segments ----------------------------------------------------------------
@@ -83,8 +83,11 @@ class Receipts:
     def __init__(self, receipts: dict[str, str]):
         self._at = {s: r for s, r in receipts.items() if r}
         self._days: dict[tuple[str, str], int] = {}
+        # The asset's zones, read once for this value and passed down to
+        # every day it is asked (REQ-PIPE-254 criterion 19).
+        self._zones = asset_time.timezone_versions()
         for supply, at in self._at.items():
-            key = (supply.split("@", 1)[0], _day(at))
+            key = (supply.split("@", 1)[0], _day(at, self._zones))
             self._days[key] = self._days.get(key, 0) + 1
 
     def at(self, supply: str | None) -> str | None:
@@ -92,7 +95,8 @@ class Receipts:
 
     def shares_a_day(self, supply: str) -> bool:
         at = self.at(supply)
-        return bool(at) and self._days.get((supply.split("@", 1)[0], _day(at)), 0) > 1
+        return bool(at) and self._days.get((supply.split("@", 1)[0], _day(at, self._zones)),
+                                           0) > 1
 
 
 def named(dataset_id: str, supply: str | None, receipts: Receipts, *, style: str) -> list[dict]:
@@ -173,15 +177,17 @@ def _reads_of(entry: dict, own_table: str) -> dict[str, dict]:
 
 
 def place(entry: dict, *, dataset_id: str, own_table: str, period: str | None, when: datetime,
-          slots: Slots, log, receipts: Receipts, held_back: dict | None) -> dict:
+          slots: Slots, log, receipts: Receipts, held_back: dict | None,
+          tables=None) -> dict:
     """The entry's cell, note and sentence on the page of the supply it is
     about (criteria 7, 8, 12 and 13), as at `when`."""
     supply = entry.get("supply_id")
     waiting_page = not slots.in_warehouse(dataset_id, period, supply, when)
     states, notes, sentences = [], [], []
+    tables = hierarchy.by_table() if tables is None else tables
     for table, read in sorted(_reads_of(entry, own_table).items()):
         try:
-            other = hierarchy.dataset_for_table(table).dataset_id
+            other = hierarchy.dataset_for_table(table, tables).dataset_id
         except Exception:  # noqa: BLE001 - not one of ours
             continue
         other_supply = read.get("supply_id") if read.get(
@@ -322,6 +328,9 @@ def place_entries(dataset_id: str, own_table: str, cards: list[dict],
     points: [{on, bucket, note, sentence}], an answer per asset day on which
     it changed (the newest on or before the date on show is in force) - the
     note and sentence as indices into `phrases` where it is given."""
+    # Read once for the page and passed down to every entry and instant
+    # (REQ-PIPE-254 criterion 19).
+    tables, zones = hierarchy.by_table(), asset_time.timezone_versions()
     for card in cards:
         for entry in [*card.get("history", []), *card.get("superseded", [])]:
             supply = entry.get("supply_id")
@@ -332,7 +341,8 @@ def place_entries(dataset_id: str, own_table: str, cards: list[dict],
             others = {}
             for table, read in _reads_of(entry, own_table).items():
                 try:
-                    others[hierarchy.dataset_for_table(table).dataset_id] = read.get("supply_id")
+                    others[hierarchy.dataset_for_table(table, tables).dataset_id] = \
+                        read.get("supply_id")
                 except Exception:  # noqa: BLE001
                     continue
             instants = {first}
@@ -345,8 +355,8 @@ def place_entries(dataset_id: str, own_table: str, cards: list[dict],
             for when in sorted(instants):
                 p = place(entry, dataset_id=dataset_id, own_table=own_table, period=period,
                           when=when, slots=slots, log=log, receipts=receipts,
-                          held_back=held_back)
-                p = {"on": asset_time.local_date(when).isoformat(), **p}
+                          held_back=held_back, tables=tables)
+                p = {"on": asset_time.local_date(when, zones).isoformat(), **p}
                 if points and points[-1]["on"] == p["on"]:
                     points.pop()
                 if points and {k: v for k, v in points[-1].items() if k != "on"} == \
@@ -389,15 +399,16 @@ def clause_points(dataset_id: str, period_of: dict[str, str | None], *, timeline
 
     points_all = timeline.get("points") or []
     standing = timeline.get("standing") or []
+    zones = asset_time.timezone_versions()  # once (REQ-PIPE-254 criterion 19)
     out: dict[str, list[dict]] = {}
     for supply, period in sorted(period_of.items()):
         received = receipts.at(supply)
         if not received:
             continue
-        first = asset_time.local_date(_instant(received)).isoformat()
+        first = asset_time.local_date(_instant(received), zones).isoformat()
         # ONLY WHILE IT CAN BE AWAITING: the line is shown for a supply waiting
         # on a decision, so nothing after its first promotion or withdrawal.
-        left = [asset_time.local_date(at).isoformat() for at, action, _n in
+        left = [asset_time.local_date(at, zones).isoformat() for at, action, _n in
                 log.state_instants.get(supply, ()) if action in _ENDS_WAITING]
         last = min(left) if left else "9999-12-31"
         days = {first} | {p["on"] for p in points_all if first < p["on"] <= last} \
@@ -406,9 +417,9 @@ def clause_points(dataset_id: str, period_of: dict[str, str | None], *, timeline
                    if p["on"] <= last} | {(e.get("standingIn") or {}).get("supply")
                                          for e in standing if e.get("period") == period}
         for h in holders - {None}:
-            days |= {asset_time.local_date(_instant(t["at"])).isoformat()
+            days |= {asset_time.local_date(_instant(t["at"]), zones).isoformat()
                      for t in (health.get(run_of.get(h)) or {}).get("timeline", []) if t.get("at")
-                     and first < asset_time.local_date(_instant(t["at"])).isoformat() <= last}
+                     and first < asset_time.local_date(_instant(t["at"]), zones).isoformat() <= last}
         points: list[dict] = []
         for day in sorted(days):
             promoted = None
@@ -419,7 +430,7 @@ def clause_points(dataset_id: str, period_of: dict[str, str | None], *, timeline
             for e in standing:
                 if e.get("period") == period and e["on"] <= day:
                     stand = e.get("standingIn")
-            when = asset_time.end_of_day(date.fromisoformat(day))
+            when = asset_time.end_of_day(date.fromisoformat(day), zones)
             if stand and stand.get("supply"):
                 holder, stands_on = stand["supply"], stand.get("standsOn")
                 kind = stand.get("kind")
