@@ -109,6 +109,41 @@ intro: >
   all three.
 
 releases:
+  - date: "2026-10-29"
+    summary: >
+      Files gated together now take effect at one moment, decisions read in
+      the order they were made, a delivery whose checking was interrupted says
+      so on its page, and the re-check wording is settled.
+    changes:
+      - category: Improved
+        items:
+          - headline: Interrupted checking, said plainly
+            components: ["Dashboard UI"]
+            description: >
+              When a processing pass stops part-way through a delivery, or its
+              gate has to wait for another, the page now says the supply is
+              still being checked or gated, with an amber pill rather than
+              green. An ordinary wait for a decision reads as it always has.
+          - headline: Clearer re-check wording
+            components: ["Dashboard UI"]
+            description: >
+              A later re-check reads "Re-checked <when>: became <status>", an
+              amber re-check reads "Promoted green, re-checked amber", and a
+              card counts "1 re-checked red after promotion".
+      - category: Fixed
+        items:
+          - headline: One delivery, one moment
+            components: ["Pipeline & publishing"]
+            description: >
+              Files promoted together now all take effect at the same moment,
+              after every earlier decision about any of them, rather than at
+              several moments days apart.
+          - headline: Decisions in the order they were made
+            components: ["Pipeline & publishing"]
+            description: >
+              A person's decision recorded after the rule's refusal of a
+              supply no longer takes effect before that refusal, so the
+              history reads in the order things happened.
   - date: "2026-10-28"
     summary: >
       The early-arrival examples now live on Emergency Department, Child
