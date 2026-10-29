@@ -12415,6 +12415,14 @@ twice. It deliberately did not re-find the `TypeError`.
      is built from the hierarchy at import time - both answer an edited file
      stale in a long-lived process. Whether the guard should reach
      generator/ is a scope call.
+     OUTCOME (wave 2 finish, 2026-10-29): (7) decided by Keith (a) - the
+     caches gate now reaches generator/ and import-time reads, and
+     emergency_department.run_plan, ticket_sync.DATASET_SCOPE/DATASET_AGENCY
+     and child_protection.TABLES are read when asked for; their tests were
+     seen failing on 4b53329's code first (22 failed with the new tests over
+     the old product code, 31 passed). REQ-PIPE-254 itself stays in_progress:
+     criteria 14 and 19 are met on the three bootstraps (#284), criterion 13
+     is not met as written and is with Keith.
 
 283. **[done, 2026-10-28]** **[Dashboard UI]** **[Testing & dev tooling]** **Lane
      L2's wave 2 (REQ-DASH-221 re-checks on the page, REQ-TEST-282 one page per
@@ -12466,6 +12474,17 @@ twice. It deliberately did not re-find the `TypeError`.
      suggests "(corrected <date>)", "Re-checked <instant>: became Green -
      <reason>", "Promoted green, re-checked amber - awaiting acknowledgement"
      and a marker reading "1 re-checked red after promotion".
+     OUTCOME (2026-10-29): Keith took the UX read's column for all of (7);
+     built at 1404f17, and REQ-DASH-272 criterion 21 built to his option (b)
+     with an amber pill. Its browser test (TestAGateThatDidNotFinishIsSaidSo)
+     had never run and FAILED on the first run: it asserted an amber HEAD
+     pill in a scenario (empty_but_workers) where every quarter before
+     2024-Q4 is closed with no Client Register, so the head is red - an
+     unfilled closed period outranks the gating amber, which is the page's
+     ordinary worst-of and not a defect. The test now asserts the verdict
+     line's own pill amber, the head never green and red there, with the
+     reason in its comment. GAP, not closed: the head pill turning AMBER
+     where nothing outranks it is not asserted in a browser or in vitest.
 
 284. **[todo, 2026-10-28]** **[Pipeline & publishing]** **[Data generation]**
      **Lane L4 (REQ-GEN-235/238, REQ-PIPE-250 progress, #276's fix): one
@@ -12565,3 +12584,61 @@ twice. It deliberately did not re-find the `TypeError`.
      self-check would fail on today's tree - FOR KEITH: criterion 13 as
      written ("only what equivalence.py already normalises") is not met;
      the honest reading is equivalent-modulo-harness-gaps.
+     bs_final, f611a43 (3cabc9a's code) into equiv_bs_final, bootstrap
+     1621.6s (Birth Registrations 550s, Child Protection and Emergency
+     Department 1465s), capture 1915s wall, exit 0 - +159.8s on bs_254,
+     about 11%, at the edge of REQ-TEST-239's measured same-commit noise
+     (about 10%); not profiled.
+     HISTORY, bs_254 -> bs_final, every decision whose effective_at moved by
+     more than a second (24, from a decision-by-decision match; S1 under the
+     harness shows only the 3 person-made ones, because it blanks a rule's
+     instant). EXPECTED: applications 27, 175, 205 and 216 (the 2026-10-28
+     history's 26, 173, 205, 216 - ids interleave) now at one instant each
+     (11 promotions, moved 6h to 10 days); the three inversions ordered
+     (TS-80's choose-file to 7:35am 8 November 2020, TS-77a's promotion to
+     10:48pm 14 June 2023, TS-67's re-file to 9:57pm 21 October 2023). No
+     application now has more than one instant and no pair is inverted.
+     NOT EXPECTED, so nothing was re-pinned and the Affects test was not
+     repointed (the main session's stop rule):
+     (A) FIVE MORE RULE DECISIONS MOVED DAYS, all by the same one-instant
+     floor reaching an application whose own members did not split before -
+     its floor takes the latest decision of ANY member, including a joined
+     earlier file's lagged hold-back or refusal: cp-investigations'
+     2015-Q4 hold-back (application 25) 2 -> 12 November 2015 (Notifications'
+     hold-back); cp-case-workers 2020-Q1 promotion 8 -> 11 February 2020;
+     cp-notifications 2022-Q2 hold-back 2 -> 6 May 2022; cp-carers 2024-Q3
+     promotion 1 -> 6 August 2024 (Placements' refusal); cp-case-workers
+     2024-Q3 promotion 9 -> 13 August 2024 (Notifications' refusal). Each is
+     a supply that now reads "Awaiting a decision" for 3 to 10 days longer.
+     Is this what option (b) means, or should the floor take only the
+     decisions the application itself writes?
+     (B) THE INVERSION FIX SPLITS A PERSON'S ONE ACT. The floor is per
+     supply, and a person's decision that spans two supplies is now at two
+     instants: TS-77a's de-substitute of the Q1 stand-in stays at 10:00am 9
+     June 2023 while its replacement's promotion moves to 14 June, so for
+     five days cp-placements 2023-Q2 holds nothing ("Since removed, as from
+     Friday, 9 June 2023" where the scenario says "Since replaced"); TS-80's
+     reject of file #2 stays at 11:00am 2 November 2020 while its
+     choose-file of #1 moves to 8 November. A defect by the decision log's
+     own reading; fixing it (floor a person's whole act, or the transaction,
+     at the latest of its supplies) changes the history again.
+     (C) seconds-scale knock-ons: the rule promotions after TS-80's and
+     TS-67's moved decisions follow them by 2-3s (application 196's four
+     members, 236); Birth Registrations' rule instants move by under 2s
+     between any two captures.
+     PINS: tests/fixtures/arrival_semantics_golden.json and every
+     distribution pin PASS on bs_final unchanged (not re-captured); REQ-PIPE-262
+     criterion 12's four inheritances are exactly as pinned on bs_254 and
+     bs_final. S4 and S7 the same; S5's Emergency Department page differs only
+     in TS-67's two same-instant decisions swapping order.
+     THE FULL GATE on fbfcecf (bs_final's database and data/ and reports/
+     copied from its capture): ruff clean; `-m needs_deployment -n 3` 9
+     failed, 495 passed, 1 xfailed (1044s); `-m "not needs_deployment" -n 3`
+     6267 passed, 0 skipped (1633s); npm test 977 passed; `mothman check
+     --no-pytest` passed with warnings from schedule and sprints. The nine:
+     TS-77a twice (B), TS-80's four (TestACrossTableCheckOnTS80 x3,
+     TestAnotherTableCouldNotBeRead - the 2-8 November window the fix
+     opened), TestThePanelAsAtTheDateOnShow (TS-80's window), the Affects test
+     (its subject went with application 205's split), and
+     TestAGateThatDidNotFinishIsSaidSo (a test defect, #283's outcome, fixed
+     after the gate and passing alone).

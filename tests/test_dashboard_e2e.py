@@ -8115,8 +8115,16 @@ class TestAGateThatDidNotFinishIsSaidSo:
             "Amber Checked, waiting for the rest of its delivery (received 9:00am Friday, "
             "1 November 2024): 1 of 2 files checked. Nothing needs deciding yet."), verdict
         assert "Awaiting a decision" not in verdict["text"]
-        assert clean_page.locator(".view-head .pill.amber").count() >= 1, "the pill is amber"
+        assert clean_page.locator(".verdict-of .pill.amber").count() == 1, "its pill is amber"
+        # THE HEAD'S PILL IS NEVER GREEN. In this scenario it is RED, which is
+        # right rather than a miss: every quarter before 2024-Q4 is closed with
+        # no Client Register (empty_but_workers), and an unfilled closed period
+        # outranks the gating amber (buildDatasetsOn's noSupply branch). The
+        # first version asserted an amber head pill here and could never pass
+        # (wave 2 finish, 2026-10-29, post-build-review #284).
         assert clean_page.locator(".view-head .pill.green").count() == 0, "never green"
+        assert clean_page.locator(".view-head .pill.red").count() >= 1, \
+            "red: the unfilled earlier quarters outrank the gating amber"
 
         cp_pages.at("2024-11-02T10:00:00+08:00")
         cp_pages.sc.process()
