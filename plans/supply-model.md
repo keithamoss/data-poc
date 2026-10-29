@@ -3722,11 +3722,15 @@ real extract built green. A scripted person settles the pair at 11:00 the
 next day (contract/scripted_decisions.yaml, "TS-80 settle"): file one by
 receipt, the test file, rejected; file two, the real extract, the quarter's
 supply.*
-**Expect** (bootstrap of 2026-10-19): on 1 November 2020 cp-clients reads
-"Two files for one table"; from 2 November, "Settled · Two files for one
-table — settled by Robin Hale, 11:00am Monday, 2 November 2020",
-cp_clients_TEST.csv rejected and cp_clients.csv the quarter's supply. The
-re-check it owed runs at 11:00 and the gate promotes it; the knock-on
+**Expect** (re-quoted from the bootstrap of 2026-10-30, post-build-review
+#284 (B)): the settlement is one act over both files, so it takes effect at
+one instant, the later of its own and file one's lagged refusal - 7:35am
+Sunday, 8 November 2020, not the scripted 11:00 on 2 November. On 1 to 7
+November 2020 cp-clients reads "Two files for one table"; from 8 November,
+"Settled · Two files for one table — settled by Robin Hale, 7:35am Sunday,
+8 November 2020", cp_clients_TEST.csv rejected and cp_clients.csv the
+quarter's supply. The re-check it owed runs at 7:35am and the gate promotes
+it; the knock-on
 re-evaluates the three readers and promotes them at the same instant
 (post-build-review #251). On 1 November 2020 each reader says so at the top
 of its page (REQ-DASH-204 criterion 13, as the page words it on the bootstrap
@@ -3737,10 +3741,12 @@ line above it: "Nothing needs deciding on this supply"); Investigations the
 same with "2 of this supply's checks need it, so they could not run";
 Placements the same as Notifications. Checks are counted as the grid's rows,
 one per check however many tools ran it (UX critic on 7093c20, B2). From
-2 November, once re-evaluated, none of the three shows the line. On the page (REQ-DASH-264): on 1 November
+8 November, once re-evaluated, none of the three shows the line. On the page (REQ-DASH-264): on 1 November
 cp-clients' own checks read "No data" and its cross-table rows red, each
 named "<reader> → Client Register", with the banner saying the cross-table
-checks did run; from 2 November the readers' Client reference reads green,
+checks did run; from 8 November the readers' Client reference reads green
+("Re-checked 7:35am Sunday, 8 November 2020, when the Client Register was
+re-checked"),
 the re-check's result shown though it was recorded under cp-clients' run.
 **Breaks as**: the test rows checked as the quarter's supply, the readers
 left contested after the settlement, or the file named by sorted name
@@ -4190,9 +4196,12 @@ February; or "Since replaced".
 cp-placements, 2023-Q2: the delivery leaves cp_placements out; a person
 substitutes onto 2023-Q1 at 09:00 on 3 May; cp_placements alone arrives at
 10:00 on 8 June and the person promotes it at 10:00 on 9 June, which removes
-the substitution. *Config: quarterly, as TS-75a.* **Expect** (REQ-DASH-198),
-on 17 May: the pill "Substituted from 2023-Q1", and in its drill-down "Since
-replaced, as from Friday, 9 June 2023". **What cp-clients and cp-carers
+the substitution - one act, taking effect at one instant: 10:48pm Wednesday,
+14 June 2023, the new supply's lagged refusal (post-build-review #284 (B);
+re-quoted from the bootstrap of 2026-10-30). *Config: quarterly, as
+TS-75a.* **Expect** (REQ-DASH-198), on 17 May: the pill "Substituted from
+2023-Q1", and in its drill-down "Since replaced, as from Wednesday, 14 June
+2023". **What cp-clients and cp-carers
 read for 2023-Q2**: both waited on 2 May; clients promoted AMBER (its
 quarter's drawn amber, kept) on 7 May and carers GREEN on 3 May, and both
 stay so while the substitution stands, on 8 June and after the promotion.
@@ -4206,8 +4215,8 @@ the reason "this one had been superseded - a newer version had arrived for
 the same period, a person had set it aside, or a later supply had been
 promoted into the period - so it was no longer what the period held" -
 against a period whose holder is a SUBSTITUTED supply, a variant of #164 -
-while the pill's drill-down reads "Since replaced, as from Friday, 9 June
-2023" and "2023-Q2 holds 2023-Q1's supply; the results below are a newer
+while the pill's drill-down reads "Since replaced, as from Wednesday, 14
+June 2023" and "2023-Q2 holds 2023-Q1's supply; the results below are a newer
 supply awaiting a decision." Once #164 is decided the panel's reason line
 should say the supply was waiting for a decision. **Breaks as**: a
 different reason line in the panel means #164 was decided, not a

@@ -5573,7 +5573,13 @@ class TestThePanelAsAtTheDateOnShow:
         itself). On every date the verdict line says a newer supply is
         awaiting, the RENDERED line must name the receipt of the run whose
         arrival key is the panel's promoted supply's - found here by key, not
-        through the runId the page used."""
+        through the runId the page used.
+
+        A date whose verdict line is a GATE form instead (REQ-DASH-272
+        criterion 21: 'Checked, waiting for the rest of its delivery' while a
+        package-mate is genuinely unchecked - TS-80's contested Client Register
+        from 1 November 2020) says something else by design and is not this
+        criterion's subject (post-build-review #284, 2026-10-30)."""
         _goto(clean_page, built_dashboard_html, state=self.WHERE)
         checked = clean_page.evaluate("""() => {
           const d = rawRealDatasets().find(x => x.id === "cp-carers");
@@ -5581,6 +5587,7 @@ class TestThePanelAsAtTheDateOnShow:
           for (const p of d.promotionTimeline.points) {
             const c = clipDatasetToInPlaceOn(d, p.on);
             if (!c || c.verdictOf.state !== "awaiting" || !p.promoted) continue;
+            if (verdictLine(c).includes('data-verdict-of="gating"')) continue;
             const key = p.promoted.supply.split("@")[1].split("#")[0];
             const run = d.runs.find(r => r.run_id.includes(key));
             if (!run) continue;
@@ -6300,7 +6307,9 @@ class TestAPendingCorrectionIsANeedsActionItem:
 class TestACrossTableCheckOnTS80:
     """REQ-DASH-264 criterion 6, on the bootstrapped history (post-build-review
     #253, Keith 2026-10-19). TS-80: two Client Registers on 1 November 2020,
-    settled at 11:00 on 2 November, the settlement's re-check re-running the
+    settled by a person at 11:00 on 2 November - which, as one act, takes
+    effect at file one's lagged refusal, 7:35am on 8 November (post-build-
+    review #284 (B), 2026-10-30) - the settlement's re-check re-running the
     readers' Client reference under the Client Register's own run."""
 
     AG, COL = "child-protection-family-support", "child-protection"
@@ -6319,7 +6328,7 @@ class TestACrossTableCheckOnTS80:
     def test_the_readers_client_reference_is_green_after_the_settlement(
             self, clean_page, built_dashboard_html):
         rows = [r for r in self._rows(clean_page, built_dashboard_html, "cp-notifications",
-                                      "2020-11-03")
+                                      "2020-11-09")
                 if r.startswith("Client reference")]
         # ONE ROW FOR THE CHECK, its three tools as marks (REQ-DASH-272
         # criterion 6, amending REQ-DASH-264 criterion 2).
@@ -6328,12 +6337,12 @@ class TestACrossTableCheckOnTS80:
         # Criterion 7 as amended by REQ-DASH-272: where the result came from is
         # said in the row's accessible name (and the panel), every time.
         labels = [x for x in self._labels(clean_page) if x.startswith("Client reference")]
-        assert len(labels) == 1 and ("Re-checked 11:00am Monday, 2 November 2020, when the "
+        assert len(labels) == 1 and ("Re-checked 7:35am Sunday, 8 November 2020, when the "
                                      "Client Register was re-checked") in labels[0], labels
 
     def test_the_panel_says_latest_result_and_where_it_came_from(self, clean_page, built_dashboard_html):
         """Criterion 8."""
-        self._rows(clean_page, built_dashboard_html, "cp-notifications", "2020-11-03")
+        self._rows(clean_page, built_dashboard_html, "cp-notifications", "2020-11-09")
         clean_page.locator('.scope-section[data-scope="cross-table"] .scope-check',
                            has_text="Client reference").first.click()
         clean_page.wait_for_selector("[data-recheck-note]")
@@ -6342,8 +6351,8 @@ class TestACrossTableCheckOnTS80:
         # The labels are upper-cased by CSS, and inner_text keeps that.
         assert "latest result" in panel.lower() and "current run" not in panel.lower(), panel[:400]
         # Criterion 9: the chart's last date is when the result was recorded.
-        assert panel.rstrip().endswith("Monday, 2 November 2020 View as table"), panel[-200:]
-        assert ("Re-checked 11:00am Monday, 2 November 2020, when the Client Register was "
+        assert panel.rstrip().endswith("Sunday, 8 November 2020 View as table"), panel[-200:]
+        assert ("Re-checked 7:35am Sunday, 8 November 2020, when the Client Register was "
                 "re-checked.") in panel
 
     def test_both_sides_of_the_comparison_stay_inside_the_panel(self, clean_page, built_dashboard_html):
@@ -6351,7 +6360,7 @@ class TestACrossTableCheckOnTS80:
         Client Register's run (previous)") widened the "Compared run" column
         until the "Latest result" box sat outside the panel, so the card showed
         one side of a comparison with no hint of the other."""
-        self._rows(clean_page, built_dashboard_html, "cp-notifications", "2020-11-03")
+        self._rows(clean_page, built_dashboard_html, "cp-notifications", "2020-11-09")
         clean_page.locator('.scope-section[data-scope="cross-table"] .scope-check',
                            has_text="Client reference").first.click()
         clean_page.wait_for_selector(".check-panel .compare-col")
@@ -7106,7 +7115,9 @@ class TestAnotherTableCouldNotBeRead:
 
     #: (arrival day, period, the day after it was re-evaluated) for TS-42 and
     #: TS-80, and how many of each reader's checks read the Client Register.
-    PAIRS = (("2019-11-01", "2019-Q4", "2019-11-29"), ("2020-11-01", "2020-Q4", "2020-11-02"))
+    #: TS-80's settlement takes effect at 7:35am on 8 November 2020, one act
+    #: at one instant (post-build-review #284 (B), 2026-10-30).
+    PAIRS = (("2019-11-01", "2019-Q4", "2019-11-29"), ("2020-11-01", "2020-Q4", "2020-11-08"))
     #: ONE CHECK PER GRID ROW, however many tools ran it (UX critic on
     #: 7093c20, B2; Keith Q2 = a, PROVISIONAL): Investigations reads the Client
     #: Register in two checks, the others in one.
@@ -7870,9 +7881,16 @@ class TestTheUxCriticsFindingsOn7093c20:
         assert style["color"] != style["bold"], style
 
     def test_affects_ends_a_sentence_on_the_awaiting_line(self, clean_page, built_dashboard_html):
-        """S2: on Notifications' page for 8 August 2021 "Affects" is part of
+        """S2: on Investigations' page for 15 May 2026 "Affects" is part of
         the awaiting line and ends with a full stop - never a line of its own
         with nothing before it.
+
+        REPOINTED AGAIN 2026-10-30 (post-build-review #284): the 2021-08-08
+        state below existed only because gate application 205 promoted its
+        members at two instants (#284 (1)); at one instant it is gone. A scan
+        of every day from 2015 to October 2026 of every Child Protection page
+        on the bootstrap of accb4f8 found the awaiting line carrying "Affects"
+        on Investigations' alone, 12 to 19 May 2026.
 
         REPOINTED 2026-10-28 (Keith: repoint rather than delete): it read the
         Client Register's page for 7 February 2020, where Placements had been
@@ -7881,12 +7899,13 @@ class TestTheUxCriticsFindingsOn7093c20:
         promotion floored at its hold-back, no Client Register page shows the
         state; a scan of every day of every Child Protection page found it on
         Notifications' (2021-08-08 and 2022-02-04)."""
-        _goto(clean_page, built_dashboard_html, state=_cp_state("cp-notifications"),
-              in_place_on="2021-08-08")
+        _goto(clean_page, built_dashboard_html, state=_cp_state("cp-investigations"),
+              in_place_on="2026-05-15")
         (verdict,) = _shown(clean_page, ".verdict-of")
         (affects,) = _shown(clean_page, "[data-affects-readers]")
-        assert affects["text"] == "Affects Investigations.", affects
-        assert verdict["text"].endswith("Affects Investigations."), verdict
+        assert verdict["text"].startswith("Awaiting a decision"), verdict
+        assert affects["text"] == "Affects Notifications.", affects
+        assert verdict["text"].endswith("Affects Notifications."), verdict
 
     def test_an_overdue_cause_says_so_on_its_own_page(self, clean_page, built_dashboard_html):
         """S2 and REQ-DASH-204 open question 1 (Keith Q4 = a, PROVISIONAL): the

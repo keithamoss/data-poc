@@ -12642,3 +12642,134 @@ twice. It deliberately did not re-find the `TypeError`.
      (its subject went with application 205's split), and
      TestAGateThatDidNotFinishIsSaidSo (a test defect, #283's outcome, fixed
      after the gate and passing alone).
+     KEITH'S ANSWERS, 2026-10-30. W1 (A) ACCEPTED, option (a): the
+     one-instant floor counts every member's own earlier decisions, so the
+     five rule decisions above stay moved - cp-investigations 2015-Q4 (2 ->
+     12 November 2015), cp-case-workers 2020-Q1 (8 -> 11 February 2020),
+     cp-notifications 2022-Q2 (2 -> 6 May 2022), cp-carers 2024-Q3 (1 -> 6
+     August 2024) and cp-case-workers 2024-Q3 (9 -> 13 August 2024), 3 to 10
+     days each. Why: a floor over only the application's own decisions would
+     let a member be promoted before its own earlier hold-back takes effect,
+     which is #276 back again; this keeps #276 fixed. Recorded in
+     REQ-PIPE-266's decisions. W2 (B) A DEFECT, FIXED: a person's single act
+     spanning several supplies takes ONE effective instant, the latest across
+     every supply it touches. The outermost decision transaction is the act;
+     decision_log.act_spans names its supplies before its first decision
+     (promotion.promote: the supply and the holder it de-substitutes or
+     displaces; settlement.apply: the pair, both files and what they
+     displace), every person's decision in it is floored at that instant and
+     at the act's own earlier decisions, and an act that would still split
+     raises decision_log.ActSplit and writes nothing. Rewriting the earlier
+     rows was not an option: qa.decision is append-only in the database.
+     FAILING FIRST on 4a6096a's code with only the new tests added:
+     tests/test_one_version_per_period.py::TestAPersonsOneActTakesOneInstant
+     (TS-77a's shape) and tests/test_choose_file.py::
+     TestASettlementTakesOneInstant's two (TS-80's, the refusal on either
+     file) - 3 failed; with the fix 3 passed, and
+     tests/test_decision_log.py::TestAPersonsOneActTakesOneInstant (act_spans,
+     ActSplit, a rule keeping its own floor) added beside them. The history
+     test is widened from pairs about one supply to acts:
+     tests/test_promotion_waits_for_next_receipt.py::
+     test_a_persons_one_act_takes_one_instant fails on equiv_bs_final with
+     exactly TS-80's choose-file/reject and TS-77a's de-substitute/promote,
+     and passes on equiv_bs_final2. Fifteen gate, promotion, settlement and
+     filing modules: 440 passed. W3, option (b): REQ-PIPE-254 criterion 13
+     met as "equivalent apart from named harness gaps", flipped to built,
+     every gap cited with the same-commit double captures in its evidence;
+     no normaliser written. The promotedHealth non-reproducibility is its
+     own open defect, #285. Measured while writing that evidence: the
+     timelines that differ are cp-notifications', cp-investigations' AND
+     cp-placements' - in all three compares, both same-commit pairs included
+     - not cp-notifications' alone as (A)'s analysis above named it.
+     THE FOURTH BOOTSTRAP FROM EMPTY, 2026-10-30 (Perth): accb4f8 (this
+     fix) into equiv_bs_final2, a REQ-TEST-239 capture with its database
+     kept, nothing else heavy running: bootstrap 1340.5s (Birth Registrations
+     456s, Child Protection and Emergency Department 1197s), capture 1598s
+     wall, exit 0 - 281s faster than bs_final's 1621.6s on the same machine,
+     which is inside the run-to-run noise this sandbox has shown (about 10%
+     either way) and not attributed to the change.
+     HISTORY, bs_final -> bs_final2, decision by decision (599 both sides, no
+     row added or removed, no split application, no inversion): EXPECTED and
+     nothing else. TS-80's reject of file #2 moved 2 -> 8 November 2020
+     (7:35am, the choose-file's instant) and TS-77a's de-substitute 9 -> 14
+     June 2023 (10:48pm, the promotion's): both acts at one instant each.
+     Thirteen rule decisions moved by under 2.4s - TS-80's knock-on
+     promotion of cp-clients and its three readers (0.8s), seven Birth
+     Registrations rule promotions after its pairs (0.4-2.3s) and two
+     Emergency Department ones (0.4s) - the replay clock's sub-second drift
+     and the seconds-scale knock-ons (C) already named. gate_application ids
+     shifted by one or two (interleaving, the named harness gap). With ids
+     named (the offline normaliser), S1 differs only in the two moved rows,
+     one application's started_at minute each in 2023-Q4 (Emergency
+     Department) and 2024-Q3, and owed_run's gate references; S4 and S7 the
+     same; S5 only in Child Protection's dashboard, every difference either
+     TS-80's 1-8 November 2020 window (cp-clients' closed slot, package
+     gating, slot timeline and its promotion timeline's 2020-Q4 point now
+     carrying the reject), TS-77a's 9-14 June 2023 (cp-placements' timeline
+     losing the 9 June point, its warehouse clause, and the cross-table
+     counts of cp-clients and cp-carers reading the placements), or the
+     promotedHealth timelines (#285).
+     PINS on equiv_bs_final2, unchanged and not re-captured:
+     tests/test_asset_time_semantics.py (the arrival golden and its
+     distribution) and tests/test_promotion_waits_for_next_receipt.py, 23
+     passed; REQ-PIPE-262 criterion 12's four inheritances exactly as pinned
+     (cp-case-workers 2021-Q4 on @202108010104000000, cp-carers 2022-Q1 and
+     2022-Q2 on @202201051000000800, ed-presentations 2015-Q4 on
+     @201507221000000800).
+     TESTS AND TEXT FOLLOWED: TS-80's three TestACrossTableCheckOnTS80 tests
+     and TestAnotherTableCouldNotBeRead read "after the settlement" as 9 and
+     8 November and "Re-checked 7:35am Sunday, 8 November 2020"; TS-77a's
+     two passed unchanged, its words now "Since replaced, as from Wednesday,
+     14 June 2023"; TS-80, TS-77a and TS-77b re-quoted in
+     plans/supply-model.md from this build and SCENARIOS.md regenerated. The
+     Affects test is repointed to Investigations' page for 15 May 2026: a
+     scan of every day, 2015 to October 2026, of every Child Protection page
+     found the awaiting line carrying "Affects" there alone (12 to 19 May
+     2026). A TEST DEFECT, fixed, minor: TestThePanelAsAtTheDateOnShow
+     counted cp-carers' 1 November 2020 as an awaiting date whose line must
+     name the warehouse's supply, but REQ-DASH-272 criterion 21 words that
+     date "Checked, waiting for the rest of its delivery" (TS-80's contested
+     Client Register is genuinely unchecked), so gate-form dates are now left
+     out; it had failed on fbfcecf too, put down then to TS-80's window.
+     FOR KEITH: TS-80's settlement, made by a scripted person at 11:00 on 2
+     November, now reads "settled by Robin Hale, 7:35am Sunday, 8 November
+     2020" - the instant of a rule's lagged refusal, so the page names a time
+     no person chose, and six days of "Two files for one table" follow the
+     decision. TS-77a's promotion likewise reads from 10:48pm on 14 June.
+     That is the rule as decided (one act, its latest instant); if the
+     scripted instants should move so the page reads as a person would act,
+     that is a scenario change, not done here.
+
+285. **[todo, 2026-10-30]** **[Pipeline & publishing]** **[Testing & dev tooling]**
+     **OPEN DEFECT, NOT FIXED: Child Protection's promotedHealth timelines are
+     not reproducible between two bootstraps of one commit from the same
+     seed.** Found by the wave 2 finish (#284, REQ-PIPE-254 criterion 13) and
+     recorded as its own defect at Keith's ask, 2026-10-30; to be fixed
+     test-first after the push, not in this pass. WHAT WAS SEEN: every
+     dashboard build carries, per dataset, `promotedHealth` - how each
+     promoted supply has done since, a timeline of points each naming its
+     status and its cause (pipeline/build_dashboard_data.py, REQ-DASH-126).
+     Compared dataset by dataset straight from the REQ-TEST-239 captures' S5
+     (the harness prints only five examples a file, so its own compare does
+     not show this), cp-notifications, cp-investigations and cp-placements
+     differ between two captures of ONE commit, and cp-clients, cp-carers and
+     cp-case-workers never do: 56a7bd5 captured 2026-10-28 against 2026-10-29,
+     55, 44 and 37 changed lines; 4b53329 captured 2026-10-28 against
+     2026-10-29, 213, 25 and 32. Mostly a point's cause names a different
+     arrival of the same delivery ("the arrival of Placements" in one,
+     "the arrival of Carer Register" in the other), and in cp-notifications
+     statuses and timeline lengths differ as well (the 2026-10-29 analysis of
+     bs_before against bs_254: 48 causes, 8 statuses, 4 lengths). The likely
+     shape, NOT YET VERIFIED: files of one delivery that land together are
+     re-evaluated in an order the parallel streams or the replay clock's
+     sub-second drift decide, and the timeline names whichever re-evaluation
+     recorded first. WHY IT MATTERS: a same-seed bootstrap is meant to
+     reproduce the history, which is what makes a compare a correctness check
+     (CLAUDE.md, "everything is seeded"); and a page that names a different
+     cause on a rebuild is one a reader cannot trust. Captures that show it:
+     the scratchpad's w2fin/equiv/bs_before.json and w2fin2/equiv/bs_before.json
+     (56a7bd5), w2fin/equiv/bs_254.json and w2fin2/equiv/bs_254.json (4b53329).
+     NEXT: a failing test first - two runs of the same small scenario with
+     several files of one delivery arriving together, asserting identical
+     promotedHealth - then the fix. Until it is fixed, REQ-PIPE-254
+     criterion 13's evidence names it as a harness gap (Keith, W3 option b).
