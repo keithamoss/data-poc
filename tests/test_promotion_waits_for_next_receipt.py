@@ -193,3 +193,46 @@ def test_every_gate_application_takes_one_instant(deployment_history):
             "HAVING count(DISTINCT effective_at) > 1 ORDER BY 1").fetchall()
     assert applications, "the history holds no gate application - nothing proved"
     assert not split, split
+
+
+#: A PERSON'S ONE ACT as the log shows it, which has no act column: a person's
+#: decision naming another person's as its cause (a settlement's per-file
+#: entries name its choose-file), or two of one person's decisions written
+#: back to back for one dataset and period with the same reason (a
+#: promotion's de-substitute or supersession and the promotion itself).
+_ONE_ACT = """
+WITH d AS (
+  SELECT id, dataset_id, actor, actor_kind, reason, effective_at,
+         coalesce(to_slot, from_slot) AS period,
+         lag(id) OVER w AS prev_id, lag(actor_kind) OVER w AS prev_kind,
+         lag(actor) OVER w AS prev_actor, lag(reason) OVER w AS prev_reason,
+         lag(coalesce(to_slot, from_slot)) OVER w AS prev_period
+  FROM qa.decision WINDOW w AS (PARTITION BY dataset_id ORDER BY id))
+SELECT prev_id AS first, id AS second FROM d
+WHERE actor_kind = 'person' AND prev_kind = 'person' AND actor = prev_actor
+  AND reason = prev_reason AND period = prev_period
+UNION
+SELECT c.id, d.id FROM qa.decision d JOIN qa.decision c ON c.id = d.caused_by_decision
+  AND c.dataset_id = d.dataset_id
+WHERE d.actor_kind = 'person' AND c.actor_kind = 'person'
+"""
+
+
+def test_a_persons_one_act_takes_one_instant(deployment_history):
+    """post-build-review #284 (B), Keith 2026-10-30 (W2), on the bootstrapped
+    history: every decision of one person's act takes ONE effective instant,
+    the latest across the supplies it touches - widening the pair test above
+    from decisions about one supply to an act over several. The 2026-10-29
+    history split two: TS-77a's de-substitute (9 June 2023) and promotion (14
+    June), and TS-80's choose-file (8 November 2020) and reject (2 November)."""
+    from qa_tools.common import supply_db
+
+    with supply_db.connect(read_only=True, label="test-284") as conn:
+        pairs = conn.execute(f"SELECT count(*) FROM ({_ONE_ACT}) a").fetchone()[0]
+        split = conn.execute(
+            f"SELECT a.first, f.dataset_id, f.action, f.effective_at, s.action, s.effective_at "
+            f"FROM ({_ONE_ACT}) a JOIN qa.decision f ON f.id = a.first "
+            "JOIN qa.decision s ON s.id = a.second "
+            "WHERE f.effective_at <> s.effective_at ORDER BY a.first").fetchall()
+    assert pairs, "the history holds no person's act of two decisions - nothing proved"
+    assert not split, split

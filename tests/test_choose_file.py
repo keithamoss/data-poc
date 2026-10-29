@@ -371,6 +371,48 @@ class TestASettledSupplysRuns:
         assert supply_files.arrival_run_id_of(DS, p.second) == f"birth_registrations__{p.key}"
 
 
+class TestASettlementTakesOneInstant:
+    """post-build-review #284 (B), Keith 2026-10-30 (W2): a settlement is one
+    person's act over both files' supplies, so all its entries take ONE
+    instant, the latest across them. TS-80's shape: a rule's lagged refusal
+    on one file floored the choose-file and left the other file's reject six
+    days earlier."""
+
+    def _refused_later(self, conn, p, supply):
+        refused_at = _at(p.day + timedelta(days=6), "07:35")
+        with decision_log.apply_decision(conn, decision_log.Decision(
+                agency_id="registry-services", collection_id="civil-registration",
+                dataset_id=DS, action=decision_log.PROMOTION_REFUSED, supply=supply,
+                to_slot=p.period, actor="promotion rule", actor_kind=decision_log.RULE,
+                effective_at=refused_at.isoformat(), reason="its own checks failed")):
+            pass
+        return refused_at
+
+    def _instants(self, conn, p):
+        return {(d["supply"], d["action"]): d["effective_at"]
+                for d in decision_log.decisions_for(conn, DS)
+                if d["supply"] in (p.pair, p.second)
+                and d["action"] in ("choose-file", "reject", "supersede")}
+
+    def test_a_refusal_on_the_chosen_file_floors_the_reject_too(self, conn, actor, day):
+        p = Pair(conn, day, [(f"birth_registrations_{day}.csv", _at(day, "13:40")),
+                              (f"birth_registrations_{day}-1.csv", _at(day, "13:50"))])
+        one, two = (n for n, _ in p.files)
+        refused_at = self._refused_later(conn, p, p.pair)
+        p.settle(conn, actor, (one, "supply"), (two, "reject"))
+        got = self._instants(conn, p)
+        assert set(got.values()) == {refused_at}, got
+
+    def test_a_refusal_on_the_rejected_file_floors_the_choice_too(self, conn, actor, day):
+        p = Pair(conn, day, [(f"birth_registrations_{day}.csv", _at(day, "13:40")),
+                              (f"birth_registrations_{day}-1.csv", _at(day, "13:50"))])
+        one, two = (n for n, _ in p.files)
+        refused_at = self._refused_later(conn, p, p.second)
+        p.settle(conn, actor, (one, "supply"), (two, "reject"))
+        got = self._instants(conn, p)
+        assert set(got.values()) == {refused_at}, got
+
+
 class TestTheRunsAfterASettlement:
     """Criterion 20: a run that fails says the settlement is recorded and the
     run owed - finished by 'Process what has arrived' - never to settle

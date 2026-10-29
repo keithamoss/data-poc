@@ -132,6 +132,40 @@ class TestIntoASubstitutedSlot:
         assert (h.held_as, h.holder, h.stands_on) == (dl.SUBSTITUTED, a, period)
 
 
+class TestAPersonsOneActTakesOneInstant:
+    """post-build-review #284 (B), Keith 2026-10-30 (W2): a person's single act
+    that spans several supplies takes ONE effective instant, the latest across
+    every supply it touches. TS-77a's shape: the promotion's supply carries a
+    rule's lagged refusal, so flooring each supply on its own left the
+    de-substitute of the stand-in five days before the promotion that
+    replaced it - and the period holding nothing in between."""
+
+    def test_the_de_substitute_takes_the_promotions_floor(self, conn, period, later):
+        from qa_tools.common import filing_decisions as fd, supply_status
+
+        a, a_table = _filed(conn, period, "2026-05-01T01:00:00+00:00")
+        _promote(conn, a, a_table, period)
+        substitution.substitute(conn, agency_id=AG, collection_id=COL, dataset_id=DS,
+                                logical_table=TABLE, period=later, stands_on=period,
+                                supply=a, actor=REAL_PERSON, reason="late", effective_at=WHEN)
+        b, b_table = _filed(conn, later, "2026-08-02T01:00:00+00:00")
+        refused_at = "2026-10-09T22:48:00+08:00"
+        with dl.apply_decision(conn, dl.Decision(
+                agency_id=AG, collection_id=COL, dataset_id=DS,
+                action=dl.PROMOTION_REFUSED, supply=b, to_slot=later,
+                actor="promotion rule", actor_kind=dl.RULE, effective_at=refused_at,
+                reason="its own checks failed")):
+            pass
+        found = fd.consequences(conn, _request(fd.PROMOTE, later, b))
+        fd.apply(_request(fd.PROMOTE, later, b, acknowledged=found.key),
+                 effective_at=WHEN, conn=conn)
+        act = [(d["action"], d["effective_at"]) for d in dl.decisions_for(conn, DS)
+               if later in (d.get("to_slot"), d.get("from_slot"))
+               and d["action"] in (dl.DE_SUBSTITUTE, dl.PROMOTE)]
+        assert act == [(dl.DE_SUBSTITUTE, supply_status.instant(refused_at)),
+                       (dl.PROMOTE, supply_status.instant(refused_at))], act
+
+
 class TestIntoAnInheritedSlot:
     """Criterion 5."""
 

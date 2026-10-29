@@ -772,3 +772,61 @@ class TestNoDecisionTakesEffectBeforeOneAlreadyRecorded:
         with dl.apply_decision(conn, a_decision(dataset, supply="first", effective_at=WHEN)):
             pass
         assert self._effective(conn, dataset, "first") == [supply_status.instant(WHEN)]
+
+
+class TestAPersonsOneActTakesOneInstant:
+    """post-build-review #284 (B), Keith 2026-10-30 (W2): every person's
+    decision in one decision transaction - one act - takes ONE instant, the
+    latest across the supplies the act names (act_spans) and the decisions it
+    has written. An act that would still split is refused, loudly."""
+
+    def _refused_later(self, conn, dataset, supply):
+        with dl.apply_decision(conn, a_decision(
+                dataset, action=dl.PROMOTION_REFUSED, supply=supply, actor="promotion rule",
+                actor_kind=dl.RULE, effective_at=LATER, reason="its own checks failed")):
+            pass
+
+    def _person(self, conn, dataset, supply):
+        with dl.apply_decision(conn, a_decision(
+                dataset, action=dl.REJECT, supply=supply, to_slot=None,
+                from_slot="2026-Q3", effective_at=WHEN, reason="a bad file")):
+            pass
+
+    def test_named_supplies_floor_every_decision_in_the_act(self, conn, dataset):
+        from qa_tools.common import supply_status
+
+        self._refused_later(conn, dataset, "late")
+        with dl.decision_transaction(conn):
+            dl.act_spans(conn, dataset, ["early", "late"])
+            self._person(conn, dataset, "early")
+            self._person(conn, dataset, "late")
+        got = {r[0]: r[1] for r in conn.execute(
+            f"SELECT supply, effective_at FROM {dl.TABLE} WHERE dataset_id = ? "
+            "AND action = ?", [dataset, dl.REJECT]).fetchall()}
+        assert got == {"early": supply_status.instant(LATER),
+                       "late": supply_status.instant(LATER)}, got
+
+    def test_an_act_that_would_split_is_refused_and_writes_nothing(self, conn, dataset):
+        self._refused_later(conn, dataset, "late")
+        with pytest.raises(dl.ActSplit, match="2 instants"):
+            with dl.decision_transaction(conn):
+                self._person(conn, dataset, "early")
+                self._person(conn, dataset, "late")
+        assert conn.execute(f"SELECT count(*) FROM {dl.TABLE} WHERE dataset_id = ? "
+                            "AND action = ?", [dataset, dl.REJECT]).fetchone()[0] == 0
+
+    def test_a_rules_decisions_keep_their_own_floor(self, conn, dataset):
+        from qa_tools.common import supply_status
+
+        with dl.decision_transaction(conn):
+            dl.act_spans(conn, dataset, ["late"])
+            self._refused_later(conn, dataset, "late")
+            with dl.apply_decision(conn, a_decision(
+                    dataset, action=dl.PROMOTION_REFUSED, supply="other",
+                    actor="promotion rule", actor_kind=dl.RULE, effective_at=WHEN,
+                    reason="its own checks failed")):
+                pass
+        (other,) = [r[0] for r in conn.execute(
+            f"SELECT effective_at FROM {dl.TABLE} WHERE dataset_id = ? AND supply = 'other'",
+            [dataset]).fetchall()]
+        assert other == supply_status.instant(WHEN)

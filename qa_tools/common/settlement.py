@@ -359,6 +359,13 @@ def apply(conn, p: Plan, *, agency_id: str, collection_id: str, actor: str, reas
         common = dict(agency_id=agency_id, collection_id=collection_id,
                       dataset_id=p.dataset_id, actor=actor,
                       actor_kind=decision_log.PERSON, effective_at=effective_at)
+        # ONE ACT, ONE INSTANT (post-build-review #284 (B)): every entry the
+        # settlement writes takes the latest instant across the pair, both its
+        # files and whatever they displace - TS-80's reject of #2 stood six
+        # days before the choose-file of #1.
+        decision_log.act_spans(conn, p.dataset_id,
+                               [p.pair, *(f.supply_id for f in p.files),
+                                *(d for f in p.files for d in f.displaced)])
         with decision_log.apply_decision(conn, decision_log.Decision(
                 action=decision_log.CHOOSE_FILE, supply=p.pair, from_slot=p.period,
                 reason=reason, **common)) as entry_id:

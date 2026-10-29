@@ -163,6 +163,12 @@ def promote(conn: supply_db.SupplyConnection, *,
         substituted = bool(h and h.held_as == decision_log.SUBSTITUTED)
         displaced = (h.holder if h and h.held_as == decision_log.PROMOTED
                      and h.holder != supply else None)
+        # ONE ACT, ONE INSTANT (post-build-review #284 (B)): removing the
+        # substitution, superseding what the slot held and the promotion take
+        # the latest instant across the supplies they touch - TS-77a's
+        # de-substitute stood five days before the promotion that replaced it.
+        decision_log.act_spans(conn, dataset_id,
+                               [supply, h.holder if (substituted or displaced) else None])
         if substituted:
             from qa_tools.common import hierarchy, substitution
 

@@ -1046,10 +1046,25 @@ def decision_transaction(conn: supply_db.SupplyConnection) -> Iterator[None]:
     outermost = getattr(conn, "_period_moves", None) is None
     if outermost:
         conn._period_moves = []
+        # A PERSON'S ONE ACT (post-build-review #284 (B); Keith, 2026-10-30,
+        # W2): the outermost transaction is the act, and every person's
+        # decision in it takes one instant - see act_spans().
+        conn._act_floor = None
+        conn._act_instants = set()
     try:
         with conn.raw.transaction():
             conn.execute(f"SET LOCAL lock_timeout = '{LOCK_TIMEOUT}'")
             yield
+            if outermost and len(conn._act_instants) > 1:
+                # LOUD, NOT SILENT: an act whose later decision met a later
+                # floor than the act knew of when it began would otherwise be
+                # recorded at two instants - the defect this closes.
+                raise ActSplit(
+                    "one person's act would take effect at "
+                    f"{len(conn._act_instants)} instants "
+                    f"({', '.join(sorted(str(i) for i in conn._act_instants))}) - "
+                    "name every supply it touches with decision_log.act_spans() "
+                    "before its first decision. Nothing was done.")
             if outermost and conn._period_moves:
                 from qa_tools.common import knock_on
 
@@ -1059,6 +1074,40 @@ def decision_transaction(conn: supply_db.SupplyConnection) -> Iterator[None]:
     finally:
         if outermost:
             conn._period_moves = None
+            conn._act_floor = None
+            conn._act_instants = None
+
+
+class ActSplit(RuntimeError):
+    """A person's one act would have been recorded at more than one effective
+    instant (post-build-review #284 (B)) - a fault in the caller, which did not
+    name every supply the act touches before its first decision."""
+
+
+def act_spans(conn: supply_db.SupplyConnection, dataset_id: str, supplies) -> None:
+    """Say, inside a decision transaction and before its first decision, every
+    supply a person's act touches - so that ALL of the act's decisions take
+    ONE effective instant, the latest decision already recorded about any of
+    them (post-build-review #284 (B); Keith, 2026-10-30, W2).
+
+    The per-supply floor (_not_before_its_supplys_latest) alone floors each
+    decision by its own supply, so an act over two supplies, one of them
+    carrying a rule's lagged refusal, was split: TS-77a's de-substitute of the
+    stand-in stayed five days before the promotion that replaced it, and
+    TS-80's reject of file #2 six days before the choose-file of #1. Live, a
+    decision takes effect when it is recorded, so this changes nothing there.
+    """
+    if getattr(conn, "_period_moves", None) is None:
+        raise RuntimeError("act_spans() is called inside decision_transaction()")
+    names = sorted({s for s in supplies if s})
+    if not names:
+        return
+    rows = conn.execute(f"SELECT max(effective_at) FROM {TABLE} "
+                        "WHERE dataset_id = ? AND supply = ANY(?)",
+                        [dataset_id, names]).fetchall()
+    latest = rows[0][0] if rows else None
+    if latest is not None and (conn._act_floor is None or latest > conn._act_floor):
+        conn._act_floor = latest
 
 
 def _not_before_its_supplys_latest(conn: supply_db.SupplyConnection,
@@ -1073,20 +1122,31 @@ def _not_before_its_supplys_latest(conn: supply_db.SupplyConnection,
     Floored at that latest instant, the order of the log is the order of
     effect. Live, a decision takes effect when it is recorded and nothing is
     recorded ahead of the clock, so this changes nothing there."""
-    if not decision.supply or not decision.effective_at:
+    if not decision.effective_at:
         return decision
     from qa_tools.common import supply_status
 
-    rows = conn.execute(f"SELECT max(effective_at) FROM {TABLE} "
-                        "WHERE dataset_id = ? AND supply = ?",
-                        [decision.dataset_id, decision.supply]).fetchall()
-    latest = rows[0][0] if rows else None
-    if latest is None:
-        return decision
+    latest = None
+    if decision.supply:
+        rows = conn.execute(f"SELECT max(effective_at) FROM {TABLE} "
+                            "WHERE dataset_id = ? AND supply = ?",
+                            [decision.dataset_id, decision.supply]).fetchall()
+        latest = rows[0][0] if rows else None
+    # A PERSON'S ONE ACT TAKES ONE INSTANT (act_spans): the latest across every
+    # supply it names and every decision it has written so far. A rule's
+    # decisions keep their own floor.
+    person = decision.actor_kind == PERSON and getattr(conn, "_act_instants", None) is not None
+    if person and conn._act_floor is not None and (latest is None or conn._act_floor > latest):
+        latest = conn._act_floor
     at = supply_status.instant(decision.effective_at)
-    if at >= latest:
-        return decision
-    return replace(decision, effective_at=latest.astimezone(at.tzinfo).isoformat())
+    if latest is not None and at < latest:
+        decision = replace(decision, effective_at=latest.astimezone(at.tzinfo).isoformat())
+        at = latest
+    if person:
+        if conn._act_floor is None or at > conn._act_floor:
+            conn._act_floor = at
+        conn._act_instants.add(at)
+    return decision
 
 
 @contextmanager
