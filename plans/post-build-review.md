@@ -12533,3 +12533,35 @@ twice. It deliberately did not re-find the `TypeError`.
      scratch database kept): bs_before, 56a7bd5 into equiv_bs_before,
      bootstrap 1446.2s (Birth Registrations 499s, Child Protection and
      Emergency Department 1274s), capture 1749s wall, exit 0.
+     bs_254, 4b53329 into equiv_bs_254, bootstrap 1461.8s (Birth
+     Registrations 520s, Child Protection and Emergency Department 1298s),
+     capture 1717s wall, exit 0: +15.6s, +1.08% on bs_before, inside
+     REQ-PIPE-254 criterion 14's 2%. Calls in the bootstrap (before -> after):
+     hierarchy._load 25,356,294 -> 25,522,767, asset_time.timezone_versions
+     849,362 -> 849,362, agreement.current 384,129 -> 384,129,
+     arrival_patterns.compiled_patterns 210,195 -> 210,195, collections._load
+     32,334 -> 32,340, run_dbt._check_ids 28,426 -> 28,426,
+     run_datacontract._authored_names 476 -> 476; in the build (build-data):
+     hierarchy._load 559,746 -> 49,185, timezone_versions 230,192 -> 41,084,
+     agreement.current 133, collections._load 163, _contract_at 16,
+     presentation._load 8 both sides. Counted by a sitecustomize wrapper in
+     both captures alike. The earlier attempt's pair (2026-10-28 night,
+     2046s and 1301s) is not evidence: something else ran beside it.
+     EQUIVALENCE (criterion 13): `mothman debug equivalence compare
+     bs_before bs_254` exits 1 - S4 and S7 the same, S1 differing only in
+     qa.gate_application (ids, started_at, ended_at, one package_instant)
+     and the columns that point at an application (decision and run
+     gate_application, owed_run's "gate/<id>"), S5 only in "gate:<id>" and
+     "decision:<id>" causes, promotionWords keys (decision ids) and
+     cp-notifications' promotedHealth timelines (48 causes, 8 statuses, 4
+     lengths). EVERY ONE OF THOSE KINDS ALSO DIFFERS BETWEEN TWO CAPTURES OF
+     THE SAME COMMIT (the 2026-10-28 and 2026-10-29 captures of 56a7bd5, and
+     of 4b53329: promotedHealth 64 and 59 lines, gate ids, application
+     instants), so none is attributable to REQ-PIPE-254. With the ids named
+     (an offline normaliser in the builder's scratch, not a harness change),
+     S1 differs in one application's started_at minute and owed_run's gate
+     references, S5 only in promotedHealth. The harness's normaliser 3 is
+     older than qa.gate_application and the promotedHealth timeline, so its
+     self-check would fail on today's tree - FOR KEITH: criterion 13 as
+     written ("only what equivalence.py already normalises") is not met;
+     the honest reading is equivalent-modulo-harness-gaps.
