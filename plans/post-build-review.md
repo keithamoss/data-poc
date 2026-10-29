@@ -12528,3 +12528,8 @@ twice. It deliberately did not re-find the `TypeError`.
      from the provider's GROWN_DROPPED rather than writing it twice.
      REQ-PIPE-250's profile stays in decisions (evidence is only allowed on a
      built requirement); a stale decision there is marked so.
+     WAVE 2 FINISH, the three bootstraps from empty (2026-10-29, one at a
+     time, nothing else heavy running, each a REQ-TEST-239 capture with its
+     scratch database kept): bs_before, 56a7bd5 into equiv_bs_before,
+     bootstrap 1446.2s (Birth Registrations 499s, Child Protection and
+     Emergency Department 1274s), capture 1749s wall, exit 0.
