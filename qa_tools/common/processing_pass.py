@@ -271,6 +271,10 @@ def unprocessed(found: list, conn=None) -> list:
 @dataclass
 class PassReport:
     processed: list[str] = field(default_factory=list)
+    #: {period, or None for held with no period: {"filed": n, "held": m}}
+    #: over the arrivals this pass filed (REQ-PIPE-327 criterion 4) - the
+    #: closing summary totals by period.
+    by_period: dict = field(default_factory=dict)
     gated_only: list[str] = field(default_factory=list)
     left_locked: list[str] = field(default_factory=list)
     left_behind_failure: list[str] = field(default_factory=list)
@@ -607,6 +611,52 @@ def run_owed_work(report: "PassReport", *, run_by: str, deadline: float | None) 
             report.red = True
 
 
+def _filed_line(arrival, report: PassReport) -> str | None:
+    """'<run>: For 2026-Q2 · received <instant> - 6 filed, 1 held' for an
+    arrival just processed, adding its counts to the report's by-period
+    totals. Reads the recorded filings and holds of its delivery; never
+    fails the pass - a line it cannot work out is left unsaid."""
+    from qa_tools.common import display_time, qa_store
+
+    datasets = set(getattr(arrival, "files_by_dataset", {}) or {})
+    try:
+        with supply_db.connect(read_only=True, label="mothman:process") as conn:
+            filed = conn.execute(
+                f'SELECT dataset_id, slot FROM "{qa_store.SCHEMA}".filing_current '
+                "WHERE delivery = ? AND slot IS NOT NULL", [arrival.delivery_name]).fetchall()
+            held = conn.execute(
+                f'SELECT dataset_id, reason FROM "{qa_store.SCHEMA}".hold '
+                "WHERE delivery = ? AND resolved_by IS NULL", [arrival.delivery_name]).fetchall()
+    except Exception:  # noqa: BLE001 - the line is a courtesy, the pass stands
+        return None
+    counts: dict = {}
+    for dataset_id, slot in filed:
+        if dataset_id in datasets:
+            counts.setdefault(slot, {"filed": 0, "held": 0})["filed"] += 1
+    for dataset_id, reason in held:
+        if dataset_id in datasets:
+            fed = (reason or {}).get("doubly_fed") if isinstance(reason, dict) else None
+            counts.setdefault(fed["period"] if fed else None, {"filed": 0, "held": 0})["held"] += 1
+    if not counts:
+        return None
+    for period, n in counts.items():
+        total = report.by_period.setdefault(period, {"filed": 0, "held": 0})
+        total["filed"] += n["filed"]
+        total["held"] += n["held"]
+    periods = sorted(p for p in counts if p is not None)
+    when = display_time.format_instant(arrival.received_at)
+    named = f"For {', '.join(periods)} · received {when}" if periods else f"Held, no period yet · received {when}"
+    return f"{arrival.run_id}: {named} - {period_tally(counts)}"
+
+
+def period_tally(counts: dict) -> str:
+    """'6 filed, 1 held' across every period of one arrival."""
+    filed = sum(n["filed"] for n in counts.values())
+    held = sum(n["held"] for n in counts.values())
+    return ", ".join(part for part in (f"{filed} filed" if filed else "",
+                                        f"{held} held" if held else "") if part)
+
+
 def _one(arrival, among, run_timestamp, run_by, report: PassReport, say) -> None:
     """One arrival, under its lock: nothing if it is already processed
     (criterion 7), only the gate if it is checked, otherwise the lifecycle."""
@@ -651,6 +701,11 @@ def _one(arrival, among, run_timestamp, run_by, report: PassReport, say) -> None
         report.processed.append(arrival.run_id)
         if _red(got):
             report.red = True
+        # THE PERIOD IT WAS FILED TO, ON ITS OWN LINE (REQ-PIPE-327 criterion
+        # 4), in the dashboard's 'For <period> · received <instant>' words.
+        line = _filed_line(arrival, report)
+        if line:
+            say(line)
     with supply_db.connect(read_only=True, label="mothman:process") as conn:
         after = state_of(arrival, recorded(conn))
         waiting = _waiting_for_package(conn, arrival, gate_mod) if after != PROCESSED else None

@@ -356,7 +356,9 @@ class TestTheCalendarEntry:
         out = capsys.readouterr().out
         assert "cp-clients as at 1 Jul 2023" in out
         assert "Calendar: quarterly" in out
-        assert "Next period owed: 2023-Q4" in out and "grace 8h" in out
+        # A SLOT NAMED BY ITS PERIOD, DUE ON ITS ROUND (REQ-PIPE-327 criteria
+        # 2 and 9).
+        assert "Next slot: For 2023-Q4 · due" in out and "grace 8h" in out
         assert "corrections" in out.lower()
 
     def test_the_view_edits_no_configuration(self, conn, monkeypatch, capsys):

@@ -373,7 +373,7 @@ Reframed from daily during Keith's review: the original example (22:00 due, 21:5
 |---|---|
 | Dataset | cp-clients |
 | Supplies | `cp_clients__202505010900000800`, `cp_clients__202505291000000800` |
-| Period | 2025-Q2 |
+| Period | 2025-Q3 |
 | Set "in the warehouse on" to | 2025-05-02 |
 
 ### TS-13 - Six tables landing seconds apart
@@ -392,7 +392,7 @@ Reframed from daily during Keith's review: the original example (22:00 due, 21:5
 |---|---|
 | Dataset | cp-clients |
 | Supplies | `cp_clients__202505010900000800`, `cp_clients__202505291000000800` |
-| Period | 2025-Q2 |
+| Period | 2025-Q3 |
 | Set "in the warehouse on" to | 2025-05-29 |
 
 ### TS-15a - An UNEXPECTED TABLE - recognised, but not owed
@@ -569,7 +569,7 @@ The negative case, and it exists for the same reason TS-33b does: the rejected d
 |---|---|
 | Dataset | cp-clients |
 | Supplies | `cp_clients__202602010900000800` |
-| Period | 2026-Q1 |
+| Period | 2026-Q2 |
 | Set "in the warehouse on" to | 2026-02-01 |
 
 ### TS-39 - A split extract, once patterns are regexes
@@ -627,7 +627,7 @@ PLANTED by REQ-GEN-203 (2026-10-18) in a grown quarter (REQ-GEN-207), after REQ-
 |---|---|
 | Dataset | cp-clients |
 | Supplies | `cp_clients__201911010830000800`, `cp_clients__201911291000000800` |
-| Period | 2019-Q4 |
+| Period | 2020-Q1 |
 | Set "in the warehouse on" to | 2019-11-01 |
 | Built to | green, the 2019-11-29 10:00 arrival |
 
@@ -643,7 +643,7 @@ TS-42a's placement; this link opens on the later file's asset day. *Config: as T
 |---|---|
 | Dataset | cp-clients |
 | Supplies | `cp_clients__201911010830000800`, `cp_clients__201911291000000800` |
-| Period | 2019-Q4 |
+| Period | 2020-Q1 |
 | Set "in the warehouse on" to | 2019-11-29 |
 | Built to | green, the 2019-11-29 10:00 arrival |
 
@@ -771,7 +771,7 @@ In the data since 2026-10-15 (REQ-GEN-044 criterion 1; Keith, 2026-10-14, Q13): 
 |---|---|
 | Dataset | cp-placements |
 | Supplies | — |
-| Period | 2025-Q1 |
+| Period | 2025-Q2 |
 | Set "in the warehouse on" to | 2025-02-17 |
 
 ### TS-55 - A period whose _manifest lists all three kinds
@@ -792,7 +792,7 @@ NOT IN THE DATA YET: needs TS-54's substitution beside an inheritance in one per
 |---|---|
 | Dataset | cp-carers |
 | Supplies | `cp_carers__202608010900000800` |
-| Period | 2026-Q3 |
+| Period | 2026-Q4 |
 | Set "in the warehouse on" to | 2026-08-01 |
 
 ### TS-80 - A contested pair of one Child Protection table, settled by a person
@@ -807,7 +807,7 @@ PLANTED by REQ-GEN-203 (2026-10-18) in a grown quarter (REQ-GEN-207): a stray te
 |---|---|
 | Dataset | cp-clients |
 | Supplies | `cp_clients__202011010820000800` |
-| Period | 2020-Q4 |
+| Period | 2021-Q1 |
 | Set "in the warehouse on" to | 2020-11-01 |
 | Built to | green, the 2020-11-01 08:30 arrival |
 
@@ -823,7 +823,7 @@ PLANTED by REQ-GEN-203 (2026-10-18) in a grown quarter (REQ-GEN-207): a stray te
 |---|---|
 | Dataset | cp-clients |
 | Supplies | `cp_clients__201705010900000800`, `cp_clients__201705151000000800` |
-| Period | 2017-Q2 |
+| Period | 2017-Q3 |
 | Set "in the warehouse on" to | 2017-05-15 |
 
 ### TS-82 - S1 red - a Client Register re-checked against the warehouse's Notifications and held back
@@ -838,7 +838,7 @@ PLANTED by REQ-GEN-203 (2026-10-18) in a grown quarter (REQ-GEN-207): a stray te
 |---|---|
 | Dataset | cp-clients |
 | Supplies | `cp_clients__201708010900000800`, `cp_clients__201708151000000800` |
-| Period | 2017-Q3 |
+| Period | 2017-Q4 |
 | Set "in the warehouse on" to | 2017-08-15 |
 
 ### TS-83 - S2 strict as re-cast - a red Client Register holds its whole first-time package back
@@ -853,7 +853,7 @@ PLANTED by REQ-GEN-203 (2026-10-18) in a grown quarter (REQ-GEN-207): a stray te
 |---|---|
 | Dataset | cp-clients |
 | Supplies | `cp_clients__201608010900000800`, `cp_clients__201608291000000800` |
-| Period | 2016-Q3 |
+| Period | 2016-Q4 |
 | Set "in the warehouse on" to | 2016-08-29 |
 
 ### TS-84 - The S10 chain re-ordered - three staggered files promoted together at the last one's arrival
@@ -868,7 +868,7 @@ PLANTED by REQ-GEN-203 (2026-10-18) in a grown quarter (REQ-GEN-207): a stray te
 |---|---|
 | Dataset | cp-clients |
 | Supplies | `cp_clients__201511010920000800` |
-| Period | 2015-Q4 |
+| Period | 2016-Q1 |
 | Set "in the warehouse on" to | 2015-11-01 |
 
 ### TS-85 - S14 - a red Placements held back alone in a first-time package
@@ -883,7 +883,7 @@ PLANTED by REQ-GEN-203 (2026-10-18) in a grown quarter (REQ-GEN-207): a stray te
 |---|---|
 | Dataset | cp-placements |
 | Supplies | `cp_placements__201602010900000800`, `cp_placements__201602291000000800` |
-| Period | 2016-Q1 |
+| Period | 2016-Q2 |
 | Set "in the warehouse on" to | 2016-02-29 |
 
 ## Calendar corrections
@@ -1065,7 +1065,7 @@ PLANTED by REQ-GEN-218 (2026-10-18) in Child Protection's grown history. *Config
 |---|---|
 | Dataset | cp-carers |
 | Supplies | `cp_carers__202201051000000800`, `cp_carers__202203151000000800` |
-| Period | 2021-Q4 |
+| Period | 2022-Q1 |
 | Set "in the warehouse on" to | 2021-12-20 |
 
 ### TS-63b - A dataset turned off for a while: the gap
@@ -1080,7 +1080,7 @@ TS-63a's placement; this link opens on 2021-Q4's delivery and runs to the end of
 |---|---|
 | Dataset | cp-carers |
 | Supplies | `cp_carers__202201051000000800`, `cp_carers__202203151000000800` |
-| Period | 2021-Q4 |
+| Period | 2022-Q1 |
 | Set "in the warehouse on" to | 2022-03-20 |
 
 ### TS-64 - An undeclared change to a frozen date
@@ -1103,7 +1103,7 @@ Cp-clients, 2024-Q1: the whole delivery on time at 09:00 on 1 February with cp_c
 |---|---|
 | Dataset | cp-clients |
 | Supplies | `cp_clients__202402010900000800`, `cp_clients__202402291000000800` |
-| Period | 2024-Q1 |
+| Period | 2024-Q2 |
 | Set "in the warehouse on" to | 2024-02-08 |
 
 ### TS-75b - A supply rejected after it waited - after it was rejected
@@ -1116,7 +1116,7 @@ The same placement, on 25 February. **Expect** (REQ-DASH-197), in the same panel
 |---|---|
 | Dataset | cp-clients |
 | Supplies | `cp_clients__202402010900000800`, `cp_clients__202402291000000800` |
-| Period | 2024-Q1 |
+| Period | 2024-Q2 |
 | Set "in the warehouse on" to | 2024-02-25 |
 
 ### TS-76 - A substitution later removed
@@ -1129,7 +1129,7 @@ Cp-placements, 2025-Q1: the delivery leaves cp_placements out; a person substitu
 |---|---|
 | Dataset | cp-placements |
 | Supplies | — |
-| Period | 2025-Q1 |
+| Period | 2025-Q2 |
 | Set "in the warehouse on" to | 2025-02-17 |
 
 ### TS-77a - A substitution later replaced - while it stood
@@ -1142,7 +1142,7 @@ Cp-placements, 2023-Q2: the delivery leaves cp_placements out; a person substitu
 |---|---|
 | Dataset | cp-placements |
 | Supplies | `cp_placements__202306081000000800` |
-| Period | 2023-Q2 |
+| Period | 2023-Q3 |
 | Set "in the warehouse on" to | 2023-05-17 |
 
 ### TS-77b - Known wrong today (post-build-review #164): A substitution later replaced - the day the late file waited
@@ -1155,7 +1155,7 @@ Cp-placements, 2023-Q2: the delivery leaves cp_placements out; a person substitu
 |---|---|
 | Dataset | cp-placements |
 | Supplies | `cp_placements__202306081000000800` |
-| Period | 2023-Q2 |
+| Period | 2023-Q3 |
 | Set "in the warehouse on" to | 2023-06-08 |
 
 ### TS-78a - A supply promoted after a newer one - the day it was promoted
@@ -1200,7 +1200,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
 |---|---|
 | Dataset | cp-case-workers |
 | Supplies | — |
-| Period | 2026-Q2 |
+| Period | 2026-Q3 |
 | Set "in the warehouse on" to | 2026-06-16 |
 
 ### TS-79b - An inherited quarter - the oldest of the original fifteen
@@ -1213,7 +1213,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
 |---|---|
 | Dataset | cp-case-workers |
 | Supplies | — |
-| Period | 2023-Q2 |
+| Period | 2023-Q3 |
 | Set "in the warehouse on" to | 2023-06-16 |
 
 
@@ -1559,7 +1559,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
      "cp_clients__202505010900000800",
      "cp_clients__202505291000000800"
     ],
-    "period": "2025-Q2",
+    "period": "2025-Q3",
     "inPlaceOn": "2025-05-02",
     "subject": "supply-history-row"
    }
@@ -1594,7 +1594,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
      "cp_clients__202505010900000800",
      "cp_clients__202505291000000800"
     ],
-    "period": "2025-Q2",
+    "period": "2025-Q3",
     "inPlaceOn": "2025-05-29",
     "subject": "supply-history-row"
    }
@@ -1935,7 +1935,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
     "supplies": [
      "cp_clients__202602010900000800"
     ],
-    "period": "2026-Q1",
+    "period": "2026-Q2",
     "inPlaceOn": "2026-02-01",
     "subject": "supply-history-row"
    }
@@ -2011,7 +2011,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
      "cp_clients__201911010830000800",
      "cp_clients__201911291000000800"
     ],
-    "period": "2019-Q4",
+    "period": "2020-Q1",
     "inPlaceOn": "2019-11-01",
     "targets": [
      {
@@ -2040,7 +2040,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
      "cp_clients__201911010830000800",
      "cp_clients__201911291000000800"
     ],
-    "period": "2019-Q4",
+    "period": "2020-Q1",
     "inPlaceOn": "2019-11-29",
     "targets": [
      {
@@ -2366,7 +2366,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "coordinates": {
     "dataset": "cp-placements",
     "supplies": [],
-    "period": "2025-Q1",
+    "period": "2025-Q2",
     "inPlaceOn": "2025-02-17",
     "subject": "substitution-drill-down"
    }
@@ -2404,7 +2404,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
     "supplies": [
      "cp_carers__202608010900000800"
     ],
-    "period": "2026-Q3",
+    "period": "2026-Q4",
     "inPlaceOn": "2026-08-01",
     "subject": "supply-history-row"
    }
@@ -2663,7 +2663,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
      "cp_carers__202201051000000800",
      "cp_carers__202203151000000800"
     ],
-    "period": "2021-Q4",
+    "period": "2022-Q1",
     "inPlaceOn": "2021-12-20",
     "subject": "supply-history-row"
    }
@@ -2685,7 +2685,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
      "cp_carers__202201051000000800",
      "cp_carers__202203151000000800"
     ],
-    "period": "2021-Q4",
+    "period": "2022-Q1",
     "inPlaceOn": "2022-03-20",
     "subject": "supply-history-row"
    }
@@ -3034,7 +3034,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
      "cp_clients__202402010900000800",
      "cp_clients__202402291000000800"
     ],
-    "period": "2024-Q1",
+    "period": "2024-Q2",
     "inPlaceOn": "2024-02-08",
     "subject": "as-at-panel"
    }
@@ -3056,7 +3056,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
      "cp_clients__202402010900000800",
      "cp_clients__202402291000000800"
     ],
-    "period": "2024-Q1",
+    "period": "2024-Q2",
     "inPlaceOn": "2024-02-25",
     "subject": "as-at-panel"
    }
@@ -3076,7 +3076,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "coordinates": {
     "dataset": "cp-placements",
     "supplies": [],
-    "period": "2025-Q1",
+    "period": "2025-Q2",
     "inPlaceOn": "2025-02-17",
     "subject": "substitution-drill-down"
    }
@@ -3097,7 +3097,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
     "supplies": [
      "cp_placements__202306081000000800"
     ],
-    "period": "2023-Q2",
+    "period": "2023-Q3",
     "inPlaceOn": "2023-05-17",
     "subject": "substitution-drill-down"
    }
@@ -3116,7 +3116,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
     "supplies": [
      "cp_placements__202306081000000800"
     ],
-    "period": "2023-Q2",
+    "period": "2023-Q3",
     "inPlaceOn": "2023-06-08",
     "subject": "as-at-panel"
    }
@@ -3294,7 +3294,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "coordinates": {
     "dataset": "cp-case-workers",
     "supplies": [],
-    "period": "2026-Q2",
+    "period": "2026-Q3",
     "inPlaceOn": "2026-06-16",
     "subject": "standing-in-pill"
    }
@@ -3313,7 +3313,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "coordinates": {
     "dataset": "cp-case-workers",
     "supplies": [],
-    "period": "2023-Q2",
+    "period": "2023-Q3",
     "inPlaceOn": "2023-06-16",
     "subject": "standing-in-pill"
    }
@@ -3337,7 +3337,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
     "supplies": [
      "cp_clients__202011010820000800"
     ],
-    "period": "2020-Q4",
+    "period": "2021-Q1",
     "inPlaceOn": "2020-11-01",
     "targets": [
      {
@@ -3373,7 +3373,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
      "cp_clients__201705010900000800",
      "cp_clients__201705151000000800"
     ],
-    "period": "2017-Q2",
+    "period": "2017-Q3",
     "inPlaceOn": "2017-05-15",
     "subject": "supply-history-row"
    }
@@ -3395,7 +3395,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
      "cp_clients__201708010900000800",
      "cp_clients__201708151000000800"
     ],
-    "period": "2017-Q3",
+    "period": "2017-Q4",
     "inPlaceOn": "2017-08-15",
     "subject": "supply-history-row"
    }
@@ -3417,7 +3417,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
      "cp_clients__201608010900000800",
      "cp_clients__201608291000000800"
     ],
-    "period": "2016-Q3",
+    "period": "2016-Q4",
     "inPlaceOn": "2016-08-29",
     "subject": "supply-history-row"
    }
@@ -3439,7 +3439,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
     "supplies": [
      "cp_clients__201511010920000800"
     ],
-    "period": "2015-Q4",
+    "period": "2016-Q1",
     "inPlaceOn": "2015-11-01",
     "subject": "supply-history-row"
    }
@@ -3461,7 +3461,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
      "cp_placements__201602010900000800",
      "cp_placements__201602291000000800"
     ],
-    "period": "2016-Q1",
+    "period": "2016-Q2",
     "inPlaceOn": "2016-02-29",
     "subject": "supply-history-row"
    }

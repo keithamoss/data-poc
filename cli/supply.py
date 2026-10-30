@@ -474,7 +474,13 @@ def filings_command(dataset_id: str, limit: int) -> None:
     }
     placed = _placements(dataset_id)
     console.print(f"[bold]{dataset_id}[/bold] - {len(found)} supply/supplies filed\n")
-    table = Table("Supply", "Filed against", "Why", box=None, pad_edge=False)
+    # 'For <period> · received <instant>' (REQ-PIPE-327 criterion 3), the
+    # supply id beside it for pasting into a decision.
+    from rich.markup import escape
+
+    from cli.filing_tui import arrived
+
+    table = Table("Filed", "Supply", "Why", box=None, pad_edge=False)
     for record in found[-limit:]:
         why = readable.get(record.get("branch", ""), record.get("branch", ""))
         if record.get("supply_id") in placed:
@@ -484,8 +490,10 @@ def filings_command(dataset_id: str, limit: int) -> None:
 
             by = "the rule" if placed[record.get("supply_id")] == "rule" else "a person"
             why = f"{placing.said(record.get('slot'))} by {by}, from held"
-        table.add_row(record.get("supply_id", ""),
-                       record.get("slot") or "[yellow]unfiled[/yellow]", why)
+        slot = record.get("slot")
+        filed = (escape(f"For {slot} · received {arrived(record.get('supply_id'))}") if slot
+                 else "[yellow]Held, no period yet[/yellow]")
+        table.add_row(filed, record.get("supply_id", ""), why)
     console.print(table)
 
 

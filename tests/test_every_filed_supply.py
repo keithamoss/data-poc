@@ -180,8 +180,10 @@ class TestTheCountIsTheSameEverywhere:
         slot, _good, _failed = mixed
         monkeypatch.setattr(filing_tui.console, "width", 220)
         filing_tui.standing_view(COL, DS)
+        # THE ROW IS FOUND BY ITS SLOT, 'For <period> · due ...' since
+        # REQ-PIPE-327 put the round's date first.
         (line,) = [ln for ln in capsys.readouterr().out.splitlines()
-                   if ln.startswith(slot.period)]
+                   if f"For {slot.period} ·" in ln]
         assert "2 supplies" in line
 
 

@@ -207,14 +207,23 @@ def _show_dataset(dataset: str, until: date | None, show_all: bool,
     from qa_tools.common import agreement as agreement_mod
     from qa_tools.common import asset_time as _at
     in_force = agreement_mod.current().participation_on(dataset, _at.local_date(_at.now()))
+    # THE PERIODS ITS ROUNDS FILL, where its collection's files go ahead
+    # (REQ-PIPE-327 criterion 8) - 'February, August - rounds whose files go
+    # into Q2 and Q4'.
+    from qa_tools.common import files_go
+    fill = files_go.rounds_fill(dataset, months, _at.local_date(_at.now())) if months else None
     console.print(f"  participates: "
                    f"{', '.join(schedule.MONTH_NAMES[m - 1] for m in months) if months else 'all'}"
+                   + (f" - {fill}" if fill else "")
                    + (f" [dim]- {in_force.reason}[/dim]" if months and in_force and in_force.reason
-                      else ""))
+                      else ""), highlight=False)
     # Shown in the form the config authors it in - `14d`, not
     # `14 days, 0:00:00` (post-build-review #27).
+    # BEFORE THE DUE INSTANT, CLOSING WHEN THE NEXT ROUND'S OPENS (REQ-PIPE-327
+    # criterion 2) - never 'before the period's date'.
     console.print(f"  claim window: {schedule.format_duration(schedule.claim_window(dataset))} "
-                   f"before each deadline [dim](opens early; closes when the next period's opens)[/dim]")
+                   f"before each slot's due instant [dim](opens early; closes when the next "
+                   f"round's claim window opens)[/dim]")
 
     from qa_tools.common import asset_time, participation_view
     today = asset_time.local_date(asset_time.now())
@@ -243,7 +252,11 @@ def _show_dataset(dataset: str, until: date | None, show_all: bool,
 
     shown, hidden = _window(periods, today, show_all or until is not None, by_period)
 
-    table = Table("", "Period", "Date", "Expected", "Due", "Claimable from",
+    # A ROUND COLUMN AND 'For <period> · due <instant>', WITH NO COLUMN
+    # GIVING THE PERIOD'S OWN DATE (REQ-PIPE-327 criterion 2; Keith's O-C1):
+    # a period's date is where a reader looks for when files come, and at
+    # files_go_to_period 1 it is a quarter after they do.
+    table = Table("", "Round", "Slot", "Expected", "Claimable from",
                    box=None, pad_edge=False)
     for p in shown:
         # A not-expected period is SHOWN, with its reason - never
@@ -267,10 +280,30 @@ def _show_dataset(dataset: str, until: date | None, show_all: bool,
         # DUE and CLAIMABLE instants are not in any file: this computes
         # them, so they are written the way everything else a person
         # reads is written (REQ-DASH-071).
-        table.add_row(marker, p.name, p.date.isoformat(), expected,
-                       display_time.format_instant(slot.due_at) if slot else "-",
+        rnd = (p.round.date if getattr(p, "round", None) is not None else p.date)
+        table.add_row(marker, rnd.isoformat(),
+                       files_go.for_due(p.name, slot.due_at) if slot else f"For {p.name}",
+                       expected,
                        display_time.format_instant(slot.claim_opens_at) if slot else "-")
-    console.print(table)
+    console.print(table, highlight=False)
+    # THE VALUE ONCE, BELOW THE TABLE (criterion 2), in the words the
+    # dashboard's tile uses (criterion 1).
+    said = files_go.describe(dataset, on or today)
+    if said:
+        console.print(f"  {said}", markup=False, highlight=False)
+    nxt = _next_slot(shown, by_period, today)
+    if nxt is not None:
+        console.print(f"  Next slot: {files_go.for_due(nxt.name, nxt.due_at)}, on "
+                      f"{files_go.round_words(nxt.round_date or nxt.date)}",
+                      markup=False, highlight=False)
+    # A FALL'S ROUND, MARKED (REQ-PIPE-327 criterion 7; Keith's O-C4): its
+    # files will be held for a person, naming the period they would feed twice.
+    for when, period in files_go.fall_rounds(dataset):
+        said_round = files_go.round_words(when)
+        console.print(f"  {said_round[0].upper() + said_round[1:]}: its files will be held for "
+                      f"a person - they would be a second supply for {period}, because this "
+                      f"collection's files_go_to_period falls from that round.",
+                      markup=False, highlight=False, style="yellow")
 
     owed = len(by_period)
     footer = f"  [dim]{len(periods)} period(s), {owed} slot(s)"
@@ -304,6 +337,12 @@ def _due_date(period, by_period) -> date:
 
     slot = by_period.get(period.name)
     return asset_time.local_date(slot.due_at) if slot else period.date
+
+
+def _next_slot(periods, by_period, today):
+    """The next slot owed whose due date is today or later, or None."""
+    name = _next_owed(periods, by_period, today)
+    return by_period.get(name) if name else None
 
 
 def _next_owed(periods, by_period, today) -> str | None:
@@ -741,6 +780,16 @@ def _show_values(v) -> None:
     for x in v.values:
         console.print(f"    {x.label:<{width}}  {x.text}  ({x.source})"
                       + (f"; changes {x.changes}" if x.changes else ""), markup=False)
+    # WHICH PERIOD ITS COLLECTION'S FILES GO INTO, 0 included (REQ-PIPE-327
+    # criterion 1): the one phrase the dashboard's tile uses, with any later
+    # version due.
+    from qa_tools.common import files_go
+
+    said = files_go.describe(v.dataset_id, v.on)
+    if said:
+        later = files_go.later_version(v.dataset_id, v.on)
+        console.print(f"    {'files go':<{width}}  {said}" + (f"; {later}" if later else ""),
+                      markup=False)
     # A TURN-OFF (REQ-PIPE-179 criterion 28): who, when, why, what is still
     # owed and until when, what is not, and how long an ordinary edit can
     # change it.
@@ -754,14 +803,19 @@ def _show_in_force(f) -> None:
     console.print(f"  Owes: {f.owes}", markup=False)
     if f.next_period and f.inputs:
         i = f.inputs
-        console.print(f"  Next period owed: {f.next_period} ({f.next_date:%-d %b %Y}) - due "
-                      f"{i['due_date']} at {i['expected_time']}"
-                      + (f", {i['days_before']} day(s) before the period's date"
+        # NAMED BY ITS PERIOD AND DUE ON ITS ROUND (REQ-PIPE-327 criteria 2 and
+        # 9) - never the period's date beside it.
+        from qa_tools.common import files_go
+        due = (files_go.for_due(f.next_period, f.next_due) if f.next_due is not None
+               else f"For {f.next_period} · due {i['due_date']} at {i['expected_time']}")
+        console.print(f"  Next slot: {due}, on {files_go.round_words(f.next_round or f.next_date)}"
+                      + (f", {i['days_before']} day(s) before the round's date"
                          if i.get("days_before") else "")
                       + f"; grace {_duration(i['grace_seconds'])}; claim window opens "
-                        f"{_duration(i['claim_window_seconds'])} before", markup=False)
+                        f"{_duration(i['claim_window_seconds'])} before its due instant",
+                      markup=False)
     elif f.next_period:
-        console.print(f"  Next period owed: {f.next_period} - its times cannot be resolved",
+        console.print(f"  Next slot: For {f.next_period} - its times cannot be resolved",
                       markup=False)
     else:
         console.print("  Nothing is owed within the next 400 days of that date.", markup=False)

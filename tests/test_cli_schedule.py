@@ -209,8 +209,10 @@ def test_show_dataset_says_the_window_opens_early_and_never_closes():
     result = CliRunner().invoke(schedule_group, ["show", "--dataset", "cp-clients"])
     assert result.exit_code == 0, result.output
     flat = " ".join(result.output.split())
-    assert "before each deadline" in flat
-    assert "closes when the next period's opens" in flat
+    # BEFORE THE DUE INSTANT, CLOSING ON THE NEXT ROUND'S OPENING
+    # (REQ-PIPE-327 criterion 2), never 'before the period's date'.
+    assert "before each slot's due instant" in flat
+    assert "closes when the next round's claim window opens" in flat
 
 
 class TestAWarningSurvivesTheCliWrapper:

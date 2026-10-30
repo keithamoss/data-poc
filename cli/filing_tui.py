@@ -1016,7 +1016,7 @@ def queue_table(states, *, held=frozenset()) -> Table:
     what."""
     from qa_tools.common import root_cause
 
-    table = Table("Period", "Dataset", "Arrived", "State", box=None, pad_edge=False)
+    table = Table("Supply", "Dataset", "State", box=None, pad_edge=False)
     for s in states:
         if root_cause.row_key(s) in held:
             state = "[red]held back - see below[/red]"
@@ -1026,9 +1026,17 @@ def queue_table(states, *, held=frozenset()) -> Table:
             state = escape(s.reason)
         else:
             state = _HOW_IT_READS.get(s.state, s.state)
-        table.add_row(s.period, s.dataset_id,
-                       arrived(s.supply) if s.supply else "[dim]-[/dim]", state)
+        # 'For <period> · received <instant>' (REQ-PIPE-327 criterion 3), the
+        # dashboard's own heading.
+        table.add_row(escape(for_received(s.period, s.supply)) if s.supply else escape(f"For {s.period}"),
+                       s.dataset_id, state)
     return table
+
+
+def for_received(period: str, supply: str | None) -> str:
+    """'For <period> · received <instant>' from a supply id (REQ-PIPE-327
+    criterion 3): the receipt as arrived() reads it."""
+    return f"For {period} · received {arrived(supply)}"
 
 
 def _own_red_words(conn, state) -> str:
@@ -1601,10 +1609,31 @@ def _queue_screen(conn, collection_id: str, *, gaps, held, carry, groups):
         # HELD SUPPLIES, THEIR OWN GROUP ABOVE THE SLOT ROWS (REQ-PIPE-163
         # criterion 17): a dataset and a receipt in place of a period, and why
         # it was held in the hold's own reason (criterion 10).
-        console.print(f"[bold]Held - no period yet ({len(held)})[/bold] - each needs a "
-                      f"period chosen, or rejecting")
-        console.print(held_table(held))
-        console.print()
+        # HELD AFTER A FALL, ONE HEADING PER ROUND (REQ-PIPE-327 criterion 6):
+        # our own configuration change, not the supplier's, so said apart.
+        from qa_tools.common import files_go
+
+        fed = {}
+        for h in held:
+            f = getattr(h, "doubly_fed", None)
+            if f:
+                fed.setdefault((f["round"], f.get("collection") or ""), []).append(h)
+        rest = [h for h in held if not getattr(h, "doubly_fed", None)]
+        for (rnd, collection), group in sorted(fed.items()):
+            from datetime import date as _date
+
+            when = files_go.round_words(_date.fromisoformat(str(rnd)[:10]))
+            console.print(f"[bold]Held after the agreement change from {when}"
+                          f"{' for ' + escape(collection) if collection else ''} ({len(group)})"
+                          f"[/bold] - a change on our side, not the supplier's; each is "
+                          f"placed as a resupply of its period, or rejected")
+            console.print(held_table(group))
+            console.print()
+        if rest:
+            console.print(f"[bold]Held - no period yet ({len(rest)})[/bold] - each needs a "
+                          f"period chosen, or rejecting")
+            console.print(held_table(rest))
+            console.print()
     # SUPPLIES CHECKED BEFORE A CHECK CHANGED (REQ-PIPE-177 criterion 19): this
     # collection's own count, and how many more elsewhere - a choice leading
     # to the asset-wide entry the door's first menu offers.
@@ -1768,10 +1797,17 @@ def turned_off_flow(group) -> None:
 
 def held_table(held) -> Table:
     """The held group: dataset, receipt on the asset's clock, and why."""
-    table = Table("Dataset", "Received", "Why it is held", box=None, pad_edge=False)
+    # WHICH KIND OF HELD (REQ-PIPE-327 criterion 3).
+    table = Table("Dataset", "Held", "Received", "Why it is held", box=None, pad_edge=False)
     for h in held:
-        table.add_row(h.dataset_name, h.received_text, h.why)
+        table.add_row(h.dataset_name, escape(_held_kind(h)), h.received_text, h.why)
     return table
+
+
+def _held_kind(h) -> str:
+    from qa_tools.common import files_go
+
+    return files_go.held_words(h)
 
 
 def _held_label(h) -> str:
@@ -1780,7 +1816,7 @@ def _held_label(h) -> str:
     if getattr(h, "turned_off", False):
         return (f"Received while turned off: {h.dataset_id} (the supply that arrived "
                 f"{arrived(h.supply)})")
-    return f"Held, no period yet: {h.dataset_id} (the supply that arrived {arrived(h.supply)})"
+    return f"{_held_kind(h)}: {h.dataset_id} (the supply that arrived {arrived(h.supply)})"
 
 
 def held_flow(h) -> None:
@@ -2140,13 +2176,17 @@ def standing_view(collection_id: str, dataset_id: str | None = None) -> None:
     if not states:
         console.print("No periods to show.", style="yellow")
         return
-    table = Table("Period", "Dataset", "State", "Arrived", "Decided by", "Why",
+    # A ROUND COLUMN AND 'For <period> · due <instant>' (REQ-PIPE-327
+    # criterion 2), the collection's files_go_to_period stated once below.
+    table = Table("Round", "Slot", "Dataset", "State", "Arrived", "Decided by", "Why",
                    box=None, pad_edge=False)
     for s in states:
         # THE SAME COUNT AS THE PERIOD PICKER (REQ-GHUB-229 criterion 15).
         n = counts.get((s.dataset_id, s.period), 0)
         many = f" [dim]- {n} supplies[/dim]" if n > 1 else ""
-        table.add_row(s.period, s.dataset_id, _HOW_IT_READS.get(s.state, s.state) + many,
+        rnd, slot_words = _round_and_slot(s.dataset_id, s.period)
+        table.add_row(rnd, escape(slot_words), s.dataset_id,
+                       _HOW_IT_READS.get(s.state, s.state) + many,
                        arrived(s.supply) if s.supply else "[dim]-[/dim]",
                        _who_decided(s), _short(s.reason))
     console.print(f"[bold]{len(states)}[/bold] period(s) in "
@@ -2154,6 +2194,40 @@ def standing_view(collection_id: str, dataset_id: str | None = None) -> None:
                    + (f", {dataset_id}" if dataset_id else "") + "\n")
     console.print(table)
     _print_amber_settings(sorted({s.dataset_id for s in states}))
+    _print_files_go(sorted({s.dataset_id for s in states}))
+
+
+def _round_and_slot(dataset_id: str, period: str) -> tuple[str, str]:
+    """(the round's date, 'For <period> · due <instant>') for one slot - the
+    period alone where its slot cannot be resolved."""
+    from qa_tools.common import files_go, slots
+
+    try:
+        slot = slots.slot_named(dataset_id, period)
+    except Exception:  # noqa: BLE001 - the period still names the row
+        slot = None
+    if slot is None:
+        return "-", f"For {period}"
+    return ((slot.round_date or slot.date).isoformat(), files_go.for_due(period, slot.due_at))
+
+
+def _print_files_go(dataset_ids: list[str]) -> None:
+    """Which period each dataset's files go into, once below the table
+    (REQ-PIPE-327 criterion 2) - one line where they all share it, in the
+    shape _print_amber_settings uses."""
+    from qa_tools.common import asset_time, files_go
+
+    today = asset_time.local_date(asset_time.now())
+    said = {ds: files_go.describe(ds, today) for ds in dataset_ids}
+    said = {ds: text for ds, text in said.items() if text}
+    if not said:
+        return
+    if len(set(said.values())) == 1:
+        console.print(f"\n{next(iter(said.values()))}", markup=False, highlight=False)
+        return
+    console.print("\nFiles go:")
+    for ds, text in said.items():
+        console.print(f"  {ds}  {text}", markup=False, highlight=False)
 
 
 def _print_amber_settings(dataset_ids: list[str]) -> None:

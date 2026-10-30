@@ -613,6 +613,12 @@ class HeldRow:
     #: Received while its dataset is turned off (REQ-PIPE-179 criterion 34):
     #: listed quietly, apart, and not counted as waiting on a decision.
     turned_off: bool = False
+    #: Held after a fall (REQ-PIPE-322 criterion 3): {"period", "round",
+    #: "collection", ...} - our configuration change, not the supplier's.
+    doubly_fed: dict | None = None
+    #: The hold's reason, for which kind of held it is (REQ-PIPE-327
+    #: criterion 3) - 'would be for <period>' where one period was refused.
+    reason: dict | None = None
 
 
 @dataclass(frozen=True)
@@ -675,6 +681,7 @@ def held_in(conn: supply_db.SupplyConnection, collection_id: str) -> list[HeldRo
             received_text=display_time.format_instant(at) if at else "an unknown time",
             why=h.describe(), schedule_ended=h.schedule_ended,
             agreement_refused=h.agreement_refused, turned_off=h.turned_off,
+            doubly_fed=h.doubly_fed, reason=dict(h.reason or {}),
             files=tuple(contest.files) if contest is not None else ()))
     return sorted(rows, key=lambda r: (r.received_at is None, r.received_at or 0, r.supply))
 

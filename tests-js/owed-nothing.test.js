@@ -43,7 +43,7 @@ function withRaw(w, raw) {
 describe("one function words every owed-nothing period (criterion 14)", () => {
   it("names each kind with the page's em dash", () => {
     const w = load();
-    expect(w.owedNothingLabel(MAY).label).toBe("Not owed — outside its agreed months (Feb, Aug)");
+    expect(w.owedNothingLabel(MAY).label).toBe("Not owed — it supplies only in the February and August rounds");
     expect(w.owedNothingLabel({ kind: "not_expected", reason: "migration" }).label)
       .toBe("Not expected — migration");
     expect(w.owedNothingLabel({ kind: "turned_off", reason: "supplier paused" }).label)
@@ -119,7 +119,7 @@ describe("owed-nothing rows in the supply history (criteria 1, 2, 10, 12 and 13)
     const doc = new w.DOMParser().parseFromString(`<div>${html}</div>`, "text/html");
     const row = doc.querySelector("[data-owed-nothing]");
     expect(row).not.toBeNull();
-    expect(row.textContent).toContain("Not owed — outside its agreed months (Feb, Aug)");
+    expect(row.textContent).toContain("Not owed — it supplies only in the February and August rounds");
     expect(row.querySelector(".pill:not(.tag)")).toBeNull();
     expect(row.querySelector("table")).toBeNull();
     expect(row.textContent).not.toContain("staffing register");
@@ -131,7 +131,7 @@ describe("owed-nothing rows in the supply history (criteria 1, 2, 10, 12 and 13)
     const w = withRaw(load(), dataset());
     w.eval("CURRENT_IN_PLACE_ON = '2026-06-15'");
     const html = w.renderSupplyHistorySection(dataset(), [], "2026-05-01");
-    expect(html).toContain("Not owed — outside its agreed months (Feb, Aug)");
+    expect(html).toContain("Not owed — it supplies only in the February and August rounds");
   });
 
   it("is never listed under 'Periods with no supply'", () => {
@@ -168,9 +168,9 @@ describe("the standing-in heading names the kind (criterion 9)", () => {
     const w = withRaw(load(), dataset());
     const d = (past) => ({ id: "cp-case-workers", promotionState: { past, on: "2026-06-15",
       standingIn: { kind: "inherited", period: "2026-Q2", standsOn: "2026-Q1" } } });
-    expect(w.standingInHeading(d(false))).toBe("Not owed — outside its agreed months (Feb, Aug)");
+    expect(w.standingInHeading(d(false))).toBe("Not owed — it supplies only in the February and August rounds");
     expect(w.standingInHeading(d(true)))
-      .toBe(`On ${w.fmtDay("2026-06-15")}: Not owed — outside its agreed months (Feb, Aug)`);
+      .toBe(`On ${w.fmtDay("2026-06-15")}: Not owed — it supplies only in the February and August rounds`);
   });
 });
 
@@ -209,7 +209,7 @@ describe("the panel's reason and the history toggle's count", () => {
       standingIn: { kind: "inherited", period: "2026-Q2", standsOn: "2026-Q1", reason: "rule text" } } };
     const doc = new w.DOMParser().parseFromString(`<div>${w.standingInDetail(d)}</div>`, "text/html");
     expect(doc.querySelector(".promo-why").textContent).toContain("staffing register");
-    expect(doc.querySelector(".promo-head").textContent).toBe("Not owed — outside its agreed months (Feb, Aug)");
+    expect(doc.querySelector(".promo-head").textContent).toBe("Not owed — it supplies only in the February and August rounds");
   });
 
   it("counts the rows it hides, owed-nothing rows included (criterion 13)", () => {
@@ -236,7 +236,7 @@ describe("post-build-review #194", () => {
     // Since Q18 the period is one block - the supply's cycle with the label
     // beneath - so the label is found on the cycle, still not in the older list.
     const owed = [...doc.querySelectorAll("[data-owed-nothing], [data-owed-nothing-sub]")];
-    expect(owed.map((e) => e.textContent).join(" ")).toContain("Not owed — outside its agreed months");
+    expect(owed.map((e) => e.textContent).join(" ")).toContain("Not owed — it supplies only in the");
     expect(owed[0].closest("#supply-history-older")).toBeNull();
   });
 
@@ -254,7 +254,7 @@ describe("post-build-review #194", () => {
     expect(blocks).toHaveLength(1);
     expect(blocks[0].querySelector("table")).not.toBeNull();
     expect(blocks[0].querySelector("[data-owed-nothing-sub]").textContent)
-      .toContain("Not owed — outside its agreed months");
+      .toContain("Not owed — it supplies only in the");
   });
 
   it("#199 F5: several supplies in one period owed nothing are one block, not one per chain", () => {
@@ -303,7 +303,7 @@ describe("post-build-review #194", () => {
     wrap.id = "supply-history-wrap";
     w.document.body.appendChild(wrap);
     w.renderBlockedSupplyHistoryOnly(raw);
-    expect(wrap.textContent).toContain("Not owed — outside its agreed months (Feb, Aug)");
+    expect(wrap.textContent).toContain("Not owed — it supplies only in the February and August rounds");
   });
 
   it("F4: a daily run is counted in days", () => {

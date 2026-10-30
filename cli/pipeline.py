@@ -234,6 +234,14 @@ def _say_pass(report) -> None:
                       f"{len(report.owed) - len(waited)} owed item(s).", style="green")
         # WAITING ON A REFUSAL is said, never counted as run (delivery-critic
         # on (f)-(i), finding 6).
+        # TOTALLED BY PERIOD (REQ-PIPE-327 criterion 4): at thirty
+        # collections one summary naming one period is wrong as often as right.
+        for period in sorted(report.by_period, key=lambda p: (p is None, p or "")):
+            n = report.by_period[period]
+            words = ", ".join(x for x in (f"{n['filed']} filed" if n["filed"] else "",
+                                          f"{n['held']} held" if n["held"] else "") if x)
+            console.print(f"  {period or 'No period yet'}: {words}", markup=False,
+                          highlight=False)
         if waited or report.left_frozen:
             console.print(f"{len(waited)} owed item(s) and {len(report.left_frozen)} "
                           f"arrival(s) wait on a refused dataset - they go ahead once the "

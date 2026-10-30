@@ -24,7 +24,8 @@ function load(periodOnShow) {
   const w = dashboard.window;
   const raw = { id: "cp-case-workers", name: "Case Worker Register", carryForwardWarnings: [WARNING] };
   w.rawRealDatasetById = (id) => (id === raw.id ? raw : null);
-  w.periodNameFor = () => periodOnShow;
+  // THE ONE CURRENT PERIOD (REQ-DASH-326 criterion 16) is what the page asks.
+  w.currentPeriodOn = () => ({ period: periodOnShow, date: null, slot: null });
   return { w, raw };
 }
 
@@ -135,7 +136,7 @@ describe("a carry-forward recorded late is named as changing the date", () => {
                       at: "2024-10-05T09:00:00+08:00", recordedAt: "2024-10-20T09:00:00+08:00" }] }] } };
     w.rawRealDatasets = () => [raw];
     w.promotionStateOn = () => ({});
-    w.periodNameFor = () => "2024-Q4";
+    w.currentPeriodOn = () => ({ period: "2024-Q4", date: null, slot: null });
     const got = w.decisionsChangingDate("2024-10-10", null);
     expect(got.map(e => e.action)).toContain("carry-forward");
   });

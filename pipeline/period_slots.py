@@ -74,6 +74,7 @@ def for_dataset(dataset_id: str, now=None) -> dict | None:
     # <period>, first due <instant>' (REQ-DASH-182 criterion 3 as amended).
     first = found[0] if found else None
     return {"filesGo": files_go.describe(dataset_id, today),
+            "filesGoValue": agr.files_go_to_period_for(dataset_id, today),
             "first": {"period": first.period.name, "due": _iso(first.due_at),
                       "opens": _iso(first.claim_opens_at)} if first else None,
             "slots": out}

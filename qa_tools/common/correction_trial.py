@@ -672,9 +672,16 @@ class InForce:
     #: Periods it owes nothing in, by name, with the agreed reason.
     not_expected: tuple[tuple[str, str], ...]
     zone: str
+    #: The next slot's round and due instant (REQ-PIPE-327 criterion 2): a
+    #: slot is named by its period and due on its round, never by the
+    #: period's own date.
+    next_round: date | None = None
+    next_due: object = None
 
 
 _MONTHS = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+_FULL_MONTHS = ("January", "February", "March", "April", "May", "June", "July", "August",
+                "September", "October", "November", "December")
 
 
 def in_force(dataset_id: str, on: date, agreement=None) -> InForce:
@@ -703,7 +710,12 @@ def in_force(dataset_id: str, on: date, agreement=None) -> InForce:
 
         owes = f"nothing - it is {turned_off.gap_words(standing.turned_off, dataset_id)}"
     elif version.participates:
-        owes = (f"periods dated in {', '.join(_MONTHS[m - 1] for m in version.participates)}"
+        # ROUNDS NAMED BY THEIR MONTH, NOT PERIODS BY THEIRS (REQ-PIPE-327
+        # criterion 9): at files_go_to_period 1 a February round's files are
+        # not February's period's.
+        months = [_FULL_MONTHS[m - 1] for m in version.participates]
+        said = months[0] if len(months) == 1 else ", ".join(months[:-1]) + " and " + months[-1]
+        owes = (f"the {said} rounds only"
                 + (f" - {version.reason}" if version.reason else ""))
     else:
         owes = "every period"
@@ -720,7 +732,9 @@ def in_force(dataset_id: str, on: date, agreement=None) -> InForce:
     skipped = tuple(sorted((entry.not_expected or {}).items())) if entry else ()
     return InForce(dataset_id, on, cal.name, owes, nxt.name if nxt else None,
                    nxt.date if nxt else None, inputs, skipped,
-                   asset_time.zone_on(on).key)
+                   asset_time.zone_on(on).key,
+                   next_round=nxt.round_date if nxt else None,
+                   next_due=nxt.due_at if nxt else None)
 
 
 @dataclass(frozen=True)

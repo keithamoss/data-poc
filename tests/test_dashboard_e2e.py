@@ -1434,7 +1434,7 @@ class TestOwedNothingPeriods:
         # cycle with the period's label beneath - never a second row.
         sub = page.locator(".supply-history > .supply-cycle [data-owed-nothing-sub]")
         assert sub.count() == 1 and sub.is_visible()
-        assert "Not owed — outside its agreed months (Feb, Aug)" in sub.inner_text()
+        assert "Not owed — it supplies only in the February and August rounds" in sub.inner_text()
         label = sub.locator("xpath=ancestor::div[contains(@class,'supply-cycle-label')][1]")
         assert "Current cycle" in label.inner_text()
         assert page.locator(".supply-history > [data-owed-nothing]").count() == 0

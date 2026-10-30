@@ -66,6 +66,10 @@ class Blocker:
     #: Received while its dataset is turned off (REQ-PIPE-179 criterion 24):
     #: NOT a state needing a person, so it never blocks or reddens the page.
     turned_off: bool = False
+    #: Held after a fall because its round's period is already filled
+    #: (REQ-PIPE-322 criterion 3): {"period", "round", ...} from the hold's
+    #: own reason - our configuration change, not the supplier's.
+    doubly_fed: dict | None = None
     #: How a contested pair was settled (REQ-PIPE-194 criteria 10 and 13):
     #: {"actor", "at", "reason", "arrivalRunId", "files": [{"filename",
     #: "receivedAt", "outcome", "toPeriod", "supplyId", "runId"}]}, files in
@@ -104,6 +108,7 @@ class Blocker:
                 "scheduleEnded": self.schedule_ended,
                 "agreementRefused": self.agreement_refused,
                 "turnedOff": self.turned_off,
+                "doublyFed": self.doubly_fed,
                 "settlement": self.settlement, "supersededBy": self.superseded_by,
                 "ended": self.ended,
                 # WHERE IT IS SETTLED, for the page's own wording on any date
@@ -154,7 +159,7 @@ def _holds(db) -> list[Blocker]:
                          if held.resolved_by is not None else None),
             reason=held.describe(), delivery=held.delivery,
             schedule_ended=held.schedule_ended, agreement_refused=held.agreement_refused,
-            turned_off=held.turned_off,
+            turned_off=held.turned_off, doubly_fed=held.doubly_fed,
             ended=_ended(action, actor_kind, actor, effective_at, to_slot, why)
             if held.resolved_by is not None and action else None))
     return out
