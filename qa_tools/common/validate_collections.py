@@ -44,10 +44,11 @@ EXEMPT_DIRS = {
     "generator/collections": "the generator's per-collection providers (REQ-GEN-246)",
     "aws": "reaches collections only through the processing pass (position.md call 9)",
 }
-#: In the scenario register, only these two assignments' values: a scenario
-#: is planted in a named dataset, which is what a scenario IS.
+#: In the scenario register, only these assignments' values: a scenario is
+#: planted in a named dataset, which is what a scenario IS - and a correction's
+#: riders (REQ-GEN-334, 2026-10-30) are the datasets whose supplies ride it.
 SCENARIO_REGISTER = "generator/scenario_injection.py"
-SCENARIO_EXEMPT_NAMES = ("INJECTIONS", "INHERITING_DATASET")
+SCENARIO_EXEMPT_NAMES = ("INJECTIONS", "INHERITING_DATASET", "CORRECTION_RIDERS")
 
 #: THE MIGRATION ALLOWLIST (criterion 10): every file still holding a
 #: collection literal when REQ-PIPE-240 landed, with the requirement that
@@ -232,6 +233,37 @@ def check_file_problems(root: Path | None = None) -> list[str]:
                             f"{c.folder}/")
 
     problems += _dbt_layout_problems(root, declared)
+    problems += dbt_cross_collection_ref_problems(root, declared)
+    return problems
+
+
+_DBT_REF = re.compile(r"""ref\(\s*['"]([A-Za-z0-9_]+)['"]\s*\)""")
+
+
+def dbt_cross_collection_ref_problems(root: Path, declared) -> list[str]:
+    """REQ-PIPE-331 criterion 11: a dbt test reading another collection's
+    table reads it through source(), never ref() to that collection's model -
+    ref() would couple two collections' dbt folders (REQ-QAC-241). Each model
+    belongs to the collection whose models folder defines it."""
+    owner: dict[str, str] = {}
+    for c in declared:
+        base = root / c.dbt_models
+        for path in sorted(base.glob("*.sql")) if base.is_dir() else []:
+            owner[path.stem] = c.id
+    problems = []
+    for c in declared:
+        for folder in (c.dbt_models, c.dbt_tests):
+            base = root / folder
+            for path in sorted(base.rglob("*")) if base.is_dir() else []:
+                if not path.is_file() or path.suffix not in (".sql", ".yml", ".yaml"):
+                    continue
+                for model in _DBT_REF.findall(path.read_text()):
+                    if owner.get(model, c.id) != c.id:
+                        problems.append(
+                            f"{path.relative_to(root).as_posix()} reads {model}, "
+                            f"{owner[model]}'s model, through ref() - read another "
+                            f"collection's table through source('raw', ...) instead "
+                            f"(REQ-PIPE-331 criterion 11)")
     return problems
 
 

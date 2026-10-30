@@ -63,10 +63,11 @@ def collection_checks(collection_id: str) -> EvidentlyChecks:
     rel = coll.check_file("evidently")
     checks = check_lifecycle.load_evidently_checks(Path(__file__).resolve().parents[2] / rel)
     psi = [i for i, m in checks.items() if m.get("method") == "psi"]
-    if not psi:
-        raise ValueError(f"{rel}: expected at least one psi check, found none")
+    # NO DRIFT CHECK IS A REAL ANSWER (Linkage Products, 2026-10-30): a
+    # collection may declare none, and its runs simply have no drift to
+    # measure - it used to raise here and stop every run of it.
     datasets = {i.split(".")[3] for i in psi}
-    if len(datasets) != 1:
+    if len(datasets) > 1:
         # ONE DRIFT DATASET: its last promoted supply is the run's reference
         # (orchestrate's reference choice), so drift checks on two datasets
         # would each need a reference of their own.

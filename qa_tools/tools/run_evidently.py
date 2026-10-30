@@ -38,8 +38,10 @@ __all__ = ["ENGINE_TAG", "evaluate"]
 
 def drift_dataset(collection_id: str) -> str:
     """The dataset a collection's drift checks are about - the check ids'
-    fourth segment (asset.agency.collection.dataset...), one for all of them."""
-    return collection_checks(collection_id).psi[0].split(".")[3]
+    fourth segment (asset.agency.collection.dataset...), one for all of them -
+    None for a collection that declares none."""
+    psi = collection_checks(collection_id).psi
+    return psi[0].split(".")[3] if psi else None
 
 
 def _table_of(check_id: str) -> str:
@@ -205,11 +207,11 @@ def evaluate(collection_id: str, run_id: str, run_timestamp: str,
              reference_run_id: str | None = None, assessment=None) -> list[dict]:
     coll = collections.by_id(collection_id)
     checks = collection_checks(coll.id)
-    psi_table = _table_of(checks.psi[0])
+    psi_table = _table_of(checks.psi[0]) if checks.psi else None
 
     asked_for.ask(run_id, run_timestamp, coll.agency_id, coll.id, "evidently")
     results = []
-    if _psi_applies(run_id, psi_table):
+    if psi_table is not None and _psi_applies(run_id, psi_table):
         results.extend(_psi_result(coll, checks.checks[c], c, psi_table, run_id,
                                    run_timestamp, reference_run_id) for c in checks.psi)
     # EACH DRIFT CHECK'S SNAPSHOT BY ITS ID (REQ-QAC-231): read by nothing, and

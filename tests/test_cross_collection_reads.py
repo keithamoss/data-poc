@@ -246,3 +246,71 @@ class TestARunnerTreatsAnAbsentForeignTableAsAbsent:
         # set from the one resolver rather than a list of their own.
         assert "run_reads.unreadable_in" in inspect.getsource(run_soda.evaluate)
         assert "run_reads.unreadable_in" in inspect.getsource(run_datacontract._unreadable_in)
+
+
+class TestDbtReadsAnotherCollectionThroughSource:
+    """Criterion 11: a dbt test reading another collection's table goes
+    through source(), never ref() to that collection's model."""
+
+    def _tree(self, tmp_path):
+        import shutil
+        from pathlib import Path
+
+        repo = Path(__file__).resolve().parent.parent
+        shutil.copytree(repo / "dbt_project" / "models", tmp_path / "dbt_project" / "models")
+        shutil.copytree(repo / "dbt_project" / "tests", tmp_path / "dbt_project" / "tests")
+        return tmp_path
+
+    def test_the_real_tree_passes(self):
+        from pathlib import Path
+
+        from qa_tools import collections
+        from qa_tools.common import validate_collections as vc
+
+        root = Path(__file__).resolve().parent.parent
+        assert vc.dbt_cross_collection_ref_problems(root, collections.all_collections()) == []
+
+    def test_a_ref_to_another_collections_model_is_refused(self, tmp_path):
+        from qa_tools import collections
+        from qa_tools.common import validate_collections as vc
+
+        root = self._tree(tmp_path)
+        bad = root / "dbt_project" / "tests" / "linkage-products" / "bad_ref.sql"
+        bad.parent.mkdir(parents=True, exist_ok=True)
+        bad.write_text("select * from {{ ref('stg_cp_clients') }} where 1 = 0\n")
+        [p] = vc.dbt_cross_collection_ref_problems(root, collections.all_collections())
+        assert "bad_ref.sql" in p and "stg_cp_clients" in p and "source(" in p
+
+    def test_source_is_allowed(self, tmp_path):
+        from qa_tools import collections
+        from qa_tools.common import validate_collections as vc
+
+        root = self._tree(tmp_path)
+        ok = root / "dbt_project" / "tests" / "linkage-products" / "ok.sql"
+        ok.parent.mkdir(parents=True, exist_ok=True)
+        ok.write_text("select * from {{ source('raw', 'cp_clients') }} where 1 = 0\n")
+        assert vc.dbt_cross_collection_ref_problems(root, collections.all_collections()) == []
+
+
+class TestACollectionWithNoDriftChecksRuns:
+    """Found by the bootstrap with Linkage Products: a collection whose
+    Evidently file declares no checks stopped its run - 'expected at least
+    one psi check, found none' - so its first arrival was never checked and
+    the bootstrap's worker died. No drift check is a real answer."""
+
+    def test_collection_checks_has_no_psi(self):
+        from qa_tools.common import evidently_common
+
+        got = evidently_common.collection_checks("linkage-products")
+        assert got.psi == () and got.row_drop == {}
+
+    def test_evaluate_runs_nothing_and_records_nothing_red(self, monkeypatch):
+        from qa_tools.tools import run_evidently
+
+        recorded = []
+        monkeypatch.setattr(run_evidently.asked_for, "ask", lambda *a, **k: [])
+        monkeypatch.setattr(run_evidently, "write_qa_result",
+                            lambda *a, **k: recorded.append(k.get("verified")))
+        monkeypatch.setattr(run_evidently.left_out, "note", lambda *a, **k: None)
+        assert run_evidently.evaluate("linkage-products", "linkage_keys__x", "t") == []
+        assert recorded == [[]]
