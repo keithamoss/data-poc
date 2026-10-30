@@ -560,3 +560,23 @@ def fall_hold(dataset_id: str, at: datetime, agreement=None) -> dict | None:
             "from_round": from_round.isoformat(),
             "period": target.name, "filled_by": filler.isoformat()}
 
+
+
+def period_claimed_at(dataset_id: str, at: datetime, agreement=None) -> str | None:
+    """The period of this dataset's slot whose claim window holds `at` -
+    opened by then, not yet closed - from configuration alone, or None
+    where none does (REQ-GEN-334 criterion 12: which period a reader's
+    delivery is for, before anything has filed it)."""
+    from qa_tools.common import asset_time
+
+    try:
+        found = slots_for_dataset(
+            dataset_id, until=claimable_until(dataset_id, asset_time.local_date(at), agreement),
+            agreement=agreement)
+    except (ValueError, KeyError, schedule.ScheduleConfigError, schedule.NoCalendarAgreed):
+        return None
+    hit = None
+    for slot in found:
+        if slot.claim_opens_at <= at and (slot.closes_at is None or at < slot.closes_at):
+            hit = slot.period.name
+    return hit

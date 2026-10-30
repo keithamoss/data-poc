@@ -431,7 +431,49 @@ def next_receipt(arrival) -> datetime | None:
     if collection_id is not None:
         found += [a.received_at for a in arrivals.arrivals_for(collection_id, "")
                   if datasets[0] in a.files_by_dataset and a.received_at > received]
+        found += _readers_next_receipts(datasets[0], received)
     return min(found) if found else None
+
+
+def _readers_next_receipts(dataset_id: str, received) -> list:
+    """Every later receipt of a delivery from ANOTHER collection whose
+    checks read this dataset's table, for the period this supply is filed to
+    (REQ-GEN-334 criterion 12; Keith, 2026-10-30, 'cap the lag'): a replay's
+    invented lag never runs past the reader's arrival, so the reader reads
+    this supply promoted rather than red, could not run. Generic - the
+    readers are whatever the check declarations say (run_reads), and a
+    reader's delivery for another period caps nothing. Live, the lag is
+    'now' anyway, so this changes nothing outside a replay."""
+    from qa_tools.common import arrivals, filing, hierarchy, run_reads, slots
+
+    try:
+        table = hierarchy.dataset(dataset_id).table
+    except hierarchy.UnknownDatasetError:
+        return []
+    readers = run_reads.foreign_readers(table)
+    if not readers:
+        return []
+    period = filing.period_of(dataset_id, received)
+    if period is None:
+        return []
+    out = []
+    for collection_id in readers:
+        # THE FIRST ONE ONLY, oldest first: only the earliest can cap, and a
+        # reader's delivery more than a year on is never for this period.
+        later = sorted((a for a in arrivals.arrivals_for(collection_id, "")
+                        if received < a.received_at <= received + _READER_REACH),
+                       key=lambda a: a.received_at)
+        for a in later:
+            if any(slots.period_claimed_at(d, a.received_at) == period
+                   for d in a.files_by_dataset):
+                out.append(a.received_at)
+                break
+    return out
+
+
+#: How far after a supply's receipt a reader's delivery for its period can
+#: be: a period's claim window is a quarter at most, so a year is generous.
+_READER_REACH = timedelta(days=400)
 
 
 def should_promote(*, status: str,
