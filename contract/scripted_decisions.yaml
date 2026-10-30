@@ -272,6 +272,47 @@ decisions:
     after_hours: 24
     reason: "Nothing was supplied for this quarter, and nothing will be; accepted as not supplied."
 
+  # THE LINKAGE HISTORY'S PERSON DECISIONS (REQ-GEN-335). TS-93a: the quarter's
+  # red Client Register is rejected three weeks after it arrived, so the 2019-Q1
+  # linkage release (TS-93b) is checked with none in the warehouse.
+  - scenario: TS-93a
+    name: TS-93 reject
+    operation: reject
+    dataset: cp-clients
+    supply: 0
+    after_hours: 504
+    reason: "Client records fail their checks and will not be corrected for this quarter."
+  # TS-94: a red release, held back, promoted by a person two days after it
+  # arrived (REQ-PIPE-332 criterion 8) - its red then counting toward the
+  # Client Register promoted on the round before.
+  - scenario: TS-94
+    name: TS-94 promote
+    operation: promote
+    dataset: linkage-keys
+    supply: 0
+    after_hours: 48
+    reason: "One client the release names is not in the quarter; the linkage unit is investigating, and the release is accepted meanwhile."
+  # TS-96: no release came for the quarter; a person marks it not supplied two
+  # days after it was due (REQ-PIPE-132).
+  - scenario: TS-96
+    name: TS-96 not supplied
+    operation: mark-not-supplied
+    dataset: linkage-keys
+    scope: period
+    after_hours: 48
+    reason: "The linkage unit did not run a release for this quarter, and will not."
+  # TS-100a: the held red Client Register promoted by a person at 10:00 the day
+  # after the 2019-Q3 linkage release, so the knock-on re-checks the release
+  # (REQ-PIPE-331 criterion 5) - day 93 from the 1 May 2019 round.
+  - scenario: TS-100a
+    name: TS-100 promote
+    operation: promote
+    dataset: cp-clients
+    supply: 0
+    at: "10:00"
+    day_offset: 93
+    reason: "Client records fail a check the supplier has explained; accepted for this quarter."
+
 # SCRIPTED CORRECTION CONFIRMATIONS (REQ-GEN-205) - see the header.
 corrections:
   # TS-59: of the moves REQ-GEN-205's correction proposes, the asset manager

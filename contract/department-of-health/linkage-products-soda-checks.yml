@@ -68,17 +68,20 @@ checks for linkage_keys:
         changelog: []
 
   # (4) Nothing after id_k. Every linked dataset declares one identifier today,
-  # so id_1 is the contract's last id column and nothing can follow it: the
-  # query is written for that, and gains a clause per dataset when one declares
-  # fewer identifiers than id_N (the id_counts attribute is gated).
+  # so id_2 - the contract's last id column, blank in an ordinary release - must
+  # be empty on every row of each (REQ-GEN-335 (c), PROVISIONAL); the query
+  # gains a clause per dataset when one declares a different count (the
+  # id_counts attribute is gated).
   - failed rows:
       name: No surplus identifiers
       fail query: |
-        SELECT dataset, linkage_key FROM linkage_keys WHERE 1 = 0
+        SELECT dataset, linkage_key FROM linkage_keys
+        WHERE (dataset = 'DOC_CLIENTS' AND id_2 IS NOT NULL AND TRIM(id_2) <> '')
+           OR (dataset = 'EDDC_PRESENTATION' AND id_2 IS NOT NULL AND TRIM(id_2) <> '')
       samples limit: 100000
       attributes:
         check_id: data-asset-1.department-of-health.linkage-products.linkage-keys.id_1.no_surplus_ids_soda
-        reads_columns: ["linkage_keys.dataset", "linkage_keys.linkage_key"]
+        reads_columns: ["linkage_keys.dataset", "linkage_keys.linkage_key", "linkage_keys.id_2"]
         category: conformity
         introduced_date: "2013-01-01"
         id_counts: {DOC_CLIENTS: 1, EDDC_PRESENTATION: 1}

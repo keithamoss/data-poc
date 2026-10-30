@@ -4,8 +4,11 @@
 # scrambled key and source identifiers only, no attribute of any person.
 # Written to docs/check-authoring-rules.md. What it links, and the source
 # columns id_1 onward hold, are declared once beside the dataset in
-# contract/data-asset.yaml (linked_datasets); N here is the largest number of
-# identifier columns any linked dataset declares, which today is 1.
+# contract/data-asset.yaml (linked_datasets); N here is one more than the
+# largest number of identifier columns any linked dataset declares, which today
+# is 1, so a surplus identifier has a column to arrive in and the no-surplus
+# check something to read (REQ-GEN-335 (c), PROVISIONAL): id_2 is blank in an
+# ordinary release.
 apiVersion: v3.2.0
 kind: DataContract
 id: linkage-keys
@@ -51,3 +54,8 @@ schema:
         physicalType: varchar(64)
         required: true
         description: "The record's first identifier value in its own dataset, held as text whatever the source column's type."
+      - name: id_2
+        logicalType: string
+        physicalType: varchar(64)
+        required: false
+        description: "The record's second identifier value in its own dataset, held as text. No linked dataset declares a second identifier today, so it is blank in every row of an ordinary release."

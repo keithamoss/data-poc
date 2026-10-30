@@ -47,7 +47,7 @@ EXEMPT_DIRS = {
 #: In the scenario register, only these two assignments' values: a scenario
 #: is planted in a named dataset, which is what a scenario IS.
 SCENARIO_REGISTER = "generator/scenario_injection.py"
-SCENARIO_EXEMPT_NAMES = ("INJECTIONS", "INHERITING_DATASET")
+SCENARIO_EXEMPT_NAMES = ("INJECTIONS", "INHERITING_DATASET", "CORRECTION_RIDERS")
 
 #: THE MIGRATION ALLOWLIST (criterion 10): every file still holding a
 #: collection literal when REQ-PIPE-240 landed, with the requirement that
