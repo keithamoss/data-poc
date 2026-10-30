@@ -3038,3 +3038,55 @@ one or more component tags, and a date.
     - **OVERNIGHT**: a second from-empty bootstrap of lp_boot runs with the
       fixes (scratchpad lp_boot2.log). The c12 moved-verdicts list, the
       scenario checks and the REQ-DASH-337 browser tests all wait on it.
+    - **SECOND BOOTSTRAP FROM EMPTY (lp_boot, ~22:30), PASSED**: 59m33s
+      wall clock. Birth Registrations took 742s and the quarterly stream
+      2645s (1291s before the linkage work). Every targeted supply read as
+      built, and `TestAfterAReplay` passes 4 of 4 against it. Linkage
+      Products: 55 runs, 536 results (486 pass / 16 warn / 34 fail).
+    - **REQ-PIPE-332 c12, THE MOVED VERDICTS** (off_boot before, lp_boot
+      after; recorded as evidence, not for review):
+      - **Child Protection 2019-Q1 and 2019-Q3**:
+        - cp-clients goes from clean to red in both quarters (about 26 checks
+          each: nulls, duplicates, ranges, codes). These are the linkage
+          scenarios' own Child Protection sides, TS-93a and TS-100a (REQ-GEN-335
+          (h)/(p)).
+        - As a result, cp-clients promotes nothing green in either quarter: 2
+          promotion-refused entries, a red promote in 2019-Q3, and 1 more
+          reject.
+        - Its package-mates cp-investigations, cp-notifications and
+          cp-placements each read 1 to 3 cross-table fails there, so 7 green
+          promotions become promotion-withheld.
+        - cp-clients, cp-investigations and cp-placements also gain 1 fail in
+          2019-Q2 and 2019-Q4, and cp-notifications 2: knock-on cross-table
+          reads of those reds.
+      - **cp-placements 2025-Q2**: 9 cross-table fails recorded 3 times rather
+        than 2, one more re-evaluation of the same red. The status is
+        unchanged.
+      - **Emergency Department**: no check result moved. 44 promotions have a
+        different effective instant: the reader lag cap (REQ-GEN-334 c12,
+        "cap the lag"), as the critic predicted. Each of the four CP datasets
+        has 1 instant moved for the same reason.
+      - The full per-check list is at
+        /tmp/claude-0/-home-user-data-poc/5735d9c2-23bf-590b-afe1-e67b136c7e21/scratchpad/moved.out
+        (178 check keys, 17 decision keys).
+    - **LINKAGE SCENARIOS AGAINST THE RECORDED RESULTS (lp_boot)**: all 15
+      read as designed.
+      - **Each fault fails or warns the check it targets**:
+        - TS-86, empty key: missing_count fails.
+        - TS-87, undeclared code: invalid_count fails, and ED coverage fails
+          with it.
+        - TS-88, surplus identifier: no-surplus fails.
+        - TS-89, double link: duplicate_count fails.
+        - TS-90 and TS-94, dangling id: the links-match check fails.
+        - TS-91, CP coverage in the amber band: warns.
+        - TS-92, ED coverage in the red band: fails.
+        - TS-97 and TS-98, large key groups: warn and fail.
+        - TS-99, blank id_1: expected-identifiers fails, and links-match
+          fails with it.
+      - **The three could-not-run scenarios**:
+        - TS-93b and TS-100b read a held client register; TS-101 waits on ED
+          resupply. Each records coverage and referential as could-not-run
+          reds.
+        - TS-100b and TS-101 clear to green on their knock-on re-checks.
+        - TS-93b stays could-not-run, since its source never promotes.
+      - **TS-96**: its quarter has no release, as scripted.
