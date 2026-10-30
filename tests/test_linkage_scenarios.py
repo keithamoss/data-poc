@@ -337,3 +337,26 @@ class TestEachOrdinaryReleaseIsScheduledAfterThePromotionItReads:
         with pytest.raises(lp.CannotGenerate) as exc:
             lp._refuse_unschedulable([job], src, {job.slot_id: [(at, (), None)]}, {})
         assert took.isoformat() in str(exc.value)
+
+
+def test_a_dataset_identified_by_several_columns_carries_each(monkeypatch):
+    """REQ-QAC-330 criterion 5: id_1 onward hold a linked dataset's declared
+    source columns in order - every one of them, not only the first - and the
+    columns after them are blank."""
+    import numpy as np
+    import pandas as pd
+
+    monkeypatch.setattr(lp, "linked", lambda: (
+        ("cp-clients", "DOC_CLIENTS", ("cp_client_id", "episode")),))
+    monkeypatch.setattr(lp, "columns", lambda: ["linkage_key", "dataset", "id_1", "id_2",
+                                                "id_3"])
+    n = 200
+    source = pd.DataFrame({"cp_client_id": [f"C{i:04d}" for i in range(n)],
+                           "episode": [str(i % 3 + 1) for i in range(n)]})
+    df = lp.build_rows({"cp-clients": source}, (), np.random.default_rng(1), "t")
+    assert list(df.columns) == ["linkage_key", "dataset", "id_1", "id_2", "id_3"]
+    pairs = set(zip(source["cp_client_id"], source["episode"]))
+    got = list(zip(df["id_1"], df["id_2"]))
+    assert got and set(got) <= pairs, got[:3]
+    assert (df["id_3"] == "").all()
+    assert 90.0 <= lp._coverage(list(pairs), set(got)) <= 96.5
