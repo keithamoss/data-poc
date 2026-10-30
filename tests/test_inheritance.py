@@ -804,14 +804,14 @@ class TestDeliveryMonthsAreNonParticipationToo:
     def test_a_quarter_outside_the_delivery_months_owes_nothing(self):
         from qa_tools.common import inheritance
 
-        skipped, reason = inheritance._does_not_participate("cp-case-workers", "2023-Q2")
+        skipped, reason = inheritance._does_not_participate("cp-case-workers", "2023-Q3")
         assert skipped
         assert "February" in reason and "August" in reason
 
     def test_a_quarter_inside_them_is_still_owed(self):
         from qa_tools.common import inheritance
 
-        assert inheritance._does_not_participate("cp-case-workers", "2023-Q1") == (False, "")
+        assert inheritance._does_not_participate("cp-case-workers", "2023-Q2") == (False, "")
 
     def test_another_calendars_period_is_not_its_business(self):
         """REAL DEFECT IN THE FIX ABOVE, found the same night by reading the
@@ -827,7 +827,7 @@ class TestDeliveryMonthsAreNonParticipationToo:
     def test_a_dataset_with_no_delivery_months_owes_every_period(self):
         from qa_tools.common import inheritance
 
-        assert inheritance._does_not_participate("cp-clients", "2023-Q2") == (False, "")
+        assert inheritance._does_not_participate("cp-clients", "2023-Q3") == (False, "")
 
 
 class TestAnInheritanceNamesThePromotionThatCausedIt:

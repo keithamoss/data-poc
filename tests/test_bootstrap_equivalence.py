@@ -68,18 +68,28 @@ pytestmark = pytest.mark.on_demand
 #: Emergency Department (REQ-PIPE-262 criterion 14) - on Child Protection's
 #: calendar, so the two replay as ONE receipt-ordered stream. Its 2013-Q1
 #: supply is received on 22 January, before any Child Protection arrival in
-#: that quarter. Its 2015-Q3 supply comes before Child Protection's 2015-Q4
-#: delivery (one file kept), which opens 2015-Q4: ED's participation gap
-#: (REQ-GEN-251) inherits, and so does case workers, who owe nothing in Q4.
-#: Before REQ-PIPE-262, --sequential ran Child Protection to its end and
-#: then ED, so 2015-Q4 opened with ED's 2015-Q3 supply not yet promoted -
-#: and its gap inherited nothing.
+#: that quarter. Its 2015-Q3 supply comes before Child Protection's first
+#: grown delivery, on the 1 November 2015 round (one file kept): Child
+#: Protection is at files_go_to_period 1, so that delivery fills 2016-Q1, and
+#: as the first arrival after the claim window of ED's own November round
+#: opens it makes ED's offset group's inheritances for 2015-Q4 (REQ-PIPE-323
+#: criterion 3) - so ED's participation gap (REQ-GEN-251) inherits. Before
+#: REQ-PIPE-262, --sequential ran Child Protection to its end and then ED,
+#: so 2015-Q4's inheritances were made with ED's 2015-Q3 supply not yet
+#: promoted - and its gap inherited nothing.
+#:
+#: BY RUN ID, which the generator numbers - so REQ-GEN-238 dropping Child
+#: Protection's two oldest grown years renumbered them, and cp_run_025 (the
+#: November 2015 delivery until then) became a 2016 one: the corpus lost the
+#: delivery the gap depended on and CI run 40978105702 went red. The
+#: corpus fixture's own check catches a run id that names nothing; this
+#: one named the wrong delivery.
 KEEP = {"birth-registrations": ("run_001", "run_002", "run_009", "run_017"),
-        "cp-clients": ("cp_run_001", "cp_run_002", "cp_run_025"),
+        "cp-clients": ("cp_run_001", "cp_run_002", "cp_run_022"),
         "ed-presentations": ("ed_run_001", "ed_run_011")}
 #: Deliveries kept only in part: run id -> the files kept.
 KEEP_ONLY_FILES = {"cp_run_002": {"cp_case_workers.csv"},
-                   "cp_run_025": {"cp_clients.csv"}}
+                   "cp_run_022": {"cp_clients.csv"}}
 
 ADMIN_DSN_ENV = "MOTHMAN_TEST_DSN"
 

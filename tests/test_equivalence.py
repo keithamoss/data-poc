@@ -448,3 +448,74 @@ class TestTheRecordOfREQPIPE279IsComparedByWhatItSays:
         before = self._snap()
         self._two_collections(conn, ["c2_a", "c1_a", "c2_b", "c1_b"])
         assert any(d.startswith("qa.run:") for d in eq.differences(before, self._snap()))
+
+
+class TestAPackageGateApplicationIsComparedByWhatItSays:
+    """REQ-PIPE-266's qa.gate_application under the snapshot (CI run
+    40978105702's on-demand failures on cc4c31a). Its start and end are the
+    replay clock, which runs on with real elapsed time, so two bootstraps -
+    or a resume and a full replay - stamp them milliseconds apart; whether
+    it ended, and how, is compared. Its id is a bigserial two collections
+    replaying side by side interleave, so it is compared as its place in
+    its collection's sequence, and a run or decision naming one is compared
+    by which application it names. Each test also shows the comparison
+    still catches the real difference beside the one it ignores."""
+
+    @staticmethod
+    def _snap(**kw):
+        return eq.snapshot(os.environ["MOTHMAN_SUPPLY_DSN"], **kw)
+
+    @staticmethod
+    def _apply(conn, collection, period, started="2026-07-06T06:46:53Z",
+               ended_at="2026-07-06T08:55:57Z"):
+        [(gid,)] = conn.execute(
+            "INSERT INTO qa.gate_application (collection_id, period, entry, started_at, ended, "
+            "ended_at, delivery, package_instant) VALUES (?, ?, 'package', ?, 'settled', ?, "
+            "'d', '2026-07-06T06:46:50Z') RETURNING id",
+            [collection, period, started, ended_at]).fetchall()
+        return gid
+
+    @staticmethod
+    def _run_through(conn, collection, gid, n):
+        """A run naming the application it ran through - qa.decision names
+        one the same way and is compared by the same expression, but it is
+        append-only, so a test cannot clear what it writes there."""
+        conn.execute("INSERT INTO qa.run (run_key, agency_id, collection_id, run_timestamp, "
+                     "run_instant, gate_application) VALUES (?, 'a', ?, "
+                     "'2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00', ?)",
+                     [f"{collection}_r{n}", collection, gid])
+
+    def test_its_clock_is_left_out_but_how_it_ended_is_not(self, clean_qa_history):
+        conn = clean_qa_history
+        self._apply(conn, "c1", "2026-07-06")
+        before = self._snap()
+        conn.execute("UPDATE qa.gate_application SET started_at = started_at + interval '2 ms', "
+                     "ended_at = ended_at - interval '1 ms'")
+        assert eq.differences(before, self._snap()) == []
+        conn.execute("UPDATE qa.gate_application SET ended = 'abandoned'")
+        assert any(d.startswith("qa.gate_application")
+                   for d in eq.differences(before, self._snap()))
+
+    @staticmethod
+    def _clear(conn):
+        conn.execute("TRUNCATE qa.run, qa.run_attempt CASCADE")
+        conn.execute("DELETE FROM qa.gate_application WHERE collection_id IN ('c1', 'c2')")
+
+    def test_two_collections_interleaving_compare_as_each_ones_own_sequence(
+            self, clean_qa_history):
+        conn = clean_qa_history
+        self._clear(conn)
+        for n, collection in enumerate(["c1", "c2", "c1"]):
+            self._run_through(conn, collection, self._apply(conn, collection, f"p{n}"), n)
+        before = self._snap()
+        # The second collection's application landing first this time:
+        # every row's own story unchanged.
+        self._clear(conn)
+        for n, collection in ((1, "c2"), (0, "c1"), (2, "c1")):
+            self._run_through(conn, collection, self._apply(conn, collection, f"p{n}"), n)
+        assert eq.differences(before, self._snap()) == []
+        # A run naming a DIFFERENT application of its collection is real.
+        [(first,)] = conn.execute("SELECT min(id) FROM qa.gate_application "
+                                  "WHERE collection_id = 'c1'").fetchall()
+        conn.execute("UPDATE qa.run SET gate_application = ? WHERE run_key = 'c1_r2'", [first])
+        assert any(d.startswith("qa.run:") for d in eq.differences(before, self._snap()))

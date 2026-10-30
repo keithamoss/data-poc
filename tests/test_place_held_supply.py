@@ -146,11 +146,11 @@ class TestRefusedBeforeAnythingIsRecorded:
 
     def test_a_period_the_dataset_owes_nothing_in_quotes_why(self, conn, period):
         """cp-case-workers participates in February and August only, so the
-        calendar's 2023-Q2 is a period it owes nothing in - for the reason its
+        calendar's 2023-Q3 is a period it owes nothing in - for the reason its
         participation version gives."""
         supply = _held(conn, period, dataset="cp-case-workers")[0]
         with pytest.raises(dl.DecisionRefused) as refused:
-            _place(conn, supply, "2023-Q2", dataset="cp-case-workers")
+            _place(conn, supply, "2023-Q3", dataset="cp-case-workers")
         said = str(refused.value)
         assert "owes nothing" in said and "staffing register" in said
         assert "un-inherit" not in said
@@ -353,7 +353,7 @@ class TestDecidePlacesThroughFlags:
 
     def test_a_placement_needs_the_supply(self, cli):
         got = cli(["decide", "--operation", "place", "--dataset", DS, "--to-period",
-                   "2099-Q1", "--reason", "r", "--yes"])
+                   "2099-Q2", "--reason", "r", "--yes"])
         assert got.exit_code != 0 and "--supply" in _plain(got.output)
 
     def test_a_placement_takes_no_period(self, conn, period, target, cli):
@@ -375,7 +375,7 @@ class TestDecidePlacesThroughFlags:
 
     def test_wait_is_refused_for_a_decision_that_owes_no_run(self, cli):
         got = cli(["decide", "--operation", "promote", "--dataset", DS, "--period",
-                   "2099-Q1", "--supply", "x", "--reason", "r", "--yes", "--wait"])
+                   "2099-Q2", "--supply", "x", "--reason", "r", "--yes", "--wait"])
         assert got.exit_code != 0 and "--wait" in _plain(got.output) and "promote" in _plain(got.output)
 
 
@@ -463,9 +463,9 @@ class TestThePeriodChooser:
         got = placing.period_choices("cp-case-workers",
                                      self._received("2024-05-15T09:00:00+08:00"), {})
         chosen = [r.period for r in got.rows if r.selectable]
-        assert "2024-Q1" in chosen and "2024-Q3" in chosen
-        q1 = next(r for r in got.rows if r.period == "2024-Q1")
-        q3 = next(r for r in got.rows if r.period == "2024-Q3")
+        assert "2024-Q2" in chosen and "2024-Q4" in chosen
+        q1 = next(r for r in got.rows if r.period == "2024-Q2")
+        q3 = next(r for r in got.rows if r.period == "2024-Q4")
         assert "closed when it arrived" in q1.label
         assert "not yet open when it arrived" in q3.label
 
@@ -475,8 +475,8 @@ class TestThePeriodChooser:
         got = placing.period_choices("cp-case-workers",
                                      self._received("2024-05-15T09:00:00+08:00"), {})
         names = [r.label.split(" ")[0] for r in got.rows]
-        assert names.index("2024-Q1") < names.index("2024-Q2") < names.index("2024-Q3")
-        q2 = got.rows[names.index("2024-Q2")]
+        assert names.index("2024-Q2") < names.index("2024-Q3") < names.index("2024-Q4")
+        q2 = got.rows[names.index("2024-Q3")]
         assert not q2.selectable and q2.period is None
         assert "owes nothing" in q2.label and "staffing register" in q2.label
 
@@ -485,12 +485,12 @@ class TestThePeriodChooser:
 
         got = placing.period_choices(
             "cp-carers", self._received("2024-05-15T09:00:00+08:00"),
-            {"2024-Q1": "promoted", "2024-Q2": "inherited", "2024-Q3": "awaiting-decision"})
+            {"2024-Q2": "promoted", "2024-Q3": "inherited", "2024-Q4": "awaiting-decision"})
         by = {r.period: r.label for r in got.rows}
         # The period list's own word for it (#188, cli-ux M5).
-        assert by["2024-Q1"].endswith("promoted")
-        assert "un-inherit it first" in by["2024-Q2"]
-        assert "decide the version waiting there first" in by["2024-Q3"]
+        assert by["2024-Q2"].endswith("promoted")
+        assert "un-inherit it first" in by["2024-Q3"]
+        assert "decide the version waiting there first" in by["2024-Q4"]
 
     def test_it_pages_earlier_and_later(self):
         from qa_tools.common import placing
@@ -502,7 +502,7 @@ class TestThePeriodChooser:
         assert first.has_earlier and first.has_later
 
         # A RUN OF QUARTERS OWED NOTHING is one row with no period to choose
-        # (cp-carers' 2022-Q1 and Q2 turn-off, TS-63), so it is not compared.
+        # (cp-carers' 2022-Q2 and Q2 turn-off, TS-63), so it is not compared.
         def periods(choices):
             return [r.period for r in choices.rows if r.period is not None]
         assert min(periods(earlier)) < min(periods(first))
@@ -551,7 +551,7 @@ class TestTheFilingDecisionsDoorListsHeldSupplies:
 
         base = dict(dataset_id=DS, dataset_name="Carer Register", supply="cp-carers@h1",
                     received_at=None, received_text="15 May 2024, 09:00",
-                    why="cp-carers@h1 could not be placed - 2024-Q1: closed.",
+                    why="cp-carers@h1 could not be placed - 2024-Q2: closed.",
                     schedule_ended=False)
         base.update(kw)
         return fq.HeldRow(**base)
@@ -575,7 +575,7 @@ class TestTheFilingDecisionsDoorListsHeldSupplies:
         from qa_tools.common import slot_state
 
         slot = slot_state.SlotState(state=slot_state.AWAITING_DECISION, dataset_id=DS,
-                                    period="2024-Q2", supply="cp-carers@w1")
+                                    period="2024-Q3", supply="cp-carers@w1")
         door, offered = self._door(monkeypatch, [self._row()], [slot])
         door.queue_flow("child-protection")
         out = _said(capsys.readouterr().out)
@@ -688,7 +688,7 @@ class TestTheRestOfThePlacementRules:
         """Criterion 6: a person is not the assignment rule."""
         from qa_tools.common import placing
 
-        assert placing.period_problem(DS, "2023-Q1") is None
+        assert placing.period_problem(DS, "2023-Q2") is None
 
     def test_a_placement_is_not_a_persons_decision_about_its_data(self, conn, period, target):
         """Criterion 24: a placed supply checked green may promote itself."""
@@ -854,7 +854,7 @@ class TestCriticFindingsOnPlacement:
         from cli import filing_tui
         from qa_tools.common import placing
 
-        p = placing.Plan(dataset_id=DS, supply="s", to_period="2024-Q1", received="",
+        p = placing.Plan(dataset_id=DS, supply="s", to_period="2024-Q2", received="",
                          classification="on_time")
         assert "on time" in filing_tui.preview(p) and "on_time" not in filing_tui.preview(p)
 
@@ -869,7 +869,7 @@ class TestCriticFindingsOnPlacement:
     def test_d10_the_owes_nothing_refusal_has_one_full_stop(self, conn, period):
         supply = _held(conn, period, dataset="cp-case-workers")[0]
         with pytest.raises(dl.DecisionRefused) as refused:
-            _place(conn, supply, "2023-Q2", dataset="cp-case-workers")
+            _place(conn, supply, "2023-Q3", dataset="cp-case-workers")
         assert ".." not in str(refused.value)
 
     def test_d6_a_refile_of_a_held_supply_names_the_place_command(self, conn, period, target):
@@ -921,19 +921,19 @@ class TestTheChooserOnARealScreen:
 
         seen = self._drive(monkeypatch, "cp-case-workers",
                            datetime.fromisoformat("2024-05-15T09:00:00+08:00"))
-        assert seen["default"].startswith("2024-Q3 ")
+        assert seen["default"].startswith("2024-Q4 ")
 
     def test_the_supplys_own_period_cannot_be_chosen(self, monkeypatch):
         from datetime import datetime
 
         seen = self._drive(monkeypatch, "cp-carers",
                            datetime.fromisoformat("2024-05-15T09:00:00+08:00"),
-                           current="2024-Q2")
+                           current="2024-Q3")
         labels = [c for c in seen["choices"] if isinstance(c, str)]
-        assert not any(c.startswith("2024-Q2 ") for c in labels)
+        assert not any(c.startswith("2024-Q3 ") for c in labels)
         shown = [getattr(c, "title", "") or "" for c in seen["choices"]
                  if not isinstance(c, str)]
-        assert any("2024-Q2" in t and "filed here now" in t for t in shown)
+        assert any("2024-Q3" in t and "filed here now" in t for t in shown)
 
 
 class TestTheHeldScreenSaysWhy:
@@ -946,9 +946,9 @@ class TestTheHeldScreenSaysWhy:
         filing_tui.held_flow(fq.HeldRow(
             dataset_id=DS, dataset_name="Carer Register", supply="cp-carers@h1",
             received_at=None, received_text="x",
-            why="cp-carers@h1 could not be placed - 2024-Q1: closed.",
+            why="cp-carers@h1 could not be placed - 2024-Q2: closed.",
             schedule_ended=False))
-        assert "2024-Q1: closed" in capsys.readouterr().out
+        assert "2024-Q2: closed" in capsys.readouterr().out
 
     def test_an_unlisted_person_is_told_on_entering_filing_decisions(self, monkeypatch, capsys):
         from cli import filing_tui

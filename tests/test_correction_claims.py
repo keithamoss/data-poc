@@ -28,8 +28,12 @@ class _P:
     name: str
     date: date
 
+    @property
+    def round_date(self):
+        return self.date
 
-def _quarters(first="2023-Q1", n=8):
+
+def _quarters(first="2023-Q2", n=8):
     year, q = int(first[:4]), int(first[-1])
     out = []
     for _ in range(n):
@@ -41,11 +45,11 @@ def _quarters(first="2023-Q1", n=8):
 class TestWhatACorrectionAlters:
     def test_a_moved_quarter_date_alters_that_quarter_and_the_one_before(self, docs):
         got = cc.altered("CAB-1", ["cp-clients"], docs=docs)
-        assert got == {"cp-clients": {"2023-Q2", "2023-Q3"}}
+        assert got == {"cp-clients": {"2023-Q3", "2023-Q4"}}
 
     def test_its_claim_adds_the_period_before_and_after(self, docs):
         got = cc.claimed("CAB-1", {"cp-clients": _quarters()}, docs=docs)
-        assert got == {"cp-clients": ["2023-Q1", "2023-Q2", "2023-Q3", "2023-Q4"]}
+        assert got == {"cp-clients": ["2023-Q2", "2023-Q3", "2023-Q4", "2024-Q1"]}
 
 
 def _inj(sid, ds, anchor, rides=None):
@@ -69,13 +73,13 @@ class TestTheClaimIsChecked:
                      {"ed-presentations": _quarters(), "cp-clients": _quarters()},
                      docs=docs, history_end=date(2026, 8, 1))
         msg = str(e.value)
-        assert "CAB-1" in msg and "child-protection" in msg and "2023-Q3" in msg
+        assert "CAB-1" in msg and "child-protection" in msg and "2023-Q4" in msg
 
     def test_a_quarter_another_collection_suppresses_is_not_a_supply(self, docs):
         cc.check([_inj("TS-58", "ed-presentations", 2, rides="CAB-1")],
                  {"ed-presentations": _quarters(), "cp-clients": _quarters()},
                  docs=docs, history_end=date(2026, 8, 1),
-                 suppressed={"cp-clients": {"2023-Q2", "2023-Q3"}})
+                 suppressed={"cp-clients": {"2023-Q3", "2023-Q4"}})
 
     def test_a_correction_dated_after_the_history_is_refused(self, docs):
         with pytest.raises(si.CannotPlace, match=r"TS-58.*CAB-1"):
@@ -83,9 +87,9 @@ class TestTheClaimIsChecked:
                      {"cp-clients": _quarters()}, docs=docs, history_end=date(2025, 12, 1))
 
     def test_an_altered_period_outside_the_history_is_refused(self, docs):
-        with pytest.raises(si.CannotPlace, match=r"TS-58.*CAB-1.*2023-Q2"):
+        with pytest.raises(si.CannotPlace, match=r"TS-58.*CAB-1.*2023-Q3"):
             cc.check([_inj("TS-58", "cp-clients", 0, rides="CAB-1")],
-                     {"cp-clients": _quarters("2023-Q3", 4)}, docs=docs,
+                     {"cp-clients": _quarters("2023-Q4", 4)}, docs=docs,
                      history_end=date(2026, 8, 1))
 
     def test_riding_an_undeclared_correction_is_refused(self, docs):
@@ -125,9 +129,9 @@ class TestAnotherCollectionsCorrectionEmptiesItsQuarters:
 
     def test_the_quarters_are_the_correction_s_altered_ones(self):
         # Only the quarters Child Protection still owes since REQ-GEN-238
-        # dropped 2013 and 2014: of the correction's, 2015-Q1 and 2015-Q3.
+        # dropped 2013 and 2014: of the correction's, 2015-Q2 and 2015-Q4.
         got = cc.foreign_altered("child-protection")
-        assert {"2015-Q1", "2015-Q3"} <= got
+        assert {"2015-Q2", "2015-Q4"} <= got
         assert not any(q.startswith(("2013", "2014", "2016", "2021")) for q in got), got
 
     def test_a_collection_riding_the_correction_suppresses_nothing_for_it(self):
@@ -230,13 +234,13 @@ class TestAWrittenArrivalIsAskedOnlyWhatAConfirmationCouldMove:
     One received after was filed under the corrected agreement as it arrived.
 
     A real defect, found by the first Emergency Department bootstrap
-    (post-build-review #244): Child Protection's ordinary 2022-Q1 delivery,
+    (post-build-review #244): Child Protection's ordinary 2022-Q2 delivery,
     received after REQ-GEN-218's 15 December 2021 date and carrying cp_carers
     as REQ-GEN-218's decision says the gap's deliveries do, was refused as an
     arrival the correction would re-file."""
 
     def _cp(self, tables, at="2022-02-01T08:30:00+08:00"):
-        return {"run_id": "cp_run_x", "period": "2022-Q1", "received_at": at,
+        return {"run_id": "cp_run_x", "period": "2022-Q2", "received_at": at,
                 "row_counts": {t: 10 for t in tables}}
 
     def test_a_gap_delivery_received_after_the_correction_is_not_asked(self):
@@ -290,7 +294,7 @@ class TestADateLevelCorrectionIsAskedToo:
                         "2026-01-10")
 
     def _cp(self, at):
-        return {"run_id": "cp_run_x", "period": "2023-Q3", "received_at": at,
+        return {"run_id": "cp_run_x", "period": "2023-Q4", "received_at": at,
                 "row_counts": {"cp_clients": 10}}
 
     def test_an_ordinary_supply_it_would_move_is_refused(self, rider):
@@ -309,4 +313,4 @@ class TestADateLevelCorrectionIsAskedToo:
 
     def test_a_scenario_s_own_supply_is_not_asked(self, rider):
         cc.check_written(["cp-clients"], [self._cp("2023-08-01T08:30:00+08:00")],
-                         frozenset({"2023-Q3"}), docs=self._docs("2023-10-20"))
+                         frozenset({"2023-Q4"}), docs=self._docs("2023-10-20"))

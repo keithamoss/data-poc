@@ -146,17 +146,22 @@ def _participation_for(dataset_id: str, period_date: date, agreement):
     return version
 
 
-def slot_instants(dataset_id: str, period_date: date, agreement=None) -> SlotInstants:
+def slot_instants(dataset_id: str, round_date: date, agreement=None) -> SlotInstants:
     """THE ONE SLOT-INSTANTS FUNCTION (REQ-PIPE-113 criterion 10): filing,
     the overlap gate (REQ-PIPE-134), the daylight-saving gate and the
     dashboard build all ask this, so none can check a different schedule
     from the one supplies are filed against.
 
-    Every input is taken AS AT THE PERIOD'S OWN DATE - the participation
+    Taken for a ROUND's date (REQ-PIPE-321 criterion 1): the slot a round
+    opens fills the period files_go_to_period after it, and every instant of
+    that slot is computed from the round. At 0 the round and the period
+    share a date, so a daily or offset-0 caller may pass either.
+
+    Every input is taken AS AT THE ROUND'S OWN DATE - the participation
     version for the expected time, days before, grace and claim-window
     override, the calendar version for the default claim window - so a
     later version never moves an earlier slot (criterion 3). The due
-    instant is the period's date LESS days before, at the expected time,
+    instant is the round's date LESS days before, at the expected time,
     in the timezone version in force on the day that falls on (criterion
     1): "due the evening before" is one day before at that evening's time
     (criterion 5), with no rule to reinterpret the arrival afterwards.
@@ -165,10 +170,10 @@ def slot_instants(dataset_id: str, period_date: date, agreement=None) -> SlotIns
     (criterion 6).
     """
     agreement = schedule._agreement(agreement)
-    version = _participation_for(dataset_id, period_date, agreement)
-    due_at = asset_time.wall_clock(period_date - timedelta(days=version.days_before),
+    version = _participation_for(dataset_id, round_date, agreement)
+    due_at = asset_time.wall_clock(round_date - timedelta(days=version.days_before),
                                    version.expected_time)
-    window = schedule.claim_window(dataset_id, on=period_date, agreement=agreement)
+    window = schedule.claim_window(dataset_id, on=round_date, agreement=agreement)
     return SlotInstants(due_at=due_at, grace=version.grace, claim_opens_at=due_at - window)
 
 

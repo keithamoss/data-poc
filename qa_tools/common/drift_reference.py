@@ -349,7 +349,8 @@ def assess(conn: supply_db.SupplyConnection, dataset_id: str, current_period: st
                           dataset_id=dataset_id, gap=tuple(gap))
     run_id = run_for(conn, dataset_id, ref.supply)
     gap, dealt = _owed_earlier(conn, dataset_id, current_period, as_at,
-                               after_date=schedule.date_of(ref.period, dataset_id))
+                               # BY ROUND, as _owed_earlier compares (REQ-PIPE-321 c2)
+                               after_date=schedule.round_of(ref.period, dataset_id))
     return Assessment(kind=GAP if gap else MEASURED, dataset_id=dataset_id,
                       reference=ref, run_id=run_id,
                       gap=tuple(gap), dealt_with=tuple(dealt))

@@ -49,23 +49,23 @@ class TestClosedIsDerived:
     """Criteria 1 and 2."""
 
     def test_a_closed_unfilled_slot_is_overdue_and_closed(self, conn):
-        got = _state(conn, "cp-clients", "2024-Q2")
+        got = _state(conn, "cp-clients", "2024-Q3")
         assert got.state == slot_state.OVERDUE and got.closed
         assert got.responses == slot_state.CLOSED_RESPONSES
 
     def test_an_overdue_slot_still_open_is_not_closed(self, conn):
-        # 2025-Q1, which no fixture promotes into: the Child Protection
-        # fixture promotes cp-clients into 2026-Q1, and the decision log
-        # outlives the module that wrote it, so on a shared worker 2026-Q1
+        # 2025-Q2, which no fixture promotes into: the Child Protection
+        # fixture promotes cp-clients into 2026-Q2, and the decision log
+        # outlives the module that wrote it, so on a shared worker 2026-Q2
         # read "promoted" (2026-10-12).
         at = datetime(2025, 3, 1, 9, tzinfo=PERTH)      # Q1 due 1 Feb, closes mid-April
-        got = _state(conn, "cp-clients", "2025-Q1", at=at)
+        got = _state(conn, "cp-clients", "2025-Q2", at=at)
         assert got.state == slot_state.OVERDUE and not got.closed
 
     def test_a_closed_slot_with_a_supply_waiting_reads_awaiting(self, conn):
         """Criterion 3."""
-        got = _state(conn, "cp-clients", "2024-Q3",
-                     filings={"2024-Q3": {"supply_id": "cp-clients@x"}})
+        got = _state(conn, "cp-clients", "2024-Q4",
+                     filings={"2024-Q4": {"supply_id": "cp-clients@x"}})
         assert got.state == slot_state.AWAITING_DECISION
 
 
@@ -73,32 +73,34 @@ class TestMarkingIt:
     """Criteria 4, 6, 7, 8 and 9."""
 
     def test_a_closed_unfilled_slot_can_be_marked_and_reads_accepted(self, conn):
-        _mark(conn, "cp-carers", "2024-Q2")
-        got = _state(conn, "cp-carers", "2024-Q2")
+        _mark(conn, "cp-carers", "2024-Q3")
+        got = _state(conn, "cp-carers", "2024-Q3")
         assert got.state == slot_state.NOT_SUPPLIED_ACCEPTED
         assert not got.needs_action, "an accepted gap leaves the to-do list"
         assert got.decided_by == REAL_PERSON and "nothing" in got.reason
 
     def test_it_changes_nothing_a_slot_holds(self, conn):
-        _mark(conn, "cp-carers", "2024-Q3")
-        assert dl.held(conn, "cp-carers", "2024-Q3") is None
-        assert dl.promoted_into(conn, "cp-carers", "2024-Q3") is None
+        _mark(conn, "cp-carers", "2024-Q4")
+        assert dl.held(conn, "cp-carers", "2024-Q4") is None
+        assert dl.promoted_into(conn, "cp-carers", "2024-Q4") is None
 
     def test_an_open_slot_is_refused_with_the_fix(self, conn):
         with pytest.raises(dl.DecisionRefused, match="still open.*mothman supply decide"):
             not_supplied.mark(
                 conn, agency_id="a", collection_id="c", dataset_id="cp-carers",
                 period="2027-Q4", actor=REAL_PERSON, reason="r",
-                effective_at=LATER.isoformat())
+                # Overdue since 1 August 2027 (the round that fills 2027-Q4 at
+                # files_go_to_period 1) and open until November's window opens.
+                effective_at=datetime(2027, 9, 1, 9, tzinfo=PERTH).isoformat())
 
     def test_a_filled_slot_is_refused(self, conn):
         with dl.apply_decision(conn, dl.Decision(
                 agency_id="a", collection_id="c", dataset_id="cp-placements",
                 action=dl.PROMOTE, supply="cp-placements@k1", actor=REAL_PERSON,
-                actor_kind=dl.PERSON, effective_at=LATER.isoformat(), to_slot="2024-Q2")):
+                actor_kind=dl.PERSON, effective_at=LATER.isoformat(), to_slot="2024-Q3")):
             pass
         with pytest.raises(dl.DecisionRefused, match="so it is answered.*demote"):
-            _mark(conn, "cp-placements", "2024-Q2")
+            _mark(conn, "cp-placements", "2024-Q3")
 
     def test_only_a_person_with_a_reason_may_mark(self, conn):
         for kind, reason in ((dl.RULE, "r"), (dl.PERSON, "")):
@@ -107,18 +109,18 @@ class TestMarkingIt:
                         agency_id="a", collection_id="c", dataset_id="cp-carers",
                         action=dl.MARK_NOT_SUPPLIED, supply="", actor="x",
                         actor_kind=kind, effective_at=LATER.isoformat(),
-                        to_slot="2024-Q4", reason=reason)):
+                        to_slot="2025-Q1", reason=reason)):
                     pass
 
     def test_a_later_substitution_supersedes_the_mark(self, conn):
-        _mark(conn, "cp-investigations", "2024-Q2")
+        _mark(conn, "cp-investigations", "2024-Q3")
         with dl.apply_decision(conn, dl.Decision(
                 agency_id="a", collection_id="c", dataset_id="cp-investigations",
                 action=dl.SUBSTITUTE, supply="cp-investigations@k0", actor=REAL_PERSON,
                 actor_kind=dl.PERSON, effective_at=(LATER + timedelta(days=1)).isoformat(),
-                to_slot="2024-Q2", stands_on="2024-Q1", reason="stand on Q1")):
+                to_slot="2024-Q3", stands_on="2024-Q2", reason="stand on Q1")):
             pass
-        assert not_supplied.marked(conn, "cp-investigations", "2024-Q2") is None
+        assert not_supplied.marked(conn, "cp-investigations", "2024-Q3") is None
 
 
 class TestBothRoutes:
@@ -128,13 +130,13 @@ class TestBothRoutes:
         actor = people.person_by_email(REAL_PERSON)
         request = fd.Request(operation=fd.MARK_NOT_SUPPLIED, dataset_id="cp-notifications",
                              actor=actor, reason="supplier had a system outage",
-                             period="2024-Q2")
+                             period="2024-Q3")
         first = fd.apply(request, effective_at=LATER.isoformat(), conn=conn)
         second = fd.apply(request, effective_at=LATER.isoformat(), conn=conn)
         assert first.changed and not second.changed
 
     def test_it_is_offered_on_a_closed_period_and_not_from_the_supply_queue(self, conn):
-        got = _state(conn, "cp-clients", "2024-Q4")
+        got = _state(conn, "cp-clients", "2025-Q1")
         supply_scoped, period_scoped = filing_queue.operations_for(got)
         assert fd.MARK_NOT_SUPPLIED in period_scoped
         assert fd.MARK_NOT_SUPPLIED not in supply_scoped
@@ -179,10 +181,10 @@ class TestWhatTheBuildEmbeds:
     def test_a_marked_period_carries_its_mark_and_instant(self, conn):
         from pipeline import closed_slots
 
-        _mark(conn, "cp-notifications", "2025-Q1", reason="nothing that quarter")
+        _mark(conn, "cp-notifications", "2025-Q2", reason="nothing that quarter")
         got = {s["period"]: s for s in closed_slots.for_dataset("cp-notifications", conn, now=LATER)}
-        assert got["2025-Q1"]["marks"][-1]["reason"] == "nothing that quarter"
-        assert got["2025-Q1"]["marks"][-1]["at"] and got["2025-Q1"]["closesAt"]
+        assert got["2025-Q2"]["marks"][-1]["reason"] == "nothing that quarter"
+        assert got["2025-Q2"]["marks"][-1]["at"] and got["2025-Q2"]["closesAt"]
         assert [s["index"] for s in got.values()] == sorted(s["index"] for s in got.values())
 
     def test_a_slot_filled_after_it_closed_was_still_a_gap_and_says_when(self, conn):
@@ -191,17 +193,17 @@ class TestWhatTheBuildEmbeds:
         with dl.apply_decision(conn, dl.Decision(
                 agency_id="a", collection_id="c", dataset_id="cp-placements",
                 action=dl.PROMOTE, supply="cp-placements@k3", actor=REAL_PERSON,
-                actor_kind=dl.PERSON, effective_at=LATER.isoformat(), to_slot="2025-Q2")):
+                actor_kind=dl.PERSON, effective_at=LATER.isoformat(), to_slot="2025-Q3")):
             pass
         got = {s["period"]: s for s in closed_slots.for_dataset("cp-placements", conn, now=LATER)}
-        assert got["2025-Q2"]["changes"][-1]["held"], "a late fill ends the gap from that instant on"
+        assert got["2025-Q3"]["changes"][-1]["held"], "a late fill ends the gap from that instant on"
 
     def test_a_slot_not_yet_closed_is_not_listed(self, conn):
         from pipeline import closed_slots
 
         early = datetime(2025, 3, 1, 9, tzinfo=PERTH)
         got = {s["period"] for s in closed_slots.for_dataset("cp-carers", conn, now=early)}
-        assert "2025-Q1" not in got and "2024-Q2" in got
+        assert "2025-Q2" not in got and "2024-Q3" in got
 
 
 class TestAMarkCarriesNoSupply:
@@ -214,7 +216,7 @@ class TestAMarkCarriesNoSupply:
     def test_the_blockers_and_the_queue_still_read(self, conn):
         from qa_tools.common import dataset_blockers, outstanding
 
-        _mark(conn, "cp-case-workers", "2024-Q3", reason="nothing that half-year")
+        _mark(conn, "cp-case-workers", "2024-Q4", reason="nothing that half-year")
         dataset_blockers.all_blockers(conn)
         outstanding.survey(conn)
 
@@ -243,24 +245,24 @@ class TestARejectedSupplyLeavesItsPeriodEmpty:
             "'2025-02-05T01:00:00+00:00', 'our-clock', 1) ON CONFLICT DO NOTHING", [delivery])
         import filing_support
 
-        filing_support.place(conn, "cp-investigations", supply, "2025-Q1", delivery)
+        filing_support.place(conn, "cp-investigations", supply, "2025-Q2", delivery)
         before = {s["period"] for s in closed_slots.for_dataset("cp-investigations", conn, now=LATER)}
-        assert "2025-Q1" not in before, "a live filing before the close was never a gap"
+        assert "2025-Q2" not in before, "a live filing before the close was never a gap"
         with dl.apply_decision(conn, dl.Decision(
                 agency_id="a", collection_id="c", dataset_id="cp-investigations",
                 action=dl.REJECT, supply=supply, actor=REAL_PERSON, actor_kind=dl.PERSON,
                 effective_at=LATER.isoformat(), reason="supplier is resending",
-                from_slot="2025-Q1")):
+                from_slot="2025-Q2")):
             pass
         got = {s["period"]: s for s in closed_slots.for_dataset("cp-investigations", conn, now=LATER)}
-        assert got["2025-Q1"]["rejected"]["reason"] == "supplier is resending"
+        assert got["2025-Q2"]["rejected"]["reason"] == "supplier is resending"
         # SHOWN BY NAME, as every person's decision on the page is
         # (REQ-PIPE-147 criterion 7; sprint 11 critic, defect 1).
         from qa_tools.common import people
 
-        assert got["2025-Q1"]["rejected"]["actor"] == people.display_name(REAL_PERSON)
-        assert got["2025-Q1"]["rejected"]["actor"] != REAL_PERSON
-        assert got["2025-Q1"]["filedAt"] is None
+        assert got["2025-Q2"]["rejected"]["actor"] == people.display_name(REAL_PERSON)
+        assert got["2025-Q2"]["rejected"]["actor"] != REAL_PERSON
+        assert got["2025-Q2"]["filedAt"] is None
 
 
 class TestAnEmptiedPeriodIsAGapAgain:
@@ -275,19 +277,19 @@ class TestAnEmptiedPeriodIsAGapAgain:
         with dl.apply_decision(conn, dl.Decision(
                 agency_id="a", collection_id="c", dataset_id="cp-clients",
                 action=dl.SUBSTITUTE, supply="cp-clients@kx", actor=REAL_PERSON,
-                actor_kind=dl.PERSON, effective_at=LATER.isoformat(), to_slot="2025-Q2",
-                stands_on="2025-Q1", reason="stand on Q1")):
+                actor_kind=dl.PERSON, effective_at=LATER.isoformat(), to_slot="2025-Q3",
+                stands_on="2025-Q2", reason="stand on Q1")):
             pass
         undone = (LATER + timedelta(days=2)).isoformat()
         with dl.apply_decision(conn, dl.Decision(
                 agency_id="a", collection_id="c", dataset_id="cp-clients",
                 action=dl.DE_SUBSTITUTE, supply="cp-clients@kx", actor=REAL_PERSON,
-                actor_kind=dl.PERSON, effective_at=undone, from_slot="2025-Q2",
+                actor_kind=dl.PERSON, effective_at=undone, from_slot="2025-Q3",
                 reason="undo")):
             pass
         got = {s["period"]: s for s in closed_slots.for_dataset(
             "cp-clients", conn, now=LATER + timedelta(days=5))}
-        changes = got["2025-Q2"]["changes"]
+        changes = got["2025-Q3"]["changes"]
         assert [c["held"] for c in changes][-2:] == [True, False]
 
 
@@ -303,20 +305,20 @@ class TestASupplyWaitingInAClosedPeriodIsNotAGap:
                 agency_id="a", collection_id="c", dataset_id="cp-investigations",
                 action=dl.REJECT, supply="cp-investigations@s1", actor=REAL_PERSON,
                 actor_kind=dl.PERSON, effective_at=LATER.isoformat(),
-                from_slot="2024-Q3", reason="bad file")):
+                from_slot="2024-Q4", reason="bad file")):
             pass
         conn.execute("INSERT INTO qa.delivery (name, received_at, received_instant) VALUES "
                      "('pytest-resupply-s2', '2024-09-05T01:00:00+00:00', "
                      "'2024-09-05T01:00:00+00:00') ON CONFLICT DO NOTHING")
         import filing_support
 
-        filing_support.place(conn, "cp-investigations", "cp-investigations@s2", "2024-Q3",
+        filing_support.place(conn, "cp-investigations", "cp-investigations@s2", "2024-Q4",
                              "pytest-resupply-s2")
-        filings = {"2024-Q3": {"supply_id": "cp-investigations@s2"}}
-        got = _state(conn, "cp-investigations", "2024-Q3", filings=filings)
+        filings = {"2024-Q4": {"supply_id": "cp-investigations@s2"}}
+        got = _state(conn, "cp-investigations", "2024-Q4", filings=filings)
         assert got.state == slot_state.AWAITING_DECISION and not got.closed
         with pytest.raises(dl.DecisionRefused, match="waiting for a decision"):
-            _mark(conn, "cp-investigations", "2024-Q3")
+            _mark(conn, "cp-investigations", "2024-Q4")
 
 
 class TestTheRefusalNamesTheRightUndo:
@@ -328,11 +330,11 @@ class TestTheRefusalNamesTheRightUndo:
         with dl.apply_decision(conn, dl.Decision(
                 agency_id="a", collection_id="c", dataset_id="cp-notifications",
                 action=dl.SUBSTITUTE, supply="cp-notifications@k0", actor=REAL_PERSON,
-                actor_kind=dl.PERSON, effective_at=LATER.isoformat(), to_slot="2025-Q2",
-                stands_on="2025-Q1", reason="stand on Q1")):
+                actor_kind=dl.PERSON, effective_at=LATER.isoformat(), to_slot="2025-Q3",
+                stands_on="2025-Q2", reason="stand on Q1")):
             pass
         with pytest.raises(dl.DecisionRefused, match="--operation de-substitute"):
-            _mark(conn, "cp-notifications", "2025-Q2")
+            _mark(conn, "cp-notifications", "2025-Q3")
 
 
 class TestALateDayStillOpenIsNamed:
@@ -346,15 +348,15 @@ class TestALateDayStillOpenIsNamed:
         from pipeline import closed_slots
 
         got = {s["period"]: s for s in closed_slots.late_slots("cp-carers", conn, now=LATER)}
-        assert got["2025-Q1"]["filedAt"] is None
-        assert got["2025-Q1"]["lateAt"] and got["2025-Q1"]["closesAt"]
+        assert got["2025-Q2"]["filedAt"] is None
+        assert got["2025-Q2"]["lateAt"] and got["2025-Q2"]["closesAt"]
 
     def test_a_slot_filed_on_time_was_never_late(self, conn):
         from pipeline import closed_slots
         from qa_tools.common import slots
 
         slot = next(s for s in slots.slots_for_dataset("cp-carers", until=LATER.date())
-                    if s.name == "2025-Q1")
+                    if s.name == "2025-Q2")
         on_time = (slot.claim_opens_at + (slot.late_after - slot.claim_opens_at) / 2).isoformat()
         delivery = "pytest-on-time-2025q1"
         conn.execute("INSERT INTO qa.delivery (name, received_at, received_instant) "
@@ -366,11 +368,11 @@ class TestALateDayStillOpenIsNamed:
             [delivery, on_time, on_time])
         import filing_support
 
-        filing_support.place(conn, "cp-carers", "cp-carers@ontime", "2025-Q1", delivery)
+        filing_support.place(conn, "cp-carers", "cp-carers@ontime", "2025-Q2", delivery)
         try:
             got = {s["period"] for s in closed_slots.late_slots("cp-carers", conn, now=LATER)}
-            assert "2025-Q1" not in got
+            assert "2025-Q2" not in got
         finally:
             # ITS FILING GOES WITH IT (2026-10-12): left behind, its sibling
-            # above read 2025-Q1 as filed whenever this ran first.
+            # above read 2025-Q2 as filed whenever this ran first.
             filing_support.forget(conn, "supply_id = 'cp-carers@ontime'")

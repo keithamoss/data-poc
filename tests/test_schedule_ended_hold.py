@@ -17,36 +17,36 @@ def _slot(name: str, opens: datetime, closes: datetime | None) -> slots.Slot:
                       due_at=opens, grace=timedelta(0), claim_opens_at=opens, closes_at=closes)
 
 
-SLOTS = [_slot("2027-Q3", datetime(2027, 7, 1, tzinfo=UTC), datetime(2027, 10, 1, tzinfo=UTC)),
+SLOTS = [_slot("2027-Q4", datetime(2027, 7, 1, tzinfo=UTC), datetime(2027, 10, 1, tzinfo=UTC)),
          # The calendar's LAST period: it closes as long after it opened as
          # the one before it stayed open (REQ-PIPE-131 criterion 16).
-         _slot("2027-Q4", datetime(2027, 10, 1, tzinfo=UTC), datetime(2027, 12, 31, tzinfo=UTC))]
+         _slot("2028-Q1", datetime(2027, 10, 1, tzinfo=UTC), datetime(2027, 12, 31, tzinfo=UTC))]
 AFTER = datetime(2030, 3, 1, tzinfo=UTC)
 
 
 class TestTheRuleKnowsTheScheduleEnded:
 
     def test_after_the_last_slot_closes_it_is_held_as_schedule_ended(self):
-        decided = assignment.assign("cp-carers", "cp-carers@x", AFTER, SLOTS, frozenset(), final_period="2027-Q4")
+        decided = assignment.assign("cp-carers", "cp-carers@x", AFTER, SLOTS, frozenset(), final_period="2028-Q1")
         assert decided.is_held
         assert decided.schedule_ended
-        assert decided.last_period == "2027-Q4"
+        assert decided.last_period == "2028-Q1"
 
     def test_the_reason_never_claims_a_next_period_opened(self):
         """Criterion 4: an exhausted calendar has no next period."""
-        decided = assignment.assign("cp-carers", "cp-carers@x", AFTER, SLOTS, frozenset(), final_period="2027-Q4")
+        decided = assignment.assign("cp-carers", "cp-carers@x", AFTER, SLOTS, frozenset(), final_period="2028-Q1")
         said = " ".join(why for _, why in decided.unavailable)
         assert "next period's claim window" not in said
-        assert "2027-Q4" in [name for name, _ in decided.unavailable]
+        assert "2028-Q1" in [name for name, _ in decided.unavailable]
 
     def test_a_gap_inside_the_calendar_is_not_schedule_ended(self):
         early = datetime(2027, 6, 1, tzinfo=UTC)
-        decided = assignment.assign("cp-carers", "cp-carers@x", early, SLOTS, frozenset(), final_period="2027-Q4")
+        decided = assignment.assign("cp-carers", "cp-carers@x", early, SLOTS, frozenset(), final_period="2028-Q1")
         assert decided.is_held and not decided.schedule_ended
 
     def test_a_last_slot_that_never_closes_is_never_ended(self):
-        one = [_slot("2027-Q4", datetime(2027, 10, 1, tzinfo=UTC), None)]
-        decided = assignment.assign("cp-carers", "cp-carers@x", AFTER, one, frozenset(), final_period="2027-Q4")
+        one = [_slot("2028-Q1", datetime(2027, 10, 1, tzinfo=UTC), None)]
+        decided = assignment.assign("cp-carers", "cp-carers@x", AFTER, one, frozenset(), final_period="2028-Q1")
         assert not decided.is_held and not decided.schedule_ended
 
 
@@ -72,7 +72,7 @@ def conn(supply_dsn):
 class TestTheHoldSaysWhatToEdit:
 
     def _held(self, conn, supply="cp-carers@20300301"):
-        decided = assignment.assign("cp-carers", supply, AFTER, SLOTS, frozenset(), final_period="2027-Q4")
+        decided = assignment.assign("cp-carers", supply, AFTER, SLOTS, frozenset(), final_period="2028-Q1")
         supply_holds.raise_hold(conn, dataset_id="cp-carers", supply_id=supply,
                                 kind=supply_holds.ASSIGNMENT_RULE,
                                 reason=supply_holds.reason_for(decided),
@@ -83,7 +83,7 @@ class TestTheHoldSaysWhatToEdit:
         """Criterion 2: no reader parses prose to tell."""
         held = self._held(conn)
         assert held.reason["schedule_ended"] is True
-        assert held.reason["last_period"] == "2027-Q4"
+        assert held.reason["last_period"] == "2028-Q1"
         assert held.schedule_ended
 
     def test_it_names_the_file_and_the_command(self, conn):
@@ -91,7 +91,7 @@ class TestTheHoldSaysWhatToEdit:
         said = self._held(conn).describe()
         assert "contract/calendar.yaml" in said  # since REQ-PIPE-110
         assert "mothman schedule candidate-dates" in said
-        assert "2027-Q4" in said
+        assert "2028-Q1" in said
         assert "next period's claim window" not in said
 
     def test_the_only_thing_offered_is_adding_dates(self, conn):
@@ -127,7 +127,7 @@ class TestAddingDatesFilesWhatWasHeld:
 
     def _held(self, conn, supply, at):
         import filing_support
-        decided = assignment.assign("cp-carers", supply, at, SLOTS, frozenset(), final_period="2027-Q4")
+        decided = assignment.assign("cp-carers", supply, at, SLOTS, frozenset(), final_period="2028-Q1")
         assert decided.schedule_ended
         filing_support.file(decided)
         supply_holds.raise_hold(conn, dataset_id="cp-carers", supply_id=supply,
@@ -141,22 +141,22 @@ class TestAddingDatesFilesWhatWasHeld:
         supply = f"cp-carers@{AFTER:%Y%m%d}a"
         self._held(conn, supply, AFTER)
         # DATES ADDED: the calendar now runs to a 2030 period covering it.
-        later = SLOTS + [_slot("2030-Q1", datetime(2030, 1, 1, tzinfo=UTC),
+        later = SLOTS + [_slot("2030-Q2", datetime(2030, 1, 1, tzinfo=UTC),
                                datetime(2030, 4, 1, tzinfo=UTC))]
         monkeypatch.setattr(slots, "slots_for_dataset", lambda dataset_id, until=None, **_: later)
         monkeypatch.setattr(schedule_ended, "_on_calendar", lambda dataset_id, period: True)
 
         done = schedule_ended.refile_covered(say=lambda line: None)
 
-        assert [(d, s, slot) for d, s, slot in done] == [("cp-carers", supply, "2030-Q1")]
+        assert [(d, s, slot) for d, s, slot in done] == [("cp-carers", supply, "2030-Q2")]
         current = filing.filing_for("cp-carers", supply)
-        assert current["slot"] == "2030-Q1"
+        assert current["slot"] == "2030-Q2"
         assert supply_holds.hold_on(conn, "cp-carers", supply) is None
         [(resolved_by,)] = conn.execute(
             f"SELECT resolved_by FROM {supply_holds.TABLE} WHERE supply_id = ?",
             [supply]).fetchall()
         [(refiled_by,)] = conn.execute(
-            f"SELECT refiled_by FROM {filing.TABLE} WHERE supply_id = ? AND slot = '2030-Q1'",
+            f"SELECT refiled_by FROM {filing.TABLE} WHERE supply_id = ? AND slot = '2030-Q2'",
             [supply]).fetchall()
         assert resolved_by == refiled_by, "the hold names the decision behind the new filing"
         assert [o for o in recheck.owed(conn, "cp-carers") if o.supply_id == supply], \
@@ -178,7 +178,7 @@ class TestAddingDatesFilesWhatWasHeld:
         second = f"cp-carers@{AFTER:%Y%m%d}d"
         self._held(conn, second, AFTER + timedelta(days=2))
         self._held(conn, first, AFTER)
-        later = SLOTS + [_slot("2030-Q1", datetime(2030, 1, 1, tzinfo=UTC),
+        later = SLOTS + [_slot("2030-Q2", datetime(2030, 1, 1, tzinfo=UTC),
                                datetime(2030, 4, 1, tzinfo=UTC))]
         monkeypatch.setattr(slots, "slots_for_dataset", lambda dataset_id, until=None, **_: later)
         monkeypatch.setattr(schedule_ended, "_on_calendar", lambda dataset_id, period: True)
@@ -193,7 +193,7 @@ class TestAddingDatesFilesWhatWasHeld:
 
         supply = f"cp-carers@{AFTER:%Y%m%d}r"
         self._held(conn, supply, AFTER)
-        later = SLOTS + [_slot("2030-Q1", datetime(2030, 1, 1, tzinfo=UTC),
+        later = SLOTS + [_slot("2030-Q2", datetime(2030, 1, 1, tzinfo=UTC),
                                datetime(2030, 4, 1, tzinfo=UTC))]
         monkeypatch.setattr(slots, "slots_for_dataset", lambda dataset_id, until=None, **_: later)
         monkeypatch.setattr(schedule_ended, "_on_calendar", lambda dataset_id, period: True)
@@ -212,11 +212,11 @@ class TestItWaitsForACorrectionsConfirmation:
     _held = TestAddingDatesFilesWhatWasHeld._held
 
     def _covered_only_by_the_correction(self, monkeypatch, pending, *, confirmed=None):
-        """The agreement on disk covers the receipt with 2030-Q1; the
+        """The agreement on disk covers the receipt with 2030-Q2; the
         CONFIRMED configuration gives `confirmed` (no slot by default)."""
         from qa_tools.common import schedule_ended
 
-        later = SLOTS + [_slot("2030-Q1", datetime(2030, 1, 1, tzinfo=UTC),
+        later = SLOTS + [_slot("2030-Q2", datetime(2030, 1, 1, tzinfo=UTC),
                                datetime(2030, 4, 1, tzinfo=UTC))]
         monkeypatch.setattr(slots, "slots_for_dataset",
                             lambda dataset_id, until=None, agreement=None, **_: later)
@@ -241,8 +241,8 @@ class TestItWaitsForACorrectionsConfirmation:
         assert any("REF-PENDING" in line and "confirmed" in line for line in said)
 
     def test_the_confirmed_agreement_must_give_the_same_slot(self, conn, monkeypatch):
-        """#199 F3: confirmed, it would be 2030-Q2; only the pending
-        correction gives it 2030-Q1 - so it waits, rather than being filed to
+        """#199 F3: confirmed, it would be 2030-Q3; only the pending
+        correction gives it 2030-Q2 - so it waits, rather than being filed to
         the slot the unconfirmed correction chose."""
         from qa_tools.common import schedule_ended
 
@@ -250,7 +250,7 @@ class TestItWaitsForACorrectionsConfirmation:
         self._held(conn, supply, AFTER)
         self._covered_only_by_the_correction(
             monkeypatch, {"cp-carers": ["REF-SLOT"]},
-            confirmed=_slot("2030-Q2", datetime(2030, 1, 1, tzinfo=UTC),
+            confirmed=_slot("2030-Q3", datetime(2030, 1, 1, tzinfo=UTC),
                             datetime(2030, 4, 1, tzinfo=UTC)))
         done = schedule_ended.refile_covered(say=lambda line: None)
         assert supply not in [s for _, s, _ in done]
@@ -302,7 +302,7 @@ class TestItWaitsForACorrectionsConfirmation:
         self._held(conn, supply, AFTER)
         self._covered_only_by_the_correction(monkeypatch, {})
         done = schedule_ended.refile_covered(say=lambda line: None)
-        assert ("cp-carers", supply, "2030-Q1") in done
+        assert ("cp-carers", supply, "2030-Q2") in done
 
 
 class TestThePassSaysSo:
@@ -314,7 +314,7 @@ class TestThePassSaysSo:
 
         for supply, run in (("cp-carers@e1", "run_a"), ("cp-carers@e2", "run_b"),
                             ("cp-carers@e3", "run_old")):
-            decided = assignment.assign("cp-carers", supply, AFTER, SLOTS, frozenset(), final_period="2027-Q4")
+            decided = assignment.assign("cp-carers", supply, AFTER, SLOTS, frozenset(), final_period="2028-Q1")
             supply_holds.raise_hold(conn, dataset_id="cp-carers", supply_id=supply,
                                     kind=supply_holds.ASSIGNMENT_RULE,
                                     reason=supply_holds.reason_for(decided),
@@ -329,7 +329,7 @@ class TestThePassSaysSo:
         from qa_tools.common import processing_pass
 
         pipeline._say_pass(processing_pass.PassReport(processed=["r1"], schedule_ended=(1, 2),
-                                                      refiled=[("cp-carers", "s", "2030-Q1")]))
+                                                      refiled=[("cp-carers", "s", "2030-Q2")]))
         out = capsys.readouterr().out
         assert "2 supplies across 1 dataset held because the dataset's schedule has ended" in out
         assert "1 supply/supplies held for an ended schedule were filed" in out
@@ -344,7 +344,7 @@ class TestTheNoticeReadsHoldRecords:
         import filing_support
         from qa_tools.common import schedule_ended
 
-        decided = assignment.assign("cp-carers", "cp-carers@n1", AFTER, SLOTS, frozenset(), final_period="2027-Q4")
+        decided = assignment.assign("cp-carers", "cp-carers@n1", AFTER, SLOTS, frozenset(), final_period="2028-Q1")
         filing_support.file(decided)
         supply_holds.raise_hold(conn, dataset_id="cp-carers", supply_id="cp-carers@n1",
                                 kind=supply_holds.ASSIGNMENT_RULE,
@@ -376,7 +376,7 @@ class TestExhaustedFromWhenTheLastSlotCloses:
             last = slots_mod.slots_for_dataset(entry.dataset_id)[-1]
             if last.closes_at is None:
                 continue
-            between = last.period.date + timedelta(days=1)
+            between = last.round_date + timedelta(days=1)
             closed = asset_time.localise(last.closes_at).date()
             assert between < closed, "the test needs a gap to look into"
             assert entry.dataset_id not in runway.exhausted_datasets(between), \
@@ -410,8 +410,8 @@ class TestATruncatedSlotListIsNotAnEndedSchedule:
 
     def test_after_the_real_last_slot_it_still_is(self):
         decided = assignment.assign("cp-carers", "cp-carers@y", AFTER, SLOTS, frozenset(),
-                                    final_period="2027-Q4")
-        assert decided.schedule_ended and decided.last_period == "2027-Q4"
+                                    final_period="2028-Q1")
+        assert decided.schedule_ended and decided.last_period == "2028-Q1"
 
     def test_a_calendar_with_no_final_period_never_ends(self):
         decided = assignment.assign("cp-carers", "cp-carers@z", AFTER, SLOTS, frozenset(),

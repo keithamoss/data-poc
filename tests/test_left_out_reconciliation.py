@@ -56,7 +56,7 @@ def _recorded(run_id: str) -> list[tuple]:
 
 
 def _placements_run(received: str, *, carers_filed: bool):
-    """A cp-placements run filed to 2027-Q3, reading every sibling from
+    """A cp-placements run filed to 2027-Q4, reading every sibling from
     the fixture's own run except cp_carers, which it cannot read."""
     from conftest import clone_run_views
     from fixture_ids import CP_REF_RUN_ID
@@ -64,12 +64,12 @@ def _placements_run(received: str, *, carers_filed: bool):
     key = supply_db.arrival_segment(received)
     run_id = f"cp_placements__{key}"
     filing_support.file(assignment.Assignment(
-        dataset_id="cp-placements", supply_id=f"cp-placements@{key}", slot="2027-Q3",
-        branch=assignment.OPEN_UNFILLED, considered=("2027-Q3",), received_at=None))
+        dataset_id="cp-placements", supply_id=f"cp-placements@{key}", slot="2027-Q4",
+        branch=assignment.OPEN_UNFILLED, considered=("2027-Q4",), received_at=None))
     if carers_filed:
         filing_support.file(assignment.Assignment(
-            dataset_id="cp-carers", supply_id=f"cp-carers@{key}", slot="2027-Q3",
-            branch=assignment.OPEN_UNFILLED, considered=("2027-Q3",), received_at=None))
+            dataset_id="cp-carers", supply_id=f"cp-carers@{key}", slot="2027-Q4",
+            branch=assignment.OPEN_UNFILLED, considered=("2027-Q4",), received_at=None))
     with supply_db.connect(label="test-left-out") as conn:
         clone_run_views(conn, CP_REF_RUN_ID, run_id, absent={"cp_carers"})
     return run_id, {"run_id": run_id, "run_index": 1, "received_at": received,
@@ -78,15 +78,15 @@ def _placements_run(received: str, *, carers_filed: bool):
 
 @pytest.fixture
 def clean_q3(supply_dsn):
-    """2027-Q3, NOT 2026-Q3 (2026-10-05): qa.decision is append-only and
+    """2027-Q4, NOT 2026-Q4 (2026-10-05): qa.decision is append-only and
     shared by every module on a worker, and other modules record decisions
-    for cp-carers in 2026-Q3 - one landing on this worker first turned each
-    sibling's reason into missing-table. No module writes 2027-Q3 for it."""
+    for cp-carers in 2026-Q4 - one landing on this worker first turned each
+    sibling's reason into missing-table. No module writes 2027-Q4 for it."""
     def _clear():
         with supply_db.connect(label="test-left-out") as conn:
             import filing_support
 
-            filing_support.forget(conn, "slot = '2027-Q3' AND dataset_id IN "
+            filing_support.forget(conn, "slot = '2027-Q4' AND dataset_id IN "
                                         "('cp-carers', 'cp-placements')")
     _clear()
     yield
@@ -98,7 +98,7 @@ class TestEachSlotStateRecordsItsOwnReason:
     four real tools."""
 
     @pytest.mark.parametrize("received,carers_filed,code,status", [
-        # Before cp-carers is due for 2027-Q3 (due 2027-08-01) - red since
+        # Before cp-carers is due for 2027-Q4 (due 2027-08-01) - red since
         # REQ-PIPE-270, its own reason kept.
         ("2027-07-25T03:00:00+00:00", False, "not-yet-due", "fail"),
         # Well after it was due, with nothing filed.

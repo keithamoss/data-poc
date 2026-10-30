@@ -166,6 +166,10 @@ ORDINAL_COLUMNS = {
     "check_result": ("id", ("run_key", "tool")),
     "decision": ("id", ("collection_id",)),
     "load_outcome": ("id", ("dataset_id",)),
+    # REQ-PIPE-266's package-gate applications: one collection's gate is
+    # applied in its own order, and two collections replaying side by side
+    # interleave the bigserial.
+    "gate_application": ("id", ("collection_id",)),
 }
 
 #: Columns recomputed as a natural value rather than compared raw.
@@ -194,6 +198,10 @@ _RESULT = "(SELECT r.ref FROM equiv_result_ref r WHERE r.id = t.{col})"
 #: collection. Applied only by snapshot(run_seq_within_collection=True);
 #: otherwise the raw numbers are compared.
 _RUN_RANK = "(SELECT r.rank FROM equiv_run_rank r WHERE r.run_seq = t.run_seq)"
+#: A REFERENCE TO A PACKAGE-GATE APPLICATION (REQ-PIPE-266) is compared as
+#: WHICH application: its collection and its place in that collection's
+#: sequence - the ordinal its own id becomes (ORDINAL_COLUMNS).
+_GATE = "(SELECT r.ref FROM equiv_gate_ref r WHERE r.id = t.{col})"
 _ATTEMPT_RANK = ("(SELECT r.rank FROM equiv_attempt_rank r "
                  "WHERE r.run_key = t.run_key AND r.run_seq = t.run_seq)")
 #: The lookups, as CTEs in the one SELECT that needs each - a snapshot only
@@ -205,6 +213,9 @@ _CTES = {
     "equiv_result_ref": (
         "SELECT id, run_key || '|' || tool || '|' || check_id || '|' || row_number() OVER "
         "(PARTITION BY run_key, tool ORDER BY id) AS ref FROM qa.check_result"),
+    "equiv_gate_ref": (
+        "SELECT id, collection_id || '#' || row_number() OVER "
+        "(PARTITION BY collection_id ORDER BY id) AS ref FROM qa.gate_application"),
     "equiv_run_rank": (
         "SELECT run_seq, row_number() OVER (PARTITION BY collection_id ORDER BY run_seq) "
         "AS rank FROM qa.run WHERE run_seq IS NOT NULL"),
@@ -219,7 +230,14 @@ _OPENING_ORDER = {("run", "run_seq"), ("run_attempt", "run_seq")}
 
 DERIVED_COLUMNS = {
     # A completion stamp is clock time, but WHETHER a run completed is not.
+    # A GATE APPLICATION'S START AND END are the replay clock, which runs on
+    # with real elapsed time after its anchor (REQ-PIPE-081), so two
+    # bootstraps - or a resume and a full replay - stamp them milliseconds
+    # apart (CI run 40978105702); whether and how it ended is compared.
+    "gate_application": {"started_at": "started_at IS NOT NULL",
+                         "ended_at": "ended_at IS NOT NULL"},
     "run": {"completed_at": "completed_at IS NOT NULL",
+            "gate_application": _GATE.format(col="gate_application"),
             "caused_by_decision": _DECISION.format(col="caused_by_decision"),
             "caused_by_load": _LOAD.format(col="caused_by_load"),
             "run_seq": _RUN_RANK},
@@ -241,6 +259,7 @@ DERIVED_COLUMNS = {
     # only when the ids happened to interleave alike.
     "filing": {"refiled_by": _DECISION.format(col="refiled_by")},
     "decision": {"caused_by_decision": _DECISION.format(col="caused_by_decision"),
+                 "gate_application": _GATE.format(col="gate_application"),
                  # A RULE-MADE decision's effective time is the replay clock,
                  # which runs on with real elapsed time after its anchor
                  # (REQ-PIPE-081): 29 of 544 differed, by at most 0.69s, between

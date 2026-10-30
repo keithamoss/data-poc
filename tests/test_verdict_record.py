@@ -1,7 +1,7 @@
 """An arrival verdict is a recorded fact naming the agreement that judged
 it, and a correction re-judges it visibly (REQ-PIPE-168).
 
-Against the real cp-clients agreement: 2023-Q3 is dated 2023-08-01, due
+Against the real cp-clients agreement: 2023-Q4 is filled by the round dated 2023-08-01 (files_go_to_period 1), due
 09:00 Perth with 8h grace and a 14-day claim window. A supply received at
 12:00 that day is ON TIME; a correction cutting grace to one hour makes
 it LATE - which is the re-judgement these tests drive.
@@ -21,7 +21,7 @@ from tests import before_growth
 
 PERTH = timezone(timedelta(hours=8))
 DATASET = "cp-clients"
-SLOT = "2023-Q3"
+SLOT = "2023-Q4"
 RECEIVED = datetime(2023, 8, 1, 12, tzinfo=PERTH)
 
 
@@ -133,7 +133,7 @@ class TestTheNewestForTheCurrentFiling:
 
     def test_a_refile_brings_its_own_verdict_and_keeps_the_old_one(self, clean):
         _file()
-        _refile("2023-Q2")
+        _refile("2023-Q3")
         assert verdict.current(clean, DATASET, "verdict-s")["classification"] == classify_mod.LATE
         assert filing.filing_for(DATASET, "verdict-s")["classification"] == classify_mod.LATE
         assert [v["classification"] for v in verdict.history(clean, DATASET, "verdict-s")] == [
@@ -227,7 +227,7 @@ class TestReJudgement:
     def test_one_computed_against_a_verdict_since_replaced_is_refused(self, clean):
         _file()
         [found] = verdict.rejudged(clean, DATASET, _agreement(_grace_one_hour))
-        _refile("2023-Q2")
+        _refile("2023-Q3")
         with pytest.raises(ValueError, match="compute it again"):
             verdict.record_rejudgement(clean, found, correction_ref="CHG-1",
                                        correction_changelog="c", recorded_at=RECEIVED)

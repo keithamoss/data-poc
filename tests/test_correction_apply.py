@@ -2,7 +2,7 @@
 all at once (REQ-PIPE-170).
 
 Recorded facts come from real filings against the real cp-clients agreement
-(2023-Q3 dated 2023-08-01, due 09:00 Perth, 8h grace). A correction is
+(2023-Q4 dated 2023-08-01, due 09:00 Perth, 8h grace). A correction is
 declared in a copy of the configuration - the change made AND its
 corrections entry, as a merged correction is - and confirmed against it.
 """
@@ -35,7 +35,7 @@ def conn(supply_dsn):
         c.execute(f'TRUNCATE "{qa_store.SCHEMA}".filing CASCADE')
         c.execute(f'TRUNCATE "{qa_store.SCHEMA}".correction_applied')
         c.execute(f'TRUNCATE "{qa_store.SCHEMA}".correction_parked CASCADE')
-        _file(SUPPLY, "2023-Q3", RECEIVED)
+        _file(SUPPLY, "2023-Q4", RECEIVED)
         yield c
         # LEFT EMPTY FOR THE NEXT MODULE ON THIS WORKER: the activity feed
         # reads every applied correction, so one left behind here appeared in
@@ -62,12 +62,12 @@ def _pair_id(minutes: int) -> str:
 
 
 def _pair(minutes: int) -> str:
-    """A contested pair's `#1`, filed to 2023-Q3: two files of one delivery
+    """A contested pair's `#1`, filed to 2023-Q4: two files of one delivery
     for one table, so its contest is OPEN (REQ-PIPE-194 criteria 8 and 9) -
     a `#` in the id alone is not a contest."""
     at = RECEIVED + timedelta(minutes=minutes)
     pair = _pair_id(minutes)
-    _file(pair, "2023-Q3", at)
+    _file(pair, "2023-Q4", at)
     filing_support.ensure_delivery(f"pytest-{DATASET}-{pair}", DATASET, at,
                                    filename="cp_clients_v2.csv")
     return pair
@@ -174,8 +174,8 @@ class TestConfirming:
         docs = _corrected(_move_q3)
         done = correction_apply.confirm(conn, "CAB-1", actor=manager, effective_at=AT,
                                         docs=docs)
-        assert [(s, a, b) for _d, s, a, b in done.moved] == [(SUPPLY, "2023-Q3", "2023-Q2")]
-        assert _current(conn)["slot"] == "2023-Q2"
+        assert [(s, a, b) for _d, s, a, b in done.moved] == [(SUPPLY, "2023-Q4", "2023-Q3")]
+        assert _current(conn)["slot"] == "2023-Q3"
         [(actor, kind, reason)] = conn.execute(
             f"SELECT actor, actor_kind, reason FROM {decision_log.TABLE} WHERE supply = ? "
             "AND action = 'refile' ORDER BY id DESC LIMIT 1", [SUPPLY]).fetchall()
@@ -200,7 +200,7 @@ class TestConfirming:
             conn, "CAB-1", actor=manager, keep={(DATASET, SUPPLY)},
             keep_reason="genuinely Q3 data, sent early", effective_at=AT, docs=docs)
         assert not done.moved and done.kept
-        assert _current(conn)["slot"] == "2023-Q3"
+        assert _current(conn)["slot"] == "2023-Q4"
         [(reason,)] = conn.execute(
             f"SELECT reason FROM {decision_log.TABLE} WHERE supply = ? AND action = 'keep' "
             "ORDER BY id DESC LIMIT 1", [SUPPLY]).fetchall()
@@ -221,19 +221,19 @@ class TestConfirming:
         assert done.kept and done.moved
 
     def test_a_supply_no_period_takes_is_held_naming_the_correction(self, conn, manager):
-        """Case Workers owes February and August only: with 2023-Q3 moved to
+        """Case Workers owes February and August only: with 2023-Q4 moved to
         October its August supply has no open period, so it is held."""
         workers = "cp-case-workers"
         filing_support.file(assignment.Assignment(
-            dataset_id=workers, supply_id="apply-h", slot="2023-Q3",
-            branch=assignment.OPEN_UNFILLED, considered=("2023-Q3",), received_at=RECEIVED))
+            dataset_id=workers, supply_id="apply-h", slot="2023-Q4",
+            branch=assignment.OPEN_UNFILLED, considered=("2023-Q4",), received_at=RECEIVED))
         docs = _corrected(_move_q3)
         _p, t = correction_apply.trial_for(conn, "CAB-1", docs=docs)
         [m] = [m for m in t.moves if m.supply_id == "apply-h"]
         assert m.held and not m.blocked
         done = correction_apply.confirm(conn, "CAB-1", actor=manager, effective_at=AT,
                                         docs=docs)
-        assert (workers, "apply-h", "2023-Q3") in done.held
+        assert (workers, "apply-h", "2023-Q4") in done.held
         assert filing.filing_for(workers, "apply-h")["slot"] is None
         [hold] = [h for h in supply_holds.outstanding(conn) if h.supply_id == "apply-h"]
         assert "CAB-1" in json.dumps(hold.reason)
@@ -254,7 +254,7 @@ class TestConfirming:
 
 
 def test_the_summary_is_the_previews_form_with_what_was_kept(conn, manager):
-    _file("apply-k", "2023-Q3", RECEIVED + timedelta(minutes=2))
+    _file("apply-k", "2023-Q4", RECEIVED + timedelta(minutes=2))
     docs = _corrected(_move_q3)
     p, t = correction_apply.trial_for(conn, "CAB-1", docs=docs)
     done = correction_apply.confirm(conn, "CAB-1", actor=manager, keep={(DATASET, "apply-k")},
@@ -262,7 +262,7 @@ def test_the_summary_is_the_previews_form_with_what_was_kept(conn, manager):
     text = correction_apply.summary(p, t, done, as_at=datetime.now(PERTH), database="d")
     assert text.startswith("# Applied: correction CAB-1")
     assert text.index("## Summary") < text.index("## Kept where they are")
-    assert "`apply-k` in 2023-Q3: really Q3" in text
+    assert "`apply-k` in 2023-Q4: really Q3" in text
 
 
 def test_a_correction_hold_says_which_correction_and_what_to_do():
@@ -402,13 +402,13 @@ class TestTheTerminal:
             self, conn, declared, monkeypatch, manager):
         from cli import filing_tui
 
-        _file("apply-t2", "2023-Q3", RECEIVED + timedelta(minutes=4))
+        _file("apply-t2", "2023-Q4", RECEIVED + timedelta(minutes=4))
         monkeypatch.setattr(filing_tui, "actor_at_the_keyboard", lambda: manager)
         self._answers(monkeypatch, [f"Keep {DATASET} apply-t2", filing_tui._KEEP_DONE],
                       ["really Q3 data"])
         filing_tui.corrections_flow(correction_apply.pending(conn, declared))
-        assert filing.filing_for(DATASET, "apply-t2")["slot"] == "2023-Q3"
-        assert filing.filing_for(DATASET, SUPPLY)["slot"] == "2023-Q2"
+        assert filing.filing_for(DATASET, "apply-t2")["slot"] == "2023-Q4"
+        assert filing.filing_for(DATASET, SUPPLY)["slot"] == "2023-Q3"
 
 
 class TestThePassNotesIt:
@@ -465,19 +465,19 @@ class TestScenarioRegister:
 
     def test_ts63_a_dataset_turned_off_for_a_while(self):
         """Against the committed calendar: Carer Register is turned off after
-        31 December 2021 and back on for 2022-Q3. Its 2021-Q4 supply arriving
-        on 5 January, after the turn-off, still files to 2021-Q4, whose slot
+        31 December 2021 and back on for 2022-Q4. Its 2022-Q1 supply arriving
+        on 5 January, after the turn-off, still files to 2022-Q1, whose slot
         is open; one arriving in March, with no owed slot open, is held as
-        turned off; and 2022-Q3's slot takes its own supply again."""
+        turned off; and 2022-Q4's slot takes its own supply again."""
         from qa_tools.common import asset_time, turned_off
 
         late = turned_off.label_at("cp-carers", asset_time.wall_clock(date(2022, 1, 5), "10:00"))
-        assert late.covered_by == "2021-Q4" and late.label == turned_off.PLAIN
+        assert late.covered_by == "2022-Q1" and late.label == turned_off.PLAIN
         gap = turned_off.label_at("cp-carers", asset_time.wall_clock(date(2022, 3, 15), "10:00"))
         assert gap.label == turned_off.TURNED_OFF and gap.covered_by is None
         assert gap.turned_off.effective_to == date(2021, 12, 31)
         back = turned_off.label_at("cp-carers", asset_time.wall_clock(date(2022, 8, 1), "09:00"))
-        assert back.covered_by == "2022-Q3"
+        assert back.covered_by == "2022-Q4"
         for other in ("cp-clients", "cp-placements"):
             assert turned_off.gap_at(other, asset_time.wall_clock(date(2022, 3, 15), "10:00")) \
                 is None, other
@@ -486,7 +486,7 @@ class TestScenarioRegister:
         from qa_tools.common import verdict
 
         late = RECEIVED + timedelta(days=1)
-        _file("ts57", "2023-Q3", late)
+        _file("ts57", "2023-Q4", late)
         # A DAY LATER is the register's late -> on time: arrived 12:00 the
         # day after the old due date, inside the new one's grace (three days
         # later would make it early, not on time).
@@ -502,43 +502,43 @@ class TestScenarioRegister:
         assert history[-1]["correction_ref"] == "CAB-1"
 
     def test_ts58_a_supply_moves_into_the_window_that_now_covers_it(self, conn, manager):
-        _file("ts58", "2023-Q2", datetime(2023, 7, 10, 12, tzinfo=PERTH))
+        _file("ts58", "2023-Q3", datetime(2023, 7, 10, 12, tzinfo=PERTH))
         docs = _corrected(_claim_window(28))
         _p, t = correction_apply.trial_for(conn, "CAB-1", docs=docs)
         [m] = [m for m in t.moves if m.supply_id == "ts58"]
-        assert (m.from_period, m.to_period) == ("2023-Q2", "2023-Q3")
+        assert (m.from_period, m.to_period) == ("2023-Q3", "2023-Q4")
         done = correction_apply.confirm(conn, "CAB-1", actor=manager, effective_at=AT,
                                         docs=docs)
-        assert (DATASET, "ts58", "2023-Q2", "2023-Q3") in done.moved
+        assert (DATASET, "ts58", "2023-Q3", "2023-Q4") in done.moved
         assert done.owed_rechecks, "re-QA'd and re-gated through an owed re-check"
 
     def test_ts59_one_kept_with_a_reason_the_other_moved(self, conn, manager):
-        _file("ts59a", "2023-Q2", datetime(2023, 7, 10, 12, tzinfo=PERTH))
-        _file("ts59b", "2023-Q2", datetime(2023, 7, 11, 12, tzinfo=PERTH))
+        _file("ts59a", "2023-Q3", datetime(2023, 7, 10, 12, tzinfo=PERTH))
+        _file("ts59b", "2023-Q3", datetime(2023, 7, 11, 12, tzinfo=PERTH))
         docs = _corrected(_claim_window(28))
         p, t = correction_apply.trial_for(conn, "CAB-1", docs=docs)
         done = correction_apply.confirm(conn, "CAB-1", actor=manager,
                                         keep={(DATASET, "ts59a")}, keep_reason="really Q2",
                                         effective_at=AT, docs=docs)
-        assert filing.filing_for(DATASET, "ts59a")["slot"] == "2023-Q2"
-        assert filing.filing_for(DATASET, "ts59b")["slot"] == "2023-Q3"
+        assert filing.filing_for(DATASET, "ts59a")["slot"] == "2023-Q3"
+        assert filing.filing_for(DATASET, "ts59b")["slot"] == "2023-Q4"
         [(actor, slot, reason)] = conn.execute(
             f"SELECT actor, to_slot, reason FROM {decision_log.TABLE} WHERE supply = 'ts59a' "
             "AND action = 'keep'").fetchall()
-        assert actor == manager["email"] and slot == "2023-Q2"
+        assert actor == manager["email"] and slot == "2023-Q3"
         assert "CAB-1" in reason and "really Q2" in reason
         text = correction_apply.summary(p, t, done, as_at=datetime.now(PERTH), database="d")
         assert "ts59a" in text and "ts59b" in text
 
     def test_ts60_a_supply_left_with_no_period_is_held(self, conn, manager):
-        _workers_file("ts60", "2023-Q3", datetime(2023, 7, 25, 12, tzinfo=PERTH))
+        _workers_file("ts60", "2023-Q4", datetime(2023, 7, 25, 12, tzinfo=PERTH))
         docs = _corrected(_claim_window(1))
         _p, t = correction_apply.trial_for(conn, "CAB-1", docs=docs)
         [m] = [m for m in t.moves if m.supply_id == "ts60"]
         assert m.held
         done = correction_apply.confirm(conn, "CAB-1", actor=manager, effective_at=AT,
                                         docs=docs)
-        assert ("cp-case-workers", "ts60", "2023-Q3") in done.held
+        assert ("cp-case-workers", "ts60", "2023-Q4") in done.held
         [hold] = [h for h in supply_holds.outstanding(conn) if h.supply_id == "ts60"]
         assert hold.correction == "CAB-1"
 
@@ -555,7 +555,7 @@ class TestScenarioRegister:
         assert [x[1] for x in done.parked] == [ts61_pair]
         assert not correction_apply.pending(conn, docs)
         assert [x.supply_id for x in correction_apply.parked(conn)] == [ts61_pair]
-        assert filing.filing_for(DATASET, ts61_pair)["slot"] == "2023-Q3", "not moved"
+        assert filing.filing_for(DATASET, ts61_pair)["slot"] == "2023-Q4", "not moved"
 
     def test_ts62_merged_not_confirmed_refuses_nothing(self, conn):
         from qa_tools.common import agreement_drift
@@ -608,9 +608,9 @@ class TestCriticFindingsOn170:
         del late
 
     def test_d1_every_owners_part_is_applied(self, conn, manager):
-        """CAB-1 moves 2023-Q3's date (the calendar's part) and shortens
+        """CAB-1 moves 2023-Q4's date (the calendar's part) and shortens
         cp-clients' grace (the dataset's part): both are applied."""
-        _file("d1-g", "2023-Q2", datetime(2023, 5, 1, 12, tzinfo=PERTH))
+        _file("d1-g", "2023-Q3", datetime(2023, 5, 1, 12, tzinfo=PERTH))
 
         def both(cal, asset):
             _move_q3(cal, asset)
@@ -618,18 +618,18 @@ class TestCriticFindingsOn170:
         docs = _corrected(both)
         done = correction_apply.confirm(conn, "CAB-1", actor=manager, effective_at=AT,
                                         docs=docs)
-        assert (DATASET, SUPPLY, "2023-Q3", "2023-Q2") in done.moved, "the calendar's part"
+        assert (DATASET, SUPPLY, "2023-Q4", "2023-Q3") in done.moved, "the calendar's part"
         assert ("d1-g", "late") in {(s, new) for _d, s, _slot, _old, new in done.rejudged}, \
             "the dataset's part"
         assert correction_apply.pending(conn, docs) == []
 
     def test_d2_holding_a_promoted_supply_empties_its_period(self, conn, manager):
         workers = "cp-case-workers"
-        _workers_file("cp-case-workers@d2h0000001", "2023-Q3", RECEIVED)
-        _promote(conn, workers, "cp-case-workers@d2h0000001", "2023-Q3")
+        _workers_file("cp-case-workers@d2h0000001", "2023-Q4", RECEIVED)
+        _promote(conn, workers, "cp-case-workers@d2h0000001", "2023-Q4")
         docs = _corrected(_move_q3)
         correction_apply.confirm(conn, "CAB-1", actor=manager, effective_at=AT, docs=docs)
-        assert decision_log.promoted_into(conn, workers, "2023-Q3") is None
+        assert decision_log.promoted_into(conn, workers, "2023-Q4") is None
 
     def test_d3_keeping_a_held_supply_keeps_it_held(self, conn, manager):
         filing_support.file(assignment.Assignment(
@@ -651,8 +651,8 @@ class TestCriticFindingsOn170:
 
     def test_d4_a_supply_held_before_is_held_again(self, conn, manager):
         workers = "cp-case-workers"
-        _workers_file("cp-case-workers@d4h0000001", "2023-Q3", RECEIVED)
-        did = _promote(conn, workers, "cp-case-workers@d4h0000001", "2023-Q3")
+        _workers_file("cp-case-workers@d4h0000001", "2023-Q4", RECEIVED)
+        did = _promote(conn, workers, "cp-case-workers@d4h0000001", "2023-Q4")
         conn.execute(f"INSERT INTO {supply_holds.TABLE} (dataset_id, supply_id, kind, reason, "
                      "raised_by, resolved_by, resolved_at) VALUES (?, 'cp-case-workers@d4h0000001', ?, '{}', "
                      "'earlier', ?, now())", [workers, supply_holds.ASSIGNMENT_RULE, did])
@@ -696,7 +696,7 @@ class TestCriticFindingsOn170:
         _move_q3(cal, asset, "2023-10-20")
         on_disk = agreement_mod.current()
         with correction_trial.configured(cal, asset):
-            assert slots.slot_named(DATASET, "2023-Q3").date.isoformat() == "2023-10-20"
+            assert slots.slot_named(DATASET, "2023-Q4").round_date.isoformat() == "2023-10-20"
         assert agreement_mod.current() is on_disk, "restored afterwards"
 
     def test_l3_an_applied_reference_says_where_it_is_recorded(self, conn, manager):
@@ -727,14 +727,14 @@ class TestKeithsAnswerO:
             "AND action = 'refile' ORDER BY id DESC LIMIT 1", [supply]).fetchall()[0]
 
     def test_a_move_is_the_rules_and_names_the_confirmer(self, conn, manager):
-        _file("o-move", "2023-Q2", datetime(2023, 7, 10, 12, tzinfo=PERTH))
+        _file("o-move", "2023-Q3", datetime(2023, 7, 10, 12, tzinfo=PERTH))
         docs = _corrected(_claim_window(28))
         correction_apply.confirm(conn, "CAB-1", actor=manager, effective_at=AT, docs=docs)
         kind, reason = self._decision(conn, "o-move")
         assert kind == decision_log.RULE and manager["email"] in reason and "CAB-1" in reason
 
     def test_a_hold_is_the_rules_and_names_the_confirmer(self, conn, manager):
-        _workers_file("o-hold", "2023-Q3", datetime(2023, 7, 25, 12, tzinfo=PERTH))
+        _workers_file("o-hold", "2023-Q4", datetime(2023, 7, 25, 12, tzinfo=PERTH))
         docs = _corrected(_claim_window(1))
         correction_apply.confirm(conn, "CAB-1", actor=manager, effective_at=AT, docs=docs)
         kind, reason = self._decision(conn, "o-hold")
@@ -746,7 +746,7 @@ def _reject(conn, supply=SUPPLY):
             agency_id="child-protection-family-support", collection_id="child-protection",
             dataset_id=DATASET, action=decision_log.REJECT, supply=supply,
             actor="somebody", actor_kind=decision_log.PERSON,
-            effective_at="2023-08-02T09:00:00+08:00", to_slot="2023-Q3",
+            effective_at="2023-08-02T09:00:00+08:00", to_slot="2023-Q4",
             reason="bad file")):
         pass
 
@@ -763,7 +763,7 @@ class TestParkedMoves:
                                         docs=docs)
         assert SUPPLY in {s for _d, s, *_ in done.moved}
         [(ds, supply, frm, to, why)] = done.parked
-        assert (ds, supply, frm) == (DATASET, park_c_pair, "2023-Q3") and "contested" in why
+        assert (ds, supply, frm) == (DATASET, park_c_pair, "2023-Q4") and "contested" in why
         [parked] = correction_apply.parked(conn)
         assert parked.reference == "CAB-1" and parked.to_period == to
         assert parked.confirmed_by == manager["email"]
@@ -772,7 +772,7 @@ class TestParkedMoves:
         assert record["parked"][0][1] == park_c_pair
 
     def test_it_moves_to_the_period_confirmed_once_the_blocker_clears(self, conn, manager):
-        _file("park-m", "2023-Q3", RECEIVED + timedelta(minutes=6))
+        _file("park-m", "2023-Q4", RECEIVED + timedelta(minutes=6))
         _reject(conn, "park-m")
         docs = _corrected(_move_q3)
         done = correction_apply.confirm(conn, "CAB-1", actor=manager, effective_at=AT,
@@ -780,10 +780,10 @@ class TestParkedMoves:
         [(_ds, _s, _frm, to, why)] = done.parked
         assert "rejected" in why
         assert correction_apply.drain_parked(conn, docs=docs, say=lambda _m: None) == []
-        assert _current(conn, "park-m")["slot"] == "2023-Q3", "still blocked, still where it was"
-        _promote(conn, DATASET, "park-m", "2023-Q3")   # the rejection reversed
+        assert _current(conn, "park-m")["slot"] == "2023-Q4", "still blocked, still where it was"
+        _promote(conn, DATASET, "park-m", "2023-Q4")   # the rejection reversed
         moved = correction_apply.drain_parked(conn, docs=docs, say=lambda _m: None)
-        assert moved == [(DATASET, "park-m", "2023-Q3", to)]
+        assert moved == [(DATASET, "park-m", "2023-Q4", to)]
         assert _current(conn, "park-m")["slot"] == to
         assert correction_apply.parked(conn) == []
         reason, actor_kind = conn.execute(
@@ -795,12 +795,12 @@ class TestParkedMoves:
         # ITS OWN SUPPLY: the decision log is not emptied between tests, so
         # another test's promotion of SUPPLY would read as this one's
         # un-rejection.
-        _file("park-f", "2023-Q3", RECEIVED + timedelta(minutes=5))
+        _file("park-f", "2023-Q4", RECEIVED + timedelta(minutes=5))
         _reject(conn, "park-f")
         docs = _corrected(_move_q3)
         correction_apply.confirm(conn, "CAB-1", actor=manager, effective_at=AT, docs=docs)
         assert [x.supply_id for x in correction_apply.parked(conn)] == ["park-f"]
-        _promote(conn, DATASET, "park-f", "2023-Q3")
+        _promote(conn, DATASET, "park-f", "2023-Q4")
         assert correction_apply.drain_parked(conn, docs=docs, skip=frozenset({DATASET}),
                                              say=lambda _m: None) == []
         assert len(correction_apply.parked(conn)) == 1
@@ -924,13 +924,13 @@ class TestCriticFindingsOn152:
     failed before its fix."""
 
     def test_1_one_move_that_cannot_go_ahead_holds_back_no_other(self, conn):
-        _file("c1-a", "2023-Q3", RECEIVED + timedelta(minutes=11))
-        _file("c1-b", "2023-Q3", RECEIVED + timedelta(minutes=12))
-        _park(conn, "c1-a", "2023-Q3", "2023-Q9")
-        _park(conn, "c1-b", "2023-Q3", "2023-Q2")
+        _file("c1-a", "2023-Q4", RECEIVED + timedelta(minutes=11))
+        _file("c1-b", "2023-Q4", RECEIVED + timedelta(minutes=12))
+        _park(conn, "c1-a", "2023-Q4", "2023-Q9")
+        _park(conn, "c1-b", "2023-Q4", "2023-Q3")
         said = []
         moved = correction_apply.drain_parked(conn, docs=_docs(), say=said.append)
-        assert moved == [(DATASET, "c1-b", "2023-Q3", "2023-Q2")]
+        assert moved == [(DATASET, "c1-b", "2023-Q4", "2023-Q3")]
         assert [p.supply_id for p in correction_apply.parked(conn)] == ["c1-a"]
         assert any("c1-a" in s and "2023-Q9" in s for s in said)
 
@@ -951,8 +951,8 @@ class TestCriticFindingsOn152:
         from test_correction_replay import _declare
 
         docs = _declare(_docs(), _grace, "CAB-2", "2026-01-01")
-        _file("c7", "2023-Q3", RECEIVED + timedelta(minutes=14))
-        _park(conn, "c7", "2023-Q3", "2023-Q2")
+        _file("c7", "2023-Q4", RECEIVED + timedelta(minutes=14))
+        _park(conn, "c7", "2023-Q4", "2023-Q3")
         seen = []
         real = correction_trial.configured
 
@@ -968,21 +968,21 @@ class TestCriticFindingsOn152:
             self, conn, manager):
         from qa_tools.common import outstanding
 
-        _file("c4", "2023-Q3", RECEIVED + timedelta(minutes=15))
-        _park(conn, "c4", "2023-Q3", "2023-Q2")
-        filing.refile(conn, DATASET, "c4", "2023-Q4", decision_id=1)
+        _file("c4", "2023-Q4", RECEIVED + timedelta(minutes=15))
+        _park(conn, "c4", "2023-Q4", "2023-Q3")
+        filing.refile(conn, DATASET, "c4", "2024-Q1", decision_id=1)
         [item] = [i for i in outstanding._from_parked_corrections(conn) if "c4" in i.headline]
-        assert "2023-Q4" in item.headline and "the next processing pass" not in item.detail
+        assert "2024-Q1" in item.headline and "the next processing pass" not in item.detail
         correction_apply.keep_parked(conn, "CAB-1", DATASET, "c4", actor=manager,
                                      reason="leave it", effective_at=AT)
         to_slot = conn.execute(
             f"SELECT to_slot FROM {decision_log.TABLE} WHERE supply = 'c4' AND action = ?",
             [decision_log.KEEP]).fetchall()[0][0]
-        assert to_slot == "2023-Q4"
+        assert to_slot == "2024-Q1"
 
     def test_9_the_move_resolves_with_its_own_decision(self, conn):
-        _file("c9", "2023-Q3", RECEIVED + timedelta(minutes=16))
-        _park(conn, "c9", "2023-Q3", "2023-Q2")
+        _file("c9", "2023-Q4", RECEIVED + timedelta(minutes=16))
+        _park(conn, "c9", "2023-Q4", "2023-Q3")
         correction_apply.drain_parked(conn, docs=_docs(), say=lambda _m: None)
         resolved = conn.execute(
             f"SELECT decision_id FROM {correction_apply.RESOLVED}").fetchall()[0][0]
@@ -994,10 +994,10 @@ class TestCriticFindingsOn152:
     def test_10_keeping_several_is_all_or_nothing(self, conn, manager, monkeypatch):
         from cli import supply as supply_cli
 
-        _file("c10-a", "2023-Q3", RECEIVED + timedelta(minutes=17))
-        _file("c10-b", "2023-Q3", RECEIVED + timedelta(minutes=18))
-        _park(conn, "c10-a", "2023-Q3", "2023-Q2")
-        _park(conn, "c10-b", "2023-Q3", "2023-Q2")
+        _file("c10-a", "2023-Q4", RECEIVED + timedelta(minutes=17))
+        _file("c10-b", "2023-Q4", RECEIVED + timedelta(minutes=18))
+        _park(conn, "c10-a", "2023-Q4", "2023-Q3")
+        _park(conn, "c10-b", "2023-Q4", "2023-Q3")
         real = correction_apply.keep_parked
 
         def keep(conn_, reference, ds, supply, **kw):
@@ -1047,7 +1047,7 @@ class TestCriticFindingsOn152TheCommand:
 
 class TestATurnOffDeclaredAsACorrection:
     """REQ-PIPE-179 criteria 35-37: a correction that turns cp-clients off
-    after 30 June 2023, so its 2023-Q3 supply sits in a period the corrected
+    after 30 June 2023, so its 2023-Q4 supply sits in a period the corrected
     agreement owes nothing in."""
 
     @staticmethod
@@ -1076,7 +1076,7 @@ class TestATurnOffDeclaredAsACorrection:
         base, work = correction_apply.states(p, [p], docs)
         t = correction_trial.trial(conn, base, work, dataset_ids=[DATASET])
         [m] = [m for m in t.moves if m.supply_id == SUPPLY]
-        assert m.keep_refused and "2023-Q3 no longer owes a supply" in m.keep_refused
+        assert m.keep_refused and "2023-Q4 no longer owes a supply" in m.keep_refused
         why = correction_apply.why_not_confirmable(t, {(DATASET, SUPPLY)}, "it is Q3 data")
         assert why and "cannot be kept" in why
         assert "it cannot be kept" in correction_trial.report(
@@ -1084,8 +1084,8 @@ class TestATurnOffDeclaredAsACorrection:
 
     def test_a_parked_move_into_a_gap_stays_parked(self, conn):
         """Criterion 37: said, naming the gap and what ends it."""
-        _file("g1", "2023-Q3", RECEIVED + timedelta(minutes=21))
-        _park(conn, "g1", "2023-Q3", "2023-Q4")
+        _file("g1", "2023-Q4", RECEIVED + timedelta(minutes=21))
+        _park(conn, "g1", "2023-Q4", "2024-Q1")
         # IN FORCE, not a pending correction - the drain reverts those.
         cal, asset = _docs()
         versions = _clients(cal)["participation"]["versions"]
@@ -1110,7 +1110,7 @@ class TestCriticFindingsOn190:
     @staticmethod
     def _gap_then_back(cal, asset):
         """cp-clients off after 30 June 2023, back on 1 October 2023 - so
-        2023-Q3 owes nothing and 2023-Q4 is owed."""
+        2023-Q4 owes nothing and 2024-Q1 is owed."""
         versions = _clients(cal)["participation"]["versions"]
         versions.append({**{k: v for k, v in versions[0].items() if k != "changelog"},
                          "effective_from": "2023-10-01",
@@ -1120,15 +1120,15 @@ class TestCriticFindingsOn190:
     def _parked_in_the_gap(self, conn, supply, minutes):
         from qa_tools.common import correction_trial
 
-        _file(supply, "2023-Q3", RECEIVED + timedelta(minutes=minutes))
-        _park(conn, supply, "2023-Q3", "2023-Q4")
+        _file(supply, "2023-Q4", RECEIVED + timedelta(minutes=minutes))
+        _park(conn, supply, "2023-Q4", "2024-Q1")
         cal, asset = _docs()
         self._gap_then_back(cal, asset)
         return correction_trial.configured(cal, asset)
 
     def test_d5_a_parked_supply_in_a_gap_is_refused_a_keep(self, conn, manager):
         with self._parked_in_the_gap(conn, "d5-a", 31):
-            with pytest.raises(decision_log.DecisionRefused, match="cannot be kept in 2023-Q3"):
+            with pytest.raises(decision_log.DecisionRefused, match="cannot be kept in 2023-Q4"):
                 correction_apply.keep_parked(conn, "CAB-1", DATASET, "d5-a", actor=manager,
                                              reason="r", effective_at=AT)
 
@@ -1164,8 +1164,8 @@ class TestCriticFindingsOn190:
     def test_d6_a_parked_move_into_a_gap_names_the_gap(self, conn):
         from qa_tools.common import correction_trial, outstanding
 
-        _file("d6-a", "2023-Q3", RECEIVED + timedelta(minutes=34))
-        _park(conn, "d6-a", "2023-Q3", "2023-Q4")
+        _file("d6-a", "2023-Q4", RECEIVED + timedelta(minutes=34))
+        _park(conn, "d6-a", "2023-Q4", "2024-Q1")
         cal, asset = _docs()
         _clients(cal)["participation"]["versions"][0].update(
             effective_to="2023-09-30", turned_off_reason="supplier paused")

@@ -53,7 +53,7 @@ def _q3_date(agr=None) -> date:
 
 @pytest.fixture
 def two(monkeypatch):
-    """CAB-1 moves 2023-Q3 to 20 October, merged 2026-01-10; CAB-2 shortens
+    """CAB-1 moves the 2023-Q3 round (cp-clients' 2023-Q4) to 20 October, merged 2026-01-10; CAB-2 shortens
     cp-clients' grace, merged 2026-02-10."""
     from qa_tools.common import correction_trial
 
@@ -132,8 +132,8 @@ def conn(supply_dsn):
         c.execute(f'TRUNCATE "{qa_store.SCHEMA}".correction_applied')
         c.execute(f'TRUNCATE "{qa_store.SCHEMA}".correction_parked CASCADE')
         filing_support.file(assignment.Assignment(
-            dataset_id="cp-clients", supply_id="replay-s", slot="2023-Q3",
-            branch=assignment.OPEN_UNFILLED, considered=("2023-Q3",),
+            dataset_id="cp-clients", supply_id="replay-s", slot="2023-Q4",
+            branch=assignment.OPEN_UNFILLED, considered=("2023-Q4",),
             received_at=datetime(2023, 8, 1, 12, tzinfo=PERTH)))
         yield c
         c.execute(f'TRUNCATE "{qa_store.SCHEMA}".correction_applied')
@@ -162,7 +162,7 @@ class TestConfirmedAsTheManagerWould:
 
         correction_replay.confirm_due(conn, effective_at="2026-10-11T00:00:00+08:00",
                                       say=lambda _m: None)
-        assert filing.filing_for("cp-clients", "replay-s")["slot"] != "2023-Q3"
+        assert filing.filing_for("cp-clients", "replay-s")["slot"] != "2023-Q4"
 
 
 def _applied_at(conn) -> dict[str, datetime]:

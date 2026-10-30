@@ -2,9 +2,10 @@
 criteria 2, 5 and 8 to 17, amended 2026-10-04).
 
 Against a real database and cp-carers' real quarterly schedule, in 2027
-so no other test's promotions are in the way. Periods: 2027-Q1 due
-1 February, 2027-Q2 due 1 May, 2027-Q3 due 1 August - each with eight
-hours' grace.
+so no other test's promotions are in the way. Child Protection's files go
+into the period after the round they arrive in (files_go_to_period 1), so
+2027-Q1 is filled by the 1 November 2026 round, 2027-Q2 by 1 February
+and 2027-Q3 by 1 May - each with eight hours' grace.
 """
 from __future__ import annotations
 
@@ -17,8 +18,8 @@ from qa_tools.common import decision_log, drift_reference, supply_db
 
 DS = "cp-carers"
 PERTH = timezone(timedelta(hours=8))
-AFTER_Q2_DUE = datetime(2027, 6, 1, 9, tzinfo=PERTH)
-BEFORE_Q2_DUE = datetime(2027, 4, 25, 9, tzinfo=PERTH)
+AFTER_Q2_DUE = datetime(2027, 3, 1, 9, tzinfo=PERTH)
+BEFORE_Q2_DUE = datetime(2027, 1, 25, 9, tzinfo=PERTH)
 
 
 def _decide(conn, action, slot, ds=DS, **kw):
@@ -87,11 +88,12 @@ class TestTheGap:
         assert "compared with 2027-Q1, not 2027-Q2" in got.reason
 
     def test_a_period_marked_not_supplied_is_said_but_not_red(self, supply_dsn):
-        """Criterion 17, REQ-PIPE-132's half: cp-case-workers owes Q1 and Q3
-        only, so 2025-Q1 is promoted and 2025-Q3 marked, measured at 2026-Q1.
+        """Criterion 17, REQ-PIPE-132's half: cp-case-workers is delivered in
+        February and August, which at files_go_to_period 1 owe Q2 and Q4 only, so
+        2025-Q2 is promoted and 2025-Q4 marked, measured at 2026-Q2.
 
         2025, NOT 2026: the shared CP fixture (tests/conftest.py) promotes
-        its reference delivery into cp-case-workers' 2026-Q1 on this same
+        its reference delivery into cp-case-workers' 2026-Q2 on this same
         worker's database, and qa.decision is append-only - a promotion of
         a different supply there made every later module's fixture refuse
         to supersede it without a reason."""
@@ -99,13 +101,13 @@ class TestTheGap:
 
         ds = OWN["marked"]
         conn = _conn_for(ds)
-        _decide(conn, decision_log.PROMOTE, "2025-Q1", ds)
+        _decide(conn, decision_log.PROMOTE, "2025-Q2", ds)
         not_supplied.mark(conn, agency_id="a", collection_id="c", dataset_id=ds,
-                          period="2025-Q3", actor="t@example.com",
+                          period="2025-Q4", actor="t@example.com",
                           reason="supplier had nothing that quarter",
                           effective_at="2027-01-01T09:00:00+08:00")
-        got = drift_reference.assess(conn, ds, "2026-Q1", AFTER_Q2_DUE)
-        assert got.kind == drift_reference.MEASURED and got.dealt_with == ("2025-Q3",)
+        got = drift_reference.assess(conn, ds, "2026-Q2", AFTER_Q2_DUE)
+        assert got.kind == drift_reference.MEASURED and got.dealt_with == ("2025-Q4",)
 
     def test_no_reference_with_owed_periods_is_red_not_no_data(self, supply_dsn):
         """Criterion 9 - the owed periods are named. (Only where this

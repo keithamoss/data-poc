@@ -47,7 +47,7 @@ def test_a_kept_supply_carries_its_correction_and_reason(conn, manager, by_suppl
     # the same supply may be listed too - this one is the CAB-1 entry.
     [kept] = [k for k in corrections.for_dataset(T.DATASET, conn)["kept"][T.SUPPLY]
               if k["reason"] == "genuinely Q3"]
-    assert (kept["reference"], kept["period"]) == ("CAB-1", "2023-Q3")
+    assert (kept["reference"], kept["period"]) == ("CAB-1", "2023-Q4")
 
 
 def test_a_pending_correction_is_awaiting_on_the_datasets_it_affects(conn, by_supply,
@@ -148,27 +148,27 @@ def test_r_a_moved_supply_carries_the_same_note(conn, manager, by_supply, monkey
     got = corrections.for_dataset(T.DATASET, conn)
     [entry] = [e for e in got["rejudged"].get(T.SUPPLY, []) if e.get("movedTo")]
     assert (entry["movedFrom"], entry["movedTo"], entry["reference"]) == \
-        ("2023-Q3", "2023-Q2", "CAB-1")
+        ("2023-Q4", "2023-Q3", "CAB-1")
     assert entry["original"] and entry["approver"] and entry["appliedAt"]
 
 
 def test_152_3_a_move_carried_out_from_parked_carries_the_moved_note(
         conn, manager, by_supply, monkeypatch):
     """delivery-critic on the parked moves (#152, finding 3)."""
-    T._file("p3", "2023-Q3", T.RECEIVED + T.timedelta(minutes=21))
-    T._park(conn, "p3", "2023-Q3", "2023-Q2", reference="CAB-1")
+    T._file("p3", "2023-Q4", T.RECEIVED + T.timedelta(minutes=21))
+    T._park(conn, "p3", "2023-Q4", "2023-Q3", reference="CAB-1")
     correction_apply.drain_parked(conn, docs=T._docs(), say=lambda _m: None)
     got = corrections.for_dataset(T.DATASET, conn, declared={})
     [entry] = [e for e in got["rejudged"].get("p3", []) if e.get("movedTo")]
     assert (entry["movedFrom"], entry["movedTo"], entry["reference"]) == \
-        ("2023-Q3", "2023-Q2", "CAB-1")
+        ("2023-Q4", "2023-Q3", "CAB-1")
 
 
 def test_152_6_a_keep_while_parked_names_its_correction_exactly(
         conn, manager, by_supply, monkeypatch):
     """Finding 6: a reference holding a space was lost to the prose regex."""
-    T._file("p6", "2023-Q3", T.RECEIVED + T.timedelta(minutes=22))
-    T._park(conn, "p6", "2023-Q3", "2023-Q2", reference="CHG 12")
+    T._file("p6", "2023-Q4", T.RECEIVED + T.timedelta(minutes=22))
+    T._park(conn, "p6", "2023-Q4", "2023-Q3", reference="CHG 12")
     correction_apply.keep_parked(conn, "CHG 12", T.DATASET, "p6", actor=manager,
                                  reason="it stays", effective_at=T.AT)
     [kept] = corrections.for_dataset(T.DATASET, conn, declared={})["kept"]["p6"]

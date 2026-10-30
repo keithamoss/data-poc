@@ -16,7 +16,7 @@ from gate_support import (CP, DATASET, Scenario, checks_reading, install_fake_to
                           pin_replacement_setting)
 from qa_tools.common import period_schema, unrunnable
 
-Q3 = "2024-Q3"
+Q3 = "2024-Q4"
 CLIENT_REFS = checks_reading("cp_clients", "cp-notifications")
 
 
@@ -168,11 +168,11 @@ class TestEveryReasonIsRed:
 class TestNotInTheAgreement:
 
     def test_a_check_whose_table_joins_later_is_out_of_scope(self, scenario, monkeypatch):
-        """A dataset joining Child Protection's agreement from 2025-Q1 - here
+        """A dataset joining Child Protection's agreement from 2025-Q2 - here
         Clients, by its slot being refused for any period before it - and a
-        reader's check of it run in 2024-Q4: left out of the run's scope, in
+        reader's check of it run in 2025-Q1: left out of the run's scope, in
         left_out with its reason, no result and no red, and the reader's
-        status decided without it. The same check in 2025-Q1, Clients not yet
+        status decided without it. The same check in 2025-Q2, Clients not yet
         supplied, is red."""
         from qa_tools.common import slots
 
@@ -181,11 +181,11 @@ class TestNotInTheAgreement:
         def joins_later(dataset_id, **kw):
             got = real(dataset_id, **kw)
             if dataset_id == "cp-clients":
-                return [s for s in got if s.name >= "2025-Q1"]
+                return [s for s in got if s.name >= "2025-Q2"]
             return got
         monkeypatch.setattr(slots, "slots_for_dataset", joins_later)
         sc = scenario
-        q4 = "2024-Q4"
+        q4 = "2025-Q1"
         _put_partners_in_the_warehouse(sc, q4, "2024-10-25T10:00:00+08:00",
                                        ["cp_case_workers", "cp_investigations"])
         n2 = sc.deliver("2024-11-03T10:00:00+08:00", {"cp_notifications": "N2"})["N2"]
@@ -207,8 +207,8 @@ class TestNotInTheAgreement:
         # DECIDED WITHOUT IT: nothing else is red, so it promotes.
         assert sc.holder("cp-notifications", q4) == n2
 
-        # 2025-Q1: Clients is part of the agreement and not yet supplied.
-        _put_partners_in_the_warehouse(sc, "2025-Q1", "2025-01-25T10:00:00+08:00",
+        # 2025-Q2: Clients is part of the agreement and not yet supplied.
+        _put_partners_in_the_warehouse(sc, "2025-Q2", "2025-01-25T10:00:00+08:00",
                                        ["cp_case_workers", "cp_investigations"])
         n3 = sc.deliver("2025-02-03T10:00:00+08:00", {"cp_notifications": "N3"})["N3"]
         sc.process()
@@ -228,11 +228,11 @@ class TestNotInTheAgreement:
 
         def joins_later(dataset_id, **kw):
             got = real(dataset_id, **kw)
-            return [s for s in got if s.name >= "2025-Q1"] if dataset_id == "cp-clients" \
+            return [s for s in got if s.name >= "2025-Q2"] if dataset_id == "cp-clients" \
                 else got
         monkeypatch.setattr(slots, "slots_for_dataset", joins_later)
         sc = scenario
-        _put_partners_in_the_warehouse(sc, "2024-Q4", "2024-10-25T10:00:00+08:00",
+        _put_partners_in_the_warehouse(sc, "2025-Q1", "2024-10-25T10:00:00+08:00",
                                        ["cp_case_workers", "cp_investigations"])
         n2 = sc.deliver("2024-11-03T10:00:00+08:00", {"cp_notifications": "N2"})["N2"]
         sc.process()
@@ -243,7 +243,7 @@ class TestNotInTheAgreement:
         page = next(d for d in bdd.build_datasets(CP) if d["id"] == "cp-notifications")
         mine = [e for e in page["notInAgreement"] if e["supplyId"] == n2]
         assert {e["checkId"] for e in mine} >= set(CLIENT_REFS)
-        assert all(e["reason"] == "not part of the agreement for 2024-Q4" for e in mine)
+        assert all(e["reason"] == "not part of the agreement for 2025-Q1" for e in mine)
 
 
 def test_dataset_names_are_the_fixtures():

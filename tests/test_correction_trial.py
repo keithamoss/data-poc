@@ -2,7 +2,7 @@
 (REQ-PIPE-169), by the one computation REQ-PIPE-170's trial will confirm.
 
 Recorded facts come from real filings against the real cp-clients agreement
-(2023-Q3 dated 2023-08-01, due 09:00 Perth, 8h grace); the corrected
+(2023-Q4 dated 2023-08-01, due 09:00 Perth, 8h grace); the corrected
 configuration is a changed copy.
 """
 from __future__ import annotations
@@ -32,7 +32,7 @@ def conn(supply_dsn):
     with supply_db.connect(label="test-correction-trial") as c:
         qa_store.ensure_schema(c)
         c.execute(f'TRUNCATE "{qa_store.SCHEMA}".filing CASCADE')
-        _file(SUPPLY, "2023-Q3", RECEIVED)
+        _file(SUPPLY, "2023-Q4", RECEIVED)
         yield c
 
 
@@ -106,7 +106,7 @@ class TestWhatItLists:
         t = _trial(conn, (cal, asset))
         assert [(v.supply_id, v.old, v.new) for v in t.verdicts] == [(SUPPLY, "on_time", "late")]
         assert not t.moves, "a grace change moves no supply"
-        late_after = [m for m in t.slot_moves if m.slot == "2023-Q3" and m.what == "late after"]
+        late_after = [m for m in t.slot_moves if m.slot == "2023-Q4" and m.what == "late after"]
         assert late_after and late_after[0].old - late_after[0].new == timedelta(hours=7)
         assert not [m for m in t.slot_moves if m.what == "due"], "due did not move"
 
@@ -115,27 +115,27 @@ class TestWhatItLists:
         _move_q3(cal, "2023-10-20")
         t = _trial(conn, (cal, asset))
         [move] = t.moves
-        assert move.supply_id == SUPPLY and move.from_period == "2023-Q3"
-        assert move.to_period != "2023-Q3"
+        assert move.supply_id == SUPPLY and move.from_period == "2023-Q4"
+        assert move.to_period != "2023-Q4"
         assert not [v for v in t.verdicts if v.supply_id == SUPPLY], \
             "a moving supply's verdict is shown with its move, not twice"
-        assert any(m.slot == "2023-Q3" and m.what == "due" for m in t.slot_moves)
+        assert any(m.slot == "2023-Q4" and m.what == "due" for m in t.slot_moves)
 
     def test_a_removed_period_is_an_obligation_lost(self, conn):
         cal, asset = _docs()
         dates = _quarterly(cal)["versions"][-1]["dates"]
-        dates[:] = [d for d in dates if d["period"] != "2023-Q3"]
+        dates[:] = [d for d in dates if d["period"] != "2023-Q4"]
         t = _trial(conn, (cal, asset))
-        assert [(o.period, o.gained) for o in t.obligations] == [("2023-Q3", False)]
+        assert [(o.period, o.gained) for o in t.obligations] == [("2023-Q4", False)]
         [move] = t.moves
-        assert move.from_period == "2023-Q3" and move.to_period != "2023-Q3"
+        assert move.from_period == "2023-Q4" and move.to_period != "2023-Q4"
 
     def test_a_changed_timezone_moves_every_instant(self, conn):
         """The asset file's zone, not the one on disk, for the corrected side."""
         cal, asset = _docs()
         asset["timezone"]["versions"][0]["zone"] = "Australia/Sydney"
         t = _trial(conn, (cal, asset))
-        due = [m for m in t.slot_moves if m.slot == "2023-Q3" and m.what == "due"]
+        due = [m for m in t.slot_moves if m.slot == "2023-Q4" and m.what == "due"]
         assert due and due[0].old - due[0].new == timedelta(hours=2)
         assert asset_time.timezone_versions()[0].zone.key == "Australia/Perth", \
             "the file's zones are back once the trial ends"
@@ -153,7 +153,7 @@ class TestWhatCannotMove:
 
         at = RECEIVED + timedelta(minutes=5)
         pair = f"{DATASET}@{asset_time.arrival_key(at)}#1"
-        _file(pair, "2023-Q3", at)
+        _file(pair, "2023-Q4", at)
         delivery = f"pytest-{DATASET}-{pair}"
         filing_support.ensure_delivery(delivery, DATASET, at, filename="cp_clients_v2.csv")
         cal, asset = _docs()
@@ -165,13 +165,13 @@ class TestWhatCannotMove:
 
     def test_a_supply_a_person_placed_is_listed_not_proposed(self, conn):
         # Somewhere neither agreement's rule would put it: a person's call.
-        filing_support.place(conn, DATASET, SUPPLY, "2023-Q1", f"pytest-cp-clients-{SUPPLY}")
+        filing_support.place(conn, DATASET, SUPPLY, "2023-Q2", f"pytest-cp-clients-{SUPPLY}")
         cal, asset = _docs()
         _move_q3(cal, "2023-10-20")
         t = _trial(conn, (cal, asset))
         assert not t.moves
         [n] = t.not_proposed
-        assert (n.supply_id, n.period) == (SUPPLY, "2023-Q1")
+        assert (n.supply_id, n.period) == (SUPPLY, "2023-Q2")
         text = correction_trial.report(t, as_at=AT, database="d", against="HEAD~1")
         assert "a person put these where they are" in text
 
@@ -190,12 +190,12 @@ class TestATurnOffHoldsAPersonsFiling:
         return cal, asset
 
     def test_a_persons_filing_in_the_new_gap_becomes_a_turned_off_hold(self, conn):
-        _file("person-off", "2023-Q2", RECEIVED + timedelta(minutes=4))
-        filing_support.place(conn, DATASET, "person-off", "2023-Q3", "pytest-cp-clients-person-off")
+        _file("person-off", "2023-Q3", RECEIVED + timedelta(minutes=4))
+        filing_support.place(conn, DATASET, "person-off", "2023-Q4", "pytest-cp-clients-person-off")
         t = _trial(conn, self._turned_off())
         assert "person-off" not in [n.supply_id for n in t.not_proposed]
         [held] = [m for m in t.moves if m.supply_id == "person-off"]
-        assert (held.from_period, held.to_period) == ("2023-Q3", None)
+        assert (held.from_period, held.to_period) == ("2023-Q4", None)
         text = correction_trial.report(t, as_at=AT, database="d", against="HEAD~1")
         line = next(x for x in text.splitlines() if "person-off" in x)
         assert "turned off" in line.lower()
@@ -205,19 +205,19 @@ class TestATurnOffHoldsAPersonsFiling:
         placed by a person into Q3 (turned off) - the rule's answer for its
         receipt is Q2 under both agreements, which is no reason to leave it in
         a period the correction turns off."""
-        _file("person-gap", "2023-Q2", datetime(2023, 6, 1, 12, tzinfo=PERTH))
-        filing_support.place(conn, DATASET, "person-gap", "2023-Q3",
+        _file("person-gap", "2023-Q3", datetime(2023, 6, 1, 12, tzinfo=PERTH))
+        filing_support.place(conn, DATASET, "person-gap", "2023-Q4",
                              "pytest-cp-clients-person-gap")
         t = _trial(conn, self._turned_off())
         [held] = [m for m in t.moves if m.supply_id == "person-gap"]
-        assert (held.from_period, held.to_period) == ("2023-Q3", None)
+        assert (held.from_period, held.to_period) == ("2023-Q4", None)
         assert held.turned_off
 
     def test_a_persons_filing_still_owed_is_left_where_they_put_it(self, conn):
         """Only a turn-off is the exception: a period still owed keeps a
         person's filing out of the proposals, as before."""
-        _file("person-on", "2023-Q2", RECEIVED + timedelta(minutes=5))
-        filing_support.place(conn, DATASET, "person-on", "2023-Q3", "pytest-cp-clients-person-on")
+        _file("person-on", "2023-Q3", RECEIVED + timedelta(minutes=5))
+        filing_support.place(conn, DATASET, "person-on", "2023-Q4", "pytest-cp-clients-person-on")
         cal, asset = _docs()
         _move_q3(cal, "2023-10-20")
         t = _trial(conn, (cal, asset))
@@ -356,7 +356,7 @@ class TestTheCalendarEntry:
         out = capsys.readouterr().out
         assert "cp-clients as at 1 Jul 2023" in out
         assert "Calendar: quarterly" in out
-        assert "Next period owed: 2023-Q3" in out and "grace 8h" in out
+        assert "Next period owed: 2023-Q4" in out and "grace 8h" in out
         assert "corrections" in out.lower()
 
     def test_the_view_edits_no_configuration(self, conn, monkeypatch, capsys):
@@ -444,7 +444,7 @@ class TestCriticFindingsOn169:
         assert move.old_verdict == "on_time"
         assert t.by_dataset()[DATASET]["verdicts"] == 1, "a moved supply's flip counts"
         text = correction_trial.report(t, as_at=AT, database="d", against="r")
-        assert "2023-Q3 (On time) ->" in text
+        assert "2023-Q4 (On time) ->" in text
 
     def test_f2_a_rule_hold_is_proposed_not_called_a_persons(self, conn):
         """A hold the rule wrote (an agreement-refused one) is the rule's,
@@ -460,8 +460,8 @@ class TestCriticFindingsOn169:
         assert held.from_period is None and held.to_period is not None
 
     def test_f2_a_persons_filing_is_never_proposed_even_where_the_rule_agreed(self, conn):
-        _file("person-q3", "2023-Q2", RECEIVED + timedelta(minutes=2))
-        filing_support.place(conn, DATASET, "person-q3", "2023-Q3", "pytest-cp-clients-person-q3")
+        _file("person-q3", "2023-Q3", RECEIVED + timedelta(minutes=2))
+        filing_support.place(conn, DATASET, "person-q3", "2023-Q4", "pytest-cp-clients-person-q3")
         cal, asset = _docs()
         _move_q3(cal, "2023-10-20")
         t = _trial(conn, (cal, asset))
@@ -475,7 +475,7 @@ class TestCriticFindingsOn169:
                 agency_id="child-protection-family-support", collection_id="child-protection",
                 dataset_id=DATASET, action=decision_log.REJECT, supply=SUPPLY,
                 actor="somebody", actor_kind=decision_log.PERSON,
-                effective_at="2023-08-02T09:00:00+08:00", to_slot="2023-Q3",
+                effective_at="2023-08-02T09:00:00+08:00", to_slot="2023-Q4",
                 reason="bad file")):
             pass
         cal, asset = _docs()
@@ -532,7 +532,7 @@ class TestCriticFindingsOn169:
     def test_f5_a_blocked_reason_stays_inside_its_bullet(self):
         t = correction_trial.Trial(
             changes=(correction_trial.FrozenChange("k", ("calendar", "q"), 1, 2),),
-            moves=(correction_trial.Move(DATASET, "x", "2023-Q3", "2023-Q2", "late",
+            moves=(correction_trial.Move(DATASET, "x", "2023-Q4", "2023-Q3", "late",
                                          blocked="line one\nmothman fix it"),))
         text = correction_trial.report(t, as_at=AT, database="d", against="r")
         bullet = text.split("BLOCKED:")[1].split("\n- ")[0]
@@ -541,7 +541,7 @@ class TestCriticFindingsOn169:
     def test_f5_the_summary_says_which_way_an_obligation_went(self):
         t = correction_trial.Trial(
             changes=(correction_trial.FrozenChange("k", ("calendar", "q"), 1, 2),),
-            obligations=(correction_trial.Obligation(DATASET, "2023-Q3", date(2023, 8, 1),
+            obligations=(correction_trial.Obligation(DATASET, "2023-Q4", date(2023, 8, 1),
                                                      gained=False),))
         text = correction_trial.report(t, as_at=AT, database="d", against="r")
         assert "Periods gained / lost" in text and "| 0 / 1 |" in text
@@ -596,6 +596,6 @@ class TestKeithsAnswersOnThePreview:
 
         old = datetime(2024, 2, 1, 9, tzinfo=ZoneInfo("Australia/Perth"))
         new = datetime(2024, 2, 1, 9, tzinfo=ZoneInfo("Australia/Sydney"))
-        text = self._report([correction_trial.SlotMove("cp-clients", "2024-Q1", "due", old, new)])
-        line = next(x for x in text.splitlines() if "2024-Q1" in x)
+        text = self._report([correction_trial.SlotMove("cp-clients", "2024-Q2", "due", old, new)])
+        line = next(x for x in text.splitlines() if "2024-Q2" in x)
         assert "09:00 (AWST)" in line and "09:00 (AEDT)" in line, line

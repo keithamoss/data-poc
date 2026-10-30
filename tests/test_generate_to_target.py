@@ -569,7 +569,8 @@ class TestFindings155:
                            config="t", arrivals=(
                                si.ExtraArrival(0, "14:00", target=targeting.Target("amber")),
                                si.ExtraArrival(0, "16:00", target=targeting.Target("green"))))
-        period = type("P", (), {"date": date(2026, 9, 3), "name": "2026-09-03"})()
+        period = type("P", (), {"date": date(2026, 9, 3), "name": "2026-09-03",
+                               "round_date": property(lambda s: s.date)})()
         for seed in range(8):
             # A targeted period is never made stale (main() puts it in
             # amber_dates), and a stale batch splits twins by design.
@@ -660,7 +661,8 @@ class TestLeadIns:
         from datetime import timedelta
         start = date(2026, 9, 1)
         return [type("P", (), {"date": start + timedelta(days=i),
-                               "name": (start + timedelta(days=i)).isoformat()})()
+                               "name": (start + timedelta(days=i)).isoformat(),
+                               "round_date": property(lambda s: s.date)})()
                 for i in range(n)]
 
     def _inj(self, sid="TS-X", anchor=5, lead_in=2, target=True):

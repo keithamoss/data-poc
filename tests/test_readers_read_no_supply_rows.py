@@ -62,7 +62,7 @@ from qa_tools.common import (agreement, assignment, asset_time, period_schema, q
 PASSWORD = "readers-publisher-password"
 PERTH = timezone(timedelta(hours=8))
 DATASET = "cp-clients"
-SLOT = "2023-Q3"
+SLOT = "2023-Q4"
 SUPPLY = "readers-s"
 RECEIVED = datetime(2023, 8, 1, 12, tzinfo=PERTH)
 AT = datetime(2026, 10, 11, tzinfo=timezone.utc)

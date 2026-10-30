@@ -230,14 +230,14 @@ class TestCouldNotRunCountsTowardTheAsker:
 
         sc = gate_scenario
         sc.rules.append(own_red("P2"))
-        # 2024-Q3, a quarter every table owes (Case Workers owes February and
+        # 2024-Q4, a quarter every table owes (Case Workers owes February and
         # August only).
         got = sc.deliver("2024-07-25T10:00:00+08:00", SIX)
         sc.process()
-        assert sc.holder("cp-placements", "2024-Q3") is None
+        assert sc.holder("cp-placements", "2024-Q4") is None
         for label, supply in got.items():
             if label != "P2":
-                assert sc.holder(supply.split("@")[0], "2024-Q3") == supply, label
+                assert sc.holder(supply.split("@")[0], "2024-Q4") == supply, label
         assert not [r for r in sc.runs(got["C2"]) if r["scope"] == "readers"]
 
     def test_a_zip_without_placements_promotes_clients(self, gate_scenario):
@@ -247,7 +247,7 @@ class TestCouldNotRunCountsTowardTheAsker:
         five = {t: lab for t, lab in SIX.items() if t != "cp_placements"}
         got = sc.deliver("2024-07-25T10:00:00+08:00", five)
         sc.process()
-        assert sc.holder("cp-clients", "2024-Q3") == got["C2"]
+        assert sc.holder("cp-clients", "2024-Q4") == got["C2"]
 
     def test_an_absent_clients_reddens_only_the_asker(self, conn, period):
         """Clients absent: Notifications' Client reference could not run and

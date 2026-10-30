@@ -620,7 +620,7 @@ def test_a_grown_delivery_leaves_case_workers_out_of_its_off_months(manifest, ra
                     and _shape_of(e, manifest) is None]
     # A SCENARIO'S DELIVERY THAT LEAVES CASE WORKERS OUT BY ITS SHAPE (a
     # corrected table resent alone - REQ-GEN-273's TS-85 Placements in
-    # 2016-Q1, TS-83's Client Register and readers in 2016-Q3) is not the
+    # 2016-Q2, TS-83's Client Register and readers in 2016-Q4) is not the
     # quarter's routine delivery, so it owes no Case Workers file; every
     # other delivery of an owed grown quarter still does.
     from generator import scenario_injection as si
@@ -737,13 +737,13 @@ class TestTheContestedClientRegisterPairs:
         from qa_tools.common import slots
 
         return slots.slot_instants("cp-clients", date.fromisoformat(
-            next(p.date.isoformat() for p in cp_provider.generated_periods()
+            next(p.round_date.isoformat() for p in cp_provider.generated_periods()
                  if p.name == record["period"])))
 
     def test_each_sits_in_its_grown_quarter_with_green_neighbours(self, manifest):
         grown = {p.name for p in cp_provider.grown_periods()}
-        for sid, period, lead, follow in (("TS-42a", "2019-Q4", "2019-Q3", "2020-Q1"),
-                                          ("TS-80", "2020-Q4", "2020-Q3", "2021-Q1")):
+        for sid, period, lead, follow in (("TS-42a", "2020-Q1", "2019-Q4", "2020-Q2"),
+                                          ("TS-80", "2021-Q1", "2020-Q4", "2021-Q2")):
             record = self._placement(sid)
             assert (record["period"], record["lead_in"], record["follow"]) == (
                 period, [lead], [follow]), sid

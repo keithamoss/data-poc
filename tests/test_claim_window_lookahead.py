@@ -56,19 +56,19 @@ PERTH = timezone(timedelta(hours=8))
 QUARTERLY = "cp-clients"        # claim_window 14d - crosses the boundary
 DAILY = "birth-registrations"   # claim_window 4h - never leaves its day
 
-#: 2023-Q3 is due 2023-08-01 and its window opens 2023-07-18. This
-#: instant is a week inside it, and in 2023-Q2 by the calendar.
+#: 2023-Q4 is due 2023-08-01 and its window opens 2023-07-18. This
+#: instant is a week inside it, and in 2023-Q3 by the calendar.
 A_WEEK_EARLY = datetime(2023, 7, 25, 9, tzinfo=PERTH)
 
 
 class TestASlotIsOfferedOnceItsWindowOpens:
 
     def test_the_quarter_a_supply_is_early_for_is_among_its_candidates(self):
-        """The whole bug in one assertion. 2023-Q3's window opened on
+        """The whole bug in one assertion. 2023-Q4's window opened on
         the 18th, so a supply arriving on the 25th must be able to
         claim it."""
         offered = {s.period.name for s in _candidates(QUARTERLY, A_WEEK_EARLY)}
-        assert "2023-Q3" in offered, (
+        assert "2023-Q4" in offered, (
             f"Q3's claim window opened 2023-07-18; a supply arriving "
             f"2023-07-25 was offered only {sorted(offered)}")
 
@@ -77,7 +77,7 @@ class TestASlotIsOfferedOnceItsWindowOpens:
         slot whose window has opened, and that must now be Q3."""
         got = assignment.current_slot(_candidates(QUARTERLY, A_WEEK_EARLY),
                                       A_WEEK_EARLY)
-        assert got is not None and got.period.name == "2023-Q3"
+        assert got is not None and got.period.name == "2023-Q4"
 
     def test_a_slot_whose_window_has_NOT_opened_is_still_withheld(self):
         """The negative case, and the one a careless fix breaks. Three
@@ -86,7 +86,7 @@ class TestASlotIsOfferedOnceItsWindowOpens:
         yet, which is what the window exists to prevent."""
         too_soon = datetime(2023, 7, 10, 9, tzinfo=PERTH)
         offered = {s.period.name for s in _candidates(QUARTERLY, too_soon)}
-        assert "2023-Q3" not in offered
+        assert "2023-Q4" not in offered
 
     def test_the_daily_feed_is_unchanged(self):
         """It was never exposed - a 4h window never crosses a day - so
@@ -140,7 +140,7 @@ class TestTheSlotStaysVisibleOnceFilled:
 
     def test_a_slot_whose_window_is_open_is_listed_today(self):
         offered = {s.period.name for s in _candidates(QUARTERLY, A_WEEK_EARLY)}
-        assert "2023-Q3" in offered
+        assert "2023-Q4" in offered
 
     def test_BOTH_real_entry_points_use_the_lookahead(self, supply_dsn, tmp_path):
         """Driven through the two real call sites, because the two
@@ -167,12 +167,12 @@ class TestTheSlotStaysVisibleOnceFilled:
         assert found, "test precondition - the delivery must be an arrival"
 
         filed = filing.file_arrivals(found)
-        assert [(a.dataset_id, a.slot) for a in filed] == [(QUARTERLY, "2023-Q3")]
+        assert [(a.dataset_id, a.slot) for a in filed] == [(QUARTERLY, "2023-Q4")]
 
         with supply_db.connect(read_only=True, label="test-claim-window") as conn:
             listed = {(s.dataset_id, s.period) for s in
                       slot_state.states_for(conn, "child-protection", now=A_WEEK_EARLY)}
-        assert (QUARTERLY, "2023-Q3") in listed
-        assert ("cp-carers", "2023-Q3") in listed, (
+        assert (QUARTERLY, "2023-Q4") in listed
+        assert ("cp-carers", "2023-Q4") in listed, (
             "a slot whose window is open, with nothing filed to it, is not listed - "
             "slot_state has lost the claim-window lookahead filing uses")

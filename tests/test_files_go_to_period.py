@@ -165,3 +165,29 @@ class TestAtZeroNothingMoves:
             new = _slots(dataset_id, agr)
             assert new
             assert all(s.round_date == s.period.date for s in new)
+
+
+class TestATurnedOffGapIsJudgedOnTheRound:
+    """REQ-PIPE-321 criterion 2: a period is in a turned-off gap when the
+    ROUND that fills it falls in the gap - never on the period's own date.
+    Found 2026-10-30: a parked move into 2024-Q1 (filled by the 1 November
+    2023 round, inside an off-from-30-September, on-from-1-January gap) was
+    read as owed because 2024-Q1's own date, 1 February 2024, is after the
+    gap ends."""
+
+    def test_the_period_a_gap_round_fills_is_in_the_gap(self, tmp_path):
+        from qa_tools.common import turned_off
+
+        doc = _doc(cp=1)
+        clients = next(d for d in doc["datasets"] if d["id"] == "cp-clients")
+        versions = clients["participation"]["versions"]
+        first = versions[-1]
+        versions.append({**{k: v for k, v in first.items() if k != "changelog"},
+                         "effective_from": "2024-01-01",
+                         "changelog": [{"date": "2026-10-30", "author": "a test",
+                                        "change": "back on"}]})
+        first.update(effective_to="2023-09-30", turned_off_reason="supplier paused")
+        agr = _load(tmp_path, doc)
+        assert turned_off.gap_for_period("cp-clients", "2024-Q1", agr) is not None
+        assert turned_off.gap_for_period("cp-clients", "2024-Q2", agr) is None
+        assert turned_off.gap_for_period("cp-clients", "2023-Q4", agr) is None

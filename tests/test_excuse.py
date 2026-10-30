@@ -1,9 +1,9 @@
 """A person can excuse a late supply, with a reason, without changing the
 calendar it was judged against (REQ-PIPE-161).
 
-Against a real database and the real cp-clients agreement: 2023-Q2 is due
+Against a real database and the real cp-clients agreement: 2023-Q3 is due
 2023-05-01 09:00 Perth, so a supply received 2023-07-25 and filed there is
-LATE; filed to 2023-Q3 (due 2023-08-01) the same supply is EARLY. qa.decision
+LATE; filed to 2023-Q4 (due 2023-08-01) the same supply is EARLY. qa.decision
 is append-only, so every test uses supplies of its own.
 """
 from __future__ import annotations
@@ -19,7 +19,7 @@ from qa_tools.common import (assignment, decision_log as dl, excuse, filing,
 
 PERTH = timezone(timedelta(hours=8))
 DATASET = "cp-clients"
-LATE_SLOT, EARLY_SLOT = "2023-Q2", "2023-Q3"
+LATE_SLOT, EARLY_SLOT = "2023-Q3", "2023-Q4"
 RECEIVED = datetime(2023, 7, 25, 9, tzinfo=PERTH)
 KEITH = "fpycnkgvmt@privaterelay.appleid.com"
 AT = "2026-10-11T05:00:00+08:00"
@@ -35,7 +35,7 @@ def conn(supply_dsn):
 @pytest.fixture(autouse=True)
 def _forget_our_filings(supply_dsn):
     """Each test's filings go with it (2026-10-12): a supply this module filed
-    into cp-carers 2024-Q2 and left there read, to test_not_supplied on the
+    into cp-carers 2024-Q3 and left there read, to test_not_supplied on the
     same worker, as a supply waiting for a decision - and its marking tests
     were refused."""
     yield
@@ -90,7 +90,7 @@ class TestAnExcuse:
     def test_a_supply_that_is_not_late_is_refused_and_told_why(self, conn):
         """Criterion 3."""
         supply = _late(slot=EARLY_SLOT)
-        with pytest.raises(dl.DecisionRefused, match="early for 2023-Q3, not late"):
+        with pytest.raises(dl.DecisionRefused, match="early for 2023-Q4, not late"):
             _apply(conn, _req(fd.EXCUSE_LATENESS, supply, period=EARLY_SLOT))
 
     def test_one_already_excused_is_refused(self, conn):
@@ -101,7 +101,7 @@ class TestAnExcuse:
 
     def test_the_wrong_period_is_refused(self, conn):
         supply = _late()
-        with pytest.raises(dl.DecisionRefused, match="filed to 2023-Q2, not 2023-Q3"):
+        with pytest.raises(dl.DecisionRefused, match="filed to 2023-Q3, not 2023-Q4"):
             _apply(conn, _req(fd.EXCUSE_LATENESS, supply, period=EARLY_SLOT))
 
     def test_a_reason_is_required(self, conn):
@@ -161,7 +161,7 @@ class TestItLapses:
         filing.refile(conn, DATASET, supply, EARLY_SLOT, decision_id=1)
         assert excuse.in_force(conn, DATASET, supply) is None
         [e] = excuse.history(conn, DATASET, supply)
-        assert e.lapsed == "re-filed to 2023-Q3" and e.slot == LATE_SLOT
+        assert e.lapsed == "re-filed to 2023-Q4" and e.slot == LATE_SLOT
 
     def test_as_at_before_it_was_recorded_there_is_none(self, conn):
         """REQ-DASH-162 criterion 5's input: an in-place-on date before it."""
@@ -187,25 +187,25 @@ class TestARange:
         return supply
 
     def test_it_shows_what_it_excuses_and_skips_then_records_one_entry_each(self, conn):
-        late_a = self._file("2024-Q1", datetime(2024, 3, 1, 9, tzinfo=PERTH))
-        late_b = self._file("2024-Q2", datetime(2024, 6, 1, 9, tzinfo=PERTH))
-        early = self._file("2024-Q3", datetime(2024, 7, 25, 9, tzinfo=PERTH))
-        request = self._range("2024-Q1", "2024-Q3")
+        late_a = self._file("2024-Q2", datetime(2024, 3, 1, 9, tzinfo=PERTH))
+        late_b = self._file("2024-Q3", datetime(2024, 6, 1, 9, tzinfo=PERTH))
+        early = self._file("2024-Q4", datetime(2024, 7, 25, 9, tzinfo=PERTH))
+        request = self._range("2024-Q2", "2024-Q4")
         found = fd.consequences(conn, request)
         text = "\n".join(found.lines)
-        assert f"excuse {late_a} (2024-Q1)" in text and f"excuse {late_b} (2024-Q2)" in text
-        assert f"skip {early} (2024-Q3)" in text and "early" in text
+        assert f"excuse {late_a} (2024-Q2)" in text and f"excuse {late_b} (2024-Q3)" in text
+        assert f"skip {early} (2024-Q4)" in text and "early" in text
         with pytest.raises(fd.ConsequencesNotAcknowledged):
             _apply(conn, request)
-        _apply(conn, self._range("2024-Q1", "2024-Q3", acknowledged=found.key))
+        _apply(conn, self._range("2024-Q2", "2024-Q4", acknowledged=found.key))
         for supply in (late_a, late_b):
             assert excuse.in_force(conn, "cp-carers", supply) is not None
         assert excuse.in_force(conn, "cp-carers", early) is None
 
     def test_a_range_that_excuses_nothing_is_refused(self, conn):
-        self._file("2025-Q3", datetime(2025, 7, 25, 9, tzinfo=PERTH))
-        with pytest.raises(dl.DecisionRefused, match="nothing in 2025-Q3 to 2025-Q3"):
-            fd.consequences(conn, self._range("2025-Q3", "2025-Q3"))
+        self._file("2025-Q4", datetime(2025, 7, 25, 9, tzinfo=PERTH))
+        with pytest.raises(dl.DecisionRefused, match="nothing in 2025-Q4 to 2025-Q4"):
+            fd.consequences(conn, self._range("2025-Q4", "2025-Q4"))
 
     def test_a_rejected_supply_is_covered_and_a_superseded_one_skipped(self, conn):
         """Keith, 2026-10-11 (a): a range excuse covers current AND rejected
@@ -214,16 +214,16 @@ class TestARange:
         from qa_tools.common import supersession
 
         ag, col = "child-protection-family-support", "child-protection"
-        rejected = self._file("2024-Q4", datetime(2024, 12, 1, 9, tzinfo=PERTH))
-        superseded = self._file("2024-Q4", datetime(2024, 12, 2, 9, tzinfo=PERTH))
-        current = self._file("2024-Q4", datetime(2024, 12, 3, 9, tzinfo=PERTH))
+        rejected = self._file("2025-Q1", datetime(2024, 12, 1, 9, tzinfo=PERTH))
+        superseded = self._file("2025-Q1", datetime(2024, 12, 2, 9, tzinfo=PERTH))
+        current = self._file("2025-Q1", datetime(2024, 12, 3, 9, tzinfo=PERTH))
         rejection.reject(conn, agency_id=ag, collection_id=col, dataset_id="cp-carers",
                          supply=rejected, physical_tables=[], actor=KEITH,
-                         effective_at=AT, reason="bad", from_slot="2024-Q4")
+                         effective_at=AT, reason="bad", from_slot="2025-Q1")
         supersession.supersede(conn, agency_id=ag, collection_id=col,
-                               dataset_id="cp-carers", supply=superseded, period="2024-Q4",
+                               dataset_id="cp-carers", supply=superseded, period="2025-Q1",
                                actor=KEITH, reason="replaced", effective_at=AT)
-        plan = excuse.range_plan(conn, "cp-carers", "2024-Q4", "2024-Q4")
+        plan = excuse.range_plan(conn, "cp-carers", "2025-Q1", "2025-Q1")
         assert {s for s, _ in plan.excuse} == {rejected, current}
         [(skipped, _, why)] = plan.skipped
         assert skipped == superseded and "superseded" in why
@@ -233,20 +233,20 @@ class TestARange:
         (delivery-critic #152, on REQ-PIPE-161's decision)."""
         from qa_tools.common import supersession
 
-        old = self._file("2025-Q2", datetime(2025, 6, 1, 9, tzinfo=PERTH))
-        self._file("2025-Q2", datetime(2025, 6, 2, 9, tzinfo=PERTH))
+        old = self._file("2025-Q3", datetime(2025, 6, 1, 9, tzinfo=PERTH))
+        self._file("2025-Q3", datetime(2025, 6, 2, 9, tzinfo=PERTH))
         supersession.supersede(conn, agency_id="child-protection-family-support",
                                collection_id="child-protection", dataset_id="cp-carers",
-                               supply=old, period="2025-Q2", actor=KEITH, reason="replaced",
+                               supply=old, period="2025-Q3", actor=KEITH, reason="replaced",
                                effective_at=AT)
         _apply(conn, fd.Request(operation=fd.EXCUSE_LATENESS, dataset_id="cp-carers",
                                 actor=people.person_by_email(KEITH), reason="outage",
-                                period="2025-Q2", supply=old))
+                                period="2025-Q3", supply=old))
         assert excuse.in_force(conn, "cp-carers", old) is not None
 
     def test_a_backwards_range_is_refused(self, conn):
         with pytest.raises(dl.DecisionRefused, match="runs backwards"):
-            fd.consequences(conn, self._range("2025-Q3", "2025-Q1"))
+            fd.consequences(conn, self._range("2025-Q4", "2025-Q2"))
 
 
 class TestTheRoutes:
@@ -275,18 +275,18 @@ class TestTheRoutes:
     def test_a_range_through_the_shared_pair_needs_the_key(self, conn, cli):
         a = f"cp-carers@cli-{uuid.uuid4().hex[:10]}"
         filing_support.file(assignment.Assignment(
-            dataset_id="cp-carers", supply_id=a, slot="2025-Q1",
-            branch=assignment.OPEN_UNFILLED, considered=("2025-Q1",),
+            dataset_id="cp-carers", supply_id=a, slot="2025-Q2",
+            branch=assignment.OPEN_UNFILLED, considered=("2025-Q2",),
             received_at=datetime(2025, 3, 1, 9, tzinfo=PERTH)))
         argv = ["decide", "--operation", "excuse-lateness", "--dataset", "cp-carers",
-                "--from-period", "2025-Q1", "--through-period", "2025-Q1",
+                "--from-period", "2025-Q2", "--through-period", "2025-Q2",
                 "--reason", "outage", "--yes"]
         first = cli(argv)
         assert first.exit_code != 0 and a in first.output
         key = fd.consequences(conn, fd.Request(
             operation=fd.EXCUSE_LATENESS, dataset_id="cp-carers",
-            actor=people.person_by_email(KEITH), reason="r", period="2025-Q1",
-            through_period="2025-Q1")).key
+            actor=people.person_by_email(KEITH), reason="r", period="2025-Q2",
+            through_period="2025-Q2")).key
         assert key in first.output
         second = cli([*argv, "--acknowledge", key])
         assert second.exit_code == 0, second.output
@@ -294,7 +294,7 @@ class TestTheRoutes:
 
     def test_the_range_flags_are_for_excuse_only_and_never_to_period(self, cli):
         got = cli(["decide", "--operation", "promote", "--dataset", DATASET,
-                   "--from-period", "2024-Q1", "--through-period", "2024-Q2",
+                   "--from-period", "2024-Q2", "--through-period", "2024-Q3",
                    "--reason", "r", "--yes"])
         assert got.exit_code != 0 and "excuse-lateness only" in got.output
 
@@ -309,11 +309,11 @@ class TestTheRoutes:
         answers = iter([filing_tui._WHAT_IT_DOES[fd.EXCUSE_LATENESS],
                         filing_tui._EXCUSE_A_RANGE])
         monkeypatch.setattr(common, "select", lambda q, options, **k: next(answers))
-        monkeypatch.setattr(common, "text_prompt", lambda q, **k: "2024-Q1")
+        monkeypatch.setattr(common, "text_prompt", lambda q, **k: "2024-Q2")
         called = {}
         monkeypatch.setattr(filing_tui, "apply_decision", lambda **kw: called.update(kw))
         filing_tui._decide_on(state, offer=(fd.EXCUSE_LATENESS,))
-        assert called["period"] == LATE_SLOT and called["through_period"] == "2024-Q1"
+        assert called["period"] == LATE_SLOT and called["through_period"] == "2024-Q2"
         assert called["supply"] is None
 
     def test_the_terminal_keeps_the_one_supply_form(self, monkeypatch):
@@ -392,7 +392,7 @@ class TestTheDashboardEmbed:
                 from_slot=LATE_SLOT, to_slot=EARLY_SLOT, reason="wrong period")) as decided:
             filing.refile(conn, DATASET, supply, EARLY_SLOT, decision_id=decided)
         [e] = excuse.history(conn, DATASET, supply)
-        assert e.lapsed == "re-filed to 2023-Q3"
+        assert e.lapsed == "re-filed to 2023-Q4"
         assert e.lapsed_at.startswith("2026-10-10T22:00")
 
 
@@ -401,7 +401,7 @@ class TestCriticFindingsOn161:
     Each failed before its fix."""
 
     def test_2_a_refile_away_and_back_does_not_revive_the_excuse(self, conn):
-        """Criterion 7: the second 2023-Q2 filing is a new filing."""
+        """Criterion 7: the second 2023-Q3 filing is a new filing."""
         supply = _late()
         _apply(conn, _req(fd.EXCUSE_LATENESS, supply))
         filing.refile(conn, DATASET, supply, EARLY_SLOT, decision_id=1)
@@ -439,17 +439,17 @@ class TestCriticFindingsOn161:
     def test_4_a_range_is_applied_whole_or_not_at_all(self, conn, monkeypatch):
         """Another person excusing one supply between the plan and the write
         must not leave the range half-applied."""
-        a = self._late_carer("2024-Q1", datetime(2024, 3, 1, 9, tzinfo=PERTH))
-        b = self._late_carer("2024-Q2", datetime(2024, 6, 1, 9, tzinfo=PERTH))
+        a = self._late_carer("2024-Q2", datetime(2024, 3, 1, 9, tzinfo=PERTH))
+        b = self._late_carer("2024-Q3", datetime(2024, 6, 1, 9, tzinfo=PERTH))
         _apply(conn, fd.Request(operation=fd.EXCUSE_LATENESS, dataset_id="cp-carers",
                                 actor=people.person_by_email(KEITH), reason="someone else",
-                                period="2024-Q2", supply=b))
+                                period="2024-Q3", supply=b))
         real = excuse.range_plan
         monkeypatch.setattr(excuse, "range_plan", lambda *args, **kw: excuse.RangePlan(
-            excuse=((a, "2024-Q1"), (b, "2024-Q2")), skipped=()))
+            excuse=((a, "2024-Q2"), (b, "2024-Q3")), skipped=()))
         request = fd.Request(operation=fd.EXCUSE_LATENESS, dataset_id="cp-carers",
                              actor=people.person_by_email(KEITH), reason="the outage",
-                             period="2024-Q1", through_period="2024-Q2")
+                             period="2024-Q2", through_period="2024-Q3")
         key = fd.consequences(conn, request).key
         with pytest.raises(dl.DecisionRefused):
             _apply(conn, fd.Request(**{**request.__dict__, "acknowledged": key}))
@@ -480,15 +480,15 @@ class TestCriticFindingsOn161:
         assert got.exit_code == 0, got.output
         assert "outage [/] see [bold]x" in got.output
 
-    @pytest.mark.parametrize("extra", [["--supply", "s"], ["--to-period", "2024-Q3"],
-                                       ["--stands-on", "2024-Q1"]])
+    @pytest.mark.parametrize("extra", [["--supply", "s"], ["--to-period", "2024-Q4"],
+                                       ["--stands-on", "2024-Q2"]])
     def test_10_a_range_refuses_flags_it_would_ignore(self, extra):
         from click.testing import CliRunner
 
         from cli import supply as supply_cli
         got = CliRunner().invoke(supply_cli.supply_group, [
             "decide", "--operation", "excuse-lateness", "--dataset", "cp-carers",
-            "--from-period", "2024-Q1", "--through-period", "2024-Q2", "--reason", "r",
+            "--from-period", "2024-Q2", "--through-period", "2024-Q3", "--reason", "r",
             "--yes", *extra])
         assert got.exit_code != 0 and "range" in got.output
 

@@ -43,15 +43,15 @@ PERTH = timezone(timedelta(hours=8))
 #: the arithmetic and skip the part that breaks.
 DATASET = "cp-clients"
 
-#: 2023-Q3 opens 2023-07-18 and is due 2023-08-01 09:00 Perth. This
+#: 2023-Q4 opens 2023-07-18 and is due 2023-08-01 09:00 Perth. This
 #: instant is inside Q3's claim window and MONTHS after Q2's due date -
 #: REQ-PIPE-066's own worked example. Against the slot it is filed to
 #: it is EARLY; the retired derivation looked backwards from the
 #: arrival date, landed on Q2, and called it about twelve weeks late.
 ARRIVED = datetime(2023, 7, 25, 9, tzinfo=PERTH)
 
-EARLY_SLOT = "2023-Q3"
-LATE_SLOT = "2023-Q2"
+EARLY_SLOT = "2023-Q4"
+LATE_SLOT = "2023-Q3"
 
 
 @pytest.fixture

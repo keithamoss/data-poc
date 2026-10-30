@@ -298,6 +298,11 @@ class TestTheBudgetLine:
 
     def test_a_bootstrap_from_empty_prints_it_last(self, empty_db, monkeypatch):
         monkeypatch.setattr("cli.pipeline.generate_collection", lambda cid, **_: None)
+        # BOTH ENTRY POINTS: a stream of one collection (Birth Registrations)
+        # runs through run_pipeline, and stubbing only run_stream replayed it
+        # for real - nine minutes with data/ present, and a refused TS-47
+        # without it, which is how CI run 40978105702 found it.
+        monkeypatch.setattr("qa_tools.tools.orchestrate.run_pipeline", lambda cid, **k: None)
         monkeypatch.setattr("qa_tools.tools.orchestrate.run_stream", lambda ids, **k: None)
         monkeypatch.setattr(boot, "_record_deliveries", lambda: None)
         monkeypatch.setattr("qa_tools.common.correction_replay.confirm_due", lambda **k: [])

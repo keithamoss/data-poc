@@ -190,7 +190,8 @@ def _owes_nothing(dataset_id: str, period: str) -> str | None:
     """Why a period the CALENDAR generates is one this dataset owes nothing
     in - in the configuration's own words - or None where the calendar does
     not generate it at all. One resolution, the participation in force on
-    the period's own date (REQ-PIPE-113 criterion 2)."""
+    the date of the round that would fill it (REQ-PIPE-113 criterion 2, as
+    REQ-PIPE-321 amends it)."""
     from qa_tools.common import asset_time, schedule, slots
 
     horizon = asset_time.local_date(asset_time.now())
@@ -206,12 +207,16 @@ def _owes_nothing(dataset_id: str, period: str) -> str | None:
     if period in reasons:
         return f"it is listed not_expected: {reasons[period]}"
     agr = schedule._agreement(None)
-    version = agr.participation_on(dataset_id, found.date)
+    # ON THE ROUND THAT WOULD FILL IT (REQ-PIPE-321 criterion 2): participation
+    # and its delivery months are a round's, so at files_go_to_period 1 a
+    # quarter is owed nothing because the round BEFORE it is not delivered in.
+    on = schedule.round_of(period, dataset_id, agr) or found.date
+    version = agr.participation_on(dataset_id, on)
     if version is None:
         first = schedule.owes_from(dataset_id)
         return (f"it is before {dataset_id} began owing supplies"
                 + (f" on {first.isoformat()}" if first else ""))
-    if version.participates is not None and found.date.month not in version.participates:
+    if version.participates is not None and on.month not in version.participates:
         return f"it does not participate in that period: {version.reason or 'no reason given'}"
     return "the participation configuration owes nothing there"
 

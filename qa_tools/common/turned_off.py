@@ -148,7 +148,10 @@ def gap_for_period(dataset_id: str, period: str, agreement=None) -> agreement_mo
     found = next((p for p in sequence if p.name == period), None)
     if found is None:
         return None
-    standing = agr.standing_on(dataset_id, found.date)
+    # ON THE ROUND THAT FILLS IT (REQ-PIPE-321 criterion 2): a turn-off
+    # stops ROUNDS, so a period is in the gap when its round is.
+    round_date = schedule.round_of(period, dataset_id, agr) or found.date
+    standing = agr.standing_on(dataset_id, round_date)
     return standing.turned_off if standing.state == agreement_mod.TURNED_OFF else None
 
 

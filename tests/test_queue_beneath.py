@@ -69,7 +69,7 @@ def _counted_on_the_card(dataset_id: str) -> int:
 
 
 def _pair_with(sc, readers: dict) -> dict:
-    """first_time's 2024-Q4, then one zip: two Client Register files and the
+    """first_time's 2025-Q1, then one zip: two Client Register files and the
     readers named ({table: label})."""
     from qa_tools.common import asset_time, delivery
 
@@ -206,7 +206,7 @@ class TestNothingToSitBeneath:
 
     def test_red_only_because_clients_is_overdue_is_an_ordinary_counted_row(
             self, sc, monkeypatch, capsys):
-        """Notifications v2 red only because 2024-Q4's Clients is overdue, with
+        """Notifications v2 red only because 2025-Q1's Clients is overdue, with
         no held-back supply to sit beneath: a counted, pickable row naming
         the overdue Clients, never 'nothing needs deciding' - and the
         dashboard's Child Protection card counts it as the terminal does."""
@@ -216,7 +216,7 @@ class TestNothingToSitBeneath:
         groups = _groups()
         assert n2 in {r.supply for r in groups.rows}, groups
         said = groups.lines.get(("cp-notifications", Q4, n2)) or []
-        assert ("red because cp-clients for 2024-Q4 is overdue; its checks run again once "
+        assert ("red because cp-clients for 2025-Q1 is overdue; its checks run again once "
                 "one is promoted") in said, said
         out, offered = _queue(monkeypatch, capsys)
         assert any("cp-notifications" in c for c in offered), offered

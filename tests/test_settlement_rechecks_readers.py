@@ -1,7 +1,7 @@
 """Settling a contested pair so that no file of it is this period's supply
 re-checks the datasets whose checks the contest stopped (REQ-PIPE-211).
 
-A Child Protection cp_clients pair arrives in 2024-Q4 with a Notifications
+A Child Protection cp_clients pair arrives in 2025-Q1 with a Notifications
 supply; Investigations v1 and Placements v1 are already promoted there. Every
 check reading cp_clients - Notifications', Investigations' and Placements' -
 records not evaluated, contested, while the two files wait to be settled.
@@ -44,7 +44,7 @@ def person(monkeypatch):
 
 
 def contested(sc) -> dict:
-    """2024-Q4 (first_time: Case Workers, Carers, Investigations v1 and
+    """2025-Q1 (first_time: Case Workers, Carers, Investigations v1 and
     Placements v1 in the warehouse) and a zip of two Client Register files
     and Notifications v2. Returns {label: supply}."""
     from qa_tools.common import asset_time, delivery
@@ -67,7 +67,7 @@ def contested(sc) -> dict:
 
 
 def _counted_reading_clients(sc, dataset_id: str, supply: str) -> list[dict]:
-    """The newest counted result per check, in 2024-Q4, of every check of
+    """The newest counted result per check, in 2025-Q1, of every check of
     this supply that reads cp_clients (REQ-PIPE-269 criterion 7)."""
     from qa_tools.common import supply_db, supply_status
 
@@ -155,7 +155,7 @@ class TestTheReadersAreReCheckedWhenNoFileStays:
 
         got = contested(sc)
         entry = _settle(sc, got, [settlement.Answer(PAIR[0], settlement.REJECT),
-                                  settlement.Answer(PAIR[1], settlement.REFILE, "2025-Q1")],
+                                  settlement.Answer(PAIR[1], settlement.REFILE, "2025-Q2")],
                         person)
         sc.run_owed()
         _assert_readers_rechecked(sc, got, entry)
@@ -167,8 +167,8 @@ class TestTheReadersAreReCheckedWhenNoFileStays:
         from qa_tools.common import period_schema, settlement
 
         got = contested(sc)
-        entry = _settle(sc, got, [settlement.Answer(PAIR[0], settlement.REFILE, "2025-Q1"),
-                                  settlement.Answer(PAIR[1], settlement.REFILE, "2025-Q2")],
+        entry = _settle(sc, got, [settlement.Answer(PAIR[0], settlement.REFILE, "2025-Q2"),
+                                  settlement.Answer(PAIR[1], settlement.REFILE, "2025-Q3")],
                         person)
         sc.run_owed()
         _assert_readers_rechecked(sc, got, entry)
@@ -208,7 +208,7 @@ class TestTheOtherOutcomesAlreadyReCheck:
 
         got = contested(sc)
         _settle(sc, got, [settlement.Answer(PAIR[0], settlement.REJECT),
-                          settlement.Answer(PAIR[1], settlement.REFILE, "2025-Q1")], person)
+                          settlement.Answer(PAIR[1], settlement.REFILE, "2025-Q2")], person)
         kinds = [o.kind for o in sc.owed()]
         assert recheck.RECHECK in kinds and recheck.REEVALUATE in kinds, kinds
         assert kinds.index(recheck.RECHECK) < kinds.index(recheck.REEVALUATE), kinds
@@ -230,7 +230,7 @@ def _flat(text: str) -> str:
 
 def _readers_section(out: str) -> str:
     flat = _flat(out)
-    start = flat.index("Datasets that read cp-clients in 2024-Q4, re-checked:")
+    start = flat.index("Datasets that read cp-clients in 2025-Q1, re-checked:")
     return flat[start:]
 
 
@@ -251,10 +251,10 @@ class TestTheTerminal:
         # P7 (CLI UX critic): no dangling 'Then', and the likely red said
         # BEFORE the person confirms.
         assert note == ("After settling, the cross-table checks of 3 datasets that read "
-                        "cp-clients in 2024-Q4 are re-checked while you wait - not their own "
+                        "cp-clients in 2025-Q1 are re-checked while you wait - not their own "
                         "tables:\n"
                         "    cp-investigations, cp-notifications, cp-placements\n"
-                        "  With no cp-clients file left in 2024-Q4, they will very likely "
+                        "  With no cp-clients file left in 2025-Q1, they will very likely "
                         "turn red: those checks cannot run until one is promoted."), note
         assert not any(n.startswith("Then") for n in shown.notes), shown.notes
         assert not any("re-checks the cross-table" in line for line in shown.lines)
@@ -279,12 +279,12 @@ class TestTheTerminal:
                           reason="test", yes=True, acknowledged=key or None, summary=False)
         out = capsys.readouterr().out
         flat = _flat(out)
-        assert ("Re-checking the 3 datasets that read cp-clients in 2024-Q4. Ctrl-C stops "
+        assert ("Re-checking the 3 datasets that read cp-clients in 2025-Q1. Ctrl-C stops "
                 "it; the settlement stands either way.") in flat, out
-        assert re.search(r"re-check 1 of \d - cp-\w+ for 2024-Q4", flat), out
+        assert re.search(r"re-check 1 of \d - cp-\w+ for 2025-Q1", flat), out
         assert flat.index("Re-checking the 3 datasets") < flat.index("Settled"), out
         section = _readers_section(out)
-        assert "red - could not run: 2024-Q4 holds no cp-clients" in section, section
+        assert "red - could not run: 2025-Q1 holds no cp-clients" in section, section
         for word in ("contested", "rejected", "refused", "knock-on:"):
             assert word not in section, (word, section)
         assert "knock-on:" not in out
@@ -308,7 +308,7 @@ class TestTheTerminal:
         result = CliRunner().invoke(supply_group, args + (["--acknowledge", key] if key else []),
                                     env=PIPED)
         assert result.exit_code == 0, result.output
-        assert "Datasets that read cp-clients in 2024-Q4, re-checked:" in _flat(result.output)
+        assert "Datasets that read cp-clients in 2025-Q1, re-checked:" in _flat(result.output)
 
     def test_a_ctrl_c_during_the_recheck_leaves_it_owed_and_exits_3(self, sc, person,
                                                                      monkeypatch):
