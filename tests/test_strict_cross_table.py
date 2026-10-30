@@ -203,7 +203,10 @@ class TestNotInTheAgreement:
         assert raw, (left, "a left_out record names the checks out of scope")
         outside = raw[0][0].get("not_in_agreement") or {}
         assert set(CLIENT_REFS) <= set(outside), outside
-        assert all(v == f"not part of the agreement for {q4}" for v in outside.values())
+        # A STRUCTURED CODE AND ITS WORDS (REQ-PIPE-332 criterion 10).
+        assert all(v["code"] == "not_in_agreement" and v["period"] == q4
+                   and v["reason"] == f"not part of the agreement for {q4}"
+                   for v in outside.values())
         # DECIDED WITHOUT IT: nothing else is red, so it promotes.
         assert sc.holder("cp-notifications", q4) == n2
 
