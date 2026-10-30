@@ -123,6 +123,24 @@ class TestOneDriverForEveryCollection:
             driver.generate(FAKE_ID)
 
 
+    def test_an_arrival_at_another_collections_instant_is_refused_before_writing(
+            self, writing):
+        """REQ-GEN-334 criterion 13: two deliveries of DIFFERENT providers at
+        one receipt instant are refused naming both, before anything is
+        written - receipt order decides what a run can read."""
+        from qa_tools.common import asset_time
+
+        _provider, out = writing
+        at = asset_time.isoformat(asset_time.wall_clock(date(2026, 1, 5), "09:00"))
+        out.mkdir(parents=True, exist_ok=True)
+        (out / "generator_bookkeeping.json").write_text(json.dumps(
+            {"another-dataset": [{"run_id": "another_run_001", "delivery": "another-drop",
+                                  "received_at": at}]}))
+        with pytest.raises(ValueError, match="another-drop.*share one receipt instant"):
+            driver.generate(FAKE_ID)
+        assert not (out / "deliveries").exists() or not any((out / "deliveries").iterdir())
+
+
 class TestTheSeedSchedule:
     """Criteria 2 and 3."""
 
