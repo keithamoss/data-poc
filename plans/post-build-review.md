@@ -12739,6 +12739,24 @@ twice. It deliberately did not re-find the `TypeError`.
      That is the rule as decided (one act, its latest instant); if the
      scripted instants should move so the page reads as a person would act,
      that is a scenario change, not done here.
+     THE FULL GATE on ed53fd9 (clean tree; equiv_bs_final2's database, and
+     data/ and reports/ copied from its capture): ruff clean; `-m
+     needs_deployment -n 3` 505 passed, 1 xfailed (939s); `-m "not
+     needs_deployment" -n 3` 2 failed, 6271 passed, 0 skipped (1247s); npm
+     test 977 passed; `mothman check --no-pytest` passed with warnings from
+     schedule and sprints. The two failures did NOT reproduce: run alone
+     twice on the same tree (`-n0`, tests/test_cp_pair.py and
+     tests/test_tidy_test_databases.py), 19 passed each time.
+     tests/test_tidy_test_databases.py::
+     test_a_database_somebody_is_connected_to_is_kept failed inside
+     PostgreSQL (`could not stat file "base/<oid>/PG_VERSION"`): its
+     leftover-database query stat()s every database's directory, and one was
+     being dropped at that moment - a race in the query, worth a small fix
+     later. tests/test_cp_pair.py::
+     test_a_later_file_supersedes_both_and_resolves_the_contest found
+     cp-investigations still stale after the knock-on (a rule supersession,
+     no person's decision in it, so not this fix's path); not diagnosed,
+     recorded as an intermittent failure to watch.
 
 285. **[todo, 2026-10-30]** **[Pipeline & publishing]** **[Testing & dev tooling]**
      **OPEN DEFECT, NOT FIXED: Child Protection's promotedHealth timelines are
