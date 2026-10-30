@@ -283,6 +283,7 @@ def _delay(rng) -> int:
 class LinkageProducts(Provider):
     collection_id = "linkage-products"
     dataset_id = DATASET_ID
+    amber_dataset = DATASET_ID
     seed_ranges = ((70_000, 71_000),)
     generating_note = "one linkage release a quarter"
 

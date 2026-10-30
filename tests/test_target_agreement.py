@@ -138,6 +138,17 @@ class TestWhatWasBuilt:
         built = targets.written(path, tmp_path / "absent.json")
         assert [b.dataset_id for b in built] == ["ed-presentations"]
 
+    def test_linkage_products_ambers_name_their_dataset(self, tmp_path):
+        """The same defect again on the Linkage Products provider, found by
+        the lp_boot bootstrap from empty 2026-10-30: it builds a quarter of
+        its supplies amber (REQ-GEN-335 criterion 1) and declared no
+        amber_dataset, so the replay check refused the whole bootstrap."""
+        path = tmp_path / "book.json"
+        path.write_text(json.dumps({"linkage-keys": [
+            _entry("2015-Q3", "lkamb", severity="amber")]}))
+        built = targets.written(path, tmp_path / "absent.json")
+        assert [b.dataset_id for b in built] == ["linkage-keys"]
+
     def test_an_amber_from_a_provider_naming_no_dataset_is_refused(self, tmp_path,
                                                                    monkeypatch):
         from generator import collections
