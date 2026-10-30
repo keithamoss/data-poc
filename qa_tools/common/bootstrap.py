@@ -168,6 +168,10 @@ def bootstrap(collection: str = "all", force: bool = False,
                                    reason="a checkpoint is taken of one collection at a time - "
                                           "choose " + " or ".join(
                                               f"--collection {s}" for s in _shorts()))
+        reads = reads_others(collection)
+        if reads:
+            return BootstrapResult(populated=False, staged_before=0, staged_after=0,
+                                   refused=True, reason=reads)
         try:
             checkpoints.require_synthetic()
             # N IS CHECKED BEFORE ANYTHING IS TOUCHED (post-build-review #133
@@ -336,6 +340,27 @@ def with_what_it_reads(names: list[str], say=lambda _m: None) -> list[str]:
             f"checks read its tables")
     wanted |= set(why)
     return [n for n in _shorts() if n in wanted]
+
+
+def reads_others(short: str) -> str | None:
+    """Why a checkpoint or resume of `short` is refused, or None
+    (REQ-PIPE-336 criterion 7; Keith, 2026-10-30: refuse by name for now). A
+    checkpoint counts one collection's own arrivals, so a collection whose
+    checks read other collections would be replayed without them and read
+    their tables as absent - a history of could-not-run reds no real run
+    records. Replaying the whole receipt-ordered stream from a checkpoint is
+    not built."""
+    from qa_tools.common import hierarchy, run_reads
+
+    coll = _collection(short)
+    others = sorted({_label(_collection_short(hierarchy.dataset_for_table(t).collection_id))
+                     for t in run_reads.reads_for(coll.id).foreign})
+    if not others:
+        return None
+    return (f"{_label(short)}'s checks read {' and '.join(others)}, and a checkpoint is of one "
+            f"collection's own arrivals, so replaying it alone would read their tables as "
+            f"absent - nothing was copied or replayed. Bootstrap from empty instead: "
+            f"`mothman pipeline bootstrap`")
 
 
 def _collection_short(collection_id: str) -> str:
@@ -622,6 +647,13 @@ def resume(name: str, sequential: bool = False,
         cp = checkpoints.find(name)
     except checkpoints.CheckpointRefused as exc:
         return ResumeResult(replayed=False, refused=True, reason=str(exc))
+
+    if cp.collection_id:
+        from qa_tools import collections as _colls
+
+        reads = reads_others(_colls.by_id(cp.collection_id).short)
+        if reads:
+            return ResumeResult(replayed=False, refused=True, reason=reads)
 
     if not cp.recorded.readable or not cp.collection_id:
         # AN UNREADABLE DESCRIPTION IS A REFUSAL, never a crash (#133 B2):

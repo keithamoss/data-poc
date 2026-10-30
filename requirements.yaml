@@ -45925,6 +45925,7 @@ requirements:
     - BUILT AFTER THE OFFSET BATCH (Keith, L-Q1 = a, 2026-10-29; architect S12).
     - 'A PARTIAL BOOTSTRAP REPLAYS WHAT IT READS, AUTOMATICALLY (Keith, 2026-10-30): `--collection lp` includes Child Protection and Emergency Department and says so. REJECTED refusing and naming the collections to add, a hurdle every time.'
     - 'GEOCODING DEFERRED (Keith, 2026-10-30): the adapter serves linkage-keys only; REQ-PIPE-296 adds the geocoding datasets, so linkage builds before geocoding is signed.'
+    - "CHECKPOINTS AND --resume REFUSE BY NAME FOR NOW (Keith, 2026-10-30, after asking what checkpoints are for): a checkpoint counts one collection's own arrivals, so one of a collection whose checks read others would replay without them and record could-not-run reds no real run does. bootstrap.reads_others refuses both, naming the collections read and pointing at a bootstrap from empty. `--collection` carries what it reads (built). REJECTED for now numbering checkpoints across the receipt-ordered stream - several hours in delicate code, for a developer speed-up nobody yet needs for linkage; criterion 7's checkpoint and resume half is recorded unmet."
     open_questions: []
     signed_off:
       by: Keith
