@@ -5962,3 +5962,8 @@ could never have computed it), and it belongs with batch 5's check work.
      any result recorded about a period's supply, whenever it arrived and
      whichever collection's check recorded it. Linkage Products and Client
      Register are the first case to show the gap, not the scope of the fix.
+
+     **THEN (~midnight)**: Keith floated a period mode on the "as at"
+     switcher as the place for it. Before any requirement was drafted he
+     said "Hmm maybe it's OK as it is". So nothing is scoped or built. Left
+     here as a possible idea to come back to, not a commitment.
