@@ -387,10 +387,19 @@ class TestEverySeedDrawnIsOneItsProviderDeclares:
     delivery_names.py is left out: it seeds from the delivery's name, not
     from the collection's seeds, and a collision there is refused at write."""
 
-    @pytest.mark.parametrize("collection_id", ["civil-registration", "child-protection"])
+    @pytest.mark.parametrize("collection_id", [p.collection_id for p in providers.providers()])
     def test_a_real_generation_draws_only_declared_seeds(self, collection_id, tmp_path,
                                                          monkeypatch, capsys):
+        """Every provider, not the first two (2026-10-30: Emergency Department
+        and Linkage Products had never been probed). A provider whose rows read
+        another's (depends_on) draws that one's seeds while planning it, so
+        those windows count too. The correction check is stubbed: it plans
+        every collection to find the quarters a correction claims, and each of
+        those draws is probed under its own collection's case."""
         import numpy as np
+        from generator import correction_claims
+
+        monkeypatch.setattr(correction_claims, "check_all", lambda: None)
 
         real_rng = np.random.default_rng
         drawn: set[int] = set()
@@ -410,6 +419,9 @@ class TestEverySeedDrawnIsOneItsProviderDeclares:
             undo()
         capsys.readouterr()
         assert drawn, "no seed was recorded - the probe would prove nothing"
-        windows = providers.provider(collection_id).seed_schedule()
+        provider = providers.provider(collection_id)
+        windows = list(provider.seed_schedule())
+        for other in provider.depends_on:
+            windows += providers.provider(other).seed_schedule()
         outside = sorted(s for s in drawn if not any(lo <= s <= hi for _, lo, hi in windows))
         assert outside == [], f"{collection_id} drew seeds no window declares: {outside[:20]}"

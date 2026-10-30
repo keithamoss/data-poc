@@ -3024,6 +3024,14 @@ one or more component tags, and a date.
       The cheap fix (the sources' own `generated_periods`) changes the
       history by one quarter, 2015-Q4, which has a period but no filed
       source supply, so it needs a decision rather than a quick patch.
+    - **TERMS, ~20:45 (Keith: "Keep going", then "Push overnight")**: the
+      standing overnight policy. A check-in every ten minutes. The
+      recommended option on anything open, marked PROVISIONAL here. Critic
+      fixes test-first. Writes only to scratch databases. ONE push at the
+      end, after a full gate on that tree, then the CI run checked. CHANGED
+      FROM THE DAY PLAN: the REQ-PIPE-332 c12 moved-verdicts list is written
+      here for Keith to review AFTER the push, rather than before it.
+      Anything he dislikes becomes a follow-up fix.
     - **OVERNIGHT**: a second from-empty bootstrap of lp_boot runs with the
       fixes (scratchpad lp_boot2.log). The c12 moved-verdicts list, the
       scenario checks and the REQ-DASH-337 browser tests all wait on it.
