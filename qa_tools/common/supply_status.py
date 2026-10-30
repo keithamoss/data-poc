@@ -425,7 +425,8 @@ def stand_in(record: dict, cause) -> dict:
 
 # ---- the one function -------------------------------------------------------------
 
-def _shown(conn, dataset_id: str, supply: str, *, application: int | None = None) -> list[dict]:
+def _shown(conn, dataset_id: str, supply: str, *, application: int | None = None,
+           as_at=None) -> list[dict]:
     """Every completed, agreed result about `supply` of `dataset_id`, oldest
     first by run_seq and then as each run recorded them, each cross-table
     one carrying what it recorded reading (`reads`).
@@ -461,6 +462,13 @@ def _shown(conn, dataset_id: str, supply: str, *, application: int | None = None
     `application`: a GATE APPLICATION reading its own re-evaluations, which
     count toward nothing else until it settles (REQ-PIPE-267 criterion 12) -
     the runs every reader sees, and that application's own.
+
+    A LATER RUN'S LEFT-OUT SUPERSEDES (REQ-PIPE-332 criteria 7 and 9,
+    PROVISIONAL): a check a later run of this supply left out of scope - a
+    person having marked a table it reads not supplied since the earlier
+    run - records no result, so the earlier run's result for it is no
+    longer about the supply, and is dropped here. `as_at`: only a left-out
+    recorded by then supersedes, so an earlier view never changes.
     """
     from qa_tools.common import hierarchy
     from qa_tools.common import qa_results_reader as reader
@@ -498,7 +506,8 @@ def _shown(conn, dataset_id: str, supply: str, *, application: int | None = None
         [*mine, qa_store.AGREED, qa_store.CROSS_TABLE_SCOPE, qa_store.FILE_SCOPE, dataset_id,
          supply,
          qa_store.FILE_SCOPE, *by_file_params, table, qa_store.READ, supply])
-    records = reader.records_from(cursor.description, cursor.fetchall())
+    records = _not_since_left_out(conn, supply, reader.records_from(
+        cursor.description, cursor.fetchall()), application=application, as_at=as_at)
     ids = [r["result_row"] for r in records]
     reads: dict[int, dict] = {}
     if ids:
@@ -514,6 +523,39 @@ def _shown(conn, dataset_id: str, supply: str, *, application: int | None = None
         if got:
             r["reads"] = got
     return records
+
+
+def _not_since_left_out(conn, supply: str, records: list[dict], *,
+                        application: int | None, as_at) -> list[dict]:
+    """`records` less each result a LATER run of `supply` left out of its
+    scope (the left_out tool output's not_in_agreement entries) - see
+    _shown. Recorded QA metadata only."""
+    if not records:
+        return records
+    s = qa_store.SCHEMA
+    runs = (f'(SELECT * FROM "{s}".run_visible UNION ALL SELECT * FROM "{s}".run '
+            "WHERE completed_at IS NOT NULL AND gate_application = ?)"
+            if application is not None else f'"{s}".run_visible')
+    rows = conn.execute(
+        f"SELECT r.run_seq, r.run_instant, t.raw_output FROM {runs} r "
+        f'JOIN "{s}".tool_output t ON t.run_key = r.run_key '
+        "WHERE r.supply_id = ? AND t.tool = 'left_out'",
+        [*([application] if application is not None else []), supply]).fetchall()
+    cut = instant(as_at) if as_at is not None else None
+    left: dict[str, int] = {}
+    for seq, at, raw in rows:
+        if cut is not None and (at is None or instant(at) > cut):
+            continue
+        payload = raw.get("raw_output", raw) if isinstance(raw, dict) else {}
+        for check in (payload or {}).get("not_in_agreement") or {}:
+            left[check] = max(left.get(check, seq), seq)
+    if not left:
+        return records
+    seqs = dict(conn.execute(
+        f'SELECT run_key, run_seq FROM "{s}".run WHERE run_key = ANY(?)',
+        [list({r["run_id"] for r in records})]).fetchall())
+    return [r for r in records if r["check_id"] not in left
+            or (seqs.get(r["run_id"]) or 0) > left[r["check_id"]]]
 
 
 def recorded_by(conn, records: list[dict], as_at) -> list[dict]:
@@ -536,7 +578,7 @@ def results_about(conn, dataset_id: str, supply: str, *, view: View) -> About:
     """The results SHOWN about `supply` of `dataset_id` and those COUNTED
     toward it in `view` (REQ-PIPE-279 criterion 21; REQ-PIPE-269 criterion
     7), both oldest first - so the last result per check is the newest."""
-    shown = recorded_by(conn, _shown(conn, dataset_id, supply), view.as_at)
+    shown = recorded_by(conn, _shown(conn, dataset_id, supply, as_at=view.as_at), view.as_at)
     tables = {t for r in shown for t in (r.get("reads") or {})}
     datasets = {dataset_id, *(d for d in map(dataset_of, tables) if d)}
     holdings = holdings_at(conn, datasets, view.as_at)

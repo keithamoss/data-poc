@@ -249,6 +249,62 @@ class TestNotInTheAgreement:
         assert all(e["reason"] == "not part of the agreement for 2025-Q1" for e in mine)
 
 
+class TestAMarkAfterTheCheckPutsItOutOfScope:
+    """REQ-PIPE-332 criteria 7, 9 and 11, end to end: a reader's check of
+    Clients is recorded red, could not run; a person then marks Clients not
+    supplied for the period; the knock-on the mark owes re-runs the reader,
+    which leaves the check out with not_supplied_by_decision - and the red
+    recorded before the mark no longer counts toward the reader."""
+
+    def test_the_red_from_before_the_mark_does_not_stand(self, scenario):
+        from qa_tools.common import not_supplied, qa_store, supply_db, supply_status
+
+        sc = scenario
+        q = "2025-Q1"
+        _put_partners_in_the_warehouse(sc, q, "2024-10-25T10:00:00+08:00",
+                                       ["cp_case_workers", "cp_investigations"])
+        n2 = sc.deliver("2024-11-03T10:00:00+08:00", {"cp_notifications": "N2"})["N2"]
+        sc.process()
+        before = _client_ref_records(sc, n2)
+        assert before and all(r["status"] == "fail" for r in before), \
+            "precondition: the Client reference is red, could not run"
+        assert sc.holder("cp-notifications", q) != n2, "precondition: held back on it"
+
+        with supply_db.connect(label="pytest-mark") as conn:
+            not_supplied.mark(
+                conn, agency_id="child-protection-family-support", collection_id=CP,
+                dataset_id="cp-clients", period=q, actor="fixture@example.org",
+                reason="the supplier confirmed there was nothing",
+                effective_at="2025-03-01T09:00:00+08:00")
+        assert sc.owed(), "criterion 9: the mark owes its readers a re-evaluation"
+        sc.run_owed()
+
+        # Criterion 7: the re-run leaves it out, with its code and words.
+        rerun = [r for r in sc.runs(n2) if r["scope"] != "arrival"]
+        assert rerun, "the knock-on re-ran the reader"
+        with supply_db.connect(read_only=True, label="pytest") as conn:
+            raw = conn.execute(
+                f'SELECT raw_output FROM "{qa_store.SCHEMA}".tool_output WHERE run_key = ? '
+                "AND tool = 'left_out'", [rerun[-1]["run_key"]]).fetchall()
+        assert raw, "the re-run records what it left out"
+        outside = raw[0][0].get("not_in_agreement") or {}
+        assert set(CLIENT_REFS) <= set(outside), outside
+        assert all(outside[c]["code"] == unrunnable.NOT_SUPPLIED_BY_DECISION
+                   and outside[c]["reason"] == f"not supplied for {q}, by decision"
+                   for c in CLIENT_REFS), outside
+
+        # The red recorded before the mark no longer counts toward the reader.
+        with supply_db.connect(read_only=True, label="pytest") as conn:
+            counted = supply_status.latest_results(conn, "cp-notifications", n2)
+        assert not [r for r in counted if r["check_id"] in CLIENT_REFS], [
+            (r["check_id"], r["status"], r["run_id"]) for r in counted
+            if r["check_id"] in CLIENT_REFS]
+        # Criterion 11: nothing else is red, so the reader is judged and
+        # promoted, and nothing stays owed for it.
+        assert sc.holder("cp-notifications", q) == n2
+        assert not sc.owed()
+
+
 def test_dataset_names_are_the_fixtures():
     assert DATASET["cp_case_workers"] == "cp-case-workers"
     assert CP == "child-protection"
