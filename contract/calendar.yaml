@@ -361,8 +361,30 @@ calendars:
 collections:
   - id: civil-registration
     calendar: daily
+    # WHICH PERIOD A ROUND'S FILES GO INTO (REQ-PIPE-320): stated on the
+    # collection, never a dataset, from the collection's first round.
+    files_go_to_period:
+      versions:
+        - effective_from: "2026-06-18"
+          value: 0
+          changelog:
+            - date: "2026-10-30"
+              author: REQ-PIPE-320
+              change: >-
+                Birth Registrations' files go into the period they arrive in - the day's own. Stated from its first round, so nothing moves.
   - id: child-protection
     calendar: quarterly
+    # WHICH PERIOD A ROUND'S FILES GO INTO (REQ-PIPE-320): stated on the
+    # collection, never a dataset, from the collection's first round.
+    files_go_to_period:
+      versions:
+        - effective_from: "2015-01-01"
+          value: 1
+          changelog:
+            - date: "2026-10-30"
+              author: REQ-PIPE-320
+              change: >-
+                Child Protection's files are not yet linked when they arrive, so each round's files go into the NEXT period, whose linkage release they become (REQ-GEN-325). Stated from its first round, so its whole synthetic history is at one value.
     # STATED ONCE FOR THE COLLECTION (REQ-PIPE-181): every Child Protection
     # dataset takes its due time and grace from here unless it states its own.
     participation_defaults:
@@ -396,6 +418,17 @@ collections:
                 unchanged - 09:00 with 8 hours' grace, as every one of them stated.
   - id: emergency-department
     calendar: quarterly
+    # WHICH PERIOD A ROUND'S FILES GO INTO (REQ-PIPE-320): stated on the
+    # collection, never a dataset, from the collection's first round.
+    files_go_to_period:
+      versions:
+        - effective_from: "2013-01-01"
+          value: 0
+          changelog:
+            - date: "2026-10-30"
+              author: REQ-PIPE-320
+              change: >-
+                Emergency Department's files arrive already linked, so they go into the period they arrive in. Stated from its first round, so nothing moves.
     # REQ-QAC-231: owed from the first quarter its synthetic history holds
     # (REQ-GEN-232), due 09:00 with 8 hours' grace as Child Protection.
     participation_defaults:

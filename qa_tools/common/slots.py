@@ -71,6 +71,14 @@ class Slot:
     grace: timedelta
     claim_opens_at: datetime
     closes_at: datetime | None = None
+    #: The date of the ROUND this slot is due on (REQ-PIPE-321 criterion 1) -
+    #: every instant above is computed from it. At files_go_to_period 0 it is
+    #: the period's own date; None means that, for a slot built by hand.
+    round_date: date | None = None
+
+    def __post_init__(self):
+        if self.round_date is None:
+            object.__setattr__(self, "round_date", self.period.date)
 
     @property
     def name(self) -> str:
@@ -78,6 +86,8 @@ class Slot:
 
     @property
     def date(self) -> date:
+        """The PERIOD's own date. Never what a slot's instants come from -
+        that is `round_date` (REQ-PIPE-321 criterion 2)."""
         return self.period.date
 
     @property
@@ -282,15 +292,17 @@ def slots_for_dataset(dataset_id: str, until: date | None = None,
         # inputs (REQ-PIPE-113 criterion 4).
         return slot_instants(dataset_id, period_date, agreement).claim_opens_at
 
-    # THE CALENDAR'S periods, not only the ones this dataset owes, so a
-    # slot closes when the NEXT CALENDAR PERIOD's window opens
-    # (REQ-PIPE-131 criterion 1). Read by index, never by walking the
+    # THE CALENDAR'S ROUNDS, not only the ones this dataset owes, so a
+    # slot closes when the NEXT ROUND's window opens, whatever period that
+    # round fills and whether or not it opens a slot (REQ-PIPE-131 criterion
+    # 1 as REQ-PIPE-321 amends it). Read by index, never by walking the
     # sequence per slot (NFR 1).
     sequence = _calendar_periods(dataset_id, until, agreement)
     following = {p.name: sequence[i + 1].date for i, p in enumerate(sequence[:-1])}
     preceding = {p.name: sequence[i - 1].date for i, p in enumerate(sequence) if i > 0}
 
-    def closes(period, opens: datetime) -> datetime | None:
+    def closes(round_period, opens: datetime) -> datetime | None:
+        period = round_period
         nxt = following.get(period.name)
         if nxt is not None:
             return claim_opens(nxt)
@@ -309,11 +321,14 @@ def slots_for_dataset(dataset_id: str, until: date | None = None,
                                                        agreement=agreement):
         if not dataset_period.expected:
             continue
-        instants = slot_instants(dataset_id, dataset_period.date, agreement)
+        # EVERY INSTANT FROM THE ROUND'S DATE (REQ-PIPE-321 criteria 1 and 2),
+        # never the date of the period it fills.
+        round_period = dataset_period.round or dataset_period.period
+        instants = slot_instants(dataset_id, round_period.date, agreement)
         opens = instants.claim_opens_at
         out.append(Slot(dataset_id=dataset_id, period=dataset_period.period,
                          due_at=instants.due_at, grace=instants.grace, claim_opens_at=opens,
-                         closes_at=closes(dataset_period.period, opens)))
+                         closes_at=closes(round_period, opens), round_date=round_period.date))
     return out
 
 

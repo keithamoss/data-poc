@@ -219,6 +219,18 @@ def flatten(cal_doc: dict, asset_doc: dict) -> dict[str, Item]:
                      {"collection": cid, "eff": eff, "end": windows.get(eff)}))
             _turn_off_item(add, f"collection {cid} participation_defaults {eff}",
                            ("collection", cid), v, {"collection": cid})
+        # A COLLECTION'S files_go_to_period FREEZES LIKE ANY OTHER VERSION
+        # (REQ-PIPE-320 criterion 8, REQ-PIPE-111 criterion 2 as amended): it
+        # moves due instants, claim windows and filings.
+        offsets = [(v or {}) for v in
+                   (((coll.get("files_go_to_period") or {}).get("versions")) or [])]
+        offset_windows = dict(_windows(offsets))
+        for i, v in enumerate(offsets):
+            eff = str(v.get("effective_from"))
+            add(Item(f"collection {cid} files_go_to_period {eff}", ("collection", cid),
+                     "offset_version", _plain(v.get("value")),
+                     {"collection": cid, "eff": eff, "end": offset_windows.get(eff),
+                      "first_version": i == 0}))
     # WHICH CALENDAR EACH DATASET IS ON, as resolved (delivery-critic on
     # 111, H2; PROVISIONAL, Keith's fork from REQ-PIPE-110 and
     # plans/running-thoughts.md #79): moving a dataset - or its whole
@@ -345,6 +357,19 @@ def freeze_instant(item: Item, agr) -> datetime | None:
         opens = []
         for ds in agr.datasets:
             if agr.collection_of(ds) != c["collection"] or not agr.defaults_for(ds):
+                continue
+            first = _first_period_on_or_after(ds, eff, end, agr)
+            if first:
+                opens.append(_claim_open(ds, first, agr))
+        return _min(asset_time.start_of_day(eff), *opens)
+    if item.kind == "offset_version":
+        # As a collection's defaults: the earliest instant any of its
+        # datasets could be filed under it - a slot due on a round it governs.
+        eff = date.fromisoformat(c["eff"])
+        end = date.fromisoformat(c["end"]) if c.get("end") else None
+        opens = []
+        for ds in agr.datasets:
+            if agr.collection_of(ds) != c["collection"]:
                 continue
             first = _first_period_on_or_after(ds, eff, end, agr)
             if first:
@@ -841,8 +866,20 @@ def check(old_cal: dict | None, new_cal: dict, old_asset: dict | None, new_asset
         # were exempt and its calendar membership was not, so the push adding a
         # collection with a past-dated history was refused.
         if added and synthetic and item.kind in ("cal_version", "participation", "tz_version",
-                                                  "defaults", "membership"):
+                                                  "defaults", "membership", "offset_version"):
             continue  # criterion 9
+        # THE ADOPTION ALLOWANCE (REQ-PIPE-320 criterion 11): a collection's
+        # FIRST files_go_to_period version stating 0 from its first round moves
+        # no instant and no filing, so it lands on frozen rounds on any asset.
+        if added and item.kind == "offset_version" and new == 0 and \
+                item.ctx.get("first_version") and \
+                not any(k.startswith(f"collection {item.ctx['collection']} files_go_to_period ")
+                        for k in old_items):
+            continue
+        # CHANGING THE VALUE a files_go_to_period version states, on a
+        # synthetic asset (REQ-PIPE-111 criterion 9 as REQ-PIPE-320 amends it).
+        if synthetic and item.kind == "offset_version" and old is not None and new is not None:
+            continue
         if added and synthetic and item.kind == "cal_date" and \
                 f"calendar {item.ctx['calendar']} version {item.ctx['version']}" not in old_items:
             continue  # a date inside a version criterion 9 lets a synthetic asset add
@@ -910,7 +947,7 @@ def check(old_cal: dict | None, new_cal: dict, old_asset: dict | None, new_asset
 
 #: The version-level items criterion 9 lets a synthetic asset add, remove or
 #: later-date without a declared correction.
-_VERSION_KINDS = ("cal_version", "participation", "tz_version", "defaults")
+_VERSION_KINDS = ("cal_version", "participation", "tz_version", "defaults", "offset_version")
 
 
 def _redated_versions(changes: dict) -> dict[str, str]:

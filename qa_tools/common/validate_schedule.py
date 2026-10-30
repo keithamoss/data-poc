@@ -45,7 +45,7 @@ import subprocess
 import sys
 from collections import Counter, defaultdict
 from dataclasses import dataclass, replace
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 
 import yaml
@@ -1785,6 +1785,143 @@ def _turn_off_errors(cal_raw: dict, raw: dict, src: Source) -> list[ConfigError]
 
 # ---- the gate -------------------------------------------------------
 
+# ---- files_go_to_period (REQ-PIPE-320) ------------------------------
+
+_OFFSET_KEY = "files_go_to_period"
+
+
+def _first_round(cal_name: str, begins: date, agr) -> date | None:
+    """The first round of a calendar dated on or after `begins` - the round
+    a version effective from `begins` takes effect from (criterion 1)."""
+    try:
+        rounds = schedule.periods_for_calendar(cal_name, until=begins + timedelta(days=400),
+                                               agreement=agr)
+    except schedule.ScheduleConfigError:
+        return None
+    return next((p.date for p in rounds if p.date >= begins), None)
+
+
+def _files_go_to_period_errors(cal_raw: dict, raw: dict, src: Source) -> list[ConfigError]:
+    """REQ-PIPE-320 criteria 3, 4, 5, 7 and 13, from committed configuration
+    alone (criterion 9). A value's type and sign are the schema's (criterion
+    6). Nothing here defaults a missing value: the two deployments want
+    opposite ones, so the gate names every collection that says nothing."""
+    from qa_tools.common import agreement as agreement_mod
+
+    out: list[ConfigError] = []
+    name = src.calendar_name
+    collection_of = {(d or {}).get("id"): (c or {}).get("id") for d, c in _walk_datasets(raw)}
+
+    def belongs(scope: str, dataset_id: str) -> ConfigError:
+        cid = collection_of.get(dataset_id)
+        return ConfigError(name, scope,
+                           f"states {_OFFSET_KEY}, which belongs to the collection - a "
+                           f"collection's files always go into the same period, so no dataset "
+                           f"can say otherwise (REQ-PIPE-320 criterion 3).",
+                           f"Remove it here and state it on the collection entry {cid!r} in "
+                           f"{name}'s collections list.")
+
+    # CRITERION 3: anywhere but a collection entry.
+    for entry in cal_raw.get("datasets") or []:
+        did = (entry or {}).get("id")
+        if _OFFSET_KEY in (entry or {}):
+            out.append(belongs(f"dataset {did!r}", did))
+        for i, v in enumerate(((entry.get("participation") or {}).get("versions")) or []):
+            if _OFFSET_KEY in (v or {}):
+                out.append(belongs(f"dataset {did!r} participation version {i + 1}", did))
+    for agency in ((raw.get("hierarchy") or {}).get("agencies") or []):
+        if _OFFSET_KEY in (agency or {}):
+            out.append(ConfigError(src.name, f"agency {agency.get('id')!r}",
+                                   f"states {_OFFSET_KEY} in the hierarchy.",
+                                   f"State it on each collection's entry in {name}."))
+    for dataset, collection in _walk_datasets(raw):
+        if _OFFSET_KEY in (collection or {}):
+            out.append(ConfigError(src.name, f"collection {collection.get('id')!r}",
+                                   f"states {_OFFSET_KEY} in the hierarchy.",
+                                   f"State it on the collection's entry in {name}, beside its "
+                                   f"calendar."))
+        if _OFFSET_KEY in (dataset or {}):
+            out.append(belongs(f"dataset {dataset.get('id')!r}", dataset.get("id")))
+    if out:
+        return out
+    try:
+        agr = agreement_mod.from_doc(cal_raw, src.agreement_path)
+    except (schedule.ScheduleConfigError, ValueError, TypeError, AttributeError):
+        return out  # the parse error is another check's to report
+    entries = {(c or {}).get("id"): (c or {}) for c in cal_raw.get("collections") or []}
+    datasets_of: dict[str, list[str]] = {}
+    for did, cid in collection_of.items():
+        datasets_of.setdefault(cid, []).append(did)
+    for cid, dids in datasets_of.items():
+        entry = entries.get(cid, {})
+        scope = f"collection {cid!r}"
+        versions = agr.offsets.get(cid, ())
+        on_calendar = []
+        for did in dids:
+            d = agr.dataset(did)
+            if d is None or d.no_calendar or not d.participation:
+                continue
+            cal_name = agr.calendar_name_for(did)
+            if cal_name and cal_name in agr.calendars:
+                on_calendar.append((did, cal_name, d))
+        if not on_calendar:
+            # CRITERION 5: a collection with no calendar has no periods.
+            if versions:
+                out.append(ConfigError(name, scope,
+                                       f"states {_OFFSET_KEY}, and none of its datasets is on a "
+                                       f"calendar.",
+                                       "Remove it - a collection with no calendar has no periods "
+                                       "to send files to."))
+            continue
+        # CRITERION 4: a version in force on its first participating round.
+        firsts = [r for did, cal_name, d in on_calendar
+                  if (r := _first_round(cal_name, d.participation[0].effective_from, agr))]
+        first = min(firsts) if firsts else None
+        if first is not None and (not versions or versions[0].effective_from > first):
+            have = (f"its first version takes effect from "
+                    f"{versions[0].effective_from.isoformat()}" if versions
+                    else f"it states no {_OFFSET_KEY}")
+            out.append(ConfigError(name, scope,
+                                   f"{have}, and its datasets supply from the round of "
+                                   f"{first.isoformat()} - its first round has no "
+                                   f"{_OFFSET_KEY}, and none is assumed.",
+                                   f"State {_OFFSET_KEY} on the collection's entry with a first "
+                                   f"version effective from {first.isoformat()} or earlier: "
+                                   f"0 if its files go into the period they arrive in, N for "
+                                   f"the period N after it."))
+        ends = [v.effective_from for v in versions[1:]] + [None]
+        for v, until in zip(versions, ends):
+            if v.value == 0:
+                continue
+            for did, cal_name, d in on_calendar:
+                cal = agr.calendars[cal_name]
+                # CRITERION 7: a cadence-rule round in this version's span.
+                starts = [cv.effective_from for cv in cal.versions]
+                spans = zip(cal.versions, starts[1:] + [None])
+                if any(cv.is_cadence_rule
+                       and (until is None or cv.effective_from < until)
+                       and (cend is None or cend > v.effective_from)
+                       for cv, cend in spans):
+                    out.append(ConfigError(name, scope,
+                                           f"states {_OFFSET_KEY} {v.value} on the version "
+                                           f"effective {v.effective_from.isoformat()}, and "
+                                           f"{did!r} is on the {cal_name!r} calendar, a cadence "
+                                           f"rule, in that span.",
+                                           "On a cadence-rule calendar a supply due ahead is "
+                                           "stated with days before, of at most 1 (REQ-PIPE-324 "
+                                           "criterion 4); state 0 here."))
+                    break
+                # CRITERION 13: a dataset with its own dates only at 0.
+                if d.own_dates is not None:
+                    out.append(ConfigError(name, scope,
+                                           f"states {_OFFSET_KEY} {v.value} on the version "
+                                           f"effective {v.effective_from.isoformat()}, and its "
+                                           f"dataset {did!r} carries its own dates.",
+                                           "A dataset with its own dates is supported only at 0 "
+                                           "- give it its collection's calendar, or state 0."))
+    return out
+
+
 def validate(src: Source | None = None) -> list[ConfigError]:
     src = src or Source.default()
     # ONE READ OF THE PREVIOUS FILE PER RUN, shared by the calendar guard
@@ -1839,6 +1976,7 @@ def validate(src: Source | None = None) -> list[ConfigError]:
     errors += _participation_errors(cal_raw, raw, src)
     errors += _defaults_errors(cal_raw, raw, src)
     errors += _turn_off_errors(cal_raw, raw, src)
+    errors += _files_go_to_period_errors(cal_raw, raw, src)
     errors += _expects_nothing_errors(merged, cal_src)
     errors += _contract_errors(raw, src)
     errors += _freeze_errors(raw, cal_raw, src)

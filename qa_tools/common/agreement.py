@@ -143,6 +143,17 @@ class DatasetAgreement:
 
 
 @dataclass(frozen=True)
+class OffsetVersion:
+    """One version of a collection's files_go_to_period (REQ-PIPE-320): from
+    the first round dated on or after `effective_from`, the files arriving in
+    a round go into the period `value` after that round's own."""
+
+    effective_from: date
+    value: int
+    changelog: tuple = ()
+
+
+@dataclass(frozen=True)
 class Agreement:
     """The whole delivery agreement of one asset, immutable."""
 
@@ -153,6 +164,24 @@ class Agreement:
     #: collection id -> its participation_defaults versions, oldest first
     #: (REQ-PIPE-181 criterion 1).
     defaults: MappingProxyType = field(default_factory=lambda: MappingProxyType({}))
+    #: collection id -> its files_go_to_period versions, oldest first
+    #: (REQ-PIPE-320 criterion 1).
+    offsets: MappingProxyType = field(default_factory=lambda: MappingProxyType({}))
+
+    def files_go_to_period(self, collection_id: str, on: date) -> int | None:
+        """The collection's files_go_to_period in force on a ROUND's date
+        (REQ-PIPE-320 criterion 2) - the round the files arrive in, never the
+        period they go into - or None where no version is in force, which the
+        schedule gate refuses (criterion 4) and nothing here defaults."""
+        from qa_tools.common import in_force
+
+        version = in_force.version_on(self.offsets.get(collection_id, ()), on)
+        return None if version is None else version.value
+
+    def files_go_to_period_for(self, dataset_id: str, on: date) -> int | None:
+        """A dataset's files_go_to_period on a round's date: its collection's,
+        always - no dataset can state one (REQ-PIPE-320 criterion 3)."""
+        return self.files_go_to_period(self.collection_of(dataset_id), on)
 
     def dataset(self, dataset_id: str) -> DatasetAgreement | None:
         return self.datasets.get(dataset_id)
@@ -418,6 +447,33 @@ def _participation_version(raw: dict, where: str) -> ParticipationVersion:
         turns_off_logged=_turns_off_logged(raw.get("changelog")))
 
 
+def _offset_versions(block, where: str) -> tuple[OffsetVersion, ...]:
+    """A collection's files_go_to_period versions, oldest first. The value is
+    a whole number of periods, 0 or more (REQ-PIPE-320 criterion 6); the
+    rest of the rules are the schedule gate's (validate_schedule)."""
+    from qa_tools.common import schedule
+
+    raw = block.get("versions") if isinstance(block, dict) else None
+    if not raw:
+        raise schedule.ScheduleConfigError(
+            f"{where} files_go_to_period: write it as versions - "
+            f"{{versions: [{{effective_from: YYYY-MM-DD, value: 0, changelog: [...]}}]}} - so a "
+            f"change takes effect from a round and the past keeps its value.")
+    out = []
+    for i, v in enumerate(raw):
+        at = f"{where} files_go_to_period version {i + 1}"
+        value = v.get("value")
+        if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+            raise schedule.ScheduleConfigError(
+                f"{at} (effective_from {v.get('effective_from')}): value is {value!r} - write a "
+                f"whole number of periods, 0 for the period the files arrive in or N for the "
+                f"period N after it.")
+        out.append(OffsetVersion(effective_from=schedule._as_date(v.get("effective_from"),
+                                                                  f"{at} effective_from"),
+                                 value=value, changelog=_changelog(v.get("changelog"), at)))
+    return tuple(sorted(out, key=lambda v: v.effective_from))
+
+
 def _own_dates(raw: dict, dataset_id: str):
     """A dataset's own authored dates as a calendar of its own, versioned like
     any calendar (criterion 25) - or None."""
@@ -473,6 +529,11 @@ def from_doc(doc: dict, path: Path | str = "contract/calendar.yaml") -> Agreemen
             (_participation_version(v, f"{where} version {i + 1}")
              for i, v in enumerate(((c.get("participation_defaults") or {}).get("versions")) or [])),
             key=lambda v: v.effective_from))
+    offsets: dict = {}
+    for c in doc.get("collections") or []:
+        block = c.get("files_go_to_period")
+        if block is not None:
+            offsets[c.get("id")] = _offset_versions(block, f"collection {c.get('id')!r}")
     datasets: dict = {}
     for raw in doc.get("datasets") or []:
         ds = raw.get("id")
@@ -506,7 +567,8 @@ def from_doc(doc: dict, path: Path | str = "contract/calendar.yaml") -> Agreemen
     return Agreement(path=Path(path), calendars=MappingProxyType(calendars),
                      collections=MappingProxyType(collections),
                      datasets=MappingProxyType(datasets),
-                     defaults=MappingProxyType({k: v for k, v in defaults.items() if v}))
+                     defaults=MappingProxyType({k: v for k, v in defaults.items() if v}),
+                     offsets=MappingProxyType(offsets))
 
 
 _BUILT = config_yaml.Built()

@@ -126,6 +126,11 @@ class DatasetPeriod:
     period: Period
     expected: bool = True
     not_expected_reason: str | None = None
+    #: THE ROUND whose slot fills this period (REQ-PIPE-321 criterion 1) - the
+    #: calendar date the files arrive on. At files_go_to_period 0 it is the
+    #: period itself; at N it is the round N periods before. None only where
+    #: a caller built a DatasetPeriod by hand, which means the period itself.
+    round: Period | None = None
 
     @property
     def name(self) -> str:
@@ -133,7 +138,15 @@ class DatasetPeriod:
 
     @property
     def date(self) -> date:
+        """The PERIOD's own date - what names its schema and orders the
+        history. Never the date a slot's instants are computed from, which
+        is `round_date` (REQ-PIPE-321 criterion 2)."""
         return self.period.date
+
+    @property
+    def round_date(self) -> date:
+        """The date of the round this period's slot is due on."""
+        return (self.round or self.period).date
 
 
 @dataclass(frozen=True)
@@ -671,41 +684,63 @@ def periods_for_dataset(dataset_id: str, until: date | None = None,
     skipped = not_expected_periods(dataset_id, agreement)
     begins = owes_from(dataset_id, agreement)
 
-    def _decorate(periods):
+    def _decorate(pairs):
         return [DatasetPeriod(period=p, expected=p.name not in skipped,
-                               not_expected_reason=skipped.get(p.name))
-                for p in periods]
+                               not_expected_reason=skipped.get(p.name), round=r)
+                for r, p in pairs]
 
-    def _owed(periods):
-        """NOT YET OWING before the first participation version (criterion
-        30), and each period filtered by the participation in force ON ITS
-        OWN DATE."""
+    def _participates(r) -> bool:
+        """Whether the dataset supplies in a ROUND - decided on the round's own
+        calendar date (REQ-PIPE-179 criterion 8, REQ-PIPE-321 criterion 6),
+        never the date of the period its files fill."""
+        if begins is not None and r.date < begins:
+            # NOT YET OWING before the first participation version (criterion 30).
+            return False
+        # TURNED OFF ON THE ROUND'S DATE (REQ-PIPE-179 criteria 4, 8 and 13):
+        # owes nothing, so no period and no slot.
+        if _agreement(agreement).standing_on(dataset_id, r.date).state == TURNED_OFF:
+            return False
+        on = delivery_months(dataset_id, r.date, agreement)
+        if on is not None and _version_in_force(cal, r.date).is_cadence_rule:
+            # CRITERION 7 PER VERSION: months mean nothing against a
+            # cadence rule, and dropping the period would leave the
+            # dataset silently owing nothing for it.
+            raise ScheduleConfigError(
+                f"dataset {dataset_id!r}'s participation in force on {r.date.isoformat()} "
+                f"names months, and calendar {cal.name!r} is a cadence rule on that date. "
+                f"Rejected rather than ignored.")
+        # THE MONTH OF THE ROUND'S CALENDAR DATE (REQ-PIPE-110 criterion 5 as
+        # REQ-PIPE-321 amends it), whatever period its files fill.
+        return on is None or r.date.month in on
+
+    def _owed(rounds, sequence):
+        """Each round the dataset supplies in, paired with the period its
+        files fill - the period N after the round's own, N being the
+        collection's files_go_to_period on the round's date (REQ-PIPE-321
+        criterion 1). A round whose period N ahead has no date, or is already
+        filled by an earlier round after a fall, opens no slot (criterion 8).
+        Read by index, never by walking the sequence per round (NFR 1)."""
+        index = {p.name: i for i, p in enumerate(sequence)}
+        taken: set[str] = set()
         out = []
-        for p in periods:
-            if begins is not None and p.date < begins:
+        for r in rounds:
+            if not _participates(r):
                 continue
-            # TURNED OFF ON THE PERIOD'S OWN DATE (REQ-PIPE-179 criteria 4, 8
-            # and 13): owes nothing, so no period and no slot - decided from
-            # the period's date, never its due date or a receipt.
-            if _agreement(agreement).standing_on(dataset_id, p.date).state == TURNED_OFF:
+            n = _agreement(agreement).files_go_to_period_for(dataset_id, r.date) or 0
+            j = index[r.name] + n
+            if j >= len(sequence):
                 continue
-            on = delivery_months(dataset_id, p.date, agreement)
-            if on is not None and _version_in_force(cal, p.date).is_cadence_rule:
-                # CRITERION 7 PER VERSION: months mean nothing against a
-                # cadence rule, and dropping the period would leave the
-                # dataset silently owing nothing for it.
-                raise ScheduleConfigError(
-                    f"dataset {dataset_id!r}'s participation in force on {p.date.isoformat()} "
-                    f"names months, and calendar {cal.name!r} is a cadence rule on that date. "
-                    f"Rejected rather than ignored.")
-            if on is not None and p.date.month not in on:
+            target = sequence[j]
+            if target.name in taken:
                 continue
-            out.append(p)
+            taken.add(target.name)
+            out.append((r, target))
         return out
 
     override = dataset_dates_override(dataset_id, agreement)
     if override is not None:
-        return _decorate(_owed([p for p in override if until is None or p.date <= until]))
+        rounds = [p for p in override if until is None or p.date <= until]
+        return _decorate(_owed(rounds, list(override)))
 
     if version.is_cadence_rule and months is not None:
         raise ScheduleConfigError(
@@ -723,8 +758,13 @@ def periods_for_dataset(dataset_id: str, until: date | None = None,
     # then this dataset's own participation applied to it. Derived here
     # rather than re-read from `version` so that a dataset sees every
     # period its calendar ever had, not only the newest version's.
-    periods = periods_for_calendar(cal.name, until=until, agreement=agreement)
-    return _decorate(_owed(periods))
+    # BOUNDED BY THE ROUND'S DATE (REQ-PIPE-321 criterion 7): `until` stops
+    # the rounds; the periods they fill may lie beyond it, so an authored
+    # calendar's whole sequence is read for the targets.
+    rounds = periods_for_calendar(cal.name, until=until, agreement=agreement)
+    sequence = (rounds if until is None or version.is_cadence_rule
+                else periods_for_calendar(cal.name, agreement=agreement))
+    return _decorate(_owed(rounds, sequence))
 
 
 def claim_window(dataset_id: str, contract_value: str | None = None,

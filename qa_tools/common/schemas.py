@@ -723,9 +723,25 @@ class DatasetAgreementConfig(_Strict):
     corrections: list[Correction] = Field(default_factory=list)
 
 
+class FilesGoToPeriodVersion(_Strict):
+    """One version of a collection's files_go_to_period (REQ-PIPE-320
+    criterion 1): from the first round dated on or after `effective_from`,
+    a round's files go into the period `value` after its own."""
+    effective_from: str = Field(pattern=_DATE_PATTERN)
+    value: int = Field(ge=0)
+    changelog: list[AgreementChangelogEntry] = Field(min_length=1)
+
+
+class FilesGoToPeriod(_Strict):
+    versions: list[FilesGoToPeriodVersion] = Field(min_length=1)
+
+
 class CollectionAgreementConfig(_Strict):
     id: NonEmptyStr
     calendar: NonEmptyStr | None = None
+    #: Which period a round's files go into (REQ-PIPE-320) - on the
+    #: collection only, never a dataset (criterion 3).
+    files_go_to_period: FilesGoToPeriod | None = None
     #: Participation values the collection's datasets take value by value
     #: unless they state their own (REQ-PIPE-181 criterion 1). A collection
     #: owes nothing itself - it holds values its datasets take.

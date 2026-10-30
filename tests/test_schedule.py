@@ -393,9 +393,11 @@ class TestAPeriodIsANameAndADateAndNothingElse:
         period = schedule.periods_for_calendar("quarterly")[0]
         assert set(vars(period)) == {"name", "date"}
 
-    def test_a_dataset_period_adds_only_whether_a_supply_is_expected(self):
+    def test_a_dataset_period_adds_only_whether_a_supply_is_expected_and_its_round(self):
+        """And, since REQ-PIPE-321, the round whose slot fills it - the date
+        its files arrive on, which names no schema."""
         dataset_period = schedule.periods_for_dataset("cp-clients")[0]
-        assert set(vars(dataset_period)) == {"period", "expected", "not_expected_reason"}
+        assert set(vars(dataset_period)) == {"period", "expected", "not_expected_reason", "round"}
 
 
 class TestAPeriodNamesAWarehouseSchema:
