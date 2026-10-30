@@ -5955,3 +5955,10 @@ could never have computed it), and it belongs with batch 5's check work.
 
      He asked to see the current period page first, and was shown CP 2019-Q1
      as at 15 March 2019. Not scoped; not part of the Linkage Products push.
+
+     **GLOBAL, NOT ONE DATASET (Keith, 2026-10-30, ~23:55)**: "I'd also want
+     this fix to apply globally, not just to one dataset." Whatever is built
+     applies to every dataset and every collection, through one generic rule:
+     any result recorded about a period's supply, whenever it arrived and
+     whichever collection's check recorded it. Linkage Products and Client
+     Register are the first case to show the gap, not the scope of the fix.
