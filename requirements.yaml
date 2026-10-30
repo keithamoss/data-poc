@@ -41766,10 +41766,7 @@ requirements:
       review-cli-ux-279v3-95v5.md), standing on REQ-PIPE-279 v4 (N1 = B, N2 = A). SIGNED by Keith 2026-10-23 (Perth) after the
       v6 walk-through, with C = A, D = A and E = B applied (summary.md, ''Keith''s sign-off walk-through, 2026-10-23'').'
     acceptance_criteria:
-    - WHERE a cross-table check cannot read a table because the period offers no supply of it the run may read - none in the
-      warehouse, none promoting with it (REQ-PIPE-267), none staged that the run may read - THE SYSTEM SHALL record the check
-      not evaluated, with status red, naming the table and the reason, for every reason, a table not yet due for the period
-      included, counted as REQ-PIPE-269 criterion 4 says.
+    - "WHERE a cross-table check cannot read a table because the period offers no supply of it the run may read - none in the warehouse, none promoting with it (REQ-PIPE-267), none staged that the run may read - THE SYSTEM SHALL record the check not evaluated, with status red, naming the table and the reason, for every reason, a table not yet due for the period included - except where the check is out of the run's scope under criterion 9, because a person has recorded the table's supply for the period as not supplied (REQ-PIPE-332 criterion 7), or because the two datasets were on different calendars for the period (REQ-PIPE-331 criterion 2) - counted as REQ-PIPE-269 criterion 4 says. AMENDED 2026-10-30 by REQ-PIPE-332."
     - THE SYSTEM SHALL write that status where not-evaluated cross-table records are written (unrunnable.results_for and held_blast_radius),
       keeping on each record the unrunnable_reason or held_reason it carries today (carried.not_evaluated_reason detects a not-evaluated
       record by key), and SHALL NOT record such a check as no data.
@@ -41782,10 +41779,7 @@ requirements:
       criterion 3; REQ-GHUB-082), shown as red promoted (REQ-DASH-126) until a re-evaluation clears it.
     - 'THE SYSTEM SHALL leave a trial run''s cross-table checks as REQ-PIPE-115 criterion 17 and REQ-PIPE-079 criterion 9 have
       them: a trial is filed to no period, so this requirement does not apply to it.'
-    - WHERE a table a cross-table check reads is not part of the collection's agreement for the run's period and has never been
-      supplied - a dataset that joins the agreement in a later period - THE SYSTEM SHALL leave the check OUT OF THE RUN'S SCOPE
-      for that period, recording it in left_out with the reason 'not part of the agreement for <period>', so that the page can
-      say why it did not run (REQ-PIPE-115 criterion 17), and SHALL record neither red nor a result for it.
+    - "WHERE a table a cross-table check reads is not part of the collection's agreement for the run's period and has never been supplied - a dataset that joins the agreement in a later period - THE SYSTEM SHALL leave the check OUT OF THE RUN'S SCOPE for that period, recording it in left_out with the reason code not_in_agreement and the reason 'not part of the agreement for <period>', so that the page can say why it did not run (REQ-PIPE-115 criterion 17), and SHALL record neither red nor a result for it. AMENDED 2026-10-30 by REQ-PIPE-332."
     - THE SYSTEM SHALL amend, in the same change, REQ-PIPE-079 criterion 14 and its decision 23's 'awaiting-supply (NOT red)',
       and REQ-PIPE-115 criterion 20, with the wording in summary-v4.md once Keith has approved it.
     - 'S3, THE FALSE GREEN CLOSED: THE SYSTEM SHALL have tests/test_strict_cross_table.py::TestNotYetDuePartner::test_early_file_is_red_until_its_partner_is_in_the_warehouse

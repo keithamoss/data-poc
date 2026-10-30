@@ -143,4 +143,11 @@ def mark(conn: supply_db.SupplyConnection, *, agency_id: str, collection_id: str
         actor_kind=decision_log.PERSON, effective_at=effective_at, to_slot=period,
         reason=reason)
     with decision_log.apply_decision(conn, decision) as entry_id:
+        # ITS READERS ARE OWED A RE-EVALUATION (REQ-PIPE-332 criterion 9): a
+        # mark moves no table, but it puts every cross-table check reading
+        # this table out of scope for the period, and a red recorded before
+        # it must not stand. Through REQ-PIPE-121's one knock-on.
+        from qa_tools.common import knock_on
+
+        knock_on.owe(conn, [(entry_id, dataset_id, period)])
         return entry_id

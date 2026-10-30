@@ -376,3 +376,19 @@ class TestALateDayStillOpenIsNamed:
             # ITS FILING GOES WITH IT (2026-10-12): left behind, its sibling
             # above read 2025-Q2 as filed whenever this ran first.
             filing_support.forget(conn, "supply_id = 'cp-carers@ontime'")
+
+
+class TestAMarkOwesItsReadersAReEvaluation:
+    """REQ-PIPE-332 criterion 9: a mark moves no table, so REQ-PIPE-121
+    alone would never re-check - but a cross-table check that read the table
+    before the mark put it out of scope must not keep its red. The mark owes
+    one re-evaluation of the period's readers of that table."""
+
+    def test_the_mark_owes_a_reevaluation_naming_the_table(self, conn):
+        from qa_tools.common import recheck
+
+        entry = _mark(conn, "cp-notifications", "2024-Q2")
+        rows = conn.execute(
+            f"SELECT kind, period, tables, caused_by_decision FROM {recheck.TABLE} "
+            "WHERE caused_by_decision = ?", [entry]).fetchall()
+        assert rows == [(recheck.REEVALUATE, "2024-Q2", ["cp_notifications"], entry)]
