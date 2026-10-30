@@ -30,7 +30,7 @@ A scenario marked **not injected** has no generated data behind it.
 Either it is a pure unit test with nothing to look at, or it is meant
 for injection and has not been placed yet.
 
-**61 of 71 scenarios marked for injection have data behind them today.** 108 scenarios are registered in all; the rest are unit tests with nothing to look at.
+**79 of 89 scenarios marked for injection have data behind them today.** 126 scenarios are registered in all; the rest are unit tests with nothing to look at.
 
 ## Slot assignment
 
@@ -1215,6 +1215,278 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
 | Supplies | — |
 | Period | 2023-Q3 |
 | Set "in the warehouse on" to | 2023-06-16 |
+
+## The linkage history, planted (REQ-GEN-335)
+
+### TS-86 - A linkage release with an empty key
+
+**What it demonstrates.** Linkage key recorded reads red on one row, and the release is held back (REQ-PIPE-332 criterion 3).
+
+**What it would look like if the rule were wrong.** The empty key passed, or the whole release refused unloaded.
+
+*Config: quarterly, due 18:00 with 8 hours' grace; 2016-Q3's release, one row's linkage_key empty.*
+
+| Where to look | |
+|---|---|
+| Dataset | linkage-keys |
+| Supplies | `linkage_keys__201608011730000800` |
+| Period | 2016-Q3 |
+| Set "in the warehouse on" to | 2016-08-01 |
+
+### TS-87 - A dataset code nobody declared - a linked dataset as good as missing
+
+**What it demonstrates.** Known dataset code reads red; ED Presentations' coverage reads 0 percent, red; its referential check finds no EDDC_PRESENTATION row to fail.
+
+**What it would look like if the rule were wrong.** The renamed code matched by similarity, or coverage green.
+
+*Config: as TS-86; 2017-Q1's release codes every ED Presentations row EDDC_PRESENTATION_V2.*
+
+| Where to look | |
+|---|---|
+| Dataset | linkage-keys |
+| Supplies | `linkage_keys__201702011730000800` |
+| Period | 2017-Q1 |
+| Set "in the warehouse on" to | 2017-02-01 |
+
+### TS-88 - A surplus identifier
+
+**What it demonstrates.** No surplus identifiers reads red on that row; every other check passes.
+
+**What it would look like if the rule were wrong.** The surplus id ignored, or read as a missing one.
+
+*Config: as TS-86; 2018-Q1's release, one DOC_CLIENTS row carrying an id_2, the contract's id_2 column being blank in every ordinary release (PROVISIONAL).*
+
+| Where to look | |
+|---|---|
+| Dataset | linkage-keys |
+| Supplies | `linkage_keys__201802011730000800` |
+| Period | 2018-Q1 |
+| Set "in the warehouse on" to | 2018-02-01 |
+
+### TS-89 - One record linked twice
+
+**What it demonstrates.** Each record linked once reads red; coverage is unchanged.
+
+**What it would look like if the rule were wrong.** The duplicate counted as two linked presentations.
+
+*Config: as TS-86; 2018-Q2's release, one EDDC_PRESENTATION record under two keys.*
+
+| Where to look | |
+|---|---|
+| Dataset | linkage-keys |
+| Supplies | `linkage_keys__201805011730000800` |
+| Period | 2018-Q2 |
+| Set "in the warehouse on" to | 2018-05-01 |
+
+### TS-90 - A link to a record the quarter does not hold
+
+**What it demonstrates.** ED Presentations links match a presentation reads red, its failing row the code and identifier; the result counts toward ED Presentations as well (REQ-PIPE-332 criterion 1).
+
+**What it would look like if the rule were wrong.** The dangling row passed, or the red kept off ED's page.
+
+*Config: as TS-86; 2018-Q3's release, one EDDC_PRESENTATION row naming a presentation not in ED's 2018-Q3 supply.*
+
+| Where to look | |
+|---|---|
+| Dataset | linkage-keys |
+| Supplies | `linkage_keys__201808011730000800` |
+| Period | 2018-Q3 |
+| Set "in the warehouse on" to | 2018-08-01 |
+
+### TS-91 - Coverage in the amber band
+
+**What it demonstrates.** Client Register coverage reads amber, worded below its band; the release promotes as amber does (REQ-DASH-337).
+
+**What it would look like if the rule were wrong.** Worded "above 90 percent", or read green.
+
+*Config: as TS-86; 2018-Q4's release links 85.5 to 89.5 percent of the Client Register's rows.*
+
+| Where to look | |
+|---|---|
+| Dataset | linkage-keys |
+| Supplies | `linkage_keys__201811011730000800` |
+| Period | 2018-Q4 |
+| Set "in the warehouse on" to | 2018-11-01 |
+
+### TS-92 - Coverage in the red band
+
+**What it demonstrates.** ED Presentations coverage reads red, a percentage only, no failing rows; the release is held back.
+
+**What it would look like if the rule were wrong.** Failing rows recorded for coverage, or amber.
+
+*Config: as TS-86; 2019-Q2's release links 78 to 84 percent of ED Presentations' rows.*
+
+| Where to look | |
+|---|---|
+| Dataset | linkage-keys |
+| Supplies | `linkage_keys__201905011730000800` |
+| Period | 2019-Q2 |
+| Set "in the warehouse on" to | 2019-05-01 |
+
+### TS-93a - A Client Register held red and rejected - its side of TS-93b
+
+**What it demonstrates.** Cp_clients held back on its own data, then rejected; its readers held for want of a Client Register.
+
+**What it would look like if the rule were wrong.** The red Client Register promoted.
+
+*Config: quarterly, Feb/May/Aug/Nov, due 09:00 on the 1st; 2019-Q1's six tables arrive on the 1 November 2018 round, cp_clients alone built red; a scripted person rejects it three weeks later ("TS-93 reject") and nothing replaces it.*
+
+| Where to look | |
+|---|---|
+| Dataset | cp-clients |
+| Supplies | `cp_clients__201811010900000800` |
+| Period | 2019-Q1 |
+| Set "in the warehouse on" to | 2018-11-01 |
+
+### TS-93b - A linkage release whose Client Register is not in the warehouse
+
+**What it demonstrates.** The release's two cp-clients checks read red, could not run, naming the rejected Client Register; ED Presentations' checks are evaluated.
+
+**What it would look like if the rule were wrong.** The cp-clients checks evaluated against another quarter's Client Register, or left out of scope as if marked not supplied.
+
+*Config: as TS-86; 2019-Q1's release, built from the Client Register as received, checked with TS-93a's supply rejected.*
+
+| Where to look | |
+|---|---|
+| Dataset | linkage-keys |
+| Supplies | `linkage_keys__201902011730000800` |
+| Period | 2019-Q1 |
+| Set "in the warehouse on" to | 2019-02-01 |
+
+### TS-94 - A red linkage release promoted by a person
+
+**What it demonstrates.** Held back red; from the promotion, the Client Register promoted green on the 1 February 2022 round reads red promoted (REQ-PIPE-332 criterion 4), and earlier dates still show it green.
+
+**What it would look like if the rule were wrong.** The Client Register demoted, or coloured before the promotion.
+
+*Config: as TS-86; 2022-Q2's release, one DOC_CLIENTS row naming a client the quarter does not hold; a scripted person promotes it two days later ("TS-94 promote", REQ-PIPE-332 criterion 8).*
+
+| Where to look | |
+|---|---|
+| Dataset | linkage-keys |
+| Supplies | `linkage_keys__202205011730000800` |
+| Period | 2022-Q2 |
+| Set "in the warehouse on" to | 2022-05-01 |
+
+### TS-95 - A linked dataset marked not supplied - named, not planted
+
+**What it demonstrates.** The release's cp-clients checks are left out of scope with reason code not_supplied_by_decision, while ED Presentations' are evaluated (REQ-PIPE-332 criterion 7).
+
+**What it would look like if the rule were wrong.** Cp-clients' checks read red, could not run.
+
+*Config: quarterly; Child Protection has no supply for 2015-Q2 and its existing scripted entry marks cp-clients not supplied; the 2015-Q2 release is an ordinary one.*
+
+| Where to look | |
+|---|---|
+| Dataset | linkage-keys |
+| Supplies | `linkage_keys__201505011725000800` |
+| Period | 2015-Q2 |
+| Set "in the warehouse on" to | 2015-05-01 |
+
+### TS-96 - A quarter with no linkage release
+
+**What it demonstrates.** The slot closes unfilled and reads not supplied (accepted) (REQ-PIPE-132, REQ-DASH-133).
+
+**What it would look like if the rule were wrong.** A red "No supply" gap left needing action.
+
+*Config: quarterly, due 18:00; no release comes for 2020-Q3, and a scripted person marks it not supplied two days after it was due ("TS-96 not supplied").*
+
+| Where to look | |
+|---|---|
+| Dataset | linkage-keys |
+| Supplies | — |
+| Period | 2020-Q3 |
+| Set "in the warehouse on" to | 2020-08-01 |
+
+### TS-97 - Large key groups in the amber band
+
+**What it demonstrates.** Large key groups reads amber, with the count of keys, the count of large groups and their histogram across several bins, and no key value.
+
+**What it would look like if the rule were wrong.** A key value recorded, or the histogram drawn over every key.
+
+*Config: as TS-86; 2021-Q3's release, records re-keyed into groups of 51 to 230 records until just over 2 percent of distinct keys are large groups.*
+
+| Where to look | |
+|---|---|
+| Dataset | linkage-keys |
+| Supplies | `linkage_keys__202108011730000800` |
+| Period | 2021-Q3 |
+| Set "in the warehouse on" to | 2021-08-01 |
+
+### TS-98 - Large key groups in the red band
+
+**What it demonstrates.** Large key groups reads red and the release is held back.
+
+**What it would look like if the rule were wrong.** Amber, or every key counted as a group.
+
+*Config: as TS-97; 2022-Q3's release, groups of 51 to 70 records until just over 4 percent of distinct keys are large groups.*
+
+| Where to look | |
+|---|---|
+| Dataset | linkage-keys |
+| Supplies | `linkage_keys__202208011730000800` |
+| Period | 2022-Q3 |
+| Set "in the warehouse on" to | 2022-08-01 |
+
+### TS-99 - A blank expected identifier
+
+**What it demonstrates.** Expected identifiers present reads red; the Client Register's referential check also fails on that row, which matches no client.
+
+**What it would look like if the rule were wrong.** The blank read as a value.
+
+*Config: as TS-86; 2022-Q4's release, one DOC_CLIENTS row's id_1 blank.*
+
+| Where to look | |
+|---|---|
+| Dataset | linkage-keys |
+| Supplies | `linkage_keys__202211011730000800` |
+| Period | 2022-Q4 |
+| Set "in the warehouse on" to | 2022-11-01 |
+
+### TS-100a - A Client Register held red, then promoted by a person - its side of TS-100b
+
+**What it demonstrates.** Held back on its own data until the person promotes it; its readers re-checked and promoted with it.
+
+**What it would look like if the rule were wrong.** Promoted by the rule.
+
+*Config: quarterly, Feb/May/Aug/Nov, due 09:00 on the 1st; 2019-Q3's six tables arrive on the 1 May 2019 round, cp_clients alone built red and held; a scripted person promotes it at 10:00 on 2 August 2019 ("TS-100 promote"), the day after the quarter's linkage release.*
+
+| Where to look | |
+|---|---|
+| Dataset | cp-clients |
+| Supplies | `cp_clients__201905010900000800` |
+| Period | 2019-Q3 |
+| Set "in the warehouse on" to | 2019-05-01 |
+
+### TS-100b - A linkage release cleared by a person's promotion
+
+**What it demonstrates.** Its cp-clients checks read red, could not run, until 10:00 on 2 August 2019, when the promotion's knock-on re-checks them and they pass (REQ-PIPE-331 criterion 5).
+
+**What it would look like if the rule were wrong.** Still red after the promotion, or evaluated against the held supply before it.
+
+*Config: as TS-86; 2019-Q3's release, ordinary rows, received while TS-100a's Client Register is held.*
+
+| Where to look | |
+|---|---|
+| Dataset | linkage-keys |
+| Supplies | `linkage_keys__201908011730000800` |
+| Period | 2019-Q3 |
+| Set "in the warehouse on" to | 2019-08-01 |
+
+### TS-101 - Emergency Department's same-round red, clearing
+
+**What it demonstrates.** The release's ED Presentations checks read red, could not run, and clear through the knock-on once the resupply is promoted (REQ-GEN-334 criteria 9 and 12); ED's own page is not coloured by them.
+
+**What it would look like if the rule were wrong.** ED's page coloured by a not-evaluated result, or the release re-timed to avoid the red.
+
+*Config: as TS-86; 2021-Q4's release, received while ED Presentations' red supply of the morning is held, its resupply arriving days later; no ED arrival moved, no release re-timed.*
+
+| Where to look | |
+|---|---|
+| Dataset | linkage-keys |
+| Supplies | `linkage_keys__202111011730000800` |
+| Period | 2021-Q4 |
+| Set "in the warehouse on" to | 2021-11-01 |
 
 
 <!-- scenario-map-data
@@ -3463,6 +3735,392 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
     ],
     "period": "2016-Q2",
     "inPlaceOn": "2016-02-29",
+    "subject": "supply-history-row"
+   }
+  },
+  {
+   "id": "TS-86",
+   "mode": "INJECT",
+   "title": "A linkage release with an empty key",
+   "section": "The linkage history, planted (REQ-GEN-335)",
+   "demonstrates": "Linkage key recorded reads red on one row, and the release is held back (REQ-PIPE-332 criterion 3).",
+   "breaksAs": "The empty key passed, or the whole release refused unloaded.",
+   "config": "Config: quarterly, due 18:00 with 8 hours' grace; 2016-Q3's release, one row's linkage_key empty.",
+   "requirements": [
+    "REQ-PIPE-332",
+    "REQ-GEN-335"
+   ],
+   "coordinates": {
+    "dataset": "linkage-keys",
+    "supplies": [
+     "linkage_keys__201608011730000800"
+    ],
+    "period": "2016-Q3",
+    "inPlaceOn": "2016-08-01",
+    "subject": "supply-history-row"
+   }
+  },
+  {
+   "id": "TS-87",
+   "mode": "INJECT",
+   "title": "A dataset code nobody declared - a linked dataset as good as missing",
+   "section": "The linkage history, planted (REQ-GEN-335)",
+   "demonstrates": "Known dataset code reads red; ED Presentations' coverage reads 0 percent, red; its referential check finds no EDDC_PRESENTATION row to fail.",
+   "breaksAs": "The renamed code matched by similarity, or coverage green.",
+   "config": "Config: as TS-86; 2017-Q1's release codes every ED Presentations row EDDC_PRESENTATION_V2.",
+   "requirements": [
+    "REQ-GEN-335"
+   ],
+   "coordinates": {
+    "dataset": "linkage-keys",
+    "supplies": [
+     "linkage_keys__201702011730000800"
+    ],
+    "period": "2017-Q1",
+    "inPlaceOn": "2017-02-01",
+    "subject": "supply-history-row"
+   }
+  },
+  {
+   "id": "TS-88",
+   "mode": "INJECT",
+   "title": "A surplus identifier",
+   "section": "The linkage history, planted (REQ-GEN-335)",
+   "demonstrates": "No surplus identifiers reads red on that row; every other check passes.",
+   "breaksAs": "The surplus id ignored, or read as a missing one.",
+   "config": "Config: as TS-86; 2018-Q1's release, one DOC_CLIENTS row carrying an id_2, the contract's id_2 column being blank in every ordinary release (PROVISIONAL).",
+   "requirements": [
+    "REQ-GEN-335"
+   ],
+   "coordinates": {
+    "dataset": "linkage-keys",
+    "supplies": [
+     "linkage_keys__201802011730000800"
+    ],
+    "period": "2018-Q1",
+    "inPlaceOn": "2018-02-01",
+    "subject": "supply-history-row"
+   }
+  },
+  {
+   "id": "TS-89",
+   "mode": "INJECT",
+   "title": "One record linked twice",
+   "section": "The linkage history, planted (REQ-GEN-335)",
+   "demonstrates": "Each record linked once reads red; coverage is unchanged.",
+   "breaksAs": "The duplicate counted as two linked presentations.",
+   "config": "Config: as TS-86; 2018-Q2's release, one EDDC_PRESENTATION record under two keys.",
+   "requirements": [
+    "REQ-GEN-335"
+   ],
+   "coordinates": {
+    "dataset": "linkage-keys",
+    "supplies": [
+     "linkage_keys__201805011730000800"
+    ],
+    "period": "2018-Q2",
+    "inPlaceOn": "2018-05-01",
+    "subject": "supply-history-row"
+   }
+  },
+  {
+   "id": "TS-90",
+   "mode": "INJECT",
+   "title": "A link to a record the quarter does not hold",
+   "section": "The linkage history, planted (REQ-GEN-335)",
+   "demonstrates": "ED Presentations links match a presentation reads red, its failing row the code and identifier; the result counts toward ED Presentations as well (REQ-PIPE-332 criterion 1).",
+   "breaksAs": "The dangling row passed, or the red kept off ED's page.",
+   "config": "Config: as TS-86; 2018-Q3's release, one EDDC_PRESENTATION row naming a presentation not in ED's 2018-Q3 supply.",
+   "requirements": [
+    "REQ-PIPE-332",
+    "REQ-GEN-335"
+   ],
+   "coordinates": {
+    "dataset": "linkage-keys",
+    "supplies": [
+     "linkage_keys__201808011730000800"
+    ],
+    "period": "2018-Q3",
+    "inPlaceOn": "2018-08-01",
+    "subject": "supply-history-row"
+   }
+  },
+  {
+   "id": "TS-91",
+   "mode": "INJECT",
+   "title": "Coverage in the amber band",
+   "section": "The linkage history, planted (REQ-GEN-335)",
+   "demonstrates": "Client Register coverage reads amber, worded below its band; the release promotes as amber does (REQ-DASH-337).",
+   "breaksAs": "Worded \"above 90 percent\", or read green.",
+   "config": "Config: as TS-86; 2018-Q4's release links 85.5 to 89.5 percent of the Client Register's rows.",
+   "requirements": [
+    "REQ-DASH-337",
+    "REQ-GEN-335"
+   ],
+   "coordinates": {
+    "dataset": "linkage-keys",
+    "supplies": [
+     "linkage_keys__201811011730000800"
+    ],
+    "period": "2018-Q4",
+    "inPlaceOn": "2018-11-01",
+    "subject": "supply-history-row"
+   }
+  },
+  {
+   "id": "TS-92",
+   "mode": "INJECT",
+   "title": "Coverage in the red band",
+   "section": "The linkage history, planted (REQ-GEN-335)",
+   "demonstrates": "ED Presentations coverage reads red, a percentage only, no failing rows; the release is held back.",
+   "breaksAs": "Failing rows recorded for coverage, or amber.",
+   "config": "Config: as TS-86; 2019-Q2's release links 78 to 84 percent of ED Presentations' rows.",
+   "requirements": [
+    "REQ-GEN-335"
+   ],
+   "coordinates": {
+    "dataset": "linkage-keys",
+    "supplies": [
+     "linkage_keys__201905011730000800"
+    ],
+    "period": "2019-Q2",
+    "inPlaceOn": "2019-05-01",
+    "subject": "supply-history-row"
+   }
+  },
+  {
+   "id": "TS-93a",
+   "mode": "INJECT",
+   "title": "A Client Register held red and rejected - its side of TS-93b",
+   "section": "The linkage history, planted (REQ-GEN-335)",
+   "demonstrates": "Cp_clients held back on its own data, then rejected; its readers held for want of a Client Register.",
+   "breaksAs": "The red Client Register promoted.",
+   "config": "Config: quarterly, Feb/May/Aug/Nov, due 09:00 on the 1st; 2019-Q1's six tables arrive on the 1 November 2018 round, cp_clients alone built red; a scripted person rejects it three weeks later (\"TS-93 reject\") and nothing replaces it.",
+   "requirements": [
+    "REQ-GEN-335"
+   ],
+   "coordinates": {
+    "dataset": "cp-clients",
+    "supplies": [
+     "cp_clients__201811010900000800"
+    ],
+    "period": "2019-Q1",
+    "inPlaceOn": "2018-11-01",
+    "subject": "supply-history-row"
+   }
+  },
+  {
+   "id": "TS-93b",
+   "mode": "INJECT",
+   "title": "A linkage release whose Client Register is not in the warehouse",
+   "section": "The linkage history, planted (REQ-GEN-335)",
+   "demonstrates": "The release's two cp-clients checks read red, could not run, naming the rejected Client Register; ED Presentations' checks are evaluated.",
+   "breaksAs": "The cp-clients checks evaluated against another quarter's Client Register, or left out of scope as if marked not supplied.",
+   "config": "Config: as TS-86; 2019-Q1's release, built from the Client Register as received, checked with TS-93a's supply rejected.",
+   "requirements": [
+    "REQ-GEN-335"
+   ],
+   "coordinates": {
+    "dataset": "linkage-keys",
+    "supplies": [
+     "linkage_keys__201902011730000800"
+    ],
+    "period": "2019-Q1",
+    "inPlaceOn": "2019-02-01",
+    "subject": "supply-history-row"
+   }
+  },
+  {
+   "id": "TS-94",
+   "mode": "INJECT",
+   "title": "A red linkage release promoted by a person",
+   "section": "The linkage history, planted (REQ-GEN-335)",
+   "demonstrates": "Held back red; from the promotion, the Client Register promoted green on the 1 February 2022 round reads red promoted (REQ-PIPE-332 criterion 4), and earlier dates still show it green.",
+   "breaksAs": "The Client Register demoted, or coloured before the promotion.",
+   "config": "Config: as TS-86; 2022-Q2's release, one DOC_CLIENTS row naming a client the quarter does not hold; a scripted person promotes it two days later (\"TS-94 promote\", REQ-PIPE-332 criterion 8).",
+   "requirements": [
+    "REQ-PIPE-332",
+    "REQ-GEN-335"
+   ],
+   "coordinates": {
+    "dataset": "linkage-keys",
+    "supplies": [
+     "linkage_keys__202205011730000800"
+    ],
+    "period": "2022-Q2",
+    "inPlaceOn": "2022-05-01",
+    "subject": "supply-history-row"
+   }
+  },
+  {
+   "id": "TS-95",
+   "mode": "INJECT",
+   "title": "A linked dataset marked not supplied - named, not planted",
+   "section": "The linkage history, planted (REQ-GEN-335)",
+   "demonstrates": "The release's cp-clients checks are left out of scope with reason code not_supplied_by_decision, while ED Presentations' are evaluated (REQ-PIPE-332 criterion 7).",
+   "breaksAs": "Cp-clients' checks read red, could not run.",
+   "config": "Config: quarterly; Child Protection has no supply for 2015-Q2 and its existing scripted entry marks cp-clients not supplied; the 2015-Q2 release is an ordinary one.",
+   "requirements": [
+    "REQ-PIPE-332",
+    "REQ-GEN-335",
+    "REQ-GEN-205"
+   ],
+   "coordinates": {
+    "dataset": "linkage-keys",
+    "supplies": [
+     "linkage_keys__201505011725000800"
+    ],
+    "period": "2015-Q2",
+    "inPlaceOn": "2015-05-01",
+    "subject": "supply-history-row"
+   }
+  },
+  {
+   "id": "TS-96",
+   "mode": "INJECT",
+   "title": "A quarter with no linkage release",
+   "section": "The linkage history, planted (REQ-GEN-335)",
+   "demonstrates": "The slot closes unfilled and reads not supplied (accepted) (REQ-PIPE-132, REQ-DASH-133).",
+   "breaksAs": "A red \"No supply\" gap left needing action.",
+   "config": "Config: quarterly, due 18:00; no release comes for 2020-Q3, and a scripted person marks it not supplied two days after it was due (\"TS-96 not supplied\").",
+   "requirements": [
+    "REQ-PIPE-132",
+    "REQ-DASH-133",
+    "REQ-GEN-335"
+   ],
+   "coordinates": {
+    "dataset": "linkage-keys",
+    "supplies": [],
+    "period": "2020-Q3",
+    "inPlaceOn": "2020-08-01",
+    "subject": "supply-history-row"
+   }
+  },
+  {
+   "id": "TS-97",
+   "mode": "INJECT",
+   "title": "Large key groups in the amber band",
+   "section": "The linkage history, planted (REQ-GEN-335)",
+   "demonstrates": "Large key groups reads amber, with the count of keys, the count of large groups and their histogram across several bins, and no key value.",
+   "breaksAs": "A key value recorded, or the histogram drawn over every key.",
+   "config": "Config: as TS-86; 2021-Q3's release, records re-keyed into groups of 51 to 230 records until just over 2 percent of distinct keys are large groups.",
+   "requirements": [
+    "REQ-GEN-335"
+   ],
+   "coordinates": {
+    "dataset": "linkage-keys",
+    "supplies": [
+     "linkage_keys__202108011730000800"
+    ],
+    "period": "2021-Q3",
+    "inPlaceOn": "2021-08-01",
+    "subject": "supply-history-row"
+   }
+  },
+  {
+   "id": "TS-98",
+   "mode": "INJECT",
+   "title": "Large key groups in the red band",
+   "section": "The linkage history, planted (REQ-GEN-335)",
+   "demonstrates": "Large key groups reads red and the release is held back.",
+   "breaksAs": "Amber, or every key counted as a group.",
+   "config": "Config: as TS-97; 2022-Q3's release, groups of 51 to 70 records until just over 4 percent of distinct keys are large groups.",
+   "requirements": [
+    "REQ-GEN-335"
+   ],
+   "coordinates": {
+    "dataset": "linkage-keys",
+    "supplies": [
+     "linkage_keys__202208011730000800"
+    ],
+    "period": "2022-Q3",
+    "inPlaceOn": "2022-08-01",
+    "subject": "supply-history-row"
+   }
+  },
+  {
+   "id": "TS-99",
+   "mode": "INJECT",
+   "title": "A blank expected identifier",
+   "section": "The linkage history, planted (REQ-GEN-335)",
+   "demonstrates": "Expected identifiers present reads red; the Client Register's referential check also fails on that row, which matches no client.",
+   "breaksAs": "The blank read as a value.",
+   "config": "Config: as TS-86; 2022-Q4's release, one DOC_CLIENTS row's id_1 blank.",
+   "requirements": [
+    "REQ-GEN-335"
+   ],
+   "coordinates": {
+    "dataset": "linkage-keys",
+    "supplies": [
+     "linkage_keys__202211011730000800"
+    ],
+    "period": "2022-Q4",
+    "inPlaceOn": "2022-11-01",
+    "subject": "supply-history-row"
+   }
+  },
+  {
+   "id": "TS-100a",
+   "mode": "INJECT",
+   "title": "A Client Register held red, then promoted by a person - its side of TS-100b",
+   "section": "The linkage history, planted (REQ-GEN-335)",
+   "demonstrates": "Held back on its own data until the person promotes it; its readers re-checked and promoted with it.",
+   "breaksAs": "Promoted by the rule.",
+   "config": "Config: quarterly, Feb/May/Aug/Nov, due 09:00 on the 1st; 2019-Q3's six tables arrive on the 1 May 2019 round, cp_clients alone built red and held; a scripted person promotes it at 10:00 on 2 August 2019 (\"TS-100 promote\"), the day after the quarter's linkage release.",
+   "requirements": [
+    "REQ-GEN-335"
+   ],
+   "coordinates": {
+    "dataset": "cp-clients",
+    "supplies": [
+     "cp_clients__201905010900000800"
+    ],
+    "period": "2019-Q3",
+    "inPlaceOn": "2019-05-01",
+    "subject": "supply-history-row"
+   }
+  },
+  {
+   "id": "TS-100b",
+   "mode": "INJECT",
+   "title": "A linkage release cleared by a person's promotion",
+   "section": "The linkage history, planted (REQ-GEN-335)",
+   "demonstrates": "Its cp-clients checks read red, could not run, until 10:00 on 2 August 2019, when the promotion's knock-on re-checks them and they pass (REQ-PIPE-331 criterion 5).",
+   "breaksAs": "Still red after the promotion, or evaluated against the held supply before it.",
+   "config": "Config: as TS-86; 2019-Q3's release, ordinary rows, received while TS-100a's Client Register is held.",
+   "requirements": [
+    "REQ-PIPE-331",
+    "REQ-GEN-335"
+   ],
+   "coordinates": {
+    "dataset": "linkage-keys",
+    "supplies": [
+     "linkage_keys__201908011730000800"
+    ],
+    "period": "2019-Q3",
+    "inPlaceOn": "2019-08-01",
+    "subject": "supply-history-row"
+   }
+  },
+  {
+   "id": "TS-101",
+   "mode": "INJECT",
+   "title": "Emergency Department's same-round red, clearing",
+   "section": "The linkage history, planted (REQ-GEN-335)",
+   "demonstrates": "The release's ED Presentations checks read red, could not run, and clear through the knock-on once the resupply is promoted (REQ-GEN-334 criteria 9 and 12); ED's own page is not coloured by them.",
+   "breaksAs": "ED's page coloured by a not-evaluated result, or the release re-timed to avoid the red.",
+   "config": "Config: as TS-86; 2021-Q4's release, received while ED Presentations' red supply of the morning is held, its resupply arriving days later; no ED arrival moved, no release re-timed.",
+   "requirements": [
+    "REQ-GEN-334",
+    "REQ-GEN-335"
+   ],
+   "coordinates": {
+    "dataset": "linkage-keys",
+    "supplies": [
+     "linkage_keys__202111011730000800"
+    ],
+    "period": "2021-Q4",
+    "inPlaceOn": "2021-11-01",
     "subject": "supply-history-row"
    }
   }
