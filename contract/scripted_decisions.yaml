@@ -292,14 +292,15 @@ decisions:
     supply: 0
     after_hours: 48
     reason: "One client the release names is not in the quarter; the linkage unit is investigating, and the release is accepted meanwhile."
-  # TS-96: no release came for the quarter; a person marks it not supplied two
-  # days after it was due (REQ-PIPE-132).
+  # TS-96: no release came for the quarter; a person marks it not supplied the
+  # day after its slot closed (REQ-PIPE-132 refuses a mark on an open slot; a
+  # quarterly slot closes 1872 hours after it is due, as TS-76's does).
   - scenario: TS-96
     name: TS-96 not supplied
     operation: mark-not-supplied
     dataset: linkage-keys
     scope: period
-    after_hours: 48
+    after_hours: 1896
     reason: "The linkage unit did not run a release for this quarter, and will not."
   # TS-100a: the held red Client Register promoted by a person at 10:00 the day
   # after the 2019-Q3 linkage release, so the knock-on re-checks the release

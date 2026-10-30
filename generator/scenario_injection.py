@@ -2485,7 +2485,7 @@ INJECTIONS: tuple[Injection, ...] = (
         scenario_id="TS-96",
         dataset_id="linkage-keys",
         anchor=-25,  # 2020-Q3
-        config="quarterly, due 18:00 on the round with 8 hours' grace. No release comes for the quarter; a scripted person marks it not supplied two days after it was due.",
+        config="quarterly, due 18:00 on the round with 8 hours' grace. No release comes for the quarter; a scripted person marks it not supplied the day after its slot closed.",
         suppress=(0,),
     ),
     Injection(
