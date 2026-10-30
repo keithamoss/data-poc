@@ -280,3 +280,24 @@ class TestTheListing:
         monkeypatch.setattr(cb, "default_rows", refuse)
         got = CliRunner().invoke(scenarios.scenarios_group, ["bands", "--dataset", BDM])
         assert got.exit_code != 0 and "--rows" in got.output
+
+
+class TestAUserDefinedMetricsBandIsRead:
+    """A Soda user-defined metric (`<metric> query:`), as Linkage Products'
+    large key groups check is (REQ-QAC-333), carries warn and fail bands in
+    the unit its attributes state - found when the catalogue refused the
+    collection's check file outright."""
+
+    def test_large_key_groups(self):
+        from pathlib import Path
+
+        from qa_tools.common import check_bands
+
+        path = (Path(__file__).resolve().parent.parent / "contract" / "department-of-health"
+                / "linkage-products-soda-checks.yml")
+        cid = ("data-asset-1.department-of-health.linkage-products.linkage-keys."
+               "linkage_key.large_key_groups_soda")
+        metric, warn, fail = check_bands.soda_bounds(path)[cid]
+        assert metric == "large_key_group_percent"
+        assert [(b.op, b.value, b.unit) for b in warn] == [(">", 2.0, check_bands.PERCENT)]
+        assert [(b.op, b.value, b.unit) for b in fail] == [(">", 4.0, check_bands.PERCENT)]

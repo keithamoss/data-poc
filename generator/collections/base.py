@@ -95,6 +95,10 @@ class Provider:
     #: collection's correction alters (REQ-GEN-237 criterion 3) - one asked
     #: by generator/correction_claims.py, so its claim check knows.
     suppresses_others_corrections: bool = False
+    #: Collections whose providers this one reads, through
+    #: generated_supplies (REQ-GEN-334 criterion 6) - none for a provider
+    #: standing alone.
+    depends_on: tuple[str, ...] = ()
 
     @property
     def run_prefix(self) -> str:
@@ -157,7 +161,56 @@ class Provider:
     def after_slot(self, plan: Plan, job: Job, deliveries: list) -> None:
         """Called once a slot's arrivals are written."""
 
+    def table_rows(self, delivery_obj, table: str):
+        """The rows of `table` in one generated arrival, or None where it
+        carries none - a one-table provider's payload is the table itself."""
+        payload = delivery_obj.payload
+        if isinstance(payload, dict):
+            return payload.get(table)
+        return payload
+
     def extra_placements(self, plan: Plan) -> list:
         """Placements recorded beside the injected ones (Child Protection's
         inheritance scenarios)."""
         return []
+
+
+@dataclass(frozen=True)
+class GeneratedSupply:
+    """One supply a provider generates, as another provider reads it
+    (REQ-GEN-334 criterion 6): the period it is FILED to, its receipt
+    instant, and the rows of one of its tables."""
+
+    period: str
+    received_at: str
+    rows: Any
+
+
+def generated_supplies(provider: "Provider", dataset_id: str) -> list[GeneratedSupply]:
+    """THE DECLARED ROW INTERFACE (REQ-GEN-334 criterion 6): every supply
+    `provider` generates for `dataset_id`, keyed by the period it is filed to
+    and its receipt instant, oldest first - made by the same plan and hooks
+    the driver writes from, in memory, never by reading data/deliveries.
+
+    Generic: it runs the driver's own hook order without writing, so a
+    provider needs nothing of its own beyond `table_rows`."""
+    from qa_tools.common import hierarchy
+
+    table = hierarchy.dataset(dataset_id).table
+    plan = provider.plan()
+    out, written = [], 0
+    for job in plan.jobs:
+        deliveries = provider.slot(plan, job)
+        if deliveries is None:
+            continue
+        entries = provider.entries(plan, job, deliveries, written)
+        written += len(entries)
+        for n, (delivery_obj, entry) in enumerate(zip(deliveries, entries), start=1):
+            received = provider.received_at(plan, job, n, delivery_obj, entry)
+            rows = provider.table_rows(delivery_obj, table)
+            if rows is not None:
+                out.append(GeneratedSupply(job.period.name, received, rows))
+    from qa_tools.common import asset_time
+
+    return sorted(out, key=lambda s: asset_time.parse_instant(s.received_at, "a receipt"))
+

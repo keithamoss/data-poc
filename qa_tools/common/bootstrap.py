@@ -185,7 +185,8 @@ def bootstrap(collection: str = "all", force: bool = False,
     # part-way through, after the collections before it.
     from qa_tools import collections as _collections
 
-    for name in [n for n in _shorts() if collection in ("all", n)]:
+    chosen = with_what_it_reads([n for n in _shorts() if collection in ("all", n)], say)
+    for name in chosen:
         try:
             _adapter(name)
         except _collections.NoAdapterError as exc:
@@ -196,7 +197,7 @@ def bootstrap(collection: str = "all", force: bool = False,
     # whose calendar cannot be resolved is refused before anything is
     # generated, naming the collection and the dataset.
     try:
-        groups = streams([n for n in _shorts() if collection in ("all", n)])
+        groups = streams(chosen)
     except StreamRefused as exc:
         return BootstrapResult(populated=False, staged_before=0, staged_after=0,
                                refused=True, reason=str(exc))
@@ -246,7 +247,7 @@ def bootstrap(collection: str = "all", force: bool = False,
         # pull in all four QA tools, several seconds of import time that a
         # caller only checking `already_populated()` should not pay.
         started = time.monotonic()
-        names = [n for n in _shorts() if collection in ("all", n)]
+        names = chosen
 
         if checkpoint_before is not None or len(names) < 2:
             # ONE COLLECTION - what a checkpoint, and a one-collection
@@ -313,6 +314,33 @@ def bootstrap(collection: str = "all", force: bool = False,
 def _collection(short: str):
     from qa_tools import collections
     return collections.by_short(short)
+
+
+def with_what_it_reads(names: list[str], say=lambda _m: None) -> list[str]:
+    """`names` and every collection whose tables their checks read, in
+    registry order (REQ-PIPE-336 criterion 7; Keith, 2026-10-30: added
+    automatically, and said). A partial bootstrap of a collection reading
+    others would otherwise read every one of their tables as absent and
+    record a whole history of could-not-run reds."""
+    from qa_tools.common import hierarchy, run_reads
+
+    wanted = set(names)
+    why: dict[str, set[str]] = {}
+    for name in names:
+        for table in run_reads.reads_for(_collection(name).id).foreign:
+            other = _collection_short(hierarchy.dataset_for_table(table).collection_id)
+            if other not in wanted:
+                why.setdefault(other, set()).add(name)
+    for other, readers in sorted(why.items()):
+        say(f"Adding {_label(other)}: {', '.join(_label(r) for r in sorted(readers))}'s "
+            f"checks read its tables")
+    wanted |= set(why)
+    return [n for n in _shorts() if n in wanted]
+
+
+def _collection_short(collection_id: str) -> str:
+    from qa_tools import collections
+    return collections.by_id(collection_id).short
 
 
 def _shorts() -> list[str]:

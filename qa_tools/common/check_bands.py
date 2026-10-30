@@ -288,6 +288,11 @@ def soda_bounds(path: Path) -> dict[str, tuple]:
                 metric, unit = "row_count", TABLE_ROWS
             elif expr.startswith("failed rows") or expr.startswith("values in"):
                 metric, unit = ("failed_rows" if expr.startswith("failed") else "reference"), ROWS
+            elif re.fullmatch(r"[a-z_]+", expr) and f"{expr} query" in cfg:
+                # A USER-DEFINED METRIC (REQ-QAC-333): its unit is what its
+                # attributes say it measures.
+                metric = expr
+                unit = PERCENT if (cfg.get("attributes") or {}).get("unit") == "percent" else ROWS
             else:
                 raise CatalogueError(f"{where}: no band can be read from a {expr!r} check")
             warn = _soda_when(cfg.get("warn"), unit, where)

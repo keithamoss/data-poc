@@ -468,19 +468,20 @@ collections:
               author: REQ-QAC-330
               change: >-
                 A linkage product is its round's own period's release, so its files go into the period they arrive in. Stated from its first round.
-    # Owed from the first quarter any linked dataset's history holds, due 14:00
-    # (PROVISIONAL, REQ-GEN-334 criterion 8) - after Emergency Department's
-    # morning arrivals for the quarter - with 8 hours' grace as its neighbours.
+    # Owed from the first quarter any linked dataset's history holds, due 18:00
+    # (PROVISIONAL, REQ-GEN-334 criterion 8; Keith 2026-10-30 moved it from
+    # 14:00) - after Emergency Department's arrivals for the quarter, which
+    # land 15:00 to 17:00 - with 8 hours' grace as its neighbours.
     participation_defaults:
       versions:
         - effective_from: "2013-01-01"
-          expected_time: "14:00"
+          expected_time: "18:00"
           grace: 8h
           changelog:
             - date: "2026-10-30"
               author: REQ-QAC-330
               change: >-
-                Linkage Products owes a release every quarter from 2013-01-01, due at 14:00 with 8 hours' grace.
+                Linkage Products owes a release every quarter from 2013-01-01, due at 18:00 with 8 hours' grace - after Emergency Department's afternoon arrivals, which it reads.
 
 # ---------------------------------------------------------------------
 # EACH DATASET'S PARTICIPATION, as effective-dated versions. A version
