@@ -307,6 +307,13 @@ def referential_name(d: dict) -> str:
     return f"{d['name']} links match a record"
 
 
+def _text(column: str) -> str:
+    """BOTH SIDES AS TEXT. REQ-QAC-333 criterion 3 casts the source column;
+    the linkage file's own id columns are typed by staging's inference, so
+    id_3 holding only episode numbers stages as a number and is cast too."""
+    return f"CAST({column} AS TEXT)"
+
+
 def _product_soda() -> str:
     """REQ-QAC-333's shape, generated from the linked datasets: own-row checks
     (1) to (5), then a referential and a coverage check per linked dataset."""
@@ -316,13 +323,13 @@ def _product_soda() -> str:
     counts = {d["code"]: len(d["id_columns"]) for d in ds}
 
     def missing(cols):
-        return " OR ".join(f"{c} IS NULL OR TRIM({c}) = ''" for c in cols)
+        return " OR ".join(f"{c} IS NULL OR TRIM({_text(c)}) = ''" for c in cols)
 
     expected = "\n   OR ".join(f"(dataset = '{d['code']}' AND ({missing(_id_cols(len(d['id_columns'])))}))"
                               for d in ds)
     surplus = "\n   OR ".join(
         f"(dataset = '{d['code']}' AND ("
-        + " OR ".join(f"COALESCE(TRIM(id_{j}), '') <> ''"
+        + " OR ".join(f"COALESCE(TRIM({_text(f'id_{j}')}), '') <> ''"
                       for j in range(len(d["id_columns"]) + 1, N_ID + 1)) + "))"
         for d in ds if len(d["id_columns"]) < N_ID)
     checks = [
@@ -365,8 +372,10 @@ def _product_soda() -> str:
     ]
     for d in ds:
         cols = d["id_columns"]
-        on_src = " AND ".join(f"CAST(s.{c} AS TEXT) = l.id_{j}" for j, c in enumerate(cols, 1))
-        on_cov = " AND ".join(f"l.id_{j} = CAST(s.{c} AS TEXT)" for j, c in enumerate(cols, 1))
+        on_src = " AND ".join(f"{_text('s.' + c)} = {_text(f'l.id_{j}')}"
+                              for j, c in enumerate(cols, 1))
+        on_cov = " AND ".join(f"{_text(f'l.id_{j}')} = {_text('s.' + c)}"
+                              for j, c in enumerate(cols, 1))
         lid = ", ".join(_id_cols(len(cols)))
         common = {"reads_tables": [d["table"]], "linked_dataset": d["id"],
                   "linkage_code": d["code"], "id_columns": cols,
@@ -424,7 +433,7 @@ import csv
 import hashlib
 import io
 from dataclasses import dataclass, field
-from datetime import date, datetime, time
+from datetime import date
 
 from generator.collections.base import Job, Plan, Provider
 
@@ -475,9 +484,6 @@ class _Product(Provider):
                    for d, _c, _x in linked()}}
         return Plan(jobs=[Job("lkp_slot_01", SEED + 1, None, p) for p in self.generated_periods()],
                     state={{"sources": sources}})
-
-    def _at(self, job):
-        return datetime.combine(job.period.round_date, time(17, 5))
 
     def slot(self, plan, job):
         from qa_tools.common import asset_time
