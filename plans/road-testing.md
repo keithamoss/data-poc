@@ -539,6 +539,19 @@ Still to settle by driving the page: #8 and #17 - both since closed
 - **We noticed:** The geocoding checks treat a missing census-year row as red, but nothing yet says how an address that could not be geocoded arrives.
 - **What we heard:** Ask how "could not be geocoded" is represented and handled before the geocoding checks are settled.
 
+32. **[todo, 2026-10-30]** **[Dashboard UI]** **[QA checks & contract]** **The
+    two coverage checks show their metric names.** Noticed by the agent
+    writing REQ-DASH-337's browser tests, against a dashboard built from
+    lp_boot. On the Linkage Keys page, the coverage checks read
+    `cp_clients_coverage_percent` and `ed_presentations_coverage_percent`
+    on both their cards and their grid rows. Every other check there has a
+    prose name ("Client Register links match a client"). Not yet looked
+    into: whether the Soda check needs a `name:`, or the page should fall
+    back to something better than the metric.
+
+- **We noticed:** Two Linkage Keys checks are labelled with raw metric names, such as cp_clients_coverage_percent, where every other check has a readable name.
+- **What we heard:** Not yet raised with Keith.
+
 ## Landed entries, kept as feedback cards (REQ-DOCS-219)
 
 Card-only entries: what was raised and what came of it. #1 and #2 landed
