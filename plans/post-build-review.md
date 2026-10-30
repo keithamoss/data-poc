@@ -13010,3 +13010,59 @@ twice. It deliberately did not re-find the `TypeError`.
        scenario entries. The critic agreed with known item (1), adding that
        Birth Registrations generation now also depends on the CP and ED
        providers succeeding.
+
+289. **[in-progress, 2026-10-30]** **[Dashboard UI]** **REQ-DASH-337 UX and visual
+     critic (delivery-dashboard-ux-critic), on a dashboard built from
+     lp_boot, ~23:30.** Driven with Python Playwright because the
+     Playwright MCP server did not connect. It confirmed criteria 1, 2, 6,
+     7, 9, 10, 13 and 14 render as specified. The defects below are being
+     fixed test-first by a dashboard fixer in off-wt; each is the critic's
+     claim until it is re-verified.
+     - **D1 (HIGH, c3/c8)**: ED Presentations' own page never shows the
+       linkage verdict about its own supply. On 2026-10-30 Linkage Keys
+       reads ED coverage as Warn 85.6%, while the ED page reads Pass 92.1%
+       from a 2013 linkage supply that was promoted later. On every other
+       date the ED page shows bare "No data", never "Not yet checked". The
+       agency page repeats the split.
+     - **D2 (HIGH, c13)**: the run comparison ignores the recorded
+       direction, so a coverage drop of 8pt reads "Better than the previous
+       run".
+     - **D3 (MEDIUM)**: closing a check panel collapses every group the
+       reader opened, and focus drops to `<body>` (the focus part predates
+       this build).
+     - **D4 (MEDIUM)**: the cross-table section pill reads "No data" while
+       its own rows and groups are coloured.
+     - **D5 (MEDIUM)**: the could-not-run sentence calls a rejected period
+       "overdue" and promises a re-run that cannot happen. "No promoted
+       Child Protection's ..." is clumsy.
+     - **D6 (LOW)**: the amber tag reads "the promote of".
+     - **D7 (LOW)**: the direction line overflows at 390px.
+     - **D8 (LOW, polish)**:
+       - the marks legend has no "!";
+       - "Warn" has no amber colour;
+       - the heading links are 14px tall;
+       - the trend axis labels overprint;
+       - a not-evaluated point is drawn as a 0% dip;
+       - "Linkage Keys's" appears in the run picker.
+     - **QUESTIONS FOR KEITH (judgement calls, not built)**:
+       - **J1**: the cp_clients page almost never shows a real linkage
+         result. Child Protection's next supply lands at 9am on the 1st and
+         linkage reads the previous one at about 5:30pm, so the supply on
+         show is nearly always "Not yet checked". The amber or red tag is
+         the only signal, and a linkage warn on an already-red supply is
+         invisible there.
+       - **J2**: "Not yet checked ..." is the heaviest text in its row.
+       - **J3**: left-out checks leave their collection group, so groups
+         change shape from period to period, and "Not supplied" doesn't
+         say whose supply.
+       - **J4**: the agency page's collection panels say "between two
+         tables in this collection" for a cross-collection check, and do
+         not group by collection.
+     - **PROVISIONAL readings, judged by the critic**:
+       - keep the possessive cause names, the no-promoted period and the
+         due time;
+       - grouping a check that involves two other collections under the
+         first is acceptable for now, though the second collection's
+         heading would under-count at thirty collections;
+       - results without a direction: consider "amber at x" rather than
+         "warn > x".
