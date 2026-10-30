@@ -12791,3 +12791,89 @@ twice. It deliberately did not re-find the `TypeError`.
      several files of one delivery arriving together, asserting identical
      promotedHealth - then the fix. Until it is fixed, REQ-PIPE-254
      criterion 13's evidence names it as a harness gap (Keith, W3 option b).
+
+286. **[done, 2026-10-30]** **[Pipeline & publishing]** **[Testing & dev tooling]**
+     **The delivery-critic on the period-offset batch (REQ-PIPE-320 to 324,
+     REQ-GEN-325), and what was done about each finding.** Every defect below
+     was fixed test-first (the test seen failing against the code it found,
+     then passing), in tests/test_files_go_to_period_change.py,
+     test_files_go_to_period_gate.py, test_days_before_bound.py,
+     test_offset_group_inheritance.py, test_runway.py, test_verdict_record.py
+     and tests-js/files-go-to-period.test.js.
+     1. HIGH, the time route ran ahead of an offset group's own filing (323
+        c2, c3): groups were made when the round's claim window opened, so 41
+        of Emergency Department's offset-0 groups in off_boot were recorded by
+        Child Protection's step. KEITH DECIDED (2026-10-30, "by time at the
+        due instant"): a group is made by time only once its own slot's due
+        instant has passed with nothing filed at that offset; until then a
+        reader at another offset sees what is promoted now. BUILT, plus one
+        PROVISIONAL refinement found by the parallel/sequential equivalence
+        test: the trigger is an arrival STRICTLY AFTER the due instant. An
+        on-time supply arrives at the due instant itself, where arrivals tie
+        and the merged stream may break the tie differently in parallel; with
+        `>=` the two modes recorded different inherit-refused rows (33 vs 35
+        decisions). Tried and REJECTED on the way: letting an arrival make
+        only its own collection's group - deterministic, but it broke the case
+        the time route exists for (ED's 2015-Q4 gap has no ED arrival in its
+        round, so only another collection's can carry ED forward). Route text
+        is now "due instant passed".
+     2. round_of ignored participation after a fall (321 c2, 322 c3): it now
+        takes the earliest round reaching the period that the dataset takes
+        part in, as its slots do, falling back to the calendar's earliest only
+        where it takes part in none (the round a not-owed reason names). So a
+        February-and-August dataset's Q3 after a fall is filled from August,
+        and fall_hold no longer calls it doubly fed.
+     3. 29 February: fall_hold's two-year horizon used day.replace(year+2).
+        The same defect was in four slot look-up horizons from now
+        (slots.slot_named, placing twice, turned_off), which would have raised
+        on every look-up on 29 February 2028. One slots.lookup_horizon() now,
+        moving 29 February to 1 March; fall_hold looks ahead 731 days.
+     4. days_before checked rounds a dataset takes no part in (324 c1): only
+        its own rounds are checked now, each still against the calendar round
+        just before it (PROVISIONAL reading of "the round before it" - the
+        conservative one; measuring against its own previous round would let a
+        February-and-August dataset reach back across two other rounds).
+     5. 320 c1's information line was not built: the gate now prints, as
+        information, "Child Protection: files go into the next period from 1
+        January 2015, which takes effect from the 2 February 2015 round" (and
+        ED's, from the 11 February 2013 round).
+     6. The rise check and the fall lines used one calendar per collection:
+        both now walk every calendar a collection's datasets name, each with
+        its own rounds and its own datasets, naming the calendar where there
+        is more than one. Tested through fall_lines with a second authored
+        calendar twenty days later; the rise split shares the same helper and
+        is covered by reading, not by its own test.
+     7. 322 c2's ready-to-paste entry was shaped `cp-clients:` rather than the
+        `- id: cp-clients` list entry contract/calendar.yaml holds, and now
+        says it goes into each dataset's existing entry. NOT DONE, for Keith:
+        combining the freeze refusal into the same numbered list - step 2
+        remains generic text pointing at preview-correction, and
+        agreement_freeze still refuses separately. Small, but it changes what
+        a person is told to do, so it waits for his word.
+     8. A doubly-fed hold's "round" was the round the supply arrived in, not
+        the round the change took effect from (322 c3): the record now carries
+        both ("round" and "from_round"), and the words on the page, the
+        filing TUI's grouping and held_words name the change's. A verdict's
+        inputs.period_date holds the ROUND's date (321 c12): the period it
+        fills is now recorded beside it as "fills", only at a value other than
+        0, so every verdict recorded at 0 reads exactly as before.
+     9. Messages: the runway warning named the last slot by its period's date
+        ("2027-Q4 on 2027-11-01"); it now reads "its own last is 2027-Q4, due
+        on the 1 August 2027 round". Three months read "February and May and
+        August"; they read "February, May and August". REQ-PIPE-321's open
+        question about batch item 32 is closed in the register (the after
+        bootstrap matched it exactly and it was applied).
+     10. 1.5 was refused only by the schema, under a path of indices: it now
+        names "collection 'child-protection', the version effective
+        2000-01-01" and asks for "a whole number of periods". Two versions on
+        one effective_from were accepted silently; they are refused.
+     Test gaps closed: 322 c8's success path (placing into 2026-Q3 is
+     planned), 320 c3's hierarchy case, 320 c5. STILL WEAK, said rather than
+     rounded off: 323 c7/c8 - make_group is driven with route strings, and
+     no re-file, placement, settle or explicit-open route is driven end to
+     end. Also found by this session, not the critic: periodOpenedOn read
+     every period with no embedded slot as not yet opened, so every Child
+     Protection period before the authored calendar's first round (2013-Q1
+     to 2015-Q1) said "had not opened" - fixed test-first
+     (tests-js/files-go-to-period.test.js) before the e2e class that caught
+     it went green.

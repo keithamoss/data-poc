@@ -119,117 +119,14 @@ requirements:
 Still to settle by driving the page: #8 and #17 - both since closed
 (2026-10-12 and 2026-10-13).
 
-3. **[todo, 2026-09-24]** **[Pipeline & publishing]** **A
+3. **[done, 2026-10-30]** **[Pipeline & publishing]** **A
    collection whose files go into the period AFTER the one they arrive
-   in.** Restated by Keith 2026-10-25 (below); the original wording -
-   data arriving in January fills Q2, not Q1, a per-dataset property -
-   was read too narrowly.
+   in.**
 
 - **You told us:** Most files arrive not yet linked and belong to the next period's release; files already linked belong to the current period.
 - **What we heard:** Which period a collection's files go into - this one, or N after - is a property of the collection, with "next period" the usual case.
-
-   **RESTATED BY KEITH, 2026-10-25 - this supersedes the reading below and
-   the scoper drafts REQ-*-320 to 324, which are not applicable.** In
-   production there are two classes of files, often from one supplier and
-   arriving around the same time. NOT-YET-LINKED files - most suppliers,
-   roughly 70-80% of files - go into the NEXT period: a file arriving on
-   1 February belongs to the next period because the linkage product for
-   that period, produced about three months later, is that period's
-   release. ALREADY-LINKED files go into the CURRENT period. A COLLECTION
-   ALWAYS GOES TO THE SAME PERIOD. The offset is +1 today and could be +2 or
-   more in future. Linkage products are a SEPARATE dataset with their own
-   files, never replacing the data already loaded, and they WILL have
-   cross-table checks with the data in that period. There are no checks
-   across periods, and none are in scope. For the synthetic history:
-   Department of Health (Emergency Department) goes into the current
-   period; every other collection goes into the next - "that's how it
-   works in production now". Keith asked how to model it: a configuration
-   flag or something else. KEITH'S ANSWERS, 2026-10-25: Birth Registrations'
-   daily supply really stands in for a separate data asset, kept in this
-   one for now, and goes into the CURRENT period - so in the synthetic
-   history only Child Protection goes into the next period. A synthetic
-   linkage dataset is wanted, at DATA ASSET level (Keith corrected
-   "dataset level" the same evening), its cross-table checks internal to
-   the period, in a linkage-products collection of its own within
-   Department of Health, and is SCOPED SEPARATELY. A change of a collection's offset is refused until a
-   period is declared not owed. The page names the period, e.g. "For
-   2026-Q2 - received 1 Feb".
-
-   **From the road-test participant, not Keith** (Keith, 2026-10-25): the "Keith's own ask" below records who relayed it.
-
-   **The DESIGN QUESTION is settled; the WORK is not, and is
-   deliberately not in these sprints.** Corrected 2026-09-24 after this
-   entry was briefly marked done at `REQ-PIPE-062`'s sign-off - the
-   sign-off resolved how it fits the model, which is not the same as
-   building it. Keith's own placement: "that can go into the future log
-   in the road testing plan file".
-
-   **What is settled** (recorded on `REQ-PIPE-062`): it is NOT an
-   exception to criterion 5, which stays absolute. The SCHEDULE
-   expresses it, not the rule - that dataset's slot for the following
-   period carries a due instant and claim window already open when the
-   supply arrives, so nothing claims forward. Slots are already
-   per-dataset, so no new configuration axis is needed. Same mechanism
-   as the daily-cutoff and arrives-a-week-early cases that requirement
-   deleted.
-
-   **What is NOT built**: nothing declares, per dataset, that its
-   supplies are for the following period, and nothing generates its
-   slot calendar accordingly. Today a dataset's slots are derived on
-   the assumption that a period's supply arrives within that period.
-
-   **NAME COLLISION - do not merge this with `plans/supply-model.md`
-   sprint 25.** Keith used "carry forward" for both on 2026-09-24, and
-   they share a phrase and nothing else. Sprint 25 is a HUMAN DECISION
-   that a supply is never coming, pointing a period's view at the last
-   green supply so downstream consumers have something to query. THIS
-   is a SCHEDULING PROPERTY of a healthy, punctual dataset. Sprint 25
-   is being renamed for exactly this reason (backfill or patch are his
-   candidates); this entry should not inherit whichever name it loses. Keith's own ask, 2026-09-24. Some
-   datasets' supplies are for the period they arrive in; others' are
-   for the following one. His own framing: "does it appear in a slot in
-   this period, or does it need to go into a slot in the next period?"
-   - and it is configured at DATASET level, which he chose over
-   collection level so that one rule applies consistently even where a
-   whole collection happens to share it.
-
-   **Logged here because he raised it here, but it is NOT a road-testing
-   sighting** - it is a supply-model design question, and it collides
-   directly with a requirement that is drafted and not yet signed.
-   `REQ-PIPE-062` criterion 5 says the system SHALL NOT assign a supply
-   to a slot whose claim window has not opened, "under any rule or any
-   circumstance". A dataset whose deliveries are FOR the next period is
-   doing exactly that, under the current wording.
-
-   **The distinction that probably resolves it, and it is not yet
-   settled.** Criterion 5 exists to stop a LATE supply being
-   misattributed forward to a slot that has not come due, which would
-   silently mark a future obligation as met. A per-dataset "supplies
-   are for the following period" offset is a different thing: it moves
-   where the dataset's period BOUNDARY sits relative to arrival, rather
-   than letting an arbitrary arrival claim ahead. If that reading
-   holds, this is a property of the slot calendar rather than an
-   exception to the assignment rule - and criterion 5 stays absolute,
-   which is worth preserving, because an absolute rule with one
-   exception is how forward-claiming comes back.
-
-   **Not yet checked**: whether this is the same idea as
-   `contract/data-asset.yaml`'s existing `as_of_offset_days`, which is a
-   VIEWING offset and data-asset-level rather than per-dataset, or a
-   genuinely separate concept that merely rhymes with it. They must not
-   be conflated by accident.
-
-   **REOPENED 2026-10-12 (Keith).** A sweep that day deleted this entry as
-   fixed by REQ-PIPE-167 (built 2026-10-07: a participation's `days_before`
-   moves a slot's due instant ahead of its period's date). Keith: "that's
-   literally talking about data that needs to be arriving now, but going
-   into the next period schema. It's an entirely different concept that we
-   need to scope. It shouldn't be closed." So this is NOT done, and it
-   needs scoping with him - starting with how it differs from what
-   REQ-PIPE-167 built, so the scoping says exactly what that requirement
-   does not cover. No Child Protection or Birth Registrations dataset uses
-   `days_before` today.
-
+- **What we built:** Each collection now says which period its files go into, Child Protection's into the next one, and the page and the terminal name the period every supply and slot is for.
+- **Evidence:** REQ-PIPE-320
 
 4. **[todo, 2026-09-24]** **[QA checks & contract]** **Cardinality
    drift - watch how many distinct values a column has, not which ones

@@ -45051,7 +45051,7 @@ requirements:
     date_written: '2026-10-25'
     story: As the person who looks after the delivery agreement for a quarterly asset of thirty collections, I want each collection to state once whether the files arriving in a round go into that round's period or the period N after it, so that not-yet-linked collections fill the period whose linkage release they become and already-linked collections fill the current one, and no dataset can quietly disagree with its siblings.
     moscow: must
-    status: in_progress
+    status: built
     signed_off:
       by: Keith
       date: '2026-10-30'
@@ -45100,13 +45100,35 @@ requirements:
     - NO CHECKS ACROSS PERIODS, AND NONE IN SCOPE (Keith, 2026-10-25).
     - NAME COLLISIONS, recorded so they are not re-made. Not plans/supply-model.md sprint 25's carry forward (a person's decision that a supply is never coming - Keith's alternative names backfill or patch). Not as_of_offset_days, removed 2026-09-17. Not slots.relative_period's offset argument, which is why the key is files_go_to_period.
     - BIRTH REGISTRATIONS IS CURRENT-PERIOD (Keith, 2026-10-25) - its daily supply really stands in for a separate data asset, kept in this one for now. So in the synthetic history only Child Protection goes into the next period, Emergency Department and Birth Registrations into the current one.
+    - 'A VALUE THAT IS NOT A WHOLE NUMBER IS REFUSED NAMING THE COLLECTION AND THE VERSION (post-build-review #286 item 10), never a schema path of indices; TWO VERSIONS ON ONE effective_from ARE REFUSED, which would otherwise leave which is in force to the order they are written in.'
     open_questions: []
+    implemented_by:
+    - qa_tools/common/agreement.py::Agreement::files_go_to_period
+    - qa_tools/common/agreement.py::Agreement::files_go_to_period_for
+    - qa_tools/common/agreement.py::_offset_versions
+    - qa_tools/common/validate_schedule.py::_files_go_to_period_errors
+    - contract/calendar.yaml
+    linked_tests:
+    - tests/test_files_go_to_period_gate.py::TestANegativeValueIsRefused::test_a_fraction_is_refused_naming_the_collection_and_the_version
+    - tests/test_files_go_to_period_gate.py::TestTwoVersionsOnOneDateAreRefused::test_refused_naming_the_date
+    - tests/test_files_go_to_period_gate.py::TestItBelongsToTheCollection::test_any_level_of_the_hierarchy_stating_it_is_refused
+    - tests/test_files_go_to_period_gate.py::TestACollectionWithNoCalendar::test_stating_it_is_refused_saying_there_are_no_periods
+    - tests/test_files_go_to_period_change.py::test_the_gate_names_the_round_a_version_takes_effect_from
+    - tests/test_files_go_to_period_gate.py::TestTheValuesTheBatchStates::test_the_intended_values_pass
+    - tests/test_files_go_to_period_gate.py::TestItBelongsToTheCollection::test_a_dataset_entry_stating_it_is_refused_naming_the_collection
+    - tests/test_files_go_to_period_gate.py::TestEveryCollectionOnACalendarStatesIt::test_a_collection_with_none_is_refused_naming_its_first_round
+    - tests/test_files_go_to_period_gate.py::TestACadenceRuleCalendarKeepsDaysBefore::test_a_non_zero_value_on_the_daily_calendar_is_refused
+    - tests/test_files_go_to_period_gate.py::TestANegativeValueIsRefused::test_minus_one_is_refused
+    - tests/test_files_go_to_period_gate.py::TestAdoptingTheKeyOnFrozenHistory::test_a_first_version_at_one_over_frozen_rounds_needs_a_correction_on_a_real_asset
+    - tests/test_files_go_to_period.py::TestTheValueIsReadFromTheCollection::test_the_value_is_resolved_on_the_round_date
+    evidence:
+    - '2026-10-30, tree 1effa85: the offset test modules (test_files_go_to_period, _gate, _change, test_days_before_bound, test_offset_group_inheritance, test_files_go_terminal, test_runway, test_verdict_record, test_agreement_drift, test_calendar_move_pin, test_scripted_decisions, test_embed_dashboard_data, test_cli_schedule, test_correction_trial) 336 passed; the schedule gate on the real contract prints the criterion 1 information line for Child Protection (from the 2 February 2015 round) and Emergency Department (from the 11 February 2013 round). The full gate runs before the push.'
   - id: REQ-PIPE-321
     title: At files_go_to_period N a round's files fill the period N after it - the slot is due on that round, and every arrival setting is resolved on that round's date
     date_written: '2026-10-25'
     story: As an agency data owner whose files arrive not yet linked, I want my 1 February files filed to the period whose release they become and judged on time against 1 February, by the settings in force on 1 February, so that the period they belong to holds them and the period they happened to arrive in is not reported as having them.
     moscow: must
-    status: in_progress
+    status: built
     signed_off:
       by: Keith
       date: '2026-10-30'
@@ -45198,14 +45220,33 @@ requirements:
     - 'THE AMENDMENT BATCH, 42 of 44 - REQ-DASH-182 criterion 6: "THE SYSTEM SHALL NOT show periods before the first period a dataset''s first participating round fills (REQ-PIPE-321 criterion 5) as owed-nothing rows, nor as ''No supply''. AMENDED <date applied> by REQ-DASH-326." The dashboard review''s notSuppliedWord finding: a never-owed first quarter would read ''No supply''.'
     - 'THE AMENDMENT BATCH, 43 of 44 - REQ-DASH-182 criterion 7: "WHERE a dataset''s supply is due on an earlier day than the date of the round it is due on (days_before above 0), THE SYSTEM SHALL say so in the delivery-time label on the SLA tile - ''by 22:00 the day before'' where it is one day, ''by 22:00, N days before each date'' where it is more - SHALL NOT show the time alone, and SHALL have a test of each of the two forms. AMENDED <date applied> by REQ-DASH-326."'
     - 'THE AMENDMENT BATCH, 44 of 44 - REQ-DASH-182 criterion 15: "THE SYSTEM SHALL NOT show a dataset as stale, as ''No data'', or with the line ''nothing has landed yet in this dataset''s current expected cycle'' - on its page or in its collection table - because the period current on the date on show is one it owes nothing in by participation or by not_expected, and SHALL show the verdict of the supply in place as for any dataset between deliveries; THE SYSTEM SHALL have a real-browser test against the built dashboard, a REGRESSION GUARD that passes on today''s page, holding this for cp-case-workers on a date at which its current cycle (REQ-DASH-326 criterion 5) is a period it owes nothing in - after the claim window of a May or November round opens and before the next round''s - after its first supply, asserting first that the date is one the dataset owes nothing in, so that the test cannot pass vacuously - and a tests-js test holding the same for a not_expected period. AMENDED <date applied> by REQ-DASH-326." At 1 cp-case-workers owes nothing in Q1 and Q3, which its May and November rounds fill, so the guard keeps its meaning.'
-    open_questions:
-    - Batch item 32 (REQ-PIPE-262 criterion 12) is a PREDICTION of the renamed pin, not a text any run has produced. Keith to say whether he signs it with the batch, to be applied only if the after-bootstrap matches exactly, or would rather it came to him after the bootstrap under REQ-GEN-325 criterion 8 like any other moved pin. O-A3 covers built-criterion amendments; it did not say whether a bootstrap-dependent one belongs in the one sign-off.
+    - 'round_of PREFERS A ROUND THE DATASET TAKES PART IN (post-build-review #286 item 2): after a fall, the earliest round reaching the period that the dataset supplies in, as its slots count; the calendar''s earliest only where it supplies in none, which is the round a not-owed reason names.'
+    - 'THE PERIOD A VERDICT''S SLOT FILLS IS RECORDED AS inputs.fills (post-build-review #286 item 8), beside period_date, which holds the round''s date - only at a value other than 0, so every verdict recorded at 0 reads exactly as before.'
+    implemented_by:
+    - qa_tools/common/schedule.py::round_of
+    - qa_tools/common/schedule.py::period_filled_by
+    - qa_tools/common/slots.py::slot_instants
+    - qa_tools/common/slots.py::slots_for_dataset
+    - qa_tools/common/inheritance.py::offset_group
+    linked_tests:
+    - tests/test_files_go_to_period_change.py::TestTheRoundFillingAPeriodAgreesWithTheSlotsAfterAFall::test_round_of_is_the_round_its_slot_is_on
+    - tests/test_verdict_record.py::TestRecordedWithItsInputs::test_a_filing_records_a_verdict_with_the_slots_resolved_inputs
+    - tests/test_runway.py::TestTheNumberCanBeCheckedAgainstTheFile::test_the_last_slot_is_named_by_the_round_it_is_due_on
+    - tests/test_files_go_to_period.py::TestARoundsSlotFillsThePeriodAfterIt::test_the_february_round_opens_2026_q2s_slot_due_on_1_february
+    - tests/test_files_go_to_period.py::TestARoundsSlotFillsThePeriodAfterIt::test_2026_q2_closes_when_the_1_may_rounds_claim_window_opens
+    - tests/test_files_go_to_period.py::TestARoundsSlotFillsThePeriodAfterIt::test_the_period_before_the_first_round_fills_is_not_yet_owing
+    - tests/test_files_go_to_period.py::TestTwoCollectionsReceivingOnOneDay::test_they_file_into_consecutive_periods
+    - tests/test_files_go_to_period.py::TestAtZeroNothingMoves::test_every_slot_at_zero_matches_the_real_agreement
+    - tests/test_files_go_to_period.py::TestATurnedOffGapIsJudgedOnTheRound::test_the_period_a_gap_round_fills_is_in_the_gap
+    - tests/test_calendar_move_pin.py::test_every_dataset_computes_what_it_did_before_the_move
+    evidence:
+    - '2026-10-30, tree 1effa85: the same 336 passed, including round_of agreeing with the slots after a fall (post-build-review #286 item 2). A bootstrap from empty on a scratch database (off_boot, 24m06s) matched every targeted verdict and batch item 32''s predicted inheritances; the on-demand equivalence tests (parallel against sequential, checkpoint resume, ED''s 2015-Q4 gap) 8 passed on the due-instant time route.'
   - id: REQ-PIPE-322
     title: A collection's files_go_to_period changes from a round - a rise is refused until the period it skips is declared not owed, and a fall is accepted with the doubly-fed period's later round held for a person
     date_written: '2026-10-25'
     story: As the person who looks after a delivery agreement, I want a rise in a collection's files_go_to_period refused until I have said which period it skips, and a fall accepted with the files that would feed one period twice held for a person, so that switching between current-period and next-period files never leaves a period silently empty and never lets the open-slot rule decide which of two rounds' files a period keeps.
     moscow: must
-    status: in_progress
+    status: built
     signed_off:
       by: Keith
       date: '2026-10-30'
@@ -45243,13 +45284,42 @@ requirements:
     - VISIBLE AT CONFIG TIME (Keith, 2026-10-29, O-C4 option c). An accepted fall prints an information line naming the doubly-fed period and the held round (criterion 10); `mothman schedule show` marks the held round (REQ-PIPE-327 criterion 7); and draft-correction prints a rise's not_expected entries up front (criterion 11). This settles v4's open question - the information line is now a criterion. REJECTED (O-C4 option a) nothing beyond the rise refusal, and (b) the information line and schedule mark without the draft.
     - ONE REFUSAL PER VERSION, COMBINED WITH THE FREEZE STEPS, AND NO PLACEHOLDER LEFT IN (v5, criteria 2 and 12; CLI UX review). A rise over frozen rounds would otherwise produce a not-owed refusal and a freeze refusal for the same edit, read as two problems; and a pasted placeholder reason is exactly the unread paste the auditability NFR depends on not happening. Uses agreement_freeze's _paste_ready and validate_schedule's _paste_entry rather than a new printer.
     - 'WHY THE CLOSING RULE IS STATED HERE (criterion 4). After a rise the last old-value slot''s ''next period'' has no slot, so REQ-PIPE-131 is read by rounds: 2026-Q2''s slot closes when the 1 August round''s window opens. After a fall the 1 May round''s slot for 2026-Q3 closes at the 1 August round''s window, which opens no slot, so the later files meet the hold rather than an open slot. v3''s skipped overlap-gate pair is withdrawn: consecutive rounds keep their usual spacing either way.'
+    - 'A DOUBLY-FED HOLD RECORDS BOTH ROUNDS (post-build-review #286 item 8): `round`, the round the supply arrived in, and `from_round`, the round the agreement change took effect from; the words name the second. They differ only for a fall of 2 or more.'
+    - 'EVERY CALENDAR A COLLECTION''S DATASETS NAME (post-build-review #286 item 6): the rise check and the fall lines walk each, with its own rounds and its own datasets, naming the calendar where there is more than one. REJECTED: the first member''s calendar, as first built.'
     open_questions: []
+    unmet_criteria:
+    - criterion: Criterion 2, in part - the freeze refusal is not combined into the same numbered list; step 2 is generic text pointing at `mothman schedule preview-correction`, and agreement_freeze still refuses separately.
+      why: 'It changes what a person is told to do on a frozen version, so it waits for Keith''s word (post-build-review #286 item 7).'
+      owner: 'Keith''s decision, post-build-review #286 item 7.'
+      blocked_by:
+        unowned: true
+    implemented_by:
+    - qa_tools/common/validate_schedule.py::_rise_errors
+    - qa_tools/common/validate_schedule.py::fall_lines
+    - qa_tools/common/slots.py::fall_hold
+    - qa_tools/common/supply_holds.py::Held::doubly_fed
+    - qa_tools/common/correction_trial.py::rise_entries
+    linked_tests:
+    - tests/test_files_go_to_period_change.py::TestARiseIsRefusedUntilTheSkippedPeriodIsDeclared::test_the_entry_to_paste_has_the_datasets_list_shape
+    - tests/test_files_go_to_period_change.py::test_placing_it_into_the_doubly_fed_period_as_a_resupply_is_accepted
+    - tests/test_files_go_to_period_change.py::test_a_hold_after_a_fall_of_two_names_the_round_the_change_took_effect_from
+    - tests/test_files_go_to_period_change.py::test_a_fall_is_reported_on_every_calendar_its_collection_names
+    - tests/test_files_go_to_period_change.py::test_where_an_arrival_falls_is_answered_on_29_february
+    - tests/test_files_go_to_period_change.py::TestTheRoundFillingAPeriodAgreesWithTheSlotsAfterAFall::test_its_august_supply_is_not_held_as_doubly_fed
+    - tests/test_files_go_to_period_change.py::TestARiseIsRefusedUntilTheSkippedPeriodIsDeclared::test_refused_while_2026_q3_is_owed_naming_it_and_who_must_declare
+    - tests/test_files_go_to_period_change.py::TestARiseIsRefusedUntilTheSkippedPeriodIsDeclared::test_refused_while_a_pasted_entry_keeps_its_placeholder
+    - tests/test_files_go_to_period_change.py::TestAFallIsAcceptedAndItsDoublyFedRoundOpensNoSlot::test_the_may_round_fills_q3_and_the_august_round_opens_no_slot
+    - tests/test_files_go_to_period_change.py::TestASupplyInTheDoublyFedRoundIsHeldForAPerson::test_it_is_held_naming_the_change_and_the_period
+    - tests/test_files_go_to_period_change.py::test_placing_it_into_the_period_after_is_refused
+    - tests/test_files_go_to_period_change.py::test_draft_correction_prints_a_rises_not_expected_entries
+    evidence:
+    - '2026-10-30, tree 1effa85: the same 336 passed - a rise refused until declared, with a `- id:` entry to paste; a fall accepted with its information line on every calendar its collection names; the doubly-fed supply held naming the round the change took effect from, placeable into the doubly-fed period and refused anywhere else.'
   - id: REQ-PIPE-323
     title: Where collections in one period have different files_go_to_period values, each group's non-participating datasets are inherited when that group first files to the period
     date_written: '2026-10-25'
     story: As someone querying a period for an annual dataset of a current-period collection, I want its inherited view to stand on the supply from that collection's round before, so that a next-period collection opening the period a whole round early does not leave my dataset carrying forward a supply one round staler than it should be.
     moscow: must
-    status: in_progress
+    status: built
     signed_off:
       by: Keith
       date: '2026-10-30'
@@ -45287,13 +45357,33 @@ requirements:
     - 'AMENDMENT, FINAL TEXT - REQ-PIPE-271 criterion 5: ''THE SYSTEM SHALL make each offset group''s inheritances in a period once - at that group''s first filing to the period, or as REQ-PIPE-323 criterion 3 gives where the group files nothing to it (REQ-PIPE-098 criterion 2) - and SHALL NOT later make, retry or re-point them automatically - neither where one was REFUSED for want of an earlier promoted supply (REQ-PIPE-098 criteria 9 and 10) nor where it was MADE on a supply that is no longer the newest promoted. AMENDED <date applied> by REQ-PIPE-323.'''
     - 'THE FIVE AMENDMENTS ABOVE ARE VERBATIM AS KEITH SIGNED THEM (2026-10-26) and are outside REQ-PIPE-321''s amendment batch. Criteria 8 and 9 add to them without changing them: a re-file, placement or settle IS a filing in their words, and the explicit open is REQ-PIPE-098 criterion 4''s own mechanism.'
     - 'UNCHANGED BY THIS: REQ-PIPE-271 criteria 2, 3 and 6 to 11 - criterion 6''s carry-forward warning still covers a later promotion overtaking an inheritance within one offset group, and criterion 9''s rule that a moved pin goes to Keith is what REQ-GEN-325 criterion 8 relies on.'
+    - 'THE TIME ROUTE FIRES AT THE DUE INSTANT, Keith 2026-10-30 (post-build-review #286 item 1): a group is made by time only once its own slot''s due instant has passed with nothing filed at that offset; until then a reader at another offset sees what is promoted now. REJECTED: the claim window''s opening, as first built - it ran ahead of the group''s own filing, so 41 of Emergency Department''s offset-0 groups were recorded by Child Protection''s step.'
+    - 'STRICTLY AFTER THE DUE INSTANT (PROVISIONAL, 2026-10-30): an on-time supply arrives AT its due instant, where arrivals tie and the merged stream may break the tie differently in parallel; at `>=` the parallel and sequential bootstraps recorded different inherit-refused rows. REJECTED on the way: letting an arrival make only its own collection''s group, which was deterministic but broke the gap the time route exists for - a round the collection has no arrival in can only be carried forward by another collection''s arrival.'
     open_questions: []
+    implemented_by:
+    - qa_tools/common/inheritance.py::make_group
+    - qa_tools/common/inheritance.py::groups_due
+    - qa_tools/common/inheritance.py::make_due_groups
+    - qa_tools/common/period_schema.py::open_period
+    - qa_tools/common/filing.py::open_at_filing
+    linked_tests:
+    - tests/test_offset_group_inheritance.py::TestTheTimeRoute::test_an_arrival_at_the_due_instant_itself_makes_none
+    - tests/test_offset_group_inheritance.py::TestTheTimeRoute::test_nothing_is_due_once_the_window_opens_until_the_due_instant
+    - tests/test_offset_group_inheritance.py::test_three_rounds_are_listed_with_commas
+    - tests/test_offset_group_inheritance.py::TestEachGroupInheritsAtItsOwnFirstFiling::test_a_group_1_filing_does_not_inherit_a_group_0_dataset
+    - tests/test_offset_group_inheritance.py::TestEachGroupInheritsAtItsOwnFirstFiling::test_group_0_inherits_the_supply_promoted_in_between
+    - tests/test_offset_group_inheritance.py::TestEachGroupInheritsAtItsOwnFirstFiling::test_each_group_is_made_once
+    - tests/test_offset_group_inheritance.py::test_one_offset_everywhere_behaves_as_before
+    - tests/test_offset_group_inheritance.py::TestTheTimeRoute::test_both_groups_are_due_for_the_periods_their_rounds_fill
+    - tests/test_offset_group_inheritance.py::test_the_not_owed_reason_names_the_round
+    evidence:
+    - '2026-10-30, tree 1effa85: test_offset_group_inheritance 12 passed (each group made once at its own first filing; by time only at an arrival strictly after its slot''s due instant, Keith''s 2026-10-30 answer); the on-demand equivalence tests 8 passed, ED''s 2015-Q4 gap inheriting its newest supply in both modes. Criteria 7 and 8 are driven through make_group''s routes rather than end to end (post-build-review #286).'
   - id: REQ-PIPE-324
     title: days before stays inside one round, so a supply for a later period is said only with its collection's files_go_to_period, and a daily calendar takes at most 1
     date_written: '2026-10-25'
     story: As the person editing a delivery agreement, I want a days-before value that reaches back past the previous round refused - on an authored calendar with a pointer to the collection's files_go_to_period, on a daily one saying 1 is the most - so that 'these files are for a later period' has one way to be said, the evening-before case keeps its own, and no refusal sends me to another that refuses me back.
     moscow: should
-    status: in_progress
+    status: built
     signed_off:
       by: Keith
       date: '2026-10-30'
@@ -45318,13 +45408,22 @@ requirements:
     - 'THE REQ-PIPE-167 WORDING GOES INTO THE ONE BATCH (Keith, 2026-10-29, O-A3 option a). v4''s open question (''still to be shown to Keith when it is applied'') is closed: the final text is items 33 to 35 and the title and story of REQ-PIPE-321''s amendment batch, signed with the rest. Criterion 6 is added to the list because it, too, names a period''s calendar date.'
     - 'days before IS KEPT, BOUNDED (Keith, 2026-10-26, on REQ-PIPE-320): its own case is one dataset due earlier than its siblings on a shared calendar.'
     - CHOSEN BY KEITH (2026-10-25, O5 option a). REJECTED leaving days before unbounded and amending REQ-PIPE-167's wording only - two ways to say one thing.
+    - 'ONLY A DATASET''S OWN ROUNDS ARE CHECKED (post-build-review #286 item 4), each against the calendar round just before it (PROVISIONAL reading of ''the round before it''). REJECTED: measuring against the dataset''s own previous round, which would let a February-and-August dataset''s due date reach back across two other rounds.'
     open_questions: []
+    implemented_by:
+    - qa_tools/common/validate_schedule.py::_days_before_errors
+    linked_tests:
+    - tests/test_days_before_bound.py::TestAnAuthoredCalendar::test_a_round_the_dataset_does_not_take_part_in_is_not_checked
+    - tests/test_days_before_bound.py::TestAnAuthoredCalendar::test_one_reaching_back_past_the_previous_round_is_refused
+    - tests/test_days_before_bound.py::TestACadenceRuleCalendar::test_two_is_refused_saying_one_is_the_most_and_pointing_nowhere_else
+    evidence:
+    - '2026-10-30, tree 1effa85: test_days_before_bound 5 passed - a reach past the previous round refused with the largest accepted, a round the dataset does not take part in not checked, 2 refused on the cadence-rule calendar.'
   - id: REQ-GEN-325
     title: Child Protection's synthetic history goes into the next period - every file arrives as it does today and fills the period after
     date_written: '2026-10-25'
     story: As Keith, I want the synthetic Child Protection history to file each round's delivery into the next period, as most collections will in production, with Emergency Department and Birth Registrations staying in the current one, so that the demonstration asset shows both classes of file side by side on one quarterly calendar.
     moscow: must
-    status: in_progress
+    status: built
     signed_off:
       by: Keith
       date: '2026-10-30'
@@ -45364,12 +45463,20 @@ requirements:
     - 'THE BASELINE IS A BEFORE-RUN, NOT A RECORDED FIGURE (v5, NFR 1 and criterion 9). v4 cited 31m52s from REQ-GEN-207, which predates REQ-GEN-238''s cut (whose own evidence records 1886s on 9777ce3 against l4_probe); both are stale against a tree with REQ-PIPE-254 and the post-build-review #284 fixes on it. REJECTED any fixed figure.'
     - LINKAGE PRODUCTS DOES NOT MOVE. It is at 0 (REQ-PIPE-320 criterion 10), so its geocoding of the Child Protection supply filed to a period arrives on that period's own round, one round after the supply it reads - the period, not the round, joins them.
     open_questions: []
+    implemented_by:
+    - generator/collections/child_protection.py::generated_periods
+    - qa_tools/common/schedule.py::round_of
+    linked_tests:
+    - tests/test_scripted_decisions.py::TestThePeriodsDueInstantIsTheCalendars::test_due_at_is_the_slots_due_instant_not_its_claim_opening
+    - tests/test_files_go_to_period.py::TestARoundsSlotFillsThePeriodAfterIt::test_february_and_august_rounds_owe_q2_and_q4
+    evidence:
+    - '2026-10-30: a bootstrap from empty on a scratch database (off_boot, 24m06s, over the budget it was already over) produced Child Protection''s history at files_go_to_period 1; every targeted scenario verdict matched, and batch item 32''s pinned inheritances (cp-case-workers 2022-Q1, cp-carers 2022-Q2/Q3, ed-presentations 2015-Q4) matched with the supply ids predicted. Tree 1effa85: test_scripted_decisions and test_files_go_to_period in the 336 passed.'
   - id: REQ-DASH-326
     title: The page names the period each supply is for - 'For 2026-Q2 · received Sunday, 1 February 2026' - and a dataset's current cycle is the one whose claim window is open
     date_written: '2026-10-25'
     story: As a data team leader looking at Child Protection in February, I want each supply headed with the period it is for and the day it arrived, and the current cycle to be the one now open for files, reading calmly until it is due, so that a file received on 1 February for 2026-Q2 is never shown as 2026-Q1's, and a quarter whose files are not yet due is never shown as early, missing or overdue.
     moscow: must
-    status: in_progress
+    status: built
     signed_off:
       by: Keith
       date: '2026-10-30'
@@ -45419,12 +45526,33 @@ requirements:
     - ONE WORDING ON EVERY AUTHORED-CALENDAR DATASET (Keith, 2026-10-25, O8 option a), whatever its value; daily Birth Registrations keeps its heading. REJECTED the new heading only where the value is not 0.
     - THE VALUE IS SHOWN ONCE PER DATASET, ON ITS TILE, with where it was set - REQ-PIPE-122's visible-not-forgotten answer, in its phrasing (REQ-PIPE-181 criterion 15 forbids 'inherited' for this kind of provenance), from one phrase function shared with the terminal so the two cannot word it differently.
     open_questions: []
+    implemented_by:
+    - pipeline/period_slots.py::for_dataset
+    - qa_tools/common/files_go.py::describe
+    - dashboard/embed_dashboard_data.py::embed
+    - dashboard/qa-reporting-dashboard.template.html::currentPeriodOn
+    - dashboard/qa-reporting-dashboard.template.html::cycleLabel
+    - dashboard/qa-reporting-dashboard.template.html::drillDateFor
+    - dashboard/qa-reporting-dashboard.template.html::latestArrivalWords
+    - dashboard/qa-reporting-dashboard.template.html::fillingClauses
+    linked_tests:
+    - tests-js/files-go-to-period.test.js
+    - tests/test_dashboard_e2e.py::TestThePageNamesThePeriodEachSupplyIsFor::test_the_first_february_supply_reads_for_its_period_and_received_its_day
+    - tests/test_dashboard_e2e.py::TestThePageNamesThePeriodEachSupplyIsFor::test_once_it_is_filed_child_protection_is_on_2026_q2_and_ed_on_2026_q1
+    - tests/test_dashboard_e2e.py::TestThePageNamesThePeriodEachSupplyIsFor::test_inside_a_claim_window_before_due_both_read_open_for_files_their_status_unchanged
+    - tests/test_dashboard_e2e.py::TestThePageNamesThePeriodEachSupplyIsFor::test_the_agency_pages_latest_arrival_names_its_period
+    - tests/test_dashboard_e2e.py::TestThePageNamesThePeriodEachSupplyIsFor::test_a_deep_link_to_2026_q2_opens_on_a_date_that_period_is_filed_to
+    - tests/test_dashboard_e2e.py::TestThePageNamesThePeriodEachSupplyIsFor::test_cp_case_workers_first_quarter_reads_not_owed_yet
+    - tests/test_dashboard_e2e.py::TestThePageNamesThePeriodEachSupplyIsFor::test_no_heading_gives_a_periods_date_as_a_due_date
+    - tests/test_embed_dashboard_data.py::test_the_period_an_open_slot_fills_IS_embedded
+    evidence:
+    - '2026-10-30: tests-js files-go-to-period, owed-nothing and carry-forward-warning 54 passed on tree 1effa85; the e2e class TestThePageNamesThePeriodEachSupplyIsFor and the composition/period-view classes 11 passed against off_boot''s build earlier the same day, after the periodOpenedOn fix (post-build-review #286); the deployment e2e run before it had 109 of 110 passing, the one failure being that defect. The full gate runs before the push.'
   - id: REQ-PIPE-327
     title: The terminal says which period a collection's files go into, names each slot's period beside the round it is due on, and names a round by its date
     date_written: '2026-10-25'
     story: As whoever maintains the pipeline, I want the terminal to say which period a collection's files go into and to show each slot's period beside the round it is due on, so that a next-period slot due in February is never read as February's period in the schedule, the queue or the processing pass.
     moscow: should
-    status: in_progress
+    status: built
     signed_off:
       by: Keith
       date: '2026-10-30'
@@ -45459,3 +45587,22 @@ requirements:
     - 'THE TERMINAL''S DUE-DATE FIXES FOR days before (post-build-review #142 item 3 - the next-due marker and window follow each slot''s due date) carry over unchanged.'
     - PIPE, NOT TEST - the outcome is the schedule concept rendered, as REQ-PIPE-181 criterion 13's terminal display was.
     open_questions: []
+
+    implemented_by:
+    - qa_tools/common/files_go.py::describe
+    - qa_tools/common/files_go.py::held_words
+    - qa_tools/common/files_go.py::fall_rounds
+    - cli/schedule.py::_show_values
+    - cli/filing_tui.py::standing_view
+    - qa_tools/common/processing_pass.py::_filed_line
+    linked_tests:
+    - tests/test_files_go_terminal.py::TestScheduleShowNamesTheSlotByItsPeriodAndItsRound::test_a_round_column_and_for_period_due_and_no_period_date_column
+    - tests/test_files_go_terminal.py::TestScheduleShowNamesTheSlotByItsPeriodAndItsRound::test_the_value_is_stated_at_0_too
+    - tests/test_files_go_terminal.py::TestScheduleShowNamesTheSlotByItsPeriodAndItsRound::test_the_next_slot_names_its_round_by_date
+    - tests/test_files_go_terminal.py::TestScheduleShowNamesTheSlotByItsPeriodAndItsRound::test_the_calendar_entrys_renderer_states_the_value
+    - tests/test_files_go_terminal.py::TestAFallsRoundIsMarked::test_schedule_show_marks_it
+    - tests/test_files_go_terminal.py::TestAHeldSupplySaysWhichKindOfHeld::test_held_after_a_fall_is_a_second_supply_caused_by_our_change
+    - tests/test_files_go_terminal.py::TestTheQueueListsWhatEachSupplyIsFor::test_a_queue_row
+    - tests/test_files_go_terminal.py::TestThePassNamesEachArrivalsPeriodAndTotalsByPeriod::test_the_arrivals_line_and_the_totals
+    evidence:
+    - '2026-10-30, tree 1effa85: test_files_go_terminal, test_cli_schedule and test_correction_trial in the 336 passed, through the real `mothman schedule show` against the real contract and a copy with a fall; the held words name the round the agreement change took effect from.'
