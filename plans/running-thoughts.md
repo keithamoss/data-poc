@@ -5914,3 +5914,18 @@ could never have computed it), and it belongs with batch 5's check work.
      (SendMessage to its id) instead of the work sitting dead until Keith
      next looks. Agents also commit local checkpoints as they go, so a stop
      loses minutes rather than hours.
+
+129. **[todo, 2026-10-30]** **[Pipeline & publishing]** **Revisit the
+     one-off project extraction shape next week.** Keith, 2026-10-30, while
+     deferring the geocoding questions: a dataset with no calendar is refused
+     by REQ-PIPE-331 criterion 2 today, so how a cadence-less project
+     extraction reads or is read by an asset-level product is undecided.
+     Needs scoping with him before anything is built.
+
+130. **[todo, 2026-10-30]** **[QA checks & contract]** **Small-count
+     suppression as a generic binned rule.** Keith, 2026-10-30: REQ-QAC-333
+     criterion 9 shows the large-key-group histogram exactly, with no
+     suppression, but a later need to suppress small counts (privacy, for a
+     real linkage unit's release) should be one generic rule on the binned
+     distribution field (qa_tools/common/distribution.py), declared with the
+     check, not a linkage special case. Not scoped.
