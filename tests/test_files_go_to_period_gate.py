@@ -81,6 +81,39 @@ class TestItBelongsToTheCollection:
         assert "cp-carers" in text and "belongs to the collection" in text
 
 
+    def test_any_level_of_the_hierarchy_stating_it_is_refused(self, tmp_path):
+        """Criterion 3's hierarchy case (critic test gap): a collection in
+        contract/data-asset.yaml stating it is refused the same way."""
+        contract = tmp_path / "contract"
+        shutil.copytree(REAL, contract)
+        path = contract / "data-asset.yaml"
+        doc = yaml.safe_load(path.read_text())
+        for agency in doc["hierarchy"]["agencies"]:
+            for collection in agency.get("collections") or []:
+                if collection["id"] == "child-protection":
+                    collection["files_go_to_period"] = 1
+        path.write_text(yaml.safe_dump(doc, sort_keys=False))
+        text = _text(validate(Source(path, contract)))
+        assert "files_go_to_period" in text and "hierarchy" in text
+        assert "child-protection" in text
+
+
+class TestACollectionWithNoCalendar:
+    """Criterion 5 (critic test gap)."""
+
+    def test_stating_it_is_refused_saying_there_are_no_periods(self, gate):
+        def mutate(doc):
+            ed = [d for d in doc["datasets"] if d["id"].startswith("ed-")]
+            assert ed, "precondition: Emergency Department's datasets"
+            for d in ed:
+                d.pop("participation", None)
+                d.pop("calendar", None)
+                d["no_calendar"] = "a test's collection with no calendar"
+        text = _text(_offset_errors(gate(mutate)))
+        assert "emergency-department" in text
+        assert "a collection with no calendar has no periods to send files to" in text
+
+
 class TestEveryCollectionOnACalendarStatesIt:
     """Criterion 4 - no default."""
 
@@ -137,6 +170,31 @@ class TestANegativeValueIsRefused:
         assert any("files_go_to_period" in f"{e.problem} {e.fix} {e.scope}" or
                    "value" in f"{e.problem}" for e in errors)
         assert errors
+
+
+    def test_a_fraction_is_refused_naming_the_collection_and_the_version(self, gate):
+        """Criterion 6 as worded (critic finding 10): the refusal names the
+        collection and the version by its effective_from - not a schema
+        path of indices."""
+        def mutate(doc):
+            _collection(doc, "child-protection")["files_go_to_period"] = {
+                "versions": [_v("2000-01-01", 1.5)]}
+        text = _text(gate(mutate))
+        assert "collection 'child-protection', the version effective 2000-01-01" in text
+        assert "a whole number of periods" in text
+
+
+class TestTwoVersionsOnOneDateAreRefused:
+    """Critic finding 10: two versions with one effective_from left which
+    is in force to the order they were written in."""
+
+    def test_refused_naming_the_date(self, gate):
+        def mutate(doc):
+            _collection(doc, "child-protection")["files_go_to_period"] = {
+                "versions": [_v("2000-01-01", 1), _v("2000-01-01", 0)]}
+        text = _text(gate(mutate))
+        assert "child-protection" in text and "two files_go_to_period versions" in text
+        assert "2000-01-01" in text
 
 
 class TestAdoptingTheKeyOnFrozenHistory:

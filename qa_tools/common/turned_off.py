@@ -134,13 +134,12 @@ def as_record(turn: agreement_mod.TurnOff) -> dict:
 def gap_for_period(dataset_id: str, period: str, agreement=None) -> agreement_mod.TurnOff | None:
     """The turn-off a calendar period of this dataset falls inside, or None
     where the period is owed, not yet owing, or not the calendar's."""
-    from qa_tools.common import asset_time, schedule, slots
+    from qa_tools.common import schedule, slots
 
     agr = schedule._agreement(agreement)
     if not agr.ever_turned_off(dataset_id):
         return None
-    horizon = asset_time.local_date(asset_time.now())
-    horizon = horizon.replace(year=horizon.year + slots.SLOT_LOOKUP_YEARS)
+    horizon = slots.lookup_horizon()
     try:
         sequence = slots._calendar_periods(dataset_id, horizon, agr)
     except schedule.NoCalendarAgreed:

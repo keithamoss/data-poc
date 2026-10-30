@@ -176,7 +176,9 @@ def calendar_runway(calendar_name: str, as_of: date) -> CalendarRunway:
         threshold=_threshold(calendar),
         driving_dataset=driver[1] if driver else None,
         driving_last_period=driving_last.name if driving_last else None,
-        driving_last_date=driving_last.date if driving_last else None,
+        # THE ROUND ITS LAST SLOT IS DUE ON (critic finding 9), never the
+        # period's own date, which at files_go_to_period N is N rounds later.
+        driving_last_date=(driving_last.round_date or driving_last.date) if driving_last else None,
     )
 
 
@@ -352,8 +354,9 @@ def warning_lines(as_of: date) -> list[str]:
             lines.append(
                 f"WARNING (not failing the build): calendar {runway.calendar_name!r} runs out "
                 f"first for {runway.driving_dataset!r}, which has only {runway.remaining} "
-                f"future supply slot(s) left - its own last is {runway.driving_last_period} on "
-                f"{runway.driving_last_date}. {datasets[0].upper()}{datasets[1:]}."
+                f"future supply slot(s) left - its own last is {runway.driving_last_period}, due on "
+                f"the {runway.driving_last_date.day} {runway.driving_last_date.strftime('%B %Y')} "
+                f"round. {datasets[0].upper()}{datasets[1:]}."
                 f"{horizon} Author the next year's dates in contract/calendar.yaml; "
                 f"`mothman schedule candidate-dates` proposes them.")
     return lines

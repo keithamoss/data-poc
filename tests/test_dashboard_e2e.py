@@ -1402,7 +1402,10 @@ class TestOwedNothingPeriods:
         return page.evaluate(
             """(date) => {
                 const raw = rawRealDatasetById('cp-case-workers');
-                const period = periodNameFor('cp-case-workers', date);
+                // ITS CURRENT CYCLE (REQ-DASH-326 criterion 5; REQ-DASH-182
+                // criterion 15 as amended): the slot whose claim window most
+                // recently opened, never the period the date falls in.
+                const period = currentPeriodOn('cp-case-workers', date).period;
                 const supplied = (raw.runs || []).some(r => r.run_date <= date);
                 return supplied && (raw.owedNothing || []).some(e => e.period === period);
             }""", date)
@@ -1464,6 +1467,138 @@ class TestOwedNothingPeriods:
         rows = page.locator("[data-owed-nothing]")
         assert rows.count() >= 1
         assert "Not expected — System migration" in rows.first.inner_text()
+
+
+class TestThePageNamesThePeriodEachSupplyIsFor:
+    """REQ-DASH-326 criterion 9, in a real browser against the built
+    dashboard, every date taken from the built data rather than fixed (the
+    architect's S4): Child Protection's files go into the next period, so a
+    file received on its February round is for the period after."""
+
+    CP = "child-protection-family-support"
+    CLIENTS = {"tier": "dataset", "agencyId": CP, "collectionId": "child-protection",
+               "datasetId": "cp-clients"}
+    ED = {"tier": "dataset", "agencyId": "department-of-health",
+          "collectionId": "emergency-department", "datasetId": "ed-presentations"}
+
+    def _first_filed_to(self, page, period):
+        """The first cp-clients supply filed to `period`: its run, receipt day
+        on the asset's clock and recorded punctuality - or None."""
+        return page.evaluate("""(period) => {
+            const raw = rawRealDatasetById('cp-clients');
+            const by = raw.arrivalByRun || {};
+            const runs = (raw.runs || []).filter(r => (by[r.run_id] || {}).slot === period)
+              .sort((a, b) => String(by[a.run_id].arrivedAt).localeCompare(String(by[b.run_id].arrivedAt)));
+            if (!runs.length) return null;
+            const a = by[runs[0].run_id];
+            return {run: runs[0].run_id, day: assetDateStrOf(a.arrivedAt),
+                    status: a.arrivalStatus, words: fmtDay(assetDateStrOf(a.arrivedAt))};
+        }""", period)
+
+    def _round_period(self, page):
+        """The period the 1 February 2026 round fills for Child Protection."""
+        return page.evaluate("""() => {
+            const s = (slotsOf('cp-clients') || []).find(x => x.round.startsWith('2026-02'));
+            return s ? s.period : null;
+        }""")
+
+    def test_the_first_february_supply_reads_for_its_period_and_received_its_day(
+            self, page, built_dashboard_html):
+        _goto(page, built_dashboard_html)
+        period = self._round_period(page)
+        assert period == "2026-Q2", "precondition: the February 2026 round fills 2026-Q2"
+        first = self._first_filed_to(page, period)
+        assert first, "precondition: a supply was filed to 2026-Q2"
+        _goto(page, built_dashboard_html, state=self.CLIENTS, in_place_on=first["day"])
+        head = page.locator(".supply-history .supply-cycle-label", has_text="Current cycle").first
+        text = " ".join(head.inner_text().split())
+        assert f"For 2026-Q2 · received {first['words']}" in text
+        assert first["status"] in ("onTime", "on_time"), first
+
+    def test_once_it_is_filed_child_protection_is_on_2026_q2_and_ed_on_2026_q1(
+            self, page, built_dashboard_html):
+        _goto(page, built_dashboard_html)
+        first = self._first_filed_to(page, "2026-Q2")
+        current = page.evaluate("""(day) => ({cp: currentPeriodOn('cp-clients', day).period,
+                                             ed: currentPeriodOn('ed-presentations', day).period})""",
+                                first["day"])
+        assert current == {"cp": "2026-Q2", "ed": "2026-Q1"}, current
+
+    def test_inside_a_claim_window_before_due_both_read_open_for_files_their_status_unchanged(
+            self, page, built_dashboard_html):
+        _goto(page, built_dashboard_html)
+        for state, ds in ((self.CLIENTS, "cp-clients"), (self.ED, "ed-presentations")):
+            day = page.evaluate("""(ds) => {
+                // THE FIRST DAY OF A CLAIM WINDOW WITH NOTHING FILED TO IT YET,
+                // and before its due day - found in the built data.
+                const raw = rawRealDatasetById(ds);
+                const by = raw.arrivalByRun || {};
+                for (const s of (slotsOf(ds) || []).slice().reverse()) {
+                  const open = assetDateStrOf(s.opens);
+                  if (!s.owed || open >= assetDateStrOf(s.due)) continue;
+                  const early = (raw.runs || []).some(r => (by[r.run_id] || {}).slot === s.period
+                      && assetDateStrOf(by[r.run_id].arrivedAt) <= open);
+                  if (!early && open <= PERIOD_SEQUENCES.today) return open;
+                }
+                return null;
+            }""", ds)
+            assert day, f"precondition: {ds} has a claim window to stand in"
+            before = page.evaluate("(d) => addDaysStr(d, -1)", day)
+            _goto(page, built_dashboard_html, state=state, in_place_on=before)
+            pill_before = page.locator(".view-head .pill").first.inner_text()
+            _goto(page, built_dashboard_html, state=state, in_place_on=day)
+            empty = page.locator("[data-empty-current-cycle]")
+            assert empty.count() == 1, ds
+            assert "· open for files, due " in " ".join(empty.inner_text().split())
+            assert page.locator(".view-head .pill").first.inner_text() == pill_before, ds
+
+    def test_the_agency_pages_latest_arrival_names_its_period(self, page, built_dashboard_html):
+        _goto(page, built_dashboard_html, state={"tier": "agency", "agencyId": self.CP})
+        cells = page.locator("[data-latest-arrival]")
+        assert cells.count() >= 1
+        for i in range(cells.count()):
+            assert cells.nth(i).inner_text().startswith("For "), cells.nth(i).inner_text()
+
+    def test_a_deep_link_to_2026_q2_opens_on_a_date_that_period_is_filed_to(
+            self, page, built_dashboard_html):
+        _goto(page, built_dashboard_html)
+        got = page.evaluate("""() => {
+            const day = drillDateFor('cp-clients', '2026-Q2');
+            const raw = rawRealDatasetById('cp-clients');
+            const by = raw.arrivalByRun || {};
+            return {day, current: currentPeriodOn('cp-clients', day).period,
+                    filed: (raw.runs || []).some(r => (by[r.run_id] || {}).slot === '2026-Q2'
+                                                  && r.run_date <= day),
+                    own: periodDateNamed('cp-clients', '2026-Q2')};
+        }""")
+        assert got["current"] == "2026-Q2" and got["filed"], got
+        assert got["day"] != got["own"], "the drill went by the period's own date"
+
+    def test_cp_case_workers_first_quarter_reads_not_owed_yet(self, page, built_dashboard_html):
+        _goto(page, built_dashboard_html)
+        before = page.evaluate("""() => {
+            const first = rawRealDatasetById('cp-case-workers').periodSlots.first.period;
+            const seq = periodsFor('cp-case-workers');
+            const i = seq.findIndex(p => p.period === first);
+            return i > 0 ? seq[i - 1].period : null;
+        }""")
+        assert before, "precondition: a period before cp-case-workers' first"
+        _goto(page, built_dashboard_html, state={"tier": "period", "agencyId": self.CP,
+                                                 "collectionId": "child-protection",
+                                                 "period": before})
+        row = page.locator("tr", has_text="Case Workers").first
+        text = " ".join(row.inner_text().split())
+        assert "Not owed yet" in text and "No supply" not in text, text
+
+    def test_no_heading_gives_a_periods_date_as_a_due_date(self, page, built_dashboard_html):
+        for state in (self.CLIENTS, self.ED):
+            _goto(page, built_dashboard_html, state=state)
+            page.click("#supply-history-toggle")
+            heads = page.locator(".supply-history .supply-cycle-label").all_inner_texts()
+            assert heads
+            for h in heads:
+                assert "period dated" not in h and "Cycle due" not in h, h
+                assert "Cycle starting" not in h, h
 
 
 class TestTurnedOffOnThePage:
@@ -2452,12 +2587,15 @@ class TestAnExhaustedScheduleIsLoud:
     ON THE PAGE, not about what the model computed - a correct
     derivation nobody can see is the same failure in a different place.
 
-    The real quarterly calendar's last date is 2027-11-01, and
-    cp-case-workers takes only February and August, so it runs out at
-    2027-Q3 while its five siblings run to 2027-Q4. That gap gives a
-    real window - autumn 2027 - where exactly ONE dataset is exhausted
-    among five that are not, which is the case a rollup most wants to
-    swallow.
+    The real quarterly calendar's last date is 2027-11-01. Child
+    Protection's files go into the next period (REQ-GEN-325), so its last
+    round to open a slot is 1 August 2027, filling 2027-Q4, and all six of
+    its datasets - cp-case-workers' August round included - run out when
+    that slot closes in October 2027. Emergency Department, on the same
+    calendar at files_go_to_period 0, still has its November slot open into
+    2028. That gives a real window where SIX datasets are exhausted beside
+    one on the same calendar that is not - the case a rollup most wants to
+    blur. (Before REQ-GEN-325, cp-case-workers ran out alone at 2027-Q3.)
 
     THE WINDOW STARTS WHEN ITS LAST SLOT CLOSES (REQ-DASH-155 criterion 6;
     Keith, 2026-10-06), not at 2027-Q3's own date: the Q3 slot stays open
@@ -2482,8 +2620,9 @@ class TestAnExhaustedScheduleIsLoud:
         notice = page.locator(".notice-exhausted")
         assert notice.count() == 1
         text = " ".join(notice.inner_text().split())
-        assert "1 dataset cannot be filed" in text
+        assert "6 datasets cannot be filed" in text
         assert "delivery dates have run out" in text
+        assert "Presentations" not in text, "Emergency Department is not exhausted"
         assert "Case Workers" in text, "the dataset is named (post-build-review #132 A4)"
 
     def test_the_count_tracks_the_in_place_on_date(self, page, dashboard_html_without_blockers):
@@ -2520,13 +2659,19 @@ class TestAnExhaustedScheduleIsLoud:
         assert "exhaust" not in stored.lower(), stored
         assert "dismiss" not in stored.lower(), stored
 
-    def test_one_exhausted_dataset_among_five_healthy_is_not_swallowed(self, page, dashboard_html_without_blockers):
-        """The nodata trap, at the tier it would vanish from."""
+    def test_the_exhausted_are_said_and_the_healthy_one_is_not(self, page, dashboard_html_without_blockers):
+        """The nodata trap, at the tier it would vanish from: every exhausted
+        Child Protection row says so, and Emergency Department - on the same
+        calendar, not exhausted - does not."""
         _goto(page, dashboard_html_without_blockers, state={"tier": "agency", "agencyId": self.CP},
               in_place_on=self.ONE_EXHAUSTED)
         rows = page.locator("tr", has=page.locator("td", has_text="Delivery schedule ended"))
-        assert rows.count() == 1
-        assert "Case Workers" in rows.first.inner_text()
+        assert rows.count() == 6
+        assert any("Case Workers" in rows.nth(i).inner_text() for i in range(rows.count()))
+        _goto(page, dashboard_html_without_blockers,
+              state={"tier": "agency", "agencyId": "department-of-health"},
+              in_place_on=self.ONE_EXHAUSTED)
+        assert page.locator("tr", has=page.locator("td", has_text="Delivery schedule ended")).count() == 0
 
     def test_the_dataset_itself_says_so_in_its_own_words(self, page, dashboard_html_without_blockers):
         _goto(page, dashboard_html_without_blockers, state=self.DS, in_place_on=self.ONE_EXHAUSTED)
@@ -2534,14 +2679,14 @@ class TestAnExhaustedScheduleIsLoud:
         assert "delivery schedule has ended" in text.lower()
         assert "contract/calendar.yaml" in text
 
-    def test_it_names_the_datasets_own_last_period_not_its_calendars(self, page, dashboard_html_without_blockers):
-        """cp-case-workers' last owed period is 2027-Q3; the quarterly
-        calendar runs to 2027-Q4. Naming the calendar's would tell a
-        reader their dataset ended after a period it never had."""
+    def test_it_names_the_datasets_own_last_period(self, page, dashboard_html_without_blockers):
+        """cp-case-workers' last owed period is 2027-Q4, which its 1 August
+        2027 round fills - the period its own last slot is for, never the
+        calendar's last date's own period name or a period it never had."""
         _goto(page, dashboard_html_without_blockers, state=self.DS, in_place_on=self.ONE_EXHAUSTED)
         text = " ".join(page.locator("#view").inner_text().split())
-        assert "2027-Q3" in text
-        assert "2027-Q4" not in text
+        assert "2027-Q4" in text
+        assert "2028-Q1" not in text and "2027-Q3" not in text
 
     def test_it_reads_differently_from_a_dataset_that_simply_has_no_run(self, page, dashboard_html_without_blockers):
         """Both are quiet tiles. Only one of them is somebody's job, and
@@ -4295,17 +4440,20 @@ class TestDrillingThroughToThePeriodThatEarnedTheResults:
     """
 
     SUBSTITUTED = {
-        "kind": "substituted", "level": "warning", "period": "2026-Q3",
-        "standsOn": "2026-Q2", "supply": "cp-carers@202605010100000000",
+        "kind": "substituted", "level": "warning", "period": "2027-Q1",
+        "standsOn": "2026-Q4", "supply": "cp-carers@202608010900000800",
         "decidedBy": "Keith", "byAPerson": True,
         "reason": "the supplier confirmed no extract will be sent this quarter",
     }
-    # The two dates the real quarterly calendar gives those period names.
-    # Written out rather than computed, so a change to the calendar shows
-    # up here as a failing assertion rather than as a test that quietly
-    # agrees with whatever it now says.
-    PERIOD_DATE = "2026-08-01"
-    STANDS_ON_DATE = "2026-05-01"
+    # 2027-Q1 IS CHILD PROTECTION'S CURRENT CYCLE on this build's date, its
+    # slot open since the claim window of the 1 November 2026 round
+    # (REQ-DASH-326 criterion 5). A drill lands on the LAST DAY 2026-Q4 is
+    # current - the day before 2027-Q1's window opens on 18 October -
+    # never on 2026-Q4's own date (criterion 11). Written out rather than
+    # computed, so a change to the calendar shows up here as a failing
+    # assertion rather than as a test that quietly agrees with it.
+    PERIOD_DATE = "2027-02-01"
+    STANDS_ON_DATE = "2026-10-17"
     WHERE = {"tier": "dataset", "agencyId": "child-protection-family-support",
               "collectionId": "child-protection", "datasetId": "cp-carers"}
 
@@ -4325,7 +4473,7 @@ class TestDrillingThroughToThePeriodThatEarnedTheResults:
                        () => { d.promotionTimeline = was; });
                      const tl = d.promotionTimeline || {points: [], standing: []};
                      d.promotionTimeline = {...tl, standing: [...tl.standing,
-                       {on: "2026-08-01", period: st.period, standingIn: st, decisions: []}]};
+                       {on: "2026-10-18", period: st.period, standingIn: st, decisions: []}]};
                      DATA = buildData(CURRENT_IN_PLACE_ON);
                      renderFromState();
                    }""", standing_in)
@@ -4343,8 +4491,8 @@ class TestDrillingThroughToThePeriodThatEarnedTheResults:
         self._open(clean_page, built_dashboard_html, self.SUBSTITUTED)
         text = " ".join(clean_page.locator(
             '[data-testid="standing-in-detail"]').inner_text().split())
-        assert "ran against 2026-Q2's supply" in text
-        assert "not 2026-Q3's own results" in text
+        assert "ran against 2026-Q4's supply" in text
+        assert "not 2027-Q1's own results" in text
 
     def test_drilling_moves_the_in_place_on_date_and_records_where_from(
             self, clean_page, built_dashboard_html):
@@ -4355,7 +4503,7 @@ class TestDrillingThroughToThePeriodThatEarnedTheResults:
         clean_page.locator('[data-testid="standing-in-drill"]').click()
         params = self._params(clean_page)
         assert params.get("in-place-on") == self.STANDS_ON_DATE
-        assert params.get("from") == "2026-Q3"
+        assert params.get("from") == "2027-Q1"
 
     def test_the_reader_is_told_they_have_left_the_period_they_were_on(
             self, clean_page, built_dashboard_html):
@@ -4363,7 +4511,7 @@ class TestDrillingThroughToThePeriodThatEarnedTheResults:
         clean_page.locator('[data-testid="standing-in-drill"]').click()
         notice = clean_page.locator('[data-testid="arrival-notice"]')
         assert notice.count() == 1
-        assert "You have left 2026-Q3" in notice.inner_text()
+        assert "You have left 2027-Q1" in notice.inner_text()
 
     def test_the_way_back_returns_and_takes_the_framing_with_it(
             self, clean_page, built_dashboard_html):
@@ -4387,12 +4535,12 @@ class TestDrillingThroughToThePeriodThatEarnedTheResults:
     def test_the_framing_does_not_travel_onto_the_next_page(
             self, clean_page, built_dashboard_html):
         """Criterion 11's second half. A banner saying 'you have left
-        2026-Q3' is true of the one page it was followed to and a lie
+        2027-Q1' is true of the one page it was followed to and a lie
         everywhere else - and pushState() with a bare hash keeps the
         query string, so this does not happen by itself."""
         self._open(clean_page, built_dashboard_html, self.SUBSTITUTED)
         clean_page.locator('[data-testid="standing-in-drill"]').click()
-        assert self._params(clean_page).get("from") == "2026-Q3"
+        assert self._params(clean_page).get("from") == "2027-Q1"
         clean_page.locator("#rail .crumb").first.click()
         clean_page.wait_for_function(
             "() => !new URLSearchParams(location.search).get('from')")
@@ -5393,8 +5541,10 @@ class TestTheQualifierAsAtTheDateOnShow:
         """The road-testing #18 case: 2026-Q2 stood on 2026-Q1, and a
         2026-Q3 view said so."""
         entry = self._standing(clean_page, built_dashboard_html)
+        # THE ONE CURRENT CYCLE (REQ-DASH-326 criterion 16), never the period
+        # the date falls in.
         today_period = clean_page.evaluate(
-            "() => periodNameFor('cp-case-workers', DEFAULT_IN_PLACE_ON)")
+            "() => currentPeriodOn('cp-case-workers', DEFAULT_IN_PLACE_ON).period")
         assert today_period != entry["period"], "precondition: today is a later period"
         _goto(clean_page, built_dashboard_html, state=self.WHERE)
         assert clean_page.locator('[data-testid="standing-in"]').count() == 0
@@ -5775,19 +5925,21 @@ class TestThePlantedPairsOnTheBuiltDashboard:
 
 
 #: REQ-GEN-199 criteria 32-34: each chip, the element holding the text its
-#: register Expect quotes, and that text - from plans/supply-model.md.
+#: register Expect quotes, and that text - from plans/supply-model.md. Child
+#: Protection's periods are named one later since REQ-GEN-325 (files go into
+#: the next period), so its chips quote the period after the one first written.
 _AS_AT_CHIPS = (
     ("TS-75a", '[data-testid="promotion-split"]',
      "this supply was staged and nobody had decided about it yet"),
     ("TS-75b", '[data-testid="promotion-split"]',
      "a person had rejected this supply, so it was not promoted"),
-    ("TS-76", '[data-testid="standing-in"]', "Substituted from 2024-Q4"),
+    ("TS-76", '[data-testid="standing-in"]', "Substituted from 2025-Q1"),
     ("TS-76", '[data-testid="standing-in-since"]', "Since removed, as from"),
-    ("TS-77a", '[data-testid="standing-in"]', "Substituted from 2023-Q1"),
+    ("TS-77a", '[data-testid="standing-in"]', "Substituted from 2023-Q2"),
     ("TS-77a", '[data-testid="standing-in-since"]', "Since replaced, as from"),
     ("TS-77b", '[data-testid="promotion-split"]', "this one had been superseded"),
     ("TS-77b", '[data-testid="standing-in-detail"]',
-     "2023-Q2 holds 2023-Q1's supply; the results below are a newer supply awaiting "
+     "2023-Q3 holds 2023-Q2's supply; the results below are a newer supply awaiting "
      "a decision."),
     ("TS-78a", '[data-testid="promotion-split"]',
      "the newest file was not the newest promotion"),
@@ -5795,8 +5947,8 @@ _AS_AT_CHIPS = (
     # the status clause after it comes with REQ-DASH-272.
     ("TS-78b", ".verdict-of", "The supply in place in the warehouse is the one received "
      "2:00pm Sunday, 30 August 2026, and is "),
-    ("TS-79a", '[data-testid="standing-in"]', "Inherited from 2026-Q1"),
-    ("TS-79b", '[data-testid="standing-in"]', "Inherited from 2023-Q1"),
+    ("TS-79a", '[data-testid="standing-in"]', "Inherited from 2026-Q2"),
+    ("TS-79b", '[data-testid="standing-in"]', "Inherited from 2023-Q2"),
 )
 
 _VISIBLE_TEXT = """() => {
@@ -7073,7 +7225,7 @@ def cp_pages(private_supply_dsn, cp_raw_dir, tmp_path, monkeypatch, built_dashbo
 
 
 def _first_time_q4(pages: _CpPages) -> None:
-    """2024-Q4 holding Case Workers, Carers, Investigations and Placements in
+    """2025-Q1 holding Case Workers, Carers, Investigations and Placements in
     the warehouse, no Clients or Notifications ever supplied (tests/
     test_package_gate.py's first_time, on the pinned clock)."""
     from test_package_gate import first_time
@@ -7117,7 +7269,7 @@ class TestAnotherTableCouldNotBeRead:
     #: TS-80, and how many of each reader's checks read the Client Register.
     #: TS-80's settlement takes effect at 7:35am on 8 November 2020, one act
     #: at one instant (post-build-review #284 (B), 2026-10-30).
-    PAIRS = (("2019-11-01", "2019-Q4", "2019-11-29"), ("2020-11-01", "2020-Q4", "2020-11-08"))
+    PAIRS = (("2019-11-01", "2020-Q1", "2019-11-29"), ("2020-11-01", "2021-Q1", "2020-11-08"))
     #: ONE CHECK PER GRID ROW, however many tools ran it (UX critic on
     #: 7093c20, B2; Keith Q2 = a, PROVISIONAL): Investigations reads the Client
     #: Register in two checks, the others in one.
@@ -7170,14 +7322,14 @@ class TestAnotherTableCouldNotBeRead:
         'was turned down' and a person is needed - judged as at the date on
         show, so the day before the rejection still reads 'was held back'."""
         got = _s2_strict(cp_pages)
-        cp_pages.reject(got["C2"], "2024-Q4", "2024-11-05T10:00:00+08:00")
+        cp_pages.reject(got["C2"], "2025-Q1", "2024-11-05T10:00:00+08:00")
         page = cp_pages.page()
         n = _cp_state("cp-notifications")
 
         _goto(clean_page, page, state=n, in_place_on="2024-11-04")
         (line,) = _shown(clean_page, "[data-no-promoted] .np-line")
         assert line["text"] == (
-            "No promoted Client Register for 2024-Q4. The Client Register received with this "
+            "No promoted Client Register for 2025-Q1. The Client Register received with this "
             "supply (10:00am Sunday, 3 November 2024) was held back, so one of this supply's "
             "checks could not run. That is not a fault in this supply's own data."), line
         (verdict,) = _shown(clean_page, ".verdict-of")
@@ -7234,7 +7386,7 @@ class TestAnotherTableCouldNotBeRead:
         _goto(clean_page, page, state=_cp_state("cp-notifications"), in_place_on="2024-10-30")
         lines = _shown(clean_page, "[data-no-promoted] .np-line")
         assert [ln["attrs"]["data-np-dataset"] for ln in lines] == ["cp-clients"], lines
-        assert lines[0]["text"].startswith("No promoted Client Register for 2024-Q4. One of this "
+        assert lines[0]["text"].startswith("No promoted Client Register for 2025-Q1. One of this "
                                            "supply's checks needs it")
         assert clean_page.locator(".view-head .pill.red").count() >= 1
 
@@ -7249,7 +7401,7 @@ class TestAnotherTableCouldNotBeRead:
         _goto(clean_page, page, state={"tier": "agency", "agencyId": CP_AGENCY},
               in_place_on="2024-10-30")
         notes = _shown(clean_page, ".no-promoted-note")
-        assert any(n["text"] == "No promoted Client Register for 2024-Q4" for n in notes), notes
+        assert any(n["text"] == "No promoted Client Register for 2025-Q1" for n in notes), notes
         # ONE LINE PER CAUSING TABLE: the Client Register, which its three
         # readers wait on (Investigations also waits on Notifications, whose v2
         # is not in the warehouse - a second cause, a second line).
@@ -7262,7 +7414,7 @@ class TestAnotherTableCouldNotBeRead:
 
         _goto(clean_page, page, state=_cp_state("cp-notifications"), in_place_on="2024-11-02")
         (verdict,) = _shown(clean_page, ".verdict-of")
-        assert "could not run because Client Register for 2024-Q4 is overdue" in verdict["text"], \
+        assert "could not run because Client Register for 2025-Q1 is overdue" in verdict["text"], \
             verdict
         assert "A person can decide on this supply, or wait for that supply to be promoted." \
             in verdict["text"]
@@ -7271,7 +7423,7 @@ class TestAnotherTableCouldNotBeRead:
         assert _shown(clean_page, "[data-not-due-yet]") == []
 
     def test_the_owed_re_check_has_its_own_wording(self, clean_page, cp_pages):
-        """2024-Q3 holding v1 of every table; a Clients v2 whose run stops
+        """2024-Q4 holding v1 of every table; a Clients v2 whose run stops
         before it checks anything is promoted by a person, so the Notifications
         in the warehouse owes a re-check against it that has not run: its line
         says so (criterion 7) - never 'No promoted'."""
@@ -7285,7 +7437,7 @@ class TestAnotherTableCouldNotBeRead:
         cp_pages.sc.process()
         assert cp_pages.sc.failures, "precondition: Clients v2's run stopped"
         cp_pages.at("2024-08-06T10:30:00+08:00")
-        cp_pages.sc.promote_by_hand(c2, "2024-Q3", at="2024-08-06T10:00:00+08:00")
+        cp_pages.sc.promote_by_hand(c2, "2024-Q4", at="2024-08-06T10:00:00+08:00")
         assert cp_pages.sc.owed("reevaluate"), "precondition: the knock-on is owed, not run"
         page = cp_pages.page()
         _goto(clean_page, page, state=_cp_state("cp-notifications"), in_place_on="2024-08-06")
@@ -7300,7 +7452,7 @@ class TestAnotherTableCouldNotBeRead:
 
 
 def _s1(pages: _CpPages, *, red: bool = False) -> dict:
-    """S1 (REQ-PIPE-267): 2024-Q3 holding v1 of every table, then a zip of
+    """S1 (REQ-PIPE-267): 2024-Q4 holding v1 of every table, then a zip of
     Clients v2 and a Notifications v2 red on its own data. Green: Clients v2 is
     re-checked against Notifications v1 and promoted. Red: that re-check fails
     and Clients v2 is held back too."""
@@ -7364,7 +7516,7 @@ class TestWarehouseAndStagingViews:
         v2's run; and at 375px every row's pill is inside the viewport and
         each stacked result names its view."""
         got = _s1(cp_pages)
-        assert cp_pages.sc.holder("cp-clients", "2024-Q3") == got["C2"], "precondition"
+        assert cp_pages.sc.holder("cp-clients", "2024-Q4") == got["C2"], "precondition"
         page = cp_pages.page()
 
         _goto(clean_page, page, state=self.N, in_place_on="2024-08-05")
@@ -7495,7 +7647,7 @@ class TestWarehouseAndStagingViews:
         cp_pages.at("2024-08-05T09:06:00+08:00")
         c2 = cp_pages.sc.deliver("2024-08-05T09:05:00+08:00", {"cp_clients": "C2"})["C2"]
         cp_pages.sc.process()
-        assert cp_pages.sc.holder("cp-clients", "2024-Q3") == c2, "precondition"
+        assert cp_pages.sc.holder("cp-clients", "2024-Q4") == c2, "precondition"
         page = cp_pages.page()
         _goto(clean_page, page, state=self.N, in_place_on="2024-08-05")
         row = _row(_grid(clean_page), "Client reference", "Notifications → Client Register")
@@ -7558,7 +7710,7 @@ class TestWarehouseAndStagingViews:
         c2 = cp_pages.sc.deliver("2024-08-05T10:00:00+08:00", {"cp_clients": "C2"})["C2"]
         cp_pages.sc.process()
         cp_pages.at("2024-08-06T10:30:00+08:00")
-        cp_pages.sc.promote_by_hand(c2, "2024-Q3", at="2024-08-06T10:00:00+08:00")
+        cp_pages.sc.promote_by_hand(c2, "2024-Q4", at="2024-08-06T10:00:00+08:00")
         page = cp_pages.page()
         _goto(clean_page, page, state=self.N, in_place_on="2024-08-06")
         row = _row(_grid(clean_page), "Client reference", "Notifications → Client Register")
@@ -7569,7 +7721,7 @@ class TestWarehouseAndStagingViews:
 
     def test_after_a_rejection_the_page_reads_the_warehouse(self, clean_page, cp_pages):
         got = _s1(cp_pages)
-        cp_pages.reject(got["N2"], "2024-Q3", "2024-08-07T10:00:00+08:00")
+        cp_pages.reject(got["N2"], "2024-Q4", "2024-08-07T10:00:00+08:00")
         page = cp_pages.page()
         _goto(clean_page, page, state=self.N, in_place_on="2024-08-06")
         assert _shown(clean_page, ".verdict-of")[0]["attrs"]["data-verdict-of"] == "awaiting"
@@ -7652,7 +7804,7 @@ class TestRecheckedAfterWeFixedACheck:
         got = self._waiting_red(cp_pages)
         cp_pages.sc.rules.clear()
         cp_pages.at("2024-08-07T10:30:00+08:00")
-        cp_pages.sc.recheck(got["C2"], "2024-Q3", at="2024-08-07T10:30:00+08:00",
+        cp_pages.sc.recheck(got["C2"], "2024-Q4", at="2024-08-07T10:30:00+08:00",
                             reason="our check was wrong")
         page = cp_pages.page()
         _goto(clean_page, page, state=self.C, in_place_on="2024-08-07")
@@ -7676,7 +7828,7 @@ class TestRecheckedAfterWeFixedACheck:
         promotion state's, unchanged by the re-check."""
         got = self._waiting_red(cp_pages)
         cp_pages.at("2024-08-07T10:30:00+08:00")
-        cp_pages.sc.recheck(got["C2"], "2024-Q3", at="2024-08-07T10:30:00+08:00",
+        cp_pages.sc.recheck(got["C2"], "2024-Q4", at="2024-08-07T10:30:00+08:00",
                             reason="just to be sure")
         page = cp_pages.page()
         for on in ("2024-08-06", "2024-08-07"):
@@ -7702,7 +7854,7 @@ class TestRecheckedAfterWeFixedACheck:
         v1 = established(cp_pages.sc)
         cp_pages.sc.rules.append(own_red("N1"))
         cp_pages.at("2024-08-09T10:30:00+08:00")
-        cp_pages.sc.recheck(v1["N1"], "2024-Q3", at="2024-08-09T10:30:00+08:00",
+        cp_pages.sc.recheck(v1["N1"], "2024-Q4", at="2024-08-09T10:30:00+08:00",
                             reason="the fix found more")
         page = cp_pages.page()
         _goto(clean_page, page, state=self.N, in_place_on="2024-08-09")
@@ -7727,7 +7879,7 @@ class TestRecheckedAfterWeFixedACheck:
                                  "the fix found more"), later
 
         cp_pages.at("2024-08-10T10:30:00+08:00")
-        cp_pages.sc.acknowledge(v1["N1"], "2024-Q3", at="2024-08-10T10:30:00+08:00")
+        cp_pages.sc.acknowledge(v1["N1"], "2024-Q4", at="2024-08-10T10:30:00+08:00")
         page = cp_pages.page()
         _goto(clean_page, page, state=self.N, in_place_on="2024-08-10")
         (badge,) = _shown(clean_page, ".view-head [data-red-promoted] [data-red-promoted-why]")
@@ -7748,7 +7900,7 @@ class TestRecheckedAfterWeFixedACheck:
         cp_pages.sc.rules.append(lambda ctx: "warn" if (not ctx.cross_table and ctx.own_label
                                                          == "N1" and _first_own(ctx)) else None)
         cp_pages.at("2024-08-09T10:30:00+08:00")
-        cp_pages.sc.recheck(v1["N1"], "2024-Q3", at="2024-08-09T10:30:00+08:00",
+        cp_pages.sc.recheck(v1["N1"], "2024-Q4", at="2024-08-09T10:30:00+08:00",
                             reason="the fix found more")
         page = cp_pages.page()
         _goto(clean_page, page, state=self.N, in_place_on="2024-08-09")
@@ -7766,7 +7918,7 @@ class TestRecheckedAfterWeFixedACheck:
             raw.turnOffs = [{effectiveTo: '2024-08-01', until: null, reason: 'paused',
               level: 'dataset', versionFrom: '2023-01-01', authoredOn: '2024-07-01',
               authoredBy: 'changelog', collection: 'Child Protection',
-              lastOwed: {period: '2024-Q3', dueAt: '2024-08-01T01:00:00+00:00',
+              lastOwed: {period: '2024-Q4', dueAt: '2024-08-01T01:00:00+00:00',
                          closesAt: '2024-10-20T16:00:00+00:00'}}];
             DATA = buildData(CURRENT_IN_PLACE_ON);
             renderFromState();
@@ -7783,7 +7935,7 @@ class TestRecheckedAfterWeFixedACheck:
         row = _row_of(clean_page, self.KEY_N1)
         assert "Promoted green, re-checked amber - awaiting acknowledgement" in row["status"], row
         cp_pages.at("2024-08-10T10:30:00+08:00")
-        cp_pages.sc.acknowledge(v1["N1"], "2024-Q3", at="2024-08-10T10:30:00+08:00")
+        cp_pages.sc.acknowledge(v1["N1"], "2024-Q4", at="2024-08-10T10:30:00+08:00")
         page = cp_pages.page()
         _goto(clean_page, page, state=self.N, in_place_on="2024-08-10")
         (tag,) = _shown(clean_page, ".view-head [data-rechecked-amber]")
@@ -7909,12 +8061,12 @@ class TestTheUxCriticsFindingsOn7093c20:
 
     def test_an_overdue_cause_says_so_on_its_own_page(self, clean_page, built_dashboard_html):
         """S2 and REQ-DASH-204 open question 1 (Keith Q4 = a, PROVISIONAL): the
-        Carer Register, overdue for 2021-Q4 on 1 November 2021, says so in one
+        Carer Register, overdue for 2022-Q1 on 1 November 2021, says so in one
         muted line naming the reader waiting on it."""
         _goto(clean_page, built_dashboard_html, state=_cp_state("cp-carers"),
               in_place_on="2021-11-01")
         (note,) = _shown(clean_page, "[data-cause-note]")
-        assert note["text"] == "Overdue for 2021-Q4 — Placements is waiting on it.", note
+        assert note["text"] == "Overdue for 2022-Q1 — Placements is waiting on it.", note
         assert "late-open-note" in note["attrs"]["class"]
         assert all("in-place-on=2021-11-01" in a["href"] for a in note["links"]), note
 
@@ -7970,7 +8122,7 @@ class TestTheUxCriticsFindingsOn7093c20:
         _goto(clean_page, built_dashboard_html, state=_cp_state("cp-placements"),
               in_place_on="2023-06-08")
         (clause,) = _shown(clean_page, ".wh-clause")
-        assert "the one substituted from 2023-Q1" in clause["text"], clause
+        assert "the one substituted from 2023-Q2" in clause["text"], clause
         assert "carried forward" not in clause["text"]
 
 
@@ -7988,7 +8140,7 @@ class TestHeldBackWithItsDelivery:
         REQ-DASH-204 notice, its links keeping the date on show; the
         Notifications' own awaiting line ends with what it holds back."""
         got = _s1(cp_pages, red=True)
-        assert cp_pages.sc.holder("cp-clients", "2024-Q3") != got["C2"], "precondition"
+        assert cp_pages.sc.holder("cp-clients", "2024-Q4") != got["C2"], "precondition"
         page = cp_pages.page()
         _goto(clean_page, page, state=self.C, in_place_on="2024-08-05")
         (notice,) = _shown(clean_page, "[data-held-back]")
@@ -8068,7 +8220,7 @@ class TestHeldBackWithItsDelivery:
               in_place_on="2024-08-05")
         assert _shown(clean_page, "[data-held-back-marker]") == []
 
-        cp_pages.reject(got["I2"], "2024-Q3", "2024-08-07T10:00:00+08:00")
+        cp_pages.reject(got["I2"], "2024-Q4", "2024-08-07T10:00:00+08:00")
         page = cp_pages.page()
         _goto(clean_page, page, state=self.C, in_place_on="2024-08-07")
         texts = [n["text"] for n in _shown(clean_page, "[data-held-back]")]
@@ -8085,7 +8237,7 @@ class TestHeldBackWithItsDelivery:
         supersedes v2 and whose own run stops: 'has been replaced'. Neither
         says 'checked again once' or 'held back'."""
         got = _s1(cp_pages, red=True)
-        cp_pages.reject(got["N2"], "2024-Q3", "2024-08-07T10:00:00+08:00")
+        cp_pages.reject(got["N2"], "2024-Q4", "2024-08-07T10:00:00+08:00")
         page = cp_pages.page()
         _goto(clean_page, page, state=self.C, in_place_on="2024-08-07")
         (notice,) = _shown(clean_page, "[data-held-back]")

@@ -52,6 +52,16 @@ class TestAnAuthoredCalendar:
         assert "files_go_to_period" in text and "every dataset of the collection" in text
 
 
+    def test_a_round_the_dataset_does_not_take_part_in_is_not_checked(self, gate):
+        """Critic finding 4: cp-case-workers supplies in the February and
+        August rounds only, so the 1 November 2015 round (82 days after the
+        August one) is not its round, and 85 is accepted. Each of its own
+        rounds is still checked against the calendar round just before it -
+        here 93 and 102 days (PROVISIONAL reading of 'the round before')."""
+        assert gate("cp-case-workers", 85) == ""
+        assert "at most 93" in gate("cp-case-workers", 95)
+
+
 class TestACadenceRuleCalendar:
     """Criteria 2 and 4."""
 

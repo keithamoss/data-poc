@@ -217,6 +217,8 @@ _SHAPES: dict[str, str] = {
 def _shape_of(loc: list[str]) -> str | None:
     """The expected shape for a pydantic location, by its last named
     segment - the indices in between say where, not what."""
+    if "files_go_to_period" in loc and loc and loc[-1] == "value":
+        return "a whole number of periods, 0 or more, like 1"
     for part in reversed(loc):
         if not part.isdigit() and part in _SHAPES:
             return _SHAPES[part]
@@ -322,6 +324,21 @@ def _scope_from_loc(raw: dict, loc: tuple) -> str | None:
     model did not validate - that is why there is an error.
     """
     parts = list(loc)
+    # A COLLECTION ENTRY, and the version by its effective_from (REQ-PIPE-320
+    # criterion 6, critic finding 10) - never a path of indices.
+    if parts and parts[0] == "collections" and len(parts) > 1 and isinstance(parts[1], int):
+        entries = raw.get("collections") or []
+        if parts[1] < len(entries):
+            entry = entries[parts[1]] or {}
+            scope = f"collection {entry.get('id')!r}"
+            if "versions" in parts:
+                k = parts.index("versions")
+                try:
+                    version = entry[parts[k - 1]]["versions"][parts[k + 1]]
+                    scope += f", the version effective {version.get('effective_from')}"
+                except (KeyError, IndexError, TypeError, AttributeError):
+                    pass
+            return scope
     if parts and parts[0] == "datasets" and len(parts) > 1 and isinstance(parts[1], int):
         entries = raw.get("datasets") or []
         if parts[1] < len(entries):
@@ -1863,6 +1880,18 @@ def _files_go_to_period_errors(cal_raw: dict, raw: dict, src: Source) -> list[Co
     for cid, dids in datasets_of.items():
         entry = entries.get(cid, {})
         scope = f"collection {cid!r}"
+        # TWO VERSIONS ON ONE DATE (critic finding 10) would leave which is in
+        # force to the order they happen to be written in.
+        seen: set[str] = set()
+        for raw_v in ((entry.get(_OFFSET_KEY) or {}).get("versions") or []):
+            when = str((raw_v or {}).get("effective_from"))
+            if when in seen:
+                out.append(ConfigError(
+                    name, scope,
+                    f"states two {_OFFSET_KEY} versions effective {when}.",
+                    "Keep one version per effective_from - a later value is a new version "
+                    "from a later round (REQ-PIPE-320)."))
+            seen.add(when)
         versions = agr.offsets.get(cid, ())
         on_calendar, unknown = [], False
         for did in dids:
@@ -1980,6 +2009,12 @@ def _days_before_errors(cal_raw: dict, src: Source) -> list[ConfigError]:
                 rnd = rounds[i]
                 if rnd.date < v.effective_from or (until is not None and rnd.date >= until):
                     continue
+                # ONLY ITS OWN ROUNDS (critic finding 4): a round it supplies
+                # nothing in has no slot of its to be due. Still measured
+                # against the calendar round just before (PROVISIONAL).
+                months = schedule.delivery_months(did, rnd.date, agr)
+                if months is not None and rnd.date.month not in months:
+                    continue
                 if rnd.date - timedelta(days=days) >= rounds[i - 1].date:
                     continue
                 filled = schedule.period_filled_by(did, rnd, agr)
@@ -2050,6 +2085,14 @@ def _rise_errors(name, cid, scope, on_calendar, versions, agr) -> list[ConfigErr
     paste."""
     if not on_calendar:
         return []
+    # EVERY CALENDAR ITS DATASETS NAME (critic finding 6): each calendar's
+    # skipped periods are worked out on its own rounds, for its own datasets.
+    by_calendar: dict[str, list] = {}
+    for entry in on_calendar:
+        by_calendar.setdefault(entry[1], []).append(entry)
+    if len(by_calendar) > 1:
+        return [e for cal, group in by_calendar.items()
+                for e in _rise_errors(name, cid, scope, group, versions, agr)]
     cal_name = on_calendar[0][1]
     out = []
     for old, new, i0, rounds in _change_rounds(cal_name, versions, agr):
@@ -2070,7 +2113,7 @@ def _rise_errors(name, cid, scope, on_calendar, versions, agr) -> list[ConfigErr
             continue
         names = ", ".join(rounds[j].name for j in skipped)
         paste = "\n".join(
-            f"     {did}:\n       not_expected:\n" + "".join(
+            f"     - id: {did}\n       not_expected:\n" + "".join(
                 f'         - period: "{p}"\n           reason: "{NOT_EXPECTED_PLACEHOLDER}"\n'
                 for p in periods)
             for did, periods in must.items())
@@ -2081,7 +2124,8 @@ def _rise_errors(name, cid, scope, on_calendar, versions, agr) -> list[ConfigErr
             f"round fills {names}. Must declare it not owed: {', '.join(must)}. Need not: "
             + (", ".join(need_not) if need_not else "none - every dataset supplies in that round")
             + ".",
-            f"1. Declare each skipped period not owed in {name}, stating the reason:\n"
+            f"1. Declare each skipped period not owed in {name}, stating the reason - add "
+            f"not_expected to each dataset's existing entry under datasets:\n"
             + paste
             + "\n  2. Where the version is already frozen, declare the change as a correction "
               "too (REQ-PIPE-320 criterion 8): `mothman schedule preview-correction` lists every "
@@ -2089,33 +2133,73 @@ def _rise_errors(name, cid, scope, on_calendar, versions, agr) -> list[ConfigErr
     return out
 
 
+def _collection_calendars(cid: str, agr) -> tuple[str, list[str]]:
+    """(collection name, each distinct authored-or-rule calendar its datasets
+    name, in hierarchy order) - every calendar, never only the first
+    member's (critic finding 6)."""
+    from qa_tools.common import hierarchy
+
+    try:
+        members = hierarchy.datasets_in_collection(cid)
+    except hierarchy.UnknownDatasetError:
+        return "", []
+    names: list[str] = []
+    for d in members:
+        name = agr.calendar_name_for(d.dataset_id)
+        if name in agr.calendars and name not in names:
+            names.append(name)
+    return (members[0].collection_name if members else ""), names
+
+
+def effective_lines(agr) -> list[str]:
+    """REQ-PIPE-320 criterion 1: where a files_go_to_period version's
+    effective_from is not itself a round's date, the round on each calendar
+    it takes effect from - information, never a refusal."""
+    from datetime import timedelta
+
+    from qa_tools.common import files_go
+
+    out = []
+    for cid, versions in sorted(agr.offsets.items()):
+        label, cals = _collection_calendars(cid, agr)
+        for v in versions:
+            for cal_name in cals:
+                try:
+                    rounds = schedule.periods_for_calendar(
+                        cal_name, until=v.effective_from + timedelta(days=400), agreement=agr)
+                except schedule.ScheduleConfigError:
+                    continue
+                first = next((r for r in rounds if r.date >= v.effective_from), None)
+                if first is None or first.date == v.effective_from:
+                    continue
+                said = files_go.value_words(v.value)
+                where = f" on the {cal_name!r} calendar" if len(cals) > 1 else ""
+                out.append(f"{label}: {said[0].lower()}{said[1:]} from {_day(v.effective_from)}, "
+                           f"which takes effect from the {_day(first.date)} round{where}.")
+    return out
+
+
 def fall_lines(agr) -> list[str]:
     """REQ-PIPE-322 criterion 10: one line per collection naming each period a
     fall feeds twice and the round whose files will be held for a person -
     information, never a refusal."""
-    from qa_tools.common import hierarchy
-
     out = []
     for cid, versions in sorted(agr.offsets.items()):
-        try:
-            members = hierarchy.datasets_in_collection(cid)
-            cal_name = next(agr.calendar_name_for(d.dataset_id) for d in members
-                            if agr.calendar_name_for(d.dataset_id) in agr.calendars)
-        except (StopIteration, hierarchy.UnknownDatasetError, KeyError):
-            continue
-        label = members[0].collection_name
-        for old, new, i0, rounds in _change_rounds(cal_name, list(versions), agr):
-            if new.value > old.value:
-                continue
-            for k in range(old.value - new.value):
-                held = rounds[i0 + k] if i0 + k < len(rounds) else None
-                target = i0 + k + new.value
-                if held is None or target >= len(rounds):
+        label, cals = _collection_calendars(cid, agr)
+        for cal_name in cals:   # EVERY calendar its datasets name (finding 6)
+            where = f" on the {cal_name!r} calendar" if len(cals) > 1 else ""
+            for old, new, i0, rounds in _change_rounds(cal_name, list(versions), agr):
+                if new.value > old.value:
                     continue
-                filler = rounds[target - old.value]
-                out.append(f"{label}: from the {_day(held.date)} round, files for "
-                           f"{rounds[target].name} will be held for a person - the "
-                           f"{_day(filler.date)} round already fills it.")
+                for k in range(old.value - new.value):
+                    held = rounds[i0 + k] if i0 + k < len(rounds) else None
+                    target = i0 + k + new.value
+                    if held is None or target >= len(rounds):
+                        continue
+                    filler = rounds[target - old.value]
+                    out.append(f"{label}: from the {_day(held.date)} round{where}, files for "
+                               f"{rounds[target].name} will be held for a person - the "
+                               f"{_day(filler.date)} round already fills it.")
     return out
 
 
@@ -2444,7 +2528,8 @@ def main(src: Source | None = None) -> int:
     try:
         from qa_tools.common import agreement as agreement_mod
 
-        for line in fall_lines(agreement_mod.load(src.agreement_path)):
+        loaded = agreement_mod.load(src.agreement_path)
+        for line in effective_lines(loaded) + fall_lines(loaded):
             print(f"  {line}")
     except (schedule.ScheduleConfigError, ValueError, OSError):
         pass  # a configuration the checks above passed always loads

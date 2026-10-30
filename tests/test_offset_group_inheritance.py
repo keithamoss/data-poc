@@ -126,21 +126,44 @@ def test_one_offset_everywhere_behaves_as_before(conn, periods, two_groups, monk
 
 
 class TestTheTimeRoute:
-    """Criterion 3 against the real calendar: at the first arrival after the
-    claim window of the 1 November 2015 round opens, Emergency Department's
-    group owes its 2015-Q4 inheritances, and Child Protection's its 2016-Q1."""
+    """Criterion 3 against the real calendar: at the first arrival once the
+    1 November 2015 round's DUE INSTANT has passed with nothing filed at an
+    offset (Keith, 2026-10-30), Emergency Department's group owes its 2015-Q4
+    inheritances, and Child Protection's its 2016-Q1. Until then a reader at
+    the other offset sees what is promoted now."""
 
-    AT = datetime(2015, 11, 1, 1, tzinfo=timezone.utc)
+    AT = datetime(2015, 11, 1, 1, tzinfo=timezone.utc)      # the due instant
+    AFTER = AT + timedelta(minutes=1)
 
     def test_both_groups_are_due_for_the_periods_their_rounds_fill(self):
-        due = inheritance.groups_due("child-protection", self.AT, recorded=set())
+        """A Child Protection arrival after Emergency Department's due instant
+        makes ED's group too: a gap is a round ED has no arrival in, so only
+        another collection's arrival can carry ED's datasets forward."""
+        due = inheritance.groups_due("child-protection", self.AFTER, recorded=set())
         assert ("2015-Q4", 0) in due and ("2016-Q1", 1) in due
         assert ("2016-Q1", 0) not in due
 
+    def test_an_arrival_at_the_due_instant_itself_makes_none(self):
+        """An on-time supply arrives AT the due instant, where arrivals tie;
+        only a later one makes a group by time, so the parallel and
+        sequential bootstraps record the same history."""
+        due = inheritance.groups_due("child-protection", self.AT, recorded=set())
+        assert ("2015-Q4", 0) not in due and ("2016-Q1", 1) not in due
+
     def test_a_group_already_recorded_is_not_due_again(self):
-        due = inheritance.groups_due("emergency-department", self.AT,
+        due = inheritance.groups_due("emergency-department", self.AFTER,
                                      recorded={("2015-Q4", 0)})
         assert ("2015-Q4", 0) not in due
+
+    def test_nothing_is_due_once_the_window_opens_until_the_due_instant(self):
+        """The 1 November 2015 round's claim window opens on 18 October; its
+        due instant is 9:00am on 1 November (Perth). In between, no group is
+        made by time - a collection filing on time makes it by filing."""
+        opened = datetime(2015, 10, 20, tzinfo=timezone.utc)
+        just_before = self.AT - timedelta(minutes=1)
+        for at in (opened, just_before):
+            due = inheritance.groups_due("child-protection", at, recorded=set())
+            assert ("2015-Q4", 0) not in due and ("2016-Q1", 1) not in due, at
 
     def test_nothing_is_due_before_the_window_opens(self):
         early = datetime(2015, 10, 1, tzinfo=timezone.utc)
@@ -161,3 +184,13 @@ def test_the_not_owed_reason_names_the_round(monkeypatch):
     assert skipped
     assert "supplies only in the February and August rounds" in reason
     assert schedule.round_of("2024-Q1", "cp-case-workers") == date(2023, 11, 1)
+
+
+def test_three_rounds_are_listed_with_commas(monkeypatch):
+    """Critic finding 9: three months read 'February and May and August'."""
+    real = schedule.delivery_months
+    monkeypatch.setattr(schedule, "delivery_months",
+                        lambda did, on=None, agreement=None: [2, 5, 8]
+                        if did == "cp-case-workers" else real(did, on, agreement))
+    _, reason = inheritance._does_not_participate("cp-case-workers", "2024-Q1")
+    assert "supplies only in the February, May and August rounds" in reason

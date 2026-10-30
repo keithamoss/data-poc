@@ -345,39 +345,64 @@ def test_the_embedded_dates_come_from_the_authored_calendar_rather_than_a_rule(
     assert {int(d[5:7]) for _n, d in embedded} >= {2, 5, 8, 11}
 
 
-def test_nothing_that_has_not_begun_is_embedded(monkeypatch, tmp_path):
-    """Criterion 3, and Keith's own question behind it: "why would we be
-    able to choose a date in the future? nothing has happened yet, so why
-    project forward?" The as-of picker asks about the past, so a date with
-    nothing behind it has no answer to give - which removes the horizon
-    question rather than answering it.
+def _furthest_open_period(name, now):
+    """The furthest period date a slot whose claim window has opened by
+    `now` fills, across the datasets on calendar `name`."""
+    from datetime import timedelta
 
-    ON THE ASSET'S CLOCK, not this machine's. Perth is eight hours ahead of
-    UTC, so for a third of every day the two are on different calendar
-    dates - and a test that took `today` from date.today() would go red in
-    that window for no reason about the code."""
+    from qa_tools.common import hierarchy, schedule, slots
+
+    reach = None
+    for entry in hierarchy.all_datasets():
+        try:
+            if schedule.calendar_for_dataset(entry.dataset_id).name != name:
+                continue
+            found = slots.slots_for_dataset(entry.dataset_id, until=now.date() + timedelta(days=400))
+        except (schedule.NoCalendarAgreed, schedule.ScheduleConfigError):
+            continue
+        for slot in found:
+            if slot.claim_opens_at <= now and (reach is None or slot.period.date > reach):
+                reach = slot.period.date
+    return reach
+
+
+def test_nothing_no_slot_has_opened_for_is_embedded(monkeypatch, tmp_path):
+    """Criterion 3 as amended by REQ-DASH-326 (Keith's own question behind
+    the original: "why would we be able to choose a date in the future?").
+    The sequence ends at the later of today's period and the furthest period
+    a slot already open fills - at files_go_to_period 1 a quarter that has not
+    begun - and holds nothing beyond it.
+
+    ON THE ASSET'S CLOCK, not this machine's: Perth is eight hours ahead of
+    UTC, so for a third of every day the two are on different dates."""
     from qa_tools.common import asset_time
 
-    today = asset_time.now().date().isoformat()
+    now = asset_time.now()
+    today = now.date().isoformat()
     sequences = _run_embed_and_extract_period_sequences(monkeypatch, tmp_path)
     for name, periods in sequences["calendars"].items():
-        future = [p["date"] for p in periods if p["date"] > today]
-        assert not future, f"{name} embedded {len(future)} period(s) that have not begun: {future[:3]}"
+        reach = _furthest_open_period(name, now)
+        bound = max(today, reach.isoformat()) if reach else today
+        beyond = [p["date"] for p in periods if p["date"] > bound]
+        assert not beyond, f"{name} embedded {len(beyond)} period(s) no slot has opened for: {beyond[:3]}"
 
 
-def test_the_current_period_IS_embedded_because_it_has_begun(monkeypatch, tmp_path):
-    """The other side of criterion 3, and the one a naive "drop anything
-    not in the past" filter gets wrong. A quarterly period that began six
-    weeks ago is the period a viewer asking about today is in; dropping it
-    would make today unpickable on that calendar."""
+def test_the_period_an_open_slot_fills_IS_embedded(monkeypatch, tmp_path):
+    """The other side of criterion 3. Today's period is embedded because it
+    has begun, and so is the period a slot already open fills - Child
+    Protection's next quarter - or a supply filed to it would have no period
+    to sit under and its deep link would read Period not found (REQ-DASH-326
+    criterion 10, the dashboard review's F1)."""
     from qa_tools.common import asset_time, schedule
 
-    today = asset_time.now().date()
+    now = asset_time.now()
     sequences = _run_embed_and_extract_period_sequences(monkeypatch, tmp_path)
     for name in sequences["calendars"]:
-        expected = [p.date.isoformat()
-                     for p in schedule.periods_for_calendar(name, until=today)]
+        reach = _furthest_open_period(name, now)
+        until = max(now.date(), reach) if reach else now.date()
+        expected = [p.date.isoformat() for p in schedule.periods_for_calendar(name, until=until)]
         assert [p["date"] for p in sequences["calendars"][name]] == expected
+    assert sequences["today"] == now.date().isoformat()
 
 
 def test_deriving_the_sequences_opens_nothing_under_data(monkeypatch, tmp_path):
@@ -461,8 +486,11 @@ def test_slot_due_dates_carry_only_the_slots_due_off_their_period_date(monkeypat
         "birth-registrations": {d.isoformat(): (d - timedelta(days=1)).isoformat() for d in era}}
 
 
-def test_slot_due_dates_name_a_following_period_datasets_due_date():
-    from qa_tools.common import slots
+def test_slot_due_dates_are_only_for_a_cadence_rule_calendar():
+    """REQ-DASH-326 criteria 3 and 4: an authored calendar's headings read
+    its embedded slots ('For <period> · due <instant>'), so only a cadence
+    rule's day-before slots travel this way - a slot due off its period's
+    date on the quarterly calendar is carried by periodSlots instead."""
 
     class Slot:
         def __init__(self, period_date, due):
@@ -470,10 +498,11 @@ def test_slot_due_dates_name_a_following_period_datasets_due_date():
             self.date = date.fromisoformat(period_date)
             self.due_at = datetime.fromisoformat(due).replace(tzinfo=timezone.utc)
 
-    got = edd._slot_due_dates({"cp-early": [Slot("2026-02-01", "2026-01-04T01:00:00"),
-                                            Slot("2026-05-01", "2026-05-01T01:00:00")]})
-    assert got == {"cp-early": {"2026-02-01": "2026-01-04"}}
-    assert slots  # imported for the shape the real call passes
+    got = edd._slot_due_dates({
+        "cp-clients": [Slot("2026-05-01", "2026-02-01T01:00:00")],
+        "birth-registrations": [Slot("2026-06-18", "2026-06-17T06:00:00"),
+                                Slot("2026-06-30", "2026-06-30T06:00:00")]})
+    assert got == {"birth-registrations": {"2026-06-18": "2026-06-17"}}
 
 
 def test_applied_corrections_are_listed_outside_the_cap(monkeypatch):

@@ -16,7 +16,7 @@ from __future__ import annotations
 from datetime import date
 
 from qa_tools.common import agreement as agreement_mod
-from qa_tools.common import schedule, slots
+from qa_tools.common import asset_time, schedule, slots
 
 #: The three kinds of period a dataset owes nothing in (criterion 2). The
 #: page words each; the build only names it.
@@ -42,7 +42,14 @@ def for_dataset(dataset_id: str, until: date, agreement=None) -> list[dict]:
     sequence = slots._calendar_periods(dataset_id, until, agr)
     index = {p.name: i for i, p in enumerate(sequence)}
     for rnd in sequence:
-        if rnd.date > until or (begins is not None and rnd.date < begins):
+        if begins is not None and rnd.date < begins:
+            continue
+        # ON SHOW ONCE ITS ROUND'S CLAIM WINDOW HAS OPENED (REQ-DASH-326
+        # criterion 5): at files_go_to_period 1 the period a round fills is
+        # current from a fortnight before the round, so its row is needed then
+        # - the page shows it from that day (periodShownOn).
+        if rnd.date > until and asset_time.local_date(
+                slots.slot_instants(dataset_id, rnd.date, agr).claim_opens_at) > until:
             continue
         j = index[rnd.name] + (agr.files_go_to_period_for(dataset_id, rnd.date) or 0)
         if j >= len(sequence):

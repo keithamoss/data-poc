@@ -2611,15 +2611,13 @@ function buildRealDataset(d){
   return {
     id: d.id, name: d.name, provider: d.provider, deliveryFormat: d.deliveryFormat,
     sla: d.sla,
-    lastArrival: { date: toDate(d.lastArrival.run_date),
-      // CARRIED WHOLE (REQ-DASH-071). It used to be sliced to a wall
-      // clock and labelled " UTC" here, in the data layer, which put a
-      // format decision two transforms away from the thing rendering
-      // it and made the real instant unrecoverable downstream.
-      arrivedAt: d.lastArrival.arrivedAt,
-      arrivalStatus: d.lastArrival.arrivalStatus,
-      // Which run, so an excuse (REQ-DASH-162) can be found for it.
-      run_id: d.lastArrival.run_id },
+    // SPREAD, NOT AN ALLOWLIST (REQ-DASH-326 criterion 12): a hand-kept list
+    // of copied fields dropped the filed period, so Latest arrival could not
+    // name it - CLAUDE.md's shape-change rule, again. arrivedAt is CARRIED
+    // WHOLE (REQ-DASH-071): it used to be sliced to a wall clock here, which
+    // made the real instant unrecoverable downstream; run_id lets an excuse
+    // (REQ-DASH-162) be found for it.
+    lastArrival: { ...d.lastArrival, date: toDate(d.lastArrival.run_date) },
     // REQ-DASH-056. Carried WHOLE rather than field by field, for the
     // reason plans/qa-pipeline.md item 74 records: a hand-maintained
     // allowlist of copied fields drops a new one in silence, and the
@@ -6995,7 +6993,7 @@ function blockerLabel(b){
   return b.scheduleEnded ? "Held: schedule ended" : (BLOCKER_LABEL[b.kind] || b.kind);
 }
 function blockerSays(b){
-  if(b.doublyFed) return `the agreement change from ${roundWords(b.doublyFed.round)} - a change on our side, not the supplier's; place it as a resupply of ${b.doublyFed.period} or reject it`;
+  if(b.doublyFed) return `the agreement change from ${roundWords(b.doublyFed.from_round || b.doublyFed.round)} - a change on our side, not the supplier's; place it as a resupply of ${b.doublyFed.period} or reject it`;
   return b.scheduleEnded
     ? "add the next delivery dates; it files itself on the next processing pass"
     : (BLOCKER_SAYS[b.kind] || "it cannot be read");
@@ -8974,7 +8972,9 @@ function renderSupplyHistorySection(ds, cycles, currentCycleStart){
 // bare line, tagged current; on a cadence rule, the line it always was.
 function emptyCurrentCycle(ds){
   const cur = currentPeriodOn(ds.id, CURRENT_IN_PLACE_ON);
-  if(!cur.slot) return `<div style="color:var(--ink-faint); font-size:13px;">No deliveries in the current cycle yet.</div>`;
+  // A round the dataset owes nothing in is an owed-nothing row, never 'open
+  // for files' (criterion 2's own exception).
+  if(!cur.slot || !cur.slot.owed) return `<div style="color:var(--ink-faint); font-size:13px;">No deliveries in the current cycle yet.</div>`;
   return `<div class="supply-cycle" data-empty-current-cycle>
       <div class="supply-cycle-label">
         <b>${periodLinkFor(ds.id, cur.period, cycleLabel(ds.sla.cadence, cur.date, ds.id))}</b>
@@ -9132,13 +9132,31 @@ function compositionCells(ag, col, row){
       <td>${row.promotedOn && STATUS_LABEL[row.promotedOn] ? pill(row.promotedOn, "sm") : ""}</td>
       <td>${ack}</td>`;
 }
+// HAS A PERIOD OPENED BY THE DATE (REQ-DASH-326 criterion 8): once any of the
+// collection's slots for it has opened its claim window - at
+// files_go_to_period 1 a quarter before the period's own date - or, where no
+// dataset has embedded slots, once its date has come.
+// A PERIOD NO DATASET HAS A SLOT FOR goes by its own date: it is from before
+// the authored calendar (or a cadence rule's), whose slots are not embedded.
+// A period's date is never before its slot's claim opening, so this never
+// calls a slotted period open early.
+function periodOpenedOn(col, p, dateStr){
+  let slotted = false;
+  for(const ds of (col && col.datasets) || []){
+    const s = slotNamed(ds.id, p.period);
+    if(!s) continue;
+    slotted = true;
+    if(assetDateStrOf(s.opens) <= dateStr) return true;
+  }
+  return slotted ? false : p.date <= dateStr;
+}
 function compositionHtml(ag, col, period, dateStr){
   const seq = collectionPeriods(col);
   const at = seq.findIndex(p=> p.period === period);
   const name = fmtPeriodName(period) || fmtPeriodOrDay(period);
   const daily = /^\d{4}-\d{2}-\d{2}$/.test(period);
   const prev = at > 0 ? seq[at - 1] : null;
-  const next = at >= 0 && at + 1 < seq.length && seq[at + 1].date <= dateStr ? seq[at + 1] : null;
+  const next = at >= 0 && at + 1 < seq.length && periodOpenedOn(col, seq[at + 1], dateStr) ? seq[at + 1] : null;
   const step = (p, which)=> {
     const label = daily ? `${which} day: ${fmtDay(p.period)}` : `${which} period: ${fmtPeriodName(p.period) || p.period}`;
     return periodLinkHtml(ag.id, col.id, p.period, escHtml(label)).replace("data-period-link", `data-period-link data-period-${which === "Previous" ? "prev" : "next"}`);
@@ -9150,7 +9168,7 @@ function compositionHtml(ag, col, period, dateStr){
       <div class="view-sub">${escHtml(sub)}</div>
       <div class="promo-actions">${prev ? step(prev, "Previous") : ""} ${next ? step(next, "Next") : ""}</div>
     </div></div>`;
-  if(at >= 0 && seq[at].date > dateStr){
+  if(at >= 0 && !periodOpenedOn(col, seq[at], dateStr)){
     return head + `<p data-not-opened>${escHtml(name)} had not opened by ${fmtDay(dateStr)}.</p>`;
   }
   const rows = (col.datasets || []).map(ds=> ({ds, row: compositionRow(rawRealDatasetById(ds.id), period, dateStr)}))

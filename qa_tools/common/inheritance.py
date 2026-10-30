@@ -132,7 +132,8 @@ def _does_not_participate(dataset_id: str, period_name: str) -> tuple[bool, str]
         import calendar
 
         names = [calendar.month_name[m] for m in months]
-        return True, (f"{dataset_id} supplies only in the {' and '.join(names)} rounds "
+        said = names[0] if len(names) == 1 else ", ".join(names[:-1]) + " and " + names[-1]
+        return True, (f"{dataset_id} supplies only in the {said} rounds "
                       f"(its participation in contract/calendar.yaml), so nothing is owed for {period_name}")
     return False, ""
 
@@ -664,8 +665,11 @@ def make_group(conn, period_name: str, *, offset: int, collection_id: str | None
 
 def groups_due(collection_id: str, at, *, recorded: set) -> list[tuple[str, int]]:
     """(period, offset) for each offset group on this collection's calendar
-    whose round's claim window has opened by `at` and whose inheritances are
-    not recorded (REQ-PIPE-323 criterion 3). From configuration alone, so the
+    whose round's DUE INSTANT has passed by `at` and whose inheritances are
+    not recorded (REQ-PIPE-323 criterion 3). Keith, 2026-10-30: by time only
+    once the slot is due with nothing filed at that offset - a filing records
+    its group, so a recorded one is never due again - and until then a reader
+    at another offset sees what is promoted now. From configuration alone, so the
     merged stream decides it identically in parallel and in sequence. Empty
     where the calendar's collections share one offset (criterion 4)."""
     from qa_tools.common import asset_time, slots
@@ -696,7 +700,11 @@ def groups_due(collection_id: str, at, *, recorded: set) -> list[tuple[str, int]
         for i, rnd in enumerate(rounds):
             if begins is not None and rnd.date < begins:
                 continue
-            if slots.slot_instants(did, rnd.date, agr).claim_opens_at > at:
+            # STRICTLY AFTER THE DUE INSTANT: an on-time supply arrives AT it,
+            # and arrivals at one instant are a tie the merged stream may
+            # break either way in parallel - so only a later arrival makes a
+            # group by time, and the two modes record the same history.
+            if slots.slot_instants(did, rnd.date, agr).due_at >= at:
                 break
             n = agr.files_go_to_period_for(did, rnd.date) or 0
             if i + n >= len(rounds):
@@ -716,10 +724,10 @@ def make_due_groups(conn, collection_id: str, at, *, effective_at: str) -> list[
     made = []
     for period_name, offset in groups_due(collection_id, at, recorded=recorded):
         period_schema.open_period(conn, period_name,
-                                  opened_by=f"the claim window opening for {period_name}",
+                                  opened_by=f"{period_name}'s due instant passing",
                                   effective_at=effective_at, groups=())
         if make_group(conn, period_name, offset=offset, collection_id=collection_id,
-                      route="claim window opened", effective_at=effective_at):
+                      route="due instant passed", effective_at=effective_at):
             made.append((period_name, offset))
     return made
 

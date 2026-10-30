@@ -156,3 +156,22 @@ describe("a supply held after a fall (criterion 15)", () => {
     expect(w.blockerSays(b)).toContain("the agreement change from the 1 May 2026 round");
   });
 });
+
+describe("a period from before the authored calendar (its slots start later)", () => {
+  it("has opened by its own date, so its composition is shown rather than 'had not opened'", () => {
+    const { w } = load();
+    const col = { datasets: [{ id: "cp-clients" }] };
+    expect(w.periodOpenedOn(col, { period: "2024-Q4", date: "2024-11-01" }, "2026-03-01")).toBe(true);
+    // A slotted period still goes by its slot's claim opening, not its date.
+    expect(w.periodOpenedOn(col, { period: "2026-Q2", date: "2026-05-01" }, "2026-01-17")).toBe(false);
+    expect(w.periodOpenedOn(col, { period: "2026-Q2", date: "2026-05-01" }, "2026-01-18")).toBe(true);
+  });
+});
+
+describe("a hold after a fall of two (critic finding 8)", () => {
+  it("names the round the agreement change took effect from, not the one the supply arrived in", () => {
+    const { w } = load();
+    const b = { kind: "held", doublyFed: { period: "2026-Q2", round: "2026-08-01", from_round: "2026-05-01" } };
+    expect(w.blockerSays(b)).toContain("the agreement change from the 1 May 2026 round");
+  });
+});

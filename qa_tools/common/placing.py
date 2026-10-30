@@ -200,10 +200,9 @@ def _owes_nothing(dataset_id: str, period: str) -> str | None:
     not generate it at all. One resolution, the participation in force on
     the date of the round that would fill it (REQ-PIPE-113 criterion 2, as
     REQ-PIPE-321 amends it)."""
-    from qa_tools.common import asset_time, schedule, slots
+    from qa_tools.common import schedule, slots
 
-    horizon = asset_time.local_date(asset_time.now())
-    horizon = horizon.replace(year=horizon.year + slots.SLOT_LOOKUP_YEARS)
+    horizon = slots.lookup_horizon()
     try:
         sequence = slots._calendar_periods(dataset_id, horizon)
     except (schedule.ScheduleConfigError, schedule.NoCalendarAgreed, KeyError, ValueError):
@@ -341,12 +340,11 @@ def period_choices(dataset_id: str, received_at, states: dict[str, str], *,
     run of periods the dataset owes nothing in is ONE row, marked with why
     and not selectable. `page` moves a window's width earlier (negative) or
     later. `states` is {period: slot_state value}, read by the caller."""
-    from qa_tools.common import asset_time, slots
+    from qa_tools.common import slots
 
     from qa_tools.common import schedule
 
-    horizon = asset_time.local_date(asset_time.now())
-    horizon = horizon.replace(year=horizon.year + slots.SLOT_LOOKUP_YEARS)
+    horizon = slots.lookup_horizon()
     try:
         owed = {s.name: s for s in slots.slots_for_dataset(dataset_id, until=horizon)}
         sequence = [p for p in slots._calendar_periods(dataset_id, horizon)

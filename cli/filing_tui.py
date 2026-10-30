@@ -1617,7 +1617,8 @@ def _queue_screen(conn, collection_id: str, *, gaps, held, carry, groups):
         for h in held:
             f = getattr(h, "doubly_fed", None)
             if f:
-                fed.setdefault((f["round"], f.get("collection") or ""), []).append(h)
+                fed.setdefault((f.get("from_round") or f["round"], f.get("collection") or ""),
+                               []).append(h)
         rest = [h for h in held if not getattr(h, "doubly_fed", None)]
         for (rnd, collection), group in sorted(fed.items()):
             from datetime import date as _date

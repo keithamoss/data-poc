@@ -65,7 +65,8 @@ def _fingerprint(parts: dict) -> str:
     return hashlib.sha256(canonical.encode()).hexdigest()[:16]
 
 
-def resolved(dataset_id: str, period_date: date, agreement=None) -> tuple[dict, str]:
+def resolved(dataset_id: str, period_date: date, agreement=None, *,
+             fills: str | None = None) -> tuple[dict, str]:
     """The inputs a slot due on the ROUND dated `period_date` is built from,
     and the fingerprint of the version-level part they came from (criterion
     1).
@@ -106,6 +107,11 @@ def resolved(dataset_id: str, period_date: date, agreement=None) -> tuple[dict, 
         "late_after": (instants.due_at + instants.grace).isoformat(),
         "claim_opens_at": instants.claim_opens_at.isoformat(),
     }
+    # THE PERIOD IT FILLS BESIDE THE ROUND'S DATE (REQ-PIPE-321 criterion 12,
+    # critic finding 8), only at a value other than 0 - where the two differ -
+    # so every verdict recorded at 0 reads exactly as before.
+    if offset and fills:
+        inputs["fills"] = fills
     fingerprint = _fingerprint({
         "participation": {
             "effective_from": version.effective_from,
@@ -151,7 +157,8 @@ def judge(dataset_id: str, slot, received_at: datetime | None, agreement=None) -
     except Exception:  # noqa: BLE001 - see the docstring
         return Judged(None, None, None)
     try:
-        inputs, fingerprint = resolved(dataset_id, slot.round_date, agreement)
+        inputs, fingerprint = resolved(dataset_id, slot.round_date, agreement,
+                                       fills=slot.period.name)
     except Exception:  # noqa: BLE001
         return Judged(classification, None, None)
     return Judged(classification, inputs, fingerprint)
@@ -372,7 +379,8 @@ def compared(conn, dataset_id: str, agreement=None) -> list[Compared]:
                                       f"{slot_name} is no longer a period of its schedule")
             else:
                 try:
-                    by_slot[slot_name] = ((*resolved(dataset_id, when, agreement),
+                    by_slot[slot_name] = ((*resolved(dataset_id, when, agreement,
+                                                     fills=slot_name),
                                            slots.slot_instants(dataset_id, when, agreement),
                                            when), None)
                 except Exception as exc:  # noqa: BLE001

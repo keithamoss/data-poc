@@ -343,13 +343,23 @@ def slots_for_dataset(dataset_id: str, until: date | None = None,
 SLOT_LOOKUP_YEARS = 3
 
 
+def lookup_horizon(on: date | None = None) -> date:
+    """SLOT_LOOKUP_YEARS after `on` (default today on the asset's clock),
+    the furthest any look-up from now reaches. 29 February moves to 1 March,
+    where date.replace(year=) would raise."""
+    from qa_tools.common import asset_time
+
+    on = on or asset_time.local_date(asset_time.now())
+    try:
+        return on.replace(year=on.year + SLOT_LOOKUP_YEARS)
+    except ValueError:
+        return date(on.year + SLOT_LOOKUP_YEARS, 3, 1)
+
+
 def slot_named(dataset_id: str, period: str, agreement=None) -> Slot | None:
     """This dataset's slot for `period`, or None where its calendar has no
     such period it takes part in."""
-    from qa_tools.common import asset_time
-
-    horizon = asset_time.local_date(asset_time.now())
-    horizon = horizon.replace(year=horizon.year + SLOT_LOOKUP_YEARS)
+    horizon = lookup_horizon()
     return next((s for s in slots_for_dataset(dataset_id, until=horizon, agreement=agreement)
                  if s.name == period), None)
 
@@ -519,7 +529,9 @@ def fall_hold(dataset_id: str, at: datetime, agreement=None) -> dict | None:
     except schedule.NoCalendarAgreed:
         return None
     day = asset_time.local_date(at)
-    rounds = schedule.periods_for_calendar(cal, until=day.replace(year=day.year + 2),
+    # Two years ahead BY DAYS, not day.replace(year+2), which raises on
+    # 29 February (critic finding 3).
+    rounds = schedule.periods_for_calendar(cal, until=day + timedelta(days=731),
                                            agreement=agr)
     k = None
     for i, r in enumerate(rounds):
@@ -539,7 +551,12 @@ def fall_hold(dataset_id: str, at: datetime, agreement=None) -> dict | None:
         return None
     version = max((v for v in versions if v.effective_from <= rnd.date),
                   key=lambda v: v.effective_from)
+    # THE ROUND THE CHANGE TOOK EFFECT FROM (REQ-PIPE-322 criterion 3, critic
+    # finding 8) beside the round the supply arrived in: after a fall of 2 or
+    # more they differ, and the words name the change's.
+    from_round = next((r.date for r in rounds if r.date >= version.effective_from), rnd.date)
     return {"collection_id": cid, "collection": name,
             "version": version.effective_from.isoformat(), "round": rnd.date.isoformat(),
+            "from_round": from_round.isoformat(),
             "period": target.name, "filled_by": filler.isoformat()}
 

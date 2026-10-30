@@ -51,7 +51,7 @@ def describe(dataset_id: str, on: date, agreement=None) -> str | None:
     agr = schedule._agreement(agreement)
     try:
         cal = schedule.calendar_for_dataset(dataset_id, agr)
-    except schedule.NoCalendarAgreed:
+    except (schedule.NoCalendarAgreed, hierarchy.UnknownDatasetError):
         return None
     try:
         if cal.version_in_force(on).is_cadence_rule:
@@ -108,7 +108,7 @@ def held_words(held) -> str:
     one period, else 'Held, no period yet'."""
     fed = getattr(held, "doubly_fed", None)
     if fed:
-        when = date.fromisoformat(str(fed["round"])[:10])
+        when = date.fromisoformat(str(fed.get("from_round") or fed["round"])[:10])
         return (f"Held, would be a second supply for {fed['period']} - agreement change "
                 f"from {round_words(when)}")
     reason = getattr(held, "reason", None) or {}

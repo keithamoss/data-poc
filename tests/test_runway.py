@@ -369,3 +369,14 @@ class TestTheNumberCanBeCheckedAgainstTheFile:
         assert r.driving_dataset == "cp-case-workers"
         assert r.driving_last_period == "2027-Q4"
         assert r.remaining == 2
+
+    def test_the_last_slot_is_named_by_the_round_it_is_due_on(self, q1_2028_authored):
+        """Critic finding 9: at files_go_to_period 1, cp-case-workers'
+        2027-Q4 slot is due on the 1 August 2027 round - never on 2027-Q4's
+        own date of 1 November."""
+        from datetime import date
+
+        r = runway.calendar_runway("quarterly", self.AS_OF)
+        assert r.driving_last_date == date(2027, 8, 1)
+        assert "its own last is 2027-Q4, due on the 1 August 2027 round" in self._line()
+        assert "2027-11-01" not in self._line()

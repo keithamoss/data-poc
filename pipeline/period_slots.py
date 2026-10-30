@@ -31,10 +31,12 @@ def for_dataset(dataset_id: str, now=None) -> dict | None:
     first, or None for a cadence-rule calendar or a dataset with none."""
     now = now or asset_time.now()
     today = asset_time.local_date(now)
+    from qa_tools.common import hierarchy
+
     try:
         cal = schedule.calendar_for_dataset(dataset_id)
-    except schedule.NoCalendarAgreed:
-        return None
+    except (schedule.NoCalendarAgreed, hierarchy.UnknownDatasetError):
+        return None             # no calendar, or a dataset outside the hierarchy
     if cal.version_in_force(today).is_cadence_rule:
         return None
     until = today + timedelta(days=400)

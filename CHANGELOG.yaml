@@ -111,9 +111,30 @@ intro: >
 releases:
   - date: "2026-10-30"
     summary: >
-      A person's decision that touches several supplies now takes effect at
-      one moment.
+      A collection's files can now go into the next period, and the dashboard
+      and terminal say which period each supply is for. One decision now takes
+      effect at one moment.
     changes:
+      - category: New
+        items:
+          - headline: Files for the next period
+            components: ["Pipeline & publishing"]
+            description: >
+              A collection can say its files go into the period after the round
+              they arrive in. Child Protection now does, so a file received in
+              February is filed to the next quarter.
+          - headline: For which period
+            components: ["Dashboard UI"]
+            description: >
+              Each supply is now headed with the period it is for and the day it
+              arrived. The current cycle is the one open for files, and it stays
+              calm until it is due.
+          - headline: The terminal names it too
+            components: ["Pipeline & publishing"]
+            description: >
+              `mothman schedule show` and `mothman supply slots` now give each
+              slot's round and the period it is for, and say once where the
+              collection's files go.
       - category: Fixed
         items:
           - headline: One decision, one moment

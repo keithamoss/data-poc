@@ -987,19 +987,21 @@ def round_of(period_name: str, dataset_id: str, agreement=None) -> date | None:
     index = next((i for i, p in enumerate(sequence) if p.name == period_name), None)
     if index is None:
         return None
-    # A PERIOD FILLED ONCE (REQ-PIPE-321 criterion 8): the latest round whose
-    # value reaches it. After a fall the earlier round keeps it.
-    for i in range(index, -1, -1):
-        n = agr.files_go_to_period_for(dataset_id, sequence[i].date) or 0
-        if i + n == index:
-            first = i
-            for j in range(i - 1, -1, -1):
-                if j + (agr.files_go_to_period_for(dataset_id, sequence[j].date) or 0) == index:
-                    first = j
-            return sequence[first].date
-        if index - i > 12:
-            break
-    return None
+    # A PERIOD FILLED ONCE (REQ-PIPE-321 criterion 8): after a fall the
+    # earlier round keeps it - the earliest round whose value reaches it
+    # THAT THIS DATASET TAKES PART IN, as its slots count (critic finding 2:
+    # a February-and-August dataset fills a doubly-fed Q3 from August, never
+    # from a May round it owes nothing in). Where it takes part in none of
+    # them, the calendar's earliest - the round a not-owed reason names.
+    reaching = [i for i in range(max(0, index - 12), index + 1)
+                if i + (agr.files_go_to_period_for(dataset_id, sequence[i].date) or 0) == index]
+    if not reaching:
+        return None
+    for i in reaching:
+        months = delivery_months(dataset_id, sequence[i].date, agr)
+        if months is None or sequence[i].date.month in months:
+            return sequence[i].date
+    return sequence[reaching[0]].date
 
 
 def period_filled_by(dataset_id: str, round_period: Period, agreement=None) -> Period | None:

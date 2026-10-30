@@ -343,8 +343,17 @@ def _slot_due_dates(by_dataset: dict) -> dict:
     than their period's date, read on the asset clock."""
     from qa_tools.common import asset_time
 
+    from qa_tools.common import hierarchy, schedule
+
     out: dict = {}
     for dataset_id, found in by_dataset.items():
+        # ONLY ON A CADENCE RULE: an authored calendar's headings read its
+        # embedded slots instead (REQ-DASH-326 criteria 3 and 4).
+        try:
+            if not schedule.calendar_for_dataset(dataset_id).current.is_cadence_rule:
+                continue
+        except (schedule.NoCalendarAgreed, hierarchy.UnknownDatasetError):
+            continue
         for slot in found:
             due = asset_time.local_date(slot.due_at)
             if due != slot.date:

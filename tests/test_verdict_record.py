@@ -76,8 +76,10 @@ class TestRecordedWithItsInputs:
             "days_before": 0, "grace_seconds": 8 * 3600,
             "claim_window_seconds": 14 * 86400, "timezone": "Australia/Perth",
             "due_at": "2023-08-01T09:00:00+08:00", "late_after": "2023-08-01T17:00:00+08:00",
-            "claim_opens_at": "2023-07-18T09:00:00+08:00"}
+            "claim_opens_at": "2023-07-18T09:00:00+08:00", "fills": "2023-Q4"}
         assert got["fingerprint"]
+        # REQ-PIPE-321 criterion 12 (critic finding 8): period_date is the
+        # ROUND's date, so the period the slot fills is recorded beside it.
 
     def test_never_the_closing_instant_nor_the_calendars_dates(self, clean):
         _file()
