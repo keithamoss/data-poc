@@ -8302,3 +8302,391 @@ class TestAGateThatDidNotFinishIsSaidSo:
         page = cp_pages.page()
         _goto(clean_page, page, state=_cp_state("cp-clients"), in_place_on="2024-11-02")
         assert _shown(clean_page, '.verdict-of[data-verdict-of="gating"]') == []
+
+
+# ---- REQ-DASH-337 criterion 16: a check that reads another collection ---------
+#
+# Every name, order and date below is read from the hierarchy (contract/
+# data-asset.yaml), the built reports or the page's own embedded data - the
+# scenario map's coordinates for the planted linkage quarters - never from
+# today's date. Nothing here counts the collections under an agency
+# (criterion 5).
+
+_STATUS_WORST_FIRST = ("red", "amber", "green", "nodata", "inactive")
+
+
+def _hierarchy_index() -> dict:
+    """{collection order, collection names, dataset -> collection, dataset
+    names}, from the asset's own hierarchy."""
+    import yaml
+
+    h = yaml.safe_load((ROOT / "contract" / "data-asset.yaml").read_text())["hierarchy"]
+    order, col_name, ds_col, ds_name, ds_agency = [], {}, {}, {}, {}
+    for ag in h["agencies"]:
+        for c in ag.get("collections") or []:
+            order.append(c["id"])
+            col_name[c["id"]] = c.get("name") or c["id"]
+            for d in c.get("datasets") or []:
+                ds_col[d["id"]] = c["id"]
+                ds_name[d["id"]] = d.get("name") or d["id"]
+                ds_agency[d["id"]] = ag["id"]
+    assert order and ds_col, "the hierarchy names no collections"
+    return {"order": order, "col_name": col_name, "ds_col": ds_col,
+            "ds_name": ds_name, "ds_agency": ds_agency}
+
+
+def _built_datasets(built: Path) -> dict:
+    """Every dataset of every collection's built dashboard file, by id."""
+    out = {}
+    for c in _registry.all_collections():
+        f = _reports_of(built) / c.dashboard_file
+        for ds in json.loads(f.read_text())["datasets"]:
+            out[ds["id"]] = ds
+    assert out, "the build holds no datasets"
+    return out
+
+
+def _cross_table_checks(ds: dict) -> list[dict]:
+    return [ck for col in ds.get("columns") or [] if col.get("scope") == "cross-table"
+            for ck in col.get("checks") or [] if not ck.get("retired")]
+
+
+def _possessive(name: str) -> str:
+    return f"{name}'" if name.endswith("s") else f"{name}'s"
+
+
+def _dataset_state(hx: dict, dataset_id: str, **extra) -> dict:
+    return {"tier": "dataset", "agencyId": hx["ds_agency"][dataset_id],
+            "collectionId": hx["ds_col"][dataset_id], "datasetId": dataset_id, **extra}
+
+
+#: The planted linkage quarter whose release reads amber on coverage (REQ-GEN-335 (f)).
+_AMBER_COVERAGE = "TS-91"
+#: The quarter whose linked dataset was marked not supplied (REQ-GEN-335 (j)).
+_NOT_SUPPLIED = "TS-95"
+#: The quarter whose large key groups read amber, with their histogram (REQ-GEN-335 (m)).
+_LARGE_KEY_GROUPS = "TS-97"
+#: The linkage product's dataset, as the hierarchy names it.
+_LINKAGE_DATASET = "linkage-keys"
+
+
+def _scenario(page, html: Path, scenario_id: str) -> dict:
+    """A planted scenario's coordinates, from the page's own scenario map."""
+    _goto(page, html)
+    coords = page.evaluate(
+        "(id) => ((SCENARIO_MAP || []).find(s => s.id === id) || {}).coordinates || null",
+        scenario_id)
+    assert coords and coords.get("inPlaceOn") and coords.get("period"), (
+        f"precondition: the scenario map places {scenario_id}")
+    return coords
+
+
+def _open_groups(page) -> None:
+    for btn in page.locator(".xt-group-toggle").all():
+        if btn.get_attribute("aria-expanded") != "true":
+            btn.click()
+
+
+def _render_count(page) -> int:
+    return page.evaluate("() => Number(document.documentElement.dataset.renderCount || 0)")
+
+
+@pytest.mark.shared_page
+class TestChecksThatReadAnotherCollection:
+    """REQ-DASH-337 criterion 16, in a real browser against the built page:
+    what a reader sees of a cross-table check that reads, or is declared on,
+    a dataset of another collection - here Linkage Products' checks, but every
+    expectation is derived from the hierarchy and the recorded results, as the
+    criteria require of the page itself (criterion 15)."""
+
+    def _linkage_page(self, page, html, hx, on):
+        _goto(page, html, state=_dataset_state(hx, _LINKAGE_DATASET), in_place_on=on)
+
+    def test_the_linkage_keys_page_groups_its_checks_collapsed_in_hierarchy_order(
+            self, clean_page, built_dashboard_html):
+        """Criteria 6 and 7: one group per other collection its cross-table
+        checks read, in hierarchy order, each collapsed on load under a
+        heading naming the collection, its worst status and its count at
+        each status; a click opens it and writes nothing to the URL."""
+        hx = _hierarchy_index()
+        ds = _built_datasets(built_dashboard_html)[_LINKAGE_DATASET]
+        checks = _cross_table_checks(ds)
+        assert checks, "precondition: Linkage Keys carries cross-table checks"
+        own = hx["ds_col"][_LINKAGE_DATASET]
+        involved = {hx["ds_col"][d] for ck in checks
+                    for d in [ck["between"]["declared_on"], *ck["between"]["reads"]]}
+        expected = [c for c in hx["order"] if c in involved and c != own]
+        assert expected, "precondition: Linkage Keys reads another collection"
+
+        on = _scenario(clean_page, built_dashboard_html, _AMBER_COVERAGE)["inPlaceOn"]
+        self._linkage_page(clean_page, built_dashboard_html, hx, on)
+        groups = clean_page.locator('.scope-section[data-scope="cross-table"] .xt-group')
+        shown = [g.get_attribute("data-xt-group") for g in groups.all()]
+        assert shown == expected, f"groups {shown}, hierarchy order {expected}"
+
+        url_before = clean_page.url
+        for g in groups.all():
+            cid = g.get_attribute("data-xt-group")
+            toggle = g.locator(".xt-group-toggle")
+            body = g.locator(".xt-group-body")
+            # COLLAPSED ON LOAD, failing groups too.
+            assert toggle.get_attribute("aria-expanded") == "false", cid
+            assert not body.is_visible(), f"{cid} is open on load"
+            head = toggle.inner_text()
+            assert hx["col_name"][cid] in head, head
+            worst = g.get_attribute("data-xt-group-status")
+            assert toggle.locator(f".pill.{worst}").count() == 1, (
+                f"{cid}'s heading shows no {worst} pill: {head}")
+
+            toggle.click()
+            assert toggle.get_attribute("aria-expanded") == "true"
+            assert body.is_visible(), f"{cid} did not open on click"
+            statuses = [next(s for s in _STATUS_WORST_FIRST if f" {s} " in f" {cls} ")
+                        for cls in (p.get_attribute("class")
+                                    for p in body.locator(".xt-pill .pill").all())]
+            assert statuses, f"{cid}'s group holds no checks"
+            assert worst == next(s for s in _STATUS_WORST_FIRST if s in statuses), (
+                f"{cid}: heading says {worst}, its checks are {statuses}")
+            n = len(statuses)
+            counts = ", ".join(
+                f"{statuses.count(s)} {label}" for s, label in
+                (("red", "red"), ("amber", "amber"), ("green", "green"),
+                 ("nodata", "no data"), ("inactive", "no rule defined"))
+                if statuses.count(s))
+            assert f"{n} {'check' if n == 1 else 'checks'}: {counts}" in head, (
+                f"{cid}'s heading {head!r} does not count its {statuses}")
+        assert clean_page.url == url_before, "opening a group changed the URL"
+
+    def test_a_client_register_page_shows_its_linkage_checks_in_their_group_with_a_working_link(
+            self, clean_page, built_dashboard_html):
+        """Criteria 2, 3 and 6 on the READ dataset's page: the Client
+        Register's page shows the linkage checks that read it in a group
+        named for Linkage Products, whose heading links to Linkage Keys at the
+        same date on show."""
+        hx = _hierarchy_index()
+        built = _built_datasets(built_dashboard_html)
+        linkage_col = hx["ds_col"][_LINKAGE_DATASET]
+        readers = [ck for ck in _cross_table_checks(built[_LINKAGE_DATASET])
+                   if "cp-clients" in ck["between"]["reads"]]
+        assert readers, "precondition: Linkage Keys has checks that read the Client Register"
+        shared = {ck["check_id"] for ck in _cross_table_checks(built["cp-clients"])}
+        assert {ck["check_id"] for ck in readers} <= shared, (
+            "the Client Register's build does not carry the linkage checks that read it")
+
+        on = _scenario(clean_page, built_dashboard_html, _AMBER_COVERAGE)["inPlaceOn"]
+        _goto(clean_page, built_dashboard_html, state=_dataset_state(hx, "cp-clients"),
+              in_place_on=on)
+        group = clean_page.locator(f'.xt-group[data-xt-group="{linkage_col}"]')
+        assert group.count() == 1, "the Client Register's page has no Linkage Products group"
+        assert hx["col_name"][linkage_col] == "Linkage Products"
+        assert "Linkage Products" in group.locator(".xt-group-toggle").inner_text()
+        group.locator(".xt-group-toggle").click()
+        rows = group.locator("button.scope-check")
+        assert rows.count() == len(readers), (
+            f"{rows.count()} rows in the group for {len(readers)} linkage checks")
+        for r in rows.all():
+            assert hx["ds_name"][_LINKAGE_DATASET] in r.inner_text()
+        # NEVER A LINK INSIDE A ROW'S BUTTON (REQ-DASH-272 criterion 15).
+        assert rows.locator("a").count() == 0
+
+        link = group.locator("[data-xt-group-links] a", has_text=hx["ds_name"][_LINKAGE_DATASET])
+        assert link.count() == 1, "the group heading does not link to Linkage Keys"
+        before = _render_count(clean_page)
+        link.click()
+        clean_page.wait_for_function(
+            "(b) => Number(document.documentElement.dataset.renderCount || 0) > b", arg=before)
+        landed = clean_page.evaluate(
+            "() => ({ds: STATE.datasetId, tier: STATE.tier, on: CURRENT_IN_PLACE_ON})")
+        assert landed == {"ds": _LINKAGE_DATASET, "tier": "dataset", "on": on}, landed
+
+    @pytest.mark.parametrize("status,selector", [
+        ("amber", "[data-amber-promoted-why]"),
+        ("red", "[data-red-promoted-why]"),
+    ])
+    def test_a_promoted_supply_names_the_linkage_release_as_its_cause(
+            self, clean_page, built_dashboard_html, status, selector):
+        """Criteria 4, 9 and 11: a supply that went in green and a later
+        linkage verdict turned amber (or red) carries the amber tag (or the
+        red-promoted badge) naming "Linkage Products' <period> Linkage Keys"
+        from the date that verdict began to count - and on the day before,
+        neither."""
+        hx = _hierarchy_index()
+        _goto(clean_page, built_dashboard_html)
+        found = clean_page.evaluate("""([status, cause]) => {
+            const out = [];
+            for(const ds of rawRealDatasets()){
+              for(const [runId, h] of Object.entries(ds.promotedHealth || {})){
+                if(h.promotedOn !== "green" || !h.promotedAt) continue;
+                let prev = null;
+                for(const t of (h.timeline || [])){
+                  if(t.at && t.status === status && t.causeDataset === cause
+                     && !(prev && prev.status === status)
+                     && assetDateStrOf(h.promotedAt) < assetDateStrOf(t.at)){
+                    out.push({datasetId: ds.id, runId, period: t.causePeriod,
+                              on: assetDateStrOf(t.at)});
+                  }
+                  if(t.at && t.status) prev = t;
+                }
+              }
+            }
+            return out;
+        }""", [status, _LINKAGE_DATASET])
+        assert found, f"precondition: a green promoted supply turned {status} by a linkage release"
+        case = found[0]
+        assert hx["ds_col"][case["datasetId"]] != hx["ds_col"][_LINKAGE_DATASET]
+        want = (f"{_possessive(hx['col_name'][hx['ds_col'][_LINKAGE_DATASET]])} "
+                f"{case['period']} {hx['ds_name'][_LINKAGE_DATASET]}")
+        assert want.startswith("Linkage Products' ")
+
+        state = _dataset_state(hx, case["datasetId"])
+        row = f'tr[data-run-id="{case["runId"]}"]'
+        _goto(clean_page, built_dashboard_html, state=state, in_place_on=case["on"])
+        why = clean_page.locator(f"{row} {selector}")
+        assert why.count() == 1, f"{case}: no {status} label on the supply's row"
+        assert want in why.inner_text(), f"{why.inner_text()!r} does not name {want!r}"
+        if status == "amber":
+            assert why.inner_text().startswith("Went in green. Amber since ")
+            assert clean_page.locator(f"{row} [data-amber-promoted] .pill.amber").inner_text() \
+                .strip() == "Amber promoted"
+
+        day_before = (date.fromisoformat(case["on"]) - timedelta(days=1)).isoformat()
+        _goto(clean_page, built_dashboard_html, state=state, in_place_on=day_before)
+        assert clean_page.locator(row).count() == 1, f"{case}: no row the day before"
+        assert clean_page.locator(f"{row} {selector}").count() == 0, (
+            f"{case}: the {status} label shows before the verdict began to count")
+
+    def test_a_percentage_result_shows_its_percentage_in_the_grid_cell(
+            self, clean_page, built_dashboard_html):
+        """Criterion 10: every cross-table check whose result is a
+        percentage reads 'Warn 85.6%' in its grid cell, not only 'Warn'."""
+        hx = _hierarchy_index()
+        pct = {ck["key"] for ck in _cross_table_checks(
+            _built_datasets(built_dashboard_html)[_LINKAGE_DATASET]) if ck.get("unit") == "%"}
+        assert pct, "precondition: Linkage Keys has a percentage cross-table check"
+        on = _scenario(clean_page, built_dashboard_html, _AMBER_COVERAGE)["inPlaceOn"]
+        self._linkage_page(clean_page, built_dashboard_html, hx, on)
+        _open_groups(clean_page)
+        words = {}
+        for r in clean_page.locator('.scope-section[data-scope="cross-table"] button.xt-row').all():
+            if r.get_attribute("data-check") in pct:
+                cell = r.locator(".xt-cell:not([data-empty]):not([data-not-yet-checked]) .xt-word")
+                assert cell.count() >= 1, f"{r.get_attribute('data-check')} shows no result"
+                words[r.get_attribute("data-check")] = [w.inner_text() for w in cell.all()]
+        assert set(words) == pct, f"rows shown {sorted(words)}, percentage checks {sorted(pct)}"
+        for key, ws in words.items():
+            for w in ws:
+                assert re.fullmatch(r"(Pass|Warn|Fail) \d+\.\d%", w), f"{key}: {w!r}"
+        # THE PLANTED AMBER reads amber with its percentage.
+        assert any(w.startswith("Warn ") for ws in words.values() for w in ws), words
+
+    def test_a_coverage_card_states_its_band_below(self, clean_page, built_dashboard_html):
+        """Criterion 13: a coverage check's card reads 'amber below 90%, red
+        below 85%' in the direction its result records - never 'warn > 90%'."""
+        hx = _hierarchy_index()
+        below = [ck for ck in _cross_table_checks(
+            _built_datasets(built_dashboard_html)[_LINKAGE_DATASET])
+            if (ck.get("band") or {}).get("warn", {}).get("op") == "<"]
+        assert below, "precondition: a cross-table check whose band is 'below'"
+        on = _scenario(clean_page, built_dashboard_html, _AMBER_COVERAGE)["inPlaceOn"]
+        _goto(clean_page, built_dashboard_html,
+              state=_dataset_state(hx, _LINKAGE_DATASET, columnName="cross-table"),
+              in_place_on=on)
+        for ck in below:
+            card = clean_page.locator(f'.check-card[href$="/check/{ck["key"]}"]')
+            assert card.count() == 1, f"no card for {ck['key']}"
+            text = card.locator(".thresholds").inner_text()
+            for side, colour in (("warn", "amber"), ("fail", "red")):
+                v = ck["band"][side]["value"]
+                assert f"{colour} below {v:g}{ck['unit']}" in text, f"{ck['key']}: {text!r}"
+            assert "warn >" not in text and "fail >" not in text, text
+
+    def test_a_child_protection_page_says_not_yet_checked_before_the_release(
+            self, clean_page, built_dashboard_html):
+        """Criterion 8: a Client Register supply on show before the linkage
+        release for its period says 'Not yet checked by Linkage Keys - due
+        <instant>', not a bare No data."""
+        hx = _hierarchy_index()
+        coords = _scenario(clean_page, built_dashboard_html, _AMBER_COVERAGE)
+        period, release_on = coords["period"], coords["inPlaceOn"]
+        case = clean_page.evaluate("""([period, before]) => {
+            const ds = rawRealDatasetById("cp-clients");
+            const r = (ds.runs || []).find(r => ((ds.arrivalByRun || {})[r.run_id] || {}).slot === period
+                                            && r.run_date < before);
+            const slot = (slotsOf("linkage-keys") || []).find(s => s.period === period);
+            return {on: r ? r.run_date : null, due: slot && slot.due ? fmtInstant(slot.due) : null};
+        }""", [period, release_on])
+        assert case["on"], f"precondition: a Client Register supply for {period} before {release_on}"
+        assert case["due"], f"precondition: Linkage Keys has a slot for {period}"
+        _goto(clean_page, built_dashboard_html, state=_dataset_state(hx, "cp-clients"),
+              in_place_on=case["on"])
+        group = clean_page.locator(f'.xt-group[data-xt-group="{hx["ds_col"][_LINKAGE_DATASET]}"]')
+        assert group.count() == 1
+        group.locator(".xt-group-toggle").click()
+        notes = [n.inner_text() for n in group.locator("[data-not-yet-checked]").all()]
+        assert notes, "no not-yet-checked note on the Client Register's linkage checks"
+        want = f"Not yet checked by {hx['ds_name'][_LINKAGE_DATASET]} - due {case['due']}"
+        assert all(want in n for n in notes), f"{notes} do not read {want!r}"
+
+    def test_the_not_supplied_quarter_reads_not_supplied_by_decision(
+            self, clean_page, built_dashboard_html):
+        """Criterion 12 on scenario (j)'s period: the release's checks of the
+        dataset marked not supplied read 'Not supplied for <period>, by
+        decision.' - worded from the entry's code."""
+        hx = _hierarchy_index()
+        coords = _scenario(clean_page, built_dashboard_html, _NOT_SUPPLIED)
+        self._linkage_page(clean_page, built_dashboard_html, hx, coords["inPlaceOn"])
+        block = clean_page.locator(".not-in-agreement")
+        assert block.count() == 1, "no left-out block on the not-supplied quarter's release"
+        whys = [w.inner_text() for w in block.locator(".why").all()]
+        assert whys, "the left-out block lists no checks"
+        assert f"Not supplied for {coords['period']}, by decision." in whys, whys
+
+    def test_the_large_key_group_check_shows_its_histogram(
+            self, clean_page, built_dashboard_html):
+        """Criterion 14: a check whose result carries a recorded binned
+        distribution shows it as a histogram on its panel, the counts the
+        recorded bins'."""
+        hx = _hierarchy_index()
+        coords = _scenario(clean_page, built_dashboard_html, _LARGE_KEY_GROUPS)
+        ds = _built_datasets(built_dashboard_html)[_LINKAGE_DATASET]
+        carrying = [(col, ck) for col in ds["columns"] for ck in col.get("checks") or []
+                    if any(h.get("distribution") for h in ck.get("history") or [])]
+        assert carrying, "precondition: a Linkage Keys check records a distribution"
+        col, ck = carrying[0]
+        (entry,) = [h for h in ck["history"] if h.get("run_id") in coords["supplies"]][-1:]
+        bins = entry["distribution"]["bins"]
+        assert len(bins) > 1, f"precondition: {_LARGE_KEY_GROUPS}'s distribution has several bins"
+        _goto(clean_page, built_dashboard_html,
+              state=_dataset_state(hx, _LINKAGE_DATASET, columnName=col.get("key") or col["name"],
+                                   checkKey=ck["key"]),
+              in_place_on=coords["inPlaceOn"])
+        hist = clean_page.locator("[data-distribution]")
+        assert hist.count() == 1, "the check's panel shows no histogram"
+        counts = [int(c.inner_text().replace(",", ""))
+                  for c in hist.locator("[data-dist-bin] .dist-count").all()]
+        assert counts == [b["count"] for b in bins], (counts, bins)
+
+    def test_a_page_with_no_cross_collection_check_is_unchanged(
+            self, clean_page, built_dashboard_html):
+        """Criterion 6's last clause: a dataset whose cross-table checks all
+        stay inside its own collection shows them ungrouped, under no group
+        heading, exactly as before."""
+        hx = _hierarchy_index()
+        built = _built_datasets(built_dashboard_html)
+        within = [ds_id for ds_id, ds in built.items() if _cross_table_checks(ds) and all(
+            hx["ds_col"][d] == hx["ds_col"][ds_id] for ck in _cross_table_checks(ds)
+            for d in [ck["between"]["declared_on"], *ck["between"]["reads"]])]
+        assert within, "precondition: a dataset whose cross-table checks stay in its collection"
+        for ds_id in within:
+            runs = built[ds_id].get("runs") or []
+            assert runs, f"precondition: {ds_id} has runs"
+            _goto(clean_page, built_dashboard_html, state=_dataset_state(hx, ds_id),
+                  in_place_on=runs[-1]["run_date"])
+            section = clean_page.locator('.scope-section[data-scope="cross-table"]')
+            assert section.count() == 1, f"{ds_id} shows no cross-table section"
+            assert section.locator("button.xt-row").count() > 0, f"{ds_id} shows no rows"
+            assert section.locator(".xt-group, .xt-group-toggle, .xt-key-only").count() == 0, (
+                f"{ds_id} shows a collection group")
+            grids = section.locator(".xt-grid")
+            assert grids.count() == 1, f"{ds_id}: {grids.count()} grids, not one"
+            assert grids.locator(".xt-key").count() == 1, f"{ds_id}: the key left its grid"
