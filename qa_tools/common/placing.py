@@ -100,6 +100,14 @@ def plan(conn, *, dataset_id: str, supply: str, to_period: str) -> Plan:
             f"placed by hand: add the next delivery dates to contract/calendar.yaml and it "
             f"files itself. Where a declared correction is needed:\n"
             f"  mothman schedule draft-correction")
+    if held.doubly_fed and to_period != held.doubly_fed["period"]:
+        # REQ-PIPE-322 criterion 9: a supply of a round a fall feeds twice is a
+        # second supply for that period - never filed forward.
+        raise dl.DecisionRefused(
+            f"{supply} arrived in a round whose files are for {held.doubly_fed['period']}, "
+            f"which an earlier round already fills - it is placed only into "
+            f"{held.doubly_fed['period']} as a resupply, or rejected. Nothing was recorded.\n"
+            f"  {flag_form(dataset_id, supply, held.doubly_fed['period'])}")
     _refuse_a_backstopped_dataset(conn, dataset_id)
     why = period_problem(dataset_id, to_period)
     if why:

@@ -631,11 +631,14 @@ def _draft(ref, *, reference=None, reason=None, approver=None, author=None,
     except correction_trial.Unreadable as exc:
         console.print(f"Nothing was compared: {exc}", style="red", markup=False)
         raise SystemExit(2) from exc
-    if not entries:
+    # A RISE IS DRAFTED COMPLETE (REQ-PIPE-322 criterion 11): the not_expected
+    # entries the gate would ask for, printed with the corrections.
+    rises = correction_trial.rise_entries()
+    if not entries and not rises:
         console.print("Nothing frozen changed without a declared correction - there is "
                       "nothing to declare.", style="green")
         return
-    for entry in entries:
+    for entry in entries + rises:
         console.print(entry, markup=False, highlight=False, soft_wrap=True)
         console.print()
 

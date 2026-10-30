@@ -109,7 +109,7 @@ class TestOneLoaderOneImmutableValue:
 class TestParticipation:
     def test_case_workers_owes_february_and_august_only(self):
         """Criterion 5's worked example, now stated as `participates`."""
-        months = {p.date.month for p in schedule.periods_for_dataset("cp-case-workers")}
+        months = {p.round_date.month for p in schedule.periods_for_dataset("cp-case-workers")}
         assert months == {2, 8}
 
     def test_saying_nothing_owes_every_period(self):
@@ -136,7 +136,7 @@ class TestParticipation:
 
         assert schedule.owes_from("cp-clients", moved) == date(2025, 1, 1)
         periods = schedule.periods_for_dataset("cp-clients", agreement=moved)
-        assert min(p.date for p in periods) == date(2025, 2, 1)
+        assert min(p.round_date for p in periods) == date(2025, 2, 1)
         assert moved.participation_on("cp-clients", date(2024, 12, 31)) is None
 
     def test_a_participation_version_decides_the_periods_on_its_own_dates(self, tmp_path):
@@ -152,8 +152,8 @@ class TestParticipation:
         path = tmp_path / "calendar.yaml"
         path.write_text(yaml.safe_dump(doc, sort_keys=False))
         periods = schedule.periods_for_dataset("cp-clients", agreement=agreement.load(path))
-        assert {p.date.month for p in periods if p.date.year == 2025} == {2, 5, 8, 11}
-        assert {p.date.month for p in periods if p.date.year == 2026} == {2}
+        assert {p.round_date.month for p in periods if p.round_date.year == 2025} == {2, 5, 8, 11}
+        assert {p.round_date.month for p in periods if p.round_date.year == 2026} == {2}
 
 
 # ---- the gate's refusals --------------------------------------------

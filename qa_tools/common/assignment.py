@@ -112,6 +112,10 @@ class Assignment:
     #: receipt fell in - effective_to, turned_off_reason and level - recorded
     #: as history. Outranks schedule_ended (criterion 17).
     turned_off: dict | None = None
+    #: HELD IN A ROUND A FALL FEEDS TWICE (REQ-PIPE-322 criterion 3): the
+    #: agreement change - collection, version, round and the period it would
+    #: be a second supply for, which an earlier round already fills.
+    doubly_fed: dict | None = None
 
     @property
     def is_resupply(self) -> bool:
@@ -225,11 +229,13 @@ def assign(dataset_id: str, supply_id: str, at: datetime,
         considered = current_slot(slots, at)
         index = _opened_by(slots, at)
         ended = schedule_ended(slots, at, opened=index, final_period=final_period)
+        fall = None if ended else slots_mod.fall_hold(dataset_id, at)
         return Assignment(
             dataset_id=dataset_id, supply_id=supply_id, received_at=at, slot=None,
             branch=HELD, considered=(considered.name,) if considered else (),
             unavailable=_why_unavailable(slots, at, filled, opened=index, ended=ended),
-            schedule_ended=ended, last_period=slots[-1].name if ended else None)
+            schedule_ended=ended, last_period=slots[-1].name if ended else None,
+            doubly_fed=fall)
     if found.name in filled:
         return Assignment(dataset_id=dataset_id, supply_id=supply_id, received_at=at,
                            slot=found.name, branch=RESUPPLY,

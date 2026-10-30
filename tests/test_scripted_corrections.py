@@ -135,7 +135,7 @@ class TestTheReplayConfirmsAsScripted:
         assert rows and "CAB-1" in rows[0][2] and "The supplier says it is Q3's." in rows[0][2]
         from qa_tools.common import filing
 
-        assert filing.filing_for("cp-clients", "replay-s")["slot"] == "2023-Q3"
+        assert filing.filing_for("cp-clients", "replay-s")["slot"] == "2023-Q4"
 
     def test_a_correction_scripted_pending_stays_pending(self, two, conn, placed):
         lines, say = _say()
@@ -150,7 +150,7 @@ class TestTheReplayConfirmsAsScripted:
 
         correction_replay.confirm_due(conn, effective_at="2026-10-11T00:00:00+08:00",
                                       say=lambda _m: None, scripts=[])
-        assert filing.filing_for("cp-clients", "replay-s")["slot"] != "2023-Q3"
+        assert filing.filing_for("cp-clients", "replay-s")["slot"] != "2023-Q4"
 
     def test_a_keep_of_a_supply_not_proposed_stops_the_replay_naming_it(
             self, two, conn, placed, monkeypatch):

@@ -166,13 +166,16 @@ class TestParticipation:
     def test_saying_nothing_means_every_period(self):
         """The reading that makes ~30 datasets tolerable to configure."""
         assert schedule.delivery_months("cp-clients") is None
-        # 32 grown quarters from 2015 (REQ-GEN-207, re-sized by REQ-GEN-238)
-        # plus the 20 from 2023.
-        assert len(schedule.periods_for_dataset("cp-clients")) == 52
+        # 32 grown quarters' rounds from 2015 (REQ-GEN-207, re-sized by
+        # REQ-GEN-238) plus the 20 from 2023 - less one at files_go_to_period
+        # 1: the last round, 2027-Q4's, fills a period the calendar gives no
+        # date (REQ-PIPE-321 criterion 8).
+        assert len(schedule.periods_for_dataset("cp-clients")) == 51
 
     def test_a_dataset_naming_months_gets_only_those(self):
         assert schedule.delivery_months("cp-case-workers") == (2, 8)
-        months = {p.date.month for p in schedule.periods_for_dataset("cp-case-workers")}
+        # The ROUNDS it supplies in (REQ-PIPE-321 criterion 2).
+        months = {p.round_date.month for p in schedule.periods_for_dataset("cp-case-workers")}
         assert months == {2, 8}
 
     def test_month_names_are_case_insensitive(self):

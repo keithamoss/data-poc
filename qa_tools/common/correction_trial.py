@@ -627,6 +627,18 @@ def draft(ref: str | None = None, **given) -> list[str]:
         today=asset_time.local_date(datetime.now(UTC)), **given)
 
 
+def rise_entries() -> list[str]:
+    """The not_expected entries a RISE in the working copy asks for
+    (REQ-PIPE-322 criterion 11) - the schedule gate's own refusal text, so a
+    rise is drafted complete rather than refused first."""
+    from qa_tools.common import validate_schedule
+
+    cal, asset = working()
+    src = validate_schedule.Source.default()
+    found = validate_schedule._files_go_to_period_errors(cal, asset, src)
+    return [f"{e.scope}: {e.problem}\n  {e.fix}" for e in found if e.problem.startswith("rises from ")]
+
+
 def may_approve(ref: str | None = None) -> list[str]:
     """Who the gate will accept as approver of a calendar correction, at the
     base - offered when the terminal asks (criterion 14)."""

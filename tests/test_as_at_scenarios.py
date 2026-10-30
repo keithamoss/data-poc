@@ -190,7 +190,7 @@ class TestWhereTheNewChildProtectionScenariosSit:
         periods = _cp_periods()
         got = {sid: si.resolve(_injection(sid), periods).period
                for sid in ("TS-75a", "TS-76", "TS-77a")}
-        assert got == {"TS-75a": "2024-Q1", "TS-76": "2025-Q1", "TS-77a": "2023-Q2"}
+        assert got == {"TS-75a": "2024-Q2", "TS-76": "2025-Q2", "TS-77a": "2023-Q3"}
 
     def test_none_at_minus_1_minus_2_or_minus_15(self):
         for sid in ("TS-75a", "TS-76", "TS-77a"):
@@ -233,7 +233,7 @@ class TestTs79IsWrittenAfterGeneration:
 
     def test_the_newest_and_oldest_inherited_quarters(self):
         got = {p.scenario_id: p for p in si.inheritance_placements(_cp_periods())}
-        assert (got["TS-79a"].period, got["TS-79b"].period) == ("2026-Q2", "2023-Q2")
+        assert (got["TS-79a"].period, got["TS-79b"].period) == ("2026-Q3", "2023-Q3")
         assert {p.dataset for p in got.values()} == {"cp-case-workers"}
 
     def test_each_link_date_is_inside_its_quarter(self):
@@ -257,7 +257,7 @@ class TestTs79IsWrittenAfterGeneration:
         path.write_text(json.dumps({"placements": [stale]}))
         si.write_placements(si.inheritance_placements(_cp_periods()), path, merge=True)
         records = json.loads(path.read_text())["placements"]
-        assert [r["period"] for r in records if r["scenario_id"] == "TS-79a"] == ["2026-Q2"]
+        assert [r["period"] for r in records if r["scenario_id"] == "TS-79a"] == ["2026-Q3"]
 
 
 class TestTheLinksResolveBetweenTheirEvents:

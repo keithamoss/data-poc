@@ -36,6 +36,27 @@ def _quarterly() -> set[str]:
              if schedule.calendar_for_dataset(d.dataset_id).name == "quarterly"}
     assert CP <= found, found
     return found
+@pytest.fixture
+def q1_2028_authored(tmp_path, monkeypatch):
+    """The real contract with a 2028-Q1 date authored after 2027-Q4.
+
+    AT files_go_to_period 1 (Child Protection, REQ-PIPE-320) a round fills
+    the period after it, so the last authored date - 2027-Q4's, 1 November
+    2027 - fills 2028-Q1, which the real calendar gives no date and so has
+    no slot (REQ-PIPE-321 criterion 8): every Child Protection dataset's
+    last slot is 2027-Q4, filled on 1 August. One more date gives the
+    November round a period to fill, and cp-case-workers - delivered in
+    February and August only - its own earlier last slot again."""
+    import shutil
+
+    contract_dir = tmp_path / "contract"
+    shutil.copytree("contract", contract_dir)
+    doc = agreement_split.merged_view(contract_dir)
+    quarterly = next(c for c in doc["calendars"] if c["name"] == "quarterly")
+    quarterly["versions"][-1]["dates"].append({"period": "2028-Q1", "date": "2028-02-01"})
+    agreement_split.repoint(monkeypatch, contract_dir, doc)
+
+
 BEFORE_ANY_RUNOUT = date(2023, 6, 1)
 AFTER_EVERYTHING = date(2028, 6, 1)
 
@@ -59,7 +80,7 @@ class TestRunwayIsMeasuredInSlots:
             if schedule.calendar_for_dataset(dataset.dataset_id).name != "quarterly":
                 continue
             owed = [p for p in schedule.periods_for_dataset(dataset.dataset_id) if p.expected]
-            per_dataset[dataset.dataset_id] = len([p for p in owed if p.date > as_of])
+            per_dataset[dataset.dataset_id] = len([p for p in owed if p.round_date > as_of])
         assert runway.calendar_runway("quarterly", as_of).remaining == min(per_dataset.values())
         assert per_dataset["cp-case-workers"] < per_dataset["cp-clients"]
 
@@ -181,14 +202,16 @@ class TestAnExhaustedScheduleIsScopedToItsOwnDatasets:
         everything is a check somebody disables wholesale."""
         assert "birth-registrations" not in runway.exhausted_datasets(AFTER_EVERYTHING)
 
-    def test_a_dataset_runs_out_before_its_siblings_if_it_participates_less(self):
-        """cp-case-workers' last slot is 2027-Q3, its siblings' is
-        2027-Q4 - so there is a window where it alone is exhausted.
+    def test_a_dataset_runs_out_before_its_siblings_if_it_participates_less(
+            self, q1_2028_authored):
+        """With 2028-Q1 authored, cp-case-workers' last slot is 2027-Q4 (the
+        August round) and its siblings' is 2028-Q1 (the November round) - so
+        there is a window where it alone is exhausted.
 
         THAT WINDOW STARTS WHEN ITS LAST SLOT CLOSES (REQ-DASH-155 criterion
-        6; Keith, 2026-10-06), not at 2027-Q3's own date: the Q3 slot stays
-        open until Q4's claim window opens, and a supply arriving before then
-        is still filed. 1 September 2027, this test's old date, is inside it."""
+        6; Keith, 2026-10-06), not at its round's own date: the slot stays
+        open until the November round's claim window opens, and a supply
+        arriving before then is still filed.""" 
         between = date(2027, 12, 1)
         exhausted = runway.exhausted_datasets(between)
         assert set(exhausted) == {"cp-case-workers"}
@@ -325,21 +348,24 @@ class TestTheNumberCanBeCheckedAgainstTheFile:
             "the number is the minimum across datasets and the sentence never "
             "says whose it is - so nobody can reproduce it from the config")
 
-    def test_it_pairs_that_number_with_that_datasets_own_last_period(self):
-        """2 future slots and 2027-Q4 are facts about different objects.
-        cp-case-workers' own last period is 2027-Q3."""
+    def test_it_pairs_that_number_with_that_datasets_own_last_period(self, q1_2028_authored):
+        """2 future slots and 2028-Q1 are facts about different objects.
+        cp-case-workers' own last period is 2027-Q4 (with 2028-Q1 authored
+        - see the fixture)."""
         line = self._line()
-        assert "2027-Q3" in line
+        assert "2027-Q4" in line
 
-    def test_the_calendars_own_last_period_is_still_available_but_not_conflated(self):
+    def test_the_calendars_own_last_period_is_still_available_but_not_conflated(
+            self, q1_2028_authored):
         """Not a deletion - the calendar's own horizon is worth knowing,
         it just is not the same fact."""
-        assert "2027-Q4" in self._line()
+        assert "2028-Q1" in self._line()
 
-    def test_the_driving_dataset_is_on_the_runway_itself_not_only_in_prose(self):
+    def test_the_driving_dataset_is_on_the_runway_itself_not_only_in_prose(
+            self, q1_2028_authored):
         """A caller that renders its own message - the dashboard does -
         needs the fact, not a sentence to parse back out."""
         r = runway.calendar_runway("quarterly", self.AS_OF)
         assert r.driving_dataset == "cp-case-workers"
-        assert r.driving_last_period == "2027-Q3"
+        assert r.driving_last_period == "2027-Q4"
         assert r.remaining == 2

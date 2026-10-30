@@ -23,7 +23,12 @@ PIN = Path(__file__).parent / "fixtures" / "calendar_move_pin.json"
 UNTIL = date(2028, 12, 31)
 
 
-def capture() -> dict:
+def capture(by_round: bool = False) -> dict:
+    """Every dataset's periods and slots. BY ROUND (REQ-PIPE-321 criterion
+    14) names each by the ROUND it is due on rather than the period it
+    fills - the pin was captured at files_go_to_period 0, where the two are
+    one, so this is the comparison that keeps a collection at N honest
+    without re-capturing anything."""
     from qa_tools.common import hierarchy, schedule, slots
 
     out: dict[str, dict] = {}
@@ -33,11 +38,18 @@ def capture() -> dict:
         if record["no_calendar"]:
             out[ds] = record
             continue
+        periods = schedule.periods_for_dataset(ds, until=UNTIL)
+        round_of = {p.name: (p.round or p.period) for p in periods}
+
+        def named(p):
+            return (p.round or p.period) if by_round else p.period
+
         record["periods"] = [
-            [p.name, p.date.isoformat(), p.expected, p.not_expected_reason]
-            for p in schedule.periods_for_dataset(ds, until=UNTIL)]
+            [named(p).name, named(p).date.isoformat(), p.expected, p.not_expected_reason]
+            for p in periods]
         record["slots"] = [
-            [s.name, s.due_at.isoformat(), s.late_after.isoformat(),
+            [round_of[s.name].name if by_round and s.name in round_of else s.name,
+             s.due_at.isoformat(), s.late_after.isoformat(),
              s.claim_opens_at.isoformat(), s.closes_at.isoformat() if s.closes_at else None]
             for s in slots.slots_for_dataset(ds, until=UNTIL)]
         out[ds] = record

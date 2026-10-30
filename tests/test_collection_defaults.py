@@ -160,7 +160,7 @@ class TestEachValueResolvesSeparately:
         agr = agreement.from_doc(doc)
         got = agr.participation_on("cp-clients", date(2024, 2, 1))
         assert got.participates == (2, 8) and got.reason == "half-yearly by agreement"
-        assert {p.date.month for p in schedule.periods_for_dataset("cp-clients", agreement=agr)} \
+        assert {p.round_date.month for p in schedule.periods_for_dataset("cp-clients", agreement=agr)} \
             == {2, 8}
 
 
@@ -174,7 +174,7 @@ class TestNotYetOwingTakesNothing:
                         "grace": "2h", "changelog": LOG})
         agr = agreement.from_doc(doc)
         assert agr.participation_on("cp-clients", date(2024, 6, 1)) is None
-        assert min(p.date for p in schedule.periods_for_dataset("cp-clients", agreement=agr)) \
+        assert min(p.round_date for p in schedule.periods_for_dataset("cp-clients", agreement=agr)) \
             == date(2025, 2, 1)
 
 

@@ -1356,6 +1356,14 @@ def _participation_errors(cal_raw: dict, raw: dict, src: Source) -> list[ConfigE
                     "Keep one entry with one reason - with two, the later reason silently "
                     "replaces the first."))
             seen_periods.add(period)
+            # REQ-PIPE-322 criterion 12: the reason the rise's refusal printed
+            # is a placeholder, never an answer.
+            if str((item or {}).get("reason") or "").strip() == NOT_EXPECTED_PLACEHOLDER:
+                out.append(ConfigError(
+                    file_name, scope,
+                    f"declares {period} not owed with the placeholder reason the gate printed.",
+                    "State the reason - why this dataset owes nothing in that period, in words "
+                    "a reader of the page will see."))
         if entry.get(schedule.NO_CALENDAR_KEY) is not None:
             continue
         cal_name = entry.get("calendar") or collections.get(collection.get("id"), {}).get("calendar")
@@ -1856,7 +1864,7 @@ def _files_go_to_period_errors(cal_raw: dict, raw: dict, src: Source) -> list[Co
         entry = entries.get(cid, {})
         scope = f"collection {cid!r}"
         versions = agr.offsets.get(cid, ())
-        on_calendar = []
+        on_calendar, unknown = [], False
         for did in dids:
             d = agr.dataset(did)
             if d is None or d.no_calendar or not d.participation:
@@ -1864,6 +1872,10 @@ def _files_go_to_period_errors(cal_raw: dict, raw: dict, src: Source) -> list[Co
             cal_name = agr.calendar_name_for(did)
             if cal_name and cal_name in agr.calendars:
                 on_calendar.append((did, cal_name, d))
+            elif cal_name:
+                unknown = True  # a calendar that does not exist - another check names it
+        if not on_calendar and unknown:
+            continue
         if not on_calendar:
             # CRITERION 5: a collection with no calendar has no periods.
             if versions:
@@ -1919,6 +1931,191 @@ def _files_go_to_period_errors(cal_raw: dict, raw: dict, src: Source) -> list[Co
                                            f"dataset {did!r} carries its own dates.",
                                            "A dataset with its own dates is supported only at 0 "
                                            "- give it its collection's calendar, or state 0."))
+        out += _rise_errors(name, cid, scope, on_calendar, versions, agr)
+    return out
+
+
+def _days_before_errors(cal_raw: dict, src: Source) -> list[ConfigError]:
+    """REQ-PIPE-324 criteria 1, 2 and 4: days before stays inside one round.
+    On an authored calendar a due date may not reach back before the round
+    before it - a later period is the collection's files_go_to_period to
+    say; on a cadence-rule calendar 1 is the most, and nothing else is
+    pointed to, since files_go_to_period is refused there. One error per
+    dataset version, at its first offending round."""
+    from datetime import timedelta
+
+    from qa_tools.common import agreement as agreement_mod
+
+    try:
+        agr = agreement_mod.from_doc(cal_raw, src.agreement_path)
+    except (schedule.ScheduleConfigError, ValueError, TypeError, AttributeError):
+        return []  # the parse error is another check's to report
+    name = src.calendar_name
+    out: list[ConfigError] = []
+    for did in sorted(d for d in (e.dataset_id for e in agr.datasets.values()) if d):
+        cal_name = agr.calendar_name_for(did)
+        cal = agr.calendars.get(cal_name) if cal_name else None
+        versions = agr.resolved_versions(did)
+        if cal is None or not versions:
+            continue
+        ends = [v.effective_from for v in versions[1:]] + [None]
+        rounds = None
+        for v, until in zip(versions, ends):
+            days = v.days_before or 0
+            if days == 0:
+                continue
+            on = f"the version effective {v.effective_from.isoformat()}"
+            if cal.current.is_cadence_rule:
+                if days > 1:
+                    out.append(ConfigError(
+                        name, f"dataset {did!r}",
+                        f"states days before {days} on {on}, on the cadence-rule calendar "
+                        f"{cal_name!r}.",
+                        "1 is the most a cadence-rule calendar accepts - the evening before "
+                        "(REQ-PIPE-324 criterion 4). State 0 or 1."))
+                continue
+            if rounds is None:
+                rounds = schedule.periods_for_calendar(cal_name, agreement=agr)
+            for i in range(1, len(rounds)):
+                rnd = rounds[i]
+                if rnd.date < v.effective_from or (until is not None and rnd.date >= until):
+                    continue
+                if rnd.date - timedelta(days=days) >= rounds[i - 1].date:
+                    continue
+                filled = schedule.period_filled_by(did, rnd, agr)
+                largest = (rnd.date - rounds[i - 1].date).days
+                out.append(ConfigError(
+                    name, f"dataset {did!r}",
+                    f"states days before {days} on {on}, so its slot on the "
+                    f"{_day(rnd.date)} round (for {filled.name if filled else rnd.name}) "
+                    f"would be due before the {_day(rounds[i - 1].date)} round - that round "
+                    f"accepts at most {largest}.",
+                    f"Keep days before inside one round. Where these files are for a later "
+                    f"period, state the collection's {_OFFSET_KEY} instead (REQ-PIPE-320) - "
+                    f"it applies to every dataset of the collection."))
+                break
+    return out
+
+
+#: The reason a pasted not_expected entry carries until somebody states one
+#: (REQ-PIPE-322 criteria 2 and 12) - refused while it is still there.
+NOT_EXPECTED_PLACEHOLDER = "<state why this dataset owes nothing in this period>"
+
+
+def _change_rounds(cal_name: str, versions, agr):
+    """(version before, version, index of the version's first round, the
+    calendar's rounds) for each change of value after a collection's first
+    version - which is no change (REQ-PIPE-322 criterion 5)."""
+    changes = [(old, new) for old, new in zip(versions, versions[1:]) if old.value != new.value]
+    if not changes:
+        return
+    # BOUNDED for a cadence rule, which never ends: a value above 0 there is
+    # refused by criterion 7 anyway, so two years past the last change is
+    # all a fall back to 0 needs.
+    until = max(new.effective_from for _o, new in changes).replace(day=1)
+    until = until.replace(year=until.year + 2)
+    rounds = schedule.periods_for_calendar(cal_name, until=until, agreement=agr)
+    for old, new in changes:
+        i0 = next((i for i, r in enumerate(rounds) if r.date >= new.effective_from), None)
+        if i0 is None or i0 == 0:
+            continue
+        yield old, new, i0, rounds
+
+
+def _participates_in(did: str, rnd, agr) -> tuple[bool, str]:
+    """Whether a dataset supplies in a round, and why not where it does not -
+    on the round's own date (REQ-PIPE-321 criterion 2)."""
+    from qa_tools.common import agreement as agreement_mod
+
+    begins = schedule.owes_from(did, agr)
+    if begins is not None and rnd.date < begins:
+        return False, f"it owes nothing before {begins.isoformat()}"
+    standing = agr.standing_on(did, rnd.date)
+    if standing.state == agreement_mod.TURNED_OFF:
+        return False, f"it is turned off on the {_day(rnd.date)} round"
+    months = schedule.delivery_months(did, rnd.date, agr)
+    if months is not None and rnd.date.month not in months:
+        return False, f"it does not supply in the {_day(rnd.date)} round"
+    return True, ""
+
+
+def _day(d) -> str:
+    return f"{d.day} {d.strftime('%B %Y')}"
+
+
+def _rise_errors(name, cid, scope, on_calendar, versions, agr) -> list[ConfigError]:
+    """REQ-PIPE-322 criteria 1 and 2: a rise by D skips D periods no round
+    fills, and each is declared not owed by every dataset that would have
+    supplied it at the old value - ONE refusal per version, with what to
+    paste."""
+    if not on_calendar:
+        return []
+    cal_name = on_calendar[0][1]
+    out = []
+    for old, new, i0, rounds in _change_rounds(cal_name, versions, agr):
+        if new.value < old.value:
+            continue
+        skipped = [j for j in range(i0 - 1 + old.value + 1, i0 + new.value) if j < len(rounds)]
+        must: dict[str, list[str]] = {}
+        need_not: list[str] = []
+        for j in skipped:
+            period, rnd = rounds[j], rounds[j - old.value]
+            for did, _cal, _d in on_calendar:
+                ok, why = _participates_in(did, rnd, agr)
+                if not ok:
+                    need_not.append(f"{did} ({why})")
+                elif period.name not in schedule.not_expected_periods(did, agr):
+                    must.setdefault(did, []).append(period.name)
+        if not must:
+            continue
+        names = ", ".join(rounds[j].name for j in skipped)
+        paste = "\n".join(
+            f"     {did}:\n       not_expected:\n" + "".join(
+                f'         - period: "{p}"\n           reason: "{NOT_EXPECTED_PLACEHOLDER}"\n'
+                for p in periods)
+            for did, periods in must.items())
+        out.append(ConfigError(
+            name, scope,
+            f"rises from {_OFFSET_KEY} {old.value} to {new.value} on the version effective "
+            f"{new.effective_from.isoformat()}, from the {_day(rounds[i0].date)} round - so no "
+            f"round fills {names}. Must declare it not owed: {', '.join(must)}. Need not: "
+            + (", ".join(need_not) if need_not else "none - every dataset supplies in that round")
+            + ".",
+            f"1. Declare each skipped period not owed in {name}, stating the reason:\n"
+            + paste
+            + "\n  2. Where the version is already frozen, declare the change as a correction "
+              "too (REQ-PIPE-320 criterion 8): `mothman schedule preview-correction` lists every "
+              "filing it would move."))
+    return out
+
+
+def fall_lines(agr) -> list[str]:
+    """REQ-PIPE-322 criterion 10: one line per collection naming each period a
+    fall feeds twice and the round whose files will be held for a person -
+    information, never a refusal."""
+    from qa_tools.common import hierarchy
+
+    out = []
+    for cid, versions in sorted(agr.offsets.items()):
+        try:
+            members = hierarchy.datasets_in_collection(cid)
+            cal_name = next(agr.calendar_name_for(d.dataset_id) for d in members
+                            if agr.calendar_name_for(d.dataset_id) in agr.calendars)
+        except (StopIteration, hierarchy.UnknownDatasetError, KeyError):
+            continue
+        label = members[0].collection_name
+        for old, new, i0, rounds in _change_rounds(cal_name, list(versions), agr):
+            if new.value > old.value:
+                continue
+            for k in range(old.value - new.value):
+                held = rounds[i0 + k] if i0 + k < len(rounds) else None
+                target = i0 + k + new.value
+                if held is None or target >= len(rounds):
+                    continue
+                filler = rounds[target - old.value]
+                out.append(f"{label}: from the {_day(held.date)} round, files for "
+                           f"{rounds[target].name} will be held for a person - the "
+                           f"{_day(filler.date)} round already fills it.")
     return out
 
 
@@ -1977,6 +2174,7 @@ def validate(src: Source | None = None) -> list[ConfigError]:
     errors += _defaults_errors(cal_raw, raw, src)
     errors += _turn_off_errors(cal_raw, raw, src)
     errors += _files_go_to_period_errors(cal_raw, raw, src)
+    errors += _days_before_errors(cal_raw, src)
     errors += _expects_nothing_errors(merged, cal_src)
     errors += _contract_errors(raw, src)
     errors += _freeze_errors(raw, cal_raw, src)
@@ -2240,6 +2438,16 @@ def main(src: Source | None = None) -> int:
     # spoke for both would be the place they got confused.
     print(f"schedule validation OK - {n_calendars} calendar(s), {n_datasets} dataset(s), "
           f"no configuration errors.")
+
+    # A FALL IS INFORMATION, NOT A REFUSAL (REQ-PIPE-322 criterion 10): each
+    # doubly-fed period and the round whose files will be held, said once.
+    try:
+        from qa_tools.common import agreement as agreement_mod
+
+        for line in fall_lines(agreement_mod.load(src.agreement_path)):
+            print(f"  {line}")
+    except (schedule.ScheduleConfigError, ValueError, OSError):
+        pass  # a configuration the checks above passed always loads
 
     # LOW RUNWAY IS A WARNING AND RETURNS 0, permanently (REQ-PIPE-053).
     # A non-fatal warning that fails a build gets disabled, and then it

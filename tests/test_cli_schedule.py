@@ -39,7 +39,7 @@ class TestShow:
 
     def test_one_dataset_shows_its_own_participation(self):
         """`--all` since 2026-09-25: the default is now a window around
-        today, so 2023-Q1 is deliberately out of frame
+        today, so 2023-Q2 is deliberately out of frame
         (post-build-review #29). What this test is actually about - that
         a dataset's own delivery months and periods are shown - is
         unchanged."""
@@ -47,7 +47,7 @@ class TestShow:
                                  ["show", "--dataset", "cp-case-workers", "--all"])
         assert result.exit_code == 0, result.output
         assert "February" in result.output and "August" in result.output
-        assert "2023-Q1" in result.output
+        assert "2023-Q2" in result.output
 
     def test_a_daily_dataset_no_longer_needs_an_until(self):
         """REPLACES "a daily dataset needs an --until", which asserted

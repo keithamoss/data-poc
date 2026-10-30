@@ -53,8 +53,10 @@ class TestSlotsAreDerivedNotAuthored:
             assert len(_cp_slots(dataset_id)) == len(periods), dataset_id
 
     def test_six_datasets_in_one_period_have_six_slots(self):
-        """Criterion 2, and the story in one line."""
-        period_name = "2026-Q1"
+        """Criterion 2, and the story in one line. 2026-Q2: the 1 February
+        round fills it at files_go_to_period 1, and cp-case-workers delivers
+        in February."""
+        period_name = "2026-Q2"
         found = [s for dataset_id in CP_DATASETS for s in _cp_slots(dataset_id)
                  if s.name == period_name]
         assert len(found) == 6
@@ -73,9 +75,12 @@ class TestSlotsAreDerivedNotAuthored:
 
 
 class TestEachSlotCarriesItsOwnTiming:
-    def test_the_due_instant_is_the_periods_date_at_the_datasets_own_time(self):
-        slot = next(s for s in _cp_slots("cp-clients") if s.name == "2026-Q1")
-        assert slot.date == date(2026, 2, 1)
+    def test_the_due_instant_is_the_rounds_date_at_the_datasets_own_time(self):
+        """REQ-PIPE-321 criterion 1: 2026-Q2 is filled by the 1 February
+        round, and is due on it."""
+        slot = next(s for s in _cp_slots("cp-clients") if s.name == "2026-Q2")
+        assert slot.date == date(2026, 5, 1)
+        assert slot.round_date == date(2026, 2, 1)
         assert slot.due_at == datetime(2026, 2, 1, 9, 0, tzinfo=PERTH)
 
     def test_the_due_instant_carries_its_offset(self):

@@ -2,7 +2,7 @@
 declared correction (REQ-PIPE-173).
 
 Recorded verdicts come from real filings against the real cp-clients
-agreement (2023-Q3 dated 2023-08-01, due 09:00 Perth, 8h grace); the
+agreement (2023-Q4 filled by the round dated 2023-08-01, due 09:00 Perth, 8h grace); the
 configuration is then changed in a copy and compared.
 """
 from __future__ import annotations
@@ -36,8 +36,8 @@ def conn(supply_dsn):
         qa_store.ensure_schema(c)
         c.execute(f'TRUNCATE "{qa_store.SCHEMA}".filing CASCADE')
         filing_support.file(assignment.Assignment(
-            dataset_id=DATASET, supply_id="drift-s", slot="2023-Q3",
-            branch=assignment.OPEN_UNFILLED, considered=("2023-Q3",), received_at=RECEIVED))
+            dataset_id=DATASET, supply_id="drift-s", slot="2023-Q4",
+            branch=assignment.OPEN_UNFILLED, considered=("2023-Q4",), received_at=RECEIVED))
         yield c
 
 
@@ -90,7 +90,7 @@ class TestAnUndeclaredChangeIsRefused:
         assert found is not None
         text = found.message()
         assert "grace_seconds was 28800, is now 3600" in text
-        assert "2023-Q3" in text
+        assert "2023-Q4" in text
         assert "restore the recorded value" in text and "declare the change" in text
         assert "configuration problem on our side" in text
 
@@ -228,7 +228,7 @@ class TestTheCommandAndThePass:
         filing.file_arrivals([arrival])
         monkeypatch.setattr(agreement_drift, "_load_docs", _docs)   # restored
         done = agreement_drift.refile_cleared(say=lambda *_: None)
-        assert ("cp-clients", "cp-clients@drift2", "2023-Q4") in done
+        assert ("cp-clients", "cp-clients@drift2", "2024-Q1") in done
         assert not [h for h in supply_holds.outstanding(conn)
                     if h.supply_id == "cp-clients@drift2"]
 
@@ -319,10 +319,13 @@ class TestCriticFindingsOn173:
     def test_10_a_missing_slot_reads_plainly(self, conn):
         cal, asset = _docs()
         q = next(c for c in cal["calendars"] if c["name"] == "quarterly")
+        # THE PERIOD ITSELF, not the round before it: at files_go_to_period
+        # 1 removing the 1 August round re-maps 2023-Q4 to the May round,
+        # which reads as a moved date (REQ-PIPE-321 criterion 1).
         q["versions"][-1]["dates"] = [d for d in q["versions"][-1]["dates"]
-                                      if d["period"] != "2023-Q3"]
+                                      if d["period"] != "2023-Q4"]
         text = _refusal(conn, cal, asset).message()
-        assert "2023-Q3: no longer a period of its schedule (it was dated 2023-08-01)" in text
+        assert "2023-Q4: no longer a period of its schedule (it was dated 2023-08-01)" in text, text
 
     def test_10_a_refusal_only_pass_does_not_say_a_result_is_red(self, capsys):
         from cli import pipeline
@@ -341,20 +344,20 @@ class TestARetroactiveNotExpectedIsCaught:
 
     def test_a_judged_period_declared_not_expected_is_refused(self, conn):
         cal, asset = _docs()
-        _clients(cal)["not_expected"] = [{"period": "2023-Q3",
+        _clients(cal)["not_expected"] = [{"period": "2023-Q4",
                                          "reason": "declared after the fact"}]
         found = _refusal(conn, cal, asset)
-        assert found is not None and "2023-Q3" in found.message()
+        assert found is not None and "2023-Q4" in found.message()
         assert "not expected" in found.message()
 
     def test_a_declared_correction_of_it_accounts_for_it(self, conn):
         cal, asset = _docs()
         entry = _clients(cal)
-        entry["not_expected"] = [{"period": "2023-Q3", "reason": "declared after the fact"}]
+        entry["not_expected"] = [{"period": "2023-Q4", "reason": "declared after the fact"}]
         entry["corrections"] = [{
             "change_reference": "CAB-NE", "date": _today(), "author": "a",
             "approver": "b", "reason": "r",
-            "changes": [{"item": f"dataset {DATASET} not_expected 2023-Q3", "old": None,
+            "changes": [{"item": f"dataset {DATASET} not_expected 2023-Q4", "old": None,
                          "new": "declared after the fact"}]}]
         assert _refusal(conn, cal, asset) is None
 
@@ -375,7 +378,7 @@ class TestFromIsTheEarlierDate:
 class TestATurnOffOverAJudgedPeriod:
     """REQ-PIPE-179 criterion 38 (amending REQ-PIPE-173 criterion 12): an
     effective_to added without a declared correction, leaving the judged
-    2023-Q3 owed nothing, counts as changed, names the turn-off, and is
+    2023-Q4 owed nothing, counts as changed, names the turn-off, and is
     accounted for only by a declared correction of that effective_to."""
 
     KEY = "dataset cp-clients participation 2023-01-01 effective_to"
@@ -395,7 +398,7 @@ class TestATurnOffOverAJudgedPeriod:
         cal, asset = _docs()
         self._off(cal)
         text = _refusal(conn, cal, asset).message()
-        assert "2023-Q3" in text and "turned off" in text and "supplier paused" in text
+        assert "2023-Q4" in text and "turned off" in text and "supplier paused" in text
         assert "not expected" not in text
 
     def test_a_declared_correction_of_the_effective_to_accounts_for_it(self, conn):

@@ -164,6 +164,9 @@ def reason_for(decided: Assignment) -> dict:
             pass
     if decided.agreement_refused:
         reason.update(agreement_refused=True, refusal=decided.agreement_refused)
+    if decided.doubly_fed:
+        # REQ-PIPE-322 criterion 3: the agreement change, structured.
+        reason["doubly_fed"] = dict(decided.doubly_fed)
     if decided.turned_off:
         # HISTORY ONLY (REQ-PIPE-179 criteria 16 and 18): the label a reader
         # sees is worked out from the configuration when it is read.
@@ -249,6 +252,20 @@ class Held:
             # once the agreement matches its recorded judgements again.
             return ("restore the delivery agreement or declare the correction - it files "
                     "itself on the next processing pass",)
+        if self.doubly_fed:
+            # REQ-PIPE-322 criterion 9: into the doubly-fed period as a
+            # resupply, or rejected - never the period after - and the route
+            # for a change made in error.
+            from qa_tools.common import placing
+
+            period = self.doubly_fed["period"]
+            return (f"place it into {period} as a resupply - at "
+                    f"'{placing.where_to_decide(self.dataset_id)}', or "
+                    f"`{placing.flag_form(self.dataset_id, self.supply_id, period)}`",
+                    "reject the supply",
+                    f"if the change was made in error, correct the collection's "
+                    f"files_go_to_period in {SCHEDULE_FILE} (by a declared correction where "
+                    f"the version is frozen)")
         if self.correction:
             # REQ-PIPE-170 criterion 8: a confirmed correction left it no period.
             # NOT PROMOTE (post-build-review #173): a held supply's data was
@@ -304,6 +321,11 @@ class Held:
         return self.reason.get("correction")
 
     @property
+    def doubly_fed(self) -> dict | None:
+        """Held in a round a fall feeds twice (REQ-PIPE-322) - from the record."""
+        return self.reason.get("doubly_fed")
+
+    @property
     def agreement_refused(self) -> bool:
         """Held because its dataset is refused (REQ-PIPE-173) - from the record."""
         return self.reason.get("agreement_refused") is True
@@ -346,6 +368,17 @@ class Held:
                     f"{turned_off.level_words(turn, self.dataset_id)}). Place it into a period "
                     f"it still owes, reject it, or change effective_to/effective_from in "
                     f"{SCHEDULE_FILE} if this period should be owed.")
+        if self.doubly_fed:
+            from datetime import date as _date
+
+            fed = self.doubly_fed
+            rnd, filler = (_date.fromisoformat(fed["round"]), _date.fromisoformat(fed["filled_by"]))
+            return (f"{self.supply_id} arrived in the {rnd.day} {rnd.strftime('%B %Y')} round, "
+                    f"which opens no slot: {fed['collection']}'s files_go_to_period fell on its "
+                    f"version from {fed['version']}, so this round's files are for "
+                    f"{fed['period']} - which the {filler.day} {filler.strftime('%B %Y')} round "
+                    f"already fills. Place it into {fed['period']} as a resupply or reject it. "
+                    f"Raised by {self.raised_by}.")
         if self.correction:
             return (f"Held when correction {self.correction} was confirmed: the corrected "
                     f"calendar offers it no period"

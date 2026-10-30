@@ -24,16 +24,23 @@ class TestWhichPeriodsOweNothing:
     def test_a_partial_participant_owes_nothing_outside_its_months(self):
         rows = owed_nothing.for_dataset("cp-case-workers", until=date(2024, 12, 31))
         got = _by_period(rows)
-        assert {"2023-Q2", "2023-Q4", "2024-Q2", "2024-Q4"} <= set(got)
-        assert not {"2023-Q1", "2023-Q3", "2024-Q1", "2024-Q3"} & set(got)
-        row = got["2024-Q2"]
+        # Delivered in the February and August rounds, which at
+        # files_go_to_period 1 fill Q2 and Q4 - so it owes nothing in the Q1
+        # and Q3 the November and May rounds fill (REQ-PIPE-321 criterion 13).
+        assert {"2023-Q1", "2023-Q3", "2024-Q1", "2024-Q3"} <= set(got)
+        assert not {"2023-Q2", "2023-Q4", "2024-Q2", "2024-Q4"} & set(got)
+        row = got["2024-Q1"]
         assert row["kind"] == owed_nothing.PARTICIPATION and row["months"] == [2, 8]
-        assert row["date"] == "2024-05-01"
+        assert row["date"] == "2024-02-01"
         assert "staffing register" in row["reason"]
 
-    def test_nothing_after_the_date_asked_for(self):
+    def test_nothing_from_a_round_after_the_date_asked_for(self):
+        """Bounded by ROUND (REQ-PIPE-321 criterion 13): the last round by
+        30 June 2024 is 1 May's, which fills 2024-Q3 (dated 1 August) - and
+        the August round's 2024-Q4 is not asked for."""
         rows = owed_nothing.for_dataset("cp-case-workers", until=date(2024, 6, 30))
-        assert max(r["date"] for r in rows) <= "2024-06-30"
+        assert max(r["date"] for r in rows) == "2024-08-01"
+        assert "2024-Q4" not in _by_period(rows) and "2025-Q1" not in _by_period(rows)
 
     def test_a_dataset_owing_every_period_has_none(self):
         assert owed_nothing.for_dataset("cp-clients", until=date(2025, 12, 31)) == []
@@ -52,9 +59,10 @@ class TestWhichPeriodsOweNothing:
         rows = owed_nothing.for_dataset("cp-clients", until=date(2025, 12, 31),
                                         agreement=agreement.from_doc(_off_for_a_while()))
         got = _by_period(rows)
-        assert {"2025-Q2", "2025-Q3", "2025-Q4"} <= set(got)
+        # The rounds of the gap fill the period after each (files_go_to_period 1).
+        assert {"2025-Q3", "2025-Q4", "2026-Q1"} <= set(got)
         assert {r["kind"] for r in rows} == {owed_nothing.TURNED_OFF}
-        assert got["2025-Q2"]["reason"] == "supplier paused"
+        assert got["2025-Q3"]["reason"] == "supplier paused"
 
     def test_nothing_before_the_first_participation_version(self):
         """Criterion 6: before a dataset owes anything, it is not yet owing,

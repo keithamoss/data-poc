@@ -509,7 +509,7 @@ class TestAPairsPayloadIsItsCleanFile:
         day = date(2026, 8, 11)
         base = provider.generate(day, seed=7, n_rows=1800, id_offset=0)
         pair = generate_runs._pair_delivery(
-            provider, injection, extra, 0, base, SimpleNamespace(date=day), seed=7,
+            provider, injection, extra, 0, base, SimpleNamespace(date=day, round_date=day), seed=7,
             id_offset=0, n_rows=1800, previous_row_count=len(base), placement=None)
         assert len(pair.payload) == len(base)
 
