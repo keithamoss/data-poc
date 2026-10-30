@@ -78,6 +78,31 @@ def providers() -> list[Provider]:
     return out
 
 
+def order_problems(found: list[Provider] | None = None,
+                   only: str | None = None) -> list[str]:
+    """Every provider whose declared dependency (Provider.depends_on) has no
+    provider or generates after it in hierarchy order - the order every
+    generation runs in (REQ-GEN-334 criterion 6) - naming both. `only`: that
+    collection's provider alone."""
+    found = providers() if found is None else found
+    order = {p.collection_id: i for i, p in enumerate(found)}
+    problems = []
+    for i, p in enumerate(found):
+        if only is not None and p.collection_id != only:
+            continue
+        for dep in p.depends_on:
+            if dep not in order:
+                problems.append(
+                    f"{p.collection_id}'s provider depends on {dep}, which has no generator "
+                    f"provider, so the supplies it reads would not exist")
+            elif order[dep] > i:
+                problems.append(
+                    f"{p.collection_id}'s provider depends on {dep}, which generates after "
+                    f"it in hierarchy order, so it would read a history not yet generated - "
+                    f"declare {p.collection_id} after {dep}")
+    return problems
+
+
 def seed_range_problems(found: list[Provider] | None = None) -> list[str]:
     """Every pair of providers whose declared seed ranges overlap, naming
     both (criterion 3) - what makes REQ-GEN-232's disjoint Emergency

@@ -175,6 +175,11 @@ class Provider:
         return []
 
 
+class GenerationOrderRefused(ValueError):
+    """A provider whose declared dependency is absent or generates after it
+    (REQ-GEN-334 criterion 6) - refused before anything is written."""
+
+
 @dataclass(frozen=True)
 class GeneratedSupply:
     """One supply a provider generates, as another provider reads it

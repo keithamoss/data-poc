@@ -167,10 +167,14 @@ def in_agreement(conn, dataset_id: str, period: str, as_at: datetime) -> bool:
 
 def out_of_agreement(conn, *, own_table: str, own_dataset: str, period: str,
                      resolution: supply_db.Resolution, reads: dict[str, list[str]],
-                     as_at: datetime) -> dict[str, str]:
+                     as_at: datetime, decided_by: datetime | None = None) -> dict[str, str]:
     """{check id: why it is out of this run's scope} for every in-scope
     check that reads a table not part of the agreement for `period` and
-    never supplied for it (criterion 9) - left out, never red, no result."""
+    never supplied for it (criterion 9) - left out, never red, no result.
+
+    `decided_by`: the instant a person's not-supplied mark is read as at -
+    the run's own, so that a re-run a later mark owes sees it (REQ-PIPE-332
+    criterion 9); `as_at`, the receipt, where not given."""
     from qa_tools.common import hierarchy
 
     missing = ((set(resolution.absent) | set(resolution.ambiguous)) - set(resolution.held)
@@ -199,7 +203,8 @@ def out_of_agreement(conn, *, own_table: str, own_dataset: str, period: str,
                 # not supplied for the period, the check is out of scope -
                 # whichever collection declares it, a sibling included.
                 if conn is not None and not_supplied.marked(
-                        conn, dataset_id, period, as_at=as_at.isoformat()) is not None:
+                        conn, dataset_id, period,
+                        as_at=max(as_at, decided_by or as_at).isoformat()) is not None:
                     outside[table] = left_out_entry(NOT_SUPPLIED_BY_DECISION, period,
                                                     dataset_id)
                 elif not in_agreement(conn, dataset_id, period, as_at):

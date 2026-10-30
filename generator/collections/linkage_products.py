@@ -28,10 +28,22 @@ from generator.collections.base import Job, Plan, Provider
 DATASET_ID = "linkage-keys"
 TABLE = "linkage_keys"
 FILE = f"{TABLE}.csv"
-#: id_2 IS EVERY FILE'S, BLANK ORDINARILY (REQ-GEN-335 (c), PROVISIONAL): every
-#: linked dataset declares one identifier, so a surplus one needs a column to
-#: arrive in - the contract's id_2, which check (4) reads.
-COLUMNS = ["linkage_key", "dataset", "id_1", "id_2"]
+
+
+def columns() -> list[str]:
+    """The release's columns: linkage_key, dataset and every id_ column the
+    contract declares, id_1 to id_N in order (REQ-QAC-330 criterion 3). The
+    contract's id_N runs one past the most identifiers any linked dataset
+    declares, so a surplus one (REQ-GEN-335 (c), PROVISIONAL) has a column to
+    arrive in; blank ordinarily."""
+    import re
+
+    from qa_tools.common import hierarchy, linked_datasets
+
+    ds = hierarchy.dataset(DATASET_ID)
+    ids = [c for c in linked_datasets._columns(linked_datasets.REPO, ds.contract, ds.table)
+           if re.fullmatch(r"id_\d+", c or "")]
+    return ["linkage_key", "dataset", *sorted(ids, key=lambda c: int(c[3:]))]
 
 #: Seeds 70001.. a quarter, each plus its resupply's +500; the key token's
 #: secret and the ordinary severity draw beside them.
@@ -130,12 +142,27 @@ def run_plan(n: int) -> list:
     return [None] + rest
 
 
+def _records(rows, cols) -> list[tuple[str, ...]]:
+    """A source supply's identifier values, one tuple per row over `cols` in
+    order, each as text as the checks cast them - a row with any of them null
+    or blank dropped, since it can match no linkage row."""
+    present = rows[list(cols)].notna().all(axis=1)
+    out = []
+    for values in zip(*(rows.loc[present, c].tolist() for c in cols)):
+        text = tuple(str(v) for v in values)
+        if all(t.strip() != "" for t in text):
+            out.append(text)
+    return out
+
+
 def _ids(rows, column: str) -> list[str]:
-    """A source supply's identifier values as text, as the checks cast them -
-    null and blank ones dropped, since they can match no linkage row."""
-    values = rows[column]
-    out = [str(v) for v in values[values.notna()].tolist()]
-    return [v for v in out if v.strip() != ""]
+    """One source column's identifier values as text (_records of one)."""
+    return [t[0] for t in _records(rows, [column])]
+
+
+def _joined(record: tuple[str, ...]) -> str:
+    """A record's identifiers as one value - the value itself for one."""
+    return "\x1f".join(record)
 
 
 def _coverage(source: list[str], linked_ids: set) -> float:
@@ -175,6 +202,7 @@ def build_rows(sources_before: dict, faults: tuple, rng, where: str):
     import pandas as pd
 
     parsed = [parse_fault(f, where) for f in faults]
+    out_cols = columns()
     by = {}
     for name, did in parsed:
         by.setdefault(name, []).append(did)
@@ -183,26 +211,34 @@ def build_rows(sources_before: dict, faults: tuple, rng, where: str):
         rows = sources_before.get(did)
         if rows is None:
             continue
-        source = _ids(rows, cols[0])
+        source = _records(rows, cols)
         sources[did] = (code, source)
         band = (COVERAGE["amber"] if did in by.get("coverage_amber", ())
                 else COVERAGE["red"] if did in by.get("coverage_red", ())
                 else COVERAGE["ordinary"])
         ids = _link(source, band, rng, f"{where}, {did}")
-        frames.append(pd.DataFrame({"linkage_key": [_token(code, v) for v in ids],
-                                    "dataset": code, "id_1": ids, "id_2": ""}))
+        frame = {"linkage_key": [_token(code, _joined(v)) for v in ids], "dataset": code}
+        for j, c in enumerate(out_cols[2:]):
+            frame[c] = [v[j] for v in ids] if j < len(cols) else ""
+        frames.append(pd.DataFrame(frame))
     df = (pd.concat(frames, ignore_index=True) if frames
-          else pd.DataFrame(columns=COLUMNS))
+          else pd.DataFrame(columns=out_cols))
     for name, did in parsed:
         if did is not None and did not in sources:
             raise CannotGenerate(f"{where}: row fault {name}@{did} - the release describes no "
                                  f"{did} supply in its quarter; nothing was written")
-    df = _apply_faults(df, parsed, sources, rng, where)
-    return df[COLUMNS].reset_index(drop=True)
+    df = _apply_faults(df, parsed, sources, rng, where, out_cols)
+    return df[out_cols].reset_index(drop=True)
 
 
-def _apply_faults(df, parsed, sources, rng, where):
+def _apply_faults(df, parsed, sources, rng, where, out_cols):
     import pandas as pd
+
+    ids = out_cols[2:]
+    width = {code: len(cols) for _did, code, cols in linked()}
+
+    def joined(k):
+        return _joined(tuple(df.at[k, c] for c in ids[:width[df.at[k, "dataset"]]]))
 
     def one_row(did):
         code = sources[did][0]
@@ -218,22 +254,29 @@ def _apply_faults(df, parsed, sources, rng, where):
             df.loc[df["dataset"] == sources[did][0], "dataset"] = f"{sources[did][0]}_V2"
         elif name == "surplus_id":
             k = one_row(did)
+            n = width[sources[did][0]]
+            if n >= len(ids):
+                raise CannotGenerate(f"{where}: {did} declares {n} identifier(s), as many as "
+                                     f"the contract's id columns, so no surplus one has a "
+                                     f"column to arrive in; nothing was written")
             others = df.loc[(df["dataset"] == df.at[k, "dataset"]) & (df.index != k), "id_1"]
-            df.loc[k, "id_2"] = others.iloc[0] if len(others) else f"{df.at[k, 'id_1']}-2"
+            df.loc[k, ids[n]] = others.iloc[0] if len(others) else f"{df.at[k, 'id_1']}-2"
         elif name == "double_link":
             k = one_row(did)
             twin = df.loc[[k]].copy()
-            twin["linkage_key"] = _token(twin.iloc[0]["dataset"], f"{twin.iloc[0]['id_1']}#2")
+            twin["linkage_key"] = _token(twin.iloc[0]["dataset"], f"{joined(k)}#2")
             df = pd.concat([df, twin], ignore_index=True)
         elif name == "dangling_id":
             code, source = sources[did]
-            value = f"{source[int(rng.integers(len(source)))]}9"
+            picked = source[int(rng.integers(len(source)))]
+            value = (*picked[:-1], f"{picked[-1]}9")
             if value in set(source):
-                raise CannotGenerate(f"{where}: the dangling identifier {value!r} matches a "
-                                     f"{did} record; nothing was written")
-            df = pd.concat([df, pd.DataFrame({"linkage_key": [_token(code, value)],
-                                              "dataset": [code], "id_1": [value],
-                                              "id_2": [""]})], ignore_index=True)
+                raise CannotGenerate(f"{where}: the dangling identifier {_joined(value)!r} "
+                                     f"matches a {did} record; nothing was written")
+            row = {"linkage_key": [_token(code, _joined(value))], "dataset": [code]}
+            for j, c in enumerate(ids):
+                row[c] = [value[j] if j < len(value) else ""]
+            df = pd.concat([df, pd.DataFrame(row)], ignore_index=True)
         elif name == "blank_id":
             df.loc[one_row(did), "id_1"] = ""
         elif name in ("large_groups_amber", "large_groups_red"):
@@ -419,7 +462,7 @@ class LinkageProducts(Provider):
             for extra in injection.arrivals:
                 for fault in extra.row_faults:
                     parse_fault(fault, injection.scenario_id)
-        _refuse_unschedulable(jobs, sources, arrivals)
+        _refuse_unschedulable(jobs, sources, arrivals, injected)
         _refuse_unmet_preconditions(jobs, sources, arrivals, injected)
         # EVERY RELEASE BUILT ONCE BEFORE THE FIRST WRITE (REQ-GEN-335
         # criterion 5): a fault that cannot be placed refuses here.
@@ -476,7 +519,7 @@ class LinkageProducts(Provider):
         from qa_tools.common import asset_time
 
         plan.state["deliveries"].setdefault(job.period.name, []).append(name)
-        return ({FILE: delivery_obj.payload[COLUMNS].to_csv(index=False)},
+        return ({FILE: delivery_obj.payload[columns()].to_csv(index=False)},
                 asset_time.parse_instant(entry["received_at"], entry["run_id"]))
 
     def describe(self, entry: dict, delivery_obj) -> str:
@@ -598,14 +641,22 @@ def _refuse_scenario_quarters(resolved) -> None:
                 f"is not moved for you); nothing was written")
 
 
-def _refuse_unschedulable(jobs, sources, arrivals) -> None:
-    """Criteria 12 and 13, before anything is written: each quarter's release
-    arrives after the same quarter's ordinary first supply of each linked
-    dataset received that day, its promotion taking effect before the release
-    by the one function the gate uses (promotion.effective_at_for, capped at
-    the release); and no release shares a receipt instant with any supply it
-    reads."""
-    from qa_tools.common import asset_time, promotion
+def _refuse_unschedulable(jobs, sources, arrivals, injected) -> None:
+    """Criteria 12 and 13, before anything is written.
+
+    13: no release shares a receipt instant with any supply it reads.
+
+    12, for each ORDINARY quarter's release (a scenario's quarter keeps what
+    it plants): received within its own due time and grace, and after each
+    same-round source supply's promotion takes effect - that instant computed
+    as the gate computes it (orchestrate.effective_at_of): the one function,
+    promotion.effective_at_for, seeded by the arrival's run id, capped at the
+    source dataset's next receipt and at the first release reading its period
+    (promotion.next_receipt's lag cap), within its claim window. Refused
+    naming the quarter, the release and the effective instant."""
+    from datetime import timedelta
+
+    from qa_tools.common import asset_time, hierarchy, promotion, schedule, slots
 
     instants = {}
     for did, supplies in sources.items():
@@ -617,9 +668,15 @@ def _refuse_unschedulable(jobs, sources, arrivals) -> None:
                 raise CannotGenerate(f"the {job.period.name} linkage release ({at.isoformat()}) "
                                      f"and {instants[at]} would share one receipt instant - "
                                      f"nothing was written")
-        if not arrivals[job.slot_id]:
+    releases = sorted((at, job.period.name) for job in jobs
+                      for at, _f, _s in arrivals[job.slot_id])
+    for job in jobs:
+        if not arrivals[job.slot_id] or job.period.name in injected:
             continue
         at = arrivals[job.slot_id][0][0]
+        slot = next(s for s in slots.slots_for_dataset(
+            DATASET_ID, until=job.period.round_date + timedelta(days=1))
+            if s.period.name == job.period.name)
         for did, supplies in sources.items():
             mine = [s for s in supplies if s.period == job.period.name]
             if not mine:
@@ -627,12 +684,20 @@ def _refuse_unschedulable(jobs, sources, arrivals) -> None:
             first = asset_time.parse_instant(mine[0].received_at, did)
             if asset_time.local_date(first) != job.period.round_date:
                 continue        # filed a round earlier, as Child Protection's are
-            took = promotion.effective_at_for(first, now=at, seed=did, before=at)
-            if first >= at or took >= at:
+            later = [t for t in (asset_time.parse_instant(s.received_at, did)
+                                 for s in supplies) if t > first]
+            readers = [t for t, name in releases if t > first and name == job.period.name]
+            caps = [min(c) for c in (later, readers) if c]
+            took = promotion.effective_at_for(
+                first, seed=f"{hierarchy.dataset(did).table}__{asset_time.arrival_key(first)}",
+                before=min(caps) if caps else None,
+                within=schedule.claim_window(did, on=asset_time.local_date(first)))
+            if first >= at or took >= at or at > slot.late_after:
                 raise CannotGenerate(
                     f"the {job.period.name} linkage release ({at.isoformat()}) cannot be "
                     f"received after {did}'s promotion for that quarter takes effect "
-                    f"({took.isoformat()}) and within its due time - nothing was written")
+                    f"({took.isoformat()}) and within its due time and grace (by "
+                    f"{slot.late_after.isoformat()}) - nothing was written")
 
 
 def _refuse_unmet_preconditions(jobs, sources, arrivals, injected) -> None:

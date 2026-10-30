@@ -245,7 +245,8 @@ def _run_one_inner(collection_id: str, entry: dict, run_id: str, run_timestamp: 
     # it, is no gap (REQ-PIPE-270 criterion 9): a check reading it is left
     # out of this run's scope, recorded in left_out with its reason below,
     # and gets neither a record nor red.
-    outside = _out_of_agreement(entry, run_id, resolution) if readable else {}
+    outside = (_out_of_agreement(entry, run_id, resolution, run_timestamp) if readable
+               else {})
     missing = (_unrunnable_results(entry, run_id, run_timestamp, resolution, outside)
                if readable else [])
     if missing:
@@ -326,11 +327,17 @@ def _period_of_entry(entry: dict, dataset_id: str, as_at) -> str | None:
     return stated or filing.period_of(dataset_id, as_at)
 
 
-def _out_of_agreement(entry: dict, run_id: str, resolution) -> dict[str, str]:
+def _out_of_agreement(entry: dict, run_id: str, resolution,
+                      run_timestamp: str | None = None) -> dict[str, str]:
     """{check: why} for the checks out of this run's scope because a table
     they read is not part of the agreement for its period and was never
-    supplied for it (REQ-PIPE-270 criterion 9) - none for a trial or an
-    unfiled run."""
+    supplied for it (REQ-PIPE-270 criterion 9), or a person has marked it not
+    supplied (REQ-PIPE-332 criterion 7) - none for a trial or an unfiled run.
+
+    THE AGREEMENT AS AT THE RECEIPT, A MARK AS AT THE RUN: what the agreement
+    asked of a period is the receipt's question, but a person's mark is a
+    decision, and a re-run owed by a mark recorded after the receipt
+    (criterion 9) must see it, or it records the same red again."""
     if trial.is_trial(run_id):
         return {}
     owner = run_owner(run_id)
@@ -344,7 +351,9 @@ def _out_of_agreement(entry: dict, run_id: str, resolution) -> dict[str, str]:
     with supply_db.connect(read_only=True, label="mothman:out-of-agreement") as conn:
         return unrunnable.out_of_agreement(
             conn, own_table=table, own_dataset=own_dataset, period=period,
-            resolution=resolution, reads=promotion._declared_reads(), as_at=as_at)
+            resolution=resolution, reads=promotion._declared_reads(), as_at=as_at,
+            decided_by=(asset_time.parse_instant(run_timestamp, f"run timestamp for {run_id}")
+                        if run_timestamp else None))
 
 
 def _unrunnable_results(entry: dict, run_id: str, run_timestamp: str, resolution,

@@ -82,7 +82,7 @@ def problems() -> list[str]:
     from generator import collections
 
     found = collections.providers()
-    out = collections.seed_range_problems(found)
+    out = collections.seed_range_problems(found) + collections.order_problems(found)
     for provider in found:
         try:
             provider.check_seeds()

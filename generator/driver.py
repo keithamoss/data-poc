@@ -13,15 +13,17 @@ generators used before they were merged here:
    and target resolved - all BEFORE THE FIRST WRITE (REQ-GEN-044 criterion
    4; REQ-GEN-184 criterion 11), so a refusal leaves the history already on
    disk standing rather than half-replaced.
-2. Only then is what this collection wrote last time cleared, so a
+2. Each slot's arrivals BUILT, in plan order and in memory: receipt
+   instant, then a delivery name (unique against what will remain on disk,
+   REQ-GEN-043), then the files.
+3. No two arrivals may share a receipt instant - within the collection (a
+   staged table is named for its arrival, so the second would drop the
+   first) or with another collection's delivery (REQ-GEN-334 criterion
+   13). Refused here, still before the first write.
+4. Only then is what this collection wrote last time cleared, so a
    regeneration overwrites its own history rather than accumulating beside
-   it (REQ-GEN-042), and delivery-name uniqueness is seeded from whatever
-   the OTHER collections have on disk (REQ-GEN-043).
-3. Each slot's arrivals, in plan order: receipt instant, then a delivery
-   name, then the files - one directory per arrival with a receipt written
-   OUTSIDE it (docs/delivery-format.md).
-4. No two arrivals may share a receipt instant: a staged table is named for
-   its arrival, so the second would drop the first.
+   it (REQ-GEN-042), and each arrival written as one directory with a
+   receipt OUTSIDE it (docs/delivery-format.md).
 5. The bookkeeping, then where every scenario landed, resolved against what
    RECOGNITION found on disk rather than what was meant to be written.
 
@@ -93,6 +95,37 @@ def no_two_arrivals_share_an_instant(manifest: list[dict]) -> None:
         seen[instant] = entry["run_id"]
 
 
+def no_instant_shared_with_another_collection(key: str, manifest: list[dict]) -> None:
+    """Refuse an arrival at the receipt instant of another collection's
+    delivery (REQ-GEN-334 criterion 13), naming both: receipt order decides
+    what a run can read, so a tie would be settled by sort order. The others
+    are what each collection generated last, from the bookkeeping - every
+    collection generates in hierarchy order, so each pair is compared by the
+    later of the two."""
+    from qa_tools.common import asset_time
+
+    path = BOOKKEEPING_PATH
+    if not path.exists():
+        return
+    with open(path) as f:
+        book = json.load(f)
+    theirs: dict = {}
+    for other, entries in book.items():
+        if other == key:
+            continue
+        for e in entries:
+            if e.get("received_at"):
+                theirs[asset_time.parse_instant(e["received_at"], other)] = (
+                    f"{other}'s delivery {e.get('delivery') or e.get('run_id')}")
+    for entry in manifest:
+        at = asset_time.parse_instant(entry["received_at"], entry["run_id"])
+        if at in theirs:
+            raise ValueError(
+                f"{entry['run_id']} (delivery {entry['delivery']}) and {theirs[at]} would "
+                f"share one receipt instant, {entry['received_at']} - receipt order decides "
+                f"what a run can read, so nothing was written")
+
+
 def generate(collection_id: str) -> list[dict]:
     """Write `collection_id`'s whole synthetic history; returns its
     bookkeeping. Refused by name for a collection with no provider."""
@@ -111,20 +144,28 @@ def generate(collection_id: str) -> list[dict]:
     # WHAT EACH DECLARED CORRECTION CLAIMS (REQ-GEN-205 criteria 10 and 18).
     from generator import correction_claims
 
+    # WHAT IT READS IS GENERATED FIRST (REQ-GEN-334 criterion 6).
+    order = collections.order_problems(only=collection_id)
+    if order:
+        raise collections.base.GenerationOrderRefused(
+            "; ".join(order) + " - nothing was written")
     correction_claims.check_all()
     provider.check_seeds()
     plan = provider.plan()
 
-    # 2. Only then is the last history cleared.
-    delivery.remove_deliveries(previous_delivery_names(provider.dataset_id),
-                               DELIVERIES_DIR, RECEIPTS_DIR)
+    # 3. Each slot's arrivals, BUILT before anything is written: what they
+    # are, their names and receipts - so that a receipt instant shared with
+    # another collection's delivery refuses before the first write
+    # (REQ-GEN-334 criterion 13). Delivery-name uniqueness is seeded from
+    # what will remain on disk once this collection's last history is
+    # cleared - the same set step 2 used to leave behind.
+    previous = previous_delivery_names(provider.dataset_id)
     # Delivery names are arbitrary BY DESIGN, which means they can collide -
     # and a collision would write two arrivals into one directory, silently
     # merging deliveries that never arrived together.
-    taken_names: set[str] = delivery.existing_delivery_names(DELIVERIES_DIR)
-
-    # 3. Each slot's arrivals.
+    taken_names: set[str] = delivery.existing_delivery_names(DELIVERIES_DIR) - set(previous)
     manifest: list[dict] = []
+    writes: list[tuple] = []
     for job in plan.jobs:
         deliveries = provider.slot(plan, job)
         if deliveries is None:
@@ -144,27 +185,33 @@ def generate(collection_id: str) -> list[dict]:
                 # recognition below - observed rather than predicted.
                 injected[1].arrivals[n - 1]["delivery"] = name
             files, received = provider.files(plan, job, n, delivery_obj, entry, name)
-            delivery.write_delivery(
-                name, files, received_at=received,
-                deliveries_dir=DELIVERIES_DIR, receipts_dir=RECEIPTS_DIR,
-                # STORAGE, because in this PoC the generator IS storage
-                # (REQ-PIPE-105 criterion 4): it stands in for the moment our
-                # own object store took a supplier's file.
-                received_from=delivery.RECEIVED_FROM_STORAGE)
-
-            tag = f"DIRTY({delivery_obj.severity})" if delivery_obj.severity else "clean"
-            resupply_tag = (f"  [resupply {n - 1}, received "
-                            f"{delivery_obj.received_date.isoformat()}]") if n > 1 else ""
-            print(f"{entry['run_id']}: {provider.describe(entry, delivery_obj)}  "
-                  f"[{tag}]{resupply_tag}  -> {name}/")
-            if delivery_obj.severity == "red" and n >= MAX_ATTEMPTS:
-                print(f"  -> still red after {n} deliveries - "
-                      f"giving up (hit MAX_ATTEMPTS={MAX_ATTEMPTS})")
+            writes.append((name, files, received, entry, delivery_obj, n))
         manifest.extend(entries)
         provider.after_slot(plan, job, deliveries)
-
-    # 4. and 5.
     no_two_arrivals_share_an_instant(manifest)
+    no_instant_shared_with_another_collection(provider.dataset_id, manifest)
+
+    # 2. Only then is the last history cleared, and the new one written.
+    delivery.remove_deliveries(previous, DELIVERIES_DIR, RECEIPTS_DIR)
+    for name, files, received, entry, delivery_obj, n in writes:
+        delivery.write_delivery(
+            name, files, received_at=received,
+            deliveries_dir=DELIVERIES_DIR, receipts_dir=RECEIPTS_DIR,
+            # STORAGE, because in this PoC the generator IS storage
+            # (REQ-PIPE-105 criterion 4): it stands in for the moment our
+            # own object store took a supplier's file.
+            received_from=delivery.RECEIVED_FROM_STORAGE)
+
+        tag = f"DIRTY({delivery_obj.severity})" if delivery_obj.severity else "clean"
+        resupply_tag = (f"  [resupply {n - 1}, received "
+                        f"{delivery_obj.received_date.isoformat()}]") if n > 1 else ""
+        print(f"{entry['run_id']}: {provider.describe(entry, delivery_obj)}  "
+              f"[{tag}]{resupply_tag}  -> {name}/")
+        if delivery_obj.severity == "red" and n >= MAX_ATTEMPTS:
+            print(f"  -> still red after {n} deliveries - "
+                  f"giving up (hit MAX_ATTEMPTS={MAX_ATTEMPTS})")
+
+    # 5.
     # NO ORDINARY ARRIVAL REFILED BY A VERSION-LEVEL CORRECTION (REQ-GEN-205
     # criterion 10): its instants exist only once written.
     from qa_tools.common import hierarchy

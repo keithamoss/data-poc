@@ -269,3 +269,94 @@ def test_the_child_protection_sides_move_no_ordinary_severity(monkeypatch):
             assert len(deliveries) == 1 and deliveries[0].severity == "red"
         else:
             assert a.severity == b.severity, a.period.name
+
+
+class TestEachOrdinaryReleaseIsScheduledAfterThePromotionItReads:
+    """REQ-GEN-334 criterion 12, refused before anything is written: an
+    ordinary release received after the effective instant of each same-round
+    source promotion - the gate's own effective_at_for, seeded as the gate
+    seeds it - AND within its own due time and grace; else refused naming the
+    quarter, the delivery and the promotion's effective instant."""
+
+    @staticmethod
+    def _quarter(name="2024-Q3"):
+        from generator.collections.base import Job
+        from qa_tools.common import schedule
+
+        period = next(p for p in schedule.periods_for_dataset(lp.DATASET_ID)
+                      if p.name == name)
+        return Job("lp_slot_01", lp.BASE_SEED + 1, None, period), period
+
+    @staticmethod
+    def _source(period, hhmm):
+        from generator.collections.base import GeneratedSupply
+
+        received = asset_time.wall_clock(period.round_date, hhmm)
+        return {"ed-presentations": [GeneratedSupply(period.name,
+                                                     asset_time.isoformat(received), None)]}
+
+    def test_an_ordinary_release_on_time_after_its_source_passes(self):
+        job, period = self._quarter()
+        at = asset_time.wall_clock(period.round_date, "17:30")
+        lp._refuse_unschedulable([job], self._source(period, "16:00"),
+                                 {job.slot_id: [(at, (), None)]}, {})
+
+    def test_a_release_past_its_due_time_and_grace_is_refused(self):
+        """Due 18:00 with eight hours' grace: a release at 03:00 the next day
+        would be late by accident (Keith, OQ1 = a) - refused, not written."""
+        from datetime import timedelta
+
+        job, period = self._quarter()
+        at = asset_time.wall_clock(period.round_date + timedelta(days=1), "03:00")
+        with pytest.raises(lp.CannotGenerate, match=f"{period.name}.*linkage.*takes effect.*due time and grace"):
+            lp._refuse_unschedulable([job], self._source(period, "16:00"),
+                                     {job.slot_id: [(at, (), None)]}, {})
+
+    def test_a_release_before_its_source_arrives_is_refused(self):
+        job, period = self._quarter()
+        at = asset_time.wall_clock(period.round_date, "17:30")
+        with pytest.raises(lp.CannotGenerate, match=f"{period.name}.*ed-presentations"):
+            lp._refuse_unschedulable([job], self._source(period, "17:45"),
+                                     {job.slot_id: [(at, (), None)]}, {})
+
+    def test_the_effective_instant_named_is_the_gates_own(self):
+        """Seeded by the arrival's run id and capped at the release, as
+        orchestrate.effective_at_of computes it."""
+        from datetime import timedelta
+
+        from qa_tools.common import promotion, schedule
+
+        job, period = self._quarter()
+        src = self._source(period, "16:00")
+        first = asset_time.parse_instant(src["ed-presentations"][0].received_at, "t")
+        at = asset_time.wall_clock(period.round_date + timedelta(days=1), "03:00")
+        took = promotion.effective_at_for(
+            first, seed=f"ed_presentations__{asset_time.arrival_key(first)}", before=at,
+            within=schedule.claim_window("ed-presentations",
+                                         on=asset_time.local_date(first)))
+        with pytest.raises(lp.CannotGenerate) as exc:
+            lp._refuse_unschedulable([job], src, {job.slot_id: [(at, (), None)]}, {})
+        assert took.isoformat() in str(exc.value)
+
+
+def test_a_dataset_identified_by_several_columns_carries_each(monkeypatch):
+    """REQ-QAC-330 criterion 5: id_1 onward hold a linked dataset's declared
+    source columns in order - every one of them, not only the first - and the
+    columns after them are blank."""
+    import numpy as np
+    import pandas as pd
+
+    monkeypatch.setattr(lp, "linked", lambda: (
+        ("cp-clients", "DOC_CLIENTS", ("cp_client_id", "episode")),))
+    monkeypatch.setattr(lp, "columns", lambda: ["linkage_key", "dataset", "id_1", "id_2",
+                                                "id_3"])
+    n = 200
+    source = pd.DataFrame({"cp_client_id": [f"C{i:04d}" for i in range(n)],
+                           "episode": [str(i % 3 + 1) for i in range(n)]})
+    df = lp.build_rows({"cp-clients": source}, (), np.random.default_rng(1), "t")
+    assert list(df.columns) == ["linkage_key", "dataset", "id_1", "id_2", "id_3"]
+    pairs = set(zip(source["cp_client_id"], source["episode"]))
+    got = list(zip(df["id_1"], df["id_2"]))
+    assert got and set(got) <= pairs, got[:3]
+    assert (df["id_3"] == "").all()
+    assert 90.0 <= lp._coverage(list(pairs), set(got)) <= 96.5

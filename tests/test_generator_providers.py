@@ -123,6 +123,24 @@ class TestOneDriverForEveryCollection:
             driver.generate(FAKE_ID)
 
 
+    def test_an_arrival_at_another_collections_instant_is_refused_before_writing(
+            self, writing):
+        """REQ-GEN-334 criterion 13: two deliveries of DIFFERENT providers at
+        one receipt instant are refused naming both, before anything is
+        written - receipt order decides what a run can read."""
+        from qa_tools.common import asset_time
+
+        _provider, out = writing
+        at = asset_time.isoformat(asset_time.wall_clock(date(2026, 1, 5), "09:00"))
+        out.mkdir(parents=True, exist_ok=True)
+        (out / "generator_bookkeeping.json").write_text(json.dumps(
+            {"another-dataset": [{"run_id": "another_run_001", "delivery": "another-drop",
+                                  "received_at": at}]}))
+        with pytest.raises(ValueError, match="another-drop.*share one receipt instant"):
+            driver.generate(FAKE_ID)
+        assert not (out / "deliveries").exists() or not any((out / "deliveries").iterdir())
+
+
 class TestTheSeedSchedule:
     """Criteria 2 and 3."""
 
@@ -293,6 +311,38 @@ class TestTheRegistryRoutesTheRest:
         assert expected[-1] == FAKE_ID
         assert [cid for cid, _ in ran] == expected
         assert all(where == str(tmp_path / "deliveries") for _, where in ran)
+
+
+class TestADependencyGeneratesFirst:
+    """REQ-GEN-334 criterion 6: a provider that reads another's supplies
+    (depends_on) is refused before anything is written, naming both, where
+    the provider it depends on is absent or generates after it - generic,
+    from the declaration alone."""
+
+    def test_a_dependency_generating_after_it_is_refused_naming_both(self, writing,
+                                                                     monkeypatch):
+        _provider, out = writing
+        # The fake collection comes last in hierarchy order, so a provider
+        # earlier in it that depends on the fake would read a history not yet
+        # generated.
+        first = providers.providers()[0]
+        assert first.collection_id != FAKE_ID
+        monkeypatch.setattr(type(first), "depends_on", (FAKE_ID,), raising=False)
+        with pytest.raises(providers.base.GenerationOrderRefused,
+                           match=f"{first.collection_id}.*{FAKE_ID}.*after"):
+            driver.generate(first.collection_id)
+        assert not out.exists() or not any(out.rglob("*.csv")), "nothing was written"
+
+    def test_an_absent_dependency_is_refused_naming_both(self, writing, monkeypatch):
+        provider, out = writing
+        monkeypatch.setattr(provider, "depends_on", ("no-such-collection",), raising=False)
+        with pytest.raises(providers.base.GenerationOrderRefused,
+                           match=f"{FAKE_ID}.*no-such-collection"):
+            driver.generate(FAKE_ID)
+        assert not out.exists() or not any(out.rglob("*.csv")), "nothing was written"
+
+    def test_the_real_providers_generate_their_dependencies_first(self):
+        assert providers.order_problems() == []
 
 
 class TestNoTestClearsTheRealDeliveryTree:

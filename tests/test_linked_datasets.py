@@ -72,10 +72,26 @@ class TestCriterionSix:
         assert "cp-clients" in text and "no_such_column" in text
 
     def test_more_identifier_columns_than_the_contracts_id_n(self, repo):
+        """The contract declares id_1 and id_2; three real source columns
+        exceed it - and the message is that one, not any other naming id_1."""
+        assert "linkage-keys links 'cp-clients' by" not in "\n".join(
+            linked_datasets.problems(repo)), "precondition: the real mapping fits"
+
         def change(ls):
-            ls[0]["id_columns"] = ["cp_client_id", "cp_client_id"]
+            ls[0]["id_columns"] = ["cp_client_id", "given_name", "family_name"]
         text = _edit(repo, change)
-        assert "cp-clients" in text and "id_1" in text
+        assert ("linkage-keys links 'cp-clients' by 3 identifier columns, more than the "
+                "contract's id_1 to id_2.") in text.splitlines(), text
+
+    def test_a_dataset_naming_no_calendar(self, repo):
+        cal_path = repo / "contract" / "calendar.yaml"
+        cal = yaml.safe_load(cal_path.read_text())
+        entry = next(d for d in cal["datasets"] if d["id"] == "cp-clients")
+        entry["no_calendar"] = True
+        cal_path.write_text(yaml.safe_dump(cal, sort_keys=False))
+        text = "\n".join(linked_datasets.problems(repo))
+        assert ("linkage-keys links 'cp-clients', which names no calendar, so it has no "
+                "period to be read for.") in text.splitlines(), text
 
     def test_two_datasets_with_one_code(self, repo):
         def change(ls):
@@ -118,3 +134,49 @@ class TestTheHandWrittenChecksAgreeWithTheMapping:
         path.write_text(path.read_text().replace("linked_dataset: ed-presentations", "linked_dataset: cp-carers", 1))
         text = "\n".join(linked_datasets.problems(repo))
         assert "cp-carers" in text and "not declared as linked" in text
+
+
+class TestTheQueriesThemselvesAgreeWithTheMapping:
+    """REQ-QAC-333 criterion 3 holds the SQL that runs and the valid values,
+    not only the attributes beside them: a check whose query or values state
+    a code or an identifier column the mapping does not declare fails,
+    naming the check, the dataset and both values."""
+
+    def _soda(self, repo):
+        return repo / "contract" / "department-of-health" / "linkage-products-soda-checks.yml"
+
+    def _replace(self, repo, old, new):
+        path = self._soda(repo)
+        text = path.read_text()
+        assert old in text, f"precondition: {old!r} is in the check file"
+        path.write_text(text.replace(old, new, 1))
+        return "\n".join(linked_datasets.problems(repo))
+
+    def test_a_referential_query_stating_another_code(self, repo):
+        text = self._replace(repo, "WHERE l.dataset = 'DOC_CLIENTS' AND c.cp_client_id IS NULL",
+                             "WHERE l.dataset = 'DOC_CLIENTZ' AND c.cp_client_id IS NULL")
+        assert "cp-clients.referential_soda" in text and "DOC_CLIENTZ" in text \
+            and "'DOC_CLIENTS'" in text, text
+
+    def test_valid_values_stating_another_code(self, repo):
+        text = self._replace(repo, 'valid values: ["DOC_CLIENTS", "EDDC_PRESENTATION"]',
+                             'valid values: ["DOC_CLIENTS", "EDC_PRESENTATION"]')
+        assert "dataset.invalid_count_soda" in text and "EDC_PRESENTATION" in text \
+            and "EDDC_PRESENTATION" in text, text
+
+    def test_a_join_on_another_identifier_column(self, repo):
+        text = self._replace(
+            repo, "LEFT JOIN ed_presentations e ON CAST(e.presentation_id AS TEXT)",
+            "LEFT JOIN ed_presentations e ON CAST(e.arrival_datetime AS TEXT)")
+        assert "ed-presentations.referential_soda" in text and "arrival_datetime" in text \
+            and "presentation_id" in text, text
+
+    def test_a_source_column_compared_without_its_text_cast(self, repo):
+        text = self._replace(repo, "ON l.id_1 = CAST(c.cp_client_id AS TEXT)",
+                             "ON l.id_1 = c.cp_client_id")
+        assert "cp-clients.coverage_soda" in text and "text" in text, text
+
+    def test_an_own_row_query_stating_an_undeclared_code(self, repo):
+        text = self._replace(repo, "WHERE (dataset = 'DOC_CLIENTS' AND id_2 IS NOT NULL",
+                             "WHERE (dataset = 'DOC_CLIENT' AND id_2 IS NOT NULL")
+        assert "no_surplus_ids_soda" in text and "DOC_CLIENT'" in text, text
