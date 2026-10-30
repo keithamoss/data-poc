@@ -453,10 +453,10 @@ def line_report(root: Path = ROOT) -> list[str]:
 
 
 def main() -> int:
-    from qa_tools.common import linked_datasets
+    from qa_tools.common import linked_datasets, run_reads
 
     problems = (config_problems() + check_file_problems() + literal_problems()
-                + presentation_problems() + linked_datasets.problems())
+                + presentation_problems() + linked_datasets.problems() + run_reads.declaration_problems())
     for line in line_report():  # reported whether or not the gate passes
         print(f"  {line}")
     if problems:

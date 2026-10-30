@@ -400,7 +400,14 @@ def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], da
         """The card's counted points, the collection's warehouse read the
         first time a card asks (a one-table collection never does)."""
         if "warehouse" not in view:
-            for d in coll.datasets:
+            # EVERY DATASET A RESULT MAY HAVE READ, WHATEVER ITS COLLECTION
+            # (REQ-PIPE-331 criterion 9, through the one resolver): without
+            # another collection's table here, a result that read its supply
+            # could never qualify to count and stayed not judged for ever.
+            from qa_tools.common import run_reads
+
+            for table in run_reads.reads_for(coll.id).tables:
+                d = hierarchy.dataset_for_table(table)
                 if d.dataset_id not in slot_timelines:
                     slot_timelines[d.dataset_id] = slot_timeline.for_dataset(d.dataset_id)
             view["warehouse"] = supply_status.HoldingsTimeline(slot_timelines)

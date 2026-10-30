@@ -270,16 +270,17 @@ def complete(item, *, run_by: str | None = None, on_step=None):
 
     still_not_judged: list[str] = []
     outcomes: dict[tuple[str, str], str] = {}
+    contended: list[str] = []
     for collection_id, items in sorted(by_collection.items()):
         applied = gate.apply(collection_id, period, entry=gate.KNOCK_ON, checked=items,
                              effective_at=now, run_by=run_by)
         gate.report(applied)
         if applied.contended:
-            return recheck.Outcome(
-                item.id, last_key, False,
-                f"{period}: {len(touched)} reader(s) re-evaluated; another gate holds "
-                f"{period}, so they are re-gated by the next pass - still owed",
-                contended=True)
+            # A CONTENDED COLLECTION DOES NOT STOP THE OTHERS (REQ-PIPE-331
+            # criterion 10): every other collection's readers are re-gated in
+            # this pass, and the item stays owed for the contended one's.
+            contended.append(collection_id)
+            continue
         if applied.failed:
             # A FAILED APPLICATION IS NOT A COMPLETED KNOCK-ON (post-build-review
             # #274 D6): it was abandoned and promoted nothing, so the item stays
@@ -322,6 +323,12 @@ def complete(item, *, run_by: str | None = None, on_step=None):
             own, holding = _by_root(conn, period, changed)
             if own:
                 _shout(conn, item, period, own, effective_at=now, holding=holding)
+    if contended:
+        return recheck.Outcome(
+            item.id, last_key, False,
+            f"{period}: {len(touched)} reader(s) re-evaluated; another gate holds "
+            f"{period} for {', '.join(contended)}, so those are re-gated by the next "
+            f"pass - still owed", contended=True)
     if waiting_on:
         return recheck.Outcome(
             item.id, last_key, False,

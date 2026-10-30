@@ -436,9 +436,13 @@ def file_and_overlay(collection_id: str, arrival, among=None) -> None:
     siblings - filing each file just before its own run left a zip's first
     file blind to the rest. Filing is per dataset and write-once, so filing a
     sibling here and again at its own turn is the same filing."""
-    coll = collections.by_id(collection_id)
+    from qa_tools.common import run_reads
+
+    reads = run_reads.reads_for(collection_id)
     filing.file_arrivals(simultaneous_with(arrival, among))
-    period_overlay.rebuild_for_arrival(arrival, tables=[d.table for d in coll.datasets])
+    # ANOTHER COLLECTION'S TABLE IS READ FROM THE WAREHOUSE ONLY (REQ-PIPE-331
+    # criterion 3), through the one resolver every caller asks.
+    period_overlay.rebuild_for_arrival(arrival, tables=reads.tables, foreign=reads.foreign)
 
 
 def _claim_window(collection_id: str, arrival):

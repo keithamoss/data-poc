@@ -291,7 +291,7 @@ def _withhold_if_held(arrival, dataset_id: str, own_table: str, *,
         conn.close()
 
 
-def rebuild_for_arrival(arrival, *, tables: Sequence[str],
+def rebuild_for_arrival(arrival, *, tables: Sequence[str], foreign: Sequence[str] = (),
                         dsn: str | None = None) -> period_schema.PeriodResolution | None:
     """The batch's one call: after an arrival is filed, give its run
     the period overlay and record what it read.
@@ -299,6 +299,11 @@ def rebuild_for_arrival(arrival, *, tables: Sequence[str],
     Returns None - and leaves the staging-time views alone - where the
     arrival's supply was filed to no period, which is the held and the
     unfiled case alike (REQ-PIPE-079 criterion 9).
+
+    `foreign` are the tables of OTHER collections the run's checks declare
+    (run_reads.reads_for, REQ-PIPE-331 criterion 3), all among `tables`:
+    each is read from the period's warehouse only - promoted, inherited or
+    substituted - never staged, and is absent where the period holds none.
 
     `tables` is the collection's logical tables. Those with no agreed
     calendar are SAMPLE data and are added from the sample schema on
@@ -343,7 +348,8 @@ def rebuild_for_arrival(arrival, *, tables: Sequence[str],
                         conn, arrival_key=key,
                         supply=resolved.supply_id if resolved is not None else None),
                     own_physical=own_physical,
-                    warehouse_for=tuple(getattr(arrival, "warehouse_for", ()) or ()))
+                    warehouse_for=tuple(getattr(arrival, "warehouse_for", ()) or ())
+                    + tuple(foreign))
         if sample:
             found = supply_db.candidates_in(conn, sample_data.SCHEMA, sample,
                                              loaded=loaded)

@@ -622,10 +622,12 @@ def _receipt(conn, dataset_id: str, supply: str):
 
 def _warehouse(conn, period: str, members) -> dict[str, str | None]:
     """{logical table: the supply the warehouse holds for it in `period`}
-    for every table of the members' collections, as the application saw it
-    - what the re-confirmation compares against."""
-    from qa_tools import collections
-    from qa_tools.common import decision_log, hierarchy
+    for every table of the members' collections AND every other
+    collection's table their checks read (REQ-PIPE-331 criterion 9, through
+    the one resolver), as the application saw it - what the re-confirmation
+    compares against. Without the second, a result that read another
+    collection's supply could never qualify to count."""
+    from qa_tools.common import decision_log, hierarchy, run_reads
 
     tables: dict[str, str | None] = {}
     seen = set()
@@ -634,7 +636,10 @@ def _warehouse(conn, period: str, members) -> dict[str, str | None]:
         if coll in seen:
             continue
         seen.add(coll)
-        for d in collections.by_id(coll).datasets:
+        for table in run_reads.reads_for(coll).tables:
+            if table in tables:
+                continue
+            d = hierarchy.dataset_for_table(table)
             h = decision_log.held(conn, d.dataset_id, period)
             tables[d.table] = (h.holder if h and h.held_as in (
                 decision_log.PROMOTED, decision_log.SUBSTITUTED, decision_log.INHERITED)
@@ -649,10 +654,13 @@ def _join(conn, members: dict, period: str) -> None:
     through recorded cross-table verdicts, transitively (criterion 2)."""
     from qa_tools.common import supply_status
 
+    from qa_tools.common import hierarchy
+
     frontier = list(members.values())
     seen = set(members)
     while frontier:
         m = frontier.pop()
+        own = hierarchy.dataset(m.dataset_id).collection_id
         for r in supply_status._shown(conn, m.dataset_id, m.supply):
             for table, read in (r.get("reads") or {}).items():
                 if read.get("state") != qa_store.READ or not read.get("supply_id"):
@@ -660,6 +668,12 @@ def _join(conn, members: dict, period: str) -> None:
                 ds = supply_status.dataset_of(table)
                 key = (ds, read["supply_id"])
                 if ds is None or key in seen:
+                    continue
+                # NEVER ACROSS COLLECTIONS (REQ-PIPE-331 criterion 6): another
+                # collection's supply is read from the warehouse only, so a
+                # recorded read naming one - even one waiting in the period -
+                # never ties its gate application to this one.
+                if hierarchy.dataset(ds).collection_id != own:
                     continue
                 seen.add(key)
                 item = joinable(conn, ds, read["supply_id"], period)

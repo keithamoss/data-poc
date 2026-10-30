@@ -222,7 +222,10 @@ def execute(*, dataset_id: str, supply_id: str, run_key: str, purpose: dict,
     # REFUSED BY NAME BEFORE ANYTHING IS STAGED OR OVERLAID (REQ-PIPE-240
     # criterion 6): a collection with no adapter raises NoAdapterError here.
     collections.adapter(coll)
-    tables = [d.table for d in coll.datasets]
+    from qa_tools.common import run_reads
+
+    reads = run_reads.reads_for(coll.id)
+    tables = reads.tables
 
     arrival = SimpleNamespace(
         run_id=run_key, received_at=received_at, sequence=0, delivery_name=delivery,
@@ -246,7 +249,7 @@ def execute(*, dataset_id: str, supply_id: str, run_key: str, purpose: dict,
                     **purpose},
     }
     try:
-        period_overlay.rebuild_for_arrival(arrival, tables=tables)
+        period_overlay.rebuild_for_arrival(arrival, tables=tables, foreign=reads.foreign)
     except Exception:
         # The run's own clean-up is in _run_one's `finally`, which an overlay
         # that broke half-built never reaches (#114, minor).

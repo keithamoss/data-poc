@@ -93,10 +93,18 @@ def _build_run_views(conn, collection_id: str, run_id: str, key: str,
     # extends the same refusal to a supply the assignment rule could not
     # place, which resolves to exactly one table and would otherwise be
     # checked against no period at all.
-    res = supply_db.create_run_views(conn, run_id, supply_db.candidates_in(
+    candidates = supply_db.candidates_in(
         conn, staging, agreed_tables, arrival=key,
-        loaded=load_log.loaded_tables(trial_scope)), source_schema=staging,
-        held=supply_holds.held_supplies(conn, arrival_key=key))
+        loaded=load_log.loaded_tables(trial_scope))
+    # ANOTHER COLLECTION'S TABLE IS ABSENT UNTIL FILING (REQ-PIPE-331
+    # criterion 3): it is read from a period's warehouse only, and before the
+    # run is filed it has no period - so a held or unfiled run reads none.
+    from qa_tools.common import run_reads
+
+    for table in run_reads.reads_for(collection_id).foreign:
+        candidates.setdefault(table, [])
+    res = supply_db.create_run_views(conn, run_id, candidates, source_schema=staging,
+                                     held=supply_holds.held_supplies(conn, arrival_key=key))
     if not sample_tables:
         return res
     # THE LOAD-RECORD GATE STILL APPLIES (REQ-PIPE-060 criterion 7).
