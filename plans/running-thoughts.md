@@ -5929,3 +5929,29 @@ could never have computed it), and it belongs with batch 5's check work.
      real linkage unit's release) should be one generic rule on the binned
      distribution field (qa_tools/common/distribution.py), declared with the
      check, not a linkage special case. Not scoped.
+
+131. **[todo, 2026-10-30]** **[Dashboard UI]** **Seeing everything recorded
+     about a period, including results that arrived late.** Keith,
+     2026-10-30 ~23:50, prompted by the REQ-DASH-337 critic's J1 (post-build
+     review #289). He asked: "How can we view the results for a whole
+     period?"
+
+     Today he can't. Every dataset page is as-at a date, and shows the supply
+     in place then with the results known by then. Child Protection's next
+     supply lands at 9am on a round day, and the linkage release that reads
+     the previous one lands at about 5:30pm the same day. So a linkage
+     verdict about a Client Register supply arrives after that supply has
+     been replaced, and no current page shows it on Client Register.
+
+     The period page (REQ-DASH-209) is one table per collection per period:
+     what each dataset holds there, how it got there, who decided, and the
+     status when promoted. It shows no check results.
+
+     Options put to Keith, not yet chosen:
+     - (a) put results on the period page, each dataset's own checks plus
+       cross-collection results recorded about that period, as known now;
+     - (b) let the dataset page open by period as well as by date;
+     - (c) both, the period page linking to each dataset's period view.
+
+     He asked to see the current period page first, and was shown CP 2019-Q1
+     as at 15 March 2019. Not scoped; not part of the Linkage Products push.
