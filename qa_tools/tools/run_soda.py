@@ -22,7 +22,7 @@ from qa_tools import collections
 from qa_tools.common import asked_for, hierarchy, left_out, supply_db
 from qa_tools.common.qa_results_writer import write_qa_result
 from qa_tools.common.soda_common import (
-    ENGINE_TAG, CaptureSampler, check_id_from_resource_attributes, execute_scan,
+    ENGINE_TAG, CaptureSampler, band, check_id_from_resource_attributes, execute_scan,
     failing_sample_keys, left_out_checks, not_evaluated_record, readable_checks_yaml,
     resource_attribute, threshold, unreported_checks,
 )
@@ -160,6 +160,9 @@ def evaluate(collection_id: str, run_id: str, run_timestamp: str) -> list[dict]:
                 "unit": "%" if base_check.endswith("percent") else "count",
                 "warn_threshold": threshold(diagnostics.get("warn")),
                 "fail_threshold": threshold(diagnostics.get("fail")),
+                # THE DIRECTION EACH SIDE COMPARES IN (REQ-DASH-337 criterion
+                # 13), so a 'below' band is never worded 'above'.
+                **({"band": b} if (b := band(diagnostics)) else {}),
                 "status": c["outcome"],
                 "on_fail_action": "flag",
                 "row_count_total": n_total_by_table[table],

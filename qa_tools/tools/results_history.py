@@ -31,7 +31,7 @@ from qa_tools import collections
 from qa_tools.common import asset_time, atomic_file, build_output
 from qa_tools.common.qa_results_reader import (
     RESULT_TOOLS, canonical_order, current_runs_only, list_run_ids, read_check_reads,
-    read_cross_table_results, read_dataset_stats, read_one, replaced_runs, run_facts,
+    read_cross_table_results, read_cross_table_results_reading, read_dataset_stats, read_one, replaced_runs, run_facts,
 )
 
 __all__ = ["build_results_from_history", "results_path", "write_results_file"]
@@ -51,7 +51,8 @@ def results_path(collection_id: str) -> str:
 def write_results_file(collection_id: str, *, runs: list[dict], dataset_stats: dict,
                        results: list[dict], generated_at: str, source: str = "",
                        facts: dict[str, dict] | None = None,
-                       not_in_agreement: dict[str, dict] | None = None) -> dict:
+                       not_in_agreement: dict[str, dict] | None = None,
+                       read_by_others: list[dict] | None = None) -> dict:
     """The results file, whole or not at all (another process may be reading
     it), with its summary - and THE FIFTH VERDICT (REQ-QAC-108 criterion 5):
     a check with no reference measured nothing, so it is counted as `nodata`
@@ -76,6 +77,11 @@ def write_results_file(collection_id: str, *, runs: list[dict], dataset_stats: d
         # PART OF THE AGREEMENT FOR ITS PERIOD (REQ-PIPE-270 criterion 9) -
         # {run id: {check id: why}}, so the page can say why it did not run.
         "not_in_agreement": not_in_agreement or {},
+        # CROSS-TABLE RESULTS RECORDED UNDER ANOTHER COLLECTION THAT READ ONE
+        # OF THIS COLLECTION'S TABLES (REQ-DASH-337 criterion 3), each with
+        # its reads - apart from `results`, which are this collection's own
+        # and what the summary counts. Their runs are in `run_facts`.
+        "read_by_others": canonical_order(read_by_others or []),
         "summary": {"total_checks": len(results), **counts,
                     "engines": sorted(set(r["engine"] for r in results))},
     }
@@ -95,7 +101,12 @@ def build_results_from_history(collection_id: str, *, generated_at: str | None =
     """Rebuild the collection's results file from the recorded `qa` schema
     alone - the dashboard build's source, no tool re-run, no supply rows."""
     coll = collections.by_id(collection_id)
-    facts = run_facts(coll.agency_id, coll.id)
+    # AND EVERY RESULT ANOTHER COLLECTION RECORDED READING ONE OF THIS ONE'S
+    # TABLES (REQ-DASH-337 criterion 3), its runs ranked among this one's.
+    read_by_others = read_cross_table_results_reading(
+        coll.agency_id, coll.id, [d.table for d in coll.datasets])
+    facts = run_facts(coll.agency_id, coll.id,
+                      also=sorted({r["run_id"] for r in read_by_others}))
     every_run = list_run_ids(coll.agency_id, coll.id)
     run_ids = current_runs_only(every_run)
     manifest, stats_by_run = [], {}
@@ -133,4 +144,5 @@ def build_results_from_history(collection_id: str, *, generated_at: str | None =
                               results=results,
                               generated_at=generated_at or asset_time.now().isoformat(),
                               source=source, facts=facts,
-                              not_in_agreement=read_not_in_agreement(coll.agency_id, coll.id))
+                              not_in_agreement=read_not_in_agreement(coll.agency_id, coll.id),
+                              read_by_others=read_by_others)
