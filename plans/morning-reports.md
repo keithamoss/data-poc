@@ -2988,3 +2988,42 @@ one or more component tags, and a date.
     - **PROCESS NOTE**: L1 wrote its code before its tests, then showed 36 of
       41 new tests failing on c1563cb. The evidence is equivalent, the order
       is not the rule; written up in post-build-review with the L1 critic.
+
+11. **[in-progress, 2026-10-30]** **[Docs & process]** **Linkage Products
+    build, evening 2026-10-30: the push waits for tomorrow.**
+    - **THE PLAN (Keith: "Everything, take longer")**: all nine Linkage
+      Products requirements (REQ-QAC-330, REQ-PIPE-331, REQ-PIPE-332,
+      REQ-QAC-333, REQ-GEN-334, REQ-GEN-335, REQ-PIPE-336, REQ-DASH-337,
+      REQ-TEST-339) in ONE push, after critics, one full gate, and Keith's
+      review of the REQ-PIPE-332 c12 list of moved Child Protection and ED
+      verdicts.
+    - **THE FIRST BOOTSTRAP FROM EMPTY THAT RAN THROUGH (lp_boot, ~57
+      minutes sequential)**: Birth Registrations 713s, the quarterly stream
+      2575s, 3450s total, against off_boot's 1291s quarterly and 1439s total.
+      Its target check refused the run, and that was correct. Three defects,
+      each fixed with a test seen failing first (37597c4, 383959b):
+      1. The Linkage Products provider declared no `amber_dataset`, the same
+         defect as post-build-review #248 on ED.
+      2. It also declared no `target_datasets`, so the bootstrap's comparison
+         skipped linkage altogether. A new general test now catches any
+         provider whose ambers would go uncompared.
+      3. An ordinary amber on 2013-Q4 read green. REQ-GEN-205 alters that
+         quarter and moves ED's supply, so the coverage check that carries
+         the amber could not run when the release arrived (the knock-on after
+         confirmation did read amber, 86.8%). A quarter that a correction
+         linkage rides alters now takes no ordinary severity. PROVISIONAL,
+         the same rule as reds on scenario quarters.
+    - **ALSO FIXED**: linkage's `seed_schedule` generated both source
+      collections just to count quarters, so the providers gate imported
+      pandas. It now counts from the calendar, which is a safe superset.
+    - **KNOWN OPEN, NOT FIXED**: generating any ONE collection now plans
+      Child Protection and ED, because `correction_claims.check_all` calls
+      linkage's `generated_periods`, which generates its sources'
+      supplies. Cost, and one red test:
+      `TestEverySeedDrawnIsOneItsProviderDeclares[civil-registration]`.
+      The cheap fix (the sources' own `generated_periods`) changes the
+      history by one quarter, 2015-Q4, which has a period but no filed
+      source supply, so it needs a decision rather than a quick patch.
+    - **OVERNIGHT**: a second from-empty bootstrap of lp_boot runs with the
+      fixes (scratchpad lp_boot2.log). The c12 moved-verdicts list, the
+      scenario checks and the REQ-DASH-337 browser tests all wait on it.
