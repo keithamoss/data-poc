@@ -187,6 +187,26 @@ def test_the_ordinary_severity_mix(plan):
             _clean(plan, job, deliveries[1].payload, n=1)
 
 
+def test_no_ordinary_severity_on_a_quarter_a_correction_it_rides_alters(plan):
+    """Found by the lp_boot bootstrap from empty, 2026-10-30: an ordinary amber
+    drawn on 2013-Q4, a quarter REQ-GEN-205 alters, read green on arrival -
+    the correction moves Emergency Department's supply there, so the coverage
+    check that carries the amber could not run until the knock-on after
+    confirmation. A severity carried only by a cross-collection check needs
+    its sources in place when it arrives, so a rider quarter is clean, like a
+    scenario's (PROVISIONAL)."""
+    from generator import correction_claims, scenario_injection
+
+    ridden = set()
+    for reference, datasets in scenario_injection.CORRECTION_RIDERS.items():
+        if lp.DATASET_ID in datasets:
+            ridden |= correction_claims.altered(reference, [lp.DATASET_ID]).get(lp.DATASET_ID, set())
+    assert ridden, "the precondition - REQ-GEN-205 alters some linkage quarter"
+    on_them = [(j.period.name, j.severity) for j in plan.jobs
+               if j.period.name in ridden and j.severity]
+    assert on_them == []
+
+
 def test_the_named_scenario_rides_a_marked_quarter(plan):
     marked = lp.marked_quarters([j.period for j in plan.jobs])
     assert marked and marked[0] == ("cp-clients", "2015-Q2")

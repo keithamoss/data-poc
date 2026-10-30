@@ -284,6 +284,7 @@ class LinkageProducts(Provider):
     collection_id = "linkage-products"
     dataset_id = DATASET_ID
     amber_dataset = DATASET_ID
+    target_datasets = (DATASET_ID,)
     seed_ranges = ((70_000, 71_000),)
     generating_note = "one linkage release a quarter"
 
@@ -299,7 +300,15 @@ class LinkageProducts(Provider):
         return tuple(out)
 
     def seed_schedule(self) -> list[tuple[str, int, int]]:
-        n = len(self._periods())
+        # COUNTED FROM THE CALENDAR, NOT THE SOURCES (2026-10-30): the quarters
+        # a release is generated for are a subset of the calendar's to date, so
+        # this covers every seed the plan derives - without generating Child
+        # Protection's and Emergency Department's histories (and importing
+        # pandas) just to check seed ranges.
+        from generator.anchor_date import get_anchor_date
+        from qa_tools.common import schedule
+
+        n = len(schedule.periods_for_dataset(DATASET_ID, until=get_anchor_date()))
         return [("the key token", KEY_SEED, KEY_SEED), ("the run plan", RUN_PLAN_SEED,
                                                        RUN_PLAN_SEED)] + [
             (f"lp_slot_{i:02d}", BASE_SEED + i, BASE_SEED + i + RESUPPLY_SPAN)
@@ -391,9 +400,15 @@ class LinkageProducts(Provider):
         _refuse_scenario_quarters(resolved)
         owned = frozenset(k for k, p in enumerate(periods)
                           if p.name in injected or p.name in suppressed)
+        # A QUARTER A CORRECTION IT RIDES ALTERS IS CLEAN TOO (lp_boot,
+        # 2026-10-30, PROVISIONAL): the correction moves a source's supply
+        # there, so the cross-collection checks carrying an ordinary
+        # severity cannot run when the release arrives.
+        ridden = _ridden_quarters()
+        clean = owned | frozenset(k for k, p in enumerate(periods) if p.name in ridden)
         severities = _place_reds(targeting.outside_hold(
             run_plan(len(periods)), [p.round_date for p in periods], DATASET_ID,
-            keep_clean=frozenset({0}), unavailable=owned), owned)
+            keep_clean=frozenset({0}), unavailable=clean), clean)
         jobs = [Job(f"lp_slot_{i:02d}", BASE_SEED + i, sev, p)
                 for i, (sev, p) in enumerate(zip(severities, periods), start=1)]
         plan = Plan(jobs=jobs, resolved=resolved, injected_by_period=injected,
@@ -519,6 +534,18 @@ def named_placements(provider, plan: Plan) -> list:
                                            DELIVERIES_DIR, RECEIPTS_DIR)
     scenario_injection.resolve_run_ids([placement], recognised)
     return [placement]
+
+
+def _ridden_quarters() -> set[str]:
+    """The quarters of this dataset that a correction it rides alters
+    (scenario_injection.CORRECTION_RIDERS) - read from the declarations."""
+    from generator import correction_claims, scenario_injection
+
+    out: set[str] = set()
+    for reference, datasets in scenario_injection.CORRECTION_RIDERS.items():
+        if DATASET_ID in datasets:
+            out |= correction_claims.altered(reference, [DATASET_ID]).get(DATASET_ID, set())
+    return out
 
 
 def _place_reds(severities: list, owned: frozenset) -> list:

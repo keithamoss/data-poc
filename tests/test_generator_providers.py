@@ -79,6 +79,14 @@ def writing(third_collection, monkeypatch, tmp_path):
     module = types.ModuleType(PROVIDER_MODULE)
     module.PROVIDER = _Writing()
     monkeypatch.setitem(sys.modules, PROVIDER_MODULE, module)
+    # NOT THE CORRECTION CHECK (tests/test_correction_claims.py owns it):
+    # since Linkage Products rides REQ-GEN-205, that check plans Child
+    # Protection's whole history to find linkage's quarters, which reads every
+    # registered collection's check files from the repository - and this
+    # fixture's fake collection has none there.
+    from generator import correction_claims
+
+    monkeypatch.setattr(correction_claims, "check_all", lambda: None)
     out = tmp_path / "out"
     undo = redirect(out)
     yield module.PROVIDER, out
@@ -194,6 +202,19 @@ class TestTheTargetTrialIsTheProvidersToDeclare:
             c.id for c in registry.all_collections()]
         assert pipeline.generated_collections()[:2] == ["civil-registration", "child-protection"]
         assert pipeline.generated_collections()[-1] == FAKE_ID
+
+    def test_every_provider_naming_where_its_ambers_land_has_them_compared(self):
+        """Found by the lp_boot bootstrap from empty, 2026-10-30: Linkage
+        Products built ordinary ambers but declared no target_datasets, so the
+        bootstrap's comparison skipped them all and passed over an amber the
+        real tools read green."""
+        from generator import collections as providers
+
+        every = providers.providers()
+        assert every, "the precondition - providers are registered"
+        uncompared = [p.collection_id for p in every
+                      if p.amber_dataset and p.amber_dataset not in p.target_datasets]
+        assert uncompared == []
 
     def test_the_adapters_carry_no_generator_pointer_any_more(self):
         from qa_tools import collections
