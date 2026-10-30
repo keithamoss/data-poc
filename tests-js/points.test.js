@@ -382,7 +382,8 @@ describe("the dataset list's sparkline names each point's cause", () => {
     expect(titles).toHaveLength(3);
     expect(titles[0]).toMatch(/Client Register's run/);
     expect(titles[1]).toMatch(/Client Register's re-check/);
-    expect(titles[2]).toMatch(/Notifications's run/);
+    // "Notifications' run", not "Notifications's" (REQ-DASH-337 UX review, D8).
+    expect(titles[2]).toMatch(/Notifications' run/);
     // One accessible name for the whole sparkline, as before.
     expect(doc.querySelectorAll("svg[aria-label]")).toHaveLength(1);
   });

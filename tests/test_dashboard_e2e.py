@@ -5164,7 +5164,7 @@ class TestColumnsNotGreenMatchesTheDatasetPage:
                 assert got["labels"] == 1 and got["titles"], got
                 titles += got["titles"]
         assert sparks, "no row drew a sparkline - this proves nothing"
-        bad = [s for s in titles if not re.match(r"^From the .+'s (run|re-check)(, .+)?$", s)]
+        bad = [s for s in titles if not re.match(r"^From the .+'s? (run|re-check)(, .+)?$", s)]
         assert not bad, bad[:5]
 
     # 15 May 2025: the readers are red there (see TestTheDatasetPageSaysWhatItsTrendPlots).
@@ -7533,7 +7533,8 @@ class TestWarehouseAndStagingViews:
                                    "2024, awaiting a decision")
         grid = _grid(clean_page)
         assert grid["key"] == (
-            "The marks are dbt, Soda and datacontract-cli, in that order: ✓ passed, ✗ failed, "
+            # "! warned" added by REQ-DASH-337's UX review, D8 - a row can show it.
+            "The marks are dbt, Soda and datacontract-cli, in that order: ✓ passed, ! warned, ✗ failed, "
             "○ could not be evaluated, and a middle dot (·) means that tool has no such check. "
             "Select a check for each tool's full result."), grid["key"]
         assert all(".." not in r["aria"] for r in grid["rows"]), [r["aria"] for r in grid["rows"]]
@@ -8690,3 +8691,232 @@ class TestChecksThatReadAnotherCollection:
             grids = section.locator(".xt-grid")
             assert grids.count() == 1, f"{ds_id}: {grids.count()} grids, not one"
             assert grids.locator(".xt-key").count() == 1, f"{ds_id}: the key left its grid"
+
+
+def _foreign_read(hx: dict, built: dict) -> dict:
+    """{read dataset: [its cross-table cards declared in ANOTHER collection]}."""
+    out: dict = {}
+    for ds_id, ds in built.items():
+        cards = [ck for ck in _cross_table_checks(ds)
+                 if hx["ds_col"].get(ck["between"]["declared_on"]) not in (None, hx["ds_col"][ds_id])]
+        if cards:
+            out[ds_id] = cards
+    return out
+
+
+class TestCrossCollectionReviewFixes:
+    """REQ-DASH-337's post-build UX review (2026-10-30), in a real browser on
+    the built page: defects D1-D4, D7 and D8, every expectation derived from
+    the recorded results and the hierarchy (criterion 15)."""
+
+    def test_a_read_datasets_page_shows_what_counts_toward_its_newest_supply(
+            self, clean_page, built_dashboard_html):
+        """D1: on a dataset another collection's checks read, each such
+        check's result on the page is the one the build counts toward the
+        dataset's NEWEST RECEIVED supply on the date on show - never the
+        supply of a correction's re-run of an old supply, which the build
+        lists last. It read 'No data' on every date and the old supply's
+        green after the re-run."""
+        hx = _hierarchy_index()
+        built = _built_datasets(built_dashboard_html)
+        readers = _foreign_read(hx, built)
+        assert readers, "precondition: a dataset read by another collection's checks"
+        _goto(clean_page, built_dashboard_html)
+        checked, rerun_last = 0, 0
+        for ds_id in readers:
+            runs = built[ds_id]["runs"]
+            rerun_last += any(runs[i]["received_at"] < runs[i - 1]["received_at"]
+                              for i in range(1, len(runs)))
+            days = sorted({(date.fromisoformat(r["run_date"]) + timedelta(days=20)).isoformat()
+                           for r in runs})
+            got = clean_page.evaluate("""([id, days]) => {
+              const raw = rawRealDatasetById(id), out = [];
+              const ms = r => Date.parse(r.received_at || r.run_date);
+              for(const day of days){
+                const eligible = raw.runs.filter(r => r.run_date <= day
+                  && runStateInPlaceOn(raw, r.run_id, day) !== "withdrawn");
+                if(!eligible.length) continue;
+                const newest = eligible.reduce((a, b) => ms(b) > ms(a) ? b : a);
+                const clipped = clipDatasetToInPlaceOn(raw, day);
+                if(!clipped) continue;
+                for(const col of raw.columns) for(const ck of col.checks || []){
+                  if(!ck.counted || !ck.between) continue;
+                  const pt = newestOnOrBefore(ck.counted[newest.supply_id], day);
+                  if(!pt || pt.rank == null) continue;
+                  const h = ck.history.find(e => e.rank === pt.rank);
+                  if(!h || !h.status) continue;
+                  const shown = clipped.columns.flatMap(c => c.checks).find(c => c.key === ck.key);
+                  out.push({day, key: ck.key, want: h.status, got: shown ? shown.current_status : null});
+                }
+              }
+              return out;
+            }""", [ds_id, days])
+            wrong = [g for g in got if g["want"] != g["got"]]
+            assert not wrong, (ds_id, wrong[:5])
+            checked += len(got)
+        assert checked, "no counted cross-collection result was compared - this proves nothing"
+        assert rerun_last, "precondition: a read dataset lists a re-run of an older supply last"
+
+    def test_the_run_comparison_follows_the_recorded_direction(
+            self, clean_page, built_dashboard_html):
+        """D2: a fall in a check whose band is recorded 'below' reads Worse,
+        a rise Better - it read '↓ 8.16pt — Better than the previous run'."""
+        hx = _hierarchy_index()
+        on = _scenario(clean_page, built_dashboard_html, _AMBER_COVERAGE)["inPlaceOn"]
+        below = [ck for ck in _cross_table_checks(
+            _built_datasets(built_dashboard_html)[_LINKAGE_DATASET])
+            if (ck.get("band") or {}).get("warn", {}).get("op") == "<"]
+        assert below, "precondition: a cross-table check whose band is 'below'"
+        seen = 0
+        for ck in below:
+            _goto(clean_page, built_dashboard_html,
+                  state=_dataset_state(hx, _LINKAGE_DATASET, columnName="cross-table",
+                                       checkKey=ck["key"]), in_place_on=on)
+            delta = clean_page.locator("#check-panel .delta")
+            if delta.count() == 0:
+                continue
+            text = delta.inner_text()
+            if text.startswith("–"):
+                continue
+            seen += 1
+            want = "Worse" if text.startswith("↓") else "Better"
+            assert f"{want} than the" in text, f"{ck['key']}: {text!r}"
+            assert delta.get_attribute("data-delta") == want.lower(), text
+        assert seen, "precondition: a 'below' check whose panel shows a change"
+
+    def _open_first_group_row(self, page, html, hx):
+        on = _scenario(page, html, _AMBER_COVERAGE)["inPlaceOn"]
+        _goto(page, html, state=_dataset_state(hx, _LINKAGE_DATASET), in_place_on=on)
+        group = page.locator(".xt-group").first
+        group.locator(".xt-group-toggle").click()
+        row = group.locator("button.xt-row").first
+        key = row.get_attribute("data-check")
+        row.click()
+        page.wait_for_selector("#check-panel.open")
+        return group.get_attribute("data-xt-group"), key, on
+
+    @pytest.mark.parametrize("how", ["escape", "close", "back"])
+    def test_closing_a_panel_keeps_its_group_open_and_returns_focus(
+            self, clean_page, built_dashboard_html, how):
+        """D3: closing a check's panel (Escape, its ✕ or Back) keeps open the
+        group the reader opened, and puts focus back on the row that opened
+        the panel - it re-rendered every group collapsed, focus on <body>."""
+        hx = _hierarchy_index()
+        gid, key, _on = self._open_first_group_row(clean_page, built_dashboard_html, hx)
+        before = _render_count(clean_page)
+        if how == "escape":
+            clean_page.keyboard.press("Escape")
+        elif how == "close":
+            clean_page.locator("#check-panel-close").click()
+        else:
+            clean_page.go_back()
+        clean_page.wait_for_function(
+            "(b) => Number(document.documentElement.dataset.renderCount || 0) > b", arg=before)
+        clean_page.wait_for_function("() => !document.querySelector('#check-panel.open')")
+        group = clean_page.locator(f'.xt-group[data-xt-group="{gid}"]')
+        assert group.locator(".xt-group-toggle").get_attribute("aria-expanded") == "true"
+        assert group.locator(".xt-group-body").is_visible()
+        focused = clean_page.evaluate(
+            "() => ({tag: document.activeElement.tagName, check: document.activeElement.dataset.check})")
+        assert focused == {"tag": "BUTTON", "check": key}, focused
+
+    def test_another_date_starts_every_group_collapsed(self, clean_page, built_dashboard_html):
+        """D3, PROVISIONAL: the open state is for one dataset on one date."""
+        hx = _hierarchy_index()
+        gid, _key, on = self._open_first_group_row(clean_page, built_dashboard_html, hx)
+        clean_page.keyboard.press("Escape")
+        clean_page.wait_for_function("() => !document.querySelector('#check-panel.open')")
+        later = (date.fromisoformat(on) + timedelta(days=1)).isoformat()
+        _goto(clean_page, built_dashboard_html, state=_dataset_state(hx, _LINKAGE_DATASET),
+              in_place_on=later)
+        toggle = clean_page.locator(f'.xt-group[data-xt-group="{gid}"] .xt-group-toggle')
+        assert toggle.get_attribute("aria-expanded") == "false"
+
+    def test_an_ungrouped_rows_panel_returns_focus_to_it(self, clean_page, built_dashboard_html):
+        """D3's second half, on a row in no group: focus went to <body>."""
+        hx = _hierarchy_index()
+        built = _built_datasets(built_dashboard_html)
+        ds_id = next(d for d in built if _cross_table_checks(built[d]))
+        _goto(clean_page, built_dashboard_html, state=_dataset_state(hx, ds_id),
+              in_place_on=built[ds_id]["runs"][-1]["run_date"])
+        row = clean_page.locator(
+            '.scope-section[data-scope="cross-table"] > .xt-grid button.scope-check').first
+        key = row.get_attribute("data-check")
+        row.click()
+        clean_page.wait_for_selector("#check-panel.open")
+        clean_page.keyboard.press("Escape")
+        clean_page.wait_for_function("() => !document.querySelector('#check-panel.open')")
+        clean_page.wait_for_function(
+            "(k) => document.activeElement && document.activeElement.dataset.check === k", arg=key)
+
+    def test_the_cross_table_pill_rolls_up_its_rows(self, clean_page, built_dashboard_html):
+        """D4: the cross-table section's pill is the worst of its rows' pills
+        (groups included) on every date, a quiet one too - it read 'No data'
+        beside green rows and an amber group."""
+        hx = _hierarchy_index()
+        built = _built_datasets(built_dashboard_html)
+        readers = _foreign_read(hx, built)
+        quiet_with_verdicts = 0
+        for ds_id in readers:
+            # Six weeks after each other receipt: a quarterly dataset's quiet
+            # stretch, where its own tiles go 'No data' (post-build-review #183).
+            days = sorted({(date.fromisoformat(r["run_date"]) + timedelta(days=44)).isoformat()
+                           for r in built[ds_id]["runs"]})[::2]
+            for day in days:
+                _goto(clean_page, built_dashboard_html, state=_dataset_state(hx, ds_id),
+                      in_place_on=day)
+                got = clean_page.evaluate("""() => {
+                  const s = document.querySelector('.scope-section[data-scope="cross-table"]');
+                  if(!s) return null;
+                  const cls = p => ['red','amber','green','nodata','inactive','notcounted']
+                    .find(c => p.classList.contains(c));
+                  const rows = [...s.querySelectorAll('.xt-pill .pill')].map(cls);
+                  const head = s.querySelector('.head .pill');
+                  return {head: head ? cls(head) : null, rows, want: rollupStatuses(rows),
+                          quiet: !!(clipDatasetToInPlaceOn(rawRealDatasetById(STATE.datasetId),
+                                                           CURRENT_IN_PLACE_ON) || {}).staleInPlaceOn};
+                }""")
+                if not got or not got["rows"]:
+                    continue
+                assert got["head"] == got["want"], (ds_id, day, got)
+                quiet_with_verdicts += got["quiet"] and got["want"] != "nodata"
+        assert quiet_with_verdicts, "precondition: a quiet date whose rows carry a verdict"
+
+    def test_at_phone_width_the_direction_line_wraps(self, clean_page, built_dashboard_html):
+        """D7: at 390px the '<declared on> → <reads>' line overflowed its row
+        and the page scrolled sideways."""
+        hx = _hierarchy_index()
+        on = _scenario(clean_page, built_dashboard_html, _AMBER_COVERAGE)["inPlaceOn"]
+        clean_page.set_viewport_size({"width": 390, "height": 844})
+        _goto(clean_page, built_dashboard_html, state=_dataset_state(hx, _LINKAGE_DATASET),
+              in_place_on=on)
+        _open_groups(clean_page)
+        got = clean_page.evaluate("""() => ({
+          over: [...document.querySelectorAll('.xt-row .bt')].filter(e => e.scrollWidth > e.clientWidth + 1)
+            .map(e => e.textContent),
+          lines: document.querySelectorAll('.xt-row .bt').length,
+          page: document.documentElement.scrollWidth - innerWidth})""")
+        assert got["lines"], "precondition: rows with a direction line"
+        assert not got["over"], got
+        assert got["page"] <= 0, got
+
+    def test_warn_reads_amber_and_group_links_are_a_usable_target(
+            self, clean_page, built_dashboard_html):
+        """D8: 'Warn' takes the amber ink as 'Pass' takes green; a group
+        heading's links are at least 24px tall."""
+        hx = _hierarchy_index()
+        on = _scenario(clean_page, built_dashboard_html, _AMBER_COVERAGE)["inPlaceOn"]
+        _goto(clean_page, built_dashboard_html, state=_dataset_state(hx, _LINKAGE_DATASET),
+              in_place_on=on)
+        _open_groups(clean_page)
+        got = clean_page.evaluate("""() => {
+          const probe = document.createElement('span');
+          probe.style.color = 'var(--warn)'; document.body.appendChild(probe);
+          const warn = getComputedStyle(probe).color; probe.remove();
+          return {warn,
+            words: [...document.querySelectorAll('.xt-word[data-status="amber"]')].map(e => getComputedStyle(e).color),
+            links: [...document.querySelectorAll('[data-xt-group-links] a')].map(a => a.getBoundingClientRect().height)};
+        }""")
+        assert got["words"], "precondition: an amber cell"
+        assert set(got["words"]) == {got["warn"]}, got
+        assert got["links"] and min(got["links"]) >= 24, got

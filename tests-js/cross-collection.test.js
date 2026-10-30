@@ -222,7 +222,8 @@ describe("the cause named in full where it is another collection's (criterion 11
     const w = load();
     const host = w.document.createElement("div");
     host.innerHTML = w.noPromotedLineHtml({ datasetId: "match-keys", period: PERIOD, n: 2 }, false, false, "people");
-    expect(host.textContent).toContain(`No promoted Matches' ${w.fmtPeriodOrDay(PERIOD)} Match Keys.`);
+    // D5 of the post-build UX review: 'No promoted supply of ...' (it read 'No promoted Matches' ...').
+    expect(host.textContent).toContain(`No promoted supply of Matches' ${w.fmtPeriodOrDay(PERIOD)} Match Keys.`);
     host.innerHTML = w.noPromotedLineHtml({ datasetId: "events", period: PERIOD, n: 2 }, false, false, "people");
     expect(host.textContent).toContain(`No promoted Events for ${w.fmtPeriodOrDay(PERIOD)}.`);
   });

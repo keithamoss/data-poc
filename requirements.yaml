@@ -45991,6 +45991,10 @@ requirements:
     - 'THE DIRECTION IS RECORDED, NOT INFERRED (UX review F3): statusForValue knows only ''greater than'', and the unit is guessed from a metric name ending ''percent''.'
     - 'THE HISTOGRAM ON THE CHECK''S PANEL (Keith, L-Q4 = a): aggregate bins only, recorded at run time (REQ-QAC-333 criterion 9).'
     - 'WORDINGS SETTLED (Keith, 2026-10-30): the amber tag mirrors the red badge - pill ''Amber promoted'', ''Went in green. Amber since <cause>, <date>.'' REJECTED the provisional ''Amber since promoted - <cause>''. The empty cell reads ''Not yet checked by <dataset> - due <date, time>''. REJECTED ''Waiting for <dataset>''.'
+    - 'PROVISIONAL (post-build UX review D3, 2026-10-30): a collection group the reader opened stays open across
+      re-renders of the same dataset page on the same date - closing a check''s panel no longer collapses it - kept in
+      memory only, never in the URL (criterion 7); another dataset or another date starts every group collapsed, as on
+      load. Focus returns to the row that opened the panel. For Keith to confirm or change.'
     open_questions: []
     signed_off:
       by: Keith
