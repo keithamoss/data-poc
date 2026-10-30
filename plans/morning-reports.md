@@ -3031,7 +3031,10 @@ one or more component tags, and a date.
       end, after a full gate on that tree, then the CI run checked. CHANGED
       FROM THE DAY PLAN: the REQ-PIPE-332 c12 moved-verdicts list is written
       here for Keith to review AFTER the push, rather than before it.
-      Anything he dislikes becomes a follow-up fix.
+      Anything he dislikes becomes a follow-up fix. AMENDED ~20:55 (Keith:
+      "I don't care about reviewing the list of moved verdicts"): nobody
+      reviews it. The list is still produced and recorded as REQ-PIPE-332
+      c12's evidence.
     - **OVERNIGHT**: a second from-empty bootstrap of lp_boot runs with the
       fixes (scratchpad lp_boot2.log). The c12 moved-verdicts list, the
       scenario checks and the REQ-DASH-337 browser tests all wait on it.
