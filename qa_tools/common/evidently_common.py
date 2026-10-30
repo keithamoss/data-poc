@@ -63,6 +63,11 @@ def collection_checks(collection_id: str) -> EvidentlyChecks:
     rel = coll.check_file("evidently")
     checks = check_lifecycle.load_evidently_checks(Path(__file__).resolve().parents[2] / rel)
     psi = [i for i, m in checks.items() if m.get("method") == "psi"]
+    if not checks:
+        # A COLLECTION MAY DECLARE NO EVIDENTLY CHECK (REQ-QAC-333 criterion
+        # 5: Linkage Products' file is present and empty) - its runs then ask
+        # Evidently for nothing, rather than failing the run.
+        return EvidentlyChecks({}, (), {})
     if not psi:
         raise ValueError(f"{rel}: expected at least one psi check, found none")
     datasets = {i.split(".")[3] for i in psi}

@@ -177,7 +177,7 @@ from __future__ import annotations
 import csv
 import io
 from dataclasses import dataclass, field
-from datetime import date, datetime, time, timedelta
+from datetime import date, time, timedelta
 
 from generator.collections.base import Job, Plan, Provider
 
@@ -244,9 +244,8 @@ class _Source(Provider):
     def received_at(self, plan, job, n, delivery_obj, entry):
         from qa_tools.common import asset_time
 
-        return asset_time.record_source_instant(
-            datetime.combine(delivery_obj.received_date, delivery_obj.at),
-            f"received_at for {{entry['run_id']}}")
+        return asset_time.isoformat(asset_time.wall_clock(
+            delivery_obj.received_date, delivery_obj.at.strftime("%H:%M")))
 
     def files(self, plan, job, n, delivery_obj, entry, name):
         from qa_tools.common import asset_time
