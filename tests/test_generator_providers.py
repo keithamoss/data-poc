@@ -295,6 +295,38 @@ class TestTheRegistryRoutesTheRest:
         assert all(where == str(tmp_path / "deliveries") for _, where in ran)
 
 
+class TestADependencyGeneratesFirst:
+    """REQ-GEN-334 criterion 6: a provider that reads another's supplies
+    (depends_on) is refused before anything is written, naming both, where
+    the provider it depends on is absent or generates after it - generic,
+    from the declaration alone."""
+
+    def test_a_dependency_generating_after_it_is_refused_naming_both(self, writing,
+                                                                     monkeypatch):
+        _provider, out = writing
+        # The fake collection comes last in hierarchy order, so a provider
+        # earlier in it that depends on the fake would read a history not yet
+        # generated.
+        first = providers.providers()[0]
+        assert first.collection_id != FAKE_ID
+        monkeypatch.setattr(type(first), "depends_on", (FAKE_ID,), raising=False)
+        with pytest.raises(providers.base.GenerationOrderRefused,
+                           match=f"{first.collection_id}.*{FAKE_ID}.*after"):
+            driver.generate(first.collection_id)
+        assert not out.exists() or not any(out.rglob("*.csv")), "nothing was written"
+
+    def test_an_absent_dependency_is_refused_naming_both(self, writing, monkeypatch):
+        provider, out = writing
+        monkeypatch.setattr(provider, "depends_on", ("no-such-collection",), raising=False)
+        with pytest.raises(providers.base.GenerationOrderRefused,
+                           match=f"{FAKE_ID}.*no-such-collection"):
+            driver.generate(FAKE_ID)
+        assert not out.exists() or not any(out.rglob("*.csv")), "nothing was written"
+
+    def test_the_real_providers_generate_their_dependencies_first(self):
+        assert providers.order_problems() == []
+
+
 class TestNoTestClearsTheRealDeliveryTree:
     """Post-build-review #221: a gate run of REQ-GEN-246 emptied data/
     deliveries and receipts. Bootstrap tests stubbed the old per-collection

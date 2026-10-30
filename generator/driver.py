@@ -111,6 +111,11 @@ def generate(collection_id: str) -> list[dict]:
     # WHAT EACH DECLARED CORRECTION CLAIMS (REQ-GEN-205 criteria 10 and 18).
     from generator import correction_claims
 
+    # WHAT IT READS IS GENERATED FIRST (REQ-GEN-334 criterion 6).
+    order = collections.order_problems(only=collection_id)
+    if order:
+        raise collections.base.GenerationOrderRefused(
+            "; ".join(order) + " - nothing was written")
     correction_claims.check_all()
     provider.check_seeds()
     plan = provider.plan()
