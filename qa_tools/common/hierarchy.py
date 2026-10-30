@@ -100,6 +100,10 @@ class Dataset:
     #: per-dataset: the boundary is a property of the transport a
     #: supplier delivers over, not of any one table inside it.
     delivery_boundary: str = ""
+    #: The datasets this one links, each (dataset id, the supplier's code,
+    #: the source identifier columns id_1 onward hold) - REQ-QAC-330
+    #: criterion 5's one place. Empty for a dataset that links nothing.
+    linked: tuple = ()
 
     @property
     def qa_results_scope(self) -> tuple[str, str]:
@@ -180,6 +184,9 @@ def _build(path: Path, text: str) -> tuple[str, "MappingProxyType[str, Dataset]"
                                        f"collection {collection.get('id')!r}"),
                     arrival_pattern=(dataset.get("arrival_pattern") or "").strip(),
                     delivery_boundary=(collection.get("delivery_boundary") or "").strip(),
+                    linked=tuple((str(x.get("dataset")), str(x.get("code")),
+                                  tuple(str(c) for c in (x.get("id_columns") or ())))
+                                 for x in (dataset.get("linked_datasets") or ())),
                 )
                 # A duplicate id would make every lookup for it
                 # ambiguous and silently resolve to whichever came

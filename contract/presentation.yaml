@@ -39,3 +39,9 @@ collections:
     provider: "Department of Health - Emergency Department Information System"
     delivery_format: "CSV (S3 drop)"
     provenance: "Computed from the synthetic Emergency Department CSVs by the real dbt-core, Soda Core, datacontract-cli and Evidently runs. ({table_description})"
+  # REQ-QAC-330 criterion 8: worded for its linkage dataset; the geocoding
+  # requirements reword it when their datasets join (REQ-QAC-294).
+  linkage-products:
+    provider: "Department of Health - data linkage unit"
+    delivery_format: "CSV (S3 drop)"
+    provenance: "Computed from the synthetic linkage release by the real dbt-core, Soda Core, datacontract-cli and Evidently runs, its checks reading the same quarter's linked tables. ({table_description})"

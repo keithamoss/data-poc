@@ -1,0 +1,53 @@
+# Open Data Contract Standard (ODCS) v3.2.0 contract for the Linkage Products
+# collection (REQ-QAC-330): one table, one CSV per quarter. A SYNTHETIC linkage
+# product standing in for one a real linkage unit would produce - it holds a
+# scrambled key and source identifiers only, no attribute of any person.
+# Written to docs/check-authoring-rules.md. What it links, and the source
+# columns id_1 onward hold, are declared once beside the dataset in
+# contract/data-asset.yaml (linked_datasets); N here is the largest number of
+# identifier columns any linked dataset declares, which today is 1.
+apiVersion: v3.2.0
+kind: DataContract
+id: linkage-keys
+status: draft
+version: 1.0.0
+name: Linkage Keys
+domain: department-of-health
+description:
+  purpose: >
+    A synthetic linkage product standing in for one a real linkage unit would
+    produce: for each quarter, one row per linked source record, carrying a
+    scrambled linkage key shared by records believed to be the same person, the
+    supplier's own code for the dataset the record is in, and that dataset's own
+    identifier values. It holds a scrambled key and source identifiers only - no
+    name, date of birth, address or any other attribute of a person, and no match
+    confidence or match type, because matching is always probabilistic. In a real
+    deployment this table is the asset's master join, and the most sensitive thing
+    it holds.
+servers:
+  - server: production
+    type: s3
+    location: s3://gov-data-exchange/linkage-products/
+    format: csv
+    delimiter: comma
+    description: A quarterly linkage release, dropped into this bucket.
+schema:
+  - name: linkage_keys
+    physicalType: table
+    description: "One row per linked source record, per quarterly linkage release."
+    properties:
+      - name: linkage_key
+        logicalType: string
+        physicalType: varchar(64)
+        required: true
+        description: "A scrambled identifier shared by the records the linkage unit believes are one person. It has no allowed range."
+      - name: dataset
+        logicalType: string
+        physicalType: varchar(40)
+        required: true
+        description: "The supplier's own code for the dataset the record is in, as declared beside this dataset in contract/data-asset.yaml."
+      - name: id_1
+        logicalType: string
+        physicalType: varchar(64)
+        required: true
+        description: "The record's first identifier value in its own dataset, held as text whatever the source column's type."

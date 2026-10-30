@@ -559,6 +559,18 @@ class NotExpectedPeriod(_Strict):
     reason: NonEmptyStr
 
 
+class LinkedDataset(_Strict):
+    """One dataset an asset-level product links (REQ-QAC-330 criterion 5): the
+    code its rows carry in the product's `dataset` column - the supplier's
+    own, deliberately unlike any configuration name - and the ordered source
+    columns id_1, id_2 and onward hold. Generic: any dataset may declare
+    what it links; Linkage Products is only the first."""
+
+    dataset: NonEmptyStr
+    code: NonEmptyStr
+    id_columns: list[NonEmptyStr] = Field(min_length=1)
+
+
 class DatasetConfig(_Strict):
     id: NonEmptyStr
     name: NonEmptyStr
@@ -575,6 +587,9 @@ class DatasetConfig(_Strict):
     arrival_pattern: NonEmptyStr | None = None
     amber_setting: AmberSetting | None = None
     replacement_setting: ReplacementSetting | None = None
+    #: The datasets this one links, and how each is identified (REQ-QAC-330
+    #: criterion 5) - the one place every reader learns what it covers.
+    linked_datasets: list[LinkedDataset] | None = None
 
 
 class CollectionConfig(_Strict):

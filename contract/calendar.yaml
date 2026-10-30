@@ -452,6 +452,35 @@ collections:
               change: >-
                 Emergency Department owes a supply every quarter from 2023-01-01,
                 due at 09:00 with 8 hours' grace.
+  # REQ-QAC-330: the data asset's linkage product. On the quarterly calendar with
+  # the data it links, so its checks read the same period's tables (REQ-PIPE-331
+  # criterion 2), and at files_go_to_period 0: the release arriving on a round is
+  # that round's own period's, about three months after Child Protection's files
+  # for it arrived (REQ-GEN-325).
+  - id: linkage-products
+    calendar: quarterly
+    files_go_to_period:
+      versions:
+        - effective_from: "2013-01-01"
+          value: 0
+          changelog:
+            - date: "2026-10-30"
+              author: REQ-QAC-330
+              change: >-
+                A linkage product is its round's own period's release, so its files go into the period they arrive in. Stated from its first round.
+    # Owed from the first quarter any linked dataset's history holds, due 14:00
+    # (PROVISIONAL, REQ-GEN-334 criterion 8) - after Emergency Department's
+    # morning arrivals for the quarter - with 8 hours' grace as its neighbours.
+    participation_defaults:
+      versions:
+        - effective_from: "2013-01-01"
+          expected_time: "14:00"
+          grace: 8h
+          changelog:
+            - date: "2026-10-30"
+              author: REQ-QAC-330
+              change: >-
+                Linkage Products owes a release every quarter from 2013-01-01, due at 14:00 with 8 hours' grace.
 
 # ---------------------------------------------------------------------
 # EACH DATASET'S PARTICIPATION, as effective-dated versions. A version
@@ -771,3 +800,12 @@ datasets:
             - date: "2026-10-18"
               author: REQ-QAC-231
               change: Owes supplies from 2023-01-01; due time and grace from Emergency Department's participation_defaults.
+  - id: linkage-keys
+    participation:
+      versions:
+        - effective_from: "2013-01-01"
+          participates: all
+          changelog:
+            - date: "2026-10-30"
+              author: REQ-QAC-330
+              change: Owes a linkage release every quarter from 2013-01-01; due time and grace from Linkage Products' participation_defaults.

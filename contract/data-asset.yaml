@@ -408,3 +408,31 @@ hierarchy:
               table: ed_presentations
               # REQ-PIPE-058 - see birth-registrations above.
               arrival_pattern: 'ed_presentations\.csv'
+        # REQ-QAC-330: the data asset's linkage product, an asset-level dataset in a
+        # collection of Department of Health's own, which produces it. One file a
+        # quarter, on the quarterly calendar at files_go_to_period 0
+        # (contract/calendar.yaml). The geocoding datasets join this collection later
+        # (REQ-QAC-294), so nothing assumes linkage-keys is its only dataset.
+        - id: linkage-products
+          name: Linkage Products
+          short: lp                # REQ-PIPE-240 - see civil-registration above.
+          run_prefix: lp_run_
+          contract: department-of-health/linkage-products-contract.yaml
+          delivery_boundary: directory   # REQ-PIPE-057 - see above.
+          datasets:
+            - id: linkage-keys
+              name: Linkage Keys
+              table: linkage_keys
+              arrival_pattern: 'linkage_keys\.csv'
+              # WHAT IT LINKS, AND HOW EACH IS IDENTIFIED (REQ-QAC-330 criterion 5):
+              # the one place every reader learns what a linkage product covers.
+              # Each code is the supplier's own, deliberately unlike any name here
+              # (Keith, 2026-10-28), so the dataset column is checked by its
+              # expected values and nothing works by matching a hierarchy name.
+              linked_datasets:
+                - dataset: cp-clients
+                  code: DOC_CLIENTS
+                  id_columns: [cp_client_id]
+                - dataset: ed-presentations
+                  code: EDDC_PRESENTATION
+                  id_columns: [presentation_id]
