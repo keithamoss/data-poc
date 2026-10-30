@@ -2754,7 +2754,12 @@ function coveredDateRange(){
   const all = Object.values(PERIOD_SEQUENCES.calendars || {}).flat();
   if(!all.length) return null;
   const dates = all.map(e=> e.date).sort();
-  return {first: dates[0], last: dates[dates.length-1]};
+  // NEVER PAST TODAY (REQ-DASH-054 criterion 8 as amended by REQ-DASH-326):
+  // a sequence reaches the period an open slot fills, which can be one that
+  // has not begun, and the picker still cannot choose the future.
+  const last = dates[dates.length-1];
+  const today = PERIOD_SEQUENCES.today;
+  return {first: dates[0], last: today && today < last ? today : last};
 }
 
 // stats.byRun's own "total" is already the dataset-wide row count at

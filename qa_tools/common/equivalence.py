@@ -140,6 +140,10 @@ CLOCK_COLUMNS = {
     # REQ-PIPE-279's attempts: when one began and ended is the wall clock;
     # whether it ended is compared (DERIVED_COLUMNS), as a run's completion is.
     "run_attempt": {"began_at", "ended_at"},
+    # REQ-PIPE-323's offset groups: made at the simulated instant plus the
+    # wall clock's few microseconds of work, so which groups were made, by
+    # which route, is compared and when to the microsecond is not.
+    "period_group": {"made_at"},
 }
 
 #: SURROGATE IDS WITH NO ORDER WORTH KEEPING, dropped outright. Rows that

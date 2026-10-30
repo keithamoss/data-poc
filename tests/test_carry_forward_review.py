@@ -883,6 +883,12 @@ class TestASharedCalendar:
             self, conn, world, monkeypatch):
         from test_period_opening import _file
 
+        from qa_tools.common import inheritance
+
+        # AT ONE OFFSET (REQ-PIPE-323 criterion 4): where the two collections'
+        # files go into a period at different files_go_to_period values, each
+        # group makes its own inheritances - tests/test_offset_group_inheritance.py.
+        monkeypatch.setattr(inheritance, "offset_group", lambda ds, period: 0)
         q2 = promote(conn, world.q2, "2099-04-02T09:00:00+08:00")
         supply, _ = _file(monkeypatch, world, world.q4, dataset_id="ed-presentations",
                           collection_id="emergency-department")

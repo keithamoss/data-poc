@@ -478,6 +478,7 @@ def file_arrivals(found_arrivals) -> list[Assignment]:
                     with _connect("mothman:filing-open") as conn:
                         open_at_filing(conn, dataset_id=dataset_id, supply_id=supply_id,
                                        period=already["slot"], at=arrival.received_at)
+                _make_due_groups(dataset_id, arrival.received_at)
                 continue
             decided = assign_mod.assign(
                 dataset_id=dataset_id, supply_id=supply_id,
@@ -521,8 +522,29 @@ def file_arrivals(found_arrivals) -> list[Assignment]:
             # that is the record a decision has to be able to close.
             if decided.is_held:
                 _raise_assignment_hold(arrival, decided)
+            _make_due_groups(dataset_id, arrival.received_at)
             written.append(decided)
     return written
+
+
+def _make_due_groups(dataset_id: str, at) -> None:
+    """After an arrival is filed: every offset group of its calendar whose
+    round's claim window has opened and that has filed nothing to its period
+    makes its inheritances now (REQ-PIPE-323 criterion 3) - so a period nobody
+    at that offset owes still carries their datasets forward. After the
+    filing, so a group's own first filing names itself, not the clock."""
+    from qa_tools.common import hierarchy, inheritance
+
+    if at is None:
+        return
+    try:
+        collection = hierarchy.dataset(dataset_id).collection_id
+    except hierarchy.UnknownDatasetError:
+        return
+    with _connect("mothman:filing-groups") as conn:
+        made = inheritance.make_due_groups(conn, collection, at, effective_at=at.isoformat())
+        for period, _offset in made:
+            _settle_the_openings_knock_on(conn, period)
 
 
 def open_at_filing(conn, *, dataset_id: str, supply_id: str, period: str, at) -> bool:
@@ -535,15 +557,19 @@ def open_at_filing(conn, *, dataset_id: str, supply_id: str, period: str, at) ->
     filing caused it (REQ-TEST-150 criterion 6). `at` is the supply's
     receipt, the instant the period opens as at (K6). Returns whether this
     call opened it."""
-    from qa_tools.common import hierarchy, period_schema
+    from qa_tools.common import hierarchy, inheritance, period_schema
 
-    if period_schema.opened(conn, period):
+    # OPENED, OR ITS OFFSET GROUP STILL TO MAKE (REQ-PIPE-323 criterion 1):
+    # another group's filing may have opened it a round before.
+    group = inheritance.offset_group(dataset_id, period)
+    if period_schema.opened(conn, period) and inheritance.group_made(
+            conn, period, 0 if group is None else group):
         return False
     collection = hierarchy.dataset(dataset_id).collection_id
     opened = period_schema.open_period(
         conn, period, opened_by=f"the filing of {supply_id} ({collection})",
         effective_at=at.isoformat() if at is not None else None,
-        caused_by=supply_id)
+        caused_by=supply_id, dataset_id=dataset_id, route="filing")
     if opened:
         _settle_the_openings_knock_on(conn, period)
     return opened
@@ -562,14 +588,18 @@ def open_on_refile(conn, dataset_id: str, supply_id: str, period: str | None, *,
     and after its entry, so a decision refused there - or rolled back - opens
     nothing. The opening's knock-on cannot settle inside that transaction;
     the caller calls settle_opening() once it has committed."""
-    from qa_tools.common import hierarchy, period_schema
+    from qa_tools.common import hierarchy, inheritance, period_schema
 
-    if not period or period_schema.opened(conn, period):
+    if not period:
+        return False
+    group = inheritance.offset_group(dataset_id, period)
+    if period_schema.opened(conn, period) and inheritance.group_made(
+            conn, period, 0 if group is None else group):
         return False
     collection = hierarchy.dataset(dataset_id).collection_id
     opened = period_schema.open_period(
         conn, period, opened_by=f"the {how} of {supply_id} ({collection})",
-        effective_at=effective_at, caused_by=supply_id)
+        effective_at=effective_at, caused_by=supply_id, dataset_id=dataset_id, route=how)
     if opened and not _in_a_transaction(conn):
         _settle_the_openings_knock_on(conn, period)
     return opened

@@ -206,7 +206,8 @@ def substitute(conn: supply_db.SupplyConnection, *,
 
     # Same reason promotion.promote() does it here - see its comment.
     period_schema.open_period(conn, period, opened_by=actor,
-                               effective_at=effective_at)
+                               effective_at=effective_at, dataset_id=dataset_id,
+                               route="substitution")
 
     decision = decision_log.Decision(
         agency_id=agency_id, collection_id=collection_id, dataset_id=dataset_id,

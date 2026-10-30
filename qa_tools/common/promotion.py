@@ -92,7 +92,8 @@ def promote(conn: supply_db.SupplyConnection, *,
     # inherits into it. Before the transaction below, because
     # inheritance writes decisions of its own.
     period_schema.open_period(conn, period, opened_by=actor,
-                               effective_at=effective_at, caused_by=supply)
+                               effective_at=effective_at, caused_by=supply,
+                               dataset_id=dataset_id, route="promotion")
     decision = decision_log.Decision(
         agency_id=agency_id,
         collection_id=collection_id,

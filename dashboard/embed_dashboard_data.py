@@ -612,12 +612,32 @@ def embed() -> None:
     # on every publish - a deployment that stopped rebuilding would
     # quietly lose its most recent days from the picker, which is what the
     # page's own out-of-range message makes visible rather than silent.
-    today = asset_time.now().date()
-    sequences = {"calendars": {}, "datasetCalendar": {}}
+    #
+    # AND TO THE FURTHEST PERIOD AN OPEN SLOT FILLS (REQ-DASH-326 criterion
+    # 10, amending REQ-DASH-054 criterion 3). At files_go_to_period 1 the
+    # slot open today fills a period that has not begun, and a supply filed
+    # to it needs its period embedded to sit under; the picker stays bounded
+    # to `today` (criterion 8 as amended), which travels with the sequences.
+    now = asset_time.now()
+    today = now.date()
+    by_dataset = _slots_by_dataset()
+    sequences = {"calendars": {}, "datasetCalendar": {}, "today": today.isoformat()}
     for cal in schedule.calendars():
+        reach = today
+        for entry in hierarchy.all_datasets():
+            if entry.dataset_id not in by_dataset:
+                continue
+            try:
+                if schedule.calendar_for_dataset(entry.dataset_id).name != cal.name:
+                    continue
+            except schedule.NoCalendarAgreed:
+                continue
+            for slot in by_dataset[entry.dataset_id]:
+                if slot.claim_opens_at <= now and slot.period.date > reach:
+                    reach = slot.period.date
         sequences["calendars"][cal.name] = [
             {"period": period.name, "date": period.date.isoformat()}
-            for period in schedule.periods_for_calendar(cal.name, until=today)
+            for period in schedule.periods_for_calendar(cal.name, until=reach)
         ]
     for entry in hierarchy.all_datasets():
         try:
@@ -636,7 +656,7 @@ def embed() -> None:
     # where it is not its period's date - configuration only, through the
     # one slot-instants function filing uses.
     html = _replace_const(html, "SLOT_DUE_DATES", json.dumps(
-        _slot_due_dates(_slots_by_dataset()), separators=(",", ":")))
+        _slot_due_dates(by_dataset), separators=(",", ":")))
     html = _replace_const(html, "PERIOD_SEQUENCES",
                            json.dumps(sequences, separators=(",", ":")))
     print("Re-embedded PERIOD_SEQUENCES = "

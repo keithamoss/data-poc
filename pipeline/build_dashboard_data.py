@@ -36,7 +36,7 @@ from __future__ import annotations
 import json
 import os
 
-from pipeline import (acknowledgements, closed_slots, corrections, cross_table_grid,
+from pipeline import (acknowledgements, period_slots, closed_slots, corrections, cross_table_grid,
                       cross_table_notices, excuses, held_back_notices,
                       file_check_panel, owed_nothing, placements, promotion_timeline,
                       recorded_arrival, re_checks, red_promoted, slot_timeline,
@@ -859,6 +859,9 @@ def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], da
         # Each person's placement of a held supply (REQ-DASH-175).
         "placements": placements.for_dataset(dataset_id),
         "owedNothing": owed_nothing.for_dataset(dataset_id, until=asset_time.now().date()),
+        # EACH SLOT'S PERIOD, ROUND AND INSTANTS (REQ-DASH-326 criteria 5, 7
+        # and 8): configuration only, None on a cadence-rule calendar.
+        "periodSlots": period_slots.for_dataset(dataset_id),
         # WHETHER ANYBODY HAS AGREED A SCHEDULE FOR THIS DATASET
         # (REQ-PIPE-106). None in the ordinary case, so the page renders
         # nothing extra - a marker on every tile is noise at 30 datasets.

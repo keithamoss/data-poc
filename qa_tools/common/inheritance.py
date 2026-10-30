@@ -39,8 +39,9 @@ silence it.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import timedelta
 
-from qa_tools.common import (decision_log, hierarchy, period_schema, schedule,
+from qa_tools.common import (decision_log, hierarchy, period_schema, qa_store, schedule,
                              supply_db)
 
 #: What a rule records as its own name in the decision log.
@@ -118,14 +119,20 @@ def _does_not_participate(dataset_id: str, period_name: str) -> tuple[bool, str]
     # THE VERSION IN FORCE FOR THIS PERIOD, never the newest (a defect found
     # planning REQ-GEN-205): a gap that is a middle participation version -
     # owed, then not, then owed again - read as owed under the newest.
+    # ON THE ROUND THAT WOULD FILL IT (REQ-PIPE-321 criterion 2, REQ-PIPE-323
+    # criterion 9): participation is a round's, so the reason names rounds.
     on = _period_dates(dataset_id).get(period_name)
+    try:
+        on = schedule.round_of(period_name, dataset_id) or on
+    except (schedule.ScheduleConfigError, hierarchy.UnknownDatasetError, KeyError, ValueError):
+        pass
     months = schedule.delivery_months(dataset_id, on=on) if on else None
     if (months and period_name in _calendar_period_names(dataset_id)
             and period_name not in _slot_names(dataset_id)):
         import calendar
 
         names = [calendar.month_name[m] for m in months]
-        return True, (f"{dataset_id} is delivered in {' and '.join(names)} only "
+        return True, (f"{dataset_id} supplies only in the {' and '.join(names)} rounds "
                       f"(its participation in contract/calendar.yaml), so nothing is owed for {period_name}")
     return False, ""
 
@@ -257,7 +264,8 @@ def _physical_in(conn, *, period: str, logical: str) -> str:
 
 
 def inherit_into(conn: supply_db.SupplyConnection, period_name: str, *,
-                 effective_at: str, caused_by: str | None = None) -> Outcome:
+                 effective_at: str, caused_by: str | None = None,
+                 collections: "set[str] | None" = None) -> Outcome:
     """Fill this newly-opened period for every dataset that owes it
     nothing.
 
@@ -271,6 +279,9 @@ def inherit_into(conn: supply_db.SupplyConnection, period_name: str, *,
     outcome = Outcome()
     schema = period_schema.period_schema(period_name)
     for entry in hierarchy.all_datasets():
+        # ONE OFFSET GROUP'S DATASETS (REQ-PIPE-323 criterion 1), where given.
+        if collections is not None and entry.collection_id not in collections:
+            continue
         try:
             skipped, reason = _does_not_participate(entry.dataset_id, period_name)
         except Exception as exc:  # noqa: BLE001 - one bad schedule must not stop the rest
@@ -584,3 +595,131 @@ def un_inherit(conn: supply_db.SupplyConnection, *, dataset_id: str,
         conn.execute(
             f'DROP VIEW IF EXISTS "{schema}".'
             f'"{supply_db._ident(entry.table, "table name")}"')
+
+
+# ---- offset groups (REQ-PIPE-323) ------------------------------------------
+
+GROUP_TABLE = f'"{qa_store.SCHEMA}".period_group'
+
+
+def offset_group(dataset_id: str, period_name: str) -> int | None:
+    """The files_go_to_period of the round whose files fill this period for
+    this dataset - its offset group in that period (REQ-PIPE-323 criterion
+    1) - or None where the period is no period of its calendar."""
+    try:
+        agr = schedule._agreement(None)
+        on = (schedule.round_of(period_name, dataset_id, agr)
+              or schedule.date_of(period_name, dataset_id))
+    except (schedule.ScheduleConfigError, hierarchy.UnknownDatasetError, KeyError, ValueError):
+        return None
+    if on is None:
+        return None
+    return agr.files_go_to_period_for(dataset_id, on) or 0
+
+
+def _members(period_name: str, offset: int) -> set[str]:
+    """The collections whose files go into this period at `offset`."""
+    out: set[str] = set()
+    for entry in hierarchy.all_datasets():
+        if offset_group(entry.dataset_id, period_name) == offset:
+            out.add(entry.collection_id)
+    return out
+
+
+def groups_in(period_name: str) -> list[tuple[int, set[str]]]:
+    """Every offset group filing into this period, with its collections."""
+    by: dict[int, set[str]] = {}
+    for entry in hierarchy.all_datasets():
+        g = offset_group(entry.dataset_id, period_name)
+        if g is not None:
+            by.setdefault(g, set()).add(entry.collection_id)
+    return sorted(by.items())
+
+
+def group_made(conn, period_name: str, offset: int) -> bool:
+    return bool(conn.execute(f"SELECT 1 FROM {GROUP_TABLE} WHERE period = ? AND "
+                             "files_go_to_period = ?", [period_name, offset]).fetchall())
+
+
+def make_group(conn, period_name: str, *, offset: int, collection_id: str | None,
+               route: str, effective_at: str, caused_by: str | None = None) -> bool:
+    """Make one offset group's inheritances in a period, ONCE (REQ-PIPE-323
+    criteria 1, 2, 5 and 8): the record and the inheritances in one step, by
+    the same mechanism and recorded as the same kind of event whichever
+    route reached it. Returns whether this call made them."""
+    from qa_tools.common import replay_clock
+
+    period_schema.ensure_period_schema(conn, period_name)
+    with decision_log.decision_transaction(conn):
+        inserted = conn.execute(
+            f"INSERT INTO {GROUP_TABLE} (period, files_go_to_period, collection_id, route, "
+            "made_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT DO NOTHING RETURNING period",
+            [period_name, offset, collection_id, route, replay_clock.now()]).fetchall()
+        if not inserted:
+            return False
+        inherit_into(conn, period_name, effective_at=effective_at, caused_by=caused_by,
+                     collections=_members(period_name, offset))
+    return True
+
+
+def groups_due(collection_id: str, at, *, recorded: set) -> list[tuple[str, int]]:
+    """(period, offset) for each offset group on this collection's calendar
+    whose round's claim window has opened by `at` and whose inheritances are
+    not recorded (REQ-PIPE-323 criterion 3). From configuration alone, so the
+    merged stream decides it identically in parallel and in sequence. Empty
+    where the calendar's collections share one offset (criterion 4)."""
+    from qa_tools.common import asset_time, slots
+
+    agr = schedule._agreement(None)
+    members = [d for d in hierarchy.all_datasets() if d.collection_id == collection_id]
+    try:
+        cal = schedule.calendar_for_dataset(members[0].dataset_id, agr).name
+    except (IndexError, schedule.ScheduleConfigError, schedule.NoCalendarAgreed):
+        return []
+    if agr.calendars[cal].current.is_cadence_rule:
+        return []
+    firsts: dict[str, str] = {}
+    for d in hierarchy.all_datasets():
+        try:
+            if schedule.calendar_for_dataset(d.dataset_id, agr).name == cal:
+                firsts.setdefault(d.collection_id, d.dataset_id)
+        except (schedule.ScheduleConfigError, schedule.NoCalendarAgreed):
+            continue
+    values = {v.value for cid in firsts for v in agr.offsets.get(cid, ())}
+    if len(values) < 2:
+        return []
+    day = asset_time.local_date(at)
+    rounds = schedule.periods_for_calendar(cal, until=day + timedelta(days=400), agreement=agr)
+    due: list[tuple[str, int]] = []
+    for cid, did in sorted(firsts.items()):
+        begins = schedule.owes_from(did, agr)
+        for i, rnd in enumerate(rounds):
+            if begins is not None and rnd.date < begins:
+                continue
+            if slots.slot_instants(did, rnd.date, agr).claim_opens_at > at:
+                break
+            n = agr.files_go_to_period_for(did, rnd.date) or 0
+            if i + n >= len(rounds):
+                continue
+            key = (rounds[i + n].name, n)
+            if key not in recorded and key not in due:
+                due.append(key)
+    return due
+
+
+def make_due_groups(conn, collection_id: str, at, *, effective_at: str) -> list[tuple[str, int]]:
+    """At an arrival the processing pass handles: every group due by time
+    (criterion 3), its period opened where nobody has, its inheritances made.
+    Returns what it made."""
+    recorded = {(r[0], r[1]) for r in conn.execute(
+        f"SELECT period, files_go_to_period FROM {GROUP_TABLE}").fetchall()}
+    made = []
+    for period_name, offset in groups_due(collection_id, at, recorded=recorded):
+        period_schema.open_period(conn, period_name,
+                                  opened_by=f"the claim window opening for {period_name}",
+                                  effective_at=effective_at, groups=())
+        if make_group(conn, period_name, offset=offset, collection_id=collection_id,
+                      route="claim window opened", effective_at=effective_at):
+            made.append((period_name, offset))
+    return made
+

@@ -200,7 +200,7 @@ _KEY_COLUMNS = ("agency_id", "collection_id", "tool", "scope", "supply_state")
 #: Bumped whenever the DDL below changes shape. `ensure_schema` reads
 #: it and does nothing when it already matches, which is what keeps
 #: migration DDL off the hot write path - see that function.
-SCHEMA_VERSION = 49
+SCHEMA_VERSION = 50
 
 #: The version at which REQ-PIPE-144 RESHAPED qa.filing and qa.delivery
 #: (a column removed, a column replaced by a foreign key). `CREATE TABLE
@@ -1321,6 +1321,22 @@ CREATE TABLE IF NOT EXISTS "{SCHEMA}".period (
     -- promotion, so this is a fact about history rather than a mode.
     opened_by  text NOT NULL CHECK (opened_by <> ''),
     opened_at  timestamptz NOT NULL DEFAULT now()
+);
+
+-- EACH OFFSET GROUP'S INHERITANCES, ONCE (REQ-PIPE-323 criterion 5): the
+-- collections whose files go into a period at one files_go_to_period make
+-- their non-participating datasets' inheritances at that group's first
+-- filing to it - or, where it files nothing, at the first arrival after its
+-- round's claim window opens (criterion 3). One row per period and group,
+-- naming whose step made them and the route, is what makes "once" hold
+-- across every route. collection_id is NULL for a person's explicit open.
+CREATE TABLE IF NOT EXISTS "{SCHEMA}".period_group (
+    period              text NOT NULL,
+    files_go_to_period  integer NOT NULL CHECK (files_go_to_period >= 0),
+    collection_id       text,
+    route               text NOT NULL CHECK (route <> ''),
+    made_at             timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (period, files_go_to_period)
 );
 
 --   one dataset's decisions, in the order they took effect, at a cost

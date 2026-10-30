@@ -244,7 +244,9 @@ def opened(conn, period_name: str) -> bool:
 
 
 def open_period(conn, period_name: str, *, opened_by: str,
-                effective_at: str | None = None, caused_by: str | None = None) -> bool:
+                effective_at: str | None = None, caused_by: str | None = None,
+                dataset_id: str | None = None, route: str | None = None,
+                groups=None) -> bool:
     """Bring a period into existence, once, and fill what it owes
     nothing for. Returns True where THIS call opened it.
 
@@ -274,20 +276,36 @@ def open_period(conn, period_name: str, *, opened_by: str,
     # opened with only some of its inheritances - and, being opened, it was
     # never revisited (criterion 2). A concurrent opener waits on the row's
     # key until this commits, then finds it there and inherits nothing.
+    when = effective_at or asset_time.now().isoformat()
     with decision_log.decision_transaction(conn):
         inserted = conn.execute(
             f'INSERT INTO "{qa_store.SCHEMA}".period (name, opened_by, opened_at) '
             "VALUES (?, ?, ?) ON CONFLICT (name) DO NOTHING RETURNING name",
             [period_name, opened_by, _replay_clock.now()]).fetchall()
-        if not inserted:
-            # Somebody else won the race. Theirs inherited; ours must not.
-            return False
-        # `caused_by` is the supply whose promotion is opening it, recorded on
-        # each inheritance (REQ-TEST-150 criterion 6); None for a person's open.
-        inheritance.inherit_into(conn, period_name,
-                                  effective_at=effective_at or asset_time.now().isoformat(),
-                                  caused_by=caused_by)
-    return bool(schema)
+        # EACH OFFSET GROUP ONCE (REQ-PIPE-323): a filing makes its own
+        # collection's group's inheritances, whether or not it opened the
+        # period; a person's explicit open makes every group's, as the one
+        # mechanism REQ-PIPE-098 criterion 4 names. `groups=()` opens the
+        # period and makes nothing - the time route's own call. `caused_by`
+        # is the supply whose filing caused it (REQ-TEST-150 criterion 6).
+        if groups is None:
+            if dataset_id is not None:
+                g = inheritance.offset_group(dataset_id, period_name)
+                from qa_tools.common import hierarchy
+
+                groups = [(0 if g is None else g,
+                           hierarchy.dataset(dataset_id).collection_id)]
+            elif inserted:
+                groups = [(g, None) for g, _ in inheritance.groups_in(period_name)] or [(0, None)]
+            else:
+                groups = []
+        made = False
+        for offset, collection_id in groups:
+            made = inheritance.make_group(
+                conn, period_name, offset=offset, collection_id=collection_id,
+                route=route or ("filing" if dataset_id else "explicit open"),
+                effective_at=when, caused_by=caused_by) or made
+    return bool(schema) and (bool(inserted) or made)
 
 
 def period_schemas(conn) -> list[str]:
