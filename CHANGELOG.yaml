@@ -135,6 +135,33 @@ releases:
               `mothman schedule show` and `mothman supply slots` now give each
               slot's round and the period it is for, and say once where the
               collection's files go.
+          - headline: Linkage Products
+            components: ["QA checks & contract", "Pipeline & publishing"]
+            description: >
+              Department of Health now has a second collection: a quarterly
+              linkage release that gives Child Protection clients and Emergency
+              Department presentations a shared key. Its checks find empty keys,
+              unknown codes, records linked twice and links to records the
+              quarter does not hold.
+          - headline: Checks across collections
+            components: ["Pipeline & publishing"]
+            description: >
+              A check can now read another collection's table for the same
+              period, from what is in place for that period only. When that
+              supply changes, only the checks that read it are run again.
+          - headline: Linked results on both pages
+            components: ["Dashboard UI"]
+            description: >
+              A check that reads another collection now shows on both datasets'
+              pages, grouped under that collection and closed until you open
+              it. Coverage reads as a percentage, and a check still waiting on
+              a supply says what it waits for and when that is due.
+          - headline: A synthetic linkage history
+            components: ["Data generation"]
+            description: >
+              `mothman lp generate-synthetic-data` writes a release for every
+              quarter the linked collections cover, with each fault planted in
+              a named scenario of its own.
       - category: Fixed
         items:
           - headline: One decision, one moment
