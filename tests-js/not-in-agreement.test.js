@@ -53,7 +53,7 @@ function dataset(runs, entries) {
 const LEFT_OUT = ["dbt", "soda", "datacontract"].map((tool) => ({
   runId: "n__2013", supplyId: "cp-notifications@2013",
   checkId: `n.assigned_worker_id.relationships_${tool}`,
-  reason: "not part of the agreement for 2013-Q2",
+  reason: "not part of the agreement for 2013-Q2", period: "2013-Q2",
 }));
 
 describe("which checks the page names", () => {
@@ -100,9 +100,20 @@ describe("what the section says", () => {
   });
 
   it("reads an entry recorded before the codes as not part of the agreement", () => {
+    // The build reads a pre-code entry's period into its `period` field.
     const w = load();
-    expect(w.notInAgreementReason({reason: "not part of the agreement for 2013-Q2"}))
+    expect(w.notInAgreementReason({reason: "not part of the agreement for 2013-Q2", period: "2013-Q2"}))
       .toBe("Not part of the agreement for 2013-Q2.");
+  });
+
+  it("never words an entry from its reason text (REQ-DASH-337 c12)", () => {
+    const w = load();
+    // A reason saying one thing and a code saying another: the code wins, and
+    // a period found only in the text is not read from it.
+    expect(w.notInAgreementReason({code: "not_supplied_by_decision", period: "2026-Q2",
+      reason: "not part of the agreement for 2013-Q2"})).toBe("Not supplied for 2026-Q2, by decision.");
+    expect(w.notInAgreementReason({reason: "not part of the agreement for 2013-Q2"}))
+      .not.toContain("2013-Q2");
   });
 
   it("is neither red nor a result: no status pill, a Not run tag", () => {

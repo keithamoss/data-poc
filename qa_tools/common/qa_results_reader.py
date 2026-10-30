@@ -393,7 +393,7 @@ def run_facts(agency: str, collection: str, conn=None, *,
         rows = conn.execute(select + "WHERE r.agency_id = ? AND r.collection_id = ? "
                             "ORDER BY r.run_seq", [agency, collection]).fetchall()
         own = {row[0] for row in rows}
-        extra = sorted(set(also) - own)
+        extra = [k for k in dict.fromkeys(also) if k not in own]
         if extra:
             rows = sorted([*rows, *conn.execute(
                 select + f"WHERE r.run_key IN ({', '.join('?' for _ in extra)})",
