@@ -347,13 +347,15 @@ class TestAPeriodScopedScriptIsValidated:
 
 class TestThePeriodsDueInstantIsTheCalendars:
     """Criterion 1 against the REAL calendar (post-build-review #168): every
-    playback test pins _due_at, so nothing computed it."""
+    playback test pins _due_at, so nothing computed it. Child Protection's
+    files go into the next period (REQ-GEN-325), so 2024-Q4's slot is due on
+    the 1 August 2024 round."""
 
     def test_due_at_is_the_slots_due_instant_not_its_claim_opening(self):
         from qa_tools.common import schedule, slots
 
-        on = schedule.date_of("2024-Q3", "cp-placements")
-        due = sd._due_at("cp-placements", "2024-Q3")
+        on = schedule.round_of("2024-Q4", "cp-placements")
+        due = sd._due_at("cp-placements", "2024-Q4")
         assert due == slots.slot_instants("cp-placements", on).due_at
         assert due.isoformat() == "2024-08-01T09:00:00+08:00"
 
@@ -361,10 +363,10 @@ class TestThePeriodsDueInstantIsTheCalendars:
         from types import SimpleNamespace
 
         script = _period_script(dataset_id="cp-placements", after_hours=5)
-        timed, why = sd._timed_by_period(script, SimpleNamespace(period="2024-Q3"))
+        timed, why = sd._timed_by_period(script, SimpleNamespace(period="2024-Q4"))
         assert why == ""
         assert timed.at.isoformat() == "2024-08-01T14:00:00+08:00"
-        assert timed.stands_on == "2024-Q2"
+        assert timed.stands_on == "2024-Q3"
 
     def test_before_plays_it_once_the_replay_reaches_its_instant(self, monkeypatch):
         from types import SimpleNamespace
@@ -373,7 +375,7 @@ class TestThePeriodsDueInstantIsTheCalendars:
         monkeypatch.setattr(sd, "_apply", lambda t: played.append(t.script.operation))
         monkeypatch.setattr(sd, "_refuse_unless_synthetic", lambda: None)
         player = sd.Player("child-protection", placements={"TS-1": SimpleNamespace(
-            period="2024-Q3", supplies=())}, scripts=[
+            period="2024-Q4", supplies=())}, scripts=[
             _period_script(dataset_id="cp-placements"),
             _period_script(dataset_id="cp-placements", operation="mark-not-supplied",
                            stands_on=None)])
@@ -405,7 +407,8 @@ class TestTheRelativePeriodCountsTheDatasetsOwnPeriods:
 
     def test_case_workers_skips_the_quarter_it_owes_nothing_for(self):
         from qa_tools.common import slots
-        assert slots.relative_period("cp-case-workers", "2024-Q3", -1) == "2024-Q1"
+        # Its February and August rounds fill Q2 and Q4 (REQ-GEN-325).
+        assert slots.relative_period("cp-case-workers", "2024-Q4", -1) == "2024-Q2"
         assert slots.relative_period("cp-clients", "2024-Q3", -1) == "2024-Q2"
 
     def test_none_before_the_first_period_or_for_an_unknown_one(self):
@@ -654,14 +657,15 @@ class TestAnEmptiedQuarterIsMarkedNotSupplied:
     def test_it_is_timed_after_the_slot_closes(self):
         from qa_tools.common import slots
 
-        # 2015-Q1, an emptied quarter Child Protection still owes since
-        # REQ-GEN-238 dropped 2013 and 2014.
-        timed, why = sd._timed_chain(self._mark("2015-Q1", dataset_id="cp-clients"))
+        # 2015-Q2, the first emptied quarter Child Protection owes: since
+        # REQ-GEN-238 dropped 2013 and 2014 its first round is 2015-Q1's,
+        # whose files go into 2015-Q2 (REQ-GEN-325).
+        timed, why = sd._timed_chain(self._mark("2015-Q2", dataset_id="cp-clients"))
         assert timed is not None, why
         slot = next(s for s in slots.slots_for_dataset("cp-clients", until=date(2016, 1, 1))
-                    if s.name == "2015-Q1")
+                    if s.name == "2015-Q2")
         assert timed.at == slot.closes_at + timedelta(hours=24)
-        assert timed.supply is None and timed.period == "2015-Q1"
+        assert timed.supply is None and timed.period == "2015-Q2"
 
     def test_the_committed_marks_are_exactly_the_emptied_quarters(self):
         """From configuration alone, so they cannot go stale: every Child

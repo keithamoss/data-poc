@@ -552,7 +552,8 @@ def _wall_clock_after(s: Script, period: str) -> datetime | None:
     the asset's clock (REQ-GEN-196 criterion 10)."""
     from qa_tools.common import asset_time, schedule
 
-    on = schedule.date_of(period, s.dataset_id)
+    # FROM THE ROUND its slot is due on (REQ-GEN-325 criterion 3).
+    on = schedule.round_of(period, s.dataset_id)
     return None if on is None else asset_time.wall_clock(on + timedelta(days=s.day_offset),
                                                          s.at)
 
@@ -562,7 +563,9 @@ def _due_at(dataset_id: str, period: str) -> datetime | None:
     computes it from configuration (REQ-GEN-200 criterion 1)."""
     from qa_tools.common import schedule, slots
 
-    on = schedule.date_of(period, dataset_id)
+    # THE ROUND the slot is due on (REQ-PIPE-321 criterion 2), never the
+    # period's own date.
+    on = schedule.round_of(period, dataset_id)
     return None if on is None else slots.slot_instants(dataset_id, on).due_at
 
 

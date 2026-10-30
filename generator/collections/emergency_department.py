@@ -161,12 +161,12 @@ def _injected_chain(rows: Rows, injection, period, seed: int):
     chain, each after the first churned from the one before."""
     from generator.resupply import Delivery
 
-    out, payload = [], rows.generate(period.date, seed, 0, 0)
+    out, payload = [], rows.generate(period.round_date, seed, 0, 0)
     for n, extra in enumerate(injection.arrivals):
         if n:
-            payload = rows.churn(payload, seed + 900 + n, period.date, 0)
+            payload = rows.churn(payload, seed + 900 + n, period.round_date, 0)
         this = rows.dirty(payload, extra.severity, seed + 800 + n) if extra.severity else payload
-        out.append(Delivery(received_date=period.date + timedelta(days=extra.day_offset),
+        out.append(Delivery(received_date=period.round_date + timedelta(days=extra.day_offset),
                             severity=extra.severity, payload=this))
     return out
 
@@ -214,7 +214,7 @@ class EmergencyDepartment(Provider):
         if injected is not None:
             return _injected_chain(rows, injected[0], job.period, job.seed)
         days, weights = _delay()
-        return list(run_slot_chain(rows, job.period.date, job.seed, id_offset=0, n_rows=0,
+        return list(run_slot_chain(rows, job.period.round_date, job.seed, id_offset=0, n_rows=0,
                                    first_severity=job.severity, previous_row_count=None,
                                    delay_days=days, delay_weights=weights))
 

@@ -238,32 +238,35 @@ decisions:
   # accepts each as not supplied a day after its slot closes. Exactly the
   # emptied quarters each dataset owes - tests/test_scripted_decisions.py
   # derives the list from configuration and fails on any difference.
-  - periods: ["2015-Q1", "2015-Q2", "2015-Q3"]
+  # RENAMED BY ONE (REQ-GEN-325 criterion 4): Child Protection's files go into
+  # the next period, so the corrected 2015-Q1 to 2015-Q3 rounds fill 2015-Q2 to
+  # 2015-Q4, and cp-case-workers' February and August rounds 2015-Q2 and 2015-Q4.
+  - periods: ["2015-Q2", "2015-Q3", "2015-Q4"]
     operation: mark-not-supplied
     dataset: cp-clients
     after_hours: 24
     reason: "Nothing was supplied for this quarter, and nothing will be; accepted as not supplied."
-  - periods: ["2015-Q1", "2015-Q2", "2015-Q3"]
+  - periods: ["2015-Q2", "2015-Q3", "2015-Q4"]
     operation: mark-not-supplied
     dataset: cp-notifications
     after_hours: 24
     reason: "Nothing was supplied for this quarter, and nothing will be; accepted as not supplied."
-  - periods: ["2015-Q1", "2015-Q2", "2015-Q3"]
+  - periods: ["2015-Q2", "2015-Q3", "2015-Q4"]
     operation: mark-not-supplied
     dataset: cp-investigations
     after_hours: 24
     reason: "Nothing was supplied for this quarter, and nothing will be; accepted as not supplied."
-  - periods: ["2015-Q1", "2015-Q2", "2015-Q3"]
+  - periods: ["2015-Q2", "2015-Q3", "2015-Q4"]
     operation: mark-not-supplied
     dataset: cp-placements
     after_hours: 24
     reason: "Nothing was supplied for this quarter, and nothing will be; accepted as not supplied."
-  - periods: ["2015-Q1", "2015-Q2", "2015-Q3"]
+  - periods: ["2015-Q2", "2015-Q3", "2015-Q4"]
     operation: mark-not-supplied
     dataset: cp-carers
     after_hours: 24
     reason: "Nothing was supplied for this quarter, and nothing will be; accepted as not supplied."
-  - periods: ["2015-Q1", "2015-Q3"]
+  - periods: ["2015-Q2", "2015-Q4"]
     operation: mark-not-supplied
     dataset: cp-case-workers
     after_hours: 24

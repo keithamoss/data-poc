@@ -374,6 +374,9 @@ class Placement:
     scenario_id: str
     dataset: str
     period: str
+    #: The date of the ROUND whose slot fills `period` - what every arrival
+    #: day is counted from (REQ-GEN-325 criterion 3). At files_go_to_period
+    #: 0 it is the period's own date.
     period_date: date
     config: str
     arrivals: tuple[dict, ...] = field(default_factory=tuple)
@@ -750,7 +753,7 @@ def resolve(injection: Injection, periods: Sequence,
                 f"{injection.scenario_id}: it needs the {injection.covers} period(s) after "
                 f"{anchor.name} as its own, and the generated history ends before them")
         covered.append(periods[index + k].name)
-    _refuse_outside_hold(injection, anchor.date)
+    _refuse_outside_hold(injection, anchor.round_date)
 
     # A TARGETED SCENARIO'S LEAD-IN AND THE PERIOD AFTER IT (REQ-GEN-185):
     # both must exist in the generated history - placing them anywhere else
@@ -776,7 +779,7 @@ def resolve(injection: Injection, periods: Sequence,
 
     arrivals = []
     for extra in injection.arrivals:
-        day = anchor.date + timedelta(days=extra.day_offset)
+        day = anchor.round_date + timedelta(days=extra.day_offset)
         arrivals.append({
             "date": day.isoformat(),
             "at": extra.at,
@@ -790,11 +793,11 @@ def resolve(injection: Injection, periods: Sequence,
             # verdict, never a value from a row.
             "target": extra.target.as_record() if extra.target is not None else None,
             # A PAIR'S FILES, each by its real name and receipt (REQ-GEN-196).
-            "files": [{"filename": f.filename(anchor.date + timedelta(days=extra.day_offset)),
+            "files": [{"filename": f.filename(anchor.round_date + timedelta(days=extra.day_offset)),
                        "at": f.at, "content": f.content, "severity": f.severity,
                        "table": f.table,
                        "shapes": list(f.shapes), "note": f.note,
-                       "built_for": (anchor.date + timedelta(
+                       "built_for": (anchor.round_date + timedelta(
                            days=extra.day_offset + f.built_for)).isoformat(),
                        "target": f.target.as_record() if f.target is not None else None}
                       for f in extra.files],
@@ -803,7 +806,7 @@ def resolve(injection: Injection, periods: Sequence,
         scenario_id=injection.scenario_id,
         dataset=injection.dataset_id,
         period=anchor.name,
-        period_date=anchor.date,
+        period_date=anchor.round_date,
         config=injection.config,
         arrivals=tuple(arrivals),
         suppressed=tuple(suppressed),
@@ -1190,7 +1193,7 @@ def inheritance_placements(periods: Sequence) -> list[Placement]:
         raise CannotPlace("TS-79: the generated history is too short to hold an "
                           "inherited quarter - lengthen the Child Protection history")
     delivered = {p.name for p in schedule.periods_for_dataset(
-        INHERITING_DATASET, until=periods[-1].date)}
+        INHERITING_DATASET, until=periods[-1].round_date)}
     inherited = [i for i, p in enumerate(periods[:-1]) if p.name not in delivered and i > 0]
     if not inherited:
         raise CannotPlace(f"TS-79: {INHERITING_DATASET} inherits in no generated quarter - "
@@ -1203,14 +1206,14 @@ def inheritance_placements(periods: Sequence) -> list[Placement]:
                                                  "whose source is the oldest of the "
                                                  "original fifteen quarters")):
         p, nxt = periods[i], periods[i + 1]
-        middle = p.date + (nxt.date - p.date) / 2
+        middle = p.round_date + (nxt.round_date - p.round_date) / 2
         # THE QUARTER IT INHERITS FROM is the latest one it was delivered in,
         # not simply the one before (the critic's G6).
         source = next(periods[j].name for j in range(i - 1, -1, -1)
                       if periods[j].name in delivered)
         out.append(Placement(
             scenario_id=sid, dataset=INHERITING_DATASET, period=p.name,
-            period_date=p.date,
+            period_date=p.round_date,
             config=(f"quarterly; {INHERITING_DATASET} is delivered only in the quarters "
                     f"contract/calendar.yaml's participation names, so {p.name} - {why} - "
                     f"inherits {source}'s supply. Nothing generated for it."),

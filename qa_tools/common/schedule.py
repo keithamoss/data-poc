@@ -111,6 +111,12 @@ class Period:
     name: str
     date: date
 
+    @property
+    def round_date(self) -> date:
+        """A bare calendar period is its own round - the date files arrive on
+        at files_go_to_period 0. A DatasetPeriod says which round fills it."""
+        return self.date
+
 
 @dataclass(frozen=True)
 class DatasetPeriod:
@@ -956,4 +962,41 @@ def date_of(period_name: str, dataset_id: str) -> date | None:
                                         until=horizon):
         if period.name == period_name:
             return period.date
+    return None
+
+
+def round_of(period_name: str, dataset_id: str, agreement=None) -> date | None:
+    """The date of the ROUND whose slot fills a named period for this dataset
+    (REQ-PIPE-321 criterion 2) - the date every one of its slot's instants is
+    computed from. At files_go_to_period 0 it is the period's own date; at N
+    it is the round N periods before.
+
+    Taken from the slot sequence, never from the period's name: the round
+    filling P is the round R, before P, whose collection's value on R's own
+    date is the distance from R to P - so a change of value is read on the
+    round it takes effect from (REQ-PIPE-320 criterion 2). None where no
+    round fills the period - a period a rise skips (REQ-PIPE-322), or one
+    the calendar does not name.
+    """
+    from qa_tools.common import asset_time
+
+    agr = _agreement(agreement)
+    horizon = asset_time.now().date() + timedelta(days=365)
+    sequence = periods_for_calendar(calendar_for_dataset(dataset_id, agr).name,
+                                    until=horizon, agreement=agr)
+    index = next((i for i, p in enumerate(sequence) if p.name == period_name), None)
+    if index is None:
+        return None
+    # A PERIOD FILLED ONCE (REQ-PIPE-321 criterion 8): the latest round whose
+    # value reaches it. After a fall the earlier round keeps it.
+    for i in range(index, -1, -1):
+        n = agr.files_go_to_period_for(dataset_id, sequence[i].date) or 0
+        if i + n == index:
+            first = i
+            for j in range(i - 1, -1, -1):
+                if j + (agr.files_go_to_period_for(dataset_id, sequence[j].date) or 0) == index:
+                    first = j
+            return sequence[first].date
+        if index - i > 12:
+            break
     return None

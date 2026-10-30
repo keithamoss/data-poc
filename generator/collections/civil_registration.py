@@ -559,18 +559,18 @@ def _injected_chain(provider: DatasetProvider, injection, period, seed: int,
     from generator.resupply import Delivery
 
     deliveries = []
-    payload = provider.generate(period.date, seed=seed, n_rows=n_rows, id_offset=id_offset)
+    payload = provider.generate(period.round_date, seed=seed, n_rows=n_rows, id_offset=id_offset)
     for n, extra in enumerate(injection.arrivals):
         if n and 0 < extra.day_offset <= injection.covers \
                 and extra.day_offset != injection.arrivals[n - 1].day_offset:
             # A COVERED DAY'S OWN SUPPLY (REQ-GEN-199): that day's extract, with
             # the id block its own slot would have had - not a resend of D's.
-            day = period.date + timedelta(days=extra.day_offset)
+            day = period.round_date + timedelta(days=extra.day_offset)
             payload = provider.generate(day, seed=seed + 50 * extra.day_offset,
                                         n_rows=n_rows,
                                         id_offset=id_offset + extra.day_offset * ID_BLOCK)
         elif n:
-            payload = provider.churn(payload, seed=seed + 900 + n, run_date=period.date,
+            payload = provider.churn(payload, seed=seed + 900 + n, run_date=period.round_date,
                                       id_offset=id_offset + (n + 1) * (ID_BLOCK // 10))
         if extra.files:
             deliveries.append(_pair_delivery(provider, injection, extra, n, payload, period,
@@ -594,7 +594,7 @@ def _injected_chain(provider: DatasetProvider, injection, period, seed: int,
             this = provider.dirty(payload, severity=extra.severity, seed=seed + 800 + n,
                                    previous_row_count=previous_row_count)
         deliveries.append(Delivery(
-            received_date=period.date + timedelta(days=extra.day_offset),
+            received_date=period.round_date + timedelta(days=extra.day_offset),
             severity=extra.severity, payload=this))
     return deliveries
 
@@ -619,7 +619,7 @@ def _pair_delivery(provider, injection, extra, n: int, base, period, seed: int,
     SHAPE, NEVER A VERDICT - the pipeline decides what each file reads as."""
     from generator import scenario_injection, targeting
 
-    day = period.date + timedelta(days=extra.day_offset)
+    day = period.round_date + timedelta(days=extra.day_offset)
     where = f"{injection.scenario_id}, its {extra.at} delivery"
     files: dict[str, tuple[str, str]] = {}
     supply_shaped = None
@@ -927,7 +927,7 @@ class CivilRegistration(Provider):
         # #154). Asked for at that size and trimmed to it exactly in dirty().
         n_rows = previous_row_count if severity == "amber" and previous_row_count \
             else job.extra["rows"]
-        slot_date, seed = period.date, job.seed
+        slot_date, seed = period.round_date, job.seed
         id_offset = i * ID_BLOCK
         job.extra["id_offset"] = id_offset
 
@@ -984,7 +984,7 @@ class CivilRegistration(Provider):
             # under its own period, which is what it is for.
             periods = plan.state["periods"]
             for delivery_obj, entry in zip(deliveries, entries):
-                offset = (delivery_obj.received_date - job.period.date).days
+                offset = (delivery_obj.received_date - job.period.round_date).days
                 if 0 < offset <= injected[0].covers:
                     entry["period"] = periods[periods.index(job.period) + offset].name
                     entry["slot_id"] = f"slot_{job.extra['i'] + offset:03d}"
@@ -1005,12 +1005,12 @@ class CivilRegistration(Provider):
             # ON TIME (REQ-GEN-185 criterion 1; post-build-review #156): a
             # lead-in or following supply arrives inside its due time and
             # grace, at the midpoint.
-            due = slots.slot_instants(DATASET_ID, period.date)
+            due = slots.slot_instants(DATASET_ID, period.round_date)
             return asset_time.isoformat(due.due_at + due.grace / 2)
         if job.extra["in_era"]:
             # AN HOUR BEFORE ITS DUE INSTANT, the evening before (REQ-GEN-044):
             # on time, and inside its own claim window, which opens at 18:00.
-            due = slots.slot_instants(DATASET_ID, period.date)
+            due = slots.slot_instants(DATASET_ID, period.round_date)
             return asset_time.isoformat(due.due_at - timedelta(hours=1))
         # THE RECEIPT INSTANT IS THE DATA'S OWN: the earliest extract_timestamp
         # in the file that just landed, so a synthetic supply turns up when

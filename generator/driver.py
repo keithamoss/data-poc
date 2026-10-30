@@ -133,7 +133,7 @@ def generate(collection_id: str) -> list[dict]:
         injected = plan.injected_by_period.get(job.period.name)
         for n, (delivery_obj, entry) in enumerate(zip(deliveries, entries), start=1):
             entry["received_at"] = provider.received_at(plan, job, n, delivery_obj, entry)
-            name = delivery_names.delivery_name(job.period.date, job.seed, attempt=n,
+            name = delivery_names.delivery_name(job.period.round_date, job.seed, attempt=n,
                                                 taken=taken_names)
             taken_names.add(name)
             entry["delivery"] = name

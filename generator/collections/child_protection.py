@@ -569,11 +569,11 @@ def _injected_chain(provider: DatasetProvider, injection, period, seed: int,
     from generator.resupply import Delivery
 
     deliveries = []
-    payload = provider.generate(period.date, seed=seed, n_rows=0, id_offset=0)
+    payload = provider.generate(period.round_date, seed=seed, n_rows=0, id_offset=0)
     for n, extra in enumerate(injection.arrivals):
         if n:
             payload = provider.churn(payload, seed=seed + 900 + n,
-                                      run_date=period.date, id_offset=0)
+                                      run_date=period.round_date, id_offset=0)
         this = payload
         if extra.target is not None:
             # BUILT TO A TARGET, NEVER THE PRESET (REQ-GEN-184 criterion 1).
@@ -606,13 +606,13 @@ def _injected_chain(provider: DatasetProvider, injection, period, seed: int,
             # TWO FILES FOR ONE TABLE (REQ-GEN-203 criterion 2): the pair's own
             # files, each with its own receipt, beside the other tables.
             deliveries.append(PairDelivery(
-                received_date=period.date + timedelta(days=extra.day_offset),
+                received_date=period.round_date + timedelta(days=extra.day_offset),
                 severity=severity, payload=this,
                 files=_pair_files(provider, injection, extra, n, this, period, seed,
                                   placement)))
             continue
         deliveries.append(Delivery(
-            received_date=period.date + timedelta(days=extra.day_offset),
+            received_date=period.round_date + timedelta(days=extra.day_offset),
             severity=severity, payload=this))
     return deliveries
 
@@ -655,7 +655,7 @@ def _pair_files(provider, injection, extra, n: int, base: dict, period, seed: in
     named shapes. A SHAPE, NEVER A VERDICT - the pipeline decides."""
     from generator import scenario_injection, targeting
 
-    day = period.date + timedelta(days=extra.day_offset)
+    day = period.round_date + timedelta(days=extra.day_offset)
     files: dict[str, tuple[str, str]] = {}
     previous = None
     for k, f in enumerate(extra.files):
@@ -729,7 +729,18 @@ def drawn_grown_periods() -> list:
     the quarterly calendar itself, because the datasets no longer owe the
     dropped ones."""
     n = len(grown_run_plan()) + len(run_plan())
-    return schedule.periods_for_calendar("quarterly", until=get_anchor_date())[-n:-len(run_plan())]
+    # DRAWN OVER ROUNDS, NAMED BY THE PERIOD EACH ROUND FILLS (REQ-GEN-325
+    # criterion 3): the plan's draws stay on the rounds they were drawn on,
+    # and a round's quarter is the one its files go into, as generated_periods'
+    # are - so at files_go_to_period 1 every name moves on by one together.
+    sequence = schedule.periods_for_calendar("quarterly")
+    index = {p.name: i for i, p in enumerate(sequence)}
+    rounds = schedule.periods_for_calendar("quarterly", until=get_anchor_date())[-n:-len(run_plan())]
+    out = []
+    for r in rounds:
+        offset = schedule._agreement(None).files_go_to_period_for(DATASET_ID, r.date) or 0
+        out.append(schedule.DatasetPeriod(period=sequence[index[r.name] + offset], round=r))
+    return out
 
 
 def original_periods() -> list:
@@ -837,7 +848,7 @@ def _severities(plan, periods, injected_by_period, dropped=frozenset()) -> list:
                             or p.name in green or p.name in emptied
                             or p.name in dropped)
     out = targeting.outside_hold([sev for _q, sev in plan[:len(periods)]],
-                                 [p.date for p in periods], "cp-clients",
+                                 [p.round_date for p in periods], "cp-clients",
                                  keep_clean=frozenset({0}), unavailable=unavailable)
     # A LEAD-IN OR FOLLOWING PERIOD IS A SINGLE CLEAN DELIVERY (REQ-GEN-185):
     # a clean chain is one arrival, with no resupply.
@@ -1013,13 +1024,13 @@ class ChildProtection(Provider):
             from generator.resupply import Delivery
 
             payload, _moved = targeting.cp_target(
-                provider.generate(job.period.date, seed=job.seed, n_rows=0, id_offset=0),
+                provider.generate(job.period.round_date, seed=job.seed, n_rows=0, id_offset=0),
                 targeting.Target("green"), seed=job.seed + 700,
                 where=f"the green quarter {job.period.name}")
-            return [Delivery(received_date=job.period.date, severity=None, payload=payload)]
+            return [Delivery(received_date=job.period.round_date, severity=None, payload=payload)]
         delay_days, delay_weights = _cp_delay()
         return list(run_slot_chain(
-            provider, job.period.date, job.seed, id_offset=0, n_rows=0,
+            provider, job.period.round_date, job.seed, id_offset=0, n_rows=0,
             first_severity=job.severity, previous_row_count=None,
             delay_days=delay_days, delay_weights=delay_weights,
         ))
