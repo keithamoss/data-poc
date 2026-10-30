@@ -419,7 +419,7 @@ class LinkageProducts(Provider):
             for extra in injection.arrivals:
                 for fault in extra.row_faults:
                     parse_fault(fault, injection.scenario_id)
-        _refuse_unschedulable(jobs, sources, arrivals)
+        _refuse_unschedulable(jobs, sources, arrivals, injected)
         _refuse_unmet_preconditions(jobs, sources, arrivals, injected)
         # EVERY RELEASE BUILT ONCE BEFORE THE FIRST WRITE (REQ-GEN-335
         # criterion 5): a fault that cannot be placed refuses here.
@@ -598,14 +598,22 @@ def _refuse_scenario_quarters(resolved) -> None:
                 f"is not moved for you); nothing was written")
 
 
-def _refuse_unschedulable(jobs, sources, arrivals) -> None:
-    """Criteria 12 and 13, before anything is written: each quarter's release
-    arrives after the same quarter's ordinary first supply of each linked
-    dataset received that day, its promotion taking effect before the release
-    by the one function the gate uses (promotion.effective_at_for, capped at
-    the release); and no release shares a receipt instant with any supply it
-    reads."""
-    from qa_tools.common import asset_time, promotion
+def _refuse_unschedulable(jobs, sources, arrivals, injected) -> None:
+    """Criteria 12 and 13, before anything is written.
+
+    13: no release shares a receipt instant with any supply it reads.
+
+    12, for each ORDINARY quarter's release (a scenario's quarter keeps what
+    it plants): received within its own due time and grace, and after each
+    same-round source supply's promotion takes effect - that instant computed
+    as the gate computes it (orchestrate.effective_at_of): the one function,
+    promotion.effective_at_for, seeded by the arrival's run id, capped at the
+    source dataset's next receipt and at the first release reading its period
+    (promotion.next_receipt's lag cap), within its claim window. Refused
+    naming the quarter, the release and the effective instant."""
+    from datetime import timedelta
+
+    from qa_tools.common import asset_time, hierarchy, promotion, schedule, slots
 
     instants = {}
     for did, supplies in sources.items():
@@ -617,9 +625,15 @@ def _refuse_unschedulable(jobs, sources, arrivals) -> None:
                 raise CannotGenerate(f"the {job.period.name} linkage release ({at.isoformat()}) "
                                      f"and {instants[at]} would share one receipt instant - "
                                      f"nothing was written")
-        if not arrivals[job.slot_id]:
+    releases = sorted((at, job.period.name) for job in jobs
+                      for at, _f, _s in arrivals[job.slot_id])
+    for job in jobs:
+        if not arrivals[job.slot_id] or job.period.name in injected:
             continue
         at = arrivals[job.slot_id][0][0]
+        slot = next(s for s in slots.slots_for_dataset(
+            DATASET_ID, until=job.period.round_date + timedelta(days=1))
+            if s.period.name == job.period.name)
         for did, supplies in sources.items():
             mine = [s for s in supplies if s.period == job.period.name]
             if not mine:
@@ -627,12 +641,20 @@ def _refuse_unschedulable(jobs, sources, arrivals) -> None:
             first = asset_time.parse_instant(mine[0].received_at, did)
             if asset_time.local_date(first) != job.period.round_date:
                 continue        # filed a round earlier, as Child Protection's are
-            took = promotion.effective_at_for(first, now=at, seed=did, before=at)
-            if first >= at or took >= at:
+            later = [t for t in (asset_time.parse_instant(s.received_at, did)
+                                 for s in supplies) if t > first]
+            readers = [t for t, name in releases if t > first and name == job.period.name]
+            caps = [min(c) for c in (later, readers) if c]
+            took = promotion.effective_at_for(
+                first, seed=f"{hierarchy.dataset(did).table}__{asset_time.arrival_key(first)}",
+                before=min(caps) if caps else None,
+                within=schedule.claim_window(did, on=asset_time.local_date(first)))
+            if first >= at or took >= at or at > slot.late_after:
                 raise CannotGenerate(
                     f"the {job.period.name} linkage release ({at.isoformat()}) cannot be "
                     f"received after {did}'s promotion for that quarter takes effect "
-                    f"({took.isoformat()}) and within its due time - nothing was written")
+                    f"({took.isoformat()}) and within its due time and grace (by "
+                    f"{slot.late_after.isoformat()}) - nothing was written")
 
 
 def _refuse_unmet_preconditions(jobs, sources, arrivals, injected) -> None:

@@ -269,3 +269,71 @@ def test_the_child_protection_sides_move_no_ordinary_severity(monkeypatch):
             assert len(deliveries) == 1 and deliveries[0].severity == "red"
         else:
             assert a.severity == b.severity, a.period.name
+
+
+class TestEachOrdinaryReleaseIsScheduledAfterThePromotionItReads:
+    """REQ-GEN-334 criterion 12, refused before anything is written: an
+    ordinary release received after the effective instant of each same-round
+    source promotion - the gate's own effective_at_for, seeded as the gate
+    seeds it - AND within its own due time and grace; else refused naming the
+    quarter, the delivery and the promotion's effective instant."""
+
+    @staticmethod
+    def _quarter(name="2024-Q3"):
+        from generator.collections.base import Job
+        from qa_tools.common import schedule
+
+        period = next(p for p in schedule.periods_for_dataset(lp.DATASET_ID)
+                      if p.name == name)
+        return Job("lp_slot_01", lp.BASE_SEED + 1, None, period), period
+
+    @staticmethod
+    def _source(period, hhmm):
+        from generator.collections.base import GeneratedSupply
+
+        received = asset_time.wall_clock(period.round_date, hhmm)
+        return {"ed-presentations": [GeneratedSupply(period.name,
+                                                     asset_time.isoformat(received), None)]}
+
+    def test_an_ordinary_release_on_time_after_its_source_passes(self):
+        job, period = self._quarter()
+        at = asset_time.wall_clock(period.round_date, "17:30")
+        lp._refuse_unschedulable([job], self._source(period, "16:00"),
+                                 {job.slot_id: [(at, (), None)]}, {})
+
+    def test_a_release_past_its_due_time_and_grace_is_refused(self):
+        """Due 18:00 with eight hours' grace: a release at 03:00 the next day
+        would be late by accident (Keith, OQ1 = a) - refused, not written."""
+        from datetime import timedelta
+
+        job, period = self._quarter()
+        at = asset_time.wall_clock(period.round_date + timedelta(days=1), "03:00")
+        with pytest.raises(lp.CannotGenerate, match=f"{period.name}.*linkage.*takes effect.*due time and grace"):
+            lp._refuse_unschedulable([job], self._source(period, "16:00"),
+                                     {job.slot_id: [(at, (), None)]}, {})
+
+    def test_a_release_before_its_source_arrives_is_refused(self):
+        job, period = self._quarter()
+        at = asset_time.wall_clock(period.round_date, "17:30")
+        with pytest.raises(lp.CannotGenerate, match=f"{period.name}.*ed-presentations"):
+            lp._refuse_unschedulable([job], self._source(period, "17:45"),
+                                     {job.slot_id: [(at, (), None)]}, {})
+
+    def test_the_effective_instant_named_is_the_gates_own(self):
+        """Seeded by the arrival's run id and capped at the release, as
+        orchestrate.effective_at_of computes it."""
+        from datetime import timedelta
+
+        from qa_tools.common import promotion, schedule
+
+        job, period = self._quarter()
+        src = self._source(period, "16:00")
+        first = asset_time.parse_instant(src["ed-presentations"][0].received_at, "t")
+        at = asset_time.wall_clock(period.round_date + timedelta(days=1), "03:00")
+        took = promotion.effective_at_for(
+            first, seed=f"ed_presentations__{asset_time.arrival_key(first)}", before=at,
+            within=schedule.claim_window("ed-presentations",
+                                         on=asset_time.local_date(first)))
+        with pytest.raises(lp.CannotGenerate) as exc:
+            lp._refuse_unschedulable([job], src, {job.slot_id: [(at, (), None)]}, {})
+        assert took.isoformat() in str(exc.value)
