@@ -50,8 +50,8 @@ checks for linkage_keys:
       name: Expected identifiers present
       fail query: |
         SELECT dataset, linkage_key FROM linkage_keys
-        WHERE (dataset = 'DOC_CLIENTS' AND (id_1 IS NULL OR TRIM(id_1) = ''))
-           OR (dataset = 'EDDC_PRESENTATION' AND (id_1 IS NULL OR TRIM(id_1) = ''))
+        WHERE (dataset = 'DOC_CLIENTS' AND (id_1 IS NULL OR TRIM(CAST(id_1 AS TEXT)) = ''))
+           OR (dataset = 'EDDC_PRESENTATION' AND (id_1 IS NULL OR TRIM(CAST(id_1 AS TEXT)) = ''))
       samples limit: 100000
       attributes:
         check_id: data-asset-1.department-of-health.linkage-products.linkage-keys.id_1.expected_ids_soda
@@ -76,8 +76,8 @@ checks for linkage_keys:
       name: No surplus identifiers
       fail query: |
         SELECT dataset, linkage_key FROM linkage_keys
-        WHERE (dataset = 'DOC_CLIENTS' AND id_2 IS NOT NULL AND TRIM(id_2) <> '')
-           OR (dataset = 'EDDC_PRESENTATION' AND id_2 IS NOT NULL AND TRIM(id_2) <> '')
+        WHERE (dataset = 'DOC_CLIENTS' AND id_2 IS NOT NULL AND TRIM(CAST(id_2 AS TEXT)) <> '')
+           OR (dataset = 'EDDC_PRESENTATION' AND id_2 IS NOT NULL AND TRIM(CAST(id_2 AS TEXT)) <> '')
       samples limit: 100000
       attributes:
         check_id: data-asset-1.department-of-health.linkage-products.linkage-keys.id_1.no_surplus_ids_soda
@@ -141,7 +141,7 @@ checks for linkage_keys:
       name: Client Register links match a client
       fail query: |
         SELECT l.dataset, l.id_1 FROM linkage_keys l
-        LEFT JOIN cp_clients c ON CAST(c.cp_client_id AS TEXT) = l.id_1
+        LEFT JOIN cp_clients c ON CAST(c.cp_client_id AS TEXT) = CAST(l.id_1 AS TEXT)
         WHERE l.dataset = 'DOC_CLIENTS' AND c.cp_client_id IS NULL
       samples limit: 100000
       attributes:
@@ -166,7 +166,7 @@ checks for linkage_keys:
       cp_clients_coverage_percent query: |
         SELECT 100.0 * COUNT(l.id_1) / NULLIF(COUNT(*), 0)
         FROM cp_clients c
-        LEFT JOIN (SELECT DISTINCT id_1 FROM linkage_keys WHERE dataset = 'DOC_CLIENTS') l
+        LEFT JOIN (SELECT DISTINCT CAST(id_1 AS TEXT) AS id_1 FROM linkage_keys WHERE dataset = 'DOC_CLIENTS') l
           ON l.id_1 = CAST(c.cp_client_id AS TEXT)
       warn: when < 90
       fail: when < 85
@@ -193,7 +193,7 @@ checks for linkage_keys:
       name: ED Presentations links match a presentation
       fail query: |
         SELECT l.dataset, l.id_1 FROM linkage_keys l
-        LEFT JOIN ed_presentations e ON CAST(e.presentation_id AS TEXT) = l.id_1
+        LEFT JOIN ed_presentations e ON CAST(e.presentation_id AS TEXT) = CAST(l.id_1 AS TEXT)
         WHERE l.dataset = 'EDDC_PRESENTATION' AND e.presentation_id IS NULL
       samples limit: 100000
       attributes:
@@ -219,7 +219,7 @@ checks for linkage_keys:
       ed_presentations_coverage_percent query: |
         SELECT 100.0 * COUNT(l.id_1) / NULLIF(COUNT(*), 0)
         FROM ed_presentations e
-        LEFT JOIN (SELECT DISTINCT id_1 FROM linkage_keys WHERE dataset = 'EDDC_PRESENTATION') l
+        LEFT JOIN (SELECT DISTINCT CAST(id_1 AS TEXT) AS id_1 FROM linkage_keys WHERE dataset = 'EDDC_PRESENTATION') l
           ON l.id_1 = CAST(e.presentation_id AS TEXT)
       warn: when < 90
       fail: when < 85
