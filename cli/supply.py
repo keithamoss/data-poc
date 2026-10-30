@@ -468,7 +468,7 @@ def filings_command(dataset_id: str, limit: int) -> None:
         return
 
     readable = {
-        assignment.OPEN_UNFILLED: "the period open when it arrived",
+        assignment.OPEN_UNFILLED: "the slot open when it arrived",
         assignment.RESUPPLY: "resupply - the open period was already filled",
         assignment.HELD: "[yellow]no period was open for it - held for a person[/yellow]",
     }
@@ -640,8 +640,17 @@ def holds_command() -> None:
         for held in supply_holds.outstanding(conn):
             if held.turned_off:
                 continue   # quiet: the summary's count (post-build-review #190 D12)
-            console.print(f"\n[yellow]{held.dataset_id}[/yellow] - {held.supply_id} "
-                           f"[dim]({held.kind})[/dim]")
+            # THE TUI'S HELD WORDS AS ITS HEADLINE (CLI UX critic H3, REQ-PIPE-327
+            # criterion 3): which kind of held, and when it was received.
+            from rich.markup import escape
+
+            from cli import filing_tui
+            from qa_tools.common import files_go
+
+            console.print(f"\n[yellow]{held.dataset_id}[/yellow] - "
+                          f"{escape(files_go.held_words(held))} · received "
+                          f"{escape(filing_tui.arrived(held.supply_id))}")
+            console.print(f"  [dim]{held.supply_id} ({held.kind})[/dim]")
             console.print(f"  {held.describe()}", markup=False, highlight=False)
             command = held.place_command
             for response in held.responses:

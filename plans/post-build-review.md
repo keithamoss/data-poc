@@ -12877,3 +12877,81 @@ twice. It deliberately did not re-find the `TypeError`.
      to 2015-Q1) said "had not opened" - fixed test-first
      (tests-js/files-go-to-period.test.js) before the e2e class that caught
      it went green.
+
+287. **[in-progress, 2026-10-30]** **[Dashboard UI]** **[Pipeline & publishing]**
+     **The three UX critics on REQ-DASH-326 and REQ-PIPE-327 (dashboard UX,
+     visual, CLI UX), and what was done about each.** Defects fixed
+     test-first (tests-js/files-go-to-period.test.js,
+     tests-js/per-dataset-arrivals.test.js, tests/test_files_go_terminal.py,
+     tests/test_place_held_supply.py), each seen failing first:
+     - DASHBOARD H1, a current cycle viewed inside its claim window was headed
+       "received <a day still to come>": the history is unclipped (road-testing
+       #19), so its later supply was named. The heading now says "open for
+       files, due ..." while its first supply is after the date on show; the
+       rows stay, as #19 decided.
+     - DASHBOARD H3 / VISUAL 1, "Latest arrival" was the newest-RECORDED run, so
+       Emergency Department showed a 2013 supply a correction had re-checked.
+       It is now the newest receipt among the runs on show, on today's view
+       and every as-of date.
+     - VISUAL 2, the tile's "(On time)" never hid: one spelling of three was
+       compared. Compared by label now; the tile's value is the instant at the
+       SLA tile's weight, the period its own muted line, the tooltip "When we
+       received this supply".
+     - UX M4, a not-owed-yet composition cell read "Not owed — Not owed yet —".
+     - UX M5, the composition view called an empty slot not yet due "Not
+       supplied — Due"; it reads "Open for files — due <instant>" and counts as
+       open until its due instant passes.
+     - CLI H1, the TUI printed a supply key's UTC digits ("2023-11-01 01:00")
+       beside format_instant's "9:00am Wednesday, 1 November 2023" for the
+       same supply. Every received instant now goes through format_instant.
+     - CLI H2, "Held - no period yet (9)" headed nine rows each saying "Held,
+       would be for <period>"; the heading is "Held - waiting on a person".
+     - CLI H3, `mothman supply holds` heads each entry with the TUI's held
+       words and its received instant.
+     Polish done without a test: the cycle heading row wraps as a unit on
+     mobile (visual 3), the files-go line is --ink-muted not --ink-faint
+     (visual 8, contrast 3.4:1 -> ok), the composition caption is screen-reader
+     only (visual 6, it repeated the heading and clipped at 390px), and
+     `supply filings` says "the slot open when it arrived" (CLI M1).
+     **FOR KEITH, NOT DONE** - each changes what was signed, or what a reader
+     is told:
+     - (a) UX M2: in a dataset's very FIRST claim window (e.g. Child
+       Protection 19 Jan - 2 Feb 2015) the page reads "No data". REQ-DASH-182
+       criterion 3 ends "Not owed yet" at the first claim opening and
+       REQ-DASH-326 criterion 5's calm needs a supply in place, so the window
+       falls between them. RECOMMENDED: keep "Not owed yet — owes from <P>,
+       first due <instant>" until the first due instant (an amendment to
+       182 c3).
+     - (b) UX H2: held, never-filed supplies are grouped under the period a
+       receipt date falls in, so cp-case-workers shows May supplies under
+       "For 2026-Q3 · ... Not owed" in green while "Waiting for a person" lists
+       them red, held. RECOMMENDED: no period-headed block for a supply never
+       filed - it already has its place under "Waiting for a person".
+     - (c) UX M1 / visual 5: one period can carry several "For <period>"
+       headings, because a chain ends at a green supply and a later resupply
+       of the same period starts another (Keith's chain rule, #123 B1). With
+       the period leading the heading they read as duplicates. RECOMMENDED:
+       one block per period, chains as sub-groups, "received" pinned to the
+       block's first receipt.
+     - (d) UX M6: on the default view, while the current cycle is empty and
+       not due, the supply actually in place is only behind "Show all
+       history". Show the previous filled cycle tagged "In place"?
+     - (e) UX M3: the picker's "On the quarterly calendar: 2026-Q3 — ..."
+       leads with the period the date falls in, which criterion 8 rules out.
+       RECOMMENDED: drop the bare lead and let the two clauses carry it.
+     - (f) CLI M4: Birth Registrations shows no files-go line - describe()
+       follows REQ-DASH-326's "authored calendar" scope, but REQ-PIPE-327
+       criterion 1 says each dataset, 0 included. Print it for cadence-rule
+       calendars too, or amend 327 c1 to match?
+     - (g) CLI M3: with a fall, the held round has no table row and the line
+       under the table drops the "from <round>" part; CLI M6 the chooser lines
+       use "arrived" and a different order from the tables; CLI L1-L9 polish.
+     - (h) visual 4, 7, 9-11 and UX L1-L5: lighter period links, period-view
+       tap targets, picker line breaks, an empty-state line under an open
+       cycle, nowrap on timestamps, and L5's suppressed "nothing has landed"
+       notice where other gaps exist.
+     Found while fixing, not by a critic: tests/test_place_held_supply.py and
+     tests/test_turn_off.py fail one test (TestCoveredHoldsFileThemselves) when
+     run in ONE process against one database - on the old code too, so not
+     this change; they pass apart and CI runs them on separate workers. An
+     isolation leak to look at.

@@ -306,7 +306,8 @@ class TestTheOfferAfterARunIsQuietWhenItShouldBe:
 class TestHowASlotReads:
 
     def test_the_arrival_is_shown_as_a_date_rather_than_a_key(self):
-        assert filing_tui.arrived("cp-carers@202605010100000000") == "2026-05-01 01:00"
+        # On the asset's clock, never the key's UTC digits (CLI UX critic H1).
+        assert filing_tui.arrived("cp-carers@202605010100000000") == "9:00am Friday, 1 May 2026"
 
     def test_a_supply_with_no_usable_key_still_renders(self):
         assert filing_tui.arrived("") == "-"

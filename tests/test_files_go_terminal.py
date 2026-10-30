@@ -182,3 +182,29 @@ class TestThePassNamesEachArrivalsPeriodAndTotalsByPeriod:
         assert line.startswith("cp_run_001: For 2026-Q2 · received ")
         assert line.endswith("2 filed, 1 held")
         assert report.by_period == {"2026-Q2": {"filed": 2, "held": 1}}
+
+
+class TestAReceiptIsShownOnTheAssetsClock:
+    """CLI UX critic H1: arrived() printed a supply key's digits, which are
+    UTC where the key ends 0000, so one supply read 01:00 in one place and
+    9:00am in the next. Every received instant goes through format_instant."""
+
+    def test_a_utc_key_reads_as_its_perth_instant(self, monkeypatch):
+        from cli import filing_tui
+        from qa_tools.common import display_time, filing
+
+        monkeypatch.setattr(filing, "received_at_of", lambda *a, **k: None)
+        want = display_time.format_instant(datetime(2023, 11, 1, 1, tzinfo=UTC))
+        assert filing_tui.arrived("cp-case-workers@202311010100000000") == want
+        assert "9:00am" in want
+        assert filing_tui.for_received("2023-Q4", "cp-case-workers@202311010100000000") \
+            == f"For 2023-Q4 · received {want}"
+
+    def test_a_perth_key_reads_the_same(self, monkeypatch):
+        from cli import filing_tui
+        from qa_tools.common import display_time, filing
+
+        monkeypatch.setattr(filing, "received_at_of", lambda *a, **k: None)
+        from datetime import timedelta, timezone
+        want = display_time.format_instant(datetime(2023, 8, 1, 9, tzinfo=timezone(timedelta(hours=8))))
+        assert filing_tui.arrived("cp-clients@202308010900000800") == want

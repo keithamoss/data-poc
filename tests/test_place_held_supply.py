@@ -579,8 +579,9 @@ class TestTheFilingDecisionsDoorListsHeldSupplies:
         door, offered = self._door(monkeypatch, [self._row()], [slot])
         door.queue_flow("child-protection")
         out = _said(capsys.readouterr().out)
-        assert "Held - no period yet (1)" in out
-        assert out.index("Held - no period yet") < out.index("waiting on a decision")
+        # NEUTRAL: its rows each say which kind of held (CLI UX critic H2).
+        assert "Held - waiting on a person (1)" in out
+        assert out.index("Held - waiting on a person") < out.index("waiting on a decision")
         assert "15 May 2024, 09:00" in out and "could not be placed" in out
         (choices,) = offered
         assert any(c.startswith(f"Held, no period yet: {DS}") for c in choices)
@@ -736,6 +737,17 @@ class TestTheRestOfThePlacementRules:
                 f"--to-period <period> --reason '<why>'\n") in out
         assert "Filing decisions" in out
 
+
+    def test_holds_heads_each_entry_with_the_tuis_held_words(self, conn, period, cli):
+        """CLI UX critic H3 (REQ-PIPE-327 criterion 3 names holds): each entry
+        says which kind of held, and when it was received, in the TUI's words."""
+        from cli import filing_tui
+        from qa_tools.common import files_go, supply_holds
+
+        supply, _ = _held(conn, period)
+        held = next(h for h in supply_holds.outstanding(conn) if h.supply_id == supply)
+        out = " ".join(cli(["holds"]).output.split())
+        assert f"{files_go.held_words(held)} · received {filing_tui.arrived(supply)}" in out
 
     def test_d8_a_reason_with_brackets_is_printed_as_written(self, conn, period, cli,
                                                                monkeypatch):

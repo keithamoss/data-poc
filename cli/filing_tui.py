@@ -964,7 +964,7 @@ def arrived(supply: str | None) -> str:
     at any terminal width, and what a person reads it for is when the
     thing turned up.
     """
-    from qa_tools.common import asset_time, filing, supply_files
+    from qa_tools.common import display_time, filing, supply_files
 
     key = filing_queue.arrival_key_of(supply or "")
     # ITS OWN FILE'S RECEIPT where it has one (REQ-PIPE-193 criterion 10,
@@ -973,10 +973,30 @@ def arrived(supply: str | None) -> str:
     if supply and "@" in supply:
         own = filing.received_at_of(supply_files.dataset_of(supply), supply)
         if own is not None:
-            key = asset_time.arrival_key(own)
+            return display_time.format_instant(own)
+    # ON THE ASSET'S CLOCK, as every other instant (CLI UX critic H1,
+    # 2026-10-30): the key is an ISO instant's digits, and one ending 0000 is
+    # UTC - printing its digits read 8 hours off beside format_instant.
+    instant = _instant_of_key(key)
+    if instant is not None:
+        return display_time.format_instant(instant)
     if len(key) >= 12 and key.isdigit():
         return f"{key[0:4]}-{key[4:6]}-{key[6:8]} {key[8:10]}:{key[10:12]}"
     return key or "-"
+
+
+def _instant_of_key(key: str):
+    """The instant an 18-digit arrival key names - YYYYMMDDHHMMSS and its
+    UTC offset HHMM, as asset_time.arrival_key writes it - or None."""
+    from datetime import datetime, timedelta, timezone
+
+    if len(key) != 18 or not key.isdigit():
+        return None
+    try:
+        offset = timedelta(hours=int(key[14:16]), minutes=int(key[16:18]))
+        return datetime.strptime(key[:14], "%Y%m%d%H%M%S").replace(tzinfo=timezone(offset))
+    except ValueError:
+        return None
 
 
 def _who_decided(state: slot_state.SlotState) -> str:
@@ -1631,7 +1651,7 @@ def _queue_screen(conn, collection_id: str, *, gaps, held, carry, groups):
             console.print(held_table(group))
             console.print()
         if rest:
-            console.print(f"[bold]Held - no period yet ({len(rest)})[/bold] - each needs a "
+            console.print(f"[bold]Held - waiting on a person ({len(rest)})[/bold] - each needs a "
                           f"period chosen, or rejecting")
             console.print(held_table(rest))
             console.print()

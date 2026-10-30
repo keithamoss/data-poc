@@ -236,3 +236,14 @@ describe("a supply is current for the period it was FILED to, whenever it arrive
     expect(w.clipDatasetToInPlaceOn(d, "2026-05-15").staleInPlaceOn).toBe(true);
   });
 });
+
+describe("Latest arrival is the newest receipt (critics on REQ-DASH-326, H3)", () => {
+  it("is never an old supply that was only re-checked most recently", () => {
+    const w = load();
+    const d = datasetArrivingOn("ed-presentations", ["2026-05-01", "2013-10-10"]);
+    // The 2013 supply's run is the newest RECORDED (a correction re-checked it),
+    // so it sits last; the newest RECEIPT is still 1 May 2026.
+    const clipped = w.clipDatasetToInPlaceOn(d, "2026-08-15");
+    expect(clipped.lastArrival.arrivedAt).toBe("2026-05-01T09:00:00+08:00");
+  });
+});

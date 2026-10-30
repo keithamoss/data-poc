@@ -1010,6 +1010,7 @@ class TestCheapPaths:
 
         v2 = part_checked(sc)
         offered = []
+        monkeypatch.setattr(filing_tui.console, "width", 250)   # one row per line
         monkeypatch.setattr(common, "select", lambda msg, choices, **k: offered.extend(
             choices) or None)
         filing_tui._choose_a_supply(slot_state.SlotState(

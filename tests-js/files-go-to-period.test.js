@@ -175,3 +175,60 @@ describe("a hold after a fall of two (critic finding 8)", () => {
     expect(w.blockerSays(b)).toContain("the agreement change from the 1 May 2026 round");
   });
 });
+
+describe("a cycle whose supplies all arrived after the date on show (UX critic H1)", () => {
+  it("is headed open for files, never 'received' a day still to come", () => {
+    const { w, r } = load();
+    w.eval("CURRENT_IN_PLACE_ON = '2026-01-25'");
+    const cycles = [{ cycleStart: "2026-05-01", entries: [
+      { run_id: "cp_run_x", run_date: "2026-02-01", arrivedAt: at("2026-02-01"), status: "green",
+        attemptNumber: 1, isResupply: false } ] }];
+    const html = w.renderSupplyHistorySection(r, cycles, "2026-05-01");
+    expect(html).toContain("For 2026-Q2 · open for files, due");
+    expect(html).not.toContain("received Sunday, 1 February 2026");
+  });
+});
+
+describe("the Latest arrival tile (visual critic 2)", () => {
+  it("leaves out the qualifier when the supply was on time, whatever the key is spelled", () => {
+    const { w } = load();
+    for (const status of ["onTime", "on_time", "on-time"]) {
+      const ds = { id: "cp-clients", lastArrival: { slot: "2026-Q2", arrivedAt: at("2026-02-01"), arrivalStatus: status, run_id: "r" } };
+      expect(w.latestArrivalTileHtml(ds)).not.toContain("(On time)");
+    }
+  });
+  it("puts the instant as the value and the period on its own line", () => {
+    const { w } = load();
+    const ds = { id: "cp-clients", lastArrival: { slot: "2026-Q2", arrivedAt: at("2026-02-01"), arrivalStatus: "early", run_id: "r" } };
+    const html = w.latestArrivalTileHtml(ds);
+    expect(html).toContain(w.fmtInstant(at("2026-02-01")));
+    expect(html).toContain("(Early)");
+    expect(html).toContain("For 2026-Q2");
+    expect(html).toContain('data-latest-arrival-period');
+  });
+});
+
+describe("the period composition before and after a slot is due (UX critic M4, M5)", () => {
+  it("reads an empty slot not yet due as open for files, never 'Not supplied'", () => {
+    const { w, r } = load();
+    w.eval("CURRENT_IN_PLACE_ON = '2026-01-25'");
+    const row = w.compositionRow(r, "2026-Q2", "2026-01-25");
+    expect(row.kind).toBe("open");
+    const cells = w.compositionCells({ id: "a" }, { id: "c" }, row);
+    expect(cells).toContain("Open for files");
+    expect(cells).toContain(w.fmtInstant(Q2.due));
+    expect(cells).not.toContain("Not supplied");
+  });
+  it("once due with nothing filed, reads not supplied as before", () => {
+    const { w, r } = load();
+    expect(w.compositionRow(r, "2026-Q2", "2026-03-01").kind).toBe("notsupplied");
+  });
+  it("says 'Not owed yet' once, never 'Not owed — Not owed yet'", () => {
+    const { w } = load();
+    const cells = w.compositionCells({ id: "a" }, { id: "c" },
+      { kind: "notowed", word: "Not owed yet", label: "Not owed yet — owes from 2026-Q1, first due x" });
+    expect(cells).toContain("<b>Not owed yet</b>");
+    expect(cells).not.toContain("Not owed — Not owed yet");
+    expect(cells).toContain("owes from 2026-Q1");
+  });
+});

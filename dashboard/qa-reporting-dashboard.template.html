@@ -666,7 +666,10 @@ span.scenario-subject-label{display:inline-block; margin:0 6px 0 0;}
 .supply-history-head{display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:10px;}
 .supply-history-head h3{font-size:16px; font-family:"Public Sans",sans-serif; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--ink-muted);}
 .supply-cycle{margin-bottom:18px;}
-.supply-cycle-label{display:flex; align-items:center; gap:8px; font-size:13px; color:var(--ink-muted); margin-bottom:8px;}
+.supply-cycle-label{display:flex; flex-wrap:wrap; align-items:baseline; column-gap:8px; row-gap:2px; font-size:13px; color:var(--ink-muted); margin-bottom:8px;}
+/* A LONG 'For <period> · ...' HEADING WRAPS AS A UNIT (visual critic on
+   REQ-DASH-326, 3): the count and the pill drop under it whole. */
+.supply-cycle-label > span{white-space:nowrap;}
 .supply-cycle-label b{color:var(--ink);}
 
 .col-grid{display:grid; grid-template-columns:repeat(auto-fill, minmax(196px,1fr)); gap:10px; margin-block:8px 30px;}
@@ -1597,6 +1600,22 @@ function fmtArrival(lastArrival){ return fmtInstant(lastArrival.arrivedAt); }
 // THE LATEST ARRIVAL, NAMING THE PERIOD IT WAS FILED TO (REQ-DASH-326
 // criterion 12): 'For 2026-Q2 · <instant>' on an authored calendar, so a
 // February receipt filed to 2026-Q2 is not read as 2026-Q1's.
+// THE LATEST ARRIVAL TILE (visual critic on REQ-DASH-326, 2): the instant is
+// the value, at the SLA tile's weight, and the period it is for its own small
+// line; the qualifier is left out when on time, by its LABEL - the data
+// spells on time three ways (ARRIVAL_STATUS_LABEL), and comparing one key
+// left '(On time)' showing always.
+function latestArrivalTileHtml(ds){
+  const a = ds.lastArrival;
+  const lateExcused = excuseInForce(ds.id, a.run_id) && a.arrivalStatus === "late";
+  const label = arrivalStatusLabel(a.arrivalStatus);
+  const qualifier = lateExcused ? arrivalPillFor(ds.id, a.run_id, "late", "sm")
+    : (label && label !== "On time" ? `<span style="white-space:nowrap;">(${escHtml(label)})</span>` : "");
+  const period = a.slot ? `<div class="sla-files-go" data-latest-arrival-period style="color:var(--ink-muted); font-size:12px; margin-top:4px; line-height:1.4;">${escHtml(forPeriodWords(a.slot))}</div>` : "";
+  return `<div class="sla-tile"><div class="k">Latest arrival</div>`
+    + `<div class="v" style="font-size:14px;" title="When we received this supply" data-latest-arrival>`
+    + `${escHtml(fmtArrival(a))} <span title="${ARRIVAL_FOLLOWS_FILING}">${qualifier}</span></div>${period}</div>`;
+}
 function latestArrivalWords(ds){
   const a = ds && ds.lastArrival;
   if(!a) return "—";
@@ -1711,7 +1730,7 @@ function slaTileHtml(d, dateStr){
   // tile.
   const filesGo = d && d.periodSlots && d.periodSlots.filesGo;
   const goes = filesGo
-    ? `<div class="sla-files-go" data-files-go style="color:var(--ink-faint); font-size:12px; margin-top:4px; line-height:1.4;">${escHtml(filesGo)}</div>` : "";
+    ? `<div class="sla-files-go" data-files-go style="color:var(--ink-muted); font-size:12px; margin-top:4px; line-height:1.4;">${escHtml(filesGo)}</div>` : "";
   return `<div class="sla-tile"><div class="k">SLA</div><div class="v" style="font-size:14px;">${escHtml(value)}</div>${why}${goes}</div>`;
 }
 // A PERMISSIVE FALLBACK FAILS IN THE DANGEROUS DIRECTION, and this one
@@ -3351,7 +3370,17 @@ function clipDatasetToInPlaceOn(d, inPlaceOnDateStr){
   // missing what the live one had. CLAUDE.md's own shape-change rule
   // names this exact failure: an allowlist drops new fields, a spread
   // carries them by default.
-  const lastArrival = arrival
+  // THE NEWEST RECEIPT, never the newest-recorded run (critics on
+  // REQ-DASH-326, H3): a correction re-checks an old supply as the latest
+  // run, and 'Latest arrival' then named a supply from years before.
+  const newest = eligibleRuns.reduce((best, r)=>{
+    const a = arrivalByRun[r.run_id];
+    if(!a || !a.arrivedAt) return best;
+    return !best || Date.parse(a.arrivedAt) > Date.parse(best.a.arrivedAt) ? {r, a} : best;
+  }, null);
+  const lastArrival = newest
+    ? {...newest.a, run_date: newest.r.run_date, run_id: newest.r.run_id}
+    : arrival
     ? {...arrival, run_date: eligibleRuns[eligibleRuns.length-1].run_date,
        run_id: eligibleRuns[eligibleRuns.length-1].run_id}
     : d.lastArrival;
@@ -8907,9 +8936,14 @@ function renderSupplyHistorySection(ds, cycles, currentCycleStart){
   const isCurrent = c => currentCycleStart!=null && c.cycleStart===currentCycleStart;
   // THE RECEIPT DAY OF A BLOCK'S FIRST SUPPLY on the asset's clock
   // (REQ-DASH-326 criterion 1): entries are newest first.
+  // NEVER A RECEIPT STILL TO COME (UX critic H1, 2026-10-30): the history
+  // is unclipped (plans/road-testing.md #19), so a current cycle viewed
+  // inside its claim window can hold a supply received later - its heading
+  // then says what was true on the date on show, open for files.
   const firstReceivedOf = c => {
     const e = c.entries[c.entries.length - 1];
-    return e ? (e.arrivedAt ? assetDateStrOf(e.arrivedAt) : e.run_date) : null;
+    const day = e ? (e.arrivedAt ? assetDateStrOf(e.arrivedAt) : e.run_date) : null;
+    return day && CURRENT_IN_PLACE_ON && day > CURRENT_IN_PLACE_ON ? null : day;
   };
   const CURRENT_TAG = '<span class="pill tag sm"><span class="ico"></span>Current cycle</span>';
   // A PERIOD OWED NOTHING IS A LABEL-ONLY BLOCK (REQ-DASH-182 criterion 12):
@@ -9011,8 +9045,8 @@ function wireSupplyHistorySection(container){
    acknowledgements; this page takes the newest entry on or before the date
    with the same lookup the standing-in qualifier uses (newestOnOrBefore).
 */
-const COMPOSITION_KINDS = ["notsupplied", "substituted", "inherited", "promoted", "notowed"];
-const COMPOSITION_WORD = {notsupplied:"Not supplied", substituted:"Substituted",
+const COMPOSITION_KINDS = ["notsupplied", "open", "substituted", "inherited", "promoted", "notowed"];
+const COMPOSITION_WORD = {notsupplied:"Not supplied", open:"Open for files", substituted:"Substituted",
   inherited:"Inherited", promoted:"Promoted", notowed:"Not owed"};
 const HELD_KINDS = new Set(["promoted", "substituted", "inherited"]);
 
@@ -9103,16 +9137,28 @@ function compositionRow(raw, period, dateStr){
   if(periodDate && ((firstDate && periodDate < firstDate) || (!firstDate && owesFrom && periodDate < owesFrom))){
     return {kind: "notowed", word: "Not owed yet", label: notOwedYetText(owesFrom, raw)};
   }
-  return {kind: "notsupplied", word: notSuppliedWord(raw, period, dateStr)};
+  // OPEN FOR FILES UNTIL DUE (UX critic M5 on REQ-DASH-326, criterion 5):
+  // an empty slot whose due instant has not passed is not 'Not supplied'.
+  const word = notSuppliedWord(raw, period, dateStr);
+  const slot = raw ? slotNamed(raw.id, period) : null;
+  if(slot && slot.owed !== false && slot.due && word !== "Waiting" && word !== "Accepted"
+     && !duePassedOn(slot, dateStr)){
+    return {kind: "open", word: `due ${fmtInstant(slot.due)}`};
+  }
+  return {kind: "notsupplied", word};
 }
 function compositionCells(ag, col, row){
   if(!HELD_KINDS.has(row.kind)){
     // ITS WORD ONCE (post-build-review #204 F3): a not-owed label already
     // starts with its own word, which may be the group's.
     let label = row.kind === "notowed" ? row.label : row.word;
-    const lead = `${COMPOSITION_WORD[row.kind]} — `;
+    // 'Not owed yet' LEADS ITS OWN ROW (UX critic M4): never 'Not owed — Not
+    // owed yet — owes from ...'.
+    const word = row.kind === "notowed" && row.word === "Not owed yet" ? "Not owed yet"
+      : COMPOSITION_WORD[row.kind];
+    const lead = `${word} — `;
     if(label.startsWith(lead)) label = label.slice(lead.length);
-    return `<td><b>${COMPOSITION_WORD[row.kind]}</b> <span style="color:var(--ink-faint);">— ${escHtml(label)}</span></td>
+    return `<td><b>${word}</b> <span style="color:var(--ink-faint);">— ${escHtml(label)}</span></td>
       <td></td><td></td><td></td><td></td><td></td><td></td>`;
   }
   const e = row.entry;
@@ -9182,7 +9228,7 @@ function compositionHtml(ag, col, period, dateStr){
   return head + `<p data-composition-count>${escHtml(count)}</p>${nothing}
     <div class="overflow-x" data-testid="period-composition">
     <table class="dataset-table static-rows">
-      <caption>${escHtml(title)} — ${escHtml(sub.charAt(0).toLowerCase() + sub.slice(1))}</caption>
+      <caption class="sr-only">${escHtml(title)} — ${escHtml(sub.charAt(0).toLowerCase() + sub.slice(1))}</caption>
       <thead><tr><th>Dataset</th><th>Holds</th><th>Received</th><th>Decided</th><th>Who decided</th><th>Reason</th><th>Status when promoted</th><th>Acknowledgement</th></tr></thead>
       <tbody>${rows.map(({ds, row})=>{
         const nav = {tier:"dataset", agencyId: ag.id, collectionId: col.id, datasetId: ds.id};
@@ -9447,7 +9493,7 @@ function renderDataset(view, agencyId, collectionId, datasetId){
       <div class="sla-tile"><div class="k">Waiting since</div><div class="v mono" title="When we received the supply that is waiting for a person">${ds.blocked.openedAt ? fmtInstant(ds.blocked.openedAt) : "—"} (${escHtml(blockerLabel(ds.blocked))})</div></div>
       <div class="sla-tile"><div class="k">Delivery format</div><div class="v" style="font-size:14px;">${ds.deliveryFormat}</div></div>
       <div class="sla-tile"><div class="k">Rows, latest run</div><div class="v mono">—</div></div>` : `
-      <div class="sla-tile"><div class="k">Latest arrival</div><div class="v mono" title="Earliest extract in the latest run" data-latest-arrival>${escHtml(latestArrivalWords(ds))} <span title="${ARRIVAL_FOLLOWS_FILING}">${excuseInForce(ds.id, ds.lastArrival.run_id) && ds.lastArrival.arrivalStatus==="late" ? arrivalPillFor(ds.id, ds.lastArrival.run_id, "late", "sm") : (ds.lastArrival.arrivalStatus!=="onTime" ? "("+arrivalStatusLabel(ds.lastArrival.arrivalStatus)+")" : "")}</span></div></div>
+      ${latestArrivalTileHtml(ds)}
       <div class="sla-tile"><div class="k">Delivery format</div><div class="v" style="font-size:14px;">${ds.deliveryFormat}</div></div>
       <div class="sla-tile"><div class="k">Rows, latest run</div><div class="v mono">${fmtInt(ds.rowCount)} <span style="font-size:11.5px; color:${rowDelta>=0?'var(--good)':'var(--bad)'};">(${rowDelta>=0?'+':''}${fmtInt(rowDelta)})</span></div></div>`}
     </div>

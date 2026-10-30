@@ -254,7 +254,10 @@ class TestCriticFindingsOn193:
                                 "acknowledged": fd.consequences(conn, request).key or None})
         fd.apply(request, effective_at=_at(day + timedelta(days=1), "09:00").isoformat(),
                  conn=conn)
-        assert filing_tui.arrived(p.pair) == f"{day} 13:45"
+        from qa_tools.common import display_time
+
+        # The later file's receipt, on the asset's clock (CLI UX critic H1).
+        assert filing_tui.arrived(p.pair) == display_time.format_instant(_at(day, "13:45"))
 
     def test_a_filename_is_never_cut_in_the_summary(self):
         from io import StringIO
