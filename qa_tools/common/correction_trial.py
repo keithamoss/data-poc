@@ -283,7 +283,8 @@ def _turned_off_by(agr, dataset_id: str, period: str | None, slots_before) -> st
     slot = next((s for s in slots_before if s.name == period), None)
     if slot is None:
         return None
-    standing = agr.standing_on(dataset_id, slot.date)
+    # ON THE ROUND'S DATE (REQ-PIPE-179 criterion 8 as REQ-PIPE-321 amends it).
+    standing = agr.standing_on(dataset_id, slot.round_date)
     if standing.state != agreement.TURNED_OFF:
         return None
     return (standing.turned_off.reason if standing.turned_off else "") or "turned off"
@@ -695,12 +696,13 @@ def in_force(dataset_id: str, on: date, agreement=None) -> InForce:
     else:
         owes = "every period"
     upcoming = [s for s in slots.slots_for_dataset(dataset_id, until=on + timedelta(days=400),
-                                                   agreement=agreement) if s.date >= on]
+                                                   agreement=agreement) if s.round_date >= on]
     nxt = upcoming[0] if upcoming else None
     inputs = None
     if nxt is not None:
         try:
-            inputs, _ = verdict.resolved(dataset_id, nxt.date, agreement)
+            # THE ROUND the next slot is due on (REQ-PIPE-321 criterion 2).
+            inputs, _ = verdict.resolved(dataset_id, nxt.round_date, agreement)
         except Exception:  # noqa: BLE001 - shown as unresolvable, not fatal
             inputs = None
     skipped = tuple(sorted((entry.not_expected or {}).items())) if entry else ()

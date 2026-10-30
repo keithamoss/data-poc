@@ -305,7 +305,7 @@ def _owed_earlier(conn, dataset_id: str, current_period: str, as_at, *,
     """
     from qa_tools.common import slots as slots_mod
 
-    current_date = schedule.date_of(current_period, dataset_id)
+    current_date = schedule.round_of(current_period, dataset_id)  # by round (REQ-PIPE-321 c2)
     try:
         own = slots_mod.slots_for_dataset(
             dataset_id, until=slots_mod.claimable_until(dataset_id, as_at.date()))
@@ -313,7 +313,7 @@ def _owed_earlier(conn, dataset_id: str, current_period: str, as_at, *,
         return [], []
     gap, dealt = [], []
     for slot in own:
-        when = slot.period.date
+        when = slot.round_date
         if current_date is None or when >= current_date:
             continue
         if after_date is not None and when <= after_date:

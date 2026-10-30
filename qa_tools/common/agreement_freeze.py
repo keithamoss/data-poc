@@ -679,7 +679,12 @@ def _flipped(item: Item, before, after, old_agr, new_agr) -> list[tuple[str, str
                 # EVERY ONE, not the first (post-build-review #190 D7): the
                 # first is the freeze, and the refusal names each that has
                 # opened by the time the change was introduced.
-                out.append((ds, p.name, opens))
+                # NAMED BY THE PERIOD THE ROUND FILLS (REQ-PIPE-179 criterion 11
+                # as REQ-PIPE-321 amends it), not the round's own name.
+                from qa_tools.common import schedule as schedule_mod
+
+                filled = schedule_mod.period_filled_by(ds, p, new_agr)
+                out.append((ds, filled.name if filled is not None else p.name, opens))
     return out
 
 

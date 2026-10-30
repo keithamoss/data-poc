@@ -20,10 +20,15 @@ from generator import scenario_injection as si
 
 @dataclass(frozen=True)
 class _Period:
-    """The two fields resolve() reads off a real schedule.Period."""
+    """The fields resolve() reads off a real schedule.Period."""
 
     name: str
     date: date
+
+    @property
+    def round_date(self) -> date:
+        """A period at files_go_to_period 0 is its own round (REQ-PIPE-321)."""
+        return self.date
 
 
 def _daily(n: int, start: date = date(2026, 8, 24)) -> list[_Period]:
@@ -794,9 +799,11 @@ class TestTheChildProtectionPairsArePlacedAsDecided:
         [found] = [i for i in si.INJECTIONS if i.scenario_id == sid]
         return found
 
+    # Each named by the period its round's files fill (REQ-GEN-325): the
+    # rounds are those of 2019-Q4 and 2020-Q4, as before.
     @pytest.mark.parametrize("sid,period,lead,follow", [
-        ("TS-42a", "2019-Q4", "2019-Q3", "2020-Q1"),
-        ("TS-80", "2020-Q4", "2020-Q3", "2021-Q1")])
+        ("TS-42a", "2020-Q1", "2019-Q4", "2020-Q2"),
+        ("TS-80", "2021-Q1", "2020-Q4", "2021-Q2")])
     def test_it_lands_in_its_grown_quarter(self, sid, period, lead, follow):
         from generator.collections import child_protection as cp
 

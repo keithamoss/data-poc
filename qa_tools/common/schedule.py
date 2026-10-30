@@ -1000,3 +1000,19 @@ def round_of(period_name: str, dataset_id: str, agreement=None) -> date | None:
         if index - i > 12:
             break
     return None
+
+
+def period_filled_by(dataset_id: str, round_period: Period, agreement=None) -> Period | None:
+    """The period a ROUND's files fill for this dataset - the round's own at
+    files_go_to_period 0, the period N on at N (REQ-PIPE-321 criterion 1) - or
+    None where the calendar gives that period no date (criterion 8). The one
+    place a round is turned into the name a person reads."""
+    agr = _agreement(agreement)
+    n = agr.files_go_to_period_for(dataset_id, round_period.date) or 0
+    if n == 0:
+        return round_period
+    sequence = periods_for_calendar(calendar_for_dataset(dataset_id, agr).name, agreement=agr)
+    index = next((i for i, p in enumerate(sequence) if p.name == round_period.name), None)
+    if index is None or index + n >= len(sequence):
+        return None
+    return sequence[index + n]

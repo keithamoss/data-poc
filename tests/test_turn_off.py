@@ -10,7 +10,7 @@ broken in ONE way against a copy of the real configuration.
 
 Child Protection is quarterly - periods dated 1 February, May, August and
 November - and takes its due time and grace from the collection, so a turn
-off at 31 March 2025 leaves 2025-Q1 (1 February) owed and 2025-Q2 (1 May)
+off at 31 March 2025 leaves 2025-Q2 (1 February) owed and 2025-Q3 (1 May)
 owing nothing.
 """
 from __future__ import annotations
@@ -141,8 +141,8 @@ class TestADatasetTurnedOff:
         _back_on(doc, "cp-clients", "2026-01-01")
         names = [p.period.name for p in
                  schedule.periods_for_dataset("cp-clients", agreement=agreement.from_doc(doc))]
-        assert "2025-Q1" in names and "2026-Q1" in names
-        assert not {"2025-Q2", "2025-Q3", "2025-Q4"} & set(names)
+        assert "2025-Q2" in names and "2026-Q2" in names
+        assert not {"2025-Q3", "2025-Q4", "2026-Q1"} & set(names)
 
 
 class TestACollectionTurnedOff:
@@ -348,18 +348,18 @@ class TestNotExpectedInsideAGap:
         def mutate(doc):
             _turn_off(_versions(doc, "cp-clients")[0])
             next(d for d in doc["datasets"] if d["id"] == "cp-clients")["not_expected"] = [
-                {"period": "2025-Q3", "reason": "no file"}]
+                {"period": "2025-Q4", "reason": "no file"}]
         got = _text(broken(mutate))
-        assert "2025-Q3" in got and "not_expected" in got and "supplier paused" in got
+        assert "2025-Q4" in got and "not_expected" in got and "supplier paused" in got
         assert "for good" in got
 
     def test_its_collections_gap(self, broken):
         def mutate(doc):
             _turn_off(_defaults_version(doc), reason="whole collection paused")
             next(d for d in doc["datasets"] if d["id"] == "cp-clients")["not_expected"] = [
-                {"period": "2025-Q3", "reason": "no file"}]
+                {"period": "2025-Q4", "reason": "no file"}]
         got = _text(broken(mutate))
-        assert "2025-Q3" in got and "whole collection paused" in got
+        assert "2025-Q4" in got and "whole collection paused" in got
 
 
 # ---- slots, filing and holds (criteria 13-20, 22) ---------------------------
@@ -400,9 +400,9 @@ class TestTheLastOwedSlotBeforeAGap:
         agr = agreement.from_doc(_off_for_a_while())
         real = agreement.from_doc(_unshare(_doc()))
         [q1] = [s for s in slots.slots_for_dataset("cp-clients", agreement=agr)
-                if s.name == "2025-Q1"]
+                if s.name == "2025-Q2"]
         [real_q1] = [s for s in slots.slots_for_dataset("cp-clients", agreement=real)
-                     if s.name == "2025-Q1"]
+                     if s.name == "2025-Q2"]
         assert q1.closes_at == real_q1.closes_at
         assert q1.closes_at == _at("2025-05-01") - timedelta(days=14)
 
@@ -414,7 +414,7 @@ class TestTheLastOwedSlotBeforeAGap:
         _turn_off(_defaults_version(doc))
         agr = agreement.from_doc(doc)
         [q1] = [s for s in slots.slots_for_dataset("cp-clients", agreement=agr)
-                if s.name == "2025-Q1"]
+                if s.name == "2025-Q2"]
         assert q1.closes_at == _at("2025-05-01", "13:00") - timedelta(days=14)
 
 
@@ -430,13 +430,13 @@ class TestTheLastOwedSlotBeforeAGap:
         _turn_off(_versions(doc, "cp-clients")[0])
         agr = agreement.from_doc(doc)
         [q1] = [s for s in slots.slots_for_dataset("cp-clients", agreement=agr)
-                if s.name == "2025-Q1"]
+                if s.name == "2025-Q2"]
         assert q1.closes_at == _at("2025-05-01", "13:00") - timedelta(days=14)
 
 
     def test_the_claim_window_too(self):
         """The same, for a collection version widening the window inside the
-        gap: 2025-Q1 closes when 2025-Q2 would have opened under 20 days."""
+        gap: 2025-Q2 closes when 2025-Q3 would have opened under 20 days."""
         doc = _unshare(_doc())
         first = _defaults_version(doc)
         _collection(doc)["participation_defaults"]["versions"].append(
@@ -445,7 +445,7 @@ class TestTheLastOwedSlotBeforeAGap:
         _turn_off(_versions(doc, "cp-clients")[0])
         agr = agreement.from_doc(doc)
         [q1] = [s for s in slots.slots_for_dataset("cp-clients", agreement=agr)
-                if s.name == "2025-Q1"]
+                if s.name == "2025-Q2"]
         assert q1.closes_at == _at("2025-05-01") - timedelta(days=20)
 
 
@@ -453,10 +453,10 @@ class TestWhatAReceiptFallsIn:
     """Criteria 15, 16 and 17."""
 
     def test_an_owed_slot_still_open_takes_it_whatever_the_date(self):
-        """Criterion 15: turned off on 10 April, and 2025-Q1 still open."""
+        """Criterion 15: turned off on 10 April, and 2025-Q2 still open."""
         agr = agreement.from_doc(_off_for_a_while())
         got = turned_off.label_at("cp-clients", _at("2025-04-10"), agr)
-        assert got.covered_by == "2025-Q1" and got.label == turned_off.PLAIN
+        assert got.covered_by == "2025-Q2" and got.label == turned_off.PLAIN
 
     def test_once_it_closes_the_supply_is_held_as_turned_off(self):
         agr = agreement.from_doc(_off_for_a_while())
@@ -470,13 +470,13 @@ class TestWhatAReceiptFallsIn:
         doc = _unshare(_doc())
         _turn_off(_versions(doc, "cp-clients")[0])
         agr = agreement.from_doc(doc)
-        assert turned_off.final_period("cp-clients", agr) == "2025-Q1"
+        assert turned_off.final_period("cp-clients", agr) == "2025-Q2"
         assert turned_off.label_at("cp-clients", _at("2025-06-01"), agr).label \
             == turned_off.TURNED_OFF
 
     def test_back_on_its_owed_slot_takes_it(self):
         agr = agreement.from_doc(_off_for_a_while())
-        assert turned_off.label_at("cp-clients", _at("2026-01-25"), agr).covered_by == "2026-Q1"
+        assert turned_off.label_at("cp-clients", _at("2026-01-25"), agr).covered_by == "2026-Q2"
 
     def test_the_real_configuration_holds_nothing_as_turned_off(self):
         assert turned_off.gap_at("cp-clients", _at("2025-06-01")) is None
@@ -489,9 +489,9 @@ class TestATurnedOffPeriodIsNotParticipated:
         from qa_tools.common import inheritance
 
         using(_off_for_a_while())
-        skipped, why = inheritance._does_not_participate("cp-clients", "2025-Q3")
+        skipped, why = inheritance._does_not_participate("cp-clients", "2025-Q4")
         assert skipped and "turned off" in why and "supplier paused" in why
-        assert inheritance._does_not_participate("cp-clients", "2026-Q1") == (False, "")
+        assert inheritance._does_not_participate("cp-clients", "2026-Q2") == (False, "")
 
 
 class TestNothingIsPlacedIntoAGap:
@@ -502,7 +502,7 @@ class TestNothingIsPlacedIntoAGap:
         from qa_tools.common import placing
 
         using(_off_for_a_while())
-        why = placing.period_problem("cp-clients", "2025-Q3")
+        why = placing.period_problem("cp-clients", "2025-Q4")
         assert "turned off" in why and "supplier paused" in why
         assert "effective_to" in why and "contract/calendar.yaml" in why
         assert "does not participate" not in why
@@ -511,14 +511,14 @@ class TestNothingIsPlacedIntoAGap:
         from qa_tools.common import placing
 
         using(_off_for_a_while())
-        assert placing.period_problem("cp-clients", "2026-Q1") is None
+        assert placing.period_problem("cp-clients", "2026-Q2") is None
 
     def test_refiling_gives_the_same_refusal(self, using):
         from qa_tools.common import refiling
 
         using(_off_for_a_while())
-        why = refiling.gap_problem("cp-clients", "2025-Q3")
-        assert why == turned_off.refusal("cp-clients", "2025-Q3")
+        why = refiling.gap_problem("cp-clients", "2025-Q4")
+        assert why == turned_off.refusal("cp-clients", "2025-Q4")
         assert "supplier paused" in why
 
 
@@ -618,7 +618,7 @@ class TestTheLabelIsReadFromConfigurationNow:
         using(_unshare(_doc()))
         held = supply_holds.hold_on(conn, "cp-clients", "cp-clients@to5")
         assert not held.turned_off
-        assert held.label.covered_by == "2025-Q2"
+        assert held.label.covered_by == "2025-Q3"
         assert held.reason["turned_off"]["reason"] == "supplier paused", "history stays"
 
 
@@ -634,8 +634,8 @@ class TestCoveredHoldsFileThemselves:
         assert schedule_ended.refile_covered(say=lambda line: None) == []
         using(_unshare(_doc()))
         done = schedule_ended.refile_covered(say=lambda line: None)
-        assert ("cp-clients", "cp-clients@to6", "2025-Q2") in done
-        assert filing.filing_for("cp-clients", "cp-clients@to6")["slot"] == "2025-Q2"
+        assert ("cp-clients", "cp-clients@to6", "2025-Q3") in done
+        assert filing.filing_for("cp-clients", "cp-clients@to6")["slot"] == "2025-Q3"
         assert supply_holds.hold_on(conn, "cp-clients", "cp-clients@to6") is None
 
 
@@ -673,7 +673,7 @@ def _findings_text(found):
 
 class TestATurnOffFreezesWhenItsPeriodsDo:
     def test_turning_off_from_a_period_not_yet_open_is_an_ordinary_edit(self):
-        """2027-Q1's window opens 18 January 2027 - nothing it flips has
+        """2027-Q2's window opens 18 January 2027 - nothing it flips has
         started to matter."""
         assert _freeze_check(_load("calendar.yaml"), lambda doc: _turn_off(
             _clients_version(doc), to="2026-12-31")) == []
@@ -683,7 +683,7 @@ class TestATurnOffFreezesWhenItsPeriodsDo:
                               lambda doc: _turn_off(_clients_version(doc)))
         got = _findings_text(found)
         assert CLIENTS_KEY in got
-        assert "cp-clients 2025-Q2" in got and "2025-04-17T09:00" in got
+        assert "cp-clients 2025-Q3" in got and "2025-04-17T09:00" in got
         assert "\n  mothman schedule draft-correction" in got
         assert "mark-not-supplied" in got
 
@@ -760,8 +760,11 @@ class TestRunway:
         from qa_tools.common import runway
 
         doc = _unshare(_doc())
+        # Back on from the August 2027 round: its files fill 2027-Q4, and the
+        # November round's would fill 2028-Q1, which the calendar gives no date
+        # (REQ-PIPE-321 criterion 8) - so one slot is owed once back on.
         _turn_off(_versions(doc, "cp-clients")[0], to="2026-10-31")
-        _back_on(doc, "cp-clients", "2027-10-15")
+        _back_on(doc, "cp-clients", "2027-07-15")
         using(doc)
         assert not runway.off_for_good("cp-clients", date(2026, 10, 14))
         got = runway.calendar_runway("quarterly", date(2026, 10, 14))
@@ -783,14 +786,14 @@ class TestTheOverlapGate:
         assert self._overlaps() == []
 
     def test_the_first_owed_slot_after_a_gap_is_checked_against_the_last_before(self):
-        """Back on with a 300-day window, 2026-Q1 opens 7 April 2025 -
-        before 2025-Q1 closes on 17 April."""
+        """Back on with a 300-day window, 2026-Q2 opens 7 April 2025 -
+        before 2025-Q2 closes on 17 April."""
         found = self._overlaps(claim_window="300d")
         pairs = {(o.earlier, o.later) for o in found}
-        assert ("2025-Q1", "2026-Q1") in pairs
-        assert not any(o.earlier in ("2025-Q2", "2025-Q3", "2025-Q4") for o in found), \
+        assert ("2025-Q2", "2026-Q2") in pairs
+        assert not any(o.earlier in ("2025-Q3", "2025-Q4", "2026-Q1") for o in found), \
             "a pair inside one gap is skipped"
-        [o] = [o for o in found if o.later == "2026-Q1"]
+        [o] = [o for o in found if o.later == "2026-Q2"]
         assert o.on_time_until == _at("2025-05-01") - timedelta(days=14)
 
 
@@ -875,14 +878,14 @@ class TestNotAStateNeedingAPerson:
                     agency_id="child-protection-family-support", collection_id="child-protection",
                     dataset_id="cp-clients", action=dl.REFILE, supply="cp-clients@tc5",
                     actor="schedule drain", actor_kind=dl.RULE,
-                    effective_at="2026-02-03T01:00:00+00:00", from_slot=None, to_slot="2026-Q1",
+                    effective_at="2026-02-03T01:00:00+00:00", from_slot=None, to_slot="2026-Q2",
                     reason="owed again")) as decision_id:
                 supply_holds.resolve(conn, dataset_id="cp-clients", supply_id="cp-clients@tc5",
                                      decision_id=decision_id)
         [b] = [b for b in dataset_blockers._holds(conn) if b.supply == "cp-clients@tc5"]
         ended = b.as_record()["ended"]
         assert ended["action"] == dl.REFILE and ended["actorKind"] == dl.RULE
-        assert ended["toPeriod"] == "2026-Q1" and ended["at"].startswith("2026-02-03")
+        assert ended["toPeriod"] == "2026-Q2" and ended["at"].startswith("2026-02-03")
 
     def test_an_open_one_has_no_ending(self, conn, using):
         from qa_tools.common import dataset_blockers
@@ -949,20 +952,20 @@ class TestScheduleShowSaysSo:
         said = "\n".join(v.turn_off)
         assert "Turned off after 31 Mar 2025 (supplier paused), set for Client Register, " \
                "until 1 Jan 2026." in said
-        assert "Owes nothing in 2025-Q2 to 2025-Q4." in said
+        assert "Owes nothing in 2025-Q3 to 2026-Q1." in said
         assert "declared correction" in said
 
     def test_still_owing_its_last_slot(self):
-        """2025-Q1's slot is open until 17 April - turned off on the date
+        """2025-Q2's slot is open until 17 April - turned off on the date
         asked about, and the slot still owed."""
         v = self._view(_off_for_a_while(), date(2025, 4, 10))
         assert v.headline is None
-        assert "Still owes 2025-Q1: its slot stays open until 17 Apr 2025 09:00." \
+        assert "Still owes 2025-Q2: its slot stays open until 17 Apr 2025 09:00." \
             in v.turn_off
 
     def test_turning_off_with_nothing_more_owed(self):
-        """Owing until 31 July; its last owed period, 2025-Q2, closed on 18
-        July when 2025-Q3's window would have opened."""
+        """Owing until 31 July; its last owed period, 2025-Q3, closed on 18
+        July when 2025-Q4's window would have opened."""
         doc = _unshare(_doc())
         _turn_off(_versions(doc, "cp-clients")[0], to="2025-07-31",
                   log=[{"date": "2025-07-01", "author": "a test", "change": "off",
@@ -1014,11 +1017,11 @@ class TestTheBuildCarriesIt:
                         "versionFrom": "2023-01-01", "authoredOn": "2026-10-14",
                         "authoredBy": "changelog", "collection": "Child Protection"}]
         # THE LAST OWED SLOT BEFORE THE GAP (REQ-DASH-180 criteria 4, 16 and
-        # 25): 2025-Q1, closing when 2025-Q2's window would have opened.
-        assert last["period"] == "2025-Q1"
+        # 25): 2025-Q2, closing when 2025-Q3's window would have opened.
+        assert last["period"] == "2025-Q2"
         agr = agreement.from_doc(doc)
         slot = next(s for s in slots.slots_for_dataset("cp-clients", until=date(2025, 3, 31),
-                                                        agreement=agr) if s.name == "2025-Q1")
+                                                        agreement=agr) if s.name == "2025-Q2")
         assert last["dueAt"] == slot.due_at.isoformat()
         assert last["closesAt"] == slot.closes_at.isoformat()
 
@@ -1049,8 +1052,8 @@ class TestAnOwedPeriodStillCounts:
         states = {s.period for s in slot_state.states_for(conn, "child-protection",
                                                           now=_at("2025-09-01"))
                   if s.dataset_id == "cp-clients"}
-        assert "2025-Q1" in states
-        assert not {"2025-Q2", "2025-Q3", "2025-Q4"} & states
+        assert "2025-Q2" in states
+        assert not {"2025-Q3", "2025-Q4", "2026-Q1"} & states
 
 
 class TestCriticFindingsOn190:
@@ -1058,7 +1061,7 @@ class TestCriticFindingsOn190:
     before its fix."""
 
     def test_d1_a_turn_off_for_good_not_yet_started_still_warns(self, using):
-        """Off for good after 2028-12-31, but the calendar ends at 2027-Q4:
+        """Off for good after 2028-12-31, but the calendar ends at 2028-Q1:
         on 1 March 2028 its schedule has ended and it still owes - so it is
         exhausted, not quiet."""
         from qa_tools.common import runway
@@ -1185,16 +1188,16 @@ class TestCriticFindingsOn190:
 
     def test_d7_every_flipped_period_already_open_is_named(self):
         """Off after 31 March 2025, introduced 14 October 2026: every
-        quarter from 2025-Q2 to 2026-Q3 had opened, and each is named. A
+        quarter from 2025-Q3 to 2026-Q4 had opened, and each is named. A
         quarter whose window opens after the change was introduced is not."""
         got = _findings_text(_freeze_check(_load("calendar.yaml"),
                                            lambda doc: _turn_off(_clients_version(doc))))
-        for period in ("2025-Q2", "2025-Q3", "2025-Q4", "2026-Q1", "2026-Q2", "2026-Q3"):
+        for period in ("2025-Q3", "2025-Q4", "2026-Q1", "2026-Q2", "2026-Q3", "2026-Q4"):
             assert f"cp-clients {period}," in got, period
-        assert "cp-clients 2027-Q1" not in got
+        assert "cp-clients 2027-Q2" not in got
 
     def test_d9a_a_slot_still_open_is_not_called_nothing_owed(self):
-        """10 April 2025: turned off, but 2025-Q1's slot is open until 17
+        """10 April 2025: turned off, but 2025-Q2's slot is open until 17
         April - so 'Owes' must not read 'nothing', nor the timing 'when last
         on'."""
         from qa_tools.common import participation_view

@@ -36,18 +36,27 @@ def for_dataset(dataset_id: str, until: date, agreement=None) -> list[dict]:
     skipped = schedule.not_expected_periods(dataset_id, agr)
     own_dates = schedule.dataset_dates_override(dataset_id, agr) is not None
     out: list[dict] = []
-    for period in slots._calendar_periods(dataset_id, until, agr):
-        if period.date > until or (begins is not None and period.date < begins):
+    # EACH ROUND, DECIDED ON THE ROUND'S OWN DATE, NAMED BY THE PERIOD ITS
+    # FILES WOULD FILL (REQ-PIPE-321 criteria 6 and 13; REQ-DASH-182 criterion
+    # 2 as amended): at files_go_to_period N the row is the period N on.
+    sequence = slots._calendar_periods(dataset_id, until, agr)
+    index = {p.name: i for i, p in enumerate(sequence)}
+    for rnd in sequence:
+        if rnd.date > until or (begins is not None and rnd.date < begins):
             continue
+        j = index[rnd.name] + (agr.files_go_to_period_for(dataset_id, rnd.date) or 0)
+        if j >= len(sequence):
+            continue
+        period = sequence[j]
         row = {"period": period.name, "date": period.date.isoformat()}
-        standing = agr.standing_on(dataset_id, period.date)
+        standing = agr.standing_on(dataset_id, rnd.date)
         if standing.state == agreement_mod.TURNED_OFF:
             out.append({**row, "kind": TURNED_OFF, "reason": standing.turned_off.reason,
                         "months": None})
             continue
-        months = None if own_dates else schedule.delivery_months(dataset_id, period.date, agr)
-        if months is not None and period.date.month not in months:
-            version = agr.participation_on(dataset_id, period.date)
+        months = None if own_dates else schedule.delivery_months(dataset_id, rnd.date, agr)
+        if months is not None and rnd.date.month not in months:
+            version = agr.participation_on(dataset_id, rnd.date)
             out.append({**row, "kind": PARTICIPATION, "reason": (version.reason or "").strip(),
                         "months": sorted(months)})
         elif period.name in skipped:

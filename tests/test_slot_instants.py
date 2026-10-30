@@ -67,12 +67,12 @@ class TestEachSlotTakesTheVersionInForceOnItsOwnDate:
             {"effective_from": "2025-06-01", "expected_time": "14:00", "grace": "1h"}])
 
     def test_a_slot_before_the_change_keeps_the_old_due_time_and_grace(self, two_eras):
-        slot = _slot("cp-clients", "2025-Q2", two_eras)  # 2025-05-01
+        slot = _slot("cp-clients", "2025-Q3", two_eras)  # 2025-05-01
         assert slot.due_at == _perth(2025, 5, 1, 9, 0)
         assert slot.grace == timedelta(hours=8)
 
     def test_a_slot_after_the_change_takes_the_new_one(self, two_eras):
-        slot = _slot("cp-clients", "2025-Q3", two_eras)  # 2025-08-01
+        slot = _slot("cp-clients", "2025-Q4", two_eras)  # 2025-08-01
         assert slot.due_at == _perth(2025, 8, 1, 14, 0)
         assert slot.grace == timedelta(hours=1)
 
@@ -89,15 +89,15 @@ class TestEachSlotTakesTheVersionInForceOnItsOwnDate:
                 new = after[name]
                 assert (new.due_at, new.grace, new.claim_opens_at) == \
                     (slot.due_at, slot.grace, slot.claim_opens_at), name
-                if name != "2025-Q2":
+                if name != "2025-Q3":
                     assert new.closes_at == slot.closes_at, name
 
     def test_a_claim_window_override_is_taken_on_the_periods_own_date(self, tmp_path):
         later_only = _with(tmp_path, versions=[
             {"effective_from": "2023-01-01"},
             {"effective_from": "2025-06-01", "claim_window": "2d"}])
-        old = _slot("cp-clients", "2025-Q2", later_only)
-        new = _slot("cp-clients", "2025-Q3", later_only)
+        old = _slot("cp-clients", "2025-Q3", later_only)
+        new = _slot("cp-clients", "2025-Q4", later_only)
         assert old.claim_opens_at == old.due_at - timedelta(days=14)
         assert new.claim_opens_at == new.due_at - timedelta(days=2)
 
@@ -110,7 +110,7 @@ class TestTheClosingInstantUsesTheNextPeriodsOwnInputs:
         two = _with(tmp_path, versions=[
             {"effective_from": "2023-01-01", "expected_time": "09:00"},
             {"effective_from": "2025-06-01", "expected_time": "14:00"}])
-        q2, q3 = _slot("cp-clients", "2025-Q2", two), _slot("cp-clients", "2025-Q3", two)
+        q2, q3 = _slot("cp-clients", "2025-Q3", two), _slot("cp-clients", "2025-Q4", two)
         assert q2.closes_at == q3.claim_opens_at
         assert q3.claim_opens_at == _perth(2025, 8, 1, 14, 0) - timedelta(days=14)
 
@@ -123,16 +123,18 @@ class TestDaysBefore:
         return _with(tmp_path, first={"expected_time": "22:00", "days_before": 1})
 
     def test_the_due_instant_is_the_evening_before(self, evening_before):
-        slot = _slot("cp-clients", "2025-Q3", evening_before)  # period date 2025-08-01
+        slot = _slot("cp-clients", "2025-Q4", evening_before)  # period date 2025-08-01
         assert slot.due_at == _perth(2025, 7, 31, 22, 0)
 
     def test_the_claim_window_opens_from_the_earlier_due_instant(self, evening_before):
-        slot = _slot("cp-clients", "2025-Q3", evening_before)
+        slot = _slot("cp-clients", "2025-Q4", evening_before)
         assert slot.claim_opens_at == _perth(2025, 7, 31, 22, 0) - timedelta(days=14)
 
     def test_zero_unless_stated(self):
         slot = slots.slots_for_dataset("cp-clients")[0]
-        assert slot.due_at.date() == slot.date
+        # Due on the date of the ROUND it is due on (REQ-PIPE-113 criterion 1
+        # as REQ-PIPE-321 amends it), not the period it fills.
+        assert slot.due_at.date() == slot.round_date
 
     def test_widening_the_claim_window_never_moves_the_due_instant(self, tmp_path):
         """Criterion 6."""
@@ -164,7 +166,7 @@ class TestEveryHorizonReachesPastTheLargestDaysBefore:
         until = slots.claimable_until("cp-clients", arrived, ninety)
         found = [s.name for s in slots.slots_for_dataset("cp-clients", until=until,
                                                          agreement=ninety)]
-        assert "2025-Q3" in found
+        assert "2025-Q4" in found
 
     def test_the_overlap_horizon_adds_it(self, tmp_path, monkeypatch):
         ninety = _with(tmp_path, dataset_id="birth-registrations",
@@ -185,7 +187,7 @@ class TestOneImplementation:
             {"effective_from": "2023-01-01"},
             {"effective_from": "2025-06-01", "expected_time": "14:00", "days_before": 1}])
         for slot in slots.slots_for_dataset("cp-clients", agreement=two):
-            instants = slots.slot_instants("cp-clients", slot.date, two)
+            instants = slots.slot_instants("cp-clients", slot.round_date, two)
             assert (instants.due_at, instants.grace, instants.claim_opens_at) == \
                 (slot.due_at, slot.grace, slot.claim_opens_at)
 
@@ -227,14 +229,14 @@ class TestCriticFindingsOn113:
     def test_the_claim_reach_uses_the_widest_window_any_version_had(self, tmp_path):
         """A window narrowed later must not shrink the reach for history
         replayed under the wider one: a supply on 2023-07-05 is inside
-        2023-Q3's 30-day window (opened 2023-07-02) and must find it."""
+        2023-Q4's 30-day window (opened 2023-07-02) and must find it."""
         narrowed = _with(tmp_path, versions=[
             {"effective_from": "2023-01-01", "claim_window": "30d"},
             {"effective_from": "2025-01-01", "claim_window": "14d"}])
         until = slots.claimable_until("cp-clients", date(2023, 7, 5), narrowed)
         names = [s.name for s in slots.slots_for_dataset("cp-clients", until=until,
                                                          agreement=narrowed)]
-        assert "2023-Q3" in names
+        assert "2023-Q4" in names
 
     def test_a_sub_day_window_crossing_midnight_still_reaches_tomorrows_slot(self, tmp_path):
         """01:00 due with a 4-hour window opens at 21:00 the day before; a
@@ -270,7 +272,7 @@ class TestCriticFindingsOn113:
                 return v
             return dataclasses.replace(v, expected_time="02:30", days_before=28)
         monkeypatch.setattr(slots, "_participation_for", due_0230_days_before)
-        # The NON-OWED 2026-Q4 (2026-11-01), 28 days back, is due 2026-10-04 -
+        # The NON-OWED 2027-Q1 (2026-11-01), 28 days back, is due 2026-10-04 -
         # Sydney's spring-forward day, when 02:30 does not exist. The owed
         # February and August periods land on 4 January and 4 July: fine.
         errors = vs._daylight_saving_errors(vs.Source.default())
@@ -285,7 +287,7 @@ class TestAFollowingPeriodDataset:
 
     @pytest.fixture
     def early(self, tmp_path):
-        # Due sixty days before each period's date: 2025-Q3 (1 August) is
+        # Due sixty days before each period's date: 2025-Q4 (1 August) is
         # due 2 June, its window opening 19 May.
         return _with(tmp_path, first={"days_before": 60})
 
@@ -297,7 +299,7 @@ class TestAFollowingPeriodDataset:
         until = slots.claimable_until("cp-clients", arrived.date(), early)
         found = slots.slots_for_dataset("cp-clients", until=until, agreement=early)
         slot = assignment.open_slot(found, arrived)
-        assert slot is not None and slot.name == "2025-Q3"
+        assert slot is not None and slot.name == "2025-Q4"
         assert slot.claim_opens_at <= arrived < slot.due_at
 
     def test_its_slots_are_checked_for_overlap_like_any_other(self, early):
@@ -308,13 +310,13 @@ class TestAFollowingPeriodDataset:
 
     def test_a_version_change_that_moves_due_instants_most_of_a_period_is_checked(self, tmp_path):
         """Criterion 4's harder half: from 2025-06-01 the dataset is due 80
-        days early, so 2025-Q3's window opens before 2025-Q2 stops being on
+        days early, so 2025-Q4's window opens before 2025-Q3 stops being on
         time - an overlap the gate must name."""
         moved = _with(tmp_path, versions=[
             {"effective_from": "2023-01-01"},
             {"effective_from": "2025-06-01", "days_before": 80}])
         found = period_overlap.overlaps_for("cp-clients", agreement=moved)
-        assert any(o.later == "2025-Q3" for o in found), found
+        assert any(o.later == "2025-Q4" for o in found), found
 
     def test_participates_names_the_calendar_dates_month(self, tmp_path):
         """Criterion 6: February's period is owed in February's name even
@@ -322,7 +324,9 @@ class TestAFollowingPeriodDataset:
         due_early = _with(tmp_path, dataset_id="cp-case-workers",
                           first={"days_before": 60})
         periods = schedule.periods_for_dataset("cp-case-workers", agreement=due_early)
-        assert {p.date.month for p in periods} == {2, 8}
+        # The rounds' months (REQ-PIPE-321 criterion 6), whatever period
+        # their files fill.
+        assert {p.round_date.month for p in periods} == {2, 8}
         q1 = next(s for s in slots.slots_for_dataset("cp-case-workers", agreement=due_early)
-                  if s.name == "2026-Q1")
+                  if s.name == "2026-Q2")
         assert q1.due_at.month == 12

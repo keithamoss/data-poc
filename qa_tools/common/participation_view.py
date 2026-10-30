@@ -96,7 +96,7 @@ def _turn_off_lines(dataset_id: str, on: date,
         owed = slots.slots_for_dataset(dataset_id, until=turn.effective_to, agreement=agr)
     except Exception:  # noqa: BLE001 - a schedule that cannot be built shows nothing owed
         owed = []
-    still = [s for s in owed if s.date <= turn.effective_to
+    still = [s for s in owed if s.round_date <= turn.effective_to
              and (s.closes_at is None or s.closes_at > start)]
     for s in still:
         lines.append(f"Still owes {s.name}: its slot stays open until "
@@ -107,8 +107,17 @@ def _turn_off_lines(dataset_id: str, on: date,
                                            + _ONE_DAY * 400, agr)
     except Exception:  # noqa: BLE001
         sequence = []
-    gap = [p for p in sequence if p.date > turn.effective_to
-           and (turn.until is None or p.date < turn.until)]
+    # THE ROUNDS IN THE GAP, NAMED BY THE PERIODS THEY WOULD FILL
+    # (REQ-PIPE-321 criterion 13): at files_go_to_period N each round's files
+    # go N periods on.
+    index = {p.name: i for i, p in enumerate(sequence)}
+    gap, gap_rounds = [], []
+    for p in sequence:
+        if p.date > turn.effective_to and (turn.until is None or p.date < turn.until):
+            j = index[p.name] + (agr.files_go_to_period_for(dataset_id, p.date) or 0)
+            if j < len(sequence):
+                gap.append(sequence[j])
+                gap_rounds.append(p)
     if gap and turn.until is not None:
         lines.append(f"Owes nothing in {gap[0].name} to {gap[-1].name}." if len(gap) > 1
                      else f"Owes nothing in {gap[0].name}.")
@@ -118,7 +127,8 @@ def _turn_off_lines(dataset_id: str, on: date,
         lines.append("Owes nothing after it - the turn-off is permanent."
                      if turn.until is None else "")
     if gap:
-        opens = agreement_freeze._claim_open(dataset_id, gap[0].date, agr)
+        # The claim window of the gap's first ROUND (REQ-PIPE-179 criterion 11).
+        opens = agreement_freeze._claim_open(dataset_id, gap_rounds[0].date, agr)
         if opens is not None:
             when = asset_time.localise(opens).strftime('%-d %b %Y %H:%M')
             # REQ-PIPE-179 c28 as amended by Keith, 2026-10-15 (morning report

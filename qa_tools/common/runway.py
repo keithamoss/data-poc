@@ -146,7 +146,12 @@ def calendar_runway(calendar_name: str, as_of: date) -> CalendarRunway:
             # those it owes once back on are counted.
             continue
         owed = [p for p in schedule.periods_for_dataset(dataset_id) if p.expected]
-        entry = (len([p for p in owed if p.date > as_of]), dataset_id, owed[-1] if owed else None)
+        # COUNTED IN SLOTS STILL TO COME DUE, BY THE ROUND EACH IS DUE ON
+        # (REQ-PIPE-321 criterion 8; post-build-review #142 item 5): at
+        # files_go_to_period N a dataset reads N slots shorter than its
+        # calendar's last date suggests.
+        entry = (len([p for p in owed if p.round_date > as_of]), dataset_id,
+                 owed[-1] if owed else None)
         # AN AUTHORED FOR-GOOD TURN-OFF STOPS DRIVING THE MINIMUM too
         # (post-build-review #199 F7, Keith 2026-10-15): it has the fewest
         # dates left by construction and would hide a sibling that is also

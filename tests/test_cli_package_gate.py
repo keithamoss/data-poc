@@ -132,7 +132,7 @@ def part_checked(sc):
 
 
 def cascade(sc):
-    """A could-not-check cascade into 2024-Q4, which holds Case Workers,
+    """A could-not-check cascade into 2025-Q1, which holds Case Workers,
     Notifications and Investigations only: Carers v2 red on its own data;
     Placements v2 cannot check Carers (none in the warehouse) and is held
     back by it; Clients v2's Placements check read the not-promoting
@@ -638,7 +638,7 @@ class TestTryLater:
     def test_a_persons_decision_refused_while_a_gate_runs_exits_75(
             self, private_supply_dsn, person):
         """A table-moving decision while a gate application holds the period:
-        'A gate is running for 2024-Q3. Nothing was changed. Try again in a
+        'A gate is running for 2024-Q4. Nothing was changed. Try again in a
         moment.', exit 75."""
         from cli.supply import supply_group
         from qa_tools.common import gate, qa_store, supply_db
@@ -650,7 +650,7 @@ class TestTryLater:
                 "decide", "--operation", "promote", "--dataset", "cp-clients", "--period",
                 Q3, "--supply", "cp-clients@202408050900000800", "--reason", "t", "--yes"])
         assert code == 75, out
-        assert "A gate is running for 2024-Q3. Nothing was changed. Try again in a moment." \
+        assert "A gate is running for 2024-Q4. Nothing was changed. Try again in a moment." \
             in _flat(out)
 
     def test_the_documented_exit_codes_name_75s_three_causes(self):
@@ -760,7 +760,7 @@ class TestWhatTheRuleDid:
         v2 = s2_strict(sc)
         request = fd.Request(operation=fd.REFILE, dataset_id="cp-clients",
                              actor=people.person_by_email(REAL_PERSON), reason="t",
-                             period=Q4, supply=v2["C2"], to_period="2025-Q1")
+                             period=Q4, supply=v2["C2"], to_period="2025-Q2")
         with supply_db.connect(read_only=True, label="pytest") as conn:
             got = fd.consequences(conn, request)
         assert any("came in one delivery with cp-notifications" in n for n in got.notes), \
@@ -1062,7 +1062,7 @@ class TestCheapPaths:
                                                          why="failed"))
         (locked, k1), (failed, _k2) = shown
         assert k1["title"] == "Re-check owed"
-        assert "Another decision or gate is working on 2024-Q4." in locked
+        assert "Another decision or gate is working on 2025-Q1." in locked
         assert "Another decision" not in failed
         assert locked.splitlines()[-1] == "mothman pipeline process"
 
@@ -1161,7 +1161,7 @@ class TestCliUxReview:
         assert re.search(r"red - .* failed against the warehouse; decide cp-notifications "
                          r"\(received [^)]*\) first", flat), flat
         row = next(line for line in out.splitlines() if "cp-clients" in line
-                   and "2024-Q3" in line)
+                   and "2024-Q4" in line)
         assert "held back" in row and "another version" not in row, row
         del c2
 

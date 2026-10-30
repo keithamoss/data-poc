@@ -29,6 +29,11 @@ class _Period:
     name: str
     date: date
 
+    @property
+    def round_date(self) -> date:
+        """A period at files_go_to_period 0 is its own round (REQ-PIPE-321)."""
+        return self.date
+
 
 def _periods() -> list[_Period]:
     days = [ANCHOR + timedelta(days=i - 10) for i in range(20)]
@@ -349,8 +354,8 @@ class TestALinkTimesADecisionWhereTheReplayPlaysIt:
         criterion 10) is played there, not `after_hours` after its supply's
         receipt - found when TS-80's settlement bounded its link (REQ-GEN-203):
         the link read it as 09:20 on the arrival day rather than 11:00 the next."""
-        monkeypatch.setattr("qa_tools.common.schedule.date_of",
-                            lambda period, ds: date.fromisoformat(period))
+        monkeypatch.setattr("qa_tools.common.schedule.round_of",
+                            lambda period, ds, agreement=None: date.fromisoformat(period))
         script = _script(name="settle", operation="choose-file", files=("reject", "supply"),
                          at="11:00", day_offset=1, after_hours=0)
         placed = si.resolve(_injection(), _periods())

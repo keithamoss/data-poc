@@ -246,7 +246,7 @@ def _last_owed(dataset_id: str, effective_to, agr) -> dict | None:
 
     try:
         found = [s for s in slots.slots_for_dataset(dataset_id, until=effective_to, agreement=agr)
-                 if s.date <= effective_to]
+                 if s.round_date <= effective_to]
     except schedule.NoCalendarAgreed:
         return None
     if not found:

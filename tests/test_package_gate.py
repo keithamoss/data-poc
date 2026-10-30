@@ -17,7 +17,7 @@ import pytest
 from gate_support import (CP, TABLES, Scenario, checks_reading, cross_red, install_fake_tools,
                           own_red, pin_replacement_setting)
 
-Q3, Q4 = "2024-Q3", "2024-Q4"
+Q3, Q4 = "2024-Q4", "2025-Q1"
 CLIENT_REFS = checks_reading("cp_clients", "cp-notifications")
 V1 = {"cp_clients": "C1", "cp_notifications": "N1", "cp_investigations": "I1",
       "cp_placements": "P1", "cp_carers": "K1", "cp_case_workers": "W1"}
@@ -34,7 +34,7 @@ def sc(private_supply_dsn, cp_raw_dir, tmp_path, monkeypatch):
 # ---- the three fixture contents (criterion 19) ---------------------------------
 
 def established(sc: Scenario) -> dict:
-    """2024-Q3 holding v1 of all six tables, promoted green."""
+    """2024-Q4 holding v1 of all six tables, promoted green."""
     got = sc.deliver("2024-07-25T10:00:00+08:00", V1)
     sc.process()
     for label, supply in got.items():
@@ -54,7 +54,7 @@ def _in_the_warehouse(sc: Scenario, got: dict, period: str) -> None:
 
 
 def first_time(sc: Scenario) -> dict:
-    """2024-Q4 holding Case Workers, Carers, Investigations and Placements in
+    """2025-Q1 holding Case Workers, Carers, Investigations and Placements in
     the warehouse (put there by the setup), no Clients or Notifications ever
     supplied."""
     got = sc.deliver("2024-10-25T10:00:00+08:00",
@@ -66,7 +66,7 @@ def first_time(sc: Scenario) -> dict:
 
 
 def empty_but_workers(sc: Scenario) -> dict:
-    """2024-Q4 holding only Case Workers and Carers in the warehouse."""
+    """2025-Q1 holding only Case Workers and Carers in the warehouse."""
     got = sc.deliver("2024-10-25T10:00:00+08:00",
                      {t: V1[t] for t in ("cp_case_workers", "cp_carers")})
     sc.process()
@@ -313,7 +313,7 @@ class TestDecisionDuringTheGate:
     ])
     def test_a_persons_decision_while_a_gate_holds_the_period_is_refused(
             self, sc, decide, operation, dataset, extra):
-        """Architect v5 B3: while an application holds 2024-Q3 a person's
+        """Architect v5 B3: while an application holds 2024-Q4 a person's
         table-moving decision there is refused with exit 75 and the
         gate-running wording, and nothing is recorded."""
         from qa_tools.common import gate
@@ -328,7 +328,7 @@ class TestDecisionDuringTheGate:
             code, out = decide("--operation", operation, "--dataset", dataset,
                                "--period", Q3, *extra)
         assert code == 75, out
-        assert "A gate is running for 2024-Q3. Nothing was changed. Try again in a moment." in out
+        assert "A gate is running for 2024-Q4. Nothing was changed. Try again in a moment." in out
         # NOTHING RECORDED ANYWHERE - no decision, filing, owed item or
         # not-supplied mark about any supply - and the warehouse holds exactly
         # what it held (criterion 16).
@@ -695,11 +695,11 @@ class TestRecheckEntry:
                      effective_at=asset_time.now().isoformat(), conn=conn)
 
     def test_refiled_partners_are_gated_on_their_current_filing(self, sc, monkeypatch):
-        """T14: a person re-files Clients v2 and Notifications v2 from 2024-Q3
-        into 2024-Q4 - two owed re-checks. While Notifications v2's is owed it
+        """T14: a person re-files Clients v2 and Notifications v2 from 2024-Q4
+        into 2025-Q1 - two owed re-checks. While Notifications v2's is owed it
         is not joined to Clients v2's application and never promoted on its
-        2024-Q3 results; once both have run, each is promoted on results
-        recorded for 2024-Q4."""
+        2024-Q4 results; once both have run, each is promoted on results
+        recorded for 2025-Q1."""
         from qa_tools.common import amber_setting, gate, replacement_setting, supply_db
 
         # A FILLED Q3 WAITS FOR A PERSON here: a resupply may not replace.

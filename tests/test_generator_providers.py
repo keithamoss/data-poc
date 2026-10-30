@@ -43,7 +43,7 @@ class _Writing(Provider):
         return [(f"fk_slot_{i}", 900_000 + i, 900_000 + i + 10) for i in (1, 2)]
 
     def generated_periods(self):
-        return [SimpleNamespace(name=d.isoformat(), date=d) for d in self.days]
+        return [SimpleNamespace(name=d.isoformat(), date=d, round_date=d) for d in self.days]
 
     def plan(self):
         return Plan(jobs=[Job(f"fk_slot_{i}", 900_000 + i, None, p)

@@ -66,8 +66,14 @@ def _fingerprint(parts: dict) -> str:
 
 
 def resolved(dataset_id: str, period_date: date, agreement=None) -> tuple[dict, str]:
-    """The inputs a slot for `period_date` is built from, and the
-    fingerprint of the version-level part they came from (criterion 1).
+    """The inputs a slot due on the ROUND dated `period_date` is built from,
+    and the fingerprint of the version-level part they came from (criterion
+    1).
+
+    `period_date` IS THE ROUND'S DATE (REQ-PIPE-168 criterion 1 as REQ-PIPE-321
+    amends it) - at files_go_to_period 0 the period's own date, recorded
+    under the same key as before, so every verdict recorded before the key
+    existed reads the same. The period the slot fills is the filing's slot.
 
     THE SAME RESOLUTION slots.slot_instants() makes - the participation
     version in force on the period's own date (the first, before it
@@ -81,6 +87,7 @@ def resolved(dataset_id: str, period_date: date, agreement=None) -> tuple[dict, 
     agreement = schedule._agreement(agreement)
     instants = slots.slot_instants(dataset_id, period_date, agreement)
     version = slots._participation_for(dataset_id, period_date, agreement)
+    offset = agreement.files_go_to_period_for(dataset_id, period_date) or 0
     window = schedule.claim_window(dataset_id, on=period_date, agreement=agreement)
     cal = schedule.calendar_for_dataset(dataset_id, agreement)
     cal_version = schedule._version_in_force(cal, period_date)
@@ -117,6 +124,10 @@ def resolved(dataset_id: str, period_date: date, agreement=None) -> tuple[dict, 
         },
         "timezone": {"effective_from": zone.effective_from if zone else None,
                      "zone": zone.zone.key if zone else None},
+        # A files_go_to_period version ONLY WHERE IT STATES A VALUE OTHER THAN
+        # 0 (REQ-PIPE-321 criterion 12), so adopting the key at 0 changes no
+        # recorded fingerprint and refuses no dataset (REQ-PIPE-173).
+        **({"files_go_to_period": offset} if offset else {}),
     })
     return inputs, fingerprint
 
@@ -140,7 +151,7 @@ def judge(dataset_id: str, slot, received_at: datetime | None, agreement=None) -
     except Exception:  # noqa: BLE001 - see the docstring
         return Judged(None, None, None)
     try:
-        inputs, fingerprint = resolved(dataset_id, slot.period.date, agreement)
+        inputs, fingerprint = resolved(dataset_id, slot.round_date, agreement)
     except Exception:  # noqa: BLE001
         return Judged(classification, None, None)
     return Judged(classification, inputs, fingerprint)
@@ -320,7 +331,10 @@ def compared(conn, dataset_id: str, agreement=None) -> list[Compared]:
         + timedelta(days=400)
     try:
         periods = schedule.periods_for_dataset(dataset_id, until=horizon, agreement=agreement)
-        dated = {p.name: p.date for p in periods}
+        # EACH SLOT BY THE ROUND IT IS DUE ON (REQ-PIPE-321 criterion 12), so
+        # a correction moving a round's date re-judges that round's supplies,
+        # whatever period they fill.
+        dated = {p.name: p.round_date for p in periods}
         # A JUDGED PERIOD DECLARED NOT EXPECTED SINCE (Keith, 2026-10-11,
         # morning-report (i)): it owes nothing now, so its recorded verdict
         # no longer stands on the schedule - as if the period had gone.

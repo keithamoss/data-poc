@@ -89,6 +89,14 @@ def overlaps_for(dataset_id: str, until: date | None = None,
     turned_off = agr.ever_turned_off(dataset_id)
     found: list[Overlap] = []
     previous = None
+
+    def label(rnd) -> str:
+        # NAMED BY THE PERIOD THE ROUND'S SLOT FILLS (REQ-PIPE-134 criterion 1
+        # as REQ-PIPE-321 amends it): the gate checks consecutive ROUNDS, and a
+        # person reads the period, which at files_go_to_period N is N on.
+        filled = schedule.period_filled_by(dataset_id, rnd, agreement)
+        return filled.name if filled is not None else rnd.name
+
     #: Inside a turned-off gap: (the last owed period before it, when its
     #: slot closes) - criterion 14's closing instant (REQ-PIPE-179 c31).
     gap = None
@@ -104,8 +112,8 @@ def overlaps_for(dataset_id: str, until: date | None = None,
             last, closes = gap
             gap = None
             if previous is not None and not instants.claim_opens_at > closes:
-                found.append(Overlap(dataset_id=dataset_id, earlier=last.name,
-                                     later=period.name, on_time_until=closes,
+                found.append(Overlap(dataset_id=dataset_id, earlier=label(last),
+                                     later=label(period), on_time_until=closes,
                                      later_claim_opens=instants.claim_opens_at))
             previous = (period, instants)
             continue
@@ -116,8 +124,8 @@ def overlaps_for(dataset_id: str, until: date | None = None,
             # closing instant criterion 14 gives it - the gap's first
             # period's own opening, which slot_instants resolves so.
             if not instants.claim_opens_at > on_time_until:
-                found.append(Overlap(dataset_id=dataset_id, earlier=earlier.name,
-                                     later=period.name, on_time_until=on_time_until,
+                found.append(Overlap(dataset_id=dataset_id, earlier=label(earlier),
+                                     later=label(period), on_time_until=on_time_until,
                                      later_claim_opens=instants.claim_opens_at))
             if off:
                 gap = (earlier, instants.claim_opens_at)
