@@ -147,6 +147,12 @@ class ExtraArrival:
     #: Notifications 08:40, Investigations 09:00, Clients 09:20). A table not
     #: named takes `at`, which is the delivery's own (earliest) instant.
     file_times: tuple[tuple[str, str], ...] = ()
+    #: NAMED CONTENT FAULTS ON THE ARRIVAL'S ROWS (REQ-GEN-335), applied by
+    #: the provider of the scenario's own dataset, which declares the names it
+    #: knows and refuses any other - each "name" or "name@<dataset id>" where
+    #: the fault is about one linked dataset. A SHAPE, NEVER A VERDICT, as
+    #: `file_shape` is; and names, not callables, so the table stays data.
+    row_faults: tuple[str, ...] = ()
 
     @property
     def targets(self) -> tuple:
@@ -787,6 +793,7 @@ def resolve(injection: Injection, periods: Sequence,
             "note": extra.note,
             "file_shape": extra.file_shape,
             "file_times": [list(x) for x in extra.file_times],
+            "row_faults": list(extra.row_faults),
             # WHAT IT WAS BUILT TO, AND WHAT WAS MOVED (REQ-GEN-184
             # criterion 12): the target as asked here, the rules and their
             # intended counts filled in once the rows are built. Never a
@@ -2378,6 +2385,183 @@ INJECTIONS: tuple[Injection, ...] = (
         also_demonstrates=("TS-78b",),
         links=(Link("TS-78a", 0, "TS-78 promote D", 2, scenario_map.AS_AT_PANEL),
                Link("TS-78b", 0, 2, "TS-78 promote D+2", scenario_map.VERDICT_LINE)),
+    ),
+    # THE LINKAGE HISTORY'S FAULTS (REQ-GEN-335), each in a quarter of its own
+    # holding no Child Protection or Emergency Department scenario (criterion
+    # 6, refused otherwise by the provider). A ROW FAULT is a named shape of
+    # the release's rows that the Linkage Products provider applies - never a
+    # verdict. Anchors count back from the newest generated quarter.
+    Injection(
+        scenario_id="TS-86",
+        dataset_id="linkage-keys",
+        anchor=-41,  # 2016-Q3
+        config="quarterly, due 18:00 on the round with 8 hours' grace, files_go_to_period 0; the release is received at 17:30, after the quarter's Emergency Department supply is promoted. One row's linkage_key is empty.",
+        arrivals=(
+            ExtraArrival(0, "17:30", None,
+                         "the quarter's release, one row's key empty", row_faults=('empty_key',)),
+        ),
+    ),
+    Injection(
+        scenario_id="TS-87",
+        dataset_id="linkage-keys",
+        anchor=-39,  # 2017-Q1
+        config="quarterly, due 18:00 on the round with 8 hours' grace, files_go_to_period 0; the release is received at 17:30, after the quarter's Emergency Department supply is promoted. Every ED Presentations row carries the code EDDC_PRESENTATION_V2, which no linked dataset declares - as good as ED Presentations missing from the release.",
+        arrivals=(
+            ExtraArrival(0, "17:30", None,
+                         "the release with ED Presentations coded EDDC_PRESENTATION_V2", row_faults=('undeclared_code@ed-presentations',)),
+        ),
+    ),
+    Injection(
+        scenario_id="TS-88",
+        dataset_id="linkage-keys",
+        anchor=-35,  # 2018-Q1
+        config="quarterly, due 18:00 on the round with 8 hours' grace, files_go_to_period 0; the release is received at 17:30, after the quarter's Emergency Department supply is promoted. One Client Register row carries an id_2, one identifier more than DOC_CLIENTS declares.",
+        arrivals=(
+            ExtraArrival(0, "17:30", None,
+                         "the release, one DOC_CLIENTS row carrying a second identifier", row_faults=('surplus_id@cp-clients',)),
+        ),
+    ),
+    Injection(
+        scenario_id="TS-89",
+        dataset_id="linkage-keys",
+        anchor=-34,  # 2018-Q2
+        config="quarterly, due 18:00 on the round with 8 hours' grace, files_go_to_period 0; the release is received at 17:30, after the quarter's Emergency Department supply is promoted. One ED presentation is linked twice, under two keys.",
+        arrivals=(
+            ExtraArrival(0, "17:30", None,
+                         "the release, one EDDC_PRESENTATION record linked twice", row_faults=('double_link@ed-presentations',)),
+        ),
+    ),
+    Injection(
+        scenario_id="TS-90",
+        dataset_id="linkage-keys",
+        anchor=-33,  # 2018-Q3
+        config="quarterly, due 18:00 on the round with 8 hours' grace, files_go_to_period 0; the release is received at 17:30, after the quarter's Emergency Department supply is promoted. One EDDC_PRESENTATION row names a presentation the quarter does not hold.",
+        arrivals=(
+            ExtraArrival(0, "17:30", None,
+                         "the release, one row naming a presentation that is not there", row_faults=('dangling_id@ed-presentations',)),
+        ),
+    ),
+    Injection(
+        scenario_id="TS-91",
+        dataset_id="linkage-keys",
+        anchor=-32,  # 2018-Q4
+        config="quarterly, due 18:00 on the round with 8 hours' grace, files_go_to_period 0; the release is received at 17:30, after the quarter's Emergency Department supply is promoted. The Client Register is linked at 85.5 to 89.5 percent - the coverage check's amber band.",
+        arrivals=(
+            ExtraArrival(0, "17:30", None,
+                         "the release, Client Register coverage in the amber band", row_faults=('coverage_amber@cp-clients',)),
+        ),
+    ),
+    Injection(
+        scenario_id="TS-92",
+        dataset_id="linkage-keys",
+        anchor=-30,  # 2019-Q2
+        config="quarterly, due 18:00 on the round with 8 hours' grace, files_go_to_period 0; the release is received at 17:30, after the quarter's Emergency Department supply is promoted. ED Presentations is linked at 78 to 84 percent - the coverage check's red band.",
+        arrivals=(
+            ExtraArrival(0, "17:30", None,
+                         "the release, ED Presentations coverage in the red band", row_faults=('coverage_red@ed-presentations',)),
+        ),
+    ),
+    Injection(
+        scenario_id="TS-93b",
+        dataset_id="linkage-keys",
+        anchor=-31,  # 2019-Q1
+        config="quarterly, due 18:00 on the round with 8 hours' grace, files_go_to_period 0; the release is received at 17:30, after the quarter's Emergency Department supply is promoted. The quarter's Client Register, received on the 1 November 2018 round, is red and rejected by a person three weeks later (TS-93a), so no Client Register is in the warehouse when the release is checked.",
+        arrivals=(
+            ExtraArrival(0, "17:30", None,
+                         "the quarter's release, built from the rejected Client Register as received"),
+        ),
+    ),
+    Injection(
+        scenario_id="TS-94",
+        dataset_id="linkage-keys",
+        anchor=-18,  # 2022-Q2
+        config="quarterly, due 18:00 on the round with 8 hours' grace, files_go_to_period 0; the release is received at 17:30, after the quarter's Emergency Department supply is promoted. One DOC_CLIENTS row names a client the quarter does not hold, so the release is red and held back; a scripted person promotes it two days later.",
+        arrivals=(
+            ExtraArrival(0, "17:30", None,
+                         "the release, one row naming a client that is not there", row_faults=('dangling_id@cp-clients',)),
+        ),
+    ),
+    Injection(
+        scenario_id="TS-96",
+        dataset_id="linkage-keys",
+        anchor=-25,  # 2020-Q3
+        config="quarterly, due 18:00 on the round with 8 hours' grace. No release comes for the quarter; a scripted person marks it not supplied two days after it was due.",
+        suppress=(0,),
+    ),
+    Injection(
+        scenario_id="TS-97",
+        dataset_id="linkage-keys",
+        anchor=-21,  # 2021-Q3
+        config="quarterly, due 18:00 on the round with 8 hours' grace, files_go_to_period 0; the release is received at 17:30, after the quarter's Emergency Department supply is promoted. Records are re-keyed into groups of more than 50 until just over 2 percent of the release's distinct keys are large groups - the large-key-group check's amber band.",
+        arrivals=(
+            ExtraArrival(0, "17:30", None,
+                         "the release, large key groups in the amber band", row_faults=('large_groups_amber',)),
+        ),
+    ),
+    Injection(
+        scenario_id="TS-98",
+        dataset_id="linkage-keys",
+        anchor=-17,  # 2022-Q3
+        config="quarterly, due 18:00 on the round with 8 hours' grace, files_go_to_period 0; the release is received at 17:30, after the quarter's Emergency Department supply is promoted. Records are re-keyed into groups of more than 50 until just over 4 percent of the release's distinct keys are large groups - the large-key-group check's red band.",
+        arrivals=(
+            ExtraArrival(0, "17:30", None,
+                         "the release, large key groups in the red band", row_faults=('large_groups_red',)),
+        ),
+    ),
+    Injection(
+        scenario_id="TS-99",
+        dataset_id="linkage-keys",
+        anchor=-16,  # 2022-Q4
+        config="quarterly, due 18:00 on the round with 8 hours' grace, files_go_to_period 0; the release is received at 17:30, after the quarter's Emergency Department supply is promoted. One DOC_CLIENTS row's id_1 is blank.",
+        arrivals=(
+            ExtraArrival(0, "17:30", None,
+                         "the release, one DOC_CLIENTS row with a blank id_1", row_faults=('blank_id@cp-clients',)),
+        ),
+    ),
+    Injection(
+        scenario_id="TS-100b",
+        dataset_id="linkage-keys",
+        anchor=-29,  # 2019-Q3
+        config="quarterly, due 18:00 on the round with 8 hours' grace, files_go_to_period 0; the release is received at 17:30, after the quarter's Emergency Department supply is promoted. The quarter's Client Register, received on the 1 May 2019 round, is red and held (TS-100a); a scripted person promotes it at 10:00 the day after the release, and the knock-on re-checks the release.",
+        arrivals=(
+            ExtraArrival(0, "17:30", None,
+                         "the quarter's release, while the Client Register it describes is held"),
+        ),
+    ),
+    Injection(
+        scenario_id="TS-101",
+        dataset_id="linkage-keys",
+        anchor=-20,  # 2021-Q4
+        config="quarterly, due 18:00 on the round with 8 hours' grace, files_go_to_period 0; the release is received at 17:30, after the quarter's Emergency Department supply is promoted. Emergency Department's routine supply for the quarter is red and held when the release is checked, its resupply arriving days later; nothing is moved or re-timed.",
+        arrivals=(
+            ExtraArrival(0, "17:30", None,
+                         "the quarter's release, while ED Presentations' red supply is held", row_faults=('awaits_resupply@ed-presentations',)),
+        ),
+    ),
+    # THE CHILD PROTECTION SIDE OF (h) AND (p) (REQ-GEN-335 criterion 6): two
+    # quarters drawn clean, holding no scenario, so no ordinary amber moves.
+    # Each delivery arrives on time with cp_clients alone built to fail.
+    Injection(
+        scenario_id="TS-93a",
+        dataset_id="cp-clients",
+        anchor=-32,  # 2019-Q1, received on the 1 November 2018 round
+        config="quarterly, Feb/May/Aug/Nov, due 09:00 on the 1st. The whole delivery arrives on time with cp_clients alone built to fail; a person rejects it three weeks later and nothing replaces it.",
+        arrivals=(
+            ExtraArrival(0, "09:00", "red",
+                         "all six tables on time, cp_clients dirtied by its own red preset "
+                         "and the other five clean", severity_tables=("cp_clients",)),
+        ),
+    ),
+    Injection(
+        scenario_id="TS-100a",
+        dataset_id="cp-clients",
+        anchor=-30,  # 2019-Q3, received on the 1 May 2019 round
+        config="quarterly, Feb/May/Aug/Nov, due 09:00 on the 1st. The whole delivery arrives on time with cp_clients alone built to fail and held; a person promotes it at 10:00 on 2 August 2019, the day after the quarter's linkage release.",
+        arrivals=(
+            ExtraArrival(0, "09:00", "red",
+                         "all six tables on time, cp_clients dirtied by its own red preset "
+                         "and the other five clean", severity_tables=("cp_clients",)),
+        ),
     ),
 )
 

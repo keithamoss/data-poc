@@ -4279,6 +4279,179 @@ shown on the grown supplies like any other, 8,529 results (8,225 pass, 111
 fail, 24 warn, 169 no data), with nothing marking them as introduced later.
 A scenario placed in a grown quarter should quote its verdicts knowing that.
 
+### The linkage history, planted (REQ-GEN-335)
+
+Each of Linkage Products' fault scenarios sits in a quarter of its own that
+holds no Child Protection or Emergency Department scenario (REQ-GEN-335
+criterion 6, refused by the provider otherwise). A fault is a NAMED ROW FAULT
+on the release (`ExtraArrival.row_faults`), applied by the Linkage Products
+provider - a shape, never a verdict. Every release is received at 17:30 on
+the round, after the quarter's Emergency Department supply is promoted, and
+is due 18:00. The ordinary quarters carry the collections' severity mix
+(criterion 1): about a quarter amber on one linked dataset's coverage, two
+reds on coverage with a green resupply five to twenty days later, the oldest
+clean. Expectations below are what the checks are built to say; none has yet
+been confirmed by a bootstrap.
+
+**TS-86 `[INJECT]` A linkage release with an empty key.** PLANTED by
+REQ-GEN-335 (a).
+*Config: quarterly, due 18:00 with 8 hours' grace; 2016-Q3's release, one
+row's linkage_key empty.*
+**Expect**: Linkage key recorded reads red on one row, and the release is
+held back (REQ-PIPE-332 criterion 3).
+**Breaks as**: the empty key passed, or the whole release refused unloaded.
+
+**TS-87 `[INJECT]` A dataset code nobody declared - a linked dataset as good
+as missing.** PLANTED by REQ-GEN-335 (b), standing also for the dropped (l).
+*Config: as TS-86; 2017-Q1's release codes every ED Presentations row
+EDDC_PRESENTATION_V2.*
+**Expect**: Known dataset code reads red; ED Presentations' coverage reads 0
+percent, red; its referential check finds no EDDC_PRESENTATION row to fail.
+**Breaks as**: the renamed code matched by similarity, or coverage green.
+
+**TS-88 `[INJECT]` A surplus identifier.** PLANTED by REQ-GEN-335 (c).
+*Config: as TS-86; 2018-Q1's release, one DOC_CLIENTS row carrying an id_2,
+the contract's id_2 column being blank in every ordinary release
+(PROVISIONAL).*
+**Expect**: No surplus identifiers reads red on that row; every other check
+passes.
+**Breaks as**: the surplus id ignored, or read as a missing one.
+
+**TS-89 `[INJECT]` One record linked twice.** PLANTED by REQ-GEN-335 (d).
+*Config: as TS-86; 2018-Q2's release, one EDDC_PRESENTATION record under two
+keys.*
+**Expect**: Each record linked once reads red; coverage is unchanged.
+**Breaks as**: the duplicate counted as two linked presentations.
+
+**TS-90 `[INJECT]` A link to a record the quarter does not hold.** PLANTED
+by REQ-GEN-335 (e) - Keith's "records we don't have".
+*Config: as TS-86; 2018-Q3's release, one EDDC_PRESENTATION row naming a
+presentation not in ED's 2018-Q3 supply.*
+**Expect**: ED Presentations links match a presentation reads red, its
+failing row the code and identifier; the result counts toward ED
+Presentations as well (REQ-PIPE-332 criterion 1).
+**Breaks as**: the dangling row passed, or the red kept off ED's page.
+
+**TS-91 `[INJECT]` Coverage in the amber band.** PLANTED by REQ-GEN-335 (f).
+*Config: as TS-86; 2018-Q4's release links 85.5 to 89.5 percent of the
+Client Register's rows.*
+**Expect**: Client Register coverage reads amber, worded below its band; the
+release promotes as amber does (REQ-DASH-337).
+**Breaks as**: worded "above 90 percent", or read green.
+
+**TS-92 `[INJECT]` Coverage in the red band.** PLANTED by REQ-GEN-335 (g).
+*Config: as TS-86; 2019-Q2's release links 78 to 84 percent of ED
+Presentations' rows.*
+**Expect**: ED Presentations coverage reads red, a percentage only, no
+failing rows; the release is held back.
+**Breaks as**: failing rows recorded for coverage, or amber.
+
+**TS-93a `[INJECT]` A Client Register held red and rejected - its side of
+TS-93b.** PLANTED by REQ-GEN-335 (h), Child Protection's side.
+*Config: quarterly, Feb/May/Aug/Nov, due 09:00 on the 1st; 2019-Q1's six
+tables arrive on the 1 November 2018 round, cp_clients alone built red; a
+scripted person rejects it three weeks later ("TS-93 reject") and nothing
+replaces it.*
+**Expect**: cp_clients held back on its own data, then rejected; its readers
+held for want of a Client Register.
+**Breaks as**: the red Client Register promoted.
+
+**TS-93b `[INJECT]` A linkage release whose Client Register is not in the
+warehouse.** PLANTED by REQ-GEN-335 (h).
+*Config: as TS-86; 2019-Q1's release, built from the Client Register as
+received, checked with TS-93a's supply rejected.*
+**Expect**: the release's two cp-clients checks read red, could not run,
+naming the rejected Client Register; ED Presentations' checks are evaluated.
+**Breaks as**: the cp-clients checks evaluated against another quarter's
+Client Register, or left out of scope as if marked not supplied.
+
+**TS-94 `[INJECT]` A red linkage release promoted by a person.** PLANTED by
+REQ-GEN-335 (i).
+*Config: as TS-86; 2022-Q2's release, one DOC_CLIENTS row naming a client
+the quarter does not hold; a scripted person promotes it two days later
+("TS-94 promote", REQ-PIPE-332 criterion 8).*
+**Expect**: held back red; from the promotion, the Client Register promoted
+green on the 1 February 2022 round reads red promoted (REQ-PIPE-332
+criterion 4), and earlier dates still show it green.
+**Breaks as**: the Client Register demoted, or coloured before the
+promotion.
+
+**TS-95 `[INJECT]` A linked dataset marked not supplied - named, not
+planted.** NAMED by REQ-GEN-335 (j) on 2015-Q2, the quarter Child
+Protection's suppressed round would have filled, riding REQ-GEN-205's
+correction claim.
+*Config: quarterly; Child Protection has no supply for 2015-Q2 and its
+existing scripted entry marks cp-clients not supplied; the 2015-Q2 release
+is an ordinary one.*
+**Expect**: the release's cp-clients checks are left out of scope with
+reason code not_supplied_by_decision, while ED Presentations' are evaluated
+(REQ-PIPE-332 criterion 7).
+**Breaks as**: cp-clients' checks read red, could not run.
+
+**TS-96 `[INJECT]` A quarter with no linkage release.** PLANTED by
+REQ-GEN-335 (k).
+*Config: quarterly, due 18:00; no release comes for 2020-Q3, and a scripted
+person marks it not supplied two days after it was due ("TS-96 not
+supplied").*
+**Expect**: the slot closes unfilled and reads not supplied (accepted)
+(REQ-PIPE-132, REQ-DASH-133).
+**Breaks as**: a red "No supply" gap left needing action.
+
+**TS-97 `[INJECT]` Large key groups in the amber band.** PLANTED by
+REQ-GEN-335 (m).
+*Config: as TS-86; 2021-Q3's release, records re-keyed into groups of 51 to
+230 records until just over 2 percent of distinct keys are large groups.*
+**Expect**: Large key groups reads amber, with the count of keys, the count
+of large groups and their histogram across several bins, and no key value.
+**Breaks as**: a key value recorded, or the histogram drawn over every key.
+
+**TS-98 `[INJECT]` Large key groups in the red band.** PLANTED by
+REQ-GEN-335 (n).
+*Config: as TS-97; 2022-Q3's release, groups of 51 to 70 records until just
+over 4 percent of distinct keys are large groups.*
+**Expect**: Large key groups reads red and the release is held back.
+**Breaks as**: amber, or every key counted as a group.
+
+**TS-99 `[INJECT]` A blank expected identifier.** PLANTED by REQ-GEN-335
+(o).
+*Config: as TS-86; 2022-Q4's release, one DOC_CLIENTS row's id_1 blank.*
+**Expect**: Expected identifiers present reads red; the Client Register's
+referential check also fails on that row, which matches no client.
+**Breaks as**: the blank read as a value.
+
+**TS-100a `[INJECT]` A Client Register held red, then promoted by a person -
+its side of TS-100b.** PLANTED by REQ-GEN-335 (p), Child Protection's side.
+*Config: quarterly, Feb/May/Aug/Nov, due 09:00 on the 1st; 2019-Q3's six
+tables arrive on the 1 May 2019 round, cp_clients alone built red and held;
+a scripted person promotes it at 10:00 on 2 August 2019 ("TS-100 promote"),
+the day after the quarter's linkage release.*
+**Expect**: held back on its own data until the person promotes it; its
+readers re-checked and promoted with it.
+**Breaks as**: promoted by the rule.
+
+**TS-100b `[INJECT]` A linkage release cleared by a person's promotion.**
+PLANTED by REQ-GEN-335 (p).
+*Config: as TS-86; 2019-Q3's release, ordinary rows, received while TS-100a's
+Client Register is held.*
+**Expect**: its cp-clients checks read red, could not run, until 10:00 on 2
+August 2019, when the promotion's knock-on re-checks them and they pass
+(REQ-PIPE-331 criterion 5).
+**Breaks as**: still red after the promotion, or evaluated against the held
+supply before it.
+
+**TS-101 `[INJECT]` Emergency Department's same-round red, clearing.**
+PLANTED by REQ-GEN-335 criterion 3 on 2021-Q4, a quarter whose routine ED
+supply is drawn red; the provider refuses if that quarter has no ED
+resupply after the release.
+*Config: as TS-86; 2021-Q4's release, received while ED Presentations' red
+supply of the morning is held, its resupply arriving days later; no ED
+arrival moved, no release re-timed.*
+**Expect**: the release's ED Presentations checks read red, could not run,
+and clear through the knock-on once the resupply is promoted (REQ-GEN-334
+criteria 9 and 12); ED's own page is not coloured by them.
+**Breaks as**: ED's page coloured by a not-evaluated result, or the release
+re-timed to avoid the red.
+
 ### The activity feed
 
 Keith, 2026-09-22, arising from TS-10 and TS-15: the existing
