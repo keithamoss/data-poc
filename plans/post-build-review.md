@@ -12955,3 +12955,58 @@ twice. It deliberately did not re-find the `TypeError`.
      run in ONE process against one database - on the old code too, so not
      this change; they pass apart and CI runs them on separate workers. An
      isolation leak to look at.
+
+288. **[in-progress, 2026-10-30]** **[Pipeline & publishing]** **[Synthetic data generation]**
+     **[Quality checks]** **Linkage Products backend critic (delivery-critic,
+     c389c72), evening 2026-10-30.** Scope: REQ-QAC-330, REQ-PIPE-331,
+     REQ-PIPE-332, REQ-QAC-333, REQ-GEN-334, REQ-GEN-335, REQ-PIPE-336 and
+     REQ-TEST-339. REQ-DASH-337 is out of scope and gets its own UX/visual
+     pass. Each finding is the critic's claim until it is verified against
+     the code; fixes are test-first, on branch lp-fixes (/home/user/fx-wt),
+     because the off-wt tree is mid-bootstrap.
+     - **D1 (reproduced)**: the linkage check SQL casts only the source side
+       to text. The loader infers types from the file, so an all-digit id_1
+       or id_2 stages as bigint, and the referential, coverage,
+       expected-identifier and no-surplus queries then error. It doesn't
+       fire today only because the ids are alphanumeric. The REQ-TEST-339
+       fixture already casts both sides. Being fixed.
+     - **D2 (traced, not reproduced)**: a red recorded before a not-supplied
+       mark probably survives it. The knock-on re-run leaves the check out
+       and records nothing, so the older red stays the newest result per
+       check, which REQ-PIPE-332 c9 says must not happen. Being fixed, with
+       an end-to-end test first.
+     - **D3**: `Provider.depends_on` has no product consumer, so REQ-GEN-334
+       c6's "generates after it" refusal is not implemented. Being fixed in
+       the shared driver.
+     - **D4**: linkage's `_refuse_unschedulable` can never fire. It is called
+       with now = before = the receipt, and seeded by dataset rather than as
+       the gate seeds. Being fixed against c12 as Keith amended it ("cap the
+       lag").
+     - **D5**: `build_rows` handles only the first identifier column of a
+       linked dataset. Latent until a dataset declares two. Being made
+       generic, with today's rows unchanged.
+     - **D6**: REQ-GEN-334 c13's shared-instant refusal covers a release
+       against its own sources only. The builder checks what c13 requires.
+     - **REQ-QAC-333 c3 (reproduced)**: the linked-dataset gate compares
+       check attributes, never the SQL that runs, so a wrong code or join
+       column passes. Being fixed.
+     - **REQ-QAC-330 c3, QUESTION FOR KEITH**: c3 says N is the largest
+       number of identifier columns any linked dataset declares, which is 1.
+       The contract declares id_2, so N is 2, to give REQ-GEN-335 (c) a
+       column. PROVISIONAL: id_2 stays; recorded as c3 partly met unless
+       Keith rules otherwise.
+     - **Test weaknesses, being fixed**:
+       - the id_N test passed for the wrong reason;
+       - no Python test covered c7's not-supplied branch;
+       - the "names no calendar" branch was uncovered.
+     - **Test weaknesses, noted and not fixed tonight**:
+       - the cross-collection tests mostly use stand-ins;
+       - REQ-TEST-339 proves its own check SQL and provider, not the real
+         ones, which is how D1 and D5 slipped through;
+       - one source-text test carries its architecture-rule note in a
+         comment rather than a docstring.
+     - **Judged acceptable**: `CORRECTION_RIDERS` names linkage-keys in
+       scenario_injection.py, which already holds every collection's
+       scenario entries. The critic agreed with known item (1), adding that
+       Birth Registrations generation now also depends on the CP and ED
+       providers succeeding.
