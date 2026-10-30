@@ -438,3 +438,90 @@ class TestTheSameHistoryBuildsTheSameBytes:
 def test_hierarchy_knows_the_tables_these_use():
     for table in ("cp_clients", "cp_notifications", "cp_case_workers"):
         hierarchy.dataset_for_table(table)
+
+
+LP_AGENCY, LP = "department-of-health", "linkage-products"
+#: A check declared in ANOTHER collection that reads the Client Register - by
+#: the checks file's own declaration, so the writer files it cross-table.
+FOREIGN_REF = f"data-asset-1.{LP_AGENCY}.{LP}.linkage-keys.cp-clients.referential_soda"
+FOREIGN_COVERAGE = f"data-asset-1.{LP_AGENCY}.{LP}.linkage-keys.cp-clients.coverage_soda"
+
+
+class TestAResultRecordedUnderAnotherCollectionReachesTheTableItRead:
+    """REQ-DASH-337 criterion 3: a collection's results are read by collection,
+    so a cross-table result recorded under another collection never reached
+    the page of the table it read. Recorded here through the real writer under
+    the declaring collection, then rebuilt and built for the READ collection."""
+
+    def _foreign_run(self, clients, *, results):
+        key = f"lp_run_{_key()}"
+        lk = f"linkage-keys@{_key()}"
+        return _run(key, dataset_id="linkage-keys", supply=lk, results=results,
+                    reads={"linkage_keys": lk, "cp_clients": clients},
+                    collection=LP, agency=LP_AGENCY)
+
+    def test_the_read_collections_results_file_carries_it_and_its_run(self, history):
+        clients = f"cp-clients@{_key()}"
+        run_id = self._foreign_run(clients, results=[_record(FOREIGN_REF, "linkage-keys", "fail")])
+        out = history.rebuild()
+        assert [r["check_id"] for r in out["read_by_others"]] == [FOREIGN_REF]
+        assert out["read_by_others"][0]["reads"]["cp_clients"]["supply_id"] == clients
+        assert run_id in out["run_facts"] and out["run_facts"][run_id]["dataset_id"] == "linkage-keys"
+        # NOT counted as the read collection's own.
+        assert FOREIGN_REF not in {r["check_id"] for r in out["results"]}
+
+    def test_it_is_on_the_read_tables_page_about_the_supply_it_read(self, history):
+        clients = f"cp-clients@{_key()}"
+        run_id = self._foreign_run(clients, results=[_record(FOREIGN_REF, "linkage-keys", "fail")])
+        pages = history.datasets()
+        (entry,) = [h for h in _history_of(pages["cp-clients"], FOREIGN_REF) if h["run_id"] == run_id]
+        assert entry["supply_id"] == clients
+        assert entry["recorded_by"] == "linkage-keys"
+        assert entry["status"] == "red"
+        (card,) = [c for col in pages["cp-clients"]["columns"] for c in col["checks"]
+                   if c.get("check_id") == FOREIGN_REF]
+        assert card["between"] == {"declared_on": "linkage-keys", "reads": ["cp-clients"]}
+        # And on no page of this collection whose table it did not read.
+        assert not [c for d in pages.values() if d["id"] != "cp-clients"
+                    for col in d["columns"] for c in col["checks"]
+                    if c.get("check_id") == FOREIGN_REF]
+
+    def test_one_recorded_not_evaluated_stays_on_the_declaring_page_only(self, history):
+        clients = f"cp-clients@{_key()}"
+        self._foreign_run(clients, results=[
+            _record(FOREIGN_COVERAGE, "linkage-keys", "fail", metric_value=None,
+                    unrunnable_reason="the linkage_keys supply could not be read")])
+        out = history.rebuild()
+        assert [r["check_id"] for r in out["read_by_others"]] == [FOREIGN_COVERAGE], \
+            "precondition: the result was recorded reading the Client Register"
+        pages = {d["id"]: d for d in bdd.build_datasets(CP)}
+        assert not [c for col in pages["cp-clients"]["columns"] for c in col["checks"]
+                    if c.get("check_id") == FOREIGN_COVERAGE]
+
+    def test_a_collection_none_of_whose_tables_it_read_carries_nothing(self, history):
+        self._foreign_run(f"cp-clients@{_key()}",
+                          results=[_record(FOREIGN_REF, "linkage-keys", "fail")])
+        assert history.rebuild("civil-registration")["read_by_others"] == []
+
+
+class TestARecordedDistributionAndBandReachTheCard:
+    """REQ-DASH-337 criteria 13 and 14: what a result records - its binned
+    distribution, its band's direction - reaches the page as recorded, for
+    any check that carries one."""
+
+    def test_they_reach_the_history_entry_and_the_card(self, history):
+        bins = {"bins": [{"from": 51, "to": 101, "count": 3}, {"from": 101, "to": None, "count": 1}],
+                "count": 4, "population": 100}
+        band = {"warn": {"op": "<", "value": 90}, "fail": {"op": "<", "value": 85}}
+        notifications = f"cp-notifications@{_key()}"
+        run_id = _run(f"cp_notifications__{_key()}", dataset_id="cp-notifications",
+                      supply=notifications,
+                      results=[_record(CLIENT_REF, "cp-notifications", "fail",
+                                       distribution=bins, band=band)],
+                      reads={"cp_notifications": notifications, "cp_clients": f"cp-clients@{_key()}"})
+        page = history.datasets()["cp-notifications"]
+        (card,) = [c for col in page["columns"] for c in col["checks"]
+                   if c.get("check_id") == CLIENT_REF]
+        (entry,) = [h for h in card["history"] if h["run_id"] == run_id]
+        assert entry["distribution"] == bins
+        assert card["band"] == band

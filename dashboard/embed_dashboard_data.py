@@ -53,12 +53,12 @@ as everything else on this page.
 
 And `const REQUIREMENTS` (item 75, plans/qa-pipeline.md - 2026-09-18) -
 a live requirements register (real user stories, MoSCoW priority,
-implementation status, real CI-enforced test linkage), scoped via
+implementation status, real CI-enforced test links), scoped via
 AskUserQuestion at Keith's own request. Same hand-maintained-file
 pattern as RELEASE_NOTES, but structured YAML (../requirements.yaml,
 repo root) rather than prose markdown - Keith's own explicit choice
 here, like CHANGELOG.yaml's. Parsed by dashboard/requirements_yaml.py's
-parse_requirements(); schema/linkage enforcement is a SEPARATE CI gate
+parse_requirements(); schema/link enforcement is a SEPARATE CI gate
 (qa_tools/common/validate_requirements.py), not this script's job.
 
 And `const TICKET_STATUS` (item 76's UI-integration follow-up,

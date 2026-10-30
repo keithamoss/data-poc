@@ -810,6 +810,24 @@ span.scenario-subject-label{display:inline-block; margin:0 6px 0 0;}
 .xt-row .xt-note{display:block; font-size:12px; color:var(--ink-muted); margin-top:2px; overflow-wrap:anywhere;}
 .xt-row .xt-pill{justify-self:end;}
 .xt-key{font-size:12px; color:var(--ink-muted); border-top:1px solid var(--line); padding-top:8px; margin-top:2px;}
+/* REQ-DASH-337 criterion 14: a recorded distribution's bins. */
+.dist{display:grid; gap:4px; margin:4px 0;}
+.dist-row{display:grid; grid-template-columns:minmax(80px,auto) minmax(0,1fr) auto; gap:8px; align-items:center; font-size:12.5px;}
+.dist-label{color:var(--ink-muted);}
+.dist-bar{display:block; height:10px; background:var(--line); border-radius:2px; overflow:hidden;}
+.dist-bar > span{display:block; height:100%; background:var(--ink-muted);}
+.dist-note{font-size:12px; color:var(--ink-muted); margin-top:4px;}
+/* REQ-DASH-337 criterion 7: a collapsed group per other collection. */
+.xt-group{border-top:1px solid var(--line); padding:6px 0;}
+.xt-group-head{display:flex; align-items:center; gap:6px 12px; flex-wrap:wrap;}
+.xt-group-toggle{display:inline-flex; align-items:center; gap:8px; flex-wrap:wrap; background:none; border:0; padding:4px 2px; font:inherit; color:var(--ink); cursor:pointer; text-align:left;}
+.xt-group-toggle:focus-visible{outline:2px solid var(--ink); outline-offset:2px;}
+.xt-group-name{font-weight:600; font-size:13px;}
+.xt-group-counts{font-size:12px; color:var(--ink-muted);}
+.xt-group-links{font-size:12px; color:var(--ink-muted);}
+.xt-group-links .dataset-link{text-decoration:underline; text-underline-offset:2px;}
+.xt-group-body{padding-left:14px;}
+.xt-key-only .xt-key{margin-top:6px;}
 .xt-caption{font-size:12px; color:var(--ink); margin-bottom:10px;}
 @media (max-width:600px){
   .xt-grid .xt-head{display:none;}
@@ -1208,7 +1226,7 @@ footer{color:var(--ink-faint); font-size:12px; padding-block:30px 40px; border-t
 
 <!-- Item 75 (plans/qa-pipeline.md, 2026-09-18) - real user stories with
      MoSCoW priority, implementation status, and CI-enforced test
-     linkage. Same interaction pattern as every other header-button
+     links. Same interaction pattern as every other header-button
      panel, reused deliberately. -->
 <div class="backdrop" id="requirements-backdrop"></div>
 <aside class="drawer" id="requirements-panel" aria-hidden="true" inert>
@@ -1957,6 +1975,29 @@ function referenceNoteHtml(h){
     </div>`;
 }
 
+// A CHECK'S BAND IN THE DIRECTION ITS RESULT RECORDS (REQ-DASH-337 criterion
+// 13; UX review F3): "amber below 90%", "red below 85%" from the recorded
+// {warn: {op, value}, fail: {op, value}}, in the unit the result records.
+// PROVISIONAL: a check whose results record no direction - every result
+// recorded before the band was, and any tool that reports none - keeps the
+// card's earlier "warn > x" wording, which is the only direction
+// statusForValue knows, rather than a direction guessed here.
+const BAND_WORD = {"<": "below", "<=": "at or below", ">": "above", ">=": "at or above",
+                   "=": "at", "!=": "other than"};
+function fmtBandValue(x, unit){
+  if(typeof x !== "number") return escHtml(String(x));
+  if(unit === "%") return `${+x.toFixed(2)}%`;
+  return fmtMetric(x, unit);
+}
+function bandParts(ck){
+  const b = ck && ck.band;
+  if(b && (b.warn || b.fail)){
+    return [["warn", "amber"], ["fail", "red"]].filter(([side])=> b[side] && BAND_WORD[b[side].op])
+      .map(([side, colour])=> `${colour} ${BAND_WORD[b[side].op]} ${fmtBandValue(b[side].value, ck.unit)}`);
+  }
+  return [ck.warn==null ? null : `warn &gt; ${fmtMetric(ck.warn,ck.unit)}`,
+          ck.fail==null ? null : `fail &gt; ${fmtMetric(ck.fail,ck.unit)}`];
+}
 function fmtMetric(x, unit){
   // item 74: a null threshold is a real, meaningful value ("no bound of
   // this kind exists"), not a missing number - render it as such rather
@@ -2234,7 +2275,7 @@ function groupChecksByCategory(checks){
    REQUIREMENTS — item 75's "📐 Requirements" panel (plans/qa-
    pipeline.md, 2026-09-18, scoped via AskUserQuestion at Keith's own
    request): real user stories tracked with MoSCoW priority,
-   implementation status, and real, CI-enforced linkage to the tests
+   implementation status, and real, CI-enforced links to the tests
    that verify them - a live register, not a design doc. Hand-
    maintained ../requirements.yaml (repo root, see its own top-of-file
    comment for the full schema), parsed by dashboard/requirements_
@@ -5724,14 +5765,164 @@ function heldCrossTableSentence(ds){
   if(ds.crossTableRowsWhileHeld) return " The cross-table checks could not run either: the tables that read this one need its supply first.";
   return "";
 }
+// ---- A DATASET OF ANOTHER COLLECTION (REQ-DASH-337) ------------------------
+// Every name, collection and order below is read from the hierarchy and the
+// embedded data - nothing on this page knows which collection or dataset reads
+// which (criterion 15, Keith 2026-10-28: "out of the box, nothing special-cased").
+// The collection a dataset belongs to, across the whole asset (criterion 2):
+// the embedded data's index first, then the hierarchy.
+function collectionOfDataset(datasetId){
+  const found = realDatasetIndex()[datasetId];
+  if(found) return found.collectionId;
+  for(const ag of ((typeof HIERARCHY !== "undefined" && HIERARCHY && HIERARCHY.agencies) || [])){
+    for(const c of ag.collections || []){
+      if((c.datasets || []).some(d=> d.id === datasetId)) return c.id;
+    }
+  }
+  return null;
+}
+function hierarchyCollections(){
+  const out = [];
+  ((typeof HIERARCHY !== "undefined" && HIERARCHY && HIERARCHY.agencies) || []).forEach(ag=>
+    (ag.collections || []).forEach(c=> out.push(c)));
+  return out;
+}
+function collectionNameOf(collectionId){
+  const c = hierarchyCollections().find(x=> x.id === collectionId);
+  return (c && c.name) || collectionId || "";
+}
+// A dataset's name: the page's collection first, then anywhere in the asset.
+function datasetNameAnywhere(datasetId, col){
+  const local = ((col && col.datasets) || []).find(d=> d.id === datasetId);
+  if(local && local.name) return local.name;
+  const raw = (realDatasetIndex()[datasetId] || {}).raw;
+  if(raw && raw.name) return raw.name;
+  for(const c of hierarchyCollections()){
+    const d = (c.datasets || []).find(x=> x.id === datasetId);
+    if(d && d.name) return d.name;
+  }
+  return datasetId;
+}
+// Whether a dataset is in ANOTHER collection from the page's: by the page's
+// own collection id where it has one, else by its dataset list.
+function inAnotherCollection(datasetId, col){
+  const of = collectionOfDataset(datasetId);
+  if(col && col.id) return !!of && of !== col.id;
+  if(((col && col.datasets) || []).some(d=> d.id === datasetId)) return false;
+  return !!of;
+}
+// THE COLLECTION A CROSS-TABLE CHECK INVOLVES BESIDE THE PAGE'S OWN (criterion
+// 6): of the tables it is declared on and reads, the first in another
+// collection, in hierarchy order - null where it involves only the page's own.
+// PROVISIONAL: a check involving TWO other collections is grouped under the
+// first of them in hierarchy order, never shown twice.
+function xtOtherCollection(col, check){
+  const b = check && check.between;
+  if(!b) return null;
+  const others = new Set([b.declared_on, ...(b.reads || [])].filter(id=> id && inAnotherCollection(id, col))
+    .map(collectionOfDataset).filter(Boolean));
+  if(!others.size) return null;
+  const order = hierarchyCollections().map(c=> c.id);
+  return [...others].sort((x, y)=> order.indexOf(x) - order.indexOf(y))[0];
+}
+// The datasets of `collectionId` a set of rows involves, in hierarchy order.
+function xtGroupDatasets(rows, collectionId){
+  const ids = new Set();
+  rows.forEach(r=>{
+    const b = (r.cards[0] || {}).between || {};
+    [b.declared_on, ...(b.reads || [])].forEach(id=>{ if(id && collectionOfDataset(id) === collectionId) ids.add(id); });
+  });
+  const c = hierarchyCollections().find(x=> x.id === collectionId);
+  const order = ((c && c.datasets) || []).map(d=> d.id);
+  return [...ids].sort((x, y)=> order.indexOf(x) - order.indexOf(y));
+}
+// "2 red, 1 amber, 3 green" - the count of a group's checks at each status,
+// worst first, in the page's status words.
+function xtStatusCounts(rows){
+  const order = ["red", "amber", "green", "nodata", "inactive"];
+  const n = {};
+  rows.forEach(r=>{ n[r.status] = (n[r.status] || 0) + 1; });
+  return order.filter(s=> n[s]).map(s=> `${n[s]} ${(STATUS_LABEL[s] || s).toLowerCase()}`).join(", ");
+}
+// A CAUSE NAMED IN FULL WHERE IT IS ANOTHER COLLECTION'S (criterion 11, Keith
+// L-Q8 = a): "<Collection>' 2026-Q2 <Dataset>" - the collection,
+// possessive, then the period, then the dataset, from the hierarchy - and the
+// short form plus the period, "2026-Q2 Notifications", for one of the page's
+// own collection. `html` renders the dataset as a real link (REQ-DASH-272
+// criterion 15); without it the result is plain text. PROVISIONAL: the
+// criterion's "'<collection>' <period> <dataset>'" read as the possessive.
+function causeName(pageDatasetId, datasetId, period, html){
+  const name = datasetNameAnywhere(datasetId);
+  const shown = html ? datasetRefLink({datasetId}) : name;
+  const p = period ? (html ? escHtml(fmtPeriodOrDay(String(period))) : fmtPeriodOrDay(String(period))) : "";
+  const pageCol = collectionOfDataset(pageDatasetId);
+  const theirs = collectionOfDataset(datasetId);
+  if(theirs && pageCol && theirs !== pageCol){
+    const cn = collectionNameOf(theirs);
+    const lead = possessive(html ? escHtml(cn) : cn, cn);
+    return `${lead}${p ? " " + p : ""} ${shown}`;
+  }
+  return p ? `${p} ${shown}` : shown;
+}
+// THE WORDS FOR A TIMELINE STEP'S CAUSE (criterion 11): from its structured
+// fields where the build gave them - the action, the dataset and its period -
+// else the build's own words, as before.
+function causeWords(pageDatasetId, step, html){
+  if(!step) return "";
+  if(step.causeDataset){
+    return `the ${escMaybe(step.causeAction || "arrival", html)} of ${causeName(pageDatasetId, step.causeDataset, step.causePeriod, html)}`;
+  }
+  return escMaybe(step.cause || "", html);
+}
+function escMaybe(text, html){ return html ? escHtml(text) : text; }
+// A RECORDED BINNED DISTRIBUTION AS A HISTOGRAM (REQ-DASH-337 criterion 14,
+// Keith L-Q4 = a): any check whose result carries one, from its recorded
+// bins only - computed at run time (REQ-QAC-333 criterion 9), never here.
+// The point on show's own, else the newest entry carrying one up to it.
+// Each bin is [from, to), the last open-ended; bar lengths are relative to
+// the largest bin, and every count is also given as text.
+function distributionOf(check, point){
+  if(point && point.distribution) return point.distribution;
+  const hist = (check && check.history) || [];
+  const upTo = point ? hist.indexOf(point) : hist.length - 1;
+  for(let i = (upTo === -1 ? hist.length - 1 : upTo); i >= 0; i--){
+    if(hist[i] && hist[i].distribution) return hist[i].distribution;
+  }
+  return null;
+}
+function distributionBlock(check, point){
+  const d = distributionOf(check, point);
+  const bins = (d && Array.isArray(d.bins)) ? d.bins : [];
+  if(!bins.length) return "";
+  const fmtEdge = v=> Number.isInteger(v) ? fmtInt(v) : String(v);
+  const label = b=> b.to == null ? `${fmtEdge(b.from)} or more` : `${fmtEdge(b.from)} to ${fmtEdge(b.to - (Number.isInteger(b.from) && Number.isInteger(b.to) ? 1 : 0))}`;
+  const max = Math.max(1, ...bins.map(b=> Number(b.count) || 0));
+  const rows = bins.map(b=>{
+    const n = Number(b.count) || 0;
+    const pct = Math.round((n / max) * 100);
+    return `<div class="dist-row" role="listitem" data-dist-bin>
+        <span class="dist-label">${escHtml(label(b))}</span>
+        <span class="dist-bar" aria-hidden="true"><span style="width:${pct}%"></span></span>
+        <span class="dist-count mono">${fmtInt(n)}</span>
+      </div>`;
+  }).join("");
+  const of = d.population != null ? ` of ${fmtInt(d.population)}` : "";
+  const counted = d.count != null ? `<div class="dist-note">${fmtInt(d.count)} counted${of}, recorded when the check ran.</div>` : "";
+  return `<div class="drawer-section" data-distribution><h4>Distribution</h4>
+      <div class="dist" role="list" aria-label="Distribution of this check's result, by bin">${rows}</div>${counted}</div>`;
+}
 // THE TABLES A CROSS-TABLE CHECK IS BETWEEN (post-build-review #253, Keith
 // 2026-10-19): the table it is declared on, then the ones it reads -
 // "Notifications → Clients" - so the Client Register's three "Client
 // reference" checks read as three, not as one listed three times.
+// RESOLVED ACROSS THE ASSET (REQ-DASH-337 criterion 2; UX review F1): a
+// dataset of another collection is named with its collection.
 function crossTableBetween(col, check){
   const b = check && check.between;
   if(!b) return "";
-  const nameOf = id=> ((col.datasets || []).find(d=> d.id === id) || {}).name || id;
+  const nameOf = id=> inAnotherCollection(id, col)
+    ? `${datasetNameAnywhere(id, col)} (${collectionNameOf(collectionOfDataset(id))})`
+    : datasetNameAnywhere(id, col);
   return `${nameOf(b.declared_on)} → ${(b.reads || []).map(nameOf).join(", ")}`;
 }
 // ONE POINT PER SUPPLY AND CAUSE (REQ-PIPE-279 criteria 10 to 13): a result is
@@ -5897,8 +6088,47 @@ function xtRowModel(col, cards, run, dateStr, datasetId, heldChecks){
   // row's accessible name - no longer on the row itself.
   const recheck = {};
   cards.forEach(ck=>{ const n = rowRecheckNote(col, ck); if(n) recheck[xtTool(ck)] = n; });
+  // NOT YET CHECKED, AND WHEN IT IS DUE (REQ-DASH-337 criterion 8): no result
+  // about the supply on show because the dataset the check waits on has not
+  // arrived for its period.
+  const anyCell = Object.keys(cells.staged).length || Object.keys(cells.warehouse).length;
+  const waiting = !anyCell && !owed ? xtNotYetChecked(datasetId, cards[0], run, dateStr) : null;
   return {name: cards[0].name || cards[0].key, between: crossTableBetween(col, cards[0]), cards, tools,
-          cells, owed, heldBack, recheck, status};
+          cells, owed, heldBack, recheck, status, waiting,
+          // THE OTHER COLLECTION IT INVOLVES, for its group (criterion 6).
+          group: xtOtherCollection(col, cards[0])};
+}
+// WHICH DATASET A CROSS-TABLE CHECK ON THIS PAGE IS WAITING ON, for the
+// period of the supply on show (criterion 8): the dataset it is declared on
+// where that is not the page's, else the ones it reads - the first that has
+// no supply received for that period by the date on show, with its slot's due
+// instant from the recorded slots (REQ-DASH-326). Null where every one has
+// arrived, or where the page cannot tell: no period for the supply, or no
+// embedded data for the dataset waited on. PROVISIONAL: where that dataset's
+// slot for the period is not embedded (its claim window had not opened when
+// the page was built) the note gives no due instant rather than a guess.
+function xtNotYetChecked(datasetId, card, run, dateStr){
+  const b = card && card.between;
+  if(!b || !run || !datasetId) return null;
+  const raw = rawRealDatasetById(datasetId);
+  const period = raw && raw.arrivalByRun && (raw.arrivalByRun[run.run_id] || {}).slot;
+  if(!period) return null;
+  const waitOn = b.declared_on && b.declared_on !== datasetId ? [b.declared_on]
+    : (b.reads || []).filter(id=> id !== datasetId);
+  for(const id of waitOn){
+    const other = rawRealDatasetById(id);
+    if(!other) continue;
+    const arrived = (other.runs || []).some(r=>
+      ((other.arrivalByRun || {})[r.run_id] || {}).slot === period && (!dateStr || !r.run_date || r.run_date <= dateStr));
+    if(arrived) continue;
+    const slot = (slotsOf(id) || []).find(sl=> sl.period === period);
+    return {datasetId: id, period, due: slot ? slot.due : null};
+  }
+  return null;
+}
+function xtNotYetCheckedWords(waiting){
+  const name = datasetNameAnywhere(waiting.datasetId);
+  return `Not yet checked by ${name}${waiting.due ? ` - due ${fmtInstant(waiting.due)}` : ""}`;
 }
 // The rows of a page's cross-table section, in crossTableRowOrder's
 // relationship-then-name order, one per check however many tools ran it.
@@ -5916,12 +6146,21 @@ function crossTableGridRows(col, ds, listed, dateStr){
     byKey.get(key).cards.push(r.ck);
   });
   const held = heldChecksOn(ds);
-  return groups.map(g=> ({c: g.c, ...xtRowModel(col, g.cards, run, dateStr, ds.id, held)}));
+  const rows = groups.map(g=> ({c: g.c, ...xtRowModel(col, g.cards, run, dateStr, ds.id, held)}));
+  // THE PAGE'S OWN COLLECTION FIRST, AS TODAY, THEN ONE GROUP PER OTHER
+  // COLLECTION IN HIERARCHY ORDER (REQ-DASH-337 criterion 6) - a stable order,
+  // so a group never moves as statuses change. Stable within each.
+  const order = hierarchyCollections().map(c=> c.id);
+  const at = r=> r.group == null ? -1 : (order.indexOf(r.group) === -1 ? order.length : order.indexOf(r.group));
+  return rows.map((r, i)=> ({r, i})).sort((a, b)=> at(a.r) - at(b.r) || a.i - b.i).map(x=> x.r);
 }
 function xtCellText(row, view){
   const cell = row.cells[view];
   if(view === "warehouse" && row.owed && !Object.keys(cell).length){
     return {word: "Not yet re-checked", status: "red", marks: "", noteSegs: row.owed.owedNote || [], owed: true};
+  }
+  if(view === "warehouse" && row.waiting){
+    return {word: xtNotYetCheckedWords(row.waiting), status: "nodata", marks: "", noteSegs: [], waiting: true};
   }
   const present = XT_TOOLS.map(([t])=> cell[t]).filter(Boolean);
   if(!present.length) return null;
@@ -5932,16 +6171,34 @@ function xtCellText(row, view){
   // evaluated, it says so - the cell keeps its status (red, it counts) but
   // never reads "Fail".
   const evaluated = present.filter(x=> !notEvaluated(x.h));
-  const word = evaluated.length
+  let word = evaluated.length
     ? (XT_WORD[rollupStatuses(evaluated.map(x=> x.h.status || "nodata"))] || STATUS_LABEL[status] || status)
     : "Not evaluated";
+  // THE RECORDED PERCENTAGE, for any check whose result is one (REQ-DASH-337
+  // criterion 10, Keith L-Q7 = a): "Warn 87.3%" - the worst evaluated tool's.
+  const pct = xtPercentOf(row, view, evaluated);
+  if(pct != null) word = `${word} ${pct}`;
   return {word, status: evaluated.length ? status : "not-evaluated", marks, noteSegs,
           heldBack: view === "warehouse" && row.heldBack};
+}
+// The percentage a cell shows: of its evaluated results whose card records a
+// percentage, the one with the worst status (the first tool's on a tie).
+function xtPercentOf(row, view, evaluated){
+  const worst = rollupStatuses(evaluated.map(x=> x.h.status || "nodata"));
+  for(const [t] of XT_TOOLS){
+    const x = row.cells[view][t];
+    const ck = row.tools[t];
+    if(!x || notEvaluated(x.h) || !ck || ck.unit !== "%" || typeof x.h.value !== "number") continue;
+    if((x.h.status || "nodata") !== worst) continue;
+    return `${x.h.value.toFixed(1)}%`;
+  }
+  return null;
 }
 const XT_VIEW = {staged: "Staged:", warehouse: "In the warehouse:"};
 function xtCellHtml(row, view){
   const c = xtCellText(row, view);
   if(!c) return `<span class="xt-cell" data-view="${view}" data-empty><span class="xt-view">${XT_VIEW[view]} </span>—</span>`;
+  if(c.waiting) return `<span class="xt-cell" data-view="${view}" data-not-yet-checked><span class="xt-view">${XT_VIEW[view]} </span><span class="xt-word" data-status="nodata">${escHtml(c.word)}</span></span>`;
   return `<span class="xt-cell" data-view="${view}"><span class="xt-view">${XT_VIEW[view]} </span><span class="xt-word" data-status="${c.status}">${escHtml(c.word)}</span>${c.marks ? ` <span class="xt-marks" aria-hidden="true">${c.marks}</span>` : ""} <span class="xt-note">${escHtml(segmentsText(c.noteSegs))}${c.heldBack ? " — why it is held back" : ""}</span></span>`;
 }
 // THE ROW'S ACCESSIBLE NAME (criterion 12): each tool's result by name, and
@@ -5973,14 +6230,70 @@ function crossTableGridHtml(rows){
   const views = ["staged", "warehouse"].filter(v=> rows.some(r=> xtCellText(r, v)));
   const shown = views.length ? views : ["warehouse"];
   const head = `<div class="xt-head" aria-hidden="true"><span>Check</span>${shown.map(v=> `<span>${v === "staged" ? "Against what's staged" : "Against what's in the warehouse"}</span>`).join("")}<span></span></div>`;
-  const body = rows.map((r, i)=> `
+  const rowHtml = (r, i)=> `
       <button class="scope-check xt-row" data-col="${columnKey(r.c)}" data-check="${r.cards[0].key}" data-xt-row="${i}">
         <span class="xt-name label"><span class="nm"></span><span class="bt" style="display:block; margin-left:0;"></span></span>
         ${shown.map(v=> xtCellHtml(r, v)).join("")}
         <span class="xt-pill">${pill(r.status, "sm")}</span>
-      </button>`).join("");
-  return {views: shown, html: `<div class="xt-grid" data-columns="${shown.length}">${head}${body}
-      <div class="xt-key">The marks are dbt, Soda and datacontract-cli, in that order: <span class="xt-marks">✓</span> passed, <span class="xt-marks">✗</span> failed, <span class="xt-marks">○</span> could not be evaluated, and a middle dot (<span class="xt-marks">·</span>) means that tool has no such check. Select a check for each tool's full result.</div></div>`};
+      </button>`;
+  const key = `
+      <div class="xt-key">The marks are dbt, Soda and datacontract-cli, in that order: <span class="xt-marks">✓</span> passed, <span class="xt-marks">✗</span> failed, <span class="xt-marks">○</span> could not be evaluated, and a middle dot (<span class="xt-marks">·</span>) means that tool has no such check. Select a check for each tool's full result.</div>`;
+  const indexed = rows.map((r, i)=> ({r, i}));
+  const own = indexed.filter(x=> x.r.group == null);
+  // A PAGE WITH NO CHECK INVOLVING ANOTHER COLLECTION IS UNCHANGED (criterion 6).
+  if(own.length === rows.length){
+    return {views: shown, html: `<div class="xt-grid" data-columns="${shown.length}">${head}${own.map(x=> rowHtml(x.r, x.i)).join("")}${key}</div>`};
+  }
+  // ONE GROUP PER OTHER COLLECTION, COLLAPSED ON LOAD, failing ones too
+  // (criterion 7, Keith L-Q6): a heading naming the collection, its worst
+  // status and its count at each status, a toggle that keeps nothing in the
+  // URL, and the datasets it is about as real links BESIDE the toggle - never
+  // inside a button (REQ-DASH-272 criterion 15).
+  const groups = [];
+  indexed.filter(x=> x.r.group != null).forEach(x=>{
+    const last = groups[groups.length - 1];
+    if(last && last.id === x.r.group) last.items.push(x);
+    else groups.push({id: x.r.group, items: [x]});
+  });
+  const groupHtml = groups.map((g, n)=>{
+    const rs = g.items.map(x=> x.r);
+    const worst = rollupStatuses(rs.map(r=> r.status));
+    const name = collectionNameOf(g.id);
+    const links = xtGroupDatasets(rs, g.id).map(id=> datasetRefLink({datasetId: id}));
+    const bodyId = `xt-group-${n}-${String(g.id).replace(/[^A-Za-z0-9_-]/g, "")}`;
+    const counts = xtStatusCounts(rs);
+    return `
+      <div class="xt-group" data-xt-group="${escAttr(g.id)}" data-xt-group-status="${worst}">
+        <div class="xt-group-head">
+          <button type="button" class="xt-group-toggle" aria-expanded="false" aria-controls="${bodyId}">
+            <span class="xt-group-caret" aria-hidden="true">▸</span>
+            <span class="xt-group-name">${escHtml(name)}</span>
+            ${pill(worst, "sm")}
+            <span class="xt-group-counts">${escHtml(`${rs.length} ${rs.length === 1 ? "check" : "checks"}: ${counts}`)}</span>
+          </button>
+          ${links.length ? `<span class="xt-group-links" data-xt-group-links>${andList(links)}</span>` : ""}
+        </div>
+        <div class="xt-grid xt-group-body" id="${bodyId}" data-columns="${shown.length}" hidden>${head}${g.items.map(x=> rowHtml(x.r, x.i)).join("")}</div>
+      </div>`;
+  }).join("");
+  const ownHtml = own.length ? `<div class="xt-grid" data-columns="${shown.length}">${head}${own.map(x=> rowHtml(x.r, x.i)).join("")}</div>` : "";
+  return {views: shown, html: `${ownHtml}${groupHtml}<div class="xt-grid xt-key-only">${key}</div>`};
+}
+// A GROUP OPENS AND CLOSES ON CLICK, and only on the page: a re-render starts
+// it collapsed again, and nothing of it reaches the URL (criterion 7).
+function wireXtGroups(root){
+  (root || document).querySelectorAll(".xt-group-toggle").forEach(btn=>{
+    if(btn.dataset.xtWired) return;
+    btn.dataset.xtWired = "1";
+    btn.addEventListener("click", ()=>{
+      const body = document.getElementById(btn.getAttribute("aria-controls"));
+      const open = btn.getAttribute("aria-expanded") !== "true";
+      btn.setAttribute("aria-expanded", open ? "true" : "false");
+      const caret = btn.querySelector(".xt-group-caret");
+      if(caret) caret.textContent = open ? "▾" : "▸";
+      if(body) body.hidden = !open;
+    });
+  });
 }
 // WHAT A HISTORY ENTRY READ, as at the date on show (criterion 12): the same
 // sentence the panel gives, for the compare list - a result in neither cell
@@ -6023,7 +6336,19 @@ function xtToolsPanelBlock(col, ds, column, check){
     }
     return html ? `<div class="xt-view-block" data-xt-view="${view}"><div class="xt-view-label">${XT_VIEW[view].replace(/:$/, "")}</div>${html}</div>` : "";
   }).join("");
-  return `<div class="drawer-section" data-xt-tools><h4>Each tool's result</h4>${views}</div>`;
+  return `<div class="drawer-section" data-xt-tools><h4>Each tool's result</h4>${xtBetweenLinksHtml(col, check)}${views}</div>`;
+}
+// THE TABLES IT IS BETWEEN, AS REAL LINKS, WHERE ONE IS ANOTHER COLLECTION'S
+// (REQ-DASH-337 criterion 2): "<declared on> → <reads>", each a link to its
+// page at the date on show, another collection's named with it. Empty for a
+// check involving only the page's own collection, whose panel is unchanged.
+function xtBetweenLinksHtml(col, check){
+  const b = check && check.between;
+  if(!b || xtOtherCollection(col, check) == null) return "";
+  const one = id=> inAnotherCollection(id, col)
+    ? `${datasetRefLink({datasetId: id})} (${escHtml(collectionNameOf(collectionOfDataset(id)))})`
+    : datasetRefLink({datasetId: id});
+  return `<div class="xt-sentence" data-xt-between>${one(b.declared_on)} → ${(b.reads || []).map(one).join(", ")}</div>`;
 }
 // LEFT OUT FOR THE AGREEMENT (REQ-PIPE-270 criterion 9): the cross-table checks
 // the supply on show was NOT run against, because a table they read is not part
@@ -6053,10 +6378,11 @@ function notInAgreementShown(col, ds){
 // A left_out entry IN WORDS, FROM ITS STRUCTURED CODE (REQ-DASH-337 criterion
 // 12, REQ-PIPE-332 criterion 10) - never by matching its recorded reason text.
 // An entry recorded before the codes existed carries no code and was only ever
-// not part of the agreement. Its period is the entry's own, else the reason's.
+// not part of the agreement. Its period is the entry's own field - the build
+// reads a pre-code entry's period once, so nothing here reads the reason.
 function notInAgreementReason(entry){
   const e = entry || {};
-  const period = e.period || ((String(e.reason || "").match(/\d{4}-[A-Z0-9]+$/) || [""])[0]);
+  const period = e.period || "its period";
   const code = e.code || "not_in_agreement";
   if(code === "not_supplied_by_decision") return `Not supplied for ${period}, by decision.`;
   if(code === "calendar_differs"){
@@ -6110,8 +6436,8 @@ function historySource(col, h, own){
     const when = h.recorded_at ? `, ${fmtInstant(h.recorded_at)}` : "";
     return `from the ${own.name}'s re-check${when}`;
   }
-  const ds = (col.datasets || []).find(d=> d.id === h.recorded_by);
-  const name = ds ? ds.name : h.recorded_by;
+  // ACROSS THE ASSET (REQ-DASH-337 criterion 2): another collection's run too.
+  const name = datasetNameAnywhere(h.recorded_by, col);
   const when = h.recorded_at ? `, ${fmtInstant(h.recorded_at)}` : "";
   return causeKind(h) === "re-check" ? `from the ${name}'s re-check${when}` : `from the ${name}'s run${when}`;
 }
@@ -6134,8 +6460,7 @@ function countWord(n){
 // row blockChecksWhileHeld matched to its blocker.
 function recheckNote(col, point, why){
   if(!point || !point.recorded_by || !point.recorded_at) return "";
-  const ds = (col.datasets || []).find(d=> d.id === point.recorded_by);
-  const name = ds ? ds.name : point.recorded_by;
+  const name = datasetNameAnywhere(point.recorded_by, col);
   const recheck = causeKind(point) === "re-check";
   const when = recheck ? `when the ${name} was re-checked` : `when the ${name} supply arrived`;
   // A RESULT THAT COULD NOT BE EVALUATED says so (post-build-review #258 Q1,
@@ -7335,8 +7660,17 @@ function checksCount(n){
 // data" is left out where the supply has a red check of its own (criterion 3).
 // `said`: the verdict line already says when the checks run again, so the
 // line does not say it twice (UX critic on 7093c20, S4, PROVISIONAL).
-function noPromotedLineHtml(line, ownRed, said){
-  const link = datasetRefLink(line);
+// ANOTHER COLLECTION'S CAUSE IS NAMED IN FULL (REQ-DASH-337 criterion 11):
+// "<Collection>' 2026-Q2 <Dataset>", the period inside the name, so
+// the sentence does not give it twice. `pageId` is the page's dataset.
+function npOther(pageId, line){
+  return !!(pageId && line && line.datasetId
+    && collectionOfDataset(line.datasetId) && collectionOfDataset(pageId)
+    && collectionOfDataset(line.datasetId) !== collectionOfDataset(pageId));
+}
+function noPromotedLineHtml(line, ownRed, said, pageId){
+  const other = npOther(pageId, line);
+  const link = other ? causeName(pageId, line.datasetId, line.period, true) : datasetRefLink(line);
   const period = escHtml(fmtPeriodOrDay(String(line.period || "this period")));
   const n = Number(line.n) || 0;
   const one = n === 1;
@@ -7344,8 +7678,8 @@ function noPromotedLineHtml(line, ownRed, said){
   // A TURNED-DOWN OR REPLACED PARTNER NEEDS A PERSON, so "runs again by
   // itself" is not said beside "needs its own decision" (S4, PROVISIONAL).
   const again = said || line.form === "turned-down" || line.form === "replaced" ? ""
-    : ` ${one ? "It runs" : "They run"} again by ${one ? "itself" : "themselves"} once a ${period} ${link} supply is promoted.`;
-  const head = `<b style="display:inline">No promoted ${link} for ${period}.</b>`;
+    : ` ${one ? "It runs" : "They run"} again by ${one ? "itself" : "themselves"} once a ${other ? "" : period + " "}${link} supply is promoted.`;
+  const head = `<b style="display:inline">No promoted ${link}${other ? "" : ` for ${period}`}.</b>`;
   const couldNot = `so ${checksCount(n)} could not run.`;
   const partner = line.partnerReceived ? fmtInstant(line.partnerReceived) : "";
   switch(line.form){
@@ -7373,7 +7707,7 @@ function noPromotedNotice(ds){
   const ownRed = !!(ds.noPromotedOn && ds.noPromotedOn.ownRed);
   const others = otherTablesVerdict(ds);
   const said = !!(others && others.kind === "nothing" && ds.verdictOf && ds.verdictOf.state === "awaiting");
-  const body = lines.map(l=> `<div class="np-line" data-np-dataset="${escAttr(l.datasetId)}" data-np-form="${escAttr(l.form)}">${noPromotedLineHtml(l, ownRed, said)}</div>`).join("");
+  const body = lines.map(l=> `<div class="np-line" data-np-dataset="${escAttr(l.datasetId)}" data-np-form="${escAttr(l.form)}">${noPromotedLineHtml(l, ownRed, said, ds.id)}</div>`).join("");
   return `<div class="notice-exhausted" role="status" data-no-promoted="${lines.length}">${body}</div>`;
 }
 // CRITERION 16's verdict-line half, from the build's lines: null where the
@@ -7389,10 +7723,12 @@ function otherTablesVerdict(ds){
   const overdue = lines.filter(l=> l.noItem);
   if(overdue.length){
     const n = overdue.reduce((s, l)=> s + (Number(l.n) || 0), 0);
-    const which = overdue.map(l=> `${datasetRefLink(l)} for ${escHtml(fmtPeriodOrDay(String(l.period || "")))}`).join(" and ");
+    const which = overdue.map(l=> npOther(ds.id, l) ? causeName(ds.id, l.datasetId, l.period, true)
+      : `${datasetRefLink(l)} for ${escHtml(fmtPeriodOrDay(String(l.period || "")))}`).join(" and ");
     return {kind: "overdue", sentence: `${capFirst(checksCount(n))} could not run because ${which} ${overdue.length === 1 ? "is" : "are"} overdue. A person can decide on this supply, or wait for ${overdue.length === 1 ? "that supply" : "those supplies"} to be promoted.`};
   }
-  const once = lines.map(l=> `a ${escHtml(fmtPeriodOrDay(String(l.period || "")))} ${datasetRefLink(l)} supply`).join(" and ");
+  const once = lines.map(l=> npOther(ds.id, l) ? `a ${causeName(ds.id, l.datasetId, l.period, true)} supply`
+    : `a ${escHtml(fmtPeriodOrDay(String(l.period || "")))} ${datasetRefLink(l)} supply`).join(" and ");
   return {kind: "nothing", once};
 }
 // THE QUIET NOTE IN THE COLLECTION TABLE (criterion 18), under the reader's
@@ -7400,7 +7736,9 @@ function otherTablesVerdict(ds){
 function noPromotedNote(ds){
   const lines = noPromotedLines(ds).filter(l=> l.form !== "owed" && l.form !== "settled");
   if(!lines.length) return "";
-  const text = lines.map(l=> `No promoted ${l.name || l.datasetId} for ${fmtPeriodOrDay(String(l.period || ""))}`).join("; ");
+  const text = lines.map(l=> npOther(ds.id, l)
+    ? `No promoted ${causeName(ds.id, l.datasetId, l.period, false)}`
+    : `No promoted ${l.name || l.datasetId} for ${fmtPeriodOrDay(String(l.period || ""))}`).join("; ");
   return `<div class="no-promoted-note" data-no-promoted-note="${lines.length}" style="font-size:11.5px; color:var(--ink); margin-top:3px;">${escHtml(text)}</div>`;
 }
 // ONE CARD LINE PER CAUSING TABLE (criterion 18), in redPromotedMarker()'s
@@ -8378,10 +8716,12 @@ function redPromotedBadge(datasetId, runId, inPlaceOnDateStr){
       const acked = ack ? `; acknowledged by ${escHtml(ack.actor)}, ${fmtInstant(ack.at)}` : "";
       return `<span class="red-promoted" data-red-promoted data-red-promoted-recheck><span class="pill red sm"><span class="ico"></span>Red promoted</span><span class="rp-why" data-red-promoted-why>${sentenceCase(`${wentRed ? "" : went}${recheckWords(rc)}${acked}`)}</span></span>`;
     }
+    // THE CAUSE NAMED IN FULL WHERE IT IS ANOTHER COLLECTION'S (REQ-DASH-337
+    // criterion 11), from the step's structured fields; the build's words else.
     const how = before
-      ? `went in red. Red since ${escHtml(since.cause)}, ${fmtInstant(since.at)}; promoted ${fmtInstant(h.promotedAt)}`
+      ? `went in red. Red since ${causeWords(datasetId, since, true)}, ${fmtInstant(since.at)}; promoted ${fmtInstant(h.promotedAt)}`
       : wentRed ? "promoted while red"
-      : `turned red ${fmtInstant(since.at)} after ${escHtml(since.cause)}`;
+      : `turned red ${fmtInstant(since.at)} after ${causeWords(datasetId, since, true)}`;
     // A SHORT PILL WITH ITS SENTENCE BENEATH (#121 D1/D2, Keith 2026-10-06):
     // the whole sentence in one nowrap pill was 598px wide and coloured with
     // a `--red` colour, which is not a token, so it had no red in it at all.
@@ -8391,9 +8731,33 @@ function redPromotedBadge(datasetId, runId, inPlaceOnDateStr){
     // A LATER RE-CHECK'S OWN NOTE IN PLACE OF THIS TAG (REQ-DASH-221 criterion 5).
     const rc = recheckEvents(datasetId, runId).find(e=> sameInstant(e.at, later.at));
     if(rc) return recheckedLaterTag(rc);
-    return `<span class="pill tag sm" data-turns-red-later style="color:var(--ink-muted);"><span class="ico"></span>Turned red later - ${fmtInstant(later.at)}, after ${escHtml(later.cause)}</span>`;
+    return `<span class="pill tag sm" data-turns-red-later style="color:var(--ink-muted);"><span class="ico"></span>Turned red later - ${fmtInstant(later.at)}, after ${causeWords(datasetId, later, true)}</span>`;
   }
   return "";
+}
+// AMBER PROMOTED (REQ-DASH-337 criterion 9, Keith L-Q5 = a; wording settled
+// 2026-10-30): a supply that went in green and that a later cross-table
+// result turned amber - ANY cross-table cause, another collection's or a
+// sibling's - in the red-promoted badge's shape: a short pill with its
+// sentence beneath. From the date the amber began to count (REQ-PIPE-332
+// criterion 4); on any earlier date the supply shows as it was. A re-check
+// that turned it amber keeps REQ-DASH-221's own tag, and a supply that went
+// in amber keeps the acknowledgement badge.
+function amberPromotedTag(datasetId, runId, inPlaceOnDateStr){
+  const raw = rawRealDatasetById(datasetId);
+  const h = raw && raw.promotedHealth && runId && raw.promotedHealth[runId];
+  if(!h || h.promotedOn !== "green") return "";
+  const on = inPlaceOnDateStr || (typeof CURRENT_IN_PLACE_ON !== "undefined" ? CURRENT_IN_PLACE_ON : null);
+  if(runStateInPlaceOn(raw, runId, on) !== "promoted") return "";
+  let now = null, since = null;
+  (h.timeline || []).forEach(t=>{
+    if(!t.at || !t.status || (on && assetDateStrOf(t.at) > on)) return;
+    if(!(now && now.status === "amber" && t.status === "amber")) since = t;
+    now = t;
+  });
+  if(!now || now.status !== "amber" || !since) return "";
+  if(recheckEvents(datasetId, runId).some(e=> sameInstant(e.at, since.at))) return "";
+  return `<span class="red-promoted" data-amber-promoted><span class="pill amber sm"><span class="ico"></span>Amber promoted</span><span class="rp-why" data-amber-promoted-why>Went in green. Amber since ${causeWords(datasetId, since, true)}, ${fmtInstant(since.at)}.</span></span>`;
 }
 // A PROMOTED SUPPLY'S PILL IS ITS NEWEST RESULT (REQ-DASH-126 criterion 3,
 // #116 D2, Keith 2026-10-06): on a supply-history row the pill used to be the
@@ -8603,7 +8967,8 @@ function renderSupplyCycleRows(entries, datasetId, cycleStart){
     // dirtySeverity pill (a synthetic-generation-only concept no real
     // production dashboard would have - item 72).
     const statusBadge = supplyRowStatus(datasetId, e) + " " + acknowledgementBadge(datasetId, e.run_id)
-      + " " + redPromotedBadge(datasetId, e.run_id) + " " + recheckedAmberTag(datasetId, e.run_id);
+      + " " + redPromotedBadge(datasetId, e.run_id) + " " + amberPromotedTag(datasetId, e.run_id)
+      + " " + recheckedAmberTag(datasetId, e.run_id);
     // A resupply (any entry after the first in its chain) has no real
     // arrivalStatus (item 69's own reasoning, now keyed off real chain
     // position) - shows how long it's been since the previous supply/
@@ -9468,7 +9833,7 @@ function renderDataset(view, agencyId, collectionId, datasetId){
         <h2>${ds.name}${ds.realRunCount?` <span class="pill tag"><span class="ico"></span>Real pipeline data — ${ds.realRunCount} computed ${pluralize(ds.realRunCount,"run")}</span>`:""}</h2>
         <div class="view-sub">${ds.provider} · ${col.name} · ${ag.name}${ds.realRunCount?" · figures below are computed by real dbt/Soda/datacontract-cli/Evidently tools against real generated runs — not fabricated in the browser.":""}</div>
       </div>
-      <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">${statusPill(ds)} ${redPromotedBadge(ds.id, ds.verdictOf && ds.verdictOf.inPlaceRunId)} ${recheckedAmberTag(ds.id, ds.verdictOf && ds.verdictOf.inPlaceRunId)} ${turnOffMarker(rawRealDatasetById(ds.id) || ds, CURRENT_IN_PLACE_ON)} ${unagreedMarker(ds)} ${standingInMarker(ds)} ${ticketBadge(ds.id)} ${githubFolderLink("datasets", ds.id)} ${assignmentBadge("datasets", ds.id)}</div>
+      <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">${statusPill(ds)} ${redPromotedBadge(ds.id, ds.verdictOf && ds.verdictOf.inPlaceRunId)} ${amberPromotedTag(ds.id, ds.verdictOf && ds.verdictOf.inPlaceRunId)} ${recheckedAmberTag(ds.id, ds.verdictOf && ds.verdictOf.inPlaceRunId)} ${turnOffMarker(rawRealDatasetById(ds.id) || ds, CURRENT_IN_PLACE_ON)} ${unagreedMarker(ds)} ${standingInMarker(ds)} ${ticketBadge(ds.id)} ${githubFolderLink("datasets", ds.id)} ${assignmentBadge("datasets", ds.id)}</div>
     </div>
     ${verdictLine(ds)}
     ${turnOffReasonLine(ds)}
@@ -9621,6 +9986,7 @@ function renderDataset(view, agencyId, collectionId, datasetId){
     </div>`;
   }).join("");
   wireNotInAgreement(scopeWrap, col, notInAgreement);
+  wireXtGroups(scopeWrap);
   // REQ-DASH-097: the file section, in a container of its OWN above the
   // data checks' sections - it is about what arrived, before anything was
   // checked of its data, and is not one of them.
@@ -9807,8 +10173,7 @@ function openColumnDrawer(ag, col, ds, column, opts){
       ${ck.description? `<div class="check-desc"></div>`:""}
       ${ck.tool_ref? `<div class="tool-ref"></div>`:""}
       <div class="thresholds">${[
-        ck.warn==null ? null : `warn &gt; ${fmtMetric(ck.warn,ck.unit)}`,
-        ck.fail==null ? null : `fail &gt; ${fmtMetric(ck.fail,ck.unit)}`,
+        ...bandParts(ck),
         ck.blockedThisPeriod ? `<span class="not-evaluated-tag">not run for this period</span>`
           : notEvaluated((ck.history||[]).slice(-1)[0]) ? `<span class="not-evaluated-tag">not evaluated in the latest run</span>` : `current ${fmtMetric(ck.current,ck.unit)}`,
       ].filter(Boolean).join(" · ")}${(ck.warn==null&&ck.fail==null) ? ` <span class="muted">(no single-sided threshold — status is this tool's own verdict)</span>` : ""}</div>
@@ -10359,7 +10724,7 @@ function openCheckPanel(ag, col, ds, column, check, opts){
       ${bulkLines.filter((l, i)=> !placedLines.has(i)).map(l=> l.html).join("")}
     </div>` : "";
 
-  body.innerHTML = descBlock + whatItDoesBlock + failureMeansBlock + referenceNoteHtml(currentPoint) + xtToolsPanelBlock(col, ds, column, check) + compareBlock + rowDetailBlock + trendBlock + changelogBlock;
+  body.innerHTML = descBlock + whatItDoesBlock + failureMeansBlock + referenceNoteHtml(currentPoint) + distributionBlock(check, currentPoint) + xtToolsPanelBlock(col, ds, column, check) + compareBlock + rowDetailBlock + trendBlock + changelogBlock;
   fillAuthored(body);
   document.getElementById("check-backdrop").classList.add("open");
   document.getElementById("check-panel").classList.add("open");

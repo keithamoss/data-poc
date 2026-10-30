@@ -110,3 +110,23 @@ class TestItTakesTheTableIndexOnce:
         got = red_promoted.for_dataset(DS, conn=conn)
         assert {"run-a", "run-b"} <= set(got), "precondition: both supplies were answered"
         assert seen.reads.get("by_table") == 1 and not seen.unpassed, vars(seen)
+
+
+class TestACauseCarriesWhatThePageNamesItBy:
+    """REQ-DASH-337 criterion 11: the page names a cause in another collection
+    as '<collection>' <period> <dataset>', so each step carries the cause's
+    dataset, its action and the period its supply was filed to - read from
+    the recorded run and the filings, beside the words it always carried."""
+
+    def test_an_arrivals_run_names_its_dataset_and_its_supplys_period(self, conn, period):
+        from qa_tools.common import qa_results_writer
+
+        a, _table = _filed(conn, period, "2026-05-01T01:00:00+00:00")
+        run_key = f"cp_carers__{_base._key()}"
+        qa_results_writer.open_run(AG, COL, run_key, WHEN, "tests@example.gov.au",
+                                   purpose={"dataset_id": DS, "supply_id": a, "scope": "arrival"})
+        got = red_promoted._cause_fields(conn, run_key, {})
+        assert got == {"causeAction": "arrival", "causeDataset": DS, "causePeriod": period}
+
+    def test_an_unrecorded_run_carries_nothing(self, conn):
+        assert red_promoted._cause_fields(conn, "no-such-run", {}) == {}

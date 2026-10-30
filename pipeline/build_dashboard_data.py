@@ -35,6 +35,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 
 from pipeline import (acknowledgements, period_slots, closed_slots, corrections, cross_table_grid,
                       cross_table_notices, excuses, held_back_notices,
@@ -375,8 +376,27 @@ def _left_out_fields(why) -> dict:
     from qa_tools.common import unrunnable
 
     entry = unrunnable.as_entry(why)
+    period = entry.get("period")
+    if period is None and isinstance(why, str):
+        # AN ENTRY RECORDED BEFORE THE CODES (REQ-PIPE-332 criterion 10) is a
+        # bare reason ending in its period - read here, once, so the page
+        # words every entry from its fields and never from its text
+        # (REQ-DASH-337 criterion 12).
+        found = re.search(r"\d{4}-[A-Z0-9]+$", why.strip())
+        period = found.group(0) if found else None
+    calendar = entry.get("calendar")
+    if calendar is None and entry["code"] == unrunnable.CALENDAR_DIFFERS and entry.get("dataset"):
+        # WHICH CALENDAR THE DATASET WAS ON, from configuration, for 'Not
+        # checked: <dataset> was on the <calendar> calendar for <period>'.
+        from qa_tools.common import schedule
+
+        try:
+            calendar = schedule.calendar_for_dataset(entry["dataset"]).name
+        except Exception:  # noqa: BLE001 - a name is decoration; the page words its absence
+            calendar = None
     return {"code": entry["code"], "reason": entry["reason"],
-            "period": entry.get("period"), "dataset": entry.get("dataset")}
+            "period": period, "dataset": entry.get("dataset"),
+            **({"calendar": calendar} if calendar else {})}
 
 
 # ---- one dataset ------------------------------------------------------------
@@ -416,7 +436,7 @@ def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], da
             # could never qualify to count and stayed not judged for ever.
             from qa_tools.common import run_reads
 
-            for table in run_reads.reads_for(coll.id).tables:
+            for table in {*run_reads.reads_for(coll.id).tables, *view.get("extra_tables", ())}:
                 d = hierarchy.dataset_for_table(table)
                 if d.dataset_id not in slot_timelines:
                     slot_timelines[d.dataset_id] = slot_timeline.for_dataset(d.dataset_id)
@@ -461,8 +481,15 @@ def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], da
             "dimension": r["dimension"], "label": r.get("label"), "check_id": r["check_id"],
             "by_run": {}, "row_count_total": {}, "row_count_invalid": {}, "failing_sample_keys": {},
             "status_by_run": {}, "reference": {}, "not_evaluated": {}, "at": {}, "reads": {},
-            "unreadable": {}, "due_at": {},
+            "unreadable": {}, "due_at": {}, "distribution": {}, "band": {},
         })
+        # A RECORDED BINNED DISTRIBUTION (REQ-DASH-337 criterion 14) and the
+        # BAND IN THE DIRECTION THE RESULT RECORDS (criterion 13), where the
+        # result carries them - any check's, never named here.
+        if r.get("distribution"):
+            slot["distribution"][r["run_id"]] = r["distribution"]
+        if r.get("band"):
+            slot["band"][r["run_id"]] = r["band"]
         slot["reads"][r["run_id"]] = r.get("reads")
         slot["at"][r["run_id"]] = r.get("run_timestamp")
         slot["not_evaluated"][r["run_id"]] = _not_evaluated_reason(r)
@@ -603,6 +630,8 @@ def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], da
                     **({"due_at": slot["due_at"][run_id]} if slot["due_at"].get(run_id) else {}),
                     **({"contested_files": this_read["contested_files"]}
                        if into is contested_reads else {}),
+                    **({"distribution": slot["distribution"][run_id]}
+                       if slot["distribution"].get(run_id) else {}),
                 })
             history = sorted(history + elsewhere, key=lambda h: h["rank"])
             if not history and not contested_reads and not replaced:
@@ -639,6 +668,11 @@ def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], da
                 # bound of that kind", NOT "zero tolerance".
                 "warn": slot["warn"],
                 "fail": slot["fail"],
+                # THE BAND AS ITS NEWEST RESULT RECORDS IT (REQ-DASH-337
+                # criterion 13) - {warn: {op, value}, fail: {op, value}} - so a
+                # 'below' threshold is worded below; absent where none records it.
+                **({"band": slot["band"][max(slot["band"], key=rank)]}
+                   if slot["band"] else {}),
                 "current": current_value,
                 "current_status": current_status,
                 "between": (_between(slot["check_id"],
@@ -790,7 +824,8 @@ def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], da
     # STATUS ON AN AWAITING LINE (REQ-DASH-272), as at every date: placed on
     # each entry, the owed re-check's words on each counted point, the clause
     # per supply - from the slot timelines and the decision log.
-    for d in coll.datasets:
+    for d in [*coll.datasets, *(hierarchy.dataset_for_table(t)
+                                for t in view.get("extra_tables", ()))]:
         if d.dataset_id not in slot_timelines:
             slot_timelines[d.dataset_id] = slot_timeline.for_dataset(d.dataset_id)
     if "slots" not in view:
@@ -1027,21 +1062,33 @@ def build_datasets(collection_id: str) -> list[dict]:
 
     by_table = {d.table: [r for r in results if r["dataset_id"] == d.dataset_id]
                 for d in coll.datasets}
-    share_cross_table_results(results, by_table)
+    # ANOTHER COLLECTION'S CROSS-TABLE RESULTS THAT READ THIS ONE'S TABLES
+    # (REQ-DASH-337 criterion 3): shared onto the pages of the tables they
+    # read, as REQ-DASH-264 shares a result within a collection - but never
+    # one recorded NOT EVALUATED, which counts toward the table the check is
+    # declared on only and so stays on that page (REQ-PIPE-269 criterion 4).
+    foreign = [r for r in payload.get("read_by_others") or []
+               if not _not_evaluated_reason(r) and r.get("run_id") in facts]
+    share_cross_table_results(results + foreign, by_table)
+    results = results + foreign
     # WHAT EVERY PERIOD HELD, AND WHAT DECISIONS STILL OWE - read once for the
     # collection, the first time a card asks, so each card's counted points
     # are a walk in memory.
-    cache: dict = {}
+    cache: dict = {"extra_tables": sorted({t for r in foreign for t in (r.get("reads") or {})})}
     # A READERS-ONLY RE-CHECK RECORDS NO dataset_stats (the knock-on's, REQ-PIPE-140
     # criterion 2), so it is not among the file's runs - and its results were
     # placed nowhere, leaving a page on the verdict it replaced (post-build-review
     # #264). It is a run of the collection all the same, dated by when it ran.
+    # AND ANOTHER COLLECTION'S RUN (REQ-DASH-337 criterion 3) the same way: it
+    # records no dataset_stats here either.
     known = {m["run_id"] for m in manifest}
+    own_datasets = {d.dataset_id for d in coll.datasets}
     readers_runs: dict[str, dict] = {}
     for r in results:
         run_id = r.get("run_id")
         if (run_id not in known and run_id not in readers_runs and run_id in facts
-                and facts[run_id]["scope"] == "readers"):
+                and (facts[run_id]["scope"] == "readers"
+                     or facts[run_id]["dataset_id"] not in own_datasets)):
             readers_runs[run_id] = {"run_id": run_id, "received_at": r["run_timestamp"]}
     all_runs = sorted([*manifest, *readers_runs.values()],
                       key=lambda m: facts[m["run_id"]]["rank"])

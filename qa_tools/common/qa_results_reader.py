@@ -365,7 +365,8 @@ def list_run_ids(agency: str, collection: str,
             conn.close()
 
 
-def run_facts(agency: str, collection: str, conn=None) -> dict[str, dict]:
+def run_facts(agency: str, collection: str, conn=None, *,
+              also: tuple[str, ...] | list[str] = ()) -> dict[str, dict]:
     """{run id: what qa.run says the run is} for every complete run of the
     collection (REQ-PIPE-279 criteria 16 and 17): its dataset, its scope, the
     supply it belongs to, its CAUSE, and its RANK - dense, from run_seq
@@ -377,23 +378,32 @@ def run_facts(agency: str, collection: str, conn=None) -> dict[str, dict]:
     siblings (`arrival:<delivery>@<instant>`; a supply with no recorded
     receipt is an arrival of its own, `arrival:<run id>`); a re-check's,
     readers-only or knock-on run's the decision or load it records. A run
-    that belongs to no supply has none."""
+    that belongs to no supply has none.
+
+    `also`: ANOTHER COLLECTION'S RUNS, ranked among this one's by run_seq
+    (REQ-DASH-337 criterion 3) - the runs whose cross-table results read
+    this collection's tables, so the build can place them on its pages."""
     conn, mine = _conn(conn)
+    select = (f'SELECT r.run_key, r.dataset_id, r.scope, r.supply_id, r.caused_by_decision, '
+              f'r.caused_by_load, rc.delivery, rc.received_instant, r.gate_application, '
+              f'r.run_seq FROM "{qa_store.SCHEMA}".run_visible r '
+              f'LEFT JOIN "{qa_store.SCHEMA}".supply_receipt rc '
+              "ON rc.dataset_id = r.dataset_id AND rc.supply_id = r.supply_id ")
     try:
-        rows = conn.execute(
-            f'SELECT r.run_key, r.dataset_id, r.scope, r.supply_id, r.caused_by_decision, '
-            f'r.caused_by_load, rc.delivery, rc.received_instant, r.gate_application '
-            f'FROM "{qa_store.SCHEMA}".run_visible r '
-            f'LEFT JOIN "{qa_store.SCHEMA}".supply_receipt rc '
-            "ON rc.dataset_id = r.dataset_id AND rc.supply_id = r.supply_id "
-            "WHERE r.agency_id = ? AND r.collection_id = ? ORDER BY r.run_seq",
-            [agency, collection]).fetchall()
+        rows = conn.execute(select + "WHERE r.agency_id = ? AND r.collection_id = ? "
+                            "ORDER BY r.run_seq", [agency, collection]).fetchall()
+        own = {row[0] for row in rows}
+        extra = [k for k in dict.fromkeys(also) if k not in own]
+        if extra:
+            rows = sorted([*rows, *conn.execute(
+                select + f"WHERE r.run_key IN ({', '.join('?' for _ in extra)})",
+                extra).fetchall()], key=lambda row: row[9])
     finally:
         if mine:
             conn.close()
     out = {}
     for rank, (key, dataset_id, scope, supply, decision, load, delivery, instant,
-               application) in enumerate(rows, start=1):
+               application, _seq) in enumerate(rows, start=1):
         if supply is None:
             cause = None
         elif application is not None:
@@ -566,6 +576,40 @@ def read_cross_table_results(agency: str, collection: str,
                     params.append(supply_state)
                 out.extend(_records(conn.execute(sql + " ORDER BY id", params),
                                     run_id, _run_timestamp(conn, run_id)))
+        return out
+    finally:
+        if mine:
+            conn.close()
+
+
+def read_cross_table_results_reading(agency: str, collection: str, tables, conn=None
+                                     ) -> list[dict]:
+    """Every cross-table result recorded under ANOTHER collection whose
+    recorded reads (qa.check_read) name one of `tables` - each with those
+    reads, as results_history gives its own (REQ-DASH-337 criterion 3).
+
+    A collection's results are read by collection, so a check declared in one
+    collection that reads another's table never reached the read table's page
+    (architect M3). Recorded QA metadata only, never a supply row. Every
+    supply_state, as the rebuild reads its own; whether a result reaches a page
+    - read, held, in development, not evaluated - is the build's to decide."""
+    from qa_tools import collections
+
+    wanted = set(tables)
+    conn, mine = _conn(conn)
+    try:
+        out: list[dict] = []
+        for other in collections.all_collections():
+            if (other.agency_id, other.id) == (agency, collection):
+                continue
+            reads = read_check_reads(other.agency_id, other.id, conn=conn)
+            if not any(wanted & set(got) for got in reads.values()):
+                continue
+            for r in read_cross_table_results(other.agency_id, other.id, conn=conn,
+                                              supply_state=None):
+                got = reads.get((r["run_id"], r["check_id"]))
+                if got and wanted & set(got):
+                    out.append({**r, "reads": got})
         return out
     finally:
         if mine:

@@ -22,7 +22,7 @@ that changed:
   - `_DEFAULTS` was a second, hand-maintained statement of the file's
     shape sitting next to the real one. The schema now says it once.
 
-The schema/linkage CI gate (qa_tools/common/validate_requirements.py)
+The schema/link CI gate (qa_tools/common/validate_requirements.py)
 still exists and still does the heavier work - AST-verifying every
 `linked_tests`/`implemented_by` symbol, resolving `dependencies`. It
 reads the raw YAML itself rather than going through this module, so it

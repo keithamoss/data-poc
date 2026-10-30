@@ -135,3 +135,26 @@ class TestSamplesAreNotLostToANameAnotherTableShares:
                     f'SELECT {pk} FROM "{schema}".{table}').fetchall()}
                 assert set(r["failing_sample_keys"]) <= keys, \
                     (r["check_id"], r["failing_sample_keys"])
+
+
+class TestEachResultRecordsTheDirectionItsBandComparesIn:
+    """REQ-DASH-337 criterion 13: the page states a band in the direction its
+    result records, so the record carries it - the comparison Soda itself
+    reported for each side, never inferred from a metric's name."""
+
+    def test_a_greater_than_rule_records_greater_than(self, monkeypatch, cp_duckdb_dir):
+        results = _run(monkeypatch, cp_duckdb_dir, _DIRTY_RUN_ID, "2026-04-01T09:00:00Z")
+        banded = [r for r in results if r.get("band")]
+        assert banded, "no Soda result recorded a band"
+        for r in banded:
+            for side, got in r["band"].items():
+                assert side in ("warn", "fail") and got["op"] in (">", ">=", "<", "<=", "=", "!=")
+                assert got["value"] == r[f"{side}_threshold"], r
+        assert any(r["band"].get("fail", {}).get("op") == ">" for r in banded)
+
+    def test_a_less_than_rule_records_less_than(self):
+        from qa_tools.common.soda_common import band
+        assert band({"warn": {"lessThan": 90}, "fail": {"lessThan": 85}}) == \
+            {"warn": {"op": "<", "value": 90}, "fail": {"op": "<", "value": 85}}
+        # A range cannot be stated as one direction, so it records none.
+        assert band({"fail": {"lessThan": 1, "greaterThan": 9}}) is None

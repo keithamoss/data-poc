@@ -172,6 +172,26 @@ def threshold(spec: dict | None) -> float | None:
     return next(iter(spec.values()), None)
 
 
+#: Soda's threshold keys as the comparison each records (REQ-DASH-337
+#: criterion 13): the page states a band in the direction its result records.
+_BAND_OPS = {"greaterThan": ">", "greaterThanOrEqual": ">=", "lessThan": "<",
+             "lessThanOrEqual": "<=", "equal": "=", "notEqual": "!="}
+
+
+def band(diagnostics: dict) -> dict | None:
+    """{warn: {op, value}, fail: {op, value}} - each side Soda reported, with
+    the direction it compares in - or None where the check reported neither,
+    or a side compares more than one way (a range), which a single word cannot
+    state."""
+    out = {}
+    for side in ("warn", "fail"):
+        spec = diagnostics.get(side) or {}
+        ops = [(k, v) for k, v in spec.items() if k in _BAND_OPS]
+        if len(ops) == 1:
+            out[side] = {"op": _BAND_OPS[ops[0][0]], "value": ops[0][1]}
+    return out or None
+
+
 def execute_scan(scan):
     """Run a Soda scan and return its results, leaving nothing behind.
 

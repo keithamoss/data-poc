@@ -46,6 +46,43 @@ def _cause(conn, run_key: str) -> tuple[str, str]:
     return at, f"the arrival of {_name(run_ds)}"
 
 
+def _cause_fields(conn, run_key: str, periods: dict) -> dict:
+    """The structured half of a run's cause (REQ-DASH-337 criterion 11):
+    {causeAction, causeDataset, causePeriod} - what the page names a cause by,
+    '<collection>' <period> <dataset>' where the dataset is another
+    collection's. Beside _cause's words, which stay as they were. Empty where
+    the run is not recorded."""
+    rows = conn.execute(
+        f'SELECT r.dataset_id, r.supply_id, d.action, d.dataset_id, d.supply '
+        f'FROM "{qa_store.SCHEMA}".run r '
+        f'LEFT JOIN "{qa_store.SCHEMA}".decision d ON d.id = r.caused_by_decision '
+        "WHERE r.run_key = ?", [run_key]).fetchall()
+    if not rows:
+        return {}
+    run_ds, run_supply, action, cause_ds, cause_supply = rows[0]
+    ds, supply = (cause_ds, cause_supply) if action else (run_ds, run_supply)
+    if not ds:
+        return {}
+    return {"causeAction": action or "arrival", "causeDataset": ds,
+            "causePeriod": _period_of(ds, supply, periods)}
+
+
+def _period_of(dataset_id: str, supply: str | None, periods: dict) -> str | None:
+    """The period a supply was filed to, from the filings - read once per
+    dataset into `periods`. None where it was filed nowhere."""
+    if not supply:
+        return None
+    if dataset_id not in periods:
+        from qa_tools.common import filing
+
+        try:
+            periods[dataset_id] = {r.get("supply_id"): r.get("slot")
+                                   for r in filing.filings_of(dataset_id)}
+        except Exception:  # noqa: BLE001 - a period is decoration, never a failure
+            periods[dataset_id] = {}
+    return periods[dataset_id].get(supply)
+
+
 def _by(conn, run_key: str) -> str | None:
     """The PERSON whose decision caused a run, by display name - None for the
     rule's or an arrival (REQ-DASH-272 criterion 3) - beside _cause's words,
@@ -89,6 +126,7 @@ def for_dataset(dataset_id: str, conn=None) -> dict[str, dict]:
     timelines: dict[str, list[dict]] = {}
     warehouses: dict[frozenset, supply_status.HoldingsTimeline] = {}
     owed = None
+    periods: dict = {}
     for supply, promoted_on, promoted_at in conn.execute(
             f"SELECT DISTINCT ON (supply) supply, promoted_status, effective_at "
             f"FROM {decision_log.TABLE} WHERE dataset_id = ? AND action = ? "
@@ -131,13 +169,15 @@ def for_dataset(dataset_id: str, conn=None) -> dict[str, dict]:
                 when = supply_status.instant(at) if at else None
                 place[run_key] = (when, order) if when is not None else None
                 if when is not None:
-                    steps[(when, order)] = (at, cause, by)
+                    steps[(when, order)] = (at, cause, by, _cause_fields(conn, run_key, periods))
         for ds in sorted(involved):
             name = _name(ds)  # once per dataset, not per entry (REQ-PIPE-254 criterion 19)
             for entry in timelines[ds]:
                 when = supply_status.instant(entry["at"])
                 steps.setdefault((when, last), (entry["at"], f"the {entry['action']} of {name}",
-                                                _person(entry)))
+                                                _person(entry),
+                                                {"causeAction": entry["action"], "causeDataset": ds,
+                                                 "causePeriod": entry.get("slot")}))
         # AND WHERE AN OWED RE-CHECK CLEARS (post-build-review #266 D2): owed
         # until the run that cleared it, which need record nothing about this
         # supply - so the badge steps there as the card does.
@@ -147,7 +187,8 @@ def for_dataset(dataset_id: str, conn=None) -> dict[str, dict]:
                 at, cause = _cause(conn, run_key)
                 by = _by(conn, run_key)
                 if at:
-                    steps.setdefault((when, last), (at, cause, by))
+                    steps.setdefault((when, last), (at, cause, by,
+                                                    _cause_fields(conn, run_key, periods)))
         timeline: list[dict] = []
         for step in sorted(steps):
             when = step[0]
@@ -165,8 +206,8 @@ def for_dataset(dataset_id: str, conn=None) -> dict[str, dict]:
                 continue
             if timeline and timeline[-1]["status"] == status:
                 continue
-            at, cause, by = steps[step]
-            timeline.append({"at": at, "status": status, "cause": cause,
+            at, cause, by, fields = steps[step]
+            timeline.append({"at": at, "status": status, "cause": cause, **fields,
                              # WHO, where the cause is a person's decision
                              # (REQ-DASH-272 criterion 3) - beside the cause,
                              # which every other reader words as it was.
