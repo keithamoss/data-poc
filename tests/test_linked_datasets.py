@@ -72,10 +72,26 @@ class TestCriterionSix:
         assert "cp-clients" in text and "no_such_column" in text
 
     def test_more_identifier_columns_than_the_contracts_id_n(self, repo):
+        """The contract declares id_1 and id_2; three real source columns
+        exceed it - and the message is that one, not any other naming id_1."""
+        assert "linkage-keys links 'cp-clients' by" not in "\n".join(
+            linked_datasets.problems(repo)), "precondition: the real mapping fits"
+
         def change(ls):
-            ls[0]["id_columns"] = ["cp_client_id", "cp_client_id"]
+            ls[0]["id_columns"] = ["cp_client_id", "given_name", "family_name"]
         text = _edit(repo, change)
-        assert "cp-clients" in text and "id_1" in text
+        assert ("linkage-keys links 'cp-clients' by 3 identifier columns, more than the "
+                "contract's id_1 to id_2.") in text.splitlines(), text
+
+    def test_a_dataset_naming_no_calendar(self, repo):
+        cal_path = repo / "contract" / "calendar.yaml"
+        cal = yaml.safe_load(cal_path.read_text())
+        entry = next(d for d in cal["datasets"] if d["id"] == "cp-clients")
+        entry["no_calendar"] = True
+        cal_path.write_text(yaml.safe_dump(cal, sort_keys=False))
+        text = "\n".join(linked_datasets.problems(repo))
+        assert ("linkage-keys links 'cp-clients', which names no calendar, so it has no "
+                "period to be read for.") in text.splitlines(), text
 
     def test_two_datasets_with_one_code(self, repo):
         def change(ls):
