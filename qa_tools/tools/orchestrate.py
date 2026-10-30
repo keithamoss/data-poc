@@ -157,9 +157,10 @@ def _run_one_inner(collection_id: str, entry: dict, run_id: str, run_timestamp: 
     assessment = None
     if reference_run_id is None:
         owner = run_owner(run_id)
-        assessment = drift_reference.assess_arrival(
-            owner[0] if owner else run_evidently.drift_dataset(coll.id), entry["received_at"],
-            period=(entry.get("purpose") or {}).get("period"))
+        drift_of = owner[0] if owner else run_evidently.drift_dataset(coll.id)
+        assessment = (drift_reference.assess_arrival(
+            drift_of, entry["received_at"], period=(entry.get("purpose") or {}).get("period"))
+            if drift_of is not None else None)
         reference_run_id = assessment.run_id if assessment else None
 
     # NO TOOL RUNS FOR A RUN WHOSE OWN TABLE IS UNREADABLE (REQ-PIPE-115

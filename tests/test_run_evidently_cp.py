@@ -100,3 +100,30 @@ class TestNoReferenceIsNotAPass:
     def test_the_row_count_it_did_measure_is_still_there(self, monkeypatch):
         psi = self._run(monkeypatch, reference_run_id=None)[0]
         assert psi["row_count_total"] == 2
+
+
+class TestACollectionWithNoEvidentlyCheck:
+    """REQ-QAC-333 criterion 5: Linkage Products' Evidently check file is
+    present and holds no check. A run of it used to fail outright at the
+    Evidently step ("expected at least one psi check, found none"), so no
+    Linkage Products run could finish - found by REQ-TEST-339's run of a
+    linkage product end to end. It records an empty Evidently result."""
+
+    def test_linkage_products_records_nothing_and_does_not_fail(self, monkeypatch):
+        written = {}
+        monkeypatch.setattr(run_evidently, "write_qa_result",
+                            lambda *a, verified=None, **kw: written.update(verified=verified))
+        got = run_evidently.evaluate("linkage-products", "linkage_keys__202605011705000800",
+                                     "2026-05-01T17:05:00+08:00")
+        assert got == [] and written == {"verified": []}
+
+    def test_a_file_with_checks_but_no_drift_check_is_still_refused(self, tmp_path, monkeypatch):
+        from qa_tools.common import check_lifecycle, evidently_common
+
+        monkeypatch.setattr(check_lifecycle, "load_evidently_checks", lambda path: {
+            "data-asset-1.department-of-health.linkage-products.linkage-keys.row_drop_evidently":
+                {"method": "row_drop"}})
+        import pytest
+
+        with pytest.raises(ValueError, match="at least one psi check"):
+            evidently_common.collection_checks("linkage-products")

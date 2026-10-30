@@ -36,7 +36,7 @@ from qa_tools.common.qa_results_writer import run_owner, write_qa_result
 __all__ = ["ENGINE_TAG", "evaluate"]
 
 
-def drift_dataset(collection_id: str) -> str:
+def drift_dataset(collection_id: str) -> str | None:
     """The dataset a collection's drift checks are about - the check ids'
     fourth segment (asset.agency.collection.dataset...), one for all of them -
     None for a collection that declares none."""

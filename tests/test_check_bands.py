@@ -301,3 +301,25 @@ class TestAUserDefinedMetricsBandIsRead:
         assert metric == "large_key_group_percent"
         assert [(b.op, b.value, b.unit) for b in warn] == [(">", 2.0, check_bands.PERCENT)]
         assert [(b.op, b.value, b.unit) for b in fail] == [(">", 4.0, check_bands.PERCENT)]
+
+    def test_a_metric_named_after_a_table_with_a_digit(self, tmp_path):
+        """A coverage metric named after its table, as REQ-QAC-333's generated
+        checks are (`<table>_coverage_percent`), where the table's name holds
+        a digit - a valid Soda metric name the catalogue refused outright
+        (found by REQ-TEST-339's thirty linked datasets)."""
+        from qa_tools.common import check_bands
+
+        path = tmp_path / "x-soda-checks.yml"
+        path.write_text(
+            "checks for keys:\n"
+            "  - src2_d1_coverage_percent:\n"
+            "      src2_d1_coverage_percent query: SELECT 100\n"
+            "      warn: when < 90\n"
+            "      fail: when < 85\n"
+            "      attributes:\n"
+            "        check_id: a.b.c.d.coverage_soda\n"
+            "        unit: percent\n")
+        metric, warn, fail = check_bands.soda_bounds(path)["a.b.c.d.coverage_soda"]
+        assert metric == "src2_d1_coverage_percent"
+        assert [(b.op, b.value, b.unit) for b in warn] == [("<", 90.0, check_bands.PERCENT)]
+        assert [(b.op, b.value, b.unit) for b in fail] == [("<", 85.0, check_bands.PERCENT)]

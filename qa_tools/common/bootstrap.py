@@ -357,7 +357,7 @@ def reads_others(short: str) -> str | None:
                      for t in run_reads.reads_for(coll.id).foreign})
     if not others:
         return None
-    return (f"{_label(short)}'s checks read {' and '.join(others)}, and a checkpoint is of one "
+    return (f"The checks of {_label(short)} read {' and '.join(others)}, and a checkpoint is of one "
             f"collection's own arrivals, so replaying it alone would read their tables as "
             f"absent - nothing was copied or replayed. Bootstrap from empty instead: "
             f"`mothman pipeline bootstrap`")
