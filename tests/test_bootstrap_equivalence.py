@@ -86,7 +86,13 @@ pytestmark = pytest.mark.on_demand
 #: one named the wrong delivery.
 KEEP = {"birth-registrations": ("run_001", "run_002", "run_009", "run_017"),
         "cp-clients": ("cp_run_001", "cp_run_002", "cp_run_022"),
-        "ed-presentations": ("ed_run_001", "ed_run_011")}
+        "ed-presentations": ("ed_run_001", "ed_run_011"),
+        # Linkage Products (REQ-GEN-334): its first delivery, 11 February
+        # 2013 - the day of ED's first, on the same calendar, so the two
+        # replay in one stream. No Child Protection supply of 2013-Q1 is
+        # kept, so its Client Register reads are left out as not supplied:
+        # a cross-collection run the equivalence still compares.
+        "linkage-keys": ("lp_run_001",)}
 #: Deliveries kept only in part: run id -> the files kept.
 KEEP_ONLY_FILES = {"cp_run_002": {"cp_case_workers.csv"},
                    "cp_run_022": {"cp_clients.csv"}}

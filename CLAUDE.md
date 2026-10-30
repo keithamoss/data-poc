@@ -917,6 +917,13 @@ Rough layout:
   **31m52s after** (Birth Registrations 550s, Child Protection 1792s) - Child
   Protection now dominates, at roughly 32s a quarter. Budget a cache-miss CI
   bootstrap accordingly; profiling it is the obvious next speed-up.
+  Re-measured 2026-10-31 for REQ-PIPE-336 criterion 4, from empty and
+  `--sequential`, before and after Linkage Products (a third Department of
+  Health collection whose checks read Child Protection and Emergency
+  Department): **1439s before** (Birth Registrations 512s, the quarterly
+  stream 1291s) and **3509s after** (Birth Registrations 814s, the quarterly
+  stream 2507s). The linkage collection adds 55 arrival runs and 6 knock-on
+  re-checks, and 14 more Child Protection and ED runs caused by a decision.
 
   So a RED IN THE COMMON CASE reports in about SEVEN minutes rather
   than nineteen - 2,622 of 2,898 tests are in the fast half. The whole

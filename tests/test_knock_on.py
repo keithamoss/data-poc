@@ -421,19 +421,56 @@ class TestAKnockOnRunsAcrossItsStream:
         knock_on.follow_up_stream("civil-registration")
         assert done == ["civil-registration"]
 
+    def test_no_package_mate_of_a_scripted_reject_waits_for_ever(self, deployment_history):
+        """post-build-review #290 (TS-93a): a scripted person who rejects a
+        supply leaves no supply of the same delivery held back with no later
+        decision - REQ-GEN-273's rule for TS-81 and TS-82, that a supply the
+        gate held back waits on no later page. TS-93a's rejected Client
+        Register left its three readers held from November 2018 to the end
+        of the history, each turning its dataset red on every page."""
+        from qa_tools.common import supply_db
+
+        with supply_db.connect(read_only=True, label="test-290") as conn:
+            rejects = conn.execute(
+                "SELECT count(*) FROM qa.decision WHERE action = 'reject' "
+                "AND actor LIKE 'scripted%'").fetchone()[0]
+            waiting = conn.execute(
+                "SELECT w.dataset_id, w.supply FROM qa.decision r "
+                "JOIN qa.decision w ON w.action = 'promotion-withheld' "
+                "AND w.collection_id = r.collection_id AND w.dataset_id <> r.dataset_id "
+                "AND split_part(w.supply, '@', 2) = split_part(r.supply, '@', 2) "
+                "WHERE r.action = 'reject' AND r.actor LIKE 'scripted%' "
+                "AND NOT EXISTS (SELECT 1 FROM qa.decision l WHERE l.dataset_id = w.dataset_id "
+                "  AND l.supply = w.supply AND l.id > w.id) "
+                "ORDER BY 1").fetchall()
+        assert rejects, "the history records no scripted reject"
+        assert waiting == [], f"held back with nothing after: {waiting}"
+
     def test_no_knock_on_waits_in_a_replayed_history(self, deployment_history):
         """Against the bootstrapped history: every re-evaluation clears within
         a week of being owed. A quarterly collection's next arrival is months
         away, which is what a missed follow-up waited for; Birth
-        Registrations' daily ones clear within two days."""
+        Registrations' daily ones clear within two days.
+
+        EXCEPT ONE THAT WAITED FOR A GATE ALREADY HOLDING ITS PERIOD
+        (REQ-PIPE-267 criterion 17): a knock-on is gated only once the
+        application that held the period releases it, so it clears at that
+        release - Linkage Products' 2019-Q3 package gate held its period for
+        its resend window, nine days. Still caught: a wait that ended at no
+        such release, which is a missed follow-up."""
         from qa_tools.common import supply_db
 
         with supply_db.connect(read_only=True, label="test-251") as conn:
             total = conn.execute("SELECT count(*) FROM qa.owed_run "
                                  "WHERE kind = 'reevaluate'").fetchone()[0]
             late = conn.execute(
-                "SELECT id, dataset_id, period, owed_at::date, cleared_at::date "
-                "FROM qa.owed_run WHERE kind = 'reevaluate' AND cleared_at IS NOT NULL "
-                "AND cleared_at - owed_at > interval '7 days' ORDER BY id").fetchall()
+                "SELECT o.id, o.dataset_id, o.period, o.owed_at::date, o.cleared_at::date "
+                "FROM qa.owed_run o WHERE o.kind = 'reevaluate' AND o.cleared_at IS NOT NULL "
+                "AND o.cleared_at - o.owed_at > interval '7 days' AND NOT EXISTS ("
+                "  SELECT 1 FROM qa.gate_application g WHERE g.period = o.period "
+                "  AND g.entry = 'package' AND g.started_at <= o.owed_at "
+                "  AND g.ended_at BETWEEN o.owed_at AND o.cleared_at "
+                "  AND o.cleared_at - g.ended_at < interval '1 minute') "
+                "ORDER BY o.id").fetchall()
         assert total, "the history records no re-evaluation"
         assert late == [], f"re-evaluations that waited more than a week: {late}"

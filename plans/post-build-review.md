@@ -13066,3 +13066,85 @@ twice. It deliberately did not re-find the `TypeError`.
          heading would under-count at thirty collections;
        - results without a direction: consider "amber at x" rather than
          "warn > x".
+
+290. **[done, 2026-10-31]** **[Pipeline & publishing]** **[Testing & dev tooling]**
+   **What the linkage push's first gate found** (gate part 1, tree 08f6985
+   plus the register flip; 122 failed, 2 errors). None needed Keith: all are
+   defects or narrow tests, fixed and re-run on their own modules.
+   - **D1 (offset batch, be273b5)**: `period_schema.open_period` looked up
+     the collection of a dataset id the hierarchy does not know, which every
+     test using a fabricated id now hits. It now opens the period and
+     inherits nothing for an unknown dataset.
+   - **D2**: `dashboard_check_labels.MEASURES` had no entry for linkage's
+     five Soda metrics (`referential`, `coverage`, `expected_ids`,
+     `no_surplus_ids`, `large_key_groups`). Added.
+   - **D3**: `validate_schedule._days_before_errors` crashed on a dataset id
+     the hierarchy does not know, rather than skipping it. It now skips it.
+   - **D4**: `correction_claims.check_all()` checked every collection's
+     corrections whenever any one was generated, so generating Child
+     Protection alone planned Emergency Department via linkage. It now takes
+     the collection id the driver is generating and checks that collection's
+     datasets plus any dataset a correction rides. Test stubs updated to
+     match (`test_generator_providers`, `test_correction_claims`,
+     `test_bootstrap_streams` - the last now also stubs `with_what_it_reads`).
+   - **T1 (test too narrow)**: `test_knock_on`'s "no re-evaluation waits
+     more than a week" went red on cp-clients/cp-placements 2019-Q3, which
+     waited 2-11 August 2019. The cause is REQ-PIPE-267 criterion 17 working
+     as designed: linkage-keys' 2019-Q3 package gate (delivery
+     `2019-08-resend`) held the period until 11 August, and the knock-on
+     cleared within a second of its release. The test now excuses only a
+     wait that ends at the release of a package gate already holding the
+     period; any other wait over a week still fails.
+   - **T2 (recapture)**: the arrival golden re-captured for linkage, with the
+     procedure recorded in the test: 504 arrivals (449 before), zero verdicts
+     and zero instants moved, ten Child Protection run ids renamed to local
+     time; distribution 345 / 98 / 48 / 13.
+   - **Not ours**: `test_cp_pair`'s two setup errors ("no free cp-clients
+     quarter") appear only when another module on the same worker has filled
+     the quarters. The module passes alone (11 passed). The same
+     order-dependence showed on ed53fd9 before this work.
+   - **T3 (test too narrow)**: on-demand `test_bootstrap_equivalence`'s
+     `test_both_collections_ran` expects every registered collection in
+     the cut-down corpus, and its `KEEP` list had no linkage delivery. It
+     now keeps `lp_run_001` (11 February 2013, ED's first day). Its Client
+     Register reads are left out as not supplied, so the comparison now
+     covers a cross-collection run. On-demand suite on this tree, empty
+     database: 42 passed, then 1 failed; after the fix, that module ran
+     8 passed.
+   - **D5 (TS-96, the e2e chip 'nothing to show')**: TS-96 suppresses its
+     only arrival, so its placement named no supply and opened on the round's
+     own day, 1 August 2020, before its not-supplied mark existed. Two generic
+     fixes, each seen failing first. In the generator, a suppress-only
+     injection must link to a scripted event: TS-96 links to "TS-96 not
+     supplied" and so opens on 19 October 2020. In the template, the
+     supply-history-row finder falls back, for a placement that names no
+     supply, to its own period's gap row, never another period's (two
+     vitest cases). The register's config text was wrong too: it said
+     "two days after it was due", where the script's 1,896 hours put the
+     mark the day after the slot closes.
+   - **D6 (TS-93a left three Child Protection datasets red for seven
+     years)**: the scripted rejection of 2019-Q1's red Client Register left
+     its three readers (Notifications, Investigations, Placements) held
+     back, with no later decision, from November 2018 to the end of the
+     history. Each one turns its dataset red and sits in the notice queue on
+     every later page. That broke REQ-GEN-335 criterion 6's "drawn clean,
+     holding no scenario". It is also what pushed the TS-76 and TS-77a pills
+     6px above the 1280x800 viewport: REQ-GEN-199 criteria 32-37 require
+     them inside it, and the queue on their cp-placements pages had grown by
+     290px. Fixed the way REQ-GEN-273 fixed TS-81 and TS-82 (PROVISIONAL):
+     an hour after the rejection the same scripted person promotes the three
+     readers, which passed their own checks. A new deployment test fails on
+     any scripted reject whose held-back package-mates have no later
+     decision; against lp_boot it found exactly these three.
+   - **D7**: road-testing #32's card read "Not yet raised with Keith", and
+     the Feedback tab must never name him. It now reads "Not discussed yet."
+   - **D8**: once D6 shortened those pages, TS-54, TS-76 and TS-77a's head
+     and subject fitted the window together. The jump brought the head back
+     to -0.5px, half a pixel above the window, because a fractional scroll
+     rounds down. The scroll-back is now `headBackBy()`: whole pixels,
+     rounded up, never more than the room below the subject. Three vitest
+     cases were seen failing first.
+   - **Also checked**: CI on cc4c31a (run 40978105702) was red - TS-47's
+     budget-line test and four on-demand tests. All five were already fixed
+     in the offset batch, and this push carries those fixes; re-run on this
+     tree before the push (see morning report #11).

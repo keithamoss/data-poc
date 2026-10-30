@@ -11534,9 +11534,25 @@ const SCENARIO_SUBJECT = {
         .find(tr=> (tr.dataset.supply.split("@")[1] || "").split("#")[0] === key);
       if(row) return row;
     }
+    // A SCENARIO WITH NO SUPPLY (post-build-review #290, TS-96): nothing came
+    // for the period, so its row is the period's gap - found by the period
+    // its own link names, never another period's.
+    if(!(coords.supplies || []).length && coords.period){
+      return [...document.querySelectorAll("#view .supply-history tr[data-gap]")]
+        .find(tr=> (tr.querySelector("[data-period-link]")?.textContent || "").trim()
+                   === coords.period) || null;
+    }
     return null;
   },
 };
+// HOW FAR TO BRING THE PAGE HEAD BACK, in whole pixels (post-build-review
+// #290): rounded UP, since a fractional scroll rounds down and left a head
+// that fits half a pixel above the window, and never more than the room below
+// the subject, which stays whole.
+function headBackBy(headTop, room){
+  if(headTop >= 0) return 0;
+  return Math.max(0, Math.min(Math.ceil(-headTop), room));
+}
 // A SUPPLY'S ROW BY ITS OWN RUN ID OR ONE OF ITS RUNS (post-build-review #202
 // F1): a placement names the supply, and its row carries the run that is in
 // place - `<run id>__1__r1` - as settledBeforeIt treats them as one supply.
@@ -11651,8 +11667,8 @@ function landOnScenarioSubject(entry, on){
     // fold rounds either way with the machine's fonts - TS-78a's landed 0.28px
     // past it on CI's (post-build-review #255).
     const room = Math.floor(window.innerHeight - el.getBoundingClientRect().bottom) - 1;
-    const back = Math.min(-headTop, room);
-    if(headTop < 0 && back > 0) window.scrollBy({top: -back, behavior: "instant"});
+    const back = headBackBy(headTop, room);
+    if(back > 0) window.scrollBy({top: -back, behavior: "instant"});
   }
   // AND IT STAYS INSIDE ONCE THE FONTS ARE IN (post-build-review #259): on a
   // GitHub runner TS-78a's subject ended 0.28px past the fold after a cold

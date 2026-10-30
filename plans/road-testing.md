@@ -550,7 +550,7 @@ Still to settle by driving the page: #8 and #17 - both since closed
     back to something better than the metric.
 
 - **We noticed:** Two Linkage Keys checks are labelled with raw metric names, such as cp_clients_coverage_percent, where every other check has a readable name.
-- **What we heard:** Not yet raised with Keith.
+- **What we heard:** Not discussed yet.
 
 ## Landed entries, kept as feedback cards (REQ-DOCS-219)
 

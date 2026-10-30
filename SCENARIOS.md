@@ -1325,11 +1325,11 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
 
 ### TS-93a - A Client Register held red and rejected - its side of TS-93b
 
-**What it demonstrates.** Cp_clients held back on its own data, then rejected; its readers held for want of a Client Register.
+**What it demonstrates.** Cp_clients held back on its own data, then rejected; its readers held for want of a Client Register until a person promotes them, so none waits on a later page.
 
 **What it would look like if the rule were wrong.** The red Client Register promoted.
 
-*Config: quarterly, Feb/May/Aug/Nov, due 09:00 on the 1st; 2019-Q1's six tables arrive on the 1 November 2018 round, cp_clients alone built red; a scripted person rejects it three weeks later ("TS-93 reject") and nothing replaces it.*
+*Config: quarterly, Feb/May/Aug/Nov, due 09:00 on the 1st; 2019-Q1's six tables arrive on the 1 November 2018 round, cp_clients alone built red; a scripted person rejects it three weeks later ("TS-93 reject") and nothing replaces it; an hour later the same person promotes its three readers ("TS-93 promote notifications", "... investigations", "... placements").*
 
 | Where to look | |
 |---|---|
@@ -1389,14 +1389,14 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
 
 **What it would look like if the rule were wrong.** A red "No supply" gap left needing action.
 
-*Config: quarterly, due 18:00; no release comes for 2020-Q3, and a scripted person marks it not supplied two days after it was due ("TS-96 not supplied").*
+*Config: quarterly, due 18:00; no release comes for 2020-Q3, and a scripted person marks it not supplied the day after its slot closed, 19 October 2020 ("TS-96 not supplied").*
 
 | Where to look | |
 |---|---|
 | Dataset | linkage-keys |
 | Supplies | — |
 | Period | 2020-Q3 |
-| Set "in the warehouse on" to | 2020-08-01 |
+| Set "in the warehouse on" to | 2020-10-19 |
 
 ### TS-97 - Large key groups in the amber band
 
@@ -3893,9 +3893,9 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "mode": "INJECT",
    "title": "A Client Register held red and rejected - its side of TS-93b",
    "section": "The linkage history, planted (REQ-GEN-335)",
-   "demonstrates": "Cp_clients held back on its own data, then rejected; its readers held for want of a Client Register.",
+   "demonstrates": "Cp_clients held back on its own data, then rejected; its readers held for want of a Client Register until a person promotes them, so none waits on a later page.",
    "breaksAs": "The red Client Register promoted.",
-   "config": "Config: quarterly, Feb/May/Aug/Nov, due 09:00 on the 1st; 2019-Q1's six tables arrive on the 1 November 2018 round, cp_clients alone built red; a scripted person rejects it three weeks later (\"TS-93 reject\") and nothing replaces it.",
+   "config": "Config: quarterly, Feb/May/Aug/Nov, due 09:00 on the 1st; 2019-Q1's six tables arrive on the 1 November 2018 round, cp_clients alone built red; a scripted person rejects it three weeks later (\"TS-93 reject\") and nothing replaces it; an hour later the same person promotes its three readers (\"TS-93 promote notifications\", \"... investigations\", \"... placements\").",
    "requirements": [
     "REQ-GEN-335"
    ],
@@ -3982,7 +3982,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "section": "The linkage history, planted (REQ-GEN-335)",
    "demonstrates": "The slot closes unfilled and reads not supplied (accepted) (REQ-PIPE-132, REQ-DASH-133).",
    "breaksAs": "A red \"No supply\" gap left needing action.",
-   "config": "Config: quarterly, due 18:00; no release comes for 2020-Q3, and a scripted person marks it not supplied two days after it was due (\"TS-96 not supplied\").",
+   "config": "Config: quarterly, due 18:00; no release comes for 2020-Q3, and a scripted person marks it not supplied the day after its slot closed, 19 October 2020 (\"TS-96 not supplied\").",
    "requirements": [
     "REQ-PIPE-132",
     "REQ-DASH-133",
@@ -3992,7 +3992,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
     "dataset": "linkage-keys",
     "supplies": [],
     "period": "2020-Q3",
-    "inPlaceOn": "2020-08-01",
+    "inPlaceOn": "2020-10-19",
     "subject": "supply-history-row"
    }
   },

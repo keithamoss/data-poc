@@ -179,17 +179,27 @@ def check(injections: Sequence, generated: Mapping[str, Sequence], *, docs=None,
                     f"need {', '.join(met)} of {inj.dataset_id} - move one")
 
 
-def check_all() -> None:
-    """Every injection against every collection's generated periods - the
-    driver's check before it writes anything."""
+def check_all(collection_id: str | None = None) -> None:
+    """Every injection against the generated periods - the driver's check
+    before it writes anything. With `collection_id` (2026-10-31): that
+    collection's datasets plus every dataset a scenario riding a correction
+    is on - so generating one collection checks its own claims against
+    each correction's riders, and a bootstrap, which generates every
+    collection, checks them all, without one collection's generation
+    planning every other's (a dependent provider's periods come from
+    planning its sources)."""
     from generator import collections, scenario_injection
     from generator.anchor_date import get_anchor_date
     from qa_tools.common import hierarchy
 
     if not any(i.correction for i in scenario_injection.INJECTIONS):
         return
+    riding = {i.dataset_id for i in scenario_injection.INJECTIONS if i.correction}
     generated, suppressed = {}, {}
     for d in hierarchy.all_datasets():
+        if (collection_id is not None and d.collection_id != collection_id
+                and d.dataset_id not in riding):
+            continue
         try:
             provider = collections.for_dataset(d.dataset_id)
         except collections.NoProviderError:

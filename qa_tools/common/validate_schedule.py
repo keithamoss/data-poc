@@ -1981,10 +1981,15 @@ def _days_before_errors(cal_raw: dict, src: Source) -> list[ConfigError]:
         return []  # the parse error is another check's to report
     name = src.calendar_name
     out: list[ConfigError] = []
+    from qa_tools.common import hierarchy
+
     for did in sorted(d for d in (e.dataset_id for e in agr.datasets.values()) if d):
-        cal_name = agr.calendar_name_for(did)
+        try:
+            cal_name = agr.calendar_name_for(did)
+            versions = agr.resolved_versions(did)
+        except hierarchy.UnknownDatasetError:
+            continue  # a dataset the hierarchy does not hold is another check's to report
         cal = agr.calendars.get(cal_name) if cal_name else None
-        versions = agr.resolved_versions(did)
         if cal is None or not versions:
             continue
         ends = [v.effective_from for v in versions[1:]] + [None]

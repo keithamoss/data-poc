@@ -306,6 +306,18 @@ class TestTheInjectedSetItself:
             for also in injection.also_demonstrates:
                 assert also in marked, also
 
+    def test_a_scenario_with_nothing_arriving_links_to_what_is_in_place(self):
+        """post-build-review #290 (TS-96): an injection that only suppresses
+        has no supply, so its placement's default date - the round's own day
+        - shows nothing at all and its chip says 'nothing to show'. It must
+        link to the moment something about it is in place, such as the
+        scripted mark that answers the gap."""
+        empty = [i.scenario_id for i in si.INJECTIONS if i.suppress and not i.arrivals]
+        assert empty, "no suppress-only injection to hold to this"
+        unlinked = [i.scenario_id for i in si.INJECTIONS
+                    if i.suppress and not i.arrivals and not i.links]
+        assert unlinked == [], f"suppress-only injections with no link: {unlinked}"
+
     def test_it_generates_no_verdict(self):
         """Criterion 6. `severity` is what the generator injects into the
         ROWS - the same lever the ordinary chain pulls - and the QA tools

@@ -79,6 +79,9 @@ class TestStreamsComeFromConfiguration:
         generated = []
         monkeypatch.setattr(bootstrap, "_shorts", lambda: ["a"])
         monkeypatch.setattr(bootstrap, "_adapter", lambda short: object())
+        # The fake collection reads nothing (REQ-PIPE-336 criterion 7's step
+        # resolves real registry names, which 'a' is not).
+        monkeypatch.setattr(bootstrap, "with_what_it_reads", lambda names, say=None: names)
         monkeypatch.setattr(bootstrap, "_generate", lambda *a, **k: generated.append(a))
         result = bootstrap.bootstrap(force=True)
         assert result.refused and "a1" in result.reason

@@ -149,7 +149,7 @@ def generate(collection_id: str) -> list[dict]:
     if order:
         raise collections.base.GenerationOrderRefused(
             "; ".join(order) + " - nothing was written")
-    correction_claims.check_all()
+    correction_claims.check_all(collection_id)
     provider.check_seeds()
     plan = provider.plan()
 

@@ -101,7 +101,7 @@ class TestTheClaimIsChecked:
 def test_the_driver_refuses_before_it_writes(monkeypatch, tmp_path):
     from generator import driver
 
-    def refuse():
+    def refuse(*_a, **_k):
         raise si.CannotPlace("claimed twice")
     monkeypatch.setattr(cc, "check_all", refuse)
     monkeypatch.setattr(driver.delivery, "remove_deliveries",

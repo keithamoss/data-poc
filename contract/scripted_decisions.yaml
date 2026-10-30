@@ -282,6 +282,30 @@ decisions:
     supply: 0
     after_hours: 504
     reason: "Client records fail their checks and will not be corrected for this quarter."
+  # Its three readers, held back only because the Client Register they read was
+  # rejected, are promoted an hour later (post-build-review #290, PROVISIONAL),
+  # so no supply the gate held waits on a later page - as TS-81 and TS-82.
+  - scenario: TS-93a
+    name: TS-93 promote notifications
+    operation: promote
+    dataset: cp-notifications
+    supply: 0
+    after_hours: 505
+    reason: "Notifications passed their own checks; the Client Register they are checked against was rejected and is not being replaced this quarter."
+  - scenario: TS-93a
+    name: TS-93 promote investigations
+    operation: promote
+    dataset: cp-investigations
+    supply: 0
+    after_hours: 505
+    reason: "Investigations passed their own checks; the Client Register they are checked against was rejected and is not being replaced this quarter."
+  - scenario: TS-93a
+    name: TS-93 promote placements
+    operation: promote
+    dataset: cp-placements
+    supply: 0
+    after_hours: 505
+    reason: "Placements passed their own checks; the Client Register they are checked against was rejected and is not being replaced this quarter."
   # TS-94: a red release, held back, promoted by a person two days after it
   # arrived (REQ-PIPE-332 criterion 8) - its red then counting toward the
   # Client Register promoted on the round before.

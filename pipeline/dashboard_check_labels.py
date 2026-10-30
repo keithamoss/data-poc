@@ -283,6 +283,12 @@ MEASURES: dict[str, str] = {
     "dbt:placement_carer_approval": "Placements with an unapproved carer",
     "soda:approval_compliance": "Placements with an unapproved carer",
     "datacontract:approval_compliance": "Placements with an unapproved carer",
+    # Checks across collections (REQ-QAC-333) - generic kinds, any linked dataset
+    "soda:referential": "Links to records that are not there",
+    "soda:coverage": "Records linked",
+    "soda:expected_ids": "Expected identifiers missing",
+    "soda:no_surplus_ids": "Surplus identifiers",
+    "soda:large_key_groups": "Keys linking many records",
     # File checks - declared, though the dashboard does not chart them yet
     # (plans/running-thoughts.md #96)
     "file:column_order": "Columns out of order",

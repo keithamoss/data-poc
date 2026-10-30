@@ -2487,6 +2487,10 @@ INJECTIONS: tuple[Injection, ...] = (
         anchor=-25,  # 2020-Q3
         config="quarterly, due 18:00 on the round with 8 hours' grace. No release comes for the quarter; a scripted person marks it not supplied the day after its slot closed.",
         suppress=(0,),
+        # NOTHING ARRIVES, so the round's own day shows nothing: the link
+        # lands on the day of the mark that answers the gap (post-build-review
+        # #290), on the period's gap row.
+        links=(Link("TS-96", 0, "TS-96 not supplied", HISTORY_END),),
     ),
     Injection(
         scenario_id="TS-97",
@@ -2545,7 +2549,7 @@ INJECTIONS: tuple[Injection, ...] = (
         scenario_id="TS-93a",
         dataset_id="cp-clients",
         anchor=-32,  # 2019-Q1, received on the 1 November 2018 round
-        config="quarterly, Feb/May/Aug/Nov, due 09:00 on the 1st. The whole delivery arrives on time with cp_clients alone built to fail; a person rejects it three weeks later and nothing replaces it.",
+        config="quarterly, Feb/May/Aug/Nov, due 09:00 on the 1st. The whole delivery arrives on time with cp_clients alone built to fail; a person rejects it three weeks later and nothing replaces it, and an hour later promotes the three readers it held back.",
         arrivals=(
             ExtraArrival(0, "09:00", "red",
                          "all six tables on time, cp_clients dirtied by its own red preset "

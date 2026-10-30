@@ -172,6 +172,35 @@ describe("#202 F1 - a supply's row is found by its run id's own prefix", () => {
   });
 });
 
+describe("a scenario with no supply lands on its period's gap row (post-build-review #290)", () => {
+  // TS-96: no release came, so the placement names no supply - its row is
+  // the period's gap, marked not supplied.
+  const GAP_ENTRY = {...ENTRY, coordinates: {...ENTRY.coordinates, supplies: [],
+                                             subject: "supply-history-row"}};
+  function gapRows(w){
+    const view = w.document.getElementById("view");
+    view.innerHTML = `<div class="supply-history"><table><tbody>
+      <tr data-gap="accepted"><td><a data-period-link>2024-Q4</a></td></tr>
+      <tr data-gap="accepted"><td><a data-period-link>2025-Q1</a></td></tr></tbody></table></div>`;
+    return [...view.querySelectorAll("tr")];
+  }
+
+  it("finds the gap row of the placement's own period", () => {
+    const w = load(undefined, [GAP_ENTRY]);
+    onItsPage(w);
+    const [, own] = gapRows(w);
+    expect(w.scenarioSubjectEl(GAP_ENTRY)).toBe(own);
+  });
+
+  it("never another period's gap", () => {
+    const entry = {...GAP_ENTRY, coordinates: {...GAP_ENTRY.coordinates, period: "2023-Q2"}};
+    const w = load(undefined, [entry]);
+    onItsPage(w);
+    gapRows(w);
+    expect(w.scenarioSubjectEl(entry)).toBeNull();
+  });
+});
+
 describe("#202 F4 - the subject counts only on the scenario's own page and date", () => {
   it("is not found on another dataset's page", () => {
     const w = load();
@@ -253,5 +282,25 @@ describe("a subject pushed past the fold after the jump", () => {
     w.scrollBy = (o) => calls.push(o.top);
     w.keepSubjectInsideFold({ getBoundingClientRect: () => ({ top: 655.5, bottom: 798.03, height: 142.5 }) }, 800);
     expect(calls).toEqual([]);
+  });
+});
+
+// post-build-review #290: the head came back to -0.5px - a fractional scroll
+// rounds down to the pixel - so a head that fits was left half a pixel above
+// the window. Whole pixels, rounded up, never more than the room below.
+describe("the head is brought back by whole pixels", () => {
+  it("rounds up, so a head that fits is wholly in view", () => {
+    page = loadDashboard();
+    expect(page.window.headBackBy(-300.5, 400)).toBe(301);
+  });
+
+  it("never scrolls back more than the room below the subject", () => {
+    page = loadDashboard();
+    expect(page.window.headBackBy(-300.5, 49)).toBe(49);
+  });
+
+  it("does nothing when the head is already in view", () => {
+    page = loadDashboard();
+    expect(page.window.headBackBy(4, 49)).toBe(0);
   });
 });

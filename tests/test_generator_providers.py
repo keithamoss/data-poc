@@ -86,7 +86,7 @@ def writing(third_collection, monkeypatch, tmp_path):
     # fixture's fake collection has none there.
     from generator import correction_claims
 
-    monkeypatch.setattr(correction_claims, "check_all", lambda: None)
+    monkeypatch.setattr(correction_claims, "check_all", lambda *a, **k: None)
     out = tmp_path / "out"
     undo = redirect(out)
     yield module.PROVIDER, out
@@ -449,7 +449,7 @@ class TestEverySeedDrawnIsOneItsProviderDeclares:
         import numpy as np
         from generator import correction_claims
 
-        monkeypatch.setattr(correction_claims, "check_all", lambda: None)
+        monkeypatch.setattr(correction_claims, "check_all", lambda *a, **k: None)
 
         real_rng = np.random.default_rng
         drawn: set[int] = set()

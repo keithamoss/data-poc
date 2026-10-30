@@ -4351,9 +4351,11 @@ TS-93b.** PLANTED by REQ-GEN-335 (h), Child Protection's side.
 *Config: quarterly, Feb/May/Aug/Nov, due 09:00 on the 1st; 2019-Q1's six
 tables arrive on the 1 November 2018 round, cp_clients alone built red; a
 scripted person rejects it three weeks later ("TS-93 reject") and nothing
-replaces it.*
+replaces it; an hour later the same person promotes its three readers ("TS-93
+promote notifications", "... investigations", "... placements").*
 **Expect**: cp_clients held back on its own data, then rejected; its readers
-held for want of a Client Register.
+held for want of a Client Register until a person promotes them, so none waits
+on a later page.
 **Breaks as**: the red Client Register promoted.
 
 **TS-93b `[INJECT]` A linkage release whose Client Register is not in the
@@ -4391,8 +4393,8 @@ reason code not_supplied_by_decision, while ED Presentations' are evaluated
 **TS-96 `[INJECT]` A quarter with no linkage release.** PLANTED by
 REQ-GEN-335 (k).
 *Config: quarterly, due 18:00; no release comes for 2020-Q3, and a scripted
-person marks it not supplied two days after it was due ("TS-96 not
-supplied").*
+person marks it not supplied the day after its slot closed, 19 October
+2020 ("TS-96 not supplied").*
 **Expect**: the slot closes unfilled and reads not supplied (accepted)
 (REQ-PIPE-132, REQ-DASH-133).
 **Breaks as**: a red "No supply" gap left needing action.

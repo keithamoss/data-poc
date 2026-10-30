@@ -45591,7 +45591,7 @@ requirements:
     date_written: '2026-10-25'
     story: As whoever maintains the pipeline, I want the data asset's linkage product declared as a dataset of its own, with what it links and how each linked dataset is identified stated once in configuration, so that each quarter's release can be checked against what that quarter holds without changing any dataset already loaded.
     moscow: should
-    status: in_progress
+    status: built
     source: 'Keith, plans/road-testing.md #3 as restated and answered 2026-10-25; his correction the same day (asset level; its own Linkage Products collection in Department of Health); his answers L1 to L8 the same evening. Drafted by delivery-scoper 2026-10-25, reworked the same evening. SIGNED by Keith 2026-10-28 with changes (one file per period; supplier codes DOC_CLIENTS and EDDC_PRESENTATION; id columns text and mapping beside the list agreed). Reworked to v3 by delivery-scoper 2026-10-29 on those changes and the architect review (S3, S13). RE-SIGNED by Keith 2026-10-30 as v4, criterion by criterion, with his answers to every open question folded in (pending-register.md 2026-10-30).'
     acceptance_criteria:
     - THE SYSTEM SHALL declare, in contract/data-asset.yaml's hierarchy, under the existing agency department-of-health, a collection linkage-products named 'Linkage Products' with short lp and run_prefix lp_run_, holding a dataset linkage-keys named 'Linkage Keys', table linkage_keys, with an exact arrival pattern for ONE FILE PER PERIOD, linkage_keys.csv, a period being one quarter.
@@ -45636,12 +45636,42 @@ requirements:
     signed_off:
       by: Keith
       date: '2026-10-30'
+    implemented_by:
+    - "qa_tools/common/linked_datasets.py::problems"
+    - "qa_tools/common/schemas.py::LinkedDataset"
+    - "qa_tools/common/hierarchy.py::Dataset"
+    - "qa_tools/common/validate_collections.py::main"
+    - "qa_tools/collections/linkage_products.py::ADAPTER"
+    - "contract/department-of-health/linkage-products-contract.yaml"
+    linked_tests:
+    - "tests/test_linked_datasets.py::test_the_real_configuration_passes"
+    - "tests/test_linked_datasets.py::test_the_linked_list_is_the_hierarchys"
+    - "tests/test_linked_datasets.py::TestCriterionSix::test_a_dataset_not_in_the_hierarchy"
+    - "tests/test_linked_datasets.py::TestCriterionSix::test_a_dataset_on_no_shared_calendar"
+    - "tests/test_linked_datasets.py::TestCriterionSix::test_a_source_column_its_contract_does_not_declare"
+    - "tests/test_linked_datasets.py::TestCriterionSix::test_more_identifier_columns_than_the_contracts_id_n"
+    - "tests/test_linked_datasets.py::TestCriterionSix::test_a_dataset_naming_no_calendar"
+    - "tests/test_linked_datasets.py::TestCriterionSix::test_two_datasets_with_one_code"
+    - "tests/test_linked_datasets.py::TestTheHandWrittenChecksAgreeWithTheMapping::test_a_check_stating_another_code_is_refused_naming_both"
+    - "tests/test_linked_datasets.py::TestTheHandWrittenChecksAgreeWithTheMapping::test_a_check_stating_another_identifier_count_is_refused"
+    - "tests/test_linked_datasets.py::TestTheHandWrittenChecksAgreeWithTheMapping::test_a_linked_dataset_without_its_coverage_check_is_refused"
+    - "tests/test_linked_datasets.py::TestTheHandWrittenChecksAgreeWithTheMapping::test_a_check_naming_a_dataset_not_linked_is_refused"
+    - "tests/test_linked_datasets.py::TestTheQueriesThemselvesAgreeWithTheMapping::test_a_referential_query_stating_another_code"
+    - "tests/test_linked_datasets.py::TestTheQueriesThemselvesAgreeWithTheMapping::test_valid_values_stating_another_code"
+    - "tests/test_linked_datasets.py::TestTheQueriesThemselvesAgreeWithTheMapping::test_a_join_on_another_identifier_column"
+    - "tests/test_linked_datasets.py::TestTheQueriesThemselvesAgreeWithTheMapping::test_a_source_column_compared_without_its_text_cast"
+    - "tests/test_linked_datasets.py::TestTheQueriesThemselvesAgreeWithTheMapping::test_an_own_row_query_stating_an_undeclared_code"
+    evidence:
+    - "2026-10-31 Perth, off-batch @ 08f6985 (lp-fixes and the dashboard fixes merged): a from-empty sequential bootstrap of a scratch database passed its target comparison, every targeted supply read as built - Linkage Products 55 runs, 536 results (486 pass, 16 warn, 34 fail)."
+    - "2026-10-30/31: tests/test_linked_datasets.py on lp-fixes @ 1d8841d passed, including the id_N and names-no-calendar refusals seen failing first (post-build-review #288 T1, T3)."
+    unmet_criteria:
+    - {"criterion": "Criterion 3, in part - N is the largest number of identifier columns any linked dataset declares (1), but the contract declares id_2.", "why": "id_2 gives REQ-GEN-335 (c) a column for a surplus identifier; a real conflict between the two criteria, put to Keith (post-build-review #288). PROVISIONAL: id_2 stays.", "owner": "Keith", "blocked_by": {"unowned": true}}
   - id: REQ-PIPE-331
     title: A check may read a table of another collection on the same calendar; every place that resolves, records, gates or counts a read resolves that table from the period's warehouse only, through one shared function
     date_written: '2026-10-25'
     story: As whoever maintains the pipeline, I want a check in one collection to read another collection's table for the same period, as that period stands in the warehouse, so that an asset-level product such as linkage or geocoding can be checked against every collection it covers.
     moscow: should
-    status: in_progress
+    status: built
     source: 'Keith, 2026-10-25: the linkage product''s cross-table checks run within the period, against that period''s data across the asset; geocoding''s later checks need the same (REQ-QAC-340). Drafted by delivery-scoper 2026-10-25. SIGNED by Keith 2026-10-28, including warehouse-only. Reworked to v3 by delivery-scoper 2026-10-29 on the architect review (M1, M2, S1 to S3, S6, C1, C2), which found the own-collection assumption in about nine places rather than one. RE-SIGNED by Keith 2026-10-30 as v4, criterion by criterion, with his answers to every open question folded in (pending-register.md 2026-10-30).'
     acceptance_criteria:
     - THE SYSTEM SHALL let a check declare in reads_tables a table of a dataset in another collection, and SHALL record it in qa.check_read exactly as for a table of its own collection (REQ-PIPE-279).
@@ -45686,12 +45716,57 @@ requirements:
     signed_off:
       by: Keith
       date: '2026-10-30'
+    implemented_by:
+    - "qa_tools/common/run_reads.py::reads_for"
+    - "qa_tools/common/run_reads.py::foreign_readers"
+    - "qa_tools/common/run_reads.py::unreadable_in"
+    - "qa_tools/common/run_reads.py::declaration_problems"
+    - "qa_tools/common/period_overlay.py::rebuild_for_arrival"
+    - "qa_tools/tools/orchestrate.py::file_and_overlay"
+    - "qa_tools/common/recheck.py::execute"
+    - "qa_tools/tools/stage.py::_build_run_views"
+    - "qa_tools/common/gate.py::_warehouse"
+    - "qa_tools/common/gate.py::_join"
+    - "qa_tools/common/knock_on.py::complete"
+    - "pipeline/build_dashboard_data.py::build_one_table"
+    - "qa_tools/common/validate_collections.py::dbt_cross_collection_ref_problems"
+    linked_tests:
+    - "tests/test_cross_collection_reads.py::TestTheOneResolver::test_a_product_reads_each_linked_table_as_foreign"
+    - "tests/test_cross_collection_reads.py::TestTheOneResolver::test_a_collection_reading_only_its_own_tables_has_no_foreign"
+    - "tests/test_cross_collection_reads.py::TestTheOneResolver::test_foreign_readers_of_a_linked_table"
+    - "tests/test_cross_collection_reads.py::TestTheOverlayIsGivenTheForeignTablesFromTheWarehouse::test_file_and_overlay"
+    - "tests/test_cross_collection_reads.py::TestTheOverlayIsGivenTheForeignTablesFromTheWarehouse::test_an_own_only_collection_is_unchanged"
+    - "tests/test_cross_collection_reads.py::TestTheGatesWarehouseViewNamesForeignTables::test_warehouse_includes_the_linked_tables"
+    - "tests/test_cross_collection_reads.py::TestJoinPassesOverAnotherCollectionsSupply::test_join"
+    - "tests/test_cross_collection_reads.py::test_recheck_execute_asks_the_resolver"
+    - "tests/test_cross_collection_reads.py::TestADeclaredReadAcrossCollectionsIsGated::test_the_real_declarations_pass"
+    - "tests/test_cross_collection_reads.py::TestADeclaredReadAcrossCollectionsIsGated::test_a_table_no_dataset_owns"
+    - "tests/test_cross_collection_reads.py::TestADeclaredReadAcrossCollectionsIsGated::test_a_dataset_on_another_calendar"
+    - "tests/test_cross_collection_reads.py::TestADeclaredReadAcrossCollectionsIsGated::test_a_dataset_with_no_calendar"
+    - "tests/test_cross_collection_reads.py::TestADeclaredReadAcrossCollectionsIsGated::test_a_read_within_the_collection_is_not_this_gates"
+    - "tests/test_cross_collection_reads.py::TestAContendedCollectionDoesNotStopTheOthers::test_complete"
+    - "tests/test_cross_collection_reads.py::TestARunnerTreatsAnAbsentForeignTableAsAbsent::test_unreadable_names_the_foreign_tables_without_a_view"
+    - "tests/test_cross_collection_reads.py::TestARunnerTreatsAnAbsentForeignTableAsAbsent::test_soda_and_datacontract_ask_it"
+    - "tests/test_cross_collection_reads.py::TestDbtReadsAnotherCollectionThroughSource::test_the_real_tree_passes"
+    - "tests/test_cross_collection_reads.py::TestDbtReadsAnotherCollectionThroughSource::test_a_ref_to_another_collections_model_is_refused"
+    - "tests/test_cross_collection_reads.py::TestDbtReadsAnotherCollectionThroughSource::test_source_is_allowed"
+    - "tests/test_cross_collection_reads.py::TestACollectionWithNoDriftChecksRuns::test_collection_checks_has_no_psi"
+    - "tests/test_cross_collection_reads.py::TestACollectionWithNoDriftChecksRuns::test_evaluate_runs_nothing_and_records_nothing_red"
+    - "tests/test_thirty_linked_datasets.py::TestTheLinkageRunReadsAllThirtyFromTheWarehouse::test_its_view_schema_resolved_all_thirty_from_the_period"
+    - "tests/test_thirty_linked_datasets.py::TestTheLinkageRunReadsAllThirtyFromTheWarehouse::test_each_referential_and_coverage_result_names_its_one_table"
+    - "tests/test_thirty_linked_datasets.py::TestAMoveInOneCollectionReRunsOnlyItsTwoChecks::test_it_asked_for_exactly_the_two_checks_reading_the_moved_table"
+    - "tests/test_thirty_linked_datasets.py::TestAMoveInOneCollectionReRunsOnlyItsTwoChecks::test_nothing_else_was_re_run"
+    evidence:
+    - "2026-10-31 Perth, off-batch @ 08f6985 (lp-fixes and the dashboard fixes merged): a from-empty sequential bootstrap of a scratch database passed its target comparison, every targeted supply read as built - Linkage Products 55 runs, 536 results (486 pass, 16 warn, 34 fail)."
+    - "2026-10-30: tests/test_cross_collection_reads.py and the thirty-dataset copy (REQ-TEST-339) passed; every linkage scenario TS-86..101 read as designed against the bootstrap's recorded results (morning-reports #11)."
+    unmet_criteria:
+    - {"criterion": "Criterion 2, the calendar_differs half - NOT APPLICABLE recorded for a period where the two datasets are on different calendars.", "why": "Unreachable today: a dataset names one calendar, so two linked datasets either share one in every period or are refused by the config gate. Built and unit-tested, never exercised by real data.", "owner": "not scheduled", "blocked_by": {"unowned": true}}
   - id: REQ-PIPE-332
     title: A linkage product's verdict counts toward the linked tables it read as well as toward itself, so a promoted supply may change colour when its period's linkage product is checked; a red linkage product holds back only itself; and any dataset marked not supplied is out of scope for EVERY cross-table check reading it
     date_written: '2026-10-25'
     story: As an agency's accountable data owner, I want my period's linkage result to count on my own promoted tables, so that how well my records link - which says something about the identifiers I supplied - shows on my dataset rather than only on someone else's.
     moscow: should
-    status: in_progress
+    status: built
     source: Keith, L1 and L3, 2026-10-25 evening - L1 reversing delivery-scoper's v1 recommendation. Redrafted by delivery-scoper the same evening. SIGNED by Keith 2026-10-28 including criterion 9. Reworked to v3 by delivery-scoper 2026-10-29 on Keith's L-Q2 (a) (every cross-table check reading a not-supplied dataset out of scope, Child Protection's siblings included), the architect review (S4) and the UX review (F6). RE-SIGNED by Keith 2026-10-30 as v4, criterion by criterion, with his answers to every open question folded in (pending-register.md 2026-10-30).
     acceptance_criteria:
     - THE SYSTEM SHALL count a linkage check's EVALUATED result toward every supply that check read - the linkage product and the linked dataset's supply - as REQ-PIPE-269 criterion 4 does for any cross-table check, with no exception for a check reading across collections.
@@ -45738,12 +45813,29 @@ requirements:
     signed_off:
       by: Keith
       date: '2026-10-30'
+    implemented_by:
+    - "qa_tools/common/unrunnable.py::out_of_agreement"
+    - "qa_tools/common/unrunnable.py::left_out_entry"
+    - "qa_tools/common/unrunnable.py::as_entry"
+    - "qa_tools/common/not_supplied.py::mark"
+    - "pipeline/build_dashboard_data.py::_left_out_fields"
+    linked_tests:
+    - "tests/test_not_supplied.py::TestAMarkOwesItsReadersAReEvaluation::test_the_mark_owes_a_reevaluation_naming_the_table"
+    - "tests/test_strict_cross_table.py::TestNotInTheAgreement::test_a_check_whose_table_joins_later_is_out_of_scope"
+    - "tests/test_strict_cross_table.py::TestNotInTheAgreement::test_the_build_carries_why_it_did_not_run"
+    - "tests/test_strict_cross_table.py::TestAMarkAfterTheCheckPutsItOutOfScope::test_the_red_from_before_the_mark_does_not_stand"
+    - "tests/test_warehouse_counts.py::TestTheCountedPoints::test_a_later_run_leaving_the_check_out_ends_the_earlier_red"
+    - "tests-js/not-in-agreement.test.js"
+    evidence:
+    - "2026-10-31 Perth, off-batch @ 08f6985 (lp-fixes and the dashboard fixes merged): a from-empty sequential bootstrap of a scratch database passed its target comparison, every targeted supply read as built - Linkage Products 55 runs, 536 results (486 pass, 16 warn, 34 fail)."
+    - "c12, the moved Child Protection and ED verdicts, from the before (offset batch, no linkage) and after bootstraps: 178 check keys and 17 decision keys, every one traced to the linkage scenarios' Child Protection sides TS-93a/TS-100a or the reader lag cap; no ED check result moved (morning-reports #11)."
+    - "2026-10-31: the left-out supersedes rule, gate and page - test_strict_cross_table.py::TestAMarkAfterTheCheckPutsItOutOfScope and test_warehouse_counts.py::...test_a_later_run_leaving_the_check_out_ends_the_earlier_red, each seen failing first; 144 passed across five modules on 08f6985."
   - id: REQ-QAC-333
     title: The Linkage Keys checks - six on its own rows, large key groups among them, and a referential and a coverage check for each linked dataset - red on any fault, coverage a percentage only, amber below 90 percent and red below 85
     date_written: '2026-10-25'
     story: As a data team leader, I want each period's linkage product checked for empty keys, unknown datasets, missing, surplus and duplicate identifiers, keys shared by implausibly many records, links to records the period does not hold and how much of each dataset it links, with each cross-table result naming the dataset it is about, so that a failure says which collection to look at.
     moscow: should
-    status: in_progress
+    status: built
     source: Keith, 2026-10-25 (referential, coverage, duplicates), and the check set and bands he agreed that evening (L6, L7). Drafted by delivery-scoper 2026-10-25, reworked the same evening. SIGNED by Keith 2026-10-28 with additions (large-key-group check; expected-ids-present check on the file's own ids; referential keeps failing rows; coverage a percentage only; check files hand-written for now); coverage bands LOWERED by Keith the same day to amber below 90 and red below 85. Reworked to v3 by delivery-scoper 2026-10-29 on those changes, Keith's L-Q4 (a), the architect review (M4, M5, S5, S6) and the UX review (F3, authoring notes). RE-SIGNED by Keith 2026-10-30 as v4, criterion by criterion, with his answers to every open question folded in (pending-register.md 2026-10-30).
     acceptance_criteria:
     - 'THE SYSTEM SHALL define six checks on linkage_keys'' own rows: (1) linkage_key not empty (null or an empty string), red on one; (2) dataset in the expected values, being the codes REQ-QAC-330 criterion 5 declares, red on one; (3) for each row, id_1 to id_k not null and not blank, k being the identifier count its dataset declares, red on one; (4) for each row, no value in any id column after id_k, red on one; (5) dataset with id_1 to id_N unique together, red on one; and (6) LARGE KEY GROUPS - a linkage_key carrying more than 50 records, counted across every dataset, is a large group, and the check''s value is the share of distinct linkage_keys that are large groups, amber above 2 percent and red above 4 percent.'
@@ -45786,12 +45878,42 @@ requirements:
     signed_off:
       by: Keith
       date: '2026-10-30'
+    implemented_by:
+    - "contract/department-of-health/linkage-products-soda-checks.yml"
+    - "qa_tools/common/distribution.py::measure"
+    - "qa_tools/common/distribution.py::bins"
+    - "qa_tools/common/distribution.py::declared"
+    - "qa_tools/tools/run_soda.py::evaluate"
+    - "qa_tools/common/check_bands.py::soda_bounds"
+    linked_tests:
+    - "tests/test_check_bands.py::TestAUserDefinedMetricsBandIsRead::test_large_key_groups"
+    - "tests/test_check_bands.py::TestAUserDefinedMetricsBandIsRead::test_a_metric_named_after_a_table_with_a_digit"
+    - "tests/test_distribution.py::test_the_large_key_groups_check_declares_its_bins"
+    - "tests/test_distribution.py::test_bins_count_each_value_once_the_last_open_ended"
+    - "tests/test_distribution.py::test_measure_records_counts_only"
+    - "tests/test_linkage_check_sql.py::test_every_kind_is_found_in_the_file"
+    - "tests/test_linkage_check_sql.py::test_the_four_kinds_run_whatever_the_staged_id_type"
+    - "tests/test_linked_datasets.py::TestTheHandWrittenChecksAgreeWithTheMapping::test_a_check_stating_another_code_is_refused_naming_both"
+    - "tests/test_linked_datasets.py::TestTheHandWrittenChecksAgreeWithTheMapping::test_a_check_stating_another_identifier_count_is_refused"
+    - "tests/test_linked_datasets.py::TestTheHandWrittenChecksAgreeWithTheMapping::test_a_linked_dataset_without_its_coverage_check_is_refused"
+    - "tests/test_linked_datasets.py::TestTheHandWrittenChecksAgreeWithTheMapping::test_a_check_naming_a_dataset_not_linked_is_refused"
+    - "tests/test_linked_datasets.py::TestTheQueriesThemselvesAgreeWithTheMapping::test_a_referential_query_stating_another_code"
+    - "tests/test_linked_datasets.py::TestTheQueriesThemselvesAgreeWithTheMapping::test_valid_values_stating_another_code"
+    - "tests/test_linked_datasets.py::TestTheQueriesThemselvesAgreeWithTheMapping::test_a_join_on_another_identifier_column"
+    - "tests/test_linked_datasets.py::TestTheQueriesThemselvesAgreeWithTheMapping::test_a_source_column_compared_without_its_text_cast"
+    - "tests/test_linked_datasets.py::TestTheQueriesThemselvesAgreeWithTheMapping::test_an_own_row_query_stating_an_undeclared_code"
+    - "tests/test_thirty_linked_datasets.py::TestTheIdentifierShapeChecksPassOnCorrectlyShapedRows::test_the_release_carries_rows_of_each_shape"
+    evidence:
+    - "2026-10-31 Perth, off-batch @ 08f6985 (lp-fixes and the dashboard fixes merged): a from-empty sequential bootstrap of a scratch database passed its target comparison, every targeted supply read as built - Linkage Products 55 runs, 536 results (486 pass, 16 warn, 34 fail)."
+    - "2026-10-30: tests/test_linkage_check_sql.py runs the real check file's queries against text and numeric identifiers (seen failing first on 'btrim(bigint)'); TestTheQueriesThemselvesAgreeWithTheMapping seen failing first on the critic's three edits."
+    unmet_criteria:
+    - {"criterion": "Criterion 3, in part - the per-code identifier count implied inside the own-row queries.", "why": "The gate now checks codes in query text and valid-values lists, which column each id_j is compared with and both-sides casts; the id_counts attribute beside the queries is checked, the count inside them is not.", "owner": "not scheduled", "blocked_by": {"unowned": true}}
   - id: REQ-GEN-334
     title: The Linkage Products provider writes, for every quarter, a linkage delivery on the quarter's own round, received after that quarter's Emergency Department promotion takes effect in an ordinary quarter and within its due time and grace, built from the last source supply received before it
     date_written: '2026-10-25'
     story: As Keith planting scenarios, I want a synthetic linkage product generated for each quarter from the records that quarter's generated Child Protection and Emergency Department supplies hold, arriving when a real one would, so that its checks pass by construction where they should, and Emergency Department's same-round red shows only where it is planted or real.
     moscow: should
-    status: in_progress
+    status: built
     source: Keith, 2026-10-25 (a synthetic linkage dataset wanted), and his answers that evening (L2, L4) and geocoding Q13. Drafted by delivery-scoper 2026-10-25, reworked the same evening. SIGNED by Keith 2026-10-28 with changes (ordinary link rate 90 to 96 percent; linkage and geocoding SEPARATE deliveries a little apart, reversing geocoding Q13's one zip). Reworked to v3 by delivery-scoper 2026-10-29 on those changes, Keith's L-Q3 (a), and the architect review (M6, M7, S7, S8, S9). RE-SIGNED by Keith 2026-10-30 as v4, criterion by criterion, with his answers to every open question folded in (pending-register.md 2026-10-30).
     acceptance_criteria:
     - THE SYSTEM SHALL generate Linkage Products' history through REQ-GEN-246's shared driver, from one provider at generator/collections/linkage_products.py that writes linkage_keys.csv; the geocoding files are added to the same provider by the geocoding requirements (REQ-GEN-295).
@@ -45852,12 +45974,39 @@ requirements:
     signed_off:
       by: Keith
       date: '2026-10-30'
+    implemented_by:
+    - "generator/collections/linkage_products.py::LinkageProducts"
+    - "generator/collections/base.py::generated_supplies"
+    - "qa_tools/common/promotion.py::_readers_next_receipts"
+    - "qa_tools/common/slots.py::period_claimed_at"
+    - "generator/correction_claims.py::check"
+    linked_tests:
+    - "tests/test_generator_providers.py::TestOneDriverForEveryCollection::test_an_arrival_at_another_collections_instant_is_refused_before_writing"
+    - "tests/test_generator_providers.py::TestADependencyGeneratesFirst::test_a_dependency_generating_after_it_is_refused_naming_both"
+    - "tests/test_generator_providers.py::TestADependencyGeneratesFirst::test_an_absent_dependency_is_refused_naming_both"
+    - "tests/test_generator_providers.py::TestADependencyGeneratesFirst::test_the_real_providers_generate_their_dependencies_first"
+    - "tests/test_linkage_scenarios.py::test_two_plans_build_the_same_rows"
+    - "tests/test_linkage_scenarios.py::TestEachOrdinaryReleaseIsScheduledAfterThePromotionItReads::test_an_ordinary_release_on_time_after_its_source_passes"
+    - "tests/test_linkage_scenarios.py::TestEachOrdinaryReleaseIsScheduledAfterThePromotionItReads::test_a_release_past_its_due_time_and_grace_is_refused"
+    - "tests/test_linkage_scenarios.py::TestEachOrdinaryReleaseIsScheduledAfterThePromotionItReads::test_a_release_before_its_source_arrives_is_refused"
+    - "tests/test_linkage_scenarios.py::TestEachOrdinaryReleaseIsScheduledAfterThePromotionItReads::test_the_effective_instant_named_is_the_gates_own"
+    - "tests/test_reader_caps_promotion_lag.py::test_a_readers_delivery_for_the_same_period_caps_the_lag"
+    - "tests/test_reader_caps_promotion_lag.py::test_a_readers_delivery_for_another_period_caps_nothing"
+    - "tests/test_reader_caps_promotion_lag.py::test_the_lag_ends_before_the_readers_receipt"
+    - "tests/test_reader_caps_promotion_lag.py::TestThePeriodAReceiptClaims::test_a_linkage_receipt_on_a_round_claims_that_rounds_own_period"
+    - "tests/test_reader_caps_promotion_lag.py::TestThePeriodAReceiptClaims::test_a_child_protection_receipt_claims_the_next_period"
+    - "tests/test_target_agreement.py::TestWhatWasBuilt::test_linkage_products_ambers_name_their_dataset"
+    evidence:
+    - "2026-10-31 Perth, off-batch @ 08f6985 (lp-fixes and the dashboard fixes merged): a from-empty sequential bootstrap of a scratch database passed its target comparison, every targeted supply read as built - Linkage Products 55 runs, 536 results (486 pass, 16 warn, 34 fail)."
+    - "2026-10-30/31: the provider declares amber_dataset and target_datasets (both found by the first from-empty bootstrap, tests seen failing first); the dependency order, shared-instant and lateness refusals each seen failing first on lp-fixes."
+    unmet_criteria:
+    - {"criterion": "Criterion 12, in part - the scheduling rule is a generic rule of the shared driver.", "why": "The check is real and tested but lives in the Linkage Products provider; moving it needs the driver to know generically which datasets a provider reads and when it releases. PROVISIONAL decision recorded.", "owner": "not scheduled", "blocked_by": {"unowned": true}}
   - id: REQ-GEN-335
     title: The linkage history carries each of its faults in a named scenario - an empty key, an undeclared dataset code, a surplus id, a blank expected id, a doubly linked record, a dangling link, coverage and large key groups in each band, a linked supply held, a red product promoted by a person, a linked dataset marked not supplied, and a product never sent - and names one quarter showing Emergency Department's same-round red clearing
     date_written: '2026-10-25'
     story: As Keith reviewing the register, I want every way a linkage product can fail, and the way Emergency Department's same-round red clears, planted somewhere in the synthetic history and linked from the scenarios panel, so that I can see each verdict on a real page rather than take it on trust.
     moscow: should
-    status: in_progress
+    status: built
     source: Keith, 2026-10-25 (planted violations, REQ-GEN-184 presets, the scenario map) and his answers that evening (L1 to L3, L6, L7). Drafted by delivery-scoper 2026-10-25, reworked the same evening. SIGNED by Keith 2026-10-28 with (m), (n) and (o) added and (l) dropped ('Skip l, b gives me what I wanted there'). Reworked to v3 by delivery-scoper 2026-10-29, restated at Child Protection files_go_to_period 1 (architect S9). RE-SIGNED by Keith 2026-10-30 as v4, criterion by criterion, with his answers to every open question folded in (pending-register.md 2026-10-30).
     acceptance_criteria:
     - THE SYSTEM SHALL draw the linkage history's ordinary quarters with the collections' severity mix - about a quarter amber on coverage, two reds with resupply chains, the oldest supply clean - from the provider's own seed, reaching each verdict by construction (REQ-GEN-184) and confirming it with the real tools (REQ-GEN-186).
@@ -45898,12 +46047,45 @@ requirements:
     signed_off:
       by: Keith
       date: '2026-10-30'
+    implemented_by:
+    - "generator/collections/linkage_products.py::LinkageProducts"
+    - "generator/scenario_injection.py::ExtraArrival"
+    - "contract/scripted_decisions.yaml"
+    linked_tests:
+    - "tests/test_linkage_scenarios.py::test_an_empty_key"
+    - "tests/test_linkage_scenarios.py::test_an_undeclared_code_stands_for_a_missing_dataset"
+    - "tests/test_linkage_scenarios.py::test_a_surplus_identifier"
+    - "tests/test_linkage_scenarios.py::test_one_record_linked_twice"
+    - "tests/test_linkage_scenarios.py::test_a_link_to_a_record_the_quarter_does_not_hold"
+    - "tests/test_linkage_scenarios.py::test_coverage_in_its_band"
+    - "tests/test_linkage_scenarios.py::test_large_key_groups_in_their_band"
+    - "tests/test_linkage_scenarios.py::test_a_blank_expected_identifier"
+    - "tests/test_linkage_scenarios.py::test_a_quarter_with_no_release"
+    - "tests/test_linkage_scenarios.py::test_the_release_reading_a_held_client_register_is_itself_ordinary"
+    - "tests/test_linkage_scenarios.py::test_the_same_round_red_quarter_is_resupplied_after_the_release"
+    - "tests/test_linkage_scenarios.py::test_every_scenario_in_a_quarter_of_its_own"
+    - "tests/test_linkage_scenarios.py::test_the_ordinary_severity_mix"
+    - "tests/test_linkage_scenarios.py::test_no_ordinary_severity_on_a_quarter_a_correction_it_rides_alters"
+    - "tests/test_linkage_scenarios.py::test_the_named_scenario_rides_a_marked_quarter"
+    - "tests/test_linkage_scenarios.py::test_an_unknown_fault_is_refused_naming_the_scenario"
+    - "tests/test_linkage_scenarios.py::test_a_fault_that_cannot_be_placed_is_refused_not_relaxed"
+    - "tests/test_linkage_scenarios.py::test_a_quarter_holding_another_collections_scenario_is_refused"
+    - "tests/test_linkage_scenarios.py::test_two_plans_build_the_same_rows"
+    - "tests/test_linkage_scenarios.py::test_the_child_protection_sides_move_no_ordinary_severity"
+    - "tests/test_linkage_scenarios.py::TestEachOrdinaryReleaseIsScheduledAfterThePromotionItReads::test_an_ordinary_release_on_time_after_its_source_passes"
+    - "tests/test_linkage_scenarios.py::TestEachOrdinaryReleaseIsScheduledAfterThePromotionItReads::test_a_release_past_its_due_time_and_grace_is_refused"
+    - "tests/test_linkage_scenarios.py::TestEachOrdinaryReleaseIsScheduledAfterThePromotionItReads::test_a_release_before_its_source_arrives_is_refused"
+    - "tests/test_linkage_scenarios.py::TestEachOrdinaryReleaseIsScheduledAfterThePromotionItReads::test_the_effective_instant_named_is_the_gates_own"
+    - "tests/test_linkage_scenarios.py::test_a_dataset_identified_by_several_columns_carries_each"
+    evidence:
+    - "2026-10-31 Perth, off-batch @ 08f6985 (lp-fixes and the dashboard fixes merged): a from-empty sequential bootstrap of a scratch database passed its target comparison, every targeted supply read as built - Linkage Products 55 runs, 536 results (486 pass, 16 warn, 34 fail)."
+    - "2026-10-31: all fifteen linkage scenarios TS-86..101 read as designed against the recorded results - each fault fails or warns the check it targets, the could-not-run three record could-not-run reds, TS-96 has no release (morning-reports #11)."
   - id: REQ-PIPE-336
     title: Linkage Products runs end to end as a fourth collection through one short QA adapter serving its linkage and geocoding datasets, each delivery its own package, in the quarterly bootstrap stream, with the bootstrap's cost measured before and after
     date_written: '2026-10-25'
     story: As whoever maintains the pipeline, I want the linkage product filed, staged, checked, recorded, gated and bootstrapped through one short adapter like every other collection, so that it is judged by the same rules and none of its behaviour is special-cased.
     moscow: should
-    status: in_progress
+    status: built
     source: Keith, 2026-10-25, and L4 that evening (measure and report the bootstrap cost). Drafted by delivery-scoper 2026-10-25 on REQ-PIPE-233's pattern. SIGNED by Keith 2026-10-28 (linkage and geocoding separate packages). Reworked to v3 by delivery-scoper 2026-10-29 on the architect review (S11, S12). RE-SIGNED by Keith 2026-10-30 as v4, criterion by criterion, with his answers to every open question folded in (pending-register.md 2026-10-30).
     acceptance_criteria:
     - THE SYSTEM SHALL provide the collection's QA adapter at qa_tools/collections/linkage_products.py, serving linkage-keys - the geocoding datasets join it under REQ-PIPE-296 - carrying no legacy flag and no temporary pointer, its logic reported against REQ-TEST-249's 150-line soft budget.
@@ -45939,12 +46121,33 @@ requirements:
     signed_off:
       by: Keith
       date: '2026-10-30'
+    implemented_by:
+    - "qa_tools/collections/linkage_products.py::ADAPTER"
+    - "qa_tools/common/bootstrap.py::with_what_it_reads"
+    - "qa_tools/common/bootstrap.py::reads_others"
+    - "qa_tools/common/evidently_common.py::collection_checks"
+    linked_tests:
+    - "tests/test_bootstrap_carries_what_it_reads.py::test_linkage_alone_brings_the_collections_it_links"
+    - "tests/test_bootstrap_carries_what_it_reads.py::test_a_collection_reading_only_itself_is_unchanged"
+    - "tests/test_bootstrap_carries_what_it_reads.py::TestACheckpointOfACollectionReadingOthersIsRefused::test_taking_one_is_refused_naming_what_it_reads"
+    - "tests/test_bootstrap_carries_what_it_reads.py::TestACheckpointOfACollectionReadingOthersIsRefused::test_resuming_one_is_refused"
+    - "tests/test_bootstrap_carries_what_it_reads.py::TestACheckpointOfACollectionReadingOthersIsRefused::test_a_collection_reading_only_itself_is_not"
+    - "tests/test_cross_collection_reads.py::TestACollectionWithNoDriftChecksRuns::test_collection_checks_has_no_psi"
+    - "tests/test_cross_collection_reads.py::TestACollectionWithNoDriftChecksRuns::test_evaluate_runs_nothing_and_records_nothing_red"
+    - "tests/test_run_evidently_cp.py::TestACollectionWithNoEvidentlyCheck::test_linkage_products_records_nothing_and_does_not_fail"
+    - "tests/test_run_evidently_cp.py::TestACollectionWithNoEvidentlyCheck::test_a_file_with_checks_but_no_drift_check_is_still_refused"
+    evidence:
+    - "2026-10-31 Perth, off-batch @ 08f6985 (lp-fixes and the dashboard fixes merged): a from-empty sequential bootstrap of a scratch database passed its target comparison, every targeted supply read as built - Linkage Products 55 runs, 536 results (486 pass, 16 warn, 34 fail)."
+    - "c4: before (offset batch, no linkage) Birth Registrations 512s and the quarterly stream 1291s, 1439s in all; after, Birth Registrations 814s and the quarterly stream (Child Protection, Emergency Department, Linkage Products) 2507s, 3509s in all - 2789s over REQ-PIPE-250's 720s budget, reported to Keith in morning-reports #11. Runs: Child Protection and ED 359 before (25 caused by a decision), 373 after (39); Linkage Products 55 arrival runs and 6 knock-on re-checks."
+    unmet_criteria:
+    - {"criterion": "Criterion 7, the checkpoint half - a bootstrap resumed from a checkpoint does not replay the collections a collection's checks read.", "why": "Keith chose to refuse instead: --resume and a checkpoint are refused, by name, for a collection whose checks read others (2026-10-30).", "owner": "not scheduled", "blocked_by": {"unowned": true}}
+    - {"criterion": "Criterion 5 - CI's deployment half against a bootstrap holding the new collection, with its duration recorded.", "why": "Measured by the CI run of the push that carries this requirement, after the flip; recorded in morning-reports #11 when it reports.", "owner": "this push's CI run", "blocked_by": {"unowned": true}}
   - id: REQ-DASH-337
     title: The dashboard shows Linkage Products as Department of Health's second collection; any check that reads another collection is grouped by that collection under a collapsed summary heading, names and links the dataset it is about, and shows on that dataset's page with its effect, its percentage and its cause - all generically, nothing coded for linkage
     date_written: '2026-10-25'
     story: As a data team leader glancing at the register, I want the linkage product shown like any other dataset, and each of its checks to appear on the dataset it is about with the colour it gives that dataset, so that I can tell at once whose records failed to link and why my promoted dataset changed colour.
     moscow: should
-    status: in_progress
+    status: built
     source: Keith, 2026-10-25, and L1 and L8 that evening. Drafted by delivery-scoper 2026-10-25, reworked the same evening. SIGNED by Keith 2026-10-28 - 'out of the box, nothing special-cased for Linkage Products'; the grouping of cross-table checks by the collection they read is generic. Reworked to v3 by delivery-scoper 2026-10-29 on Keith's L-Q4 to L-Q8, the dashboard UX review (F1 to F7) and the architect review (M3, S10). RE-SIGNED by Keith 2026-10-30 as v4, criterion by criterion, with his answers to every open question folded in (pending-register.md 2026-10-30).
     acceptance_criteria:
     - WHEN the dashboard is built from recorded results holding Linkage Products, THE SYSTEM SHALL show it as a collection under Department of Health beside Emergency Department, and the Linkage Keys page with the same status, as-at and supply-history behaviour as every other dataset.
@@ -46002,12 +46205,40 @@ requirements:
     signed_off:
       by: Keith
       date: '2026-10-30'
+    implemented_by:
+    - "dashboard/qa-reporting-dashboard.template.html"
+    - "qa_tools/common/qa_results_reader.py::read_cross_table_results_reading"
+    - "pipeline/build_dashboard_data.py::build_one_table"
+    linked_tests:
+    - "tests-js/cross-collection.test.js"
+    - "tests-js/not-in-agreement.test.js"
+    - "tests-js/cross-collection-review.test.js"
+    - "tests/test_dashboard_e2e.py::TestChecksThatReadAnotherCollection::test_the_linkage_keys_page_groups_its_checks_collapsed_in_hierarchy_order"
+    - "tests/test_dashboard_e2e.py::TestChecksThatReadAnotherCollection::test_a_client_register_page_shows_its_linkage_checks_in_their_group_with_a_working_link"
+    - "tests/test_dashboard_e2e.py::TestChecksThatReadAnotherCollection::test_a_promoted_supply_names_the_linkage_release_as_its_cause"
+    - "tests/test_dashboard_e2e.py::TestChecksThatReadAnotherCollection::test_a_percentage_result_shows_its_percentage_in_the_grid_cell"
+    - "tests/test_dashboard_e2e.py::TestChecksThatReadAnotherCollection::test_a_coverage_card_states_its_band_below"
+    - "tests/test_dashboard_e2e.py::TestChecksThatReadAnotherCollection::test_a_child_protection_page_says_not_yet_checked_before_the_release"
+    - "tests/test_dashboard_e2e.py::TestChecksThatReadAnotherCollection::test_the_not_supplied_quarter_reads_not_supplied_by_decision"
+    - "tests/test_dashboard_e2e.py::TestChecksThatReadAnotherCollection::test_the_large_key_group_check_shows_its_histogram"
+    - "tests/test_dashboard_e2e.py::TestChecksThatReadAnotherCollection::test_a_page_with_no_cross_collection_check_is_unchanged"
+    - "tests/test_dashboard_e2e.py::TestCrossCollectionReviewFixes::test_a_read_datasets_page_shows_what_counts_toward_its_newest_supply"
+    - "tests/test_dashboard_e2e.py::TestCrossCollectionReviewFixes::test_the_run_comparison_follows_the_recorded_direction"
+    - "tests/test_dashboard_e2e.py::TestCrossCollectionReviewFixes::test_closing_a_panel_keeps_its_group_open_and_returns_focus"
+    - "tests/test_dashboard_e2e.py::TestCrossCollectionReviewFixes::test_another_date_starts_every_group_collapsed"
+    - "tests/test_dashboard_e2e.py::TestCrossCollectionReviewFixes::test_an_ungrouped_rows_panel_returns_focus_to_it"
+    - "tests/test_dashboard_e2e.py::TestCrossCollectionReviewFixes::test_the_cross_table_pill_rolls_up_its_rows"
+    - "tests/test_dashboard_e2e.py::TestCrossCollectionReviewFixes::test_at_phone_width_the_direction_line_wraps"
+    - "tests/test_dashboard_e2e.py::TestCrossCollectionReviewFixes::test_warn_reads_amber_and_group_links_are_a_usable_target"
+    evidence:
+    - "2026-10-31 Perth, off-batch @ 08f6985 (lp-fixes and the dashboard fixes merged): a from-empty sequential bootstrap of a scratch database passed its target comparison, every targeted supply read as built - Linkage Products 55 runs, 536 results (486 pass, 16 warn, 34 fail)."
+    - "2026-10-31: TestChecksThatReadAnotherCollection (10, c16, each seen failing against a deliberately broken template) and TestCrossCollectionReviewFixes (10, post-build-review #289 D1-D8) passed against a dashboard built from that bootstrap; npm test 1048 passed on 9040d00."
   - id: REQ-TEST-339
     title: A copy of the repository with thirty fake linked datasets across several fake collections, some identified by one column and some by several, checks one linkage product end to end, proving the cross-collection read scales without new code
     date_written: '2026-10-25'
     story: As whoever maintains the pipeline, I want proof that an asset-level linkage product checked against thirty datasets works through configuration alone, so that the design is known to hold at the scale this PoC is for, not just at two linked datasets.
     moscow: could
-    status: in_progress
+    status: built
     source: Keith's standing scale instruction (CLAUDE.md, 2026-09-21; about 30 collections on the quarterly asset, 2026-10-16), applied by delivery-scoper 2026-10-25 on REQ-TEST-249's fake-collection pattern; the several-identifier case from Keith's L6. SIGNED by Keith 2026-10-28. Reworked to v3 by delivery-scoper 2026-10-29 for the six own-row checks (REQ-QAC-333) and architect C3. RE-SIGNED by Keith 2026-10-30 as v4, criterion by criterion, with his answers to every open question folded in (pending-register.md 2026-10-30).
     acceptance_criteria:
     - THE SYSTEM SHALL have a test that, in a copy of the repository, adds fake quarterly collections holding thirty linked datasets between them - at least one declaring two identifier columns and one declaring three - each with its referential and coverage checks, plus a linkage product reading all thirty, and runs one period from generation to recorded results.
@@ -46029,3 +46260,23 @@ requirements:
     signed_off:
       by: Keith
       date: '2026-10-30'
+
+    implemented_by:
+    - "tests/thirty_linked_datasets.py::build"
+    - "tests/thirty_linked_run.py::main"
+    linked_tests:
+    - "tests/test_thirty_linked_datasets.py::TestThirtyLinkedDatasetsGoFromGenerationToRecordedResults::test_the_fixture_holds_thirty_across_several_collections"
+    - "tests/test_thirty_linked_datasets.py::TestThirtyLinkedDatasetsGoFromGenerationToRecordedResults::test_every_linked_dataset_arrived_and_was_promoted_into_the_period"
+    - "tests/test_thirty_linked_datasets.py::TestThirtyLinkedDatasetsGoFromGenerationToRecordedResults::test_the_product_was_checked_once_on_arrival"
+    - "tests/test_thirty_linked_datasets.py::TestThirtyLinkedDatasetsGoFromGenerationToRecordedResults::test_every_linked_dataset_has_its_referential_and_coverage_result"
+    - "tests/test_thirty_linked_datasets.py::TestTheLinkageRunReadsAllThirtyFromTheWarehouse::test_its_view_schema_resolved_all_thirty_from_the_period"
+    - "tests/test_thirty_linked_datasets.py::TestTheLinkageRunReadsAllThirtyFromTheWarehouse::test_each_referential_and_coverage_result_names_its_one_table"
+    - "tests/test_thirty_linked_datasets.py::TestTheIdentifierShapeChecksPassOnCorrectlyShapedRows::test_the_release_carries_rows_of_each_shape"
+    - "tests/test_thirty_linked_datasets.py::TestAMoveInOneCollectionReRunsOnlyItsTwoChecks::test_it_asked_for_exactly_the_two_checks_reading_the_moved_table"
+    - "tests/test_thirty_linked_datasets.py::TestAMoveInOneCollectionReRunsOnlyItsTwoChecks::test_nothing_else_was_re_run"
+    - "tests/test_thirty_linked_datasets.py::TestNoProductFileChanged::test_before_the_run"
+    - "tests/test_thirty_linked_datasets.py::TestNoProductFileChanged::test_the_check_would_catch_an_edit_to_product_code"
+    - "tests/test_thirty_linked_datasets.py::test_how_long_the_linkage_run_took"
+    evidence:
+    - "2026-10-31 Perth, off-batch @ 08f6985 (lp-fixes and the dashboard fixes merged): a from-empty sequential bootstrap of a scratch database passed its target comparison, every targeted supply read as built - Linkage Products 55 runs, 536 results (486 pass, 16 warn, 34 fail)."
+    - "c4: the linkage run at thirty linked datasets took 1.56s (tests/test_thirty_linked_datasets.py, on demand, 21 passed)."

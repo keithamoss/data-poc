@@ -293,8 +293,16 @@ def open_period(conn, period_name: str, *, opened_by: str,
                 g = inheritance.offset_group(dataset_id, period_name)
                 from qa_tools.common import hierarchy
 
-                groups = [(0 if g is None else g,
-                           hierarchy.dataset(dataset_id).collection_id)]
+                # A DATASET THE HIERARCHY DOES NOT HOLD has no collection and
+                # no offset group (offset_group already says None for it), so
+                # the period is opened and nothing is inherited for it -
+                # never every collection's group, which (g, None) would mean.
+                try:
+                    collection = hierarchy.dataset(dataset_id).collection_id
+                except hierarchy.UnknownDatasetError:
+                    collection = None
+                groups = ([(0 if g is None else g, collection)]
+                          if collection is not None else [])
             elif inserted:
                 groups = [(g, None) for g, _ in inheritance.groups_in(period_name)] or [(0, None)]
             else:

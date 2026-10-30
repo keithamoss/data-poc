@@ -274,6 +274,17 @@ class TestEveryCommittedArrivalKeepsItsVerdict:
     files - S1's zips on 15 May and 15 August 2017, TS-83's resend of the
     Client Register and its three readers on 29 August 2016 and TS-85's
     corrected Placements on 29 February 2016. 466 arrivals (457 before).
+
+    RE-CAPTURED 2026-10-31 FOR THE LINKAGE PRODUCTS COLLECTION (REQ-GEN-334,
+    REQ-GEN-335). The procedure first: 281 deliveries, zero `handfiled-*`, a
+    bootstrap from empty and `mothman dashboard build-data` before the
+    capture. Old entries matched to new by run id: zero verdicts and zero
+    instants moved. What changed: linkage-keys joins, 55 arrivals; and the
+    2018-Q4 and 2019-Q2 Child Protection arrivals of the five tables the
+    linkage scenarios plant against change run id only - the same instant
+    and the same verdict, the id now written in the scenario's stated local
+    time (`...0900000800` where it was `...0100000000`). 504 arrivals (449
+    before).
     """
 
     def test_the_golden_covers_every_dataset_and_run_that_exists_now(self):
@@ -520,8 +531,13 @@ class TestEveryCommittedArrivalKeepsItsVerdict:
         # unfiled - cp-case-workers off-months) and the 4 scenarios on
         # Emergency Department (early, TS-67 after its re-file). No arrival in
         # both captures changed its verdict or instant.
-        assert counts == {"on_time": 345, "early": 45, "late": 46, "unfiled": 13}
-        assert sum(counts.values()) == 449
+        # 345 / 98 / 48 / 13 over 504 FOR THE LINKAGE PRODUCTS COLLECTION
+        # (2026-10-31): linkage-keys' 55 arrivals join, 53 early (each lands
+        # the evening its Client Register does, ahead of its own due day) and
+        # 2 late (7 November 2023 and 6 February 2026, after their due days). Every other arrival matched by instant has the
+        # same verdict; ten Child Protection run ids renamed, nothing moved.
+        assert counts == {"on_time": 345, "early": 98, "late": 48, "unfiled": 13}
+        assert sum(counts.values()) == 504
 
 
 class TestTheClassificationBoundaries:

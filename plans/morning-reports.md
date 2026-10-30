@@ -3090,3 +3090,43 @@ one or more component tags, and a date.
         - TS-100b and TS-101 clear to green on their knock-on re-checks.
         - TS-93b stays could-not-run, since its source never promotes.
       - **TS-96**: its quarter has no release, as scripted.
+    - **THE GATE, SPLIT IN THREE** (after a full `mothman check` hung on a
+      dead Chromium and was killed at the two-hour background limit, and
+      the disk filled to 1MB):
+      - **Disk**: freed by deleting the `.venv` of 14 merged worktrees and
+        about 150 scratch, test and probe databases. supply, supply_prev,
+        lp_boot, off_boot and postgres were kept. A /tmp sweep was refused
+        by the auto-mode classifier and not attempted another way.
+      - **Part 1, pytest without e2e (lp_boot)**: 122 failed, 2 errors. Five
+        root causes, D1-D4 and T1-T2 in post-build-review #290, each re-run
+        green on its own modules. The two `test_cp_pair` errors predate this
+        work: the module passes alone, 11 passed.
+      - **CI on cc4c31a was red** (run 40978105702): TS-47's budget line and
+        four on-demand tests. All five were already fixed in the offset
+        batch. The on-demand suite was re-run on this tree in a clean clone
+        against an empty database: 42 passed, 1 failed (linkage missing from
+        the equivalence corpus, T3). After the fix, that module ran 8 passed.
+      - **Part 2, e2e (lp_boot)**: 5 failed, 397 passed. The fixes were
+        TS-96's placement (D5), TS-93a's held readers (D6), a feedback card
+        that named Keith (D7) and a half-pixel head-back (D8). D6 changed
+        the recorded history, so this needed a fourth bootstrap.
+      - **FOURTH BOOTSTRAP FROM EMPTY (lp_boot4)**: 3703s wall clock. Birth
+        Registrations 735s, the quarterly stream 2725s, total 3690s. Every
+        targeted verdict was as built. Against lp_boot, the only difference
+        is TS-93a's three scripted promotions (promote 413 -> 416). The
+        arrival golden was unchanged.
+      - **On lp_boot4**: needs_deployment without e2e, 131 passed and 1
+        xfailed. knock_on and asset-time, 32 passed. e2e, 401 passed and 1
+        failed (D8); after D8 the affected classes ran 23 passed.
+      - **Part 3, `mothman check --no-pytest`**: every gate passed except
+        `plans` (a stale INDEX.md), which was regenerated and re-run under
+        the docs gate.
+    - **PROVISIONAL CHOICES TONIGHT, for Keith**:
+      - (a) TS-93a's rejected Client Register now has its three readers
+        promoted by the same scripted person an hour later, rather than left
+        held for good. Rejecting them instead was the alternative.
+      - (b) A wait that ends at the release of a package gate already
+        holding the period is excused from the "no re-evaluation waits a
+        week" test (REQ-PIPE-267 c17).
+      - (c) TS-96 opens on the day of its mark, 19 October 2020, landing on
+        the period's gap row.
