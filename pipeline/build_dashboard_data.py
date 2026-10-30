@@ -444,7 +444,25 @@ def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], da
             with supply_db.connect(read_only=True, label="mothman:warehouse-counts") as conn:
                 view["owed"] = supply_status.owing(conn)
         return warehouse_counts.points(dataset_id, check_id, history,
-                                       warehouse=view["warehouse"], owed=view["owed"])
+                                       warehouse=view["warehouse"], owed=view["owed"],
+                                       left_out=left_out_by_supply)
+
+    # A LATER RUN'S LEFT-OUT ENDS AN EARLIER RESULT (REQ-PIPE-332 criteria 7
+    # and 9, as supply_status._shown counts it for the gate): {supply: [(check
+    # id, rank, recorded at)]} for every run that recorded a check left out
+    # of its scope, dated from its results' run_timestamp - the time the
+    # build already dates a readers-only run by. A run recording nothing at
+    # all has no date here, and ends nothing.
+    run_at = {r["run_id"]: r.get("run_timestamp") for r in results if r.get("run_timestamp")}
+    left_out_by_supply: dict[str, list[tuple]] = {}
+
+    for run_id, checks in (not_in_agreement or {}).items():
+        fact = facts.get(run_id)
+        if not fact or not fact.get("supply_id") or not run_at.get(run_id):
+            continue
+        for check in checks:
+            left_out_by_supply.setdefault(fact["supply_id"], []).append(
+                (check, fact["rank"], run_at[run_id]))
     meta = column_meta(coll, dataset)
     all_columns = list(meta)
     stats_spec = collections.adapter(coll).stats

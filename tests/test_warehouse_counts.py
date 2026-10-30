@@ -19,6 +19,8 @@ from qa_tools.tools import results_history
 from test_build_from_the_record import AGENCY, BY, CLIENT_REF, CP, _key, _record
 
 KEYS = {"agency_id": AGENCY, "collection_id": CP}
+#: An own-table check of Notifications, which reads nothing else.
+OWN_CHECK = CLIENT_REF.replace("cp_client_id.relationships_dbt", "notification_id.not_null_dbt")
 
 
 @pytest.fixture
@@ -138,6 +140,45 @@ class TestTheCountedPoints:
         points = card["counted"][c1]
         assert ranks[red] not in [p["rank"] for p in points]
         assert [p for p in points if p["on"] <= "2099-01-06"][-1]["rank"] == ranks[green]
+
+    def test_a_later_run_leaving_the_check_out_ends_the_earlier_red(self, build, period):
+        """REQ-PIPE-332 criteria 7 and 9 on the page, as the gate counts them
+        (supply_status._shown): Notifications' red on the Client reference,
+        recorded before a person marked Clients not supplied, stops counting
+        toward that supply once the knock-on re-run left the check out of
+        scope - and still counted on the dates before that re-run."""
+        from qa_tools.common import left_out, unrunnable
+
+        c1, n1 = f"cp-clients@{_key()}", f"cp-notifications@{_key()}"
+        _run(_uid("c"), dataset_id="cp-clients", supply=c1, when="2099-01-01T09:00:00+08:00")
+        _decide(dl.PROMOTE, "cp-clients", c1, period, "2099-01-01T10:00:00+08:00")
+        red = _run(_uid("n"), dataset_id="cp-notifications", supply=n1,
+                   when="2099-01-02T09:00:00+08:00",
+                   reads={"cp_clients": c1, "cp_notifications": n1},
+                   results=[_record(CLIENT_REF, "cp-notifications", "fail")])
+        rerun, when = _uid("n"), "2099-01-10T09:00:00+08:00"
+        qa_results_writer.open_run(AGENCY, CP, rerun, when, BY, purpose={
+            "dataset_id": "cp-notifications", "supply_id": n1, "scope": "arrival"})
+        qa_results_writer.write_qa_result(
+            AGENCY, CP, rerun, when, left_out.TOOL,
+            {"left_out": {}, "not_in_agreement": {CLIENT_REF: unrunnable.left_out_entry(
+                unrunnable.NOT_SUPPLIED_BY_DECISION, period, "cp-clients")}})
+        # AS A REAL RE-RUN DOES: its stats, and its other checks' results.
+        qa_results_writer.write_qa_result(
+            AGENCY, CP, rerun, when, "dataset_stats",
+            {"arrival_record": {"run_id": rerun, "received_at": when, "delivery": "d"},
+             "row_counts": {}, "value_counts": {}, "check_aggregates": {}}, run_by=BY)
+        qa_results_writer.write_qa_result(AGENCY, CP, rerun, when, "dbt", {}, verified=[
+            dict(_record(OWN_CHECK, "cp-notifications", "pass"), run_id=rerun)])
+        qa_results_writer.finish_run(rerun)
+
+        card = _card(build()["cp-notifications"], CLIENT_REF)
+        points = card["counted"].get(n1) or []
+        before = [p for p in points if p["on"] < "2099-01-10"]
+        assert before and before[-1]["rank"] is not None, \
+            f"the precondition - the red {red} counted until the re-run: {points}"
+        after = [p for p in points if p["on"] >= "2099-01-10"]
+        assert after and after[-1]["rank"] is None, points
 
     def test_r4_a_late_reader_of_an_older_supply_never_counts_toward_the_newer(self, build,
                                                                                period):

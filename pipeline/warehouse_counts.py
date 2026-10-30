@@ -57,11 +57,17 @@ def _about(entry: dict) -> str | None:
 
 def points(dataset_id: str, check_id: str, history: list[dict], *,
            warehouse: supply_status.HoldingsTimeline,
-           owed: supply_status.Owing | None) -> dict[str, list[dict]]:
+           owed: supply_status.Owing | None,
+           left_out: dict[str, list[tuple]] | None = None) -> dict[str, list[dict]]:
     """{supply: [{on, rank, reason, owedBy, owedSince}]} for one cross-table
     card: from each `on` (an asset day), the result with that `rank` counts
     toward the supply - or, with no rank, nothing does and `reason` says why.
-    `history` is the card's entries, in rank order."""
+    `history` is the card's entries, in rank order.
+
+    `left_out`: {supply: [(check id, rank, recorded at)]} - from the instant a
+    LATER run of that supply recorded this check left out of its scope, an
+    earlier result for it is no longer about the supply (REQ-PIPE-332
+    criteria 7 and 9; supply_status._shown is the gate's half)."""
     declared_on = check_id.split(".")[3] if check_id.count(".") >= 4 else dataset_id
     zones = asset_time.timezone_versions()  # once, not per point (REQ-PIPE-254 criterion 19)
     by_supply: dict[str, list[dict]] = {}
@@ -79,14 +85,19 @@ def points(dataset_id: str, check_id: str, history: list[dict], *,
         # AND WHERE 'OWED' BEGINS OR ENDS (post-build-review #266 D2): the run
         # that clears a re-check need record nothing on this card.
         owed_at = {t for t, _run in (owed.changes(tables) if owed is not None else ())}
+        ends = [(rank, supply_status.instant(at)) for check, rank, at
+                in (left_out or {}).get(supply, ()) if check == check_id]
         instants = sorted({at for at, _r in records if at is not None}
-                          | {t for t in {*warehouse.instants(involved), *owed_at}
+                          | {t for t in {*warehouse.instants(involved), *owed_at,
+                                         *(at for _rank, at in ends)}
                              if first is None or t >= first})
         found: list[dict] = []
         for when in instants:
-            got = [r for at, r in records if at is None or at <= when]
-            if not got:
+            seen = [r for at, r in records if at is None or at <= when]
+            if not seen:
                 continue
+            got = [r for r in seen
+                   if not any(at_end <= when and rank > r["_rank"] for rank, at_end in ends)]
             counted = supply_status.count(dataset_id, supply, got, holdings=warehouse.at(when),
                                           owed=owed, at=when)
             point = _point(counted[-1] if counted else None)
