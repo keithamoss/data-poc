@@ -134,3 +134,49 @@ class TestTheHandWrittenChecksAgreeWithTheMapping:
         path.write_text(path.read_text().replace("linked_dataset: ed-presentations", "linked_dataset: cp-carers", 1))
         text = "\n".join(linked_datasets.problems(repo))
         assert "cp-carers" in text and "not declared as linked" in text
+
+
+class TestTheQueriesThemselvesAgreeWithTheMapping:
+    """REQ-QAC-333 criterion 3 holds the SQL that runs and the valid values,
+    not only the attributes beside them: a check whose query or values state
+    a code or an identifier column the mapping does not declare fails,
+    naming the check, the dataset and both values."""
+
+    def _soda(self, repo):
+        return repo / "contract" / "department-of-health" / "linkage-products-soda-checks.yml"
+
+    def _replace(self, repo, old, new):
+        path = self._soda(repo)
+        text = path.read_text()
+        assert old in text, f"precondition: {old!r} is in the check file"
+        path.write_text(text.replace(old, new, 1))
+        return "\n".join(linked_datasets.problems(repo))
+
+    def test_a_referential_query_stating_another_code(self, repo):
+        text = self._replace(repo, "WHERE l.dataset = 'DOC_CLIENTS' AND c.cp_client_id IS NULL",
+                             "WHERE l.dataset = 'DOC_CLIENTZ' AND c.cp_client_id IS NULL")
+        assert "cp-clients.referential_soda" in text and "DOC_CLIENTZ" in text \
+            and "'DOC_CLIENTS'" in text, text
+
+    def test_valid_values_stating_another_code(self, repo):
+        text = self._replace(repo, 'valid values: ["DOC_CLIENTS", "EDDC_PRESENTATION"]',
+                             'valid values: ["DOC_CLIENTS", "EDC_PRESENTATION"]')
+        assert "dataset.invalid_count_soda" in text and "EDC_PRESENTATION" in text \
+            and "EDDC_PRESENTATION" in text, text
+
+    def test_a_join_on_another_identifier_column(self, repo):
+        text = self._replace(
+            repo, "LEFT JOIN ed_presentations e ON CAST(e.presentation_id AS TEXT)",
+            "LEFT JOIN ed_presentations e ON CAST(e.arrival_datetime AS TEXT)")
+        assert "ed-presentations.referential_soda" in text and "arrival_datetime" in text \
+            and "presentation_id" in text, text
+
+    def test_a_source_column_compared_without_its_text_cast(self, repo):
+        text = self._replace(repo, "ON l.id_1 = CAST(c.cp_client_id AS TEXT)",
+                             "ON l.id_1 = c.cp_client_id")
+        assert "cp-clients.coverage_soda" in text and "text" in text, text
+
+    def test_an_own_row_query_stating_an_undeclared_code(self, repo):
+        text = self._replace(repo, "WHERE (dataset = 'DOC_CLIENTS' AND id_2 IS NOT NULL",
+                             "WHERE (dataset = 'DOC_CLIENT' AND id_2 IS NOT NULL")
+        assert "no_surplus_ids_soda" in text and "DOC_CLIENT'" in text, text

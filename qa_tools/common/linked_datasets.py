@@ -52,6 +52,11 @@ def _columns(root: Path, contract: str, table: str) -> list[str]:
 
 def _soda_checks(path: Path) -> list[tuple[str, dict]]:
     """(check_id, attributes) for every Soda check in a file."""
+    return [(cid, attrs) for cid, attrs, _body in _soda_bodies(path)]
+
+
+def _soda_bodies(path: Path) -> list[tuple[str, dict, dict]]:
+    """(check_id, attributes, the check's whole body) for every Soda check."""
     doc = _load(path) or {}
     out = []
     for key, checks in doc.items():
@@ -62,7 +67,59 @@ def _soda_checks(path: Path) -> list[tuple[str, dict]]:
                 for body in item.values():
                     attrs = (body or {}).get("attributes") or {} if isinstance(body, dict) else {}
                     if attrs.get("check_id"):
-                        out.append((attrs["check_id"], attrs))
+                        out.append((attrs["check_id"], attrs, body))
+    return out
+
+
+_CAST = re.compile(r"CAST\(\s*([\w.]+)\s+AS\s+TEXT\s*\)", re.IGNORECASE)
+_EQ = re.compile(r"([\w.]+)\s*=\s*([\w.]+)")
+_CODE = re.compile(r"\bdataset\s*=\s*'([^']*)'", re.IGNORECASE)
+
+
+def _queries(body: dict) -> list[str]:
+    """The SQL a Soda check runs: its fail query, or its metric's query."""
+    return [v for k, v in body.items() if isinstance(v, str) and k.endswith("query")]
+
+
+def _query_problems(check_id: str, body: dict, mapping: dict, did: str | None) -> list[str]:
+    """REQ-QAC-333 criterion 3 against WHAT RUNS: every dataset code a query
+    or a valid-values list states is one the mapping declares (the linked
+    dataset's own, for a referential or coverage check); and every identifier
+    a referential or coverage query compares is the mapping's column for that
+    id, cast to text."""
+    codes = {c for c, _cols in mapping.values()}
+    out = []
+    values = body.get("valid values")
+    if isinstance(values, list) and sorted(values) != sorted(codes):
+        out.append(f"check {check_id} states the valid values {sorted(values)}; the mapping "
+                   f"declares {sorted(codes)}.")
+    for sql in _queries(body):
+        for stated in _CODE.findall(sql):
+            if did is not None and stated != mapping[did][0]:
+                out.append(f"check {check_id} queries the code {stated!r} for {did}; the "
+                           f"mapping declares {mapping[did][0]!r}.")
+            elif did is None and stated not in codes:
+                owner = ", ".join(sorted(codes))
+                out.append(f"check {check_id} queries the code {stated!r}, which no linked "
+                           f"dataset declares; the mapping declares {owner}.")
+        if did is None:
+            continue
+        cols = mapping[did][1]
+        cast = {m.split(".")[-1] for m in _CAST.findall(sql)}
+        plain = _CAST.sub(lambda m: m.group(1), sql)
+        for left, right in _EQ.findall(plain):
+            a, b = left.split(".")[-1], right.split(".")[-1]
+            ida, idb = _ID.match(a), _ID.match(b)
+            if bool(ida) == bool(idb):
+                continue
+            j, col = (int((ida or idb).group(1)), b if ida else a)
+            want = cols[j - 1] if j <= len(cols) else None
+            if col != want:
+                out.append(f"check {check_id} compares id_{j} with the column {col!r} of "
+                           f"{did}; the mapping declares {want!r}.")
+            elif col not in cast or f"id_{j}" not in cast:
+                out.append(f"check {check_id} compares id_{j} with {did}'s {col!r} without "
+                           f"casting both to text (REQ-QAC-333 criterion 3).")
     return out
 
 
@@ -118,7 +175,7 @@ def _check_problems(root: Path, coll: dict, pid: str, mapping: dict) -> list[str
     path = root / "contract" / folder / f"{stem}-soda-checks.yml"
     out: list[str] = []
     have: dict[str, set] = {did: set() for did in mapping}
-    for check_id, attrs in _soda_checks(path):
+    for check_id, attrs, body in _soda_bodies(path):
         did = attrs.get("linked_dataset")
         if did is not None:
             if did not in mapping:
@@ -142,6 +199,7 @@ def _check_problems(root: Path, coll: dict, pid: str, mapping: dict) -> list[str
             elif int(k) != want:
                 out.append(f"check {check_id} states {k} identifier(s) for {code} ({did}); "
                            f"the mapping declares {want}.")
+        out += _query_problems(check_id, body, mapping, attrs.get("linked_dataset"))
         codes = attrs.get("linkage_codes")
         if codes is not None and sorted(codes) != sorted(c for c, _cols in mapping.values()):
             out.append(f"check {check_id} states the codes {sorted(codes)}; the mapping declares "
