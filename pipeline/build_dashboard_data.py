@@ -369,6 +369,16 @@ def share_cross_table_results(results: list[dict], by_table: dict[str, list[dict
             by_table[other].append(r)
 
 
+def _left_out_fields(why) -> dict:
+    """A recorded left_out entry for the page: its structured code and its
+    words (REQ-PIPE-332 criterion 10), plus the period and dataset it names."""
+    from qa_tools.common import unrunnable
+
+    entry = unrunnable.as_entry(why)
+    return {"code": entry["code"], "reason": entry["reason"],
+            "period": entry.get("period"), "dataset": entry.get("dataset")}
+
+
 # ---- one dataset ------------------------------------------------------------
 
 def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], dataset_stats: dict,
@@ -939,7 +949,7 @@ def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], da
         "noPromoted": no_promoted,
         "notInAgreement": [
             {"runId": run_id, "supplyId": facts[run_id]["supply_id"], "checkId": check,
-             "reason": why}
+             **_left_out_fields(why)}
             for run_id, checks in sorted((not_in_agreement or {}).items(),
                                          key=lambda kv: facts.get(kv[0], {}).get("rank", 0))
             if run_id in facts and facts[run_id]["dataset_id"] == dataset_id

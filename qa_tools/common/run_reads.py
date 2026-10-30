@@ -120,3 +120,15 @@ def declaration_problems(declared: dict[str, list[str]] | None = None,
                            f"{mine} calendar - a check reads only its own period "
                            f"(REQ-PIPE-331 criterion 2).")
     return out
+
+
+def unreadable_in(conn, collection_id: str, run_id: str) -> frozenset[str]:
+    """Every table a run of `collection_id` reads - its own and every other
+    collection's its checks declare - that has no view in the run's schema
+    (criterion 8): what a runner leaves out, so a check reading an absent
+    table of another collection is treated exactly as one reading an absent
+    table of its own, never handed to its tool to raise."""
+    from qa_tools.common import supply_db
+
+    return frozenset(reads_for(collection_id).tables) - frozenset(
+        supply_db.readable_in(conn, run_id))

@@ -62,12 +62,15 @@ def _authored_names(path: str) -> "MappingProxyType":
         name_by_check_id(parse_contract_check_metadata(path, text=text))))
 
 
-def _unreadable_in(run_id: str, tables) -> frozenset[str]:
-    """The logical tables this run has no view for - see
+def _unreadable_in(run_id: str, collection_id: str) -> frozenset[str]:
+    """The logical tables this run has no view for - its own and every other
+    collection's its checks read (REQ-PIPE-331 criterion 8) - see
     supply_db.readable_in() for why the schema rather than the record."""
+    from qa_tools.common import run_reads
+
     conn = supply_db.connect(read_only=True, label="mothman:datacontract-readable")
     try:
-        return frozenset(tables) - supply_db.readable_in(conn, run_id)
+        return run_reads.unreadable_in(conn, collection_id, run_id)
     finally:
         conn.close()
 
@@ -92,7 +95,7 @@ def evaluate(collection_id: str, run_id: str, run_timestamp: str) -> list[dict]:
     options = (selection_for(path, asked)
                if scoped and run_owner(run_id) is not None else {})
     run = run_against_warehouse(path, supply_db.run_schema(run_id), **options)
-    unreadable = _unreadable_in(run_id, tables)
+    unreadable = _unreadable_in(run_id, collection_id)
     declared = _declared_reads_tables()
     names = _authored_names(path)
 

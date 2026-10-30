@@ -120,7 +120,10 @@ checks for linkage_keys:
         category: consistency
         introduced_date: "2013-01-01"
         unit: percent
-        histogram: {query: large_groups, edges: [51, 101, 151, 201, 251, 501, 1001]}
+        histogram:
+          values: SELECT COUNT(*) FROM linkage_keys GROUP BY linkage_key HAVING COUNT(*) > 50
+          population: SELECT COUNT(DISTINCT linkage_key) FROM linkage_keys
+          edges: [51, 101, 151, 201, 251, 501, 1001]
         description: >
           No more than 2 percent of keys may carry more than 50 records; above 4
           percent fails.

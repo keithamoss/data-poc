@@ -1437,6 +1437,17 @@ _PAIR_CONFIG = ("daily, due 14:00 AWST, 60 minutes' grace, 4-hour claim window -
                 "for one table, each with its own receipt; a person settles the pair at "
                 "11:00 the next day.")
 
+#: SUPPLIES RIDING A CORRECTION, BY DATASET (REQ-GEN-237 criterion 3 and
+#: REQ-GEN-205 criteria 9 and 10 as amended by REQ-GEN-334; Keith 2026-10-30,
+#: PROVISIONAL): every generated supply of these datasets in a quarter the
+#: correction alters rides it - generated there, and what the confirmed
+#: correction does to each is what its impact preview shows at confirmation
+#: (re-judged, moved, kept, held or parked), recorded then rather than
+#: predicted here. Data, not a rule naming any collection.
+CORRECTION_RIDERS: dict[str, tuple[str, ...]] = {
+    "REQ-GEN-205": ("linkage-keys",),
+}
+
 INJECTIONS: tuple[Injection, ...] = (
     Injection(
         scenario_id="TS-1",

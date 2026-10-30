@@ -222,3 +222,27 @@ class TestAContendedCollectionDoesNotStopTheOthers:
         assert out.contended and not out.completed
         assert "child-protection" in out.message
         assert cleared == []
+
+
+class TestARunnerTreatsAnAbsentForeignTableAsAbsent:
+    """Criterion 8, found by the first bootstrap with Linkage Products: Soda
+    and datacontract-cli worked out what a run could not read from its OWN
+    collection's tables only, so a check reading another collection's absent
+    table was handed to the tool and raised 'relation does not exist'."""
+
+    def test_unreadable_names_the_foreign_tables_without_a_view(self, monkeypatch):
+        from qa_tools.common import supply_db
+
+        monkeypatch.setattr(supply_db, "readable_in", lambda conn, run_id: {"linkage_keys"})
+        got = run_reads.unreadable_in(None, "linkage-products", "linkage_keys__x")
+        assert got == frozenset({"cp_clients", "ed_presentations"})
+
+    def test_soda_and_datacontract_ask_it(self):
+        import inspect
+
+        from qa_tools.tools import run_datacontract, run_soda
+
+        # An architecture rule, by source: both runners take their unreadable
+        # set from the one resolver rather than a list of their own.
+        assert "run_reads.unreadable_in" in inspect.getsource(run_soda.evaluate)
+        assert "run_reads.unreadable_in" in inspect.getsource(run_datacontract._unreadable_in)

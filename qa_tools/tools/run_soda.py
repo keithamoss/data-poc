@@ -73,7 +73,11 @@ def evaluate(collection_id: str, run_id: str, run_timestamp: str) -> list[dict]:
         # ONLY WHAT THIS RUN CAN READ - see soda_common.readable_checks_yaml().
         # Asked of the run's OWN SCHEMA rather than the recorded resolution:
         # what Soda can query is exactly what has a view.
-        unreadable = set(tables) - supply_db.readable_in(conn, run_id)
+        # ITS OWN TABLES AND EVERY OTHER COLLECTION'S IT READS (REQ-PIPE-331
+        # criterion 8), through the one resolver.
+        from qa_tools.common import run_reads
+
+        unreadable = set(run_reads.unreadable_in(conn, collection_id, run_id))
         n_total_by_table = {t: conn.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0]
                             for t in tables if t not in unreadable}
 
@@ -164,6 +168,16 @@ def evaluate(collection_id: str, run_id: str, run_timestamp: str) -> list[dict]:
                                                            adapter.sample_key[table], table),
                 "engine": ENGINE_TAG,
             })
+
+        # A BINNED DISTRIBUTION WHERE A CHECK DECLARES ONE (REQ-QAC-333
+        # criteria 9 and 10), measured here while the run's connection is open.
+        from qa_tools.common import distribution
+
+        histograms = distribution.declared(path)
+        for r in results:
+            spec = histograms.get(r["check_id"])
+            if spec is not None:
+                r["distribution"] = distribution.measure(conn, spec)
 
         # EVERY DECLARED CHECK SODA DID NOT REPORT IS RED, never absent (the
         # road-testing sweep's #7): Soda leaves a check it cannot evaluate

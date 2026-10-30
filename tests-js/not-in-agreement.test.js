@@ -86,11 +86,23 @@ describe("which checks the page names", () => {
 });
 
 describe("what the section says", () => {
-  it("says the reason as a sentence", () => {
+  it("words each entry from its structured code, never its text (REQ-DASH-337 c12)", () => {
     const w = load();
-    expect(w.notInAgreementReason("not part of the agreement for 2013-Q2"))
+    expect(w.notInAgreementReason({code: "not_in_agreement", period: "2013-Q2",
+                                   reason: "anything at all"}))
       .toBe("Not part of the agreement for 2013-Q2.");
-    expect(w.notInAgreementReason("")).toBe("");
+    expect(w.notInAgreementReason({code: "not_supplied_by_decision", period: "2026-Q2",
+                                   reason: "not part of the agreement for 2026-Q2"}))
+      .toBe("Not supplied for 2026-Q2, by decision.");
+    expect(w.notInAgreementReason({code: "calendar_differs", period: "2026-Q2",
+                                   dataset: "no-such", calendar: "monthly"}))
+      .toBe("Not checked: no-such was on the monthly calendar for 2026-Q2.");
+  });
+
+  it("reads an entry recorded before the codes as not part of the agreement", () => {
+    const w = load();
+    expect(w.notInAgreementReason({reason: "not part of the agreement for 2013-Q2"}))
+      .toBe("Not part of the agreement for 2013-Q2.");
   });
 
   it("is neither red nor a result: no status pill, a Not run tag", () => {

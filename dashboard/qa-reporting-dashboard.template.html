@@ -6050,11 +6050,21 @@ function notInAgreementShown(col, ds){
     ck: byId[e.checkId] || {check_id: e.checkId, key: e.checkId, name: e.checkId}}));
   return crossTableRowOrder(col, rows);
 }
-// "not part of the agreement for 2013-Q2" -> "Not part of the agreement for 2013-Q2."
-function notInAgreementReason(reason){
-  const r = String(reason || "").trim();
-  if(!r) return "";
-  return r.charAt(0).toUpperCase() + r.slice(1) + (/[.!?]$/.test(r) ? "" : ".");
+// A left_out entry IN WORDS, FROM ITS STRUCTURED CODE (REQ-DASH-337 criterion
+// 12, REQ-PIPE-332 criterion 10) - never by matching its recorded reason text.
+// An entry recorded before the codes existed carries no code and was only ever
+// not part of the agreement. Its period is the entry's own, else the reason's.
+function notInAgreementReason(entry){
+  const e = entry || {};
+  const period = e.period || ((String(e.reason || "").match(/\d{4}-[A-Z0-9]+$/) || [""])[0]);
+  const code = e.code || "not_in_agreement";
+  if(code === "not_supplied_by_decision") return `Not supplied for ${period}, by decision.`;
+  if(code === "calendar_differs"){
+    const d = e.dataset ? realDatasetIndex()[e.dataset] : null;
+    const name = (d && d.name) || e.dataset || "a dataset it reads";
+    return `Not checked: ${name} was on ${e.calendar ? "the " + e.calendar : "another"} calendar for ${period}.`;
+  }
+  return `Not part of the agreement for ${period}.`;
 }
 function notInAgreementBlock(rows){
   if(!rows.length) return "";
@@ -6066,8 +6076,8 @@ function notInAgreementBlock(rows){
   return `<div class="not-in-agreement" data-not-in-agreement="${rows.length}">
       <div class="nia-head">Not run for this supply</div>
       ${lines}
-      <div class="nia-note">${rows.length === 1 ? "This check reads a table" : "These checks read a table"} that is not part
-        of this collection's delivery agreement for the supply's period, so ${rows.length === 1 ? "it was" : "they were"} left out of
+      <div class="nia-note">${rows.length === 1 ? "This check reads a table" : "These checks read a table"} that ${rows.every(r=> (r.entry.code || "not_in_agreement") === "not_in_agreement")
+        ? "is not part of the delivery agreement for the supply's period" : "was out of scope for the supply's period, for the reason given"}, so ${rows.length === 1 ? "it was" : "they were"} left out of
         its run. ${rows.length === 1 ? "It is" : "They are"} neither red nor a result, and ${rows.length === 1 ? "does" : "do"} not count toward this dataset's status.</div>
     </div>`;
 }
@@ -6079,7 +6089,7 @@ function wireNotInAgreement(scopeWrap, col, rows){
     el.querySelector(".nm").textContent = r.ck.name || r.entry.checkId;
     el.querySelector(".bt").textContent = crossTableBetween(col, r.ck);
     el.querySelector(".tr").textContent = r.ck.tool_ref || "";
-    el.querySelector(".why").textContent = notInAgreementReason(r.entry.reason);
+    el.querySelector(".why").textContent = notInAgreementReason(r.entry);
   });
 }
 // A history row's source, where it was another table's run.

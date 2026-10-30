@@ -147,8 +147,9 @@ def check(injections: Sequence, generated: Mapping[str, Sequence], *, docs=None,
                 raise CannotPlace(f"{inj.scenario_id}: correction {reference} alters "
                                   f"{', '.join(outside)} of {inj.dataset_id}, outside its "
                                   f"generated history - grow the history or move the change")
+        riding_datasets = set(si.CORRECTION_RIDERS.get(reference, ()))
         for dataset_id, periods in sorted(changed.items()):
-            if _collection_of(dataset_id) in riding_collections:
+            if _collection_of(dataset_id) in riding_collections or dataset_id in riding_datasets:
                 continue
             held = sorted(set(periods) & {q.name for q in generated[dataset_id]}
                           - suppressed.get(dataset_id, set()))
@@ -424,6 +425,10 @@ def check_written(dataset_ids, entries, injected_periods=frozenset(), *, docs=No
                 continue
             for dataset_id in dataset_ids:
                 if not _carries(e, dataset_id) or not _on_a_calendar(dataset_id):
+                    continue
+                # A DECLARED RIDER (CORRECTION_RIDERS): its supplies ride the
+                # correction, their outcome recorded at confirmation.
+                if dataset_id in scenario_injection.CORRECTION_RIDERS.get(reference, ()):
                     continue
                 moved = filing_changes(reference, dataset_id, [at], docs=docs)
                 if moved:

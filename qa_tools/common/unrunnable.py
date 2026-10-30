@@ -177,8 +177,10 @@ def out_of_agreement(conn, *, own_table: str, own_dataset: str, period: str,
                - set(resolution.resolved))
     if not missing or not reads:
         return {}
-    outside: dict[str, bool] = {}
-    out: dict[str, str] = {}
+    from qa_tools.common import not_supplied
+
+    outside: dict[str, dict | None] = {}
+    out: dict[str, dict] = {}
     for check, tables in sorted(reads.items()):
         parsed = check_id_mod.try_parse(check)
         if parsed is None:
@@ -190,13 +192,47 @@ def out_of_agreement(conn, *, own_table: str, own_dataset: str, period: str,
                 try:
                     dataset_id = hierarchy.dataset_for_table(table).dataset_id
                 except Exception:  # noqa: BLE001 - not one of ours
-                    outside[table] = False
+                    outside[table] = None
                     continue
-                outside[table] = not in_agreement(conn, dataset_id, period, as_at)
-            if outside[table]:
-                out[check] = f"not part of the agreement for {period}"
+                outside[table] = None
+                # A PERSON'S DECISION FIRST (REQ-PIPE-332 criterion 7): marked
+                # not supplied for the period, the check is out of scope -
+                # whichever collection declares it, a sibling included.
+                if conn is not None and not_supplied.marked(
+                        conn, dataset_id, period, as_at=as_at.isoformat()) is not None:
+                    outside[table] = left_out_entry(NOT_SUPPLIED_BY_DECISION, period,
+                                                    dataset_id)
+                elif not in_agreement(conn, dataset_id, period, as_at):
+                    outside[table] = left_out_entry(NOT_IN_AGREEMENT, period, dataset_id)
+            if outside[table] is not None:
+                out[check] = outside[table]
                 break
     return out
+
+
+#: THE STRUCTURED REASON CODES a left_out entry carries (REQ-PIPE-332
+#: criterion 10), so the page words each from its code, never its text.
+NOT_IN_AGREEMENT = "not_in_agreement"
+NOT_SUPPLIED_BY_DECISION = "not_supplied_by_decision"
+CALENDAR_DIFFERS = "calendar_differs"
+_REASONS = {NOT_IN_AGREEMENT: "not part of the agreement for {period}",
+            NOT_SUPPLIED_BY_DECISION: "not supplied for {period}, by decision",
+            CALENDAR_DIFFERS: "not checked: {dataset} was on another calendar for {period}"}
+
+
+def left_out_entry(code: str, period: str, dataset_id: str) -> dict:
+    """One recorded left_out entry: its code, its reason in words, and the
+    period and dataset it is about."""
+    return {"code": code, "reason": _REASONS[code].format(period=period, dataset=dataset_id),
+            "period": period, "dataset": dataset_id}
+
+
+def as_entry(value) -> dict:
+    """A recorded entry as a dict - one recorded before the codes existed is
+    a bare reason, which was only ever not_in_agreement's."""
+    if isinstance(value, dict):
+        return value
+    return {"code": NOT_IN_AGREEMENT, "reason": str(value)}
 
 
 def _refused_with(conn, run_id: str) -> frozenset[str]:
