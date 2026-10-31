@@ -360,3 +360,35 @@ def test_a_backstopped_reader_is_not_said_refused(private_supply_dsn):
     said = " ".join(settle_tui.reader_lines(readers))
     assert "refused" not in said, said
     assert "agreement backstop" in said, said
+
+
+class TestTheFlagFormExits3WhenItsOwnRunsAreLeftOwed:
+    """post-build-review #263: a settlement by flags whose OWN QA run does not
+    finish exits CHECKS_STILL_OWED_EXIT (3), as every other operation of the
+    command does - not 0, which a script cannot tell from a complete one."""
+
+    def test_a_failed_owed_run_exits_3(self, sc, person, monkeypatch):
+        from click.testing import CliRunner
+
+        from cli import filing_tui
+        from cli.supply import supply_group
+        from qa_tools.common import filing_decisions as fd, recheck, settlement, supply_db
+
+        got = contested(sc)
+        answers = (settlement.Answer(PAIR[0], settlement.SUPPLY),
+                   settlement.Answer(PAIR[1], settlement.REJECT))
+        request = fd.Request(operation=fd.CHOOSE_FILE, dataset_id="cp-clients", actor=person,
+                             reason="t", period=Q4, supply=got["pair"], file_outcomes=answers)
+        with supply_db.connect(read_only=True, label="pytest") as conn:
+            key = fd.consequences(conn, request).key
+
+        def fails(*_a, **_k):
+            raise RuntimeError("the tool fell over")
+        monkeypatch.setattr(recheck, "run", fails)
+        args = ["decide", "--operation", "choose-file", "--dataset", "cp-clients",
+                "--period", Q4, "--file-outcome", f"{PAIR[0]}=supply",
+                "--file-outcome", f"{PAIR[1]}=reject", "--reason", "test", "--yes"]
+        result = CliRunner().invoke(supply_group, args + (["--acknowledge", key] if key else []),
+                                    env=PIPED)
+        assert "not checked yet - owed" in _flat(result.output), result.output
+        assert result.exit_code == filing_tui.CHECKS_STILL_OWED_EXIT, result.output

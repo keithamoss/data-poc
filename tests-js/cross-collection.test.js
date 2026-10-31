@@ -198,6 +198,16 @@ describe("not yet checked, with its due date (criterion 8)", () => {
     expect(cell.textContent).toContain(`Not yet checked by Match Keys - due ${w.fmtInstant(DUE)}`);
   });
 
+  it("reads at the muted secondary weight, not a result's (post-build-review #289 J2)", () => {
+    const w = load();
+    const { host } = grid(w, [card("ref", FROM_MATCHES, { result: false })]);
+    w.document.body.appendChild(host);
+    const word = host.querySelector("[data-not-yet-checked] .xt-word");
+    const style = w.getComputedStyle(word);
+    expect(style.fontWeight).toBe("400");
+    expect(style.color).toBe("var(--ink-muted)");
+  });
+
   it("says nothing once that dataset has arrived for the period", () => {
     const w = load({ matchKeys: { runs: [{ run_id: "m__1", run_date: "2026-05-01" }],
                                   arrivalByRun: { m__1: { slot: PERIOD } } } });

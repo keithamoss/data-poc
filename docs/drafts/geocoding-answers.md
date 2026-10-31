@@ -44,3 +44,34 @@
 - G1 (= architect GA3): (b) - a geocoding check's verdict counts against the source dataset's supply it read, exactly as linkage does (REQ-PIPE-332 / REQ-PIPE-269 c4); a promoted Client Register supply may change colour when its period's geocodes are checked. (Recommendation was (a); Keith chose (b).)
 - #291 (linkage referential failing samples empty, REQ-QAC-333 c6): (b) fixed inside the geocoding batch by REQ-PIPE-341 c3 (composite sample key); REQ-QAC-333 c6 goes back to unmet until then.
 - GA1: (a) one geocode set per DISTINCT identifier set; a source's duplicate is reported once, by the source's own uniqueness check, never as a geocoding duplicate year.
+- GA2: (a) faithful - a geocode follows from the source row's own address columns: a record with none of them filled (e.g. an ED presentation with no postcode) is 'not geocoded', and otherwise is placed no finer than its present columns support; the planned verdict is confirmed by the targeting trial (Keith, 2026-10-31).
+- N1 (geocoding coverage bands, REQ-QAC-340): (a) amber below 100 percent, red below 98 (Keith, 2026-10-31).
+- Q7 (geocoding named scenarios, REQ-GEN-298): (a) a named scenario for each of REQ-QAC-340's five verdict routes, including the G1 route; the ordinary checks rely on presets (Keith, 2026-10-31).
+- GA4 (geocoding id width): (a) the same id_1 to id_N as the Linkage Keys contract, N = 2 today (Keith, 2026-10-31).
+- Q10 (census years before 2021, REQ-QAC-300): (b) effective-dated as a real geocoder would deliver, each version ADDING a year: 2011 alone from 2013; 2016 added about 2017-Q3; 2021 added about 2022-Q3; 2026 added from 2026-Q3 (as Q14). Exact quarters of the 2016 and 2021 additions to be proposed by the scoper and confirmed at sign-off (Keith, 2026-10-31).
+- Q6 (geocoding participation, REQ-QAC-294 c10): (a) mirror the source's owed periods after its offset, gated (Keith, 2026-10-31).
+- Q11 (MEASURES phrases for the shared kinds): (a) reword generically - 'Rows matching no source record' and 'Source records matched' (UX wording); Linkage Keys' built page wording changes too, written up in post-build-review with its e2e text in the same change (Keith, 2026-10-31).
+- Architect Q2 / UX N1 (sample heading): (a) site-wide 'Examples: <the check's MEASURES phrase>', keeping 'Examples' and '(key only)', every check page with a declared phrase changes, e2e text updated in the same change (Keith, 2026-10-31; architect had recommended per-kind declared headings). Scoper to state the heading for a check with no declared phrase.
+- Architect Q3 ('moves no other check', REQ-GEN-298 c7): (a) a real-tool trial (REQ-GEN-186) over each drafted injected supply (Keith, 2026-10-31).
+- G3 (match_level distribution, REQ-DASH-299): (a) the existing per-value bars (Keith, 2026-10-31).
+- G4 (census years tile, REQ-DASH-299): (a) an always-present 'Census years' tile from the recorded version (Keith, 2026-10-31).
+- Q9 (geocoding due time, REQ-GEN-295): (a) due 19:00 with 8 hours' grace, received 18:05 to 18:55, declared as the dataset's own expected time; REQ-GEN-334 c8's stale 14:00/15:00 amended (Keith, 2026-10-31).
+- Q1 (ids, tables, files): (a) as proposed - geo-cp-clients / geo-ed-presentations, tables geo_cp_clients / geo_ed_presentations, files geo_cp_clients.csv / geo_ed_presentations.csv (Keith, 2026-10-31).
+- J3 (#289, N5 - linkage and geocoding alike): (a) a left-out check stays in its collection group as a quiet row naming whose supply was not supplied for the period, e.g. 'Not checked: Client Register not supplied for 2024-Q2' (Keith, 2026-10-31). Applies to built linkage too: an amendment, with its own wording at sign-off.
+- J4 (#289, N5): (a) the agency page names which collections a cross-collection check reads, long-form, and groups such checks under an 'Across collections' sub-heading in the panel (Keith, 2026-10-31). An amendment to built linkage, wording at sign-off.
+- J1 / G1 surfacing: NONE of (a) accept, (b) quiet notice, (c) move timing. Keith wants a PERIOD VIEW of the dashboard alongside the as-at control (running-thoughts #131), scoped as its own requirement. Geocoding does NOT wait for it: the geocoding batch builds with J1 as built (the change shows on the older supply's history row and badge), and the period view is scoped and reviewed alongside the build (Keith, 2026-10-31).
+
+## v5 review round (Keith, 2026-10-31)
+- Architect v5 BLOCKING 1 (the trial has no period): (a) the trial takes its slot's period and reads the other collections' tables from that period's warehouse, so every planned verdict, the cross-collection ones included, is confirmed before anything is written. Generic, not geocoding-only.
+- Architect v5 Q1 (an always-empty id column): (b) drop TRAILING empty parts from the display only; the recorded sample stays complete, and a middle empty part still shows '—'.
+- REQ-QAC-300 open question 1 (when 2016 and 2021 join): (a) 2017-Q3 and 2022-Q3, the first round after the ABS's first release of each census's data.
+- 2026's join date: (a) moved to 2027-Q3, so all four years follow one rule (2011 from 2013; 2016 from 2017-Q3; 2021 from 2022-Q3; 2026 from 2027-Q3). This SUPERSEDES Q14's 'from 2026-Q3'. The unexpected-year scenario sends 2026 in any quarter before 2027-Q3.
+- REQ-DASH-299 sample lines: (a) 'source record', not 'source row'.
+- A2 wording: (a) keep 'by decision' - 'Not checked: Client Register not supplied for 2024-Q2, by decision'.
+- A1 scope: (a) EVERY left-out reason (not supplied, not owed, not in the agreement) follows J3's rule - the check stays in its collection group as a quiet 'Not checked: <why>' row, and the separate 'Not run for this supply' block goes.
+
+## v6 questions (Keith, 2026-10-31)
+- REQ-GEN-298 Q1 (where the trial gets the other collections' tables): (a) stage the source supplies the generator has just written for that period, so every planned verdict, the cross-collection ones included, is confirmed before anything is written.
+- REQ-GEN-298 Q2 (which supplies the trial tries): (a) ambers, reds and named scenarios, about 45 supplies and roughly 10 minutes; ordinary greens are confirmed when replayed.
+- REQ-QAC-300 Q1 (the fourth version takes effect after the history ends): (a) declare it now; its tile and the third trend break are proven in Vitest only.
+- REQ-DASH-299 Q1 (group-heading count words): SUPERSEDED by Keith's site-wide decision (running-thoughts #132) - Pass / Warn / Fail everywhere, so counts read '1 pass, 2 warn, 1 not checked'. The relabel itself is its own requirement.

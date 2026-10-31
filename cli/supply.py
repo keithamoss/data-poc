@@ -1200,8 +1200,9 @@ def decide_command(operation: str, dataset_id: str, period: str | None,
       0   recorded, or already so
       1   refused - nothing was recorded
       3   recorded, but the checks it owes did not finish (--wait); for
-          choose-file, the re-check of the datasets that read the table did
-          not finish and is owed to the processing pass
+          choose-file, a QA run of a settled file, or the re-check of the
+          datasets that read the table, did not finish and is owed to the
+          processing pass
       75  nothing was changed; the same command later goes through. One
           of three causes: the delivery is still being checked, a gate is
           running for the period, or a lock wait timed out

@@ -61,6 +61,17 @@ describe("D1: the supply on show is the newest received, not the newest re-run",
     expect(ck.current).toBe(85.6);
   });
 
+  it("the page's built dataset keeps that supply, which its rows' cells read (#289 D1 residual)", () => {
+    // clipDatasetToInPlaceOn picked visits__2026, but buildRealDataset - which
+    // builds what the page renders - dropped onShowRun, so supplyOnShow fell
+    // back to the run listed last: the 2013 supply's re-run.
+    const w = win();
+    const raw = { ...visits(), lastArrival: { run_id: "visits__2026", run_date: "2026-08-01" } };
+    const built = w.buildRealDataset(w.clipDatasetToInPlaceOn(raw, "2026-10-30"));
+    const onShow = w.supplyOnShow(built);
+    expect(onShow && onShow.run_id).toBe("visits__2026");
+  });
+
   it("shows the supply of the day on a date before the re-run existed", () => {
     const ck = win().clipDatasetToInPlaceOn(visits(), "2019-06-15").columns[0].checks[0];
     expect(ck.current_status).toBe("red");

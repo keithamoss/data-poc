@@ -11167,7 +11167,7 @@ twice. It deliberately did not re-find the `TypeError`.
      - T6: the guard strengthened in 9585a14; test 26 in f7b6c9e.
      - c13: a dataset's own re-check names its cause, 9585a14.
 
-263. **[todo, 2026-10-24]** **[Pipeline & publishing]** **A settlement by
+263. **[done, 2026-10-31]** **[Pipeline & publishing]** **A settlement by
      flags exits 0 when its own QA runs are left owed.** Found by the
      delivery-cli-ux pre-build review of REQ-PIPE-211 (finding S5), a
      pre-existing gap in REQ-PIPE-193's flag form rather than anything 211
@@ -11189,7 +11189,14 @@ twice. It deliberately did not re-find the `TypeError`.
      second, for its readers' re-check). Keith asked for this entry and
      named that fix on 2026-10-24, at REQ-PIPE-211's sign-off. A defect, so
      a failing test first (a settlement by flags whose owed run fails exits
-     3), then the fix. Not yet built.
+     3), then the fix.
+     **BUILT 2026-10-31.** `tests/test_settlement_rechecks_readers.py`'s
+     `TestTheFlagFormExits3WhenItsOwnRunsAreLeftOwed` was seen failing first
+     (exit 0, the output saying 'not checked yet - owed'). `cli/settle_tui.py`
+     now sets `checks_finished=False` whenever any of the settlement's own
+     runs is left owed (`_Results.left_owed`), as well as when the readers'
+     re-check does not finish. `decide --help` names both causes of exit 3
+     for choose-file. The three settlement modules ran 69 passed.
 
 264. **[done, 2026-10-24]** **[Pipeline & publishing]** **[Dashboard UI]**
      **A readers-only re-check's results were placed on no page.** Found
@@ -13067,6 +13074,26 @@ twice. It deliberately did not re-find the `TypeError`.
        - results without a direction: consider "amber at x" rather than
          "warn > x".
 
+     - **VERIFIED AGAINST THE CODE 2026-10-31** (read-only check at c9b4d7a):
+       - D2-D7, D8a-c and D8f are fixed and tested.
+       - **D1 WAS ONLY HALF FIXED.** `clipDatasetToInPlaceOn` picked the
+         newest received supply as `onShowRun`, but `buildRealDataset`, which
+         builds what the page renders, did not carry it. So `supplyOnShow`
+         fell back to the run listed last, an old supply's re-run, and the
+         cross-table cells, the panel's each-tool block and the not-in-agreement
+         list read that supply. The existing tests checked only the clipped
+         status. Fixed: `buildRealDataset` carries `onShowRun`. The new test in
+         tests-js/cross-collection-review.test.js reads `supplyOnShow` on the
+         built dataset; it was seen failing first, receiving
+         visits__2013__r1. The four cross-table files ran 79 passed.
+       - **J2 FIXED**: the 'Not yet checked by ...' word is muted and set at
+         weight 400. Its test was seen failing first (600, not 400).
+       - **STILL OPEN**:
+         - D8d: the trend axis labels overprint.
+         - D8e: a not-evaluated point is drawn as a 0% dip. The `plotted()`
+           guard predates the critic run and does not cover this case.
+       - **DECISIONS, CARRIED**: J1 goes to the period view (running-thoughts
+         #131). J3 and J4 become amendments in the geocoding batch.
 290. **[done, 2026-10-31]** **[Pipeline & publishing]** **[Testing & dev tooling]**
    **What the linkage push's first gate found** (gate part 1, tree 08f6985
    plus the register flip; 122 failed, 2 errors). None needed Keith: all are
@@ -13199,3 +13226,22 @@ twice. It deliberately did not re-find the `TypeError`.
    - **DECIDED (Keith, 2026-10-31): fold it into the geocoding batch.**
      REQ-PIPE-341 criterion 3 fixes it. REQ-QAC-333 c6 goes back to unmet,
      with that requirement as its blocker.
+
+292. **[todo, 2026-10-31]** **[Dashboard UI]** **[Docs & process]** **A provisional wording sat unanswered for a week and got built on.**
+     REQ-DASH-272's builder (2026-10-25) chose the cross-table grid's cell
+     words, Pass / Warn / Fail / No result, and recorded them in that
+     requirement's decisions as "PROVISIONAL WORDING, for Keith". The
+     overnight report listed them among several provisional calls. They were
+     never asked as a question, so Keith never answered. Later work treated
+     them as settled: REQ-DASH-337's UX critic coloured 'Warn' amber to match,
+     and the geocoding reviews of 2026-10-31 built on them. Keith found out by
+     asking. The result is two vocabularies on one page, 'Amber' in a pill
+     beside 'Warn' in a cell.
+     OUTCOME: Keith chose Pass / Warn / Fail everywhere (running-thoughts #132).
+     THE PROCESS GAP: a provisional choice inside a requirement's decisions
+     has no question attached, so nothing makes it come up again. Proposed
+     fix, for Keith: every PROVISIONAL item is also listed in the morning
+     report's question list, so the answered/unanswered state is visible, and
+     a later build that leans on an unanswered one says so. Worth deciding
+     whether a check (a gate counting PROVISIONAL decisions on built
+     requirements) is wanted.

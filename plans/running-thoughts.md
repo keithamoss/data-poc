@@ -1136,6 +1136,13 @@ to the exact right file/line/folder with zero console errors.
     configuration injected at deploy time. Nobody has argued any of them
     yet.
 
+    **DECIDED FOR THE PoC (Keith, 2026-10-31): (a), one repository with a
+    configuration folder per asset**, scoped together with the period control
+    (see #131). **(b) a repository per asset and (c) configuration injected at
+    deploy time are a FUTURE DECISION POINT**, to be taken "once this needs to
+    migrate out of PoC stage". Sample datasets, project extractions and ad hoc
+    QA (shapes 2 to 4 above) are not part of this decision.
+
 
 88. **[todo, 2026-10-12]** **[Testing]** **Run tests more selectively,
     so failures turn up earlier - and the full gate is too long.** Keith,
@@ -5963,7 +5970,133 @@ could never have computed it), and it belongs with batch 5's check work.
      whichever collection's check recorded it. Linkage Products and Client
      Register are the first case to show the gap, not the scope of the fix.
 
+     **A PERIOD VIEW, ALONGSIDE AS-AT (Keith, 2026-10-31 morning, answering
+     the geocoding batch's J1/G1 surfacing question - he rejected all three
+     options put: accept, a quiet notice, or move the timing)**: "what we need
+     here is a new way to view the dashboard ... almost by period."
+     - Mostly for the quarterly asset, but applied to every cadence; it does no
+       harm on a daily asset, where you would just choose the day, and is
+       valuable for weekly or monthly ones.
+     - For a quarterly refresh and release he needs TWO DISTINCT VIEWS:
+       - what we know about the source data arriving now, for the period it
+         is coming in for (the next period);
+       - what we know about the linkage products and geocoding arriving for
+         the current period. Those are distinct, separate releases, almost
+         separate work streams.
+     - "Show me what we know about this period", most likely ALONGSIDE the
+       as-at control rather than instead of it: for this period, what do we
+       know as at this time.
+     - THIS REOPENS A RECORDED DECISION, said so to Keith: REQ-DASH-054's
+       decisions (2026-09-23) kept the picker a plain date and REJECTED a
+       period picker beside it. The reason given was that a period name is
+       ambiguous at asset level once several calendars exist, so it "could only
+       ever sit beside the date, not replace it". Beside the date is what
+       Keith is now proposing.
+     - Not scoped. It supersedes the geocoding batch's J1 question.
+     - SEQUENCING (Keith, same morning): geocoding does NOT wait for this; scope,
+       discuss and review the period view alongside the geocoding build.
+     - KEYED BY PERIOD, NOT BY ROUND (Keith, same morning, (a)): a view of
+       2026-Q2 shows everything known about Q2. That is the source supplies
+       filed to Q2, which arrived in an earlier round, and the linkage and
+       geocoding releases for Q2, which arrive in a later round, in two
+       sections, one per workstream. The as-at time is picked within it.
+       REJECTED (b), a view by round or refresh (sources for Q3 beside linkage
+       for Q2), and (c), both views.
+     - A GLOBAL PERIOD CONTROL, BESIDE THE GLOBAL AS-AT CONTROL (Keith, same
+       morning): "something like another global 'as at' control ... that's what
+       I want". It sits in the header, is carried in the URL and kept across
+       navigation like as-at, and every page reads it: agency, collection and
+       dataset pages show that period's supply and results as at the date on
+       show, including linkage and geocoding verdicts that arrived later. With
+       no period chosen, every page behaves as today.
+       REJECTED growing only the existing period page (REQ-DASH-209) into the
+       view. How the period page relates to the new control is still open.
+     - ONE BASELINE CALENDAR PER ASSET, SO SPLIT THE PoC INTO TWO FAKE ASSETS
+       (Keith, same morning, answering how the period control handles an
+       asset with several calendars): "the thing we've been putting off for a
+       while ... splitting this to have two different fake data assets. One's
+       the quarterly one, one is the daily one ... each data asset needs to have
+       a single baseline calendar". This makes the period control unambiguous,
+       since a period means one thing within an asset. It is the split already
+       raised in #55 (how configuration is organised with two assets) and #109
+       (a monthly dataset in a quarterly asset, a weekly one in a daily asset,
+       "possibly ... the point that we want to split this repository into two
+       separate data asset configurations"). "Baseline" leaves room for a
+       dataset on another cadence inside an asset, which is #109's question.
+       This makes the period control depend on the split, or on a rule for the
+       one combined asset in the meantime.
+     - SEQUENCING (Keith, same morning, (c)): scope the split and the period
+       control TOGETHER now, the period control written against the post-split
+       shape (one baseline calendar per asset), then build the split first and
+       the period control after. REJECTED (b), a period control on today's
+       combined asset with an interim rule for Birth Registrations.
+       Geocoding builds in parallel and waits on neither.
+     - REPOSITORY SHAPE FOR THE SPLIT (Keith, same morning, #55's options):
+       (a) ONE REPOSITORY, A CONFIGURATION FOLDER PER ASSET, for the PoC now.
+       FLAGGED AS A FUTURE DECISION POINT, in his words, "once this needs to
+       migrate out of PoC stage": (b) a repository per asset, or (c) shared code
+       and checks with each asset's configuration injected at deploy time.
+     - THE SPLIT INCLUDES #109's TWO DATASETS (Keith, same morning, (b)): a
+       monthly dataset in the quarterly asset and a weekly one in the daily
+       asset, so the period control is designed against off-baseline cadences
+       from the start. #109's conceptual question comes first: is a period
+       schema a RELEASE of the asset, or a supply's own cadence?
+       REJECTED (a), splitting with today's datasets only.
+     - WHAT A PERIOD SCHEMA IS, SETTLED (Keith, same morning, answering
+       #109). None of the three options put: "a data asset has to nominate a
+       baseline calendar, whether that's quarterly or monthly or daily. And then
+       everything else has to fit around that."
+       - NOTHING FASTER THAN THE BASELINE. A quarterly asset cannot hold a
+         monthly dataset.
+       - SLOWER IS PARTICIPATION IN A SUBSET OF BASELINE PERIODS. A dataset on
+         a quarterly asset may be owed in two quarters a year, or annually,
+         meaning one quarter a year.
+       - TO GO FASTER, CHANGE THE ASSET. A monthly dataset on a quarterly asset
+         means changing the asset's baseline to monthly, then re-expressing
+         every quarterly dataset as owed only in certain months.
+       So a period schema is one baseline period, which is one release, and
+       there is never a second cadence of schemas inside an asset. REJECTED
+       per-cadence schemas, with or without a release layer.
+       #109's own question is answered by this. Its two test datasets need
+       re-thinking, since a monthly dataset in a quarterly asset is now
+       refused by design.
+     - #109's TEST DATASETS, REPLACED (Keith, same morning, (a)): an annual or
+       twice-yearly dataset in the quarterly asset, using `participates:` as
+       built (named delivery months plus a reason, contract/calendar.yaml), and
+       a weekly dataset in the daily asset, which needs NEW participation by
+       weekday because `participates:` names months only. The refusal of a
+       dataset faster than its asset's baseline is proven by a gate test, not
+       by a dataset.
+     - TWO DASHBOARDS ON ONE SITE (Keith, same morning, (a)): two separately
+       built dashboards, e.g. /quarterly/ and /daily/, each built only from its
+       own asset's database, with a plain landing page linking them. REJECTED
+       (b), one dashboard with an asset switcher, which mixes both assets into
+       one build, and (c), two entirely separate sites.
+     - DRAFTED 2026-10-31: docs/drafts/asset-split-v1.yaml (REQ-PIPE-342 to
+       REQ-DOCS-358, 17 requirements), with five questions for Keith: Q1 the
+       period page, Q2 asset ids, Q3 the test datasets, Q4 how amendments are
+       signed, Q5 a cost budget. Next: architect and UX review, then sign-off.
+
      **THEN (~midnight)**: Keith floated a period mode on the "as at"
      switcher as the place for it. Before any requirement was drafted he
      said "Hmm maybe it's OK as it is". So nothing is scoped or built. Left
      here as a possible idea to come back to, not a commitment.
+
+132. **[todo, 2026-10-31]** **[Dashboard UI]** **[Pipeline & publishing]** **Pass / Warn / Fail everywhere, replacing Green / Amber / Red.**
+     Keith's decision, 2026-10-31 late morning. It came up when he asked "when
+     the hell did we decide to change the language?", because the
+     cross-table grid's cells read Pass / Warn / Fail while every other place
+     reads Green / Amber / Red. He was shown that the grid's words were a
+     builder's PROVISIONAL choice for REQ-DASH-272 (2026-10-25), never put to
+     him, and offered three options: (a) Green / Amber / Red everywhere, (b)
+     Pass / Warn / Fail in the grid only, (c) Pass / Warn / Fail everywhere.
+     He chose **(c)**, confirmed when asked which direction. That means status
+     pills, dataset rows, agency cards, group headings, the terminal's words
+     and the Python status mirror all change.
+     NOT SCOPED YET. Needs an inventory of every occurrence, including
+     compound labels ("Red promoted", "Amber promoted", the amber tag), prose
+     ("went amber", "the amber band"), CSS and data values versus displayed
+     words, the CLI, the changelog and docs. Then a requirement, sign-off and
+     the post-build-review note of how the provisional word slipped through
+     (post-build-review #292). Interacts with the geocoding batch's heading-count
+     question (REQ-DASH-299 Q1), which now follows this decision.

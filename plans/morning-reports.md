@@ -3151,3 +3151,6 @@ one or more component tags, and a date.
         database, the way CI runs it.
       - **REQ-QAC-333 criterion 6 reopened** (post-build-review #291, Keith's
         (b)). It waits on REQ-PIPE-341's composite sample key.
+      - **CI on c9b4d7a (run 41156234338): GREEN**, every job: the fast half,
+        the deployment half (bootstrap 34m55s on a cache miss), js-tests and
+        on-demand. Run 01:37 to 02:48Z. D10 and D11 are confirmed fixed in CI.

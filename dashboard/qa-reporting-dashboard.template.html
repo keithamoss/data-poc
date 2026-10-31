@@ -812,6 +812,10 @@ span.scenario-subject-label{display:inline-block; margin:0 6px 0 0;}
 .xt-row .xt-name{min-width:0;}
 .xt-row .xt-name .bt{white-space:normal; overflow-wrap:anywhere;}
 .xt-row .xt-word[data-status="not-evaluated"]{color:var(--ink); font-weight:600;}
+/* post-build-review #289 J2: "Not yet checked by ..." is a wait, not a
+   result, so it reads at the muted secondary weight and never out-shouts
+   the Pass/Warn/Fail words in the rows beside it. */
+.xt-row [data-not-yet-checked] .xt-word{color:var(--ink-muted); font-weight:400;}
 .xt-row .xt-marks{margin-left:6px; letter-spacing:.12em; font-family:"IBM Plex Mono",monospace;}
 .xt-row .xt-note{display:block; font-size:12px; color:var(--ink-muted); margin-top:2px; overflow-wrap:anywhere;}
 .xt-row .xt-pill{justify-self:end;}
@@ -2739,6 +2743,11 @@ function buildRealDataset(d){
     // "no result for this check between two of its history points" apart
     // from "no REAL RUN happened at all in that window".
     runs: d.runs,
+    // post-build-review #289 D1: the supply on show, picked by
+    // clipDatasetToInPlaceOn as the newest RECEIVED. Without it supplyOnShow
+    // fell back to the run listed last - an old supply's re-run - and the
+    // cross-table cells read that supply's results.
+    onShowRun: d.onShowRun || null,
   };
 }
 // Thread C - cadence-aware "as of" viewing (plans/publishing-and-

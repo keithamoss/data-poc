@@ -550,7 +550,7 @@ Still to settle by driving the page: #8 and #17 - both since closed
     back to something better than the metric.
 
 - **We noticed:** Two Linkage Keys checks are labelled with raw metric names, such as cp_clients_coverage_percent, where every other check has a readable name.
-- **What we heard:** Not discussed yet.
+- **What we heard:** Coverage checks get a generic page phrase, 'Source records matched', in the geocoding batch (Keith's Q11 answer, 2026-10-31). Most checks are named from their metric's phrase, and these two custom metrics had none.
 
 ## Landed entries, kept as feedback cards (REQ-DOCS-219)
 

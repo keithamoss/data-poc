@@ -414,7 +414,9 @@ def settle(dataset_id: str, period: str, supply: str, *,
         filing_tui._follow_up(collection_id)
     _closing_panel(chosen, results, period, readers=readers)
     filing_decisions.reconcile_after(applied, collection_id)
-    if readers is not None and not readers.finished:
+    # ITS OWN RUNS LEFT OWED ARE CHECKS STILL OWED TOO (post-build-review
+    # #263), so the flag form exits 3 as every other operation does.
+    if (readers is not None and not readers.finished) or getattr(results, "left_owed", False):
         applied = dataclasses.replace(applied, checks_finished=False)
     return applied
 
@@ -640,9 +642,19 @@ def _confirm_and_apply(request, shown, *, name: str, period: str, actor: dict, y
     return _Applied(outcome, runs)
 
 
+#: What a settlement's own owed run that did not finish came to.
+LEFT_OWED = "not checked yet - owed"
+
+
 class _Results(dict):
     """{filename: what came of it}, and whether a Ctrl-C stopped the runs."""
     stopped = False
+
+    @property
+    def left_owed(self) -> bool:
+        """Whether any of the settlement's own runs is still owed
+        (post-build-review #263)."""
+        return any(v == LEFT_OWED for v in self.values())
 
 
 def _run_what_it_owed(outcome, runs: list[tuple[str, str]], period: str) -> dict[str, str]:
@@ -660,7 +672,7 @@ def _run_what_it_owed(outcome, runs: list[tuple[str, str]], period: str) -> dict
     for n, (owed_id, (filename, target)) in enumerate(zip(outcome.owed, runs), 1):
         label = f"run {n} of {total} - {filename} for {target}"
         if stopped:
-            out[filename] = "not checked yet - owed"
+            out[filename] = LEFT_OWED
             continue
         try:
             with common.chain_progress(label) as on_step:
@@ -673,7 +685,7 @@ def _run_what_it_owed(outcome, runs: list[tuple[str, str]], period: str) -> dict
         if got.completed:
             out[filename] = got.message
         else:
-            out[filename] = "not checked yet - owed"
+            out[filename] = LEFT_OWED
             # PLAIN FIRST, THE DETAIL BENEATH (#170): what a person does
             # next does not depend on the exception's wording.
             body = Text(
