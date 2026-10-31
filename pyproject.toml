@@ -4,11 +4,20 @@ version = "0.1.0"
 description = "QA/data-pipeline PoC for a multi-agency government data asset (BDM Birth Registrations + Child Protection), backed by real dbt-core/Soda Core/datacontract-cli/Evidently runs against synthetic data."
 requires-python = ">=3.11"
 dependencies = [
+    # Reads a developer's own .env - see qa_tools/common/local_env.py.
+    # Declared explicitly rather than leaned on transitively (soda and
+    # datacontract-cli both pull it in): a dependency this project calls
+    # directly is one this project should name.
+    "python-dotenv>=1.0",
     "dbt-core>=1.12",
-    "dbt-duckdb>=1.11",
-    "duckdb>=1.0",
-    "soda-core-duckdb>=3.5",
-    "datacontract-cli[duckdb]>=1.2",
+    "dbt-postgres>=1.9", # the warehouse engine (REQ-PIPE-087). dbt-duckdb is gone:
+    # every tool now checks what is in PostgreSQL, not a file
+    "psycopg[binary]>=3.2", # this project's own PostgreSQL driver - binary wheel so
+    # an evaluator needs no libpq or compiler to run the PoC
+    "duckdb>=1.0", # RETAINED, and narrowly: reading what arrives (CSV, Parquet and
+    # whatever else a supplier sends). Never a warehouse any more - REQ-PIPE-087
+    "soda-core-postgres>=3.5",
+    "datacontract-cli[postgres]>=1.2",
     "evidently>=0.7",
     "pandas>=2.2",
     "numpy>=1.26",
@@ -21,6 +30,9 @@ dependencies = [
     "questionary>=2.1", # mothman CLI's real interactive arrow-key menus - chosen
     # over InquirerPy/PyInquirer on project-health grounds, see plans/tooling.md #1
     "pyfiglet>=1.0", # mothman CLI's splash-screen wordmark - plans/tooling.md #1
+    "rfc8785==0.1.4", # RFC 8785 canonical JSON for a check's definition fingerprint
+    # (REQ-QAC-176). PINNED EXACTLY: an upgrade that changed its output would
+    # move every stored fingerprint, which tests/test_check_fingerprint.py's golden catches
 ]
 
 [project.optional-dependencies]
@@ -68,6 +80,9 @@ dev = [
     "pytest>=8.0",
     "ruff>=0.6",
     "pre-commit>=3.8",
+    "yamllint>=1.38", # duplicate-key detection on this repo's own hand-authored
+    # YAML - see .yamllint for the real incident it exists for, and why neither a
+    # JSON-Schema/pydantic model nor PyYAML itself can catch that class of bug
     "playwright>=1.62.0", # real-browser UI verification (dashboard) - `uv run playwright install chromium` once after `uv sync --dev`, then drive it via `uv run python3 ...`; deliberately in the venv, not relied on as a system package, so this works the same on any contributor's machine
     "pytest-cov>=7.1.0",
     "pytest-playwright>=0.9.0",
@@ -89,10 +104,43 @@ dev = [
 # This override tells uv's resolver to trust that, so `uv sync` resolves
 # everything in one step instead of needing a manual two-step pip dance.
 [tool.uv]
-override-dependencies = ["duckdb>=1.5"]
+# override-dependencies = ["duckdb>=1.5"] is GONE (REQ-PIPE-087). It existed
+# because soda-core-duckdb pinned an older duckdb than this project wanted, and
+# an override is a blunt instrument - it silences a real conflict rather than
+# resolving it. With the Soda adapter now postgres, nothing pins duckdb at all,
+# so the resolution is honest again. Measured: 160 packages resolved, against
+# 190 under the duckdb set.
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# Parallel by default (Keith's call, 2026-09-19, reversing the earlier
+# serial-by-default preference recorded in plans/running-thoughts.md
+# #12). The original reasoning was debuggability - and the biggest part
+# of it turned out not to hold: pytest-xdist silently falls back to
+# serial the moment `--pdb` is passed (verified against a real failing
+# test - a real (Pdb) prompt, no gw0 worker banner), so interactive
+# debugging is unaffected by this default. Measured cost/benefit on a
+# 4-core box: a targeted single-file run pays a flat ~1s of worker
+# startup (1.4s -> 2.2s), while the full suite goes ~220s -> ~55s. Use
+# `-n0` to force serial when print-debugging several tests at once,
+# which is the one case genuinely worsened by interleaved output.
+#
+# --dist loadgroup, with tests/conftest.py giving EVERY test a group
+# (REQ-TEST-281): its file for every module, so each module still runs whole
+# on one worker as `--dist loadfile` used to keep it, and its file plus class
+# for tests/test_dashboard_e2e.py, so the browser tests spread across every
+# worker a class at a time. Bare loadgroup would hand ungrouped tests out one
+# by one, so the conftest hook is load-bearing.
+#
+# WHAT KEEPS THE OLD RACE CLOSED (plans/tooling.md #10, race 2): the e2e
+# module's session-scoped built_dashboard_html fixture runs once per worker,
+# and each worker builds into a directory of its own (`mothman dashboard
+# rebuild-results|build-data|embed --out-dir`), so no two builds share a file
+# and none writes the real reports/ or built page. That is a property of the
+# build, not of the distribution - loadfile used to be what prevented it.
+# The cost: a test's node id under xdist carries its group as an `@...`
+# suffix in the report; drop the suffix to re-run it by id.
+addopts = "-n auto --dist loadgroup"
 # Just the repo root - generator/, pipeline/, and synthetic_data_generator/
 # are real packages now (each has an __init__.py), same as qa_tools/ always
 # was (plans/qa-pipeline.md #84), so everything imports as e.g.
@@ -101,6 +149,21 @@ testpaths = ["tests"]
 # for why the old per-directory pythonpath entries (and every script's own
 # sys.path.insert hack) are gone.
 pythonpath = ["."]
+# WHICH HALF OF CI A TEST BELONGS IN (plans/tooling.md #27). `needs_deployment`
+# means "this reads the DEPLOYMENT's recorded QA history, or the reports/*.json
+# built from it" - 269 of 2,894 tests, and the only ones that need
+# `mothman pipeline bootstrap`. tests/conftest.py applies it to anything
+# requesting the `deployment_history` fixture; five modules that read reports/
+# carry it themselves. Registered here so a typo in `-m` is a warning rather
+# than a silently empty selection.
+markers = [
+    "needs_deployment: needs a bootstrapped deployment database (and reports/ built from it)",
+    "on_demand: deselected unless --run-on-demand is given (slow; run when its subject changes)",
+    "full_capture: deselected unless --run-full-capture is given (two full bootstraps; never in CI)",
+    "closed_periods: opts a test back in to REQ-PIPE-132's closed-period queue items (tests/test_outstanding.py)",
+    "shared_page: a browser-test class whose tests share one loaded dashboard page (REQ-TEST-282)",
+    "fresh_load: a test in a shared_page class that needs a document load of its own (REQ-TEST-282)",
+]
 
 [tool.coverage.run]
 # Just the real pipeline source - not tests/ itself, not dbt_project/

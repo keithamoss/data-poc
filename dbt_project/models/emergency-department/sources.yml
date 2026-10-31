@@ -1,0 +1,8 @@
+# Emergency Department's dbt source (REQ-QAC-231) - the run's own view schema.
+version: 2
+
+sources:
+  - name: raw
+    schema: "{{ env_var('DBT_RUN_SCHEMA') }}"
+    tables:
+      - name: ed_presentations

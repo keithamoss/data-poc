@@ -1,0 +1,86 @@
+// REQ-PIPE-081 criteria 1, 2 and 8 as amended 2026-10-05 (Keith): the
+// dataset's verdict is the newest supply PROMOTED or AWAITING A DECISION
+// on the date on show - a withdrawn one leaves the view - labelled which.
+import { describe, it, expect } from "vitest";
+import { loadDashboard } from "./support/loadDashboard.js";
+
+const RUNS = [{run_id: "r1", run_date: "2026-01-10"}, {run_id: "r2", run_date: "2026-02-10"}];
+const dataset = runStates => ({id: "cp-carers", runs: RUNS, columns: [], runStates});
+
+describe("a run's supply on the date on show", () => {
+  it("is awaiting before any decision, then whatever the last decision said", () => {
+    const w = loadDashboard().window;
+    const d = dataset({r1: [{at: "2026-01-20T01:00:00+00:00", state: "promoted"}]});
+    expect(w.runStateInPlaceOn(d, "r1", "2026-01-15")).toBe("awaiting");
+    expect(w.runStateInPlaceOn(d, "r1", "2026-01-20")).toBe("promoted");
+  });
+});
+
+describe("the verdict's supply", () => {
+  it("skips a newer supply withdrawn by the date on show", () => {
+    const w = loadDashboard().window;
+    const d = dataset({r1: [{at: "2026-01-20T01:00:00+00:00", state: "promoted"}],
+                       r2: [{at: "2026-02-12T01:00:00+00:00", state: "withdrawn"}]});
+    const clipped = w.clipDatasetToInPlaceOn(d, "2026-02-20");
+    expect(clipped.runs.map(r=>r.run_id)).toEqual(["r1"]);
+    expect(clipped.verdictOf.state).toBe("promoted");
+  });
+
+  it("shows a newer supply still awaiting, naming the one in place", () => {
+    const w = loadDashboard().window;
+    const d = {...dataset({r1: [{at: "2026-01-20T01:00:00+00:00", state: "promoted"}]}),
+      promotionTimeline: {standing: [], points: [
+        {on: "2026-01-20", promoted: {supply: "s1", period: "P1", runId: "r1"},
+         arrived: {supply: "s1", period: "P1", files: []}, differs: false, whyNot: null}]}};
+    const clipped = w.clipDatasetToInPlaceOn(d, "2026-02-20");
+    expect(clipped.runs.map(r=>r.run_id)).toEqual(["r1", "r2"]);
+    expect(clipped.verdictOf).toEqual({state: "awaiting", inPlaceRunDate: "2026-01-10",
+                                      inPlaceReceivedAt: null, inPlaceRunId: "r1"});
+  });
+
+  it("names the supply most recently PROMOTED, not the newest by receipt", () => {
+    // REQ-DASH-197 criterion 13: the same supply the panel names. r2 arrived
+    // later but r1 was promoted after it; the panel says r1, so must this.
+    const w = loadDashboard().window;
+    const runs = [...RUNS, {run_id: "r3", run_date: "2026-03-10"}];
+    const d = {id: "cp-carers", runs, columns: [],
+      runStates: {r1: [{at: "2026-03-01T01:00:00+00:00", state: "promoted"}],
+                  r2: [{at: "2026-02-15T01:00:00+00:00", state: "promoted"}]},
+      promotionTimeline: {standing: [], points: [
+        {on: "2026-03-01", promoted: {supply: "s1", period: "P1", runId: "r1"},
+         arrived: {supply: "s2", period: "P2", files: []}, differs: true,
+         whyNot: "promoted-into-its-own-period"}]}};
+    const clipped = w.clipDatasetToInPlaceOn(d, "2026-03-20");
+    expect(clipped.verdictOf.state).toBe("awaiting");
+    expect(clipped.verdictOf.inPlaceRunId).toBe("r1");
+  });
+
+  it("names the in-place supply's receipt time, not only its day (#166)", () => {
+    const w = loadDashboard().window;
+    const v = {state: "awaiting", inPlaceRunDate: "2026-01-10",
+               inPlaceReceivedAt: "2026-01-10T03:00:00+00:00", inPlaceRunId: "r1"};
+    const html = w.verdictLine({verdictOf: v, lastArrival: {arrivedAt: "2026-02-10T03:00:00+00:00"}});
+    expect(html).toContain(w.fmtInstant("2026-01-10T03:00:00+00:00"));
+  });
+
+  it("before the withdrawal the newer supply was the verdict", () => {
+    const w = loadDashboard().window;
+    const d = dataset({r2: [{at: "2026-02-12T01:00:00+00:00", state: "withdrawn"}]});
+    expect(w.clipDatasetToInPlaceOn(d, "2026-02-11").runs.map(r=>r.run_id)).toEqual(["r1", "r2"]);
+  });
+});
+
+// dashboard UX critic on 8a942e7, H2: a past date kept each check's NEWEST
+// status, so a check red on the run being shown read green - a false green.
+describe("a check's status on a past date", () => {
+  it("is the status of the run on show, not the newest", () => {
+    const w = loadDashboard().window;
+    const d = {id: "cp-clients", runs: RUNS, runStates: {},
+      columns: [{name: "c", stats: {}, checks: [{id: "k", current_status: "green", history: [
+        {run_id: "r1", value: 20, status: "red"},
+        {run_id: "r2", value: 0, status: "green"}]}]}]};
+    const clipped = w.clipDatasetToInPlaceOn(d, "2026-01-15");
+    const check = clipped.columns[0].checks[0];
+    expect(w.checkStatus(check)).toBe("red");
+  });
+});

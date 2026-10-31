@@ -1,0 +1,16 @@
+    # REQ-TEST-249: the fake Widget Register, added to a copy only.
+    - id: widget-agency
+      name: Department of Widgets
+      short: wdg
+      collections:
+        - id: widget-register
+          name: Widget Register
+          short: wreg   # not "wr": see post-build-review #235
+          run_prefix: wreg_run_
+          contract: widget-agency/widget-register-contract.yaml
+          delivery_boundary: directory
+          datasets:
+            - id: widgets
+              name: Widget Register
+              table: widgets
+              arrival_pattern: 'widgets\.csv'

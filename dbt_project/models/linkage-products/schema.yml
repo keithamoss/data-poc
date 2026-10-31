@@ -1,0 +1,7 @@
+# Linkage Products' dbt model (REQ-QAC-330). Its checks are Soda's
+# (contract/department-of-health/linkage-products-soda-checks.yml).
+version: 2
+
+models:
+  - name: stg_linkage_keys
+    description: One row per linked source record, per quarterly linkage release.

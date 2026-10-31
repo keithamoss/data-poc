@@ -223,6 +223,33 @@ def test_sync_local_snapshots_decompresses_gz_files_missing_a_local_copy(tmp_pat
     assert expected_html.read_bytes() == b"<html>archived content</html>"
 
 
+def test_a_local_snapshot_gets_the_fonts_and_player_beside_it(tmp_path):
+    """Keith, 2026-10-25 (#268 (c)): a snapshot opened from
+    dashboard/snapshots/ asks for fonts/ and vendor/ relative to itself, as
+    the published copy does, so the local sync places them there too."""
+    snapshots_dir = tmp_path / "snapshots"
+    snapshots_dir.mkdir()
+    with gzip.open(snapshots_dir / "20260916T000000Z_abc1234.html.gz", "wb") as f:
+        f.write(b"<html>archived content</html>")
+    fonts, vendor = tmp_path / "fonts", tmp_path / "vendor"
+    fonts.mkdir(); vendor.mkdir()
+    (fonts / "a.woff2").write_bytes(b"font")
+    (vendor / "asciinema-player.min.js").write_bytes(b"player")
+
+    snapshot_dashboard.sync_local_snapshots(snapshots_dir, fonts_dir=fonts, vendor_dir=vendor)
+
+    assert (snapshots_dir / "fonts" / "a.woff2").read_bytes() == b"font"
+    assert (snapshots_dir / "vendor" / "asciinema-player.min.js").read_bytes() == b"player"
+
+
+def test_the_local_fonts_and_player_copies_are_never_committed():
+    import subprocess
+
+    for path in ("dashboard/snapshots/fonts/a.woff2", "dashboard/snapshots/vendor/x.js"):
+        assert subprocess.run(["git", "check-ignore", "-q", path],
+                              cwd=snapshot_dashboard.SNAPSHOTS_DIR.parent.parent).returncode == 0, path
+
+
 def test_sync_local_snapshots_skips_gz_files_that_already_have_a_local_copy(tmp_path):
     snapshots_dir = tmp_path / "snapshots"
     snapshots_dir.mkdir()
@@ -432,3 +459,242 @@ def test_main_prepare_site_flag_requires_a_directory_argument(monkeypatch, capsy
         assert False, "expected SystemExit for a missing --prepare-site argument"
     except SystemExit as e:
         assert e.code == 2
+
+
+# --- REQ-DASH-292: a snapshot inlines its data files; the site splits them back
+
+def _split_built_page(tmp_path, *, budget=None, size=4000):
+    """A page in the built page's shape with its data files beside it -
+    two collections and the Requirements and Plans file."""
+    from dashboard import data_files
+
+    files = []
+    for cid in ("civil-registration", "child-protection"):
+        files += data_files.encode(data_files.collection_key(cid),
+                                   {"datasets": [{"id": cid, "pad": "y" * size}]},
+                                   kind="collection", collection=cid, budget=budget)
+    files += data_files.encode(data_files.REQUIREMENTS_PLANS_KEY,
+                               {"requirements": [{"id": "REQ-X"}], "plans": {"items": []}},
+                               kind=data_files.REQUIREMENTS_PLANS_KEY, budget=budget)
+    html = ("<html>\n<!-- mothman:data-files -->\n<script>\nconst DATA_FILES = null;\n"
+            "const COLLECTION_DATA = null;\nconst SNAPSHOT_MANIFEST = [];\n</script>\n</html>\n")
+    page = tmp_path / "qa-reporting-dashboard.html"
+    page.write_text(data_files.embed_into_page(html, data_files.manifest(files)))
+    data_files.write(files, tmp_path / "data")
+    return page, files
+
+
+def _archived(out_path) -> str:
+    with gzip.open(out_path, "rb") as f:
+        return f.read().decode("utf-8")
+
+
+def test_a_snapshot_inlines_every_data_file_each_block_marked(tmp_path):
+    """Criterion 1: the Requirements and Plans file included, and no
+    sibling file referenced."""
+    page, files = _split_built_page(tmp_path)
+    out = snapshot_dashboard.take_snapshot(html_path=page, snapshots_dir=tmp_path / "snapshots")
+    html = _archived(out)
+    assert 'src="data/' not in html
+    for f in files:
+        marker = f'data-mothman-key="{f.entry["key"]}" data-mothman-file="{f.entry["name"]}">'
+        assert html.count(marker) == 1, f.entry["name"]
+        assert f.content.decode("ascii") + "</script>" in html
+    assert ('<script type="text/plain" data-mothman-key="requirements-plans"' in html), \
+        "the on-demand file is inlined inert, to be run when asked for"
+
+
+def test_a_snapshot_refuses_a_missing_or_altered_file_and_writes_nothing(tmp_path):
+    """Criterion 3."""
+    import pytest
+    from dashboard import data_files
+
+    page, files = _split_built_page(tmp_path)
+    (tmp_path / "data" / files[0].entry["name"]).unlink()
+    altered = tmp_path / "data" / files[1].entry["name"]
+    altered.write_bytes(altered.read_bytes().replace(b"yyy", b"zzz", 1))
+    snapshots = tmp_path / "snapshots"
+    with pytest.raises(data_files.DataFileError) as refused:
+        snapshot_dashboard.take_snapshot(html_path=page, snapshots_dir=snapshots)
+    said = str(refused.value)
+    assert files[0].entry["name"] in said and files[1].entry["name"] in said
+    assert not snapshots.exists()
+
+
+def _site_with_a_snapshot(tmp_path, *, budget=None, size=4000):
+    page, files = _split_built_page(tmp_path, size=size)
+    snapshots = tmp_path / "snapshots"
+    out = snapshot_dashboard.take_snapshot(html_path=page, snapshots_dir=snapshots)
+    site = tmp_path / "_site"
+    snapshot_dashboard.prepare_deploy_site(site, html_path=page, snapshots_dir=snapshots,
+                                           budget=budget)
+    return page, files, out, site
+
+
+def test_the_site_carries_the_live_pages_files(tmp_path):
+    page, files, _out, site = _site_with_a_snapshot(tmp_path)
+    for f in files:
+        assert (site / "data" / f.entry["name"]).read_bytes() == f.content
+
+
+def test_the_site_carries_each_snapshot_split_back_byte_for_byte(tmp_path):
+    """Criteria 4 and 5, and the fingerprint risk: a split one byte off
+    would fail the page's own list and make every publish count as
+    changed (REQ-PIPE-255 criterion 24)."""
+    import hashlib
+    from dashboard import data_files
+
+    page, files, out, site = _site_with_a_snapshot(tmp_path)
+    stem = out.name[: -len(".html.gz")]
+    placed = site / "snapshots" / f"{stem}.html"
+    html = placed.read_text()
+    assert "data-mothman-file" in html and "</script>" in html
+    assert not re.search(r'data-mothman-file="[^"]+">\(window', html), "a block was left inline"
+    listed = data_files.page_manifest(html)["files"]
+    for e in listed:
+        content = (site / "snapshots" / f"{stem}.data" / e["name"]).read_bytes()
+        assert hashlib.sha256(content).hexdigest() == e["sha256"]
+        assert len(content) <= data_files.BUDGET_BYTES
+    assert data_files.read_page(html, placed.parent).problems == []
+    assert {e["name"]: e["sha256"] for e in listed} == \
+        {f.entry["name"]: f.entry["sha256"] for f in files}
+
+
+def test_a_snapshot_fingerprints_the_same_as_the_page_it_archived(tmp_path):
+    """REQ-PIPE-255 criteria 22 and 24, as REQ-DASH-292 amends them: the
+    newest snapshot, its inlined files read back out, fingerprints exactly
+    as the build it archived - and a one-byte change in a data file does
+    not."""
+    page, files = _split_built_page(tmp_path)
+    before = snapshot_dashboard.page_fingerprint(page)
+    out = snapshot_dashboard.take_snapshot(html_path=page, snapshots_dir=tmp_path / "snapshots")
+    assert snapshot_dashboard.snapshot_fingerprint(out) == before
+    # take_snapshot re-embedded SNAPSHOT_MANIFEST into the live page, which
+    # the fingerprint deliberately ignores.
+    assert snapshot_dashboard.page_fingerprint(page) == before
+    path = tmp_path / "data" / files[0].entry["name"]
+    path.write_bytes(path.read_bytes().replace(b"yyy", b"yyz", 1))
+    from dashboard import data_files
+    import pytest
+
+    with pytest.raises(data_files.DataFileError):
+        snapshot_dashboard.page_fingerprint(page)
+
+
+def test_a_block_over_the_budget_is_split_into_parts_within_it(tmp_path):
+    """Criterion 6."""
+    from dashboard import data_files
+
+    budget = 3000
+    page, files, out, site = _site_with_a_snapshot(tmp_path, budget=budget, size=9000)
+    stem = out.name[: -len(".html.gz")]
+    placed = site / "snapshots" / f"{stem}.html"
+    listed = data_files.page_manifest(placed.read_text())["files"]
+    assert len(listed) > len(files)
+    for e in listed:
+        assert (site / "snapshots" / f"{stem}.data" / e["name"]).stat().st_size <= budget
+    got = data_files.read_page(placed.read_text(), placed.parent)
+    assert got.problems == []
+    whole = data_files.read_page(_archived(out), tmp_path / "nowhere")
+    assert got.collections == whole.collections
+
+
+def test_a_snapshot_from_before_the_split_is_placed_as_it_is(tmp_path):
+    """Criterion 7."""
+    page, _files = _split_built_page(tmp_path)
+    snapshots = tmp_path / "snapshots"
+    snapshots.mkdir()
+    old = b"<html>\nconst COLLECTION_DATA = {\"x\":{\"datasets\":[]}};\n</html>\n"
+    with gzip.open(snapshots / "20261022T000000Z_abc1234.html.gz", "wb") as f:
+        f.write(old)
+    site = tmp_path / "_site"
+    snapshot_dashboard.prepare_deploy_site(site, html_path=page, snapshots_dir=snapshots)
+    assert (site / "snapshots" / "20261022T000000Z_abc1234.html").read_bytes() == old
+    assert not (site / "snapshots" / "20261022T000000Z_abc1234.data").exists()
+
+
+def test_a_local_snapshot_copy_is_still_decompressed_whole(tmp_path):
+    """Criterion 8."""
+    page, _files = _split_built_page(tmp_path)
+    snapshots = tmp_path / "snapshots"
+    out = snapshot_dashboard.take_snapshot(html_path=page, snapshots_dir=snapshots)
+    local = out.with_suffix("")
+    assert local.read_text() == _archived(out)
+    assert not (snapshots / (local.stem + ".data")).exists()
+
+
+def test_a_reused_site_directory_publishes_none_of_its_stale_files(tmp_path):
+    """post-build-review #268 D1: `mothman dashboard publish` reuses `_site/`,
+    and the site was never cleared, so a data file or snapshot directory
+    from an earlier build stayed in it and was published again on every
+    publish after. Only what this build lists is on the site afterwards."""
+    page, files, out, site = _site_with_a_snapshot(tmp_path)
+    stale = [site / "data" / "collection-gone.0123456789ab.js",
+             site / "snapshots" / "20200101T000000Z_old.data" / "x.js",
+             site / "snapshots" / "20200101T000000Z_old.html"]
+    for path in stale:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("stale")
+    snapshot_dashboard.prepare_deploy_site(site, html_path=page, snapshots_dir=tmp_path / "snapshots")
+    assert [p for p in stale if p.exists()] == []
+    assert sorted(p.name for p in (site / "data").iterdir()) == sorted(f.entry["name"] for f in files)
+    assert (site / "snapshots" / out.with_suffix("").name).is_file()
+
+
+def test_clearing_the_site_touches_nothing_it_does_not_write(tmp_path):
+    """The other half of D1: `mothman dashboard prepare-site` takes any
+    directory, so only what the site is made of is cleared - never the
+    directory itself or a file beside it."""
+    page, _files = _split_built_page(tmp_path)
+    site = tmp_path / "_site"
+    site.mkdir()
+    (site / "keep.txt").write_text("not ours")
+    snapshot_dashboard.prepare_deploy_site(site, html_path=page, snapshots_dir=tmp_path / "snapshots")
+    assert (site / "keep.txt").read_text() == "not ours"
+
+
+def _site_with_fonts_vendor_and_a_snapshot(tmp_path):
+    page, _files = _split_built_page(tmp_path)
+    snapshots = tmp_path / "snapshots"
+    snapshot_dashboard.take_snapshot(html_path=page, snapshots_dir=snapshots)
+    fonts_dir, vendor_dir = tmp_path / "fonts", tmp_path / "vendor"
+    fonts_dir.mkdir()
+    (fonts_dir / "public-sans-regular.woff2").write_bytes(b"fake-woff2-bytes")
+    vendor_dir.mkdir()
+    (vendor_dir / "asciinema-player.min.js").write_text("/* fake player */")
+    site = tmp_path / "_site"
+    snapshot_dashboard.prepare_deploy_site(site, html_path=page, snapshots_dir=snapshots,
+                                           fonts_dir=fonts_dir, vendor_dir=vendor_dir)
+    return site
+
+
+def test_a_snapshot_on_the_site_finds_its_fonts_and_player_beside_it(tmp_path):
+    """Keith, 2026-10-25 (post-build-review #268 (c)): a snapshot at
+    snapshots/<name>.html asks for fonts/ and vendor/ relative to itself, and
+    those sat only at the site root, so every published snapshot fell back to
+    a system font and failed to load the player."""
+    site = _site_with_fonts_vendor_and_a_snapshot(tmp_path)
+    assert (site / "snapshots" / "fonts" / "public-sans-regular.woff2").read_bytes() == b"fake-woff2-bytes"
+    assert (site / "snapshots" / "vendor" / "asciinema-player.min.js").read_text() == "/* fake player */"
+    assert (site / "fonts" / "public-sans-regular.woff2").is_file(), "the live page's own copy stays"
+
+
+def test_the_site_tells_the_browser_its_data_is_not_for_other_sites(tmp_path):
+    """Keith, 2026-10-25 (post-build-review #268 (b)): a data file is a script
+    any other website could include with a <script> tag, so the site's
+    Cloudflare Pages _headers marks /data/* and /snapshots/* same-origin and
+    no-sniff."""
+    site = _site_with_fonts_vendor_and_a_snapshot(tmp_path)
+    rules = snapshot_dashboard.parse_headers((site / "_headers").read_text())
+    want = {"Cross-Origin-Resource-Policy": "same-origin", "X-Content-Type-Options": "nosniff"}
+    assert rules == {"/data/*": want, "/snapshots/*": want}
+
+
+def test_a_reused_site_directory_gets_its_headers_written_afresh(tmp_path):
+    site = _site_with_fonts_vendor_and_a_snapshot(tmp_path)
+    (site / "_headers").write_text("/*\n  X-Stale: yes\n")
+    (tmp_path / "again").mkdir()
+    page, _ = _split_built_page(tmp_path / "again")
+    snapshot_dashboard.prepare_deploy_site(site, html_path=page, snapshots_dir=tmp_path / "none")
+    assert "X-Stale" not in (site / "_headers").read_text()
+    assert not (site / "snapshots").exists(), "the earlier snapshots/ was cleared"

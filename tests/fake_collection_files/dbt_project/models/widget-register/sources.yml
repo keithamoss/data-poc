@@ -1,0 +1,8 @@
+# REQ-TEST-249: the fake collection's dbt source - the run's own schema.
+version: 2
+
+sources:
+  - name: raw
+    schema: "{{ env_var('DBT_RUN_SCHEMA') }}"
+    tables:
+      - name: widgets

@@ -43,17 +43,17 @@ def test_build_check_source_links_covers_every_real_check_id():
 
 def test_a_real_known_check_id_resolves_to_its_real_source_line():
     """registration_number's matches_regex dbt check - a real, stable
-    check_id (dbt_project/models/staging/schema.yml) - verified against
+    check_id (dbt_project/models/civil-registration/schema.yml) - verified against
     the file's own real content at the URL's own #L<n> anchor, not a
     hardcoded line number (which would make this test fragile against
     unrelated edits to that file)."""
-    check_id = "data-asset-1.registry-services.birth-registrations.stg_birth_registrations.registration_number.matches_regex_dbt"
+    check_id = "data-asset-1.registry-services.civil-registration.birth-registrations.registration_number.matches_regex_dbt"
     links = github_links.build_check_source_links(sha="abc123")
     url = links[check_id]
-    assert url.startswith("https://github.com/keithamoss/data-poc/blob/abc123/dbt_project/models/staging/schema.yml#L")
+    assert url.startswith("https://github.com/keithamoss/data-poc/blob/abc123/dbt_project/models/civil-registration/schema.yml#L")
 
     line_no = int(url.rsplit("#L", 1)[1])
-    lines = (github_links.ROOT / "dbt_project/models/staging/schema.yml").read_text().splitlines()
+    lines = (github_links.ROOT / "dbt_project/models/civil-registration/schema.yml").read_text().splitlines()
     assert check_id in lines[line_no - 1]
 
 
@@ -62,33 +62,45 @@ def test_a_real_contract_check_id_resolves_to_its_real_source_line():
     check_id / value: <id>) is a genuinely different YAML layout from
     dbt/soda's inline `check_id: <value>` - covers that the same plain
     text-scan approach still finds the right line for it."""
-    check_id = "data-asset-1.registry-services.birth-registrations.stg_birth_registrations.registration_number.nullValues_datacontract"
+    check_id = "data-asset-1.registry-services.civil-registration.birth-registrations.registration_number.nullValues_datacontract"
     links = github_links.build_check_source_links(sha="abc123")
     url = links[check_id]
-    assert "contract/bdm-birth-registrations-contract.yaml#L" in url
+    assert "contract/registry-services/bdm-birth-registrations-contract.yaml#L" in url
 
     line_no = int(url.rsplit("#L", 1)[1])
-    lines = (github_links.ROOT / "contract/bdm-birth-registrations-contract.yaml").read_text().splitlines()
+    lines = (github_links.ROOT / "contract/registry-services/bdm-birth-registrations-contract.yaml").read_text().splitlines()
     assert check_id in lines[line_no - 1]
 
 
 def test_a_real_evidently_check_id_resolves_to_its_real_source_line():
-    """Evidently's own shape (a plain Python constant assignment, no
-    YAML at all) - a third real format the line-scan needs to handle."""
-    check_id = "data-asset-1.registry-services.birth-registrations.stg_birth_registrations.sex.drift_psi_evidently"
+    """Evidently's own shape (a `- check_id:` list entry in its check
+    file, REQ-QAC-241) - a third real format the line-scan needs to handle."""
+    check_id = "data-asset-1.registry-services.civil-registration.birth-registrations.sex.drift_psi_evidently"
     links = github_links.build_check_source_links(sha="abc123")
     url = links[check_id]
-    assert "qa_tools/bdm/evidently_check_lifecycle.py#L" in url
+    assert "contract/registry-services/bdm-birth-registrations-evidently-checks.yml#L" in url
 
     line_no = int(url.rsplit("#L", 1)[1])
-    lines = (github_links.ROOT / "qa_tools/bdm/evidently_check_lifecycle.py").read_text().splitlines()
+    lines = (github_links.ROOT / "contract/registry-services/bdm-birth-registrations-evidently-checks.yml").read_text().splitlines()
     assert check_id in lines[line_no - 1]
 
 
-def test_build_folder_links_covers_every_real_agency_and_dataset():
+def test_a_dataset_opens_its_contract_at_its_own_entry_and_an_agency_its_folder():
+    """REQ-DASH-244 criteria 12 and 13: every registered dataset and agency,
+    from the registry, with a tooltip naming the target."""
+    from qa_tools import collections
+
     folders = github_links.build_folder_links(sha="abc123")
-    assert folders["agencies"]["registry-services"].endswith("/qa_tools/bdm")
-    assert folders["agencies"]["child-protection-family-support"].endswith("/qa_tools/cp")
-    assert folders["datasets"]["birth-registrations"].endswith("/qa_tools/bdm")
-    for cp_dataset in ("cp-clients", "cp-notifications", "cp-investigations", "cp-placements", "cp-carers", "cp-case-workers"):
-        assert folders["datasets"][cp_dataset].endswith("/qa_tools/cp")
+    every = collections.all_collections()
+    assert every, "the registry must hold collections for this test to mean anything"
+    for coll in every:
+        assert folders["agencies"][coll.agency_id] == (
+            f"https://github.com/keithamoss/data-poc/tree/abc123/contract/{coll.agency_id}")
+        assert f"contract/{coll.agency_id}/" in folders["titles"]["agencies"][coll.agency_id]
+        contract = coll.check_file("contract")
+        lines = (github_links.ROOT / contract).read_text().splitlines()
+        for d in coll.datasets:
+            url = folders["datasets"][d.dataset_id]
+            assert url.startswith(f"https://github.com/keithamoss/data-poc/blob/abc123/{contract}#L")
+            assert lines[int(url.rsplit("#L", 1)[1]) - 1].strip() == f"- name: {d.table}"
+            assert contract in folders["titles"]["datasets"][d.dataset_id]

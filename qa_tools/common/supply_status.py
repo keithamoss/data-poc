@@ -1,0 +1,674 @@
+"""A supply's status from the newest COUNTED result of every check about it
+- one function (REQ-PIPE-121 NFR 4, shared with REQ-DASH-126 and the status
+REQ-PIPE-130 criterion 11 records at promotion).
+
+WHICH RESULTS ARE ABOUT A SUPPLY is results_about's answer, the one
+function the promotion gate, the knock-on, the dashboard build
+(pipeline.red_promoted, pipeline.warehouse_counts) and carried.decide all
+read (REQ-PIPE-279 criterion 21) - from what each RESULT recorded reading,
+never from whose run it was nor from a run's record of physical names.
+
+WHICH OF THOSE COUNT (REQ-PIPE-269 criterion 7) is the same function's
+second answer, given the VIEW - the warehouse as at an instant, judged from
+the decision log alone (criterion 9). A result is SHOWN about every supply
+it read; it COUNTS toward a supply in the warehouse only where every supply
+of every table THAT CHECK read is the one in the warehouse for its table in
+a period that supply is in (criteria 1 and 2), toward a waiting supply
+whatever else it read (criterion 3), and - recorded not evaluated for want
+of a table - only toward the table the check is declared on (criterion 4).
+Counting first and then taking the newest per check is what lets a check
+fall back to its newest counted result.
+
+WHERE NOTHING COUNTS for an in-warehouse supply, a check OWED to it - declared
+on its table, or reading only tables that each have a supply in the
+warehouse - reads red with a structured reason: 'recheck-owed' while a
+decision that moved a table owes a re-evaluation not yet run, naming that
+decision, and otherwise 'no-current-result' (criterion 5). A check NOT owed
+counts nothing (criterion 6). Neither falls back to a result about a supply
+no longer in the warehouse.
+
+NEWEST IS THE LATER-OPENED RUN (REQ-PIPE-279 criterion 9; Keith, K1 = A):
+qa.run.run_seq, the order runs were opened for evaluation.
+
+READ-ONLY, and only recorded QA results and the decision log - never a
+supply row. So it is safe on the dashboard build's path as well as the gate's.
+"""
+from __future__ import annotations
+
+import bisect
+from dataclasses import dataclass, field
+from datetime import datetime
+
+from qa_tools.common import qa_store, supply_db
+
+#: The structured reasons an owed check with no counted result reads red
+#: under (criterion 5) - a reader can tell an owed re-check, which clears by
+#: itself and raises nothing (#113), from a result that will not come.
+RECHECK_OWED, NO_CURRENT_RESULT = "recheck-owed", "no-current-result"
+
+#: How a period holds a supply IN THE WAREHOUSE - promoted, inherited or
+#: substituted (criterion 1), as qa.slot_holds names them.
+IN_THE_WAREHOUSE = ("promoted", "substituted", "inherited")
+
+
+@dataclass(frozen=True)
+class View:
+    """The warehouse a status is judged against: as at `as_at` (an instant,
+    ISO text or datetime), or as the decision log stands now where None. The
+    effective time of each decision, never when it was recorded - the same
+    answer the dashboard's date on show and the terminal give (criterion 9).
+
+    `period`, where given and the supply stands in it, reads that period
+    alone - what a period's own list shows (post-build-review #266 S5,
+    Keith Q3 = A). Without it a supply in several periods reads the WORST
+    across them."""
+    as_at: object = None
+    period: str | None = None
+
+
+@dataclass
+class About:
+    """results_about's two answers: every result SHOWN about the supply,
+    oldest first by run_seq, and those that COUNT toward it in the view -
+    with a red record standing in for each owed check that has none."""
+    shown: list[dict]
+    counted: list[dict]
+
+
+# ---- the warehouse at an instant ---------------------------------------------
+
+class Holdings:
+    """What each (dataset, period) holds in the warehouse at one instant."""
+
+    def __init__(self, held: dict[tuple[str, str], str], *, tables=None):
+        self._held = held
+        # The hierarchy's {table: Dataset}, taken once for this instance and
+        # passed down to the many per-table lookups the counting rule makes
+        # (REQ-PIPE-254 criterion 19). Read on first use when not given.
+        self._tables = tables
+        self._periods: dict[tuple[str, str], list[str]] = {}
+        for (ds, period), supply in held.items():
+            self._periods.setdefault((ds, supply), []).append(period)
+
+    def holder(self, dataset_id: str, period: str) -> str | None:
+        return self._held.get((dataset_id, period))
+
+    def periods_of(self, dataset_id: str, supply: str) -> list[str]:
+        return sorted(self._periods.get((dataset_id, supply), ()))
+
+    @property
+    def tables(self):
+        if self._tables is None:
+            from qa_tools.common import hierarchy
+
+            self._tables = hierarchy.by_table()
+        return self._tables
+
+
+def holdings_at(conn, dataset_ids, as_at=None) -> Holdings:
+    """The warehouse at `as_at` for these datasets, from qa.slot_holds - the
+    one definition of what a slot holds (REQ-PIPE-130 criterion 9)."""
+    held: dict[tuple[str, str], str] = {}
+    for ds in sorted(set(dataset_ids)):
+        for slot, held_as, holder in conn.execute(
+                f'SELECT slot, held_as, holder FROM "{qa_store.SCHEMA}".slot_holds(?, ?)',
+                [ds, _iso(as_at)]).fetchall():
+            if held_as in IN_THE_WAREHOUSE and holder:
+                held[(ds, slot)] = holder
+    return Holdings(held)
+
+
+class HoldingsTimeline:
+    """The same answers at every instant, for a reader that asks many - the
+    dashboard build. Made from the slot timeline the build already reads
+    (pipeline.slot_timeline.for_dataset), which is qa.slot_holds asked at
+    each instant a decision took effect, so it answers exactly as
+    holdings_at does; tests/test_warehouse_view.py holds the two together."""
+
+    def __init__(self, entries_by_dataset: dict[str, list[dict]]):
+        changes: list[tuple[datetime, str, str, str | None]] = []
+        for ds, entries in entries_by_dataset.items():
+            for e in entries:
+                holder = e.get("holder") if e.get("held_as") in IN_THE_WAREHOUSE else None
+                changes.append((instant(e["at"]), ds, e["slot"], holder))
+        changes.sort(key=lambda c: c[0])
+        self._changes = changes
+        # A BISECT, NOT A WALK (post-build-review #266 S6): warehouse_counts
+        # and red_promoted ask at() once per instant, and a walk of every
+        # change on each call made that quadratic. `_ends[i]` is one past
+        # the last change at the i-th distinct instant; a snapshot is made
+        # only for an instant asked about, by replaying forward from the
+        # last one made - so asking in time order, as both readers do, is
+        # one pass over the changes in all.
+        self._instants: list[datetime] = []
+        self._ends: list[int] = []
+        for i, (at, *_rest) in enumerate(changes):
+            if i + 1 == len(changes) or changes[i + 1][0] != at:
+                self._instants.append(at)
+                self._ends.append(i + 1)
+        self._made: dict[int, Holdings] = {}
+        self._cursor, self._held = 0, {}
+        self._tables = None
+
+    @property
+    def tables(self):
+        """The hierarchy's {table: Dataset}, read once for this timeline and
+        handed to every Holdings it makes (REQ-PIPE-254 criterion 19)."""
+        if self._tables is None:
+            from qa_tools.common import hierarchy
+
+            self._tables = hierarchy.by_table()
+        return self._tables
+
+    def at(self, when) -> Holdings:
+        i = bisect.bisect_right(self._instants, instant(when)) - 1
+        if i < 0:
+            return Holdings({}, tables=self.tables)
+        if i not in self._made:
+            end = self._ends[i]
+            if end < self._cursor:
+                self._cursor, self._held = 0, {}
+            for _at, ds, slot, holder in self._changes[self._cursor:end]:
+                self._held[(ds, slot)] = holder
+            self._cursor = end
+            self._made[i] = Holdings({k: v for k, v in self._held.items() if v},
+                                     tables=self.tables)
+        return self._made[i]
+
+    def instants(self, dataset_ids) -> list[datetime]:
+        wanted = set(dataset_ids)
+        return sorted({at for at, ds, _s, _h in self._changes if ds in wanted})
+
+
+# ---- what is owed --------------------------------------------------------------
+
+@dataclass
+class Owing:
+    """The re-evaluations decisions owe (REQ-PIPE-121), for 'owed at T':
+    from each cause's effective instant until the recorded instant of the
+    run that cleared it - never the wall clock (criterion 5). Each item is
+    (period, tables, decision id, effective, cleared_from), cleared_from
+    None while it is still owed."""
+    items: list[tuple[str, frozenset, int, datetime, datetime | None]] = field(
+        default_factory=list)
+    #: The run that cleared each item, aligned with `items` where known.
+    cleared_by: list[str | None] = field(default_factory=list)
+
+    def changes(self, tables) -> list[tuple[datetime, str | None]]:
+        """Every instant 'owed' changes for a reader of `tables` - each
+        cause's effective instant (run None) and each clearing run's
+        recorded instant (that run) - so a reader that asks at chosen
+        instants (warehouse_counts, red_promoted) asks at these too: a
+        clearing run need record nothing about a supply to end its owed red."""
+        wanted, out = set(tables), []
+        for i, (_p, owed_tables, _d, effective, cleared_from) in enumerate(self.items):
+            if not owed_tables & wanted:
+                continue
+            out.append((effective, None))
+            if cleared_from is not None and cleared_from > effective:
+                out.append((cleared_from, self.cleared_by[i] if i < len(self.cleared_by)
+                            else None))
+        return out
+
+    def owing(self, periods, tables, at) -> tuple[int, datetime] | None:
+        """The newest decision owing a re-evaluation of one of `tables` in
+        one of `periods` that is still owed at `at`, as (id, effective)."""
+        when = instant(at) if at is not None else None
+        found = None
+        for period, owed_tables, decision_id, effective, cleared_from in self.items:
+            if period not in periods or not owed_tables & set(tables):
+                continue
+            if when is not None and effective > when:
+                continue
+            # OWED UNTIL THE RUN THAT CLEARED IT (post-build-review #266 D2,
+            # Keith Q4 = A - one clock): that run's result counts from its
+            # recorded instant, so the item is owed up to it and no further.
+            # A re-check that failed and was retried later is owed between.
+            if cleared_from is not None and (when is None or when >= cleared_from):
+                continue
+            if found is None or (effective, decision_id) > (found[1], found[0]):
+                found = (decision_id, effective)
+        return found
+
+
+def owing(conn, periods=None) -> Owing:
+    """Every re-evaluation a decision owes, from qa.owed_run and the log -
+    only those in `periods` where given (one supply's, for results_about;
+    the dashboard build reads them all once)."""
+    from qa_tools.common import recheck
+
+    scoped = periods is not None
+    rows = conn.execute(
+        f"SELECT o.period, o.tables, o.caused_by_decision, d.effective_at, "
+        f"o.cleared_at IS NOT NULL, o.cleared_by_run "
+        f'FROM {recheck.TABLE} o JOIN "{qa_store.SCHEMA}".decision d '
+        "ON d.id = o.caused_by_decision WHERE o.kind = ? "
+        + ("AND o.period = ANY(?) " if scoped else "") + "ORDER BY o.id",
+        [recheck.REEVALUATE, *([list(periods)] if scoped else [])]).fetchall()
+    when = cleared_instants(conn, [k for *_rest, k in rows if k])
+    return Owing([(p, frozenset(t or ()), int(d), instant(e),
+                   (when[k] if k in when else instant(e)) if cleared else None)
+                  for p, t, d, e, cleared, k in rows],
+                 [k for *_rest, k in rows])
+
+
+def cleared_instants(conn, run_keys: list[str]) -> dict[str, datetime]:
+    """{run key: its recorded instant} for the runs that cleared owed items -
+    qa.run.run_instant, the instant their results count from (post-build-
+    review #266 D2, Keith Q4 = A: one clock). An item cleared with no
+    recorded run - nothing to date it by - is owed at no instant. DATING,
+    not placing, as recorded_by is (REQ-PIPE-279 criterion 20)."""
+    if not run_keys:
+        return {}
+    return {k: instant(v) for k, v in conn.execute(
+        f'SELECT run_key, run_instant FROM "{qa_store.SCHEMA}".run WHERE run_key = ANY(?)',
+        [list(set(run_keys))]).fetchall()}
+
+
+# ---- the rule ------------------------------------------------------------------
+
+def declared_on(record: dict) -> str | None:
+    """The dataset a check is declared on, from its id (asset.agency.
+    collection.dataset...), else the dataset it was recorded for."""
+    from qa_tools.common import check_id as cid
+
+    parsed = cid.try_parse(record.get("check_id") or "")
+    return parsed.dataset if parsed else record.get("dataset_id")
+
+
+def dataset_of(table: str, tables=None) -> str | None:
+    """The dataset a logical table belongs to, or None for one the hierarchy
+    does not know (a sample's or a trial's). `tables` is a
+    hierarchy.by_table() the caller already holds (REQ-PIPE-254 criterion
+    19); without one the hierarchy is read now."""
+    from qa_tools.common import hierarchy
+
+    entry = (hierarchy.by_table() if tables is None else tables).get(table)
+    return entry.dataset_id if entry is not None else None
+
+
+def _matches(holdings: Holdings, reads: dict, period: str) -> bool:
+    """Whether the warehouse in `period` is what this result read: each
+    supply READ is the one the period holds, and a table it read nothing of
+    (HELD, ABSENT) has nothing there - by supply id, never physical name."""
+    for table, read in reads.items():
+        state = read.get("state")
+        if state == qa_store.NO_SUPPLY:
+            continue
+        ds = dataset_of(table, holdings.tables)
+        if ds is None:
+            continue
+        held = holdings.holder(ds, period)
+        if state == qa_store.READ:
+            if held != read.get("supply_id"):
+                return False
+        elif held is not None:
+            return False
+    return True
+
+
+def counts_toward(record: dict, dataset_id: str, periods: list[str],
+                  holdings: Holdings) -> bool:
+    """THE RULE (criteria 1 to 4) for one result already about the supply:
+    `periods` are those its supply is in the warehouse in at the view's
+    instant - none for a waiting supply."""
+    from qa_tools.common import carried
+
+    reads = record.get("reads")
+    if not reads:
+        return True  # a single-table or file result is about its own supply
+    if carried.not_evaluated_reason(record) and declared_on(record) != dataset_id:
+        return False  # criterion 4: only toward the table that asks
+    if not periods:
+        return True  # criterion 3: a waiting supply counts what read it
+    return any(_matches(holdings, reads, p) for p in periods)
+
+
+def _owed(record: dict, dataset_id: str, periods: list[str], holdings: Holdings) -> bool:
+    """Criteria 5 and 6: declared on this table, or reading only tables that
+    each have a supply in the warehouse in one of its periods."""
+    if declared_on(record) == dataset_id:
+        return True
+    known = holdings.tables
+    tables = [t for t, r in (record.get("reads") or {}).items()
+              if r.get("state") != qa_store.NO_SUPPLY and dataset_of(t, known)]
+    return any(all(holdings.holder(dataset_of(t, known), p) for t in tables) for p in periods)
+
+
+def count(dataset_id: str, supply: str, shown: list[dict], *, holdings: Holdings,
+          owed: Owing | None, at=None, period: str | None = None,
+          stand_ins: bool = True) -> list[dict]:
+    """The results that COUNT toward `supply` in the warehouse `holdings`
+    describe, oldest first, then one red stand-in per owed check with none -
+    so the last record per check is the one it reads.
+    Pure: the gate (results_about) and the dashboard build
+    (pipeline.warehouse_counts) both call it, so neither keeps a rule of its
+    own (criterion 7).
+
+    COUNTED PER PERIOD (post-build-review #266 S5, Keith Q3 = A): a supply in
+    the warehouse in several periods - promoted into one, inherited or
+    substituted into others - is counted in each separately, and each check
+    reads the WORST of its periods' readings, so a later green beside one
+    period's partner never hides a red beside another's. `period`, where the
+    supply stands in it, reads that period alone."""
+    periods = holdings.periods_of(dataset_id, supply)
+    if period is not None and period in periods:
+        periods = [period]
+    if not periods:
+        return [r for r in shown if counts_toward(r, dataset_id, [], holdings)]
+    if len(periods) == 1:
+        return _count_in(dataset_id, shown, periods[0], holdings, owed, at, stand_ins)
+    readings = [_count_in(dataset_id, shown, p, holdings, owed, at, stand_ins)
+                for p in periods]
+    position = {id(r): i for i, r in enumerate(shown)}
+    worst: dict[str, dict] = {}
+    for got in readings:
+        for r in newest_per_check(got):
+            held = worst.get(r["check_id"])
+            if held is None or _severity(r, position) > _severity(held, position):
+                worst[r["check_id"]] = r
+    chosen = {id(r) for r in worst.values()}
+    counted_ids = {id(r) for got in readings for r in got}
+    rest = [r for r in shown if id(r) in counted_ids and id(r) not in chosen]
+    return rest + sorted(worst.values(), key=lambda r: position.get(id(r), len(shown)))
+
+
+def _count_in(dataset_id: str, shown: list[dict], period: str, holdings: Holdings,
+              owed: Owing | None, at, stand_ins: bool = True) -> list[dict]:
+    """count() for one period the supply stands in. `stand_ins` False leaves
+    an owed check with no counted result uncounted rather than red - the
+    promotion gate's reading of the warehouse as it WILL stand (REQ-PIPE-267
+    criteria 1 and 6), where such a check is re-evaluated, or decided
+    without where its result could count toward nothing."""
+    periods = [period]
+    counted = [r for r in shown if counts_toward(r, dataset_id, periods, holdings)]
+    if not stand_ins:
+        return counted
+    have = {r["check_id"] for r in counted}
+    newest: dict[str, dict] = {}
+    for r in shown:
+        if r.get("reads"):
+            newest[r["check_id"]] = r
+    for check, r in newest.items():
+        if check in have or not _owed(r, dataset_id, periods, holdings):
+            continue
+        cause = owed.owing(periods, list(r.get("reads") or {}), at) if owed is not None else None
+        counted.append(stand_in(r, cause))
+    return counted
+
+
+def _severity(record: dict, position: dict[int, int]) -> tuple:
+    """How bad one reading is, for the worst across periods: red over amber
+    over green over a quiet status, an UNREADABLE verdict worst of all (so
+    promotion.status_of still refuses it rather than a green hiding it);
+    a recorded result over a stand-in of the same colour, then the newer."""
+    from qa_tools.common import dataset_status
+
+    colour = dataset_status.dashboard_status(record.get("status"))
+    rank = len(dataset_status.ORDERED_STATUSES) if colour is None else \
+        dataset_status.ORDERED_STATUSES.get(colour, -1)
+    real = id(record) in position
+    return rank, real, position.get(id(record), -1)
+
+
+def stand_in(record: dict, cause) -> dict:
+    """The red an owed check reads with no counted result (criterion 5)."""
+    from qa_tools.common import carried
+
+    red = {k: v for k, v in record.items() if k not in carried.NOT_EVALUATED_KEYS}
+    red.update({"status": "fail", "metric_value": None,
+                "warehouse_reason": RECHECK_OWED if cause else NO_CURRENT_RESULT,
+                "owed_by_decision": cause[0] if cause else None,
+                "owed_since": cause[1].isoformat() if cause else None})
+    return red
+
+
+# ---- the one function -------------------------------------------------------------
+
+def _shown(conn, dataset_id: str, supply: str, *, application: int | None = None,
+           as_at=None) -> list[dict]:
+    """Every completed, agreed result about `supply` of `dataset_id`, oldest
+    first by run_seq and then as each run recorded them, each cross-table
+    one carrying what it recorded reading (`reads`).
+
+    A RESULT IS ABOUT A SUPPLY BY WHAT IT RECORDED, in one of five states:
+
+      its run's own   a single-table result recorded under a run whose
+                      qa.run.supply_id is this supply - such a result reads
+                      only its run's own supply (criterion 3), so the run's
+                      supply is its supply
+      its file        a file check's, whose recorded delivery and file are
+                      one of this supply's files (supply_files.resolve): a
+                      pair's arrival run is shared by both its supplies, and
+                      which file each one IS is settled later
+                      (post-build-review #262 D2). A supply never filed has
+                      no recorded file, so its run's own rule applies
+      READ            a cross-table result whose qa.check_read for this
+                      dataset's table names this supply - a contested
+                      table's included, read as the supply it fell through to
+      HELD            the supply was deliberately not read: NOT about it
+      ABSENT          nothing of the table was read: about no supply of it
+                      (K2 = A - it shows only where its check is declared)
+      NO-SUPPLY       a sample's or a trial's table: about no supply at all
+
+    Only the first two are about the supply, and that is the whole rule.
+    The run-level qa.tables_read is not consulted: it says what a RUN read,
+    and matching it by physical name was a guess about each result.
+
+    TIE-BREAK: none is needed. run_seq is unique per run; within a run, the
+    order the run recorded its results (qa.check_result.id), exactly as one
+    run's own reader reads them.
+
+    `application`: a GATE APPLICATION reading its own re-evaluations, which
+    count toward nothing else until it settles (REQ-PIPE-267 criterion 12) -
+    the runs every reader sees, and that application's own.
+
+    A LATER RUN'S LEFT-OUT SUPERSEDES (REQ-PIPE-332 criteria 7 and 9,
+    PROVISIONAL): a check a later run of this supply left out of scope - a
+    person having marked a table it reads not supplied since the earlier
+    run - records no result, so the earlier run's result for it is no
+    longer about the supply, and is dropped here. `as_at`: only a left-out
+    recorded by then supersedes, so an earlier view never changes.
+    """
+    from qa_tools.common import hierarchy
+    from qa_tools.common import qa_results_reader as reader
+    from qa_tools.common import supply_files
+
+    table = hierarchy.dataset(dataset_id).table
+    s = qa_store.SCHEMA
+    own = "(r.dataset_id = ? AND r.supply_id = ?)"
+    found = supply_files.resolve(conn, dataset_id, supply)
+    if found is not None and found.delivery is not None:
+        files = ([found.filename] if found.filename
+                 else supply_files.files_in_order(conn, dataset_id, found.delivery)
+                 if len(found.own) > 1 else [])
+        by_file = "(c.dataset_id = ? AND c.delivery = ? AND c.filename = ANY(?))"
+        by_file_params = [dataset_id, found.delivery, files]
+    else:
+        by_file, by_file_params = own, [dataset_id, supply]
+    if application is None:
+        results_from = (f'"{s}".check_result_visible c '
+                        f'JOIN "{s}".run_visible r ON r.run_key = c.run_key')
+        mine: list = []
+    else:
+        results_from = (f'"{s}".check_result c JOIN (SELECT * FROM "{s}".run_visible '
+                        f'UNION ALL SELECT * FROM "{s}".run WHERE completed_at IS NOT NULL '
+                        "AND gate_application = ?) r ON r.run_key = c.run_key")
+        mine = [application]
+    cursor = conn.execute(
+        f'SELECT c.*, c.id AS result_row FROM {results_from} '
+        "WHERE c.supply_state = ? AND ("
+        f"(c.scope NOT IN (?, ?) AND {own}) "
+        f"OR (c.scope = ? AND {by_file}) "
+        f'OR EXISTS (SELECT 1 FROM "{s}".check_read k WHERE k.check_result_id = c.id '
+        "AND k.logical_table = ? AND k.state = ? AND k.supply_id = ?)) "
+        "ORDER BY r.run_seq, c.id",
+        [*mine, qa_store.AGREED, qa_store.CROSS_TABLE_SCOPE, qa_store.FILE_SCOPE, dataset_id,
+         supply,
+         qa_store.FILE_SCOPE, *by_file_params, table, qa_store.READ, supply])
+    records = _not_since_left_out(conn, supply, reader.records_from(
+        cursor.description, cursor.fetchall()), application=application, as_at=as_at)
+    ids = [r["result_row"] for r in records]
+    reads: dict[int, dict] = {}
+    if ids:
+        for rid, t, state, sup, contested, files in conn.execute(
+                f'SELECT check_result_id, logical_table, state, supply_id, contested, '
+                f'contested_files FROM "{s}".check_read WHERE check_result_id = ANY(?) '
+                "ORDER BY check_result_id, logical_table", [ids]).fetchall():
+            reads.setdefault(rid, {})[t] = {"state": state, "supply_id": sup,
+                                            "contested": bool(contested),
+                                            "contested_files": sorted(files or ())}
+    for r in records:
+        got = reads.get(r.pop("result_row"))
+        if got:
+            r["reads"] = got
+    return records
+
+
+def _not_since_left_out(conn, supply: str, records: list[dict], *,
+                        application: int | None, as_at) -> list[dict]:
+    """`records` less each result a LATER run of `supply` left out of its
+    scope (the left_out tool output's not_in_agreement entries) - see
+    _shown. Recorded QA metadata only."""
+    if not records:
+        return records
+    s = qa_store.SCHEMA
+    runs = (f'(SELECT * FROM "{s}".run_visible UNION ALL SELECT * FROM "{s}".run '
+            "WHERE completed_at IS NOT NULL AND gate_application = ?)"
+            if application is not None else f'"{s}".run_visible')
+    rows = conn.execute(
+        f"SELECT r.run_seq, r.run_instant, t.raw_output FROM {runs} r "
+        f'JOIN "{s}".tool_output t ON t.run_key = r.run_key '
+        "WHERE r.supply_id = ? AND t.tool = 'left_out'",
+        [*([application] if application is not None else []), supply]).fetchall()
+    cut = instant(as_at) if as_at is not None else None
+    left: dict[str, int] = {}
+    for seq, at, raw in rows:
+        if cut is not None and (at is None or instant(at) > cut):
+            continue
+        payload = raw.get("raw_output", raw) if isinstance(raw, dict) else {}
+        for check in (payload or {}).get("not_in_agreement") or {}:
+            left[check] = max(left.get(check, seq), seq)
+    if not left:
+        return records
+    seqs = dict(conn.execute(
+        f'SELECT run_key, run_seq FROM "{s}".run WHERE run_key = ANY(?)',
+        [list({r["run_id"] for r in records})]).fetchall())
+    return [r for r in records if r["check_id"] not in left
+            or (seqs.get(r["run_id"]) or 0) > left[r["check_id"]]]
+
+
+def recorded_by(conn, records: list[dict], as_at) -> list[dict]:
+    """The records whose run had been recorded by `as_at` - qa.run.run_instant,
+    the dashboard clip's own 'recorded by' date (post-build-review #266 D1: a
+    result that did not yet exist never counts as at the past). DATING, not
+    placing: it keeps the order it is given (REQ-PIPE-279 criterion 20)."""
+    if as_at is None or not records:
+        return records
+    keys = list({r["run_id"] for r in records})
+    when = dict(conn.execute(
+        f'SELECT run_key, run_instant FROM "{qa_store.SCHEMA}".run WHERE run_key = ANY(?)',
+        [keys]).fetchall())
+    cut = instant(as_at)
+    return [r for r in records if when.get(r["run_id"]) is not None
+            and instant(when[r["run_id"]]) <= cut]
+
+
+def results_about(conn, dataset_id: str, supply: str, *, view: View) -> About:
+    """The results SHOWN about `supply` of `dataset_id` and those COUNTED
+    toward it in `view` (REQ-PIPE-279 criterion 21; REQ-PIPE-269 criterion
+    7), both oldest first - so the last result per check is the newest."""
+    shown = recorded_by(conn, _shown(conn, dataset_id, supply, as_at=view.as_at), view.as_at)
+    tables = {t for r in shown for t in (r.get("reads") or {})}
+    datasets = {dataset_id, *(d for d in map(dataset_of, tables) if d)}
+    holdings = holdings_at(conn, datasets, view.as_at)
+    periods = holdings.periods_of(dataset_id, supply)
+    owed = owing(conn, periods) if periods and tables else None
+    return About(shown, count(dataset_id, supply, shown, holdings=holdings, owed=owed,
+                              at=view.as_at, period=view.period))
+
+
+def newest_per_check(records: list[dict]) -> list[dict]:
+    """The last record per check, in the order each check first appears."""
+    latest: dict[str, dict] = {}
+    for record in records:
+        latest[record["check_id"]] = record
+    return list(latest.values())
+
+
+def latest_results(conn, dataset_id: str, supply: str, *, view: View = View()) -> list[dict]:
+    """The newest COUNTED result per check about this supply in `view`
+    (results_about), the later-opened run's where two recorded one.
+    Includes other datasets' results; status() keeps only what contributes
+    to this dataset."""
+    return newest_per_check(results_about(conn, dataset_id, supply, view=view).counted)
+
+
+def status(conn: supply_db.SupplyConnection, dataset_id: str, supply: str, *,
+           reads: dict[str, list[str]] | None = None, view: View = View()) -> str | None:
+    """green/amber/red (or a quiet status) from the newest counted result of
+    every check contributing to this dataset; None where nothing did."""
+    from qa_tools.common import promotion
+
+    reads = reads if reads is not None else promotion._declared_reads()
+    return promotion.status_of(dataset_id, latest_results(conn, dataset_id, supply, view=view),
+                               reads=reads)
+
+
+# ---- small helpers ---------------------------------------------------------------
+
+def instant(value) -> datetime:
+    """An instant from ISO text or a datetime, on the asset's terms."""
+    from qa_tools.common import asset_time
+
+    return value if isinstance(value, datetime) else asset_time.parse_instant(
+        value, "warehouse view")
+
+
+def _iso(value):
+    if value is None:
+        return None
+    return value.isoformat() if hasattr(value, "isoformat") else str(value)
+
+
+def red_only_for_recheck_owed(conn, dataset_id: str, supply: str, *,
+                              view: View = View()) -> list[dict]:
+    """The 'recheck-owed' stand-ins (criterion 5) where they are the WHOLE of
+    this supply's red - every failing check counted toward it reads red only
+    because a re-check a decision owes has not run - else []. What lets the
+    terminal word such a red as not yet re-checked rather than 're-checked
+    worse' (REQ-PIPE-276 criterion 14; #113, NO FLICKERING REDS)."""
+    from qa_tools.common import promotion
+
+    try:
+        latest = latest_results(conn, dataset_id, supply, view=view)
+    except Exception:  # noqa: BLE001 - nothing readable is no owed red
+        return []
+    failing = [r for r in promotion._contributing_records(
+                   dataset_id, latest, promotion._declared_reads())
+               if (r.get("status") or "") in ("fail", "error")]
+    if not failing or any(r.get("warehouse_reason") != RECHECK_OWED for r in failing):
+        return []
+    return failing
+
+
+def recheck_owed_words(conn, records: list[dict]) -> str | None:
+    """REQ-DASH-204 criterion 7's sentence for the terminal (REQ-PIPE-276
+    criterion 14): 'Not yet re-checked against the <dataset> promoted
+    <instant>; the re-check runs on the next processing pass:' - naming the
+    decision that owes it, from the stand-in's own fields."""
+    from qa_tools.common import decision_log, display_time
+
+    ids = sorted({r.get("owed_by_decision") for r in records if r.get("owed_by_decision")})
+    if not ids:
+        return None
+    rows = conn.execute(f"SELECT dataset_id, action, effective_at FROM {decision_log.TABLE} "
+                        "WHERE id = ?", [ids[-1]]).fetchall()
+    if not rows:
+        return None
+    from qa_tools.common import decision_words
+
+    ds, action, at = rows[0]
+    verb = decision_words.said(action)
+    return (f"Not yet re-checked against the {ds} {verb} {display_time.format_instant(at)}; "
+            f"the re-check runs on the next processing pass:")

@@ -1,0 +1,142 @@
+# Child Protection's Evidently checks (REQ-QAC-241). They used to be a Python
+# dict in qa_tools/cp/evidently_check_lifecycle.py; see
+# contract/registry-services/bdm-birth-registrations-evidently-checks.yml
+# for why they live here now, and how qa_tools/tools/run_evidently.py reads them.
+#
+# ONE ROW-COUNT CHECK PER DATASET (REQ-QAC-108 criterion 1), six rather than
+# one, because the question is about a TABLE: a collection-wide count would
+# say something shrank without saying what. Each check's dataset is the
+# fourth segment of its id, and qa_tools/tools/run_evidently.py counts that dataset's
+# table.
+#
+# Every date is quoted, so it stays the string it was. Writing the
+# reader-facing prose: docs/check-authoring-rules.md.
+checks:
+  - check_id: data-asset-1.child-protection-family-support.child-protection.cp-notifications.concern_type.drift_psi_evidently
+    # Matches the "dimension": "consistency" qa_tools/tools/run_evidently.py's result
+    # has always carried. PSI over the column, tripped on a strict >.
+    category: consistency
+    introduced_date: "2023-01-15"
+    description: The spread of values must stay close to the reference supply.
+    failure_indicates: self-evident
+    column: concern_type
+    method: psi
+    warn_threshold: 0.10
+    fail_threshold: 0.25
+    changelog:
+      - date: "2026-10-14T00:00:00Z"
+        description: "Definition now recorded with the check (its column, method and warn/fail bands, REQ-QAC-223); behaviour unchanged."
+  - check_id: data-asset-1.child-protection-family-support.child-protection.cp-clients.row_count_growth_evidently
+    # The same category Birth Registrations' own volume check carries, and
+    # for the same reading: a supply arriving much smaller than the last one
+    # is a question about the refresh rather than about any column's content.
+    # Introduced the day it was authored, not the day the collection started:
+    # a check cannot have found anything before it existed. A whole-table
+    # count, filed in "Supply-level checks" (column "(table)", see
+    # qa_tools/tools/run_evidently.py).
+    category: timeliness
+    introduced_date: "2026-09-29"
+    description: The number of rows must not drop sharply against the last promoted supply.
+    failure_indicates: self-evident
+    column: null
+    method: row_drop
+    warn_threshold: 0.10
+    fail_threshold: 0.25
+    changelog:
+      - date: "2026-10-14T00:00:00Z"
+        description: "Definition now recorded with the check (its column, method and warn/fail bands, REQ-QAC-223); behaviour unchanged."
+  - check_id: data-asset-1.child-protection-family-support.child-protection.cp-notifications.row_count_growth_evidently
+    # The same category Birth Registrations' own volume check carries, and
+    # for the same reading: a supply arriving much smaller than the last one
+    # is a question about the refresh rather than about any column's content.
+    # Introduced the day it was authored, not the day the collection started:
+    # a check cannot have found anything before it existed. A whole-table
+    # count, filed in "Supply-level checks" (column "(table)", see
+    # qa_tools/tools/run_evidently.py).
+    category: timeliness
+    introduced_date: "2026-09-29"
+    description: The number of rows must not drop sharply against the last promoted supply.
+    failure_indicates: self-evident
+    column: null
+    method: row_drop
+    warn_threshold: 0.10
+    fail_threshold: 0.25
+    changelog:
+      - date: "2026-10-14T00:00:00Z"
+        description: "Definition now recorded with the check (its column, method and warn/fail bands, REQ-QAC-223); behaviour unchanged."
+  - check_id: data-asset-1.child-protection-family-support.child-protection.cp-investigations.row_count_growth_evidently
+    # The same category Birth Registrations' own volume check carries, and
+    # for the same reading: a supply arriving much smaller than the last one
+    # is a question about the refresh rather than about any column's content.
+    # Introduced the day it was authored, not the day the collection started:
+    # a check cannot have found anything before it existed. A whole-table
+    # count, filed in "Supply-level checks" (column "(table)", see
+    # qa_tools/tools/run_evidently.py).
+    category: timeliness
+    introduced_date: "2026-09-29"
+    description: The number of rows must not drop sharply against the last promoted supply.
+    failure_indicates: self-evident
+    column: null
+    method: row_drop
+    warn_threshold: 0.10
+    fail_threshold: 0.25
+    changelog:
+      - date: "2026-10-14T00:00:00Z"
+        description: "Definition now recorded with the check (its column, method and warn/fail bands, REQ-QAC-223); behaviour unchanged."
+  - check_id: data-asset-1.child-protection-family-support.child-protection.cp-placements.row_count_growth_evidently
+    # The same category Birth Registrations' own volume check carries, and
+    # for the same reading: a supply arriving much smaller than the last one
+    # is a question about the refresh rather than about any column's content.
+    # Introduced the day it was authored, not the day the collection started:
+    # a check cannot have found anything before it existed. A whole-table
+    # count, filed in "Supply-level checks" (column "(table)", see
+    # qa_tools/tools/run_evidently.py).
+    category: timeliness
+    introduced_date: "2026-09-29"
+    description: The number of rows must not drop sharply against the last promoted supply.
+    failure_indicates: self-evident
+    column: null
+    method: row_drop
+    warn_threshold: 0.10
+    fail_threshold: 0.25
+    changelog:
+      - date: "2026-10-14T00:00:00Z"
+        description: "Definition now recorded with the check (its column, method and warn/fail bands, REQ-QAC-223); behaviour unchanged."
+  - check_id: data-asset-1.child-protection-family-support.child-protection.cp-carers.row_count_growth_evidently
+    # The same category Birth Registrations' own volume check carries, and
+    # for the same reading: a supply arriving much smaller than the last one
+    # is a question about the refresh rather than about any column's content.
+    # Introduced the day it was authored, not the day the collection started:
+    # a check cannot have found anything before it existed. A whole-table
+    # count, filed in "Supply-level checks" (column "(table)", see
+    # qa_tools/tools/run_evidently.py).
+    category: timeliness
+    introduced_date: "2026-09-29"
+    description: The number of rows must not drop sharply against the last promoted supply.
+    failure_indicates: self-evident
+    column: null
+    method: row_drop
+    warn_threshold: 0.10
+    fail_threshold: 0.25
+    changelog:
+      - date: "2026-10-14T00:00:00Z"
+        description: "Definition now recorded with the check (its column, method and warn/fail bands, REQ-QAC-223); behaviour unchanged."
+  - check_id: data-asset-1.child-protection-family-support.child-protection.cp-case-workers.row_count_growth_evidently
+    # The same category Birth Registrations' own volume check carries, and
+    # for the same reading: a supply arriving much smaller than the last one
+    # is a question about the refresh rather than about any column's content.
+    # Introduced the day it was authored, not the day the collection started:
+    # a check cannot have found anything before it existed. A whole-table
+    # count, filed in "Supply-level checks" (column "(table)", see
+    # qa_tools/tools/run_evidently.py).
+    category: timeliness
+    introduced_date: "2026-09-29"
+    description: The number of rows must not drop sharply against the last promoted supply.
+    failure_indicates: self-evident
+    column: null
+    method: row_drop
+    warn_threshold: 0.10
+    fail_threshold: 0.25
+    changelog:
+      - date: "2026-10-14T00:00:00Z"
+        description: "Definition now recorded with the check (its column, method and warn/fail bands, REQ-QAC-223); behaviour unchanged."

@@ -1,0 +1,600 @@
+"""Characterization pin for arrival/as-of semantics (REQ-PIPE-048).
+
+WRITTEN BEFORE THE REFACTOR, DELIBERATELY. That requirement's own NFR
+asks for exactly this and says why: the current behaviour is correct by
+COINCIDENCE in at least one place - clipDatasetToInPlaceOn() compares date
+STRINGS, which gives end-of-day semantics by accident rather than by
+design - so "did the refactor change anything" cannot be answered by
+reading the new code. It has to be measured against what the old code
+actually produced.
+
+tests/fixtures/arrival_semantics_golden.json is that measurement: every
+run in committed history, with its arrival instant and its
+early/onTime/late verdict. Regenerate it ONLY when the committed
+history is legitimately rebuilt, never to make a failing test pass - a
+diff here after a timezone change is the finding, not the noise.
+
+REGENERATED THREE TIMES - twice on 2026-09-23, both checked rather than
+assumed, and once on 2026-09-28 to UNDO an extension that should never
+have happened (see TestEveryCommittedArrivalKeepsItsVerdict's own
+docstring). `mothman debug capture-arrival-golden` is how, so the one
+operation that can silently destroy this pin has a recorded procedure
+instead of an ad-hoc script.
+
+  1. For REQ-GEN-042's rebuild, which renamed every run_id. The verdict
+     distribution came back IDENTICAL - 131 onTime, 16 early, 3 late
+     over the same 144 arrivals and 7 datasets.
+
+  2. For REQ-GEN-043's, where 16 Birth Registrations runs came back
+     with a DIFFERENT verdict under the same run_id, which is exactly
+     the shape this pin exists to catch and was not waved through.
+     What it turned out to be: run identity now comes from RECEIPT
+     ORDER rather than from the generator's slot order, so a resupply
+     for an earlier period that arrived after a later period's first
+     delivery now sorts where it actually landed. Proved, not assumed,
+     by comparing the committed history before and after: the multiset
+     of 42 receipt instants is identical, 23 run_ids carry a different
+     one, and mapping instant -> verdict instead of run_id -> verdict
+     gives ZERO differences. The verdicts never moved; the labels did.
+
+     That check is worth repeating verbatim next time, because the
+     distribution staying at 131/16/3 would have looked like proof on
+     its own and is not - a permutation preserves it.
+
+THE INSTANT HALF OF THIS PIN MEASURED NOTHING until that second
+capture. `arrivalHistory` rows carry no instant, so every `arrivedAt`
+in the golden was None and test_no_arrival_instant_changed compared
+None to None, 150 times. The instants live in `arrivalByRun`, which is
+where the capture command reads them from now. A pin that cannot fail
+is worse than no pin, and this one was written specifically to catch a
+verdict-preserving eight-hour shift - precisely the case the vacuous
+field would have missed.
+
+WHAT 048 DELIBERATELY DOES CHANGE, so it is not mistaken for a
+regression: a timestamp with no offset currently gets silently treated
+as UTC (pipeline/cadence.py's own `if ... tzinfo is None` branch, whose
+docstring admits it). Criterion 4 makes that a loud failure. The
+verdicts below must not move; the handling of a naked value must.
+"""
+from __future__ import annotations
+
+import json
+from datetime import date, datetime, timedelta, timezone
+from pathlib import Path
+
+import pytest
+
+from qa_tools.common import asset_time
+
+# NEEDS A BOOTSTRAPPED DEPLOYMENT (plans/tooling.md #27). This module
+# reads `reports/*.json`, which is built from the deployment's recorded
+# QA history - so it belongs in the CI job that bootstraps one. Nothing
+# in a signature says so, which is why the mark is here rather than
+# derived; tests/test_publish.py asserts it is not forgotten.
+pytestmark = pytest.mark.needs_deployment
+
+
+def _instant_as_written_before_048(value) -> datetime | None:
+    """One stored arrival as an instant, under the pre-048 reading.
+
+    A value with no offset is taken as UTC - which is exactly what
+    classify_arrival() used to do silently, and exactly what this
+    requirement stops. It survives HERE, in one test, for the single
+    purpose of proving that the values written the new way mean the same
+    thing the old ones did.
+    """
+    if value in (None, "None"):
+        return None
+    parsed = datetime.fromisoformat(str(value).replace(" ", "T"))
+    return parsed.replace(tzinfo=timezone.utc) if parsed.tzinfo is None else parsed
+
+
+ROOT = Path(__file__).resolve().parent.parent
+GOLDEN = Path(__file__).parent / "fixtures" / "arrival_semantics_golden.json"
+
+def _reports():
+    """Every registered collection's dashboard file, from the registry - it
+    named two, so Emergency Department's arrivals were never compared
+    (post-build-review #250, the same class as #247)."""
+    from qa_tools import collections
+
+    names = [c.dashboard_file for c in collections.all_collections()]
+    assert len(names) > 1
+    return names
+
+
+def _built_datasets():
+    """Every real dataset from the built dashboard JSON, keyed by id.
+
+    Skips rather than fails when the reports are absent - they are
+    gitignored build output, and a fresh clone has not built them yet.
+    """
+    out = {}
+    for name in _reports():
+        path = ROOT / "reports" / name
+        if not path.exists():
+            pytest.skip(f"{name} not built - run `mothman dashboard build-data`")
+        doc = json.loads(path.read_text())
+        for ds in doc["datasets"]:
+            out[ds["id"]] = ds
+    return out
+
+
+class TestEveryCommittedArrivalKeepsItsVerdict:
+    """The pin proper. 144 real arrivals across 7 datasets.
+
+    IT WAS EXTENDED TO 162 ON 2026-09-27 AND THAT WAS WRONG, corrected
+    2026-09-28 - and the correction is worth more than the pin, because
+    the mistake was invisible from here and obvious from CI.
+
+    What happened: `_built_datasets()` reads `reports/*.json`, gitignored
+    build output, and rebuilding those from the working tree's own
+    `data/deliveries/` showed 20 Child Protection runs per dataset where
+    the pin held 18. That read as the pin having silently stopped covering
+    things, so twelve arrivals were added to the golden - cp_run_019 and
+    cp_run_020 across six datasets.
+
+    They were not arrivals. They were `handfiled-*` deliveries that one
+    CLI test had been filing into the real delivery tree on every run of
+    the suite (see tests/conftest.py's `_no_test_files_a_real_delivery`,
+    which now refuses that). A clean checkout has 18, so CI failed three
+    ways on a corpus that had never existed anywhere but this container.
+
+    THE LESSON IS ABOUT WHAT A GOLDEN MAY BE CAPTURED FROM. This one is
+    captured from `reports/*.json`, which is built from `data/`, which is
+    gitignored and accumulates - so the pin is only ever as trustworthy as
+    that directory was on the day. A disagreement between the pin and the
+    corpus is therefore TWO hypotheses, not one: the pin went stale, or the
+    corpus did. It was the corpus, and the reflex was to believe the
+    corpus.
+
+    So: before extending this golden, count the deliveries. `mothman
+    debug capture-arrival-golden` is still the recorded procedure, and
+    `ls data/deliveries | wc -l` is the question to ask first.
+
+    RE-CAPTURED AGAIN THE SAME NIGHT for post-build-review #172 (pairs spaced
+    out, 85 days): 117 deliveries, zero `handfiled-*`, rebuilt first; Child
+    Protection identical, the 27 Birth Registrations arrivals in both
+    unchanged, 98 -> 100.
+
+    RE-CAPTURED 2026-10-13 FOR REQ-GEN-196 (Birth Registrations' history 80
+    days, seven two-file pairs settled by script). The procedure first: 115
+    deliveries, zero `handfiled-*`, `mothman dashboard rebuild` before the
+    capture. Every Child Protection dataset is identical. Birth Registrations
+    51 arrivals became 98: the 19 present in both are unchanged in instant
+    and verdict; 32 went and 79 came because the new July days now hold the
+    ordinary reds (moved before the scenarios) and August holds the pairs.
+
+    RE-CAPTURED 2026-10-13 NIGHT FOR REQ-GEN-199 (TS-75 to TS-78 planted).
+    The procedure first: 119 deliveries, zero `handfiled-*`, `mothman dashboard
+    rebuild` before the capture. 208 arrivals. What moved: Birth
+    Registrations' 28 August to 2 September - TS-78's lead-ins, D to D+2 and
+    its following day - now arrive at their stated 14:00 and 14:30 (six ids
+    out, six in); the three Child Protection quarters TS-75, TS-76 and TS-77
+    took arrive at the scenario's 09:00 (three ids per table each way);
+    cp-clients gains TS-75's corrected file, cp-placements loses TS-76's and
+    TS-77's on-time supplies and gains TS-77's late one. NO arrival present
+    in both changed its instant or its verdict.
+
+    RE-CAPTURED 2026-10-12 FOR REQ-GEN-195 (Child Protection arrives early:
+    TS-9, TS-65, TS-66, and TS-67 too early). The procedure first: 69
+    deliveries, zero `handfiled-*`, `mothman dashboard rebuild` before the
+    capture. Four quarters' on-time arrivals out and their early ones in,
+    across all six Child Protection datasets - 24 run ids each way - and NO
+    other arrival changed its instant or its verdict.
+    Re-captured again the same day once a scripted person re-files TS-67 to
+    2023-Q4: exactly five verdicts moved, late -> early, nothing else.
+    And once more for post-build-review #161 (playback runs a scripted
+    decision's owed re-check): TS-67's five re-filed supplies now have a
+    re-check run, which is their CURRENT run, so five ids moved from
+    `<table>__<key>` to `<table>__<key>__r1` - same instants, same verdicts,
+    distribution unchanged.
+
+    RE-CAPTURED 2026-10-11 AGAIN FOR REQ-GEN-185 (TS-43 to TS-46 planted, the
+    history 40 days). The procedure first: 69 deliveries, zero `handfiled-*`,
+    and `mothman dashboard rebuild` BEFORE the capture - the golden reads
+    reports/*.json, so capturing over a stale build pins the old history
+    (it did, once, here: 150 arrivals, unchanged). Birth Registrations 42
+    arrivals became 51 and its days moved wholesale; every Child Protection
+    dataset is identical.
+
+    RE-CAPTURED 2026-10-11 FOR plans/running-thoughts.md #82 (churn voids
+    single births only). The procedure first: 60 deliveries, zero
+    `handfiled-*`. One Birth Registrations arrival moved and NO VERDICT: the
+    2026-09-04 resend's receipt instant comes from its earliest extract
+    timestamp, and voiding different rows moved it 02:13:03 -> 02:11:03, so
+    its run id moved with it. One run id out, one in, nothing else changed.
+
+    RE-CAPTURED 2026-10-05 FOR REQ-GEN-044's QUIET DAYS (sprint 11). The
+    procedure first: 60 deliveries, zero `handfiled-*`. What moved is
+    Birth Registrations' arrivals only, and NO VERDICT: TS-47 replaces
+    2026-09-07's own supply with one late file at 11:00 on 2026-09-08, and
+    keeps both days clear of other days' resends, so the two 2026-09-06
+    resends that landed on 09-07 and 09-08 now land on their next free
+    weekdays (09-11, 09-14). Three run ids out, three in, nothing changed.
+
+    RE-CAPTURED 2026-10-02 FOR REQ-PIPE-080, which moved both axes this
+    pin exists to hold still - so it failed, which is the pin working
+    rather than a regression. Recorded here because "the golden
+    changed" is exactly the event its own lesson says to be suspicious
+    of, and the procedure was followed before re-capturing: 60
+    deliveries, 18 Child Protection runs, zero `handfiled-*`, matching
+    a clean checkout.
+
+    WHAT MOVED, and why each is intended:
+      - 133 verdicts. Most are the vocabulary: the retired
+        `cadence.classify_arrival()` said `onTime` where
+        `arrival_classification` says `on_time`. Twenty-five are real -
+        Child Protection supplies that read on time and are genuinely
+        late, one of them by eleven days.
+      - 34 arrival instants, where our RECEIPT instant differs from the
+        `earliest_extract` this used to carry (criterion 4). The other
+        116 were already equal, which is why the diff is smaller than
+        the change sounds.
+
+    RE-CAPTURED AGAIN 2026-10-02 FOR REQ-PIPE-105, which moved ONLY the
+    keys. One file is one arrival and a run id is its staged table's
+    spelling, so `cp_run_007` became `cp_clients__2023...` and its five
+    siblings. Procedure followed first: 60 deliveries, zero
+    `handfiled-*`. Then verified the claim that nothing ELSE moved rather
+    than assuming it, by matching old and new entries per dataset on
+    their arrival INSTANT: all 150 matched, none only on one side, and
+    zero verdicts moved. Still 18 arrivals per Child Protection dataset -
+    108 runs in all, six per delivery, each dataset seeing its own.
+
+    AND ONCE MORE THE SAME EVENING FOR REQ-GEN-044 criteria 12-14, which
+    gave every file its own receipt instant. Procedure followed again (60
+    deliveries, no `handfiled-*`). This time instants MOVED, as intended,
+    and only where intended: 10 arrivals, all of them files of the two
+    deliveries that trickled in (2024-08-01 and 2025-05-01), each now
+    within ten minutes of its delivery's first file - which kept its
+    instant. Every other arrival matched old-to-new, and zero verdicts
+    moved: a few minutes inside a quarter's window changes no lateness.
+
+    RE-CAPTURED 2026-10-15 FOR REQ-GEN-207, ten years of Child Protection
+    grown at the old end. Procedure first: 162 deliveries, the same names a
+    from-empty generation writes, no `handfiled-*`. Old entries matched to new
+    by run id: zero verdicts and zero instants moved. What changed, all of it
+    expected: 40 grown runs per Child Protection dataset (2013-Q1 to
+    2022-Q4, plus two resupplies) and 22 for Case Workers, which sends nothing
+    in its off-months there; the two quarters Keith changed swap run ids - 2024-Q4, now an
+    ordinary amber delivery, and 2026-Q3, now TS-56 - because their receipt
+    instants moved; and TS-14's corrected Client Register, planted in 421e9f4
+    without this pin being re-captured. 453 arrivals (441 before REQ-GEN-044's evening-before era added 12).
+
+    RE-CAPTURED 2026-10-25 FOR REQ-GEN-273 criterion 4 (TS-81 to TS-85, the
+    package gate's declared outcomes, planted in five grown quarters). The
+    procedure first: 229 deliveries, zero `handfiled-*`, a bootstrap from
+    empty and `mothman dashboard build-data` before the capture. Old entries
+    matched to new by run id: zero verdicts and zero instants moved. What
+    changed, all of it the five quarters 2015-Q4, 2016-Q1, 2016-Q3, 2017-Q2
+    and 2017-Q3: their on-time arrivals now arrive at the scenario's stated
+    times (five ids per table each way, three for Case Workers, which sends in
+    February and August only), and the quarters gain their scenarios' second
+    files - S1's zips on 15 May and 15 August 2017, TS-83's resend of the
+    Client Register and its three readers on 29 August 2016 and TS-85's
+    corrected Placements on 29 February 2016. 466 arrivals (457 before).
+
+    RE-CAPTURED 2026-10-31 FOR THE LINKAGE PRODUCTS COLLECTION (REQ-GEN-334,
+    REQ-GEN-335). The procedure first: 281 deliveries, zero `handfiled-*`, a
+    bootstrap from empty and `mothman dashboard build-data` before the
+    capture. Old entries matched to new by run id: zero verdicts and zero
+    instants moved. What changed: linkage-keys joins, 55 arrivals; and the
+    2018-Q4 and 2019-Q2 Child Protection arrivals of the five tables the
+    linkage scenarios plant against change run id only - the same instant
+    and the same verdict, the id now written in the scenario's stated local
+    time (`...0900000800` where it was `...0100000000`). 504 arrivals (449
+    before).
+    """
+
+    def test_the_golden_covers_every_dataset_and_run_that_exists_now(self):
+        """A pin that silently stops covering things is worse than none -
+        it goes green by measuring less. Guards both directions."""
+        golden = json.loads(GOLDEN.read_text())
+        built = _built_datasets()
+        assert set(golden) == set(built), "the golden and the built reports disagree about which datasets exist"
+        for ds_id, runs in golden.items():
+            on_page = {a["run_id"] for a in built[ds_id].get("arrivalHistory") or []}
+            assert set(runs) == on_page, f"{ds_id}: the golden and the built history disagree about run ids"
+
+    def test_no_arrival_changed_its_verdict(self):
+        golden = json.loads(GOLDEN.read_text())
+        built = _built_datasets()
+        moved = []
+        for ds_id, runs in golden.items():
+            actual = {a["run_id"]: a for a in built[ds_id].get("arrivalHistory") or []}
+            for run_id, expected in runs.items():
+                got = actual[run_id]
+                if got.get("arrivalStatus") != expected["arrivalStatus"]:
+                    moved.append(f"{ds_id}/{run_id}: {expected['arrivalStatus']} -> {got.get('arrivalStatus')}")
+        assert moved == [], "arrival verdicts moved:\n  " + "\n  ".join(moved)
+
+    def test_no_arrival_instant_changed(self):
+        """Separate from the verdict deliberately. A verdict can stay
+        put while the instant behind it shifts by eight hours, and that
+        is precisely the bug this requirement exists to prevent.
+
+        Compared as INSTANTS rather than as strings, because REQ-PIPE-048
+        deliberately changes the REPRESENTATION: the golden was captured
+        when an arrival was stored as "2026-09-01 10:00:00" and read as
+        UTC by whoever got to it, and it is now stored as
+        "2026-09-01T10:00:00+00:00" and says so. Those are the same
+        moment, and a string comparison would report the fix as the
+        regression. The golden's own naked values are read here under
+        the rule that was in force when they were written - which is the
+        one place in this repo that rule still applies, and only because
+        it is being used to prove it was preserved."""
+        golden = json.loads(GOLDEN.read_text())
+        built = _built_datasets()
+        moved = []
+        for ds_id, runs in golden.items():
+            # arrivalByRun, not arrivalHistory - a history row carries
+            # no instant at all, and reading it from there is what made
+            # this test compare None to None 150 times over.
+            actual = built[ds_id].get("arrivalByRun") or {}
+            for run_id, expected in runs.items():
+                got = (actual.get(run_id) or {}).get("arrivedAt")
+                assert expected["arrivedAt"] is not None, \
+                    f"{ds_id}/{run_id}: the golden carries no instant - re-capture it, this test cannot fail as is"
+                if _instant_as_written_before_048(expected["arrivedAt"]) != _instant_as_written_before_048(got):
+                    moved.append(f"{ds_id}/{run_id}: {expected['arrivedAt']} -> {got}")
+        assert moved == [], "arrival instants moved:\n  " + "\n  ".join(moved)
+
+    def test_the_distribution_is_the_one_that_was_measured(self):
+        """A blunt backstop for the two tests above, readable without a
+        diff - see the history below for the figure's moves.
+
+        THIS NUMBER WENT TO 28 EARLY AND BACK, and the round trip is the
+        useful part. It moved to 28 on 2026-09-27 when twelve arrivals were
+        added to the golden - all twelve early, which is the only reason a
+        single figure moved and looked plausible. Those twelve were the
+        `handfiled-*` deliveries one CLI test had been leaving in the real
+        delivery tree, not arrivals at all, so the recapture on 2026-09-28
+        restored exactly 131 / 16 / 3 - the figure measured on 2026-09-23,
+        twice, against a corpus nothing had polluted.
+
+        A distribution coming back identical is therefore evidence the
+        corpus is the same corpus, which is precisely what was wanted and
+        precisely what 28 could not tell anybody.
+
+        AND THEN IT MOVED AGAIN, TO 129 / 18 / 3, LEGITIMATELY - the same
+        day, once REQ-GEN-044 injected its first two scenarios into Birth
+        Registrations. That one IS a corpus change: three slots on one
+        day instead of a random chain, and two days carrying no supply at
+        all. Checked the way this file's own header says to check rather
+        than accepted because a number moved - SIX golden entries differ,
+        all Birth Registrations, all inside the 2026-09-09 to 2026-09-15
+        window the two scenarios occupy; the other 36 Birth
+        Registrations arrivals and all 108 Child Protection ones are
+        byte-identical.
+
+        Most of that six is the LABEL shift REQ-GEN-043's own recapture
+        documented rather than a verdict moving: run ids are positional
+        over receipt order, so two suppressed days renumber the tail and
+        run_022 through run_027 each carry the instant that used to
+        belong to a neighbour.
+
+        AND IT MOVED AGAIN FOR REQ-PIPE-080, to 106 / 14 / 30, which is
+        the largest shift this figure has taken and the one with a real
+        cause rather than a relabelling. Two things moved it:
+
+          - 25 CHILD PROTECTION SUPPLIES WENT ON-TIME TO LATE, and they
+            are the requirement's whole point. Punctuality used to be
+            measured from `earliest_extract` - a timestamp inside the
+            SUPPLIER'S OWN FILE - so a supplier effectively decided
+            whether they were late. It is now measured from when the
+            file reached us. Verified by hand rather than inferred:
+            cp-clients in cp_run_008 was received 2024-08-13 against a
+            2024-Q3 slot due 2024-08-01 with grace to 17:00, so it is
+            late by eleven days, and the old reading of "on time" was
+            simply wrong.
+          - 4 BIRTH REGISTRATIONS SUPPLIES moved between early, on time
+            and late for the same reason, in both directions.
+
+        The key `onTime` also becomes `on_time`: the retired
+        `cadence.classify_arrival()` and `arrival_classification` spell
+        it differently, and the page has rendered both for some time.
+
+        AND AGAIN FOR REQ-PIPE-131, to 106 / 14 / 21 late / 9 unfiled.
+        Exactly nine verdicts moved, all cp-case-workers, all late ->
+        unfiled: arrivals in quarters Case Workers does not deliver in,
+        which the old rule filed backward into an earlier quarter (one of
+        them over a year back) and which are now HELD, because no period
+        of theirs was open (criterion 10). Checked entry by entry: the
+        golden's diff is those nine lines and nothing else.
+
+        AND FOR REQ-GEN-044's QUIET DAYS (TS-47, 2026-10-05), to 105 / 15 /
+        21 / 9: one on-time arrival became early. 2026-09-07's own on-time
+        supply is gone - TS-47 replaces it with one file at 11:00 on
+        2026-09-08, which fills 09-08 three hours before it is due, so it is
+        early. The two 2026-09-06 resends moved off TS-47's quiet days and
+        are early where they now land, as they were before. Six lines of
+        the golden, all Birth Registrations, and nothing else.
+
+        AND FOR REQ-GEN-044 CRITERIA 15 AND 16 (TS-12, TS-56, the same
+        night), to 105 / 15 / 15 / 9 over 144. Procedure first: 59
+        deliveries, zero `handfiled-*`. Each scenario replaces its
+        Child Protection period's chain with one delivery of all six
+        tables at 09:00 - 2025-Q2 (TS-12) and 2024-Q3 (TS-56, since moved) - so their
+        six ordinary first arrivals are replaced by six injected ones of
+        the same status, and 2024-Q3's six-table resend of 13 August,
+        late, is gone. No arrival kept under the same id changed.
+
+        AND TO 122 / 6 / 22 / 9 over 159 FOR REQ-GEN-185 (2026-10-11), a corpus
+        change: TS-43 to TS-46 planted with green lead-in and following days,
+        Birth Registrations 40 days rather than 30, and its ordinary reds moved
+        before the scenarios. Procedure first: 69 deliveries, zero
+        `handfiled-*`, the dashboard rebuilt before the capture. Every Child
+        Protection entry is identical; Birth Registrations alone went 22 / 15 /
+        5 to 39 / 6 / 6 (on time / early / late) - nine more arrivals and the
+        green days on time, and the reds' resends no longer filing early into
+        the later periods they used to land on.
+
+        AND TO 126 / 4 / 20 / 9 over 159 FOR POST-BUILD-REVIEW #156 (2026-10-11):
+        a lead-in or following supply arrives on time, halfway through its
+        grace, rather than at its rows' earliest extract timestamp. Procedure
+        first: 69 deliveries, zero `handfiled-*`, the dashboard rebuilt before
+        the capture. Birth Registrations alone went 39 / 6 / 6 to 43 / 4 / 4 -
+        exactly the four the critic named (09-16 and 09-18 late, 09-06 and
+        09-22 early, now on time) - and every Child Protection entry is
+        identical.
+
+        AND BACK TO 105 / 15 / 21 / 9 over 150 WHEN TS-56 MOVED (sprint 13,
+        2026-10-05). Procedure first: 60 deliveries, zero `handfiled-*`.
+        2024-Q3 was the only quarter whose late siblings re-evaluated a
+        promoted table (REQ-PIPE-121), so TS-56 moved one quarter later, to
+        2024-Q4, a quarter with no resend. 2024-Q3's six-table resend of 13
+        August is back - six late arrivals - and 2024-Q4's six ordinary first
+        arrivals are six injected ones of the same status.
+
+        THEN 105 / 20 / 26 / 8 over 159 FOR REQ-GEN-195 (2026-10-12), Child
+        Protection arriving early. Procedure first: 69 deliveries, zero
+        `handfiled-*`. Four quarters change, six datasets each. Three are
+        early (TS-9, TS-65, TS-66): +16 early, not +18, because cp-case-
+        workers does not participate in 2024-Q2 or 2025-Q4 and stays
+        unfiled. The fourth is too early (TS-67) and files as a late
+        resupply of 2023-Q3: +6 late, and the one unfiled to go is
+        cp-case-workers' 2023-Q4, which it skips but 2023-Q3 does not.
+
+        THEN 105 / 25 / 21 / 8 THE SAME DAY, once a scripted person re-files
+        TS-67 to 2023-Q4 (Keith: "have it refiled to Q4 by a synthetic
+        human"). Five of its six move late -> early, judged against the
+        quarter they now belong to; cp-case-workers, not delivered in
+        2023-Q4, is rejected instead and keeps its late verdict.
+
+        THEN 132 / 39 / 27 / 8 over 206 FOR REQ-GEN-196 (2026-10-13), Birth
+        Registrations' history lengthened to 80 days with seven two-file
+        pairs. Procedure first: 115 deliveries, zero `handfiled-*`, the
+        dashboard rebuilt before the capture. Every Child Protection entry is
+        identical; Birth Registrations alone went 43 / 4 / 4 to 70 / 18 / 10.
+        The early ones are mostly the pairs, received before their 14:00 due
+        time (Keith chose to word those criteria "early", 2026-10-13); the
+        late ones are the ordinary reds' resends and TS-70's 16:30 file.
+
+        THEN 132 / 39 / 29 / 8 over 208 THE SAME NIGHT (post-build-review
+        #172): the pairs spaced out with ordinary days between them, the
+        history 85 days, the ordinary reds kept apart. Procedure first: 117
+        deliveries, zero `handfiled-*`, the dashboard rebuilt. Every Child
+        Protection entry identical; the 27 Birth Registrations arrivals in
+        both captures unchanged; Birth Registrations 70 / 18 / 12 over 100.
+
+        MEASURED AGAIN 2026-10-13 NIGHT FOR REQ-GEN-199: 134 / 38 / 28 / 8 over
+        the same 208. TS-78's six days now arrive at their stated 14:00 and
+        14:30 and the three Child Protection quarters TS-75 to TS-77 took at
+        09:00 - fixed instants in place of ones read from the rows - and no
+        arrival present in both captures changed its verdict.
+        """
+        golden = json.loads(GOLDEN.read_text())
+        counts: dict[str, int] = {}
+        for runs in golden.values():
+            for a in runs.values():
+                counts[a["arrivalStatus"]] = counts.get(a["arrivalStatus"], 0) + 1
+        # 354 / 38 / 41 / 8 over 441 FOR REQ-GEN-207 (2026-10-15): the 232
+        # grown runs add 220 on time and 12 late (the two grown red chains'
+        # resupplies, one per dataset each); nothing unfiled, because a grown
+        # delivery sends no Case Workers file in its off-months (Keith); and
+        # TS-14's corrected Client Register adds 1 late. Early is unchanged.
+        # 356 / 46 / 43 / 8 over 453 FOR REQ-GEN-044's evening-before era
+        # (2026-10-16): its twelve arrivals, each checked by hand - eight
+        # ordinary days at 21:00, an hour before their 22:00 due, early;
+        # TS-10a and TS-10b at 22:00 exactly, on time; TS-3c's 17:00 resupply
+        # and TS-3d's 19-hours-late supply, late. No arrival in both captures
+        # changed its verdict.
+        # 342 / 59 / 44 / 12 over 457 FOR EMERGENCY DEPARTMENT (2026-10-19),
+        # each move accounted for by hand. In: ED's 55 (47 / 2 / 5 / 1) - the
+        # registry now reads its report (post-build-review #250). Out: the 56
+        # Child Protection arrivals in the nine 2013-2015 quarters REQ-GEN-237
+        # empties (50 on time, 6 late), and the 15 routine supplies TS-42, TS-80
+        # and TS-63 replaced in 2019-Q4, 2020-Q4 and 2021-Q4 (on time). In from
+        # those three scenarios: 10 early, 4 on time, 2 late, 1 unfiled. Birth
+        # Registrations' three new last days for TS-62: 2 on time, 1 early. And
+        # two cp-carers supplies in TS-63's turned-off quarters, 2022-Q1 and
+        # 2022-Q2, went on time -> unfiled (REQ-GEN-218: received while turned
+        # off). No other arrival in both captures changed its verdict or instant.
+        # 339 / 62 / 53 / 12 over 466 FOR REQ-GEN-273 criterion 4 (2026-10-25),
+        # TS-81 to TS-85, each move accounted for by hand. Out: the 28 routine
+        # arrivals of 2015-Q4, 2016-Q1, 2016-Q3, 2017-Q2 and 2017-Q3 (all on
+        # time). In: those quarters' scenario arrivals - 25 on time; TS-84's
+        # Carer Register, Notifications and Placements at 08:30, 08:40 and
+        # 08:50, before their 09:00 due, early; and the nine second files, all
+        # after the due day, late (S1's two zips, TS-83's resend of four and
+        # TS-85's corrected Placements). No arrival in both captures changed
+        # its verdict or instant.
+        # 345 / 45 / 46 / 13 over 449 FOR REQ-GEN-235 AND REQ-GEN-238
+        # (2026-10-28; the move accepted by Keith, 2026-10-27), each accounted
+        # for by hand. Out: Child Protection's 17 arrivals of 2013 and 2014,
+        # which REQ-GEN-238 dropped (11 on time, 6 late); the 24 Child
+        # Protection arrivals of TS-9, TS-65, TS-66 and TS-67, which moved (21
+        # early, 1 late, 2 unfiled - cp-case-workers'); and Emergency
+        # Department's 4 routine supplies of those quarters (on time). In: the
+        # 24 routine Child Protection arrivals of those quarters (21 on time, 3
+        # unfiled - cp-case-workers off-months) and the 4 scenarios on
+        # Emergency Department (early, TS-67 after its re-file). No arrival in
+        # both captures changed its verdict or instant.
+        # 345 / 98 / 48 / 13 over 504 FOR THE LINKAGE PRODUCTS COLLECTION
+        # (2026-10-31): linkage-keys' 55 arrivals join, 53 early (each lands
+        # the evening its Client Register does, ahead of its own due day) and
+        # 2 late (7 November 2023 and 6 February 2026, after their due days). Every other arrival matched by instant has the
+        # same verdict; ten Child Protection run ids renamed, nothing moved.
+        assert counts == {"on_time": 345, "early": 98, "late": 48, "unfiled": 13}
+        assert sum(counts.values()) == 504
+
+
+class TestTheClassificationBoundaries:
+    """The RULE, stated as boundary cases rather than inferred from the
+    144 real arrivals above - those happen to cluster, and none of them
+    sits on a boundary. Written against aware instants only, since that
+    is the half 048 must not move."""
+
+    CADENCE = {"type": "daily", "weekday": None, "anchor_months": None,
+               "day_of_month": None, "expected_time": "14:00", "latency_minutes": 60}
+
+    def _expected(self, run_date):
+        # A daily cycle starts on the run date itself; the expected
+        # moment is the wall-clock time on it in the asset's zone.
+        return asset_time.wall_clock(run_date, self.CADENCE["expected_time"])
+
+    def _verdict(self, run_date, arrived):
+        """Early / on time / late against this cadence's own expected
+        moment and grace.
+
+        SPELLED OUT HERE rather than calling a shared classifier, since
+        REQ-PIPE-080 retired `cadence.classify_arrival()`. What these
+        tests are about is ASSET TIME - that the expected moment is a
+        wall clock in the asset's own zone, and that the grace window is
+        closed at both ends - not about which module owns the comparison.
+        The arithmetic is three lines and keeping it local is what lets
+        them go on asserting the thing they are named for.
+        """
+        grace = timedelta(minutes=self.CADENCE["latency_minutes"])
+        expected = self._expected(run_date)
+        arrived = asset_time.parse_instant(arrived, "test arrival")
+        if arrived < expected:
+            return "early"
+        return "onTime" if arrived <= expected + grace else "late"
+
+    @pytest.mark.parametrize("delta,verdict", [
+        (timedelta(seconds=-1), "early"),
+        (timedelta(0), "onTime"),
+        (timedelta(minutes=60), "onTime"),
+        (timedelta(minutes=60, seconds=1), "late"),
+    ])
+    def test_the_grace_window_is_closed_at_both_ends(self, delta, verdict):
+        run_date = date(2026, 9, 1)
+        arrived = self._expected(run_date) + delta
+        assert self._verdict(run_date, arrived) == verdict
+
+    def test_the_expected_moment_is_the_wall_clock_time_in_the_assets_own_zone(self):
+        """14:00 in Perth is 06:00 UTC the same day. Pinned as a real
+        instant rather than as an offset arithmetic step, so the
+        refactor from a hardcoded UTC+8 to a named zone has something
+        to be judged against."""
+        assert self._expected(date(2026, 9, 1)) == datetime(2026, 9, 1, 6, 0, tzinfo=timezone.utc)
+
+    def test_an_arrival_the_day_before_is_early_not_late(self):
+        """The wrap case the generator's own comment calls out: an AWST
+        expected_time before 08:00 lands on the PREVIOUS UTC day, which
+        made "on time" structurally unreachable once before."""
+        run_date = date(2026, 9, 1)
+        arrived = self._expected(run_date) - timedelta(hours=12)
+        assert self._verdict(run_date, arrived) == "early"

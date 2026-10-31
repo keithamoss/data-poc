@@ -1,0 +1,244 @@
+# Linkage Products' Soda checks (REQ-QAC-333): six on linkage_keys' own rows,
+# and a referential and a coverage check for each linked dataset. The prose
+# follows docs/check-authoring-rules.md. A synthetic linkage product.
+#
+# HAND-WRITTEN, NOT GENERATED, FOR NOW (Keith, 2026-10-28): each check that
+# states a dataset code, an identifier count or an identifier column carries
+# it as an attribute (linked_dataset, linkage_code, id_columns, id_counts),
+# and `mothman check` fails where one disagrees with the linked_datasets
+# declared beside linkage-keys in contract/data-asset.yaml (criterion 3), or
+# where a linked dataset lacks either of its two checks (criterion 8).
+# Identifiers are compared as text, the source column cast (criterion 3).
+checks for linkage_keys:
+  # (1) An empty key.
+  - missing_count(linkage_key):
+      missing values: [""]
+      fail: when > 0
+      attributes:
+        check_id: data-asset-1.department-of-health.linkage-products.linkage-keys.linkage_key.missing_count_soda
+        name: Linkage key recorded
+        category: completeness
+        introduced_date: "2013-01-01"
+        description: >
+          This value must never be empty.
+        failure_indicates: >
+          A record was released without a key, most often because the linkage
+          unit's run did not finish for it.
+        changelog: []
+
+  # (2) A code no linked dataset declares - which also stands for a whole linked
+  # dataset missing from the release (REQ-GEN-335 (b)).
+  - invalid_count(dataset):
+      valid values: ["DOC_CLIENTS", "EDDC_PRESENTATION"]
+      fail: when > 0
+      attributes:
+        check_id: data-asset-1.department-of-health.linkage-products.linkage-keys.dataset.invalid_count_soda
+        name: Known dataset code
+        category: conformity
+        introduced_date: "2013-01-01"
+        linkage_codes: ["DOC_CLIENTS", "EDDC_PRESENTATION"]
+        description: >
+          Every row must name a dataset this release is agreed to link; a single
+          unknown code fails.
+        failure_indicates: >
+          The linkage unit has used a code nobody agreed, or renamed one, so its
+          rows cannot be matched to any dataset.
+        changelog: []
+
+  # (3) The identifiers a row's dataset declares, present: id_1 to id_k.
+  - failed rows:
+      name: Expected identifiers present
+      fail query: |
+        SELECT dataset, linkage_key FROM linkage_keys
+        WHERE (dataset = 'DOC_CLIENTS' AND (id_1 IS NULL OR TRIM(CAST(id_1 AS TEXT)) = ''))
+           OR (dataset = 'EDDC_PRESENTATION' AND (id_1 IS NULL OR TRIM(CAST(id_1 AS TEXT)) = ''))
+      samples limit: 100000
+      attributes:
+        check_id: data-asset-1.department-of-health.linkage-products.linkage-keys.id_1.expected_ids_soda
+        reads_columns: ["linkage_keys.dataset", "linkage_keys.linkage_key", "linkage_keys.id_1"]
+        category: completeness
+        introduced_date: "2013-01-01"
+        id_counts: {DOC_CLIENTS: 1, EDDC_PRESENTATION: 1}
+        description: >
+          Each row must carry every identifier its dataset is identified by; one
+          missing fails.
+        failure_indicates: >
+          The linkage unit released a record without the identifier that says
+          which record it is, so it cannot be traced back.
+        changelog: []
+
+  # (4) Nothing after id_k. Every linked dataset declares one identifier today,
+  # so id_2 - the contract's last id column, blank in an ordinary release - must
+  # be empty on every row of each (REQ-GEN-335 (c), PROVISIONAL); the query
+  # gains a clause per dataset when one declares a different count (the
+  # id_counts attribute is gated).
+  - failed rows:
+      name: No surplus identifiers
+      fail query: |
+        SELECT dataset, linkage_key FROM linkage_keys
+        WHERE (dataset = 'DOC_CLIENTS' AND id_2 IS NOT NULL AND TRIM(CAST(id_2 AS TEXT)) <> '')
+           OR (dataset = 'EDDC_PRESENTATION' AND id_2 IS NOT NULL AND TRIM(CAST(id_2 AS TEXT)) <> '')
+      samples limit: 100000
+      attributes:
+        check_id: data-asset-1.department-of-health.linkage-products.linkage-keys.id_1.no_surplus_ids_soda
+        reads_columns: ["linkage_keys.dataset", "linkage_keys.linkage_key", "linkage_keys.id_2"]
+        category: conformity
+        introduced_date: "2013-01-01"
+        id_counts: {DOC_CLIENTS: 1, EDDC_PRESENTATION: 1}
+        description: >
+          A row must carry no identifier beyond those its dataset is identified
+          by; one surplus fails.
+        failure_indicates: >
+          The linkage unit has started sending an identifier nobody agreed, or a
+          dataset's identifiers have shifted a column.
+        changelog: []
+
+  # (5) One record linked once.
+  - duplicate_count(dataset, id_1):
+      fail: when > 0
+      attributes:
+        check_id: data-asset-1.department-of-health.linkage-products.linkage-keys.id_1.duplicate_count_soda
+        name: Each record linked once
+        category: uniqueness
+        introduced_date: "2013-01-01"
+        description: >
+          A record must appear once in a release; one record linked twice fails.
+        failure_indicates: >
+          The linkage unit put one record under two keys, so it is counted as two
+          people.
+        changelog: []
+
+  # (6) Large key groups: a key carrying more than 50 records, counted across
+  # every dataset. The value is the share of distinct keys that are large; the
+  # histogram of the large groups is recorded with it at run time.
+  - large_key_group_percent:
+      large_key_group_percent query: |
+        SELECT 100.0 * COUNT(*) FILTER (WHERE n > 50) / NULLIF(COUNT(*), 0)
+        FROM (SELECT linkage_key, COUNT(*) AS n FROM linkage_keys GROUP BY linkage_key) g
+      warn: when > 2
+      fail: when > 4
+      attributes:
+        check_id: data-asset-1.department-of-health.linkage-products.linkage-keys.linkage_key.large_key_groups_soda
+        name: Large key groups
+        category: consistency
+        introduced_date: "2013-01-01"
+        unit: percent
+        histogram:
+          values: SELECT COUNT(*) FROM linkage_keys GROUP BY linkage_key HAVING COUNT(*) > 50
+          population: SELECT COUNT(DISTINCT linkage_key) FROM linkage_keys
+          edges: [51, 101, 151, 201, 251, 501, 1001]
+        description: >
+          No more than 2 percent of keys may carry more than 50 records; above 4
+          percent fails.
+        failure_indicates: >
+          The linkage unit is joining records that are not the same person,
+          usually because its matching was loosened or ran on a field with a
+          default value.
+        changelog: []
+
+  # --- Each linked dataset: one referential and one coverage check ----------
+  - failed rows:
+      name: Client Register links match a client
+      fail query: |
+        SELECT l.dataset, l.id_1 FROM linkage_keys l
+        LEFT JOIN cp_clients c ON CAST(c.cp_client_id AS TEXT) = CAST(l.id_1 AS TEXT)
+        WHERE l.dataset = 'DOC_CLIENTS' AND c.cp_client_id IS NULL
+      samples limit: 100000
+      attributes:
+        check_id: data-asset-1.department-of-health.linkage-products.linkage-keys.cp-clients.referential_soda
+        reads_columns: ["linkage_keys.dataset", "linkage_keys.id_1", "cp_clients.cp_client_id"]
+        reads_tables: [cp_clients]
+        linked_dataset: cp-clients
+        linked_check: referential
+        linkage_code: DOC_CLIENTS
+        id_columns: [cp_client_id]
+        category: consistency
+        introduced_date: "2013-01-01"
+        description: >
+          Every row coded DOC_CLIENTS must match a record in Child Protection's
+          Client Register for the same quarter; one that matches none fails.
+        failure_indicates: >
+          Either the linkage release names a client the quarter does not hold,
+          or Child Protection's Client Register supply for the quarter is missing
+          records it should have.
+        changelog: []
+  - cp_clients_coverage_percent:
+      cp_clients_coverage_percent query: |
+        SELECT 100.0 * COUNT(l.id_1) / NULLIF(COUNT(*), 0)
+        FROM cp_clients c
+        LEFT JOIN (SELECT DISTINCT CAST(id_1 AS TEXT) AS id_1 FROM linkage_keys WHERE dataset = 'DOC_CLIENTS') l
+          ON l.id_1 = CAST(c.cp_client_id AS TEXT)
+      warn: when < 90
+      fail: when < 85
+      attributes:
+        check_id: data-asset-1.department-of-health.linkage-products.linkage-keys.cp-clients.coverage_soda
+        reads_tables: [cp_clients]
+        linked_dataset: cp-clients
+        linked_check: coverage
+        linkage_code: DOC_CLIENTS
+        id_columns: [cp_client_id]
+        unit: percent
+        direction: below
+        category: completeness
+        introduced_date: "2013-01-01"
+        description: >
+          At least 90 percent of Child Protection's Client Register records for
+          the quarter must be linked; below 85 percent fails.
+        failure_indicates: >
+          Either the linkage release left out client records, or Child
+          Protection's Client Register supply carries identifiers the linkage
+          unit could not match.
+        changelog: []
+  - failed rows:
+      name: ED Presentations links match a presentation
+      fail query: |
+        SELECT l.dataset, l.id_1 FROM linkage_keys l
+        LEFT JOIN ed_presentations e ON CAST(e.presentation_id AS TEXT) = CAST(l.id_1 AS TEXT)
+        WHERE l.dataset = 'EDDC_PRESENTATION' AND e.presentation_id IS NULL
+      samples limit: 100000
+      attributes:
+        check_id: data-asset-1.department-of-health.linkage-products.linkage-keys.ed-presentations.referential_soda
+        reads_columns: ["linkage_keys.dataset", "linkage_keys.id_1", "ed_presentations.presentation_id"]
+        reads_tables: [ed_presentations]
+        linked_dataset: ed-presentations
+        linked_check: referential
+        linkage_code: EDDC_PRESENTATION
+        id_columns: [presentation_id]
+        category: consistency
+        introduced_date: "2013-01-01"
+        description: >
+          Every row coded EDDC_PRESENTATION must match a presentation in
+          Emergency Department's ED Presentations for the same quarter; one that
+          matches none fails.
+        failure_indicates: >
+          Either the linkage release names a presentation the quarter does not
+          hold, or Emergency Department's ED Presentations supply for the quarter
+          is missing records it should have.
+        changelog: []
+  - ed_presentations_coverage_percent:
+      ed_presentations_coverage_percent query: |
+        SELECT 100.0 * COUNT(l.id_1) / NULLIF(COUNT(*), 0)
+        FROM ed_presentations e
+        LEFT JOIN (SELECT DISTINCT CAST(id_1 AS TEXT) AS id_1 FROM linkage_keys WHERE dataset = 'EDDC_PRESENTATION') l
+          ON l.id_1 = CAST(e.presentation_id AS TEXT)
+      warn: when < 90
+      fail: when < 85
+      attributes:
+        check_id: data-asset-1.department-of-health.linkage-products.linkage-keys.ed-presentations.coverage_soda
+        reads_tables: [ed_presentations]
+        linked_dataset: ed-presentations
+        linked_check: coverage
+        linkage_code: EDDC_PRESENTATION
+        id_columns: [presentation_id]
+        unit: percent
+        direction: below
+        category: completeness
+        introduced_date: "2013-01-01"
+        description: >
+          At least 90 percent of Emergency Department's ED Presentations records
+          for the quarter must be linked; below 85 percent fails.
+        failure_indicates: >
+          Either the linkage release left out presentations, or Emergency
+          Department's ED Presentations supply carries identifiers the linkage
+          unit could not match.
+        changelog: []

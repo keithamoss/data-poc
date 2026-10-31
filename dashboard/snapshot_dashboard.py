@@ -8,7 +8,7 @@ Scoping recap, since the design choices here aren't obvious from the code
 alone:
 
 - What gets frozen: the ENTIRE rendered dashboard HTML (shell + CSS + JS
-  + embedded REAL_BIRTH_REG_DATA/REAL_CP_DATA), not just a data payload.
+  + embedded COLLECTION_DATA), not just a data payload.
   Deliberately NOT a "data snapshot + shared shell" hybrid, and NOT a
   "raw inputs, rebuild on demand" scheme - both were considered and
   rejected. A snapshot must be openable with nothing but a browser,
@@ -90,6 +90,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
+from dashboard import data_files
+
 DASHBOARD_HTML = Path(__file__).parent / "qa-reporting-dashboard.html"
 SNAPSHOTS_DIR = Path(__file__).parent / "snapshots"
 FONTS_DIR = Path(__file__).parent / "fonts"
@@ -142,6 +144,16 @@ def take_snapshot(html_path: Path = DASHBOARD_HTML, snapshots_dir: Path = SNAPSH
             f"{html_path} doesn't exist - run dashboard/embed_dashboard_data.py first "
             "so there's a fully up-to-date dashboard to snapshot."
         )
+    # ONE SELF-CONTAINED FILE STILL (REQ-DASH-292 criteria 1 and 3). Since
+    # REQ-DASH-291 the built page loads its data from files beside it, so
+    # those files are inlined back into the archived copy - the
+    # Requirements and Plans file too, because a snapshot is a record of what
+    # the page showed. Done BEFORE anything is written: a missing file, or
+    # one that is not the one the page lists, refuses the snapshot and leaves
+    # snapshots/ exactly as it was. A page with no list of files (built
+    # before the split, or a test's stand-in) is archived byte for byte.
+    html_bytes = data_files.inline(html_path.read_bytes().decode("utf-8"),
+                                   html_path.parent).encode("utf-8")
     now = now or datetime.now(timezone.utc)
     stamp = now.strftime("%Y%m%dT%H%M%SZ")
     sha = _git_short_sha(cwd=html_path.parent)
@@ -149,7 +161,6 @@ def take_snapshot(html_path: Path = DASHBOARD_HTML, snapshots_dir: Path = SNAPSH
 
     snapshots_dir.mkdir(parents=True, exist_ok=True)
     out_path = snapshots_dir / name
-    html_bytes = html_path.read_bytes()
     with gzip.open(out_path, "wb") as f:
         f.write(html_bytes)
 
@@ -185,7 +196,49 @@ def _decompress_snapshot(gz_path: Path, dest_path: Path) -> None:
         dest_path.write_bytes(f.read())
 
 
-def sync_local_snapshots(snapshots_dir: Path = SNAPSHOTS_DIR) -> list[Path]:
+def _place_snapshot(gz_path: Path, site_snapshots_dir: Path, dest_name: str,
+                    budget: int | None) -> None:
+    """One archived snapshot on the site, SPLIT BACK INTO FILES (REQ-DASH-292
+    criteria 4 to 7). The committed .html.gz stays one self-contained file;
+    the copy Cloudflare Pages serves is split so no file of it passes the
+    per-file limit: its page at the picker's existing `snapshots/<name>.html`
+    address, and each inlined block written back out byte for byte under
+    `snapshots/<name>.data/`, so the files match the list the page carries
+    and REQ-DASH-291's checks work on a published snapshot too. A snapshot
+    archived before the split has no blocks and is placed as it is."""
+    _decompress_snapshot(gz_path, site_snapshots_dir / dest_name)
+    archived = (site_snapshots_dir / dest_name).read_bytes().decode("utf-8")
+    files_dir = dest_name[: -len(".html")] + ".data"
+    page, files = data_files.split(archived, files_dir, budget=budget)
+    if not files:
+        return
+    (site_snapshots_dir / files_dir).mkdir(exist_ok=True)
+    for name, content in files.items():
+        (site_snapshots_dir / files_dir / name).write_bytes(content)
+    (site_snapshots_dir / dest_name).write_bytes(page.encode("utf-8"))
+
+
+def page_fingerprint(html_path: Path = DASHBOARD_HTML, fonts_dir: Path = FONTS_DIR,
+                     vendor_dir: Path = VENDOR_DIR) -> str:
+    """REQ-PIPE-255 criterion 22: a built page's content fingerprint, over the
+    page with its volatile values blanked, every data file it lists, and
+    fonts/ and vendor/. Raises when a listed file is missing or altered."""
+    return data_files.fingerprint(html_path.read_bytes().decode("utf-8"), html_path.parent,
+                                  [fonts_dir, vendor_dir])
+
+
+def snapshot_fingerprint(gz_path: Path, fonts_dir: Path = FONTS_DIR,
+                         vendor_dir: Path = VENDOR_DIR) -> str:
+    """REQ-PIPE-255 criterion 24: an archived snapshot's fingerprint, computed
+    the same way from its decompressed page with its inlined data files read
+    back out - equal to page_fingerprint() of the build it archived."""
+    with gzip.open(gz_path, "rb") as f:
+        html = f.read().decode("utf-8")
+    return data_files.fingerprint(html, gz_path.parent, [fonts_dir, vendor_dir])
+
+
+def sync_local_snapshots(snapshots_dir: Path = SNAPSHOTS_DIR, fonts_dir: Path = FONTS_DIR,
+                         vendor_dir: Path = VENDOR_DIR) -> list[Path]:
     """Decompresses every `*.html.gz` in `snapshots_dir` that doesn't
     already have a local `.html` sibling, so the live dashboard's "past
     snapshots" picker (each row links to `snapshots/<name>.html`) resolves
@@ -202,6 +255,12 @@ def sync_local_snapshots(snapshots_dir: Path = SNAPSHOTS_DIR) -> list[Path]:
     taken)."""
     if not snapshots_dir.exists():
         return []
+    # THE FONTS AND PLAYER BESIDE THEM, as on the published site (Keith,
+    # 2026-10-25, post-build-review #268 (c)): a local snapshot asks for
+    # fonts/ and vendor/ relative to itself too. Gitignored copies.
+    for static_dir, dest_name in ((fonts_dir, "fonts"), (vendor_dir, "vendor")):
+        if static_dir.exists():
+            shutil.copytree(static_dir, snapshots_dir / dest_name, dirs_exist_ok=True)
     written = []
     for gz_path in sorted(snapshots_dir.glob("*.html.gz")):
         html_path = gz_path.with_suffix("")  # strips only the trailing .gz
@@ -214,7 +273,8 @@ def sync_local_snapshots(snapshots_dir: Path = SNAPSHOTS_DIR) -> list[Path]:
 
 def prepare_deploy_site(site_dir: Path, html_path: Path = DASHBOARD_HTML,
                          snapshots_dir: Path = SNAPSHOTS_DIR,
-                         fonts_dir: Path = FONTS_DIR, vendor_dir: Path = VENDOR_DIR) -> None:
+                         fonts_dir: Path = FONTS_DIR, vendor_dir: Path = VENDOR_DIR,
+                         budget: int | None = None) -> None:
     """Builds the `_site/` tree `.github/workflows/deploy-pages.yml`
     uploads to GitHub Pages: `index.html` (the live dashboard) plus every
     committed snapshot decompressed into `_site/snapshots/`, alongside a
@@ -268,11 +328,34 @@ def prepare_deploy_site(site_dir: Path, html_path: Path = DASHBOARD_HTML,
     this - only the site copy gets the embed, same one-way relationship
     as embed_dashboard_data.py's own gitignored build output."""
     site_dir.mkdir(parents=True, exist_ok=True)
+    # EVERYTHING THE SITE IS MADE OF IS CLEARED FIRST (post-build-review #268
+    # D1): `mothman dashboard publish` reuses `_site/`, and a data file or a
+    # split snapshot from an earlier build was otherwise published again on
+    # every publish after - content-hashed names mean a changed file always
+    # leaves its predecessor behind. Only these names: prepare-site takes any
+    # directory a person names, so nothing else in it is touched.
+    for name in ("index.html", data_files.DATA_DIR, "snapshots", "fonts", "vendor", HEADERS_FILE):
+        stale = site_dir / name
+        if stale.is_dir() and not stale.is_symlink():
+            shutil.rmtree(stale)
+        elif stale.exists() or stale.is_symlink():
+            stale.unlink()
     manifest = _read_manifest(snapshots_dir)
-    html = _embed_snapshot_manifest_into_html(
-        html_path.read_text(), manifest, f"{html_path} (deploy site copy)"
-    )
-    (site_dir / "index.html").write_text(html)
+    page = html_path.read_bytes().decode("utf-8")
+    html = _embed_snapshot_manifest_into_html(page, manifest, f"{html_path} (deploy site copy)")
+    # THE LIVE PAGE'S DATA FILES (REQ-DASH-291), each checked against the
+    # page's own list on the way - a site that would show the missing-file
+    # error is refused here rather than published.
+    found = data_files.read_page(page, html_path.parent)
+    if found.manifest is not None:
+        if found.problems:
+            raise data_files.DataFileError(found.problems)
+        for name, content in found.contents.items():
+            (site_dir / data_files.DATA_DIR).mkdir(exist_ok=True)
+            (site_dir / data_files.DATA_DIR / name).write_bytes(content)
+    (site_dir / "index.html").write_bytes(html.encode("utf-8"))
+
+    (site_dir / HEADERS_FILE).write_text(headers_file())
 
     for static_dir, dest_name in ((fonts_dir, "fonts"), (vendor_dir, "vendor")):
         if static_dir.exists():
@@ -282,13 +365,65 @@ def prepare_deploy_site(site_dir: Path, html_path: Path = DASHBOARD_HTML,
         return
     site_snapshots_dir = site_dir / "snapshots"
     site_snapshots_dir.mkdir(parents=True, exist_ok=True)
+    # FONTS AND THE PLAYER BESIDE THE SNAPSHOTS TOO (Keith, 2026-10-25,
+    # post-build-review #268 (c)). A snapshot at snapshots/<name>.html asks
+    # for fonts/ and vendor/ relative to itself, and they sat only at the
+    # site root, so every published snapshot fell back to a system font and
+    # logged each as a failed load. Copied, not inlined into the archive
+    # (#268 E2): wrangler uploads by content hash, so the second copy costs
+    # nothing to send.
+    for static_dir, dest_name in ((fonts_dir, "fonts"), (vendor_dir, "vendor")):
+        if static_dir.exists():
+            shutil.copytree(static_dir, site_snapshots_dir / dest_name, dirs_exist_ok=True)
     for gz_path in sorted(snapshots_dir.glob("*.html.gz")):
         dest_name = gz_path.with_suffix("").name  # strips only the trailing .gz
-        _decompress_snapshot(gz_path, site_snapshots_dir / dest_name)
+        _place_snapshot(gz_path, site_snapshots_dir, dest_name, budget)
 
     manifest_path = snapshots_dir / "manifest.json"
     if manifest_path.exists():
         (site_snapshots_dir / "manifest.json").write_bytes(manifest_path.read_bytes())
+
+
+#: Cloudflare Pages' own per-path response headers file, at the site root.
+HEADERS_FILE = "_headers"
+
+#: THE DATA IS NOT FOR OTHER SITES (Keith, 2026-10-25, post-build-review #268
+#: (b)). Since REQ-DASH-291 a data file is a script, and any other website can
+#: include a script with a <script> tag and read what it defines.
+#: Cross-Origin-Resource-Policy: same-origin makes the browser refuse that
+#: cross-site load, and nosniff stops a file being run as anything other than
+#: the type it is served as. Beside REQ-PIPE-257's SameSite=Lax on the Access
+#: cookie, not instead of it. /snapshots/* covers each split snapshot's own
+#: <name>.data/ files, and its fonts and player.
+SITE_HEADERS = {
+    path: {"Cross-Origin-Resource-Policy": "same-origin", "X-Content-Type-Options": "nosniff"}
+    for path in (f"/{data_files.DATA_DIR}/*", "/snapshots/*")
+}
+
+
+def headers_file() -> str:
+    """SITE_HEADERS in Cloudflare Pages' _headers format: a path pattern,
+    then each header indented beneath it."""
+    out = []
+    for path, headers in SITE_HEADERS.items():
+        out.append(path)
+        out.extend(f"  {name}: {value}" for name, value in headers.items())
+    return "\n".join(out) + "\n"
+
+
+def parse_headers(text: str) -> dict:
+    """A _headers file read back into {path: {header: value}}."""
+    rules, current = {}, None
+    for line in text.splitlines():
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        if line[0].isspace():
+            name, _, value = line.strip().partition(":")
+            rules[current][name.strip()] = value.strip()
+        else:
+            current = line.strip()
+            rules[current] = {}
+    return rules
 
 
 def _append_manifest_entry(snapshots_dir: Path, entry: dict) -> list:
@@ -309,7 +444,7 @@ def _append_manifest_entry(snapshots_dir: Path, entry: dict) -> list:
 def _embed_snapshot_manifest_into_html(html: str, manifest: list, source_desc: str) -> str:
     """Returns `html` with its `const SNAPSHOT_MANIFEST = [...];` line
     replaced - same mechanism as dashboard/embed_dashboard_data.py's
-    REAL_BIRTH_REG_DATA/REAL_CP_DATA replacement (a single-line const,
+    COLLECTION_DATA replacement (a single-line const,
     regex-replaced with a lambda substitution so any special characters
     already in the JSON are never reinterpreted as regex backreferences).
     `source_desc` is just for the error message, identifying which HTML
