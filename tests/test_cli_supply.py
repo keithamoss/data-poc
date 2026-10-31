@@ -306,9 +306,15 @@ class TestReadingTheDecisionLog:
     def test_it_is_in_the_supply_group(self):
         assert "decisions" in CliRunner().invoke(cli, ["supply", "--help"]).output
 
-    def test_an_empty_log_says_so_rather_than_printing_a_bare_table(self, supply_dsn):
+    def test_an_empty_log_says_so_rather_than_printing_a_bare_table(self, supply_dsn,
+                                                                      monkeypatch):
+        """An EMPTY log of its own (post-build-review #290 D11): the worker's
+        shared database held another module's cp-placements promotion in CI
+        run 41144293386."""
+        import dbsupport
         from qa_tools.common import qa_store, supply_db
 
+        dbsupport.use_empty_supply_db(monkeypatch)
         with supply_db.connect(label="test-cli-decisions-empty") as conn:
             qa_store.ensure_schema(conn)
         result = _run(["decisions", "--dataset", "cp-placements"])

@@ -3130,3 +3130,24 @@ one or more component tags, and a date.
         week" test (REQ-PIPE-267 c17).
       - (c) TS-96 opens on the day of its mark, 19 October 2020, landing on
         the period's gap row.
+      - **ANSWERED (Keith, 2026-10-31, ~08:10)**: "Happy with those three
+        provisional choices too". (a), (b) and (c) stand as built. On the
+        dbt symlink fix (D9): "No need for a test for the dbt symlink
+        issue".
+    - **CI ON THE PUSH (2226719, run 41144293386)**:
+      - **Every Python job was red at `dbt deps`.** `dbt_project/dbt_packages`
+        had been committed as a symlink into a worktree the runner does not
+        have (D9). 1963c75 untracks it and fixes the `.gitignore` line to
+        match a link as well as a directory. Checked by running `dbt deps`
+        in a clean clone.
+      - **Deployment half on a cache miss: 62m17s.** The bootstrap holding
+        Linkage Products took 29m47s and its tests 30m15s. This is
+        REQ-PIPE-336 criterion 5's measured figure, now in its evidence.
+      - **Fast half on 1963c75: 4 failed, 2 errors.** Two causes:
+        - D10, a real regression from TS-96's link. Fixed test-first.
+        - D11, test isolation in three modules. Fixed.
+        Both are written up in post-build-review #290. They were checked by
+        re-running the fast half in a clean depth-1 clone against an empty
+        database, the way CI runs it.
+      - **REQ-QAC-333 criterion 6 reopened** (post-build-review #291, Keith's
+        (b)). It waits on REQ-PIPE-341's composite sample key.

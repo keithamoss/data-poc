@@ -314,3 +314,24 @@ class TestADateLevelCorrectionIsAskedToo:
     def test_a_scenario_s_own_supply_is_not_asked(self, rider):
         cc.check_written(["cp-clients"], [self._cp("2023-08-01T08:30:00+08:00")],
                          frozenset({"2023-Q4"}), docs=self._docs("2023-10-20"))
+
+
+def test_the_req_gen_199_link_day_plans_only_injections_carrying_its_links(monkeypatch):
+    """post-build-review #290 D10: last_req_gen_199_link_day() resolved EVERY
+    linked injection, so once TS-96 (Linkage Products) gained a link, any
+    collection's generation planned linkage - and through it every source
+    collection, whose target check catalogues every collection's check files.
+    Only the injections carrying a TS-75..79 link are asked."""
+    asked = []
+    real = si.generated_periods
+
+    def recording(dataset_id):
+        asked.append(dataset_id)
+        return real(dataset_id)
+
+    monkeypatch.setattr(si, "generated_periods", recording)
+    cc.last_req_gen_199_link_day()
+    carrying = {i.dataset_id for i in si.INJECTIONS
+                if any(cc._REQ_GEN_199.match(link.scenario_id) for link in i.links)}
+    assert carrying, "no REQ-GEN-199 link to resolve"
+    assert set(asked) == carrying, f"asked {sorted(set(asked))}, carrying {sorted(carrying)}"

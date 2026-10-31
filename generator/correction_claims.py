@@ -243,7 +243,11 @@ def last_req_gen_199_link_day() -> date | None:
 
     days = []
     for inj in si.INJECTIONS:
-        if not inj.links:
+        # ONLY AN INJECTION CARRYING ONE OF ITS LINKS (post-build-review #290
+        # D10): resolving every linked injection planned Linkage Products for
+        # TS-96, and through it every source collection, whatever was being
+        # generated.
+        if not any(_REQ_GEN_199.match(link.scenario_id) for link in inj.links):
             continue
         placement = si.resolve(si.dataclasses.replace(inj, links=()),
                                si.generated_periods(inj.dataset_id))

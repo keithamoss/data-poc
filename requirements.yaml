@@ -45908,6 +45908,11 @@ requirements:
     - "2026-10-30: tests/test_linkage_check_sql.py runs the real check file's queries against text and numeric identifiers (seen failing first on 'btrim(bigint)'); TestTheQueriesThemselvesAgreeWithTheMapping seen failing first on the critic's three edits."
     unmet_criteria:
     - {"criterion": "Criterion 3, in part - the per-code identifier count implied inside the own-row queries.", "why": "The gate now checks codes in query text and valid-values lists, which column each id_j is compared with and both-sides casts; the id_counts attribute beside the queries is checked, the count inside them is not.", "owner": "not scheduled", "blocked_by": {"unowned": true}}
+    - criterion: Criterion 6, the failing-rows half - the referential check records its failing rows as dataset code and identifier values.
+      why: All three failing linkage referential results on the bootstrap recorded failing_sample_keys as an empty list (post-build-review #291); the sample key is one column today and these rows need a composite one. Keith chose (b), 2026-10-31 - fold the fix into REQ-PIPE-341 criterion 3.
+      owner: REQ-PIPE-341 criterion 3, still a draft (docs/drafts/geocoding-v4.yaml) - repoint blocked_by at it when the geocoding batch is written into this file
+      blocked_by:
+        unowned: true
   - id: REQ-GEN-334
     title: The Linkage Products provider writes, for every quarter, a linkage delivery on the quarter's own round, received after that quarter's Emergency Department promotion takes effect in an ordinary quarter and within its due time and grace, built from the last source supply received before it
     date_written: '2026-10-25'
@@ -46138,10 +46143,10 @@ requirements:
     - "tests/test_run_evidently_cp.py::TestACollectionWithNoEvidentlyCheck::test_a_file_with_checks_but_no_drift_check_is_still_refused"
     evidence:
     - "2026-10-31 Perth, off-batch @ 08f6985 (lp-fixes and the dashboard fixes merged): a from-empty sequential bootstrap of a scratch database passed its target comparison, every targeted supply read as built - Linkage Products 55 runs, 536 results (486 pass, 16 warn, 34 fail)."
+    - "c5: CI run 41144293386 (commit 2226719, then 1963c75's dbt fix): the deployment half on a cache miss took 62m17s - the bootstrap holding Linkage Products 29m47s, its tests 30m15s. Recorded in morning-reports #11."
     - "c4: before (offset batch, no linkage) Birth Registrations 512s and the quarterly stream 1291s, 1439s in all; after, Birth Registrations 814s and the quarterly stream (Child Protection, Emergency Department, Linkage Products) 2507s, 3509s in all - 2789s over REQ-PIPE-250's 720s budget, reported to Keith in morning-reports #11. Runs: Child Protection and ED 359 before (25 caused by a decision), 373 after (39); Linkage Products 55 arrival runs and 6 knock-on re-checks."
     unmet_criteria:
     - {"criterion": "Criterion 7, the checkpoint half - a bootstrap resumed from a checkpoint does not replay the collections a collection's checks read.", "why": "Keith chose to refuse instead: --resume and a checkpoint are refused, by name, for a collection whose checks read others (2026-10-30).", "owner": "not scheduled", "blocked_by": {"unowned": true}}
-    - {"criterion": "Criterion 5 - CI's deployment half against a bootstrap holding the new collection, with its duration recorded.", "why": "Measured by the CI run of the push that carries this requirement, after the flip; recorded in morning-reports #11 when it reports.", "owner": "this push's CI run", "blocked_by": {"unowned": true}}
   - id: REQ-DASH-337
     title: The dashboard shows Linkage Products as Department of Health's second collection; any check that reads another collection is grouped by that collection under a collapsed summary heading, names and links the dataset it is about, and shows on that dataset's page with its effect, its percentage and its cause - all generically, nothing coded for linkage
     date_written: '2026-10-25'

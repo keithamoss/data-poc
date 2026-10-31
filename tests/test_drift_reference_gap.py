@@ -32,6 +32,18 @@ def _decide(conn, action, slot, ds=DS, **kw):
         pass
 
 
+@pytest.fixture(autouse=True)
+def _a_database_of_its_own(supply_dsn, monkeypatch):
+    """post-build-review #290 D11: an empty database per test. The worker's
+    shared one gathers other modules' decisions on these datasets - in CI
+    run 41144293386 a not-supplied mark already stood on cp-case-workers'
+    2025 quarters - and qa.decision is append-only, so nothing here can clear
+    them."""
+    import dbsupport
+
+    dbsupport.use_empty_supply_db(monkeypatch)
+
+
 #: ONE DATASET PER TEST - qa.decision is append-only, so a test cannot
 #: clear what an earlier one promoted. All five are quarterly.
 OWN = {"measured": "cp-carers", "gap": "cp-clients", "not_due": "cp-placements",

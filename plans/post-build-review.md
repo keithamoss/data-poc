@@ -13133,7 +13133,7 @@ twice. It deliberately did not re-find the `TypeError`.
      them inside it, and the queue on their cp-placements pages had grown by
      290px. Fixed the way REQ-GEN-273 fixed TS-81 and TS-82 (PROVISIONAL):
      an hour after the rejection the same scripted person promotes the three
-     readers, which passed their own checks. A new deployment test fails on
+     readers, which passed their own checks (accepted by Keith, 2026-10-31). A new deployment test fails on
      any scripted reject whose held-back package-mates have no later
      decision; against lp_boot it found exactly these three.
    - **D7**: road-testing #32's card read "Not yet raised with Keith", and
@@ -13144,7 +13144,58 @@ twice. It deliberately did not re-find the `TypeError`.
      rounds down. The scroll-back is now `headBackBy()`: whole pixels,
      rounded up, never more than the room below the subject. Three vitest
      cases were seen failing first.
+   - **D9 (wiring, the first push's red CI)**: cd7235e committed
+     `dbt_project/dbt_packages` as a symlink to another worktree. The
+     `.gitignore` rule had a trailing slash, so it matched only a directory.
+     On the runner `dbt deps` failed trying to delete the dangling link,
+     taking down all three Python jobs of run 41140335553. Fixed in 1963c75:
+     the link is untracked and the rule has no slash. No regression test
+     (Keith, 2026-10-31: "No need for a test for the dbt symlink issue").
+   - **D10 (CI run 41144293386, fast half)**: `last_req_gen_199_link_day()`
+     resolved every injection that has links, but needs only TS-75..79's.
+     Once TS-96 (D5) gained a link, generating any collection planned Linkage
+     Products, and through it every source collection, whose target check
+     catalogues every collection's check files. A fake third collection then
+     failed on its missing Soda file, and so did the thirty-collection generate
+     menu. This only shows with no `data/`, which is why part 1 missed it. It
+     now resolves only injections that carry a REQ-GEN-199 link; the test was
+     seen failing first. Both CI failures pass in a clean clone with an empty
+     database (128 passed).
+   - **D11 (same run, test isolation)**: three tests found other modules'
+     state in their worker's shared database. `qa.decision` is append-only,
+     and the new modules changed which tests share a worker. Reproduced
+     locally with CI's conditions and 4 workers: worker gw2 held a period
+     schema for every quarter since 2013-Q1 (inheritance opened them, so only
+     `_manifest` was in them) and 13 marks on cp-case-workers. The fixes:
+     - `test_drift_reference_gap` and `test_cli_supply`'s empty-log test each
+       take an empty database of their own (`dbsupport.use_empty_supply_db`).
+     - `test_cp_pair`'s free-quarter finder no longer treats a period that
+       holds only `_manifest` as populated. Its stated concern is a table of
+       another shape, which `_manifest` is not.
    - **Also checked**: CI on cc4c31a (run 40978105702) was red - TS-47's
      budget-line test and four on-demand tests. All five were already fixed
      in the offset batch, and this push carries those fixes; re-run on this
      tree before the push (see morning report #11).
+
+291. **[blocked, 2026-10-31]** **[QA checks & contracts]** **[Dashboard UI]**
+   **REQ-QAC-333 criterion 6 is marked met but is not: linkage's referential
+   checks record no failing rows.** The geocoding scoper found it by reading
+   the code (2026-10-31): the referential checks select `dataset, id_1`, but
+   the Soda sampler keeps only the adapter's one `sample_key`,
+   `linkage_key`. Confirmed against the recorded results of lp_boot4, the
+   from-empty bootstrap of 2226719's code: all three failing referential
+   results recorded `failing_sample_keys: []` (linkage_keys__201808011730000800
+   for ed-presentations, and linkage_keys__202205011730000800 and
+   linkage_keys__202211011730000800 for cp-clients), with
+   row_count_invalid 1 each. So the dashboard shows those failures with no
+   example rows.
+   - The fix the geocoding v4 draft proposes is a composite failing-sample
+     key, REQ-PIPE-341 criterion 3. Every adapter's `sample_key` is a single
+     column today.
+   - It touches a built requirement's claim, so it is Keith's call: fix it
+     now as its own defect (test first), or as part of REQ-PIPE-341 in the
+     geocoding batch. Either way REQ-QAC-333 c6 goes back to unmet until it
+     is fixed.
+   - **DECIDED (Keith, 2026-10-31): fold it into the geocoding batch.**
+     REQ-PIPE-341 criterion 3 fixes it. REQ-QAC-333 c6 goes back to unmet,
+     with that requirement as its blocker.

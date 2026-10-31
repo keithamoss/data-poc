@@ -34,8 +34,13 @@ def _free_quarter(conn):
     # took a run down in CI (674399a, "column postcode does not exist").
     taken = {r[0] for r in conn.execute(
         "SELECT slot FROM qa.filing_current WHERE dataset_id LIKE 'cp-%'").fetchall()}
+    # A PERIOD OPENED BUT HOLDING NOTHING is not in the way (post-build-review
+    # #290 D11): every period gets its own _manifest when it opens, and
+    # another module's inheritance opened all of them on CI's worker, which
+    # left this finder no quarter at all.
     populated = {r[0] for r in conn.execute(
-        "SELECT DISTINCT table_schema FROM information_schema.tables").fetchall()}
+        "SELECT DISTINCT table_schema FROM information_schema.tables "
+        "WHERE table_name <> '_manifest'").fetchall()}
     taken |= {s.name for s in slots.slots_for_dataset(DS, until=asset_time.local_date(
         asset_time.now()) + timedelta(days=400))
         if period_schema.period_schema(s.name) in populated}
