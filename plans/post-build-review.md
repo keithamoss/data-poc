@@ -12940,6 +12940,16 @@ twice. It deliberately did not re-find the `TypeError`.
        the period leading the heading they read as duplicates. RECOMMENDED:
        one block per period, chains as sub-groups, "received" pinned to the
        block's first receipt.
+     - **ANSWERED (Keith, 2026-10-31): (a), (b), (c) and (e) accepted as
+       recommended.** (a) is an amendment to REQ-DASH-182 criterion 3 and is
+       signed one by one when it is written; (b), (c) and (e) are display
+       fixes. (g) and (h) are polish, handled without asking. (d) (a): show the
+       previous filled cycle tagged 'In place' above an empty, not-yet-due
+       current cycle (Keith, 2026-10-31). (f) (a): print the files-go line for
+       every dataset, offset 0 included, e.g. 'Files go to the same day's
+       period', as REQ-PIPE-327 criterion 1 already says; REQ-DASH-326's
+       authored-calendar scope is not followed in the terminal (Keith,
+       2026-10-31). Every item of #287 is now answered.
      - (d) UX M6: on the default view, while the current cycle is empty and
        not due, the supply actually in place is only behind "Show all
        history". Show the previous filled cycle tagged "In place"?

@@ -75,3 +75,6 @@
 - REQ-GEN-298 Q2 (which supplies the trial tries): (a) ambers, reds and named scenarios, about 45 supplies and roughly 10 minutes; ordinary greens are confirmed when replayed.
 - REQ-QAC-300 Q1 (the fourth version takes effect after the history ends): (a) declare it now; its tile and the third trend break are proven in Vitest only.
 - REQ-DASH-299 Q1 (group-heading count words): SUPERSEDED by Keith's site-wide decision (running-thoughts #132) - Pass / Warn / Fail everywhere, so counts read '1 pass, 2 warn, 1 not checked'. The relabel itself is its own requirement.
+
+## v6 delta round (Keith, 2026-10-31)
+- REQ-GEN-298 criterion 11, which sources the trial stages: (a) only the source supplies the generator's plan promotes before the geocoding delivery, which is what the warehouse will hold then (REQ-GEN-334 c12's scheduling already computes this). A held source is not staged, and the trial expects could-not-run, so trial and replay agree. REJECTED (b), every filed source. This needs a signed amendment to REQ-PIPE-331 criterion 3 ('never a staged one'), whose wording comes in v7.

@@ -6067,6 +6067,7 @@ could never have computed it), and it belongs with batch 5's check work.
        weekday because `participates:` names months only. The refusal of a
        dataset faster than its asset's baseline is proven by a gate test, not
        by a dataset.
+     - SUPERSEDED (Keith, 2026-10-31, after the architect review): ONE CLOUDFLARE PROJECT PER ASSET, each with its own Access allow-list, because REQ-PIPE-255 uploads a whole tree. See docs/drafts/asset-split-answers.md.
      - TWO DASHBOARDS ON ONE SITE (Keith, same morning, (a)): two separately
        built dashboards, e.g. /quarterly/ and /daily/, each built only from its
        own asset's database, with a plain landing page linking them. REJECTED
@@ -6100,3 +6101,47 @@ could never have computed it), and it belongs with batch 5's check work.
      the post-build-review note of how the provisional word slipped through
      (post-build-review #292). Interacts with the geocoding batch's heading-count
      question (REQ-DASH-299 Q1), which now follows this decision.
+
+133. **[parked, 2026-10-31]** **[Pipeline & publishing]** **[QA checks & contract]** **Rename the configuration and the stored values to Pass / Warn / Fail too.**
+     Keith, 2026-10-31, answering the relabel's depth question: displayed
+     words only for now (running-thoughts #132), and "b/c parked for later".
+     (b) is the configuration people type: `amber_setting`,
+     `replacement_setting`'s values, `--dirty amber|red`, `green-or-amber`.
+     (c) is everything, stored database values and the status constraint
+     included, which means a migration. Not scoped. Pick it up once the
+     displayed relabel has landed.
+
+134. **[investigate, 2026-10-31]** **[Data generation]** **[Pipeline & publishing]** **The synthetic data generator and the bootstrap as separate components, strictly separated from each other and from the real pipeline and asset configuration.**
+     Keith, 2026-10-31: "I would like the synthetic data generator and the
+     bootstrap to be separate components with a strict separation between
+     themselves and with the actual pipelines and asset configuration ...
+     They will still be in the same repo." He asked for a high-level scan of
+     how close the code is to that today. The scan's findings are added below
+     once reported. Not scoped.
+     **SCAN, 2026-10-31 (high level, grep only)**:
+     - The pipeline never imports the generator (qa_tools, pipeline and
+       dashboard have no `import generator`). Only cli/ wires the two.
+     - The generator imports the pipeline heavily: 63 imports from qa_tools,
+       mostly asset_time, hierarchy, schedule and slots, the shared domain
+       model. Also correction_trial, correction_apply, promotion,
+       scripted_decisions, scenario_map and the collection registry.
+     - The bootstrap and replay machinery lives INSIDE the pipeline package:
+       qa_tools/common/bootstrap, checkpoints, replay_clock, replay_inputs,
+       scripted_decisions, scripted_corrections, correction_replay, scenarios,
+       scenario_map and target_agreement, about 4,800 lines. replay_clock is
+       woven into about 20 real pipeline modules (stage, orchestrate, gate,
+       filing, decision_log, ...), and orchestrate plays scripted decisions.
+     - Synthetic-only configuration is mixed into asset configuration:
+       `synthetic: true` and the "synthetic eras" in contract/data-asset.yaml's
+       amber setting; contract/scripted_decisions.yaml. The planned
+       contract/synthetic_inputs.yaml would add another.
+     - **DECIDED (Keith, 2026-10-31, (a))**: the CONFIGURATION half is folded
+       into the asset split now. Synthetic-only configuration gets a home of
+       its own beside each asset's folder, e.g. synthetic/<asset>/: scripted
+       decisions, synthetic inputs, synthetic eras, the `synthetic` flag's
+       consequences. The CODE half (the bootstrap and replay machinery out of
+       qa_tools, the replay clock untangled from the real pipeline, the
+       generator's imports narrowed to the shared domain model) is scoped
+       afterwards as its own batch. REJECTED (b), the whole separation after
+       the split, which moves the configuration twice, and (c), the whole
+       separation before the split.

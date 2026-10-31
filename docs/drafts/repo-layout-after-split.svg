@@ -1,0 +1,133 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1180" height="860" viewBox="0 0 1180 860" font-family="Helvetica, Arial, sans-serif">
+  <style>
+    .t{font-size:15px;font-weight:700;fill:#1b2733}
+    .s{font-size:12px;fill:#33414e}
+    .m{font-size:11.5px;fill:#33414e;font-family:Menlo,Consolas,monospace}
+    .h{font-size:20px;font-weight:700;fill:#1b2733}
+    .note{font-size:12px;fill:#55606b;font-style:italic}
+    .q{fill:#e8f1fb;stroke:#3d7cc9;stroke-width:1.5}
+    .d{fill:#fdf1e3;stroke:#d08a2e;stroke-width:1.5}
+    .sh{fill:#eef2ee;stroke:#5f8a5f;stroke-width:1.5}
+    .sy{fill:#f4ecf7;stroke:#8a5fa0;stroke-width:1.5;stroke-dasharray:5 3}
+    .st{fill:#f5f5f5;stroke:#999;stroke-width:1.2;stroke-dasharray:3 3}
+    .ln{stroke:#8a96a3;stroke-width:1.4;fill:none}
+  </style>
+  <rect width="1180" height="860" fill="#ffffff"/>
+  <text x="24" y="36" class="h">data-poc repository after the asset split (proposed)</text>
+  <text x="24" y="58" class="s">One repository. Configuration per asset, synthetic configuration kept apart, one shared code tree, state and outputs per asset.</text>
+
+  <!-- legend -->
+  <rect x="820" y="20" width="16" height="12" class="q"/><text x="842" y="31" class="s">quarterly asset</text>
+  <rect x="950" y="20" width="16" height="12" class="d"/><text x="972" y="31" class="s">daily asset</text>
+  <rect x="820" y="40" width="16" height="12" class="sh"/><text x="842" y="51" class="s">shared (both assets)</text>
+  <rect x="950" y="40" width="16" height="12" class="sy"/><text x="972" y="51" class="s">synthetic only</text>
+  <rect x="820" y="60" width="16" height="12" class="st"/><text x="842" y="71" class="s">generated state (gitignored)</text>
+
+  <!-- CONFIGURATION column -->
+  <text x="24" y="100" class="t">CONFIGURATION  (committed)</text>
+  <rect x="24" y="112" width="540" height="56" rx="6" class="sh"/>
+  <text x="38" y="134" class="t">contract/</text>
+  <text x="38" y="154" class="m">environments.yaml · moved-paths.yaml  (asset-wide, same for both)</text>
+
+  <rect x="24" y="180" width="265" height="300" rx="6" class="q"/>
+  <text x="38" y="202" class="t">contract/quarterly/</text>
+  <text x="38" y="222" class="m">data-asset.yaml</text>
+  <text x="50" y="238" class="s">id quarterly · one baseline calendar</text>
+  <text x="50" y="253" class="s">Cloudflare project · moved_to (BDM)</text>
+  <text x="38" y="272" class="m">calendar.yaml  presentation.yaml</text>
+  <text x="38" y="288" class="m">people.yaml  file-checks.yaml</text>
+  <text x="38" y="312" class="m">child-protection-family-support/</text>
+  <text x="50" y="328" class="s">Child Protection (6 check files)</text>
+  <text x="38" y="350" class="m">department-of-health/</text>
+  <text x="50" y="366" class="s">Emergency Department</text>
+  <text x="50" y="382" class="s">Linkage Products</text>
+  <text x="62" y="398" class="s">+ the two geocoding datasets</text>
+  <text x="50" y="414" class="s">Cancer  (NEW, annual)</text>
+  <text x="38" y="446" class="note">MOTHMAN_ASSET=quarterly</text>
+
+  <rect x="299" y="180" width="265" height="300" rx="6" class="d"/>
+  <text x="313" y="202" class="t">contract/daily/</text>
+  <text x="313" y="222" class="m">data-asset.yaml</text>
+  <text x="325" y="238" class="s">id daily · one baseline calendar</text>
+  <text x="325" y="253" class="s">its own Cloudflare project</text>
+  <text x="313" y="272" class="m">calendar.yaml  presentation.yaml</text>
+  <text x="313" y="288" class="m">people.yaml  file-checks.yaml</text>
+  <text x="313" y="312" class="m">registry-services/</text>
+  <text x="325" y="328" class="s">Birth Registrations</text>
+  <text x="313" y="350" class="m">department-of-health/</text>
+  <text x="325" y="366" class="s">Mental Health  (NEW, weekly)</text>
+  <text x="325" y="384" class="note">same agency, own folder per asset</text>
+  <text x="313" y="446" class="note">MOTHMAN_ASSET=daily</text>
+
+  <rect x="24" y="494" width="265" height="92" rx="6" class="sy"/>
+  <text x="38" y="516" class="t">synthetic/quarterly/</text>
+  <text x="38" y="536" class="m">scripted_decisions.yaml</text>
+  <text x="38" y="552" class="m">synthetic_inputs.yaml</text>
+  <text x="38" y="568" class="m">eras.yaml</text>
+
+  <rect x="299" y="494" width="265" height="92" rx="6" class="sy"/>
+  <text x="313" y="516" class="t">synthetic/daily/</text>
+  <text x="313" y="536" class="m">scripted_decisions.yaml</text>
+  <text x="313" y="552" class="m">eras.yaml</text>
+  <text x="313" y="574" class="note">read only by generator + bootstrap</text>
+
+  <!-- CODE column -->
+  <text x="600" y="100" class="t">CODE  (committed, one copy for both assets)</text>
+  <rect x="600" y="112" width="556" height="250" rx="6" class="sh"/>
+  <text x="614" y="136" class="m">cli/</text><text x="760" y="136" class="s">mothman: only the selected asset's commands exist</text>
+  <text x="614" y="160" class="m">qa_tools/</text><text x="760" y="160" class="s">the real pipeline: stage, check, gate, promote</text>
+  <text x="614" y="184" class="m">qa_tools/collections/</text><text x="760" y="184" class="s">one adapter per collection (+ cancer, mental_health)</text>
+  <text x="614" y="208" class="m">pipeline/</text><text x="760" y="208" class="s">dashboard data builder</text>
+  <text x="614" y="232" class="m">dashboard/</text><text x="760" y="232" class="s">one template, built once per asset</text>
+  <text x="614" y="256" class="m">dbt_project/</text><text x="760" y="256" class="s">one dbt project; models/&lt;collection&gt;/</text>
+  <rect x="608" y="270" width="540" height="84" rx="5" class="sy"/>
+  <text x="614" y="290" class="m">generator/</text><text x="760" y="290" class="s">driver + one provider per collection</text>
+  <text x="614" y="312" class="m">bootstrap + replay</text><text x="760" y="312" class="s">today inside qa_tools/common; to be separated</text>
+  <text x="760" y="328" class="s">later (running-thoughts #134, code half)</text>
+  <text x="614" y="346" class="note">synthetic side: never imported by the real pipeline</text>
+
+  <!-- STATE column -->
+  <text x="600" y="400" class="t">GENERATED STATE  (gitignored, per asset)</text>
+  <rect x="600" y="412" width="272" height="116" rx="6" class="st"/>
+  <text x="614" y="434" class="m">data/quarterly/</text>
+  <text x="626" y="452" class="s">deliveries/ · receipts/</text>
+  <text x="626" y="468" class="s">generator_bookkeeping.json</text>
+  <text x="626" y="484" class="s">scenario_placements.json</text>
+  <text x="614" y="508" class="m">reports/quarterly/</text>
+  <rect x="884" y="412" width="272" height="116" rx="6" class="st"/>
+  <text x="898" y="434" class="m">data/daily/</text>
+  <text x="910" y="452" class="s">deliveries/ · receipts/</text>
+  <text x="910" y="468" class="s">generator_bookkeeping.json</text>
+  <text x="910" y="484" class="s">scenario_placements.json</text>
+  <text x="898" y="508" class="m">reports/daily/</text>
+
+  <text x="600" y="556" class="t">COMMITTED OUTPUTS</text>
+  <rect x="600" y="566" width="556" height="62" rx="6" class="sh"/>
+  <text x="614" y="588" class="m">SCENARIOS-quarterly.md · SCENARIOS-daily.md</text>
+  <text x="614" y="608" class="m">dashboard/snapshots/quarterly/ · daily/</text>
+  <text x="900" y="608" class="note">today's archive left as is</text>
+
+  <!-- RUNTIME -->
+  <text x="24" y="640" class="t">RUNTIME  (outside the repository)</text>
+  <rect x="24" y="652" width="540" height="76" rx="6" class="q"/>
+  <text x="38" y="676" class="t">Quarterly deployment</text>
+  <text x="38" y="696" class="s">database supply_quarterly · today's Cloudflare project + Access list</text>
+  <text x="38" y="714" class="s">Child Protection · Emergency Department · Linkage Products · Cancer</text>
+  <rect x="24" y="740" width="540" height="76" rx="6" class="d"/>
+  <text x="38" y="764" class="t">Daily deployment</text>
+  <text x="38" y="784" class="s">database supply_daily · a new Cloudflare project + Access list</text>
+  <text x="38" y="802" class="s">Birth Registrations · Mental Health</text>
+
+  <rect x="600" y="652" width="556" height="164" rx="6" fill="#ffffff" stroke="#c9d1d9"/>
+  <text x="614" y="676" class="t">Rules that keep them apart</text>
+  <text x="614" y="700" class="s">• Nothing run for one asset reads the other asset's folder, data or database.</text>
+  <text x="614" y="722" class="s">• Code never names an asset; folders are discovered from contract/.</text>
+  <text x="614" y="744" class="s">• Each asset owns ONE baseline calendar; nothing faster than it.</text>
+  <text x="614" y="766" class="s">• Each dashboard is built only from its own asset's database.</text>
+  <text x="614" y="788" class="s">• Synthetic configuration is read only by the generator and bootstrap.</text>
+  <text x="614" y="808" class="note">Future decision point: a repository per asset, or injected config (#55).</text>
+
+  <!-- connectors -->
+  <path class="ln" d="M156 480 V494"/><path class="ln" d="M431 480 V494"/>
+  <path class="ln" d="M156 586 V652"/><path class="ln" d="M431 586 Q431 700 431 740"/>
+</svg>

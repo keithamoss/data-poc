@@ -1,0 +1,380 @@
+# DRAFT v1 - Pass / Warn / Fail everywhere a person reads a status
+# (plans/running-thoughts.md #132; plans/post-build-review.md #292).
+# delivery-scoper, 2026-10-31 (Perth). A PROPOSAL for sign-off, not a settled
+# requirement. Nothing here applies until Keith has signed it.
+#
+# KEITH'S DECISION, 2026-10-31: option (c), Pass / Warn / Fail everywhere.
+# REJECTED (a) Green / Amber / Red everywhere, and (b) Pass / Warn / Fail in
+# the cross-table grid only. The grid's words were REQ-DASH-272's builder's
+# PROVISIONAL choice (2026-10-25) and were never asked. This batch settles them.
+#
+# =============================================================================
+# THE INVENTORY - grep, 2026-10-31, tree c9b4d7a, /home/user/off-wt.
+# Pattern \b(green|amber|red)\b, any case. Counts are LINES unless stated.
+# Lines were classified by reading them: template code lines, every Python
+# string literal (via ast, docstrings excluded), and every contract YAML
+# string value.
+# =============================================================================
+#
+# 1. DISPLAYED WORDS (a status shown as one word): 1 map, 13 literal template
+#    lines, 12 leak sites.
+#    - STATUS_LABEL (template :2057) says Green / Amber / Red. These all read
+#      it: every pill (pill() :4986), chart tooltips :4842, group-heading
+#      and rollup counts :5885 (lower-cased: '1 green, 2 amber'), the agency
+#      legend counts :8318, 'Arrived <X>' :8893 :8975, 'Re-checked <t>:
+#      became <X>' :8948, status-dot titles :10352, the grid's accessible
+#      name 'Status <X>' :6277, and the warehouse clause '..., and is <X>'
+#      (REQ-DASH-272). That is about 12 call sites behind one map.
+#    - XT_WORD (:6067) already says Pass / Warn / Fail / No result.
+#    - Literal words: exec legend :8339-8341 ('Green - within threshold',
+#      'Amber - warning band', 'Red - fail band'); dataset legend :9980;
+#      trend table header :4431 ('Red | Amber | Not green'); dataset table
+#      header :8453 ('Columns not green'); band text :2005 ('amber above 5%',
+#      'red above 10%'); 'Amber setting: <text>' and its title :7971.
+#    - RAW STORED VALUES PRINTED AS WORDS. These skip every label map, so a
+#      relabel alone will NOT change them: template :8808 'went in
+#      ${promotedOn}', :7282 're-checked ${verdict} after promotion', :7287
+#      'Promoted, then re-checked ${verdict}'; cli/filing_tui.py :738 :1302
+#      (the verdict on a listed supply, REQ-GHUB-229) and :1250;
+#      cli/lifecycle_report.py :287; qa_tools/common/ticket_sync.py :215
+#      :235 :277 :278 :295 :305 (GitHub Issue titles and bodies, '<name> is
+#      red'; that workflow is disabled today).
+#    - ALREADY IN THE NEW WORDS: the column panel's stats Passing / Warning /
+#      Failing (:10344-10346), and the terminal's per-check results
+#      (cli/collection_cli.py :40, pass / warn / fail / error).
+#
+# 2. COMPOUND AND PROSE PHRASES: about 39 template lines, 2 page-text lines
+#    built in pipeline/, about 37 qa_tools message literals across 15
+#    modules, about 18 cli/ literals, and 68 generator messages.
+#    - Template badges: 'Red promoted' :8821 :8832, 'Amber promoted' :8864,
+#      'Amber, promoted - awaiting acknowledgement' :8732, 'Promoted green,
+#      re-checked amber - ...' :9010-9011, 'Turned red later - ...' :8838,
+#      '<n> red promoted: <names>' :9054.
+#    - Template sentences: 'went in red. Red since', 'promoted while red',
+#      'turned red <t> after' :8826-8828; 'Went in green. Amber since' :8864.
+#    - Template counts: '<r> red, <a> amber' and 'All <M> green' :4377-4378
+#      :4469-4470; '<n> of <m> not green' :4432; the 'Columns not green' key
+#      :4390.
+#    - Template trend titles and accessible names, 'Columns / Datasets /
+#      Checks on this column red and amber, each ...': :4304 :4329 :4416
+#      :4505 :4509 :4511 :9983 :9987 :10359.
+#    - Template prose: :1179 :1984 :6493 :8216 ('Makes its dataset red')
+#      :8257 :8334 :9834 :9963 :10615 :11783 :11804, and the thrown error
+#      text :2113.
+#    - pipeline/cross_table_grid.py :491 ': it was promoted while red.' and
+#      :495 ': it turned red <t>, after <cause>'.
+#    - qa_tools/common: root_cause.py ('red because ...', 'red - <n> of its own
+#      checks fail', 'red - <check> failed against the warehouse'),
+#      acknowledgement.py (4), amber_setting.py (2), decision_log.py (3),
+#      filing_decisions.py (4), promotion.py (4), replacement_setting.py (3),
+#      validate_schedule.py (2), gate.py, held_blast_radius.py, own_table.py,
+#      knock_on.py, dataset_status.py :132, ticket_sync.py (2).
+#    - cli/: common.py :1185 ('red because'); filing_tui.py :97 :180 :200
+#      :1080 :1205 :2269 :2271 ('amber, waiting for a person (amber setting:
+#      hold)', 'Amber setting:'); settle_tui.py :755 ('red - could not run:');
+#      lifecycle_report.py :214 ('..., green, because'); pipeline.py :189-190
+#      :298 ('At least one recorded result is red.'); scenarios.py :179 :181
+#      ('amber at', 'no amber band'); schedule.py :525 (help text).
+#    - generator/: 68 messages. These are developer errors ('an ordinary red
+#      is drawn for ...') and scenario config strings that end up in
+#      SCENARIOS.md.
+#    - DISPLAYED CONFIGURATION AND GENERATED TEXT: 2 contract column
+#      descriptions ('dirty(amber/red) presets', child-protection-contract
+#      :460 :628), shown on the column page. SCENARIOS.md, 245 lines,
+#      generated from plans/supply-model.md's scenario register and the
+#      generator's config strings, then embedded as SCENARIO_MAP and shown in
+#      the 'Which red was on purpose' panel.
+#    - CHECK PROSE: ZERO. No description, failure_indicates or technical_note
+#      in any contract file contains these words, and neither does
+#      docs/check-authoring-rules.md or CHANGELOG.yaml's header. So no
+#      authoring standard has to change.
+#    - contract/presentation.yaml: ZERO.
+#
+# 3. INTERNAL IDENTIFIERS (never seen as words).
+#    - Template CSS, 38 lines: .pill.green/.amber/.red, [data-status="red"],
+#      .not-green-*, .red-promoted. These are colour classes. The Plans and
+#      Requirements tabs already use them for pills with their own words
+#      (PLANS_STATUS_CLASS :11905, REQ_STATUS_CLASS :11245), which shows a
+#      class is a colour, not a word.
+#    - Template JS, about 85 code lines: status values, STATUS_ORDER, rollups,
+#      RECHECK_RANK, the function names redPromotedBadge and
+#      amberPromotedTag, and the data-red-promoted / data-amber-promoted /
+#      data-amber-setting / data-status attributes that tests select on. Plus
+#      about 190 comment lines.
+#    - Python, 333 identifier literals: status values 'green'/'amber'/'red',
+#      the pass->green map (dataset_status.py :175-178), and Rich colour
+#      styles (colours, not statuses). Also the modules amber_setting.py and
+#      pipeline/red_promoted.py, and EXIT_RED.
+#    - status-cases.json, 45 lines: REQ-QAC-047's shared vocabulary table.
+#    - Configuration people type: the amber_setting key; the
+#      replacement_setting values green and green-or-amber
+#      (contract/data-asset.yaml, 2 values); the qa schema's CHECK constraint
+#      on replacement_setting (qa_store.py :220); `mothman population --dirty
+#      none|amber|red` (cli/population.py :35); the generator's VERDICTS
+#      (targeting.py :151).
+#    - Stored values: dataset and supply statuses in qa rows and in the
+#      build's JSON (promotedOn, timeline status, verdict).
+#    - THE OVERLAP: each tool's per-check status is ALREADY stored as pass /
+#      warn / fail / error, and dataset_status.py maps it to green / amber /
+#      red. Soda's warn/fail thresholds, ck.warn / ck.fail and a band's 'warn'
+#      and 'fail' sides already use these words. So the new display words
+#      match the words already underneath. Only the dataset-level layer in
+#      between says green / amber / red.
+#
+# 4. TESTS THAT ASSERT DISPLAYED WORDS: about 56 Python assertion lines in
+#    12 files (43 of them in tests/test_dashboard_e2e.py), and about 27
+#    Vitest lines in 7 files (supply-outcome, datasets-not-green,
+#    columns-not-green, cross-collection, rechecks, period-composition,
+#    amber-setting). This is a lower bound, because a few tests build the
+#    text in a variable first. Tests that assert identifier VALUES (525
+#    Python lines, 391 JS lines) stay as they are under the recommendation.
+#
+# 5. HISTORICAL RECORDS
+#    - CHANGELOG.yaml: 129 lines, shown in Release Notes.
+#    - requirements.yaml: 1,460 lines. 323 criteria in 107 requirements
+#      mention one of the words. About 30 criteria in 14 requirements QUOTE
+#      displayed text; those make up the amendment list (REQ-DOCS-362).
+#    - plans/*.md: about 1,400 lines, shown in the Plans and Feedback tabs.
+#    - docs/drafts: 1,536 lines.
+#    - Reader docs: README 17 lines; docs/ outside drafts 46 lines, of which
+#      supplier-guidance.md has 4 and is written FOR suppliers.
+#    - Text recorded in the database (decision reasons, ticket comments).
+#      None of it can be rewritten, because the decision log is append-only.
+#
+# FOUR REQUIREMENTS: REQ-DASH-359, REQ-TEST-360, REQ-TEST-361 and
+# REQ-DOCS-362. The register ends at 341, and docs/drafts/asset-split-v1.yaml
+# takes 342 to 358.
+#
+# INTERACTIONS
+#   - docs/drafts/geocoding-v6.yaml is now in the register as REQ-DASH-299,
+#     signed and not built. This decision answers its open question 1 (the
+#     group heading's count words): option (a), '1 green, 2 not checked',
+#     is no longer possible. The heading counts come from STATUS_LABEL
+#     (:5885), so REQ-DASH-359 makes them '1 pass, 1 warn, 1 fail, 2 not
+#     checked' everywhere, which is option (b), at no extra cost.
+#     REQ-DASH-299 also quotes 'never green' (A5; criterion 15 (11)) and
+#     'its amber tag' (criterion 15 (9)): see amendment B1. RECOMMENDED
+#     ORDER: build this batch BEFORE REQ-DASH-299, so its tests are only
+#     written once, in the new words.
+#   - docs/drafts/asset-split-v1.yaml: no quoted words change. Its 'rather
+#     than red or No data' (line 456) is about the status, not the word, so
+#     it stays. The daily dashboard uses the same template, so it gets the
+#     new words for free, and REQ-TEST-361's guard runs on whatever the build
+#     produces.
+# =============================================================================
+requirements:
+  - id: REQ-DASH-359
+    title: "The dashboard words every status Pass, Warn or Fail - pills, legends, counts, badges, tooltips, accessible names and prose - with colours, stored values and identifiers unchanged"
+    date_written: "2026-10-31"
+    story: "As a data team leader glancing at the register, I want every status in the three words the cross-table grid already uses - Pass, Warn, Fail - so that one page never says 'Amber' in a pill beside 'Warn' in a cell, and a status reads the same whether or not I can see its colour."
+    moscow: should
+    status: not_started
+    source: "Keith, 2026-10-31 late morning, choosing option (c) on finding the cross-table grid's Pass / Warn / Fail beside Green / Amber / Red elsewhere (plans/running-thoughts.md #132, plans/post-build-review.md #292). Drafted by delivery-scoper 2026-10-31. A PROPOSAL, not signed."
+    acceptance_criteria:
+      - "THE SYSTEM SHALL label the statuses green, amber and red 'Pass', 'Warn' and 'Fail' in STATUS_LABEL, so that every status pill, chart tooltip, status-dot title, legend count and the grid's accessible name 'Status <status>' reads the new word; and SHALL keep 'No data', 'Schedule ended', 'No rule defined', 'Not counted' and 'Turned off' unchanged."
+      - "THE SYSTEM SHALL count statuses in every group heading and rollup count line in the lower-cased new words - e.g. '3 checks: 1 pass, 1 warn, 1 fail' - so that REQ-DASH-299's left-out count reads '3 checks: 1 pass, 2 not checked'."
+      - "THE SYSTEM SHALL word a status in running prose as its verb form - 'passing', 'warning', 'failing' - or as the capitalised label used as a noun ('a Fail anywhere below'), and SHALL NOT use the words green, amber or red for a status in any text a person reads (PROVISIONAL on question Q1)."
+      - "THE SYSTEM SHALL replace each compound label and phrase as follows (PROVISIONAL on question Q1): 'Red promoted' -> 'Promoted, failing'; 'Amber promoted' -> 'Promoted, warning'; '<n> red promoted: <names>' -> '<n> promoted, failing: <names>'; 'Amber, promoted - awaiting acknowledgement' -> 'Promoted, warning - awaiting acknowledgement'; 'Promoted green, re-checked amber - awaiting acknowledgement' and '... - acknowledged by <who>' -> 'Promoted passing, re-checked warning - awaiting acknowledgement' and '... - acknowledged by <who>'; 'Turned red later - <t>, after <cause>' -> 'Started failing later - <t>, after <cause>'; 'went in red. Red since <cause>, <t>; promoted <t>' -> 'went in failing. Failing since <cause>, <t>; promoted <t>'; 'promoted while red' -> 'promoted while failing'; 'turned red <t> after <cause>' -> 'started failing <t>, after <cause>'; 'Went in green. Amber since <cause>, <date>.' -> 'Went in passing. Warning since <cause>, <date>.'; 'Arrived <status>' -> 'Arrived <verb form>'; 'Re-checked <t>: became <status>' -> 'Re-checked <t>: now <verb form>'; 're-checked red after promotion' -> 're-checked failing after promotion'; 'Promoted, then re-checked <verdict>' -> 'Promoted, then re-checked <verb form>'."
+      - "THE SYSTEM SHALL word the warehouse clause (REQ-DASH-272 criteria 1 and 3) '..., and is passing.', '..., and is warning.', '..., and is failing: it was promoted while failing.' and '..., and is failing: it started failing <time>, after <cause>', in the page and in pipeline/cross_table_grid.py alike."
+      - "THE SYSTEM SHALL replace the count and trend words as follows: '<r> red, <a> amber' -> '<r> fail, <a> warn' (both numbers always given, as today); 'All <M> green' -> 'All <M> passing'; 'All <M> datasets green' and 'All <M> counted datasets green' -> 'All <M> datasets passing' and 'All <M> counted datasets passing'; '<N> of <M> datasets not green' -> '<N> of <M> datasets not passing'; the column header and key 'Columns not green' -> 'Columns not passing', the key reading 'Columns not passing - <solid line> fail · <dotted line> warn, share of columns on each QA run. ...'; 'Columns red and amber, each QA run', 'Datasets red and amber, each week' and 'Checks on this column red and amber, each QA run' -> '... failing and warning, each ...', with their accessible names likewise ('latest 2 fail and 1 warn of 15'); 'Each column's lines: share of its checks red (solid) and amber (dotted), each QA run' -> '... failing (solid) and warning (dotted) ...'; and the trend table's headers 'Red | Amber | Not green' -> 'Fail | Warn | Not passing'."
+      - "THE SYSTEM SHALL word the legends 'Pass - within threshold', 'Warn - in the warning band' and 'Fail - in the fail band' on the Agencies tier and 'Pass · Warn · Fail' on the dataset page, each dot keeping its colour."
+      - "THE SYSTEM SHALL word a check's band 'warn above <value>' and 'fail above <value>' (and the other directions BAND_WORD gives), as its fallback already reads 'warn > <value>'."
+      - "THE SYSTEM SHALL reword the remaining prose without a colour word, among them: 'Makes its dataset red' -> 'Makes its dataset fail'; 'each turn their dataset red until someone resolves them' -> 'each make their dataset fail until someone resolves them'; 'The dataset stays red' -> 'The dataset keeps failing'; 'it counts as red until it can be' -> 'it counts as a fail until it can be'; 'neither red nor a result' -> 'neither a fail nor a result'; 'this check is red because of the gap' -> 'this check fails because of the gap'; 'A red anywhere below makes the parent red; an amber with no red makes it amber' -> 'A Fail anywhere below makes the parent Fail; a Warn with no Fail makes it Warn'; 'never a misleading blank, green, or red' -> 'never a misleading blank, Pass or Fail'; 'no column reads red/amber/green as CURRENT status' -> 'no column reads Pass, Warn or Fail as its CURRENT status'; 'Which red was on purpose' and 'the list that says which red was on purpose' -> 'Which failures were on purpose' and '... which failures were on purpose'; 'a red supply should read the way a real one would' -> 'a failing supply ...'; and the refused-status error's 'read as green' -> 'read as a pass'."
+      - "THE SYSTEM SHALL show the amber setting (REQ-PIPE-122) as 'Warn setting: <text>', titled 'What happens to a supply whose checks come back warning, and where that was set', and a replacement setting's value (REQ-PIPE-123) in words - 'never', 'when passing', 'when passing or warning' - never as the raw value green or green-or-amber (PROVISIONAL on question Q3)."
+      - "THE SYSTEM SHALL turn every status shown as a word into words through one label function (label or verb form), including the three places that print a stored value directly today (template :8808 'went in ${promotedOn}', :7282 and :7287 '${verdict}'); and IF that function meets a status it has no word for, THEN THE SYSTEM SHALL refuse it as unrecognised (REQ-QAC-047's rule) and never show the raw value."
+      - "THE SYSTEM SHALL reword the column descriptions that say 'dirty(amber/red) presets' (child-protection-contract.yaml :460 and :628) to 'the warning and failing dirty presets', and SHALL regenerate SCENARIOS.md (`mothman scenarios map`) once REQ-DOCS-362 has reworded its sources, so that the scenario panel uses no colour word for a status (PROVISIONAL on question Q4)."
+      - "THE SYSTEM SHALL leave unchanged every colour (--good, --warn-fill, --warn, --bad and every use of them), every CSS class, every data-status, data-red-promoted, data-amber-promoted and data-amber-setting attribute value, every function name, every status value in the build's JSON and in status-cases.json, and the cross-table grid's Pass / Warn / Fail / No result words and its marks (PROVISIONAL on question Q2)."
+      - "THE SYSTEM SHALL update, in the same change, every Python and Vitest test asserting a displayed word this requirement changes (about 56 Python assertion lines in 12 files and about 27 Vitest lines in 7 files on 2026-10-31, re-counted at build), each re-run and seen to pass on the new words, and SHALL change no test that asserts an identifier or stored value."
+      - "THE SYSTEM SHALL have a Vitest test, seen failing first, that renders a promoted supply turned failing, one turned warning, and a re-checked-worse one, each with a STORED promotedOn or verdict of 'red' or 'amber', and asserts that the badge and its sentence read the new words and contain neither stored value."
+    non_functional_requirements:
+      - "ONE VOCABULARY, TWO SIDES HELD EQUAL (REQ-QAC-047): the words sit beside the values in status-cases.json, a 'labels' block (PROPOSED) giving each status its label and verb form, read by tests-js/status-parity.test.js and tests/test_status_parity.py, so that the page's STATUS_LABEL and the terminal's words (REQ-TEST-360) cannot drift apart the way the grid's word did."
+      - "NO PERMISSIVE FALLBACK: an unknown status is refused, as today, and never shown as its raw value or as a pass (criterion 11)."
+      - "ACCESSIBILITY: every accessible name and title follows the words (criteria 1 and 6), so a screen-reader user and a colour-blind reader get the same status the colour shows."
+      - "SCALE AT 30 COLLECTIONS: the words change in one map and one label function, never per collection; no word names a collection."
+      - "WORDING ONLY: every status, rollup, pixel and colour stays as it is, so TestStatusMatchesEachToolsOwnVerdict passes unchanged."
+      - "COST: no new e2e module; changed assertions stay in their classes, and the work goes out in one push (REQ-TEST-260)."
+      - "OBSERVABILITY: a CHANGELOG.yaml entry in the same push, and a plans/post-build-review.md entry recording a change to built wording (REQ-DOCS-362)."
+    dependencies:
+      - REQ-QAC-047
+      - REQ-DASH-272
+      - REQ-DASH-126
+      - REQ-DASH-337
+    decisions:
+      - "PASS / WARN / FAIL EVERYWHERE (Keith, 2026-10-31, option (c)). REJECTED (a), Green / Amber / Red everywhere, which would reword the grid back; REJECTED (b), Pass / Warn / Fail in the grid only, which keeps two vocabularies on one page, the very thing he found."
+      - "DISPLAY ONLY, PROPOSED (delivery-scoper; question Q2): renaming the stored values would touch about 900 test lines, status-cases.json, the qa schema's write-once rows and every data attribute tests select on, and change nothing a reader sees. The colour and its value stay together: green is still the colour of a Pass."
+      - "THE WORDS MATCH WHAT IS ALREADY UNDERNEATH (from the code): a tool's per-check status is already stored as pass / warn / fail / error, Soda and band thresholds are already warn / fail, and the terminal's per-check results already say pass / warn / fail. Only the dataset-level layer says green / amber / red, and that layer stays as values."
+      - "VERB FORMS IN PROSE, PROPOSED (question Q1): 'Promoted, failing' rather than a literal 'Fail promoted', which reads as 'the promotion failed'; 'Promoted, warning' to match. The column panel already says Passing / Warning / Failing."
+      - "'NO DATA' STAYS, AND SO DOES THE GRID'S 'NO RESULT' (delivery-scoper, PROPOSED): 'No data' is a dataset with nothing supplied, 'No result' a check with nothing recorded - two facts, so two words are right here, unlike green and Pass."
+      - "SETTLES THE PROVISIONAL GRID WORDING: REQ-DASH-272's 'PROVISIONAL WORDING, for Keith' decision is answered - Pass / Warn / Fail / No result stand."
+    open_questions:
+      - "TITLE CASE OR CAPITALS: the brief says 'PASS / WARN / FAIL'; running-thoughts #132 and the grid say 'Pass / Warn / Fail'. Drafted in title case to match the grid, the pills' existing case and the other labels ('No data'). Capitals would mean changing the grid too. Confirm at sign-off."
+  - id: REQ-TEST-360
+    title: "The terminal and the GitHub Issue text word every status Pass, Warn or Fail (or passing, warning, failing), with colour styles, exit codes, option values and stored values unchanged"
+    date_written: "2026-10-31"
+    story: "As whoever works the filing queue in the terminal, I want a supply's status in the same words the dashboard uses, so that 'failing because ...' in the queue and 'Promoted, failing' on the page are plainly the same thing."
+    moscow: should
+    status: not_started
+    source: "Keith, 2026-10-31, option (c) - 'the terminal's words and the Python status mirror all change' (plans/running-thoughts.md #132). Drafted by delivery-scoper 2026-10-31. A PROPOSAL, not signed."
+    acceptance_criteria:
+      - "THE SYSTEM SHALL word every status the terminal prints in REQ-DASH-359's vocabulary - label 'Pass' / 'Warn' / 'Fail', verb form 'passing' / 'warning' / 'failing' - from one Python label function beside qa_tools/common/dataset_status.py, held equal to the page by status-cases.json's labels (REQ-DASH-359 NFR 1)."
+      - "THE SYSTEM SHALL reword the root-cause and outcome lines: 'red because <dataset> for <period> is overdue; ...' -> 'failing because ...'; 'red - <n> of its own checks fail(s)' -> 'failing - ...'; 'red - <check> failed against the warehouse; decide ...' -> 'failing - ...'; 'red - could not run: <period> holds no <dataset>' -> 'failing - could not run: ...'; '(measured <x> - red because <reason>)' -> '(measured <x> - failing because <reason>)'; '..., green, because the <dataset> ... was held back' -> '..., passing, because ...'."
+      - "THE SYSTEM SHALL word the filing queue's 'amber, waiting for a person (amber setting: hold)' as 'warning, waiting for a person (warn setting: hold)', 'amber and held for a person' as 'warning and held for a person', the acknowledge choice's 'this amber supply' as 'this warning supply', and 'Amber setting:' as 'Warn setting:' (PROVISIONAL on question Q3)."
+      - "THE SYSTEM SHALL print a listed supply's verdict (REQ-GHUB-229 criterion 4), 'Promoted, then re-checked <verdict>', and lifecycle_report's outcome lines through the label function, never the raw stored value; and IF it meets a status it has no word for, THEN THE SYSTEM SHALL refuse it as unrecognised."
+      - "THE SYSTEM SHALL order lifecycle_report.outcome_lines' failing lines first, and attach its 'more' pointer, by the STATUS VALUE - not, as today (:284, :288), by testing whether the worded status starts with 'red' - so the reword cannot silently undo REQ-PIPE-276 criterion 10's order; a test, seen failing first, SHALL show a failing group still sorts first after the reword."
+      - "THE SYSTEM SHALL reword the qa_tools refusals and notices a person reads in the terminal - acknowledgement.py, decision_log.py, filing_decisions.py, promotion.py, replacement_setting.py, validate_schedule.py, gate.py, held_blast_radius.py, own_table.py and knock_on.py - by REQ-DASH-359 criterion 3's rule, each listed at build by grepping their string literals for the three words."
+      - "THE SYSTEM SHALL print 'At least one recorded result is a fail.' for `mothman pipeline run`'s exit 1, and word the exit-code help in cli/pipeline.py and cli/schedule.py 'failing' rather than 'red', with the exit codes themselves unchanged."
+      - "THE SYSTEM SHALL word `mothman scenarios rules`' bands 'warn at <band>' and 'no warn band - closed by ...'."
+      - "THE SYSTEM SHALL word a GitHub Issue's title '<name> is failing' and its bodies 'currently reading **Fail**', 'Still **failing** as of this run' and 'Resolved to **Pass**' (qa_tools/common/ticket_sync.py), even though the workflow is disabled today, so that it uses the dashboard's words when turned back on."
+      - "THE SYSTEM SHALL leave unchanged every Rich colour style (green, yellow, red are colours, not statuses), every exit code and its name (EXIT_RED), the `mothman population --dirty none|amber|red` values and the generator's target verdicts (PROVISIONAL on question Q2), and the generator's developer error messages."
+      - "THE SYSTEM SHALL show every reworded line correctly with NO_COLOR set, piped and at 80 columns, as REQ-PIPE-276 criterion 21 requires, and SHALL update in the same change every test asserting a changed terminal word, re-run and seen to pass."
+    non_functional_requirements:
+      - "ONE VOCABULARY (REQ-DASH-359 NFR 1): the terminal and the page read words held equal by one committed table."
+      - "NO COLOUR-ONLY MEANING: the words carry the status with NO_COLOR set, as REQ-PIPE-211 criterion 16 already requires for the settlement panel."
+      - "COMPATIBILITY: nothing a script types changes - no option value, exit code or config key - so no workflow or runbook breaks."
+      - "RECORDS ARE NOT REWRITTEN: recorded decision reasons and ticket comments keep their words; only new text uses the new ones."
+    dependencies:
+      - REQ-DASH-359
+      - REQ-QAC-047
+      - REQ-PIPE-276
+    decisions:
+      - "THE TERMINAL FOLLOWS THE PAGE (Keith, 2026-10-31: 'the terminal's words and the Python status mirror all change'). dataset_status.py, the Python status mirror, holds VALUES and no words (one error message aside), so changing the mirror means adding its label function, not renaming its values (PROPOSED)."
+      - "ORDER BY VALUE, FOUND IN THE CODE: outcome_lines sorts on the worded status's first word, so a word-only change would quietly move failing lines out of first place. Criterion 5 fixes this test-first."
+      - "COMPONENT TEST, because cli/ belongs to TEST (docs/components.md). The ticket_sync criterion is a GHUB file, folded in as one line rather than given its own requirement."
+    open_questions: []
+  - id: REQ-TEST-361
+    title: "A guard stops a colour word for a status coming back - a real-browser scan of the built dashboard's visible text and accessible names, and a scan of the terminal's worded statuses"
+    date_written: "2026-10-31"
+    story: "As Keith, I want a test that fails when a person can read 'Green', 'Amber' or 'Red' as a status anywhere on the dashboard or in the terminal, so that the vocabulary I chose does not drift back one provisional wording at a time, as the grid's did."
+    moscow: should
+    status: not_started
+    source: "Keith, 2026-10-31 (plans/running-thoughts.md #132; the process gap is plans/post-build-review.md #292). Drafted by delivery-scoper 2026-10-31. A PROPOSAL, not signed."
+    acceptance_criteria:
+      - "WHEN the test suite runs, THE SYSTEM SHALL drive the built dashboard in a real browser across the Executive, Agencies and collection tiers, one dataset page of every registered collection, a column panel, and datasets showing a promoted-failing, a promoted-warning and an acknowledgement-owed supply (each found from the scenario map and first asserted to exist), and SHALL fail on any match of /\\b(green|amber|red)\\b/i in visible text, in any title or aria-label attribute, or in any SVG title, naming the page, the element and the text."
+      - "THE SYSTEM SHALL exclude from that scan only the Plans, Requirements, Release Notes and Feedback tabs, which show records (REQ-DOCS-362 criterion 4), and text inside elements that show data values - failing samples and value bars - marked by a data attribute the template sets on them; a synthetic surname such as 'Green' (generator/names_au.py) is a data value, not a status."
+      - "THE SYSTEM SHALL assert, before scanning, that each page holds at least one status pill and that the scanned text is not empty, so an empty page cannot pass (CLAUDE.md test rule 3); and a test SHALL show, seen failing first, that restoring 'Red promoted' in the template makes the guard fail."
+      - "WHEN the test suite runs, THE SYSTEM SHALL run the terminal's label function and the outcome, root-cause and queue-state wordings (REQ-TEST-360 criteria 2 to 4) over every status in status-cases.json with NO_COLOR set, and SHALL fail on any colour word in the result."
+      - "THE SYSTEM SHALL NOT scan source text, CSS, unshown attribute values or comments - only what a person reads (CLAUDE.md test rule 1)."
+    non_functional_requirements:
+      - "COST: the browser half adds classes to tests/test_dashboard_e2e.py, reusing its session-built dashboard rather than building again, in the needs_deployment half where that module already runs. A few seconds per page; at 30 collections it scans one dataset page per collection, not every dataset."
+      - "PRIVACY: a failure names the element and the matched text, never a whole sample, so a real deployment's failure output holds no row values."
+      - "MAINTAINABILITY: the exclusions are a short named list in the test, each with its reason; a new tab that shows records is added on purpose, not by accident."
+    dependencies:
+      - REQ-DASH-359
+      - REQ-TEST-360
+    decisions:
+      - "BY BEHAVIOUR, NOT BY GREPPING THE TEMPLATE (CLAUDE.md test rule 1): a grep would hit about 190 comment lines and 85 identifier lines nobody reads, and would miss the stored values printed raw (REQ-DASH-359 criterion 11), which the browser does show."
+      - "REJECTED a mothman check gate over string literals: cheaper, but it would test display through source text, which rule 1 allows only for architecture rules."
+    open_questions: []
+  - id: REQ-DOCS-362
+    title: "Built requirements whose criteria quote a colour word for a status are amended to the new words, reader-facing docs follow, and history stays as it was"
+    date_written: "2026-10-31"
+    story: "As whoever builds and audits against requirements.yaml, I want every criterion that quotes the dashboard's or the terminal's words to quote the words now shown, so that a criterion and the page never disagree - while what was recorded at the time stays as it was."
+    moscow: should
+    status: not_started
+    source: "Keith, 2026-10-31 (plans/running-thoughts.md #132: 'the changelog and docs'). Drafted by delivery-scoper 2026-10-31. A PROPOSAL, not signed."
+    acceptance_criteria:
+      - "THE SYSTEM SHALL amend, in the change that builds REQ-DASH-359 and REQ-TEST-360, the built criteria listed in this requirement's decisions as A1 to A27, each to its PROPOSED text and each marked 'AMENDED <date applied> by REQ-DOCS-362', and SHALL change no other criterion's words (PROVISIONAL on question Q4)."
+      - "THE SYSTEM SHALL amend signed, unbuilt REQ-DASH-299 as B1 says, and SHALL close its open question 1 as decided by REQ-DASH-359."
+      - "THE SYSTEM SHALL reword the reader-facing documents - docs/supplier-guidance.md (4 lines) and README.md's descriptions of what the dashboard shows - to Pass, Warn, Fail or the verb forms, and SHALL reword the text in plans/supply-model.md's scenario register that SCENARIOS.md carries to the dashboard, so that the regenerated map (REQ-DASH-359 criterion 12) uses no colour word for a status (PROVISIONAL on question Q4)."
+      - "THE SYSTEM SHALL leave unchanged every past CHANGELOG.yaml entry, every requirement's decisions and evidence, every plans/*.md entry apart from the scenario register's displayed text, docs/drafts/, and every text recorded in the database."
+      - "THE SYSTEM SHALL add a CHANGELOG.yaml entry in the push that ships REQ-DASH-359, saying that statuses now read Pass, Warn and Fail and that colours are unchanged, and a plans/post-build-review.md entry recording it as a change to built wording, with the inventory counts re-taken at build."
+      - "WHEN `mothman check` runs after the amendments, THE SYSTEM SHALL pass validate-requirements and every docs gate."
+    non_functional_requirements:
+      - "AN AMENDMENT CHANGES SIGNED TEXT: several of these wordings were 'approved by Keith' word for word (REQ-DASH-225 c2 and c5, REQ-DASH-226 c8, REQ-DASH-227 c5; REQ-DASH-337 c9 'settled 2026-10-30'). Each amendment is signed on its own wording, as REQ-DASH-299's A1 to A6 were."
+      - "NO AUTHORING STANDARD CHANGES: neither docs/check-authoring-rules.md nor CHANGELOG.yaml's header contains a colour word. Adding a rule ('write a status as Pass, Warn or Fail') to either would need Keith's explicit approval of the exact wording (CLAUDE.md), and is NOT proposed here."
+    dependencies:
+      - REQ-DASH-359
+      - REQ-TEST-360
+    decisions:
+      - "HISTORY STAYS (PROPOSED, question Q4): a changelog entry, decision or recorded reason says what was true and shown at the time; rewriting it would make the record claim something that was never on the page."
+      - "ONLY QUOTED DISPLAY TEXT IS AMENDED (PROPOSED): 323 criteria in 107 requirements mention one of the words, but most use it for the status itself ('reads red', 'a red promoted supply'). That stays true, since red is still the colour and the value. About 30 criteria in 14 requirements quote words a person reads, and those are the ones amended."
+      - "A1 - REQ-DASH-126 c1. CURRENT: 'THE SYSTEM SHALL show it as RED PROMOTED on its dataset page and its agency card'. PROPOSED: 'THE SYSTEM SHALL show it as red promoted - labelled 'Promoted, failing' (REQ-DASH-359) - on its dataset page and its agency card'. The rest is unchanged."
+      - "A2 - REQ-DASH-133 c6. CURRENT: 'for example '3 waiting for a person: 2 no supply, 1 red promoted''. PROPOSED: 'for example '3 waiting for a person: 2 no supply, 1 promoted, failing''."
+      - "A3 - REQ-DASH-180 c29. CURRENT: 'never '0 of 0 datasets not green''. PROPOSED: 'never '0 of 0 datasets not passing''."
+      - "A4 - REQ-DASH-225 c1. CURRENT: 'a column headed 'Columns not green''. PROPOSED: 'a column headed 'Columns not passing''."
+      - "A5 - REQ-DASH-225 c2 (wording approved by Keith 2026-10-14). CURRENT: ''Columns not green — <solid red line sample> red · <dotted amber line sample> amber, share of columns on each QA run. ...''. PROPOSED: ''Columns not passing — <solid red line sample> fail · <dotted amber line sample> warn, share of columns on each QA run. ...''."
+      - "A6 - REQ-DASH-225 c4. CURRENT: 'how many units are red and how many amber - '2 red, 1 amber' - ... so that a dataset with only red reads '2 red, 0 amber''. PROPOSED: 'how many units fail and how many warn - '2 fail, 1 warn' - ... so that a dataset with only fails reads '2 fail, 0 warn''."
+      - "A7 - REQ-DASH-225 c5 (approved 2026-10-14). CURRENT: ''2 red, 1 amber · incl. Supply-level checks''. PROPOSED: ''2 fail, 1 warn · incl. Supply-level checks''."
+      - "A8 - REQ-DASH-225 c6. CURRENT: 'THE SYSTEM SHALL read 'All <M> green''. PROPOSED: 'THE SYSTEM SHALL read 'All <M> passing''."
+      - "A9 - REQ-DASH-225 c12. CURRENT: ''Columns red and amber on each QA run, 12 runs from 1 Feb 2023 to 1 Aug 2026; latest 2 red and 1 amber of 15''. PROPOSED: ''Columns failing and warning on each QA run, 12 runs from 1 Feb 2023 to 1 Aug 2026; latest 2 fail and 1 warn of 15''."
+      - "A10 - REQ-DASH-225 c17. CURRENT: ''1 red, 0 amber · incl. Supply-level checks'; a dataset whose units are all green reads 'All <M> green''. PROPOSED: ''1 fail, 0 warn · incl. Supply-level checks'; a dataset whose units all pass reads 'All <M> passing''. The lines and stroke colours are unchanged."
+      - "A11 - REQ-DASH-225 c21. CURRENT: 'SHALL NOT read 'All 0 green''. PROPOSED: 'SHALL NOT read 'All 0 passing''."
+      - "A12 - REQ-DASH-226 c1. CURRENT: ''<N> of <M> datasets not green' ... '<N> of <M> counted datasets not green' ... beneath it '<r> red, <a> amber''. PROPOSED: ''<N> of <M> datasets not passing' ... '<N> of <M> counted datasets not passing' ... beneath it '<r> fail, <a> warn''."
+      - "A13 - REQ-DASH-226 c4. CURRENT: ''All <M> datasets green' ('All <M> counted datasets green' ...)'. PROPOSED: ''All <M> datasets passing' ('All <M> counted datasets passing' ...)'."
+      - "A14 - REQ-DASH-226 c8 (approved 2026-10-14). CURRENT: ''Datasets red and amber, each week' ... 'Datasets red and amber each week, 40 weeks from 3 Jan 2026 to 10 Oct 2026; latest 1 red and 1 amber of 6''. PROPOSED: ''Datasets failing and warning, each week' ... 'Datasets failing and warning each week, 40 weeks from 3 Jan 2026 to 10 Oct 2026; latest 1 fail and 1 warn of 6''."
+      - "A15 - REQ-DASH-226 c11. CURRENT: 'reads '2 of 3 counted datasets not green' and '1 red, 1 amber''. PROPOSED: 'reads '2 of 3 counted datasets not passing' and '1 fail, 1 warn''."
+      - "A16 - REQ-DASH-227 c1. CURRENT: 'a trend titled 'Columns red and amber, each QA run''. PROPOSED: 'a trend titled 'Columns failing and warning, each QA run''."
+      - "A17 - REQ-DASH-227 c4. CURRENT: 'the number red, the number amber, and the count as '<N> of <M> not green''. PROPOSED: 'the number failing, the number warning, and the count as '<N> of <M> not passing''."
+      - "A18 - REQ-DASH-227 c5 (approved 2026-10-14). CURRENT: ''Each column's lines: share of its checks red (solid) and amber (dotted), each QA run''. PROPOSED: ''Each column's lines: share of its checks failing (solid) and warning (dotted), each QA run''."
+      - "A19 - REQ-DASH-221 c8. CURRENT: 'a tag in the acknowledgement badge's form - 'Amber, promoted - re-checked, awaiting acknowledgement''. PROPOSED: 'a tag in the acknowledgement badge's form - 'Promoted passing, re-checked warning - awaiting acknowledgement''. NOTE: the CURRENT text was already out of date. Keith settled 'Promoted green, re-checked amber - ...' on 2026-10-29 (REQ-DASH-221's own wording decision), and the criterion was never amended."
+      - "A20 - REQ-DASH-272 c1. CURRENT: ''..., and is <status>.' with ... <status> as STATUS_LABEL gives it - for example '... 9:00am Monday, 1 July 2024, and is Green.''. PROPOSED: ''..., and is <status>.' with ... <status> in its verb form (REQ-DASH-359) - for example '... 9:00am Monday, 1 July 2024, and is passing.''."
+      - "A21 - REQ-DASH-272 c3. CURRENT: 'green or amber '..., and is <status>.'; red and promoted while red '..., and is Red: it was promoted while red.'; red since promotion '..., and is Red: it turned red <time>, after <cause>''. PROPOSED: 'passing or warning '..., and is <status>.'; failing and promoted while failing '..., and is failing: it was promoted while failing.'; failing since promotion '..., and is failing: it started failing <time>, after <cause>''."
+      - "A22 - REQ-DASH-272 c24. CURRENT: ''..., and is Green.' ... and a Red pill ... reads Green with no result'. PROPOSED: ''..., and is passing.' ... and a Fail pill ... reads Pass with no result'. The rest is unchanged."
+      - "A23 - REQ-DASH-275 c4. CURRENT: ''[Red] Held back together: <names> ...' (twice)'. PROPOSED: ''[Fail] Held back together: <names> ...' (twice)'."
+      - "A24 - REQ-DASH-337 c9 (settled 2026-10-30). CURRENT: 'an amber pill 'Amber promoted' and the sentence 'Went in green. Amber since <cause>, <date>.''. PROPOSED: 'an amber pill 'Promoted, warning' and the sentence 'Went in passing. Warning since <cause>, <date>.''."
+      - "A25 - REQ-PIPE-210 c9. CURRENT: ''red because <dataset> for <period> is overdue; its checks run again once one is promoted''. PROPOSED: ''failing because <dataset> for <period> is overdue; its checks run again once one is promoted''."
+      - "A26 - REQ-PIPE-211 c14. CURRENT: 'a red line for want of the table reading 'red - could not run: <period> holds no <dataset>''. PROPOSED: 'a failing line for want of the table reading 'failing - could not run: <period> holds no <dataset>''."
+      - "A27 - REQ-PIPE-276 c15 and REQ-GHUB-229 c4. CURRENT: '... (received <instant>), green, because the cp-notifications received with it was held back' and 'its verdict (green, amber or red, ...)'. PROPOSED: '... (received <instant>), passing, because ...' and 'its verdict (Pass, Warn or Fail, ...)'."
+      - "B1 - REQ-DASH-299 (signed 2026-10-31, not built). In its decision for amendment A5: CURRENT 'never green and never 'No data'' and ''3 checks: 1 green, 2 not checked''; PROPOSED 'never Pass and never 'No data'' and ''3 checks: 1 pass, 2 not checked''. Criterion 15 (9): CURRENT 'showing its amber tag naming Linkage Products''; PROPOSED 'showing its 'Promoted, warning' tag naming Linkage Products''. Criterion 15 (11): CURRENT 'its pill reads 'Not checked' and never green or 'No data''; PROPOSED 'its pill reads 'Not checked' and never 'Pass' or 'No data''. Its A1 note 'It is neither red nor a result' becomes 'It is neither a fail nor a result'. Open question 1 is CLOSED: option (b) follows from REQ-DASH-359 criterion 2."
+    open_questions: []
+
+# =============================================================================
+# QUESTIONS FOR KEITH (ready to relay; every PROVISIONAL item above names one)
+# =============================================================================
+# Q1. How should a status read inside a phrase?
+#   (a) RECOMMENDED. Pills, legends and counts say Pass / Warn / Fail; prose
+#       says passing / warning / failing: 'Promoted, failing', 'Promoted,
+#       warning', 'went in passing. Warning since ...', '1 promoted,
+#       failing'. Reads as plain English, and the column panel already says
+#       Passing / Warning / Failing.
+#   (b) The three words exactly, everywhere: 'Fail, promoted', 'Warn,
+#       promoted', 'went in at Pass. Warn since ...'. One spelling per word,
+#       but stiffer, and '1 fail, promoted' reads oddly in a count.
+#   (c) A straight swap: 'Fail promoted', 'Warn promoted'. The smallest
+#       change, but 'Fail promoted' reads as 'the promotion failed'.
+# Q2. How deep does the rename go?
+#   (a) RECOMMENDED. Displayed words only. These stay as they are: stored
+#       values, CSS classes, data attributes, function and module names,
+#       config keys (amber_setting), config values (green-or-amber),
+#       database values and CLI option values (--dirty amber).
+#   (b) Also rename what people type in config and options: warn_setting,
+#       pass / pass-or-warn, --dirty warn|fail, with a migration. More
+#       consistent, but it means migrating settings whose past is frozen and
+#       gated in CI.
+#   (c) Everything, stored values included: about 900 test lines, the shared
+#       status table, and rows that can only be written once.
+# Q3. What does the dashboard call the amber setting?
+#   (a) RECOMMENDED. 'Warn setting: promote', with replacement values shown
+#       as 'never', 'when passing', 'when passing or warning'. The config key
+#       stays amber_setting.
+#   (b) Keep 'Amber setting' as the setting's proper name. The page and the
+#       config would match, but one colour word stays on screen.
+# Q4. What happens to records and the documents around them?
+#   (a) RECOMMENDED. History stays: past changelog entries, decisions,
+#       evidence, plans and recorded reasons. Only the ~30 built criteria
+#       that quote displayed words are amended (A1-A27, B1). What readers see
+#       today is reworded: supplier-guidance.md, the README, two column
+#       descriptions, and the scenario register text the dashboard shows.
+#   (b) As (a), and also reword the 323 criteria that use a colour as the
+#       status ('reads red'). Consistent, but a sweep of 107 requirements
+#       that says nothing new.
+#   (c) As (a), but leave the docs and the scenario text alone. Smaller, but
+#       the scenario panel would still say 'which red was on purpose'.
+#
+# DRAFT plans/running-thoughts.md #132 UPDATE (for whoever applies it; not
+# written by the scoper): replace 'NOT SCOPED YET ...' with 'SCOPED
+# 2026-10-31 as REQ-DASH-359, REQ-TEST-360, REQ-TEST-361 and REQ-DOCS-362
+# (docs/drafts/pass-warn-fail-v1.yaml), awaiting sign-off. Settles
+# REQ-DASH-299 open question 1 as (b).'
+#
+# DRAFT plans/post-build-review.md ENTRY, for whoever applies this once it
+# is built:
+#   <next>. [todo, <date applied>] [Dashboard UI] [Testing & dev tooling]
+#   Built wording changed site-wide: statuses read Pass / Warn / Fail
+#   (REQ-DASH-359, REQ-TEST-360), with compound labels as in REQ-DASH-359
+#   criterion 4, and colours and stored values unchanged. 27 built criteria
+#   amended (REQ-DOCS-362). A real-browser guard added (REQ-TEST-361).
+#   Re-counted inventory: <counts>. This does NOT close #292's process gap
+#   (provisional wordings with no question attached); that stays its own
+#   item.
+# =============================================================================
