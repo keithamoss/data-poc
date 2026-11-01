@@ -46777,7 +46777,7 @@ requirements:
     date_written: '2026-10-31'
     story: As a data team leader glancing at the register, I want every status in the three words the cross-table grid already uses - Pass, Warn, Fail - so that one page never says 'Amber' in a pill beside 'Warn' in a cell, and a status reads the same whether or not I can see its colour.
     moscow: should
-    status: not_started
+    status: built
     signed_off:
       by: Keith
       date: '2026-11-01'
@@ -46839,13 +46839,80 @@ requirements:
     - 'SETTLES THE GRID WORDING: REQ-DASH-272''s ''PROVISIONAL WORDING, for Keith'' decision is answered - Pass / Warn / Fail / No result stand, SETTLED by Keith 2026-10-31.'
     - '#289 D8d AND D8e ARE FIXED IN THIS BATCH, SETTLED by Keith 2026-11-01, D8e test-first (criteria 18 and 19). They sit on the trends this batch rewords, so the trend tests are touched once.'
     - 'THE SCRIPTED CHECKLIST, NOT A COMMITTED GATE (architect SHOULD): the churn is about 27 files; the checklist''s per-phrase zero counts are the evidence. Zero-count-only rows SETTLED by Keith 2026-11-01 (build-time decision 3).'
+    - 'STATUSWORDS IS THE ONE FUNCTION, STATUS_LABEL IS GONE (criteria 1 and 2): every former reader of STATUS_LABEL calls statusWords(value, form), which throws on a status it has no word for. A caller that shows a note only where there IS a status (''Arrived <X>'', the status-when-promoted cell) asks hasStatusWords() first - a value check, not a fallback, so no raw value is ever shown.'
+    - 'THE WAREHOUSE CLAUSE KEEPS ITS PILL, IN THE VERB FORM (criteria 11 and 15): criterion 11 words the clause ''..., and is passing.'', and criterion 15 keeps every colour and its use, so the pill stays with its colour and icon and says the verb form inside the sentence - pill(status, size, ''verb''). A pill standing alone still says the label.'
+    - '''NOT PASSING'' AND ITS SPLIT IN ONE ACCESSIBLE NAME (criterion 8): the agency card''s line and the dataset row''s count cell each carry role=group with an aria-label holding both (''2 of 3 counted datasets not passing: 1 failing, 1 warning'').'
+    - 'THE FALLBACK WHERE NO VERDICT IS RECORDED: markerKindLabel reads ''<n> worse on re-check after promotion'' (criterion 6), and the queue heading, the terminal''s state word and the promote consequence follow it - ''Promoted, then worse on re-check'' - so the heading and the count say the same thing.'
+    - 'RECORDED TEXT IS MARKED, CONFIGURATION IS NOT (criterion 14): data-recorded-text wraps a decision''s reason (acknowledgement, excuse, re-check, rejection, settlement, mark, kept), a recorded reference reason and a check''s changelog description; data-recorded-title marks an element whose title is a recorded reason; data-value-text marks failing-row keys and value bars. A turn-off''s reason and an agreement''s reason are current configuration and stay subject to the guard.'
+    - 'D8d WAS THE CHECK TREND (criterion 18): its x labels were fmtDay''s long dates (''Wednesday, 30 September 2026'', about 160 units at 9.5px in a 480-unit chart), so first, middle and last overprinted. One function, xAxisTicks, now draws both labelled trends'' dates in the short form, always keeps the last, and leaves out the first or middle where its extent - 0.6em a character in the monospaced axis font - would touch another. Both charts scale with their viewBox, so phone and desktop widths share the layout.'
+    - 'D8e IS DRAWING, NOT STATUS (criterion 19): unitCounts marks a point none of whose results was evaluated, and twoLinePaths draws no segment to or from it - a gap, as plotted() makes one in a check''s own trend. The point keeps its place and the counts are unchanged, so the count line and the pill are as before.'
+    - 'SCENARIOS.md REGENERATED WITHOUT A BOOTSTRAP (criterion 13): the placements it is built from were rebuilt from the committed map''s own data block into the worktree''s gitignored data/scenario_placements.json, and `mothman scenarios map` rewrote it; every scenario''s coordinates were compared before and after and are identical, so only the reworded register text changed. The generator''s own config strings are not carried to SCENARIOS.md (it reads the register''s text and the placements'' targets, whose built_to now goes through status_words), so they are not reworded.'
     open_questions: []
+    linked_tests:
+    - 'tests-js/status-parity.test.js'
+    - 'tests-js/pass-warn-fail.test.js'
+    - 'tests-js/unit-trend-not-evaluated.test.js'
+    - 'tests-js/trend-axis-labels.test.js'
+    - 'tests-js/supply-outcome.test.js'
+    - 'tests-js/columns-not-green.test.js'
+    - 'tests-js/datasets-not-green.test.js'
+    - 'tests-js/cross-collection.test.js'
+    - 'tests-js/rechecks.test.js'
+    - 'tests-js/amber-setting.test.js'
+    - 'tests-js/turned-off.test.js'
+    - 'tests-js/not-in-agreement.test.js'
+    - 'tests-js/period-composition.test.js'
+    - 'tests/test_status_parity.py::TestTheWordsAreTheOnesBothSidesAgreed'
+    - 'tests/test_cross_table_grid.py'
+    - 'tests/test_scenario_map.py'
+    - 'tests/test_dashboard_e2e.py::TestNoColourWordIsReadAsAStatus'
+    implemented_by:
+    - 'dashboard/qa-reporting-dashboard.template.html::statusWords'
+    - 'dashboard/qa-reporting-dashboard.template.html::markerKindLabel'
+    - 'dashboard/qa-reporting-dashboard.template.html::outstandingKindLabel'
+    - 'dashboard/qa-reporting-dashboard.template.html::redPromotedBadge'
+    - 'dashboard/qa-reporting-dashboard.template.html::amberPromotedTag'
+    - 'dashboard/qa-reporting-dashboard.template.html::recordedText'
+    - 'dashboard/qa-reporting-dashboard.template.html::xAxisTicks'
+    - 'dashboard/qa-reporting-dashboard.template.html::unitCounts'
+    - 'dashboard/qa-reporting-dashboard.template.html::twoLinePaths'
+    - 'dashboard/qa-reporting-dashboard.template.html::replacementWords'
+    - 'pipeline/cross_table_grid.py::_clause'
+    - 'qa_tools/common/scenario_map.py::_target_text'
+    - 'qa_tools/common/replacement_setting.py::words'
+    evidence:
+    - '2026-11-01, tree f22855b (worktree bpwf), empty warehouse, no bootstrap: the full Vitest suite 1075 of 1078 passed with the Python run beside it; the three that failed (another-table, census, implemented-by) passed alone, 11 of 11 - timeouts under load. tests-js/pass-warn-fail.test.js (criterion 17) and tests-js/status-parity.test.js''s words block pass.'
+    - 'Criterion 17 SEEN FAILING FIRST: tests-js/pass-warn-fail.test.js run against the template as it stood before this build (935e53b) failed 8 of 8; it passes 12 of 12 on f22855b.'
+    - 'Criterion 19 (D8e) SEEN FAILING FIRST: tests-js/unit-trend-not-evaluated.test.js failed 3 of 4 with the fix''s two lines taken out (a red share of 0 drawn at the not-evaluated run) and passes 4 of 4 with them. Criterion 18 (D8d): tests-js/trend-axis-labels.test.js passes 3 of 3; with only a data-x-label added to the pre-fix template its check-trend case fails (the long dates overprint) while its unit-trend case passes, which located the defect in the check trend.'
+    - 'Criterion 13: SCENARIOS.md regenerated by `mothman scenarios map` from placements rebuilt out of the committed map''s own data block; 79 placements, every scenario''s coordinates identical before and after, and `mothman scenarios map --check` read it current. No colour word is left in any field of the 126 parsed register entries; the 41 left in SCENARIOS.md are stored built_to values in its machine data block, which the page does not render.'
+    - 'Python on f22855b: tests/test_status_parity.py''s words class, tests/test_cross_table_grid.py and tests/test_scenario_map.py are in the 1035-passed run of 33 touched and neighbouring modules (the five failures in it, a worker database that did not exist, passed alone, 11 of 11).'
+    unmet_criteria:
+    - criterion: 'Criterion 4, in the built page - no colour word for a status in any text a person reads; proven by REQ-TEST-361''s real-browser guard over the built dashboard.'
+      why: 'The guard needs a dashboard built from a bootstrapped history; this build ran with an empty warehouse (Keith''s run terms, 2026-11-01), so it is written and not yet run.'
+      owner: 'the end-of-run bootstrap (2026-11-01 build run)'
+      blocked_by:
+        unowned: true
+    - criterion: 'Criterion 14, in the built page - recorded text rendered inside its marked element, on pages carrying real recorded reasons and check changelog entries.'
+      why: 'The marks are covered by tests-js/pass-warn-fail.test.js; the proof on real recorded text needs the built dashboard.'
+      owner: 'the end-of-run bootstrap (2026-11-01 build run)'
+      blocked_by:
+        unowned: true
+    - criterion: 'Criterion 15, in the built page - colours, classes, data attributes and the grid''s words unchanged, with TestStatusMatchesEachToolsOwnVerdict passing unchanged.'
+      why: 'A real-browser proof over the built dashboard; waits on the bootstrap.'
+      owner: 'the end-of-run bootstrap (2026-11-01 build run)'
+      blocked_by:
+        unowned: true
+    - criterion: 'Criterion 16, the e2e half and the NFR''s scripted checklist - tests/test_dashboard_e2e.py''s changed assertions re-run and seen to pass, and the per-phrase before/after counts over the built dashboard''s visible text.'
+      why: 'Both need the built dashboard; the Python and Vitest assertions are re-run and pass (evidence).'
+      owner: 'the end-of-run bootstrap (2026-11-01 build run)'
+      blocked_by:
+        unowned: true
   - id: REQ-TEST-360
     title: The terminal and the GitHub Issue text word every status Pass, Warn or Fail (or passing, warning, failing) through one Python statusWords, with code that read worded text moved onto status values, and colour styles, exit codes, option values and stored values unchanged
     date_written: '2026-10-31'
     story: As whoever works the filing queue in the terminal, I want a supply's status in the same words the dashboard uses, so that 'failing because ...' in the queue and 'Promoted, failing' on the page are plainly the same thing.
     moscow: should
-    status: not_started
+    status: built
     signed_off:
       by: Keith
       date: '2026-11-01'
@@ -46884,13 +46951,66 @@ requirements:
     - 'THE TICKET DUPLICATE IS ACCEPTED AND NOTED, NOT FIXED, SETTLED by Keith 2026-11-01: ticket_sync._already_said (:300, :313) compares worded bodies, so if the disabled workflow is re-enabled each open ticket gets one duplicate ''Still failing'' comment, once. REJECTED fixing it now: the workflow is disabled and its replacement (plans/running-thoughts.md #53) inverts the integration.'
     - 'GENERATOR STRINGS: those SCENARIOS.md shows are reworded (architect SHOULD, resolving v1''s REQ-TEST-360 c10 against REQ-DASH-359 c12); developer error messages are not - nobody but a developer reads them.'
     - COMPONENT TEST, because cli/ belongs to TEST (docs/components.md). The ticket_sync criterion is a GHUB file, folded in as one line rather than given its own requirement.
+    - 'THE GATE''S REASON CARRIES ITS KIND (criterion 3): should_promote returns a Refusal - a str, so every place that shows, records or joins a reason is unchanged - carrying a kind (FAILING, WARN_HOLD, SLOT_FILLED and the rest). knock_on._fails_the_rules, promotion.judge and gate._record_holdback read refusal_kind(why); a plain-text reason has no kind and never fails the rules. REJECTED a parallel kind map threaded through Judged and a gate application, which every reader of `refused` would have had to learn.'
+    - 'THE OUTCOME TUPLE (criterion 2): lifecycle_report.ReGated is (dataset_id, status, words, result), the four the renderer reads; knock_on.Regated leads with the same four and carries supply and period after them, which filing_tui and settle_tui need to look the hold-back reason up. A plain phrase travels with status None; outcome_lines sorts and points by status == ''red'', never by the words.'
+    - 'promotion._status_label REFUSES (the earlier critic''s finding): an unknown status raises UnknownStatusError rather than being printed or turned into a phrase.'
+    - 'THE PROMOTION DATE (criterion 6; SETTLED by Keith 2026-11-01): Worse.promoted_at is the promote decision''s effective_at, read in the same query as its promoted_status, and the reason names it in display_time.format_day''s words (''was promoted passing on Thursday, 1 August 2024'').'
+    - 'THE RE-CHECK PANEL SAYS ''was passing; on re-check it is failing'' (criterion 7), not ''was passing, re-checked failing'', for UX MUST 3''s reason: ''re-checked failing'' reads as the re-check itself failing.'
+    - 'A TICKET SAYS THE LABEL FOR A STATE REACHED AND THE VERB IN PROSE (criterion 10): ''currently reading **Fail**'', ''Resolved to **Pass**'', ''Still **failing**'', its title ''<name> is failing''. The duplicate comment this causes once per open ticket is ACCEPTED AND NOTED, NOT FIXED (SETTLED by Keith 2026-11-01), as ticket_sync._label''s docstring says.'
+    - 'A CONFIGURATION VALUE A PERSON TYPES STAYS AS TYPED in a configuration error (validate_schedule: "Make the replacement setting ''green'' (or ''never'')"), quoted, with the warn setting named beside its key (amber_setting) - NFR COMPATIBILITY: nothing a script types changes.'
     open_questions: []
+    linked_tests:
+    - 'tests/test_status_reads_values.py'
+    - 'tests/test_status_words_shown.py'
+    - 'tests/test_status_parity.py::TestTheWordsAreTheOnesBothSidesAgreed'
+    - 'tests/test_lifecycle_report.py'
+    - 'tests/test_recheck_decision.py'
+    - 'tests/test_in_place_in_the_warehouse.py'
+    - 'tests/test_ticket_sync.py'
+    - 'tests/test_bulk_recheck.py'
+    - 'tests/test_target_agreement.py'
+    - 'tests/test_cli_package_gate.py'
+    - 'tests/test_settlement_rechecks_readers.py'
+    - 'tests/test_queue_beneath.py'
+    - 'tests/test_knock_on.py'
+    - 'tests/test_amber_setting.py'
+    - 'tests/test_check_bands.py'
+    - 'tests/test_cli_filing_tui.py'
+    - 'tests/test_decision_log.py'
+    - 'tests/test_agreement_drift.py'
+    - 'tests/test_replacement_setting.py'
+    - 'tests/test_generate_to_target.py'
+    implemented_by:
+    - 'qa_tools/common/dataset_status.py::status_words'
+    - 'qa_tools/common/dataset_status.py::STATUS_WORDS'
+    - 'qa_tools/common/promotion.py::Refusal'
+    - 'qa_tools/common/promotion.py::refusal_kind'
+    - 'qa_tools/common/promotion.py::_status_label'
+    - 'qa_tools/common/knock_on.py::Regated'
+    - 'qa_tools/common/knock_on.py::_fails_the_rules'
+    - 'cli/lifecycle_report.py::ReGated'
+    - 'cli/lifecycle_report.py::outcome_lines'
+    - 'qa_tools/common/root_cause.py::_overdue_reason'
+    - 'qa_tools/common/filing_queue.py::rechecked_worse_heading'
+    - 'qa_tools/common/filing_queue.py::rechecked_worse_reason'
+    - 'qa_tools/common/rechecking.py::Worse'
+    - 'qa_tools/common/slot_state.py::SlotState'
+    - 'cli/filing_tui.py::verdict_words'
+    - 'qa_tools/common/ticket_sync.py::_label'
+    - 'qa_tools/common/bulk_recheck.py::summary_lines'
+    - 'qa_tools/common/recheck.py::_said'
+    - 'qa_tools/common/target_agreement.py::_said'
+    evidence:
+    - '2026-11-01, tree f22855b, empty warehouse: 33 touched and neighbouring test modules, 1035 passed, 2 failed and 3 errors, all five a worker test database that did not exist (''database "mothman_test_gw3" does not exist''); re-run alone, 11 of 11 passed.'
+    - 'Criterion 3 SEEN FAILING FIRST: tests/test_status_reads_values.py failed 15 of 17 before the change; its overdue-reason case passed on the old code until root_cause was reworded, then failed (''could not run: failing because cp-clients ...''), and passed once filing_tui read root_cause._overdue_reason. 17 of 17 pass after.'
+    - 'Criteria 1 and 2: tests/test_status_parity.py''s TestTheWordsAreTheOnesBothSidesAgreed holds STATUS_WORDS to status-cases.json''s labels block and refuses an unknown status; test_status_reads_values pins ReGated''s and Regated''s field order.'
+    - 'tests/test_knock_on.py::TestThePersonIsToldWhoWillBeReChecked::test_only_a_decision_that_moves_the_table_names_its_readers failed on the original tree 935e53b too (a DecisionRefused about a run that had not completed) and is not this build''s; it passed in the f22855b run.'
   - id: REQ-TEST-361
     title: A guard stops a colour word for a status coming back - a real-browser scan of the built dashboard's text and accessible names, collapsed and hover-only text included, and a scan of the terminal's worded statuses
     date_written: '2026-10-31'
     story: As Keith, I want a test that fails when a person can read 'Green', 'Amber' or 'Red' as a status anywhere on the dashboard or in the terminal, so that the vocabulary I chose does not drift back one provisional wording at a time, as the grid's did.
     moscow: should
-    status: not_started
+    status: built
     signed_off:
       by: Keith
       date: '2026-11-01'
@@ -46915,13 +47035,33 @@ requirements:
     - 'REJECTED a mothman check gate over string literals: cheaper, but it would test display through source text, which rule 1 allows only for architecture rules.'
     - 'textContent AND HOVER (UX SHOULD 5, signed 2026-11-01): a visible-text scan passes while collapsed groups and hover-only tooltips leak; the self-test restores a raw-value leak as well as a literal, because the raw values are the leak a relabel alone misses.'
     - THE PAGE SET NAMES THE SCENARIOS TAB, THE QUEUE AND THE GRID, AND EXCLUDES DEMO (architect SHOULD, signed 2026-11-01); the recorded-text marker covers check changelog descriptions that say 'read red' (bdm-birth-registrations-soda-checks.yml :200 :218 :540; bdm-birth-registrations-contract.yaml :370 :566 :611), which are history.
+    - 'ONE SCAN, IN THE PAGE (criteria 2 and 6): _GUARD_SCAN walks document.body''s text nodes - textContent, so collapsed groups are read - and every title, aria-label and SVG title, passing over the marked elements and the two drawers in short named lists, each with its reason; Plans, Feedback and Demo are tiers of their own and are not visited. Chart tooltips are read after hovering a point of each check trend.'
+    - 'THE NAMED SURFACES ARE FOUND FROM THE SCENARIO MAP (criterion 1; RELIABILITY NFR): the guard visits the placed scenarios'' pages in map order, scanning each that shows a surface not yet seen, until every one in _GUARD_SURFACES has been, and fails naming any it never found; scenario (j) is TS-95''s period on the Linkage Keys page.'
+    - 'THE SELF-TESTS EMBED A COPY OF THE TEMPLATE (criterion 4): the real embed() of a template copy carrying one regression - the literal ''Red promoted'', or ''Arrived ${entry.status}'' printed raw - and the guard must name it.'
     open_questions: []
+    linked_tests:
+    - 'tests/test_status_words_shown.py'
+    - 'tests/test_dashboard_e2e.py::TestNoColourWordIsReadAsAStatus'
+    - 'tests/test_dashboard_e2e.py::TestTheColourWordGuardCanFail'
+    implemented_by:
+    - 'tests/test_dashboard_e2e.py::_colour_words'
+    - 'tests/test_dashboard_e2e.py::_GUARD_SCAN'
+    - 'tests/test_dashboard_e2e.py::_GUARD_SKIPPED_DRAWERS'
+    - 'tests/test_dashboard_e2e.py::_GUARD_SKIPPED_MARKS'
+    evidence:
+    - '2026-11-01, tree f22855b: criterion 5''s tests/test_status_words_shown.py passes 53 of 53 (status_words in every form for every status, the outcome, root-cause, queue-state, re-checked-worse, bulk re-check, gate refusal, ticket and scenario-map wordings with NO_COLOR set, and the replacement setting''s words). The browser guard and its two self-tests are written in tests/test_dashboard_e2e.py and not run (unmet_criteria).'
+    unmet_criteria:
+    - criterion: 'Criteria 1 to 4 and 6 - the real-browser guard and its two self-tests run against the built dashboard.'
+      why: 'Written in tests/test_dashboard_e2e.py and not run: they need a dashboard built from a bootstrapped history, and this build ran with an empty warehouse (Keith''s run terms, 2026-11-01).'
+      owner: 'the end-of-run bootstrap (2026-11-01 build run)'
+      blocked_by:
+        unowned: true
   - id: REQ-DOCS-362
     title: Built requirements whose criteria quote a colour word for a status are amended to the new words (A1-A39, B1), reader-facing docs follow, and history stays as it was
     date_written: '2026-10-31'
     story: As whoever builds and audits against requirements.yaml, I want every criterion that quotes the dashboard's or the terminal's words to quote the words now shown, so that a criterion and the page never disagree - while what was recorded at the time stays as it was.
     moscow: should
-    status: not_started
+    status: built
     signed_off:
       by: Keith
       date: '2026-11-01'
@@ -46986,7 +47126,30 @@ requirements:
     - 'A38 - REQ-GEN-183 criterion 7 (built). CURRENT: <<<WHERE no such range exists for a rule, THE SYSTEM SHALL report the rule as having no amber band, naming the check or checks that close it.>>> PROPOSED: <<<WHERE no such range exists for a rule, THE SYSTEM SHALL report the rule as having no warn band (''no warn band - closed by <checks>''), naming the check or checks that close it. AMENDED <date applied> by REQ-DOCS-362 (Pass / Warn / Fail, signed by Keith 2026-11-01).>>> NOTE: Architect NIT; `mothman scenarios rules` words it (cli/scenarios.py :181).'
     - 'A39 - REQ-DASH-337 criterion 13 (built). CURRENT: <<<THE SYSTEM SHALL state a check''s band in the direction its result records, so that a coverage card reads ''amber below 90%, red below 85%'' and never ''warn > 90%'', and SHALL show the unit its result records.>>> PROPOSED: <<<THE SYSTEM SHALL state a check''s band in the direction its result records, so that a coverage card reads ''warn below 90%, fail below 85%'' and never ''warn > 90%'', and SHALL show the unit its result records. AMENDED <date applied> by REQ-DOCS-362 (Pass / Warn / Fail, signed by Keith 2026-11-01).>>> NOTE: ''never ''warn > 90%'''' stays: it is the fallback form, still refused.'
     - 'B1 - REQ-DASH-299 criterion 15 (signed 2026-10-31, not built), SHRUNK because the geocoding v7 delta already carries the rest: v7 writes A1''s note ''It is neither a Fail nor a result'', A5''s ''never Pass'' and ''3 checks: 1 passing, 2 not checked'', criterion 15 (11)''s ''never Pass or ''No data'''', and notchecked''s words; and REQ-DASH-299 has no open question 1 left to close. What remains, applied to criterion 15 as v7 leaves it - CURRENT, in part: <<<(9) the G1 route scenario''s older Client Register supply showing its amber tag naming Linkage Products'' <period> Client Register Geocodes as the cause on its history row from the geocoding promotion''s date and not before;>>> PROPOSED, in part: <<<(9) the G1 route scenario''s older Client Register supply showing its ''Promoted, warning'' tag naming Linkage Products'' <period> Client Register Geocodes as the cause on its history row from the geocoding promotion''s date and not before;>>> marked ''AMENDED <date applied> by REQ-DOCS-362''. The tag is amberPromotedTag''s (UX review: check at build).'
+    - 'APPLIED BY SCRIPT, VERIFIED VERBATIM (NFR AUDITABILITY): each CURRENT was compared with the live criterion before anything was written (all 41 matched, none was unbuilt), each replaced by its PROPOSED text with ''<date applied>'' as 2026-11-01, and each read back with yaml.safe_load and compared; 42 criteria changed (A1-A39, A27''s and A36''s second criteria, and B1) and no other requirement''s text. Every amended criterion is one single-quoted line; 105 lines of multi-line plain scalars became 42.'
+    - 'B1 IS APPLIED TO REQ-DASH-299 AS v7 LEAVES IT (criterion 2): the v7 delta was already in its criterion 15, so the ''(9)'' clause was replaced in place and the criterion marked ''AMENDED 2026-11-01 by REQ-DOCS-362.'''
+    - 'THE SCENARIO REGISTER (criterion 3): every colour word for a status in the text SCENARIOS.md carries - titles, Config, Expect, Breaks as and body, 169 lines across the register''s entries - reworded by the rules of use, ''false green'' as ''false pass'' and the S1 branches as ''S1 pass'' and ''S1 fail''; the register''s own intro, which SCENARIOS.md does not carry, and the rest of plans/supply-model.md are unchanged.'
+    - 'plans/running-thoughts.md #132 IS NOT UPDATED HERE: criterion 4 leaves every plans entry unchanged apart from the scenario register, and the draft''s suggested #132 status line would change one. Raised with Keith rather than decided.'
     open_questions: []
+    linked_tests:
+    - 'tests/test_status_words_shown.py'
+    - 'tests/test_scenario_map.py'
+    implemented_by:
+    - 'requirements.yaml'
+    - 'docs/supplier-guidance.md'
+    - 'README.md'
+    - 'plans/supply-model.md'
+    - 'SCENARIOS.md'
+    evidence:
+    - '2026-11-01: A1-A39 (41 criteria) and B1 applied by a script that stopped on any CURRENT not matching the live criterion verbatim (none did) and read each back with yaml.safe_load: 0 mismatches, 42 criteria changed, every requirement''s criterion count unchanged, no other requirement''s text changed.'
+    - '2026-11-01, after these edits: `mothman check --only` for requirements, plans, changelog, yamllint, feedback, scenarios and premise passed; sprints and scenario map passed with warnings - scenario map because no placements file is on this machine once the rebuilt one was removed, sprints with the same warning before this change.'
+    unmet_criteria:
+    - criterion: 'Criterion 2''s check at that build - that the tag criterion 15 (9) names is amberPromotedTag''s.'
+      why: 'The criterion places this check at REQ-DASH-299''s own build, where the G1 route scenario''s tag is first drawn.'
+      owner: 'the geocoding build (REQ-DASH-299)'
+      blocked_by:
+        requirements:
+        - REQ-DASH-299
   - id: REQ-PIPE-342
     title: One repository holds one folder per data asset under assets/, holding everything for that asset, and one call-time resolver is the only way any reader finds an asset's configuration or its state paths
     date_written: '2026-10-31'
