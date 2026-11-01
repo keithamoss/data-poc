@@ -1273,15 +1273,15 @@ class LinkageProducts(Provider):
     def _rows(self, plan: Plan, job: Job, n: int):
         import numpy as np
 
-        from qa_tools.common import asset_time
-
         at, faults, _sev = plan.state["arrivals"][job.slot_id][n]
         # THE LAST SUPPLY FILED TO THE QUARTER AND RECEIVED BEFORE THIS
-        # DELIVERY (criterion 5): a release cannot describe a later file.
+        # DELIVERY (criterion 5): a release cannot describe a later file -
+        # NOR ONE WHOSE FILE NEVER ARRIVED (criterion 5 as amended 2026-11-02,
+        # Keith, morning report D1; plans/qa-pipeline.md #89): only a carried
+        # supply, by the rule the geocoding stream reads by (_before).
         described = {}
         for did, _code, _cols in linked():
-            before = [s for s in plan.state["sources"][did] if s.period == job.period.name
-                      and asset_time.parse_instant(s.received_at, did) < at]
+            before = _before(plan.state["sources"][did], did, job.period.name, at)
             if before:
                 described[did] = before[-1].rows
         injected = plan.injected_by_period.get(job.period.name)
@@ -1430,8 +1430,10 @@ NAMED_HELD_SOURCE = (("TS-93c", "geo-cp-clients", "TS-93b"),
 def _before(supplies, dataset_id: str, period: str, at) -> list:
     """The source's supplies filed to `period` and received before `at`,
     oldest first - only those whose file arrives (GeneratedSupply.carried):
-    the geocoding stream geocodes what the geocoder could have been sent.
-    The linkage stream does not ask, so its releases are unchanged."""
+    the geocoding stream geocodes what the geocoder could have been sent,
+    and a linkage release describes only what could have been linked
+    (REQ-GEN-334 criterion 5 as amended 2026-11-02, Keith, morning report
+    D1)."""
     from qa_tools.common import asset_time
 
     return [s for s in supplies if s.period == period and s.carried
