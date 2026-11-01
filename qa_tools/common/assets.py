@@ -46,6 +46,7 @@ from __future__ import annotations
 import importlib.util
 import os
 import sys
+import threading
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -328,6 +329,17 @@ def load(kind: str, module: str):
     and registered as mothman_<kind>_<asset>_<module> - a name no package on
     sys.path provides, so two assets' same-named modules are two modules.
     Loaded once per file; asked again, the same module."""
+    with _loading:
+        return _load(kind, module)
+
+
+#: ONE LOAD AT A TIME (a run's dbt thread and its foreground load the same
+#: adapter at once): a module is registered before its body runs, so a second
+#: thread must wait for the first rather than be handed it half built.
+_loading = threading.RLock()
+
+
+def _load(kind: str, module: str):
     asset = selected()
     path = module_file(kind, module)
     name = module_name(kind, module)

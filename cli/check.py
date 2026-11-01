@@ -249,7 +249,7 @@ def _run_captured_once(label: str, argv: list[str], can_warn: bool,
     if shutil.which(argv[0]) is None:
         return 127, (f"{argv[0]!r} is not installed - skipping {label}. "
                      f"See CLAUDE.md's environment-setup bullet.\n")
-    env = {**os.environ, **extra}
+    env = {**os.environ, **extra} if (extra or can_warn) else None
     if can_warn:
         env[WARNING_EXIT_VAR] = str(WARNING_EXIT)
     done = subprocess.run(argv, cwd=ROOT, env=env, capture_output=True, text=True)
@@ -282,7 +282,8 @@ def _run(label: str, argv: list[str], can_warn: bool = False) -> int:
         return 127
     codes = []
     for extra in _asset_passes(label):
-        env = {**os.environ, **extra}
+        # NOTHING TO ADD, NOTHING PASSED: the gate inherits this environment.
+        env = {**os.environ, **extra} if (extra or can_warn) else None
         if can_warn:
             env[WARNING_EXIT_VAR] = str(WARNING_EXIT)
         codes.append(subprocess.run(argv, cwd=ROOT, env=env).returncode)

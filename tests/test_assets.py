@@ -7,6 +7,9 @@ ON TODAY'S LAYOUT (REQ-TEST-357 criterion 6): contract/ is the one asset,
 named data-asset-1 until REQ-QAC-344 renames it, and every path resolves to
 where it is today. The assets/<asset>/ layout is exercised against a folder
 of the test's own.
+
+READS ONLY ITS OWN REPORTS - none at all: it compares the paths the resolver
+names under reports/ and opens nothing there (tests/test_publish.py's marker).
 """
 from __future__ import annotations
 
@@ -290,3 +293,31 @@ class TestTheBootstrapHandsItsStreamsTheAsset:
 def _which_asset_and_adapter(key: str, sequential: bool):
     """What a stream process would load - run in the spawned child."""
     return os.environ.get(assets.ASSET_ENV), assets.adapter_file(key)
+
+
+class TestLoadingIsSafeAcrossThreads:
+    """A run's dbt thread and its foreground load the same adapter at once
+    (parallel_orchestrate.beside): neither may be handed a module still
+    running its own body."""
+
+    def test_a_second_thread_waits_for_the_first_to_finish_loading(self, monkeypatch, tmp_path):
+        import threading
+
+        root = _two_assets(tmp_path)
+        (root / "daily" / "collections" / "slow.py").write_text(
+            "import time\ntime.sleep(0.5)\nDONE = True\n")
+        assets.use_root(root)
+        monkeypatch.setenv(assets.ASSET_ENV, "daily")
+        got = []
+
+        def load():
+            got.append(getattr(assets.load("adapter", "slow"), "DONE", False))
+
+        threads = [threading.Thread(target=load) for _ in range(2)]
+        threads[0].start()
+        import time
+        time.sleep(0.1)
+        threads[1].start()
+        for t in threads:
+            t.join()
+        assert got == [True, True]
