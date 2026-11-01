@@ -1005,13 +1005,29 @@ def generated_periods(dataset_id: str) -> list:
     return provider.generated_periods_for(dataset_id)
 
 
+def this_assets_injections() -> tuple["Injection", ...]:
+    """The injections naming a dataset the selected asset declares.
+
+    ANOTHER ASSET'S SCENARIO IS NOT THIS ONE'S TO PLACE (PROVISIONAL, the
+    asset split, 2026-11-02): the table below is still one repository-wide
+    list until each asset holds its own, so an injection naming a dataset the
+    selected asset does not declare is the other asset's - passed over rather
+    than refused, and placed by its own asset's generation. Telling it from a
+    typo would mean reading the other asset, which REQ-PIPE-342 criterion 8
+    forbids, so a typo'd dataset id is no longer refused here."""
+    from qa_tools.common import hierarchy
+
+    mine = {d.dataset_id for d in hierarchy.all_datasets()}
+    return tuple(i for i in INJECTIONS if i.dataset_id in mine)
+
+
 def unprovided_scenarios() -> list[str]:
     """Every injected scenario naming a dataset no generator provider makes,
     with why - checked before anything is written (REQ-GEN-246 criterion 8)."""
     from generator import collections
 
     out = []
-    for injection in INJECTIONS:
+    for injection in this_assets_injections():
         try:
             collections.for_dataset(injection.dataset_id)
         except collections.NoProviderError as exc:

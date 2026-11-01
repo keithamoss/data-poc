@@ -61,7 +61,7 @@ def script_path() -> Path:
     6; it was the import-time constant SCRIPT_PATH)."""
     from qa_tools.common import assets
 
-    return assets.selected().file("scripted_decisions.yaml")
+    return assets.selected().synthetic / "scripted_decisions.yaml"
 
 
 class ScriptRefused(RuntimeError):

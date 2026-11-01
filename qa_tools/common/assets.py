@@ -110,6 +110,13 @@ class Asset:
         return self.folder / name
 
     @property
+    def synthetic(self) -> Path:
+        """Its synthetic-only configuration (REQ-GEN-370 criterion 1):
+        scripted_decisions.yaml, synthetic_inputs.yaml - read only by the
+        generator, the bootstrap and the gates."""
+        return self.folder / "synthetic"
+
+    @property
     def data_asset_yaml(self) -> Path:
         return self.file("data-asset.yaml")
 
