@@ -103,3 +103,36 @@ describe("'Not checked' and 'Not counted' stay apart (criterion 18)", () => {
     expect(w.statusWords(w.rollup([out]), "label")).toBe("Not counted");
   });
 });
+
+// A3: REQ-DASH-337 criterion 17 - the agency page's collection panel.
+describe("the agency page's collection panel (A3)", () => {
+  const xt = (checks) => ({ name: "Cross-table checks", scope: "cross-table", checks });
+  const ck = (name, between) => ({ check_id: `a.ag-two.matches.match-keys.${name}.x_soda`, key: name, name,
+    tool_ref: "soda:x", current_status: "green", between, history: [] });
+
+  it("lists a check reading another collection's dataset under 'Across collections', in the long form", () => {
+    const w = load();
+    const col = { id: "matches", datasets: [{ id: "match-keys", name: "Match Keys", columns: [xt([
+      ck("own", null), ck("theirs", BETWEEN)])] }] };
+    const host = w.document.createElement("div");
+    host.innerHTML = w.collectionCrossTableSection({ id: "ag-two" }, col);
+    const across = host.querySelector("[data-across-collections]");
+    expect(across).not.toBeNull();
+    expect(across.querySelector("h4").textContent).toBe("Across collections");
+    expect(across.textContent).toContain("Registers' People Register");
+    expect(across.textContent).not.toMatch(/between two tables in this collection/);
+    expect(across.querySelectorAll(".scope-check")).toHaveLength(1);
+    // The collection's own check comes first, under the old blurb.
+    const buttons = [...host.querySelectorAll(".scope-check")];
+    expect(buttons[0].textContent).toContain("own");
+  });
+
+  it("renders as before where no check reads another collection", () => {
+    const w = load();
+    const col = { id: "matches", datasets: [{ id: "match-keys", name: "Match Keys", columns: [xt([ck("own", null)])] }] };
+    const host = w.document.createElement("div");
+    host.innerHTML = w.collectionCrossTableSection({ id: "ag-two" }, col);
+    expect(host.querySelector("[data-across-collections]")).toBeNull();
+    expect(host.textContent).toMatch(/between two tables in this collection/);
+  });
+});

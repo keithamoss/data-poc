@@ -45,3 +45,20 @@ collections:
     provider: "Department of Health - data linkage unit"
     delivery_format: "CSV (S3 drop)"
     provenance: "Computed from the synthetic linkage and geocoding releases by the real dbt-core, Soda Core, datacontract-cli and Evidently runs, their checks reading the same quarter's source tables. ({table_description})"
+
+# THE WORDS FOR TWO TILES IN A DATASET PAGE'S STRIP (REQ-DASH-299 criteria 9
+# and 10), so the page that shows them names nothing itself (NFR 2):
+# - each list setting's display name, keying the tile that names the set a
+#   period was held to, read from the recorded result;
+# - a dataset's word for its relation to the one source it links with no
+#   code (a single code-less linked_datasets entry), keying the tile that
+#   names and links that source. `mothman check`'s collections gate fails a
+#   list setting or such a dataset with no word here.
+list_settings:
+  census_years:
+    label: "Census years"
+datasets:
+  geo-cp-clients:
+    relation: "Geocodes"
+  geo-ed-presentations:
+    relation: "Geocodes"

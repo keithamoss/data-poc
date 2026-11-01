@@ -809,6 +809,8 @@ span.scenario-subject-label{display:inline-block; margin:0 6px 0 0;}
 .xt-left-out .bt, .xt-left-out .why{display:block; font-size:12.5px; color:var(--ink-muted); overflow-wrap:anywhere;}
 .xt-left-out .tr{display:block; font-size:11px; color:var(--ink-faint); font-family:"IBM Plex Mono",monospace; overflow-wrap:anywhere;}
 .xt-left-out .bt:empty, .xt-left-out .tr:empty{display:none;}
+.across-collections{margin-top:12px;}
+.across-collections-head{font-size:12px; font-weight:600; color:var(--ink-muted); text-transform:uppercase; letter-spacing:.04em; margin:0 0 4px;}
 .xt-not-checked-note{font-size:12px; color:var(--ink-muted); margin:4px 2px 2px; max-width:70ch;}
 .xt-view-block{margin:6px 0 10px;}
 .xt-view-label{font-size:11.5px; font-weight:600; letter-spacing:.04em; text-transform:uppercase; color:var(--ink-muted); margin-bottom:4px;}
@@ -1772,6 +1774,51 @@ function latestArrivalTileHtml(ds){
   return `<div class="sla-tile"><div class="k">Latest arrival</div>`
     + `<div class="v" style="font-size:14px;" title="When we received this supply" data-latest-arrival>`
     + `${escHtml(fmtArrival(a))} <span title="${ARRIVAL_FOLLOWS_FILING}">${qualifier}</span></div>${period}</div>`;
+}
+// THE SET A PERIOD WAS HELD TO (REQ-DASH-299 criterion 9): a tile keyed by the
+// list setting's display name (contract/presentation.yaml, carried by the
+// build), naming the members of the version the newest result on or before the
+// date on show RECORDED - never re-resolved - with '<added> added on <date>'
+// where that version added members to the one before. Generic: any recorded
+// list setting, any dataset. Absent on a date before any such result.
+function recordedListSettings(ds, dateStr){
+  const newest = {};
+  ((ds && ds.columns) || []).forEach(c=> (c.checks || []).forEach(ck=>{
+    if(ck.retired) return;
+    (ck.history || []).forEach(h=>{
+      const m = h.member_set;
+      if(!m || !m.setting) return;
+      if(dateStr && h.run_date && String(h.run_date).slice(0, 10) > dateStr) return;
+      const was = newest[m.setting];
+      if(!was || (h.rank != null && was.rank != null ? h.rank > was.rank : String(h.run_date) > String(was.run_date)))
+        newest[m.setting] = {rank: h.rank, run_date: h.run_date, set: m};
+    });
+  }));
+  return Object.keys(newest).sort().map(k=> newest[k].set);
+}
+function shortDay(iso){
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || ""));
+  return m ? `${Number(m[3])} ${_MONTH_FULL[Number(m[2]) - 1].slice(0, 3)} ${m[1]}` : escHtml(String(iso || ""));
+}
+function listSettingTilesHtml(ds, dateStr){
+  return recordedListSettings(ds, dateStr).filter(m=> m.label).map(m=> {
+    const added = (m.added || []).length
+      ? `<div class="sla-files-go" data-list-setting-added style="color:var(--ink-muted); font-size:12px; margin-top:4px; line-height:1.4;">${escHtml(m.added.join(", "))} added on ${shortDay(m.version)}</div>` : "";
+    return `<div class="sla-tile" data-list-setting="${escAttr(m.setting)}"><div class="k">${escHtml(m.label)}</div>`
+      + `<div class="v" style="font-size:14px;" data-list-setting-members>${escHtml((m.members || []).join(", "))}</div>${added}</div>`;
+  }).join("");
+}
+// WHAT A DATASET LINKING ONE SOURCE WITH NO CODE IS ABOUT (REQ-DASH-299
+// criterion 10): a tile keyed by its word for the relation ('Geocodes'),
+// naming the source in REQ-DASH-337 criterion 11's long form - without the
+// period, a relation rather than a supply - linked to the source's page at the
+// date on show, through datasetRefLink. Absent for every other dataset.
+function linkedSourceTileHtml(ds){
+  const raw = (ds && rawRealDatasetById(ds.id)) || ds || {};
+  const ls = raw.linkedSource;
+  if(!ls || !ls.datasetId || !ls.relation) return "";
+  return `<div class="sla-tile" data-linked-source="${escAttr(ls.datasetId)}"><div class="k">${escHtml(ls.relation)}</div>`
+    + `<div class="v" style="font-size:14px;" data-linked-source-name>${causeName(ds.id, ls.datasetId, null, true)}</div></div>`;
 }
 function latestArrivalWords(ds){
   const a = ds && ds.lastArrival;
@@ -6806,6 +6853,15 @@ function recheckNote(col, point, why){
     ? `Re-checked ${fmtInstant(point.recorded_at)}, ${when}.`
     : `Checked ${fmtInstant(point.recorded_at)}, ${when}.`;
 }
+// WHICH OTHER COLLECTIONS' DATASETS A CHECK READS (REQ-DASH-337 criterion 17,
+// A3 by REQ-DASH-299): in criterion 11's long form without the period -
+// "Child Protection's Client Register" - as text, never inside a button's link.
+function acrossCollectionsReads(col, check){
+  const b = check && check.between;
+  if(!b) return [];
+  return [b.declared_on, ...(b.reads || [])].filter(id=> id && inAnotherCollection(id, col))
+    .map(id=> { const cn = collectionNameOf(collectionOfDataset(id)); return `${possessive(cn, cn)} ${datasetNameAnywhere(id)}`; });
+}
 function collectionCrossTableSection(ag, col){
   const entries = collectionCrossTableChecks(col);
   if(!entries.length) return "";
@@ -6816,18 +6872,32 @@ function collectionCrossTableSection(ag, col){
   // that produced a false green once already, and there is no reason
   // for this page to keep its own arithmetic.
   const worst = rollupStatuses(entries.map(e=> checkStatus(e.check)));
-  const rows = entries.map(e=> `
+  const row = (e, across)=> `
     <button class="scope-check" data-nav='${JSON.stringify({tier:"dataset", agencyId:ag.id, collectionId:col.id, datasetId:e.dataset.id})}'>
       <span class="label"><span class="nm">${escHtml(e.check.label || e.check.name || e.check.check_id)}</span>
-        <span class="ds">${escHtml(crossTableSource(col, e))}</span></span>
+        <span class="ds">${escHtml(across.length ? [`Reads ${andList(across)}`, String(e.check.tool_ref || "").split(":")[0]].filter(Boolean).join(" · ") : crossTableSource(col, e))}</span></span>
       ${pill(checkStatus(e.check),"sm")}
-    </button>`).join("");
+    </button>`;
+  // A CHECK READING ANOTHER COLLECTION'S DATASET IS LISTED AFTER THE
+  // COLLECTION'S OWN, under its own sub-heading (A3) - never called one
+  // 'between two tables in this collection'. A collection with none renders
+  // as before.
+  const own = entries.filter(e=> !acrossCollectionsReads(col, e.check).length);
+  const across = entries.filter(e=> acrossCollectionsReads(col, e.check).length);
+  const ownBlurb = `<div class="blurb">Checks about the relationship between two tables in this collection.
+      A failure is a disagreement between them rather than a fault in either one alone, so it
+      counts against every table the check reads.</div>`;
+  const acrossHtml = across.length ? `
+    <div class="across-collections" data-across-collections>
+      <h4 class="across-collections-head">Across collections</h4>
+      <div class="blurb">Checks that read a dataset of another collection; a failure counts against every dataset the check reads.</div>
+      ${across.map(e=> row(e, acrossCollectionsReads(col, e.check))).join("")}
+    </div>` : "";
   return `<div class="scope-section" data-scope="cross-table" style="margin-bottom:14px;">
     <div class="head"><h3>Cross-table checks</h3>${pill(worst,"sm")}</div>
-    <div class="blurb">Checks about the relationship between two tables in this collection.
-      A failure is a disagreement between them rather than a fault in either one alone, so it
-      counts against every table the check reads.</div>
-    ${rows}
+    ${own.length ? ownBlurb : ""}
+    ${own.map(e=> row(e, [])).join("")}
+    ${acrossHtml}
   </div>`;
 }
 
@@ -10227,6 +10297,8 @@ function renderDataset(view, agencyId, collectionId, datasetId){
       <div class="sla-tile"><div class="k">Delivery format</div><div class="v" style="font-size:14px;">${ds.deliveryFormat}</div></div>
       <div class="sla-tile"><div class="k">Rows, latest run</div><div class="v mono">—</div></div>` : `
       ${latestArrivalTileHtml(ds)}
+      ${linkedSourceTileHtml(ds)}
+      ${listSettingTilesHtml(ds, CURRENT_IN_PLACE_ON)}
       <div class="sla-tile"><div class="k">Delivery format</div><div class="v" style="font-size:14px;">${ds.deliveryFormat}</div></div>
       <div class="sla-tile"><div class="k">Rows, latest run</div><div class="v mono">${fmtInt(ds.rowCount)} <span style="font-size:11.5px; color:${rowDelta>=0?'var(--good)':'var(--bad)'};">(${rowDelta>=0?'+':''}${fmtInt(rowDelta)})</span></div></div>`}
     </div>

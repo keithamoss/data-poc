@@ -405,10 +405,27 @@ def _left_out_fields(why) -> dict:
             **({"calendar": calendar} if calendar else {})}
 
 
+def _member_set(record: dict) -> dict | None:
+    """A set-member result's recorded version of its list setting (REQ-QAC-300
+    criterion 9) for the page: the setting, its display name from
+    contract/presentation.yaml, the version's effective date, the members it
+    held and those it added to the version before. None where the result
+    records none. Read from the result, never by re-resolving configuration."""
+    setting = record.get("member_setting")
+    if not setting or record.get("member_set_version") is None:
+        return None
+    from qa_tools.common import presentation
+
+    return {"setting": setting, "label": presentation.list_setting_label(setting),
+            "version": str(record["member_set_version"]),
+            "members": list(record.get("member_set") or []),
+            "added": list(record.get("member_set_added") or [])}
+
+
 def _left_out_between(check_id: str, lifecycle_by_id: dict) -> dict:
     """The tables a left-out check is BETWEEN, from the tables it declares it
     reads (configuration), so that the page shows its row where it would be
-    shown had it ran - in its collection's group (REQ-DASH-337 criterion 6 as
+    shown had it run - in its collection's group (REQ-DASH-337 criterion 6 as
     amended by REQ-DASH-299, A1). A left-out check has no result to read its
     tables from. Empty where it declares none beyond its own."""
     meta = lifecycle_by_id.get(check_id)
@@ -518,7 +535,7 @@ def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], da
             "by_run": {}, "row_count_total": {}, "row_count_invalid": {}, "failing_sample_keys": {},
             "failing_sample_key_columns": {},
             "status_by_run": {}, "reference": {}, "not_evaluated": {}, "at": {}, "reads": {},
-            "unreadable": {}, "due_at": {}, "distribution": {}, "band": {},
+            "unreadable": {}, "due_at": {}, "distribution": {}, "band": {}, "member_set": {},
         })
         # A RECORDED BINNED DISTRIBUTION (REQ-DASH-337 criterion 14) and the
         # BAND IN THE DIRECTION THE RESULT RECORDS (criterion 13), where the
@@ -527,6 +544,12 @@ def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], da
             slot["distribution"][r["run_id"]] = r["distribution"]
         if r.get("band"):
             slot["band"][r["run_id"]] = r["band"]
+        # THE VERSION OF A LIST SETTING THE RESULT WAS JUDGED AGAINST (REQ-QAC-300
+        # criterion 9), as recorded - never re-resolved - for the page's tile
+        # naming the set (REQ-DASH-299 criterion 9), any setting's.
+        recorded_set = _member_set(r)
+        if recorded_set:
+            slot["member_set"][r["run_id"]] = recorded_set
         slot["reads"][r["run_id"]] = r.get("reads")
         slot["at"][r["run_id"]] = r.get("run_timestamp")
         slot["not_evaluated"][r["run_id"]] = _not_evaluated_reason(r)
@@ -675,6 +698,8 @@ def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], da
                        if into is contested_reads else {}),
                     **({"distribution": slot["distribution"][run_id]}
                        if slot["distribution"].get(run_id) else {}),
+                    **({"member_set": slot["member_set"][run_id]}
+                       if slot["member_set"].get(run_id) else {}),
                 })
             history = sorted(history + elsewhere, key=lambda h: h["rank"])
             if not history and not contested_reads and not replaced:
@@ -949,9 +974,15 @@ def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], da
     slot_timeline_raw = slot_timelines.get(dataset_id)
     if slot_timeline_raw is None:
         slot_timeline_raw = slot_timeline.for_dataset(dataset_id)
+    from qa_tools.common import presentation
+
+    linked = presentation.linked_source(dataset)
     return {
         "id": dataset_id,
         "name": dataset.dataset_name,
+        # THE ONE SOURCE IT LINKS WITH NO CODE, AND ITS WORD FOR THAT
+        # (REQ-DASH-299 criterion 10): {datasetId, relation}, absent otherwise.
+        **({"linkedSource": linked} if linked else {}),
         "provider": presented["provider"],
         "deliveryFormat": presented["delivery_format"],
         # THE DELIVERY TIME IN FORCE ON EACH DATE, and every period owed
