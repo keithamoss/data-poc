@@ -260,6 +260,41 @@ class TestAMoveInOneCollectionReRunsOnlyItsTwoChecks:
         assert after == copy.readers_runs
 
 
+class TestEachFakeGeocodingDatasetIsCheckedAgainstItsSource:
+    """REQ-QAC-340 criterion 11: a geocoding dataset identified by two
+    columns and one by three, each with its orphan and coverage checks in its
+    own block, checked end to end in the same copy."""
+
+    def test_the_fixture_holds_a_two_and_a_three_identifier_geocode(self):
+        assert sorted(len(g["id_columns"]) for g in fx.geocodes()) == [2, 3]
+
+    @pytest.mark.parametrize("kind", ["referential", "coverage"])
+    def test_each_has_its_pair_passing_on_rows_matching_every_record(self, copy, kind):
+        for g in fx.geocodes():
+            check = fx.geo_check_id(g, f"{g['source']}.{kind}_soda")
+            got = [r for r in c_results(copy) if r["check_id"] == check]
+            assert got, f"no {kind} result for {g['id']}"
+            assert {r["status"] for r in got} == {"pass"}, got
+            if kind == "coverage":
+                assert {r["metric_value"] for r in got} == {100.0}
+
+    def test_each_reads_its_one_source_table(self, copy):
+        for g in fx.geocodes():
+            check = fx.geo_check_id(g, f"{g['source']}.referential_soda")
+            [r] = [r for r in c_results(copy) if r["check_id"] == check][:1]
+            assert set(r.get("tables_read") or {}) >= {g["source_table"]}
+
+    def test_its_delivery_was_its_own_run(self, copy):
+        runs = [r for r in copy.evidence["recorded_runs"]
+                if r["collection"] == fx.PRODUCT["collection"] and r["scope"] == "arrival"]
+        tables = {r["run_key"].split("__")[0] for r in runs}
+        assert {g["table"] for g in fx.geocodes()} <= tables
+
+
+def c_results(copy):
+    return copy.results
+
+
 class TestNoProductFileChanged:
     """Criterion 3: only configuration, check files, adapters and providers
     were added or changed - before the run and after it."""

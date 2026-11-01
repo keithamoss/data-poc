@@ -86,7 +86,7 @@ def written(bookkeeping: Path | None = None, placements: Path | None = None) -> 
             # the provider's target datasets, else in its amber_dataset
             # (REQ-GEN-295 criterion 1: the declarations generalised over a
             # provider writing several).
-            where = (key if key in tuple(owners[key].target_datasets or ())
+            where = (key if key in tuple(getattr(owners[key], "target_datasets", ()) or ())
                      else owners[key].amber_dataset)
             # AN AMBER COMPARED UNDER NO DATASET IS A DISAGREEMENT NOBODY CAN
             # READ (post-build-review #248), so a provider that builds one

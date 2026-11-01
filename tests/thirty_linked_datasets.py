@@ -23,6 +23,13 @@ same day; and one supply of `lks3-d1` is sent again two days later, which a
 scripted person promotes over the first - moving it in the period, so the
 knock-on re-runs the two linkage checks that read it (criterion 2).
 
+TWO FAKE GEOCODING DATASETS (REQ-QAC-340 criterion 11) join the product's
+collection: each a linked dataset with no code geocoding one source - one
+identified by two columns (`lks1-d2`), one by three (`lks2-d3`) - each with
+its orphan and coverage checks in its own check block, delivered at 18:05 on
+the round as a delivery of its own, a second delivery stream of the product's
+provider (REQ-GEN-295 criterion 1).
+
 Everything is written into a COPY of the tracked tree (tests/tree_copy.py);
 the repository's own contract/, data/ and reports/ are never touched.
 """
@@ -56,6 +63,26 @@ SAMPLE_KEY = ["dataset"] + [f"id_{j}" for j in range(1, N_ID + 1)]
 MOVED = "lks3-d1"
 ROWS = 12
 INTRODUCED = "2024-01-01"
+#: The fake geocoding datasets (REQ-QAC-340 criterion 11), each geocoding one
+#: source: one identified by two columns, one by three.
+GEO = ({"id": "lk-geo-two", "table": "lk_geo_two", "name": "Test Geocodes Two",
+        "source": "lks1-d2"},
+       {"id": "lk-geo-three", "table": "lk_geo_three", "name": "Test Geocodes Three",
+        "source": "lks2-d3"})
+GEO_YEAR = 2021
+
+
+def geocodes() -> list[dict]:
+    """Each fake geocoding dataset with its source's table and identifier
+    columns."""
+    by_id = {d["id"]: d for d in linked()}
+    return [{**g, "source_table": by_id[g["source"]]["table"],
+             "id_columns": list(by_id[g["source"]]["id_columns"])} for g in GEO]
+
+
+def geo_sample_key(g: dict) -> list[str]:
+    """A geocoding table's key: its source's identifiers and the census year."""
+    return _id_cols(len(g["id_columns"])) + ["census_year"]
 
 #: Where a collection's own files may go (criterion 3), and the configuration
 #: files that take an insert.
@@ -297,9 +324,63 @@ def _product_contract() -> str:
                         "delimiter": "comma", "description": "A quarterly linkage release."}],
            "schema": [{"name": PRODUCT["table"], "physicalType": "table",
                        "description": "One row per linked source record.",
-                       "properties": props}]}
+                       "properties": props}] + [_geo_table(g) for g in geocodes()]}
     return "# REQ-TEST-339: a fake linkage product, in a copy only.\n" + yaml.safe_dump(
         doc, sort_keys=False)
+
+
+def _geo_table(g: dict) -> dict:
+    props = [{"name": f"id_{j}", "logicalType": "string", "physicalType": "varchar(64)",
+              "required": j == 1, "description": f"The record's identifier value {j}."}
+             for j in range(1, N_ID + 1)]
+    props += [{"name": "census_year", "logicalType": "integer", "physicalType": "integer",
+               "required": True, "description": "The census year the codes are for."},
+              {"name": "sa2_code", "logicalType": "string", "physicalType": "varchar(9)",
+               "required": False, "description": "A synthetic SA2 code."},
+              {"name": "lga_code", "logicalType": "string", "physicalType": "varchar(5)",
+               "required": False, "description": "A synthetic LGA code."},
+              {"name": "match_level", "logicalType": "string", "physicalType": "varchar(20)",
+               "required": True, "description": "How precisely the record was placed."}]
+    return {"name": g["table"], "physicalType": "table",
+            "description": f"One row per record of {g['source']} and census year.",
+            "properties": props}
+
+
+def geo_check_id(g: dict, tail: str) -> str:
+    return (f"data-asset-1.{PRODUCT_AGENCY[0]}.{PRODUCT['collection']}."
+            f"{g['id']}.{tail}")
+
+
+def _geo_soda(g: dict) -> list:
+    """REQ-QAC-340's pair for one fake geocoding dataset, in its own block:
+    the orphan check and the coverage check, of REQ-QAC-333's two kinds."""
+    t, src, cols = g["table"], g["source_table"], g["id_columns"]
+    on = " AND ".join(f"{_text('s.' + c)} = {_text(f'g.id_{j}')}" for j, c in enumerate(cols, 1))
+    on_cov = " AND ".join(f"{_text(f'g.id_{j}')} = {_text('s.' + c)}" for j, c in enumerate(cols, 1))
+    key = geo_sample_key(g)
+    common = {"reads_tables": [src], "linked_dataset": g["source"], "id_columns": cols,
+              "introduced_date": INTRODUCED, "changelog": [], "failure_indicates": "self-evident"}
+    metric = f"{t}_coverage_percent"
+    return [
+        {"failed rows": {
+            "name": "Rows matching no source record",
+            "fail query": (f"SELECT {', '.join('g.' + c for c in key)} FROM {t} g\n"
+                           f"LEFT JOIN {src} s ON {on}\nWHERE s.{cols[0]} IS NULL\n"),
+            "samples limit": 1000,
+            "attributes": {"check_id": geo_check_id(g, f"{g['source']}.referential_soda"),
+                           "reads_columns": [f"{t}.{c}" for c in key]
+                           + [f"{src}.{c}" for c in cols],
+                           **common, "linked_check": "referential", "category": "consistency",
+                           "description": f"Every row must match a record of {g['source']}."}}},
+        {metric: {
+            f"{metric} query": (f"SELECT 100.0 * COUNT(g.id_1) / NULLIF(COUNT(*), 0)\n"
+                                f"FROM {src} s\nLEFT JOIN (SELECT DISTINCT "
+                                f"{', '.join(_id_cols(len(cols)))} FROM {t}) g\n  ON {on_cov}\n"),
+            "warn": "when < 100", "fail": "when < 98",
+            "attributes": {"check_id": geo_check_id(g, f"{g['source']}.coverage_soda"),
+                           **common, "linked_check": "coverage", "unit": "percent",
+                           "direction": "below", "category": "completeness",
+                           "description": f"Every record of {g['source']} must have a row."}}}]
 
 
 def check_id(tail: str) -> str:
@@ -409,19 +490,24 @@ def _product_soda() -> str:
                            "direction": "below", "category": "completeness",
                            "description": f"At least 90 percent of {d['name']}'s records must be linked.",
                            "failure_indicates": "self-evident"}}})
+    blocks = {f"checks for {t}": checks}
+    blocks |= {f"checks for {g['table']}": _geo_soda(g) for g in geocodes()}
     return ("# REQ-TEST-339: the fake linkage product's Soda checks, generated from its\n"
-            "# linked_datasets in the shape of the real Linkage Products' file.\n"
-            + yaml.safe_dump({f"checks for {t}": checks}, sort_keys=False, width=1000))
+            "# linked_datasets in the shape of the real Linkage Products' file, and each\n"
+            "# fake geocoding dataset's pair in its own block (REQ-QAC-340 criterion 11).\n"
+            + yaml.safe_dump(blocks, sort_keys=False, width=1000))
 
 
 def _product_adapter() -> str:
     names = {"Expected identifiers present": "id_1", "No surplus identifiers": "id_1"}
     names |= {referential_name(d): "id_1" for d in linked()}
+    names |= {"Rows matching no source record": "id_1"}
+    keys = {PRODUCT["table"]: SAMPLE_KEY} | {g["table"]: geo_sample_key(g) for g in geocodes()}
     return ("\"\"\"The fake linkage product's adapter (REQ-TEST-339), in a copy only.\"\"\"\n"
             "from qa_tools.collections.base import CollectionAdapter, SodaSpec\n\n"
             f"ADAPTER = CollectionAdapter(\n"
             f"    collection_id={PRODUCT['collection']!r}, label={PRODUCT['name']!r},\n"
-            f"    sample_key={{{PRODUCT['table']!r}: {SAMPLE_KEY!r}}},\n"
+            f"    sample_key={keys!r},\n"
             f"    soda=SodaSpec(data_source={PRODUCT['short']!r}, column_by_name={names!r}),\n"
             f"    claim_window_dataset={PRODUCT['dataset']!r})\n")
 
@@ -440,9 +526,12 @@ import io
 from dataclasses import dataclass, field
 from datetime import date
 
-from generator.collections.base import Job, Plan, Provider
+from generator.collections.base import Job, Plan, Provider, Stream
 
 DATASET_ID = {PRODUCT["dataset"]!r}
+#: The fake geocoding datasets (REQ-QAC-340 criterion 11): (id, table, source).
+GEO = {[(g["id"], g["table"], g["source"]) for g in GEO]!r}
+GEO_YEAR = {GEO_YEAR}
 TABLE = {PRODUCT["table"]!r}
 N_ID = {N_ID}
 COLUMNS = ["linkage_key", "dataset"] + [f"id_{{j}}" for j in range(1, N_ID + 1)]
@@ -474,7 +563,10 @@ class _Product(Provider):
         return tuple(dict.fromkeys(hierarchy.dataset(d).collection_id for d, _c, _x in linked()))
 
     def seed_schedule(self):
-        return [("the release", SEED + 1, SEED + 1)]
+        return [("the release", SEED + 1, SEED + 1), ("the geocodes", SEED + 2, SEED + 2)]
+
+    def streams(self):
+        return (Stream("linkage", (DATASET_ID,)), Stream("geocoding", tuple(g for g, _t, _s in GEO)))
 
     def generated_periods(self):
         from qa_tools.common import schedule
@@ -487,13 +579,45 @@ class _Product(Provider):
 
         sources = {{d: base.generated_supplies(collections.for_dataset(d), d)
                    for d, _c, _x in linked()}}
-        return Plan(jobs=[Job("lkp_slot_01", SEED + 1, None, p) for p in self.generated_periods()],
+        periods = self.generated_periods()
+        return Plan(jobs=[Job("lkp_slot_01", SEED + 1, None, p, stream="linkage") for p in periods]
+                    + [Job("lkg_slot_01", SEED + 2, None, p, stream="geocoding") for p in periods],
                     state={{"sources": sources}})
+
+    def _at(self, job):
+        from qa_tools.common import asset_time
+
+        return asset_time.wall_clock(job.period.round_date,
+                                     "18:05" if job.stream == "geocoding" else "17:05")
+
+    def _geocodes(self, plan, job):
+        """Each fake geocoding table: one row per source record, its
+        identifiers in id_1 onward, placed by postcode."""
+        from qa_tools.common import asset_time, hierarchy
+
+        at = self._at(job)
+        out = {{}}
+        for geo_id, table, src in GEO:
+            id_columns = next(x[2] for x in hierarchy.dataset(geo_id).linked)
+            before = [s for s in plan.state["sources"][src] if s.period == job.period.name
+                      and asset_time.parse_instant(s.received_at, src) < at]
+            rows = []
+            for rec in before[-1].rows:
+                row = {{f"id_{{j}}": "" for j in range(1, N_ID + 1)}}
+                for j, c in enumerate(id_columns, 1):
+                    row[f"id_{{j}}"] = str(rec[c])
+                row.update({{"census_year": GEO_YEAR, "sa2_code": "501011001",
+                            "lga_code": "57080", "match_level": "postcode"}})
+                rows.append(row)
+            out[table] = rows
+        return out
 
     def slot(self, plan, job):
         from qa_tools.common import asset_time
 
-        at = asset_time.wall_clock(job.period.round_date, "17:05")
+        at = self._at(job)
+        if job.stream == "geocoding":
+            return [_Delivery(self._geocodes(plan, job), None, job.period.round_date)]
         rows = []
         for did, code, cols in linked():
             before = [s for s in plan.state["sources"][did] if s.period == job.period.name
@@ -508,6 +632,12 @@ class _Product(Provider):
         return [_Delivery(rows, None, job.period.round_date)]
 
     def entries(self, plan, job, deliveries, run_index_start):
+        if job.stream == "geocoding":
+            return [{{"run_id": f"lkp_run_geocoding_{{run_index_start + n:03d}}",
+                     "run_index": run_index_start + n, "slot_id": job.slot_id,
+                     "period": job.period.name, "received_at": None, "dirty_severity": None,
+                     "seed": job.seed, "row_counts": {{t: len(r) for t, r in d.payload.items()}}}}
+                    for n, d in enumerate(deliveries, start=1)]
         return [{{"run_id": f"lkp_run_{{run_index_start + n:03d}}", "run_index": run_index_start + n,
                  "slot_id": job.slot_id, "period": job.period.name, "received_at": None,
                  "dirty_severity": None, "seed": job.seed, "row_counts": {{TABLE: len(d.payload)}}}}
@@ -516,11 +646,20 @@ class _Product(Provider):
     def received_at(self, plan, job, n, delivery_obj, entry):
         from qa_tools.common import asset_time
 
-        return asset_time.isoformat(asset_time.wall_clock(job.period.round_date, "17:05"))
+        return asset_time.isoformat(self._at(job))
 
     def files(self, plan, job, n, delivery_obj, entry, name):
         from qa_tools.common import asset_time
 
+        if job.stream == "geocoding":
+            out = {{}}
+            for table, rows in delivery_obj.payload.items():
+                gbuf = io.StringIO()
+                writer = csv.DictWriter(gbuf, fieldnames=list(rows[0]))
+                writer.writeheader()
+                writer.writerows(rows)
+                out[f"{{table}}.csv"] = gbuf.getvalue()
+            return out, asset_time.parse_instant(entry["received_at"], entry["run_id"])
         buf = io.StringIO()
         writer = csv.DictWriter(buf, fieldnames=COLUMNS)
         writer.writeheader()
@@ -529,7 +668,7 @@ class _Product(Provider):
                 asset_time.parse_instant(entry["received_at"], entry["run_id"]))
 
     def describe(self, entry, delivery_obj):
-        return f"{{entry['row_counts'][TABLE]:5d}} linkage keys"
+        return f"{{sum(entry['row_counts'].values()):5d}} rows"
 
 
 PROVIDER = _Product()
@@ -562,7 +701,12 @@ def _hierarchy_block() -> str:
                                        "arrival_pattern": rf"{PRODUCT['table']}\.csv",
                                        "linked_datasets": [
                                            {"dataset": d["id"], "code": d["code"],
-                                            "id_columns": d["id_columns"]} for d in linked()]}]}]})
+                                            "id_columns": d["id_columns"]} for d in linked()]}]
+                         + [{"id": g["id"], "name": g["name"], "table": g["table"],
+                             "arrival_pattern": rf"{g['table']}\.csv",
+                             "linked_datasets": [{"dataset": g["source"],
+                                                  "id_columns": list(g["id_columns"])}]}
+                            for g in geocodes()]}]})
     text = yaml.safe_dump(agencies, sort_keys=False, width=1000)
     return ("    # REQ-TEST-339: thirty linked datasets and a linkage product, in a copy only.\n"
             + "".join(f"    {line}\n" for line in text.splitlines()))
@@ -582,7 +726,8 @@ def _calendar_blocks() -> tuple[str, str]:
                                                     expected_time=due, grace="8h")}
                for cid, due in colls]
     datasets = [{"id": d, "participation": _versions("Owes supplies every quarter.")}
-                for d in [x["id"] for x in linked()] + [PRODUCT["dataset"]]]
+                for d in [x["id"] for x in linked()] + [PRODUCT["dataset"]]
+                + [g["id"] for g in GEO]]
 
     def indent(doc):
         return "".join(f"  {line}\n" for line in yaml.safe_dump(doc, sort_keys=False).splitlines())
@@ -650,9 +795,11 @@ def install(tree: Path) -> Path:
     write(f"{stem}-soda-checks.yml", _product_soda())
     write(f"{stem}-evidently-checks.yml", "checks: []\n")
     write(f"{stem}-contract-retired.yaml", "schema: []\n")
-    write(f"{stem}-soda-checks-retired.yml", f"checks for {PRODUCT['table']}: []\n")
+    write(f"{stem}-soda-checks-retired.yml", f"checks for {PRODUCT['table']}: []\n"
+          + "".join(f"checks for {g['table']}: []\n" for g in GEO))
     write(f"{stem}-evidently-checks-retired.yml", "checks: []\n")
-    for name, text in _dbt(PRODUCT["collection"], [PRODUCT["table"]]).items():
+    for name, text in _dbt(PRODUCT["collection"],
+                           [PRODUCT["table"], *(g["table"] for g in GEO)]).items():
         write(f"dbt_project/models/{PRODUCT['collection']}/{name}", text)
     module = PRODUCT["collection"].replace("-", "_")
     write(f"qa_tools/collections/{module}.py", _product_adapter())
