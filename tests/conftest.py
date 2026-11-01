@@ -200,7 +200,16 @@ def pytest_collectstart(collector):
         except OSError:
             text = ""
         m = _MODULE_ASSET.search(text)
-        os.environ[_assets.ASSET_ENV] = m.group(1) if m else TEST_ASSET
+        if m:
+            asset = m.group(1)
+        else:
+            # NAMED AT IMPORT (the asset split): a module whose import-time
+            # statements name only one asset's ids is imported under it.
+            import asset_inference
+
+            found = asset_inference.named(asset_inference.module_level_text(collector.path))
+            asset = found.pop() if len(found) == 1 else TEST_ASSET
+        os.environ[_assets.ASSET_ENV] = asset
         asset_cli.rebuild_for_selected()
 
 
@@ -1158,7 +1167,23 @@ def pytest_collection_modifyitems(config, items):
             config.hook.pytest_deselected(items=dropped)
             items[:] = kept
     _mark_deployment(items)
+    _mark_asset(items)
     _group_for_distribution(items)
+
+
+def _mark_asset(items):
+    """THE ASSET A TEST ACTS FOR, FROM THE REGISTRY (the asset split): a test
+    with no `asset` mark of its own acts for the asset whose ids it names -
+    tests/asset_inference.py reads them from each asset's data-asset.yaml -
+    and for the suite's when it names none, or both."""
+    import asset_inference
+
+    for item in items:
+        if item.get_closest_marker("asset") is not None:
+            continue
+        asset = asset_inference.asset_of_item(item, TEST_ASSET)
+        if asset != TEST_ASSET:
+            item.add_marker(pytest.mark.asset(asset))
 
 
 def _mark_deployment(items):
