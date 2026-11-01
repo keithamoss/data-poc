@@ -153,3 +153,12 @@ the rebuild needs no question asked twice. Drafts and builders read this file.
   with no synthetic/ folder runs, only generate refused; REQ-PIPE-372's setting
   named publish_to_gh_pages, removed once REQ-PIPE-255 is built; the quarterly
   Demo caption text.
+- PWF build-time wordings, SETTLED by Keith 2026-11-01 (all four accepted):
+  the warehouse clause's pill reads the verb ('..., and is passing'); the
+  re-check panel reads 'was passing; on re-check it is failing'; with no
+  verdict the heading reads 'Promoted, then worse on re-check'; D8d's trend
+  axis shows short dates and drops the middle label when it would collide.
+- running-thoughts #132 is DELETED under the delete-on-built rule once its
+  decisions are carried into REQ-DASH-359; REQ-DOCS-362 c4 gets an explicit
+  carve-out (it means 'do not reword history', not 'never delete a built
+  entry'). SETTLED by Keith 2026-11-01.
