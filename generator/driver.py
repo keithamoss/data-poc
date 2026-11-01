@@ -95,13 +95,15 @@ def no_two_arrivals_share_an_instant(manifest: list[dict]) -> None:
         seen[instant] = entry["run_id"]
 
 
-def no_instant_shared_with_another_collection(key: str, manifest: list[dict]) -> None:
+def no_instant_shared_with_another_collection(key, manifest: list[dict]) -> None:
     """Refuse an arrival at the receipt instant of another collection's
     delivery (REQ-GEN-334 criterion 13), naming both: receipt order decides
     what a run can read, so a tie would be settled by sort order. The others
     are what each collection generated last, from the bookkeeping - every
     collection generates in hierarchy order, so each pair is compared by the
-    later of the two."""
+    later of the two. `key` is this collection's bookkeeping key, or every
+    key its delivery streams write under (REQ-GEN-295 criterion 1) - none of
+    which is another collection's."""
     from qa_tools.common import asset_time
 
     path = BOOKKEEPING_PATH
@@ -109,9 +111,10 @@ def no_instant_shared_with_another_collection(key: str, manifest: list[dict]) ->
         return
     with open(path) as f:
         book = json.load(f)
+    own = {key} if isinstance(key, str) else set(key)
     theirs: dict = {}
     for other, entries in book.items():
-        if other == key:
+        if other in own:
             continue
         for e in entries:
             if e.get("received_at"):
@@ -159,19 +162,29 @@ def generate(collection_id: str) -> list[dict]:
     # (REQ-GEN-334 criterion 13). Delivery-name uniqueness is seeded from
     # what will remain on disk once this collection's last history is
     # cleared - the same set step 2 used to leave behind.
-    previous = previous_delivery_names(provider.dataset_id)
+    # EACH DELIVERY STREAM'S OWN BOOKKEEPING (REQ-GEN-295 criterion 1): keyed
+    # by its own datasets, its entries numbered within it, so one stream's
+    # jobs never shift another's run numbering or entries.
+    streams = provider.streams()
+    keys = [d for st in streams for d in st.dataset_ids]
+    previous = list(dict.fromkeys(n for k in keys for n in previous_delivery_names(k)))
     # Delivery names are arbitrary BY DESIGN, which means they can collide -
     # and a collision would write two arrivals into one directory, silently
     # merging deliveries that never arrived together.
     taken_names: set[str] = delivery.existing_delivery_names(DELIVERIES_DIR) - set(previous)
     manifest: list[dict] = []
+    by_stream: dict[str, list[dict]] = {st.name: [] for st in streams}
     writes: list[tuple] = []
     for job in plan.jobs:
         deliveries = provider.slot(plan, job)
         if deliveries is None:
             continue
-        entries = provider.entries(plan, job, deliveries, len(manifest))
-        injected = plan.injected_by_period.get(job.period.name)
+        entries = provider.entries(plan, job, deliveries, len(by_stream[job.stream]))
+        by_stream[job.stream].extend(entries)
+        # A PERIOD'S INJECTED SCENARIOS ARE THE PROVIDER'S OWN STREAM'S - its
+        # first - never another stream's job in the same period.
+        injected = (plan.injected_by_period.get(job.period.name)
+                    if job.stream == streams[0].name else None)
         for n, (delivery_obj, entry) in enumerate(zip(deliveries, entries), start=1):
             entry["received_at"] = provider.received_at(plan, job, n, delivery_obj, entry)
             name = delivery_names.delivery_name(job.period.round_date, job.seed, attempt=n,
@@ -188,8 +201,10 @@ def generate(collection_id: str) -> list[dict]:
             writes.append((name, files, received, entry, delivery_obj, n))
         manifest.extend(entries)
         provider.after_slot(plan, job, deliveries)
+    # EVERY STREAM'S ENTRIES TOGETHER: two of this provider's deliveries
+    # never share an instant, whichever streams they are in.
     no_two_arrivals_share_an_instant(manifest)
-    no_instant_shared_with_another_collection(provider.dataset_id, manifest)
+    no_instant_shared_with_another_collection(keys, manifest)
 
     # 2. Only then is the last history cleared, and the new one written.
     delivery.remove_deliveries(previous, DELIVERIES_DIR, RECEIPTS_DIR)
@@ -219,7 +234,18 @@ def generate(collection_id: str) -> list[dict]:
     correction_claims.check_written(
         [d.dataset_id for d in hierarchy.datasets_in_collection(collection_id)], manifest,
         frozenset(plan.injected_by_period))
-    write_bookkeeping(provider.dataset_id, manifest)
+    for st in streams:
+        if len(st.dataset_ids) == 1:
+            write_bookkeeping(st.dataset_ids[0], by_stream[st.name])
+            continue
+        # A STREAM OF SEVERAL DATASETS writes each entry under every dataset
+        # whose file its delivery carries.
+        from qa_tools.common import hierarchy as _h
+
+        for d in st.dataset_ids:
+            table = _h.dataset(d).table
+            write_bookkeeping(d, [e for e in by_stream[st.name]
+                                  if table in (e.get("row_counts") or {})])
     if plan.resolved:
         placed = [placement for _, placement in plan.resolved]
         recognised = arrivals.arrivals_for(collection_id, provider.run_prefix,

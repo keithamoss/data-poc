@@ -204,7 +204,7 @@ def check_all(collection_id: str | None = None) -> None:
             provider = collections.for_dataset(d.dataset_id)
         except collections.NoProviderError:
             continue
-        generated[d.dataset_id] = provider.generated_periods()
+        generated[d.dataset_id] = provider.generated_periods_for(d.dataset_id)
         if provider.suppresses_others_corrections:
             suppressed[d.dataset_id] = foreign_altered(d.collection_id)
     check(scenario_injection.INJECTIONS, generated, history_end=get_anchor_date(),

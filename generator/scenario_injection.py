@@ -989,7 +989,7 @@ def generated_periods(dataset_id: str) -> list:
     except collections.NoProviderError as exc:
         raise CannotPlace(f"no generator writes {dataset_id}, so it has no generated periods "
                           f"to place a scenario in: {exc}") from None
-    return provider.generated_periods()
+    return provider.generated_periods_for(dataset_id)
 
 
 def unprovided_scenarios() -> list[str]:
@@ -1451,8 +1451,12 @@ _PAIR_CONFIG = ("daily, due 14:00 AWST, 60 minutes' grace, 4-hour claim window -
 #: correction does to each is what its impact preview shows at confirmation
 #: (re-judged, moved, kept, held or parked), recorded then rather than
 #: predicted here. Data, not a rule naming any collection.
+#: THE GEOCODING DATASETS RIDE IT TOO, unconditionally (REQ-GEN-295
+#: criterion 11): every geocoding supply in a period an altered round's slot
+#: fills rides the correction, its outcome recorded from the impact preview
+#: at confirmation.
 CORRECTION_RIDERS: dict[str, tuple[str, ...]] = {
-    "REQ-GEN-205": ("linkage-keys",),
+    "REQ-GEN-205": ("linkage-keys", "geo-cp-clients", "geo-ed-presentations"),
 }
 
 INJECTIONS: tuple[Injection, ...] = (

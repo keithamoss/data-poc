@@ -48,6 +48,21 @@ class Job:
     severity: str | None
     period: Any
     extra: dict = field(default_factory=dict)
+    #: The DELIVERY STREAM the slot belongs to (REQ-GEN-295 criterion 1) -
+    #: its bookkeeping and numbering are that stream's own. "" for a
+    #: provider writing one kind of delivery.
+    stream: str = ""
+
+
+@dataclass(frozen=True)
+class Stream:
+    """One kind of delivery a provider writes (REQ-GEN-295 criterion 1): its
+    name, as its jobs carry it, and the datasets its deliveries carry. Its
+    bookkeeping is written under its own datasets and its entries numbered
+    within it, so one stream's jobs never shift another's."""
+
+    name: str
+    dataset_ids: tuple[str, ...]
 
 
 @dataclass
@@ -124,11 +139,24 @@ class Provider:
                     f"{'' if last == first else f'..{last}'} for {label}, outside the "
                     f"ranges it declares ({ranges})")
 
+    # ---- the delivery streams (REQ-GEN-295 criterion 1) -------------------
+
+    def streams(self) -> tuple[Stream, ...]:
+        """The kinds of delivery this provider writes - one, keyed by its
+        dataset, unless it declares several."""
+        return (Stream(name="", dataset_ids=(self.dataset_id,)),)
+
     # ---- the period plan ---------------------------------------------------
 
     def generated_periods(self) -> list:
         """The periods this provider writes, oldest first."""
         raise NotImplementedError
+
+    def generated_periods_for(self, dataset_id: str) -> list:
+        """The periods this provider writes for ONE of its datasets - its
+        whole plan's, unless a stream writes the dataset in fewer
+        (REQ-GEN-295 criterion 1)."""
+        return self.generated_periods()
 
     def plan(self) -> Plan:
         raise NotImplementedError
