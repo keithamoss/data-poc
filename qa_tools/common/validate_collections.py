@@ -284,15 +284,25 @@ def check_file_problems(root: Path | None = None) -> list[str]:
         return []  # config_problems() reports a hierarchy that cannot be read
     problems: list[str] = []
     owner = {}
+
+    def shown(rel: str) -> str:
+        """A path named relative to the checkout being checked - the asset's
+        folder may be given absolute when it is outside this repository
+        (assets.folder_rel)."""
+        path = root / rel
+        try:
+            return path.relative_to(root).as_posix()
+        except ValueError:
+            return path.as_posix()
     for c in declared:
         if not c.contract.startswith(f"{c.agency_id}/"):
             problems.append(f"{c.id!r}'s contract {c.contract!r} is not in its agency's folder "
-                            f"{c.folder}/")
+                            f"{shown(c.folder)}/")
         # Its contract is config_problems()'s (REQ-PIPE-240 criterion 7).
         for kind in ("soda", "evidently"):
             if not (root / c.check_file(kind)).is_file():
                 problems.append(f"collection {c.id!r} is missing its {kind} check file "
-                                f"{c.check_file(kind)}")
+                                f"{shown(c.check_file(kind))}")
         owner[c.stem] = c
 
     contract = root / assets.folder_rel()
@@ -314,7 +324,7 @@ def check_file_problems(root: Path | None = None) -> list[str]:
                 "" if where in agencies else f", in {where}/, which is no agency's folder"))
         elif path.parent != root / c.folder:
             problems.append(f"{rel} is {c.id!r}'s, which belongs in its agency's folder "
-                            f"{c.folder}/")
+                            f"{shown(c.folder)}/")
 
     problems += _dbt_layout_problems(root, declared)
     problems += dbt_cross_collection_ref_problems(root, declared)
