@@ -527,6 +527,11 @@ checks for birth_registrations:
       name: recent birth dates present (freshness)
       attributes:
         check_id: data-asset-1.registry-services.civil-registration.birth-registrations.date_of_birth.freshness_soda
+        # Its failure judges the whole supply and names no row (REQ-PIPE-341,
+        # decisions 2026-11-01): it records no sample, and the key gate
+        # leaves it alone. Outside the definition fingerprint, as every
+        # attribute is.
+        names_no_row: true
         reads_columns: ["birth_registrations.date_of_birth", "birth_registrations.date_registered"]
         name: Recent births present
         category: timeliness

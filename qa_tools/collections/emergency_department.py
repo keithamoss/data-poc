@@ -8,7 +8,7 @@ TRIAGE_CATEGORIES = [1, 2, 3, 4, 5]
 ADAPTER = CollectionAdapter(
     collection_id="emergency-department",
     label="Emergency Department",
-    sample_key={"ed_presentations": "presentation_id"},
+    sample_key={"ed_presentations": ["presentation_id"]},
     dbt=DbtSpec(
         dimension_by_test={"not_null": "completeness", "accepted_values": "conformity",
                            "accepted_range": "conformity"},

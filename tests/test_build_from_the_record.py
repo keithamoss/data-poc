@@ -525,3 +525,28 @@ class TestARecordedDistributionAndBandReachTheCard:
         (entry,) = [h for h in card["history"] if h["run_id"] == run_id]
         assert entry["distribution"] == bins
         assert card["band"] == band
+
+
+class TestASeveralColumnSampleReachesThePageUnchanged:
+    """REQ-PIPE-341 criteria 4 and 9: the build carries each sample's ordered
+    parts, null parts included, and the key's column names, to the history
+    entry the page reads; a one-column result carries no column names."""
+
+    def test_samples_and_key_columns_are_carried(self, history):
+        cols = ["cp_client_id", "notification_id"]
+        samples = [["C-1", "N-1"], ["C-2", None]]
+        for samples_here, extra, day in ((samples, {"failing_sample_key_columns": cols}, "01"),
+                                         (["C-9"], {}, "02")):
+            clients, notes = f"cp-clients@{_key()}", f"cp-notifications@{_key()}"
+            _run(f"cp_notifications__{_key()}", dataset_id="cp-notifications", supply=notes,
+                 received_at=f"2099-01-{day}T01:00:00+00:00",
+                 results=[_record(CLIENT_REF, "cp-notifications", "fail",
+                                  failing_sample_keys=samples_here, **extra)],
+                 reads={"cp_clients": clients, "cp_notifications": notes})
+        entries = _history_of(history.datasets()["cp-notifications"], CLIENT_REF)
+        assert entries, "no history entries - this would prove nothing"
+        by_samples = {json.dumps(e["failing_sample_keys"]): e for e in entries}
+        several = by_samples[json.dumps(samples)]
+        assert several["failing_sample_key_columns"] == cols
+        one = by_samples[json.dumps(["C-9"])]
+        assert "failing_sample_key_columns" not in one

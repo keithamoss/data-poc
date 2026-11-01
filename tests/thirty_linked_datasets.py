@@ -50,6 +50,8 @@ PRODUCT = {"collection": "lk-linkage", "short": "lkp", "dataset": "lk-keys",
 MULTI_ID = {"lks1-d2": ["site_code", "episode_no"],
             "lks2-d3": ["region", "site_code", "episode_no"]}
 N_ID = max(len(c) for c in MULTI_ID.values())
+#: The product's failing-sample key: dataset and id_1 to id_N (REQ-PIPE-341).
+SAMPLE_KEY = ["dataset"] + [f"id_{j}" for j in range(1, N_ID + 1)]
 #: The supply sent again and promoted over the first (criterion 2's move).
 MOVED = "lks3-d1"
 ROWS = 12
@@ -154,7 +156,9 @@ def _dbt(coll_id: str, tables: list[str]) -> dict[str, str]:
 
 
 def _source_adapter(c: dict) -> str:
-    keys = {d["table"]: d["id_columns"][0] for d in c["datasets"]}
+    # EVERY IDENTIFIER COLUMN (REQ-PIPE-341): a several-column dataset is
+    # sampled by all of them.
+    keys = {d["table"]: list(d["id_columns"]) for d in c["datasets"]}
     return ("\"\"\"A fake source collection's adapter (REQ-TEST-339), in a copy only.\"\"\"\n"
             "from qa_tools.collections.base import CollectionAdapter, SodaSpec\n\n"
             f"ADAPTER = CollectionAdapter(collection_id={c['id']!r}, label={c['name']!r},\n"
@@ -332,6 +336,7 @@ def _product_soda() -> str:
         + " OR ".join(f"COALESCE(TRIM({_text(f'id_{j}')}), '') <> ''"
                       for j in range(len(d["id_columns"]) + 1, N_ID + 1)) + "))"
         for d in ds if len(d["id_columns"]) < N_ID)
+    sample_cols = ", ".join(SAMPLE_KEY)
     checks = [
         {"missing_count(linkage_key)": {"missing values": [""], "fail": "when > 0", "attributes": {
             "check_id": check_id("linkage_key.missing_count_soda"), "name": "Linkage key recorded",
@@ -344,21 +349,21 @@ def _product_soda() -> str:
             "description": "Every row must name a dataset this release is agreed to link.",
             "failure_indicates": "self-evident", "changelog": []}}},
         {"failed rows": {"name": "Expected identifiers present",
-                         "fail query": f"SELECT dataset, linkage_key FROM {t}\nWHERE {expected}\n",
+                         "fail query": f"SELECT {sample_cols} FROM {t}\nWHERE {expected}\n",
                          "samples limit": 1000, "attributes": {
                              "check_id": check_id("id_1.expected_ids_soda"),
-                             "reads_columns": [f"{t}.dataset", f"{t}.linkage_key"]
+                             "reads_columns": [f"{t}.dataset"]
                              + [f"{t}.{c}" for c in _id_cols(N_ID)],
                              "category": "completeness", "introduced_date": INTRODUCED,
                              "id_counts": counts,
                              "description": "Each row must carry every identifier its dataset is identified by.",
                              "failure_indicates": "self-evident", "changelog": []}}},
         {"failed rows": {"name": "No surplus identifiers",
-                         "fail query": f"SELECT dataset, linkage_key FROM {t}\nWHERE {surplus}\n",
+                         "fail query": f"SELECT {sample_cols} FROM {t}\nWHERE {surplus}\n",
                          "samples limit": 1000, "attributes": {
                              "check_id": check_id("id_1.no_surplus_ids_soda"),
-                             "reads_columns": [f"{t}.dataset", f"{t}.linkage_key"]
-                             + [f"{t}.{c}" for c in _id_cols(N_ID)][1:],
+                             "reads_columns": [f"{t}.dataset"]
+                             + [f"{t}.{c}" for c in _id_cols(N_ID)],
                              "category": "conformity", "introduced_date": INTRODUCED,
                              "id_counts": counts,
                              "description": "A row must carry no identifier beyond those its dataset is identified by.",
@@ -382,12 +387,12 @@ def _product_soda() -> str:
                   "introduced_date": INTRODUCED, "changelog": []}
         checks.append({"failed rows": {
             "name": referential_name(d),
-            "fail query": (f"SELECT l.dataset, l.id_1 FROM {t} l\n"
+            "fail query": (f"SELECT {', '.join('l.' + c for c in SAMPLE_KEY)} FROM {t} l\n"
                            f"LEFT JOIN {d['table']} s ON {on_src}\n"
                            f"WHERE l.dataset = '{d['code']}' AND s.{cols[0]} IS NULL\n"),
             "samples limit": 1000,
             "attributes": {"check_id": check_id(f"{d['id']}.referential_soda"),
-                           "reads_columns": [f"{t}.dataset", f"{t}.id_1"]
+                           "reads_columns": [f"{t}.{c}" for c in SAMPLE_KEY]
                            + [f"{d['table']}.{c}" for c in cols],
                            **common, "linked_check": "referential", "category": "consistency",
                            "description": f"Every row coded {d['code']} must match a record of {d['name']}.",
@@ -416,7 +421,7 @@ def _product_adapter() -> str:
             "from qa_tools.collections.base import CollectionAdapter, SodaSpec\n\n"
             f"ADAPTER = CollectionAdapter(\n"
             f"    collection_id={PRODUCT['collection']!r}, label={PRODUCT['name']!r},\n"
-            f"    sample_key={{{PRODUCT['table']!r}: 'linkage_key'}},\n"
+            f"    sample_key={{{PRODUCT['table']!r}: {SAMPLE_KEY!r}}},\n"
             f"    soda=SodaSpec(data_source={PRODUCT['short']!r}, column_by_name={names!r}),\n"
             f"    claim_window_dataset={PRODUCT['dataset']!r})\n")
 

@@ -5,7 +5,7 @@ from qa_tools.collections.base import CollectionAdapter, DbtSpec, SodaSpec, Stat
 ADAPTER = CollectionAdapter(
     collection_id="widget-register",
     label="Widget Register",
-    sample_key={"widgets": "widget_id"},
+    sample_key={"widgets": ["widget_id"]},
     dbt=DbtSpec(
         dimension_by_test={"unique": "uniqueness", "not_null": "completeness"},
         label_by_test={"unique": "Duplicate rate", "not_null": "Null rate"},

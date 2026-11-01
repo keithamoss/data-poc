@@ -33,11 +33,10 @@ class DatacontractSpec:
 @dataclass(frozen=True)
 class DbtSpec:
     #: Each singular test's home table - it has no attached model - and the
-    #: column it is routed to; the singular tests whose audit table holds no
-    #: row keys to sample.
+    #: column it is routed to. (A test whose failure names no row declares
+    #: `names_no_row: true` in its own meta - REQ-PIPE-341.)
     singular_home: dict = field(default_factory=dict)
     singular_column: dict = field(default_factory=dict)
-    singular_unsampled: frozenset = frozenset()
     #: A model-level generic test's column, by test type.
     model_level_column: dict = field(default_factory=dict)
     #: Each test type's dimension and cross-tool label.
@@ -82,8 +81,11 @@ class CollectionAdapter:
     #: How the bootstrap names this collection's work when it reports it -
     #: the words it has always used, so nothing it prints changes.
     label: str
-    #: Each table's key column, the only value a failing-row sample keeps -
-    #: never full row content (plans/qa-pipeline.md #15).
+    #: Each table's failing-sample key, an ORDERED LIST of columns - one
+    #: column a list of one (REQ-PIPE-341 criterion 1). Only these values ever
+    #: leave a sampler - never full row content (plans/qa-pipeline.md #15);
+    #: qa_tools/common/sample_keys.py says what a sample of one or several
+    #: columns records.
     sample_key: dict = field(default_factory=dict)
     #: What each shared tool module reads (REQ-QAC-242 criterion 2).
     dbt: DbtSpec = field(default_factory=DbtSpec)

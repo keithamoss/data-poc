@@ -173,6 +173,23 @@ class TestTheLinkageRunReadsAllThirtyFromTheWarehouse:
         assert len(coverage) == 30 and all(r["metric_value"] == 100.0 for r in coverage)
 
 
+class TestEveryLinkageResultNamesItsRowsByTheWholeKey:
+    """REQ-PIPE-341 at thirty linked datasets, several identified by more than
+    one column: every linkage result records the product's whole key -
+    dataset and id_1 to id_N - as its sample's column names, and the run
+    recorded at all, so no sampler refused a captured row (criterion 8).
+    WRITTEN, NOT YET RUN: deferred to the end-of-run bootstrap (2026-11-01
+    build run)."""
+
+    def test_each_result_records_the_key_columns(self, copy):
+        mine = [r for r in copy.results if r["run_id"] == copy.linkage_run]
+        assert mine, "the linkage run recorded nothing"
+        for r in mine:
+            assert r.get("failing_sample_key_columns") == fx.SAMPLE_KEY, r["check_id"]
+            for sample in r.get("failing_sample_keys") or []:
+                assert isinstance(sample, list) and len(sample) == len(fx.SAMPLE_KEY), sample
+
+
 class TestTheIdentifierShapeChecksPassOnCorrectlyShapedRows:
     """Criterion 2: the expected-ids and nothing-after-id_k checks pass on
     rows of every dataset - one, two and three identifiers - and the rows are

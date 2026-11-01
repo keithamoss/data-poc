@@ -522,14 +522,15 @@ class TestTheSharedToolModules:
         sampled, written = [], []
         monkeypatch.setattr(dc.asked_for, "ask", lambda *a, **k: [])
         monkeypatch.setattr(dc.asked_for, "SCOPED", frozenset())
-        monkeypatch.setattr(dc, "run_against_warehouse", lambda path, schema, **o: SimpleNamespace(
-            checks=[check], model_dump=lambda: {"path": path}))
+        options = {}
+        monkeypatch.setattr(dc, "run_against_warehouse", lambda path, schema, **o: options.update(o)
+                            or SimpleNamespace(checks=[check], model_dump=lambda: {"path": path}))
         monkeypatch.setattr(dc, "_unreadable_in", lambda run_id, tables: frozenset())
         monkeypatch.setattr(dc, "_declared_reads_tables", lambda: {})
         monkeypatch.setattr(dc, "_authored_names", lambda path: {check.qualityDefinition: "Pair"})
         monkeypatch.setattr(dc, "check_id_from_quality_definition", lambda q: q)
         monkeypatch.setattr(dc, "fail_threshold_from_quality_definition", lambda *a: 0)
-        monkeypatch.setattr(dc, "failing_sample_keys", lambda c, key: sampled.append(key) or [])
+        monkeypatch.setattr(dc, "failing_sample_keys", lambda c, key, **k: sampled.append(key) or [])
         monkeypatch.setattr(dc, "write_qa_result", lambda *a, **k: written.append(a))
 
         [r] = dc.evaluate(FAKE_ID, "fake_things__1", "2026-01-01T00:00:00Z")
@@ -540,6 +541,9 @@ class TestTheSharedToolModules:
         assert written[0][:2] == ("fake-agency", FAKE_ID)
         assert written[0][5]["path"].endswith("contract/fake-agency/fake-things-contract.yaml")
         assert sampled == []  # custom_sql is never sampled; the key is the adapter's when it is
+        # ...and datacontract-cli is told that key, not left to guess it from
+        # primaryKey/unique properties (REQ-PIPE-341, post-build-review).
+        assert options["sample_key"] == collections.adapter(FAKE_ID).sample_key
 
     def test_a_rule_over_an_unreadable_table_is_left_out_and_noted(
             self, third_collection, monkeypatch):
@@ -563,7 +567,7 @@ class TestTheSharedToolModules:
         monkeypatch.setattr(dc, "_authored_names", lambda path: {})
         monkeypatch.setattr(dc, "check_id_from_quality_definition", lambda q: q)
         monkeypatch.setattr(dc, "fail_threshold_from_quality_definition", lambda *a: 0)
-        monkeypatch.setattr(dc, "failing_sample_keys", lambda c, key: [])
+        monkeypatch.setattr(dc, "failing_sample_keys", lambda c, key, **k: [])
         monkeypatch.setattr(dc, "write_qa_result", lambda *a, **k: None)
         monkeypatch.setattr(dc.left_out, "note", lambda run_id, tool, ids: notes.extend(ids))
 
@@ -773,7 +777,7 @@ class TestTheSharedToolModules:
         monkeypatch.setattr(run_dbt, "run_dbt", lambda command, select, *a, **k: built_runs.append(select))
         monkeypatch.setattr(run_dbt, "_check_ids", lambda path: {
             (f"stg_{FAKE_TABLE}", "things", "not_null"): "fake.not_null_dbt"})
-        monkeypatch.setattr(run_dbt, "failing_sample_keys_direct", lambda *a: [])
+        monkeypatch.setattr(run_dbt, "failing_sample_keys_direct", lambda *a, **k: [])
         monkeypatch.setattr(run_dbt.left_out, "note", lambda run_id, tool, ids: notes.extend(ids))
         monkeypatch.setattr(run_dbt, "write_qa_result", lambda *a, **k: None)
         got = run_dbt.evaluate(FAKE_ID, "fake_things__1", "2026-01-01T00:00:00Z")

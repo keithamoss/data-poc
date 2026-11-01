@@ -19,7 +19,7 @@ from __future__ import annotations
 import os
 
 from qa_tools import collections
-from qa_tools.common import asked_for, hierarchy, left_out, supply_db
+from qa_tools.common import asked_for, hierarchy, left_out, sample_keys, supply_db
 from qa_tools.common.qa_results_writer import write_qa_result
 from qa_tools.common.soda_common import (
     ENGINE_TAG, CaptureSampler, band, check_id_from_resource_attributes, execute_scan,
@@ -167,8 +167,12 @@ def evaluate(collection_id: str, run_id: str, run_timestamp: str) -> list[dict]:
                 "on_fail_action": "flag",
                 "row_count_total": n_total_by_table[table],
                 "row_count_invalid": row_count_invalid,
-                "failing_sample_keys": failing_sample_keys(sampler.captured, c["name"],
-                                                           adapter.sample_key[table], table),
+                # EVERY KEY COLUMN, AND THEIR NAMES WHERE THERE ARE SEVERAL
+                # (REQ-PIPE-341 criteria 2 and 9); none for a check declaring
+                # that its failure names no row.
+                **sample_keys.recorded(adapter.sample_key[table], failing_sample_keys(
+                    sampler.captured, c["name"], adapter.sample_key[table], table,
+                    names_no_row=sample_keys.names_no_row(resource_attribute(c, "names_no_row")))),
                 "engine": ENGINE_TAG,
             })
 

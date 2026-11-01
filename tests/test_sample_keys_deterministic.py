@@ -22,22 +22,22 @@ def test_dbt_samples_are_the_lowest_keys_in_order(supply_dsn):
             conn.execute("INSERT INTO public.sample_probe VALUES (?)", [k])
         try:
             assert dbt_common.failing_sample_keys_direct(
-                conn, "public.sample_probe", "pk") == WANT
+                conn, "public.sample_probe", ["pk"]) == WANT
             assert dbt_common.failing_sample_keys_via_values(
-                conn, "public.sample_probe", "pk", "public.sample_probe", "pk", "pk") == WANT
+                conn, "public.sample_probe", "pk", "public.sample_probe", "pk", ["pk"]) == WANT
         finally:
             conn.execute("DROP TABLE public.sample_probe")
 
 
 def test_soda_samples_are_the_lowest_keys_in_order():
     captured = {("t", "c"): [{"pk": k, "other": 1} for k in KEYS]}
-    assert soda_common.failing_sample_keys(captured, "c", "pk", "t") == WANT
+    assert soda_common.failing_sample_keys(captured, "c", ["pk"], "t") == WANT
 
 
 def test_datacontract_samples_are_in_key_order():
     """datacontract-cli bounds its own sample; only the order was ours."""
     check = SimpleNamespace(failedSamples=[{"pk": k} for k in KEYS])
-    assert datacontract_common.failing_sample_keys(check, "pk") == sorted(KEYS)
+    assert datacontract_common.failing_sample_keys(check, ["pk"]) == sorted(KEYS)[:5]
 
 
 def _soda_limits() -> set[int]:
@@ -82,7 +82,7 @@ def test_soda_is_asked_for_enough_rows_to_pick_the_lowest(supply_dsn):
         soda_common.execute_scan(scan)
         ((table, name),) = sampler.captured
         assert table == "t"
-        assert soda_common.failing_sample_keys(sampler.captured, name, "pk", table) == WANT
+        assert soda_common.failing_sample_keys(sampler.captured, name, ["pk"], table) == WANT
     finally:
         with supply_db.connect(label="test-samples-soda") as conn:
             conn.execute("DROP SCHEMA sample_probe_soda CASCADE")

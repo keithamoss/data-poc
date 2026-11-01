@@ -76,6 +76,8 @@ tests:
     config:
       meta:
         check_id: data-asset-1.registry-services.civil-registration.birth-registrations.recency_dbt
+        # Its failure judges the whole supply and names no row (REQ-PIPE-341).
+        names_no_row: true
         reads_columns: ["birth_registrations.date_of_birth", "birth_registrations.date_registered"]
         name: Recent births present
         category: timeliness

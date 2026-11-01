@@ -118,7 +118,7 @@ def _install(monkeypatch, tmp_path, *, bare: bool) -> list:
     adapter.ADAPTER = CollectionAdapter(
         collection_id=FAKE_ID, label="Fake Things",
         datacontract=DatacontractSpec(labels_by_check_tail={"pair_datacontract": "Fake pair"}),
-        sample_key={FAKE_TABLE: "fake_id"})
+        sample_key={FAKE_TABLE: ["fake_id"]})
     monkeypatch.setitem(sys.modules, "qa_tools.collections.fake_collection", adapter)
     return calls
 

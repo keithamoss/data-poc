@@ -35,14 +35,13 @@ ADAPTER = CollectionAdapter(
             "freshness_datacontract": "Freshness",
         },
     ),
-    sample_key={"birth_registrations": "registration_number"},
+    sample_key={"birth_registrations": ["registration_number"]},
     dbt=DbtSpec(
         singular_home={"multiple_birth_sibling": "birth_registrations",
                        "recency": "birth_registrations"},
         singular_column={"multiple_birth_sibling": "is_multiple_birth", "recency": "date_of_birth"},
         # recency is a NOT EXISTS check: its audit table holds one synthetic
         # row and no registration number to sample.
-        singular_unsampled=frozenset({"recency"}),
         model_level_column={"expression_is_true": "date_registered"},
         dimension_by_test={
             "unique": "uniqueness", "not_null": "completeness", "accepted_values": "conformity",

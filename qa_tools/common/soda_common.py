@@ -11,7 +11,7 @@ import re
 
 from soda.sampler.sampler import Sampler
 from soda.sampler.sample_ref import SampleRef
-from qa_tools.common import config_yaml
+from qa_tools.common import config_yaml, sample_keys
 
 def _defuse_sodas_dotenv_reload() -> None:
     """Build Soda's EnvHelper now, and put the environment back.
@@ -63,7 +63,7 @@ ENGINE_TAG = "Soda Core 3.5"
 # Matches datacontract-cli's own hardcoded _FAILED_SAMPLE_LIMIT (see
 # datacontract_common.py) - one consistent cap across every tool's
 # failing-row samples, not a per-tool guess. See plans/qa-pipeline.md #15.
-FAILING_SAMPLE_LIMIT = 5
+FAILING_SAMPLE_LIMIT = sample_keys.FAILING_SAMPLE_LIMIT
 
 #: How many failing rows each Soda check asks Soda for (`samples limit:` in
 #: the checks YAML) - more than FAILING_SAMPLE_LIMIT on purpose, so the five
@@ -127,16 +127,23 @@ class CaptureSampler(Sampler):
 
 
 def failing_sample_keys(captured: dict[tuple[str | None, str], list[dict]], check_name: str,
-                        pk_column: str, table: str | None) -> list[str]:
-    """Pulls just pk_column's value out of whatever CaptureSampler captured
-    for this check - a metric check's sample carries every table column
-    (Soda doesn't pre-restrict the way datacontract-cli does), a "failed
-    rows" check's sample usually already carries only the identifier
-    column its own fail query selected. Either way, only pk_column's
-    value ever leaves this function - never other row content."""
+                        key_columns: list[str], table: str | None, *,
+                        names_no_row: bool = False) -> list:
+    """The key of each row CaptureSampler captured for this check - a metric
+    check's sample carries every table column (Soda doesn't pre-restrict the
+    way datacontract-cli does), a "failed rows" check's sample carries what its
+    own fail query selected. Only the key columns ever leave this function -
+    never other row content (sample_keys, REQ-PIPE-341).
+
+    A captured row lacking a key column raises (criterion 8) - it was dropped
+    silently, which is how Linkage Keys' referential samples were recorded
+    empty (post-build-review #291) - unless the check declares that its
+    failure names no row (`names_no_row`), when nothing is recorded."""
+    if names_no_row:
+        return []
     rows = captured.get((table, check_name), [])
-    keys = sorted(str(row[pk_column]) for row in rows if row.get(pk_column) is not None)
-    return keys[:FAILING_SAMPLE_LIMIT]
+    return sample_keys.pick(sample_keys.value_of(row, key_columns, check=check_name, table=table)
+                            for row in rows)
 
 
 def check_id_from_resource_attributes(check: dict) -> str | None:

@@ -49,13 +49,13 @@ checks for linkage_keys:
   - failed rows:
       name: Expected identifiers present
       fail query: |
-        SELECT dataset, linkage_key FROM linkage_keys
+        SELECT dataset, id_1, id_2 FROM linkage_keys
         WHERE (dataset = 'DOC_CLIENTS' AND (id_1 IS NULL OR TRIM(CAST(id_1 AS TEXT)) = ''))
            OR (dataset = 'EDDC_PRESENTATION' AND (id_1 IS NULL OR TRIM(CAST(id_1 AS TEXT)) = ''))
       samples limit: 100000
       attributes:
         check_id: data-asset-1.department-of-health.linkage-products.linkage-keys.id_1.expected_ids_soda
-        reads_columns: ["linkage_keys.dataset", "linkage_keys.linkage_key", "linkage_keys.id_1"]
+        reads_columns: ["linkage_keys.dataset", "linkage_keys.id_1", "linkage_keys.id_2"]
         category: completeness
         introduced_date: "2013-01-01"
         id_counts: {DOC_CLIENTS: 1, EDDC_PRESENTATION: 1}
@@ -65,7 +65,11 @@ checks for linkage_keys:
         failure_indicates: >
           The linkage unit released a record without the identifier that says
           which record it is, so it cannot be traced back.
-        changelog: []
+        changelog:
+          - date: "2026-11-01T00:00:00Z"
+            description: "Now selects the row's dataset and identifiers, so its examples can name the record they are about; its verdicts are unchanged (REQ-PIPE-341)."
+            author: "Keith Moss"
+            breaking: false
 
   # (4) Nothing after id_k. Every linked dataset declares one identifier today,
   # so id_2 - the contract's last id column, blank in an ordinary release - must
@@ -75,13 +79,13 @@ checks for linkage_keys:
   - failed rows:
       name: No surplus identifiers
       fail query: |
-        SELECT dataset, linkage_key FROM linkage_keys
+        SELECT dataset, id_1, id_2 FROM linkage_keys
         WHERE (dataset = 'DOC_CLIENTS' AND id_2 IS NOT NULL AND TRIM(CAST(id_2 AS TEXT)) <> '')
            OR (dataset = 'EDDC_PRESENTATION' AND id_2 IS NOT NULL AND TRIM(CAST(id_2 AS TEXT)) <> '')
       samples limit: 100000
       attributes:
         check_id: data-asset-1.department-of-health.linkage-products.linkage-keys.id_1.no_surplus_ids_soda
-        reads_columns: ["linkage_keys.dataset", "linkage_keys.linkage_key", "linkage_keys.id_2"]
+        reads_columns: ["linkage_keys.dataset", "linkage_keys.id_1", "linkage_keys.id_2"]
         category: conformity
         introduced_date: "2013-01-01"
         id_counts: {DOC_CLIENTS: 1, EDDC_PRESENTATION: 1}
@@ -91,7 +95,11 @@ checks for linkage_keys:
         failure_indicates: >
           The linkage unit has started sending an identifier nobody agreed, or a
           dataset's identifiers have shifted a column.
-        changelog: []
+        changelog:
+          - date: "2026-11-01T00:00:00Z"
+            description: "Now selects the row's dataset and identifiers, so its examples can name the record they are about; its verdicts are unchanged (REQ-PIPE-341)."
+            author: "Keith Moss"
+            breaking: false
 
   # (5) One record linked once.
   - duplicate_count(dataset, id_1):
@@ -140,13 +148,13 @@ checks for linkage_keys:
   - failed rows:
       name: Client Register links match a client
       fail query: |
-        SELECT l.dataset, l.id_1 FROM linkage_keys l
+        SELECT l.dataset, l.id_1, l.id_2 FROM linkage_keys l
         LEFT JOIN cp_clients c ON CAST(c.cp_client_id AS TEXT) = CAST(l.id_1 AS TEXT)
         WHERE l.dataset = 'DOC_CLIENTS' AND c.cp_client_id IS NULL
       samples limit: 100000
       attributes:
         check_id: data-asset-1.department-of-health.linkage-products.linkage-keys.cp-clients.referential_soda
-        reads_columns: ["linkage_keys.dataset", "linkage_keys.id_1", "cp_clients.cp_client_id"]
+        reads_columns: ["linkage_keys.dataset", "linkage_keys.id_1", "linkage_keys.id_2", "cp_clients.cp_client_id"]
         reads_tables: [cp_clients]
         linked_dataset: cp-clients
         linked_check: referential
@@ -161,7 +169,11 @@ checks for linkage_keys:
           Either the linkage release names a client the quarter does not hold,
           or Child Protection's Client Register supply for the quarter is missing
           records it should have.
-        changelog: []
+        changelog:
+          - date: "2026-11-01T00:00:00Z"
+            description: "Now selects the row's dataset and identifiers, so its examples can name the record they are about; its verdicts are unchanged (REQ-PIPE-341)."
+            author: "Keith Moss"
+            breaking: false
   - cp_clients_coverage_percent:
       cp_clients_coverage_percent query: |
         SELECT 100.0 * COUNT(l.id_1) / NULLIF(COUNT(*), 0)
@@ -192,13 +204,13 @@ checks for linkage_keys:
   - failed rows:
       name: ED Presentations links match a presentation
       fail query: |
-        SELECT l.dataset, l.id_1 FROM linkage_keys l
+        SELECT l.dataset, l.id_1, l.id_2 FROM linkage_keys l
         LEFT JOIN ed_presentations e ON CAST(e.presentation_id AS TEXT) = CAST(l.id_1 AS TEXT)
         WHERE l.dataset = 'EDDC_PRESENTATION' AND e.presentation_id IS NULL
       samples limit: 100000
       attributes:
         check_id: data-asset-1.department-of-health.linkage-products.linkage-keys.ed-presentations.referential_soda
-        reads_columns: ["linkage_keys.dataset", "linkage_keys.id_1", "ed_presentations.presentation_id"]
+        reads_columns: ["linkage_keys.dataset", "linkage_keys.id_1", "linkage_keys.id_2", "ed_presentations.presentation_id"]
         reads_tables: [ed_presentations]
         linked_dataset: ed-presentations
         linked_check: referential
@@ -214,7 +226,11 @@ checks for linkage_keys:
           Either the linkage release names a presentation the quarter does not
           hold, or Emergency Department's ED Presentations supply for the quarter
           is missing records it should have.
-        changelog: []
+        changelog:
+          - date: "2026-11-01T00:00:00Z"
+            description: "Now selects the row's dataset and identifiers, so its examples can name the record they are about; its verdicts are unchanged (REQ-PIPE-341)."
+            author: "Keith Moss"
+            breaking: false
   - ed_presentations_coverage_percent:
       ed_presentations_coverage_percent query: |
         SELECT 100.0 * COUNT(l.id_1) / NULLIF(COUNT(*), 0)

@@ -51,7 +51,7 @@ ADAPTER = CollectionAdapter(
         # referential integrity.
         labels_by_check_tail={"relationships_datacontract": "Referential integrity"},
     ),
-    sample_key=TABLE_PK,
+    sample_key={table: [pk] for table, pk in TABLE_PK.items()},
     dbt=DbtSpec(
         singular_home=BUSINESS_RULE_HOME_TABLE,
         dimension_by_test={
