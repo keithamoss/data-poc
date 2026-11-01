@@ -1093,7 +1093,8 @@ def link_problems(injections: Sequence[Injection] | None = None,
     for `mothman scenarios validate` - through link_dates(), the resolver
     the generator writes with (criterion 9)."""
     out = []
-    for injection in (injections if injections is not None else INJECTIONS):
+    # The selected asset's own (PROVISIONAL - this_assets_injections).
+    for injection in (injections if injections is not None else this_assets_injections()):
         if not injection.links:
             continue
         try:

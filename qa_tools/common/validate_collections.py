@@ -262,11 +262,17 @@ def config_problems(package: Path | None = None) -> list[str]:
 
 # ---- REQ-QAC-241 criteria 2, 5 and 9: the check files ----------------------
 
-#: The only files at the top of contract/ - the asset's own, not a
-#: collection's (REQ-QAC-241 criterion 2).
-ASSET_WIDE = ("data-asset.yaml", "calendar.yaml", "people.yaml", "environments.yaml",
-              "file-checks.yaml", "scripted_decisions.yaml", "presentation.yaml",
-              "synthetic_inputs.yaml")
+#: The only files at the top of an asset's folder - the asset's own, not a
+#: collection's (REQ-QAC-241 criterion 2 as amended by A21).
+ASSET_WIDE = ("data-asset.yaml", "calendar.yaml", "people.yaml", "file-checks.yaml",
+              "presentation.yaml")
+#: The asset folder's own parts, each with a gate of its own - its dbt project
+#: (the dbt-folder gate), its QA adapters (the adapters gate) and its
+#: synthetic-only configuration (below) - so never an agency's folder.
+ASSET_PARTS = ("dbt", "collections", "synthetic")
+#: The only files at the top of an asset's synthetic/ folder, beside its
+#: providers in synthetic/collections/ (REQ-GEN-370 criterion 1).
+SYNTHETIC = ("scripted_decisions.yaml", "synthetic_inputs.yaml", "eras.yaml")
 _CHECK_FILE = re.compile(r"(?P<stem>.+)-(?:contract|soda-checks|evidently-checks)(?:-retired)?\.ya?ml")
 
 
@@ -275,9 +281,11 @@ def check_file_problems(root: Path | None = None) -> list[str]:
     repository unless a test names another; the hierarchy is read from the
     selected asset's folder."""
     from qa_tools import collections
-    from qa_tools.common import assets, hierarchy
+    from qa_tools.common import assets
 
-    root = root or hierarchy.data_asset_yaml().parent.parent
+    # The checkout the asset's paths are relative to (assets.folder_rel) -
+    # the repository, wherever the asset folder sits inside it.
+    root = root or assets.ROOT
     try:
         declared = collections.all_collections()
     except ValueError:
@@ -313,8 +321,16 @@ def check_file_problems(root: Path | None = None) -> list[str]:
         rel = path.relative_to(root).as_posix()
         if path.parent == contract:
             if path.name not in ASSET_WIDE:
-                problems.append(f"{rel} is at the top of contract/, where only the asset-wide "
-                                f"files belong ({', '.join(ASSET_WIDE)})")
+                problems.append(f"{rel} is at the top of the asset's folder, where only the "
+                                f"asset-wide files belong ({', '.join(ASSET_WIDE)})")
+            continue
+        part = path.relative_to(contract).parts[0]
+        if part == "synthetic" and path.parent == contract / "synthetic":
+            if path.name not in SYNTHETIC:
+                problems.append(f"{rel} is at the top of the asset's synthetic/ folder, where "
+                                f"only {', '.join(SYNTHETIC)} belong")
+            continue
+        if part in ASSET_PARTS:
             continue
         m = _CHECK_FILE.fullmatch(path.name)
         c = owner.get(m.group("stem")) if m else None

@@ -119,14 +119,14 @@ def validate_command() -> None:
     confirmations = scripted_corrections.load()
     found += scripted_corrections.problems(confirmations, declared={
         p.reference for p in correction_apply._declared(*correction_trial.working())},
-        injections=scenario_injection.INJECTIONS)
+        injections=scenario_injection.this_assets_injections())
     if found:
         for problem in found:
             console.print(f"  - {problem}", style="red")
         raise click.ClickException(
             f"scripted decisions and scenario links FAILED ({len(found)} problem(s)) - "
             f"see above.")
-    links = sum(len(i.links) for i in scenario_injection.INJECTIONS)
+    links = sum(len(i.links) for i in scenario_injection.this_assets_injections())
     console.print(f"scripted decisions OK - {len(script)} decision(s), "
                   f"{len(confirmations)} correction confirmation(s) and {links} scenario "
                   f"link(s), zero errors.")
