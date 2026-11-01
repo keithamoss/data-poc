@@ -577,16 +577,24 @@ def logic_lines(path: Path) -> int:
     return len({n.lineno for n in ast.walk(tree) if hasattr(n, "lineno")} - docstrings)
 
 
-def line_report(root: Path = ROOT) -> list[str]:
+def line_report(adapters: Path | None = None, providers: Path | None = None) -> list[str]:
     """Each registered collection's adapter against the budget, and its
     generator provider's lines beside it, outside the budget - a real
-    deployment's collections have no synthetic generator at all."""
-    from qa_tools import collections
+    deployment's collections have no synthetic generator at all.
 
+    Each from the selected asset's own folders (the asset split: adapters in
+    assets/<asset>/collections/, providers in assets/<asset>/synthetic/
+    collections/), unless a test names others."""
+    from qa_tools import collections
+    from qa_tools.common import assets
+
+    asset = assets.selected()
+    adapters = adapters or asset.adapters
+    providers = providers or asset.providers
     out = []
     for coll in collections.all_collections():
-        adapter = root / "qa_tools" / "collections" / f"{coll.module_name}.py"
-        provider = root / "generator" / "collections" / f"{coll.module_name}.py"
+        adapter = adapters / f"{coll.module_name}.py"
+        provider = providers / f"{coll.module_name}.py"
         if not adapter.is_file():
             continue  # config_problems() says so
         n = logic_lines(adapter)

@@ -236,7 +236,17 @@ class TestAThirdCollectionAtEverySite:
         real = driver.generate
         monkeypatch.setattr(driver, "generate", lambda cid: real(cid) if cid == FAKE_ID else [])
         monkeypatch.setattr("qa_tools.common.scenario_map.write_map", lambda: None)
-        monkeypatch.setattr(__import__("cli.collection_cli", fromlist=["of"]).of("bdm"), "try_targets", lambda **_: 0)
+        # Every real collection whose provider declares a target trial - read
+        # from the provider, never named (the asset split: Birth Registrations
+        # on the daily asset, Linkage Products on the quarterly).
+        from cli.collection_cli import of
+        from cli.pipeline import has_target_trial
+
+        trials = [c for c in collections.all_collections()
+                  if c.id not in (FAKE_ID, BARE_ID) and has_target_trial(c.id)]
+        assert trials, "no real collection declares a target trial - nothing to stub"
+        for c in trials:
+            monkeypatch.setattr(of(c.short), "try_targets", lambda **_: 0)
         monkeypatch.setattr("qa_tools.tools.orchestrate.run_pipeline",
                             lambda collection_id, *_, **__: self.ran.append(collection_id))
         # A STREAM of collections sharing a calendar (REQ-PIPE-262).
@@ -293,7 +303,8 @@ class TestAThirdCollectionAtEverySite:
             _datasets_json(built / c.dashboard_file,
                            {"datasets": [{"id": first.dataset_id, "name": first.dataset_name}]})
             expected.append(first.dataset_id)
-        assert expected[:2] == ["birth-registrations", "cp-clients"]
+        # The quarterly asset's hierarchy order (the asset split).
+        assert expected[:2] == ["cp-clients", "ed-presentations"]
         _datasets_json(built / f"fka_{FAKE_ID}_dashboard.json",
                        {"datasets": [{"id": FAKE_DATASET, "name": "Fake Things"}]})
         monkeypatch.setattr(ticket_sync, "reports_dir", fixed(str(built)))
@@ -389,15 +400,20 @@ class TestTheLiteralGate:
     def _found(self, tmp_path, files):
         return {(rel, text) for rel, _line, text in gate.literal_findings(_tree(tmp_path, files))}
 
-    def test_it_finds_each_kind_of_collection_literal(self, tmp_path):
+    @pytest.mark.parametrize("cid, path, run", [
+        # Each asset's own literals - the gate runs once per asset folder
+        # (cli/check.py), so each asset's literals are found on its own run.
+        pytest.param("child-protection", "assets/quarterly/child-protection-family-support/"
+                     "child-protection-soda-checks.yml", ("cp_run_", 'f"cp_run_{n}"'),
+                     marks=pytest.mark.asset("quarterly")),
+        pytest.param("civil-registration", "contract/bdm-birth-registrations-soda-checks.yml",
+                     ("run_7", 'f"run_7{n}"'), marks=pytest.mark.asset("daily"))])
+    def test_it_finds_each_kind_of_collection_literal(self, tmp_path, cid, path, run):
         got = self._found(tmp_path, {"qa_tools/x.py": (
-            'A = "child-protection"\n'
-            'C = "contract/bdm-birth-registrations-soda-checks.yml"\n'
-            'D = f"cp_run_{n}"\n'
-            'E = f"run_7{n}"\n')})
-        assert got == {("qa_tools/x.py", "child-protection"),
-                       ("qa_tools/x.py", "contract/bdm-birth-registrations-soda-checks.yml"),
-                       ("qa_tools/x.py", "cp_run_"), ("qa_tools/x.py", "run_7")}
+            f'A = "{cid}"\n'
+            f'C = "{path}"\n'
+            f'D = {run[1]}\n')})
+        assert got == {("qa_tools/x.py", cid), ("qa_tools/x.py", path), ("qa_tools/x.py", run[0])}
 
     def test_a_short_alone_is_not_a_collection_literal(self, tmp_path):
         """post-build-review #235 (Keith, 2026-10-18): a short is too short to
@@ -978,11 +994,12 @@ class TestTheAdapterLineReport:
         from qa_tools.common import validate_collections as vc
 
         for coll in collections.all_collections():
-            path = tmp_path / "qa_tools" / "collections" / f"{coll.module_name}.py"
+            path = tmp_path / "collections" / f"{coll.module_name}.py"
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text('"""A docstring is not logic."""\n# nor is a comment\n\n'
                             + "".join(f"x{i} = {i}\n" for i in range(160)))
-        lines = vc.line_report(tmp_path)
+        lines = vc.line_report(tmp_path / "collections", tmp_path / "no-providers")
+        assert lines, "no adapter reported - the check below would prove nothing"
         assert all("adapter 160 lines" in line and "10 over" in line
                    and "no generator provider" in line for line in lines), lines
         assert vc.main() == 0
