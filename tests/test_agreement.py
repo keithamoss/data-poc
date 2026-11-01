@@ -32,6 +32,7 @@ class TestTheDashboardCadenceComesFromTheAgreement:
     """Criterion 17 - the per-dataset delivery-time label the builders
     embed, read from contract/calendar.yaml."""
 
+    @pytest.mark.asset("daily")
     def test_birth_registrations_is_daily_at_two_with_an_hour_of_grace(self):
         assert agreement.cadence("birth-registrations") == {
             "type": "daily", "expected_time": "14:00", "latency_minutes": 60}
@@ -65,6 +66,7 @@ class TestTheDashboardCadenceComesFromTheAgreement:
 class TestOneLoaderOneImmutableValue:
     """Criterion 31."""
 
+    @pytest.mark.asset("daily")
     def test_the_value_cannot_be_changed_in_place(self):
         current = agreement.current()
         with pytest.raises(Exception):
@@ -245,12 +247,14 @@ class TestTheGateRefusesTheNewShapeBroken:
         assert any("cp-nobody" in (e.scope or "") and "hierarchy" in e.problem
                    for e in errors), _text(errors)
 
+    @pytest.mark.asset("daily")
     def test_a_collection_the_hierarchy_does_not_hold_is_refused(self, broken):
         def mutate(doc):
             doc["collections"].append({"id": "nowhere", "calendar": "daily"})
         errors = broken(mutate)
         assert any("nowhere" in (e.scope or "") for e in errors), _text(errors)
 
+    @pytest.mark.asset("daily")
     def test_a_dataset_on_no_calendar_at_all_is_refused_naming_both_files(self, broken):
         """Criterion 18, the other direction: take the collection's
         calendar away and the dataset is on nothing."""
@@ -268,6 +272,7 @@ class TestTheGateRefusesTheNewShapeBroken:
         errors = broken(mutate)
         assert any("no reason" in e.problem for e in errors), _text(errors)
 
+    @pytest.mark.asset("daily")
     @pytest.mark.parametrize("key", ["expected_time", "grace"])
     def test_a_version_with_no_expected_time_or_grace_is_refused(self, broken, key):
         """Criterion 29."""
@@ -396,6 +401,7 @@ class TestCriticFindingsOn110:
         with pytest.raises(schedule.ScheduleConfigError, match="twice"):
             agreement.load(path)
 
+    @pytest.mark.asset("daily")
     def test_months_on_an_older_version_against_a_cadence_rule_are_refused(self, broken):
         """Criterion 7: EACH participation version, against every calendar
         version it overlaps - not the newest alone."""
@@ -467,6 +473,7 @@ class TestCriticFindingsOn110:
         errors = broken(mutate)
         assert any("author" in e.fix for e in errors), _text(errors)
 
+    @pytest.mark.asset("daily")
     def test_a_dataset_on_no_calendar_names_both_files(self, broken):
         """Criterion 18 says both files."""
         def mutate(doc):
@@ -489,6 +496,7 @@ class TestCriticFindingsOn110:
         assert moved.calendar_name_for("cp-carers") == "quarterly"
 
 
+@pytest.mark.asset("daily")
 def test_the_runtime_refuses_older_months_against_a_cadence_rule_too(tmp_path):
     """Criterion 7 at runtime as well as at the gate: an older version's
     months against the daily rule used to drop those days silently."""
@@ -521,3 +529,8 @@ class TestACorrectionMustBeComplete:
                 correction]
         errors = broken(mutate)
         assert any(missing in (e.problem + (e.field or "")) for e in errors), _text(errors)
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

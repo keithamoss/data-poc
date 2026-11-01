@@ -42,6 +42,8 @@ real bug this test itself introduced and caught - see the "verify a
 regression test actually fails first" convention, CLAUDE.md)."""
 from __future__ import annotations
 
+import pytest
+
 from qa_tools.tools import orchestrate
 
 
@@ -143,6 +145,7 @@ def test_bdm_run_one_forwards_manifest_reference_not_the_stale_default(monkeypat
         "the reference is forwarded as a run id now, not a filename (REQ-PIPE-102)"
 
 
+@pytest.mark.asset("quarterly")
 def test_cp_run_one_forwards_manifest_reference_not_the_stale_default(monkeypatch, tmp_path):
     captured = {}
 
@@ -181,3 +184,8 @@ def test_cp_run_one_forwards_manifest_reference_not_the_stale_default(monkeypatc
     # explicit reference is forwarded UNCHANGED, and nothing between
     # here and the check second-guesses it.
     assert captured["reference_run_id"] == "cp_run_01_2099-01-01"
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("daily")

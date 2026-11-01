@@ -75,6 +75,7 @@ class TestABirthRegistrationsAmber:
 
 
 class TestAChildProtectionAmber:
+    @pytest.mark.asset("quarterly")
     def test_a_few_unrecognised_postcodes_inside_the_band(self, cat):
         clients = _clients()
         payload = {"cp_clients": clients, "cp_carers": pd.DataFrame({"carer_id": [1, 2]})}
@@ -83,6 +84,7 @@ class TestAChildProtectionAmber:
         [(lo, hi)] = cat.rule("cp-clients", "postcode", "conformity").amber(len(clients))
         assert lo < int(bad.sum()) < hi
 
+    @pytest.mark.asset("quarterly")
     def test_nothing_else_of_the_delivery_changes(self, cat):
         """Criterion 8."""
         clients = _clients()
@@ -144,6 +146,7 @@ class TestTheGeneratedHistory:
             setting = amber_setting.resolve(g.DATASET_ID, asset_time.start_of_day(p.date))
             assert setting.value != amber_setting.HOLD, p.date
 
+    @pytest.mark.asset("quarterly")
     def test_child_protection_ambers_avoid_injected_periods(self):
         cp = collection_modules.provider_module("child-protection")
 
@@ -255,10 +258,12 @@ class TestTheCriticsSmallerGaps:
         with pytest.raises(targeting.TargetError, match="single-birth rows"):
             targeting.bdm_amber(few, seed=1, catalogue=cat)
 
+    @pytest.mark.asset("quarterly")
     def test_no_postcode_band_is_refused(self, cat):
         with pytest.raises(targeting.TargetError, match="no amber band"):
             targeting.cp_amber({"cp_clients": _clients(n=1)}, seed=1, catalogue=cat)
 
+    @pytest.mark.asset("quarterly")
     def test_too_few_postcodes_to_write_is_refused(self, cat):
         clients = _clients()
         clients.loc[clients.index[3:], "postcode"] = None
@@ -364,11 +369,13 @@ class TestBirthRegistrationsTargets:
 
 
 class TestChildProtectionTargets:
+    @pytest.mark.asset("quarterly")
     def test_red_is_refused_naming_why(self, cat):
         with pytest.raises(targeting.TargetError, match="no lever"):
             targeting.cp_target({"cp_clients": _clients()}, targeting.Target("red"), seed=1,
                                 catalogue=cat)
 
+    @pytest.mark.asset("quarterly")
     def test_amber_is_the_postcode_lever(self, cat):
         out, moved = targeting.cp_target({"cp_clients": _clients()},
                                          targeting.Target("amber"), seed=1, catalogue=cat)
@@ -528,6 +535,7 @@ class TestRefusedBeforeAnythingIsWritten:
             restore()
             si.INJECTIONS = original
 
+    @pytest.mark.asset("quarterly")
     def test_child_protection_red_is_refused_up_front_too(self):
         cp = collection_modules.provider_module("child-protection")
         from generator import scenario_injection as si
@@ -856,6 +864,7 @@ class TestRefusals156:
         finally:
             si.INJECTIONS = original
 
+    @pytest.mark.asset("quarterly")
     def test_a_child_protection_targeted_injection_is_planned_with_green_lead_ins(self):
         """REQ-GEN-203 criterion 4, which lifted finding 8's refusal: a targeted
         Child Protection supply has its lead-in quarters before it and the
@@ -883,6 +892,7 @@ class TestRefusals156:
         for name in placed.built_green:
             assert grown_sevs[names.index(name)] is None, name
 
+    @pytest.mark.asset("quarterly")
     def test_a_child_protection_targeted_injection_whose_lead_ins_cannot_be_placed_is_refused(self):
         """REQ-GEN-203 criterion 4: still refused, naming the scenario, where
         its lead-in quarters fall before the generated history."""
@@ -894,6 +904,7 @@ class TestRefusals156:
         with pytest.raises(si.CannotPlace, match="TS-CPAMB.*lead-in"):
             self._cp_plan_alone(bad)
 
+    @pytest.mark.asset("quarterly")
     def test_a_drawn_red_on_an_original_lead_in_is_refused_naming_the_scenario(self):
         """A lead-in or following quarter is one clean delivery, so a red drawn
         there would never be generated - refused naming the scenario, as the
@@ -958,3 +969,8 @@ class TestEachPlantedScenarioSitsInItsEra:
                 assert s.after_hours > window, (s.scenario, s.after_hours, window)
                 checked += 1
         assert checked, "no scripted promotion or acknowledgement to check"
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("daily")

@@ -407,3 +407,8 @@ class TestAPairsFileChecksAreAboutTheFileEachSupplyIs:
         sf, one, _two = self._pair(conn, received, settle=False)
         assert self._files(conn, sf.DATASET, one) == sorted(
             f.rsplit(".", 1)[0] for f in (sf.LATER, sf.EARLIER))
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

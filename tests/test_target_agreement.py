@@ -136,6 +136,7 @@ class TestWhatWasBuilt:
         with pytest.raises(ValueError, match="TS-43.*2026-09-05 14:00"):
             targets.written(book, placed)
 
+    @pytest.mark.asset("quarterly")
     def test_every_ordinary_amber_names_its_dataset(self, tmp_path):
         """post-build-review #248: Emergency Department's provider declared no
         amber_dataset, so its ordinary ambers were compared under dataset
@@ -146,6 +147,7 @@ class TestWhatWasBuilt:
         built = targets.written(path, tmp_path / "absent.json")
         assert [b.dataset_id for b in built] == ["ed-presentations"]
 
+    @pytest.mark.asset("quarterly")
     def test_linkage_products_ambers_name_their_dataset(self, tmp_path):
         """The same defect again on the Linkage Products provider, found by
         the lp_boot bootstrap from empty 2026-10-30: it builds a quarter of
@@ -571,6 +573,7 @@ def _delivery_of(sc, supply):
 
 class TestPackageMateHeldBack:
 
+    @pytest.mark.asset("quarterly")
     def test_green_target_agrees_when_only_a_held_back_partner_made_it_red(self,
                                                                          gate_scenario):
         """A fixture replay of S2 strict as re-cast - Clients built red,
@@ -598,6 +601,7 @@ class TestPackageMateHeldBack:
 
 class TestGateOutcomes:
 
+    @pytest.mark.asset("quarterly")
     def test_a_declared_gate_outcome_that_differs_fails_the_bootstrap(self, gate_scenario,
                                                                        monkeypatch):
         """S1 green declared wrongly - Clients v2 held back, where the gate
@@ -635,6 +639,7 @@ class TestGateOutcomes:
         disagreements = bootstrap.targets_agree(["cp"])
         assert any(d.startswith("TS-S1g: cp-clients") for d in disagreements), disagreements
 
+    @pytest.mark.asset("quarterly")
     def test_a_declaration_on_a_dataset_with_no_targets_is_compared_too(self, gate_scenario,
                                                                         monkeypatch):
         """A declared gate outcome names any table of its package, and Child
@@ -664,3 +669,8 @@ class TestGateOutcomes:
         disagreements = bootstrap.targets_agree(["cp"])
         assert any(d.startswith("TS-S1g: cp-notifications") for d in disagreements), \
             disagreements
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("daily")

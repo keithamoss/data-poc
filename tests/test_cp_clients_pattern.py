@@ -42,3 +42,8 @@ class TestThePattern:
     def test_the_odcs_transport_value_is_unchanged(self):
         text = (ROOT / "assets" / "quarterly" / "child-protection-family-support" / "child-protection-contract.yaml").read_text()
         assert "cp_clients(_" not in text
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

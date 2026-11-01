@@ -135,6 +135,7 @@ class TestAnotherAssetsCollection:
         listed = said.split("Commands for asset 'quarterly':", 1)[1]
         assert "cp" in listed.split() and "bdm" not in listed.split()
 
+    @pytest.mark.asset("daily")
     def test_the_other_asset_still_has_it(self, two_assets):
         result = _mothman("bdm", "--help", asset="daily", root=two_assets)
         assert result.returncode == 0, _said(result)
@@ -174,3 +175,8 @@ class TestTheAssetIsNamed:
         result = _mothman("env", "list", asset=None)
         assert result.returncode == 0, _said(result)
         assert "MOTHMAN_ASSET is not set" in result.stdout
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

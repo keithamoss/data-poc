@@ -221,6 +221,7 @@ class TestAKeptSyntheticArrivalIsReportedToo:
         mod._report_synthetic([], mine.run_id, True, interactive=interactive)
         assert shown == [[mine.run_id]]
 
+    @pytest.mark.asset("daily")
     def test_a_trial_has_no_lifecycle_to_report(self, monkeypatch):
         from cli.collection_cli import of as _cli_of
         bdm = _cli_of('bdm')
@@ -234,6 +235,7 @@ class TestAKeptRunIdNothingRecognisesIsRefusedPlainly:
     """#120 D13: `next()` over the recognised arrivals raised a bare
     StopIteration when the run id named none of them."""
 
+    @pytest.mark.asset("daily")
     def test_the_keep_branch_names_the_run(self, monkeypatch):
         from qa_tools.common import arrivals
 
@@ -267,3 +269,8 @@ class TestTheCheckColumnSaysWhichCheck:
 
         assert common.check_label({"check_id": "odd"}) == "odd"
         assert common.check_label({"name": "n"}) == "n"
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

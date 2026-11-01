@@ -179,3 +179,8 @@ def test_a_blank_changelog_field_is_rejected():
     with pytest.raises(ValidationError) as exc:
         Changelog(**_FEED, intro="   ")
     assert "blank" in str(exc.value)
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

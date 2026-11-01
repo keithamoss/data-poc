@@ -904,3 +904,8 @@ class TestCriticFindingsOn189:
             fd.apply(request, effective_at=_iso(_now()), conn=conn)
         assert "None" not in str(refused.value) and "--supply" in str(refused.value)
         assert len(dl.decisions_for(conn, DS)) == before, "nothing was recorded"
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

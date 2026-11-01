@@ -3,6 +3,8 @@ Keith 2026-10-06): a slow test deselected locally and run nowhere had already
 failed unnoticed for two days."""
 from __future__ import annotations
 
+import pytest
+
 from pathlib import Path
 
 import yaml
@@ -40,3 +42,8 @@ def test_no_job_takes_full_captures():
     for name, job in _jobs().items():
         for step in job.get("steps", []):
             assert "--run-full-capture" not in step.get("run", ""), name
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

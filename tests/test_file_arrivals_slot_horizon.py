@@ -8,6 +8,8 @@ receipt instant per call - but the function's contract takes a list.
 """
 from __future__ import annotations
 
+import pytest
+
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
@@ -34,8 +36,6 @@ def test_a_later_arrival_in_the_same_call_files_to_its_own_open_day(private_supp
     by_supply = {a.supply_id: a for a in written}
     late = next(a for a in by_supply.values() if a.received_at == later.received_at)
     assert late.branch == assignment.OPEN_UNFILLED and late.slot == "2026-09-03", late
-
-import pytest  # noqa: E402
 
 #: Birth Registrations is the daily asset's (the asset split).
 pytestmark = pytest.mark.asset("daily")

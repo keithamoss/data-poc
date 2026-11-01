@@ -436,6 +436,7 @@ class TestTheLiteralGate:
             ("dashboard/qa-reporting-dashboard.template.html", "cp-notifications"),
             ("dashboard/qa-reporting-dashboard.template.html", "cp_run_${n}")}
 
+    @pytest.mark.asset("daily")
     def test_an_unlisted_file_fails_naming_file_line_and_literal(self, tmp_path):
         root = _tree(tmp_path, {"cli/x.py": 'A = 1\nB = "civil-registration"\n'})
         assert gate.literal_problems(root, allowlist={}) == [
@@ -443,6 +444,7 @@ class TestTheLiteralGate:
             "(qa_tools.collections), or list the file on the migration allowlist with the "
             "requirement that rewires it"]
 
+    @pytest.mark.asset("daily")
     def test_a_listed_file_passes_and_the_list_only_shrinks(self, tmp_path):
         root = _tree(tmp_path, {"cli/x.py": 'B = "civil-registration"\n', "cli/y.py": "C = 1\n"})
         assert gate.literal_problems(root, allowlist={"cli/x.py": "REQ-TEST-245"}) == []
@@ -985,3 +987,8 @@ class TestTheAdapterLineReport:
                    and "no generator provider" in line for line in lines), lines
         assert vc.main() == 0
         assert "against a budget of 150" in capsys.readouterr().out
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

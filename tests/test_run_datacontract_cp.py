@@ -5,6 +5,8 @@ CSV, this reads all 6 real tables from the warehouse -
 no explicit csv_filename argument needed."""
 from __future__ import annotations
 
+import pytest
+
 import qa_tools.tools.run_datacontract as run_datacontract
 
 from fixture_ids import CP_DIRTY_RUN_ID as _DIRTY_RUN_ID, CP_REF_RUN_ID as _REF_RUN_ID
@@ -131,3 +133,8 @@ class TestAnUnreadableTableIsNotReportedRed:
         finally:
             with supply_db.connect(label="test-held-datacontract") as conn:
                 conn.execute(f'DROP SCHEMA IF EXISTS "{supply_db.run_schema(mine)}" CASCADE')
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

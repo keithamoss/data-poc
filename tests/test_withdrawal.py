@@ -323,3 +323,8 @@ class TestCriticFindingsOn193:
         state, _ = parity.ex_awaiting_acknowledgement(conn, minted)
         with pytest.raises(dl.DecisionRefused, match="names no supply"):
             _withdraw(conn, fd.WITHDRAW_ACKNOWLEDGEMENT, state.period, None)
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

@@ -103,3 +103,8 @@ def test_the_four_kinds_run_whatever_the_staged_id_type(id_type, source_type, id
         assert got[kind] == n, (kind, got)
     for kind in ("cp-clients.coverage_soda", "ed-presentations.coverage_soda"):
         assert float(got[kind]) == pytest.approx(200 / 3), (kind, got)
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

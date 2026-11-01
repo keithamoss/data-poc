@@ -6,6 +6,8 @@ date. In memory; the page is tests/test_dashboard_e2e.py's
 TestHeldBackWithItsDelivery."""
 from __future__ import annotations
 
+import pytest
+
 from pipeline import cross_table_grid as g
 from pipeline import cross_table_notices as ctn
 from pipeline import held_back_notices as hb
@@ -161,3 +163,8 @@ class TestForDataset:
     def test_a_supply_never_held_back_has_no_points(self):
         log = _log()
         assert hb.for_dataset("cp-notifications", [N3], log, RECEIPTS, hb.involved(log)) == {}
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

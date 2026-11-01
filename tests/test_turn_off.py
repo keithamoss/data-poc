@@ -1234,3 +1234,8 @@ class TestCriticFindingsOn190:
         got = _text(errors)
         assert "2023-01-01" in got
         assert "\n      turns_off: true" in got
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

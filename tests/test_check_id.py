@@ -41,6 +41,7 @@ def test_the_grammar_is_exactly_these_segments_in_this_order():
         "data_asset", "agency", "collection", "dataset", "column", "check_name", "tool")
 
 
+@pytest.mark.asset("quarterly")
 def test_a_table_level_check_has_no_column_rather_than_a_guessed_one():
     """The optional segment is what makes 5- and 6-segment ids ambiguous
     by dot-counting alone. Anchoring the tail on a known tool suffix is
@@ -122,6 +123,7 @@ def test_a_column_segment_disagreeing_with_its_attachment_is_an_error():
     assert "registration_number" in errors[0] and "some_other_column" in errors[0]
 
 
+@pytest.mark.asset("quarterly")
 def test_a_table_level_rule_is_not_reported_as_a_column_mismatch():
     assert ci.validate_column_matches([(_TABLE_LEVEL, None)]) == []
 
@@ -193,3 +195,8 @@ class TestHierarchyAgreement:
         """Reporting the same id twice, once per rule, makes a fixing
         session read two lists to find one problem."""
         assert ci.validate_hierarchy_agreement(["not-a-check-id"]) == []
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("daily")

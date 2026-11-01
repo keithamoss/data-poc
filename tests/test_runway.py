@@ -102,10 +102,12 @@ class TestACadenceRuleNeverWarns:
     would be warning about something that cannot happen - and a warning
     that can never be acted on teaches a reader to skip the class."""
 
+    @pytest.mark.asset("daily")
     def test_the_daily_calendar_is_never_low(self):
         for as_of in (BEFORE_ANY_RUNOUT, date(2026, 9, 23), AFTER_EVERYTHING, date(2199, 1, 1)):
             assert "daily" not in [r.calendar_name for r in runway.low_runway(as_of)]
 
+    @pytest.mark.asset("daily")
     def test_a_daily_dataset_is_never_exhausted(self):
         for as_of in (date(2026, 9, 23), AFTER_EVERYTHING, date(2199, 1, 1)):
             assert "birth-registrations" not in runway.exhausted_datasets(as_of)
@@ -198,6 +200,7 @@ class TestAnExhaustedScheduleIsScopedToItsOwnDatasets:
         assert set(exhausted) == _quarterly()
         assert set(exhausted.values()) == {"quarterly"}
 
+    @pytest.mark.asset("daily")
     def test_the_daily_dataset_carries_on(self):
         """Criterion: the failure is scoped to the affected dataset and
         must not stop any other. At thirty datasets, a check that stops
@@ -382,3 +385,8 @@ class TestTheNumberCanBeCheckedAgainstTheFile:
         assert r.driving_last_date == date(2027, 8, 1)
         assert "its own last is 2027-Q4, due on the 1 August 2027 round" in self._line()
         assert "2027-11-01" not in self._line()
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

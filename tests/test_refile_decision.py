@@ -352,3 +352,8 @@ class TestCliCriticFindingsOnSprintNine:
             rejection.reject(conn, agency_id=AG, collection_id=COL, dataset_id=DS, supply=a,
                              physical_tables=[a_table], actor=REAL_PERSON,
                              effective_at=WHEN, reason="probe", from_slot=period)
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

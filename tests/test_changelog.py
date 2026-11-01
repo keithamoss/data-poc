@@ -163,3 +163,8 @@ class TestNoCommitSurvivesInTheFEED:
         events = changelog.build_changelog("agency-a", "dataset-a")
         assert [e["run_timestamp"] for e in events] == [
             "2026-01-01T09:00:00+00:00", "2026-01-08T09:00:00+00:00"]
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

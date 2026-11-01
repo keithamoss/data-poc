@@ -33,6 +33,8 @@ got the blame.
 """
 from __future__ import annotations
 
+import pytest
+
 from datetime import datetime, timedelta, timezone
 
 from qa_tools.common import assignment, slots as slots_mod
@@ -88,6 +90,7 @@ class TestASlotIsOfferedOnceItsWindowOpens:
         offered = {s.period.name for s in _candidates(QUARTERLY, too_soon)}
         assert "2023-Q4" not in offered
 
+    @pytest.mark.asset("daily")
     def test_the_daily_feed_is_unchanged(self):
         """It was never exposed - a 4h window never crosses a day - so
         the fix must not quietly add a day to its candidates either."""
@@ -176,3 +179,8 @@ class TestTheSlotStaysVisibleOnceFilled:
         assert ("cp-carers", "2023-Q4") in listed, (
             "a slot whose window is open, with nothing filed to it, is not listed - "
             "slot_state has lost the claim-window lookahead filing uses")
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

@@ -520,6 +520,7 @@ def test_resupply_subset_holds_no_state_between_chains():
     assert a_first == a_again
 
 
+@pytest.mark.asset("daily")
 def test_a_birth_registrations_supply_cannot_be_split():
     """One CSV is indivisible, and the provider says so rather than
     leaving the method off."""
@@ -824,3 +825,8 @@ class TestTheContestedClientRegisterPairs:
         owed = {p.name for p in cp_provider.schedule.periods_for_dataset("cp-case-workers")
                 if p.expected}
         return {f"{t}.csv" for t in TABLES if t != "cp_case_workers" or period in owed}
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

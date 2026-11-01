@@ -371,3 +371,8 @@ class TestTheResolutionCarriesTheSupplyOfEveryTableItReads:
         res = supply_db.Resolution(run_id="r", schema="s", absent=["cp_clients"])
         period_overlay.name_held_siblings(conn, res, SimpleNamespace(received_at=at))
         assert res.held_supply == {"cp_clients": f"cp-clients@{key}"}
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

@@ -355,3 +355,8 @@ class TestAResumeRecordsWhatAFullReplayDoes:
         assert sum(equiv_support.summary(full_snap).values()) > 0
         diffs = equiv_support.differences(full_snap, resumed_snap)
         assert not diffs, "a resume differs from the full replay:\n" + "\n".join(diffs)
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

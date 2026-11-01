@@ -35,6 +35,8 @@ read a particular supply's "waited 14h" as a measurement of anything.
 """
 from __future__ import annotations
 
+import pytest
+
 from datetime import datetime, timedelta, timezone
 
 from qa_tools.common import promotion
@@ -139,3 +141,8 @@ class TestTheLagNeverRunsPastTheNextArrival:
         arrival = SimpleNamespace(received_at=LONG_AGO, files_by_dataset={ds: ("f.csv",)})
         assert promotion.next_receipt(arrival) == LONG_AGO + timedelta(minutes=45)
         assert promotion.next_receipt(SimpleNamespace(received_at=None)) is None
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

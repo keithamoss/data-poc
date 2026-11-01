@@ -88,6 +88,7 @@ class TestAssigneesFor:
     def test_a_scope_with_neither_returns_an_empty_list(self, config):
         assert people_mod.assignees_for("cp-carers", "child-protection-family-support", config) == []
 
+    @pytest.mark.asset("quarterly")
     def test_dataset_level_entries_are_never_merged_with_agency_level(self):
         """A dataset carrying its own explicit assignments overrides its
         agency's list outright - a real design choice (people.py's own
@@ -125,3 +126,8 @@ class TestGithubUsernamesFor:
         committed check-definition files."""
         config = people_mod.parse_people_config()
         assert isinstance(config["people"], dict)
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("daily")

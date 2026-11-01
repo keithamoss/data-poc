@@ -8,6 +8,8 @@ tests/test_acceptance_sync.py's own pure functions already get - no
 real `gh`/network here at all."""
 from __future__ import annotations
 
+import pytest
+
 import json
 
 from qa_tools.common import leaderboard as lb
@@ -219,6 +221,7 @@ class TestBuildLeaderboard:
             "nickname": "KP", "github": "knownperson", "streak": 0,
         }]
 
+    @pytest.mark.asset("quarterly")
     def test_an_assigned_person_with_no_github_still_appears_at_zero(self):
         """contract/people.yaml's own fictional placeholder people
         (Brian/Reg/Arthur) deliberately have no `github:` - they can
@@ -291,3 +294,8 @@ class TestBuildLeaderboard:
         rows = lb.build_leaderboard([], people_config, {"birth-registrations": "registry-services"})
 
         assert len(rows) == 1
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("daily")

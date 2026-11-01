@@ -366,3 +366,8 @@ def test_a_hold_after_a_fall_of_two_names_the_round_the_change_took_effect_from(
 
     held = type("H", (), {"doubly_fed": fed, "reason": {}})()
     assert files_go.held_words(held).endswith("agreement change from the 1 August 2026 round")
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

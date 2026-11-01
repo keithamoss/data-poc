@@ -308,3 +308,8 @@ class TestParallelRecordsTheSameHistory:
         sequential, parallel = both
         diffs = equiv_support.differences(sequential, parallel)
         assert not diffs, "parallel bootstrap differs from sequential:\n" + "\n".join(diffs)
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = [*(pytestmark if isinstance(pytestmark, list) else [pytestmark]), pytest.mark.asset("quarterly")]

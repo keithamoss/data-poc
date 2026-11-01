@@ -372,3 +372,8 @@ class TestInProductionTheTypedIdIsTheKeepDecision:
         keep = common.decide_keep(["/x/a.csv"], keep=True)
         assert keep
         assert self._through_filing(monkeypatch, keep) == ["typed id again"]
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

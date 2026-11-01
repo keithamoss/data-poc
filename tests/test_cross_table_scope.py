@@ -296,3 +296,8 @@ class TestPooledChecksKeepSeparateIdentities:
                         f"{ds['id']} / {col['name']}: {ck['key']!r} resolves to "
                         f"both {by_key[ck['key']]} and {check_id}")
                     by_key[ck["key"]] = check_id
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = [*(pytestmark if isinstance(pytestmark, list) else [pytestmark]), pytest.mark.asset("quarterly")]

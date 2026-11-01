@@ -7,6 +7,8 @@ what CI itself reads, and exactly the "must never touch data/" rule
 this module exists to satisfy, so there's nothing to fake here."""
 from __future__ import annotations
 
+import pytest
+
 from state_paths import fixed
 from qa_tools.tools import results_history
 
@@ -44,6 +46,7 @@ def test_bdm_rebuilds_from_real_committed_history(tmp_path, monkeypatch, deploym
     assert set(output["dataset_stats"]) == {r["run_id"] for r in output["runs"]}
 
 
+@pytest.mark.asset("quarterly")
 def test_cp_rebuilds_from_real_committed_history(tmp_path, monkeypatch, deployment_history):
     results_path = tmp_path / "reports" / "results_cpfs_child-protection.json"
     monkeypatch.setattr(results_history, "reports_root", fixed(str(tmp_path / "reports")))
@@ -76,3 +79,8 @@ def test_cp_rebuilds_from_real_committed_history(tmp_path, monkeypatch, deployme
     tables_seen = {r["dataset_id"] for r in output["results"]}
     assert len(tables_seen) > 1
     assert set(output["dataset_stats"]) == {r["run_id"] for r in output["runs"]}
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("daily")

@@ -2,6 +2,8 @@
 placement record and the committed map (REQ-DASH-208 criterion 2)."""
 from __future__ import annotations
 
+import pytest
+
 from datetime import date
 
 from generator import scenario_injection as si
@@ -79,3 +81,8 @@ class TestAnUnknownSubjectIsRefused:
         with pytest.raises(ValueError, match="no-such-thing"):
             scenario_map.Placement.of({"scenario_id": "TS-1", "dataset": "d", "period": "p",
                                        "in_place_on": "2025-01-01", "subject": "no-such-thing"})
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

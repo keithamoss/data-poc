@@ -54,6 +54,7 @@ class TestIdentityIsResolvedBeforeAnythingIsStaged:
     """run_single_file() with no run_by and no git identity must fail before
     it stages, or it leaves a trial table behind with nothing to clean it."""
 
+    @pytest.mark.asset("daily")
     def test_a_missing_identity_stages_nothing(self, monkeypatch, tmp_path):
         from qa_tools.common import trial
         from qa_tools.tools import stage
@@ -116,3 +117,8 @@ class TestAThirdCollectionsStatsAndClaimWindowForReal:
                               files_by_dataset={"cp-clients": "x", "cp-case-workers": "y"})
         windows = [schedule.claim_window(d, on=on) for d in ("cp-clients", "cp-case-workers")]
         assert orchestrate._claim_window("child-protection", two) == min(windows)
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

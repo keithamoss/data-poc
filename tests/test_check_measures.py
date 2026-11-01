@@ -7,6 +7,8 @@ either by MEASURES or by every check of it declaring one.
 
 Reads configuration, never recorded results, so it sits in CI's fast half."""
 
+import pytest
+
 import re
 
 from pipeline.dashboard_check_labels import MEASURES, measure, measures_phrase, tool_ref
@@ -84,3 +86,8 @@ def test_the_cross_collection_kinds_read_as_siblings():
     """REQ-DASH-299 criterion 2 (Keith, 2026-10-31, Q11 a)."""
     assert MEASURES["soda:referential"] == "Rows matching no source record"
     assert MEASURES["soda:coverage"] == "Source records matched"
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("daily")

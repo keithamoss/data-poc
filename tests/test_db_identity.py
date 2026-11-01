@@ -300,3 +300,8 @@ class TestReplacingAnIdentityNeedsAPerson:
         flat = re.sub(r"[\s\u2502\u256d\u256e\u2570\u256f\u2500]+", " ", out.output)
         assert out.exit_code != 0 and "data-asset-1/sandbox" not in flat.replace(
             "data asset 'data-asset-1', environment 'sandbox'", "")
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

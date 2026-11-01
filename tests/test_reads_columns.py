@@ -56,6 +56,7 @@ class TestWhichChecksAreSqlBodied:
             """))
         assert not c.sql_bodied
 
+    @pytest.mark.asset("quarterly")
     def test_a_soda_reference_check_is_not(self, tmp_path):
         """Keith: its columns are already structured fields."""
         [c] = cl.parse_soda_check_metadata(_write(tmp_path, "soda.yml", """
@@ -255,3 +256,8 @@ class TestItIsAMothmanCommand:
         from cli import check
         [cmd] = [c for label, c, *_ in check._GATES if label == "columns"]
         assert "mothman" in " ".join(cmd)
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("daily")

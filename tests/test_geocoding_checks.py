@@ -250,3 +250,8 @@ def _tidy():
                 "SELECT schema_name FROM information_schema.schemata "
                 "WHERE schema_name LIKE ?", [supply_db.run_schema("geo_probe") + "%"]).fetchall():
             conn.execute(f'DROP SCHEMA IF EXISTS "{schema}" CASCADE')
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

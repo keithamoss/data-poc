@@ -9,6 +9,8 @@ cause. This fails in one place, with the cause in the message.
 """
 from __future__ import annotations
 
+import pytest
+
 import fixture_ids
 
 from qa_tools.common import arrivals
@@ -22,6 +24,7 @@ def test_bdm_fixture_run_ids_are_the_ones_recognition_actually_assigns(bdm_deliv
         "BDM fixture's deliveries - update it there, not in each test module")
 
 
+@pytest.mark.asset("quarterly")
 def test_cp_fixture_run_ids_are_the_ones_recognition_actually_assigns(cp_delivery_dirs):
     deliveries, receipts = cp_delivery_dirs
     found = [a.run_id for a in arrivals.arrivals_for("child-protection", "cp_run_", deliveries, receipts)]
@@ -61,3 +64,8 @@ def test_the_cp_reference_run_is_the_one_that_sees_the_whole_delivery(cp_duckdb_
     assert not dirty.ambiguous, dirty.ambiguous
     assert all(p.endswith("__202604010600000000") for p in dirty.resolved.values()), \
         "the dirty run must read the DIRTY delivery's tables, not the reference ones"
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("daily")

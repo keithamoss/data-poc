@@ -66,3 +66,8 @@ def test_the_move_refuses_rather_than_falling_back_where_undeclared(monkeypatch,
     with supply_db.connect(label="test-capabilities") as conn:
         with pytest.raises(supply_db.SupplyDbError, match="does not declare"):
             supply_db.move_table(conn, "anything", supply_db.STAGING_SCHEMA, "x")
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

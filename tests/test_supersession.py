@@ -290,3 +290,8 @@ def test_mothman_supply_superseded_lists_them(supply_dsn, monkeypatch):
                                                  "--dataset", DS, "--period", period])
     assert result.exit_code == 0, result.output
     assert f"{old}  superseded by {new}" in result.output
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

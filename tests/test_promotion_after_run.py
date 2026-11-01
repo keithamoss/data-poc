@@ -110,3 +110,8 @@ class TestRunningItTwiceIsSafe:
             "AND table_name <> '_manifest'",
             [period_schema.period_schema(period)]).fetchall()
         assert rows[0][0] == 1
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

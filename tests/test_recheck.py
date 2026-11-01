@@ -460,3 +460,7 @@ class TestTwoRunnersNeverRunOneOwedItem:
                                  [space, owed_id]).fetchone()[0]
             other.execute("SELECT pg_advisory_unlock(?, ?)", [space, owed_id])
 
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

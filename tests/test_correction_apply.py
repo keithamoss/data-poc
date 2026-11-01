@@ -1174,3 +1174,8 @@ class TestCriticFindingsOn190:
                       if "d6-a" in i.headline]
         assert "turned off" in item.detail and "supplier paused" in item.detail
         assert "next processing pass moves it" not in item.detail
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

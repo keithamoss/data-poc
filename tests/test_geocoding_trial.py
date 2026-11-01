@@ -483,3 +483,8 @@ class TestAnEmptySupplysDriftIsNotEvaluated:
                                         "trial_ref_x")
         assert out["status"] == "nodata" and out["metric_value"] is None
         assert "no rows" in (out.get("not_evaluated_reason") or "")
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = [*(pytestmark if isinstance(pytestmark, list) else [pytestmark]), pytest.mark.asset("quarterly")]

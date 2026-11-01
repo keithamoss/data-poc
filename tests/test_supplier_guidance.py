@@ -7,6 +7,8 @@ point at it say it does, that every link it makes resolves, and that it
 still says the three things its criteria require."""
 from __future__ import annotations
 
+import pytest
+
 import re
 from pathlib import Path
 
@@ -58,3 +60,8 @@ def test_a_package_is_files_arriving_at_one_instant_and_nothing_else():
     text = _text().lower()
     assert "arrive at the same instant" in text
     assert "manifest" not in text and "end marker" not in text
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

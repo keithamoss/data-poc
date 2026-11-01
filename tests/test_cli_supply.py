@@ -405,6 +405,7 @@ class TestLoadStagesTheCollectionItIsGiven:
     "unknown collection 'civil-registration'" - the option hands the command
     an id, which the command then looked up among the shorts."""
 
+    @pytest.mark.asset("daily")
     @pytest.mark.parametrize("value", ["bdm", "civil-registration"])
     def test_by_short_or_id(self, monkeypatch, value):
         from qa_tools.common import load_log
@@ -418,3 +419,8 @@ class TestLoadStagesTheCollectionItIsGiven:
         result = CliRunner().invoke(supply_group, ["load", "--collection", value])
         assert result.exit_code == 0, result.output
         assert staged == ["civil-registration"]
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

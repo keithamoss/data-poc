@@ -9,6 +9,8 @@ tests/test_dashboard_e2e.py::TestInPlaceInTheWarehouse.
 """
 from __future__ import annotations
 
+import pytest
+
 import io
 from types import SimpleNamespace
 
@@ -166,3 +168,8 @@ class TestTheLineAPersonPicks:
         assert line.startswith("2024-08-13 09:00  in place in the warehouse")
         assert line.endswith(f"…  ({filing_queue.VERDICT_UNREADABLE})")
         assert "\n" not in line and "[" not in line
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

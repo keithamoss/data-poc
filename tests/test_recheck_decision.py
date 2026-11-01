@@ -618,3 +618,8 @@ class TestCriticFindingsOn192:
         del promotion
         done = recheck.run(got.owed[0], run_by="pytest@example.org")
         assert asked == [1] and not done.stays_promoted
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

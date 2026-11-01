@@ -106,6 +106,7 @@ class TestFilingGivesARealArrival:
         # typed - the check must read the file the record describes.
         assert filed.paths == (str(deliveries / filed.delivery_name / path.name),)
 
+    @pytest.mark.asset("quarterly")
     def test_a_folder_of_files_is_ONE_delivery(self, tmp_path, tree):
         """They arrived together, and a delivery is the transport unit.
         One delivery per file would invent DELIVERIES that never
@@ -177,6 +178,7 @@ class TestAnUnplaceableFileIsRefused:
         assert not deliveries.exists() or not list(deliveries.iterdir())
         assert not receipts.exists() or not list(receipts.iterdir())
 
+    @pytest.mark.asset("quarterly")
     def test_one_bad_name_refuses_the_whole_delivery(self, tmp_path, tree):
         """They arrived together, so filing the half we can read would
         record a delivery that is missing a file nobody would know to
@@ -238,3 +240,8 @@ class TestAFileOfAnotherCollectionIsRefusedFirst:
             [_csv(tmp_path, "birth_registrations_2026-09-20.csv")], "civil-registration",
             "run_", deliveries_dir=deliveries, receipts_dir=receipts, **KEPT)
         assert filed.delivery_name
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("daily")

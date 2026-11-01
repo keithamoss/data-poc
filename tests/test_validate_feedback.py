@@ -208,3 +208,8 @@ def test_the_build_refuses_a_card_citing_an_unknown_requirement(tmp_path):
     (tmp_path / "r.yaml").write_text("requirements: []\n")
     with pytest.raises(ValueError, match="REQ-DASH-404"):
         feedback_data(tmp_path, tmp_path / "r.yaml")
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

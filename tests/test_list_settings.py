@@ -220,3 +220,8 @@ class TestCriterionTenEachVersionLandsInItsQuarter:
         dp = next(p for p in schedule.periods_for_dataset(dataset) if p.name == period)
         assert dp.round_date == round_date
         assert amber_setting.resolve_on_date(dataset, dp.round_date, key=PATH).value == years
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

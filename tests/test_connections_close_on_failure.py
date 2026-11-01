@@ -137,3 +137,8 @@ class TestEveryLongLivedConnectSiteIsGuarded:
             f"{[c.lineno for c in unguarded]} is not in a finally - it will be "
             f"skipped whenever the body raises, leaking a backend that holds "
             f"ACCESS SHARE and blocks the orchestrator's own DROP SCHEMA")
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

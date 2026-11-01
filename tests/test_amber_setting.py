@@ -410,3 +410,8 @@ class TestTheSettingIsVisible:
         assert text == "promote and acknowledge (set for Child Protection, since 5 Oct 2026)"
         assert amber_setting.describe("cp-clients", date(2026, 1, 1), doc=doc) == \
             "promote (set for the whole data asset, since 1 Jan 2023)"
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

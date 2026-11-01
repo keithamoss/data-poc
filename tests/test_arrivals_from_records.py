@@ -89,3 +89,8 @@ class TestALocalRecordWhoseDirectoryIsGoneIsNotAnArrival:
         offered = {a.delivery_name for a in arrivals.arrivals_from_records(
             "child-protection", tmp_path)}
         assert name in offered
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

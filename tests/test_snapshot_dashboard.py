@@ -9,6 +9,8 @@ gate (off by default, since this PoC has no real "scheduled run" vs.
 "developer iterating" distinction to key off automatically)."""
 from __future__ import annotations
 
+import pytest
+
 import gzip
 import json
 import re
@@ -698,3 +700,8 @@ def test_a_reused_site_directory_gets_its_headers_written_afresh(tmp_path):
     snapshot_dashboard.prepare_deploy_site(site, html_path=page, snapshots_dir=tmp_path / "none")
     assert "X-Stale" not in (site / "_headers").read_text()
     assert not (site / "snapshots").exists(), "the earlier snapshots/ was cleared"
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

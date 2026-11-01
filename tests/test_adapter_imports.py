@@ -86,3 +86,8 @@ class TestTheGate:
         _imports(adapters, "from qa_tools.collections import child_protection")
         assert any("emergency_department.py" in p and "child_protection" in p
                    for p in gate.config_problems())
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

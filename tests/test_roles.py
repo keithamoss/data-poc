@@ -77,6 +77,7 @@ class TestTheAssetManager:
         """Criteria 4 and 5."""
         assert [p["email"] for p in people.asset_managers()] == [KEITH]
 
+    @pytest.mark.asset("daily")
     def test_an_agency_manager_is_not_the_asset_manager(self):
         """Criterion 4's second half: per-agency managers stay in force for
         their own agency, and are not the asset's."""
@@ -212,3 +213,8 @@ def test_an_assigned_role_must_be_one_the_person_holds(tmp_path):
         keith = next(p for p in doc["people"] if p["email"] == KEITH)
         keith["roles"] = [r for r in keith["roles"] if r != "manager"]
     assert any("does not hold" in p and "manager" in p for p in _problems(tmp_path, mutate))
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

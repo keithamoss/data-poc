@@ -366,3 +366,8 @@ class TestWhichClockStampedTheReceipt:
         assert read.received_at.year > 2020, (
             "the receipt followed the file's mtime - a supplier who preserves "
             "timestamps on upload would be setting our own arrival record")
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("daily")

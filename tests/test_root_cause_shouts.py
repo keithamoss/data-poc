@@ -334,3 +334,8 @@ def test_a_failure_of_its_own_is_ticketed_naming_what_else_holds_it_back(sc):
     service = _tickets(now="2024-11-03T12:00:00+08:00")
     body = service.bodies[f"cp-notifications/{Q4}"]
     assert "Also held back for want of cp_clients" in body
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

@@ -62,6 +62,7 @@ class TestOneNameResolvesToOneTable:
             f'SELECT count(*) FROM "{res.schema}"."birth_registrations"').fetchone()[0]
         assert got == 3
 
+    @pytest.mark.asset("quarterly")
     def test_a_name_with_no_candidate_is_absent_not_empty(self, db):
         res = supply_db.create_run_views(
             db, "run_001", supply_db.candidates_in(
@@ -78,6 +79,7 @@ class TestOneNameResolvesToOneTable:
 class TestAmbiguityIsAbsenceRatherThanAChoice:
     """Criterion 3, and REQ-PIPE-059 depends on it."""
 
+    @pytest.mark.asset("quarterly")
     def test_two_candidates_produce_no_view_at_all(self, db):
         _stage(db, "cp_clients", "run_007")
         # A second physical table claiming the same logical name, which
@@ -95,6 +97,7 @@ class TestAmbiguityIsAbsenceRatherThanAChoice:
         with pytest.raises(psycopg.errors.UndefinedTable):
             db.execute(f'SELECT * FROM "{res.schema}"."cp_clients"')
 
+    @pytest.mark.asset("quarterly")
     def test_it_never_picks_the_first_one(self, db):
         """The failure this prevents is silent: a view over whichever
         candidate happened to sort first reads as a healthy table."""
@@ -108,6 +111,7 @@ class TestAmbiguityIsAbsenceRatherThanAChoice:
         assert res.resolved == {}
         assert len(res.ambiguous["cp_carers"]) == 3
 
+    @pytest.mark.asset("quarterly")
     def test_ambiguous_and_absent_are_reported_apart(self, db):
         """They are the same thing to a check and completely different
         things to whoever has to fix it."""
@@ -163,6 +167,7 @@ class TestCandidatesAreScopedToTheRun:
             db, supply_db.STAGING_SCHEMA, ["birth_registrations"], arrival=supply_db.arrival_segment("run_001"))
         assert found["birth_registrations"] == ["birth_registrations__run_001"]
 
+    @pytest.mark.asset("quarterly")
     def test_two_files_for_one_dataset_in_one_run_are_still_ambiguous(self, db):
         """The ambiguity this is actually for (REQ-PIPE-059) survives
         the scoping - it is within one run, not across runs."""
@@ -180,6 +185,7 @@ class TestCandidatesAreScopedToTheRun:
 
 
 class TestACandidateMustActuallyClaimTheName:
+    @pytest.mark.asset("quarterly")
     def test_a_longer_name_is_not_a_candidate_for_a_shorter_one(self, db):
         """`cp_case_workers__x` is not a version of `cp_case`. A prefix
         test says it is, which is why this is matched on the separator."""
@@ -189,6 +195,7 @@ class TestACandidateMustActuallyClaimTheName:
         assert found["cp_case"] == []
         assert found["cp_case_workers"] == ["cp_case_workers__run_001"]
 
+    @pytest.mark.asset("quarterly")
     def test_a_table_in_another_schema_is_not_a_candidate(self, db):
         db.execute('CREATE SCHEMA IF NOT EXISTS "somewhere_else"')
         db.execute('CREATE TABLE "somewhere_else"."cp_clients__run_001" AS SELECT 1 AS id')
@@ -246,6 +253,7 @@ class TestOneDatabase:
         assert db.execute(f'SELECT count(*) FROM "{a.schema}"."birth_registrations"').fetchone()[0] == 1
         assert db.execute(f'SELECT count(*) FROM "{b.schema}"."birth_registrations"').fetchone()[0] == 2
 
+    @pytest.mark.asset("quarterly")
     def test_a_resupply_is_a_new_table_rather_than_an_overwrite(self, db):
         """The cheapest implementation is the wrong one: CREATE OR
         REPLACE keeps exactly one version and destroys the history the
@@ -399,6 +407,7 @@ class TestWhatARunReadIsRecorded:
         back = supply_db.resolution_for(db, "run_001")
         assert back.resolved == {"birth_registrations": "birth_registrations__run_001"}
 
+    @pytest.mark.asset("quarterly")
     def test_it_records_why_a_name_was_not_readable(self, db):
         """Ambiguous and absent are different answers to "why is this
         table missing", and both are worth keeping."""
@@ -438,3 +447,8 @@ class TestWhatARunReadIsRecorded:
         assert record["run_id"] == "run_009"
         assert record["schema"] == supply_db.run_schema("run_009")
         assert record["resolved"] == {"birth_registrations": "birth_registrations__run_009"}
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("daily")

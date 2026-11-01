@@ -238,6 +238,7 @@ class TestTheRunIdsComeFromRecognition:
 class TestTheRecordTheScenarioMapReads:
     """Criterion 7, against the reader rather than against this module."""
 
+    @pytest.mark.asset("daily")
     def test_it_round_trips_through_the_scenario_map(self, tmp_path):
         from qa_tools.common import scenario_map
 
@@ -253,6 +254,7 @@ class TestTheRecordTheScenarioMapReads:
         assert back["TS-1"].supplies == ("run_028",)
         assert back["TS-1"].is_complete
 
+    @pytest.mark.asset("daily")
     def test_a_shared_placement_is_recorded_under_both_scenarios(self, tmp_path):
         """TS-1's third file IS TS-4's arrival into a filled slot.
         Recording one placement under both is honest; generating a
@@ -526,6 +528,7 @@ class TestQuietDays:
         placed = si.resolve(si.Injection("TS-x", "d", -5, "cfg", quiet=(0, 1)), periods)
         assert placed.quiet == (periods[-5].name, periods[-4].name)
 
+    @pytest.mark.asset("daily")
     def test_a_period_keeps_its_own_supply_on_a_quiet_day(self):
         gr = collection_modules.provider_module("civil-registration")
 
@@ -533,6 +536,7 @@ class TestQuietDays:
                                   quiet={"2026-09-07", "2026-09-08"})
         assert avoid == {"2026-09-01", "2026-09-07"}
 
+    @pytest.mark.asset("daily")
     def test_another_period_s_resend_is_moved_off_a_quiet_day(self):
         gr = collection_modules.provider_module("civil-registration")
         from generator.resupply import Delivery
@@ -931,3 +935,8 @@ class TestTheGateOutcomeScenarios:
             arrivals=(si.ExtraArrival(0, "09:00"),))))
         with pytest.raises(si.CannotPlace, match="TS-x"):
             cp._plan_injections(periods)
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

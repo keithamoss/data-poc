@@ -143,6 +143,7 @@ class TestADeliveryIsRecognisedNotLabelled:
         assert ed[0].files_by_dataset == {"ed-presentations": (_ED_FILE,)}
         assert cp[0].files_by_dataset == {"cp-clients": ("cp_clients.csv",)}
 
+    @pytest.mark.asset("quarterly")
     def test_a_spanning_delivery_names_both_collections(self, dirs):
         _write(dirs, "mixed", {_ED_FILE: "presentation_id\n1\n", "cp_clients.csv": "a\n1\n"})
         d, r = dirs
@@ -457,3 +458,8 @@ class TestNoRecordedResultCarriesBookkeeping:
                  for key in self.FORBIDDEN if f'"{key}"' in raw]
         assert found == [], (
             "recorded QA history carries the generator's own bookkeeping:\n  " + "\n  ".join(found))
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("daily")

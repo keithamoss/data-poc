@@ -8,6 +8,8 @@ that nothing had noticed.
 """
 from __future__ import annotations
 
+import pytest
+
 import asset_folders
 
 import yaml
@@ -55,6 +57,7 @@ class TestTheDriftsThatActuallyHappened:
         assert "id is 'bdm-birth-registrations'" in errors[0]
         assert "'birth-registrations'" in errors[0]
 
+    @pytest.mark.asset("quarterly")
     def test_a_domain_that_names_neither_the_collection_nor_the_agency(self, tmp_path, monkeypatch):
         _contract(tmp_path, monkeypatch, "c.yaml", {
             "id": "child-protection", "name": "Child Protection",
@@ -112,6 +115,7 @@ class TestItFailsUsefully:
 
 
 class TestCollectionScopedContracts:
+    @pytest.mark.asset("quarterly")
     def test_a_collection_contract_resolves_to_its_collection_not_a_dataset(self, tmp_path, monkeypatch):
         # Child Protection's contract describes six datasets at once,
         # so it is held to the COLLECTION's id and name - the asymmetry
@@ -189,6 +193,7 @@ class TestTheContractListIsDerivedNotMaintained:
         assert named == covered, (
             f"the gate checks {covered} but the hierarchy names {named}")
 
+    @pytest.mark.asset("quarterly")
     def test_a_collection_scoped_contract_resolves_to_its_collection(self):
         """Shared by several datasets, so it describes what they have in
         common - which is the collection, not any one of them."""
@@ -214,3 +219,8 @@ class TestTheContractListIsDerivedNotMaintained:
 
     def test_the_real_repo_still_passes(self):
         assert validate_hierarchy.validate() == []
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("daily")

@@ -392,3 +392,8 @@ class TestAMarkOwesItsReadersAReEvaluation:
             f"SELECT kind, period, tables, caused_by_decision FROM {recheck.TABLE} "
             "WHERE caused_by_decision = ?", [entry]).fetchall()
         assert rows == [(recheck.REEVALUATE, "2024-Q2", ["cp_notifications"], entry)]
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

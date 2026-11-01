@@ -1,6 +1,8 @@
 """A binned distribution any check may carry (REQ-QAC-333 criteria 9 and 10)."""
 from __future__ import annotations
 
+import pytest
+
 from pathlib import Path
 
 from qa_tools.common import distribution
@@ -37,3 +39,8 @@ def test_measure_records_counts_only():
     assert got["count"] == 2 and got["population"] == 900
     assert sum(b["count"] for b in got["bins"]) == 2
     assert set(got) == {"bins", "count", "population"}
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

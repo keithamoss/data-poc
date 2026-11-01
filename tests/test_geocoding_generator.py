@@ -302,3 +302,8 @@ def test_an_sa2_sits_inside_one_lga():
             seen.setdefault(sa2, set()).add(lga)
     assert len(seen) > 50
     assert all(len(lgas) == 1 for lgas in seen.values())
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = [*(pytestmark if isinstance(pytestmark, list) else [pytestmark]), pytest.mark.asset("quarterly")]

@@ -336,3 +336,8 @@ class TestTheBudgetLine:
         app._bootstrap_menu()
         assert ("Generating synthetic data...", "dim") in said
         assert (line, style) in said, said
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

@@ -63,6 +63,7 @@ class TestCriterionSix:
             {"dataset": "cp-nope", "code": "X", "id_columns": ["a"]}))
         assert "cp-nope" in text and "not in the hierarchy" in text
 
+    @pytest.mark.asset("daily")
     def test_a_dataset_on_no_shared_calendar(self, repo):
         text = _edit(repo, lambda ls: ls.append(
             {"dataset": "birth-registrations", "code": "BR", "id_columns": ["registration_number"]}))
@@ -183,3 +184,8 @@ class TestTheQueriesThemselvesAgreeWithTheMapping:
         text = self._replace(repo, "WHERE (dataset = 'DOC_CLIENTS' AND id_2 IS NOT NULL",
                              "WHERE (dataset = 'DOC_CLIENT' AND id_2 IS NOT NULL")
         assert "no_surplus_ids_soda" in text and "DOC_CLIENT'" in text, text
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

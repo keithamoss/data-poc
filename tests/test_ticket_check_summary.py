@@ -9,6 +9,8 @@ green. The one test that does read the real files asserts a property
 that must hold whatever is failing."""
 from __future__ import annotations
 
+import pytest
+
 
 from qa_tools.common.ticket_check_summary import (
     DASHBOARD_BASE_URL, build_check_summary, check_url,
@@ -143,6 +145,7 @@ def test_the_self_evident_sentinel_never_reaches_a_ticket():
 
 
 class TestCheckUrl:
+    @pytest.mark.asset("daily")
     def test_it_matches_the_dashboards_own_path_shape(self):
         url = check_url("registry-services", "civil-registration",
                         "birth-registrations", "sex", "not_null_dbt")
@@ -220,3 +223,8 @@ class TestAgainstTheRealCommittedCheckDefinitions:
             tool, terse = ref.split(":", 1)
             assert key == f"{terse}_{tool}", check.check_id
             assert check_url("a", "b", "c", "col", key).endswith(f"/check/{key}")
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

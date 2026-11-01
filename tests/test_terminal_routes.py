@@ -262,3 +262,8 @@ class TestAFallbackTrialAsksForItsReference:
         self._tty(monkeypatch, False)
         with pytest.raises(click.ClickException, match="--reference-file"):
             common.reference_for_fallback_trial(None, "--reference-file", "file")
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

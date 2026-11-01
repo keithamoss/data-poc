@@ -47,6 +47,7 @@ class TestAnOverlapIsFound:
         e = next(e for e in errors if e.scope == "cp-clients")
         assert "overlap by" in e.problem and "claim window opens" in e.problem
 
+    @pytest.mark.asset("daily")
     def test_touching_is_still_an_overlap(self, monkeypatch):
         """'Strictly after': a window opening at the very instant the
         earlier period stops being on time leaves one instant in both."""
@@ -82,3 +83,8 @@ class TestEveryCalendarPeriodCounts:
                             widest + timedelta(days=1))
         pairs = {(o.earlier, o.later) for o in period_overlap.overlaps_for("cp-case-workers")}
         assert len(pairs) == len(all_periods) - 1
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

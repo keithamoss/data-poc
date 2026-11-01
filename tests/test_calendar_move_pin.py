@@ -6,6 +6,8 @@ existed. Arrival verdicts are pinned separately, by the arrival-semantics
 golden after a rebuild (tests/test_asset_time_semantics.py)."""
 from __future__ import annotations
 
+import pytest
+
 import json
 
 from calendar_move_pin import PIN, UNTIL, capture
@@ -124,3 +126,8 @@ def _without_rounds_filling_nothing(dataset_id: str, pinned, now):
             f"{dataset_id}: the pinned round {entry[0]} is gone, and it is not a round whose "
             f"period {n} ahead is past the calendar's end")
     return [e for e in pinned if e[0] in have]
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

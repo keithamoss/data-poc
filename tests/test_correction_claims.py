@@ -267,11 +267,13 @@ class TestAWrittenArrivalIsAskedOnlyWhatAConfirmationCouldMove:
         return {"run_id": "run_x", "period": "2026-09-20", "received_at": at,
                 "row_counts": {"birth_registrations": 10}}
 
+    @pytest.mark.asset("daily")
     def test_an_arrival_before_the_correction_it_would_refile_is_refused(self, backdated):
         with pytest.raises(si.CannotPlace, match="run_x"):
             cc.check_written(["birth-registrations"], [self._br("2026-09-20T09:00:00+08:00")],
                              docs=backdated)
 
+    @pytest.mark.asset("daily")
     def test_the_same_arrival_after_the_correction_is_not(self, backdated, monkeypatch):
         later = _declare(_docs(), _widen_daily, "CAB-W", "2026-09-19")
         cc.check_written(["birth-registrations"], [self._br("2026-09-20T09:00:00+08:00")],
@@ -341,3 +343,8 @@ def test_the_req_gen_199_link_day_plans_only_injections_carrying_its_links(monke
                 if any(cc._REQ_GEN_199.match(link.scenario_id) for link in i.links)}
     assert carrying, "no REQ-GEN-199 link to resolve"
     assert set(asked) == carrying, f"asked {sorted(set(asked))}, carrying {sorted(carrying)}"
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

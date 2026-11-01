@@ -775,3 +775,8 @@ class TestADiscardedTrialTakesItsAttempts:
         assert len(_attempts(conn, run_id)) == 1
         trial.discard(conn, run_id)
         assert _attempts(conn, run_id) == []
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

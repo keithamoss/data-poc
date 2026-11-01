@@ -370,3 +370,8 @@ class TestCriterionThreeThePlacingConfiguration:
             text = (REAL / module).read_text()
             for word in ("place_by", "placed_column", "unplaced_value", "match_level"):
                 assert word not in text, (module, word)
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

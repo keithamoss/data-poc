@@ -167,3 +167,8 @@ class TestAContestedTableIsNeverPromoted:
             status="green", slot_filled=False, held_without_slot=False,
             has_active_checks=True)
         assert (ok, why) == (True, None)
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

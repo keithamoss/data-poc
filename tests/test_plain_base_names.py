@@ -439,3 +439,8 @@ class TestTheGuardCanBePutBack:
         monkeypatch.setattr(supply_db, "connect", lambda **_k: Empty())
         assert period_tables.main() == 0
         assert "nothing to guard" in capsys.readouterr().out
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

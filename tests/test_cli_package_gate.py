@@ -1319,3 +1319,8 @@ class TestCliUxReview:
         flat = _flat(capsys.readouterr().out)
         assert "arrives" not in flat, flat
         assert "two cp-clients files wait to be settled" in flat, flat
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

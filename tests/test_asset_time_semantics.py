@@ -598,3 +598,8 @@ class TestTheClassificationBoundaries:
         run_date = date(2026, 9, 1)
         arrived = self._expected(run_date) - timedelta(hours=12)
         assert self._verdict(run_date, arrived) == "early"
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = [*(pytestmark if isinstance(pytestmark, list) else [pytestmark]), pytest.mark.asset("daily")]

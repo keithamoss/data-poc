@@ -203,3 +203,8 @@ class TestItTouchesOnlyWhatIsOurs:
                 synthetic_reset.reset(conn, synthetic_reset.confirmation_phrase())
             assert "public.depends_on_qa" in str(caught.value)
             assert conn.execute(f"SELECT to_regclass('{qa_store.SCHEMA}.filing')").fetchall()[0][0]
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

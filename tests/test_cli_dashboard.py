@@ -5,6 +5,8 @@ cli.dashboard's) is what actually takes effect at call time - same
 pattern as tests/test_cli_bdm.py's own real-tool-seam tests."""
 from __future__ import annotations
 
+import pytest
+
 from click.testing import CliRunner
 
 import cli.dashboard as dashboard_cli
@@ -239,3 +241,8 @@ def test_build_data_refuses_a_missing_results_file_by_name(tmp_path, monkeypatch
     import re
 
     assert "mothman dashboard rebuild-results" in " ".join(re.sub(r"[│╭╮╰╯─]", " ", out.output).split())
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

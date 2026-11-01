@@ -365,3 +365,8 @@ class TestOnePeriodsDecisionLeavesOthersAlone:
             reason="the real extract arrived", effective_at=WHEN, confirmed=True)
         assert substitution.substituted(conn, dataset, third) is not None
         assert substitution.substituted(conn, dataset, second) is None
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

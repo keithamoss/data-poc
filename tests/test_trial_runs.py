@@ -19,6 +19,8 @@ supply that really arrived and exactly wrong for one nobody accepted.
 """
 from __future__ import annotations
 
+import pytest
+
 import attempt_support
 from qa_tools.common import supply_db, trial
 from staging_support import stage_bdm
@@ -389,6 +391,7 @@ class TestATrialIsNeverSilentlyCheckedAgainstPromotedData:
     reintroduce the bug.
     """
 
+    @pytest.mark.asset("quarterly")
     def test_the_overlay_reads_a_trials_own_staging_schema(self, supply_dsn):
         from qa_tools.common import period_schema
 
@@ -439,6 +442,7 @@ class TestASingleTableRunRecordsAllSixTablesItRead:
     years later by an audit, so under-reporting it is not cosmetic.
     """
 
+    @pytest.mark.asset("quarterly")
     def test_borrowing_a_table_records_that_the_run_read_it(self, supply_dsn):
         earlier = "cp_run_900"
         later = trial.trial_run_id()
@@ -485,3 +489,7 @@ class TestASingleTableRunRecordsAllSixTablesItRead:
                 f'DELETE FROM "{supply_db.STAGING_SCHEMA}"._resolutions '
                 f"WHERE run_id = '{earlier}'")
 
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("daily")

@@ -75,3 +75,8 @@ def test_the_orchestrator_runs_dbt_beside_the_rest(module):
     calls = [n for n in ast.walk(tree) if isinstance(n, ast.Call)
              and isinstance(n.func, ast.Attribute) and n.func.attr == "beside"]
     assert calls, f"{module} still runs its four tools strictly one after another"
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

@@ -117,6 +117,7 @@ class TestTheDailyCalendarStartsWhereTheFeedDoes:
 
         return get_anchor_date() - timedelta(days=N_DELIVERIES + GROWN_DAYS + END_DAYS - 1)
 
+    @pytest.mark.asset("daily")
     def test_the_calendar_starts_no_earlier_than_the_generator_supplies(self):
         """THE GUARD THAT SURVIVES A RE-ANCHOR. Pinning ANCHOR_DATE made
         the history deliberate rather than floating, and bumping it is
@@ -139,6 +140,7 @@ class TestTheDailyCalendarStartsWhereTheFeedDoes:
             f"a late supply files to the earliest of them instead of its own day. "
             f"Bump the calendar's effective_from alongside ANCHOR_DATE.")
 
+    @pytest.mark.asset("daily")
     def test_a_late_supply_files_to_its_own_day_not_to_the_dawn_of_the_calendar(self):
         """The consequence, asserted through the real assignment rule
         rather than through the slot count - a count can look wrong and
@@ -195,6 +197,7 @@ class TestParticipation:
         with pytest.raises(schedule.ScheduleConfigError, match="full month name"):
             schedule.parse_month_name(bad, "x")
 
+    @pytest.mark.asset("daily")
     def test_months_on_a_cadence_calendar_are_an_error_not_ignored(self, tmp_path, monkeypatch):
         """Accepted-and-discarded config is how a dataset ends up
         expecting something other than what its author wrote."""
@@ -446,6 +449,7 @@ class TestMalformedCalendars:
         with pytest.raises(schedule.ScheduleConfigError, match="forwards in time"):
             schedule.calendars()
 
+    @pytest.mark.asset("daily")
     def test_both_dates_and_a_cadence_rule_is_an_error(self, tmp_path, monkeypatch):
         _repoint(tmp_path, monkeypatch, _calendar_doc(cadence={"rule": "daily"}))
         with pytest.raises(schedule.ScheduleConfigError, match="never both and never neither"):
@@ -501,6 +505,7 @@ class TestCandidateDates:
         assert "Sunday" in got[date(2026, 2, 1)]
         assert not got[date(2026, 5, 1)], "1 May 2026 is a Friday and needs no note"
 
+    @pytest.mark.asset("daily")
     def test_a_cadence_rule_calendar_has_nothing_to_extend(self):
         assert schedule.candidate_dates("daily", 2029) == []
 
@@ -529,3 +534,8 @@ class TestNothingIsComputedFromAHolidayCalendar:
         loaded = [(p.name, p.date.isoformat())
                   for p in schedule.calendar("quarterly").current.periods]
         assert loaded == authored
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

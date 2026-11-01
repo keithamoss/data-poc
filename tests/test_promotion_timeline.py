@@ -299,3 +299,8 @@ class TestItTakesTheZonesOnce:
         assert got["points"] and got["standing"], "precondition: points and stand-ins"
         assert seen.reads.get("timezone_versions") == 1, vars(seen)
         assert not seen.unpassed, vars(seen)
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

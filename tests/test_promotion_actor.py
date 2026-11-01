@@ -66,3 +66,8 @@ def test_the_rule_not_the_operator_is_the_actor(collection_id, captured, monkeyp
 
 def test_the_rule_has_a_name_of_its_own():
     assert promotion.RULE_ACTOR == "promotion rule"
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

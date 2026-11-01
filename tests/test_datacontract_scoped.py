@@ -40,6 +40,7 @@ def _check_id(rule) -> str:
 class TestEveryRuleHasAnId:
     """Criteria 1 and 2."""
 
+    @pytest.mark.asset("daily")
     @pytest.mark.parametrize("path", CONTRACTS)
     def test_its_id_is_its_check_id_with_colons(self, path):
         """ODCS forbids a '.' in an id (Keith, 2026-10-12: ':' for '.')."""
@@ -114,6 +115,7 @@ class TestTheSameVerdicts:
         assert want
         assert {r["check_id"]: r for r in scoped} == want
 
+    @pytest.mark.asset("daily")
     def test_birth_registrations(self, _quiet, monkeypatch):
         import qa_tools.tools.run_datacontract as bdm
 
@@ -224,3 +226,8 @@ class TestNothingAsked:
         monkeypatch.setattr(cp, "write_qa_result", lambda *a, **k: written.append((a[4], a[5])))
         assert cp.evaluate("child-protection", run_id, "2026-04-01T09:00:00Z") == []
         assert written == [("datacontract", {"asked": []})]
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

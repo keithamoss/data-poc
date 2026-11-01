@@ -328,6 +328,7 @@ def test_a_dataset_with_no_calendar_is_recorded_as_having_none(monkeypatch, tmp_
             f"{dataset_id} points at a calendar that was not embedded: {calendar!r}"
 
 
+@pytest.mark.asset("quarterly")
 def test_the_embedded_dates_come_from_the_authored_calendar_rather_than_a_rule(
         monkeypatch, tmp_path):
     """Criterion 2, positively. The quarterly calendar's own anchor is
@@ -694,3 +695,8 @@ class TestABuildUnderAnOutDir:
             assert results_history.results_path(c.id) == str(tmp_path / "reports" / c.results_file)
             assert bdd.results_path(c.id) == str(tmp_path / "reports" / c.results_file)
             assert bdd.out_path(c.id) == str(tmp_path / "reports" / c.dashboard_file)
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = [*(pytestmark if isinstance(pytestmark, list) else [pytestmark]), pytest.mark.asset("daily")]

@@ -135,3 +135,8 @@ class TestWhatIsNeverCarried:
         assert carried.not_evaluated_reason({"unrunnable_reason": "not yet due"})
         assert carried.not_evaluated_reason({"held_reason": "held"})
         assert carried.not_evaluated_reason({"status": "fail"}) is None
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

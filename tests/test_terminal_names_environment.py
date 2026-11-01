@@ -113,3 +113,8 @@ class TestTheTuiRefusesWithoutAnEnvironment:
         result = CliRunner().invoke(app.cli, [])
         assert result.exit_code != 0 and "MOTHMAN_ENVIRONMENT" in result.output
         assert not shown
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

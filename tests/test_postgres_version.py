@@ -165,3 +165,8 @@ def test_the_version_refusal_carries_no_part_of_the_dsn(supply_dsn, monkeypatch)
     info = psycopg.conninfo.conninfo_to_dict(supply_dsn)
     for part in ("dbname=", "host=", info["dbname"]):
         assert part not in str(caught.value)
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

@@ -258,6 +258,7 @@ class TestTheWholeCorpusStillReadsBack:
                     "cp_carers.csv", "cp_placements.csv"],
                    f"2026-01-{n:02d}T09:00:00+08:00", n)
 
+    @pytest.mark.asset("daily")
     def test_one_dataset_has_its_own_unbroken_timeline(self, tmp_path, logs):
         self._corpus(tmp_path, logs, 20)
         found = arrival_history.arrivals_of("birth-registrations", conn=logs)
@@ -272,3 +273,8 @@ class TestTheWholeCorpusStillReadsBack:
         assert {len(v) for v in counts.values()} == {20}
         ids = [v[0].supply_id for v in counts.values()]
         assert len(set(ids)) == 3, f"three datasets share one identifier: {ids}"
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

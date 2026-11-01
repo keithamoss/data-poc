@@ -39,6 +39,7 @@ def test_qa_menu_picks_bdm_and_calls_its_run_qa_interactive(monkeypatch):
     assert called == ["bdm"]
 
 
+@pytest.mark.asset("quarterly")
 def test_qa_menu_picks_cp_and_calls_its_run_qa_interactive(monkeypatch):
     # The other collection beside it is the same asset's (the asset split).
     monkeypatch.setattr(common, "select", lambda *a, **k: cp.label)
@@ -216,3 +217,8 @@ def test_a_refusal_inside_a_flow_returns_to_the_menu(monkeypatch, capsys):
     out = capsys.readouterr()
     assert seen == ["qa", "qa"], "the second choice was never offered"
     assert "no reference was given" in out.out + out.err
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("daily")

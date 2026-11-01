@@ -195,3 +195,8 @@ class TestACheckThatCouldNotRunIsReadBack:
         from qa_tools.common import held_blast_radius, unrunnable
         from qa_tools.common.qa_results_reader import RESULT_TOOLS
         assert unrunnable.TOOL in RESULT_TOOLS and held_blast_radius.TOOL in RESULT_TOOLS
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = [*(pytestmark if isinstance(pytestmark, list) else [pytestmark]), pytest.mark.asset("quarterly")]

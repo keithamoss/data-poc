@@ -49,6 +49,7 @@ def fake_db(monkeypatch):
     return seen
 
 
+@pytest.mark.asset("quarterly")
 @pytest.mark.parametrize("collection_id", COLLECTIONS)
 def test_the_runs_rows_are_read_from_the_entrys_column(collection_id, fake_db, monkeypatch):
     coll, entry, check_id = _entry(collection_id)
@@ -58,6 +59,7 @@ def test_the_runs_rows_are_read_from_the_entrys_column(collection_id, fake_db, m
     assert result["column_name"] == "some_other_column"
 
 
+@pytest.mark.asset("quarterly")
 @pytest.mark.parametrize("collection_id", COLLECTIONS)
 def test_the_reference_is_looked_up_by_the_entrys_column(collection_id, fake_db, monkeypatch):
     asked = []
@@ -72,3 +74,8 @@ def test_the_reference_is_looked_up_by_the_entrys_column(collection_id, fake_db,
                                            entry["column"])
     assert asked == ["some_other_column"]
     assert list(frame.columns) == ["some_other_column"]
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("daily")

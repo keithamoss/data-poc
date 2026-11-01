@@ -535,3 +535,8 @@ class TestItParsesEachSourceFileOnce:
         f.write_text("def b():\n    pass\n\n\n# longer now\n")
         assert vr._python_symbol_exists("m.py", ["b"])
         assert not vr._python_symbol_exists("m.py", ["a"])
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

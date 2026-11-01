@@ -36,6 +36,12 @@ def _patterns() -> dict[str, re.Pattern]:
     for folder in sorted(p for p in root.iterdir() if (p / "data-asset.yaml").is_file()):
         doc = yaml.safe_load((folder / "data-asset.yaml").read_text()) or {}
         words, quoted, prefixes = set(), set(), set()
+        # The asset's calendar names, quoted - each asset declares its own
+        # (calendar.yaml), so a test naming one names that asset's agreement.
+        cal_path = folder / "calendar.yaml"
+        if cal_path.is_file():
+            cal = yaml.safe_load(cal_path.read_text()) or {}
+            quoted |= {str(c.get("name", "")) for c in cal.get("calendars") or []}
         for agency in (doc.get("hierarchy") or {}).get("agencies") or []:
             words.add(agency["id"])
             quoted.add(str(agency.get("short", "")))

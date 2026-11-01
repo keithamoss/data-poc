@@ -240,3 +240,8 @@ class TestAFaultOfItsOwn:
             said
         beneath = [b.state.supply for v in groups.beneath.values() for b in v]
         assert got["P2"] not in beneath and got["N2"] in beneath
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

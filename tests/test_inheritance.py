@@ -893,3 +893,8 @@ class TestAPeriodIsOpenedWholeOrNotAtAll:
         assert period_schema.open_period(conn, second, opened_by="Keith") is True
         assert [e["action"] for e in dl.decisions_for(conn, annual.dataset_id)
                 if e["to_slot"] == second] == [dl.INHERIT]
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

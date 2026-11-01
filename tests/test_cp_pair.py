@@ -359,3 +359,8 @@ def test_a_partner_the_load_refuses_keeps_the_pair_contested(cp_pair_one_unloada
             "SELECT filename FROM qa.check_result_visible WHERE run_key = ? "
             "AND filename IS NOT NULL", [pair["clients"].run_id]).fetchall()}
     assert {"cp_clients.csv", "cp_clients_part2.csv"} <= names
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

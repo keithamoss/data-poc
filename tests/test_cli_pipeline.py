@@ -306,6 +306,7 @@ def test_running_the_pipeline_does_not_destroy_the_committed_delivery_log(
     assert [r["delivery"] for r in delivery_log.records()] == ["monday"]
 
 
+@pytest.mark.asset("quarterly")
 def test_a_delivery_still_present_keeps_its_record_across_a_run(
         monkeypatch, tmp_path, clean_delivery_log):
     """The other half, and the one that actually guards the incident."""
@@ -372,3 +373,8 @@ def test_the_committed_history_trees_are_never_the_real_ones_in_a_test():
             f"{module.__name__}.{name} points into the real repo at {current} - a test "
             f"that writes there puts temporary names into permanent history, and a test "
             f"that prunes there deletes it")
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("daily")

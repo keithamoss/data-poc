@@ -65,10 +65,17 @@ class TestAnAuthoredCalendar:
 class TestACadenceRuleCalendar:
     """Criteria 2 and 4."""
 
+    @pytest.mark.asset("daily")
     def test_the_evening_before_is_accepted(self, gate):
         assert gate("birth-registrations", 1) == ""
 
+    @pytest.mark.asset("daily")
     def test_two_is_refused_saying_one_is_the_most_and_pointing_nowhere_else(self, gate):
         text = gate("birth-registrations", 2)
         assert "birth-registrations" in text and "1 is the most" in text
         assert "files_go_to_period" not in text
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

@@ -1,6 +1,8 @@
 """REQ-DOCS-073 - `mothman plans` (the CLI half of the dependency view)."""
 from __future__ import annotations
 
+import pytest
+
 import re
 
 from click.testing import CliRunner
@@ -48,3 +50,8 @@ class TestTheSprintsCommand:
     def test_it_prints_the_counts(self):
         out = _run("plans", "sprints").output
         assert "done" in out and "/" in out
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

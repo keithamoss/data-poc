@@ -163,3 +163,8 @@ class TestAStreamRunsOnTheReplayClock:
         orchestrate.run_stream(["child-protection", "emergency-department"],
                                record_deliveries=False)
         assert seen == [True]
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

@@ -55,6 +55,7 @@ def _ran(run_id: str) -> set[str]:
 
 class TestTheSelection:
 
+    @pytest.mark.asset("daily")
     @pytest.mark.parametrize("collection", [CP, "civil-registration"])
     def test_every_active_dbt_check_names_a_test(self, collection):
         """Through the project's own node-to-check-id lookup, never a list
@@ -169,6 +170,7 @@ class TestBirthRegistrationsTakesTheSamePath:
     """REQ-PIPE-188 criterion 10: the scope is every check on its one
     table, and what it records does not change."""
 
+    @pytest.mark.asset("daily")
     def test_the_same_records_scoped(self, bdm_duckdb_dir, monkeypatch):
         import qa_tools.tools.run_dbt as run_dbt
         from conftest import clone_run_views
@@ -190,3 +192,8 @@ class TestBirthRegistrationsTakesTheSamePath:
         whole, scoped = evaluate(False), evaluate(True)
         assert whole and scoped == whole
         assert any(r["status"] == "fail" for r in whole.values())
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

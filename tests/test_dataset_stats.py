@@ -6,6 +6,8 @@ never touch data). Real small DuckDB fixtures, since these functions'
 whole job is running real SQL - a mock wouldn't test anything real."""
 from __future__ import annotations
 
+import pytest
+
 import collection_modules
 
 import duckdb
@@ -17,6 +19,7 @@ BDM, CP = "civil-registration", "child-protection"
 CP_TABLES = [d.table for d in collections.by_id(CP).datasets]
 
 
+@pytest.mark.asset("daily")
 def test_bdm_compute_dataset_stats_shape():
     conn = duckdb.connect(":memory:")
     conn.execute("""
@@ -161,3 +164,8 @@ def test_a_run_owning_none_of_the_tables_sharing_a_column_records_none():
         assert "match_level" not in stats["value_counts"], dataset_id
         assert set(stats["row_counts"]) == {"linkage_keys", "geo_cp_clients",
                                             "geo_ed_presentations"}
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

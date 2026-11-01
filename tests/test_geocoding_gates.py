@@ -210,3 +210,8 @@ class TestATrialsYearChecksSayTrialNotNoPeriod:
         assert {r["not_evaluated_code"] for r in records} == {list_setting_members.TRIAL_NO_PERIOD}
         assert all("trial" in r["not_evaluated_reason"] and "filed to no period" not in
                    r["not_evaluated_reason"] for r in records)
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

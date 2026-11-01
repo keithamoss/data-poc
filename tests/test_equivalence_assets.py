@@ -6,6 +6,8 @@ row. Driven on hand-built baselines and trees - a real capture is two full
 bootstraps (the end-of-run bootstrap's job)."""
 from __future__ import annotations
 
+import pytest
+
 from qa_tools.common import equivalence as eq
 
 
@@ -102,3 +104,8 @@ class TestComparingAcrossTheSplit:
         renamed = _base(["data-asset-1"], {"S1": _s1(("quarterly.x.y.z.c.unique_dbt", "pass"))})
         plain = _base(["data-asset-1"], {"S1": _s1(("data-asset-1.x.y.z.c.unique_dbt", "pass"))})
         assert eq.compare(plain, renamed, ["S1"])["S1"]
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("daily")

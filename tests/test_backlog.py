@@ -165,6 +165,7 @@ class TestAnExhaustedScheduleStillAcceptsSupplies:
     053's hard failure rests on.
     """
 
+    @pytest.mark.asset("quarterly")
     def test_an_arrival_is_recognised_whatever_the_schedule_says(self, tmp_path, monkeypatch):
         from qa_tools.common import arrivals, slots
 
@@ -182,6 +183,7 @@ class TestAnExhaustedScheduleStillAcceptsSupplies:
             "still an arrival, and refusing to record it is how the backlog stops being "
             "drainable once dates are added")
 
+    @pytest.mark.asset("quarterly")
     def test_it_is_still_written_to_the_delivery_log(
             self, tmp_path, monkeypatch, clean_delivery_log):
         from qa_tools.common import arrivals, delivery_log, slots
@@ -212,6 +214,7 @@ class TestAPositionCannotBeInventedFromAMissingField:
     wrong answer.
     """
 
+    @pytest.mark.asset("quarterly")
     def test_an_arrival_carries_its_receipts_sequence(self, tmp_path):
         from qa_tools.common import arrivals
 
@@ -355,3 +358,8 @@ class TestHowFarProcessingGotIsDerived:
         calls = self._done(monkeypatch)
         self._owed([self._arrival(n) for n in range(20)])
         assert calls["n"] == 1
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("daily")

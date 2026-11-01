@@ -5,6 +5,8 @@ own docstring) is that resupply orchestration can be tested without
 knowing how a dataset's rows are actually made."""
 from __future__ import annotations
 
+import pytest
+
 import collection_modules
 
 import re
@@ -418,8 +420,6 @@ def test_partial_resupplies_stay_reproducible(monkeypatch):
                     partial_resupply=True, first_arrival_offset_days=-2)]
 
     assert run() == run()
-
-import pytest  # noqa: E402
 
 #: Birth Registrations is the daily asset's (the asset split).
 pytestmark = pytest.mark.asset("daily")

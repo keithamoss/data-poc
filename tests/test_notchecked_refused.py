@@ -42,3 +42,8 @@ def test_a_tool_error_is_still_recorded_as_one(conn):
     _run(conn, "r299b")
     assert qa_store.record_results(conn, "r299b", [_result("error")], tool="dbt",
                                    agency_id="a", collection_id="b", fingerprints=ANY_CHECK) == 1
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

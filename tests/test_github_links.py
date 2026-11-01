@@ -6,6 +6,8 @@ check_ids to REAL lines in REAL files, so a fixture-based test would
 only prove the algorithm works on data written to match it."""
 from __future__ import annotations
 
+import pytest
+
 import subprocess
 
 from qa_tools.common import github_links
@@ -104,8 +106,6 @@ def test_a_dataset_opens_its_contract_at_its_own_entry_and_an_agency_its_folder(
             assert url.startswith(f"https://github.com/keithamoss/data-poc/blob/abc123/{contract}#L")
             assert lines[int(url.rsplit("#L", 1)[1]) - 1].strip() == f"- name: {d.table}"
             assert contract in folders["titles"]["datasets"][d.dataset_id]
-
-import pytest  # noqa: E402
 
 #: Birth Registrations is the daily asset's (the asset split).
 pytestmark = pytest.mark.asset("daily")

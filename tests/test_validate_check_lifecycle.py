@@ -8,6 +8,8 @@ exactly the part worth testing for real, not the already-covered
 parsing logic in qa_tools/common/check_lifecycle.py itself."""
 from __future__ import annotations
 
+import pytest
+
 import subprocess
 import textwrap
 
@@ -393,6 +395,7 @@ def test_the_gate_is_off_by_default_and_fatal_only_when_asked(tmp_path, monkeypa
     assert "no failure_indicates" in capsys.readouterr().err
 
 
+@pytest.mark.asset("quarterly")
 def test_a_contract_from_before_rule_ids_is_still_read_as_the_old_side(tmp_path, monkeypatch, capsys):
     """A defect, 2026-10-12: REQ-PIPE-190 made an ODCS `id` mandatory on
     every quality rule, and the gate held the PREVIOUS commit's contract to
@@ -696,6 +699,7 @@ def test_moving_a_singular_test_into_a_collections_folder_is_not_a_change(
     assert vcl.main() == 0, capsys.readouterr().err
 
 
+@pytest.mark.asset("quarterly")
 def test_an_edit_to_any_collections_check_source_moves_the_fingerprint(tmp_path, monkeypatch):
     """Criterion 11: REQ-PIPE-192's cache is keyed on this, so an edit to an
     Evidently file or a collection's dbt folder must be seen."""
@@ -719,3 +723,8 @@ def test_an_edit_to_any_collections_check_source_moves_the_fingerprint(tmp_path,
         assert path.is_file(), f"precondition: {rel} exists"
         path.write_text(path.read_text() + "\n")
         assert vcl.sources_fingerprint() != before, rel
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("daily")

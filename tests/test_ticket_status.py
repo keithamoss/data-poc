@@ -5,6 +5,8 @@ list --json ...` output - no real `gh` invocation or network access
 here, same reasoning as tests/test_ticket_sync.py's own FakeGh."""
 from __future__ import annotations
 
+import pytest
+
 from qa_tools.common.ticket_status import parse_open_tickets
 
 
@@ -53,3 +55,8 @@ def test_missing_updated_at_defaults_to_none():
     del issue["updatedAt"]
     result = parse_open_tickets([issue])
     assert result["birth-registrations"]["updated_at"] is None
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("daily")

@@ -237,3 +237,8 @@ class TestTheReadersThatUsedToWalkTheLogThemselves:
         h = dl.held(conn, dataset, "2099-Q2")
         assert (h.held_as, h.holder) == (dl.INHERITED, "s0")
         assert dl.periods_standing_on(conn, dataset, "s0") == ("2099-Q2",)
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

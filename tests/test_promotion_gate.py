@@ -137,3 +137,8 @@ class TestTheReasonsAreOrderedSoTheMostUsefulOneWins:
         _, why = promotion.should_promote(
             **a_supply(status="red", slot_filled=True))
         assert why.kind == promotion.FAILING and "status is Fail" in why
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

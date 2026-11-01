@@ -3,6 +3,8 @@
 ever runs on a GitHub runner."""
 from __future__ import annotations
 
+import pytest
+
 from pathlib import Path
 
 import yaml
@@ -107,3 +109,8 @@ class TestTheLogSaysWhichItWas:
         run = _named("Say whether the database was restored or rebuilt")["run"]
         assert "RESTORED" in run and "REBUILT" in run
         assert "steps.key.outputs.key" in run
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

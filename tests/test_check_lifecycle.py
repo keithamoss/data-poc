@@ -680,3 +680,8 @@ def test_validate_reports_both_kinds_of_error_together():
     assert len(errors) == 2
     assert any("Duplicate check_id" in e and "'b'" in e for e in errors)
     assert any("changed without a new changelog entry" in e and "'a'" in e for e in errors)
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("daily")

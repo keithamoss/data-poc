@@ -330,3 +330,8 @@ class TestAFollowingPeriodDataset:
         q1 = next(s for s in slots.slots_for_dataset("cp-case-workers", agreement=due_early)
                   if s.name == "2026-Q2")
         assert q1.due_at.month == 12
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

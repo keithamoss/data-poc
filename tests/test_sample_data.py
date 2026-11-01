@@ -673,3 +673,8 @@ class TestATableNameIsNotADatasetId:
             with supply_db.connect(label="test-sample-landing") as conn:
                 for schema in (supply_db.SAMPLE_SCHEMA, supply_db.STAGING_SCHEMA):
                     conn.execute(f'DROP TABLE IF EXISTS "{schema}"."{physical}" CASCADE')
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = [*(pytestmark if isinstance(pytestmark, list) else [pytestmark]), pytest.mark.asset("daily")]

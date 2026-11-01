@@ -271,3 +271,8 @@ def test_the_real_command_warns_on_a_new_marker_and_exits_0(repo, monkeypatch):
     assert "warning: REQ-A-001 decisions item 2" in result.output
     monkeypatch.setenv(vp.WARNING_EXIT_VAR, str(WARN))
     assert CliRunner().invoke(cli, ["dashboard", "validate-provisional"]).exit_code == WARN
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

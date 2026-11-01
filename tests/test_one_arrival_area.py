@@ -42,6 +42,7 @@ def test_staging_writes_no_second_copy_of_the_file_it_was_given(tmp_path, supply
     assert not new, f"staging left a copy of the supply under data/: {sorted(str(p) for p in new)}"
 
 
+@pytest.mark.asset("daily")
 def test_a_bdm_single_arrival_is_staged_from_where_it_is(tmp_path, supply_dsn, monkeypatch):
     """The Birth Registrations counterpart, through the real
     single-arrival entry point. run_single() used to copy every arriving
@@ -126,3 +127,8 @@ def test_a_warehouse_failure_fails_the_drift_check_rather_than_producing_a_numbe
             {"bdm": "civil-registration", "cp": "child-protection"}[compute],
             "drift_failure_run", "2026-01-02T00:00:00+08:00", reference_run_id=None)
     assert recorded == [], "a drift result was recorded from a failed warehouse read"
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

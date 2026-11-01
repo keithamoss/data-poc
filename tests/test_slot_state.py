@@ -243,3 +243,8 @@ class TestRejectingAnotherSupplyLeavesTheSlotPromoted:
         # Who decided and why are the PROMOTION's, not the rejection's.
         assert got.decided_by == "Keith"
         assert got.reason != "a bad file"
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

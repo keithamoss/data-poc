@@ -35,6 +35,7 @@ def _active(collection: str, tool: str) -> set[str]:
 
 class TestWhatACollectionHolds:
 
+    @pytest.mark.asset("daily")
     @pytest.mark.parametrize("collection", [CP, BDM])
     @pytest.mark.parametrize("tool", asked_for.TOOLS)
     def test_every_active_check_of_that_tool_and_collection(self, collection, tool):
@@ -206,6 +207,7 @@ class TestThroughTheRealOrchestrator:
     """Criteria 6, 8 and 10 end to end: Birth Registrations through all
     four real tools, the same path Child Protection takes."""
 
+    @pytest.mark.asset("daily")
     def test_every_tool_invoked_has_what_it_was_asked_for_on_record(self, bdm_duckdb_dir):
         from qa_tools.tools import orchestrate
 
@@ -216,6 +218,7 @@ class TestThroughTheRealOrchestrator:
         assert _asked(run_id) == {tool: asked_for.collection_checks(BDM, tool)
                                   for tool in asked_for.TOOLS}
 
+    @pytest.mark.asset("daily")
     def test_a_check_gone_missing_refuses_the_run(self, bdm_duckdb_dir, monkeypatch):
         """A tool that comes back without one of its in-scope checks - the
         shape a wrong selection takes - refuses the run before it is
@@ -240,6 +243,7 @@ class TestThroughTheRealOrchestrator:
         assert dropped and dropped[0] in str(caught.value) and "soda" in str(caught.value)
         assert not _completed(run_id)
 
+    @pytest.mark.asset("daily")
     def test_a_run_whose_tools_did_not_run_asks_nothing(self, bdm_duckdb_dir, monkeypatch):
         """Criterion 8 is WHEN a tool is invoked: a run that may not read
         its own table invokes none, and the guard does not demand verdicts
@@ -320,6 +324,7 @@ class TestBirthRegistrationsAskedForNothing:
     """An empty ask invokes no tool and says so, on the Birth Registrations
     path too (critic F5: these three branches were untested)."""
 
+    @pytest.mark.asset("daily")
     @pytest.mark.parametrize("module,evaluate,tool,invoker,lead", [
         ("qa_tools.tools.run_dbt", "evaluate", "dbt", "run_dbt", ("civil-registration",)),
         ("qa_tools.tools.run_soda", "evaluate", "soda", "execute_scan", ("civil-registration",)),
@@ -338,3 +343,8 @@ class TestBirthRegistrationsAskedForNothing:
         monkeypatch.setattr(mod, "write_qa_result", lambda *a, **k: written.append((a[4], a[5])))
         assert getattr(mod, evaluate)(*lead, "birth_registrations__1", "2026-01-01T00:00:00Z") == []
         assert written == [(tool, {"asked": []})]
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

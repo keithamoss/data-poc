@@ -84,3 +84,8 @@ class TestNothingIsReadFromASourceThatHasNotSaid:
         monkeypatch.setattr(delivery, "default_deliveries_dir", fixed(tmp_path / "nothing-here"))
         with pytest.raises(delivery_boundary.DeliveryBoundaryError):
             delivery.survey()
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

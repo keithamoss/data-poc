@@ -67,3 +67,8 @@ def test_a_datasets_own_dates_close_at_its_next_own_date(calendar):
                         {"period": "own-2", "date": "2024-09-01"}]})
     own1 = slots.slots_for_dataset("d")[0]
     assert own1.closes_at == datetime(2024, 8, 18, 9, 0, tzinfo=PERTH)
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("daily")

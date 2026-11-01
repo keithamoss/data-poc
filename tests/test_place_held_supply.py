@@ -849,6 +849,7 @@ class TestCriticFindingsOnPlacement:
         line = next(x for x in said.split(supply)[1:2])
         assert "by the rule" in line and "by a person" not in line
 
+    @pytest.mark.asset("daily")
     def test_d7_a_pair_placed_through_flags_says_where_it_is_settled(self, conn, cli):
         """Criterion 37: the outcome offers settling the pair now."""
         held = TestAPairHeldWholeIsPlacedTogether.held_pair.__wrapped__(None, conn)
@@ -975,3 +976,8 @@ class TestTheHeldScreenSaysWhy:
                             lambda *a, **k: asked.append(a) or None)
         filing_tui.filing_menu()
         assert "people.yaml" in capsys.readouterr().out and not asked
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

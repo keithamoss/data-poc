@@ -232,3 +232,8 @@ def test_how_long_it_took(copy):
     """The measured time goes in the requirement's evidence (TEST COST NFR)."""
     print(f"\nREQ-TEST-249 step times: {copy.seconds}")
     assert copy.seconds["bootstrap"] > 0
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = [*(pytestmark if isinstance(pytestmark, list) else [pytestmark]), pytest.mark.asset("quarterly")]

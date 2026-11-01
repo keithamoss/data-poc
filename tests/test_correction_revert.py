@@ -109,3 +109,8 @@ def test_an_item_it_does_not_know_is_refused():
     cal, asset = _docs()
     with pytest.raises(ValueError, match="cannot be reverted"):
         agreement_freeze.revert(cal, asset, [("calendar quarterly sideways 1", 1, 2)])
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

@@ -57,13 +57,13 @@ os.environ["PY_COLORS"] = "0"
 # the `selected_asset` fixture below then states it again for every test, so
 # a test that selected another cannot leak it into the next.
 #
-# THE SUITE'S ASSET IS STATED HERE, AND A TEST ABOUT ANOTHER STATES ITS OWN
-# (PROVISIONAL, the asset split, 2026-11-02): `quarterly`, which holds three
-# of the four collections, unless the test - or its class or module - carries
-# `@pytest.mark.asset("daily")`. Stated in the suite, never taken from the
-# ambient variable (REQ-PIPE-363 criterion 9). A test module imported at
-# collection sees this asset, so a module whose import-time reads are another
-# asset's selects it per test instead.
+# EVERY TEST MODULE NAMES ITS ASSET (C11, Keith 2026-11-02): a module-level
+# `pytestmark = pytest.mark.asset("<asset>")`, and a test acting for another
+# asset carries its own mark. There is no default: a module naming none is
+# refused by name (pytest_collection_modifyitems). Never the ambient variable
+# (REQ-PIPE-363 criterion 9). SUITE_ASSET below is only the asset the SESSION
+# starts under - the CLI's first import and the worker database's first mark -
+# and never stands in for a test's own.
 from qa_tools.common import assets as _assets  # noqa: E402
 
 SUITE_ASSET = "quarterly"
@@ -200,15 +200,9 @@ def pytest_collectstart(collector):
         except OSError:
             text = ""
         m = _MODULE_ASSET.search(text)
-        if m:
-            asset = m.group(1)
-        else:
-            # NAMED AT IMPORT (the asset split): a module whose import-time
-            # statements name only one asset's ids is imported under it.
-            import asset_inference
-
-            found = asset_inference.named(asset_inference.module_level_text(collector.path))
-            asset = found.pop() if len(found) == 1 else TEST_ASSET
+        # A module naming no asset is imported under the session's, and then
+        # refused by name before any test runs (C11).
+        asset = m.group(1) if m else TEST_ASSET
         os.environ[_assets.ASSET_ENV] = asset
         asset_cli.rebuild_for_selected()
 
@@ -239,14 +233,18 @@ def _mark_worker_db_for(asset: str) -> None:
 
 
 def asset_of(node) -> str:
-    """The asset a test acts for: its closest `asset` marker's, or the suite's."""
+    """The asset a test acts for: its closest `asset` mark - its own, its
+    class's or its module's. Every module names one (C11)."""
     mark = node.get_closest_marker("asset")
-    return mark.args[0] if mark is not None else TEST_ASSET
+    if mark is None:
+        raise pytest.UsageError(f"{node.nodeid} names no data asset - give its module a "
+                                f"`pytestmark = pytest.mark.asset(...)` (C11)")
+    return mark.args[0]
 
 
 @pytest.fixture(autouse=True)
 def selected_asset(monkeypatch, request):
-    """Every test acts for TEST_ASSET unless it selects another, with the
+    """Every test acts for the asset its mark names (C11), with the
     resolver pointed at the real asset folders and no connection claimed
     (REQ-PIPE-343 criterion 6: the suite's exemption from one asset per
     process is that each TEST starts unclaimed - each still opens one asset's
@@ -1167,9 +1165,29 @@ def pytest_collection_modifyitems(config, items):
             config.hook.pytest_deselected(items=dropped)
             items[:] = kept
     _mark_deployment(items)
-    _mark_asset(items)
+    _refuse_a_module_naming_no_asset(items)
     _group_by_asset(items)
     _group_for_distribution(items)
+
+
+def _refuse_a_module_naming_no_asset(items):
+    """C11 (Keith, 2026-11-02): every test module names its asset at module
+    level. One that does not is refused, by name - never given a default.
+    tests/asset_inference.py says which asset a module's tests name, to help
+    write the mark."""
+    unnamed = set()
+    for item in items:
+        module = getattr(item, "module", None)
+        marks = getattr(module, "pytestmark", [])
+        marks = marks if isinstance(marks, list) else [marks]
+        if not any(getattr(m, "name", None) == "asset" for m in marks):
+            unnamed.add(item.nodeid.split("::", 1)[0])
+    if unnamed:
+        raise pytest.UsageError(
+            "these test modules name no data asset - add a module-level "
+            "`pytestmark = pytest.mark.asset(\"<asset>\")` to each (C11; "
+            "tests/asset_inference.named() says which asset's ids a test names): "
+            + ", ".join(sorted(unnamed)))
 
 
 def _group_by_asset(items):
@@ -1221,21 +1239,6 @@ def pytest_runtest_protocol(item, nextitem):
     runtestprotocol(item, nextitem=_AboveTheModule())
     item.ihook.pytest_runtest_logfinish(nodeid=item.nodeid, location=item.location)
     return True
-
-
-def _mark_asset(items):
-    """THE ASSET A TEST ACTS FOR, FROM THE REGISTRY (the asset split): a test
-    with no `asset` mark of its own acts for the asset whose ids it names -
-    tests/asset_inference.py reads them from each asset's data-asset.yaml -
-    and for the suite's when it names none, or both."""
-    import asset_inference
-
-    for item in items:
-        if item.get_closest_marker("asset") is not None:
-            continue
-        asset = asset_inference.asset_of_item(item, TEST_ASSET)
-        if asset != TEST_ASSET:
-            item.add_marker(pytest.mark.asset(asset))
 
 
 def _mark_deployment(items):

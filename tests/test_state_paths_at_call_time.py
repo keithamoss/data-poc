@@ -28,6 +28,8 @@ The geocoding merge, and any module after it, is held to the same rules.
 """
 from __future__ import annotations
 
+import pytest
+
 import ast
 import re
 from pathlib import Path
@@ -239,3 +241,7 @@ class TestNoProductModuleBuildsAnAssetPathItself:
                     used.add(key)
         assert set(ALLOWED) - used == set(), sorted(set(ALLOWED) - used)
 
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

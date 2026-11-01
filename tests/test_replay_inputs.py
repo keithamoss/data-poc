@@ -3,6 +3,8 @@ chosen by hand (REQ-TEST-160, signed by Keith 2026-10-06), from one input list
 shared with CI's bootstrap cache (REQ-TEST-117)."""
 from __future__ import annotations
 
+import pytest
+
 import inspect
 import json
 from pathlib import Path
@@ -217,3 +219,8 @@ class TestAnArrivalHoldingSeveralFiles:
                           inputs={"q.py": "1"})
         got = ri.first_affected(rec, arrivals=self._prints("changed"), inputs={"q.py": "1"})
         assert "was changed" in got.reason, got.reason
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

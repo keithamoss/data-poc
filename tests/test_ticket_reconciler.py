@@ -540,3 +540,8 @@ class TestAPersonsOperationGoesThroughTheSamePass:
         so the pass would find nothing changed and say nothing - which
         is why the refusal is said directly instead."""
         assert self._decided(False, monkeypatch) == []
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

@@ -2,6 +2,8 @@
 (REQ-PIPE-336 criterion 7; Keith, 2026-10-30: added automatically, and said)."""
 from __future__ import annotations
 
+import pytest
+
 from qa_tools.common import bootstrap
 
 
@@ -52,3 +54,8 @@ class TestACheckpointOfACollectionReadingOthersIsRefused:
     def test_a_collection_reading_only_itself_is_not(self):
         assert bootstrap.reads_others("cp") is None
         assert bootstrap.reads_others("ed") is None
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

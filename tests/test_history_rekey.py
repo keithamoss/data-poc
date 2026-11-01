@@ -322,6 +322,7 @@ class TestOneAgreedOrdering:
             assert len(keys) == len(results), (
                 f"{name}: {len(results) - len(keys)} duplicate (run_id, check_id) pairs")
 
+    @pytest.mark.asset("daily")
     @pytest.mark.parametrize("module", rebuild_support.REBUILDS)
     def test_both_rebuilds_apply_it(self, module, clean_qa_history, tmp_path, monkeypatch):
         """Results recorded out of order come back from the real rebuild
@@ -430,3 +431,8 @@ def test_a_dataset_with_only_file_checks_is_not_missing_its_data_tools(
     finish_runs("r1", agency=AGENCY, collection=COLLECTION, when=_WHEN, run_by="a@b.c")
     missing = reader.missing_tools(AGENCY, COLLECTION, "r1")
     assert not [m for m in missing if m.startswith("cp-placements/")], missing
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = [*(pytestmark if isinstance(pytestmark, list) else [pytestmark]), pytest.mark.asset("quarterly")]

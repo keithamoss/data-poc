@@ -33,6 +33,7 @@ def _version(value, start="2023-01-01"):
 class TestTheSettingIsReadLikeTheAmberSetting:
     """Criterion 1."""
 
+    @pytest.mark.asset("daily")
     def test_the_asset_says_never(self):
         r = replacement_setting.resolve("birth-registrations", "2026-10-05T00:00:00+08:00")
         assert (r.value, r.level) == ("never", amber_setting.ASSET)
@@ -60,6 +61,7 @@ class TestTheSettingIsReadLikeTheAmberSetting:
         r = replacement_setting.resolve(DS, "2026-10-05T00:00:00+08:00", doc=doc)
         assert (r.value, r.level) == ("green", amber_setting.DATASET)
 
+    @pytest.mark.asset("daily")
     def test_no_asset_level_value_is_refused(self):
         doc = _doc()
         del doc["replacement_setting"]
@@ -254,3 +256,8 @@ class TestStoodOnThroughTheGate:
 def test_the_shipped_document_is_unchanged_by_these_tests():
     """The tests above edit copies; the real file is read fresh each time."""
     assert copy.deepcopy(_doc()) == _doc()
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

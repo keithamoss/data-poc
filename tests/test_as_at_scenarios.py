@@ -123,6 +123,7 @@ class TestOnePlacementCoversSeveralDays:
     """TS-78: D, D+1 and D+2 are one placement, because D+1 is both D's
     following day and D+2's lead-in."""
 
+    @pytest.mark.asset("daily")
     def test_the_covered_days_are_claimed_and_the_green_day_follows_them(self):
         placement = si.resolve(_injection("TS-78a"), _bdm_periods())
         assert placement.period == "2026-08-30"
@@ -130,6 +131,7 @@ class TestOnePlacementCoversSeveralDays:
         assert placement.lead_in == ("2026-08-28", "2026-08-29")
         assert placement.follow == ("2026-09-02",)
 
+    @pytest.mark.asset("daily")
     def test_another_scenario_on_a_covered_day_is_refused(self):
         periods = _bdm_periods()
         # 31 AUGUST, counted from the history's end rather than written as a
@@ -140,6 +142,7 @@ class TestOnePlacementCoversSeveralDays:
             si.no_two_scenarios_share_a_period([_injection("TS-78a"), other],
                                                {"birth-registrations": periods})
 
+    @pytest.mark.asset("daily")
     def test_the_generator_writes_no_ordinary_supply_on_a_covered_day(self):
         generate_runs = collection_modules.provider_module("civil-registration")
 
@@ -153,9 +156,11 @@ class TestTheHoldEraIsNotLeft:
     """Criterion 15: outside the era, refused naming the scenario - never
     shifted."""
 
+    @pytest.mark.asset("daily")
     def test_today_the_era_covers_d_to_d_plus_2(self):
         si.resolve(_injection("TS-78a"), _bdm_periods())  # no refusal
 
+    @pytest.mark.asset("daily")
     def test_an_anchor_outside_the_era_is_refused_naming_it(self):
         moved = dataclasses.replace(_injection("TS-78a"), anchor=-30)
         with pytest.raises(si.CannotPlace, match="TS-78a.*outside a hold"):
@@ -326,3 +331,8 @@ class TestOnlyThePlantedAmbersWaitUnderHold:
     def test_nothing_else_is_held(self, deployment_history):
         held, planted = self._held_and_planted()
         assert held - planted == set(), sorted(held - planted)
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

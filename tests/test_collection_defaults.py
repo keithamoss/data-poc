@@ -724,3 +724,8 @@ class TestTheRealContractStatesChildProtectionOnce:
         due = slots.slot_instants("cp-clients", date(2024, 2, 1), agreement=agr)
         assert due.due_at.isoformat() == "2024-02-01T09:00:00+08:00"
         assert due.grace == timedelta(hours=8)
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

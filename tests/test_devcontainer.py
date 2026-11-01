@@ -123,3 +123,8 @@ def test_the_container_does_not_start_a_database_from_the_test_path():
     for forbidden in ("docker", "testcontainers", "pg_ctl", "initdb"):
         assert forbidden not in conftest.lower(), \
             f"tests/conftest.py mentions {forbidden!r} - the suite must only connect"
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

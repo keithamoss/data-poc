@@ -59,6 +59,7 @@ class TestTheHandedText:
         left = soda_common.left_out_checks(cp.checks_path("child-protection"), {"cp_carers"}, keep=keep)
         assert left and set(left) <= keep
 
+    @pytest.mark.asset("daily")
     def test_an_unreadable_tables_filtered_section_and_filter_go_too(self):
         """A FILTERED SECTION READS ITS TABLE (post-build-review #239):
         `checks for birth_registrations [recent]` and its `filter` entry were
@@ -115,6 +116,7 @@ class TestTheSameVerdicts:
         assert want
         assert {r["check_id"]: r for r in scoped} == want
 
+    @pytest.mark.asset("daily")
     def test_birth_registrations(self, _quiet, monkeypatch):
         import qa_tools.tools.run_soda as bdm
 
@@ -167,3 +169,8 @@ class TestNothingAsked:
         monkeypatch.setattr(cp, "write_qa_result", lambda *a, **k: written.append((a[4], a[5])))
         assert cp.evaluate("child-protection", run_id, "2026-04-01T09:00:00Z") == []
         assert written == [("soda", {"asked": []})]
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

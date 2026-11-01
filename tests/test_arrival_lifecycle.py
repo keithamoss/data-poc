@@ -8,6 +8,8 @@ tests.
 """
 from __future__ import annotations
 
+import pytest
+
 from types import SimpleNamespace
 
 from qa_tools.tools import orchestrate
@@ -88,6 +90,7 @@ class TestBothCollectionsSupplyTheirHalf:
 
 
 class TestTheCollectionsHalvesForwardWhatTheyAreGiven:
+    @pytest.mark.asset("quarterly")
     def test_child_protection_files_with_the_whole_pass_as_among(self, monkeypatch):
         """A zip is filed whole (REQ-PIPE-105 criterion 5) only while CP's
         half passes `among` through - nothing else would notice if it
@@ -109,3 +112,8 @@ class TestTheCollectionsHalvesForwardWhatTheyAreGiven:
             steps.run_one({"run_id": "r"}, "T", "x", on_step=None)
             steps.promote_after(A, [], "x")
             assert calls == [("run", collection_id), ("gate", collection_id)], collection_id
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("daily")

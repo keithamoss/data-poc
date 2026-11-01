@@ -2,6 +2,8 @@
 evaluate() - the CP counterpart to tests/test_run_soda_bdm.py."""
 from __future__ import annotations
 
+import pytest
+
 import qa_tools.tools.run_soda as run_soda
 from qa_tools import collections
 
@@ -159,3 +161,8 @@ class TestEachResultRecordsTheDirectionItsBandComparesIn:
             {"warn": {"op": "<", "value": 90}, "fail": {"op": "<", "value": 85}}
         # A range cannot be stated as one direction, so it records none.
         assert band({"fail": {"lessThan": 1, "greaterThan": 9}}) is None
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

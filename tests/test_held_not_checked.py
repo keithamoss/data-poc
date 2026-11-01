@@ -249,3 +249,8 @@ class TestItIsReportedAsOneThing:
 
     def test_nothing_to_say_when_nothing_is_held(self):
         assert held_blast_radius.describe([]) == ""
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

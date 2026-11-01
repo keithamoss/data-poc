@@ -351,3 +351,8 @@ class TestASupplysRunIsItsOwnDatasetsRun:
                              "VALUES (?, 'cp_clients', ?)", [run, physical])
                 attempt_support.opened(conn, run)
             assert drift_reference.run_for(conn, "cp-clients", f"cp-clients@{key}") == own
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

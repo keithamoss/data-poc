@@ -9581,3 +9581,8 @@ class TestTheGeocodingPages:
         assert across.count() >= 1, "no 'Across collections' sub-heading on the agency page"
         assert across.first.locator("h4").inner_text().strip().lower() == "across collections"
         assert "Child Protection's Client Register" in across.first.inner_text()
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = [*(pytestmark if isinstance(pytestmark, list) else [pytestmark]), pytest.mark.asset("quarterly")]

@@ -3,6 +3,8 @@ rank_for_headline/display_name - the dashboard's shared "worst status
 first" sort and the card title."""
 from __future__ import annotations
 
+import pytest
+
 from pipeline.dashboard_check_labels import (
     display_name, rank_for_headline, status_rank, tool_ref, url_key,
 )
@@ -121,3 +123,8 @@ def test_tool_ref_does_not_strip_a_tail_that_is_only_a_tool_token():
 
 def test_tool_ref_degrades_to_the_raw_id_when_it_cannot_parse():
     assert tool_ref("not-a-real-check-id") == "not-a-real-check-id"
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

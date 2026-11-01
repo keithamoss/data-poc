@@ -8,6 +8,8 @@ get written, not its output-parsing logic - see that file's own
 docstring)."""
 from __future__ import annotations
 
+import pytest
+
 import qa_tools.tools.run_evidently as run_evidently
 from qa_tools.common.evidently_common import collection_checks
 
@@ -250,3 +252,8 @@ class TestAnUnreadableNotificationsDoesNotTakeTheRunDown:
         finally:
             with supply_db.connect(label="test-held-evidently") as conn:
                 conn.execute(f'DROP SCHEMA IF EXISTS "{supply_db.run_schema(mine)}" CASCADE')
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

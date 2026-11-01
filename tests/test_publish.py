@@ -607,3 +607,8 @@ class TestNeitherHalfOfCIQuietlyStopsCovering:
         assert "coverage combine" in text
         assert text.count("--cov-fail-under=0") == 2, (
             "each half must defer the threshold to the combine")
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

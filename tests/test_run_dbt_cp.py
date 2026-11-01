@@ -128,3 +128,8 @@ class TestAnUnreadableTableDoesNotTakeTheRunDown:
                 conn.execute(
                     f'DROP SCHEMA IF EXISTS "{supply_db.run_schema(mine)}" CASCADE')
                 conn.execute(f'DROP SCHEMA IF EXISTS "dbt_{mine}" CASCADE')
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

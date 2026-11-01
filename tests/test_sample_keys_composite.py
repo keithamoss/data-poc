@@ -359,6 +359,7 @@ def _singular(meta):
             "config": {"meta": meta}}
 
 
+@pytest.mark.asset("daily")
 def test_dbt_records_nothing_for_a_test_declaring_it_names_no_row():
     from qa_tools.tools import run_dbt
 
@@ -369,6 +370,7 @@ def test_dbt_records_nothing_for_a_test_declaring_it_names_no_row():
     assert got == []
 
 
+@pytest.mark.asset("daily")
 def test_dbt_samples_a_singular_test_without_the_declaration():
     from qa_tools.tools import run_dbt
 
@@ -378,6 +380,7 @@ def test_dbt_samples_a_singular_test_without_the_declaration():
                                      "birth_registrations", _singular({}), "fail", frozenset())
 
 
+@pytest.mark.asset("daily")
 def test_birth_registrations_recency_test_declares_it_names_no_row():
     """The one declaration, not an adapter list (singular_unsampled is gone)."""
     import yaml
@@ -435,3 +438,7 @@ def test_datacontract_samples_the_declared_key_where_the_contract_marks_none(tmp
     [c] = [c for c in run.checks if getattr(c, "failedSamples", None)]
     assert "site_code" not in c.failedSamples[0]
 
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

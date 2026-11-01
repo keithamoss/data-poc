@@ -309,3 +309,8 @@ class TestEachReaderOnItsOwnEntryPoint:
         package_gating.for_collection(conn, CP)
         assert statements, "precondition: the reader issued its queries"
         _assert_only_the_publisher_read(role, statements)
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

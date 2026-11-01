@@ -145,6 +145,7 @@ class TestAnEditInPlaceIsSeenOnTheNextCall:
         edit_in_place(Path(path), *DC_NAME)
         assert DC_NAME[1] in run_datacontract._authored_names(path).values()
 
+    @pytest.mark.asset("daily")
     def test_the_presentation(self, tmp_path):
         path = _copy(CONTRACT / "presentation.yaml", tmp_path)
         assert presentation.agency_blurbs(path)["registry-services"].startswith(BLURB[0])
@@ -290,6 +291,7 @@ class TestNoCallersChangeReachesAnother:
             run_datacontract._authored_names(str(CP_CONTRACT))["invented"] = "x"
         assert "invented" not in run_datacontract._authored_names(str(CP_CONTRACT))
 
+    @pytest.mark.asset("daily")
     def test_the_presentation_is_each_callers_own(self):
         path = CONTRACT / "presentation.yaml"
         mine = presentation.load(path)
@@ -643,3 +645,8 @@ class TestEachHotSiteTakesItsValueOnce:
         seen = watching(monkeypatch, "pipeline.cross_table_notices")
         assert ctn._own_red(own, N2, "2024-11-05") is True
         assert seen.reads == {"timezone_versions": 1} and not seen.unpassed, vars(seen)
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

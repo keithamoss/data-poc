@@ -417,6 +417,7 @@ class TestAKnockOnRunsAcrossItsStream:
         assert sorted(done) == ["child-protection", "emergency-department",
                                 "linkage-products"]
 
+    @pytest.mark.asset("daily")
     def test_a_collection_alone_on_its_calendar_follows_up_alone(self, monkeypatch):
         done = []
         monkeypatch.setattr(knock_on, "follow_up",
@@ -477,3 +478,8 @@ class TestAKnockOnRunsAcrossItsStream:
                 "ORDER BY o.id").fetchall()
         assert total, "the history records no re-evaluation"
         assert late == [], f"re-evaluations that waited more than a week: {late}"
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

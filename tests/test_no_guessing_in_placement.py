@@ -303,3 +303,8 @@ class TestTheGuardCanFail:
                               "a.r.run_date.localeCompare(b.r.run_date) || "
                               "a.r.run_id.localeCompare(b.r.run_id)")
         assert [c for c in _js_sort_comparators(broken) if _forbidden_in(c, JS_SORT_FORBIDDEN)]
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

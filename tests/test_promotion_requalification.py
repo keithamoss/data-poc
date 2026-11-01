@@ -20,6 +20,8 @@ never computed against).
 """
 from __future__ import annotations
 
+import pytest
+
 from qa_tools.common import promotion
 
 
@@ -73,3 +75,8 @@ class TestWhichCrossTableChecksHaveToBeReEvaluated:
 
     def test_nothing_declared_means_nothing_to_re_evaluate(self):
         assert promotion.checks_reading("cp_carers", reads={}) == set()
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

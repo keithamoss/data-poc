@@ -7,6 +7,8 @@ could say anything: the file is read while the command modules import.
 """
 from __future__ import annotations
 
+import pytest
+
 import asset_folders
 
 import subprocess
@@ -53,3 +55,8 @@ def test_a_slip_is_one_line_naming_the_file_and_line(tmp_path):
     assert "Traceback" not in out, out
     assert "data-asset.yaml" in out and f"line {line}" in out, out
     assert len(out.splitlines()) == 1, out
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

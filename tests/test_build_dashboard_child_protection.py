@@ -321,3 +321,8 @@ class TestAResultFromAnotherTablesRunSaysWhichOwnRunItRead:
 
     def test_a_table_it_read_no_supply_of_names_nothing(self):
         assert self._read_run(None) is None
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

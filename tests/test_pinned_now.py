@@ -50,3 +50,7 @@ def test_a_naive_pinned_instant_is_refused(monkeypatch, synthetic):
     with pytest.raises(asset_time.NaiveTimestampError):
         asset_time.now()
 
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

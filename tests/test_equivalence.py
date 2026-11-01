@@ -519,3 +519,8 @@ class TestAPackageGateApplicationIsComparedByWhatItSays:
                                   "WHERE collection_id = 'c1'").fetchall()
         conn.execute("UPDATE qa.run SET gate_application = ? WHERE run_key = 'c1_r2'", [first])
         assert any(d.startswith("qa.run:") for d in eq.differences(before, self._snap()))
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("daily")

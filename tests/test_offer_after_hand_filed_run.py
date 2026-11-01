@@ -51,3 +51,8 @@ def test_a_trial_offers_nothing(module, offers, monkeypatch):
     module._finish_supply([], filed)
 
     assert offers == []
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("daily")

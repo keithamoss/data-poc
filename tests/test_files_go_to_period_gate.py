@@ -261,3 +261,8 @@ class TestAdoptingTheKeyOnFrozenHistory:
         new = self._with(cal, {"child-protection": 1})
         found = self._check(old, new, asset, people, synthetic=False)
         assert any("files_go_to_period" in f.scope for f in found)
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

@@ -185,3 +185,8 @@ class TestAThirdCollectionIsLinked:
 
     def test_its_agency_blurb_comes_from_presentation(self, described):
         assert presentation.agency_blurbs()[FAKE_AGENCY] == "Makes fake things."
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

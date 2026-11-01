@@ -310,3 +310,8 @@ class TestTheFilingMenuAtTwo:
         expected = [c.label for c in collections.all_collections() if c.id in filed]
         assert expected[:2] == ["Birth Registrations", "Child Protection"]
         assert asked["groups"] == [("", expected)]
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

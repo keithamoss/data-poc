@@ -118,3 +118,8 @@ def test_the_referential_results_found_empty_now_name_their_records(sides):
         for sample in now["samples"]:
             assert isinstance(sample, list) and len(sample) == len(KEY_COLUMNS), (key, sample)
             assert sample[0] == code and sample[1] not in (None, "", "None"), (key, sample)
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = [*(pytestmark if isinstance(pytestmark, list) else [pytestmark]), pytest.mark.asset("quarterly")]

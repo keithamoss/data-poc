@@ -442,3 +442,8 @@ def test_two_plans_place_the_same_faults(plan):
         for (_at, fa), (_at2, fb) in zip(a, b):
             for t in fa:
                 assert fa[t][1].equals(fb[t][1]) and fa[t][2] == fb[t][2]
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = [*(pytestmark if isinstance(pytestmark, list) else [pytestmark]), pytest.mark.asset("quarterly")]

@@ -9,6 +9,8 @@ tests/conftest.py already builds for the batch-path tests - this sandbox
 has real access to those four tools, just not to AWS, so there's no
 reason to stub any of them out here."""
 from __future__ import annotations
+
+import pytest
 import os
 
 from qa_tools import collections
@@ -23,7 +25,10 @@ from fixture_ids import (BDM_REF_RUN_ID as _REF_RUN_ID,
                           CP_DIRTY_RUN_ID as _CP_DIRTY_RUN_ID, CP_REF_RUN_ID as _CP_REF_RUN_ID)
 from staging_support import stage_bdm, stage_cp
 
-CP_TABLES = [d.table for d in collections.by_id("child-protection").datasets]
+def _cp_tables():
+    """Child Protection's tables - read when a test of its asset runs, never at
+    import, since this module is the daily asset's (C11)."""
+    return [d.table for d in collections.by_id("child-protection").datasets]
 
 # The flat CSVs tests/conftest.py writes alongside its deliveries - the
 # "a human downloaded this file" shape run_single() exists for, which is
@@ -103,6 +108,7 @@ def test_run_single_bdm_produces_real_results_without_touching_the_manifest(monk
         "run_single() still copies the arriving file into a directory of its own"
 
 
+@pytest.mark.asset("quarterly")
 def test_run_single_cp_produces_real_cross_table_results_once_all_6_tables_present(
         monkeypatch, tmp_path, cp_raw_dir, cp_duckdb_dir):
     """CP's own single-arrival entry point, with all six tables staged.
@@ -137,7 +143,7 @@ def test_run_single_cp_produces_real_cross_table_results_once_all_6_tables_prese
     # A TRIAL ID, staged the way the terminal's trial route stages one:
     # run_single runs trials only (REQ-PIPE-086 criterion 10).
     run_id = trial.trial_run_id()
-    for table in CP_TABLES:
+    for table in _cp_tables():
         stage_cp(
             run_id, table, os.path.join(cp_raw_dir, _CP_DIRTY_RUN_ID, f"{table}.csv"))
     entry = {"run_id": run_id, "run_index": 2,
@@ -236,3 +242,8 @@ class TestABirthRegistrationsRunWithNothingItMayRead:
             with supply_db.connect(label="test-bdm-unreadable") as conn:
                 conn.execute("DELETE FROM qa.hold WHERE dataset_id = 'birth-registrations' "
                              "AND supply_id = ?", [supply])
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("daily")

@@ -14,6 +14,8 @@ year of filings.
 """
 from __future__ import annotations
 
+import pytest
+
 from datetime import datetime, timedelta, timezone
 
 from qa_tools.common import assignment
@@ -334,3 +336,8 @@ class TestAHoldsReasonIsWrittenForAPerson:
             _slot(5, hour=22)], frozenset({"01"}))
         text = got.describe() + " ".join(why for _, why in got.unavailable)
         assert not re.search(r"\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}", text), text
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

@@ -251,3 +251,8 @@ class TestTheQualifierIsAboutThePeriodOnShow:
         self._substitute(conn, dataset, second, first, f"{dataset}@1", _at(4))
         assert promotion_state.standing_in(conn, dataset, period=first) is None
         assert promotion_state.standing_in(conn, dataset, period=second).stands_on == first
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

@@ -187,3 +187,8 @@ class TestEveryObjectInAnEventIsTried:
                                     client, prefix="cp/")
         assert _files(s3_arrival.delivery_name_for(bucket, "cp/cp_carers.csv", LANDED))
         assert len(no_pass) == 1, "the pass still runs for what was recorded"
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

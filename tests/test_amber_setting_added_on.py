@@ -3,6 +3,8 @@ is added' is the date, on the asset's clock, of the commit that
 introduced the version - not the day the gate runs."""
 from __future__ import annotations
 
+import pytest
+
 import os
 import subprocess
 from datetime import date
@@ -52,3 +54,8 @@ def test_a_version_is_dated_by_the_commit_that_added_it_not_the_push(tmp_path, m
     monkeypatch.setattr(validate_schedule, "ROOT", repo)
     assert validate_schedule._version_added_on(
         "contract/data-asset.yaml", "HEAD~2", "2026-10-02") == date(2026, 10, 10)
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

@@ -257,3 +257,8 @@ class TestDaylightSaving:
                                                   ("2026-10-05", "Australia/Sydney")))
         assert asset_time.wall_clock_problem(date(2026, 10, 4), "02:30") is None  # Perth that day
         assert asset_time.wall_clock(date(2026, 10, 5), "09:00").utcoffset() == timedelta(hours=11)
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

@@ -168,6 +168,7 @@ class TestAMistypedKeyFailsToo:
 
 
 class TestCalendarIntegrity:
+    @pytest.mark.asset("daily")
     def test_duplicate_calendar_names_are_rejected(self):
         def mutate(doc):
             doc["calendars"].append(copy.deepcopy(_calendar(doc, "daily")))
@@ -262,6 +263,7 @@ class TestSubsettingAndOverridingAreDifferentActs:
         errors = _run(mutate)
         assert any("BOTH" in e.problem for e in errors), _messages(errors)
 
+    @pytest.mark.asset("daily")
     def test_delivery_months_against_a_cadence_rule_calendar_is_rejected(self):
         def mutate(doc):
             _dataset(doc, "birth-registrations")["delivery_months"] = ["February"]
@@ -858,3 +860,8 @@ class TestTheDiffBase:
         mod.main()
         assert seen[0] == "HEAD", (
             f"the check-lifecycle gate compared against {seen[0]!r}")
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

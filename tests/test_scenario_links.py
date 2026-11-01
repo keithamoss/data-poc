@@ -433,3 +433,8 @@ class TestALinkCanStandOnTheHistorysLastDay:
         assert sorted(found) == ["TS-57b", "TS-58b", "TS-59b", "TS-60b", "TS-61b"]
         last = si._history_last_day()
         assert all(v == (last, None) for v in found.values()), found
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

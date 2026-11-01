@@ -94,3 +94,8 @@ class TestTheScheduleConfigIsGatedAtCommitTime:
         assert covering, (
             "nothing at commit time looks at contract/data-asset.yaml, where a "
             "one-character calendar name can leave a dataset expecting nothing")
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

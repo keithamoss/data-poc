@@ -527,3 +527,8 @@ class TestAnUnsupersededSupplyWaitsAgain:
                  conn=conn)
         fd.apply(_request(fd.UN_SUPERSEDE, period, a), effective_at=WHEN, conn=conn)
         assert supersession.waiting_in(conn, DS, period, besides=b) == [a]
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

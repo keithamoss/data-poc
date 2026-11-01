@@ -300,3 +300,8 @@ class TestABrokenCollectionIsRefusedByNameEverywhere:
         out = _runner.invoke(pipeline_cli.pipeline_group, ["run", "--collection", "zzz"])
         assert out.exit_code == 2
         assert "This option also takes `all`" in _flat(out.output), out.output
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

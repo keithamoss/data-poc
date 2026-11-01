@@ -137,3 +137,8 @@ def test_the_scope_uses_reevaluations_own_plan_and_mark(scoped, monkeypatch):
     assert planned == ["cp_clients"]
     assert marked == [PLACEMENTS_FK]
     assert [r["check_id"] for r in records] == [CLIENTS_OWN, PLACEMENTS_FK]
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

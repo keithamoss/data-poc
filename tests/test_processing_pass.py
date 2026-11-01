@@ -658,3 +658,8 @@ class TestCriticFindingsOn190:
         monkeypatch.setattr(pp, "run_pass", run_pass)
         pipeline.run_process(confirm=lambda message, yes: True)
         assert "turned off [/supplier paused]" in capsys.readouterr().out
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

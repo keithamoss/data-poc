@@ -495,3 +495,8 @@ class TestEverySeedDrawnIsOneItsProviderDeclares:
             windows += providers.provider(other).seed_schedule()
         outside = sorted(s for s in drawn if not any(lo <= s <= hi for _, lo, hi in windows))
         assert outside == [], f"{collection_id} drew seeds no window declares: {outside[:20]}"
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

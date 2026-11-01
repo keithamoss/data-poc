@@ -168,3 +168,8 @@ class TestTheBusiestParsersAskOnce:
         before = environments._load(path)
         path.write_text(path.read_text().replace(before[0].id, before[0].id + "x", 1))
         assert environments._load(path)[0].id == before[0].id + "x"
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

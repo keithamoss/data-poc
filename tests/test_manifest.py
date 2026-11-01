@@ -220,3 +220,8 @@ class TestTheDefinersSearchPathIsSafe:
         (config,) = conn.execute(
             "SELECT proconfig FROM pg_proc WHERE proname = 'manifest_for'").fetchall()[0]
         assert any(c.replace(" ", "") == "search_path=pg_catalog,pg_temp" for c in config), config
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

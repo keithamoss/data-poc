@@ -350,6 +350,7 @@ class TestVersions:
                              base_codeowners=CODEOWNERS)
         assert found == [], _text(found)
 
+    @pytest.mark.asset("daily")
     def test_a_cadence_rule_versions_rule_applies(self, state):
         """Criterion 17: the daily calendar has no dated entries, and its
         version is frozen like any other."""
@@ -387,10 +388,12 @@ class TestRestatingAnOmittedValueAtItsDefault:
                 "days_before"] = value
         return mutate
 
+    @pytest.mark.asset("daily")
     def test_restating_days_before_at_its_default_is_free(self, state):
         assert state[1].get("synthetic") is True
         assert _check(state, self._restate(0)) == []
 
+    @pytest.mark.asset("daily")
     def test_not_on_a_real_asset(self, state):
         old_cal, old_asset, people = state
         old_asset = dict(old_asset, synthetic=False)
@@ -399,11 +402,13 @@ class TestRestatingAnOmittedValueAtItsDefault:
         assert any("birth-registrations participation" in (f.scope or "") for f in found), \
             _text(found)
 
+    @pytest.mark.asset("daily")
     def test_not_at_any_other_value(self, state):
         found = _check(state, self._restate(1))
         assert any("birth-registrations participation" in (f.scope or "") for f in found), \
             _text(found)
 
+    @pytest.mark.asset("daily")
     def test_not_alongside_another_change_to_the_version(self, state):
         def mutate(doc):
             self._restate(0)(doc)
@@ -739,3 +744,8 @@ class TestASyntheticAssetMayLaterDateACalendarVersion:
         found = freeze.check(cal, new_cal, asset, asset, people, instant_of=lambda key: NOW,
                              today=NOW.date(), base_codeowners=CODEOWNERS)
         assert any(PAST in (f.scope or "") for f in found), _text(found)
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

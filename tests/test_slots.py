@@ -122,6 +122,7 @@ class TestTheClaimWindowOpensEarlyAndClosesWithTheNextPeriod:
         slot = _cp_slots("cp-clients")[0]
         assert slot.claim_opens_at == slot.due_at - timedelta(days=14)
 
+    @pytest.mark.asset("daily")
     def test_a_daily_feed_gets_its_calendars_own_much_shorter_window(self):
         slot = slots.slots_for_dataset("birth-registrations", until=BDM_UNTIL)[-1]
         assert slot.claim_opens_at == slot.due_at - timedelta(hours=4)
@@ -132,6 +133,7 @@ class TestTheClaimWindowOpensEarlyAndClosesWithTheNextPeriod:
         for here, there in zip(sequence, sequence[1:]):
             assert here.closes_at == there.claim_opens_at, here.name
 
+    @pytest.mark.asset("daily")
     def test_a_daily_slot_closes_when_tomorrows_window_opens(self):
         sequence = slots.slots_for_dataset("birth-registrations", until=BDM_UNTIL)
         for here, there in zip(sequence, sequence[1:]):
@@ -337,3 +339,8 @@ class TestTheClaimWindowIsEffectiveDated:
                       base=agreement_split.participation("d", claim_window="2h"))
         for slot in slots.slots_for_dataset("d"):
             assert slot.claim_opens_at == slot.due_at - timedelta(hours=2)
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

@@ -233,3 +233,8 @@ class TestAHeldTableIsOneRecordPerCheckToo:
         assert [r["check_id"] for r in out] == [PLACEMENTS_READS_BOTH]
         assert out[0]["held_tables"] == ["cp_carers", "cp_clients"]
         assert "cp_carers" in out[0]["held_reason"] and "cp_clients" in out[0]["held_reason"]
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

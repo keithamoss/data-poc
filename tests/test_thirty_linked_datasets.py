@@ -342,3 +342,8 @@ def test_how_long_the_linkage_run_took(copy):
           f"knock-on re-run {runs[readers]}s; {len(runs)} QA runs in a {copy.evidence['stream_seconds']}s "
           f"stream; {copy.wall_seconds}s end to end including generation")
     assert linkage > 0
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = [*(pytestmark if isinstance(pytestmark, list) else [pytestmark]), pytest.mark.asset("quarterly")]

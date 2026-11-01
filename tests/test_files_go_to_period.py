@@ -191,3 +191,8 @@ class TestATurnedOffGapIsJudgedOnTheRound:
         assert turned_off.gap_for_period("cp-clients", "2024-Q1", agr) is not None
         assert turned_off.gap_for_period("cp-clients", "2024-Q2", agr) is None
         assert turned_off.gap_for_period("cp-clients", "2023-Q4", agr) is None
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

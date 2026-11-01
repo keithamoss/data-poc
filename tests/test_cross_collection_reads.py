@@ -323,3 +323,8 @@ class TestACollectionWithNoDriftChecksRuns:
         monkeypatch.setattr(run_evidently.left_out, "note", lambda *a, **k: None)
         assert run_evidently.evaluate("linkage-products", "linkage_keys__x", "t") == []
         assert recorded == [[]]
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

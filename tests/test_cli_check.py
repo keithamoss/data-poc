@@ -319,3 +319,8 @@ class TestTheProvisionalGate:
         result = _runner.invoke(check_cli.check_command, ["--only", "provisional"])
         assert result.exit_code == 0, result.output
         assert "passed, with a warning" in result.output
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

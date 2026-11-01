@@ -99,6 +99,7 @@ def test_a_similarly_named_run_is_not_collateral(db):
     supply_db.drop_run_schemas(db, "lifecycle_99")
 
 
+@pytest.mark.asset("quarterly")
 def test_a_rerun_of_the_same_supply_is_not_collateral(db):
     """REQ-PIPE-140: a re-run's id is its supply's run id plus `__r<N>`,
     so `<base>_` matched it - tidying the first run would have dropped the
@@ -118,6 +119,7 @@ def test_a_rerun_of_the_same_supply_is_not_collateral(db):
     supply_db.drop_run_schemas(db, again)
 
 
+@pytest.mark.asset("quarterly")
 def test_a_rerun_id_round_trips_and_keeps_its_supply(db):
     first = "cp_carers__000000000000000042"
     again = supply_db.rerun_id(first, 3)
@@ -198,6 +200,7 @@ def test_a_finished_run_leaves_no_schema_behind(monkeypatch, tmp_path, bdm_raw_d
         f"the run removed schemas that were not its own: {sorted(before - after)}"
 
 
+@pytest.mark.asset("quarterly")
 def test_two_runs_over_the_same_files_do_not_share_a_staged_table(db):
     """Two runs with no receipt are two arrivals, whatever their names
     look like.
@@ -232,6 +235,7 @@ def test_two_runs_over_the_same_files_do_not_share_a_staged_table(db):
         f"table ({a}) - the second load would CASCADE away the first's views")
 
 
+@pytest.mark.asset("quarterly")
 def test_a_real_receipt_instant_still_names_the_table_exactly_as_before(db):
     """The other half, and the reason the fix is where it is: a real
     arrival's physical name must not change, because committed history
@@ -355,3 +359,8 @@ class TestARunGivesBackItsDiskSpaceToo:
         # A run that never created one: the ordinary case for a run that
         # failed before dbt, and it must not turn one failure into two.
         orchestrate.discard_run_schemas("leak_probe_never_existed")
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("daily")

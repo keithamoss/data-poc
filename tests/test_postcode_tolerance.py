@@ -96,3 +96,8 @@ def test_an_ordinary_child_protection_amber_reads_amber(clients):
     soda = [r for r in run_soda.evaluate("child-protection", CP_REF_RUN_ID, "2026-01-01T09:00:00Z")
             if r["check_id"] == SODA]
     assert [r["status"] for r in soda] == ["warn"]
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

@@ -417,3 +417,8 @@ class TestATruncatedSlotListIsNotAnEndedSchedule:
         decided = assignment.assign("cp-carers", "cp-carers@z", AFTER, SLOTS, frozenset(),
                                     final_period=None)
         assert decided.is_held and not decided.schedule_ended
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

@@ -279,6 +279,7 @@ class TestNeverInAStatus:
         return {"dataset_id": "birth-registrations", "check_id": f"{self._DS}.{tail}",
                 "status": status}
 
+    @pytest.mark.asset("daily")
     def test_a_file_warning_does_not_change_a_green_supply(self):
         from qa_tools.common import promotion
 
@@ -286,6 +287,7 @@ class TestNeverInAStatus:
                    self._record("column_order_file", "warn")]
         assert promotion.status_of("birth-registrations", results, reads={}) == "green"
 
+    @pytest.mark.asset("daily")
     def test_file_checks_alone_are_no_active_checks(self):
         from qa_tools.common import promotion
 
@@ -350,3 +352,8 @@ class TestAHeaderIsNotValueShaped:
         f = _by_check(fc.evaluate(_write(tmp_path, b"7,name,1987-02-03\n1,Ann,2020\n"),
                                   COLUMNS))
         assert "1987-02-03" not in f[fc.HEADER_ROW].words
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

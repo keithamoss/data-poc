@@ -8,6 +8,8 @@ mark. tests/test_assignment.py asserts the mark is gone.
 """
 from __future__ import annotations
 
+import pytest
+
 from datetime import datetime, timedelta, timezone
 
 from qa_tools.common import landed_on_accepted
@@ -127,3 +129,8 @@ class TestItNeverAutoPromotesOverAcceptedData:
         assert list(signature.parameters) == ["slot", "promoted_slots"], (
             "if this took the supply's status it could be talked into promoting a "
             "green duplicate over data already accepted")
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

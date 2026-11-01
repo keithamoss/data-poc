@@ -369,3 +369,8 @@ def test_a_dataset_identified_by_several_columns_carries_each(monkeypatch):
     assert got and set(got) <= pairs, got[:3]
     assert (df["id_3"] == "").all()
     assert 90.0 <= lp._coverage(list(pairs), set(got)) <= 96.5
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = [*(pytestmark if isinstance(pytestmark, list) else [pytestmark]), pytest.mark.asset("quarterly")]

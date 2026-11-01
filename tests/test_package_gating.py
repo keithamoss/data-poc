@@ -123,3 +123,8 @@ class TestAGateThatGenuinelyDidNotFinish:
         points = _read()["cp-clients"][got["C2"]]
         assert [(p["on"], p["form"]) for p in points] == \
             [("2024-11-01", "gating"), ("2024-11-02", None)], points
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

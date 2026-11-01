@@ -170,6 +170,7 @@ class TestTheTimeRoute:
         assert ("2015-Q4", 0) not in inheritance.groups_due("child-protection", early,
                                                              recorded=set())
 
+    @pytest.mark.asset("daily")
     def test_a_calendar_whose_collections_share_one_offset_owes_nothing_by_time(self):
         """Criterion 4: Birth Registrations' calendar has one collection."""
         at = datetime(2026, 7, 1, tzinfo=timezone(timedelta(hours=8)))
@@ -194,3 +195,8 @@ def test_three_rounds_are_listed_with_commas(monkeypatch):
                         if did == "cp-case-workers" else real(did, on, agreement))
     _, reason = inheritance._does_not_participate("cp-case-workers", "2024-Q1")
     assert "supplies only in the February, May and August rounds" in reason
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

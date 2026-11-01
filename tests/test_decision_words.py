@@ -88,3 +88,8 @@ def test_the_terminal_listing_uses_the_words(supply_dsn, monkeypatch, slot_alrea
     rows = [line for line in got.output.splitlines()
             if mine in line and "2026-Q3" in line and not line.startswith("Currently")]
     assert len(rows) == 1 and "  promoted  " in rows[0]
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

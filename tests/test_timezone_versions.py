@@ -120,3 +120,8 @@ class TestSettingsChangelogsAreStructured:
             {"date": "2026-10-11", "author": "pytest", "change": "a note added later"})
         assert amber_setting.past_change_problems(old, new, date(2030, 1, 1),
                                                   synthetic=False) == []
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

@@ -3,6 +3,8 @@
 a PERSON's re-file from no period (criterion 9). Written first."""
 from __future__ import annotations
 
+import pytest
+
 from datetime import datetime, timedelta, timezone
 
 import test_place_held_supply as place
@@ -129,3 +131,8 @@ class TestThePromotionTimelineSaysPlaced:
         decided = [d for day in days for d in h.decisions_on(day)
                    if d["supply"] == supply and d["action"] == dl.REFILE]
         assert decided and all(d["placedIn"] == target for d in decided)
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

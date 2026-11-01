@@ -107,3 +107,8 @@ class TestARunWithoutThemIsRefused:
             run_dbt.test_names_by_check_id("child-protection")
         assert invoked == []
         assert "'one'" in str(exc.value) and "mothman env dbt-deps" in str(exc.value)
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

@@ -183,6 +183,7 @@ class TestRealChecks:
         after = {c.check_id: c.config_hash for c in cl.parse_soda_check_metadata(edited)}
         assert {i for i in before if before[i] != after[i]} == {target.check_id}
 
+    @pytest.mark.asset("quarterly")
     def test_changing_one_evidently_threshold_moves_that_check_alone(self):
         rel = "assets/quarterly/child-protection-family-support/child-protection-evidently-checks.yml"
         checks = cl.load_evidently_checks(ROOT / rel)
@@ -454,3 +455,8 @@ class TestOneMapPerAttempt:
         with pytest.raises(cl.MissingCheckIdError):
             tables_read.definition_fingerprints()
         tables_read.forget_declared_reads()
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("daily")
