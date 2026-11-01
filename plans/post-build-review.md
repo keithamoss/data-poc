@@ -13247,7 +13247,7 @@ twice. It deliberately did not re-find the `TypeError`.
      and the geocoding reviews of 2026-10-31 built on them. Keith found out by
      asking. The result is two vocabularies on one page, 'Amber' in a pill
      beside 'Warn' in a cell.
-     OUTCOME: Keith chose Pass / Warn / Fail everywhere (running-thoughts #132).
+     OUTCOME: Keith chose Pass / Warn / Fail everywhere (REQ-DASH-359, built 2026-11-01).
      THE PROCESS GAP: a provisional choice inside a requirement's decisions
      has no question attached, so nothing makes it come up again. Proposed
      fix, for Keith: every PROVISIONAL item is also listed in the morning
@@ -13315,3 +13315,31 @@ twice. It deliberately did not re-find the `TypeError`.
    test files, 126 scenario-register entries re-read (169 lines reworded),
    SCENARIOS.md regenerated with every coordinate unchanged. This does NOT
    close #292's process gap; that is REQ-TEST-374.
+297. **[done, 2026-11-01]** **[Dashboard UI]** **[Testing & dev tooling]**
+   **Critic on the Pass / Warn / Fail build (REQ-DASH-359 to REQ-DOCS-362), and Keith's answers to its five questions.**
+   - **D1 (DEFECT)**: tests/test_dashboard_e2e.py's parsers still read the
+     old words ('(\d+) red, (\d+) amber', 'All (\d+) green', 'latest (\d+)
+     red and (\d+) amber') at eight places. FIXED to the new words, and each
+     regex is held to the template's real output by
+     tests-js/e2e-parsers.test.js, which runs without a bootstrap. No other
+     old-word regex or expected string in tests/ or tests-js/.
+   - **M2**: `_hover_trends` hovered only `svg .hitrect`, which only a check
+     trend has, and asserted nothing, so it could pass on []. FIXED: it takes
+     the trend kinds (check trend, unit trend, sparkline) and asserts each
+     drew and said something; the column-panel test now also opens a check
+     panel and an agency tier's sparklines.
+   - **M3**: `mothman scenarios bands --help` said 'whether it can read
+     amber' and 'its amber band'. FIXED, and added to
+     tests/test_status_words_shown.py.
+   - **N4**: four template sites guarded with hasStatusWords and dropped an
+     unknown status in silence. FIXED to skip only an absent one and refuse an
+     unknown one through statusWords (criterion 2), tested in
+     tests-js/pass-warn-fail.test.js.
+   - **KEITH'S ANSWERS (2026-11-01)**: accepted the warehouse pill in the verb
+     form, 'was passing; on re-check it is failing', 'Promoted, then worse on
+     re-check' with no verdict recorded, and D8d's short dates with the
+     colliding middle label dropped - each SETTLED on REQ-DASH-359. Deleted
+     running-thoughts #132 under the delete-on-built rule, its one uncarried
+     decision moved to REQ-DASH-359 and its references repointed; REQ-DOCS-362
+     criterion 4 amended to forbid rewording history, not deleting a built
+     entry.
