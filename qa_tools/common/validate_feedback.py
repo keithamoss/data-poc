@@ -29,7 +29,6 @@ from dashboard.plans_md import FEEDBACK_FILE, parse_feedback_cards, road_testing
 ROOT = Path(__file__).resolve().parents[2]
 PLANS_DIR = ROOT / "plans"
 REQUIREMENTS = ROOT / "requirements.yaml"
-DATA_ASSET = ROOT / "contract" / "data-asset.yaml"
 
 _TOP_ROUTES = {"", "plans", "demo", "scenarios", "feedback"}
 
@@ -69,7 +68,11 @@ def route_problem(path: str, tree: dict) -> str | None:
 
 
 def problems(plans_dir: Path = PLANS_DIR, requirements: Path = REQUIREMENTS,
-             data_asset: Path = DATA_ASSET) -> tuple[list[dict], list[str]]:
+             data_asset: Path | None = None) -> tuple[list[dict], list[str]]:
+    if data_asset is None:
+        from qa_tools.common import assets
+
+        data_asset = assets.selected().data_asset_yaml
     path = Path(plans_dir) / FEEDBACK_FILE
     cards, errors = parse_feedback_cards(path)
     if not path.is_file():

@@ -39,7 +39,7 @@ def is_synthetic() -> bool:
     """Whether contract/data-asset.yaml declares this asset synthetic."""
     from qa_tools.common import asset_time
 
-    raw = config_yaml.parse(asset_time.DATA_ASSET_YAML.read_text()) or {}
+    raw = config_yaml.parse(asset_time.data_asset_yaml().read_text()) or {}
     return raw.get("synthetic") is True
 
 
@@ -56,7 +56,7 @@ def in_production() -> bool:
 def asset_id() -> str:
     from qa_tools.common import asset_time
 
-    return (config_yaml.parse(asset_time.DATA_ASSET_YAML.read_text()) or {})["data_asset_id"]
+    return (config_yaml.parse(asset_time.data_asset_yaml().read_text()) or {})["data_asset_id"]
 
 
 def confirmation_phrase() -> str:

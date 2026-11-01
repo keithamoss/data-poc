@@ -12,8 +12,10 @@ generator, and an adapter that carried one would import generator code into
 every real deployment (the requirement's decision 4).
 
 CHOSEN BY CONFIGURATION, NEVER IMPORTED FROM IT: a collection's id picks
-which module of this package loads, exactly as qa_tools/collections does
-for adapters, and only an id the hierarchy declares may.
+which file of the selected asset's provider folder loads, exactly as
+qa_tools/collections does for adapters, and only an id the hierarchy declares
+may. LOADED BY PATH (REQ-GEN-370 criterion 2), as mothman_provider_<asset>_
+<module>, never as a module of this package.
 
 CHEAP TO READ: every provider module is importable without pandas or numpy
 (criterion 7), so asking what a provider declares - its seed ranges, whether
@@ -21,33 +23,35 @@ it supports a target trial - costs no tool import.
 """
 from __future__ import annotations
 
-import importlib
-
 from generator.collections.base import NoProviderError, Provider  # noqa: F401 - re-exported
 
 
-def provider(collection_id: str) -> Provider:
-    """The provider for `collection_id`, or NoProviderError naming it.
+def provider_module(collection_id: str):
+    """The module of the provider for `collection_id`, loaded by path from the
+    selected asset's provider folder, or NoProviderError naming it.
 
     The id is the registry's own (qa_tools.collections.by_id), so an
     undeclared collection is refused there by name; a declared one with no
-    provider module is refused here by name - never generated with another
+    provider file is refused here by name - never generated with another
     collection's behaviour."""
     from qa_tools import collections
+    from qa_tools.common import assets
 
     coll = collections.by_id(collection_id)
     if not collections.ID_PATTERN.fullmatch(coll.id):
         raise NoProviderError(f"collection id {coll.id!r} is not a hierarchy id, so it cannot "
                               f"name a generator provider")
     try:
-        module = importlib.import_module(f"generator.collections.{coll.module_name}")
-    except ModuleNotFoundError as exc:
-        if exc.name != f"generator.collections.{coll.module_name}":
-            raise
+        return assets.load("provider", coll.module_name)
+    except assets.NoModule:
         raise NoProviderError(
             f"collection {collection_id!r} has no synthetic generator: no provider module "
-            f"generator/collections/{coll.module_name}.py") from None
-    return module.PROVIDER
+            f"{assets.module_file('provider', coll.module_name)}") from None
+
+
+def provider(collection_id: str) -> Provider:
+    """The provider for `collection_id` - see provider_module."""
+    return provider_module(collection_id).PROVIDER
 
 
 def for_dataset(dataset_id: str) -> Provider:

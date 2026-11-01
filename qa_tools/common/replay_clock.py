@@ -86,7 +86,7 @@ def _is_synthetic() -> bool:
     """Whether contract/data-asset.yaml declares the asset synthetic - read
     here rather than through the reset module, which nothing but `mothman env`
     may reach (REQ-PIPE-144 criterion 23)."""
-    raw = config_yaml.load(asset_time.DATA_ASSET_YAML) or {}
+    raw = config_yaml.load(asset_time.data_asset_yaml()) or {}
     return raw.get("synthetic") is True
 
 

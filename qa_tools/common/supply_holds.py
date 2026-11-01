@@ -133,7 +133,7 @@ class Holds:
 def _schedule_file() -> str:
     from qa_tools.common import agreement
 
-    path = agreement.CALENDAR_YAML
+    path = agreement.calendar_yaml()
     root = path.parent.parent
     return str(path.relative_to(root))
 

@@ -57,7 +57,12 @@ import yaml
 
 from qa_tools.common import hierarchy, postgres_version, tables_read
 
-CONTRACT_DIR = Path(__file__).resolve().parent.parent.parent / "contract"
+def contract_dir() -> Path:
+    """The selected asset's configuration folder, resolved now (REQ-PIPE-342
+    criterion 6; it was the import-time constant CONTRACT_DIR)."""
+    from qa_tools.common import assets
+
+    return assets.selected().folder
 
 def contracts() -> tuple[tuple[str, str], ...]:
     """(filename, what it describes) for every contract the hierarchy
@@ -194,16 +199,17 @@ def validate() -> list[str]:
     # have lost - and it was never checked before either, because
     # nobody had added it to the hand-written tuple. So this is
     # coverage that list did not have (post-build-review #36).
-    if CONTRACT_DIR.exists():
+    folder = contract_dir()
+    if folder.exists():
         known = {filename for filename, _ in named}
-        for path in sorted(CONTRACT_DIR.rglob("*-contract.yaml")):
-            rel = path.relative_to(CONTRACT_DIR).as_posix()
+        for path in sorted(folder.rglob("*-contract.yaml")):
+            rel = path.relative_to(folder).as_posix()
             if rel not in known:
                 errors.append(
                     f"{rel}: no dataset in contract/data-asset.yaml names this "
                     f"contract, so nothing checks it. Point a dataset at it, or remove it.")
     for filename, describes in named:
-        path = CONTRACT_DIR / filename
+        path = folder / filename
         if not path.exists():
             errors.append(f"{filename}: no such contract")
             continue

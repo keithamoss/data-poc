@@ -54,7 +54,14 @@ from pathlib import Path
 from qa_tools.common import config_yaml
 
 ROOT = Path(__file__).resolve().parent.parent.parent
-SCRIPT_PATH = ROOT / "contract" / "scripted_decisions.yaml"
+
+
+def script_path() -> Path:
+    """The selected asset's scripted_decisions.yaml, resolved now (REQ-PIPE-342 criterion
+    6; it was the import-time constant SCRIPT_PATH)."""
+    from qa_tools.common import assets
+
+    return assets.selected().file("scripted_decisions.yaml")
 
 
 class ScriptRefused(RuntimeError):
@@ -131,7 +138,7 @@ class Script:
 
 def load(path: Path | str | None = None) -> list[Script]:
     """The committed script, in file order. Absent is empty."""
-    p = Path(path or SCRIPT_PATH)
+    p = Path(path or script_path())
     if not p.exists():
         return []
     doc = config_yaml.parse(p.read_text()) or {}
@@ -597,9 +604,9 @@ def _connect():
 
 def _refuse_unless_synthetic() -> None:
     """Criterion 8: never on an asset that has not declared itself synthetic."""
-    from qa_tools.common.hierarchy import DATA_ASSET_YAML
+    from qa_tools.common.hierarchy import data_asset_yaml
 
-    doc = config_yaml.parse(Path(DATA_ASSET_YAML).read_text()) or {}
+    doc = config_yaml.parse(Path(data_asset_yaml()).read_text()) or {}
     if not doc.get("synthetic"):
         raise ScriptRefused(
             "scripted decisions are played back only into a synthetic history, and this "

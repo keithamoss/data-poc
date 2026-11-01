@@ -161,7 +161,7 @@ def config_problems(package: Path | None = None) -> list[str]:
                 problems.append(f"{c.id!r}'s run_prefix {c.run_prefix!r} makes {name!r}, "
                                 f"{len(name.encode())} bytes - over PostgreSQL's "
                                 f"{PG_IDENTIFIER_BYTES}")
-        if not (hierarchy.DATA_ASSET_YAML.parent / c.contract).is_file():
+        if not (hierarchy.data_asset_yaml().parent / c.contract).is_file():
             problems.append(f"{c.id!r}'s contract file contract/{c.contract} is missing")
 
     for field in ("dataset_id", "table"):
@@ -193,7 +193,7 @@ def check_file_problems(root: Path | None = None) -> list[str]:
     from qa_tools import collections
     from qa_tools.common import hierarchy
 
-    root = root or hierarchy.DATA_ASSET_YAML.parent.parent
+    root = root or hierarchy.data_asset_yaml().parent.parent
     try:
         declared = collections.all_collections()
     except ValueError:
@@ -308,7 +308,7 @@ def _names() -> tuple[set[str], tuple[str, ...]]:
     from qa_tools import collections
     from qa_tools.common import config_yaml, hierarchy
 
-    doc = config_yaml.parse(hierarchy.DATA_ASSET_YAML.read_text()) or {}
+    doc = config_yaml.parse(hierarchy.data_asset_yaml().read_text()) or {}
     ids = set()
     for agency in ((doc.get("hierarchy") or {}).get("agencies") or []):
         ids.add(agency["id"])

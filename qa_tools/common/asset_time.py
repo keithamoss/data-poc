@@ -45,9 +45,13 @@ from datetime import UTC, date, datetime, time, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from qa_tools.common import config_yaml
+from qa_tools.common import assets, config_yaml
 
-DATA_ASSET_YAML = Path(__file__).resolve().parent.parent.parent / "contract" / "data-asset.yaml"
+
+def data_asset_yaml() -> Path:
+    """The selected asset's data-asset.yaml, resolved now (REQ-PIPE-342
+    criterion 6; it was the import-time constant DATA_ASSET_YAML)."""
+    return assets.selected().data_asset_yaml
 
 
 class NaiveTimestampError(ValueError):
@@ -125,7 +129,7 @@ def timezone_versions() -> tuple[ZoneVersion, ...]:
     caller that has not thought about 'as at when' cannot quietly get
     today's zone for a date in 2024.
     """
-    path = DATA_ASSET_YAML
+    path = data_asset_yaml()
     return _BUILT.from_file(path, lambda text: parse_timezone_versions(
         config_yaml.parse(text, name=str(path)) or {}, str(path)))
 
@@ -184,7 +188,7 @@ class PinnedClockRefused(RuntimeError):
 def declared_synthetic() -> bool:
     """Whether contract/data-asset.yaml declares the asset synthetic - read
     here, as the replay clock reads it, rather than through the reset module."""
-    raw = config_yaml.load(DATA_ASSET_YAML) or {}
+    raw = config_yaml.load(data_asset_yaml()) or {}
     return raw.get("synthetic") is True
 
 
