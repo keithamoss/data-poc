@@ -6,12 +6,14 @@ Planned once for the module: the plan runs every linked collection's provider
 in memory (about forty seconds)."""
 from __future__ import annotations
 
+import collection_modules
+
 import dataclasses
 
 import pytest
 
 from generator import scenario_injection as si
-from generator.collections import linkage_products as lp
+lp = collection_modules.provider_module("linkage-products")
 from qa_tools.common import asset_time
 
 pytestmark = pytest.mark.filterwarnings("ignore::UserWarning")

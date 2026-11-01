@@ -10,6 +10,8 @@ and no test can stand in for it.
 """
 from __future__ import annotations
 
+import collection_modules
+
 from dataclasses import dataclass, field
 from datetime import date, timedelta
 
@@ -148,7 +150,7 @@ class TestAStoodOnPeriodIsClaimed:
     def test_the_real_child_protection_plan_passes(self):
         """TS-76 stands on 2024-Q4 and TS-77a on 2023-Q1; TS-56 moved to the
         newest quarter so neither is another scenario's (Keith, 2026-10-15)."""
-        from generator.collections import child_protection as cp_provider
+        cp_provider = collection_modules.provider_module("child-protection")
 
         periods = cp_provider.generated_periods()
         resolved, _ = cp_provider._plan_injections(periods)
@@ -526,14 +528,14 @@ class TestQuietDays:
         assert placed.quiet == (periods[-5].name, periods[-4].name)
 
     def test_a_period_keeps_its_own_supply_on_a_quiet_day(self):
-        from generator.collections import civil_registration as gr
+        gr = collection_modules.provider_module("civil-registration")
 
         avoid = gr._days_to_avoid("2026-09-08", suppressed={"2026-09-01"},
                                   quiet={"2026-09-07", "2026-09-08"})
         assert avoid == {"2026-09-01", "2026-09-07"}
 
     def test_another_period_s_resend_is_moved_off_a_quiet_day(self):
-        from generator.collections import civil_registration as gr
+        gr = collection_modules.provider_module("civil-registration")
         from generator.resupply import Delivery
 
         resend = Delivery(received_date=date(2026, 9, 7), severity=None, payload=None)
@@ -594,7 +596,7 @@ class TestEveryChildProtectionInjectionIsPlanned:
     def test_an_injection_on_another_dataset_is_planned(self, monkeypatch):
         import dataclasses
 
-        from generator.collections import child_protection as cp
+        cp = collection_modules.provider_module("child-protection")
 
         # PLANNED WITHOUT LINKS: these periods are made up, so a link's
         # period-scoped decision has no real slot to be timed from.
@@ -606,7 +608,7 @@ class TestEveryChildProtectionInjectionIsPlanned:
         assert "TS-56" in {inj.scenario_id for inj, _ in resolved}
 
     def test_two_in_one_delivery_are_refused(self, monkeypatch):
-        from generator.collections import child_protection as cp
+        cp = collection_modules.provider_module("child-protection")
 
         both = (si.Injection("TS-a", "cp-clients", -5, "cfg"),
                 si.Injection("TS-b", "cp-carers", -5, "cfg"))
@@ -626,7 +628,7 @@ class TestTheEarlyEmergencyDepartmentSupplies:
     def _where(scenario_id):
         from datetime import timedelta
 
-        from generator.collections import emergency_department as g
+        g = collection_modules.provider_module("emergency-department")
         from generator import scenario_injection
         from qa_tools.common import asset_time, slots
 
@@ -649,7 +651,7 @@ class TestTheEarlyEmergencyDepartmentSupplies:
     def test_each_keeps_its_quarter_and_instant_on_emergency_department(
             self, scenario_id, period, received):
         from generator import scenario_injection
-        from generator.collections import emergency_department as g
+        g = collection_modules.provider_module("emergency-department")
 
         injection = next(i for i in scenario_injection.INJECTIONS
                          if i.scenario_id == scenario_id)
@@ -789,7 +791,7 @@ class TestTheLaterSingleTableResupplyAndTheStoodOnPeriod:
         assert "TS-54" in self._of("TS-76").also_demonstrates
 
     def test_their_links_resolve_on_the_real_calendar(self):
-        from generator.collections import child_protection as cp_provider
+        cp_provider = collection_modules.provider_module("child-protection")
 
         periods = cp_provider.generated_periods()
         for sid in ("TS-12", "TS-76"):
@@ -817,7 +819,7 @@ class TestTheChildProtectionPairsArePlacedAsDecided:
         ("TS-42a", "2020-Q1", "2019-Q4", "2020-Q2"),
         ("TS-80", "2021-Q1", "2020-Q4", "2021-Q2")])
     def test_it_lands_in_its_grown_quarter(self, sid, period, lead, follow):
-        from generator.collections import child_protection as cp
+        cp = collection_modules.provider_module("child-protection")
 
         placed = si.resolve(self._injection(sid), cp.generated_periods())
         assert (placed.period, placed.lead_in, placed.follow) == (period, (lead,), (follow,))
@@ -825,7 +827,7 @@ class TestTheChildProtectionPairsArePlacedAsDecided:
         assert {period, lead, follow} <= grown
 
     def test_no_other_scenario_claims_their_quarters(self):
-        from generator.collections import child_protection as cp
+        cp = collection_modules.provider_module("child-protection")
 
         periods = cp.generated_periods()
         ours = {sid: set(si.claimed_periods(self._injection(sid), periods))
@@ -861,7 +863,7 @@ class TestTheGateOutcomeScenarios:
     need are the generator's."""
 
     def test_the_five_declare_their_outcomes_in_the_record(self):
-        from generator.collections import child_protection as cp
+        cp = collection_modules.provider_module("child-protection")
 
         periods = cp.generated_periods()
         found = {}
@@ -884,7 +886,7 @@ class TestTheGateOutcomeScenarios:
         bad = si.Injection("TS-x", "cp-clients", -38, "cfg",
                            arrivals=(si.ExtraArrival(0, "09:00"),),
                            gate_outcomes=(si.GateOutcome("cp-clients", 1, "promoted"),))
-        from generator.collections import child_protection as cp
+        cp = collection_modules.provider_module("child-protection")
 
         with pytest.raises(si.CannotPlace, match="arrival 1"):
             si.resolve(bad, cp.generated_periods())
@@ -917,7 +919,7 @@ class TestTheGateOutcomeScenarios:
         2015-Q2, whose bootstrap marked every table not supplied (found
         building REQ-GEN-273 criterion 4, 2026-10-25). Refused, naming the
         scenario: criterion 4's silent absence."""
-        from generator.collections import child_protection as cp
+        cp = collection_modules.provider_module("child-protection")
 
         periods = cp.generated_periods()
         emptied = sorted(cp._foreign_altered())

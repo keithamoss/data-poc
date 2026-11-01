@@ -5,6 +5,8 @@ own docstring) is that resupply orchestration can be tested without
 knowing how a dataset's rows are actually made."""
 from __future__ import annotations
 
+import collection_modules
+
 import re
 
 from datetime import date
@@ -13,7 +15,7 @@ import numpy as np
 import pandas as pd
 
 import generator.resupply as resupply
-from generator.collections.civil_registration import _manifest_entries_for_slot
+_manifest_entries_for_slot = collection_modules.provider_module("civil-registration")._manifest_entries_for_slot
 from generator.resupply import MAX_ATTEMPTS, Delivery, _add_business_days, run_slot_chain
 
 

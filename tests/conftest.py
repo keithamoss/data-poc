@@ -19,6 +19,8 @@ since genuinely testing "does this correctly parse the real tool's
 real output" requires actually running the real tool."""
 from __future__ import annotations
 
+import collection_modules
+
 import os
 from datetime import date
 
@@ -791,7 +793,7 @@ def cp_raw_dir(tmp_path_factory):
     smaller scale, not a hand-rolled copy of CP's real cross-table
     structure."""
     from generator import dirty as dirty_mod
-    from generator.collections.child_protection import _add_extract_timestamp
+    _add_extract_timestamp = collection_modules.provider_module("child-protection")._add_extract_timestamp
     from synthetic_data_generator.child_protection import generate_child_protection_collection
     from synthetic_data_generator.population import generate_population
 

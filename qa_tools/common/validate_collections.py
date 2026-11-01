@@ -83,9 +83,55 @@ def _pointer_problem(c, exc: TypeError) -> str:
             f"lists its datasets under `datasets`")
 
 
+def _reaches_another_module(name: str, adapters: set[str], providers: set[str]) -> bool:
+    """Whether an imported dotted name is another adapter, a provider or
+    anything under assets/ - what an adapter may never import."""
+    parts = name.split(".")
+    if parts[0] == "assets" or parts[0].startswith(("mothman_adapter_", "mothman_provider_")):
+        return True
+    if parts[:2] == ["qa_tools", "collections"] and len(parts) > 2:
+        return parts[2] in adapters
+    if parts[:2] == ["generator", "collections"] and len(parts) > 2:
+        return parts[2] in providers
+    return False
+
+
+def adapter_import_problems(package: Path | None = None) -> list[str]:
+    """Every import statement in the selected asset's adapters that reaches
+    another adapter, a generator provider or anything under assets/
+    (REQ-PIPE-369 criterion 3), naming the file and the statement. Shared code
+    - qa_tools.collections.base, qa_tools.common, generator.collections.base -
+    and the standard library are what an adapter may import."""
+    from qa_tools.common import assets
+
+    asset = assets.selected()
+    package = package or asset.adapters
+    adapters = {p.stem for p in package.glob("*.py") if p.stem not in ("__init__", "base")}
+    providers = {p.stem for p in asset.providers.glob("*.py")
+                 if p.stem not in ("__init__", "base")}
+    problems = []
+    for path in sorted(package.glob("*.py")):
+        if path.stem in ("__init__", "base"):
+            continue
+        text = path.read_text()
+        for node in ast.walk(ast.parse(text)):
+            if isinstance(node, ast.Import):
+                names = [a.name for a in node.names]
+            elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
+                names = [node.module] + [f"{node.module}.{a.name}" for a in node.names]
+            else:
+                continue
+            if any(_reaches_another_module(n, adapters, providers) for n in names):
+                problems.append(
+                    f"{path.name}: `{ast.get_source_segment(text, node)}` - an adapter imports "
+                    f"only shared code and the standard library, never another adapter, a "
+                    f"provider or anything under assets/ (REQ-PIPE-369 criterion 3)")
+    return problems
+
+
 def config_problems(package: Path | None = None) -> list[str]:
-    """`package` is the adapter package's directory - the real one unless a
-    test names another."""
+    """`package` is the selected asset's adapter folder unless a test names
+    another."""
     from qa_tools import collections
     from qa_tools.common import hierarchy
 
@@ -96,8 +142,11 @@ def config_problems(package: Path | None = None) -> list[str]:
         # A hierarchy that cannot be read at all - a dataset id declared
         # twice, a collection missing its short - is reported, not raised.
         return [str(exc)]
-    package = package or ROOT / "qa_tools" / "collections"
+    from qa_tools.common import assets
+
+    package = package or assets.selected().adapters
     modules = {p.stem for p in package.glob("*.py") if p.stem not in ("__init__", "base")}
+    problems += adapter_import_problems(package)
     wanted = {c.module_name: c for c in declared}
     loaded = {}
     for c in declared:

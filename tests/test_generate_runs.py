@@ -19,6 +19,8 @@ explicit call: "fix the issue where tests and production share an output
 directory") - see the `raw_dir` fixture's own docstring."""
 from __future__ import annotations
 
+import collection_modules
+
 import re
 from datetime import date, timedelta
 from pathlib import Path
@@ -28,7 +30,7 @@ import json
 import pytest
 
 import generator_isolation
-from generator.collections import civil_registration as generate_runs
+generate_runs = collection_modules.provider_module("civil-registration")
 from generator import scenario_injection as si
 from qa_tools.common import asset_time
 from generator import driver

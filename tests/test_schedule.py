@@ -14,6 +14,8 @@ something other than what its author wrote, and nothing ever says so.
 """
 from __future__ import annotations
 
+import collection_modules
+
 from datetime import date, timedelta
 
 import pytest
@@ -109,7 +111,9 @@ class TestTheDailyCalendarStartsWhereTheFeedDoes:
         the date could not detect them disagreeing.
         """
         from generator.anchor_date import get_anchor_date
-        from generator.collections.civil_registration import END_DAYS, GROWN_DAYS, N_DELIVERIES
+        END_DAYS = collection_modules.provider_module("civil-registration").END_DAYS
+        GROWN_DAYS = collection_modules.provider_module("civil-registration").GROWN_DAYS
+        N_DELIVERIES = collection_modules.provider_module("civil-registration").N_DELIVERIES
 
         return get_anchor_date() - timedelta(days=N_DELIVERIES + GROWN_DAYS + END_DAYS - 1)
 

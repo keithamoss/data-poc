@@ -10,6 +10,8 @@ drawn.
 """
 from __future__ import annotations
 
+import collection_modules
+
 from datetime import date
 
 import numpy as np
@@ -118,7 +120,7 @@ class TestOutOfTheHoldEra:
 class TestTheGeneratedHistory:
     @staticmethod
     def _bdm():
-        from generator.collections import civil_registration as g
+        g = collection_modules.provider_module("civil-registration")
 
         _r, by_period, suppressed, _q = g._plan_injections(g.generated_periods())
         # The ordinary plan covers the 85 alone (REQ-GEN-044's evening-before
@@ -143,7 +145,7 @@ class TestTheGeneratedHistory:
             assert setting.value != amber_setting.HOLD, p.date
 
     def test_child_protection_ambers_avoid_injected_periods(self):
-        from generator.collections import child_protection as cp
+        cp = collection_modules.provider_module("child-protection")
 
         # PLANNED OVER THE WHOLE HISTORY (REQ-GEN-207): scenarios sit in the
         # grown quarters too; the original fifteen's ambers are what this counts.
@@ -172,7 +174,7 @@ class TestTheGeneratedHistory:
 
     def test_an_amber_is_never_made_stale(self, monkeypatch):
         from generator import dirty
-        from generator.collections import civil_registration as g
+        g = collection_modules.provider_module("civil-registration")
 
         # The provider imports its presets at call time (REQ-GEN-246
         # criterion 7), so the one module that defines them is patched.
@@ -183,8 +185,8 @@ class TestTheGeneratedHistory:
             day, seed=1, n_rows=50, id_offset=0)
 
     def test_the_providers_never_reach_the_amber_preset(self, monkeypatch, batch, cat):
-        from generator.collections import child_protection as cp
-        from generator.collections import civil_registration as g
+        cp = collection_modules.provider_module("child-protection")
+        g = collection_modules.provider_module("civil-registration")
 
         from generator import dirty
 
@@ -414,7 +416,7 @@ class TestAnInjectedTargetEndToEnd:
     def generated(self, tmp_path_factory):
         import json
 
-        from generator.collections import civil_registration as g
+        g = collection_modules.provider_module("civil-registration")
         from generator import scenario_injection as si
         from generator.output import redirect
 
@@ -501,7 +503,7 @@ class TestRefusedBeforeAnythingIsWritten:
     that cannot be moved stops generation before the first write."""
 
     def test_an_unmovable_rule_stops_the_generator_with_nothing_written(self, tmp_path):
-        from generator.collections import civil_registration as g
+        g = collection_modules.provider_module("civil-registration")
         from generator import scenario_injection as si
         from generator.output import redirect
 
@@ -527,7 +529,7 @@ class TestRefusedBeforeAnythingIsWritten:
             si.INJECTIONS = original
 
     def test_child_protection_red_is_refused_up_front_too(self):
-        from generator.collections import child_protection as cp
+        cp = collection_modules.provider_module("child-protection")
         from generator import scenario_injection as si
         from generator.anchor_date import get_anchor_date
         from qa_tools.common import schedule
@@ -562,7 +564,7 @@ def _unmatched_twins(df):
 class TestFindings155:
     def test_a_targeted_resend_keeps_every_twin(self):
         """Finding 1: the resend is churned before it is targeted."""
-        from generator.collections import civil_registration as g
+        g = collection_modules.provider_module("civil-registration")
         from generator import scenario_injection as si
 
         inj = si.Injection(scenario_id="TS-X", dataset_id=g.DATASET_ID, anchor=-20,
@@ -718,7 +720,7 @@ class TestLeadInsEndToEnd:
     def generated(self, tmp_path_factory):
         import json
 
-        from generator.collections import civil_registration as g
+        g = collection_modules.provider_module("civil-registration")
         from generator import scenario_injection as si
         from generator.output import redirect
 
@@ -797,20 +799,20 @@ class TestLeadInsEndToEnd:
 
 class TestRefusals156:
     def test_a_red_with_nowhere_before_the_scenarios_is_refused(self):
-        from generator.collections import civil_registration as g
+        g = collection_modules.provider_module("civil-registration")
         with pytest.raises(targeting.TargetError, match="ordinary red"):
             g._reds_clear_of_scenarios([None, "red", "red", None, None],
                                        frozenset({4}))
 
     def test_with_nothing_claimed_reds_stay_where_drawn(self):
-        from generator.collections import civil_registration as g
+        g = collection_modules.provider_module("civil-registration")
         drawn = [None, "red", None, "red", None]
         assert g._reds_clear_of_scenarios(drawn, frozenset()) == drawn
 
     def test_a_resend_pushed_past_the_history_is_refused(self):
         from datetime import timedelta
 
-        from generator.collections import civil_registration as g
+        g = collection_modules.provider_module("civil-registration")
         from generator import scenario_injection as si
         from generator.resupply import Delivery
         last = date(2026, 9, 22)
@@ -840,7 +842,7 @@ class TestRefusals156:
     def _cp_plan_alone(injection):
         """Child Protection's planning with `injection` the only scenario - the
         planting is the point, not where the planted ones sit."""
-        from generator.collections import child_protection as cp
+        cp = collection_modules.provider_module("child-protection")
         from generator import scenario_injection as si
 
         original = si.INJECTIONS
@@ -859,7 +861,7 @@ class TestRefusals156:
         Child Protection supply has its lead-in quarters before it and the
         quarter after it generated green, as Birth Registrations' are
         (REQ-GEN-185) - each a single clean delivery."""
-        from generator.collections import child_protection as cp
+        cp = collection_modules.provider_module("child-protection")
         from generator import scenario_injection as si
 
         grown = cp.grown_periods()
@@ -896,7 +898,7 @@ class TestRefusals156:
         """A lead-in or following quarter is one clean delivery, so a red drawn
         there would never be generated - refused naming the scenario, as the
         grown quarters' plan already refuses it, never swallowed."""
-        from generator.collections import child_protection as cp
+        cp = collection_modules.provider_module("child-protection")
         from generator import scenario_injection as si
 
         plan = [s for _q, s in cp.run_plan()]
@@ -921,7 +923,7 @@ class TestEachPlantedScenarioSitsInItsEra:
             "TS-78a": ("amber", "hold")}
 
     def test_each_anchor_falls_under_the_setting_it_needs(self):
-        from generator.collections import civil_registration as g
+        g = collection_modules.provider_module("civil-registration")
         from generator import scenario_injection as si
         from qa_tools.common import amber_setting, asset_time, replacement_setting
         periods = g.generated_periods()
@@ -942,7 +944,7 @@ class TestEachPlantedScenarioSitsInItsEra:
         import dataclasses
 
         from generator import scenario_injection as si
-        from generator.collections import civil_registration
+        civil_registration = collection_modules.provider_module("civil-registration")
         from qa_tools.common import schedule, scripted_decisions
         periods = civil_registration.generated_periods()
         day = {i.scenario_id: date.fromisoformat(

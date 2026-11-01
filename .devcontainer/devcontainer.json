@@ -14,6 +14,8 @@
     "MOTHMAN_SUPPLY_DSN": "postgresql://user:password@db:5432/supply",
     "MOTHMAN_TEST_DSN": "postgresql://user:password@db:5432/postgres",
     "MOTHMAN_ENVIRONMENT": "local",
+    // Which data asset, with no default (REQ-PIPE-363 criterion 1).
+    "MOTHMAN_ASSET": "data-asset-1",
     // The pre-installed Chromium, same as this project's cloud sessions
     // use - the pinned playwright package expects a newer build than
     // the image ships, so it is pointed at the one that is there.
