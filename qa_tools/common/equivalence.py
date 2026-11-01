@@ -452,20 +452,44 @@ def _in_tree(tree: Path, folder: Path) -> Path:
     return tree / folder.relative_to(assets.ROOT)
 
 
-def generated_files(tree: Path) -> dict[str, str]:
+def tree_assets(tree: Path) -> list[str]:
+    """The assets a captured tree holds (REQ-TEST-357 criterion 2): one per
+    folder under its assets/ after the split, each holding a data-asset.yaml;
+    before it, the one asset its contract/data-asset.yaml names."""
+    import yaml
+
+    root = tree / "assets"
+    found = sorted(p.name for p in root.iterdir()
+                   if p.is_dir() and (p / "data-asset.yaml").is_file()) if root.is_dir() else []
+    if found:
+        return found
+    doc = yaml.safe_load((tree / "contract" / "data-asset.yaml").read_text()) or {}
+    return [str(doc["data_asset_id"])]
+
+
+def _tree_state(tree: Path, asset: str, kind: str) -> Path:
+    """An asset's data/ or reports/ in the captured tree's OWN layout:
+    data/<asset>/ where the tree holds asset folders, data/ before."""
+    return tree / kind / asset if (tree / "assets" / asset / "data-asset.yaml").is_file() \
+        else tree / kind
+
+
+def generated_files(tree: Path, asset: str | None = None) -> dict[str, str]:
     """S4: every file the bootstrap left under `tree`'s data/ - every
     delivery, every receipt, and the generators' own records - except
     dbt's scratch. Named by WHERE it is rather than file by file, so this
     module never names the generator's bookkeeping, which no QA module may
     (REQ-GEN-043 criterion 7, tests/test_arrivals.py)."""
-    data = _in_tree(tree, assets.data_dir())
+    data = _tree_state(tree, asset or assets.selected().name, "data")
     out = {}
     if not data.is_dir():
         return out
     for f in sorted(data.rglob("*")):
         rel = f.relative_to(data)
         if f.is_file() and rel.parts[0] not in NOT_GENERATED:
-            out[str(f.relative_to(tree))] = hashlib.sha256(f.read_bytes()).hexdigest()
+            # Named under data/ whatever the layout, so a split tree's
+            # data/<asset>/ and an older tree's data/ name a file alike.
+            out[f"data/{rel.as_posix()}"] = hashlib.sha256(f.read_bytes()).hexdigest()
     return out
 
 
@@ -554,12 +578,13 @@ def _normalise_report(value, ctx: dict | None, parent: str | None = None):
     return out
 
 
-def reports(tree: Path, ctx: dict | None = None) -> dict:
+def reports(tree: Path, ctx: dict | None = None, asset: str | None = None) -> dict:
     """S5: every JSON the build wrote under `tree`'s reports/, parsed and
     normalised (REPORT_KEYS_REMOVED always; ids and clock instants by
     `report_context` when the database is to hand)."""
     out = {}
-    for f in sorted(_in_tree(tree, assets.reports_dir()).glob("*.json")):
+    folder = _tree_state(tree, asset or assets.selected().name, "reports")
+    for f in sorted(folder.glob("*.json")):
         out[f.name] = _normalise_report(json.loads(f.read_text()), ctx)
     return out
 
@@ -747,7 +772,13 @@ def _clear_killed() -> None:
 
 
 def capture(ref: str, label: str, *, yes: bool = False, say=print) -> Path:
-    """Capture `ref` as `label` (criteria 1, 4, 7-15). Returns the baseline path."""
+    """Capture `ref` as `label` (criteria 1, 4, 7-15). Returns the baseline path.
+
+    ONE BASELINE PER ASSET (REQ-TEST-357 criterion 2): a commit whose tree
+    holds asset folders is bootstrapped once per asset, each into a scratch
+    database of its own with that asset selected, and each asset's surfaces
+    are kept under `per_asset`; `surfaces` holds their union, which is what
+    `compare` reads. A tree from before the split is its one asset."""
     import psycopg
 
     from qa_tools.common import asset_time, environments
@@ -759,27 +790,17 @@ def capture(ref: str, label: str, *, yes: bool = False, say=print) -> Path:
     if path.exists() and not yes:
         raise Refused(f"a baseline called {label!r} exists at {path} - give --yes to "
                       f"replace it")
-    admin, scratch, dbname = _scratch_dsn(label)
     commit = _commit(ref)
     env_id = environments.current().id
     work = work_dir()
     tree = work / "tree"
-    env = {**os.environ, "MOTHMAN_SUPPLY_DSN": scratch, "PYTHONPATH": str(tree),
-           "MOTHMAN_PINNED_NOW": PINNED_NOW,
-           "NO_COLOR": "1", "COLUMNS": str(COLUMNS), "TERM": "xterm"}
-    env.pop("GITHUB_REPOSITORY", None)
     stage = "worktree"
     baseline: dict = {"harness": HARNESS_VERSION, "normaliser": NORMALISER_VERSION,
                       "label": label, "ref": ref, "commit": commit,
                       "pinned_now": PINNED_NOW,
                       "captured_at": datetime.now(UTC).isoformat(timespec="seconds")}
-
-    def run(stage_name: str, *args: str) -> str:
-        done = subprocess.run([sys.executable, "-m", "cli.app", *args], cwd=tree, env=env,
-                              capture_output=True, text=True)
-        if done.returncode != 0:
-            raise StageFailed(stage_name, (done.stdout + done.stderr)[-3000:])
-        return done.stdout + done.stderr
+    databases: list[str] = []
+    admin = _scratch_dsn(label)[0]
 
     lock = _one_capture_at_a_time()
     try:
@@ -787,37 +808,80 @@ def capture(ref: str, label: str, *, yes: bool = False, say=print) -> Path:
         work.mkdir(parents=True)
         subprocess.run(["git", "worktree", "add", "--detach", "-q", str(tree), commit],
                        cwd=ROOT, check=True, capture_output=True)
-        packages = ROOT / "dbt_project" / "dbt_packages"
-        if packages.is_dir() and not (tree / "dbt_project" / "dbt_packages").exists():
-            (tree / "dbt_project" / "dbt_packages").symlink_to(packages)
-        stage = "database"
-        with psycopg.connect(admin, autocommit=True) as conn:
-            conn.execute(f'DROP DATABASE IF EXISTS "{dbname}" WITH (FORCE)')
-            conn.execute(f'CREATE DATABASE "{dbname}"')
-        stage = "mark"
-        run(stage, "env", "mark", "--confirm", env_id)
-        stage = "bootstrap"
-        say(f"bootstrapping {commit[:10]} into {dbname} (this is a full bootstrap)...")
-        started = time.monotonic()
-        output = run(stage, "pipeline", "bootstrap")
-        baseline["bootstrap_seconds"] = round(time.monotonic() - started, 1)
-        baseline["timings"] = _timings(output)
-        stage = "build"
-        run(stage, "dashboard", "rebuild-results")
-        run(stage, "dashboard", "build-data")
-        stage = "S1"
-        # Its bootstrap runs collections side by side (REQ-PIPE-279's rank NFR).
-        s1 = snapshot(scratch, run_seq_within_collection=True)
-        baseline["surfaces"] = {"S1": {k: {"columns": list(cols),
-                                           "rows": sorted([list(r), n] for r, n in rows.items())}
-                                       for k, (cols, rows) in s1.items()
-                                       if k.startswith("qa.")}}
-        stage = "S4"
-        baseline["surfaces"]["S4"] = generated_files(tree)
-        stage = "S5"
-        baseline["surfaces"]["S5"] = reports(tree, report_context(scratch))
-        stage = "S7"
-        baseline["surfaces"]["S7"] = help_and_menus(tree, env)
+        names = tree_assets(tree)
+        baseline["assets"] = names
+        per_asset: dict = {}
+        for asset in names:
+            def named(stage_name: str, asset=asset) -> str:
+                # A stage names its asset only where the tree holds several.
+                return stage_name if len(names) == 1 else f"{stage_name} ({asset})"
+
+            # One database per asset; with one asset, the label's own name,
+            # as before the split.
+            _admin, scratch, dbname = _scratch_dsn(label if len(names) == 1 else f"{label}_{asset}")
+            databases.append(dbname)
+            env = {**os.environ, "MOTHMAN_SUPPLY_DSN": scratch, "PYTHONPATH": str(tree),
+                   "MOTHMAN_ASSET": asset, "MOTHMAN_PINNED_NOW": PINNED_NOW,
+                   "NO_COLOR": "1", "COLUMNS": str(COLUMNS), "TERM": "xterm"}
+            env.pop("GITHUB_REPOSITORY", None)
+
+            def run(stage_name: str, *args: str, env=env) -> str:
+                done = subprocess.run([sys.executable, "-m", "cli.app", *args], cwd=tree,
+                                      env=env, capture_output=True, text=True)
+                if done.returncode != 0:
+                    raise StageFailed(stage_name, (done.stdout + done.stderr)[-3000:])
+                return done.stdout + done.stderr
+
+            stage = named("database")
+            with psycopg.connect(admin, autocommit=True) as conn:
+                conn.execute(f'DROP DATABASE IF EXISTS "{dbname}" WITH (FORCE)')
+                conn.execute(f'CREATE DATABASE "{dbname}"')
+            stage = named("mark")
+            run(stage, "env", "mark", "--confirm", env_id)
+            # THE TREE'S OWN dbt PACKAGES, in its own layout's project - the
+            # asset's dbt/ after the split, dbt_project/ before (REQ-QAC-368) -
+            # by dbt itself, so a tree older than `mothman env dbt-deps` works.
+            stage = named("dbt-deps")
+            project = (tree / "assets" / asset / "dbt" if (tree / "assets" / asset / "dbt").is_dir()
+                       else tree / "dbt_project")
+            done = subprocess.run([sys.executable, "-m", "dbt.cli.main", "deps", "--project-dir",
+                                   str(project), "--profiles-dir",
+                                   str(tree / "qa_tools" / "dbt_profiles")],
+                                  cwd=tree, env=env, capture_output=True, text=True)
+            if done.returncode != 0:
+                raise StageFailed(stage, (done.stdout + done.stderr)[-3000:])
+            stage = named("bootstrap")
+            say(f"bootstrapping {commit[:10]} ({asset}) into {dbname} (this is a full "
+                f"bootstrap)...")
+            started = time.monotonic()
+            output = run(stage, "pipeline", "bootstrap")
+            here: dict = {"bootstrap_seconds": round(time.monotonic() - started, 1),
+                          "timings": _timings(output)}
+            stage = named("build")
+            run(stage, "dashboard", "rebuild-results")
+            run(stage, "dashboard", "build-data")
+            stage = named("S1")
+            # Its bootstrap runs collections side by side (REQ-PIPE-279's rank NFR).
+            s1 = snapshot(scratch, run_seq_within_collection=True)
+            surfaces = {"S1": {k: {"columns": list(cols),
+                                   "rows": sorted([list(r), n] for r, n in rows.items())}
+                               for k, (cols, rows) in s1.items() if k.startswith("qa.")}}
+            stage = named("S4")
+            surfaces["S4"] = generated_files(tree, asset)
+            stage = named("S5")
+            surfaces["S5"] = reports(tree, report_context(scratch), asset)
+            stage = named("S7")
+            surfaces["S7"] = help_and_menus(tree, env)
+            here["surfaces"] = surfaces
+            per_asset[asset] = here
+        if len(names) == 1:
+            only = per_asset[names[0]]
+            baseline.update(bootstrap_seconds=only["bootstrap_seconds"],
+                            timings=only["timings"], surfaces=only["surfaces"])
+        else:
+            baseline["per_asset"] = per_asset
+            baseline["bootstrap_seconds"] = sum(a["bootstrap_seconds"] for a in per_asset.values())
+            baseline["surfaces"] = union({a: v["surfaces"] for a, v in per_asset.items()})
         stage = "write"
         path.parent.mkdir(parents=True, exist_ok=True)
         tmp = path.with_suffix(".partial")
@@ -831,15 +895,93 @@ def capture(ref: str, label: str, *, yes: bool = False, say=print) -> Path:
     except Exception as exc:  # noqa: BLE001 - every failure names its stage
         raise StageFailed(stage, f"{type(exc).__name__}: {exc}") from exc
     finally:
-        try:
-            with psycopg.connect(admin, autocommit=True) as conn:
-                conn.execute(f'DROP DATABASE IF EXISTS "{dbname}" WITH (FORCE)')
-        except Exception:  # noqa: BLE001 - the stage's own error is the one to show
-            pass
+        for dbname in databases:
+            try:
+                with psycopg.connect(admin, autocommit=True) as conn:
+                    conn.execute(f'DROP DATABASE IF EXISTS "{dbname}" WITH (FORCE)')
+            except Exception:  # noqa: BLE001 - the stage's own error is the one to show
+                pass
         subprocess.run(["git", "worktree", "remove", "--force", str(tree)], cwd=ROOT,
                        capture_output=True)
         shutil.rmtree(work, ignore_errors=True)
         lock.close()
+
+
+# ---- one asset or several (REQ-TEST-357 criterion 2) --------------------
+
+#: What a check id's first segment, or a whole value naming an asset, reads
+#: as once normalised - the ONE thing besides the identity row a comparison
+#: across the split normalises (criterion 2).
+ASSET_TOKEN = "<asset>"
+#: The database identity row, which names its asset and is per database.
+IDENTITY_TABLE = "qa.identity"
+
+
+def union(per_asset: dict[str, dict]) -> dict:
+    """One set of surfaces from each asset's: S1's rows added table by table;
+    S4, S5 and S7 keyed as each asset keyed them, where no two assets share a
+    key - and where they do (each asset's own bookkeeping, its own --help),
+    each kept under `<asset> | <key>`, so a comparison shows the difference
+    rather than one asset's copy hiding the other's."""
+    out: dict = {"S1": {}}
+    for asset, surfaces in per_asset.items():
+        for table, body in (surfaces.get("S1") or {}).items():
+            into = out["S1"].setdefault(table, {"columns": body["columns"], "rows": []})
+            if into["columns"] != body["columns"]:
+                raise Refused(f"{table}'s columns differ between assets - "
+                              f"{into['columns']} vs {body['columns']}")
+            into["rows"] = into["rows"] + body["rows"]
+    for code in ("S4", "S5", "S7"):
+        seen: dict[str, int] = Counter(k for s in per_asset.values() for k in (s.get(code) or {}))
+        merged: dict = {}
+        for asset, surfaces in per_asset.items():
+            for key, value in (surfaces.get(code) or {}).items():
+                merged[key if seen[key] == 1 else f"{asset} | {key}"] = value
+        out[code] = merged
+    for table, body in out["S1"].items():
+        rows = Counter()
+        for r, n in body["rows"]:
+            rows[tuple(r)] += n
+        body["rows"] = sorted([list(r), n] for r, n in rows.items())
+    return out
+
+
+def _asset_ids(baseline: dict) -> list[str]:
+    return list(baseline.get("assets") or [])
+
+
+def normalise_assets(surfaces: dict, asset_ids: list[str]) -> dict:
+    """Every asset id as a check id's first segment (dotted or an ODCS rule's
+    colon form) or as a whole value read as ASSET_TOKEN, and the identity row
+    dropped - REQ-QAC-344's rename and the per-database identity, and nothing
+    else (criterion 2)."""
+    if not asset_ids:
+        return surfaces
+    pattern = re.compile("(?<![A-Za-z0-9_-])(?:" + "|".join(map(re.escape, asset_ids))
+                         + ")(?=[.:][a-z])")
+
+    def norm(value):
+        if isinstance(value, str):
+            return ASSET_TOKEN if value in asset_ids else pattern.sub(ASSET_TOKEN, value)
+        if isinstance(value, list):
+            return [norm(v) for v in value]
+        if isinstance(value, dict):
+            return {norm(k): norm(v) for k, v in value.items()}
+        return value
+
+    out = {code: norm(body) for code, body in surfaces.items() if code != "S1"}
+    s1 = {}
+    for table, body in (surfaces.get("S1") or {}).items():
+        if table == IDENTITY_TABLE:
+            continue
+        rows = Counter()
+        for r, n in body["rows"]:
+            rows[tuple(norm(list(r)))] += n
+        s1[table] = {"columns": body["columns"],
+                     "rows": sorted([list(r), n] for r, n in rows.items())}
+    if "S1" in surfaces:
+        out["S1"] = s1
+    return out
 
 
 # ---- compare -----------------------------------------------------------
@@ -953,9 +1095,17 @@ def compare(a: dict, b: dict, surfaces: list[str], *, limit: int = 5,
             raise Refused(f"the two baselines were taken by different {key} versions "
                           f"({a.get('label')}: {a.get(key)}, {b.get('label')}: "
                           f"{b.get(key)}) - recapture one so they compare like with like")
+    # ACROSS THE SPLIT (REQ-TEST-357 criterion 2): where either side was
+    # captured as more than one asset, or the two name different assets, each
+    # side's asset ids and its identity row are normalised - nothing else.
+    sa_all, sb_all = a["surfaces"], b["surfaces"]
+    if len(_asset_ids(a)) > 1 or len(_asset_ids(b)) > 1 or (
+            _asset_ids(a) and _asset_ids(b) and _asset_ids(a) != _asset_ids(b)):
+        sa_all = normalise_assets(sa_all, _asset_ids(a))
+        sb_all = normalise_assets(sb_all, _asset_ids(b))
     out = {}
     for code in surfaces:
-        sa, sb = a["surfaces"].get(code, {}), b["surfaces"].get(code, {})
+        sa, sb = sa_all.get(code, {}), sb_all.get(code, {})
         out[code] = _diff_s1(sa, sb, limit) if code == "S1" else _diff_mapping(sa, sb, 50)
     return out
 
