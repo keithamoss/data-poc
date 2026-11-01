@@ -46808,3 +46808,28 @@ requirements:
     - 'ONE SORT RULE FOR EVERY TOOL (architect v5 SHOULD): a several-column sample holding None cannot be sorted by Python''s default comparison, and SQL ordering follows the database''s collation, so without a stated rule two tools would pick different examples for the same data. Text by code point, nulls last, the same in Python and SQL. REJECTED dropping rows with a null part, which hides exactly the samples a null-identifier fault produces.'
     - 'LOUD, NOT SILENT, IN EVERY SAMPLER (architect v5 SHOULD): criterion 5''s gate reads Soda''s queries only; dbt''s swallowed exception and datacontract-cli''s column filter lose samples the same way #291 did. Failing the tool''s recording makes the next one a red run rather than a post-build finding. REJECTED a logged warning, which nobody reads.'
     - 'THE KEY''S COLUMN NAMES ARE RECORDED, NOT LOOKED UP (architect v5 SHOULD and NIT): the page cannot tell id parts from census_year, and an adapter''s declaration read at build would describe today''s key, not the one a past result used; recorded with the result, an old result keeps its own shape and a compare across a change of key shape can say so instead of showing every sample as new. REJECTED carrying the adapter''s current declaration in the build.'
+  - id: REQ-TEST-374
+    title: mothman check warns on every unanswered PROVISIONAL choice in a built requirement, naming each
+    date_written: '2026-11-01'
+    story: 'As Keith, I want every provisional choice a builder made on my behalf to stay in front of me until I answer it, so that later work cannot quietly treat it as settled, as happened with Pass / Warn / Fail (post-build-review #292).'
+    moscow: should
+    status: not_started
+    signed_off:
+      by: Keith
+      date: '2026-11-01'
+    source: 'Keith, 2026-11-01, answering post-build-review #292 (Report list + gate).'
+    acceptance_criteria:
+    - WHEN `mothman check` runs, THE SYSTEM SHALL list every requirement whose status is built and whose decisions, criteria or non-functional requirements contain the word PROVISIONAL, naming the requirement id, the field and the item number, under its own gate row.
+    - 'THE SYSTEM SHALL count only PROVISIONAL markers added after the gate is built: the markers present when it is built are written once to a committed baseline (each as requirement id, field and a fingerprint of the item text) that only ever shrinks - an entry is removed when its marker is answered or its item changes - and `mothman check` SHALL fail if the baseline gains an entry.'
+    - THE SYSTEM SHALL report that gate as 'passed, with a warning' while any such item exists, and SHALL NOT fail the build on it.
+    - THE SYSTEM SHALL NOT count a PROVISIONAL that is quoted inside an amendment's CURRENT text (between <<< and >>>), nor one marked answered in the same item (an item that also names Keith's answer, e.g. 'SETTLED', 'answered', or 'SIGNED by Keith').
+    - WHEN an overnight build writes its report to plans/morning-reports.md, THE SYSTEM SHALL list every PROVISIONAL choice it made in that report's question list, each as a question with a recommendation, never only in a requirement's decisions.
+    - WHEN the test suite runs, THE SYSTEM SHALL show, each seen failing first, that a built requirement carrying an unanswered PROVISIONAL is listed by the gate, and that a quoted or answered one is not.
+    non_functional_requirements:
+    - 'SPEED: the gate reads requirements.yaml once and adds under a second to `mothman check --docs`.'
+    dependencies: []
+    decisions:
+    - 'WARN, NOT FAIL (Keith, 2026-11-01): a provisional choice is a question waiting on a person, not a defect; a red CI would block unrelated work. REJECTED a failing gate, and REJECTED the report list alone, which is the process that already slipped.'
+    - 'BUILT REQUIREMENTS ONLY: a PROVISIONAL marker on an unsigned draft is normal and is resolved at sign-off; the risk is one that survives into built work.'
+    - 'NEW MARKERS ONLY (Keith, 2026-11-01): the 190 markers on 75 built requirements found that day are baselined, not reviewed. REJECTED sweeping them first and REJECTED warning on all 190 from day one. The baseline is shrink-only, the same pattern as the collections gate''s allowlist.'
+    open_questions: []
