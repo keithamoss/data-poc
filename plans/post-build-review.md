@@ -13552,3 +13552,25 @@ twice. It deliberately did not re-find the `TypeError`.
        "no such supply" refusal now says "a supply's trial".
      - **7. TS-93c, TS-100c and TS-101b's lettered names (left)**: already a
        question for Keith on REQ-GEN-298; unchanged.
+
+302. **[done, 2026-11-02]** **[Dashboard UI]** **[QA checks & contract]** **REQ-DASH-299's change to built page wording, site-wide (criteria 2, 3 and 5; NFR 3).**
+     Written up here because these change every check page of every
+     collection, Birth Registrations included - not only the geocoding pages
+     the requirement is about. All three were signed by Keith on 2026-10-31.
+     - **Criterion 2, the two cross-collection kinds as siblings**: MEASURES'
+       soda:referential reads 'Rows matching no source record' (was 'Links to
+       records that are not there') and soda:coverage 'Source records matched'
+       (was 'Records linked'), for Linkage Keys' checks and the geocoding
+       checks alike. No test asserted the old phrases (grep, 2026-11-01);
+       tests/test_check_measures.py now pins the new ones.
+     - **Criterion 3, every check's examples**: 'Example failing rows (primary
+       key only)' is now 'Examples: <what the check measures> (key only)',
+       'Rows flagged, this run' is '<phrase>, this run', and 'Failing rows vs.
+       the compared run' is 'Examples vs. the compared run'. A check naming no
+       phrase reads 'Examples (key only)' and 'Flagged, this run' (criterion
+       4); none in committed configuration does.
+     - **Criterion 5, a result with no examples**: 'No examples were recorded
+       for this result.' replaces the sentence that guessed a reason and
+       pointed readers at plans/qa-pipeline.md #15.
+     - **Left as decided**: the fine print under the examples, which says how
+       the tool chose them, is unchanged (the requirement's own decision).

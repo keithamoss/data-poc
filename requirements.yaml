@@ -41837,6 +41837,7 @@ requirements:
     - "2026-10-25, A FRESH BOOTSTRAP FROM EMPTY ON 2e781d1's CODE (a3_probe, schema 48, branch a3-build). Three small fixes came after it, in the register commit, and are covered by the module runs, not by this bootstrap: cli/filing_tui.py's pre-check, processing_pass._waiting_for_package, and the period lock's advisory space moved from 51513 to 51514 with its pg_locks reads scoped to the database: rc 0 in 1572s (Birth Registrations 537s, Child Protection and Emergency Department 1433s side by side; the last comparable figure, f861ee4 on 2026-10-24, was 1610s). 250 package applications, 14 re-check and 17 knock-on applications, all settled, none abandoned; 44 'gate', 239 'reevaluate' and 14 'recheck' owed items, every one cleared. Target agreement passed with no reported difference. REQ-PIPE-262 criterion 12's four pins hold: cp-case-workers 2021-Q4 inherits cp-case-workers@202108010104000000, cp-carers 2022-Q1 and 2022-Q2 inherit cp-carers@202201051000000800 (TS-63), ed-presentations 2015-Q4 inherits ed-presentations@201507221000000800 (REQ-GEN-251 criterion 3). All 89 scripted decisions applied. Then, after mothman dashboard build-data, the deployment tests of the 20 modules that carry them (-m needs_deployment: arrivals, arrivals_from_records, as_at_scenarios, asset_time_semantics, build_results_from_history, cross_table_scope, embed_dashboard_data, evidently_recorded_reference, history_rekey, knock_on, manifest, no_calendar, promotion_timeline, publish, scenario_injection, scenario_map, scripted_decisions, status_parity, target_agreement, warehouse_counts) 123 passed, 1 xfailed, 0 skipped."
     - "2026-10-25, THE AFFECTED MODULES' FAST HALF (-m 'not needs_deployment' over the 229 test modules importing any module this change touched, tests/test_dashboard_e2e.py excluded): 4 failed, 4791 passed in 649.85s. Two were defects of this change and are fixed in the register commit - filing_tui's period-lock pre-check let a database refusal escape before the typed production id was asked (test_cli_filing_tui's TestProductionTypesItsIdIntoTheRealFlows), and processing_pass._waiting_for_package assumed every arrival carried a receipt instant (test_refused_dataset_freezes, 2 tests); tests/test_tools_beside.py::test_they_actually_overlap failed under the load of the full run and passed alone. After the fixes, and after the period lock's own advisory space (tests/test_package_gate.py::test_the_period_lock_has_an_advisory_lock_space_of_its_own, seen to fail first, 4 == 5), on the final code: the three gate modules plus test_cli_filing_tui, test_refused_dataset_freezes, test_tools_beside, test_carry_forward, test_checkpoints, test_recheck, test_recheck_decision, test_knock_on, test_promotion_actor, test_target_agreement, test_warehouse_view, test_unrunnable, test_check_readiness_supply_states, test_left_out_reconciliation, test_filing_decisions and test_processing_pass, both halves against a3_probe: 429 passed in 327.99s. The full mothman check was not run here (the caller runs it after merging); ruff clean."
     decisions:
+    - 'SUPERSEDED IN PART 2026-11-01 BY REQ-DASH-299 (REQ-DASH-337 A1 and A2, signed by Keith 2026-10-31): the ''Not run for this supply'' block, its ''Not run'' tag and its note are gone - each left-out check is a quiet ''Not checked'' row where it would sit had it run, its reason ''Not checked: not part of the agreement for <period>.'', the note once per list. Criterion 9''s substance - the page says why each did not run, for the run on show only - is unchanged.'
     - 'STRICT (Keith, 2026-10-21): ''things that depend on each other don''t promote until they''re all happy... A human can
       always overrule that using the terminal... It''s the strictest rule. It''s probably the easiest to sort of think about
       and understand.'' REJECTED ''not supplied = empty''.'
@@ -46635,16 +46636,11 @@ requirements:
     - tests/test_geocoding_gates.py::test_criterion_fifteen_no_distribution_of_an_area_code_or_an_identifier
     - tests/test_check_measures.py::test_every_declared_rule_kind_names_its_measure
     evidence:
+    - '2026-11-02 Perth, CLEARED BY REQ-DASH-299''s build (worktree b299): criterion 9''s MEASURES phrase is declared on each share check (''Rows not geocoded'', a Soda attribute `measures:`), read ahead of MEASURES'' generic ''Share of rows with the value''; tests/test_check_measures.py::test_each_geocoding_dataset_declares_its_four_phrases green.'
     - '2026-11-01 Perth, worktree bgeo, branch bgeo from 60575ac. Green on this tree: tests/test_geocoding_checks.py (real dbt-core, Soda Core and Evidently in this worker''s own database), test_geocoding_gates.py, test_check_measures.py, test_check_bands.py, test_validate_soda.py, test_distribution.py, test_run_evidently_cp.py; the soda, columns and collections gates green.'
     - 'PROVEN BY EXPERIMENT (criterion 3): two runs of 2017-Q2 and 2017-Q3 over the same two records read [2011] and [2011, 2016] from their own relation - 0 then 2 missing years - with identical node checksums in both manifests, so one parse served both and nothing about the set is in the project or its vars. (criterion 4): with no relation, the selector source:raw.list_setting_members+ leaves all three tests out and the build runs clean. (criteria 5 to 7): 3 missing, 1 duplicated and 2 unexpected on a hand-built supply. (criterion 12): an empty supply passes all three year checks, and the share check reads 0.0, pass. (criterion 11): frames whose unplaced share rises from 2 to 51 percent drift above 0.25 unexcluded and below 0.10 with ''not geocoded'' excluded from both sides.'
     - NO BOOTSTRAP AND NO FULL GATE in this run (Keith's build-run terms).
     unmet_criteria:
-    - criterion: Criterion 9's MEASURES phrase declared on the check ('Rows not geocoded').
-      why: Declaring a check's own phrase, read ahead of MEASURES, is REQ-DASH-299 criterion 1's mechanism and wording; until it is built the share check reads the generic kind's phrase added to MEASURES ('Share of rows with the value').
-      owner: REQ-DASH-299
-      blocked_by:
-        requirements:
-        - REQ-DASH-299
     - criterion: Every check here recorded for a replayed geocoding supply - status, samples by id_1 and census_year, and the set it was judged against.
       why: Needs the quarterly stream replayed.
       owner: the end-of-run bootstrap (2026-11-01 build run)
@@ -46823,7 +46819,7 @@ requirements:
     date_written: '2026-10-25'
     story: As a data team leader glancing at a geocoding dataset, I want the three year checks to read as three different problems, a failing sample to say which record and which census year without pretending a missing year is a row, and the page to say which census years the period was held to and which dataset it geocodes, so that I can tell an incomplete geocode from a double-load without opening a tool's output.
     moscow: should
-    status: not_started
+    status: built
     signed_off:
       by: Keith
       date: '2026-10-31'
@@ -46898,6 +46894,101 @@ requirements:
     - 'NOTCHECKED IS DISPLAY ONLY (Keith, 2026-10-31, v7 round (a)): no tool can record a result as notchecked and the results store refuses it; it is derived where a cross-collection check has no result on a supply. A check that ran and errored stays Fail. REJECTED letting a tool record notchecked, under which a broken tool could turn every check quiet.'
     - 'V7 DELTA SIGNED (Keith, 2026-10-31): every change in docs/drafts/geocoding-v7-delta.yaml, including the FINAL TEXT of amendments A1, A5, A6, A7 and A8, each applied to its target by the change that builds it.'
     - 'CALENDAR_DIFFERS AND THE ASSET SPLIT, RECONCILED BY WHICHEVER LANDS SECOND (architect v6 SHOULD): asset-split amendment A13 retires calendar_differs from REQ-PIPE-331 criterion 2 and REQ-PIPE-332 criterion 10. A1 now names the reason codes by reference to REQ-PIPE-332 criterion 10, so it needs nothing. A2 keeps its calendar_differs clause, true today. IF the asset split''s A13 is applied first, A2 is applied without that clause; IF this batch lands first, REQ-DOCS-358 gains a line striking it from REQ-DASH-337 criterion 12 as amended, with that criterion''s test of the wording.'
+    - 'BUILT 2026-11-01 (overnight rebuild, worktree b299, after the lost container): the declared phrase is a `measures:` field on the check - a dbt meta key, a Soda attribute - read by check_lifecycle''s one field reader, outside the config hash (all 378 fingerprints byte-identical before and after); the build emits it bare as `measures` beside `measure`.'
+    - 'THE HEADING DROPS TODAY''S TRAILING COLON (build): ''Examples: Duplicate values (key only) — 2 of 9'', not ''...(key only):'' - a colon after a heading that already holds one read as a stutter; the count suffix is today''s.'
+    - 'A SET-MEMBER SAMPLE IS RECOGNISED BY ITS KIND AND ITS RECORDED COLUMNS (build): a check whose kind is one of the three set-member kinds and whose result recorded key columns holding its own column (read from its check id) is laid out as a line; anything else stays a pill, so no dataset or set is named in the template. The compare block uses the same lines.'
+    - 'PROVISIONAL (builder, 2026-11-01) - A NULL MIDDLE PART READS ''(no value)'', AN EMPTY ONE ''—'': criterion 8 says an empty part followed by a present one shows ''—'', and the first decision keeps REQ-PIPE-341''s ''(no value)'' for a null part. Built: a TRAILING null or empty identifier part is dropped from the display; a middle empty-string part shows ''—'' and a middle null part ''(no value)'', as REQ-PIPE-341''s tests pin. Question for Keith: should a middle NULL part read ''—'' too (criterion 8''s letter), or ''(no value)'' as built?'
+    - 'PROVISIONAL (builder, 2026-11-01) - THE TILE WORDS'' HOME: contract/presentation.yaml gains `list_settings: {<setting>: {label}}` and `datasets: {<dataset id>: {relation}}`, and the collections gate fails a declared list setting, or a dataset linking one source with no code, that has no word (presentation._tile_word_problems), so the page never draws a tile it cannot name. Question for Keith: is a per-dataset `relation` right, or should the word sit once on the collection for every such dataset in it?'
+    - 'PROVISIONAL (builder, 2026-11-01) - THE GEOCODES TILE NAMES THE SOURCE WITHOUT A PERIOD: ''Child Protection''s Client Register'', the long form A3 uses, through causeName and so datasetRefLink, linking to the source''s page at the date on show. A relation is not a supply, so no period is named. Question for Keith: should the tile name the period of the supply on show too (''Child Protection''s 2024-Q2 Client Register'')?'
+    - 'PROVISIONAL (builder, 2026-11-01) - ''SHOWN IN THAT ORDER'' (criterion 1): the three year checks are declared, and built, missing, duplicated, unexpected; a column''s checks are still ranked worst status first (rank_for_headline, stable), so declared order is the order among equals and a failing year check moves to the top. Not changed, because ranking is built behaviour for every column. Question for Keith: should a set-member check family keep its declared order whatever the statuses?'
+    - 'THE LEFT-OUT ROW (build): a div, never a button - there is no result to open - in the grid''s columns, ''—'' in each view, the ''Not checked'' pill in the status column, its name, tables, tool and reason set as text; the build gives each left_out entry the tables it is BETWEEN from the check''s declared reads_tables, so a left-out row lands in its collection''s group even where the check never ran on the page. The notchecked pill has a dashed border and no icon, so it cannot be mistaken for a group''s ''Not counted''.'
+    - 'THE CENSUS TILE READS THE NEWEST RECORDED RESULT ON OR BEFORE THE DATE ON SHOW (build): across the dataset''s checks, by rank, each history entry carrying its result''s member_set (setting, label, version, members, added); its date is shortDay''s ''1 Aug 2022''. No entry - before the first supply - no tile.'
+    - 'AMENDMENTS APPLIED 2026-11-01: A1 and A5 append to REQ-DASH-337 criteria 6 and 7, A2 replaces criterion 12, A3 is its new criterion 17, each marked ''AMENDED 2026-11-01 by REQ-DASH-299''; and REQ-DASH-359 criterion 1''s list of unchanged quiet labels gains ''Not checked'' (the v7 delta''s cross-batch note). REQ-PIPE-270''s implemented_by moves from notInAgreementBlock, which is gone, to leftOutRowModels and leftOutRowHtml.'
+    - 'CALENDAR_DIFFERS, FOR WHICHEVER LANDS SECOND (decision above): this batch lands with A2''s calendar_differs clause in REQ-DASH-337 criterion 12. NOT written into REQ-DOCS-358 here, because the asset split edits that requirement in parallel on its own branch; the merge that lands second adds the line to REQ-DOCS-358 striking the clause, with tests-js/not-in-agreement.test.js''s calendar_differs case.'
+    - 'REQ-DOCS-362 CRITERION 2''S CHECK, MADE AT THIS BUILD: the tag criterion 15 (9) names is amberPromotedTag''s - its markup is [data-amber-promoted] with the pill ''Promoted, warning'' and [data-amber-promoted-why]; tests/test_dashboard_e2e.py::TestTheGeocodingPages::test_9_the_g1_route_tags_the_older_client_register_supply asserts exactly that element.'
+    - 'NO PLANS PROSE TO DELETE (delete-on-built rule): the geocoding design lived in docs/drafts/ (the v7 delta and the decisions record), not in plans/*.md; nothing in plans/ described this build.'
+    implemented_by:
+    - "pipeline/dashboard_check_labels.py::measures_phrase"
+    - "pipeline/dashboard_check_labels.py::measure"
+    - "pipeline/dashboard_check_labels.py::MEASURES"
+    - "qa_tools/common/check_lifecycle.py::CheckMetadata"
+    - "qa_tools/common/check_lifecycle.py::_lifecycle_fields"
+    - "pipeline/build_dashboard_data.py::_member_set"
+    - "pipeline/build_dashboard_data.py::_left_out_between"
+    - "pipeline/build_dashboard_data.py::build_one_table"
+    - "qa_tools/common/presentation.py::list_setting_label"
+    - "qa_tools/common/presentation.py::relation_word"
+    - "qa_tools/common/presentation.py::linked_source"
+    - "qa_tools/common/presentation.py::_tile_word_problems"
+    - "qa_tools/common/dataset_status.py::LEFT_OUT_STATUSES"
+    - "qa_tools/common/dataset_status.py::UNORDERED_STATUSES"
+    - "qa_tools/common/dataset_status.py::STATUS_WORDS"
+    - "qa_tools/common/dataset_status.py::recognised_status"
+    - "qa_tools/common/dataset_status.py::_QUIET_PRECEDENCE"
+    - "dashboard/qa-reporting-dashboard.template.html::sampleParts"
+    - "dashboard/qa-reporting-dashboard.template.html::sampleKeyText"
+    - "dashboard/qa-reporting-dashboard.template.html::samplePill"
+    - "dashboard/qa-reporting-dashboard.template.html::sampleHeading"
+    - "dashboard/qa-reporting-dashboard.template.html::flaggedLabel"
+    - "dashboard/qa-reporting-dashboard.template.html::setMemberSampleLine"
+    - "dashboard/qa-reporting-dashboard.template.html::sampleRecordNoun"
+    - "dashboard/qa-reporting-dashboard.template.html::sampleKeyHtml"
+    - "dashboard/qa-reporting-dashboard.template.html::sampleBlockHtml"
+    - "dashboard/qa-reporting-dashboard.template.html::statusWords"
+    - "dashboard/qa-reporting-dashboard.template.html::recognisedStatus"
+    - "dashboard/qa-reporting-dashboard.template.html::rollupStatuses"
+    - "dashboard/qa-reporting-dashboard.template.html::xtStatusCounts"
+    - "dashboard/qa-reporting-dashboard.template.html::notInAgreementReason"
+    - "dashboard/qa-reporting-dashboard.template.html::leftOutRowModels"
+    - "dashboard/qa-reporting-dashboard.template.html::leftOutRowHtml"
+    - "dashboard/qa-reporting-dashboard.template.html::notCheckedNote"
+    - "dashboard/qa-reporting-dashboard.template.html::wireNotInAgreement"
+    - "dashboard/qa-reporting-dashboard.template.html::crossTableGridHtml"
+    - "dashboard/qa-reporting-dashboard.template.html::acrossCollectionsReads"
+    - "dashboard/qa-reporting-dashboard.template.html::collectionCrossTableSection"
+    - "dashboard/qa-reporting-dashboard.template.html::recordedListSettings"
+    - "dashboard/qa-reporting-dashboard.template.html::listSettingTilesHtml"
+    - "dashboard/qa-reporting-dashboard.template.html::linkedSourceTileHtml"
+    - "status-cases.json"
+    - "contract/presentation.yaml"
+    - "contract/department-of-health/linkage-products-soda-checks.yml"
+    - "dbt_project/models/linkage-products/schema.yml"
+    linked_tests:
+    - "tests/test_check_measures.py::test_every_declared_rule_kind_names_its_measure"
+    - "tests/test_check_measures.py::test_a_declared_phrase_wins_over_the_kinds"
+    - "tests/test_check_measures.py::test_each_geocoding_dataset_declares_its_four_phrases"
+    - "tests/test_check_measures.py::test_no_census_or_geocoding_word_is_in_shared_code"
+    - "tests/test_check_measures.py::test_the_cross_collection_kinds_read_as_siblings"
+    - "tests/test_geocoding_page_build.py::TestTheRecordedSetRidesOnTheResult"
+    - "tests/test_geocoding_page_build.py::TestTheLinkedSource"
+    - "tests/test_geocoding_page_build.py::TestALeftOutCheckKnowsItsTables"
+    - "tests/test_geocoding_page_build.py::TestEveryTileHasItsWord"
+    - "tests/test_status_parity.py::TestEveryLevelCase"
+    - "tests/test_status_parity.py::TestEveryDatasetRollupCase"
+    - "tests/test_status_parity.py::TestTheWordsAreTheOnesBothSidesAgreed"
+    - "tests-js/geocoding-display.test.js"
+    - "tests-js/geocoding-tiles.test.js"
+    - "tests-js/left-out-groups.test.js"
+    - "tests-js/not-in-agreement.test.js"
+    - "tests-js/status-parity.test.js"
+    - "tests/test_dashboard_e2e.py::TestTheGeocodingPages"
+    - "tests/test_dashboard_e2e.py::TestNotInTheAgreementOnThePage"
+    evidence:
+    - '2026-11-02 Perth, worktree b299 (overnight rebuild): the full Vitest suite green; pytest -m ''not needs_deployment'' over test_check_measures, test_geocoding_page_build, test_status_parity, test_dataset_status, test_check_lifecycle, test_validate_check_lifecycle, test_check_fingerprint, test_collections_registry, test_linked_datasets, test_geocoding_declarations, test_geocoding_checks, test_geocoding_gates, test_cross_collection_reads, test_status_words_shown, test_ticket_status, test_requirements_yaml, test_validate_requirements, test_build_dashboard_data, test_embed_dashboard_data, test_dashboard_data_files, test_config_content_keying and test_status_reads_values green; mothman check --docs green. No bootstrap, no full suite, and tests/test_dashboard_e2e.py written, not run (Keith''s terms for the build run; the warehouse is empty).'
+    - 'SEEN FAILING FIRST: tests-js/geocoding-display.test.js 13 of 15 against the base template (the two passing pin REQ-PIPE-341''s built behaviour); left-out-groups.test.js and the rewritten not-in-agreement.test.js 9 of 15; geocoding-tiles.test.js 5 of 6 (the trend-break case passes on the base - three breaks are drawn by the existing generic rule, as criterion 12 says); the notchecked parity cases 12 in tests/test_status_parity.py and 4 in tests-js/status-parity.test.js against the unchanged implementations.'
+    - 'FINGERPRINTS UNCHANGED: every one of the 378 committed checks'' config_hash is byte-identical before and after the `measures:` field (compared by script against the base tree), so declaring a phrase reports no check as changed.'
+    - 'A DEFECT OF THE BUILD, CAUGHT BY THE FULL VITEST RUN BEFORE ANY PUSH: a second top-level shortDay() for the tile''s date silently replaced the page''s own (function declarations, last wins), so the weekly trend''s accessible name printed raw Date strings. Removed; the tile uses the existing shortDay. Every name this build added was then checked unique in the template.'
+    unmet_criteria:
+    - criterion: 'Criterion 15, every one of its twelve browser proofs (with criteria 1''s on-page order, 6 and 7 on a real scenario supply, 9''s three versions, 10''s link, 11''s value bars, 12''s two breaks and 13 on the built page).'
+      why: 'Written as tests/test_dashboard_e2e.py::TestTheGeocodingPages, with criterion 14''s updates to TestNotInTheAgreementOnThePage and TestChecksThatReadAnotherCollection::test_the_not_supplied_quarter_reads_not_supplied_by_decision, and not run: the warehouse is empty, and the dashboard is built from a bootstrapped database (Keith''s terms for the build run).'
+      owner: 'the end-of-run bootstrap (2026-11-01 build run)'
+      blocked_by:
+        unowned: true
+    - criterion: 'NFR 6, the render budget - page size and tests/test_dashboard_e2e.py''s duration before and after.'
+      why: 'Both are measured on a built dashboard, which needs the bootstrapped database.'
+      owner: 'the end-of-run bootstrap (2026-11-01 build run)'
+      blocked_by:
+        unowned: true
   - id: REQ-QAC-300
     title: The census years every geocoding dataset owes are declared once for the collection as an effective-dated, frozen-past entry of a generic container of list-valued settings, by the existing setting mechanism - 2011 alone from 2013, 2016 added from 2017-Q3, 2021 from 2022-Q3 and 2026 from 2027-Q3 - and each supply is judged against the set in force on its period's round date
     date_written: '2026-10-25'
@@ -47637,15 +47728,9 @@ requirements:
     - 'plans/supply-model.md'
     - 'SCENARIOS.md'
     evidence:
+    - '2026-11-02 Perth, CLEARED BY REQ-DASH-299''s build (worktree b299): the tag REQ-DASH-299 criterion 15 (9) names is amberPromotedTag''s - [data-amber-promoted], its pill ''Promoted, warning'' and [data-amber-promoted-why] - checked against the template and asserted by tests/test_dashboard_e2e.py::TestTheGeocodingPages::test_9_the_g1_route_tags_the_older_client_register_supply (written; run by the end-of-run bootstrap).'
     - '2026-11-01: A1-A39 (41 criteria) and B1 applied by a script that stopped on any CURRENT not matching the live criterion verbatim (none did) and read each back with yaml.safe_load: 0 mismatches, 42 criteria changed, every requirement''s criterion count unchanged, no other requirement''s text changed.'
     - '2026-11-01, after these edits: `mothman check --only` for requirements, plans, changelog, yamllint, feedback, scenarios and premise passed; sprints and scenario map passed with warnings - scenario map because no placements file is on this machine once the rebuilt one was removed, sprints with the same warning before this change.'
-    unmet_criteria:
-    - criterion: 'Criterion 2''s check at that build - that the tag criterion 15 (9) names is amberPromotedTag''s.'
-      why: 'The criterion places this check at REQ-DASH-299''s own build, where the G1 route scenario''s tag is first drawn.'
-      owner: 'the geocoding build (REQ-DASH-299)'
-      blocked_by:
-        requirements:
-        - REQ-DASH-299
   - id: REQ-PIPE-342
     title: One repository holds one folder per data asset under assets/, holding everything for that asset, and one call-time resolver is the only way any reader finds an asset's configuration or its state paths
     date_written: '2026-10-31'
