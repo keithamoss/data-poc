@@ -13294,7 +13294,7 @@ twice. It deliberately did not re-find the `TypeError`.
      - Not defects: criterion 3's geocoding half (REQ-PIPE-296) and criterion
        7's compare wait on later work and the end bootstrap.
 
-295. **[todo, 2026-11-01]** **[Dashboard UI]** **[Testing & dev tooling]**
+298. **[todo, 2026-11-01]** **[Dashboard UI]** **[Testing & dev tooling]**
    **Built wording changed site-wide: statuses read Pass / Warn / Fail.**
    REQ-DASH-359 and REQ-TEST-360: every status a person reads is worded
    through one statusWords per side (status-cases.json's labels block, held
