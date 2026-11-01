@@ -1,5 +1,5 @@
 """The collection registry (REQ-PIPE-240): every collection the data asset
-declares, read from contract/data-asset.yaml's hierarchy, and the adapter
+declares, read from the selected asset's data-asset.yaml hierarchy, and the adapter
 each one's code is reached through.
 
 WHY ONE REGISTRY. Until this, which collections existed was written down in
@@ -13,9 +13,11 @@ THE SCALE THIS IS FOR is about thirty collections on one asset (Keith,
 2026-10-16), so nothing here assumes two, and nothing assumes a calendar.
 
 ADAPTERS ARE CODE, CHOSEN BY CONFIGURATION, NEVER IMPORTED FROM IT
-(criterion 4). A collection's id picks WHICH module of this package
-loads - `civil-registration` loads `qa_tools.collections.civil_registration`
-- and the id must match the hierarchy's own id pattern first, so
+(criterion 4). A collection's id picks WHICH FILE of the selected asset's
+adapter folder loads, BY PATH (REQ-PIPE-369 criterion 2, assets.load) -
+`civil-registration` loads `civil_registration.py`, registered as
+`mothman_adapter_<asset>_civil_registration`, never imported as a package
+module - and the id must match the hierarchy's own id pattern first, so
 configuration can never name an arbitrary import path.
 
 READS CONFIGURATION AND NOTHING ELSE: no connection is opened here.

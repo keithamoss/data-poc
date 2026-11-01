@@ -96,6 +96,35 @@ def _reaches_another_module(name: str, adapters: set[str], providers: set[str]) 
     return False
 
 
+#: CALLS THAT REACH ANOTHER ADAPTER OR A PROVIDER AT RUN TIME, whatever the
+#: module they were called on is named locally (post-build-review, the
+#: groundwork critic): the registry's adapter lookups, the providers', and a
+#: load by path. The registry's other lookups (by_id, all_collections) name
+#: no adapter and stay allowed.
+RUN_TIME_REACHES = frozenset({"adapter", "adapter_module", "adapters", "provider", "providers"})
+#: The resolver's loads by path - only on `assets`, so json.load stays allowed.
+ASSET_LOADS = frozenset({"load", "module_file"})
+
+
+def _reaches_at_run_time(node) -> bool:
+    """Whether a node imports importlib, calls __import__, or calls one of
+    RUN_TIME_REACHES on a module or ASSET_LOADS on assets."""
+    if isinstance(node, ast.Import):
+        return any(a.name.split(".")[0] == "importlib" for a in node.names)
+    if isinstance(node, ast.ImportFrom):
+        return node.level == 0 and (node.module or "").split(".")[0] == "importlib"
+    if isinstance(node, ast.Call):
+        func = node.func
+        if isinstance(func, ast.Name):
+            return func.id == "__import__"
+        if not isinstance(func, ast.Attribute):
+            return False
+        return func.attr in RUN_TIME_REACHES or (
+            func.attr in ASSET_LOADS and isinstance(func.value, ast.Name)
+            and func.value.id == "assets")
+    return False
+
+
 def adapter_import_problems(package: Path | None = None) -> list[str]:
     """Every import statement in the selected asset's adapters that reaches
     another adapter, a generator provider or anything under assets/
@@ -115,6 +144,12 @@ def adapter_import_problems(package: Path | None = None) -> list[str]:
             continue
         text = path.read_text()
         for node in ast.walk(ast.parse(text)):
+            if _reaches_at_run_time(node):
+                problems.append(
+                    f"{path.name}: `{ast.get_source_segment(text, node)}` - an adapter reaches "
+                    f"no other adapter or provider at run time either: no registry or provider "
+                    f"lookup of one, no load by path, no importlib (REQ-PIPE-369 criterion 3)")
+                continue
             if isinstance(node, ast.Import):
                 names = [a.name for a in node.names]
             elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:

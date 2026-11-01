@@ -13351,6 +13351,56 @@ twice. It deliberately did not re-find the `TypeError`.
        Soda and datacontract-cli's text. It predates this build and criterion 2
        covers several-column keys only; recorded as a REQ-PIPE-341 decision.
 
+300. **[done, 2026-11-01]** **[QA pipeline]** **[Testing & dev tooling]**
+   **Critic on the asset-split groundwork (REQ-PIPE-342, REQ-PIPE-363, REQ-PIPE-369, REQ-QAC-368), fixed in the state-path sweep.**
+   Each claim checked against the code before it was written up; each defect
+   fixed test-first, its test seen failing first. Built overnight under
+   Keith's terms; the PROVISIONAL choices are listed for his morning.
+   - **1 (DEFECT, REQ-PIPE-342 c6)**: readers building contract/ paths
+     themselves - agreement_freeze's three `*_REL` constants,
+     linked_datasets' `root / "contract"` (four sites, one more than
+     reported), the registry's agency folder and FILE_CHECKS, check_bands'
+     FILE_CHECKS - plus three the critic missed (validate_check_lifecycle,
+     validate_collections, collection_cli). And the two import-time
+     constants it named, delivery.DELIVERIES_DIR and
+     scenario_map.PLACEMENTS_PATH, which the sweep had already replaced.
+     REPRODUCED on the base tree: `mothman scenarios list` with
+     MOTHMAN_ASSET unset ran and exited 0. FIXED: every one asks the
+     resolver at call time (a new `assets.folder_rel()` for readers that
+     name files by repository path, as a git-ref read must), and
+     tests/test_state_paths_at_call_time.py fails on any contract/, data/
+     or reports/ path built outside the resolver and on any resolver lookup
+     made at import time, with a shrink-only allowlist (messages that name a
+     file; three repository-wide lists). Regression test in
+     tests/test_cli_asset_selection.py.
+   - **2 (DEFECT, REQ-PIPE-363 c6)**: `mothman pipeline checkpoint list`
+     connected with no asset selected (checkpoints._admin called
+     psycopg.connect itself). FIXED: it claims the selected asset first, as
+     supply_db.connect does. `mothman env tidy-test-databases` KEPT
+     exempt - the suite's databases belong to no asset - recorded
+     PROVISIONAL on REQ-PIPE-363 for Keith, and pinned by a test.
+   - **3 (MINOR)**: 'a-b' and 'a_b' made one module name, an asset/module
+     split could collide, a dot in a folder name was accepted, and _load
+     silently replaced sys.modules on a clash. FIXED: asset folder names
+     must match assets.NAME_PATTERN (lowercase letters, digits, single
+     hyphens), and a load whose name is held by another asset's module is
+     refused (ModuleNameClash); the same module re-pointed at a new file
+     still reloads. Groundwork PROVISIONAL #6 reworded to state the rule.
+   - **4 (MINOR)**: the bootstrap's spawned streams were handed the asset's
+     name but not a use_root/use_folder layout, and parallel_orchestrate's
+     pool relied on fork. FIXED: `assets.handoff()` and `assets.adopt()`
+     carry both, explicitly, into every pool.
+   - **5 (MINOR, REQ-PIPE-369 c3)**: the adapter import gate missed
+     run-time reaches. EXTENDED to the registry's and providers' lookups of
+     one, `assets.load`/`module_file`, importlib and `__import__`;
+     `collections.by_id` and `json.load` stay allowed.
+   - **6 (NIT)**: the spawned-exemption test passed trivially; it now needs
+     the child to refuse a second asset AND accept it after a release. The
+     dbt stamp said installed after dbt_packages/dbt_utils was deleted; it
+     now lists the package directories and reinstalls when one is gone
+     (that PROVISIONAL on REQ-QAC-368 amended).
+   - **7 (NIT)**: the registry's docstring still described package
+     loading. Reworded to loading by path.
 298. **[todo, 2026-11-01]** **[Dashboard UI]** **[Testing & dev tooling]**
    **Built wording changed site-wide: statuses read Pass / Warn / Fail.**
    REQ-DASH-359 and REQ-TEST-360: every status a person reads is worded
