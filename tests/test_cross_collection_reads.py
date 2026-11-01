@@ -14,11 +14,15 @@ import pytest
 
 from qa_tools.common import run_reads
 
+#: Linkage Products' own tables: the linkage release and, since REQ-QAC-294,
+#: one geocoding table per geocoded source.
+LP_OWN = ("linkage_keys", "geo_cp_clients", "geo_ed_presentations")
+
 
 class TestTheOneResolver:
     def test_a_product_reads_each_linked_table_as_foreign(self):
         reads = run_reads.reads_for("linkage-products")
-        assert reads.own == ("linkage_keys",)
+        assert reads.own == LP_OWN
         assert reads.foreign == ("cp_clients", "ed_presentations")
 
     def test_a_collection_reading_only_its_own_tables_has_no_foreign(self):
@@ -48,7 +52,7 @@ class TestTheOverlayIsGivenTheForeignTablesFromTheWarehouse:
         arrival = SimpleNamespace(run_id="linkage_keys__x", received_at=None, sequence=0,
                                   run_index=0, files_by_dataset={"linkage-keys": ()})
         orchestrate.file_and_overlay("linkage-products", arrival, among=[arrival])
-        assert seen["tables"] == ["linkage_keys", "cp_clients", "ed_presentations"]
+        assert seen["tables"] == [*LP_OWN, "cp_clients", "ed_presentations"]
         assert seen["foreign"] == ("cp_clients", "ed_presentations")
 
     def test_an_own_only_collection_is_unchanged(self, monkeypatch):
@@ -139,7 +143,7 @@ def test_recheck_execute_asks_the_resolver(coll, monkeypatch):
     with pytest.raises(_Stop):
         recheck.execute(dataset_id="linkage-keys", supply_id="linkage-keys@1",
                         run_key="linkage_keys__r", purpose={})
-    assert seen["tables"] == ["linkage_keys", "cp_clients", "ed_presentations"]
+    assert seen["tables"] == [*LP_OWN, "cp_clients", "ed_presentations"]
     assert seen["foreign"] == ("cp_clients", "ed_presentations")
 
 
@@ -233,7 +237,7 @@ class TestARunnerTreatsAnAbsentForeignTableAsAbsent:
     def test_unreadable_names_the_foreign_tables_without_a_view(self, monkeypatch):
         from qa_tools.common import supply_db
 
-        monkeypatch.setattr(supply_db, "readable_in", lambda conn, run_id: {"linkage_keys"})
+        monkeypatch.setattr(supply_db, "readable_in", lambda conn, run_id: set(LP_OWN))
         got = run_reads.unreadable_in(None, "linkage-products", "linkage_keys__x")
         assert got == frozenset({"cp_clients", "ed_presentations"})
 
@@ -298,9 +302,12 @@ class TestACollectionWithNoDriftChecksRuns:
     one psi check, found none' - so its first arrival was never checked and
     the bootstrap's worker died. No drift check is a real answer."""
 
-    def test_collection_checks_has_no_psi(self):
-        from qa_tools.common import evidently_common
+    def test_collection_checks_has_no_psi(self, monkeypatch):
+        """Linkage Products declared none until its geocoding tables gained
+        drift checks (REQ-QAC-297), so an empty file is stood in for."""
+        from qa_tools.common import check_lifecycle, evidently_common
 
+        monkeypatch.setattr(check_lifecycle, "load_evidently_checks", lambda path: {})
         got = evidently_common.collection_checks("linkage-products")
         assert got.psi == () and got.row_drop == {}
 

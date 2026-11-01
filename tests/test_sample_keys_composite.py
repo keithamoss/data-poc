@@ -50,7 +50,17 @@ def test_linkage_keys_is_named_by_its_dataset_and_every_identifier():
     ids = [p["name"] for s in contract["schema"] for p in s["properties"]
            if p["name"].startswith("id_")]
     assert ids, "the contract declares no id columns - this would prove nothing"
-    assert collections.adapter("linkage-products").sample_key == {"linkage_keys": ["dataset", *ids]}
+    key = collections.adapter("linkage-products").sample_key
+    linkage = next(s for s in contract["schema"] if s["name"] == "linkage_keys")
+    assert key["linkage_keys"] == ["dataset", *[p["name"] for p in linkage["properties"]
+                                                if p["name"].startswith("id_")]]
+    # A GEOCODING TABLE'S KEY is its source's identifiers and the census year
+    # (REQ-QAC-294 criterion 9), never id_2, which its source does not declare.
+    from qa_tools.common import hierarchy
+
+    for table in ("geo_cp_clients", "geo_ed_presentations"):
+        (_src, _code, cols), = hierarchy.dataset_for_table(table).linked
+        assert key[table] == [f"id_{i + 1}" for i in range(len(cols))] + ["census_year"]
 
 
 # ---- the shared value, order and record rules ------------------------------
