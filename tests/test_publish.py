@@ -101,7 +101,14 @@ class TestThereIsExactlyOnePublishPath:
                 body = ast.get_source_segment(path.read_text(), node) or ""
                 if '"push"' in body:
                     pushers.append(f"{path.name}::{node.name}")
-        assert pushers == ["dashboard.py::_publish"], pushers
+        # ONE NAMED EXCEPTION, and it publishes nothing (2026-11-02): `mothman
+        # debug snapshot-worktrees` pushes each worktree's uncommitted work to
+        # a wip/<branch>-snap ref as a safety net (plans/running-thoughts.md
+        # #135). It never builds, uploads or deploys a site; that it pushes
+        # ONLY to such refs is pinned in test_worktree_snapshot.py. Any other
+        # pusher still fails here.
+        assert pushers == ["dashboard.py::_publish",
+                           "worktree_snapshot.py::snapshot_one"], pushers
 
 
 class TestTheGateCannotBeSkipped:

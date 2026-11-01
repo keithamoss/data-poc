@@ -124,3 +124,18 @@ def test_the_command_reports_each_worktree(repo, monkeypatch):
     assert out.exit_code == 0, out.output
     assert "work: no uncommitted changes" in out.output
     assert "feature: snapshot abc1234 built, not pushed" in out.output
+
+
+def test_it_only_ever_pushes_to_a_wip_snap_ref(repo):
+    """Why the publish-path guard (tests/test_publish.py) lets this one pusher
+    through: it publishes nothing. Every ref it writes is wip/<branch>-snap,
+    and no other ref on the remote moves."""
+    main, remote = repo
+    (main / "tracked.txt").write_text("changed on work\n")
+    (main.parent / "wt" / "new.txt").write_text("x\n")
+
+    worktree_snapshot.snapshot_all(main)
+
+    refs = git(remote, "for-each-ref", "--format=%(refname)").splitlines()
+    assert refs, "precondition: something was pushed"
+    assert set(refs) == {"refs/heads/wip/work-snap", "refs/heads/wip/feature-snap"}, refs
