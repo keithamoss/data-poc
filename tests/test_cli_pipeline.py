@@ -85,6 +85,7 @@ class TestCorrectionsAfterAFullRun:
         assert calls.index("confirm") > max(calls.index("bdm"), calls.index("cp"))
         assert calls.index("confirm") < calls.index("build-data")
 
+    @pytest.mark.asset("daily")
     def test_not_for_one_collection(self, monkeypatch):
         assert "confirm" not in self._run(monkeypatch, "--collection", "bdm")
 
@@ -377,4 +378,4 @@ def test_the_committed_history_trees_are_never_the_real_ones_in_a_test():
 
 #: The data asset this module's tests act for, unless a test says otherwise
 #: (C11, Keith 2026-11-02: every test module names its asset).
-pytestmark = pytest.mark.asset("daily")
+pytestmark = pytest.mark.asset("quarterly")

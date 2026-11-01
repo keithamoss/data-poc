@@ -136,6 +136,7 @@ class TestBothFilesAreStagedAndNeitherIsReadable:
     it - which enforces "not QA'd" by the mechanism rather than by
     remembering."""
 
+    @pytest.mark.asset("quarterly")
     def test_two_files_stage_as_two_physical_tables(self):
         # AN ORDINAL, not the supplier's filename: these become SQL
         # identifiers, and DuckDB's parameter binding covers values,
@@ -161,6 +162,7 @@ class TestBothFilesAreStagedAndNeitherIsReadable:
             conn.execute(f'SELECT * FROM "{res.schema}"."birth_registrations"')
         conn.close()
 
+    @pytest.mark.asset("quarterly")
     def test_staging_the_second_file_does_not_overwrite_the_first(self, tmp_path, monkeypatch):
         """The failure the hold exists to prevent, reintroduced one
         layer down: one physical name for both files loses one of them

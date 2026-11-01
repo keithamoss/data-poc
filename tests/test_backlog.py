@@ -47,6 +47,7 @@ def marker(tmp_path):
 class TestReceiptOrderIsTheOnlyOrder:
     """Criteria 1, 2 and 3."""
 
+    @pytest.mark.asset("daily")
     def test_deliveries_come_back_oldest_receipt_first(self, tmp_path):
         deliveries, receipts = tmp_path / "deliveries", tmp_path / "receipts"
         for name, instant in (("zulu", "2026-03-01T09:00:00+08:00"),
@@ -58,6 +59,7 @@ class TestReceiptOrderIsTheOnlyOrder:
         assert got == ["alpha", "mike", "zulu"], (
             "ordered by OUR receipt instant, never by the supplier's own naming habits")
 
+    @pytest.mark.asset("daily")
     def test_a_tie_breaks_on_receipt_write_order_not_on_name(self, tmp_path):
         """Criterion 3, and the bug it removes.
 
@@ -77,6 +79,7 @@ class TestReceiptOrderIsTheOnlyOrder:
             "the tie must break on the order the RECEIPTS were written - 'alpha' first would "
             "mean the order came from the directory listing")
 
+    @pytest.mark.asset("daily")
     def test_every_receipt_gets_its_own_sequence(self, tmp_path):
         deliveries, receipts = tmp_path / "deliveries", tmp_path / "receipts"
         for i in range(5):
@@ -87,6 +90,7 @@ class TestReceiptOrderIsTheOnlyOrder:
             "a sequence must be total - two receipts sharing one puts the order back in the "
             "hands of whatever the sort does")
 
+    @pytest.mark.asset("daily")
     def test_a_receipt_without_a_sequence_cannot_be_ordered(self, tmp_path):
         """Not defaulted to zero: that would put every pre-sequence
         receipt in one place and hand the tie back to a listing."""
@@ -100,6 +104,7 @@ class TestReceiptOrderIsTheOnlyOrder:
         with pytest.raises(delivery.ReceiptOrderError, match="sequence"):
             delivery.read_delivery("drop", deliveries, receipts)
 
+    @pytest.mark.asset("daily")
     def test_that_refusal_is_not_reported_as_still_in_flight(self, tmp_path):
         """survey() catches DeliveryFormatError and calls it in flight.
 
@@ -362,4 +367,4 @@ class TestHowFarProcessingGotIsDerived:
 
 #: The data asset this module's tests act for, unless a test says otherwise
 #: (C11, Keith 2026-11-02: every test module names its asset).
-pytestmark = pytest.mark.asset("daily")
+pytestmark = pytest.mark.asset("quarterly")

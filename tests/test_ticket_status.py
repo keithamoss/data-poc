@@ -27,6 +27,7 @@ def test_empty_list_gives_empty_mapping():
     assert parse_open_tickets([]) == {}
 
 
+@pytest.mark.asset("daily")
 def test_single_issue_keyed_by_its_dataset_label():
     result = parse_open_tickets([_issue(42, "birth-registrations")])
     assert result == {
@@ -50,6 +51,7 @@ def test_issue_without_a_dataset_label_is_skipped_not_raised():
     assert result == {}
 
 
+@pytest.mark.asset("daily")
 def test_missing_updated_at_defaults_to_none():
     issue = _issue(1, "birth-registrations")
     del issue["updatedAt"]
@@ -59,4 +61,4 @@ def test_missing_updated_at_defaults_to_none():
 
 #: The data asset this module's tests act for, unless a test says otherwise
 #: (C11, Keith 2026-11-02: every test module names its asset).
-pytestmark = pytest.mark.asset("daily")
+pytestmark = pytest.mark.asset("quarterly")

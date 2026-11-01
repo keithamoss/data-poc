@@ -51,6 +51,7 @@ def test_the_last_authored_slot_closes_when_the_cadence_rule_begins(calendar, un
     assert q2.closes_at == datetime(2024, 6, 1, 5, 0, tzinfo=PERTH)
 
 
+@pytest.mark.asset("quarterly")
 def test_a_claim_window_change_closes_with_the_next_periods_own_window(calendar):
     calendar([
         {"effective_from": "2023-01-01", "changelog": ["i"], "claim_window": "14d",

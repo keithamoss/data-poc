@@ -44,6 +44,7 @@ def test_recognised_run_ids_are_ordered_by_receipt_not_by_delivery_name(bdm_deli
     assert found[0].received_at < found[1].received_at
 
 
+@pytest.mark.asset("quarterly")
 def test_the_cp_reference_run_is_the_one_that_sees_the_whole_delivery(cp_duckdb_dir):
     """CP_REF_RUN_ID is not "the first file" or "any file" of the clean
     delivery: it is the run whose overlay reads all six clean tables

@@ -221,4 +221,4 @@ def test_a_refusal_inside_a_flow_returns_to_the_menu(monkeypatch, capsys):
 
 #: The data asset this module's tests act for, unless a test says otherwise
 #: (C11, Keith 2026-11-02: every test module names its asset).
-pytestmark = pytest.mark.asset("daily")
+pytestmark = pytest.mark.asset("quarterly")

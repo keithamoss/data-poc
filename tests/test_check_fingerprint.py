@@ -171,6 +171,7 @@ class TestRealChecks:
             assert fp.fingerprint(c.tool, c.check_kind, grown, table=table) == c.config_hash, \
                 c.check_id
 
+    @pytest.mark.asset("daily")
     def test_changing_one_soda_expression_moves_that_check_alone(self, tmp_path):
         rel = "assets/daily/registry-services/bdm-birth-registrations-soda-checks.yml"
         before = {c.check_id: c.config_hash for c in cl.parse_soda_check_metadata(ROOT / rel)}
@@ -324,6 +325,7 @@ class TestTheStamp:
                             run_by="keith@example.gov.au", environment="sandbox", **self.KEYS)
         return key
 
+    @pytest.mark.asset("daily")
     def test_every_row_carries_the_fingerprint_its_map_gives_its_check(self, db):
         key = self._run(db)
         fps = {"c.one": "v1:" + "1" * 64, "c.two": "v1:" + "2" * 64}
@@ -334,6 +336,7 @@ class TestTheStamp:
                                [key]).fetchall())
         assert rows == fps
 
+    @pytest.mark.asset("daily")
     def test_a_check_the_map_does_not_hold_is_refused_and_nothing_is_written(self, db):
         key = self._run(db)
         with pytest.raises(fp.NoFingerprint) as caught:
@@ -344,6 +347,7 @@ class TestTheStamp:
         assert not db.execute(f'SELECT 1 FROM "{qa_store.SCHEMA}".check_result '
                               "WHERE run_key = ?", [key]).fetchall()
 
+    @pytest.mark.asset("daily")
     def test_the_mapping_is_required_by_both_writers(self, db):
         key = self._run(db)
         with pytest.raises(TypeError):
@@ -353,6 +357,7 @@ class TestTheStamp:
                                          load_attempt=1, delivery="d", filename="f",
                                          **self.KEYS)
 
+    @pytest.mark.asset("daily")
     def test_a_file_checks_result_is_stamped_too(self, db):
         key = self._run(db)
         qa_store.record_file_results(db, key, [_record("c.file")], supply_state="agreed",
@@ -361,6 +366,7 @@ class TestTheStamp:
         assert db.execute(f'SELECT definition_fingerprint FROM "{qa_store.SCHEMA}".check_result '
                           "WHERE run_key = ?", [key]).fetchall() == [("v1:" + "3" * 64,)]
 
+    @pytest.mark.asset("daily")
     def test_the_column_refuses_a_malformed_or_missing_fingerprint(self, db):
         import psycopg
 
@@ -371,6 +377,7 @@ class TestTheStamp:
                            "collection_id, tool, check_id, status, definition_fingerprint) "
                            "VALUES (?, 'a', 'c', 'dbt', 'x', 'pass', ?)", [key, bad])
 
+    @pytest.mark.asset("daily")
     def test_the_fingerprint_is_not_carried_into_a_read_back_record(self, db):
         from qa_tools.common import qa_results_reader
 
@@ -411,6 +418,7 @@ class TestAnOlderDatabaseIsRefused:
 # ---- criterion 24: one map per attempt --------------------------------------
 
 class TestOneMapPerAttempt:
+    @pytest.mark.asset("daily")
     def test_an_attempts_results_carry_the_map_taken_when_it_opened(self, db, monkeypatch):
         from qa_tools.common import qa_results_writer, tables_read
 
@@ -459,4 +467,4 @@ class TestOneMapPerAttempt:
 
 #: The data asset this module's tests act for, unless a test says otherwise
 #: (C11, Keith 2026-11-02: every test module names its asset).
-pytestmark = pytest.mark.asset("daily")
+pytestmark = pytest.mark.asset("quarterly")

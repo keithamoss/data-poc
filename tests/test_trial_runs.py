@@ -70,6 +70,7 @@ class TestATrialIsNamedForWhatItIs:
         run_id = trial.trial_run_id()
         assert supply_db.run_schema(run_id) == supply_db.RUN_SCHEMA_PREFIX + run_id
 
+    @pytest.mark.asset("daily")
     def test_a_trial_staged_table_fits_an_identifier(self):
         name = supply_db.staged_table("birth_registrations", trial.trial_run_id())
         assert len(name.encode()) <= 63, f"{name} is {len(name.encode())} bytes"
@@ -185,6 +186,7 @@ class TestATrialLeavesNothingBehind:
             supply_db.ensure_schemas(conn)
             trial.discard(conn, trial.trial_run_id())
 
+    @pytest.mark.asset("daily")
     def test_discarding_a_trial_leaves_a_real_supply_alone(self, supply_dsn):
         """The property shared staging made impossible to guarantee."""
         with supply_db.connect(label="test-trial") as conn:
@@ -226,6 +228,7 @@ class TestARealTrialStagesAndVanishes:
         deliveries, _ = bdm_delivery_dirs
         return str(deliveries / "REF_20260101" / "birth_registrations_2026-01-01.csv")
 
+    @pytest.mark.asset("daily")
     def test_a_real_trial_stages_into_its_own_schema_and_leaves_no_trace(
             self, supply_dsn, bdm_delivery_dirs, tmp_path):
 
@@ -340,6 +343,7 @@ class TestARealTrialStagesAndVanishes:
                 [run_id]).fetchall()
             assert run_id not in qa_store.incomplete_runs(conn)
 
+    @pytest.mark.asset("daily")
     def test_a_completed_trials_own_results_go_with_it(self, supply_dsn, invented_check_ids):
         """REQ-PIPE-103 criterion 6 - Keith, 2026-10-06 (post-build-review
         #120 Q6): discard KEPT a trial's own recorded checks on purpose, so a
@@ -492,4 +496,4 @@ class TestASingleTableRunRecordsAllSixTablesItRead:
 
 #: The data asset this module's tests act for, unless a test says otherwise
 #: (C11, Keith 2026-11-02: every test module names its asset).
-pytestmark = pytest.mark.asset("daily")
+pytestmark = pytest.mark.asset("quarterly")

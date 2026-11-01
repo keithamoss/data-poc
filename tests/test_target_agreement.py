@@ -90,6 +90,7 @@ def _entry(period, delivery, at="14:30", severity=None):
 
 class TestWhatWasBuilt:
 
+    @pytest.mark.asset("quarterly")
     def test_targets_lead_ins_and_ambers_in_both_collections(self, tmp_path):
         book = _book(tmp_path, [
             _entry("2026-08-20", "amb", severity="amber"),
@@ -113,6 +114,7 @@ class TestWhatWasBuilt:
         assert not built["lead1"].injected
         assert built["amb"].target == "amber" and built["cpamb"].dataset_id == "cp-clients"
 
+    @pytest.mark.asset("quarterly")
     def test_a_green_follow_with_no_target_is_still_compared(self, tmp_path):
         """#172 D1: a placement with no targets (TS-73's green_follow) skipped
         its green following day, so the day read RED on the page and nothing
@@ -127,6 +129,7 @@ class TestWhatWasBuilt:
         assert set(built) == {"after"}
         assert built["after"].target == "green" and not built["after"].injected
 
+    @pytest.mark.asset("quarterly")
     def test_a_record_the_placement_does_not_match_is_refused(self, tmp_path):
         book = _book(tmp_path, [_entry("2026-09-04", "lead2")])
         placed = tmp_path / "placed.json"
@@ -159,6 +162,7 @@ class TestWhatWasBuilt:
         built = targets.written(path, tmp_path / "absent.json")
         assert [b.dataset_id for b in built] == ["linkage-keys"]
 
+    @pytest.mark.asset("quarterly")
     def test_an_amber_from_a_provider_naming_no_dataset_is_refused(self, tmp_path,
                                                                    monkeypatch):
         from generator import collections
@@ -174,6 +178,7 @@ class TestWhatWasBuilt:
         with pytest.raises(ValueError, match="nameless.*amber_dataset"):
             targets.written(path, tmp_path / "absent.json")
 
+    @pytest.mark.asset("quarterly")
     def test_nothing_generated_is_nothing_built(self, tmp_path):
         assert targets.written(tmp_path / "absent.json", tmp_path / "absent2.json") == []
 
@@ -276,6 +281,7 @@ class TestSkippingTheTrial:
         bdm.generate_synthetic_data()
         assert ran == [True]
 
+    @pytest.mark.asset("quarterly")
     def test_the_bootstrap_flag_reaches_both_generators(self, monkeypatch):
         from qa_tools.common import bootstrap as boot
 
@@ -329,6 +335,7 @@ class TestAfterAReplay:
             [found] = target_agreement.after_replay(conn, [missing])
         assert found.verdict is None and "nothing recorded" in found.checks[0]
 
+    @pytest.mark.asset("quarterly")
     def test_every_targeted_supply_in_the_deployment_agrees_and_nothing_changes(
             self, deployment_history):
         """The real corpus: injected targets, lead-ins and following days, and
@@ -383,6 +390,7 @@ class TestAResumeLeavesTheCallersDatabaseAlone:
     resume promises never to write to. It compares after its own replay,
     so it needs no trial."""
 
+    @pytest.mark.asset("quarterly")
     def test_its_regeneration_runs_no_trial(self, monkeypatch):
         import types
 
@@ -517,6 +525,7 @@ class TestAPipelineRunComparesToo:
         monkeypatch.setattr(snapshot_dashboard, "sync_local_snapshots", lambda: [])
         return calls
 
+    @pytest.mark.asset("quarterly")
     def test_a_disagreement_fails_the_run_and_publishes_nothing(self, monkeypatch):
         from cli import pipeline
 

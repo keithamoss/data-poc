@@ -59,6 +59,7 @@ def _dbt_schema(check_id: str, extra_config: str = "") -> str:
         """)
 
 
+@pytest.mark.asset("quarterly")
 def test_old_file_content_returns_none_before_the_file_existed(tmp_path, monkeypatch):
     repo = _init_repo(tmp_path)
     monkeypatch.setattr(vcl, "ROOT", repo)
@@ -69,6 +70,7 @@ def test_old_file_content_returns_none_before_the_file_existed(tmp_path, monkeyp
     assert vcl._old_file_content("schema.yml", "HEAD") is None
 
 
+@pytest.mark.asset("quarterly")
 def test_old_file_content_returns_the_content_at_that_ref(tmp_path, monkeypatch):
     repo = _init_repo(tmp_path)
     monkeypatch.setattr(vcl, "ROOT", repo)
@@ -652,6 +654,7 @@ def test_an_evidently_threshold_change_fails_naming_that_check_alone(tmp_path, m
     assert a in err and b not in err
 
 
+@pytest.mark.asset("quarterly")
 def test_every_real_evidently_check_carries_its_whole_definition():
     """REQ-QAC-223 criterion 3: an Evidently check's column, method and
     warn/fail bands are literals in its own entry in its collection's check
@@ -668,6 +671,7 @@ def test_every_real_evidently_check_carries_its_whole_definition():
         assert 0 < meta["warn_threshold"] < meta["fail_threshold"], check_id
 
 
+@pytest.mark.asset("quarterly")
 def test_the_evidently_runners_judge_by_the_bands_in_each_checks_entry():
     """...and the runners read them from there by check_id, so the band the
     hash covers is the band a verdict is judged by."""

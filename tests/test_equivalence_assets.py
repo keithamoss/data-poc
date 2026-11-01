@@ -63,6 +63,7 @@ class TestTheTreesAssets:
         assert eq.tree_assets(tmp_path) == ["data-asset-1"]
         assert eq._tree_state(tmp_path, "data-asset-1", "data") == tmp_path / "data"
 
+    @pytest.mark.asset("daily")
     def test_files_are_named_under_data_whatever_the_layout(self, tmp_path):
         (tmp_path / "assets" / "daily").mkdir(parents=True)
         (tmp_path / "assets" / "daily" / "data-asset.yaml").write_text("data_asset_id: daily\n")
@@ -108,4 +109,4 @@ class TestComparingAcrossTheSplit:
 
 #: The data asset this module's tests act for, unless a test says otherwise
 #: (C11, Keith 2026-11-02: every test module names its asset).
-pytestmark = pytest.mark.asset("daily")
+pytestmark = pytest.mark.asset("quarterly")

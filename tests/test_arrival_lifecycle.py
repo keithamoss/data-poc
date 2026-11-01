@@ -71,6 +71,7 @@ class TestBothCollectionsSupplyTheirHalf:
         for coll in collections.all_collections():
             assert isinstance(orchestrate.steps(coll.id), arrival_lifecycle.Steps), coll.id
 
+    @pytest.mark.asset("daily")
     def test_a_contested_birth_registrations_file_is_checked_not_refused(self):
         """One of the drifts the extraction removed: the hand-filed path
         called path_for() and so refused a contested file the batch would
@@ -116,4 +117,4 @@ class TestTheCollectionsHalvesForwardWhatTheyAreGiven:
 
 #: The data asset this module's tests act for, unless a test says otherwise
 #: (C11, Keith 2026-11-02: every test module names its asset).
-pytestmark = pytest.mark.asset("daily")
+pytestmark = pytest.mark.asset("quarterly")

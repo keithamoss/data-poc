@@ -292,6 +292,7 @@ class TestTheSurfacesReadTheTree:
                                                   "run_timestamp": "t", "recordedAt": "t"}]}))
         assert eq.reports(tmp_path) == {"x.json": {"datasets": [{"id": "a"}]}}
 
+    @pytest.mark.asset("daily")
     def test_reports_name_ids_and_noisy_instants_by_what_they_are(self, tmp_path):
         """Normaliser 2: a decision or load id becomes what it names; an
         instant from a clock or a rule decision's running clock becomes its
@@ -523,4 +524,4 @@ class TestAPackageGateApplicationIsComparedByWhatItSays:
 
 #: The data asset this module's tests act for, unless a test says otherwise
 #: (C11, Keith 2026-11-02: every test module names its asset).
-pytestmark = pytest.mark.asset("daily")
+pytestmark = pytest.mark.asset("quarterly")

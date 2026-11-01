@@ -52,6 +52,7 @@ def _stage(conn, table: str, run_id: str, rows: int = 1) -> str:
 class TestOneNameResolvesToOneTable:
     """Criteria 1 and 4."""
 
+    @pytest.mark.asset("daily")
     def test_a_single_candidate_becomes_a_readable_view(self, db):
         _stage(db, "birth_registrations", "run_001", rows=3)
         res = supply_db.create_run_views(
@@ -139,6 +140,7 @@ class TestCandidatesAreScopedToTheRun:
     table, which reads nothing like a scoping mistake.
     """
 
+    @pytest.mark.asset("daily")
     def test_a_run_sees_its_own_arrival_and_not_every_other_one(self, db):
         for run_id in ("run_001", "run_002", "run_042"):
             _stage(db, "birth_registrations", run_id)
@@ -147,6 +149,7 @@ class TestCandidatesAreScopedToTheRun:
         assert res.resolved == {"birth_registrations": "birth_registrations__run_042"}
         assert res.ambiguous == {}
 
+    @pytest.mark.asset("daily")
     def test_unscoped_is_what_went_wrong(self, db):
         """The old call, kept as a test so the failure mode stays
         visible rather than becoming a thing nobody remembers."""
@@ -158,6 +161,7 @@ class TestCandidatesAreScopedToTheRun:
         res = supply_db.create_run_views(db, "run_001", unscoped)
         assert res.resolved == {}, "this is the bug: every run after the first resolves nothing"
 
+    @pytest.mark.asset("daily")
     def test_a_run_id_is_matched_whole_not_by_prefix(self, db):
         """`run_001` and `run_0011` are different runs, and a prefix
         test says the second belongs to the first."""
@@ -207,6 +211,7 @@ class TestACandidateMustActuallyClaimTheName:
 class TestTheRunSchemaIsDisposable:
     """Criteria 1 and 6."""
 
+    @pytest.mark.asset("daily")
     def test_dropping_the_view_schema_leaves_the_data_alone(self, db):
         _stage(db, "birth_registrations", "run_001", rows=5)
         supply_db.create_run_views(db, "run_001", supply_db.candidates_in(
@@ -242,6 +247,7 @@ class TestOneDatabase:
             "SELECT schema_name FROM information_schema.schemata").fetchall()}
         assert {supply_db.STAGING_SCHEMA, supply_db.REJECTED_SCHEMA} <= schemas
 
+    @pytest.mark.asset("daily")
     def test_two_runs_share_one_database_and_do_not_collide(self, db):
         _stage(db, "birth_registrations", "run_001", rows=1)
         _stage(db, "birth_registrations", "run_002", rows=2)
@@ -360,6 +366,7 @@ class TestAWriterDoesNotExcludeReaders:
     exists.
     """
 
+    @pytest.mark.asset("daily")
     def test_a_reader_sees_committed_rows_while_another_connection_holds_one_open(self, db):
         _stage(db, "birth_registrations", "run_001", rows=3)
         writer = supply_db.connect()
@@ -397,6 +404,7 @@ class TestWhatARunReadIsRecorded:
     that started failing.
     """
 
+    @pytest.mark.asset("daily")
     def test_a_resolution_survives_the_schema_it_describes(self, db):
         _stage(db, "birth_registrations", "run_001")
         res = supply_db.create_run_views(db, "run_001", supply_db.candidates_in(
@@ -423,6 +431,7 @@ class TestWhatARunReadIsRecorded:
         assert back.ambiguous == {"cp_carers": ["cp_carers__r__1", "cp_carers__r__2"]}
         assert back.absent == ["cp_placements"]
 
+    @pytest.mark.asset("daily")
     def test_restaging_replaces_the_record_rather_than_adding_to_it(self, db):
         _stage(db, "birth_registrations", "run_001")
         args = (db, "run_001", supply_db.candidates_in(
@@ -439,6 +448,7 @@ class TestWhatARunReadIsRecorded:
         recorded" is more use than a traceback."""
         assert supply_db.resolution_for(db, "run_never").resolved == {}
 
+    @pytest.mark.asset("daily")
     def test_the_record_names_the_run_and_the_schema_it_describes(self, db):
         _stage(db, "birth_registrations", "run_009")
         res = supply_db.create_run_views(db, "run_009", supply_db.candidates_in(
@@ -451,4 +461,4 @@ class TestWhatARunReadIsRecorded:
 
 #: The data asset this module's tests act for, unless a test says otherwise
 #: (C11, Keith 2026-11-02: every test module names its asset).
-pytestmark = pytest.mark.asset("daily")
+pytestmark = pytest.mark.asset("quarterly")

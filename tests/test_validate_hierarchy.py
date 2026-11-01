@@ -33,9 +33,11 @@ def _contract(tmp_path, monkeypatch, filename, doc, describes):
 
 
 class TestTheRealRepo:
+    @pytest.mark.asset("quarterly")
     def test_the_real_contracts_agree_with_the_real_hierarchy(self):
         assert validate_hierarchy.validate() == []
 
+    @pytest.mark.asset("quarterly")
     def test_it_reports_a_count_of_what_it_checked(self, capsys):
         assert validate_hierarchy.main() == 0
         assert "in agreement" in capsys.readouterr().out
@@ -102,6 +104,7 @@ class TestItFailsUsefully:
                              lambda: (("gone.yaml", "birth-registrations"),))
         assert validate_hierarchy.validate() == ["gone.yaml: no such contract"]
 
+    @pytest.mark.asset("quarterly")
     def test_a_contract_describing_something_the_hierarchy_lacks_is_named(self, tmp_path, monkeypatch):
         _contract(tmp_path, monkeypatch, "c.yaml", {"id": "x"}, "not-a-real-thing")
         errors = validate_hierarchy.validate()
@@ -145,6 +148,7 @@ class TestArrivalPatternsNameRealDatasets:
                     {"type": "single_file", "keyPattern": f"x/{i}.csv", "dataset_id": d}
                     for i, d in enumerate(dataset_ids)]}]}
 
+    @pytest.mark.asset("quarterly")
     def test_the_real_contracts_name_only_real_datasets(self):
         assert validate_hierarchy.validate() == []
 
@@ -163,6 +167,7 @@ class TestArrivalPatternsNameRealDatasets:
                    self._doc(["child-protection-casework"]), "birth-registrations")
         assert any("child-protection-casework" in e for e in validate_hierarchy.validate())
 
+    @pytest.mark.asset("quarterly")
     def test_every_offending_pattern_is_reported_not_just_the_first(self, tmp_path, monkeypatch):
         _contract(tmp_path, monkeypatch, "c.yaml",
                    self._doc(["nope-one", "nope-two", "cp-clients"]), "birth-registrations")
@@ -187,6 +192,7 @@ class TestTheContractListIsDerivedNotMaintained:
     whose whole job is noticing that a contract and the tree disagree.
     """
 
+    @pytest.mark.asset("quarterly")
     def test_it_covers_every_contract_the_hierarchy_names(self):
         named = {d.contract for d in hierarchy.all_datasets()}
         covered = {filename for filename, _ in validate_hierarchy.contracts()}
@@ -204,6 +210,7 @@ class TestTheContractListIsDerivedNotMaintained:
         by_file = dict(validate_hierarchy.contracts())
         assert by_file["registry-services/bdm-birth-registrations-contract.yaml"] == "birth-registrations"
 
+    @pytest.mark.asset("quarterly")
     def test_a_contract_file_nothing_names_is_reported(self, tmp_path, monkeypatch):
         """The one thing deriving could have LOST. An orphan contract was
         never checked before either - nobody had added it to the tuple -
@@ -217,6 +224,7 @@ class TestTheContractListIsDerivedNotMaintained:
         errors = validate_hierarchy.validate()
         assert any("orphan-contract.yaml" in e for e in errors), errors
 
+    @pytest.mark.asset("quarterly")
     def test_the_real_repo_still_passes(self):
         assert validate_hierarchy.validate() == []
 

@@ -190,11 +190,13 @@ class TestNeverInTheConfigHash:
             """))[0].config_hash
         assert before == after
 
+    @pytest.mark.asset("quarterly")
     def test_evidently_excludes_it_by_name(self):
         assert "reads_columns" in cl._NON_CONFIG_FIELDS
 
 
 class TestTheCommittedDefinitions:
+    @pytest.mark.asset("quarterly")
     def test_every_sql_bodied_check_in_force_declares_its_columns(self):
         """Criterion 11: the real files pass the gate."""
         checks = vcl.collect_checks(None)
@@ -203,6 +205,7 @@ class TestTheCommittedDefinitions:
 
 
 class TestMothmanCheckRunsIt:
+    @pytest.mark.asset("quarterly")
     def test_it_is_a_gate(self):
         from cli import check
         assert any(label == "columns" for label, *_ in check._GATES)
@@ -215,6 +218,7 @@ class TestMothmanCheckRunsIt:
         assert vrc.main() == 1
         assert "a.b.c.d.sex.x_soda" in capsys.readouterr().err
 
+    @pytest.mark.asset("quarterly")
     def test_the_committed_tree_passes(self):
         from qa_tools.common import validate_reads_columns as vrc
         assert vrc.main() == 0
@@ -244,6 +248,7 @@ class TestAJsonStringValue:
 
 
 class TestItIsAMothmanCommand:
+    @pytest.mark.asset("quarterly")
     def test_mothman_dashboard_validate_reads_columns(self):
         """Finding 14: every gate has a mothman subcommand."""
         from click.testing import CliRunner
@@ -252,6 +257,7 @@ class TestItIsAMothmanCommand:
         got = CliRunner().invoke(dashboard.dashboard_group, ["validate-reads-columns"])
         assert got.exit_code == 0, got.output
 
+    @pytest.mark.asset("quarterly")
     def test_mothman_check_calls_it_through_mothman(self):
         from cli import check
         [cmd] = [c for label, c, *_ in check._GATES if label == "columns"]

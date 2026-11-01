@@ -192,6 +192,7 @@ def test_run_evidently_cp_defaults_reference_to_manifests_first_run_id(monkeypat
     assert seen == {"run_id": "cp_run_02", "reference_run_id": "cp_run_01"}
 
 
+@pytest.mark.asset("quarterly")
 @pytest.mark.parametrize("short,collection_id", [("bdm", "civil-registration"),
                                                    ("cp", "child-protection")])
 def test_build_warehouses_stages_that_collection(monkeypatch, short, collection_id):

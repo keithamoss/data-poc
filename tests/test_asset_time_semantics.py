@@ -573,6 +573,7 @@ class TestTheClassificationBoundaries:
             return "early"
         return "onTime" if arrived <= expected + grace else "late"
 
+    @pytest.mark.asset("daily")
     @pytest.mark.parametrize("delta,verdict", [
         (timedelta(seconds=-1), "early"),
         (timedelta(0), "onTime"),
@@ -584,6 +585,7 @@ class TestTheClassificationBoundaries:
         arrived = self._expected(run_date) + delta
         assert self._verdict(run_date, arrived) == verdict
 
+    @pytest.mark.asset("daily")
     def test_the_expected_moment_is_the_wall_clock_time_in_the_assets_own_zone(self):
         """14:00 in Perth is 06:00 UTC the same day. Pinned as a real
         instant rather than as an offset arithmetic step, so the
@@ -591,6 +593,7 @@ class TestTheClassificationBoundaries:
         to be judged against."""
         assert self._expected(date(2026, 9, 1)) == datetime(2026, 9, 1, 6, 0, tzinfo=timezone.utc)
 
+    @pytest.mark.asset("daily")
     def test_an_arrival_the_day_before_is_early_not_late(self):
         """The wrap case the generator's own comment calls out: an AWST
         expected_time before 08:00 lands on the PREVIOUS UTC day, which
@@ -602,4 +605,4 @@ class TestTheClassificationBoundaries:
 
 #: The data asset this module's tests act for, unless a test says otherwise
 #: (C11, Keith 2026-11-02: every test module names its asset).
-pytestmark = [*(pytestmark if isinstance(pytestmark, list) else [pytestmark]), pytest.mark.asset("daily")]
+pytestmark = [*(pytestmark if isinstance(pytestmark, list) else [pytestmark]), pytest.mark.asset("quarterly")]

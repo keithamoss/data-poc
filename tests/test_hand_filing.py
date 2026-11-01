@@ -223,6 +223,7 @@ class TestAFileOfAnotherCollectionIsRefusedFirst:
     written, naming the collection it belongs to - and not offered as a
     trial, since it is the wrong command rather than an unplaceable file."""
 
+    @pytest.mark.asset("quarterly")
     def test_it_is_refused_naming_its_collection_and_writes_nothing(self, tmp_path, tree):
         deliveries, receipts = tree
         path = _csv(tmp_path, "birth_registrations_2026-09-20.csv")

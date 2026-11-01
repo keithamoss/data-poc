@@ -22,6 +22,7 @@ def _write(tmp_path, name, content):
 
 # ---- dbt parsing --------------------------------------------------------
 
+@pytest.mark.asset("daily")
 def test_parse_dbt_check_metadata_extracts_check_id_and_lifecycle_fields(tmp_path):
     path = _write(tmp_path, "schema.yml", """\
         models:
@@ -51,6 +52,7 @@ def test_parse_dbt_check_metadata_extracts_check_id_and_lifecycle_fields(tmp_pat
     assert c.changelog == []
 
 
+@pytest.mark.asset("daily")
 def test_parse_dbt_check_metadata_raises_for_tests_without_check_id(tmp_path):
     path = _write(tmp_path, "schema.yml", """\
         models:
@@ -72,6 +74,7 @@ def test_parse_dbt_check_metadata_raises_for_tests_without_check_id(tmp_path):
     assert "not_null" in message, "a dict test with no meta.check_id must also be reported"
 
 
+@pytest.mark.asset("daily")
 def test_parse_dbt_check_metadata_covers_singular_tests(tmp_path):
     """Regression for a real, pre-existing gap found 2026-09-16: this
     function only ever walked models[].tests/models[].columns[].tests -
@@ -104,6 +107,7 @@ def test_parse_dbt_check_metadata_covers_singular_tests(tmp_path):
     assert c.introduced_date == "2026-01-15"
 
 
+@pytest.mark.asset("daily")
 def test_parse_dbt_check_metadata_raises_for_singular_test_without_check_id(tmp_path):
     path = _write(tmp_path, "schema.yml", """\
         models:
@@ -119,6 +123,7 @@ def test_parse_dbt_check_metadata_raises_for_singular_test_without_check_id(tmp_
     assert "multiple_birth_sibling" in str(exc_info.value)
 
 
+@pytest.mark.asset("daily")
 def test_dbt_check_id_lookup_keys_generic_tests_by_column_and_type(tmp_path):
     path = _write(tmp_path, "schema.yml", """\
         models:
@@ -137,6 +142,7 @@ def test_dbt_check_id_lookup_keys_generic_tests_by_column_and_type(tmp_path):
         "data-asset-1.bdm.birth_registrations.stg_birth_registrations.registration_number.not_null_dbt")
 
 
+@pytest.mark.asset("daily")
 def test_dbt_check_id_lookup_keys_singular_tests_by_name_with_no_column(tmp_path):
     path = _write(tmp_path, "schema.yml", """\
         models:
@@ -155,6 +161,7 @@ def test_dbt_check_id_lookup_keys_singular_tests_by_name_with_no_column(tmp_path
         "is_multiple_birth.multiple_birth_sibling_dbt")
 
 
+@pytest.mark.asset("daily")
 def test_dbt_check_id_lookup_strips_the_package_prefix_from_cross_package_macros(tmp_path):
     """A real bug, found 2026-09-16 wiring this lookup into run_dbt_bdm.py
     for real: schema.yml's own key for a dbt_utils macro is package-
@@ -217,6 +224,7 @@ def test_dbt_check_id_lookup_does_not_collide_across_models_with_the_same_column
         "data-asset-1.cp.child_protection.stg_cp_clients.date_of_birth.accepted_range_dbt")
 
 
+@pytest.mark.asset("daily")
 def test_parse_dbt_check_metadata_covers_model_level_tests(tmp_path):
     path = _write(tmp_path, "schema.yml", """\
         models:
@@ -266,6 +274,7 @@ def test_parse_dbt_check_metadata_config_hash_excludes_meta_but_includes_config(
 
 # ---- Soda parsing ---------------------------------------------------------
 
+@pytest.mark.asset("daily")
 def test_parse_soda_check_metadata_extracts_check_id_from_attributes(tmp_path):
     path = _write(tmp_path, "checks.yml", """\
         checks for birth_registrations:
@@ -285,6 +294,7 @@ def test_parse_soda_check_metadata_extracts_check_id_from_attributes(tmp_path):
     assert checks[0].tool == "soda"
 
 
+@pytest.mark.asset("daily")
 def test_parse_soda_check_metadata_ignores_dataset_level_attributes_block(tmp_path):
     path = _write(tmp_path, "checks.yml", """\
         checks for birth_registrations:
@@ -303,6 +313,7 @@ def test_parse_soda_check_metadata_ignores_dataset_level_attributes_block(tmp_pa
     assert checks[0].check_id == "data-asset-1.bdm.birth_registrations.stg_birth_registrations.row_count"
 
 
+@pytest.mark.asset("daily")
 def test_parse_soda_check_metadata_raises_for_checks_without_check_id(tmp_path):
     path = _write(tmp_path, "checks.yml", """\
         checks for birth_registrations:
@@ -354,6 +365,7 @@ def test_parse_soda_check_metadata_config_hash_ignores_samples_limit(tmp_path):
 
 # ---- Contract parsing -------------------------------------------------
 
+@pytest.mark.asset("daily")
 def test_parse_contract_check_metadata_extracts_check_id_from_custom_properties(tmp_path):
     path = _write(tmp_path, "contract.yaml", """\
         schema:
@@ -446,6 +458,7 @@ def test_parse_contract_check_metadata_reads_failure_indicates_and_technical_not
     assert checks[0].technical_note == "Paired with the Soda check on the same column."
 
 
+@pytest.mark.asset("daily")
 def test_parse_contract_check_metadata_covers_table_level_quality(tmp_path):
     path = _write(tmp_path, "contract.yaml", """\
         schema:
@@ -466,6 +479,7 @@ def test_parse_contract_check_metadata_covers_table_level_quality(tmp_path):
     assert checks[0].check_id == "x.y.birth_registrations.stg_birth_registrations.rowCount"
 
 
+@pytest.mark.asset("daily")
 def test_parse_contract_check_metadata_raises_for_quality_rule_without_check_id(tmp_path):
     path = _write(tmp_path, "contract.yaml", """\
         schema:
@@ -483,6 +497,7 @@ def test_parse_contract_check_metadata_raises_for_quality_rule_without_check_id(
 
 # ---- Evidently parsing (plain dict, no file I/O) -----------------------
 
+@pytest.mark.asset("daily")
 def test_parse_evidently_check_metadata_reads_a_check_lifecycle_dict():
     check_lifecycle = {
         "data-asset-1.bdm.birth_registrations.stg_birth_registrations.row_count_growth": {
@@ -501,6 +516,7 @@ def test_parse_evidently_check_metadata_reads_a_check_lifecycle_dict():
     assert checks[0].source_file == "run_evidently_bdm.py"
 
 
+@pytest.mark.asset("daily")
 @pytest.mark.parametrize("field, value", [
     ("description", "A different plain-English sentence."),
     ("name", "A hand-authored display name"),
@@ -537,6 +553,7 @@ def test_authored_prose_never_changes_an_evidently_checks_config_hash(field, val
         f"modified, and CI will demand a changelog entry for a wording change")
 
 
+@pytest.mark.asset("daily")
 def test_the_evidently_hash_still_notices_a_real_config_change():
     """The other side of it. Widening the exclusion list is only safe
     while something a check actually DOES still moves the hash - an
@@ -684,4 +701,4 @@ def test_validate_reports_both_kinds_of_error_together():
 
 #: The data asset this module's tests act for, unless a test says otherwise
 #: (C11, Keith 2026-11-02: every test module names its asset).
-pytestmark = pytest.mark.asset("daily")
+pytestmark = pytest.mark.asset("quarterly")

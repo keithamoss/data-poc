@@ -170,6 +170,7 @@ def test_embed_defaults_to_empty_ticket_status_when_file_absent(monkeypatch, tmp
     assert _run_embed_and_extract_ticket_status(monkeypatch, tmp_path) == {}
 
 
+@pytest.mark.asset("daily")
 def test_embed_reads_real_open_tickets_json_when_present(monkeypatch, tmp_path):
     raw_issues = [{
         "number": 42, "title": "Birth Registrations is red",
@@ -221,6 +222,7 @@ def test_embed_defaults_to_every_assigned_person_at_zero_when_file_absent(monkey
     assert all(row["streak"] == 0 for row in rows)
 
 
+@pytest.mark.asset("daily")
 def test_embed_reads_real_ticket_resolutions_json_when_present(monkeypatch, tmp_path):
     raw_tickets = [{
         "number": 1, "labels": [{"name": "dataset:birth-registrations"}],
@@ -471,6 +473,7 @@ def test_the_schedule_ended_notice_names_the_file_dates_are_authored_in(monkeypa
     assert supply_holds.schedule_file() == "contract/calendar.yaml"
 
 
+@pytest.mark.asset("daily")
 def test_slot_due_dates_carry_only_the_slots_due_off_their_period_date(monkeypatch, tmp_path):
     """REQ-PIPE-167 criterion 5: the page is told a slot's own due date
     wherever it differs from the period's date - today, exactly Birth
@@ -657,6 +660,7 @@ class TestABuildUnderAnOutDir:
     reading the reports an earlier step wrote there and writing nothing in the
     real tree."""
 
+    @pytest.mark.asset("daily")
     def test_the_page_its_files_and_its_assets_land_in_the_out_dir(self, monkeypatch, tmp_path):
         from qa_tools.common import build_output
 
@@ -699,4 +703,4 @@ class TestABuildUnderAnOutDir:
 
 #: The data asset this module's tests act for, unless a test says otherwise
 #: (C11, Keith 2026-11-02: every test module names its asset).
-pytestmark = [*(pytestmark if isinstance(pytestmark, list) else [pytestmark]), pytest.mark.asset("daily")]
+pytestmark = [*(pytestmark if isinstance(pytestmark, list) else [pytestmark]), pytest.mark.asset("quarterly")]

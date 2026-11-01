@@ -33,6 +33,7 @@ class TestFetchTicketResolutionGhInvocation:
     reaches for `-f`/`-F` again, without needing a real `gh`/network
     call itself."""
 
+    @pytest.mark.asset("quarterly")
     def test_the_events_api_call_never_uses_f_flags(self, monkeypatch):
         calls = []
 
@@ -105,6 +106,7 @@ class TestBuildResolutionEpisodes:
         episodes = lb.build_resolution_episodes(raw_tickets)["birth-registrations"]
         assert [ep["closed_at"] for ep in episodes] == ["2026-01-01T09:00:00Z", "2026-02-01T09:00:00Z"]
 
+    @pytest.mark.asset("quarterly")
     def test_a_ticket_with_no_dataset_label_is_skipped(self):
         raw_tickets = [{"number": 1, "labels": [{"name": "qa-ticket"}],
                         "events": [_event("closed", "a", "2026-01-01T09:00:00Z")]}]
@@ -119,6 +121,7 @@ class TestComputeResolutionStreaks:
     def _episodes(self, *entries):
         return [{"closed_by": who, "closed_at": at, "clean": clean} for who, at, clean in entries]
 
+    @pytest.mark.asset("quarterly")
     def test_a_persons_current_streak_counts_backward_from_their_own_latest_close(self):
         episodes = self._episodes(
             ("a", "2026-01-01T09:00:00Z", False),
@@ -128,6 +131,7 @@ class TestComputeResolutionStreaks:
         streaks = lb.compute_resolution_streaks(episodes)
         assert streaks == {"a": {"streak": 2, "last_closed_at": "2026-01-03T09:00:00Z"}}
 
+    @pytest.mark.asset("quarterly")
     def test_a_dirty_most_recent_close_gives_no_streak_entry_at_all(self):
         episodes = self._episodes(
             ("a", "2026-01-01T09:00:00Z", True),
@@ -136,6 +140,7 @@ class TestComputeResolutionStreaks:
         streaks = lb.compute_resolution_streaks(episodes)
         assert streaks == {}
 
+    @pytest.mark.asset("quarterly")
     def test_other_peoples_interleaved_closes_are_skipped_not_counted_against_this_person(self):
         episodes = self._episodes(
             ("a", "2026-01-01T09:00:00Z", True),
@@ -178,6 +183,7 @@ class TestBuildLeaderboard:
         assert rows[0]["streak"] == 1
         assert "email" not in rows[0]
 
+    @pytest.mark.asset("quarterly")
     def test_sorted_by_streak_descending_across_datasets(self):
         raw_tickets = (
             self._raw("x", ("a", "2026-01-01T09:00:00Z"))

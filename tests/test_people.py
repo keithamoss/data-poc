@@ -55,6 +55,7 @@ class TestParsePeopleConfig:
         assert config["agency_assignments"]["registry-services"][0]["github"] == "keithamoss"
         assert config["dataset_assignments"]["cp-clients"][0]["github"] == "janereviewer"
 
+    @pytest.mark.asset("daily")
     def test_an_assignment_referencing_an_unknown_person_is_skipped_not_an_error(self, tmp_path):
         path = _write(tmp_path, """
             people: []
@@ -110,6 +111,7 @@ class TestGithubUsernamesFor:
             {"email": "aaron@example.com", "github": "aaronsomeone", "role": "manager"})
         assert people_mod.github_usernames_for("birth-registrations", "registry-services", config) == ["aaronsomeone", "keithamoss"]
 
+    @pytest.mark.asset("daily")
     def test_a_person_with_no_real_github_username_is_silently_excluded(self):
         config = {
             "people": {},
@@ -130,4 +132,4 @@ class TestGithubUsernamesFor:
 
 #: The data asset this module's tests act for, unless a test says otherwise
 #: (C11, Keith 2026-11-02: every test module names its asset).
-pytestmark = pytest.mark.asset("daily")
+pytestmark = pytest.mark.asset("quarterly")
