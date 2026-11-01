@@ -13255,3 +13255,42 @@ twice. It deliberately did not re-find the `TypeError`.
      a later build that leans on an unanswered one says so. Worth deciding
      whether a check (a gate counting PROVISIONAL decisions on built
      requirements) is wanted.
+     **DECIDED (Keith, 2026-11-01)**: both. Every PROVISIONAL choice goes on
+     the morning report's question list, and `mothman check` WARNS (does not
+     fail) with a count of PROVISIONAL markers on built requirements, naming
+     each. The gate needs a requirement of its own before it is built
+     (drafted as docs/drafts/provisional-gate.yaml, for sign-off; Keith chose to baseline the 190 existing markers and gate only new ones). REJECTED
+     a failing gate and the report list alone.
+293. **[todo, 2026-11-01]** **[Pipeline & publishing]** **A latent defect and a signed-list drift, found by the geocoding v6 architect review.**
+     - **amber_setting.timeline() reads the amber setting's version dates
+       whatever setting is meant** (qa_tools/common/amber_setting.py:115),
+       and describe() resolves the default key, so neither can describe
+       replacement_setting. Latent: no page shows a replacement setting's
+       timeline today. Owned by REQ-QAC-300 (signed): fixed test-first when
+       that builds (its new criterion from the v7 delta).
+     - **REQ-QAC-241 criterion 2's signed asset-wide list omits
+       presentation.yaml**, which validate_collections.ASSET_WIDE already
+       allows. Closed by amendment A8 (signed 2026-10-31, applied when
+       REQ-QAC-294 builds).
+     Neither needed Keith; both are owned by signed requirements.
+294. **[todo, 2026-11-01]** **[QA checks & contract]** **[Testing & dev tooling]** **Critic on REQ-PIPE-341 and REQ-TEST-374 (snapshot da9a7c7; 108 tests passed in 7 modules).**
+     - **341 D1, null keys in datacontract-cli samples (SIGNIFICANT, Keith
+       2026-11-01: 'no value')**: the old code recorded a null key as the text
+       'None'; the new one dropped it, against criterion 7. DECIDED: record the
+       row with an empty key part, shown as '(no value)'; criterion 7 amended
+       for this one correction. Test first.
+     - **374 D1+D2, the answer rule (Keith 2026-11-01: tighten)**: bare
+       'answered' anywhere (even 'not yet answered') counted as answered - a
+       false negative - and the gate flagged its own requirement. DECIDED: an
+       item is answered only by 'SETTLED by Keith' or 'answered by Keith' with
+       a date; a quoted `PROVISIONAL` is a mention, not a marker; REQ-TEST-374's
+       own items quote the word. Its decision on 'answered' amended. Test first.
+     - MINOR, to fix under the polish rule: the morning-report paragraph and
+       evidence cite criterion 4, it is 5; 341's NFR 1 real-browser assertion
+       is not written (deferred is not the same as missing); validate_soda
+       silently skips a failed-rows check whose table declares no key - say
+       so; sampleKeyText strips every trailing null part, so an all-null key
+       shows nothing and a null census_year would vanish - show '(no value)'.
+     - Not defects: criterion 3's geocoding half (REQ-PIPE-296) and criterion
+       7's compare wait on later work and the end bootstrap.
+
