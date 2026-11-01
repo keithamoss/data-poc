@@ -9339,16 +9339,22 @@ class TestTheGeocodingPages:
 
     def test_1_the_three_year_checks_read_as_three_problems_in_order(
             self, clean_page, built_dashboard_html):
+        """On the page: the census_year column's cards list the three year
+        checks missing, duplicated, unexpected - whatever order dbt recorded
+        them in (post-build critic, item 2) - each panel naming its phrase."""
         checks = self._year_checks(built_dashboard_html)
-        phrases = [ck.get("measures") for ck in checks if ck.get("measures") in _YEAR_PHRASES]
-        assert phrases == _YEAR_PHRASES, phrases
+        by_phrase = {ck.get("measures"): ck for ck in checks if ck.get("measures") in _YEAR_PHRASES}
+        assert set(by_phrase) == set(_YEAR_PHRASES), sorted(by_phrase)
         hx = _hierarchy_index()
-        for ck in checks:
-            if ck.get("measures") not in _YEAR_PHRASES:
-                continue
+        _goto(clean_page, built_dashboard_html, state=self._geo_state(hx, columnName="census_year"))
+        cards = clean_page.locator(".check-card").evaluate_all("els => els.map(e => e.dataset.check)")
+        wanted = [by_phrase[p]["key"] for p in _YEAR_PHRASES]
+        assert all(k in cards for k in wanted), cards
+        assert [k for k in cards if k in wanted] == wanted, cards
+        for phrase in _YEAR_PHRASES:
             _goto(clean_page, built_dashboard_html, state=self._geo_state(
-                hx, columnName="census_year", checkKey=ck["key"]))
-            assert f"{ck['measures']} (" in clean_page.locator("#check-panel").inner_text()
+                hx, columnName="census_year", checkKey=by_phrase[phrase]["key"]))
+            assert f"{phrase} (" in clean_page.locator("#check-panel").inner_text()
 
     def test_2_a_missing_year_is_a_constructed_line_never_a_row(
             self, clean_page, built_dashboard_html):
@@ -9406,15 +9412,26 @@ class TestTheGeocodingPages:
 
     def test_5_a_year_check_breaks_at_each_widening_in_the_history(
             self, clean_page, built_dashboard_html):
+        """Exactly two breaking markers, each between the last point before a
+        widening and the first on or after it - located, not only counted."""
         hx = _hierarchy_index()
         (ck,) = [c for c in self._year_checks(built_dashboard_html)
                  if c["tool_ref"] == "dbt:missing_set_members"]
         dates = [h["run_date"][:10] for h in ck["history"]]
+        n = len(dates)
+        assert n > 2, dates
+        xs = [42 + i * (480 - 42 - 16) / (n - 1) for i in range(n)]  # trendChart's own geometry
+        mids = []
         for cut in ("2017-08-01", "2022-08-01"):
-            assert any(d < cut for d in dates) and any(d >= cut for d in dates), (cut, dates[:3])
+            after = next((i for i, d in enumerate(dates) if d >= cut), None)
+            assert after not in (None, 0), (cut, dates[:3], dates[-3:])
+            mids.append((xs[after - 1] + xs[after]) / 2)
         _goto(clean_page, built_dashboard_html, state=self._geo_state(
             hx, columnName="census_year", checkKey=ck["key"]))
-        assert clean_page.locator("#check-panel .break-glyph").count() == 2
+        got = clean_page.locator("#check-panel .break-glyph").evaluate_all(
+            "els => els.map(e => Number(/translate\\(([\\d.]+)/.exec(e.getAttribute('transform'))[1]))")
+        assert len(got) == 2, got
+        assert sorted(got) == pytest.approx(sorted(mids), abs=0.2), (got, mids)
 
     def test_6_the_geocodes_tile_links_its_source_and_match_level_has_value_bars(
             self, clean_page, built_dashboard_html):
@@ -9437,23 +9454,52 @@ class TestTheGeocodingPages:
 
     def test_7_no_area_code_or_nine_digit_run_on_a_geocoding_page(
             self, clean_page, built_dashboard_html):
+        """Criterion 13, on every geocoding page shown for a scenario's
+        period: the dataset page's strip and EVERY check panel of its
+        census_year and match_level columns. The supply's file is found
+        through its receipt (qa.supply_receipt) - a delivery folder's name is
+        arbitrary (generator/delivery_names.py) and never holds the period."""
         import csv
 
+        from qa_tools.common import delivery, qa_store, supply_db
+
         hx = _hierarchy_index()
-        for sid in (_MISSING_YEAR, _UNEXPECTED_YEAR):
+        built = _built_datasets(built_dashboard_html)
+        for sid, dataset_id in ((_MISSING_YEAR, _GEO), (_DUPLICATE_YEAR, "geo-ed-presentations"),
+                                (_UNEXPECTED_YEAR, _GEO)):
             coords = _scenario(clean_page, built_dashboard_html, sid)
-            files = sorted((ROOT / "data" / "deliveries").glob(f"*{coords['period']}*/geo_cp_clients.csv"))
-            assert files, f"precondition: {sid}'s supply file is on disk"
-            with files[-1].open(newline="") as fh:
-                codes = {v for row in csv.DictReader(fh) for k, v in row.items()
-                         if k in ("sa2_code", "lga_code") and v}
+            ds = built[dataset_id]
+            supplies = {r["supply_id"] for r in ds["runs"] if r["run_id"] in coords["supplies"]}
+            assert supplies, f"precondition: {sid}'s runs are {dataset_id}'s"
+            with supply_db.connect(read_only=True, label="test-e2e") as conn:
+                found = conn.execute(
+                    f'SELECT delivery, filename FROM "{qa_store.SCHEMA}".supply_receipt '
+                    "WHERE supply_id = ANY(?)", [sorted(supplies)]).fetchall()
+            assert found, f"precondition: {sid}'s supply has a receipt"
+            codes = set()
+            for name, filename in found:
+                path = delivery.default_deliveries_dir() / name / filename
+                assert path.is_file(), path
+                with path.open(newline="") as fh:
+                    codes |= {v for row in csv.DictReader(fh) for k, v in row.items()
+                              if k in ("sa2_code", "lga_code") and v}
             assert codes, f"precondition: {sid}'s file holds area codes"
-            panel = self._check_panel(clean_page, built_dashboard_html, hx, _GEO,
-                                      "missing_set_members", coords["inPlaceOn"])
-            shown = " ".join([*panel.locator(".sample-line, .sample-heading").all_inner_texts(),
-                              *clean_page.locator(".sla-strip").all_inner_texts()])
-            assert not re.search(r"\b\d{9}\b", shown), shown
-            assert not any(c in shown for c in codes)
+            on = coords["inPlaceOn"]
+            _goto(clean_page, built_dashboard_html, state=self._geo_state(hx, dataset_id), in_place_on=on)
+            shown = clean_page.locator(".sla-strip").all_inner_texts()
+            panels = [ck for col in ds["columns"] if col["name"] in ("census_year", "match_level")
+                      for ck in col["checks"] if not ck.get("retired")]
+            assert len(panels) >= 4, [ck["key"] for ck in panels]
+            for ck in panels:
+                col = ck["check_id"].split(".")[4]
+                _goto(clean_page, built_dashboard_html, state=self._geo_state(
+                    hx, dataset_id, columnName=col, checkKey=ck["key"]), in_place_on=on)
+                panel = clean_page.locator("#check-panel")
+                assert panel.count() == 1, ck["key"]
+                shown += panel.locator(".sample-line, .sample-heading, [data-value-text]").all_inner_texts()
+            text = " ".join(shown)
+            assert not re.search(r"\b\d{9}\b", text), (sid, text[:500])
+            assert not any(c in text for c in codes), sid
 
     def test_8_another_collections_check_is_headed_by_its_phrase(
             self, clean_page, built_dashboard_html):
@@ -9477,16 +9523,19 @@ class TestTheGeocodingPages:
         geocoding promotion's date and not before (REQ-DOCS-362 criterion 2)."""
         hx = _hierarchy_index()
         coords = _scenario(clean_page, built_dashboard_html, _G1_ROUTE)
-        found = clean_page.evaluate("""(cause) => {
+        found = clean_page.evaluate("""([cause, period]) => {
             const ds = rawRealDatasetById("cp-clients");
             for(const [runId, h] of Object.entries(ds.promotedHealth || {})){
               if(h.promotedOn !== "green") continue;
-              const t = (h.timeline || []).find(t=> t.status === "amber" && t.causeDataset === cause);
+              const t = (h.timeline || []).find(t=> t.status === "amber" && t.causeDataset === cause
+                                                  && t.causePeriod === period);
               if(t) return {runId, on: assetDateStrOf(t.at), period: t.causePeriod};
             }
             return null;
-        }""", _GEO)
-        assert found, f"precondition: {_G1_ROUTE} turned an older Client Register supply amber"
+        }""", [_GEO, coords["period"]])
+        assert found, (f"precondition: {_G1_ROUTE}'s {coords['period']} geocoding promotion turned "
+                       "an older Client Register supply amber")
+        assert found["period"] == coords["period"]
         want = f"Linkage Products' {found['period']} {hx['ds_name'][_GEO]}"
         row = f'tr[data-run-id="{found["runId"]}"]'
         state = _dataset_state(hx, "cp-clients")
@@ -9499,7 +9548,6 @@ class TestTheGeocodingPages:
         _goto(clean_page, built_dashboard_html, state=state, in_place_on=day_before)
         assert clean_page.locator(row).count() == 1
         assert clean_page.locator(f"{row} [data-amber-promoted]").count() == 0
-        assert coords["period"]
 
     def test_10_ed_presentations_shows_its_own_coverage_verdict(
             self, clean_page, built_dashboard_html):

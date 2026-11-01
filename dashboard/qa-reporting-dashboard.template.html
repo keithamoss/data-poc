@@ -1816,6 +1816,11 @@ function linkedSourceTileHtml(ds){
   return `<div class="sla-tile" data-linked-source="${escAttr(ls.datasetId)}"><div class="k">${escHtml(ls.relation)}</div>`
     + `<div class="v" style="font-size:14px;" data-linked-source-name>${causeName(ds.id, ls.datasetId, null, true)}</div></div>`;
 }
+// BOTH TILES, ON EVERY STRIP OF A SHOWN PAGE, a blocked one's included
+// (criterion 10, "WHILE shown"; post-build critic, item 4).
+function relationTilesHtml(ds, dateStr){
+  return `${linkedSourceTileHtml(ds)}${listSettingTilesHtml(ds, dateStr)}`;
+}
 function latestArrivalWords(ds){
   const a = ds && ds.lastArrival;
   if(!a) return "—";
@@ -6754,11 +6759,13 @@ function notInAgreementReason(entry){
     const d = e.dataset ? realDatasetIndex()[e.dataset] : null;
     return (d && d.name) || (e.dataset && datasetNameAnywhere(e.dataset)) || e.dataset || "a dataset it reads";
   };
-  if(code === "not_supplied_by_decision") return `Not checked: ${named()} not supplied for ${period}, by decision.`;
+  // THE STATUS'S OWN WORD, through statusWords (REQ-DASH-359 criterion 1).
+  const lead = statusWords("notchecked", "label");
+  if(code === "not_supplied_by_decision") return `${lead}: ${named()} not supplied for ${period}, by decision.`;
   if(code === "calendar_differs"){
-    return `Not checked: ${named()} was on ${e.calendar ? "the " + e.calendar : "another"} calendar for ${period}.`;
+    return `${lead}: ${named()} was on ${e.calendar ? "the " + e.calendar : "another"} calendar for ${period}.`;
   }
-  return `Not checked: not part of the agreement for ${period}.`;
+  return `${lead}: not part of the agreement for ${period}.`;
 }
 // A LEFT-OUT CHECK'S ROW (REQ-DASH-337 criterion 6 as amended by REQ-DASH-299,
 // A1): where it would be shown had it run - in its collection's group, or
@@ -6858,6 +6865,13 @@ function acrossCollectionsReads(col, check){
   return [b.declared_on, ...(b.reads || [])].filter(id=> id && inAnotherCollection(id, col))
     .map(id=> { const cn = collectionNameOf(collectionOfDataset(id)); return `${possessive(cn, cn)} ${datasetNameAnywhere(id)}`; });
 }
+// A tool's display name - 'datacontract-cli', 'Soda' - from XT_TOOLS, never
+// its raw key (post-build critic, item 7); an unlisted tool reads as its key.
+function toolDisplayName(toolRef){
+  const t = String(toolRef || "").split(":")[0];
+  const found = XT_TOOLS.find(([k])=> k === t);
+  return found ? found[1] : t;
+}
 function collectionCrossTableSection(ag, col){
   const entries = collectionCrossTableChecks(col);
   if(!entries.length) return "";
@@ -6871,7 +6885,7 @@ function collectionCrossTableSection(ag, col){
   const row = (e, across)=> `
     <button class="scope-check" data-nav='${JSON.stringify({tier:"dataset", agencyId:ag.id, collectionId:col.id, datasetId:e.dataset.id})}'>
       <span class="label"><span class="nm">${escHtml(e.check.label || e.check.name || e.check.check_id)}</span>
-        <span class="ds">${escHtml(across.length ? [`Reads ${andList(across)}`, String(e.check.tool_ref || "").split(":")[0]].filter(Boolean).join(" · ") : crossTableSource(col, e))}</span></span>
+        <span class="ds">${escHtml(across.length ? [`Reads ${andList(across)}`, toolDisplayName(e.check.tool_ref)].filter(Boolean).join(" · ") : crossTableSource(col, e))}</span></span>
       ${pill(checkStatus(e.check),"sm")}
     </button>`;
   // A CHECK READING ANOTHER COLLECTION'S DATASET IS LISTED AFTER THE
@@ -10215,6 +10229,7 @@ function renderDataset(view, agencyId, collectionId, datasetId){
       ${outstandingQueue("dataset", ds.id)}
       <div class="sla-strip">
         <div class="sla-tile"><div class="k">Waiting since</div><div class="v mono">${ds.blocked.openedAt ? fmtInstant(ds.blocked.openedAt) : "—"}</div></div>
+        ${relationTilesHtml(ds, CURRENT_IN_PLACE_ON)}
         <div class="sla-tile"><div class="k">Rows, latest run</div><div class="v mono">—</div></div>
       </div>
       <div id="supply-history-wrap"></div>
@@ -10290,11 +10305,11 @@ function renderDataset(view, agencyId, collectionId, datasetId){
       ${slaTileHtml(rawRealDatasetById(ds.id) || ds, CURRENT_IN_PLACE_ON)}
       ${ds.blocked ? `
       <div class="sla-tile"><div class="k">Waiting since</div><div class="v mono" title="When we received the supply that is waiting for a person">${ds.blocked.openedAt ? fmtInstant(ds.blocked.openedAt) : "—"} (${escHtml(blockerLabel(ds.blocked))})</div></div>
+      ${relationTilesHtml(ds, CURRENT_IN_PLACE_ON)}
       <div class="sla-tile"><div class="k">Delivery format</div><div class="v" style="font-size:14px;">${ds.deliveryFormat}</div></div>
       <div class="sla-tile"><div class="k">Rows, latest run</div><div class="v mono">—</div></div>` : `
       ${latestArrivalTileHtml(ds)}
-      ${linkedSourceTileHtml(ds)}
-      ${listSettingTilesHtml(ds, CURRENT_IN_PLACE_ON)}
+      ${relationTilesHtml(ds, CURRENT_IN_PLACE_ON)}
       <div class="sla-tile"><div class="k">Delivery format</div><div class="v" style="font-size:14px;">${ds.deliveryFormat}</div></div>
       <div class="sla-tile"><div class="k">Rows, latest run</div><div class="v mono">${fmtInt(ds.rowCount)} <span style="font-size:11.5px; color:${rowDelta>=0?'var(--good)':'var(--bad)'};">(${rowDelta>=0?'+':''}${fmtInt(rowDelta)})</span></div></div>`}
     </div>

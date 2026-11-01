@@ -94,3 +94,43 @@ class TestEveryTileHasItsWord:
         found = presentation.problems(path)
         assert any("geo-ed-presentations" in p and "relation" in p for p in found), found
         assert not any("geo-cp-clients" in p for p in found), found
+
+
+class TestTheYearChecksKeepTheirDeclaredOrder:
+    """REQ-DASH-299 criterion 1: missing, duplicated, unexpected - however
+    the results arrive. dbt with one thread breaks ties by unique_id, which
+    is alphabetical (duplicated, missing, unexpected), and the build keeps
+    arrival order; equals are sorted by the kinds' declared order, data in
+    pipeline/dashboard_check_labels.py, never by a dataset's name."""
+
+    def _card(self, kind, status="green"):
+        return {"check_id": f"a.b.c.geo-cp-clients.census_year.{kind}_dbt",
+                "tool_ref": f"dbt:{kind}", "current": 0, "warn": None, "fail": 0,
+                "current_status": status}
+
+    def test_alphabetical_arrival_is_shown_missing_duplicated_unexpected(self):
+        from pipeline.dashboard_check_labels import rank_for_headline
+
+        cards = [self._card(k) for k in ("duplicated_set_members", "missing_set_members",
+                                          "unexpected_set_members")]
+        rank_for_headline(cards)
+        assert [c["tool_ref"] for c in cards] == [
+            "dbt:missing_set_members", "dbt:duplicated_set_members", "dbt:unexpected_set_members"]
+
+    def test_a_worse_status_still_comes_first(self):
+        from pipeline.dashboard_check_labels import rank_for_headline
+
+        cards = [self._card("duplicated_set_members"), self._card("missing_set_members"),
+                 self._card("unexpected_set_members", "red")]
+        rank_for_headline(cards)
+        assert [c["tool_ref"] for c in cards] == [
+            "dbt:unexpected_set_members", "dbt:missing_set_members", "dbt:duplicated_set_members"]
+
+    def test_checks_of_no_declared_family_keep_their_arrival_order(self):
+        from pipeline.dashboard_check_labels import rank_for_headline
+
+        cards = [{"check_id": f"a.b.c.d.col.{k}", "tool_ref": f"dbt:{k}", "current": 0,
+                  "warn": None, "fail": 0, "current_status": "green"}
+                 for k in ("unique", "not_null", "accepted_values")]
+        rank_for_headline(cards)
+        assert [c["tool_ref"] for c in cards] == ["dbt:unique", "dbt:not_null", "dbt:accepted_values"]
