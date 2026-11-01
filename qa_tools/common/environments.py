@@ -37,7 +37,7 @@ from pathlib import Path
 from qa_tools.common import config_yaml
 
 ROOT = Path(__file__).resolve().parent.parent.parent
-ENVIRONMENTS_PATH = ROOT / "contract" / "environments.yaml"
+ENVIRONMENTS_PATH = ROOT / "assets" / "environments.yaml"
 
 #: Where a deployment says which of the declared environments it is.
 ENVIRONMENT_ENV = "MOTHMAN_ENVIRONMENT"

@@ -1,0 +1,34 @@
+# Linkage Products' Evidently checks (REQ-QAC-333 criterion 5, REQ-QAC-297
+# criterion 11). A linkage release is judged by its keys and what they link,
+# not by drift, so it holds none. Each geocoding table holds one: drift in how
+# precisely its records are placed, against that table's last promoted supply,
+# over PLACED rows only - an unplaced row is excluded from reference and
+# current alike, so a rise in unplaced rows is the share check's one alarm and
+# never a second one here. Bands as Emergency Department's drift checks.
+checks:
+  - check_id: quarterly.department-of-health.linkage-products.geo-cp-clients.match_level.drift_psi_evidently
+    category: consistency
+    introduced_date: "2013-01-01"
+    description: The spread of values among placed rows must stay close to the reference supply.
+    failure_indicates: >
+      Either the geocoder has changed how it places records, or the source
+      supply it was sent carries a different mix of address details than usual.
+    column: match_level
+    method: psi
+    exclude_values: ["not geocoded"]
+    warn_threshold: 0.10
+    fail_threshold: 0.25
+    changelog: []
+  - check_id: quarterly.department-of-health.linkage-products.geo-ed-presentations.match_level.drift_psi_evidently
+    category: consistency
+    introduced_date: "2013-01-01"
+    description: The spread of values among placed rows must stay close to the reference supply.
+    failure_indicates: >
+      Either the geocoder has changed how it places records, or the source
+      supply it was sent carries a different mix of address details than usual.
+    column: match_level
+    method: psi
+    exclude_values: ["not geocoded"]
+    warn_threshold: 0.10
+    fail_threshold: 0.25
+    changelog: []

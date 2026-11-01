@@ -179,8 +179,8 @@ class _Assets:
 NAME_PATTERN = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*")
 
 
-#: THE SWITCH. The move commit makes this `_Assets(ROOT / "assets")`.
-_DEFAULT = _PreMove()
+#: THE SWITCH, made by the move commit: one folder per asset under assets/.
+_DEFAULT = _Assets(ROOT / "assets")
 _layout = _DEFAULT
 
 

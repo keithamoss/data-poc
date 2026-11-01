@@ -1,0 +1,130 @@
+# SCRIPTED PERSON DECISIONS, played back into the synthetic history
+# (REQ-GEN-135). Configuration, reviewed like the injection table: each
+# names its scenario and which of that scenario's recorded supplies it acts
+# on (by index - never a generated id), and takes effect `after_hours` after
+# that supply was received. Raised through the one decision path as the
+# synthetic person in contract/people.yaml, only on a synthetic asset, and a
+# refusal stops the replay. `mothman scenarios validate` gates it in CI.
+#
+# SCRIPTED CORRECTION CONFIRMATIONS (REQ-GEN-205) sit in a separate
+# top-level `corrections:` list, after `decisions:`. Each names a declared
+# correction by `change_reference:` (no dataset of its own) and says either
+# `keep:` - a list of supplies, each `{scenario, dataset, supply}` by the
+# scenario's supply index, never a generated id - with one `keep_reason:`
+# covering them, or `pending: true`, leaving it for the asset manager. No
+# timing field: it is confirmed when the replay confirms the due
+# corrections. A correction with no entry moves everything it proposes.
+#
+decisions:
+  - scenario: TS-47
+    operation: mark-not-supplied
+    dataset: birth-registrations
+    supply: 0
+    after_hours: 2
+    names_supply: false
+    period_from: placement
+    reason: "The supplier's file for this day arrived the next morning and filled that day instead; this day was not supplied."
+  # REQ-GEN-185 criterion 7: TS-43's held amber is promoted by a person, so the
+  # gap it opens is closed before the next day's supply is measured. TWENTY
+  # HOURS - ten the next morning, before that day's 14:30 supply - so it comes
+  # after the rule has held it (a replayed rule decision lands within the
+  # 4-hour claim window, promotion.effective_at_for) and the hold is still
+  # what the page shows at the end of its own day (post-build-review #156).
+  - scenario: TS-43
+    operation: promote
+    dataset: birth-registrations
+    supply: 0
+    after_hours: 20
+    reason: "Facility details missing on more registrations than usual, explained by the supplier; accepted for this day."
+  # REQ-GEN-137 criterion 4: TS-45's promoted amber is acknowledged by a person,
+  # five hours after it arrived - after the rule has promoted it.
+  - scenario: TS-45
+    operation: acknowledge
+    dataset: birth-registrations
+    supply: 0
+    after_hours: 5
+    reason: "Second-parent names missing on more registrations than usual; checked with the supplier, expected for this day."
+  # REQ-GEN-196: each two-file pair (TS-68 to TS-74) is settled by a person
+  # with one choose-file decision at 11:00 the NEXT day on the asset's clock -
+  # a later asset day than both receipts, so the arrival day reads contested,
+  # and before that day's own 14:30 supply. Files are named by POSITION in
+  # receipt order (1 = the earlier), resolved to filenames at play time;
+  # `refile:+1` is the day after the placement.
+  - scenario: TS-68
+    operation: choose-file
+    dataset: birth-registrations
+    supply: 0
+    at: "11:00"
+    day_offset: 1
+    files: [supply, supersede]
+    reason: "The supplier sent the same file twice; the first is the day's supply and the copy is kept but superseded."
+  - scenario: TS-69
+    operation: choose-file
+    dataset: birth-registrations
+    supply: 0
+    at: "11:00"
+    day_offset: 1
+    files: [supply, "refile:+1"]
+    reason: "The second file is the next day's extract, sent early; it belongs to the next day."
+  - scenario: TS-70
+    operation: choose-file
+    dataset: birth-registrations
+    supply: 0
+    at: "11:00"
+    day_offset: 1
+    files: [reject, supply]
+    reason: "The supplier re-exported the day's extract with the fault fixed; the corrected file is the day's supply."
+  - scenario: TS-71
+    operation: choose-file
+    dataset: birth-registrations
+    supply: 0
+    at: "11:00"
+    day_offset: 1
+    files: [reject, supply]
+    reason: "The first file is the supplier's test data, sent by mistake; the real extract is the day's supply."
+  - scenario: TS-72
+    operation: choose-file
+    dataset: birth-registrations
+    supply: 0
+    at: "11:00"
+    day_offset: 1
+    files: [supply, reject]
+    reason: "The second file is the supplier's test data and never loaded; the real extract is the day's supply."
+  - scenario: TS-73
+    operation: choose-file
+    dataset: birth-registrations
+    supply: 0
+    at: "11:00"
+    day_offset: 1
+    files: [reject, reject]
+    reason: "Neither file is usable: the extract is faulty and the other is test data. The supplier will resend."
+  - scenario: TS-74
+    operation: choose-file
+    dataset: birth-registrations
+    supply: 0
+    at: "11:00"
+    day_offset: 1
+    files: ["refile:+1", reject]
+    reason: "The first file is the next day's extract, sent early, and the second is test data; nothing came for this day."
+  # TS-78: a supply promoted after a newer one. D's held amber is promoted at
+  # 20:00 on D+1, after D+1's own promotion; D+2's at 10:00 on D+3.
+  - scenario: TS-78a
+    name: TS-78 promote D
+    operation: promote
+    dataset: birth-registrations
+    supply: 0
+    after_hours: 30
+    reason: "Parent names missing on more registrations than usual, explained by the supplier; accepted for this day."
+  - scenario: TS-78a
+    name: TS-78 promote D+2
+    operation: promote
+    dataset: birth-registrations
+    supply: 2
+    after_hours: 20
+    reason: "Second-parent names missing on more registrations than usual, explained by the supplier; accepted for this day."
+
+# SCRIPTED CORRECTION CONFIRMATIONS (REQ-GEN-205) - see the header.
+corrections:
+  # TS-62: merged and left for the asset manager - pending to the end.
+  - change_reference: REQ-GEN-205-WINDOW
+    pending: true
