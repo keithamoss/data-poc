@@ -139,7 +139,7 @@ def validate_command() -> None:
               help="The supply's row count a band is worked out at (default: the "
                    "smallest supply the contract calls ordinary).")
 def bands_command(dataset_id: str | None, rows: int | None) -> None:
-    """Every rule's bands per tool, and whether it can read amber (REQ-GEN-183).
+    """Every rule's bands per tool, and whether it can read Warn (REQ-GEN-183).
 
     \b
     Examples:
@@ -148,7 +148,7 @@ def bands_command(dataset_id: str | None, rows: int | None) -> None:
 
     A rule is the checks that implement it across tools - those sharing an
     authored name, or else one dataset, column, category and measure - and
-    its amber band is where no implementing check fails and
+    its warn band is where no implementing check fails and
     at least one warns, honouring each tool's own unit and operator. Read from
     the committed definitions the tools run; opens no database. What the
     synthetic generator reads to build a supply to a verdict.

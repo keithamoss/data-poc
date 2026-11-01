@@ -151,3 +151,19 @@ describe("recorded text is marked as recorded", () => {
     expect(root.querySelector("[data-recorded-text]").textContent).toBe("went red on Monday");
   });
 });
+
+// Pass / Warn / Fail critic, nit 4: a stored status the page has no word for
+// is REFUSED where a supply's history prints it, never silently dropped.
+describe("an unknown stored status is refused, not dropped", () => {
+  it("in 'went in <X>' and in 'Arrived <X>'", () => {
+    const w = withRaw({ promotedHealth: { r1: { promotedOn: "purple", promotedAt: "2026-01-20T01:00:00+00:00",
+      timeline: [{ at: "2026-01-10T01:00:00+00:00", status: "green", cause: "a" },
+                 { at: "2026-03-01T01:00:00+00:00", status: "red", cause: "b" }] } } });
+    expect(() => w.redPromotedBadge("cp-carers", "r1", "2026-03-05")).toThrow(/unrecognised status/);
+    const w2 = withRaw({ promotedHealth: { r1: { promotedOn: "green", promotedAt: "2026-01-20T01:00:00+00:00",
+      timeline: [{ at: "2026-01-10T01:00:00+00:00", status: "green", cause: "a" },
+                 { at: "2026-03-01T01:00:00+00:00", status: "red", cause: "b" }] } } });
+    expect(() => w2.supplyRowStatus("cp-carers", { run_id: "r1", status: "purple" }, "2026-03-05"))
+      .toThrow(/unrecognised status/);
+  });
+});

@@ -2074,8 +2074,10 @@ const STATUS_WORDS = {
   notcounted: {label:"Not counted", verb:"not counted", count:"not counted"},
   turnedoff: {label:"Turned off", verb:"turned off", count:"turned off"},
 };
-// Whether a value is a status this page has words for - for a caller that
-// shows a note only where there is a status to name.
+// Whether a value is a status this page has words for. NOT a guard for a
+// caller that shows a status: an absent one is skipped by testing for
+// absence, and an unknown one is passed to statusWords, which refuses it
+// (REQ-DASH-359 criterion 2; Pass / Warn / Fail critic, nit 4).
 // A REPLACEMENT SETTING'S VALUE IN WORDS (REQ-DASH-359 criterion 12), never
 // the raw green or green-or-amber - the same words as qa_tools/common/
 // replacement_setting.py's WORDS, each held to criterion 12's words by its
@@ -8890,7 +8892,7 @@ function redPromotedBadge(datasetId, runId, inPlaceOnDateStr){
     // is kept for a red that really came after the promotion.
     const before = !!h.promotedAt && new Date(since.at) <= new Date(h.promotedAt);
     const wentRed = h.promotedOn === "red";
-    const went = hasStatusWords(h.promotedOn) ? `went in ${statusWords(h.promotedOn, "verb")}, ` : "";
+    const went = h.promotedOn ? `went in ${statusWords(h.promotedOn, "verb")}, ` : "";
     // A RE-CHECK TURNED IT (REQ-DASH-221 criterion 8, amending REQ-DASH-126
     // criterion 2): named as criteria 1 and 2 word it, and the badge stays
     // after acknowledgement, naming who.
@@ -8974,7 +8976,7 @@ function supplyRowStatus(datasetId, entry, inPlaceOnDateStr){
     });
     if(changed && changed.status === entry.status) changed = null;
   }
-  const arrived = changed && hasStatusWords(entry.status)
+  const arrived = changed && entry.status
     ? ` <span class="arrived-as" data-arrived-as style="color:var(--ink-muted); font-size:12px;">Arrived ${statusWords(entry.status, "verb")}</span>`
       + ` <span class="changed-by" data-changed-by style="color:var(--ink-muted); font-size:12px;">· changed ${escHtml(fmtDay(changed.at))} after ${escHtml(changed.cause || "a later check")}</span>`
     : "";
@@ -9058,7 +9060,7 @@ function recheckedRowStatus(datasetId, entry, on){
     if(changed && (changed.status === arrived || rc.some(e=> sameInstant(e.at, changed.at)))) changed = null;
   }
   const notes = [];
-  if(shown !== arrived && hasStatusWords(arrived)) notes.push(`Arrived ${statusWords(arrived, "verb")}`);
+  if(shown !== arrived && arrived) notes.push(`Arrived ${statusWords(arrived, "verb")}`);
   // A RED-PROMOTED ROW DOES NOT REPEAT ITS BADGE (Keith, 2026-10-29): the
   // re-check that turned a supply in place red is the red-promoted badge's
   // sentence beside this note, so it is not said twice.
@@ -9740,7 +9742,7 @@ function compositionCells(ag, col, row){
       <td>${fmtInstant(e.at)}</td>
       <td>${who}</td>
       <td>${escHtml(e.reason || "")}</td>
-      <td>${hasStatusWords(row.promotedOn) ? pill(row.promotedOn, "sm") : ""}</td>
+      <td>${row.promotedOn ? pill(row.promotedOn, "sm") : ""}</td>
       <td>${ack}</td>`;
 }
 // HAS A PERIOD OPENED BY THE DATE (REQ-DASH-326 criterion 8): once any of the

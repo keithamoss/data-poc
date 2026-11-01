@@ -5138,12 +5138,12 @@ class TestColumnsNotGreenMatchesTheDatasetPage:
     @staticmethod
     def _parse(text):
         import re
-        m = re.match(r"(\d+) of (\d+) (\d+) red, (\d+) amber", text)
+        m = re.match(r"(\d+) of (\d+) (\d+) failing, (\d+) warning", text)
         if m:
             n, total, red, amber = map(int, m.groups())
             assert n == red + amber, text
             return {"red": red, "amber": amber, "counted": total}
-        m = re.match(r"All (\d+) green", text)
+        m = re.match(r"All (\d+) passing", text)
         assert m, f"unexpected cell text {text!r}"
         return {"red": 0, "amber": 0, "counted": int(m.group(1))}
 
@@ -5182,7 +5182,7 @@ class TestColumnsNotGreenMatchesTheDatasetPage:
                     continue
                 said = self._parse(row["text"])
                 if row["label"]:
-                    m = re.search(r"latest (\d+) red and (\d+) amber of (\d+)", row["label"])
+                    m = re.search(r"latest (\d+) failing and (\d+) warning of (\d+)", row["label"])
                     assert m and list(map(int, m.groups())) == [said["red"], said["amber"], said["counted"]], row
                 _goto(clean_page, built_dashboard_html, row["nav"], in_place_on)
                 shown = self._page_counts(clean_page)
@@ -5219,11 +5219,11 @@ class TestTheDatasetPageSaysWhatItsTrendPlots:
         _goto(clean_page, built_dashboard_html, self._CP, self._ON)
         row = clean_page.evaluate("""() => [...document.querySelectorAll('tr[data-nav]')]
           .map(tr => ({nav: JSON.parse(tr.dataset.nav), td: tr.querySelector('.not-green-td')}))
-          .filter(r => r.td && /\\d+ red, \\d+ amber/.test(r.td.innerText))
+          .filter(r => r.td && /\\d+ failing, \\d+ warning/.test(r.td.innerText))
           .map(r => ({nav: r.nav, text: r.td.innerText.replace(/\\s+/g, ' ').trim()}))[0] || null""")
         assert row, "precondition: a Child Protection dataset has a unit that is not green"
         import re
-        n, m, red, amber = map(int, re.match(r"(\d+) of (\d+) (\d+) red, (\d+) amber", row["text"]).groups())
+        n, m, red, amber = map(int, re.match(r"(\d+) of (\d+) (\d+) failing, (\d+) warning", row["text"]).groups())
 
         _goto(clean_page, built_dashboard_html, row["nav"], self._ON)
         trend = clean_page.locator('[data-unit-trend="dataset"]')
@@ -5267,19 +5267,19 @@ class TestDatasetsNotGreenOnCardsAndHeadings:
         import re
         if not text:
             return None
-        m = re.match(r"(\d+) of (\d+) (?:counted )?datasets? not green (\d+) red, (\d+) amber", text)
+        m = re.match(r"(\d+) of (\d+) (?:counted )?datasets? not passing (\d+) failing, (\d+) warning", text)
         if m:
             n, total, red, amber = map(int, m.groups())
             assert n == red + amber, text
             return [red, amber, total]
-        m = re.match(r"All (\d+) (?:counted )?datasets? green", text)
+        m = re.match(r"All (\d+) (?:counted )?datasets? passing", text)
         assert m, text
         return [0, 0, int(m.group(1))]
 
     @staticmethod
     def _latest(label):
         import re
-        m = re.search(r"latest (\d+) red and (\d+) amber of (\d+)", label or "")
+        m = re.search(r"latest (\d+) failing and (\d+) warning of (\d+)", label or "")
         return list(map(int, m.groups())) if m else None
 
     def _wait_trends(self, page):
@@ -8996,19 +8996,40 @@ def _colour_words(page, where: str, *, pills: bool = True) -> list[str]:
     return [f"{where}: {h['element']} {h['text']!r}" for h in got["hits"]]
 
 
-def _hover_trends(page) -> list[str]:
-    """Hover one point of each check trend on the page and read its tooltip
-    (REQ-TEST-361 criterion 2: hover-only text)."""
+#: The trend kinds a page draws, and how each says a point's value on hover
+#: (REQ-TEST-361 criterion 2): a check's own trend fills a tooltip element
+#: when its hit area is hovered; a unit trend's and a sparkline's points
+#: carry a native SVG <title>, which shows on hover and is read directly.
+_TREND_KINDS = {
+    "check trend": "svg .hitrect",
+    "unit trend": ".unit-trend svg",
+    "sparkline": "svg.spark",
+}
+
+
+def _hover_trends(page, kinds) -> list[str]:
+    """Hover a point of each trend kind in `kinds` on the page and return
+    what its tooltip says - ASSERTING each kind drew and said something, so
+    the guard cannot pass on an empty list (CLAUDE.md test rule 3)."""
     said = []
-    for hit in page.locator("svg .hitrect").all()[:3]:
-        box = hit.bounding_box()
-        if not box:
-            continue
-        page.mouse.move(box["x"] + box["width"] * 0.9, box["y"] + box["height"] / 2)
-        svg_id = hit.evaluate("el => el.closest('svg').id")
-        tip = page.locator(f"#{svg_id}-tip")
-        if tip.count():
-            said.append(tip.text_content() or "")
+    for kind in kinds:
+        sel = _TREND_KINDS[kind]
+        assert page.locator(sel).count(), f"precondition: the page draws a {kind}"
+        if kind == "check trend":
+            hit = page.locator(sel).first
+            box = hit.bounding_box()
+            assert box, "precondition: the check trend's hit area is on screen"
+            page.mouse.move(box["x"] + box["width"] * 0.9, box["y"] + box["height"] / 2)
+            svg_id = hit.evaluate("el => el.closest('svg').id")
+            got = page.locator(f"#{svg_id}-tip").text_content() or ""
+            assert got.strip(), "hovering the check trend filled no tooltip"
+            said.append(got)
+        else:
+            page.locator(sel).first.hover()
+            got = page.evaluate(
+                "(sel) => [...document.querySelectorAll(sel + ' title')].map(t => t.textContent)", sel)
+            assert any(t.strip() for t in got), f"no {kind} point carries a tooltip"
+            said += got
     return said
 
 
@@ -9062,7 +9083,7 @@ class TestNoColourWordIsReadAsAStatus:
             _goto(clean_page, built_dashboard_html, state=_dataset_state(hx, dataset))
             _open_groups(clean_page)
             hits += _colour_words(clean_page, f"dataset page, {dataset}")
-            for tip in _hover_trends(clean_page):
+            for tip in _hover_trends(clean_page, ["unit trend"]):
                 if re.search(r"\b(green|amber|red)\b", tip, re.I):
                     hits.append(f"dataset page, {dataset}: chart tooltip {tip!r}")
         assert not hits, "\n".join(hits)
@@ -9079,9 +9100,24 @@ class TestNoColourWordIsReadAsAStatus:
         tile.click()
         clean_page.locator("#drawer[aria-hidden='false']").wait_for()
         hits += _colour_words(clean_page, "column panel")
-        for tip in _hover_trends(clean_page):
+        for tip in _hover_trends(clean_page, ["unit trend"]):
             if re.search(r"\b(green|amber|red)\b", tip, re.I):
                 hits.append(f"column panel: chart tooltip {tip!r}")
+        # A CHECK'S OWN TREND, from its card in the panel.
+        card = clean_page.locator("#drawer .check-card").first
+        assert card.count(), "precondition: the column panel lists a check"
+        card.click()
+        clean_page.locator("#drawer svg .hitrect").first.wait_for()
+        hits += _colour_words(clean_page, "check panel")
+        for tip in _hover_trends(clean_page, ["check trend"]):
+            if re.search(r"\b(green|amber|red)\b", tip, re.I):
+                hits.append(f"check panel: chart tooltip {tip!r}")
+        # AND A SPARKLINE'S POINT TITLES, on the agency tier's dataset rows.
+        _goto(clean_page, built_dashboard_html,
+              state={"tier": "agency", "agencyId": hx["ds_agency"][_LINKAGE_DATASET]})
+        for tip in _hover_trends(clean_page, ["sparkline"]):
+            if re.search(r"\b(green|amber|red)\b", tip, re.I):
+                hits.append(f"agency tier: sparkline point {tip!r}")
         assert not hits, "\n".join(hits)
 
     def test_the_scenario_pages_every_named_surface_and_scenario_j(
