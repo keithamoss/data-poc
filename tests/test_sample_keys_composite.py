@@ -247,3 +247,39 @@ def test_datacontract_cli_samples_every_primary_key_column_by_experiment(tmp_pat
     [c] = sampled
     assert datacontract_common.failing_sample_keys(c, ["site_code", "episode_no"]) == [
         ["S1", "1"], ["S2", "1"]]
+
+
+def test_every_sampled_contract_rule_can_record_its_tables_key():
+    """What criterion 8 would otherwise find at run time: datacontract-cli's
+    samples carry only primaryKey or unique columns, never a sensitive one, and
+    a duplicate rule's samples are the duplicated VALUE - so a sampled rule's
+    key columns must be such columns, and a duplicate rule on a column outside
+    the key must declare names_no_row."""
+    import yaml
+
+    sensitive = {"pii", "personal", "personal_data", "confidential", "restricted",
+                 "sensitive", "secret"}
+    seen = 0
+    for c in collections.all_collections():
+        key_by_table = collections.adapter(c).sample_key
+        doc = yaml.safe_load(open(c.check_file("contract")))
+        for schema in doc.get("schema") or []:
+            table = schema.get("physicalName") or schema["name"]
+            props = {p["name"]: p for p in schema.get("properties") or []}
+            for col, prop in props.items():
+                for rule in prop.get("quality") or []:
+                    if rule.get("metric") not in ("nullValues", "invalidValues", "duplicateValues"):
+                        continue
+                    seen += 1
+                    custom = {p["property"]: p.get("value") for p in rule.get("customProperties") or []}
+                    if sample_keys.names_no_row(custom.get("names_no_row")):
+                        continue
+                    key = key_by_table[table]
+                    if rule["metric"] == "duplicateValues":
+                        assert key == [col], (c.id, table, col, "declare names_no_row")
+                        continue
+                    for k in key:
+                        p = props[k]
+                        assert p.get("primaryKey") or p.get("unique"), (c.id, table, k)
+                        assert (p.get("classification") or "").lower() not in sensitive, (c.id, k)
+    assert seen, "no sampled contract rule found - this would prove nothing"
