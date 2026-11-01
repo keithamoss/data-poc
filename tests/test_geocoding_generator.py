@@ -272,3 +272,15 @@ def test_the_received_window_is_inside_the_due_time_and_grace(plan):
         slot = next(s for s in slots.slots_for_dataset(
             d, until=job.period.round_date + timedelta(days=1)) if s.period.name == job.period.name)
         assert at < slot.due_at
+
+
+def test_an_sa2_sits_inside_one_lga():
+    """post-build-review #299 item 6: the LGA is derived from the SA2, so the
+    same SA2 never appears in two LGAs, across records and census years."""
+    seen: dict[str, set] = {}
+    for i in range(3000):
+        for year in (2011, 2016, 2021):
+            sa2, lga = lp.area_codes("geo-ed-presentations", f"P{i}", year)
+            seen.setdefault(sa2, set()).add(lga)
+    assert len(seen) > 50
+    assert all(len(lgas) == 1 for lgas in seen.values())

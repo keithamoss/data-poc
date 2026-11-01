@@ -177,7 +177,9 @@ def area_codes(dataset_id: str, record: str, year) -> tuple[str, str]:
     if not _POOLS:
         _POOLS["sa2"], _POOLS["lga"] = _pool("sa2", SA2_POOL, 9), _pool("lga", LGA_POOL, 5)
     sa2 = _POOLS["sa2"][int(_hash_unit(dataset_id, record, year, "sa2") * SA2_POOL)]
-    lga = _POOLS["lga"][int(_hash_unit(dataset_id, record, year, "lga") * LGA_POOL)]
+    # THE LGA IS THE SA2'S (post-build-review #299 item 6): derived from the
+    # SA2 code alone, so an SA2 always sits inside one LGA.
+    lga = _POOLS["lga"][int(_hash_unit("lga-of", sa2) * LGA_POOL)]
     return sa2, lga
 
 
