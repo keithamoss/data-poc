@@ -6145,6 +6145,10 @@ could never have computed it), and it belongs with batch 5's check work.
        afterwards as its own batch. REJECTED (b), the whole separation after
        the split, which moves the configuration twice, and (c), the whole
        separation before the split.
+     - **QUEUED (Keith, 2026-10-31)**: the CODE half is scoped next, queued
+       behind the asset split, and only once geocoding is fully signed off
+       (it was, the same day: all nine requirements signed, no open
+       questions, every amendment wording signed).
 135. **[done, 2026-11-01]** **[Docs & process]** **[Testing & dev tooling]** **A replaced container lost a day of unpushed work; every checkpoint is now pushed to a `wip/` branch.**
      2026-11-01, afternoon Perth: under Keith's "no push until the very end"
      the whole build run (REQ-PIPE-341, REQ-TEST-374, Pass / Warn / Fail,
