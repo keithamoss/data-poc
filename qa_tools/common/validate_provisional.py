@@ -46,11 +46,14 @@ _LOADER = getattr(yaml, "CSafeLoader", yaml.SafeLoader)
 _AMENDMENT_QUOTE = re.compile(r"<<<.*?>>>", re.S)
 _QUOTED_WORD = re.compile(r"`PROVISIONAL`|'PROVISIONAL'")
 _MARKER = re.compile(r"\bPROVISIONAL\b")
-# The words, then a date. "to be answered" and "not yet answered" are a
-# promise, not an answer, even when a date follows.
+# The words, then a date. Case-insensitive on purpose: REQ-PIPE-110 d5 is
+# answered as "settled by Keith on 2026-10-07".
 _ANSWERED = re.compile(
-    r"(?<!be )(?<!yet )\b(?:SETTLED|answered) by Keith,?\s+(?:on\s+)?\d{4}-\d{2}-\d{2}",
-    re.I)
+    r"\b(?:SETTLED|answered) by Keith,?\s+(?:on\s+)?\d{4}-\d{2}-\d{2}", re.I)
+# A promise or a denial is not an answer, even when a date follows: "to be
+# answered", "not yet answered", "not answered", "never answered",
+# "un-answered", "has not been answered" - the negation within a word of it.
+_NEGATED = re.compile(r"\b(?:not|never|un|yet|be|been)\b[\s-]*(?:\w+\s+)?$", re.I)
 
 _HEADER = """\
 # REQ-TEST-374: the `PROVISIONAL` markers already in BUILT requirements when
@@ -65,7 +68,10 @@ _HEADER = """\
 def is_unanswered_marker(text: str) -> bool:
     """True where `text` carries an unquoted marker and no dated answer."""
     live = _QUOTED_WORD.sub("", _AMENDMENT_QUOTE.sub("", text))
-    return bool(_MARKER.search(live)) and not _ANSWERED.search(live)
+    if not _MARKER.search(live):
+        return False
+    return not any(not _NEGATED.search(live[max(0, m.start() - 40):m.start()])
+                   for m in _ANSWERED.finditer(live))
 
 
 def fingerprint(text: str) -> str:
@@ -123,10 +129,20 @@ def write_baseline(root: Path, entries) -> None:
 
 def _baseline_at_base(root: Path) -> set[tuple[str, str, str]] | None:
     """The baseline as the push's base held it, or None where that commit
-    is unreadable or did not hold one yet (its first introduction)."""
+    is unreadable or did not hold one yet (its first introduction).
+
+    UNREADABLE IS SAID, NOT SWALLOWED (post-build-review #295): a shallow
+    checkout cannot reach the push's base, and falling back to HEAD there
+    compared the baseline with itself, so a gain committed in the push
+    passed in silence. Now the gate prints that the gain check was skipped,
+    and why; the stale-entry check still runs."""
     ref = _diff_base.diff_base(root=root)
     if not _diff_base._resolves(ref, root):
-        ref = "HEAD"
+        wanted = (os.environ.get(_diff_base.ENV_VAR) or "").strip() or ref
+        print(f"provisional: note - gain check skipped: the push's base ({wanted}) cannot be "
+              f"read from this checkout (a shallow clone, or a first commit), so whether "
+              f"{BASELINE} gained an entry is unchecked here.")
+        return None
     shown = subprocess.run(["git", "show", f"{ref}:{BASELINE}"], cwd=root,
                            capture_output=True, text=True)
     if shown.returncode != 0:
@@ -134,7 +150,8 @@ def _baseline_at_base(root: Path) -> set[tuple[str, str, str]] | None:
     return _entries(yaml.load(shown.stdout, Loader=_LOADER))
 
 
-def main(argv: list[str] | None = None, root: Path = ROOT) -> int:
+def main(argv: list[str] | None = None, root: Path | None = None) -> int:
+    root = root or ROOT
     parser = argparse.ArgumentParser(prog="validate-provisional")
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--write-baseline", action="store_true")

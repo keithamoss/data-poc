@@ -13294,3 +13294,27 @@ twice. It deliberately did not re-find the `TypeError`.
      - Not defects: criterion 3's geocoding half (REQ-PIPE-296) and criterion
        7's compare wait on later work and the end bootstrap.
 
+295. **[done, 2026-11-01]** **[Testing & dev tooling]** **Post-build critic on REQ-TEST-374 as rebuilt (3ec7991): all findings minor.**
+     Each one was verified against the code before it went here. Three are
+     fixed under the polish rule, test-first and seen failing first (the
+     coordinator passed them on); three are accepted and recorded as
+     decisions on REQ-TEST-374.
+     - **Fixed, a silent gain check**: where the push's base cannot be read
+       (a shallow clone), `_baseline_at_base` fell back to HEAD and compared
+       the baseline with itself, so a gain committed in the push passed
+       silently. It now prints that the gain check was skipped and why, and
+       returns None as its docstring says. Tested with a `--depth 1` clone.
+     - **Fixed, negated answers**: 'not answered by Keith 2026-10-01' and
+       'never answered by Keith 2026-10-01' counted as answered. A negation
+       within a word before the answer (not, never, un-, yet, to be, been)
+       now leaves the item unanswered. The real register is unchanged: 0 new,
+       188 baselined.
+     - **Fixed, untested warning path**: a test now drives the real `mothman
+       dashboard validate-provisional` command over a scratch register with
+       a new marker: a warning line and exit 0, or 78 when asked for the
+       warning channel.
+     - **Accepted**: one dated answer clears every marker in its item, since
+       an item is one decision. Matching stays case-insensitive, because
+       REQ-PIPE-110 d5 is answered as 'settled by Keith on 2026-10-07'.
+       A backtick-colon or double-quoted mention is still flagged; every such
+       item on the register today is baselined.

@@ -37,6 +37,11 @@ WARN = 78
     "PROVISIONAL, SETTLED by Keith.",
     "PROVISIONAL. CURRENT: <<<answered by Keith 2026-10-01>>>",
     "Quotes `PROVISIONAL` and then really is PROVISIONAL.",
+    "PROVISIONAL - not answered by Keith 2026-10-01.",
+    "PROVISIONAL - never answered by Keith 2026-10-01.",
+    "PROVISIONAL - un-answered by Keith 2026-10-01.",
+    "PROVISIONAL - has not been answered by Keith 2026-10-01.",
+    "PROVISIONAL - not SETTLED by Keith 2026-10-01.",
 ])
 def test_an_unanswered_marker_is_counted(text):
     assert vp.is_unanswered_marker(text)
@@ -46,6 +51,8 @@ def test_an_unanswered_marker_is_counted(text):
     "SETTLED by Keith 2026-10-06, was PROVISIONAL (overnight).",
     "PROVISIONAL (open question 1 answered by Keith 2026-10-23).",
     "PROVISIONAL; Answered by Keith, 2026-10-23.",
+    "PROVISIONAL, settled by Keith on 2026-10-07 (REQ-PIPE-110 d5's lower case).",
+    "Not this one. PROVISIONAL, SETTLED by Keith 2026-10-06.",
     "A builder's `PROVISIONAL` choice goes on the report.",
     "The word 'PROVISIONAL' is a mention here.",
     "CURRENT: <<<a PROVISIONAL choice>>> PROPOSED: <<<a settled one>>>",
@@ -229,3 +236,38 @@ def test_ci_runs_it_without_the_warning_channel():
     mine = [s for s in steps if "validate-provisional" in (s.get("run") or "")]
     assert len(mine) == 1
     assert vp.WARNING_EXIT_VAR not in yaml.safe_dump(wf)
+
+
+def test_a_shallow_clone_says_the_gain_check_was_skipped(repo, tmp_path_factory,
+                                                         monkeypatch, capsys):
+    """CI's checkout cannot always reach the push's base. Then the gain
+    check cannot run, and says so rather than passing in silence."""
+    _write_register(repo, _req("REQ-A-001", decisions=["PROVISIONAL: x"]))
+    vp.write_baseline(repo, [])
+    base = _commit(repo)
+    _write_register(repo, _req("REQ-A-001", decisions=["PROVISIONAL: x"]),
+                    _req("REQ-A-002", decisions=["PROVISIONAL: y"]))
+    (repo / vp.BASELINE).unlink()
+    vp.write_baseline(repo, vp.scan(vp.load_register(repo)))  # a gain
+    _commit(repo)
+    shallow = tmp_path_factory.mktemp("shallow") / "clone"
+    subprocess.run(["git", "clone", "-q", "--depth", "1", f"file://{repo}", str(shallow)],
+                   check=True)
+    subprocess.run(["git", "-C", str(shallow), "checkout", "-q", "--detach"], check=True)
+    monkeypatch.setenv("MOTHMAN_DIFF_BASE", base)  # not in the clone
+    assert vp._baseline_at_base(shallow) is None
+    assert vp.main([], root=shallow) == 0
+    out = capsys.readouterr().out
+    assert "gain check skipped" in out and base in out
+
+
+def test_the_real_command_warns_on_a_new_marker_and_exits_0(repo, monkeypatch):
+    from cli.app import cli
+    _write_register(repo, _req("REQ-A-001", decisions=["ok", "PROVISIONAL: x"]))
+    vp.write_baseline(repo, [])
+    monkeypatch.setattr(vp, "ROOT", repo)
+    result = CliRunner().invoke(cli, ["dashboard", "validate-provisional"])
+    assert result.exit_code == 0, result.output
+    assert "warning: REQ-A-001 decisions item 2" in result.output
+    monkeypatch.setenv(vp.WARNING_EXIT_VAR, str(WARN))
+    assert CliRunner().invoke(cli, ["dashboard", "validate-provisional"]).exit_code == WARN
