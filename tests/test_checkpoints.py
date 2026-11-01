@@ -2,6 +2,8 @@
 (REQ-TEST-159, signed by Keith 2026-10-06)."""
 from __future__ import annotations
 
+import asset_folders
+
 import contextlib
 import os
 from dataclasses import dataclass
@@ -65,10 +67,10 @@ class TestOnlyASyntheticAsset:
     def real_asset(self, tmp_path, monkeypatch):
         from qa_tools.common import hierarchy
 
-        doc = hierarchy.DATA_ASSET_YAML.read_text().replace("synthetic: true", "synthetic: false")
+        doc = hierarchy.data_asset_yaml().read_text().replace("synthetic: true", "synthetic: false")
         assert "synthetic: false" in doc
         (tmp_path / "data-asset.yaml").write_text(doc)
-        monkeypatch.setattr(hierarchy, "DATA_ASSET_YAML", tmp_path / "data-asset.yaml")
+        asset_folders.point(tmp_path)
 
     def test_a_checkpoint_is_refused(self, real_asset):
         with pytest.raises(checkpoints.CheckpointRefused, match="synthetic"):
@@ -289,9 +291,9 @@ class TestARefusalChangesNothing:
         """#131 D9: a string "false" is truthy."""
         from qa_tools.common import hierarchy
 
-        doc = hierarchy.DATA_ASSET_YAML.read_text().replace("synthetic: true", 'synthetic: "false"')
+        doc = hierarchy.data_asset_yaml().read_text().replace("synthetic: true", 'synthetic: "false"')
         (tmp_path / "data-asset.yaml").write_text(doc)
-        monkeypatch.setattr(hierarchy, "DATA_ASSET_YAML", tmp_path / "data-asset.yaml")
+        asset_folders.point(tmp_path)
         with pytest.raises(checkpoints.CheckpointRefused, match="synthetic"):
             checkpoints.require_synthetic()
 

@@ -533,7 +533,7 @@ def embed() -> None:
     # The file a person edits to add dates - supply_holds' one constant,
     # contract/calendar.yaml since REQ-PIPE-110, never a second copy.
     from qa_tools.common import supply_holds
-    schedule_runway = {"configFile": supply_holds.SCHEDULE_FILE,
+    schedule_runway = {"configFile": supply_holds.schedule_file(),
                         "defaultThreshold": runway.DEFAULT_WARNING_SLOTS,
                         "calendars": []}
     for cal in schedule.calendars():

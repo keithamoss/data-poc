@@ -7,6 +7,8 @@ nothing has to be cleared.
 """
 from __future__ import annotations
 
+import asset_folders
+
 import json
 import os
 import shutil
@@ -39,6 +41,8 @@ BLURB = ("Civil registration of life events", "Civil registration of life eventS
 
 def _copy(src: Path, tmp_path: Path) -> Path:
     dest = tmp_path / src.name
+    if dest.is_symlink():
+        dest.unlink()
     shutil.copyfile(src, dest)
     return dest
 
@@ -58,17 +62,19 @@ def edit_in_place(path: Path, old: str, new: str) -> None:
 
 @pytest.fixture
 def asset(tmp_path, monkeypatch) -> Path:
-    """A copy of data-asset.yaml every reader of it is pointed at."""
-    path = _copy(CONTRACT / "data-asset.yaml", tmp_path)
-    monkeypatch.setattr(hierarchy, "DATA_ASSET_YAML", path)
-    monkeypatch.setattr(asset_time, "DATA_ASSET_YAML", path)
+    """A copy of data-asset.yaml every reader of it is pointed at, through the
+    asset resolver (REQ-PIPE-342 criterion 7)."""
+    (tmp_path / "pointed").mkdir(exist_ok=True)
+    path = _copy(CONTRACT / "data-asset.yaml", tmp_path / "pointed")
+    asset_folders.point(tmp_path / "pointed")
     return path
 
 
 @pytest.fixture
 def calendar(tmp_path, monkeypatch) -> Path:
-    path = _copy(CONTRACT / "calendar.yaml", tmp_path)
-    monkeypatch.setattr(agreement, "CALENDAR_YAML", path)
+    (tmp_path / "pointed").mkdir(exist_ok=True)
+    path = _copy(CONTRACT / "calendar.yaml", tmp_path / "pointed")
+    asset_folders.point(tmp_path / "pointed")
     return path
 
 
@@ -163,8 +169,7 @@ class TestAPatchedPathIsReadAndUndoneWithNothingCleared:
         other = _copy(CONTRACT / "data-asset.yaml", tmp_path)
         edit_in_place(other, *DATASET_NAME)
         edit_in_place(other, *PATTERN)
-        with monkeypatch.context() as m:
-            m.setattr(hierarchy, "DATA_ASSET_YAML", other)
+        with asset_folders.pointed(tmp_path):
             assert _client_name() == DATASET_NAME[1]
             assert _registry_client_name() == DATASET_NAME[1]
             assert not _has_notifications_pattern()
@@ -176,8 +181,7 @@ class TestAPatchedPathIsReadAndUndoneWithNothingCleared:
         assert _zone() == ZONE[0]
         other = _copy(CONTRACT / "data-asset.yaml", tmp_path)
         edit_in_place(other, *ZONE)
-        with monkeypatch.context() as m:
-            m.setattr(asset_time, "DATA_ASSET_YAML", other)
+        with asset_folders.pointed(tmp_path):
             assert _zone() == ZONE[1]
         assert _zone() == ZONE[0]
 
@@ -185,8 +189,7 @@ class TestAPatchedPathIsReadAndUndoneWithNothingCleared:
         assert _first_expected_time() == "09:00"
         other = _copy(CONTRACT / "calendar.yaml", tmp_path)
         edit_in_place(other, *EXPECTED)
-        with monkeypatch.context() as m:
-            m.setattr(agreement, "CALENDAR_YAML", other)
+        with asset_folders.pointed(tmp_path):
             assert _first_expected_time() == "10:00"
         assert _first_expected_time() == "09:00"
 
@@ -402,9 +405,11 @@ class TestAFailureIsNeverRemembered:
 
     def test_a_missing_file_raises_every_call(self, tmp_path, monkeypatch):
         missing = tmp_path / "nowhere.yaml"
-        monkeypatch.setattr(hierarchy, "DATA_ASSET_YAML", missing)
-        monkeypatch.setattr(asset_time, "DATA_ASSET_YAML", missing)
-        monkeypatch.setattr(agreement, "CALENDAR_YAML", missing)
+        folder = tmp_path / "pointed"
+        folder.mkdir()
+        for name in ("data-asset.yaml", "calendar.yaml"):
+            (folder / name).symlink_to(missing)
+        asset_folders.point(folder)
         for call in (hierarchy.all_datasets, collections.all_collections,
                      asset_time.timezone_versions, agreement.current,
                      lambda: run_dbt._check_ids(str(missing)),
@@ -436,7 +441,7 @@ class TestTheContentIsReadOnEveryCall:
         monkeypatch.setattr(config_yaml, "read", lambda p: reads.append(p) or real(p))
         hierarchy.all_datasets()
         agreement.current()
-        assert asset in reads and agreement.CALENDAR_YAML in reads
+        assert asset in reads and agreement.calendar_yaml() in reads
 
 
 # ---- the store's own bound (NFR MEMORY) --------------------------------------

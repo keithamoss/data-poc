@@ -6,8 +6,9 @@ and dataset statistics driven for real against a third collection.
 """
 from __future__ import annotations
 
+import collection_modules
+
 import dataclasses
-import sys
 from datetime import date
 from types import SimpleNamespace
 
@@ -76,7 +77,7 @@ class TestAThirdCollectionsStatsAndClaimWindowForReal:
     def test_a_non_empty_stats_spec_is_what_the_fake_collection_measures(self, third_collection):
         from qa_tools.tools import dataset_stats
 
-        adapter = sys.modules["qa_tools.collections.fake_collection"]
+        adapter = collection_modules.installed("adapter", "fake_collection")
         adapter.ADAPTER = dataclasses.replace(adapter.ADAPTER, stats=StatsSpec(
             aggregates={(FAKE_TABLE, "things"): {
                 "kind": "categorical", "invalid_condition": "things NOT IN ('a', 'b')",

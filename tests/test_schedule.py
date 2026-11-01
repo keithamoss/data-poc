@@ -518,7 +518,7 @@ class TestNothingIsComputedFromAHolidayCalendar:
         agreed; it does not constitute it."""
         import yaml as _yaml
         from qa_tools.common import agreement
-        raw = _yaml.safe_load(agreement.CALENDAR_YAML.read_text())
+        raw = _yaml.safe_load(agreement.calendar_yaml().read_text())
         authored = [(d["period"], str(d["date"]))
                     for c in raw["calendars"] if c["name"] == "quarterly"
                     for d in c["versions"][-1]["dates"]]

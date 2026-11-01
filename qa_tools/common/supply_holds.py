@@ -130,18 +130,17 @@ class Holds:
                 f"Each needs somebody to assign it to a slot or reject it.")
 
 
-def _schedule_file() -> str:
+def schedule_file() -> str:
+    """Where a dataset's delivery dates are authored (REQ-PIPE-154 criterion
+    3): the selected asset's agreement file, relative to the repository - one
+    path, never a second literal copy of it (REQ-PIPE-110 criterion 17).
+    Resolved at call time (REQ-PIPE-342 criterion 6); it was the import-time
+    constant SCHEDULE_FILE."""
     from qa_tools.common import agreement
 
     path = agreement.calendar_yaml()
     root = path.parent.parent
     return str(path.relative_to(root))
-
-
-#: Where a dataset's delivery dates are authored (REQ-PIPE-154 criterion 3):
-#: the agreement's own file, relative to the repository - one path, never a
-#: second literal copy of it (REQ-PIPE-110 criterion 17).
-SCHEDULE_FILE = _schedule_file()
 
 
 def reason_for(decided: Assignment) -> dict:
@@ -153,7 +152,7 @@ def reason_for(decided: Assignment) -> dict:
               "considered": list(decided.considered)}
     if decided.schedule_ended:
         reason.update(schedule_ended=True, last_period=decided.last_period,
-                      fix_file=SCHEDULE_FILE)
+                      fix_file=schedule_file())
         try:
             from qa_tools.common import schedule
             calendar = schedule.calendar_for_dataset(decided.dataset_id).name
@@ -242,10 +241,10 @@ class Held:
             # REQ-PIPE-179 criterion 34: place it, reject it, or change the
             # configuration if this period should be owed.
             return (self._place_response(), "reject the supply",
-                    f"change effective_to/effective_from in {SCHEDULE_FILE} if this period "
+                    f"change effective_to/effective_from in {schedule_file()} if this period "
                     f"should be owed - it files itself on the next processing pass")
         if self.schedule_ended:
-            return (f"add the next delivery dates to {SCHEDULE_FILE} - it files itself "
+            return (f"add the next delivery dates to {schedule_file()} - it files itself "
                     f"on the next processing pass",)
         if self.agreement_refused:
             # OURS TO FIX, IN CONFIGURATION (REQ-PIPE-173): it files itself
@@ -264,7 +263,7 @@ class Held:
                     f"`{placing.flag_form(self.dataset_id, self.supply_id, period)}`",
                     "reject the supply",
                     f"if the change was made in error, correct the collection's "
-                    f"files_go_to_period in {SCHEDULE_FILE} (by a declared correction where "
+                    f"files_go_to_period in {schedule_file()} (by a declared correction where "
                     f"the version is frozen)")
         if self.correction:
             # REQ-PIPE-170 criterion 8: a confirmed correction left it no period.
@@ -363,11 +362,11 @@ class Held:
             if turn is None:
                 return (f"Received while {name} is turned off. Place it into a period it still "
                         f"owes, reject it, or change effective_to/effective_from in "
-                        f"{SCHEDULE_FILE} if this period should be owed.")
+                        f"{schedule_file()} if this period should be owed.")
             return (f"Received while {name} is turned off ({turn.reason}, "
                     f"{turned_off.level_words(turn, self.dataset_id)}). Place it into a period "
                     f"it still owes, reject it, or change effective_to/effective_from in "
-                    f"{SCHEDULE_FILE} if this period should be owed.")
+                    f"{schedule_file()} if this period should be owed.")
         if self.doubly_fed:
             from datetime import date as _date
 
@@ -395,7 +394,7 @@ class Held:
             return (f"{self.supply_id} arrived after the {name} schedule ended - "
                     f"its last authored period is {last}, and "
                     f"there is no later date to file it to. Add dates to the dataset's "
-                    f"calendar in {SCHEDULE_FILE}.{how} The next processing pass then "
+                    f"calendar in {schedule_file()}.{how} The next processing pass then "
                     f"files it by the rule. Raised by {self.raised_by}.")
         if self.agreement_refused:
             # OUR CONFIGURATION, NOT THE SUPPLIER (REQ-PIPE-173 criterion 2).
@@ -470,7 +469,7 @@ class Tally:
         datasets, supplies = self.schedule_ended
         if supplies:
             line += (f" {supplies} of them, across {datasets} dataset(s), because the "
-                     f"dataset's schedule has ended - add dates in {SCHEDULE_FILE} and the "
+                     f"dataset's schedule has ended - add dates in {schedule_file()} and the "
                      f"next processing pass files them.")
         return line
 

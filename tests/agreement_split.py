@@ -156,16 +156,15 @@ def write(contract_dir: Path, merged: dict, base: dict | None = None) -> None:
 
 def repoint(monkeypatch, directory: Path, merged: dict, base: dict | None = None) -> Path:
     """Write `merged` as the two files into `directory` and point every
-    reader at them - the hierarchy at the asset file, the agreement at the
-    calendar file. Returns the asset file's path."""
-    from qa_tools.common import agreement, hierarchy
+    reader at them, by pointing the asset resolver at `directory` - completed
+    from the real asset folder, so every other file still reads as committed
+    (REQ-PIPE-342 criterion 7). Returns the asset file's path."""
+    import asset_folders
 
     directory.mkdir(parents=True, exist_ok=True)
     write(directory, merged, base)
-    asset_path = directory / "data-asset.yaml"
-    monkeypatch.setattr(hierarchy, "DATA_ASSET_YAML", asset_path)
-    monkeypatch.setattr(agreement, "CALENDAR_YAML", directory / "calendar.yaml")
-    return asset_path
+    asset_folders.point(directory)
+    return directory / "data-asset.yaml"
 
 
 def participation(dataset_id: str, **version) -> dict:

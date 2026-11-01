@@ -3,9 +3,10 @@ the hierarchy, behind every dispatch site whose code survives the series -
 and the gate that keeps it the only one."""
 from __future__ import annotations
 
+import collection_modules
+
 import contextlib
 import json
-import sys
 from types import SimpleNamespace
 
 import pytest
@@ -24,7 +25,7 @@ def _declared() -> list[tuple[dict, dict]]:
     from the YAML rather than through the registry under test - whichever
     file is current, so a fixture's added collection is in it too. Never
     empty: a test comparing against it must be able to fail."""
-    doc = yaml.safe_load(hierarchy.DATA_ASSET_YAML.read_text())
+    doc = yaml.safe_load(hierarchy.data_asset_yaml().read_text())
     found = [(a, c) for a in doc["hierarchy"]["agencies"] for c in a.get("collections") or []]
     assert found, "the hierarchy declares no collection - the comparison would prove nothing"
     return found
@@ -33,7 +34,7 @@ def _declared() -> list[tuple[dict, dict]]:
 #: The real adapter modules, one per collection the real hierarchy declares
 #: (read once, at import, before any fixture adds a collection).
 REAL_MODULES = tuple(c.module_name for c in collections.collections_in(
-    yaml.safe_load(hierarchy.DATA_ASSET_YAML.read_text())))
+    yaml.safe_load(hierarchy.data_asset_yaml().read_text())))
 
 
 class TestTheRegistry:
@@ -307,9 +308,9 @@ def _package(tmp_path, *modules):
 
 
 def _edit(edit) -> None:
-    doc = yaml.safe_load(hierarchy.DATA_ASSET_YAML.read_text())
+    doc = yaml.safe_load(hierarchy.data_asset_yaml().read_text())
     edit(doc["hierarchy"]["agencies"][-1]["collections"][0], doc)
-    hierarchy.DATA_ASSET_YAML.write_text(yaml.safe_dump(doc, sort_keys=False))
+    hierarchy.data_asset_yaml().write_text(yaml.safe_dump(doc, sort_keys=False))
 
 
 class TestTheConfigurationGate:
@@ -584,7 +585,7 @@ class TestTheSharedToolModules:
         from qa_tools.collections.base import SodaSpec
         from qa_tools.tools import run_soda
 
-        adapter = sys.modules["qa_tools.collections.fake_collection"]
+        adapter = collection_modules.installed("adapter", "fake_collection")
         adapter.ADAPTER = dataclasses.replace(
             adapter.ADAPTER,
             soda=soda or SodaSpec(data_source="fake_source",
@@ -742,7 +743,7 @@ class TestTheSharedToolModules:
         from qa_tools.collections.base import DbtSpec
         from qa_tools.tools import run_dbt
 
-        adapter = sys.modules["qa_tools.collections.fake_collection"]
+        adapter = collection_modules.installed("adapter", "fake_collection")
         adapter.ADAPTER = dataclasses.replace(
             adapter.ADAPTER,
             dbt=DbtSpec(dimension_by_test={"not_null": "completeness"},
@@ -824,7 +825,7 @@ class TestTheSharedToolModules:
             "from qa_tools.collections.base import CollectionAdapter\n"
             f"ADAPTER = CollectionAdapter(collection_id={FAKE_ID!r}, label='Fake',\n"
             "                            dashboard_json='fake.json')\n")
-        monkeypatch.delitem(sys.modules, "qa_tools.collections.fake_collection")
+        collection_modules.uninstall(monkeypatch, "adapter", "fake_collection")
         monkeypatch.setattr(registry, "__path__", [*registry.__path__, str(importable)])
         got = gate.config_problems(_package(tmp_path, *TestTheConfigurationGate.REAL,
                                             "fake_collection"))
@@ -836,7 +837,7 @@ class TestTheSharedToolModules:
     def test_an_unknown_legacy_flag_fails_the_gate_naming_it(self, third_collection, tmp_path):
         import dataclasses
 
-        adapter = sys.modules["qa_tools.collections.fake_collection"]
+        adapter = collection_modules.installed("adapter", "fake_collection")
         adapter.ADAPTER = dataclasses.replace(adapter.ADAPTER, legacy=frozenset({"no.such.flag"}))
         got = gate.config_problems(_package(tmp_path, *TestTheConfigurationGate.REAL,
                                             "fake_collection"))

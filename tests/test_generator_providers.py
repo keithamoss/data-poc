@@ -10,6 +10,8 @@ one, a scenario naming a dataset no provider makes.
 """
 from __future__ import annotations
 
+import collection_modules
+
 import json
 import subprocess
 import sys
@@ -78,7 +80,7 @@ def writing(third_collection, monkeypatch, tmp_path):
     tmp_path/out."""
     module = types.ModuleType(PROVIDER_MODULE)
     module.PROVIDER = _Writing()
-    monkeypatch.setitem(sys.modules, PROVIDER_MODULE, module)
+    collection_modules.install(monkeypatch, "provider", "fake_collection", module)
     # NOT THE CORRECTION CHECK (tests/test_correction_claims.py owns it):
     # since Linkage Products rides REQ-GEN-205, that check plans Child
     # Protection's whole history to find linkage's quarters, which reads every

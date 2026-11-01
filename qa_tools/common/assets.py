@@ -213,7 +213,7 @@ def _refusal(stated: str | None, found: list[str]) -> str:
         head = f"{ASSET_ENV} is {stated!r}, which names no asset folder."
     return (f"{head} Set it to one of: {listed}. There is deliberately no default - a "
             f"command that guesses is a command that can act for an asset it was not "
-            f"meant to")
+            f"meant to.")
 
 
 def selected() -> Asset:
@@ -224,6 +224,15 @@ def selected() -> Asset:
     if stated is None or stated not in found:
         raise AssetNotSelected(_refusal(stated, found))
     return _layout.asset(stated)
+
+
+def why_not_selected() -> str | None:
+    """The refusal `selected()` would raise, or None when an asset is
+    selected - for a caller that says it rather than raising it, such as the
+    CLI meeting a command it cannot place (REQ-PIPE-363 criterion 4)."""
+    stated = os.environ.get(ASSET_ENV) or None
+    found = names()
+    return None if stated in found else _refusal(stated, found)
 
 
 def selected_or_none() -> Asset | None:
@@ -276,37 +285,44 @@ def receipts_dir() -> Path:
 _KINDS = {"adapter": "adapters", "provider": "providers"}
 
 
-def module_file(kind: str, module_name: str) -> Path:
-    """Where the selected asset's `kind` module would be. `module_name` must
+def module_file(kind: str, module: str) -> Path:
+    """Where the selected asset's `kind` module would be. `module` must
     already have passed the hierarchy's id pattern - the callers validate the
     collection id before it reaches here."""
-    return getattr(selected(), _KINDS[kind]) / f"{module_name}.py"
+    return getattr(selected(), _KINDS[kind]) / f"{module}.py"
 
 
-def load(kind: str, module_name: str):
+def module_name(kind: str, module: str) -> str:
+    """The name the selected asset's `kind` module is registered under -
+    mothman_<kind>_<asset>_<module> (REQ-PIPE-369 criterion 2, REQ-GEN-370
+    criterion 2, both SETTLED by Keith 2026-11-01)."""
+    return f"mothman_{kind}_{selected().module_tag}_{module}"
+
+
+def load(kind: str, module: str):
     """The selected asset's adapter or provider module, loaded from its file
     and registered as mothman_<kind>_<asset>_<module> - a name no package on
     sys.path provides, so two assets' same-named modules are two modules.
     Loaded once per file; asked again, the same module."""
     asset = selected()
-    path = module_file(kind, module_name)
-    name = f"mothman_{kind}_{asset.module_tag}_{module_name}"
+    path = module_file(kind, module)
+    name = module_name(kind, module)
     loaded = sys.modules.get(name)
     if loaded is not None and getattr(loaded, "__file__", None) == str(path):
         return loaded
     if not path.is_file():
-        raise NoModule(f"asset {asset.name!r} has no {kind} {module_name!r} - {path} does not "
+        raise NoModule(f"asset {asset.name!r} has no {kind} {module!r} - {path} does not "
                        f"exist")
     spec = importlib.util.spec_from_file_location(name, path)
-    module = importlib.util.module_from_spec(spec)
+    loaded = importlib.util.module_from_spec(spec)
     # REGISTERED BEFORE IT RUNS: a dataclass in it looks its own module up.
-    sys.modules[name] = module
+    sys.modules[name] = loaded
     try:
-        spec.loader.exec_module(module)
+        spec.loader.exec_module(loaded)
     except BaseException:
         sys.modules.pop(name, None)
         raise
-    return module
+    return loaded
 
 
 def adapter_file(collection_id: str) -> str:

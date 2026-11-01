@@ -15,6 +15,8 @@ owing nothing.
 """
 from __future__ import annotations
 
+import asset_folders
+
 from datetime import date, timedelta
 
 import pytest
@@ -387,7 +389,7 @@ def using(monkeypatch, tmp_path):
     def apply(doc):
         path = tmp_path / "calendar.yaml"
         path.write_text(yaml.safe_dump(doc, sort_keys=False))
-        monkeypatch.setattr(agreement, "CALENDAR_YAML", path)
+        asset_folders.point(tmp_path)
         return agreement.current()
     yield apply
 

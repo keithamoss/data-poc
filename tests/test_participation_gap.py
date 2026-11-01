@@ -9,6 +9,8 @@ owed again - was never seen, and the gap quarter inherited nothing.
 """
 from __future__ import annotations
 
+import asset_folders
+
 import yaml
 
 from qa_tools.common import agreement, inheritance
@@ -18,7 +20,7 @@ ED = "ed-presentations"
 
 def _with_gap(tmp_path, monkeypatch):
     """The real calendar, with ED owing nothing for 2024-Q2 (May) alone."""
-    raw = yaml.safe_load(agreement.CALENDAR_YAML.read_text())
+    raw = yaml.safe_load(agreement.calendar_yaml().read_text())
     entry = next(d for d in raw["datasets"] if d["id"] == ED)
     first = entry["participation"]["versions"][0]
     note = [{"date": "2026-10-18", "author": "test", "change": "a gap for a test"}]
@@ -30,7 +32,7 @@ def _with_gap(tmp_path, monkeypatch):
     ]
     path = tmp_path / "calendar.yaml"
     path.write_text(yaml.safe_dump(raw, sort_keys=False))
-    monkeypatch.setattr(agreement, "CALENDAR_YAML", path)
+    asset_folders.point(tmp_path)
 
 
 def test_the_gap_quarter_is_owed_nothing(tmp_path, monkeypatch):

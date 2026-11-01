@@ -29,7 +29,7 @@ FAKE_AGENCY = "fake-agency"
 def described(third_collection, tmp_path, monkeypatch, supply_dsn):
     """The third collection with what a real one carries: its table in its
     contract, a presentation entry, and no recorded runs."""
-    contract = hierarchy.DATA_ASSET_YAML.parent / collections.by_id(FAKE_ID).contract
+    contract = hierarchy.data_asset_yaml().parent / collections.by_id(FAKE_ID).contract
     doc = yaml.safe_load(contract.read_text())
     doc["schema"] = [{
         "name": FAKE_TABLE, "physicalType": "table", "description": "One row per fake thing.",
@@ -45,12 +45,12 @@ def described(third_collection, tmp_path, monkeypatch, supply_dsn):
     shown["collections"][FAKE_ID] = {"provider": "The Fake Agency", "delivery_format": "CSV",
                                      "provenance": "Built from fakes. ({table_description})"}
     shown["agencies"][FAKE_AGENCY] = {"blurb": "Makes fake things."}
-    (hierarchy.DATA_ASSET_YAML.parent / "presentation.yaml").write_text(yaml.safe_dump(shown))
+    (hierarchy.data_asset_yaml().parent / "presentation.yaml").write_text(yaml.safe_dump(shown))
     # ITS PLACE IN THE DELIVERY CALENDAR, as any real collection has: on the
     # quarterly calendar, owing what a Child Protection dataset owes.
     from qa_tools.common import agreement
 
-    cal = yaml.safe_load(agreement.CALENDAR_YAML.read_text())
+    cal = yaml.safe_load(agreement.calendar_yaml().read_text())
     cp = next(c for c in cal["collections"] if c["id"] == "child-protection")
     # REPLACED, not appended: the third_collection fixture already puts it on
     # the quarterly calendar (REQ-PIPE-262's streams need one).
@@ -58,9 +58,9 @@ def described(third_collection, tmp_path, monkeypatch, supply_dsn):
     cal["collections"].append({**cp, "id": FAKE_ID})
     clients = next(d for d in cal["datasets"] if d["id"] == "cp-clients")
     cal["datasets"].append({**clients, "id": FAKE_DATASET})
-    calendar = tmp_path / "calendar.yaml"
-    calendar.write_text(yaml.safe_dump(cal, sort_keys=False))
-    monkeypatch.setattr(agreement, "CALENDAR_YAML", calendar)
+    import asset_folders
+
+    asset_folders.replace("calendar.yaml", yaml.safe_dump(cal, sort_keys=False))
     # AN EMPTY RESULTS FILE, as the real rebuild writes for a collection with
     # no recorded runs - a MISSING file is refused (Keith, 2026-10-18; see
     # TestAMissingResultsFileIsRefused below), not read as no runs.
@@ -175,7 +175,7 @@ class TestAThirdCollectionIsLinked:
     def test_its_dataset_and_agency_get_links_from_the_registry(self, described):
         from qa_tools.common import github_links
 
-        links = github_links.build_folder_links(sha="abc123", root=hierarchy.DATA_ASSET_YAML.parent.parent)
+        links = github_links.build_folder_links(sha="abc123", root=hierarchy.data_asset_yaml().parent.parent)
         assert links["agencies"][FAKE_AGENCY].endswith(f"/tree/abc123/contract/{FAKE_AGENCY}")
         assert links["datasets"][FAKE_DATASET].startswith(
             f"https://github.com/keithamoss/data-poc/blob/abc123/contract/{FAKE_AGENCY}/")

@@ -95,7 +95,14 @@ def environment_statement() -> str | None:
         return None
     if env is None:
         return None
-    return f"Environment: {env.label}" + ("" if env.publishes else " (not production)")
+    statement = f"Environment: {env.label}" + ("" if env.publishes else " (not production)")
+    # AND THE ASSET, IN WORDS (REQ-PIPE-363 criterion 8), wherever the
+    # environment is named - so a person switching assets can see which one
+    # this terminal is acting for.
+    from qa_tools.common import assets
+
+    asset = assets.selected_or_none()
+    return statement + (f" · Asset: {asset.name}" if asset is not None else "")
 
 
 def _with_environment_toolbar(question):
@@ -1203,8 +1210,14 @@ N_LIST = 9
 
 
 def _registered():
+    """The selected asset's collections - none while no asset is selected,
+    which is what lets the command modules build their options with nothing
+    of any asset read (REQ-PIPE-363 criterion 2)."""
     from qa_tools import collections
+    from qa_tools.common import assets
 
+    if assets.selected_or_none() is None:
+        return []
     return collections.all_collections()
 
 

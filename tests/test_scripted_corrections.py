@@ -46,7 +46,7 @@ corrections:
         assert scripted_decisions.load(path) == [], "the Player never sees a confirmation"
 
     def test_the_file_header_describes_the_entry(self):
-        head = scripted_decisions.SCRIPT_PATH.read_text().split("\ndecisions:")[0]
+        head = scripted_decisions.script_path().read_text().split("\ndecisions:")[0]
         assert "corrections:" in head and "keep_reason" in head and "pending" in head
 
 
