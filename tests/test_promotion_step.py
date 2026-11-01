@@ -101,7 +101,7 @@ class TestAPromotionPastAGapRedNamesIt:
         [(reason,)] = conn.execute(
             f"SELECT reason FROM {dl.TABLE} WHERE dataset_id = ?", [ds]).fetchall()
         assert "volume_evidently" in reason
-        assert "apart from 1 recorded red" in reason
+        assert "apart from 1 recorded failing" in reason
 
     def test_with_none_the_reason_is_unchanged(self, conn, period):
         ds = _dataset()
@@ -126,7 +126,7 @@ class TestTheStatusComesFromEveryContributingCheck:
                      "check_id": sibling_check}],
                    reads={sibling_check: [ds, "cp_placements"]})
         assert out.promoted == ()
-        assert "red" in out.refused[ds]
+        assert "Fail" in out.refused[ds]
 
     def test_a_check_declaring_nothing_of_ours_does_not_gate_us(self, conn, period):
         ds = _dataset()
