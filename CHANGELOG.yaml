@@ -109,6 +109,34 @@ intro: >
   all three.
 
 releases:
+  - date: "2026-11-02"
+    summary: >
+      A trial now reads a supply still waiting on a decision, linkage releases
+      describe only files that arrived, and a gap inside a record's key reads
+      one way.
+    changes:
+      - category: Improved
+        items:
+          - headline: Trials read waiting supplies
+            components: ["Pipeline & publishing"]
+            description: >
+              Trying a folder without keeping it now reads each table it did not
+              bring as a real arrival would - including a supply that arrived for
+              the quarter and is still awaiting a decision.
+      - category: Fixed
+        items:
+          - headline: One gap, one mark
+            components: ["Dashboard UI"]
+            description: >
+              In an example identified by several columns, a missing part with
+              more after it now shows as a dash whether it was empty or never
+              recorded, so the same gap no longer reads two ways.
+          - headline: Linkage describes what arrived
+            components: ["Data generation"]
+            description: >
+              A Linkage Products release is now built only from source supplies
+              whose file actually arrived, never one a scenario left out. No
+              release in today's history changes.
   - date: "2026-11-01"
     summary: >
       Every status now reads Pass, Warn or Fail with the colours unchanged,

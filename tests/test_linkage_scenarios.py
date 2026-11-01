@@ -223,7 +223,8 @@ def test_the_named_scenario_rides_a_marked_quarter(plan):
 
 
 class TestAReleaseDescribesOnlyASupplyThatArrived:
-    """plans/qa-pipeline.md #89, FIXED 2026-11-02 (Keith, morning report D1):
+    """REQ-GEN-334 criterion 5 as amended 2026-11-02 (Keith, morning report D1;
+    it was plans/qa-pipeline.md #89, now deleted):
     a release describes its quarter's last source supply received before it
     WHOSE FILE ARRIVED (GeneratedSupply.carried) - the rule the geocoding
     stream reads by - never one a scenario's file shape left out

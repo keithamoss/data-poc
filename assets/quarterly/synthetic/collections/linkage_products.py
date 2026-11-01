@@ -1277,7 +1277,7 @@ class LinkageProducts(Provider):
         # THE LAST SUPPLY FILED TO THE QUARTER AND RECEIVED BEFORE THIS
         # DELIVERY (criterion 5): a release cannot describe a later file -
         # NOR ONE WHOSE FILE NEVER ARRIVED (criterion 5 as amended 2026-11-02,
-        # Keith, morning report D1; plans/qa-pipeline.md #89): only a carried
+        # Keith, morning report D1; it was plans/qa-pipeline.md #89): only a carried
         # supply, by the rule the geocoding stream reads by (_before).
         described = {}
         for did, _code, _cols in linked():

@@ -13603,3 +13603,34 @@ twice. It deliberately did not re-find the `TypeError`.
      - **7. Nits (fixed)**: A1-A5 marked applied and dated; the agency row
        names the tool by display name; each remaining PROVISIONAL question
        carries a recommendation.
+
+304. **[done, 2026-11-02]** **[Data generation]** **[QA pipeline]** **[Dashboard UI]** **Keith's morning answers to morning report 12, built: A2's drift planning, B1's folder trial, B11's null key part, and D1's linkage releases.**
+     Not a critic's finding: four changes to built behaviour Keith decided on
+     2026-11-02, each built test-first, the test seen failing first, and the
+     rest of his answers marked SETTLED or CHANGED in the register.
+     - **A2, REQ-GEN-295 criterion 7 (amended)**: a geocoding file's drift
+       verdict is planned from what the drift check reads - its placed value
+       counts against its reference's, through the check's own PSI,
+       exclusions and thresholds (evidently_common.psi_of_counts) - in place
+       of #301's fitted 'red source with blank address fields' rule. The
+       whole quarterly history generated before and after is byte-identical,
+       bookkeeping included, so on today's history the computed rule plans
+       exactly what the fitted one did; the generation-time trial agrees on
+       all 43 tried supplies against a scratch database.
+     - **B1, REQ-PIPE-202 decision 17 (changed)**: a folder trial reads each
+       table it did not carry as a real arrival's overlay does - a staged,
+       undecided supply filed to the period first, behind the real
+       load-record gate, else the promoted version.
+     - **B11, REQ-DASH-299 criterion 8 and decision 36 (changed)**: a null
+       part followed by a present one reads '—', as an empty one does; only
+       a key of nothing reads '(no value)'.
+     - **D1, REQ-GEN-334 criterion 5 (amended; it was plans/qa-pipeline.md
+       #89, deleted)**: a linkage release describes only a source supply whose
+       file arrived. THE LIST OF RELEASES THAT MOVED IS EMPTY. Three releases
+       read a left-out Client Register - 2016-Q2 (lp_slot_13, the 2016-02-29
+       supply), 2022-Q1 (lp_slot_36, 2022-01-05) and 2023-Q3 (lp_slot_42,
+       2023-06-08) - and each now describes the carried supply before it,
+       whose identifier records are identical (2023-Q3's differ only in
+       postcode, which a release does not read). Every linkage release and
+       delivery, every other delivery, every receipt and the bookkeeping are
+       byte-identical before and after.
