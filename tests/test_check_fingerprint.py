@@ -214,7 +214,9 @@ class TestRealChecks:
 
     def test_changing_a_file_checks_definition_moves_it_for_every_dataset_and_no_other(
             self, tmp_path):
-        rel = "contract/file-checks.yaml"
+        from qa_tools.common import assets
+
+        rel = f"{assets.folder_rel()}/file-checks.yaml"
         before = cl.parse_file_check_metadata(ROOT / rel)
         name = before[0].check_kind
         text = (ROOT / rel).read_text()
@@ -229,7 +231,9 @@ class TestRealChecks:
         assert len(moved) > 1, "every dataset's copy of the one definition moves together"
 
     def test_one_file_check_definition_gives_every_dataset_one_fingerprint(self):
-        checks = cl.parse_file_check_metadata(ROOT / "contract/file-checks.yaml")
+        from qa_tools.common import assets
+
+        checks = cl.parse_file_check_metadata(assets.selected().file("file-checks.yaml"))
         by_kind: dict = {}
         for c in checks:
             by_kind.setdefault(c.check_kind, set()).add(c.config_hash)

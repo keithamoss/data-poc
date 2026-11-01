@@ -38,7 +38,11 @@ from qa_tools.common import dbt_common, supply_db
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PROFILES_DIR = os.path.join(ROOT, "qa_tools", "dbt_profiles")
-DBT_PROJECT_DIR = os.path.join(ROOT, "dbt_project")
+def _project() -> str:
+    """The selected asset's dbt project, asked of the resolver when used."""
+    from qa_tools.common import assets
+
+    return str(assets.selected().dbt_project)
 
 
 def _target(tmp_path):
@@ -57,7 +61,7 @@ _NO_SUCH_RUN = "run_that_was_never_staged"
 
 def _build_against_a_missing_schema(target):
     dbt_common.run_dbt("build", ["stg_birth_registrations"], target,
-                        PROFILES_DIR, DBT_PROJECT_DIR, ROOT,
+                        PROFILES_DIR, _project(), ROOT,
                         run_schema=supply_db.run_schema(_NO_SUCH_RUN),
                         run_id=_NO_SUCH_RUN)
 
@@ -107,7 +111,7 @@ def test_a_real_test_failure_is_not_an_error(tmp_path, supply_dsn, bdm_duckdb_di
 
     target = str(supply_db.dbt_target_path(BDM_DIRTY_RUN_ID))
     dbt_common.run_dbt("build", ["stg_birth_registrations"], target,
-                        PROFILES_DIR, DBT_PROJECT_DIR, ROOT,
+                        PROFILES_DIR, _project(), ROOT,
                         run_schema=supply_db.run_schema(BDM_DIRTY_RUN_ID),
                         run_id=BDM_DIRTY_RUN_ID)
 

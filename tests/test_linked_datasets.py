@@ -4,6 +4,8 @@ contract folder, changes one thing, and asks the gate - the collections gate
 calls the same function. The real files are untouched."""
 from __future__ import annotations
 
+from qa_tools.common import assets
+
 import asset_folders
 import shutil
 from pathlib import Path
@@ -18,12 +20,12 @@ REAL = Path(__file__).resolve().parent.parent
 
 @pytest.fixture
 def repo(tmp_path):
-    shutil.copytree(asset_folders.real_folder(), tmp_path / "contract")
+    shutil.copytree(asset_folders.real_folder(), tmp_path / assets.folder_rel())
     return tmp_path
 
 
 def _asset(repo):
-    return repo / "contract" / "data-asset.yaml"
+    return repo / assets.folder_rel() / "data-asset.yaml"
 
 
 def _linked(doc):
@@ -85,7 +87,7 @@ class TestCriterionSix:
                 "contract's id_1 to id_2.") in text.splitlines(), text
 
     def test_a_dataset_naming_no_calendar(self, repo):
-        cal_path = repo / "contract" / "calendar.yaml"
+        cal_path = repo / assets.folder_rel() / "calendar.yaml"
         cal = yaml.safe_load(cal_path.read_text())
         entry = next(d for d in cal["datasets"] if d["id"] == "cp-clients")
         entry["no_calendar"] = True

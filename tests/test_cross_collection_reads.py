@@ -261,8 +261,10 @@ class TestDbtReadsAnotherCollectionThroughSource:
         from pathlib import Path
 
         repo = Path(__file__).resolve().parent.parent
-        shutil.copytree(repo / "dbt_project" / "models", tmp_path / "dbt_project" / "models")
-        shutil.copytree(repo / "dbt_project" / "tests", tmp_path / "dbt_project" / "tests")
+        from qa_tools.common import assets
+
+        for part in ("models", "tests"):
+            shutil.copytree(repo / assets.dbt_rel() / part, tmp_path / assets.dbt_rel() / part)
         return tmp_path
 
     def test_the_real_tree_passes(self):

@@ -40,10 +40,14 @@ class TestSlotsAreDerivedNotAuthored:
         import yaml
         from pathlib import Path
 
-        doc = yaml.safe_load(Path("contract/data-asset.yaml").read_text())
-        for agency in doc["hierarchy"]["agencies"]:
-            for collection in agency["collections"]:
-                assert "slots" not in collection
+        # Every asset's hierarchy (the asset split).
+        paths = sorted(Path(__file__).resolve().parent.parent.glob("assets/*/data-asset.yaml"))
+        assert paths
+        for path in paths:
+            doc = yaml.safe_load(path.read_text())
+            for agency in doc["hierarchy"]["agencies"]:
+                for collection in agency["collections"]:
+                    assert "slots" not in collection
                 for dataset in collection["datasets"]:
                     assert "slots" not in dataset, \
                         f"{dataset['id']} authors slots - they are derived from participation"

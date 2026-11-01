@@ -22,9 +22,15 @@ def repo(tmp_path):
     shutil.copytree(asset_folders.real_folder(), tmp_path / "contract")
     (tmp_path / SCHEMA).parent.mkdir(parents=True)
     shutil.copy(REAL / SCHEMA, tmp_path / SCHEMA)
-    for coll in ("child-protection", "civil-registration", "emergency-department"):
-        shutil.copytree(REAL / "dbt_project" / "models" / coll,
-                        tmp_path / "dbt_project" / "models" / coll)
+    # The asset's own collections' models, in its own dbt project (the split).
+    from qa_tools import collections
+    from qa_tools.common import assets
+
+    for c in collections.all_collections():
+        if c.id == "linkage-products":
+            continue
+        shutil.copytree(REAL / assets.dbt_rel() / "models" / c.id,
+                        tmp_path / assets.dbt_rel() / "models" / c.id)
     return tmp_path
 
 

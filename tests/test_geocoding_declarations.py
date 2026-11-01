@@ -4,6 +4,8 @@ thing, and asks the gate the collections gate calls; the real files are
 untouched. Nothing here reads supply rows or the database."""
 from __future__ import annotations
 
+from qa_tools.common import assets
+
 import asset_folders
 import shutil
 from pathlib import Path
@@ -21,12 +23,12 @@ GEO = ("geo-cp-clients", "geo-ed-presentations")
 
 @pytest.fixture
 def repo(tmp_path):
-    shutil.copytree(asset_folders.real_folder(), tmp_path / "contract")
+    shutil.copytree(asset_folders.real_folder(), tmp_path / assets.folder_rel())
     return tmp_path
 
 
 def _asset(repo):
-    return repo / "contract" / "data-asset.yaml"
+    return repo / assets.folder_rel() / "data-asset.yaml"
 
 
 def _dataset(doc, ds_id):
@@ -175,7 +177,7 @@ class TestTheCalendar:
                 assert (str(v.expected_time)[:5], v.grace) == ("19:00", timedelta(hours=8)), (ds, v)
 
     def test_a_participation_that_disagrees_with_its_source_fails_naming_the_first_period(self, repo):
-        cal_path = repo / "contract" / "calendar.yaml"
+        cal_path = repo / assets.folder_rel() / "calendar.yaml"
         cal = yaml.safe_load(cal_path.read_text())
         entry = next(d for d in cal["datasets"] if d["id"] == "geo-cp-clients")
         entry["participation"]["versions"][0]["effective_from"] = "2015-07-01"
@@ -312,7 +314,7 @@ class TestCriterionThreeThePlacingConfiguration:
     """contract/synthetic_inputs.yaml: generator-only, generic, gated."""
 
     def _edit(self, repo, change):
-        path = repo / "contract" / "synthetic_inputs.yaml"
+        path = repo / assets.folder_rel() / "synthetic" / "synthetic_inputs.yaml"
         doc = yaml.safe_load(path.read_text())
         change({d["dataset"]: d for d in doc["datasets"]})
         path.write_text(yaml.safe_dump(doc, sort_keys=False))
@@ -354,10 +356,11 @@ class TestCriterionThreeThePlacingConfiguration:
             d["geo-cp-clients"]["unplaced_value"] = "ungeocoded"
         assert "'ungeocoded'" in self._edit(repo, change)
 
-    def test_it_is_an_asset_wide_file(self):
+    def test_it_is_an_asset_wide_synthetic_file(self):
+        # In the asset's synthetic/ folder since the split (REQ-GEN-370).
         from qa_tools.common import validate_collections
 
-        assert "synthetic_inputs.yaml" in validate_collections.ASSET_WIDE
+        assert "synthetic_inputs.yaml" in validate_collections.SYNTHETIC
 
     def test_no_shared_module_carries_a_placing_word(self):
         """Architecture rule with no behaviour to observe (criterion 3): the

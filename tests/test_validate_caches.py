@@ -26,10 +26,15 @@ def _gate(root: Path) -> subprocess.CompletedProcess:
 def tree(tmp_path) -> Path:
     """A tree with the committed allowlisted caches in it, so only what a
     test plants is off the list."""
-    for rel, _ in validate_caches.ALLOWLIST:
-        dest = tmp_path / rel
-        dest.parent.mkdir(parents=True, exist_ok=True)
-        dest.write_text((ROOT / rel).read_text())
+    # An entry may name an asset's module as `assets/*/...` (the asset
+    # split), matching it in whichever asset holds it.
+    for pattern, _ in validate_caches.ALLOWLIST:
+        found = sorted(ROOT.glob(pattern))
+        assert found, f"the allowlist names {pattern}, which matches no file"
+        for source in found:
+            dest = tmp_path / source.relative_to(ROOT)
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            dest.write_text(source.read_text())
     (tmp_path / "pipeline").mkdir(exist_ok=True)
     (tmp_path / "generator").mkdir(exist_ok=True)
     return tmp_path
@@ -119,7 +124,15 @@ class TestItPassesOnTheCommittedTree:
     def test_the_scan_is_not_empty_and_every_cache_is_allowlisted(self):
         found = validate_caches.scan(ROOT)
         assert found, "the committed tree holds allowlisted caches, so the scan saw something"
-        assert {(rel, name) for rel, name, _ in found} == set(validate_caches.ALLOWLIST)
+        # Every cache found is allowlisted, and every entry matches one - an
+        # asset's module through its `assets/*/...` pattern (the asset split).
+        import fnmatch
+
+        found_pairs = {(rel, name) for rel, name, _ in found}
+        assert all(validate_caches._allowed(rel, name, validate_caches.ALLOWLIST)
+                   for rel, name in found_pairs), found_pairs
+        assert all(any(n == name and fnmatch.fnmatchcase(rel, pattern) for rel, n in found_pairs)
+                   for pattern, name in validate_caches.ALLOWLIST)
         done = _gate(ROOT)
         assert done.returncode == 0, done.stdout
 
