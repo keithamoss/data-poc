@@ -1,0 +1,176 @@
+<title>The Split, Mapped</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,500;8..60,650&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one reading column, a full-width diagram band, then a module table and a ranked findings list. */
+:root {
+  --bg: #f6f7f5;
+  --surface: #ffffff;
+  --fg: #1d2421;
+  --muted: #5b6661;
+  --rule: #d9dfdb;
+  --accent: #2f6b55;
+  --accent-soft: #e3efe9;
+  --warn: #9a5a12;
+  --warn-soft: #f6ead9;
+  --display: "Source Serif 4", Georgia, "Times New Roman", serif;
+  --body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #141917; --surface: #1c2320; --fg: #e4ebe7; --muted: #9aa6a0;
+    --rule: #2e3833; --accent: #7cc4a6; --accent-soft: #1f3129;
+    --warn: #e0a85c; --warn-soft: #33281a; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #141917; --surface: #1c2320; --fg: #e4ebe7; --muted: #9aa6a0;
+  --rule: #2e3833; --accent: #7cc4a6; --accent-soft: #1f3129;
+  --warn: #e0a85c; --warn-soft: #33281a; color-scheme: dark;
+}
+body {
+  background: var(--bg); color: var(--fg); font-family: var(--body);
+  font-size: 16px; line-height: 1.6;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 40px 64px;
+}
+main { max-width: 860px; margin: 0 auto; display: flex; flex-direction: column; gap: 40px; }
+h1, h2 { font-family: var(--display); font-weight: 650; text-wrap: balance; line-height: 1.2; margin: 0; }
+h1 { font-size: 2.1rem; }
+h2 { font-size: 1.45rem; }
+p { margin: 0; max-width: 68ch; }
+section { display: flex; flex-direction: column; gap: 14px; }
+.lede { color: var(--muted); font-size: 1.05rem; }
+.eyebrow { font-size: .78rem; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); font-weight: 600; }
+code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft); padding: 1px 5px; border-radius: 3px; }
+.diagram { background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; padding: 16px; overflow-x: auto; }
+.diagram pre { margin: 0; }
+.legend { display: flex; flex-wrap: wrap; gap: 8px 20px; font-size: .88rem; color: var(--muted); }
+.legend span::before { content: ""; display: inline-block; width: 22px; height: 0; border-top: 2px solid var(--accent); vertical-align: middle; margin-right: 6px; }
+.legend span.no::before { border-top: 2px dashed var(--warn); }
+.tablewrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: .95rem; }
+th, td { text-align: left; vertical-align: top; padding: 10px 12px 10px 0; border-bottom: 1px solid var(--rule); }
+th { font-size: .8rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; }
+td:first-child { white-space: nowrap; font-family: var(--mono); font-size: .9rem; color: var(--accent); }
+td .side { display: block; font-family: var(--body); font-size: .78rem; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; margin-top: 2px; }
+.findings { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 14px; counter-reset: f; }
+.findings li { counter-increment: f; background: var(--surface); border: 1px solid var(--rule); border-left: 3px solid var(--warn); border-radius: 4px; padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; }
+.findings li h3 { margin: 0; font-size: 1rem; font-weight: 600; }
+.findings li h3::before { content: counter(f) ". "; color: var(--warn); }
+.findings .fold { font-size: .92rem; color: var(--muted); }
+.findings .fold b { color: var(--fg); font-weight: 600; }
+.ok { display: flex; flex-direction: column; gap: 6px; padding-left: 18px; margin: 0; }
+.ask { background: var(--accent-soft); border-radius: 6px; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; }
+.ask ol { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; }
+.meta { font-size: .85rem; color: var(--muted); }
+</style>
+
+<main>
+  <header style="display:flex;flex-direction:column;gap:10px">
+    <div class="eyebrow">Asset split + generator/bootstrap separation (#134 v3)</div>
+    <h1>The split, mapped</h1>
+    <p class="lede">What each top-level part of the repository would do once the asset split and the #134 separation are both built, which parts may rely on which, and where the code would still repeat itself. Written for deciding whether the cut is in the right place.</p>
+    <p class="meta">Sources: the moved tree (wip/bmove), the draft docs/drafts/separation-v3.yaml, and a DRY analysis measured with diff on 2026-11-02. Figures marked "measured" were counted; judgements of deliberate or accidental are estimates.</p>
+  </header>
+
+  <section>
+    <h2>Who may rely on whom</h2>
+    <p>An arrow means "may import". Everything points down towards <code>domain/</code>, which imports nothing. The real pipeline never reaches for anything synthetic, so a real deployment can ship without the generator, <code>scenarios/</code> or the bootstrap. A new <code>mothman check</code> gate (REQ-TEST-384) fails any import across a forbidden edge.</p>
+    <div class="diagram">
+<pre class="mermaid">
+flowchart TB
+  cli["cli/ - mothman"]
+  subgraph real["Real deployment ships these"]
+    dashboard["dashboard/"]
+    pipeline["pipeline/"]
+    qa["qa_tools/ - the QA pipeline"]
+  end
+  subgraph synth["Synthetic only - absent on a real asset"]
+    boot["bootstrap/"]
+    gen["generator/"]
+    scen["scenarios/"]
+  end
+  domain["domain/ - shared model"]
+  assets[("assets/&lt;asset&gt;/ - configuration")]
+
+  cli --> dashboard
+  cli --> qa
+  cli -.->|"only if installed"| boot
+  cli -.->|"only if installed"| gen
+  dashboard --> pipeline
+  pipeline --> qa
+  qa --> domain
+  boot --> qa
+  boot --> gen
+  boot --> scen
+  boot --> domain
+  gen --> scen
+  gen --> domain
+  scen --> domain
+  qa -. "loads adapters by path" .-> assets
+  gen -. "loads providers by path" .-> assets
+  domain -. "reads config" .-> assets
+</pre>
+    </div>
+    <div class="legend"><span>may import</span><span class="no">loads files, not code imports</span></div>
+    <p><b>Forbidden, and gated:</b> <code>domain/</code> importing anything; the real pipeline importing the generator, <code>scenarios/</code>, the bootstrap or <code>cli/</code>; the generator importing the real pipeline, the bootstrap or <code>cli/</code>; the bootstrap importing <code>cli/</code>.</p>
+  </section>
+
+  <section>
+    <h2>What each part does</h2>
+    <div class="tablewrap">
+    <table>
+      <thead><tr><th>Part</th><th>In plain language</th></tr></thead>
+      <tbody>
+        <tr><td>assets/&lt;asset&gt;/<span class="side">configuration</span></td><td>Everything one data asset is: its collections and datasets, calendar, people, the checks (contracts, Soda, Evidently, its own dbt project), the small QA adapter per collection, and a <code>synthetic/</code> folder that only a synthetic asset has. Two today, <code>quarterly</code> and <code>daily</code>. Configuration, never state.</td></tr>
+        <tr><td>dbt_shared/<span class="side">configuration</span></td><td>The dbt macros and generic tests both assets use, held once.</td></tr>
+        <tr><td>domain/<span class="side">shared, ~3,700 lines</span></td><td>The vocabulary everyone agrees on: the asset's own clock and time zone, the hierarchy of agencies and collections, the delivery schedule and its slots, and the pure rules the generator and pipeline both need (which slot a supply fills, how an arrival is classified, a check's warn and fail bands). It reads configuration but imports nothing, opens no database, and holds no supply rows.</td></tr>
+        <tr><td>qa_tools/<span class="side">real pipeline</span></td><td>The QA pipeline itself: receives and stages a supply, runs dbt, Soda, datacontract-cli and Evidently, files it to a period, applies the promotion rule, records results and decisions in the database. It reads the time through one clock seam and never plays a scripted person.</td></tr>
+        <tr><td>pipeline/<span class="side">real pipeline</span></td><td>Turns recorded QA results into the dashboard's data. Reads recorded results only, never supply rows.</td></tr>
+        <tr><td>dashboard/<span class="side">real pipeline</span></td><td>The single-file dashboard page, its build and its one publish path. On a real asset its scenario features are hidden.</td></tr>
+        <tr><td>cli/<span class="side">front door</span></td><td><code>mothman</code>, the one entry point. Synthetic commands (generate, bootstrap, scenarios) appear only where the synthetic parts are installed and the asset has a <code>synthetic/</code> folder.</td></tr>
+        <tr><td>scenarios/<span class="side">synthetic, shared</span></td><td>A small package both synthetic parts read: the scripted-decisions file reader and the scenario vocabulary (the TS-numbered planted cases).</td></tr>
+        <tr><td>generator/<span class="side">synthetic</span></td><td>Invents supplies: writes delivery files, their receipts and the scenario map, using each collection's provider. Knows only the domain model and the scenarios, never the pipeline's internals.</td></tr>
+        <tr><td>bootstrap/<span class="side">synthetic, ~3,500 lines</span></td><td>Replays a generated history through the real pipeline from empty: runs the generator, feeds the pipeline one arrival at a time under a simulated clock, and plays the scripted people's decisions through hooks. Refuses any asset not declared synthetic.</td></tr>
+        <tr><td>synthetic_data_generator/<span class="side">exploratory</span></td><td>The separate population-scale generator, still unwired, behind <code>mothman population</code>.</td></tr>
+      </tbody>
+    </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>How DRY it will be</h2>
+    <p>Mostly good where it matters. Things already held once:</p>
+    <ul class="ok">
+      <li>dbt macros and generic tests (<code>dbt_shared/</code>).</li>
+      <li>Warn and fail thresholds, read from each tool's own files rather than copied.</li>
+      <li>File checks, defined once with ids derived per dataset.</li>
+      <li>Status words in Python and the page, held equal by shared test cases neither side owns. This copy is justified: the page has no build step and ticketing runs without a browser.</li>
+      <li>Moving the generator's shared functions into <code>domain/</code> removes the direct sharing: 75 of the 122 names it imports come from there.</li>
+    </ul>
+    <p>Between the two assets, most "repetition" is deliberate. Contracts, checks, adapters and providers share only 10 to 25% of their lines (measured), mostly YAML keys, because they describe different collections for different teams.</p>
+    <p><b>The real risks, most important first:</b></p>
+    <ol class="findings">
+      <li><h3>Allowed values in up to five places per collection</h3><p>A list such as valid postcodes can sit in the contract, the Soda checks, the dbt schema, the QA adapter and the generator, with no test holding them equal (measured).</p><p class="fold"><b>Would fold it:</b> declare each list once and have the others read it, or at least an agreement gate.</p></li>
+      <li><h3>Byte-identical files in both assets</h3><p><code>file-checks.yaml</code> (118 lines), the dbt project boilerplate, a 35-line forwarding macro, most of <code>people.yaml</code> and much of <code>data-asset.yaml</code> are identical in both assets (measured). They will drift one asset at a time.</p><p class="fold"><b>Would fold it:</b> a shared default with per-asset override, plus an "identical unless overridden" gate. Your answers already rename the dbt projects and drop the forwarding macro (C12, C13).</p></li>
+      <li><h3>Near-copies the function move misses</h3><p>The status ranking exists four times, one on each side; the Child Protection provider restates the quarterly calendar's quarters; <code>generator/dirty.py</code> hard-codes fault rates sized to Soda thresholds written in comments; one table of expected verdicts is hand-written.</p><p class="fold"><b>Would fold it:</b> the status order in <code>domain/</code>, and the older providers reading thresholds through the same reader Linkage Products already uses.</p></li>
+      <li><h3>Geocoding checks, about 330 hand-copied lines per new source</h3><p>Each geocoded dataset's Soda, dbt and contract files are near-copies (measured). Deliberate: you decided on 28 October that these checks are hand-written.</p><p class="fold"><b>Would fold it:</b> only worth it if many sources are coming. The file-checks "derive per dataset" pattern is the template.</p></li>
+      <li><h3>Status copies inside the page itself</h3><p>Two tables in the dashboard template repeat its own status words and order.</p><p class="fold"><b>Would fold it:</b> point them at the one copy the page already has. A small fix.</p></li>
+    </ol>
+  </section>
+
+  <section class="ask">
+    <h2>What to decide</h2>
+    <ol>
+      <li>Is the cut right: a shared <code>domain/</code>, a real pipeline that never sees synthetic code, and three synthetic parts that a real deployment leaves out?</li>
+      <li>Should identical per-asset configuration become a shared default with per-asset override, or stay copied because each asset is its own deployment?</li>
+      <li>Should allowed-value lists be declared once, or get an agreement gate, or neither for now?</li>
+      <li>Should the status order and the generator's near-copies join the #134 work, or wait?</li>
+    </ol>
+    <p class="meta">After your decisions, the draft goes back to the scoper or on to the architect and the CLI and dashboard UX reviewers before sign-off.</p>
+  </section>
+</main>
