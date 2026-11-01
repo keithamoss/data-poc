@@ -122,7 +122,7 @@ class TestTheClause:
         got = self._clause({"run-c1": {"promotedOn": "green", "timeline": []}})
         assert g.words_of(got["clause"]) + "passing" + g.words_of(got["tail"]) == (
             "The supply in place in the warehouse is the one received 10:00am Thursday, 25 July "
-            "2024, and is Green.")
+            "2024, and is passing.")
 
     def test_red_since_a_persons_promotion_names_them(self):
         health = {"run-c1": {"promotedOn": "green", "promotedAt": "2024-07-25T10:30:00+08:00",

@@ -45,7 +45,8 @@ class TestRedWaitsForAPerson:
 
     def test_and_says_why_in_terms_an_operator_can_act_on(self):
         _, why = promotion.should_promote(**a_supply(status="red"))
-        assert why and "red" in why.lower()
+        assert why and "status is Fail" in why
+        assert why.kind == promotion.FAILING
 
 
 class TestAFilledSlotIsNeverOverwritten:
@@ -135,4 +136,4 @@ class TestTheReasonsAreOrderedSoTheMostUsefulOneWins:
     def test_red_is_reported_ahead_of_a_filled_slot(self):
         _, why = promotion.should_promote(
             **a_supply(status="red", slot_filled=True))
-        assert "red" in why.lower()
+        assert why.kind == promotion.FAILING and "status is Fail" in why

@@ -65,7 +65,8 @@ describe("a withdrawn mark as not supplied", () => {
     const w = loadDashboard().window;
     const note = w.markWithdrawalNotes([MARK], "2026-03-09");
     expect(note).toContain("Not supplied (accepted)");
-    expect(note).toContain(`· withdrawn by Ana, ${w.fmtInstant(MARK.withdrawn.at)}: it came`);
+    // The reasons are recorded text, marked as such (REQ-DASH-359 criterion 14).
+    expect(note).toContain(`· withdrawn by Ana, ${w.fmtInstant(MARK.withdrawn.at)}: <span data-recorded-text>it came</span>`);
     expect(w.markWithdrawalNotes([MARK], "2026-03-06")).toBe("");
   });
 });
