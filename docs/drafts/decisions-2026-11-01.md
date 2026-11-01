@@ -166,3 +166,16 @@ the rebuild needs no question asked twice. Drafts and builders read this file.
   are checked against what is in place in the warehouse for the rest, as a
   real arrival is. REPLACES the rule that a trial needs all 3 tables (no
   Linkage Products delivery carries all three). SETTLED by Keith 2026-11-01.
+
+## Overnight (Keith 22:2x Perth, 2026-11-01: "Keep going overnight as far as you can")
+- Same build-run terms. Keith is asleep: a question a builder cannot settle from
+  this file takes the recommended option, marked PROVISIONAL in the
+  requirement's decisions with the question worded for Keith, and is listed in
+  the morning report's question list (REQ-TEST-374 c5). Nothing waits on him.
+- Order: geocoding fixes -> REQ-GEN-298 -> REQ-DASH-299; split groundwork ->
+  state-path sweep -> the move -> four streams; then one bootstrap per asset,
+  clear proven unmet_criteria, full gate, ONE push to
+  claude/qac-024-explanations-qx8hx8, check CI, write the morning report in
+  plans/morning-reports.md.
+- Anything significant (a defect needing a product decision, a criterion that
+  cannot be met) is stopped and reported, not decided.
