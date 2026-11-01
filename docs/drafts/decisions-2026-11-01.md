@@ -31,6 +31,11 @@ the rebuild needs no question asked twice. Drafts and builders read this file.
   waits on the end-of-run bootstrap goes in unmet_criteria with blocked_by
   {unowned: true}, owner 'the end-of-run bootstrap (2026-11-01 build run)',
   cleared once it passes, before the push. Applies to every batch.
+- COUNT FORM (rebuild, 2026-11-01): in a count list the re-check reads
+  '1 failing on re-check after promotion' (and 'warning on re-check after
+  promotion'); the HEADING stays 'Promoted, then failing on re-check'.
+  REJECTED '1 promoted, then failing on re-check' (the comma reads as two
+  things) and dropping the comma.
 
 ## REQ-TEST-374 (the provisional-choice gate) - signed 2026-11-01
 - post-build-review #292: every PROVISIONAL choice goes on the morning report's
@@ -137,3 +142,14 @@ the rebuild needs no question asked twice. Drafts and builders read this file.
 - No bootstrap, no full gate between batches; targeted tests only.
 - ONE bootstrap per asset at the end, then one full gate, one push, one CI run.
 - Every checkpoint pushed to `wip/build-2026-11-01` ([skip ci]).
+
+## Rebuild sign-offs (2026-11-01, after the lost container)
+- PWF v2 regenerated: signed as drafted, with the COUNT FORM above applied
+  (A35-A39, A28's promotion-date wording and D8d/D8e as REQ-DASH-359 c18/c19
+  accepted under "approve all but significant").
+- Asset split v4 regenerated: Keith signed the scoper's five new choices as
+  drafted - REQ-PIPE-352 c3 per-asset scenario check; REQ-GEN-371 c5 eras.yaml
+  frozen with data-asset.yaml as one combined history; REQ-GEN-370 c8 an asset
+  with no synthetic/ folder runs, only generate refused; REQ-PIPE-372's setting
+  named publish_to_gh_pages, removed once REQ-PIPE-255 is built; the quarterly
+  Demo caption text.
