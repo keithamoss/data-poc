@@ -477,9 +477,9 @@ def _dbt_repo(tmp_path, monkeypatch):
     monkeypatch.setattr(vcl, "ROOT", repo)
     _use_sources(monkeypatch, [("schema.yml", vcl.cl.parse_dbt_check_metadata)],
                  [])
-    (repo / "dbt_project" / "macros").mkdir(parents=True)
+    (repo / "dbt_shared" / "macros").mkdir(parents=True)
     (repo / "dbt_project" / "tests").mkdir(parents=True)
-    (repo / "dbt_project" / "macros" / "matches_regex.sql").write_text(_MATCHES_REGEX)
+    (repo / "dbt_shared" / "macros" / "matches_regex.sql").write_text(_MATCHES_REGEX)
     (repo / "dbt_project" / "tests" / "sibling_rule.sql").write_text("select 1 where false\n")
     (repo / "schema.yml").write_text(_regex_schema())
     _git(repo, "add", "-A")
@@ -503,14 +503,14 @@ def _commit(repo, message):
 def test_an_unexplained_macro_edit_fails_naming_the_file_once_and_every_check_it_backs(
         tmp_path, monkeypatch, capsys):
     repo = _dbt_repo(tmp_path, monkeypatch)
-    (repo / "dbt_project" / "macros" / "matches_regex.sql").write_text(
+    (repo / "dbt_shared" / "macros" / "matches_regex.sql").write_text(
         _MATCHES_REGEX.replace("regexp_like", "not regexp_like"))
     _commit(repo, "change the macro, no changelog")
 
     assert vcl.main() == 1
     err = capsys.readouterr().err
     _only_changelog_errors(err)
-    assert err.count("dbt_project/macros/matches_regex.sql") == 1
+    assert err.count("dbt_shared/macros/matches_regex.sql") == 1
     assert f"{_BDM}.a.matches_regex_dbt" in err and f"{_BDM}.b.matches_regex_dbt" in err
     assert "not_null_dbt" not in err and "sibling_rule_dbt" not in err
 
@@ -529,14 +529,14 @@ def test_an_unexplained_singular_sql_edit_fails_naming_that_check_alone(tmp_path
 
 def test_a_singular_test_also_covers_the_project_macros_its_sql_uses(tmp_path, monkeypatch, capsys):
     repo = _dbt_repo(tmp_path, monkeypatch)
-    (repo / "dbt_project" / "macros" / "helper.sql").write_text(
+    (repo / "dbt_shared" / "macros" / "helper.sql").write_text(
         "{% macro clean_name(c) %} trim({{ c }}) {% endmacro %}\n")
     (repo / "dbt_project" / "tests" / "sibling_rule.sql").write_text(
         "select {{ clean_name('x') }} where false\n")
     _commit(repo, "the singular test starts using a project macro (new check text, so a changelog)")
     # Re-baseline: the commit above changed the singular test, which the gate
     # would rightly flag - this test is about the edit AFTER it.
-    (repo / "dbt_project" / "macros" / "helper.sql").write_text(
+    (repo / "dbt_shared" / "macros" / "helper.sql").write_text(
         "{% macro clean_name(c) %} lower(trim({{ c }})) {% endmacro %}\n")
     _commit(repo, "change the helper macro, no changelog")
 
@@ -561,9 +561,9 @@ def test_a_macro_in_a_subfolder_is_still_covered(tmp_path, monkeypatch, capsys):
     """dbt reads macros from every folder under macro-paths, so the gate must
     too (#182: it listed only the top level, so this edit passed)."""
     repo = _dbt_repo(tmp_path, monkeypatch)
-    sub = repo / "dbt_project" / "macros" / "regex"
+    sub = repo / "dbt_shared" / "macros" / "regex"
     sub.mkdir()
-    (repo / "dbt_project" / "macros" / "matches_regex.sql").rename(sub / "matches_regex.sql")
+    (repo / "dbt_shared" / "macros" / "matches_regex.sql").rename(sub / "matches_regex.sql")
     _commit(repo, "move the macro into a subfolder (no behaviour change)")
     (sub / "matches_regex.sql").write_text(_MATCHES_REGEX.replace("regexp_like", "not regexp_like"))
     _commit(repo, "change the macro, no changelog")
@@ -571,7 +571,7 @@ def test_a_macro_in_a_subfolder_is_still_covered(tmp_path, monkeypatch, capsys):
     assert vcl.main() == 1
     err = capsys.readouterr().err
     _only_changelog_errors(err)
-    assert "dbt_project/macros/regex/matches_regex.sql" in err
+    assert "dbt_shared/macros/regex/matches_regex.sql" in err
     assert f"{_BDM}.a.matches_regex_dbt" in err
 
 

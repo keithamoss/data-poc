@@ -342,6 +342,24 @@ def folder_rel() -> str:
         return folder.as_posix()
 
 
+def dbt_rel() -> str:
+    """The selected asset's dbt project relative to the repository root,
+    POSIX-style - `dbt_project` today - for the readers that name its files
+    by repository path, as `folder_rel` does for the configuration folder
+    (REQ-QAC-368 criterion 1); absolute outside the repository."""
+    project = selected().dbt_project
+    try:
+        return project.relative_to(ROOT).as_posix()
+    except ValueError:
+        return project.as_posix()
+
+
+#: The shared local dbt package every asset's project pulls in (REQ-QAC-368
+#: criterion 2): the shared macros and generic tests, and nothing a
+#: collection owns. Repository-wide, so a constant.
+DBT_SHARED = "dbt_shared"
+
+
 # ---- state paths, per asset, at call time (REQ-PIPE-342 criterion 6) ----
 
 def data_dir() -> Path:

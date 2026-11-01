@@ -268,13 +268,12 @@ ASSET_WIDE = ("data-asset.yaml", "calendar.yaml", "people.yaml", "environments.y
               "file-checks.yaml", "scripted_decisions.yaml", "presentation.yaml",
               "synthetic_inputs.yaml")
 _CHECK_FILE = re.compile(r"(?P<stem>.+)-(?:contract|soda-checks|evidently-checks)(?:-retired)?\.ya?ml")
-#: Shared dbt SQL that belongs to no collection (criterion 4).
-_SHARED_DBT = ("dbt_project/tests/generic/",)
 
 
 def check_file_problems(root: Path | None = None) -> list[str]:
-    """`root` holds contract/ and dbt_project/ - the repository unless a
-    test names another; the hierarchy is read from root/contract."""
+    """`root` holds the asset's configuration folder and dbt project - the
+    repository unless a test names another; the hierarchy is read from the
+    selected asset's folder."""
     from qa_tools import collections
     from qa_tools.common import assets, hierarchy
 
@@ -369,21 +368,22 @@ def _dbt_layout_problems(root: Path, declared) -> list[str]:
     folders = [c.dbt_models + "/" for c in declared] + [c.dbt_tests + "/" for c in declared]
     folders += [c.dbt_retired_schema.rsplit("/", 1)[0] + "/" for c in declared]
     singular: dict[str, str] = {}
-    for top in ("dbt_project/models", "dbt_project/tests", "dbt_project/retired"):
+    from qa_tools.common import assets
+
+    project = assets.dbt_rel()
+    for top in (f"{project}/models", f"{project}/tests", f"{project}/retired"):
         base = root / top
         for path in sorted(base.rglob("*")) if base.is_dir() else []:
             if not path.is_file() or path.suffix not in (".sql", ".yml", ".yaml"):
                 continue
             rel = path.relative_to(root).as_posix()
-            if rel.startswith(_SHARED_DBT):
-                continue
             home = next((f for f in folders if rel.startswith(f)), None)
             if home is None:
                 problems.append(f"{rel} sits outside every collection's dbt folder "
-                                f"(dbt_project/models/<collection-id>/, "
-                                f"dbt_project/tests/<collection-id>/)")
+                                f"({project}/models/<collection-id>/, "
+                                f"{project}/tests/<collection-id>/)")
                 continue
-            if top == "dbt_project/tests" and path.suffix == ".sql":
+            if top == f"{project}/tests" and path.suffix == ".sql":
                 if path.stem in singular and singular[path.stem] != home:
                     problems.append(f"singular test {path.stem!r} is declared in both "
                                     f"{singular[path.stem]} and {home} - dbt names a singular "

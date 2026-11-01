@@ -488,8 +488,10 @@ class TestTheCheckFileGate:
     def test_a_dbt_model_outside_every_collections_folder_fails(self, third_collection, tmp_path):
         (tmp_path / "dbt_project" / "models" / "staging").mkdir(parents=True)
         (tmp_path / "dbt_project" / "models" / "staging" / "stg_x.sql").write_text("select 1\n")
-        (tmp_path / "dbt_project" / "tests" / "generic").mkdir(parents=True)
-        (tmp_path / "dbt_project" / "tests" / "generic" / "shared.sql").write_text("select 1\n")
+        # A generic test is the shared package's (REQ-QAC-368), never a
+        # project's, so one in dbt_shared/ is no collection's problem.
+        (tmp_path / "dbt_shared" / "tests" / "generic").mkdir(parents=True)
+        (tmp_path / "dbt_shared" / "tests" / "generic" / "shared.sql").write_text("select 1\n")
         assert gate.check_file_problems() == [
             "dbt_project/models/staging/stg_x.sql sits outside every collection's dbt folder "
             "(dbt_project/models/<collection-id>/, dbt_project/tests/<collection-id>/)"]
