@@ -160,6 +160,10 @@ def _geo(plan):
     return [j for j in plan.jobs if j.stream == lp.GEO_STREAM]
 
 
+def _job(plan, slot_id):
+    return next(j for j in _geo(plan) if j.slot_id == slot_id)
+
+
 def _faults(plan):
     return plan.state["geo_faults"]
 
@@ -401,24 +405,93 @@ class TestEveryProvidersFileShapeDecidesWhatIsCarried:
         assert si.carries_file("columns_reordered", files, "cp_carers.csv")
 
 
-class TestADirtiedSourcesDriftIsPlanned:
-    """Found by the trial (PROVISIONAL): geocoding TS-93a's and TS-100a's
-    dirtied Client Registers shifts the placed-level mix, so those files -
-    and 2019-Q4's, measured against TS-100c once it promotes - are planned
-    Warn and tried; a red source dirtied elsewhere (2017-Q3) is not."""
+def _mixed(n_suburb, n_postcode, start=0):
+    """A source whose records are placed at suburb or, the suburb blank, at
+    postcode - the two placed levels the drift check compares."""
+    ids = [f"C{i}" for i in range(start, start + n_suburb + n_postcode)]
+    return pd.DataFrame({"cp_client_id": ids,
+                         "suburb": ["Ascot"] * n_suburb + [""] * n_postcode,
+                         "postcode": ["6104"] * (n_suburb + n_postcode)})
 
-    def test_the_drift_planned_files_are_amber_and_tried(self, plan):
-        by_period = {j.period.name: j for j in _geo(plan)}
-        want = {(by_period[q].slot_id, CP) for q in ("2019-Q1", "2019-Q3", "2019-Q4")}
-        drift = plan.state["geo_drift"]
-        assert want <= drift
-        assert {d for _s, d in drift} == {CP, ED}, "ED's gapped red sources too"
-        for slot, d in drift:
-            # AT LEAST AMBER: a drawn red there stays red.
-            assert plan.state["geocoding"][slot][1][_table(d)][2] in ("amber", "red")
-            assert d in plan.state["geo_meta"][(slot, 1)]["tried"]
-        assert (by_period["2017-Q3"].slot_id, CP) not in plan.state["geo_drift"]
 
+def _drift_entry(dataset_id):
+    from qa_tools.common import evidently_common
+
+    found = [m for i, m in evidently_common.collection_checks("linkage-products").checks.items()
+             if m.get("method") == "psi" and i.split(".")[3] == dataset_id]
+    assert len(found) == 1
+    return found[0]
+
+
+class TestDriftIsPlannedFromWhatTheDriftCheckReads:
+    """REQ-GEN-295 criterion 7 as AMENDED 2026-11-02 (Keith, morning report
+    A2): a geocoding file's drift verdict is planned from the inputs the real
+    drift check reads - its placed rows' value counts and its reference's -
+    by the check's own PSI and its own thresholds, never from a rule about
+    the source (the fitted 'red source with blank address fields' rule it
+    replaces)."""
+
+    def test_the_same_mix_plans_green(self):
+        rows = _rows(_mixed(300, 100))
+        assert lp.drift_verdict(CP, rows, _rows(_mixed(300, 100, start=900))) == "green"
+
+    def test_a_shifted_mix_plans_the_checks_own_band(self):
+        from qa_tools.common import evidently_common
+
+        entry = _drift_entry(CP)
+        reference = _rows(_mixed(300, 100))
+        seen = set()
+        for n_postcode in (100, 160, 250, 380):
+            current = _rows(_mixed(400 - n_postcode, n_postcode, start=900))
+            psi, status = evidently_common.psi_of_counts(
+                lp.value_counts(current, entry["column"]),
+                lp.value_counts(reference, entry["column"]), entry)
+            want = {"pass": "green", "warn": "amber", "fail": "red"}[status]
+            assert lp.drift_verdict(CP, current, reference) == want, (n_postcode, psi)
+            seen.add(want)
+        assert seen == {"green", "amber", "red"}, "every band reached, so the test can fail"
+
+    def test_the_bands_are_the_checks_own_configuration(self):
+        entry = _drift_entry(CP)
+        assert (entry["warn_threshold"], entry["fail_threshold"]) == (0.10, 0.25)
+        assert entry["exclude_values"] == ["not geocoded"]
+
+    def test_unplaced_records_never_drift(self):
+        """The share check's alarm, never a second one (REQ-QAC-297 c11)."""
+        reference = _rows(_mixed(300, 100))
+        current = lp.geocode_rows(CP, _mixed(300, 100, start=900), ("cp_client_id",),
+                                  (2011, 2016), 0.6)
+        assert (current["match_level"] == "not geocoded").sum() > 0
+        assert lp.drift_verdict(CP, current, reference) == "green"
+
+    def test_no_reference_plans_no_drift(self):
+        assert lp.drift_verdict(CP, _rows(_mixed(300, 100)), None) == "green"
+
+    def test_a_red_gapped_source_whose_mix_holds_plans_green(self):
+        """What the fitted rule got wrong: blanks in a red source's address
+        columns are not drift unless they move the placed mix."""
+        reference = _rows(_mixed(300, 100))
+        gapped = _mixed(300, 100, start=900)
+        assert lp.drift_verdict(CP, _rows(gapped), reference) == "green"
+
+    def test_the_plans_drift_set_is_exactly_the_computed_drift(self, plan):
+        """Every geocoding arrival, resupplies included, planned at least its
+        computed drift band against the reference the replay resolves; and
+        the files said to drift are exactly those whose band is not green."""
+        computed = plan.state["geo_drift_bands"]
+        assert computed, "the plan computed drift for its files"
+        drifting = {k for k, band in computed.items() if band != "green"}
+        assert drifting, "the history holds drift, so the test can fail"
+        assert {(slot, d) for slot, d, _n in drifting} == plan.state["geo_drift"]
+        for (slot, d, n), band in computed.items():
+            at, files = lp.PROVIDER._geo_arrivals(plan, _job(plan, slot))[n - 1]
+            verdict = files[_table(d)][2]
+            assert lp.worst(verdict, band) == verdict, (slot, d, n, band, verdict)
+            if band != "green":
+                assert d in plan.state["geo_meta"][(slot, n)]["tried"]
+
+
+class TestWhatEachTriedFileIsMeasuredAgainst:
     def test_a_tried_files_reference_is_what_the_replay_promotes_before_it(self, plan):
         by_period = {j.period.name: j for j in _geo(plan)}
         refs = {q: plan.state["geo_meta"][(by_period[q].slot_id, 1)]["references"][CP]

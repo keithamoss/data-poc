@@ -101,6 +101,41 @@ def status_for(value: float, entry: dict) -> str:
     return "pass"
 
 
+def excluding(frame, entry: dict):
+    """A drift frame without the values the check declares excluded, from
+    reference and current alike (REQ-QAC-297 criterion 11) - so a value
+    another check already measures, such as an unplaced level, does not raise
+    a second alarm for one fault. Generic: any column, any values. The one
+    copy: the real check (run_evidently) and the generator's drift planning
+    (psi_of_counts) both exclude through it."""
+    excluded = [str(v) for v in (entry.get("exclude_values") or ())]
+    if not excluded:
+        return frame
+    column = entry["column"]
+    return frame[~frame[column].astype(str).isin(excluded)].reset_index(drop=True)
+
+
+def psi_of_counts(current_counts, reference_counts, entry: dict) -> tuple[float | None, str]:
+    """(PSI, status) of one drift check from two value-count distributions,
+    `[[value, count], ...]` - the inputs the real check reads (the reference
+    is rebuilt from its recorded value counts, exactly; see below), through
+    the same exclusion, the same Evidently PSI and the same thresholds
+    (status_for over the check's own entry). REQ-GEN-295 criterion 7 as
+    amended 2026-11-02 (Keith, morning report A2): the generator plans a
+    geocoding file's drift verdict with this, so it predicts the check from
+    what the check reads. NO_REFERENCE where either side holds nothing to
+    compare, as the real check records an empty current supply."""
+    if reference_counts is None:
+        return None, NO_REFERENCE
+    column = entry["column"]
+    current = excluding(frame_from_value_counts(current_counts, column), entry)
+    reference = excluding(frame_from_value_counts(reference_counts, column), entry)
+    if not len(current) or not len(reference):
+        return None, NO_REFERENCE
+    psi, _snapshot = compute_psi(current, reference, column)
+    return psi, status_for(psi, entry)
+
+
 def recorded_row_counts(agency: str, collection: str, run_id: str) -> dict | None:
     """One run's recorded per-table row counts, or None - measured from the
     warehouse when that run was checked, never from the generator's own

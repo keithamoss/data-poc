@@ -26,7 +26,8 @@ from __future__ import annotations
 import psycopg
 
 from qa_tools import collections
-from qa_tools.common import asked_for, drift_reference, hierarchy, left_out, supply_db
+from qa_tools.common import (asked_for, drift_reference, evidently_common, hierarchy, left_out,
+                             supply_db)
 from qa_tools.common.evidently_common import (
     ENGINE_TAG, NO_REFERENCE, collection_checks, compute_psi, frame_from_value_counts,
     recorded_row_counts, reference_value_counts, status_for,
@@ -47,15 +48,9 @@ def drift_dataset(collection_id: str) -> str | None:
 
 
 def _excluding(frame, entry: dict):
-    """A drift frame without the values the check declares excluded, from
-    reference and current alike (REQ-QAC-297 criterion 11) - so a value
-    another check already measures, such as an unplaced level, does not raise
-    a second alarm for one fault. Generic: any column, any values."""
-    excluded = [str(v) for v in (entry.get("exclude_values") or ())]
-    if not excluded:
-        return frame
-    column = entry["column"]
-    return frame[~frame[column].astype(str).isin(excluded)].reset_index(drop=True)
+    """evidently_common.excluding - the one copy, shared with the
+    generator's drift planning (REQ-GEN-295 criterion 7 as amended)."""
+    return evidently_common.excluding(frame, entry)
 
 
 def _table_of(check_id: str) -> str:
