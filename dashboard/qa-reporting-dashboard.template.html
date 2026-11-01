@@ -1751,7 +1751,7 @@ function slaTileHtml(d, dateStr){
   }
   const value = s.notOwedYet ? notOwedYetText(s.notOwedYet, d) : (s.cadence ? cadenceLabel(s.cadence) : "");
   const why = s.reason
-    ? `<div class="sla-why" style="color:var(--ink-faint); font-size:12px; margin-top:4px; line-height:1.4;">${escHtml(s.reason)}</div>` : "";
+    ? `<div class="sla-why" style="color:var(--ink-faint); font-size:12px; margin-top:4px; line-height:1.4;">${recordedText(s.reason)}</div>` : "";
   // WHICH PERIOD ITS COLLECTION'S FILES GO INTO, 0 included (REQ-DASH-326
   // criterion 7): the build's words, from the one phrase function the
   // terminal prints (qa_tools/common/files_go.py), on every authored-calendar
@@ -1811,7 +1811,7 @@ function excuseInForce(datasetId, runId, inPlaceOnDateStr){
 function arrivalPillFor(datasetId, runId, status, size, inPlaceOnDateStr){
   const e = status === "late" ? excuseInForce(datasetId, runId, inPlaceOnDateStr) : null;
   if(!e) return arrivalPill(status, size);
-  return `<span class="pill tag ${size||""}" data-excused title="${escAttr(e.reason)}"><span class="ico"></span>Late (excused)</span>`;
+  return `<span class="pill tag ${size||""}" data-excused data-recorded-title title="${escAttr(e.reason)}"><span class="ico"></span>Late (excused)</span>`;
 }
 function arrivalPill(status, size){
   const cls = ARRIVAL_STATUS_CLASS[status] || "nodata";
@@ -1877,13 +1877,13 @@ function placedTag(d, runId, dateStr){
   const when = PLACED_WHEN[p.when] ? `<div style="color:var(--ink-muted); font-size:11.5px;">${escHtml(fmtPeriodOrDay(p.period))} was ${PLACED_WHEN[p.when]}</div>` : "";
   return `<span class="pill tag sm" data-placed><span class="ico"></span>Placed in ${escHtml(fmtPeriodOrDay(p.period))}</span>
     <div style="color:var(--ink-faint); font-size:11.5px;">${escHtml(p.actor)}, ${fmtInstant(p.at)}</div>
-    ${p.reason ? `<div style="color:var(--ink-muted); font-size:11.5px; max-width:40ch;">${escHtml(p.reason)}</div>` : ""}${when}`;
+    ${p.reason ? `<div data-recorded-text style="color:var(--ink-muted); font-size:11.5px; max-width:40ch;">${recordedText(p.reason)}</div>` : ""}${when}`;
 }
 // A HOLD RESOLVED BY PLACING, in the rejected row's form (criteria 3 and 10).
 function placedHoldNote(d, supply, dateStr){
   const p = placementFor(d, supply, dateStr, true);
   if(!p) return "";
-  return ` <span style="color:var(--ink-faint);" data-placed-hold>— placed in ${escHtml(fmtPeriodOrDay(p.period))} by ${escHtml(p.actor)}, ${fmtInstant(p.at)}${p.reason ? ": "+escHtml(p.reason) : ""}</span>`;
+  return ` <span style="color:var(--ink-faint);" data-placed-hold>— placed in ${escHtml(fmtPeriodOrDay(p.period))} by ${escHtml(p.actor)}, ${fmtInstant(p.at)}${p.reason ? ": "+recordedText(p.reason) : ""}</span>`;
 }
 // A PAST DECISION IN WORDS (criterion 7): a person's re-file from no period
 // is a placement, said as one.
@@ -1978,7 +1978,7 @@ function referenceNoteHtml(h){
   return `
     <div class="drawer-section reference-note" data-reference-note>
       <h4>Compared with ${escHtml(ref.period || "nothing earlier")}</h4>
-      <div style="font-size:13px;">${escHtml(ref.reason)}.</div>
+      <div style="font-size:13px;">${recordedText(ref.reason)}.</div>
       ${ref.measuredStatus ? `<div style="font-size:12.5px; color:var(--ink-muted); margin-top:8px;">
         The measurement alone reads ${pill(ref.measuredStatus,"sm")}${gapRed
           ? " — this check is at Fail because of the gap, not because anything drifted, and it does not hold the supply back from promotion. To clear it, deal with the missing period in the filing wizard (run <code>mothman</code> and choose <i>Filing decisions</i>): promote its supply, substitute an earlier one, or accept it as not supplied." : "."}</div>` : ""}
@@ -4645,6 +4645,14 @@ let chartSeq=0;
 // AUTHORED only ever grows - it is never reset, so an index handed out
 // by one render stays valid if another render happens first.
 const AUTHORED = [];
+// TEXT RECORDED AT THE TIME, SHOWN AS IT WAS (REQ-DASH-359 criterion 14;
+// Keith, architect Q-B): a decision's reason, a ticket comment, a check's
+// changelog description - never translated into the new words. Each sits
+// inside an element marked data-recorded-text (data-recorded-title where the
+// recorded text is the element's title), so REQ-TEST-361's guard passes
+// over it; a data VALUE (a failing row's key, a value bar's label - a
+// surname such as 'Green' is data, not a status) is marked data-value-text.
+function recordedText(text){ return `<span data-recorded-text>${escHtml(text)}</span>`; }
 function authoredSlot(value){ return ` data-authored="${AUTHORED.push(value) - 1}"`; }
 function fillAuthored(root){
   root.querySelectorAll("[data-authored]").forEach(el=>{
@@ -5141,7 +5149,7 @@ function collectionCarryForwardLines(col, dateStr){
 function collectionTurnOffLine(col){
   const t = ((col && col.datasets) || []).map(d=> d.turnOff).find(t=> t && t.level === "collection");
   if(!t) return "";
-  return `<div class="collection-turn-off" data-collection-turn-off style="margin-top:6px; font-size:12px; color:var(--ink-muted);">${turningOrTurned(t)} with ${escHtml(t.turnOff.collection)}: ${escHtml(t.reason)}</div>`;
+  return `<div class="collection-turn-off" data-collection-turn-off style="margin-top:6px; font-size:12px; color:var(--ink-muted);">${turningOrTurned(t)} with ${escHtml(t.turnOff.collection)}: ${recordedText(t.reason)}</div>`;
 }
 // 'Turning off' until the effective_to has passed, 'Turned off' after (#195 D5).
 function turningOrTurned(t){
@@ -5152,7 +5160,7 @@ function turnOffReasonLine(ds){
   const t = ds && ds.turnOff;
   if(!t || !t.reason) return "";
   const who = t.level === "collection" ? `${turningOrTurned(t)} with ${escHtml(t.turnOff.collection)}: ` : "";
-  return `<div class="turn-off-why" data-turn-off-reason style="margin:-4px 0 12px; color:var(--ink-muted); font-size:13px; max-width:70ch;">${who}${escHtml(t.reason)}</div>`;
+  return `<div class="turn-off-why" data-turn-off-reason style="margin:-4px 0 12px; color:var(--ink-muted); font-size:13px; max-width:70ch;">${who}${recordedText(t.reason)}</div>`;
 }
 function turnOffMarker(d, dateStr){
   const t = turnOffOn(d, dateStr);
@@ -7420,7 +7428,7 @@ function receivedWhileOffEnding(d, b, inPlaceOnDateStr){
   if(placed) return placed;
   const e = b.ended || {};
   const at = fmtInstant(e.at || b.resolvedAt);
-  const why = e.reason ? ": "+escHtml(e.reason) : "";
+  const why = e.reason ? ": "+recordedText(e.reason) : "";
   if(e.action === "refile" && e.actorKind === "rule" && e.toPeriod)
     return quiet(`filed by the rule once ${escHtml(fmtPeriodOrDay(e.toPeriod))} was owed again, ${at}`);
   if(e.action === "refile" && e.toPeriod)
@@ -7626,7 +7634,7 @@ function markWithdrawalNotes(marks, inPlaceOnDateStr){
   const on = inPlaceOnDateStr || (typeof CURRENT_IN_PLACE_ON !== "undefined" ? CURRENT_IN_PLACE_ON : null);
   const by = v => v && (!on || assetDateStrOf(v) <= on);
   return (marks || []).filter(m=> m.withdrawn && by(m.withdrawn.at)).map(m=>
-    `<div class="excuse-note" data-mark-withdrawn>Not supplied (accepted) — ${escHtml(m.actor)}, ${fmtInstant(m.at)}: ${escHtml(m.reason)} · withdrawn by ${escHtml(m.withdrawn.actor)}, ${fmtInstant(m.withdrawn.at)}: ${escHtml(m.withdrawn.reason)}</div>`).join("");
+    `<div class="excuse-note" data-mark-withdrawn>Not supplied (accepted) — ${escHtml(m.actor)}, ${fmtInstant(m.at)}: ${recordedText(m.reason)} · withdrawn by ${escHtml(m.withdrawn.actor)}, ${fmtInstant(m.withdrawn.at)}: ${recordedText(m.withdrawn.reason)}</div>`).join("");
 }
 // CONSECUTIVE GAPS ARE ONE ITEM (criterion 7), by the slot's position in
 // the dataset's own schedule.
@@ -8632,9 +8640,9 @@ function excuseNote(datasetId, runId, inPlaceOnDateStr){
   const on = inPlaceOnDateStr || (typeof CURRENT_IN_PLACE_ON !== "undefined" ? CURRENT_IN_PLACE_ON : null);
   const by = v => v && (!on || assetDateStrOf(v) <= on);
   const lines = list.filter(e => by(e.at)).map(e => {
-    const said = `Excused by ${escHtml(e.actor)}, ${fmtInstant(e.at)}: ${escHtml(e.reason)}`;
+    const said = `Excused by ${escHtml(e.actor)}, ${fmtInstant(e.at)}: ${recordedText(e.reason)}`;
     if(e.withdrawn && by(e.withdrawn.at)){
-      return `<div class="excuse-note" data-excuse-withdrawn>${said} · withdrawn by ${escHtml(e.withdrawn.actor)}, ${fmtInstant(e.withdrawn.at)}: ${escHtml(e.withdrawn.reason)}</div>`;
+      return `<div class="excuse-note" data-excuse-withdrawn>${said} · withdrawn by ${escHtml(e.withdrawn.actor)}, ${fmtInstant(e.withdrawn.at)}: ${recordedText(e.withdrawn.reason)}</div>`;
     }
     if(e.lapsed && (e.lapsedAt ? by(e.lapsedAt) : true)){
       return `<div class="excuse-note" data-excuse-lapsed>Excuse lapsed - ${escHtml(e.lapsed)}</div>`;
@@ -8726,7 +8734,7 @@ function correctionMoveNote(datasetId, runId){
   const lines = ((c.rejudged || {})[runId] || []).filter(r => r.movedTo).map(r =>
     `<div class="changed-by" data-corrected-move style="color:var(--ink-muted); font-size:12px;">In ${escHtml(fmtPeriodName(r.movedFrom))} · moved to ${escHtml(fmtPeriodName(r.movedTo))} ${escHtml(fmtDay(assetDateStrOf(r.appliedAt)))} by correction ${escHtml(r.reference)}${r.approver ? `, approved by ${escHtml(r.approver)}` : ""}</div>`);
   ((c.kept || {})[runId] || []).forEach(k => lines.push(
-    `<div class="changed-by" data-kept style="color:var(--ink-muted); font-size:12px;">Kept ${k.period ? `in ${escHtml(fmtPeriodName(k.period))}` : "held"} against correction ${escHtml(k.reference || "")}${k.actor ? ` by ${escHtml(k.actor)}` : ""}: ${escHtml(k.reason)}</div>`));
+    `<div class="changed-by" data-kept style="color:var(--ink-muted); font-size:12px;">Kept ${k.period ? `in ${escHtml(fmtPeriodName(k.period))}` : "held"} against correction ${escHtml(k.reference || "")}${k.actor ? ` by ${escHtml(k.actor)}` : ""}: ${recordedText(k.reason)}</div>`));
   return lines.join("");
 }
 // A CORRECTION AWAITING THE ASSET MANAGER, said on each dataset it affects
@@ -8777,10 +8785,10 @@ function acknowledgementBadge(datasetId, runId, inPlaceOnDateStr){
   const gone = k => k.withdrawn && by(k.withdrawn.at);
   const standing = [...acks].reverse().find(k=> !gone(k));
   const withdrawn = acks.filter(gone).map(k=>
-    `<div class="excuse-note" data-acknowledgement-withdrawn>Acknowledged by ${escHtml(k.actor)}, ${fmtInstant(k.at)}: ${escHtml(k.reason)} · withdrawn by ${escHtml(k.withdrawn.actor)}, ${fmtInstant(k.withdrawn.at)}: ${escHtml(k.withdrawn.reason)}</div>`).join("");
+    `<div class="excuse-note" data-acknowledgement-withdrawn>Acknowledged by ${escHtml(k.actor)}, ${fmtInstant(k.at)}: ${recordedText(k.reason)} · withdrawn by ${escHtml(k.withdrawn.actor)}, ${fmtInstant(k.withdrawn.at)}: ${recordedText(k.withdrawn.reason)}</div>`).join("");
   if(standing){
     // THE REASON AS VISIBLE TEXT, not only a title (criterion 16).
-    return `<span class="pill tag sm" data-acknowledged title="${escAttr(standing.reason)}"><span class="ico"></span>✓ Acknowledged by ${escHtml(standing.actor)}, ${fmtInstant(standing.at)}</span><div class="excuse-note" data-acknowledgement-reason>${escHtml(standing.reason)}</div>${withdrawn}`;
+    return `<span class="pill tag sm" data-acknowledged data-recorded-title title="${escAttr(standing.reason)}"><span class="ico"></span>✓ Acknowledged by ${escHtml(standing.actor)}, ${fmtInstant(standing.at)}</span><div class="excuse-note" data-acknowledgement-reason data-recorded-text>${escHtml(standing.reason)}</div>${withdrawn}`;
   }
   if(a.lapsedAt && by(a.lapsedAt)) return "";
   return `<span class="pill tag sm" data-awaiting-acknowledgement><span class="ico"></span>Promoted, warning - awaiting acknowledgement</span>${withdrawn}`;
@@ -8990,12 +8998,12 @@ function recheckWords(e, asText){
     const date = e.bulk.changelogDate ? ` (corrected ${escHtml(fmtDay(e.bulk.changelogDate))})` : "";
     return `re-checked after we corrected ${recheckCheckLink(e.bulk.checkId, asText)}${date}${e.bulk.others ? " and other checks" : ""}`;
   }
-  return `re-checked ${escHtml(fmtDay(e.at))} by ${escHtml(e.person)} - ${escHtml(e.reason)}`;
+  return `re-checked ${escHtml(fmtDay(e.at))} by ${escHtml(e.person)} - ${recordedText(e.reason)}`;
 }
 // What a later re-check came after, for the forward note (criterion 5).
 function recheckCause(e, asText){
   return e.bulk ? `we corrected ${recheckCheckLink(e.bulk.checkId, asText)}`
-    : escHtml(e.reason);
+    : recordedText(e.reason);
 }
 // 'Re-checked <instant>: became <label> - <reason>' (Keith, 2026-10-29;
 // REQ-DASH-359 criterion 5: 'became Fail', the label for a status reached).
@@ -9062,7 +9070,7 @@ function recheckedAmberTag(datasetId, runId, inPlaceOnDateStr){
   if(now !== "amber") return "";
   const ack = recheckAcknowledged(datasetId, runId, last, on);
   return ack
-    ? `<span class="pill tag sm" data-rechecked-amber="acknowledged" title="${escAttr(ack.reason)}"><span class="ico"></span>Promoted, then warning on re-check - acknowledged by ${escHtml(ack.actor)}</span>`
+    ? `<span class="pill tag sm" data-rechecked-amber="acknowledged" data-recorded-title title="${escAttr(ack.reason)}"><span class="ico"></span>Promoted, then warning on re-check - acknowledged by ${escHtml(ack.actor)}</span>`
     : `<span class="pill tag sm" data-rechecked-amber="awaiting"><span class="ico"></span>Promoted, then warning on re-check - awaiting acknowledgement</span>`;
 }
 // The standing acknowledgement given after a re-check, as at the date on show.
@@ -9083,7 +9091,7 @@ function bulkRecheckLines(datasetId, checkId, inPlaceOnDateStr){
   const by = v=> !on || assetDateStrOf(v) <= on;
   return lines.filter(l=> by(l.at)).map(l=>{
     const changed = (l.changes || []).filter(by).length;
-    return {changelogDate: l.changelogDate, html: `<div class="bulk-recheck-line" data-bulk-recheck="${escAttr(String(l.id))}">Re-checked ${l.supplies} ${pluralize(l.supplies, "supply", "supplies")} across ${l.datasets} ${pluralize(l.datasets, "dataset")} on ${escHtml(fmtDay(l.at))} by ${escHtml(l.person)}: ${changed} changed - ${escHtml(l.reason)}</div>`};
+    return {changelogDate: l.changelogDate, html: `<div class="bulk-recheck-line" data-bulk-recheck="${escAttr(String(l.id))}">Re-checked ${l.supplies} ${pluralize(l.supplies, "supply", "supplies")} across ${l.datasets} ${pluralize(l.datasets, "dataset")} on ${escHtml(fmtDay(l.at))} by ${escHtml(l.person)}: ${changed} changed - ${recordedText(l.reason)}</div>`};
   });
 }
 // RED PROMOTED AS A KIND ON THE AGENCY AND COLLECTION CARDS (#123 A1, Keith
@@ -9211,7 +9219,7 @@ function blockerHistoryRows(datasetId, inPlaceOnDateStr, source){
           const placed = placedHoldNote(rawRealDatasetById(datasetId), b.supply, inPlaceOnDateStr);
           const ending = !resolved ? ""
             : b.rejected
-            ? ` <span style="color:var(--ink-faint);">— rejected by ${escHtml(b.rejected.actor)}, ${fmtInstant(b.rejected.at)}${b.rejected.reason ? ": "+escHtml(b.rejected.reason) : ""}</span>`
+            ? ` <span style="color:var(--ink-faint);">— rejected by ${escHtml(b.rejected.actor)}, ${fmtInstant(b.rejected.at)}${b.rejected.reason ? ": "+recordedText(b.rejected.reason) : ""}</span>`
             : b.supersededBy
             ? ` <span style="color:var(--ink-faint);">— superseded by the supply received ${b.supersededBy.receivedAt ? fmtInstant(b.supersededBy.receivedAt) : "later"}</span>`
             : placed ? ""
@@ -9219,7 +9227,7 @@ function blockerHistoryRows(datasetId, inPlaceOnDateStr, source){
           return `<tr data-blocker="${b.kind}" data-supply="${escAttr(b.supply || "")}">
             <td>${fmtInstant(b.openedAt)}</td>
             <td>${resolved ? pill("nodata","sm") : pill("red","sm")}</td>
-            <td><b>${escHtml(blockerLabel(b))}</b>${resolved || b.kind === "contested" ? placed : ""}${ending}<div style="color:var(--ink-muted); font-size:12px; max-width:60ch;">${escHtml(b.reason)}</div></td>
+            <td><b>${escHtml(blockerLabel(b))}</b>${resolved || b.kind === "contested" ? placed : ""}${ending}<div style="color:var(--ink-muted); font-size:12px; max-width:60ch;">${recordedText(b.reason)}</div></td>
           </tr>`;}).join("")}</tbody>
       </table>
       </div>
@@ -9252,7 +9260,7 @@ function settledPairRow(b, datasetId, inPlaceOnDateStr){
   return `<tr data-blocker="${b.kind}" data-settled data-supply="${escAttr(b.supply || "")}">
     <td>${fmtInstant(b.openedAt)}</td>
     <td><span class="pill tag sm"><span class="ico"></span>Settled</span></td>
-    <td><b>${escHtml(blockerLabel(b))}</b>${placedHoldNote(rawRealDatasetById(datasetId), b.supply, inPlaceOnDateStr)} <span style="color:var(--ink-faint);">— settled by ${escHtml(s.actor || "a person")}, ${fmtInstant(s.at)}</span>${s.reason ? `<div style="color:var(--ink-muted); font-size:12px; max-width:60ch;">${escHtml(s.reason)}</div>` : ""}
+    <td><b>${escHtml(blockerLabel(b))}</b>${placedHoldNote(rawRealDatasetById(datasetId), b.supply, inPlaceOnDateStr)} <span style="color:var(--ink-faint);">— settled by ${escHtml(s.actor || "a person")}, ${fmtInstant(s.at)}</span>${s.reason ? `<div style="color:var(--ink-muted); font-size:12px; max-width:60ch;">${recordedText(s.reason)}</div>` : ""}
       <div style="font-size:12px; margin-top:4px;">${files}</div></td>
   </tr>`;
 }
@@ -9296,7 +9304,7 @@ function gapHistoryRows(ds, inPlaceOnDateStr){
             <td class="mono">${g.periods.length === 1 ? periodLinkFor(ds.id, g.periods[0], escHtml(fmtPeriodOrDay(g.periods[0]))) : `${periodLinkFor(ds.id, g.periods[0], escHtml(fmtPeriodOrDay(g.periods[0])))} to ${periodLinkFor(ds.id, g.periods[g.periods.length-1], escHtml(fmtPeriodOrDay(g.periods[g.periods.length-1])))}`}</td>
             <td>${g.accepted ? `<span class="pill tag sm"><span class="ico"></span>Accepted</span>` : pill("red","sm")}</td>
             <td>${g.accepted
-              ? `<b>Not supplied (accepted)</b>${mark ? ` <span style="color:var(--ink-faint);">— ${escHtml(mark.actor)}, ${fmtInstant(mark.at)}</span><div style="color:var(--ink-muted); font-size:12px; max-width:60ch;">${escHtml(mark.reason)}</div>` : ""}`
+              ? `<b>Not supplied (accepted)</b>${mark ? ` <span style="color:var(--ink-faint);">— ${escHtml(mark.actor)}, ${fmtInstant(mark.at)}</span><div style="color:var(--ink-muted); font-size:12px; max-width:60ch;">${recordedText(mark.reason)}</div>` : ""}`
               : `<b>No supply</b> <span style="color:var(--ink-faint);">— ${escHtml(gapText(g))}; waiting for a person</span>`}${markWithdrawalNotes(g.allMarks, inPlaceOnDateStr)}</td>
           </tr>`;}).join("")}</tbody>
       </table>
@@ -9871,7 +9879,7 @@ function renderDataset(view, agencyId, collectionId, datasetId){
       <div class="notice-exhausted" role="status" data-blocked="${ds.blocked.kind}">
         <b>${escHtml(blockerLabel(ds.blocked))} — this dataset's own supply is not checked ${blockerUntil(ds.blocked)}.</b>
         <div style="color:var(--ink-muted); font-size:13.5px; margin-top:6px; max-width:70ch;">
-          ${withCode(ds.blocked.reason)}<br><br>
+          <span data-recorded-text>${withCode(ds.blocked.reason)}</span><br><br>
           ${ds.blocked.kind === "agreement-refused" ? "New supplies are held and not checked" : ds.blocked.count > 1 ? `${ds.blocked.count} supplies are waiting - ${escHtml(blockerReceivedText(ds.blocked))}` : `Received <b style="display:inline">${fmtInstant(ds.blocked.openedAt)}</b>`}. Every
           check on this dataset's own data reads <b style="display:inline">No data</b> for this
           period: none of them ran, and no earlier supply's result stands in for it.${heldCrossTableSentence(ds)}
@@ -9908,7 +9916,7 @@ function renderDataset(view, agencyId, collectionId, datasetId){
       </div>` : "";
   const acceptedGapsNote = ds.acceptedGaps ? `
       <div class="accepted-gaps-note" style="margin:-4px 0 16px; color:var(--ink-muted); font-size:13px; max-width:70ch;">
-        ${ds.acceptedGaps.map(g=>`<div>Not supplied (accepted) — ${escHtml(gapText(g).replace(" with no supply", ""))}${g.marks.length ? `: “${escHtml(g.marks[g.marks.length-1].reason)}”, ${escHtml(g.marks[g.marks.length-1].actor)}, ${fmtInstant(g.marks[g.marks.length-1].at)}` : ""}${markWithdrawalNotes(g.allMarks)}</div>`).join("")}
+        ${ds.acceptedGaps.map(g=>`<div>Not supplied (accepted) — ${escHtml(gapText(g).replace(" with no supply", ""))}${g.marks.length ? `: “${recordedText(g.marks[g.marks.length-1].reason)}”, ${escHtml(g.marks[g.marks.length-1].actor)}, ${fmtInstant(g.marks[g.marks.length-1].at)}` : ""}${markWithdrawalNotes(g.allMarks)}</div>`).join("")}
       </div>` : "";
   if(ds.noDataInPlaceOn && !ds.columns.length){
     if(noSupplyShown(ds)){
@@ -10273,7 +10281,7 @@ function openColumnDrawer(ag, col, ds, column, opts){
         <div class="stat"><div class="k">Null / invalid</div><div class="v">${fmtInt(column.stats.current.invalid)}</div></div>
       </div>
       ${column.stats.current.valueCounts ? `
-      <div class="value-bars" style="margin-top:12px;">
+      <div class="value-bars" data-value-text style="margin-top:12px;">
         ${column.stats.current.valueCounts.map(([label,count])=>{
           const isInvalid = String(label).toLowerCase().includes("invalid") || label==="U (invalid)";
           const pct = (count/column.stats.current.total*100);
@@ -10531,7 +10539,7 @@ function aggregateValuesBlock(last){
     const maxCount = Math.max(...agg.values.map(v=>v.count), 1);
     return `<div style="margin-top:10px;">
       <div style="font-size:11px; color:var(--ink-faint); margin-bottom:5px;">Invalid values seen, current run (${fmtInt(agg.total_invalid)} row(s)):</div>
-      <div class="value-bars">
+      <div class="value-bars" data-value-text>
         ${agg.values.map(v=>{
           const pct = v.count/maxCount*100;
           return `<div class="agg-value-row"><span class="lbl" title="${v.value}">${v.value}</span>
@@ -10550,7 +10558,7 @@ function aggregateValuesBlock(last){
       <div class="stat"><div class="k">Distinct values</div><div class="v">${agg.values.length}</div></div>
     </div>
     <div style="font-size:11px; color:var(--ink-faint); margin-bottom:5px;">Distribution of failing values, current run:</div>
-    <div class="value-bars">
+    <div class="value-bars" data-value-text>
       ${agg.histogram.map(b=>{
         const pct = b.count/maxCount*100;
         return `<div class="agg-histogram-row"><span class="lbl" title="${b.bucket}">${b.bucket}</span>
@@ -10735,7 +10743,7 @@ function openCheckPanel(ag, col, ds, column, check, opts){
       <div style="margin-top:10px;">
         <div style="font-size:11px; color:var(--ink-faint); margin-bottom:5px;">Example failing rows (primary key only)${currentPoint.row_count_invalid > sampleKeys.length ? ` — ${sampleKeys.length} of ${fmtInt(currentPoint.row_count_invalid)}` : ""}:</div>
         <div style="display:flex; flex-wrap:wrap; gap:5px;">
-          ${sampleKeys.map(k => `<span style="font:11px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; background:rgba(127,127,127,.12); border-radius:4px; padding:2px 6px;">${k}</span>`).join("")}
+          ${sampleKeys.map(k => `<span data-value-text style="font:11px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; background:rgba(127,127,127,.12); border-radius:4px; padding:2px 6px;">${k}</span>`).join("")}
         </div>
         ${(fp => fp ? `<div class="sample-fine-print" style="font-size:11px; color:var(--ink-muted); margin-top:5px;">${fp}</div>` : "")(sampleFinePrint(check.tool_ref, sampleKeys.length, currentPoint.row_count_invalid))}
       </div>` : (currentPoint.row_count_invalid ? `
@@ -10893,7 +10901,7 @@ function openCheckPanel(ag, col, ds, column, check, opts){
               ? `<span class="pill red sm"><span class="ico"></span>Breaking</span>`
               : `<span class="pill tag sm"><span class="ico"></span>Non-breaking</span>`}
           </div>
-          <div class="changelog-desc"${authoredSlot(e.description)}></div>
+          <div class="changelog-desc" data-recorded-text${authoredSlot(e.description)}></div>
           <div class="changelog-author">— <span${authoredSlot(e.author)}></span></div>
           ${linesFor(e)}
         </div>`).join("")}
@@ -11304,7 +11312,7 @@ let REQ_STATUS_FILTER = "all";
 function retirementNote(ret){
   if(!ret) return "";
   const by = (ret.replaced_by||[]).map(id=>`<span class="mono">${escHtml(id)}</span>`).join(", ");
-  return `Retired ${escHtml(ret.date)} by ${escHtml(ret.by)} - replaced by ${by}${ret.reason ? ". "+escHtml(ret.reason) : ""}`;
+  return `Retired ${escHtml(ret.date)} by ${escHtml(ret.by)} - replaced by ${by}${ret.reason ? ". "+recordedText(ret.reason) : ""}`;
 }
 function requirementStatusLabel(s){ return REQ_STATUS_LABEL[s] || s; }
 function requirementStatusPill(s){ return `<span class="pill ${REQ_STATUS_CLASS[s]||"nodata"} sm"><span class="ico"></span>${requirementStatusLabel(s)}</span>`; }
