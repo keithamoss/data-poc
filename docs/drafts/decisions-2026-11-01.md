@@ -200,3 +200,19 @@ the rebuild needs no question asked twice. Drafts and builders read this file.
   fields' rule; c7 is amended to say verdicts are planned from the not-geocoded
   share AND the drift check. REJECTED accepting the fitted rule, and dropping
   drift planning.
+- B2-B10, B12, B13 SETTLED by Keith 2026-11-02 as RECOMMENDED (shared scenario
+  quarters accepted; ordinary geocoding faults allowed in linkage-scenario
+  quarters; one geocoding scenario a quarter kept; TS-93c/100c/101b keep their
+  letters; resupply re-sends only the failed files from the latest source;
+  inheritance left unmodelled for the replay to judge; year faults 1-3 records;
+  trials one per core; drift reference the last PROMOTED earlier delivery;
+  tile words per dataset; Geocodes tile names its source without a period).
+- B1 CHANGED by Keith 2026-11-02 (against the recommendation): a Linkage
+  Products folder trial ALSO reads a staged, undecided supply in the period,
+  as a real arrival's overlay does (REQ-PIPE-202 d17). To BUILD.
+- B11 CHANGED by Keith 2026-11-02 (against the recommendation): a NULL middle
+  part of a sample key reads '—', as REQ-DASH-299 c8's letter says, the same
+  as an empty one (REQ-DASH-299 d36). To BUILD.
+- B14 SETTLED by Keith 2026-11-02: the withdrawal of REQ-DASH-299's
+  PROVISIONAL #4 is confirmed; mark that item answered. The gate's rule is
+  unchanged.
