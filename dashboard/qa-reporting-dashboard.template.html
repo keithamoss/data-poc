@@ -1595,6 +1595,37 @@ function fmtInt(x){ return x == null ? "—" : x.toLocaleString("en-US"); }
 // pins both numbers to the pipeline's own.
 const SODA_SAMPLES_ASKED = 100;
 const DATACONTRACT_SAMPLES_RETURNED = 5;
+// A FAILING-ROW SAMPLE MAY BE SEVERAL COLUMNS (REQ-PIPE-341): a one-column
+// key is recorded as its bare value, a several-column one as an ordered list
+// of that row's key values, a null part kept as null, with the key's column
+// names beside the samples on the result (failing_sample_key_columns).
+//
+// Every pill is ESCAPED, a one-column key included (it was interpolated raw).
+// A several-column key's parts are joined in declared order; how a NULL part
+// reads on the page is REQ-DASH-299's, so it is an empty part here.
+function samplePill(key, bg){
+  const text = Array.isArray(key)
+    ? key.map(p => p == null ? "" : escHtml(String(p))).join(" / ")
+    : escHtml(String(key));
+  return `<span style="font:11px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; background:${bg}; border-radius:4px; padding:2px 6px;">${text}</span>`;
+}
+const SAMPLE_KEYS_INCOMPARABLE = "These examples cannot be compared: the compared run named its rows by different columns.";
+// A run's samples against the compared run's, BY VALUE: a Set of arrays
+// compares them by reference, so every several-column sample read "new". Two
+// runs whose results named their rows by different columns are not compared.
+function compareSampleKeys(current, compare){
+  const cols = p => JSON.stringify(p.failing_sample_key_columns || null);
+  const cur = current.failing_sample_keys || [], cmp = compare.failing_sample_keys || [];
+  if (cols(current) !== cols(compare)) return { comparable: false };
+  const id = k => JSON.stringify(k);
+  const cmpIds = new Set(cmp.map(id)), curIds = new Set(cur.map(id));
+  return {
+    comparable: true,
+    stillFailing: cur.filter(k => cmpIds.has(id(k))),
+    newSinceCompare: cur.filter(k => !cmpIds.has(id(k))),
+    noLongerSampled: cmp.filter(k => !curIds.has(id(k))),
+  };
+}
 function sampleFinePrint(toolRef, shown, failing){
   if (!shown || !(failing > shown)) return "";
   const tool = String(toolRef || "").split(":")[0];
@@ -10675,12 +10706,12 @@ function openCheckPanel(ag, col, ds, column, check, opts){
   // remediation-workflow design draws (docs/remediation-workflow-design
   // .md) between reporting and case-management.
   const sampleKeys = currentPoint.failing_sample_keys || [];
-  const compareSampleKeys = hasCompareRun ? (comparePoint.failing_sample_keys || []) : [];
+  const comparedSampleKeys = hasCompareRun ? (comparePoint.failing_sample_keys || []) : [];
   const sampleBlock = sampleKeys.length ? `
       <div style="margin-top:10px;">
         <div style="font-size:11px; color:var(--ink-faint); margin-bottom:5px;">Example failing rows (primary key only)${currentPoint.row_count_invalid > sampleKeys.length ? ` — ${sampleKeys.length} of ${fmtInt(currentPoint.row_count_invalid)}` : ""}:</div>
         <div style="display:flex; flex-wrap:wrap; gap:5px;">
-          ${sampleKeys.map(k => `<span style="font:11px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; background:rgba(127,127,127,.12); border-radius:4px; padding:2px 6px;">${k}</span>`).join("")}
+          ${sampleKeys.map(k => samplePill(k, "rgba(127,127,127,.12)")).join("")}
         </div>
         ${(fp => fp ? `<div class="sample-fine-print" style="font-size:11px; color:var(--ink-muted); margin-top:5px;">${fp}</div>` : "")(sampleFinePrint(check.tool_ref, sampleKeys.length, currentPoint.row_count_invalid))}
       </div>` : (currentPoint.row_count_invalid ? `
@@ -10695,20 +10726,21 @@ function openCheckPanel(ag, col, ds, column, check, opts){
   // either run's own (small) sample, same honest limitation sampleBlock
   // above already carries. Scoped via AskUserQuestion (2026-09-15,
   // Keith's call): richer than a bare row-count comparison, on purpose.
-  const keyPill = (k, bg) => `<span style="font:11px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; background:${bg}; border-radius:4px; padding:2px 6px;">${k}</span>`;
   const keyGroup = (label, keys, bg) => keys.length ? `
       <div style="margin-top:8px;">
         <div style="font-size:11px; color:var(--ink-faint); margin-bottom:5px;">${label} (${keys.length}):</div>
-        <div style="display:flex; flex-wrap:wrap; gap:5px;">${keys.map(k=>keyPill(k,bg)).join("")}</div>
+        <div style="display:flex; flex-wrap:wrap; gap:5px;">${keys.map(k=>samplePill(k,bg)).join("")}</div>
       </div>` : "";
-  const diffBlock = (hasCompareRun && (sampleKeys.length || compareSampleKeys.length)) ? (()=>{
-    const compareSet = new Set(compareSampleKeys), currentSet = new Set(sampleKeys);
-    const stillFailing = sampleKeys.filter(k=>compareSet.has(k));
-    const newSinceCompare = sampleKeys.filter(k=>!compareSet.has(k));
-    const noLongerSampled = compareSampleKeys.filter(k=>!currentSet.has(k));
-    return `
+  const diffBlock = (hasCompareRun && (sampleKeys.length || comparedSampleKeys.length)) ? (()=>{
+    const diff = compareSampleKeys(currentPoint, comparePoint);
+    const head = `
       <div style="margin-top:14px; padding-top:12px; border-top:1px solid var(--line);">
-        <div style="font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--ink-faint); font-weight:700;">Failing rows vs. the compared run</div>
+        <div style="font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--ink-faint); font-weight:700;">Failing rows vs. the compared run</div>`;
+    if (!diff.comparable) return `${head}
+        <div class="sample-keys-incomparable" style="font-size:11.5px; color:var(--ink-faint); margin-top:8px;">${SAMPLE_KEYS_INCOMPARABLE}</div>
+      </div>`;
+    const { stillFailing, newSinceCompare, noLongerSampled } = diff;
+    return `${head}
         ${keyGroup("Still failing in both runs", stillFailing, "rgba(127,127,127,.12)")}
         ${keyGroup("New since the compared run", newSinceCompare, "var(--bad-soft)")}
         ${keyGroup("No longer sampled as failing", noLongerSampled, "var(--good-soft)")}

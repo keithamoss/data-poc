@@ -86,6 +86,21 @@ def test_read_one_returns_the_verified_list(tmp_path):
 
     assert read_one("agency", "dataset", "run_01", "dbt") == verified
 
+def test_a_several_column_sample_and_its_key_columns_round_trip_unchanged(tmp_path):
+    """REQ-PIPE-341 criteria 4 and 9: each sample an ordered list, a null part
+    kept as null, and the key's column names beside them - written and read
+    back exactly, in order."""
+    record = {"check_id": "soda:ref", "check_name": "soda:ref", "status": "fail",
+              "failing_sample_keys": [["CP", "C-1", None], ["CP", None, None]],
+              "failing_sample_key_columns": ["dataset", "id_1", "id_2"]}
+    write_qa_result("agency", "dataset", "run_01", "2026-01-01T00:00:00Z", "soda", {},
+                    verified=[dict(record)])
+    _done("run_01")
+    [got] = read_one("agency", "dataset", "run_01", "soda")
+    assert got["failing_sample_keys"] == record["failing_sample_keys"]
+    assert got["failing_sample_key_columns"] == record["failing_sample_key_columns"]
+
+
 def test_read_one_returns_empty_list_for_a_missing_file(tmp_path):
     assert read_one("agency", "dataset", "run_99", "dbt") == []
 

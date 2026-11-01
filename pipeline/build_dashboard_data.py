@@ -498,6 +498,7 @@ def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], da
             "unit": r["unit"], "warn": r["warn_threshold"], "fail": r["fail_threshold"],
             "dimension": r["dimension"], "label": r.get("label"), "check_id": r["check_id"],
             "by_run": {}, "row_count_total": {}, "row_count_invalid": {}, "failing_sample_keys": {},
+            "failing_sample_key_columns": {},
             "status_by_run": {}, "reference": {}, "not_evaluated": {}, "at": {}, "reads": {},
             "unreadable": {}, "due_at": {}, "distribution": {}, "band": {},
         })
@@ -526,6 +527,10 @@ def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], da
         slot["row_count_total"][r["run_id"]] = r["row_count_total"]
         slot["row_count_invalid"][r["run_id"]] = r["row_count_invalid"]
         slot["failing_sample_keys"][r["run_id"]] = r.get("failing_sample_keys") or []
+        # THE KEY'S COLUMN NAMES, as the result recorded them (REQ-PIPE-341
+        # criterion 9): only a several-column result carries them.
+        if r.get("failing_sample_key_columns"):
+            slot["failing_sample_key_columns"][r["run_id"]] = r["failing_sample_key_columns"]
 
     def rank(run_id: str) -> int:
         return facts[run_id]["rank"]
@@ -637,6 +642,8 @@ def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], da
                     "row_count_total": slot["row_count_total"].get(run_id),
                     "row_count_invalid": slot["row_count_invalid"].get(run_id),
                     "failing_sample_keys": slot["failing_sample_keys"].get(run_id) or [],
+                    **({"failing_sample_key_columns": slot["failing_sample_key_columns"][run_id]}
+                       if slot["failing_sample_key_columns"].get(run_id) else {}),
                     "aggregate_values": aggregate_values,
                     "status": slot["status_by_run"].get(run_id),
                     "reference": slot["reference"].get(run_id),
