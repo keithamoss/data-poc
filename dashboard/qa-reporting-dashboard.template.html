@@ -1601,10 +1601,11 @@ const DATACONTRACT_SAMPLES_RETURNED = 5;
 // names beside the samples on the result (failing_sample_key_columns).
 //
 // Every pill is ESCAPED, a one-column key included (it was interpolated raw).
-// A several-column key's parts are joined in declared order; how a NULL key
-// or part reads on the page is REQ-DASH-299's, so it is empty here.
+// A several-column key's parts are joined in declared order, and a NULL key or
+// part - recorded for every tool since post-build-review #294 D1 - reads
+// '(no value)' (Keith's wording; REQ-DASH-299 keeps it).
 function samplePill(key, bg){
-  const part = p => p == null ? "" : escHtml(String(p));
+  const part = p => p == null ? "(no value)" : escHtml(String(p));
   const text = Array.isArray(key) ? key.map(part).join(" / ") : part(key);
   return `<span style="font:11px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; background:${bg}; border-radius:4px; padding:2px 6px;">${text}</span>`;
 }

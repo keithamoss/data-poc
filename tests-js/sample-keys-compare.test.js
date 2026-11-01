@@ -67,4 +67,10 @@ describe("a failing-row sample pill", () => {
     expect(w.samplePill(null, "transparent")).not.toContain("null");
     expect(w.samplePill(["CP", null], "transparent")).not.toContain("null");
   });
+
+  it("shows a null key, or a null part, as (no value)", () => {
+    const w = load();
+    expect(w.samplePill(null, "transparent")).toContain(">(no value)</span>");
+    expect(w.samplePill(["CP", null, "x"], "transparent")).toContain("CP / (no value) / x");
+  });
 });

@@ -139,6 +139,11 @@ def _unreadable_in(run_id: str) -> frozenset[str]:
 def _failing_sample_keys(conn, adapter, test_name, column, table, node, status, built) -> list:
     if status not in ("warn", "fail"):
         return []
+    # A TEST WHOSE FAILURE NAMES NO ROW declares it in its own meta - the one
+    # `names_no_row` declaration every tool honours (REQ-PIPE-341); it replaced
+    # the adapter's singular_unsampled list.
+    if sample_keys.names_no_row(((node.get("config") or {}).get("meta") or {}).get("names_no_row")):
+        return []
     relation_name = node.get("relation_name")
     if not relation_name:
         return []
@@ -146,8 +151,7 @@ def _failing_sample_keys(conn, adapter, test_name, column, table, node, status, 
     if built and model not in built:
         return []
     singular = node.get("test_metadata") is None
-    if (test_name in _SAMPLED_DIRECTLY
-            or (singular and test_name not in adapter.dbt.singular_unsampled)):
+    if test_name in _SAMPLED_DIRECTLY or singular:
         return failing_sample_keys_direct(conn, relation_name, key, check=test_name, table=table)
     if test_name in ("unique", "accepted_values"):
         value_column = "unique_field" if test_name == "unique" else "value_field"

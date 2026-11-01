@@ -33,11 +33,10 @@ class DatacontractSpec:
 @dataclass(frozen=True)
 class DbtSpec:
     #: Each singular test's home table - it has no attached model - and the
-    #: column it is routed to; the singular tests whose audit table holds no
-    #: row keys to sample.
+    #: column it is routed to. (A test whose failure names no row declares
+    #: `names_no_row: true` in its own meta - REQ-PIPE-341.)
     singular_home: dict = field(default_factory=dict)
     singular_column: dict = field(default_factory=dict)
-    singular_unsampled: frozenset = frozenset()
     #: A model-level generic test's column, by test type.
     model_level_column: dict = field(default_factory=dict)
     #: Each test type's dimension and cross-tool label.

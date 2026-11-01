@@ -335,3 +335,47 @@ def test_real_soda_over_the_real_linkage_checks_names_each_failing_row(supply_ds
         ["EDDC_PRESENTATION", "P-404", None]]
     assert got["Expected identifiers present"] == [["DOC_CLIENTS", None, None]]
     assert got["No surplus identifiers"] == [["DOC_CLIENTS", "C-1", "extra"]]
+
+
+# ---- dbt honours the same names_no_row declaration (post-build-review) ----
+
+class _NoQueries:
+    def execute(self, sql, *a):
+        raise AssertionError(f"queried for a check that names no row: {sql}")
+
+
+def _singular(meta):
+    return {"relation_name": '"x"."audit"', "test_metadata": None,
+            "config": {"meta": meta}}
+
+
+def test_dbt_records_nothing_for_a_test_declaring_it_names_no_row():
+    from qa_tools.tools import run_dbt
+
+    adapter = collections.adapter("civil-registration")
+    got = run_dbt._failing_sample_keys(_NoQueries(), adapter, "recency", "date_of_birth",
+                                       "birth_registrations", _singular({"names_no_row": True}),
+                                       "fail", frozenset())
+    assert got == []
+
+
+def test_dbt_samples_a_singular_test_without_the_declaration():
+    from qa_tools.tools import run_dbt
+
+    adapter = collections.adapter("civil-registration")
+    with pytest.raises(sample_keys.SampleNotRecordable, match="queried"):
+        run_dbt._failing_sample_keys(_NoQueries(), adapter, "recency", "date_of_birth",
+                                     "birth_registrations", _singular({}), "fail", frozenset())
+
+
+def test_birth_registrations_recency_test_declares_it_names_no_row():
+    """The one declaration, not an adapter list (singular_unsampled is gone)."""
+    import yaml
+
+    from qa_tools.collections.base import DbtSpec
+
+    doc = yaml.safe_load(open("dbt_project/models/civil-registration/schema.yml"))
+    [recency] = [t for t in doc.get("data_tests") or doc.get("tests") or []
+                 if t.get("name") == "recency"]
+    assert recency["config"]["meta"]["names_no_row"] is True
+    assert not hasattr(DbtSpec(), "singular_unsampled")
