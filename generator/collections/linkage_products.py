@@ -10,8 +10,9 @@ row interface (generated_supplies) - never data/deliveries. Importable
 without pandas or numpy.
 
 WHEN IT ARRIVES (criteria 8 and 12, Keith 2026-10-30 'cap the lag'): on the
-round, before its 18:00 due time (PROVISIONAL; Keith 2026-10-30, moved from 14:00
-because Emergency Department's files land 15:00 to 17:00) and after the
+round, before its 18:00 due time (Keith 2026-10-30, moved from 14:00 because
+Emergency Department's files land 15:00 to 17:00; settled by his signing of
+REQ-GEN-334 criterion 8's amendment A4, 2026-10-31) and after the
 arrivals it reads. A replay's invented promotion lag for a supply this
 product reads ends before this delivery's receipt (promotion.next_receipt),
 so an ordinary quarter's supply is promoted when the release is checked.

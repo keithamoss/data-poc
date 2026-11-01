@@ -271,6 +271,16 @@ decisions:
     dataset: cp-case-workers
     after_hours: 24
     reason: "Nothing was supplied for this quarter, and nothing will be; accepted as not supplied."
+  # AND THE GEOCODING OF A SUPPRESSED SOURCE (REQ-GEN-295 criterion 12): with no
+  # Client Register supply for these quarters there is nothing to geocode, so no
+  # geo_cp_clients file is written and its slot is accepted as not supplied too.
+  # 2015-Q2 and 2015-Q3 are also quarters REQ-GEN-205's correction alters, which
+  # geo-cp-clients rides - so there it is both ridden and marked.
+  - periods: ["2015-Q2", "2015-Q3", "2015-Q4"]
+    operation: mark-not-supplied
+    dataset: geo-cp-clients
+    after_hours: 24
+    reason: "Nothing was supplied for this quarter, and nothing will be; accepted as not supplied."
 
   # THE LINKAGE HISTORY'S PERSON DECISIONS (REQ-GEN-335). TS-93a: the quarter's
   # red Client Register is rejected three weeks after it arrived, so the 2019-Q1

@@ -161,14 +161,21 @@ def test_every_scenario_in_a_quarter_of_its_own(plan):
         assert plan.injected_by_period[period][0].dataset_id == lp.DATASET_ID
 
 
+def _linkage_jobs(plan):
+    """The linkage stream's jobs - the geocoding stream's follow them
+    (REQ-GEN-295 criterion 1) and are tested in tests/test_geocoding_generator.py."""
+    return [j for j in plan.jobs if j.stream == lp.LINKAGE_STREAM]
+
+
 def test_the_ordinary_severity_mix(plan):
     owned = set(plan.injected_by_period) | plan.state["suppressed"]
-    ordinary = [j for j in plan.jobs if j.period.name not in owned]
-    severities = [j.severity for j in plan.jobs]
+    jobs = _linkage_jobs(plan)
+    ordinary = [j for j in jobs if j.period.name not in owned]
+    severities = [j.severity for j in jobs]
     assert severities[0] is None
     assert severities.count("red") == 2
-    assert severities.count("amber") == round(len(plan.jobs) * 0.25)
-    assert all(j.severity is None for j in plan.jobs if j.period.name in owned)
+    assert severities.count("amber") == round(len(jobs) * 0.25)
+    assert all(j.severity is None for j in jobs if j.period.name in owned)
     for job in ordinary:
         deliveries = lp.PROVIDER.slot(plan, job)
         if job.severity is None:
@@ -242,7 +249,7 @@ def test_a_quarter_holding_another_collections_scenario_is_refused(plan):
 
 def test_two_plans_build_the_same_rows(plan):
     again = lp.PROVIDER.plan()
-    for job in plan.jobs:
+    for job in _linkage_jobs(plan):
         for a, b in zip(plan.state["rows"][job.slot_id], again.state["rows"][job.slot_id]):
             assert a.equals(b), job.period.name
 

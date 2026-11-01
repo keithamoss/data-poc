@@ -681,6 +681,21 @@ class TestAnEmptiedQuarterIsMarkedNotSupplied:
             owed = {p.name for p in schedule.periods_for_dataset(ds.dataset_id,
                                                                  until=date(2016, 1, 1))}
             expected |= {(ds.dataset_id, p) for p in owed & emptied}
+        # AND EVERY DATASET READING ONLY SUPPRESSED SOURCES (REQ-GEN-295
+        # criterion 12), derived from what each declares it reads - never a
+        # dataset named here. A product reading a source still supplied there
+        # (Linkage Keys reads ED Presentations too) is not emptied.
+        suppressed = set(expected)
+        for ds in hierarchy.all_datasets():
+            sources = [src for src, _code, _cols in ds.linked]
+            if not sources:
+                continue
+            owed = {p.name for p in schedule.periods_for_dataset(ds.dataset_id,
+                                                                 until=date(2016, 1, 1))}
+            expected |= {(ds.dataset_id, p) for p in owed
+                         if all((src, p) in suppressed for src in sources)}
+        assert any(not d.startswith("cp-") for d, _p in expected), \
+            "no dataset reads a suppressed source - the generalisation proves nothing"
         marks = {(s.dataset_id, s.period) for s in sd.load()
                  if s.period is not None and s.operation == "mark-not-supplied"}
         assert marks == expected

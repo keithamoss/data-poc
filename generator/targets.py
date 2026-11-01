@@ -82,15 +82,27 @@ def written(bookkeeping: Path | None = None, placements: Path | None = None) -> 
             out += _trialled(key, book[key], placed)
         else:
             ambers = [e for e in book[key] if e.get("dirty_severity") == "amber"]
+            # AN AMBER IS COMPARED IN ITS OWN DATASET where the key is one of
+            # the provider's target datasets, else in its amber_dataset
+            # (REQ-GEN-295 criterion 1: the declarations generalised over a
+            # provider writing several).
+            where = (key if key in tuple(owners[key].target_datasets or ())
+                     else owners[key].amber_dataset)
             # AN AMBER COMPARED UNDER NO DATASET IS A DISAGREEMENT NOBODY CAN
             # READ (post-build-review #248), so a provider that builds one
             # without naming where it lands is refused here.
-            if ambers and not owners[key].amber_dataset:
+            if ambers and not where:
                 raise ValueError(f"{owners[key].collection_id} built ordinary ambers but "
                                  f"its provider declares no amber_dataset to compare them in")
-            out += [Built(f"the ordinary amber for {entry['period']}", owners[key].amber_dataset,
+            out += [Built(f"the ordinary amber for {entry['period']}", where,
                           entry["delivery"], "amber")
                     for entry in ambers]
+            # EVERY PLANNED VERDICT, GREEN INCLUDED (REQ-GEN-295 criterion 7):
+            # a supply the provider planned from its own rows - the geocoding
+            # stream's - is a target whatever it was planned to be.
+            out += [Built(f"the planned {entry['planned'][key]} for {entry['period']}", key,
+                          entry["delivery"], entry["planned"][key])
+                    for entry in book[key] if key in (entry.get("planned") or {})]
     return out
 
 
