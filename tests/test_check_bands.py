@@ -42,11 +42,13 @@ class TestTheRealDefinitions:
         """REQ-QAC-187's own arithmetic, now read off the definitions."""
         assert catalogue.rule("cp-clients", "postcode", "conformity").amber(527) == [(1, 15)]
 
+    @pytest.mark.asset("daily")  # a Birth Registrations check, named by its column
     def test_a_sql_check_is_single_tier(self, catalogue):
         [c] = [c for c in catalogue.checks
                if c.check_id.endswith("is_multiple_birth.sibling_match_soda")]
         assert c.single_tier and c.reads_columns
 
+    @pytest.mark.asset("daily")  # a Birth Registrations check, named by its column
     def test_a_dbt_test_with_no_warn_if_is_single_tier(self, catalogue):
         [c] = [c for c in catalogue.checks
                if c.check_id.endswith("registration_number.unique_dbt")]
@@ -68,11 +70,15 @@ class TestTheRealDefinitions:
         assert [b.value for b in psi.warn] == [entry["warn_threshold"]]
         assert [b.value for b in psi.fail] == [entry["fail_threshold"]]
 
-    def test_every_dataset_is_catalogued(self, catalogue):
+    # EACH ASSET'S EVERY DATASET (the asset split): the catalogue is one
+    # asset's, so the check is made once per asset.
+    @pytest.mark.parametrize("asset", [pytest.param("daily", marks=pytest.mark.asset("daily")),
+                                       pytest.param("quarterly", marks=pytest.mark.asset("quarterly"))])
+    def test_every_dataset_is_catalogued(self, catalogue, asset):
         from qa_tools.common import hierarchy
 
-        expected = {d.dataset_id for c in ("civil-registration", "child-protection")
-                    for d in hierarchy.datasets_in_collection(c)}
+        expected = {d.dataset_id for d in hierarchy.all_datasets()}
+        assert expected
         assert {c.dataset_id for c in catalogue.checks} >= expected
 
     def test_it_never_opens_a_database(self, monkeypatch):
@@ -101,6 +107,7 @@ class TestUnparseable:
             cb.soda_bounds(path)
 
 
+@pytest.mark.asset("daily")  # the one retired check is a Birth Registrations check
 class TestRetired:
     def test_a_retired_check_is_left_out(self, catalogue):
         """Criterion 5."""

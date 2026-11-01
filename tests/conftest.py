@@ -1185,6 +1185,20 @@ def _group_by_asset(items):
 
 
 @pytest.hookimpl(tryfirst=True)
+def pytest_runtest_setup(item):
+    """THE TEST'S ASSET BEFORE ANY OF ITS FIXTURES (the asset split): a
+    module-, class- or session-scoped fixture is set up before the autouse
+    `selected_asset` one, so it would otherwise be built under whichever
+    asset the previous test left selected."""
+    import asset_cli
+
+    asset = asset_of(item)
+    os.environ[_assets.ASSET_ENV] = asset
+    asset_cli.rebuild_for_selected()
+    _mark_worker_db_for(asset)
+
+
+@pytest.hookimpl(tryfirst=True)
 def pytest_runtest_protocol(item, nextitem):
     """WHEN THE NEXT TEST ACTS FOR ANOTHER ASSET, its module- and
     class-scoped fixtures are torn down after this one, so it gets fixtures

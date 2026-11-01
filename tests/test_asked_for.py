@@ -42,11 +42,14 @@ class TestWhatACollectionHolds:
         assert got == sorted(_active(collection, tool))
         assert got, "a collection with no checks for a tool it runs"
 
+    @pytest.mark.asset("daily")  # the asset holding the register's retired check
     def test_a_retired_check_is_never_asked_for(self):
+        from qa_tools import collections
+
         retired = [c.check_id for c in vcl.collect_checks(None) if c.retired_as_of]
         assert retired, "precondition: the register holds a retired check"
-        asked = {c for tool in asked_for.TOOLS for coll in (CP, BDM)
-                 for c in asked_for.collection_checks(coll, tool)}
+        asked = {c for tool in asked_for.TOOLS for coll in collections.all_collections()
+                 for c in asked_for.collection_checks(coll.id, tool)}
         assert asked.isdisjoint(retired)
 
 class TestOneRule:
@@ -66,8 +69,10 @@ class TestOneRule:
         assert asked_for.for_run("cp_clients__x", CP, "evidently") == \
             asked_for.collection_checks(CP, "evidently")
 
-    def test_a_run_naming_no_table_is_asked_for_everything(self, monkeypatch):
-        """Criterion 4: a trial or a fixture's run."""
+    def test_a_run_naming_no_table_is_asked_for_everything(self, monkeypatch, clean_qa_history):
+        """Criterion 4: a trial or a fixture's run. The scope rule reads what
+        the run carries from the QA store, so the store is set up here
+        rather than left to whichever test ran before."""
         monkeypatch.setattr(asked_for, "SCOPED", frozenset(asked_for.TOOLS))
         for tool in asked_for.TOOLS:
             assert asked_for.for_run("run_001", CP, tool) == \
