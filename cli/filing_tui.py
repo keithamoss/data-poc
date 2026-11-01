@@ -673,20 +673,23 @@ def regated_lines(regated) -> list[str]:
     from cli import lifecycle_report
     from qa_tools.common import root_cause, supply_status
 
-    outcomes: list[tuple[str, str, str]] = []
+    outcomes: list[lifecycle_report.ReGated] = []
     try:
         with open_log() as conn:
-            for dataset_id, supply, _period, status, result in regated:
+            for r in regated:
+                status, words, result = r.status, r.words, r.result
                 if result == "still held back":
-                    why = root_cause.holdback_reason(conn, dataset_id, supply)
+                    why = root_cause.holdback_reason(conn, r.dataset_id, r.supply)
                     if why:
                         result = f"still held back - {re.sub(r'^Held back[^:]*: ', '', why)}"
                 if status == "red" and supply_status.red_only_for_recheck_owed(
-                        conn, dataset_id, supply):
-                    status = "not yet re-checked"
-                outcomes.append((dataset_id, status, result))
+                        conn, r.dataset_id, r.supply):
+                    # A PLAIN PHRASE, SO NO VALUE (REQ-TEST-360 criterion 2).
+                    status, words = None, "not yet re-checked"
+                outcomes.append(lifecycle_report.ReGated(r.dataset_id, status, words, result))
     except filing_queue.LogUnreachable:
-        outcomes = [(d, st, res) for d, _s, _p, st, res in regated]
+        outcomes = [lifecycle_report.ReGated(r.dataset_id, r.status, r.words, r.result)
+                    for r in regated]
     # THE ONE RENDERER (lifecycle_report.outcome_lines), shared with a
     # settlement's outcome panel.
     return lifecycle_report.outcome_lines(outcomes)
@@ -1202,7 +1205,9 @@ def _beneath_words(b, root_name: str) -> str:
                 f"cannot run while two {root.dataset_id} files wait to be settled; settling "
                 f"them re-checks it.{tail}")
     if root.kind == "slot":
-        why = root_cause._overdue_words(root).replace("red because ", "", 1)
+        # THE REASON WITHOUT ITS STATUS WORD (REQ-TEST-360 criterion 3), never
+        # by stripping the word off the queue's own line.
+        why = root_cause._overdue_reason(root)
         return (f"nothing needs deciding on this supply - its checks of {root.dataset_id} "
                 f"could not run: {why}.{tail}")
     why = (b.reason or "").strip()
@@ -1246,9 +1251,11 @@ def _label(state: slot_state.SlotState, count: int = 0) -> str:
     # IN WORDS, as the table above it says it (CLI UX critic, #107): the
     # picker used to show the machine id - `awaiting-acknowledgement`.
     words = re.sub(r"\[/?[a-z ]+\]", "", _HOW_IT_READS.get(state.state, state.state))
-    if state.state == filing_queue.RECHECKED_WORSE and state.reason:
-        # 'Promoted, then re-checked <verdict>' (REQ-PIPE-164 criterion 15).
-        words = state.reason.split(":")[0]
+    if state.state == filing_queue.RECHECKED_WORSE and state.verdict:
+        # 'Promoted, then failing on re-check' (REQ-PIPE-164 criterion 15),
+        # from the state's verdict VALUE, never cut out of the reason's text
+        # (REQ-TEST-360 criterion 3).
+        words = filing_queue.rechecked_worse_heading(state.verdict)
     # HOW MANY, where more than one (REQ-GHUB-229 criterion 3).
     many = f"  - {count} supplies" if count > 1 else ""
     return f"{state.period}  {state.dataset_id}  {where}  ({words}){many}"
@@ -1276,8 +1283,9 @@ def listed_words(entry: "filing_queue.FiledSupply") -> str:
     what superseded it, both files of an open pair."""
     s = entry.state
     words = _LISTED_AS.get(s.state, "")
-    if s.state == filing_queue.RECHECKED_WORSE and s.reason:
-        words = "in place in the warehouse - " + s.reason.split(":")[0].lower()
+    if s.state == filing_queue.RECHECKED_WORSE and getattr(s, "verdict", None):
+        words = ("in place in the warehouse - "
+                 + filing_queue.rechecked_worse_heading(s.verdict).lower())
     elif s.state == slot_state.TWO_FILES:
         words = f"{words} - {' and '.join(s.files)}" if s.files else words
     elif s.state in (filing_queue.COULD_NOT_LOAD, slot_state.REJECTED,

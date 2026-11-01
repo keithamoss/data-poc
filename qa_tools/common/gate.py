@@ -1152,7 +1152,7 @@ def _record_holdback(conn, application: int, m: Member, members, effective_at: s
                                        reason=_absent_words(wanted),
                                        effective_at=effective_at, gate=gate_fields)
             return
-        if why == promotion.AMBER_WAITING_REASON:
+        if promotion.refusal_kind(why) == promotion.WARN_HOLD:
             amber = _amber(m.dataset_id, effective_at)
             promotion._record_amber_waiting(
                 conn, agency_id=ds.agency_id, collection_id=ds.collection_id,

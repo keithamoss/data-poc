@@ -728,19 +728,20 @@ def reader_lines(readers: "_Readers") -> list[str]:
     """Criterion 14's lines, through the one renderer (lifecycle_report.
     outcome_lines): red first, one per resulting outcome, up to eight
     dataset ids then 'and <n> more', a truncated red line pointing to the
-    queue, and a red for want of the table worded 'red - could not run:
+    queue, and a red for want of the table worded 'failing - could not run:
     <period> holds no <dataset>'. Never 'contested', 'rejected' or
     'refused', nor a raw 'knock-on:' line."""
     import re
 
     from cli import filing_tui, lifecycle_report
     from qa_tools.common import carried, hierarchy, promotion, root_cause, supply_status
+    from qa_tools.common.dataset_status import status_words
 
     table = hierarchy.dataset(readers.dataset_id).table
     outcomes = []
     with filing_tui.open_log() as conn:
-        for ds, sup, _period, status, result in readers.regated:
-            words = status
+        for r in readers.regated:
+            ds, sup, status, words, result = r.dataset_id, r.supply, r.status, r.words, r.result
             if status == "red":
                 try:
                     latest = supply_status.latest_results(conn, ds, sup)
@@ -752,7 +753,8 @@ def reader_lines(readers: "_Readers") -> list[str]:
                 if failing and all(carried.not_evaluated_reason(r) and table in (
                         r.get("unrunnable_tables") or [r.get("unrunnable_table")])
                         for r in failing):
-                    words = f"red - could not run: {readers.period} holds no {readers.dataset_id}"
+                    words = (f"{status_words(status, 'verb')} - could not run: "
+                             f"{readers.period} holds no {readers.dataset_id}")
             if result == "still held back":
                 why = root_cause.holdback_reason(conn, ds, sup)
                 if why:
@@ -762,7 +764,7 @@ def reader_lines(readers: "_Readers") -> list[str]:
             result = result.replace("refused by the agreement backstop",
                                     "kept waiting by the agreement backstop until its "
                                     "dataset matches the agreement again")
-            outcomes.append((ds, words, result))
+            outcomes.append(lifecycle_report.ReGated(ds, status, words, result))
     pointer = (f"see Filing decisions > {filing_tui._collection_name(readers.collection_id)} "
                f"> Supplies waiting on a decision")
     return lifecycle_report.outcome_lines(outcomes, more=pointer)

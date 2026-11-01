@@ -17,6 +17,7 @@ from __future__ import annotations
 
 from collections import OrderedDict
 from dataclasses import dataclass
+from typing import NamedTuple
 
 from rich.console import Console
 
@@ -273,19 +274,33 @@ def beneath_lines(root_line: str, members, *, root_name: str) -> list[str]:
     return lines
 
 
+class ReGated(NamedTuple):
+    """One resulting outcome as outcome_lines renders it (REQ-TEST-360
+    criterion 2): the status VALUE, or None where the status slot holds a
+    plain phrase ('no verdict', 'not yet re-checked'); the WORDS a person
+    reads; and the gate's result. The order and the sort are decided from
+    the value, never the words (criterion 3)."""
+
+    dataset_id: str
+    status: str | None
+    words: str
+    result: str
+
+
 def outcome_lines(outcomes, *, more: str | None = None) -> list[str]:
-    """One line per resulting outcome - (dataset id, status in words, the
-    gate's result) - naming up to eight datasets and then 'and <n> more',
-    red lines first (REQ-PIPE-276 criterion 10; REQ-PIPE-211 criterion 14).
-    A truncated red line ends with `more`, where to see them all."""
-    groups: "OrderedDict[tuple[str, str], list[str]]" = OrderedDict()
-    for dataset_id, status, result in outcomes:
-        groups.setdefault((status, result), []).append(dataset_id)
-    order = sorted(groups.items(), key=lambda kv: (not kv[0][0].startswith("red"),))
+    """One line per resulting outcome - ReGated(dataset id, status value,
+    status in words, the gate's result) - naming up to eight datasets and
+    then 'and <n> more', failing lines first (REQ-PIPE-276 criterion 10;
+    REQ-PIPE-211 criterion 14). A truncated failing line ends with `more`,
+    where to see them all."""
+    groups: "OrderedDict[tuple, list[str]]" = OrderedDict()
+    for dataset_id, status, words, result in outcomes:
+        groups.setdefault((status, words, result), []).append(dataset_id)
+    order = sorted(groups.items(), key=lambda kv: (kv[0][0] != "red",))
     lines = []
-    for (status, result), names in order:
-        line = f"- {named(names)}: {status}, {result}"
-        if more and status.startswith("red") and len(set(names)) > _NAMED:
+    for (status, words, result), names in order:
+        line = f"- {named(names)}: {words}, {result}"
+        if more and status == "red" and len(set(names)) > _NAMED:
             line += f" - {more}"
         lines.append(line)
     return lines
