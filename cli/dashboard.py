@@ -178,6 +178,19 @@ def validate_feedback_command() -> None:
     _validate_feedback()
 
 
+@dashboard_group.command("validate-provisional")
+@click.option("--write-baseline", is_flag=True,
+              help="Write provisional-baseline.yaml from the register. Once only - "
+                   "refused when the file exists.")
+@click.option("--prune", is_flag=True,
+              help="Take answered or reworded entries off the baseline. Never adds one.")
+def validate_provisional_command(write_baseline: bool, prune: bool) -> None:
+    """Gate: warn on every unanswered PROVISIONAL choice in a built requirement (REQ-TEST-374)."""
+    from qa_tools.common.validate_provisional import main as validate_main
+    argv = (["--write-baseline"] if write_baseline else []) + (["--prune"] if prune else [])
+    raise SystemExit(validate_main(argv))
+
+
 INDEX_PATH = "plans/INDEX.md"
 
 

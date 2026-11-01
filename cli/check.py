@@ -124,6 +124,11 @@ _GATES: tuple[tuple[str, list[str], str, bool], ...] = (
     # failure - see sprint_state.main() for why it must not be one.
     ("sprints", ["uv", "run", "mothman", "plans", "sprints"],
      "a sprint's written status matches what its criteria say", True),
+    # REQ-TEST-374 (Keith, 2026-11-01, post-build-review #292): a builder's
+    # provisional choice is a question waiting on him, so a new one in BUILT
+    # work WARNS - never fails - against a shrink-only baseline.
+    ("provisional", ["uv", "run", "mothman", "dashboard", "validate-provisional"],
+     "every unanswered PROVISIONAL choice in built work is named", True),
     ("changelog", ["uv", "run", "mothman", "dashboard", "validate-changelog"],
      "CHANGELOG.yaml's schema and component tags", False),
     # REQ-DOCS-219. Every road-testing entry carries a card the Feedback
@@ -169,9 +174,10 @@ _GATES: tuple[tuple[str, list[str], str, bool], ...] = (
 #: would need - a narrow gate that silently passed a code change is the
 #: false green this command exists to prevent.
 _DOCS_GATES = frozenset({"yamllint", "plans", "requirements", "sprints", "changelog",
-                         "feedback", "scenarios", "scenario map", "premise"})
+                         "feedback", "scenarios", "scenario map", "premise",
+                         "provisional"})
 _DOCS_PATHS = ("plans/", "docs/", "requirements.yaml", "CHANGELOG.yaml", "CLAUDE.md",
-               "SCENARIOS.md", "README.md")
+               "SCENARIOS.md", "README.md", "provisional-baseline.yaml")
 
 
 def _changed_paths() -> list[str]:

@@ -18,6 +18,14 @@ then the questions. A report is a record of what was done and decided -
 anything still to BUILD lives in `requirements.yaml` and the other plans
 files, never only here.
 
+EVERY PROVISIONAL CHOICE THE NIGHT MADE GOES ON THAT REPORT'S QUESTION
+LIST (REQ-TEST-374 criterion 5, Keith, 2026-11-01): each as a question
+with a recommendation, never only in a requirement's `decisions:`. And
+once Keith answers one, the requirement's item says so as 'SETTLED by
+Keith <date>' or 'answered by Keith <date>' - the only forms `mothman
+check`'s `provisional` gate reads as an answer; until then it warns,
+naming the requirement, field and item.
+
 Same conventions as the other numbered-item plans files: a closed status,
 one or more component tags, and a date.
 
