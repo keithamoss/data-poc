@@ -206,10 +206,31 @@ class Provider:
         inheritance scenarios)."""
         return []
 
+    def arrival_files(self, plan: Plan, job: Job, n: int, delivery_obj) -> dict[str, str] | None:
+        """Arrival `n`'s files by name BEFORE any scenario file shape, as
+        files() builds them - what carries_table runs a shape over. None for
+        a provider whose scenarios shape no file sets."""
+        return None
+
     def carries_table(self, plan: Plan, job: Job, n: int, delivery_obj, table: str) -> bool:
-        """Whether arrival `n` of `job` writes `table`'s file, readable - True
-        unless the provider shapes its file sets (generated_supplies)."""
-        return True
+        """Whether arrival `n` of `job` writes `table`'s file, readable
+        (generated_supplies): the arrival's own files through its scenario's
+        file shape (scenario_injection.carries_file) - left out, renamed so
+        nothing claims it, or made unreadable reads as not carried. GENERIC
+        for every provider declaring arrival_files (post-build-review #301
+        finding 3; it was Child Protection's alone)."""
+        files = self.arrival_files(plan, job, n, delivery_obj)
+        if files is None:
+            return True
+        injected = plan.injected_by_period.get(job.period.name)
+        if injected is None:
+            return True
+        shape = injected[0].arrivals[n - 1].file_shape
+        if shape is None:
+            return True
+        from generator import scenario_injection
+
+        return scenario_injection.carries_file(shape, files, f"{table}.csv")
 
 
 class GenerationOrderRefused(ValueError):

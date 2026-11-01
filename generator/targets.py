@@ -206,7 +206,7 @@ def _delivery_received(book: dict, dataset_id: str, received_at: str) -> tuple[s
     if found:
         return found
     raise ValueError(f"the generator's record holds no {dataset_id} supply received "
-                     f"{received_at}, which a geocoding supply's trial would stage")
+                     f"{received_at}, which a supply's trial would stage")
 
 
 def _trialled(dataset_id: str, entries: list[dict], placed: list[dict]) -> list[Built]:

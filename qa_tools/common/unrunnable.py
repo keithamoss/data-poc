@@ -387,7 +387,8 @@ def results_for(conn, *, run_id: str, run_timestamp: str, own_table: str,
     return out
 
 
-def results_for_trial(*, run_id: str, run_timestamp: str, resolution: supply_db.Resolution,
+def results_for_trial(*, run_id: str, run_timestamp: str, collection_id: str,
+                      resolution: supply_db.Resolution,
                       reads: dict[str, list[str]], checks_by_id: dict | None = None,
                       left_out_ids=()) -> list[dict]:
     """The not-evaluated records for a TRIAL - one per check reading a
@@ -411,24 +412,22 @@ def results_for_trial(*, run_id: str, run_timestamp: str, resolution: supply_db.
     # and - for a check the tools LEFT OUT - its own dataset's table. A
     # left-out check nothing unreadable explains gets no record here, so
     # the reconciliation still refuses it.
-    # ONLY THE RUN'S OWN CHECKS: one declaring a table the run's resolution
-    # does not know at all - resolved, absent, contested or held - belongs to
-    # another collection, and is no trial's to speak for (found running
-    # REQ-GEN-298's generation-time trial: Child Protection's relationships
-    # check reads cp_clients, and a Linkage Products trial without it wrote a
-    # record for it that recording then refused).
-    known = (set(resolution.resolved) | set(resolution.absent) | set(resolution.ambiguous)
-             | set(resolution.held))
-
-    def own_table(check: str) -> set[str]:
+    # ONLY THE RUN'S OWN CHECKS, decided by each check's COLLECTION: another
+    # collection's check is no trial's to speak for, whatever tables it
+    # reads (found running REQ-GEN-298's generation-time trial: Child
+    # Protection's relationships check reads cp_clients, and a Linkage
+    # Products trial without it wrote a record for it that recording then
+    # refused). It was decided by table membership - every table the check
+    # reads known to the run - which still let through a Child Protection
+    # check reading only a table this trial lists (post-build-review #301
+    # finding 2).
+    def own(check: str) -> bool:
         parsed = check_id_mod.try_parse(check)
-        try:
-            return {hierarchy.dataset(parsed.dataset).table} if parsed else set()
-        except Exception:  # noqa: BLE001 - not one of ours, nothing to add
-            return set()
-    candidates = {c: list(t) for c, t in reads.items() if (set(t) | own_table(c)) <= known}
+        return parsed is not None and parsed.collection == collection_id
+    candidates = {c: list(t) for c, t in reads.items() if own(c)}
     for check in left_out_ids:
-        candidates.setdefault(check, [])
+        if own(check):
+            candidates.setdefault(check, [])
     for check, declared in sorted(candidates.items()):
         parsed = check_id_mod.try_parse(check)
         if parsed is None:

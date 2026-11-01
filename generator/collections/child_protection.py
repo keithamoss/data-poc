@@ -1048,37 +1048,28 @@ class ChildProtection(Provider):
         return _cp_received_at(delivery_obj.payload, delivery_obj.received_date,
                                f"received_at for {entry['run_id']}")
 
+    def arrival_files(self, plan, job, n, delivery_obj) -> dict[str, str]:
+        """ALL SIX TABLES IN ONE DELIVERY, each without its bookkeeping
+        columns - files()'s set before any period rule or scenario shape."""
+        csvs = {}
+        for t in _tables():
+            df = delivery_obj.payload[t]
+            csvs[f"{t}.csv"] = df[[c for c in df.columns if not c.startswith("_")]].to_csv(
+                index=False)
+        return csvs
+
     def carries_table(self, plan, job, n, delivery_obj, table: str) -> bool:
         """Whether this arrival writes `table`'s file as a readable extract -
         the same file set files() writes: a grown quarter's case workers only
-        where owed, and a scenario's file shape (scenario_injection.
-        apply_file_shape) leaving a file out, renaming it so nothing claims
-        it, or making it unreadable."""
-        from generator import scenario_injection
+        where owed, then the generic scenario file-shape rule
+        (Provider.carries_table)."""
         from qa_tools.common import hierarchy
 
         period = job.period.name
         if (table == hierarchy.dataset(_CASE_WORKERS).table and period in plan.state["grown_names"]
                 and period not in plan.state["case_workers_owed"]):
             return False
-        injected = plan.injected_by_period.get(period)
-        if injected is None:
-            return True
-        shape = injected[0].arrivals[n - 1].file_shape
-        if shape is None:
-            return True
-        # THE ARRIVAL'S OWN FILES, as files() builds them, through the same
-        # shape: a shape may rewrite a file from its real columns.
-        csvs = {}
-        for t in _tables():
-            df = delivery_obj.payload[t]
-            csvs[f"{t}.csv"] = df[[c for c in df.columns if not c.startswith("_")]].to_csv(
-                index=False)
-        name = f"{table}.csv"
-        shaped = scenario_injection.apply_file_shape(shape, csvs)
-        if name not in shaped:
-            return False
-        return shape != "one_file_unreadable" or shaped[name] == csvs[name]
+        return super().carries_table(plan, job, n, delivery_obj, table)
 
     def files(self, plan: Plan, job: Job, n: int, delivery_obj, entry: dict, name: str):
         from generator import receipt_instants, scenario_injection

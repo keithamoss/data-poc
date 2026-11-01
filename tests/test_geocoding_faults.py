@@ -350,6 +350,57 @@ class TestOnlyASupplyThatArrivesIsGeocoded:
         assert all(at_mod.parse_instant(s.received_at, "x") for s in left_out)
 
 
+class TestEveryProvidersFileShapeDecidesWhatIsCarried:
+    """post-build-review #301 finding 3, seen failing first: the carried-table
+    rule above was Child Protection's alone, so an Emergency Department
+    scenario shaping its delivery - leaving ed_presentations.csv out, or
+    making it unreadable - would still have read as a Presentations supply
+    the geocoding stream geocodes. Generic now (Provider.carries_table over
+    each provider's arrival_files)."""
+
+    @staticmethod
+    def _ed(monkeypatch, shaped):
+        import types
+
+        from generator import scenario_injection
+
+        ed = provider_module("emergency-department")
+        payload = pd.DataFrame([dict.fromkeys(ed.COLUMNS, "1")] * 4)
+        delivery_obj = types.SimpleNamespace(payload=payload)
+        period = types.SimpleNamespace(name="2024-Q1")
+        job = types.SimpleNamespace(period=period)
+        arrival = types.SimpleNamespace(file_shape="a scenario's shape")
+        plan_ = types.SimpleNamespace(
+            injected_by_period={"2024-Q1": [types.SimpleNamespace(arrivals=[arrival])]})
+        monkeypatch.setattr(scenario_injection, "apply_file_shape",
+                            lambda shape, files: shaped(files))
+        return ed.PROVIDER.carries_table(plan_, job, 1, delivery_obj, ed.TABLE)
+
+    def test_a_shape_leaving_the_presentations_file_out_is_not_carried(self, monkeypatch):
+        assert self._ed(monkeypatch, lambda files: {}) is False
+
+    def test_a_shape_making_it_unreadable_is_not_carried(self, monkeypatch):
+        from generator import scenario_injection
+
+        unreadable = scenario_injection.unreadable
+        assert self._ed(monkeypatch,
+                        lambda files: {k: unreadable(v) for k, v in files.items()}) is False
+
+    def test_a_shape_keeping_it_readable_is_carried(self, monkeypatch):
+        assert self._ed(monkeypatch, lambda files: dict(files)) is True
+
+    def test_the_rule_reads_child_protections_real_shapes_alike(self):
+        from generator import scenario_injection as si
+
+        files = {f"{t}.csv": "a,b\n1,2\n3,4\n5,6\n" for t in
+                 ("cp_clients", "cp_carers", "cp_placements", "cp_notifications",
+                  "cp_investigations", "cp_case_workers")}
+        assert not si.carries_file("one_file_unreadable", files, "cp_clients.csv")
+        assert si.carries_file("one_file_unreadable", files, "cp_carers.csv")
+        assert not si.carries_file("one_table_missing", files, "cp_placements.csv")
+        assert si.carries_file("columns_reordered", files, "cp_carers.csv")
+
+
 class TestADirtiedSourcesDriftIsPlanned:
     """Found by the trial (PROVISIONAL): geocoding TS-93a's and TS-100a's
     dirtied Client Registers shifts the placed-level mix, so those files -
