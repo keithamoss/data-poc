@@ -379,3 +379,49 @@ def test_birth_registrations_recency_test_declares_it_names_no_row():
                  if t.get("name") == "recency"]
     assert recency["config"]["meta"]["names_no_row"] is True
     assert not hasattr(DbtSpec(), "singular_unsampled")
+
+
+def _probe_contract(tmp_path, *, mark_keys: bool):
+    import duckdb
+    import yaml
+
+    db = tmp_path / f"probe{int(mark_keys)}.duckdb"
+    con = duckdb.connect(str(db))
+    con.execute("CREATE TABLE probe (site_code VARCHAR, episode_no INTEGER, v VARCHAR, other VARCHAR)")
+    con.execute("INSERT INTO probe VALUES ('S1', 1, NULL, 'o'), ('S1', 2, 'ok', 'o'), ('S2', 1, NULL, 'o')")
+    con.close()
+    pk = (lambda n: {"primaryKey": True, "primaryKeyPosition": n}) if mark_keys else (lambda n: {})
+    contract = {
+        "apiVersion": "v3.0.2", "kind": "DataContract", "id": "probe", "name": "probe",
+        "version": "1.0.0", "status": "active",
+        "servers": [{"server": "local", "type": "duckdb", "database": str(db), "schema": "main"}],
+        "schema": [{"name": "probe", "physicalName": "probe", "logicalType": "object", "properties": [
+            {"name": "site_code", "logicalType": "string", **pk(1)},
+            {"name": "episode_no", "logicalType": "integer", **pk(2)},
+            {"name": "v", "logicalType": "string",
+             "quality": [{"type": "library", "metric": "nullValues", "mustBe": 0}]},
+            {"name": "other", "logicalType": "string"}]}]}
+    path = tmp_path / f"probe{int(mark_keys)}-contract.yaml"
+    path.write_text(yaml.safe_dump(contract, sort_keys=False))
+    return path
+
+
+def test_datacontract_samples_the_declared_key_where_the_contract_marks_none(tmp_path):
+    """Post-build-review: datacontract-cli takes a sample's identifiers from
+    primaryKey or unique properties only, so a rule on a table whose key is
+    neither (Linkage Keys') would raise. The adapter's declared key is used."""
+    from datacontract.data_contract import DataContract
+
+    path = _probe_contract(tmp_path, mark_keys=False)
+    with datacontract_common.declared_sample_keys({"probe": ["site_code", "episode_no"]}):
+        run = DataContract(data_contract_file=str(path), include_failed_samples=True).test()
+    [c] = [c for c in run.checks if getattr(c, "failedSamples", None)]
+    for s in c.failedSamples:
+        assert {"site_code", "episode_no"} <= set(s) and "other" not in s, s
+    assert datacontract_common.failing_sample_keys(c, ["site_code", "episode_no"]) == [
+        ["S1", "1"], ["S2", "1"]]
+    # Outside the block datacontract-cli's own rule applies again.
+    run = DataContract(data_contract_file=str(path), include_failed_samples=True).test()
+    [c] = [c for c in run.checks if getattr(c, "failedSamples", None)]
+    assert "site_code" not in c.failedSamples[0]
+
