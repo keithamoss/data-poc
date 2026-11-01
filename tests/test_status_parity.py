@@ -81,6 +81,47 @@ class TestTheVocabularyIsTheOneBothSidesAgreed:
         assert CHECK_STATUSES < DATASET_STATUSES
 
 
+class TestTheWordsAreTheOnesBothSidesAgreed:
+    """REQ-DASH-359 NFR 1, REQ-TEST-360 criterion 1: the terminal's words for
+    each status are status-cases.json's vocabulary.labels block, exactly -
+    the page's copy is held to the same block by tests-js/
+    status-parity.test.js, so the two cannot drift apart."""
+
+    def _table(self):
+        labels = CASES["vocabulary"]["labels"]
+        return {k: v for k, v in labels.items() if not k.startswith("_")}
+
+    def test_the_words_match_the_table_exactly(self):
+        from qa_tools.common.dataset_status import STATUS_WORDS
+
+        assert self._table(), "the labels block is empty"
+        assert STATUS_WORDS == self._table()
+
+    def test_every_status_a_dataset_may_carry_has_words(self):
+        assert set(self._table()) == set(CASES["vocabulary"]["by_level"]["dataset"])
+
+    @pytest.mark.parametrize("form", ["label", "verb", "count"])
+    def test_status_words_gives_each_form(self, form):
+        from qa_tools.common.dataset_status import status_words
+
+        for value, words in self._table().items():
+            assert status_words(value, form) == words[form]
+
+    @pytest.mark.parametrize("value", ["purple", "", None, "Fail", "pass"])
+    def test_a_status_it_has_no_word_for_is_refused(self, value):
+        from qa_tools.common.dataset_status import status_words
+
+        with pytest.raises(UnknownStatusError):
+            status_words(value)
+
+    def test_no_word_is_a_colour(self):
+        import re
+
+        for words in self._table().values():
+            for said in words.values():
+                assert not re.search(r"\b(green|amber|red)\b", said, re.I), said
+
+
 class TestEveryCheckCase:
     @pytest.mark.parametrize("case", [c for c in CASES["check_cases"]
                                       if not c.get("expect_error")],

@@ -317,8 +317,55 @@ def filled_slots(conn: supply_db.SupplyConnection, dataset_id: str) -> frozenset
 #: says when it applies. The words "amber, waiting for a person" are this
 #: state's own label - deliberately not "held" (criterion 18).
 AMBER_HOLD = "hold"
-AMBER_WAITING_REASON = ("this supply is amber and its amber setting is hold, so it "
-                        "is not promoted automatically - amber, waiting for a person")
+AMBER_WAITING_REASON = ("this supply is warning and its warn setting is hold, so it "
+                        "is not promoted automatically - warning, waiting for a person")
+
+#: WHY THE GATE REFUSED, AS A KIND (REQ-TEST-360 criterion 3). Code that has
+#: to tell a supply FAILING the rules from one waiting for some other reason
+#: reads the kind, never the words: knock_on tested '"status is red" in why',
+#: and rewording this module's refusal made it answer False in silence.
+CONTESTED = "contested"
+NO_SLOT = "no-slot"
+DECIDED_BY_A_PERSON = "decided-by-a-person"
+NO_ACTIVE_CHECKS = "no-active-checks"
+#: Its status is red - the rule's own failure.
+FAILING = "failing"
+#: Its status is neither red nor one that promotes itself.
+NOT_PROMOTABLE = "not-promotable"
+#: Amber under the warn setting 'hold' (REQ-PIPE-122 criterion 10).
+WARN_HOLD = "warn-hold"
+SLOT_FILLED = "slot-filled"
+INHERITED = "inherited"
+
+
+class Refusal(str):
+    """The gate's reason, worded for a person, carrying its KIND for code.
+
+    A str, so every place that shows, records or joins a reason is
+    unchanged; the kind rides on the same object through Judged.why and a
+    gate application's `refused` map, which is where the three comparisons
+    REQ-TEST-360 criterion 3 replaces read it."""
+
+    kind: str
+
+    def __new__(cls, text: str, kind: str):
+        out = super().__new__(cls, text)
+        out.kind = kind
+        return out
+
+
+def _status_label(status) -> str:
+    """A status as the gate's reason names it ('Fail'). REFUSES one it has
+    no word for (UnknownStatusError), never passing the raw value through -
+    an unrecognised status is not evidence of anything (REQ-QAC-047)."""
+    from qa_tools.common.dataset_status import status_words
+
+    return status_words(status, "label")
+
+
+def refusal_kind(why) -> str | None:
+    """A refusal's kind, or None for a reason that is plain text."""
+    return getattr(why, "kind", None)
 
 #: Statuses that promote themselves into an empty slot (criterion 1).
 #: Amber is included on purpose: an amber supply is usable data with
@@ -501,19 +548,19 @@ def should_promote(*, status: str,
         # criterion's own phrase: where several files claim one dataset
         # nobody has said which file IS the supply, so there is no
         # supply here to ask any of the later questions about.
-        return False, ("several files claim this dataset and nothing says "
-                       "which one is the supply, so a person decides before "
-                       "anything is promoted")
+        return False, Refusal("several files claim this dataset and nothing says "
+                              "which one is the supply, so a person decides before "
+                              "anything is promoted", CONTESTED)
     if held_without_slot:
         # Criterion 5. Then, because a supply with no confident slot has
         # no slot to be filled or empty, so every later question is moot.
-        return False, ("no slot could be confidently claimed for this supply, "
-                       "so it is neither promoted nor arrival-classified")
+        return False, Refusal("no slot could be confidently claimed for this supply, "
+                              "so it is neither promoted nor arrival-classified", NO_SLOT)
     if decided_by_a_person:
         # REQ-PIPE-076 criterion 7. Ahead of the verdict, because a person
         # having decided outranks whatever the checks now say.
-        return False, ("a person has already decided about this supply, and "
-                       "automation defers to them permanently")
+        return False, Refusal("a person has already decided about this supply, and "
+                              "automation defers to them permanently", DECIDED_BY_A_PERSON)
     if not has_active_checks:
         # Criterion 12, and the dangerous direction: a table nobody wrote
         # a check for computes as green by having no failures, and would
@@ -526,20 +573,21 @@ def should_promote(*, status: str,
         # green or amber" sends an operator looking for a failing check
         # that does not exist. If nothing was asked, there is no answer
         # to report.
-        return False, ("this table has no ACTIVE checks, so nothing was "
-                       "asked of it and green means only that")
+        return False, Refusal("this table has no ACTIVE checks, so nothing was "
+                              "asked of it and a pass means only that", NO_ACTIVE_CHECKS)
     if status not in PROMOTES_ITSELF:
         # Criterion 3.
-        return False, (f"this supply's status is {status} rather than green or "
-                       "amber, so it waits for a person")
+        return False, Refusal(f"this supply's status is {_status_label(status)} rather than Pass or "
+                              "Warn, so it waits for a person",
+                              FAILING if status == "red" else NOT_PROMOTABLE)
     if status == "amber" and amber_setting == AMBER_HOLD:
         # REQ-PIPE-122 criterion 10. Never "held" (criterion 18) - that
         # word means a supply filed to no slot.
-        return False, AMBER_WAITING_REASON
+        return False, Refusal(AMBER_WAITING_REASON, WARN_HOLD)
     if slot_filled:
         # Criterion 4, whatever the status.
-        return False, ("this supply's slot is already filled by a promoted "
-                       "supply, so a person decides what happens to it")
+        return False, Refusal("this supply's slot is already filled by a promoted "
+                              "supply, so a person decides what happens to it", SLOT_FILLED)
     if inherited:
         # REQ-PIPE-098 criterion 17, and it needs its own refusal rather
         # than riding on the one above. A SUBSTITUTED period counts as
@@ -547,9 +595,9 @@ def should_promote(*, status: str,
         # INHERITED period deliberately does not - nothing was owed - so
         # without this the rule would promote straight over the
         # inherited view and nobody would be asked.
-        return False, ("nothing was owed for this period, so it stands on an "
-                       "earlier supply - a person decides whether this one "
-                       "replaces it")
+        return False, Refusal("nothing was owed for this period, so it stands on an "
+                              "earlier supply - a person decides whether this one "
+                              "replaces it", INHERITED)
     return True, None
 
 
@@ -1091,7 +1139,7 @@ def judge(conn, item: dict, status, *, results: Sequence[dict], reads: dict[str,
         amber_setting=amber.value if amber else None,
     )
     if not ok:
-        if why == AMBER_WAITING_REASON and record:
+        if refusal_kind(why) == WARN_HOLD and record:
             _record_amber_waiting(conn, agency_id=agency_id, collection_id=collection_id,
                                   dataset_id=dataset_id, supply=item["supply"],
                                   period=period, amber=amber, effective_at=effective_at)
@@ -1100,7 +1148,7 @@ def judge(conn, item: dict, status, *, results: Sequence[dict], reads: dict[str,
     past = gap_reds(dataset_id, results, reads=reads)
     if past:
         reason = (f"every check contributing to this dataset passed or warned, apart "
-                  f"from {len(past)} recorded red only because its reference crossed "
+                  f"from {len(past)} recorded failing only because its reference crossed "
                   f"an owed period, which warns rather than blocks "
                   f"({', '.join(past)}); and its slot for this period was unfilled")
     if replacing is not None:
@@ -1110,7 +1158,8 @@ def judge(conn, item: dict, status, *, results: Sequence[dict], reads: dict[str,
             decision_log.refuse_if_stood_on(conn, dataset_id, held.holder,
                                             decision_log.SUPERSEDE)
         except decision_log.DecisionRefused as exc:
-            why = (f"the replacement setting '{replacing.value}' would replace "
+            why = (f"the replacement setting '{replacement_setting.words(replacing.value)}' "
+                   f"would replace "
                    f"{held.holder}, but a later period stands on it - {exc}")
             if record:
                 _record_withheld(conn, agency_id=agency_id, collection_id=collection_id,
@@ -1118,8 +1167,10 @@ def judge(conn, item: dict, status, *, results: Sequence[dict], reads: dict[str,
                                  period=period, reason=why, effective_at=effective_at)
             return Judged(why=why, withheld=True)
         # THE SETTING THAT AUTHORISED IT IS THE REASON (criterion 5).
+        # IN WORDS, NEVER THE RAW VALUE (REQ-DASH-359 criterion 12).
         reason = (f"{reason} It replaces {held.holder} under the replacement "
-                  f"setting '{replacing.value}' (set for the {replacing.level}, version "
+                  f"setting '{replacement_setting.words(replacing.value)}' (set for the "
+                  f"{replacing.level}, version "
                   f"{replacing.version}); {held.holder} is superseded, not rejected.")
     return Judged(work={"dataset_id": dataset_id, "supply": item["supply"],
                         "period": period, "physical_tables": item["physical_tables"],

@@ -74,6 +74,59 @@
     "turnedoff"
    ]
   },
+  "labels": {
+   "_why": [
+    "The words a person reads for each status, beside the value it is stored",
+    "as (REQ-DASH-359 criterion 1; REQ-TEST-360 criterion 1). 'label' is a pill,",
+    "legend, table header or a status reached or held ('Fail', 'became Fail');",
+    "'verb' is running prose ('failing because ...'); 'count' is a count",
+    "('2 failing, 1 warning' - never '1 pass', which reads as a processing",
+    "pass). The stored values do not change (Keith, 2026-10-31, Q2 (a)).",
+    "Both statusWords functions - the page's and qa_tools/common/",
+    "dataset_status.py's status_words - are held equal to this block, and",
+    "refuse a status it does not name rather than show its raw value."
+   ],
+   "green": {
+    "label": "Pass",
+    "verb": "passing",
+    "count": "passing"
+   },
+   "amber": {
+    "label": "Warn",
+    "verb": "warning",
+    "count": "warning"
+   },
+   "red": {
+    "label": "Fail",
+    "verb": "failing",
+    "count": "failing"
+   },
+   "nodata": {
+    "label": "No data",
+    "verb": "no data",
+    "count": "no data"
+   },
+   "exhausted": {
+    "label": "Schedule ended",
+    "verb": "schedule ended",
+    "count": "schedule ended"
+   },
+   "inactive": {
+    "label": "No rule defined",
+    "verb": "no rule defined",
+    "count": "no rule defined"
+   },
+   "notcounted": {
+    "label": "Not counted",
+    "verb": "not counted",
+    "count": "not counted"
+   },
+   "turnedoff": {
+    "label": "Turned off",
+    "verb": "turned off",
+    "count": "turned off"
+   }
+  },
   "unordered": {
    "_why": [
     "Recognised, but deliberately OUTSIDE the ordering, so a rollup",

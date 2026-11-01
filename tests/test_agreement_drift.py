@@ -333,7 +333,7 @@ class TestCriticFindingsOn173:
 
         report = processing_pass.PassReport(refused=["cp-clients"])
         pipeline._say_pass(report)
-        assert "recorded result is red" not in capsys.readouterr().out
+        assert "recorded result is a Fail" not in capsys.readouterr().out
         assert report.exit_status == processing_pass.EXIT_REFUSED  # (h)
 
 

@@ -79,7 +79,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from qa_tools.common import (delivery_log, display_time, hierarchy,
+from qa_tools.common import (dataset_status, delivery_log, display_time, hierarchy,
                              in_flight_log)
 
 ROOT = Path(__file__).resolve().parent.parent.parent
@@ -636,8 +636,10 @@ def _rechecked_worse_item(w, received, ran_at=None) -> Item:
         headline=f"{_name_of(w.dataset_id)}, {display_time.format_period(w.period)}",
         verdict=w.now,
         detail=(f"The supply received {when} was promoted into "
-                f"{display_time.format_period(w.period)} {w.promoted_on}; a re-check "
-                f"{display_time.format_instant(ran_at or w.recheck_at)} came back {w.now}. It stays "
+                f"{display_time.format_period(w.period)} "
+                f"{dataset_status.status_words(w.promoted_on, 'verb')}; a re-check "
+                f"{display_time.format_instant(ran_at or w.recheck_at)} came back "
+                f"{dataset_status.status_words(w.now, 'verb')}. It stays "
                 f"promoted until a person demotes it, or acknowledges its new verdict."),
         agency_id=agency, collection_id=collection, dataset_id=w.dataset_id,
         observed_at=_iso_text(ran_at or w.recheck_at),

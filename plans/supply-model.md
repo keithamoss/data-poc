@@ -2819,7 +2819,7 @@ rather than rendering a dead link.
 
 **TS-1 `[INJECT]` Forward cascade.**
 *Config: daily, due 12:00.*
-Monday's supply arrives 14:00 and fails QA - red, rejected, so Monday's
+Monday's supply arrives 14:00 and fails QA - failing, rejected, so Monday's
 slot stays unfilled. A resupply lands 16:00, passes, and is promoted, so
 Monday is now filled. Then a THIRD file arrives at 20:00 the same day.
 **Expect**: the 20:00 arrival files as a **resupply of Monday**, because
@@ -2928,7 +2928,7 @@ REQ-PIPE-123 made that a setting (REQ-GEN-138).
 
 **TS-5 `[unit]` A missed slot must not absorb a later resupply.**
 *Config: MUST be stated per variant - Keith's correction.*
-Tuesday missed entirely. Wednesday arrives on time at 22:00, green,
+Tuesday missed entirely. Wednesday arrives on time at 22:00, passing,
 promoted. A further supply arrives 23:00 Wednesday.
 **Expect**: Tuesday is **closed** - it closed when Wednesday's claim
 window opened (REQ-PIPE-131, which replaced REQ-PIPE-063's monotonic
@@ -3153,7 +3153,7 @@ re-filing exists as its own operation.
 **TS-12 `[INJECT]` Five tables load, one is an invalid CSV.**
 *In the data since 2026-10-05 (REQ-GEN-044 criterion 15): the ragged
 `cp_clients` is refused by the fields-per-row file check before it is
-loaded (REQ-QAC-096), and reads red as could-not-be-loaded with the check
+loaded (REQ-QAC-096), and reads Fail as could-not-be-loaded with the check
 named (REQ-DASH-148, REQ-DASH-097).*
 **Keith, 2026-09-22: "this is a really important one."** The canonical
 case, and the one he raised from real operational experience.
@@ -3161,30 +3161,30 @@ Child Protection's August delivery arrives - all six tables. Five load
 cleanly. `cp_clients` is an invalid CSV and cannot be loaded at all. The
 agency would be asked for a separate resupply of just that one table.
 **Expect**:
-- The five are staged, QA'd, green, and auto-promoted. Their August
+- The five are staged, QA'd, passing, and auto-promoted. Their August
   slots are **filled**, and their own checks are unaffected - they are
   not dragged down.
-- `cp_clients` is **red** (a supply that cannot be loaded is a red QA
+- `cp_clients` is a **Fail** (a supply that cannot be loaded is a failing QA
   finding), rejected, and its August slot stays **unfilled**.
 - Every check declaring `depends_on: [cp_clients]` - including "Client
   reference", which is DEFINED on `cp_notifications` - **cannot run**,
-  and reads **red with a qualifying chip naming `cp_clients` as the
+  and reads **Fail with a qualifying chip naming `cp_clients` as the
   blocker**.
-- That red lands at **collection** level, since cross-table checks are
-  lifted there. `cp_notifications` keeps its own green status and
+- That Fail lands at **collection** level, since cross-table checks are
+  lifted there. `cp_notifications` keeps its own passing status and
   carries only an informational pointer: fully verified against its own
   data, unverified against its relationships.
 
 **TS-13 `[INJECT]` Six tables landing seconds apart.**
 `cp_clients` 09:00:00, `cp_notifications` 09:00:04, and so on.
 **Expect**: **one QA run over the delivery**, with no intermediate state
-in which cross-table checks read red. The test asserts the ABSENCE of
+in which cross-table checks read Fail. The test asserts the ABSENCE of
 flicker.
 **Breaks as**: per-table triggering evaluates "Client reference" at
-09:00:00 when notifications has not arrived, so it reads red, then green
+09:00:00 when notifications has not arrived, so it reads Fail, then Pass
 four seconds later. Transiently true and practically useless - and at 30
-datasets, a red appearing on every healthy delivery is how people learn
-to ignore red.
+datasets, a Fail appearing on every healthy delivery is how people learn
+to ignore a Fail.
 
 **TS-14 `[INJECT]` A later single-table resupply.**
 The corrected `cp_clients` arrives on its own, weeks later.
@@ -3192,7 +3192,7 @@ The corrected `cp_clients` arrives on its own, weeks later.
 is clients' own August slot - per-table slot sequences mean there is no
 "resupply of table X within delivery Y" concept to implement; it is just
 clients' August supply, arriving late. The previously blocked
-cross-table check now runs. If green, clients promotes and August's slot
+cross-table check now runs. If it passes, clients promotes and August's slot
 fills. The recorded QA history keeps **both** runs - the period's current
 state is the latest, its history is all of them. Clients arriving also
 re-evaluates the waiting placements' reading checks and re-gates them
@@ -3210,7 +3210,7 @@ slot in that period.
 **Expect**: it does **not** break the delivery or block readiness, which
 are defined over EXPECTED tables. Not QA'd, not promoted (no slot).
 **Informational** in the activity feed - Keith settled the earlier
-red-or-informational question this way, 2026-09-22: it is not a data
+Fail-or-informational question this way, 2026-09-22: it is not a data
 quality failure, it is a supplier telling us something changed without
 saying so. Unchanged by the 2026-09-24 severity decision below, because
 we know exactly what this file is; it is merely surplus.
@@ -3250,34 +3250,34 @@ at grouping. The delivery boundary is load-bearing and comes from the
 transport, so a feed that cannot express one needs a boundary arranged
 as a plumbing step.
 
-### Status and rollup - the false-green family
+### Status and rollup - the false-pass family
 
-**TS-18 `[both]` Cross-table check green, candidate rejected for a
+**TS-18 `[both]` Cross-table check passing, candidate rejected for a
 different reason.**
 The resupplied `cp_clients` arrives. "Client reference" evaluates
-**green** against staged clients plus promoted notifications. But
-clients is rejected because one of its OWN checks is red.
-**Expect**: "Client reference" does **not** keep its green verdict for
-August. It reverts to **cannot-run, red**, because clients never entered
-the warehouse. The green result stays attached to the rejected SUPPLY as
+**Pass** against staged clients plus promoted notifications. But
+clients is rejected because one of its OWN checks is a Fail.
+**Expect**: "Client reference" does **not** keep its passing verdict for
+August. It reverts to **cannot-run, Fail**, because clients never entered
+the warehouse. The passing result stays attached to the rejected SUPPLY as
 evidence of what was evaluated.
 **Why this one matters most**: it is the case that makes
 period-state-from-promoted-supplies-only load-bearing rather than tidy.
-Keep the verdict and a check reads green for a period whose data is not
+Keep the verdict and a check reads Pass for a period whose data is not
 there.
 
-**TS-19 `[unit]` Partial nodata must not roll up green.**
-A collection with several green checks and one that could not run.
-**Expect**: the collection reads **red**.
-**Breaks as**: `worstOf()` is seeded `"green"` and `STATUS_ORDER.nodata`
-is -1, so a nodata can never win a reduce - five green plus one nodata
-returns green. Red-for-unrun makes this structurally impossible; the
+**TS-19 `[unit]` Partial nodata must not roll up to Pass.**
+A collection with several passing checks and one that could not run.
+**Expect**: the collection reads **Fail**.
+**Breaks as**: `worstOf()` is seeded at a pass and `STATUS_ORDER.nodata`
+is -1, so a nodata can never win a reduce - five passes plus one nodata
+returns a pass. Fail-for-unrun makes this structurally impossible; the
 test guards the old path.
 
 **TS-20 `[unit]` The two status implementations must agree.**
 `qa_tools/common/dataset_status.py` has no `nodata` in its
 `STATUS_ORDER` at all, so a recorded `nodata` falls through
-`dashboard_status_of()` to threshold math and returns **green** - no
+`dashboard_status_of()` to threshold math and returns **Pass** - no
 crash, no warning, silently different from the JS.
 **Expect**: Python and JS return the same status for every input,
 including ones the Python side does not currently know.
@@ -3286,9 +3286,9 @@ drifted from its JS counterpart once already.
 
 **TS-21 `[unit]` A table with no checks defined.**
 Nothing failed to run, because there was nothing to run. `worstOf()`
-over an empty list is seeded green, so such a table reads green by
+over an empty list is seeded at a pass, so such a table reads Pass by
 vacuum and would auto-promote with no quality signal behind it at all.
-Every other false green found was a real signal being swallowed; this is
+Every other false pass found was a real signal being swallowed; this is
 the ABSENCE of any signal reading as a good one.
 
 **SETTLED 2026-09-22: CI gate, hard fail, no opt-out.** Keith's call,
@@ -3320,14 +3320,14 @@ before the dataset existed), which never reaches a promotion decision.
 
 **TS-22 `[both]` Freshness caps the headline.**
 Child Protection's August delivery: all six tables promoted, every check
-green. It is now November and Q4's supply, due 2 November, has not
-arrived. Every check is still green - they ran against August data and
-passed, and nothing has re-run since - so the quality rollup says green.
+passing. It is now November and Q4's supply, due 2 November, has not
+arrived. Every check is still passing - they ran against August data and
+passed, and nothing has re-run since - so the quality rollup says Pass.
 But the newest CP data is a full quarter old, and a consumer reading
-"green" would conclude CP is current and healthy.
-**Expect**: the headline is **worst of (quality, freshness)**. All-green
+"Pass" would conclude CP is current and healthy.
+**Expect**: the headline is **worst of (quality, freshness)**. All-passing
 checks on a dataset whose expected period is unfilled must not read
-green. **Keith, 2026-09-22**: the tables read **red, with a "no data"
+Pass. **Keith, 2026-09-22**: the tables read **Fail, with a "no data"
 qualifier** - the same status-plus-chip vocabulary as a check that could
 not run.
 
@@ -3402,7 +3402,7 @@ move when a supplier changes.
 
 **TS-27 `[unit]` `not_expected` versus marked not supplied.** **Expect**:
 `not_expected` yields **no slot** - nothing owed, nothing overdue,
-nothing red. A closed slot a person marks **not supplied** (REQ-PIPE-132)
+nothing failing. A closed slot a person marks **not supplied** (REQ-PIPE-132)
 **keeps its slot**, unfilled, reading "not supplied (accepted)", counted
 as an obligation NOT MET, with a reason. The distinction protects
 supplier reliability from becoming whatever people were willing to
@@ -3413,7 +3413,7 @@ introduced mark as not supplied, which records the decision.
 
 **TS-28 `[both]` Rejected Monday, promoted Friday.**
 ```
-Mon 22:00   supply arrives, QA red, rejected. NOT promoted.
+Mon 22:00   supply arrives, QA failing, rejected. NOT promoted.
 Tue-Thu     nothing. Warehouse still holds the previous period's table.
 Fri         a human decides it is the best available and promotes it.
 ```
@@ -3434,14 +3434,14 @@ as "transaction time" when the warehouse's transaction time is
 promotion.
 
 **TS-29 `[unit]` Drift with a missing reference period.** The reference
-period was expected and is not there. **Expect**: **red** - identical to
+period was expected and is not there. **Expect**: **Fail** - identical to
 a missing table dependency, the dependency simply being temporal rather
 than lateral.
 
 **TS-30 `[unit]` Drift on a brand-new dataset.** No prior period exists
-because none was ever owed. **Expect**: **`nodata`, not red.** The
+because none was ever owed. **Expect**: **`nodata`, not a Fail.** The
 owed-versus-not-owed boundary. Without it, every new dataset starts life
-red on all its drift checks, which is how people learn to ignore a
+failing on all its drift checks, which is how people learn to ignore a
 signal.
 
 ### Timestamps
@@ -3467,7 +3467,7 @@ any of them is for, and nothing may read that from them.
 needing action naming every file that matched. No view is built for
 either, so they are unqueryable for that run. The other four datasets
 are staged, assigned, classified and QA'd normally. Every cross-table
-check reading a held table reads RED naming it - which is three real
+check reading a held table reads as a Fail naming it - which is three real
 checks against `cp_clients` alone (`cp_notifications`,
 `cp_investigations`, `cp_placements` each carry a referential check on
 `cp_client_id`). Neither held dataset's slot is filled, so both go
@@ -3475,7 +3475,7 @@ overdue in the ordinary way.
 **Why it is worth injecting rather than unit-testing**: the interesting
 part is not the hold, it is that the blast radius is neither zero nor
 the whole delivery. Only a rendered dashboard shows whether a reader can
-tell "two tables need a human" apart from "three datasets are red", and
+tell "two tables need a human" apart from "three datasets are failing", and
 those are the same event seen from two ends.
 STILL NOT REACHABLE after REQ-PIPE-202 (2026-10-15): that requirement
 widened `cp_clients`' pattern only, and `cp_placements`' is still an exact
@@ -3572,7 +3572,7 @@ convention from the upstream system.
 unmatched ones are reported as unrecognised artefacts at **warning**
 level. Critically, the supply is **NOT** silently treated as complete -
 the warning is the only thing standing between this and a promoted,
-green, HALF supply. Had the resupplies matched, this would instead be
+passing, HALF supply. Had the resupplies matched, this would instead be
 the duplicate-match hold of TS-34, which is louder still.
 **Why `[INJECT]`**: the failure is one of ATTENTION, not computation. A
 unit test asserts the warning is emitted; only a rendered dashboard
@@ -3635,7 +3635,7 @@ claim window opens, and nothing is open again until August's does.
 arrival carrying the other five Child Protection tables, all of them
 due this quarter.
 **Expect**: each is filed to its own open period and promoted on the
-ordinary green-or-amber rule. The hold is on one supply only.
+ordinary passing-or-warning rule. The hold is on one supply only.
 
 **TS-33b is the important half**, and it is the half an earlier
 implementation got wrong rather than a hypothetical: a gate once
@@ -3654,7 +3654,7 @@ data says why.*
 
 **TS-41 `[INJECT]` A resend supersedes the failed supply before it.**
 *Config: daily, due 14:00 AWST - TS-1's own placement. Settings in force
-where it lands (2026-09-15): amber setting promote-and-acknowledge,
+where it lands (2026-09-15): warn setting promote-and-acknowledge,
 replacement setting never.*
 The 14:00 supply fails QA and waits; the 16:00 resend arrives for the same
 day.
@@ -3675,8 +3675,8 @@ days. 2019-Q4's delivery carries the usual files and two Client Registers -
 cp_clients.csv at 08:30 and a re-export, cp_clients_v2.csv, at 08:40 whose
 rows differ (each re-pulled an hour later) - both before due; a clean
 cp_clients.csv follows alone on 29 November at 10:00, after due and before
-2020-Q1's window opens, built green (REQ-GEN-184) after one green lead-in
-quarter (2019-Q3) and before a green one (2020-Q1).*
+2020-Q1's window opens, built passing (REQ-GEN-184) after one passing lead-in
+quarter (2019-Q3) and before a passing one (2020-Q1).*
 **Expect** (bootstrap of 2026-10-19): on 1 November 2019 cp-clients reads
 "Two files for one table — this dataset's own supply is not checked until
 a person resolves it" (REQ-DASH-264), naming cp_clients.csv (received 8:30am) and
@@ -3717,8 +3717,8 @@ arrival day.
 days. 2020-Q4's delivery carries the usual files and two Client Registers -
 a stray test file, cp_clients_TEST.csv, every client named TEST, at 08:20 on
 the due day and the real cp_clients.csv at 08:30, both before 09:00 - after
-one green lead-in quarter (2020-Q3) and before a green one (2021-Q1), the
-real extract built green. A scripted person settles the pair at 11:00 the
+one passing lead-in quarter (2020-Q3) and before a passing one (2021-Q1), the
+real extract built passing. A scripted person settles the pair at 11:00 the
 next day (contract/scripted_decisions.yaml, "TS-80 settle"): file one by
 receipt, the test file, rejected; file two, the real extract, the quarter's
 supply.*
@@ -3742,9 +3742,9 @@ same with "2 of this supply's checks need it, so they could not run";
 Placements the same as Notifications. Checks are counted as the grid's rows,
 one per check however many tools ran it (UX critic on 7093c20, B2). From
 8 November, once re-evaluated, none of the three shows the line. On the page (REQ-DASH-264): on 1 November
-cp-clients' own checks read "No data" and its cross-table rows red, each
+cp-clients' own checks read "No data" and its cross-table rows at Fail, each
 named "<reader> → Client Register", with the banner saying the cross-table
-checks did run; from 8 November the readers' Client reference reads green
+checks did run; from 8 November the readers' Client reference reads Pass
 ("Re-checked 7:35am Sunday, 8 November 2020, when the Client Register was
 re-checked"),
 the re-check's result shown though it was recorded under cp-clients' run.
@@ -3752,25 +3752,25 @@ the re-check's result shown though it was recorded under cp-clients' run.
 left contested after the settlement, or the file named by sorted name
 rather than by receipt position.
 
-**TS-81 `[INJECT]` S1 green - a clean Client Register promoted beside the
+**TS-81 `[INJECT]` S1 pass - a clean Client Register promoted beside the
 warehouse's Notifications, its package-mate held back.** PLANTED by
 REQ-GEN-273 criterion 4 (2026-10-25) in a grown quarter, with its gate
 outcomes declared for the bootstrap to compare (criterion 3).
 *Config: quarterly, Feb/May/Aug/Nov, due 09:00 on the 1st; Child
-Protection's replacement setting is green for 2017-Q2 and 2017-Q3
+Protection's replacement setting is 'when passing' for 2017-Q2 and 2017-Q3
 (contract/data-asset.yaml, Keith 2026-10-25). 2017-Q2's five tables arrive
 on time, clean, and are promoted; on 15 May 2017 at 10:00 a zip of a clean
-cp_clients and a cp_notifications red on its own data arrives. A scripted
+cp_clients and a cp_notifications failing on its own data arrives. A scripted
 person rejects that Notifications three weeks later (contract/
 scripted_decisions.yaml, "TS-81 reject"), so it waits on no later page.*
 **Expect**: Notifications v2 is held back (refused on its own data);
 Clients v2's Notifications -> Client Register check is re-run against
 Notifications v1 in the warehouse, passes, and Clients v2 replaces Clients
-v1 under the green setting (REQ-PIPE-267 criterion 6, REQ-PIPE-123).
+v1 under the 'when passing' setting (REQ-PIPE-267 criterion 6, REQ-PIPE-123).
 **Breaks as**: Clients v2 held back with its package-mate, or promoted on a
 verdict that read the held-back Notifications v2.
 
-**TS-82 `[INJECT]` S1 red - a Client Register re-checked against the
+**TS-82 `[INJECT]` S1 fail - a Client Register re-checked against the
 warehouse's Notifications and held back.** PLANTED by REQ-GEN-273 criterion
 4 (2026-10-25), as TS-81 in the next quarter.
 *Config: as TS-81, in 2017-Q3, the zip's cp_clients missing the five clients
@@ -3783,11 +3783,11 @@ Notifications v1) and Clients v1 stays. Its root is Clients v2 itself - its
 own check failed (Keith, 2026-10-25, answer 3a).
 **Breaks as**: Clients v2 promoted, or refused without the re-check.
 
-**TS-83 `[INJECT]` S2 strict as re-cast - a red Client Register holds its
+**TS-83 `[INJECT]` S2 strict as re-cast - a failing Client Register holds its
 whole first-time package back.** PLANTED by REQ-GEN-273 criterion 4
 (2026-10-25).
 *Config: quarterly, Feb/May/Aug/Nov, due 09:00 on the 1st. 2016-Q3's six
-tables arrive together on time, the quarter's first supply, cp_clients red
+tables arrive together on time, the quarter's first supply, cp_clients failing
 on its own data and the other five clean. On 29 August a corrected
 cp_clients and its three readers are resent together.*
 **Expect**: Clients is held back on its own data; Notifications,
@@ -3807,17 +3807,17 @@ together at the last one's arrival.** PLANTED by REQ-GEN-273 criterion 4
 Carer Register 08:30, Notifications 08:40, Placements 08:50, Investigations
 09:00, Client Register 09:20, all clean.*
 **Expect**: Carer Register is promoted at 08:30; Notifications, Placements
-and Investigations each wait red for want of a Client Register
+and Investigations each wait failing for want of a Client Register
 ('promotion-withheld'); at 09:20 the Client Register's arrival gates them
 with it and all four are promoted together (REQ-PIPE-267 criterion 2).
 **Breaks as**: any of the three left waiting after the Client Register, or
 Clients promoted alone.
 
-**TS-85 `[INJECT]` S14 - a red Placements held back alone in a first-time
+**TS-85 `[INJECT]` S14 - a failing Placements held back alone in a first-time
 package.** PLANTED by REQ-GEN-273 criterion 4 (2026-10-25), Q13's case.
 *Config: quarterly, Feb/May/Aug/Nov, due 09:00 on the 1st. 2016-Q1's six
 tables arrive together on time, the quarter's first supply, cp_placements
-red on its own data and the other five clean. On 29 February a corrected
+failing on its own data and the other five clean. On 29 February a corrected
 cp_placements arrives alone.*
 **Expect**: Placements is held back on its own data; Client Register,
 Notifications, Investigations, Carer Register and Case Workers are promoted
@@ -3825,32 +3825,32 @@ Notifications, Investigations, Carer Register and Case Workers are promoted
 corrected Placements is promoted, superseding the first.
 **Breaks as**: a reader of Placements held back with it.
 
-**TS-43 `[INJECT]` An amber supply held under hold.**
-PLANTED 2026-10-11 (parked 2026-10-05 for want of an amber supply): built
-to amber on facility nulls from the checks' own bands (REQ-GEN-184), after
-two green lead-in days and before a green one (REQ-GEN-185); a scripted
+**TS-43 `[INJECT]` A warning supply held under hold.**
+PLANTED 2026-10-11 (parked 2026-10-05 for want of a warning supply): built
+to warn on facility nulls from the checks' own bands (REQ-GEN-184), after
+two passing lead-in days and before a passing one (REQ-GEN-185); a scripted
 person promotes it the next morning, twenty hours after it arrives - once
 the rule has held it, and after the hold has stood for the rest of its day.
-*Config: daily; the amber setting is HOLD from 2026-08-30 (TS-78's version, REQ-GEN-199); a scripted promotion
+*Config: daily; the warn setting is HOLD from 2026-08-30 (TS-78's version, REQ-GEN-199); a scripted promotion
 at 10:00 the next morning.*
-**Expect**: the amber supply is not promoted; the rule records a
-promotion-withheld note naming the setting, and the slot reads amber,
+**Expect**: the warning supply is not promoted; the rule records a
+promotion-withheld note naming the setting, and the slot reads Warn,
 waiting for a person (REQ-PIPE-122).
 **Breaks as**: it promotes itself, as it would under promote.
 
-**TS-44 `[INJECT]` An amber supply promoted and awaiting acknowledgement.**
-PLANTED 2026-10-11 (parked 2026-10-05 for want of an amber supply): built
-to amber on parent 1 nulls (REQ-GEN-184), after one green lead-in day - the
-era is too short for two beside TS-2 and TS-1 - and before a green one.
+**TS-44 `[INJECT]` A warning supply promoted and awaiting acknowledgement.**
+PLANTED 2026-10-11 (parked 2026-10-05 for want of a warning supply): built
+to warn on parent 1 nulls (REQ-GEN-184), after one passing lead-in day - the
+era is too short for two beside TS-2 and TS-1 - and before a passing one.
 *Config: daily; PROMOTE-AND-ACKNOWLEDGE from 2026-09-10.*
 **Expect**: promoted by the rule, recorded with the setting, and shown as
 awaiting acknowledgement (REQ-PIPE-122).
 **Breaks as**: promoted with nothing asked, or held.
 
 **TS-45 `[INJECT]` The same, acknowledged by a person.**
-PLANTED 2026-10-11 (parked 2026-10-05 for want of an amber supply): built
-to amber on parent 2 nulls (REQ-GEN-184), after one green lead-in day and
-before a green one; its acknowledgement is scripted.
+PLANTED 2026-10-11 (parked 2026-10-05 for want of a warning supply): built
+to warn on parent 2 nulls (REQ-GEN-184), after one passing lead-in day and
+before a passing one; its acknowledgement is scripted.
 *Config: as TS-44; a scripted acknowledgement five hours after receipt, once
 the rule has promoted it.*
 **Expect**: beside TS-44's, this one reads acknowledged, by the person, with
@@ -3858,14 +3858,14 @@ their reason (REQ-PIPE-122, REQ-GEN-137 criterion 4).
 **Breaks as**: the acknowledgement refused, or written outside the decision
 path.
 
-**TS-46 `[INJECT]` A green resupply replaces the promoted supply.**
-PLANTED 2026-10-11 (parked 2026-10-05: a churned resend read red against
-the supply before it). Both supplies are built to green (REQ-GEN-184) at the
-size of a green lead-in day (REQ-GEN-185), and a resend no longer drops a
+**TS-46 `[INJECT]` A passing resupply replaces the promoted supply.**
+PLANTED 2026-10-11 (parked 2026-10-05: a churned resend read Fail against
+the supply before it). Both supplies are built to pass (REQ-GEN-184) at the
+size of a passing lead-in day (REQ-GEN-185), and a resend no longer drops a
 twin (plans/running-thoughts.md #82).
-*Config: daily; the replacement setting is GREEN from 2026-09-18 to
+*Config: daily; the replacement setting is 'when passing' from 2026-09-18 to
 2026-09-21.*
-Two green supplies for one day, at 14:00 and 16:00.
+Two passing supplies for one day, at 14:00 and 16:00.
 **Expect**: the 16:00 supply is promoted by the rule, naming the supply it
 replaced and the setting; the 14:00 one is superseded, not rejected, and its
 supply-history row says so (REQ-PIPE-123, REQ-DASH-127).
@@ -3874,7 +3874,7 @@ supply-history row says so (REQ-PIPE-123, REQ-DASH-127).
 **TS-47 `[INJECT]` A daily file arriving after the next day's window
 opened.**
 *Config: daily, due 14:00, 4-hour claim window - the next day's window opens
-at 10:00. Settings in force where it lands (2026-09-07): amber setting hold,
+at 10:00. Settings in force where it lands (2026-09-07): warn setting hold,
 replacement setting never.*
 The day's supply never comes on the day; it arrives at 11:00 the next
 morning.
@@ -3885,7 +3885,7 @@ REQ-DASH-133, REQ-GEN-137 criterion 3).
 **Breaks as**: filed backward to its own day.
 
 **TS-48 `[INJECT]` A correction arriving before its partner is promoted.**
-NOT IN THE DATA YET. A single-table correction that goes red on a
+NOT IN THE DATA YET. A single-table correction that starts failing on a
 cross-table check and is promoted when its partner's promotion re-checks it
 (REQ-PIPE-121) needs the Child Protection generator to place a partner's
 promotion between two arrivals of one quarter, which its delivery shapes do
@@ -3899,7 +3899,7 @@ decision log's still-failing record (REQ-PIPE-121 criterion 12).
 THE DATA YET, for TS-48's reason (REQ-PIPE-118, REQ-PIPE-123 with a
 cross-table reader).
 
-**TS-51 `[INJECT]` A promoted supply turned red by a later sibling.** NOT IN
+**TS-51 `[INJECT]` A promoted supply turned to Fail by a later sibling.** NOT IN
 THE DATA YET. Needs a Child Protection file shape that breaks a promoted
 sibling's referential check (REQ-DASH-126).
 
@@ -3914,7 +3914,7 @@ supporting a placement with no extra arrival.
 FOR KEITH. A good file superseded by a bad later one, the bad one rejected
 and the good one un-superseded, re-checked and promoted by the gate
 (REQ-PIPE-120). Under the rules as built a good file is superseded only
-while WAITING, and a green one waits only behind a filled slot or a hold -
+while WAITING, and a passing one waits only behind a filled slot or a hold -
 in either case the gate does not promote it after the un-supersede without
 a further decision. What should the planted shape be?
 
@@ -3922,12 +3922,12 @@ a further decision. What should the planted shape be?
 In the data since 2026-10-15 (REQ-GEN-044 criterion 1; Keith, 2026-10-14,
 Q13): demonstrated by TS-76's placement - cp-placements' 2025-Q1
 substituted by a scripted person onto 2024-Q4, whose cp-placements supply
-was promoted green - with its own link while the substitution stands.
+was promoted passing - with its own link while the substitution stands.
 CORRECTED 2026-10-16 (post-build-review #207 D1): REQ-GEN-207 moved the
-ordinary amber drawn for 2026-Q3 to 2024-Q4 and this entry then said
-"promoted amber", but that amber dirties only cp_carers and cp_clients, so
-cp-placements' 2024-Q4 supply is still green and promoted. Whether it should
-be amber is with Keith. The script's
+ordinary Warn drawn for 2026-Q3 to 2024-Q4 and this entry then said
+"promoted warning", but that Warn dirties only cp_carers and cp_clients, so
+cp-placements' 2024-Q4 supply is still passing and promoted. Whether it should
+be a Warn is with Keith. The script's
 `stands_on` field (REQ-GEN-200) answered the old blocker.
 
 **TS-55 `[INJECT]` A period whose _manifest lists all three kinds.** NOT IN
@@ -3944,7 +3944,7 @@ alike - the same data, laid out differently by an upstream export.
 column-order file check WARNS, shown in the dataset's file section, and the
 dataset's status is unchanged by it (REQ-QAC-096 criteria 12 and 18,
 REQ-DASH-097 criterion 7, REQ-GEN-044 criterion 16).
-**Breaks as**: refused, or the dataset turned amber or red by a warning.
+**Breaks as**: refused, or the dataset turned to Warn or Fail by a warning.
 
 ### Calendar corrections
 
@@ -4024,8 +4024,8 @@ TS-59a's placement.
 **Expect**: the supply stays filed where it is, with a KEPT decision-log
 entry naming it, its period, the change reference, the actor and the
 reason, and its verdict judged against the period it stays in (REQ-PIPE-170
-criteria 5, 6, 22). 2014-Q3, which the kept supply leaves empty, reads red
-"No supply" for good - the scenario's own consequence, left red (Keith,
+criteria 5, 6, 22). 2014-Q3, which the kept supply leaves empty, reads Fail
+"No supply" for good - the scenario's own consequence, left at Fail (Keith,
 2026-10-19).
 **Breaks as**: moved anyway, kept silently with no reason, or re-judged
 against the period it did not go to.
@@ -4045,8 +4045,8 @@ TS-60a's placement.
 *Config: as TS-60a.*
 **Expect**: held (REQ-PIPE-064), the hold's reason naming the correction:
 "Held when correction REQ-GEN-205 was confirmed: the corrected calendar
-offers it no period". 2013-Q1 reads red "No supply" for good - the
-scenario's own consequence, left red (Keith, 2026-10-19).
+offers it no period". 2013-Q1 reads Fail "No supply" for good - the
+scenario's own consequence, left at Fail (Keith, 2026-10-19).
 **Breaks as**: left filed in a period the corrected agreement does not give
 it, or dropped.
 
@@ -4081,13 +4081,13 @@ its own day, early, and is promoted. Birth Registrations' page says "A
 calendar correction to this dataset's delivery agreement -
 REQ-GEN-205-WINDOW - is awaiting the data asset's manager to confirm it",
 and `mothman supply corrections` lists it as pending. `mothman schedule
-check-agreement` exits 0: REQ-PIPE-173's backstop does NOT go red, because
+check-agreement` exits 0: REQ-PIPE-173's backstop does NOT go to Fail, because
 a declared but unapplied correction accounts for the difference
 (REQ-PIPE-170 criteria 20-21). The TUI lists it under "Calendar
 corrections awaiting confirmation". The page's Needs action list does not
 yet: REQ-DASH-263 (signed 2026-10-19, Keith) adds it there, and
 `mothman supply queue` stays as it is.
-**Breaks as**: the backstop's "configuration problem on our side" red;
+**Breaks as**: the backstop's "configuration problem on our side" Fail;
 or the arrival judged against the old date.
 
 **TS-63a `[INJECT]` A dataset turned off for a while: the turn-off.**
@@ -4146,7 +4146,7 @@ the first bootstrapped build (2026-10-13).
 
 **TS-75a `[INJECT]` A supply rejected after it waited - while it waited.**
 cp-clients, 2024-Q1: the whole delivery on time at 09:00 on 1 February with
-cp_clients alone built red by its own preset; the other five clean.
+cp_clients alone built failing by its own preset; the other five clean.
 *Config: quarterly, due 09:00 on the 1st; a person rejects it at 09:00 on 22
 February; a corrected cp_clients alone arrives at 10:00 on 29 February.*
 **Expect** (REQ-DASH-197), on 8 February, in the as-at panel under the
@@ -4154,13 +4154,13 @@ results' verdict line: the heading "On Thursday, 8 February 2024 the
 warehouse did not hold the latest file", the column "Latest arrival by
 Thursday, 8 February 2024 — not promoted" naming
 cp-clients@202402010900000800, and the reason "this supply was staged and
-nobody had decided about it yet". **What the other tables show**: the red
+nobody had decided about it yet". **What the other tables show**: the Fail
 clients turned notifications', investigations' and placements' own
-cross-table checks red, so all three wait for a person on 8 and 25
-February; carers waited until 11 February and then promoted green; case
-workers promoted green on 7 February. When the corrected cp_clients
+cross-table checks failing, so all three wait for a person on 8 and 25
+February; carers waited until 11 February and then promoted passing; case
+workers promoted passing on 7 February. When the corrected cp_clients
 arrives the re-evaluation promotes clients, notifications, investigations
-and placements green (11 March). **Breaks as**: no panel; or the reason
+and placements passing (11 March). **Breaks as**: no panel; or the reason
 "superseded" (post-build-review #164's reading, which this quarter is
 placed to avoid).
 
@@ -4182,14 +4182,14 @@ as TS-75a.* **Expect** (REQ-DASH-198), on 17 February: the pill "Substituted
 from 2024-Q4" beside the dataset's title, and in its drill-down, below the
 results' heading, "Since removed, as from Sunday, 20 April 2025". The
 quarter closes "not supplied (accepted)". **What cp-clients and cp-carers
-read for 2025-Q1** (H1): clients promoted AMBER on arrival and stays amber
-before, during and after the substitution - the amber is the ordinary one
+read for 2025-Q1** (H1): clients promoted WARNING on arrival and stays at Warn
+before, during and after the substitution - the Warn is the ordinary one
 drawn for this quarter, which the delivery keeps (REQ-GEN-199's PROVISIONAL
-choice); carers waited until 9 February, then promoted GREEN and stays
-green. Neither is red after the substitution ends: the cross-table checks
+choice); carers waited until 9 February, then promoted PASSING and stays
+at Pass. Neither is a Fail after the substitution ends: the cross-table checks
 reading cp_placements are filed under cp-placements, so in a quarter with no
 placements supply nothing runs them for clients or carers (the architect's
-H1 expected red; post-build-review #174). **Breaks as**: no pill on 17
+H1 expected a Fail; post-build-review #174). **Breaks as**: no pill on 17
 February; or "Since replaced".
 
 **TS-77a `[INJECT]` A substitution later replaced - while it stood.**
@@ -4202,8 +4202,8 @@ re-quoted from the bootstrap of 2026-10-30). *Config: quarterly, as
 TS-75a.* **Expect** (REQ-DASH-198), on 17 May: the pill "Substituted from
 2023-Q1", and in its drill-down "Since replaced, as from Wednesday, 14 June
 2023". **What cp-clients and cp-carers
-read for 2023-Q2**: both waited on 2 May; clients promoted AMBER (its
-quarter's drawn amber, kept) on 7 May and carers GREEN on 3 May, and both
+read for 2023-Q2**: both waited on 2 May; clients promoted WARNING (its
+quarter's drawn Warn, kept) on 7 May and carers PASSING on 3 May, and both
 stay so while the substitution stands, on 8 June and after the promotion.
 **Breaks as**: no pill; or "Since removed".
 
@@ -4225,10 +4225,10 @@ included - is a regression.
 
 **TS-78a `[INJECT]` A supply promoted after a newer one - the day it was
 promoted.** Birth Registrations, 30 August to 2 September 2026, inside the
-hold era: D's supply amber and held; D+1's green and promoted by the rule;
-a person promotes D's into D at 20:00 on D+1; D+2's amber and held,
-promoted by the person at 10:00 on D+3, before D+3's green supply. *Config:
-daily; the amber setting is HOLD from 2026-08-30 (contract/data-asset.yaml,
+hold era: D's supply warning and held; D+1's passing and promoted by the rule;
+a person promotes D's into D at 20:00 on D+1; D+2's warning and held,
+promoted by the person at 10:00 on D+3, before D+3's passing supply. *Config:
+daily; the warn setting is HOLD from 2026-08-30 (contract/data-asset.yaml,
 the version added for this scenario); D to D+3 quiet.* **Expect**
 (REQ-DASH-197 criterion 6), on 31 August, in the as-at panel: "On Monday,
 31 August 2026 the newest file was not the newest promotion", the column
@@ -4243,7 +4243,7 @@ The same placement, on 1 September. **Expect** (REQ-DASH-197 criterion 13),
 the verdict line above the results: "Awaiting a decision — the results
 below are the newest supply, received 2:00pm Tuesday, 1 September 2026,
 which is not in place in the warehouse yet. The supply in place in the
-warehouse is the one received 2:00pm Sunday, 30 August 2026, and is Amber." -
+warehouse is the one received 2:00pm Sunday, 30 August 2026, and is warning." -
 the warehouse's status in the legend's word since REQ-DASH-272 - naming D's
 supply, not D+1's, which is newer by
 receipt. **Breaks as**: the verdict line naming 31 August's supply as in
@@ -4297,7 +4297,7 @@ been confirmed by a bootstrap.
 REQ-GEN-335 (a).
 *Config: quarterly, due 18:00 with 8 hours' grace; 2016-Q3's release, one
 row's linkage_key empty.*
-**Expect**: Linkage key recorded reads red on one row, and the release is
+**Expect**: Linkage key recorded reads Fail on one row, and the release is
 held back (REQ-PIPE-332 criterion 3).
 **Breaks as**: the empty key passed, or the whole release refused unloaded.
 
@@ -4305,76 +4305,76 @@ held back (REQ-PIPE-332 criterion 3).
 as missing.** PLANTED by REQ-GEN-335 (b), standing also for the dropped (l).
 *Config: as TS-86; 2017-Q1's release codes every ED Presentations row
 EDDC_PRESENTATION_V2.*
-**Expect**: Known dataset code reads red; ED Presentations' coverage reads 0
-percent, red; its referential check finds no EDDC_PRESENTATION row to fail.
-**Breaks as**: the renamed code matched by similarity, or coverage green.
+**Expect**: Known dataset code reads Fail; ED Presentations' coverage reads 0
+percent, Fail; its referential check finds no EDDC_PRESENTATION row to fail.
+**Breaks as**: the renamed code matched by similarity, or coverage passing.
 
 **TS-88 `[INJECT]` A surplus identifier.** PLANTED by REQ-GEN-335 (c).
 *Config: as TS-86; 2018-Q1's release, one DOC_CLIENTS row carrying an id_2,
 the contract's id_2 column being blank in every ordinary release
 (PROVISIONAL).*
-**Expect**: No surplus identifiers reads red on that row; every other check
+**Expect**: No surplus identifiers reads Fail on that row; every other check
 passes.
 **Breaks as**: the surplus id ignored, or read as a missing one.
 
 **TS-89 `[INJECT]` One record linked twice.** PLANTED by REQ-GEN-335 (d).
 *Config: as TS-86; 2018-Q2's release, one EDDC_PRESENTATION record under two
 keys.*
-**Expect**: Each record linked once reads red; coverage is unchanged.
+**Expect**: Each record linked once reads Fail; coverage is unchanged.
 **Breaks as**: the duplicate counted as two linked presentations.
 
 **TS-90 `[INJECT]` A link to a record the quarter does not hold.** PLANTED
 by REQ-GEN-335 (e) - Keith's "records we don't have".
 *Config: as TS-86; 2018-Q3's release, one EDDC_PRESENTATION row naming a
 presentation not in ED's 2018-Q3 supply.*
-**Expect**: ED Presentations links match a presentation reads red, its
+**Expect**: ED Presentations links match a presentation reads Fail, its
 failing row the code and identifier; the result counts toward ED
 Presentations as well (REQ-PIPE-332 criterion 1).
-**Breaks as**: the dangling row passed, or the red kept off ED's page.
+**Breaks as**: the dangling row passed, or the Fail kept off ED's page.
 
-**TS-91 `[INJECT]` Coverage in the amber band.** PLANTED by REQ-GEN-335 (f).
+**TS-91 `[INJECT]` Coverage in the warn band.** PLANTED by REQ-GEN-335 (f).
 *Config: as TS-86; 2018-Q4's release links 85.5 to 89.5 percent of the
 Client Register's rows.*
-**Expect**: Client Register coverage reads amber, worded below its band; the
-release promotes as amber does (REQ-DASH-337).
-**Breaks as**: worded "above 90 percent", or read green.
+**Expect**: Client Register coverage reads Warn, worded below its band; the
+release promotes as a Warn does (REQ-DASH-337).
+**Breaks as**: worded "above 90 percent", or read Pass.
 
-**TS-92 `[INJECT]` Coverage in the red band.** PLANTED by REQ-GEN-335 (g).
+**TS-92 `[INJECT]` Coverage in the fail band.** PLANTED by REQ-GEN-335 (g).
 *Config: as TS-86; 2019-Q2's release links 78 to 84 percent of ED
 Presentations' rows.*
-**Expect**: ED Presentations coverage reads red, a percentage only, no
+**Expect**: ED Presentations coverage reads Fail, a percentage only, no
 failing rows; the release is held back.
-**Breaks as**: failing rows recorded for coverage, or amber.
+**Breaks as**: failing rows recorded for coverage, or Warn.
 
-**TS-93a `[INJECT]` A Client Register held red and rejected - its side of
+**TS-93a `[INJECT]` A Client Register held failing and rejected - its side of
 TS-93b.** PLANTED by REQ-GEN-335 (h), Child Protection's side.
 *Config: quarterly, Feb/May/Aug/Nov, due 09:00 on the 1st; 2019-Q1's six
-tables arrive on the 1 November 2018 round, cp_clients alone built red; a
+tables arrive on the 1 November 2018 round, cp_clients alone built failing; a
 scripted person rejects it three weeks later ("TS-93 reject") and nothing
 replaces it; an hour later the same person promotes its three readers ("TS-93
 promote notifications", "... investigations", "... placements").*
 **Expect**: cp_clients held back on its own data, then rejected; its readers
 held for want of a Client Register until a person promotes them, so none waits
 on a later page.
-**Breaks as**: the red Client Register promoted.
+**Breaks as**: the failing Client Register promoted.
 
 **TS-93b `[INJECT]` A linkage release whose Client Register is not in the
 warehouse.** PLANTED by REQ-GEN-335 (h).
 *Config: as TS-86; 2019-Q1's release, built from the Client Register as
 received, checked with TS-93a's supply rejected.*
-**Expect**: the release's two cp-clients checks read red, could not run,
+**Expect**: the release's two cp-clients checks read Fail, could not run,
 naming the rejected Client Register; ED Presentations' checks are evaluated.
 **Breaks as**: the cp-clients checks evaluated against another quarter's
 Client Register, or left out of scope as if marked not supplied.
 
-**TS-94 `[INJECT]` A red linkage release promoted by a person.** PLANTED by
+**TS-94 `[INJECT]` A failing linkage release promoted by a person.** PLANTED by
 REQ-GEN-335 (i).
 *Config: as TS-86; 2022-Q2's release, one DOC_CLIENTS row naming a client
 the quarter does not hold; a scripted person promotes it two days later
 ("TS-94 promote", REQ-PIPE-332 criterion 8).*
-**Expect**: held back red; from the promotion, the Client Register promoted
-green on the 1 February 2022 round reads red promoted (REQ-PIPE-332
-criterion 4), and earlier dates still show it green.
+**Expect**: held back failing; from the promotion, the Client Register promoted
+passing on the 1 February 2022 round reads 'Promoted, failing' (REQ-PIPE-332
+criterion 4), and earlier dates still show it passing.
 **Breaks as**: the Client Register demoted, or coloured before the
 promotion.
 
@@ -4388,7 +4388,7 @@ is an ordinary one.*
 **Expect**: the release's cp-clients checks are left out of scope with
 reason code not_supplied_by_decision, while ED Presentations' are evaluated
 (REQ-PIPE-332 criterion 7).
-**Breaks as**: cp-clients' checks read red, could not run.
+**Breaks as**: cp-clients' checks read Fail, could not run.
 
 **TS-96 `[INJECT]` A quarter with no linkage release.** PLANTED by
 REQ-GEN-335 (k).
@@ -4397,34 +4397,34 @@ person marks it not supplied the day after its slot closed, 19 October
 2020 ("TS-96 not supplied").*
 **Expect**: the slot closes unfilled and reads not supplied (accepted)
 (REQ-PIPE-132, REQ-DASH-133).
-**Breaks as**: a red "No supply" gap left needing action.
+**Breaks as**: a Fail "No supply" gap left needing action.
 
-**TS-97 `[INJECT]` Large key groups in the amber band.** PLANTED by
+**TS-97 `[INJECT]` Large key groups in the warn band.** PLANTED by
 REQ-GEN-335 (m).
 *Config: as TS-86; 2021-Q3's release, records re-keyed into groups of 51 to
 230 records until just over 2 percent of distinct keys are large groups.*
-**Expect**: Large key groups reads amber, with the count of keys, the count
+**Expect**: Large key groups reads Warn, with the count of keys, the count
 of large groups and their histogram across several bins, and no key value.
 **Breaks as**: a key value recorded, or the histogram drawn over every key.
 
-**TS-98 `[INJECT]` Large key groups in the red band.** PLANTED by
+**TS-98 `[INJECT]` Large key groups in the fail band.** PLANTED by
 REQ-GEN-335 (n).
 *Config: as TS-97; 2022-Q3's release, groups of 51 to 70 records until just
 over 4 percent of distinct keys are large groups.*
-**Expect**: Large key groups reads red and the release is held back.
-**Breaks as**: amber, or every key counted as a group.
+**Expect**: Large key groups reads Fail and the release is held back.
+**Breaks as**: Warn, or every key counted as a group.
 
 **TS-99 `[INJECT]` A blank expected identifier.** PLANTED by REQ-GEN-335
 (o).
 *Config: as TS-86; 2022-Q4's release, one DOC_CLIENTS row's id_1 blank.*
-**Expect**: Expected identifiers present reads red; the Client Register's
+**Expect**: Expected identifiers present reads Fail; the Client Register's
 referential check also fails on that row, which matches no client.
 **Breaks as**: the blank read as a value.
 
-**TS-100a `[INJECT]` A Client Register held red, then promoted by a person -
+**TS-100a `[INJECT]` A Client Register held failing, then promoted by a person -
 its side of TS-100b.** PLANTED by REQ-GEN-335 (p), Child Protection's side.
 *Config: quarterly, Feb/May/Aug/Nov, due 09:00 on the 1st; 2019-Q3's six
-tables arrive on the 1 May 2019 round, cp_clients alone built red and held;
+tables arrive on the 1 May 2019 round, cp_clients alone built failing and held;
 a scripted person promotes it at 10:00 on 2 August 2019 ("TS-100 promote"),
 the day after the quarter's linkage release.*
 **Expect**: held back on its own data until the person promotes it; its
@@ -4435,24 +4435,24 @@ readers re-checked and promoted with it.
 PLANTED by REQ-GEN-335 (p).
 *Config: as TS-86; 2019-Q3's release, ordinary rows, received while TS-100a's
 Client Register is held.*
-**Expect**: its cp-clients checks read red, could not run, until 10:00 on 2
+**Expect**: its cp-clients checks read Fail, could not run, until 10:00 on 2
 August 2019, when the promotion's knock-on re-checks them and they pass
 (REQ-PIPE-331 criterion 5).
-**Breaks as**: still red after the promotion, or evaluated against the held
+**Breaks as**: still failing after the promotion, or evaluated against the held
 supply before it.
 
-**TS-101 `[INJECT]` Emergency Department's same-round red, clearing.**
+**TS-101 `[INJECT]` Emergency Department's same-round Fail, clearing.**
 PLANTED by REQ-GEN-335 criterion 3 on 2021-Q4, a quarter whose routine ED
-supply is drawn red; the provider refuses if that quarter has no ED
+supply is drawn failing; the provider refuses if that quarter has no ED
 resupply after the release.
-*Config: as TS-86; 2021-Q4's release, received while ED Presentations' red
+*Config: as TS-86; 2021-Q4's release, received while ED Presentations' Fail
 supply of the morning is held, its resupply arriving days later; no ED
 arrival moved, no release re-timed.*
-**Expect**: the release's ED Presentations checks read red, could not run,
+**Expect**: the release's ED Presentations checks read Fail, could not run,
 and clear through the knock-on once the resupply is promoted (REQ-GEN-334
 criteria 9 and 12); ED's own page is not coloured by them.
 **Breaks as**: ED's page coloured by a not-evaluated result, or the release
-re-timed to avoid the red.
+re-timed to avoid the Fail.
 
 ### The activity feed
 

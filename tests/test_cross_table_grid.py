@@ -120,9 +120,9 @@ class TestTheClause:
 
     def test_green(self):
         got = self._clause({"run-c1": {"promotedOn": "green", "timeline": []}})
-        assert g.words_of(got["clause"]) + "Green" + g.words_of(got["tail"]) == (
+        assert g.words_of(got["clause"]) + "passing" + g.words_of(got["tail"]) == (
             "The supply in place in the warehouse is the one received 10:00am Thursday, 25 July "
-            "2024, and is Green.")
+            "2024, and is passing.")
 
     def test_red_since_a_persons_promotion_names_them(self):
         health = {"run-c1": {"promotedOn": "green", "promotedAt": "2024-07-25T10:30:00+08:00",
@@ -131,14 +131,14 @@ class TestTheClause:
                                            "by": "Robin Hale"}]}}
         got = self._clause(health)
         assert got["status"] == "red"
-        assert g.words_of(got["tail"]) == (": it turned red 10:00am Thursday, 1 August 2024, "
+        assert g.words_of(got["tail"]) == (": it started failing 10:00am Thursday, 1 August 2024, "
                                           "after the promote of Notifications by Robin Hale.")
 
     def test_promoted_while_red(self):
         health = {"run-c1": {"promotedOn": "red", "promotedAt": "2024-07-25T10:30:00+08:00",
                              "timeline": [{"at": "2024-07-25T10:00:00+08:00", "status": "red",
                                            "cause": "the arrival of Client Register"}]}}
-        assert g.words_of(self._clause(health)["tail"]) == ": it was promoted while red."
+        assert g.words_of(self._clause(health)["tail"]) == ": it was promoted while failing."
 
     def test_an_unknown_status_is_not_called_green(self):
         """Functional critic on 7093c20: with no recorded health for the holder

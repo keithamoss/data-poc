@@ -143,7 +143,7 @@ describe("grouped by the other collection (criteria 6 and 7)", () => {
     expect(matches.dataset.xtGroupStatus).toBe("red");
     expect(toggle.textContent).toContain("Matches");
     expect(toggle.querySelector(".pill.red")).not.toBeNull();
-    expect(toggle.textContent).toContain("2 checks: 1 red, 1 green");
+    expect(toggle.textContent).toContain("2 checks: 1 failing, 1 passing");
   });
 
   it("opens on click and keeps nothing in the URL", () => {
@@ -256,9 +256,9 @@ describe("the amber tag (criterion 9) and the red-promoted badge (criteria 4 and
     const w = amber();
     const host = w.document.createElement("div");
     host.innerHTML = w.amberPromotedTag("people", RUN.run_id, "2026-05-11");
-    expect(host.querySelector(".pill.amber").textContent.trim()).toBe("Amber promoted");
+    expect(host.querySelector(".pill.amber").textContent.trim()).toBe("Promoted, warning");
     expect(host.querySelector("[data-amber-promoted-why]").textContent).toBe(
-      `Went in green. Amber since the arrival of Matches' ${w.fmtPeriodOrDay(PERIOD)} Match Keys, `
+      `Went in passing. Warning since the arrival of Matches' ${w.fmtPeriodOrDay(PERIOD)} Match Keys, `
       + `${w.fmtInstant("2026-05-10T01:00:00+00:00")}.`);
   });
 
@@ -273,7 +273,7 @@ describe("the amber tag (criterion 9) and the red-promoted badge (criteria 4 and
       { ...step("2026-05-10T01:00:00+00:00", "amber"), causeDataset: "events" }) } });
     const host = w.document.createElement("div");
     host.innerHTML = w.amberPromotedTag("people", RUN.run_id, "2026-05-11");
-    expect(host.textContent).toContain(`Amber since the arrival of ${w.fmtPeriodOrDay(PERIOD)} Events`);
+    expect(host.textContent).toContain(`Warning since the arrival of ${w.fmtPeriodOrDay(PERIOD)} Events`);
     // The dataset a real link (REQ-DASH-272 criterion 15).
     expect(host.querySelector("[data-amber-promoted-why] a.dataset-link").textContent).toBe("Events");
   });
@@ -298,12 +298,12 @@ describe("a band in the direction its result records (criterion 13)", () => {
   it("words a below-band as below, in the recorded unit", () => {
     const w = load();
     expect(w.bandParts({ unit: "%", band: { warn: { op: "<", value: 90 }, fail: { op: "<", value: 85 } } }))
-      .toEqual(["amber below 90%", "red below 85%"]);
+      .toEqual(["warn below 90%", "fail below 85%"]);
   });
 
   it("words an above-band as above", () => {
     const w = load();
-    expect(w.bandParts({ unit: "count", band: { fail: { op: ">", value: 0 } } })).toEqual(["red above 0"]);
+    expect(w.bandParts({ unit: "count", band: { fail: { op: ">", value: 0 } } })).toEqual(["fail above 0"]);
   });
 });
 

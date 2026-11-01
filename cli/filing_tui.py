@@ -62,6 +62,7 @@ from rich.table import Table
 from rich.text import Text
 
 from cli import common
+from qa_tools.common.dataset_status import status_words
 from qa_tools.common import (asset_time, decision_log, filing_decisions,
                              filing_queue, git_identity, hierarchy, inheritance, people,
                              qa_store, slot_state, substitution, supply_db)
@@ -94,8 +95,8 @@ _WHAT_IT_DOES = {
     filing_decisions.CARRY_FORWARD: "carry forward - inherit the newest promoted supply",
     filing_decisions.MARK_NOT_SUPPLIED: ("mark as not supplied - accept that this closed "
                                          "period was missed, with a reason"),
-    filing_decisions.ACKNOWLEDGE: ("acknowledge - say you have looked at this amber "
-                                   "supply and why it is acceptable"),
+    filing_decisions.ACKNOWLEDGE: ("acknowledge - say you have looked at this supply, "
+                                   "now warning, and why it is acceptable"),
     filing_decisions.SUPERSEDE: ("supersede - set this supply aside for a newer version; "
                                  "it is kept, and can be brought back"),
     filing_decisions.UN_SUPERSEDE: ("un-supersede - bring a superseded version back to be "
@@ -177,13 +178,13 @@ _HOW_IT_READS = {
     slot_state.NOT_SUPPLIED_ACCEPTED: "[dim]not supplied (accepted)[/dim]",
     # REQ-PIPE-122 criteria 17 and 18: each distinguishable from a red
     # supply awaiting a decision, and the first never called "held".
-    slot_state.AMBER_WAITING: "[yellow]amber, waiting for a person (amber setting: hold)[/yellow]",
+    slot_state.AMBER_WAITING: "[yellow]warning, waiting for a person (warn setting: hold)[/yellow]",
     slot_state.AWAITING_ACKNOWLEDGEMENT: "[yellow]promoted, awaiting acknowledgement[/yellow]",
     filing_queue.COULD_NOT_LOAD: "[red]could not be loaded[/red]",
     filing_queue.ANOTHER_VERSION_WAITING:
         "[yellow]another version waiting - the period holds a promoted one[/yellow]",
     # REQ-PIPE-164 criterion 15 - _words() gives its new verdict from the reason.
-    filing_queue.RECHECKED_WORSE: "[red]Promoted, then re-checked worse[/red]",
+    filing_queue.RECHECKED_WORSE: "[red]Promoted, then worse on re-check[/red]",
     # REQ-GHUB-229: a version set aside, listed among its period's supplies.
     filing_queue.SUPERSEDED: "[dim]superseded[/dim]",
 }
@@ -197,7 +198,7 @@ _LISTED_AS = {
     slot_state.AWAITING_ACKNOWLEDGEMENT: "in place in the warehouse, awaiting acknowledgement",
     slot_state.AWAITING_DECISION: "waiting on a decision",
     slot_state.RETURNED: "taken back out by a person, waiting on a decision",
-    slot_state.AMBER_WAITING: "amber and held for a person",
+    slot_state.AMBER_WAITING: "warning and held for a person",
     filing_queue.ANOTHER_VERSION_WAITING: "waiting behind the promoted supply",
     filing_queue.COULD_NOT_LOAD: "could not be loaded",
     slot_state.REJECTED: "turned down",
@@ -673,20 +674,23 @@ def regated_lines(regated) -> list[str]:
     from cli import lifecycle_report
     from qa_tools.common import root_cause, supply_status
 
-    outcomes: list[tuple[str, str, str]] = []
+    outcomes: list[lifecycle_report.ReGated] = []
     try:
         with open_log() as conn:
-            for dataset_id, supply, _period, status, result in regated:
+            for r in regated:
+                status, words, result = r.status, r.words, r.result
                 if result == "still held back":
-                    why = root_cause.holdback_reason(conn, dataset_id, supply)
+                    why = root_cause.holdback_reason(conn, r.dataset_id, r.supply)
                     if why:
                         result = f"still held back - {re.sub(r'^Held back[^:]*: ', '', why)}"
                 if status == "red" and supply_status.red_only_for_recheck_owed(
-                        conn, dataset_id, supply):
-                    status = "not yet re-checked"
-                outcomes.append((dataset_id, status, result))
+                        conn, r.dataset_id, r.supply):
+                    # A PLAIN PHRASE, SO NO VALUE (REQ-TEST-360 criterion 2).
+                    status, words = None, "not yet re-checked"
+                outcomes.append(lifecycle_report.ReGated(r.dataset_id, status, words, result))
     except filing_queue.LogUnreachable:
-        outcomes = [(d, st, res) for d, _s, _p, st, res in regated]
+        outcomes = [lifecycle_report.ReGated(r.dataset_id, r.status, r.words, r.result)
+                    for r in regated]
     # THE ONE RENDERER (lifecycle_report.outcome_lines), shared with a
     # settlement's outcome panel.
     return lifecycle_report.outcome_lines(outcomes)
@@ -730,7 +734,8 @@ def _say_carry_forward_readers(carried) -> None:
     try:
         with open_log() as conn:
             for r in readers:
-                status = supply_status.status(conn, r.dataset_id, r.supply) or "no verdict"
+                status = supply_status.status(conn, r.dataset_id, r.supply)
+                status = status_words(status, "verb") if status else "no verdict"
                 # ONE DATE STYLE IN ONE FOLLOW-UP (CLI UX critic minor, #267):
                 # the instant as the consequences above it say one.
                 lines.append(f"- {hierarchy.dataset(r.dataset_id).dataset_name}, received "
@@ -905,8 +910,11 @@ def _recheck_panel(who: str, where: str, got) -> tuple[str, str, str]:
     before and after, and what the gate did with a waiting supply - or, for a
     promoted one, that it stays promoted, naming demote and acknowledge where
     it came back red, each command on a line of its own."""
-    lines = [f"{who} in {where} was {got.before or 'without a verdict'}, re-checked "
-             f"{got.status or 'without a verdict'}."]
+    # THE VERDICTS IN WORDS (REQ-TEST-360 criterion 7), and never 're-checked
+    # failing', which reads as the re-check itself failing (UX MUST 3).
+    before = status_words(got.before, "verb") if got.before else "without a verdict"
+    now = status_words(got.status, "verb") if got.status else "without a verdict"
+    lines = [f"{who} in {where} was {before}; on re-check it is {now}."]
     if got.stays_promoted:
         lines.append(f"It is still promoted - {where} keeps it.")
         text = " ".join(lines)
@@ -1077,8 +1085,8 @@ def _own_red_words(conn, state) -> str:
            if not r.get("reads") and (r.get("status") or "") in ("fail", "error")]
     if not own:
         return words
-    return ("red - 1 of its own checks fails" if len(own) == 1
-            else f"red - {len(own)} of its own checks fail")
+    return ("failing - 1 of its own checks fails" if len(own) == 1
+            else f"failing - {len(own)} of its own checks fail")
 
 
 def queue_groups(conn, waiting, *, held=()):
@@ -1202,7 +1210,9 @@ def _beneath_words(b, root_name: str) -> str:
                 f"cannot run while two {root.dataset_id} files wait to be settled; settling "
                 f"them re-checks it.{tail}")
     if root.kind == "slot":
-        why = root_cause._overdue_words(root).replace("red because ", "", 1)
+        # THE REASON WITHOUT ITS STATUS WORD (REQ-TEST-360 criterion 3), never
+        # by stripping the word off the queue's own line.
+        why = root_cause._overdue_reason(root)
         return (f"nothing needs deciding on this supply - its checks of {root.dataset_id} "
                 f"could not run: {why}.{tail}")
     why = (b.reason or "").strip()
@@ -1246,9 +1256,11 @@ def _label(state: slot_state.SlotState, count: int = 0) -> str:
     # IN WORDS, as the table above it says it (CLI UX critic, #107): the
     # picker used to show the machine id - `awaiting-acknowledgement`.
     words = re.sub(r"\[/?[a-z ]+\]", "", _HOW_IT_READS.get(state.state, state.state))
-    if state.state == filing_queue.RECHECKED_WORSE and state.reason:
-        # 'Promoted, then re-checked <verdict>' (REQ-PIPE-164 criterion 15).
-        words = state.reason.split(":")[0]
+    if state.state == filing_queue.RECHECKED_WORSE and state.verdict:
+        # 'Promoted, then failing on re-check' (REQ-PIPE-164 criterion 15),
+        # from the state's verdict VALUE, never cut out of the reason's text
+        # (REQ-TEST-360 criterion 3).
+        words = filing_queue.rechecked_worse_heading(state.verdict)
     # HOW MANY, where more than one (REQ-GHUB-229 criterion 3).
     many = f"  - {count} supplies" if count > 1 else ""
     return f"{state.period}  {state.dataset_id}  {where}  ({words}){many}"
@@ -1276,8 +1288,9 @@ def listed_words(entry: "filing_queue.FiledSupply") -> str:
     what superseded it, both files of an open pair."""
     s = entry.state
     words = _LISTED_AS.get(s.state, "")
-    if s.state == filing_queue.RECHECKED_WORSE and s.reason:
-        words = "in place in the warehouse - " + s.reason.split(":")[0].lower()
+    if s.state == filing_queue.RECHECKED_WORSE and getattr(s, "verdict", None):
+        words = ("in place in the warehouse - "
+                 + filing_queue.rechecked_worse_heading(s.verdict).lower())
     elif s.state == slot_state.TWO_FILES:
         words = f"{words} - {' and '.join(s.files)}" if s.files else words
     elif s.state in (filing_queue.COULD_NOT_LOAD, slot_state.REJECTED,
@@ -1285,6 +1298,16 @@ def listed_words(entry: "filing_queue.FiledSupply") -> str:
         words = f"{words} - {s.reason}" if s.state == filing_queue.COULD_NOT_LOAD \
             else f"{words} {s.reason}"
     return words
+
+
+def verdict_words(verdict: str) -> str:
+    """A listed supply's verdict in words (REQ-GHUB-229 criterion 4 as
+    REQ-DOCS-362 amends it; REQ-TEST-360 criterion 7): Pass, Warn or Fail -
+    never the stored value - or the queue's own phrase where there is none,
+    which is never handed to status_words."""
+    if verdict in (filing_queue.NO_VERDICT, filing_queue.VERDICT_UNREADABLE):
+        return verdict
+    return status_words(verdict, "label")
 
 
 #: The columns questionary's pointer takes before every choice it lists.
@@ -1299,7 +1322,7 @@ def _supply_line(entry: "filing_queue.FiledSupply") -> str:
     are shortened with _short where the line would run past, never wrapped
     - the arrival and the verdict always stay, and the table above holds
     the words in full."""
-    head, tail = f"{arrived(entry.state.supply)}  ", f"  ({entry.verdict})"
+    head, tail = f"{arrived(entry.state.supply)}  ", f"  ({verdict_words(entry.verdict)})"
     words = listed_words(entry) or "-"
     room = 80 - _POINTER_WIDTH - len(head) - len(tail)
     return head + (words if len(words) <= room else _short(words, room)) + tail
@@ -2146,7 +2169,8 @@ def _choose_a_supply(state: slot_state.SlotState, period_scoped: tuple[str, ...]
     table = Table("Arrived", "Where it stands", "Verdict", box=None, pad_edge=False)
     for e in entries:
         table.add_row(arrived(e.state.supply),
-                      escape(gating.get(e.state.supply) or listed_words(e)), e.verdict)
+                      escape(gating.get(e.state.supply) or listed_words(e)),
+                      verdict_words(e.verdict))
     console.print(f"[bold]{len(entries)}[/bold] supplies filed to {state.dataset_id} "
                   f"{state.period}\n")
     console.print(table)
@@ -2266,9 +2290,9 @@ def _print_amber_settings(dataset_ids: list[str]) -> None:
     if not said:
         return
     if len(set(said.values())) == 1:
-        console.print(f"\nAmber setting: {next(iter(said.values()))}")
+        console.print(f"\nWarn setting: {next(iter(said.values()))}")
         return
-    console.print("\nAmber setting:")
+    console.print("\nWarn setting:")
     for ds, text in said.items():
         console.print(f"  {ds}  {text}")
 

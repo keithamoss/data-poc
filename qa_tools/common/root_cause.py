@@ -438,7 +438,7 @@ def own_checks_passed(conn, dataset_id: str, supply: str) -> bool:
 def failed_recheck_words(conn, dataset_id: str, supply: str) -> str | None:
     """CLI UX review S5 (PROVISIONAL, Keith Q1 = a): a counted row whose
     re-check against the warehouse failed while the supply that caused that
-    re-check still waits - 'red - <check> failed against the warehouse;
+    re-check still waits - 'failing - <check> failed against the warehouse;
     decide <dataset> (received <instant>) first'."""
     from qa_tools.common import display_time, filing, gate, supersession
 
@@ -460,17 +460,25 @@ def failed_recheck_words(conn, dataset_id: str, supply: str) -> str | None:
     words = gate._check_words(checks[0]) if checks else "a cross-table check"
     got = filing.received_at_of(by_ds, by, conn=conn)
     when = display_time.format_instant(got) if got else by
-    return f"red - {words} failed against the warehouse; decide {by_ds} (received {when}) first"
+    return f"failing - {words} failed against the warehouse; decide {by_ds} (received {when}) first"
 
 
 def _overdue_words(root: Root) -> str:
-    """'red because cp-clients for 2024-Q4 is overdue; its checks run again
-    once one is promoted' (REQ-PIPE-210 criterion 9) - in the reason's own
-    words where it is not one of the clock's two."""
+    """'failing because cp-clients for 2024-Q4 is overdue; its checks run
+    again once one is promoted' (REQ-PIPE-210 criterion 9; REQ-TEST-360
+    criterion 4) - in the reason's own words where it is not one of the
+    clock's two."""
+    return f"failing because {_overdue_reason(root)}"
+
+
+def _overdue_reason(root: Root) -> str:
+    """The overdue line's reason WITHOUT its status word (REQ-TEST-360
+    criterion 3): filing_tui used to strip 'red because ' off
+    _overdue_words, which a rewording silently broke."""
     from qa_tools.common import period_schema, unrunnable
 
     if root.kind == "supply":
-        return (f"red because {root.dataset_id}'s supply for {root.period} is held back; "
+        return (f"{root.dataset_id}'s supply for {root.period} is held back; "
                 f"its checks run again once one is promoted")
     how = {period_schema.PAST_DUE: "is overdue",
            period_schema.NOT_YET_DUE: "is not yet due"}.get(root.reason or "")
@@ -479,7 +487,7 @@ def _overdue_words(root: Root) -> str:
             how = "is " + unrunnable.words_for(root.reason) if root.reason else "is not in place"
         except KeyError:
             how = "is not in place"
-    return (f"red because {root.dataset_id} for {root.period} {how}; its checks run again "
+    return (f"{root.dataset_id} for {root.period} {how}; its checks run again "
             f"once one is promoted")
 
 

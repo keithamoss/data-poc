@@ -34,6 +34,23 @@ LABEL = "replacement setting"
 PERMITS = {NEVER: frozenset(), GREEN: frozenset({"green"}),
            GREEN_OR_AMBER: frozenset({"green", "amber"})}
 
+#: Each value as a person reads it (REQ-DASH-359 criterion 12): never the
+#: raw value green or green-or-amber, which are stored configuration. The
+#: page's REPLACEMENT_WORDS holds the same words; each side is held to
+#: criterion 12's words by its own test (tests/test_status_words_shown.py,
+#: tests-js/pass-warn-fail.test.js).
+WORDS = {NEVER: "never", GREEN: "when passing", GREEN_OR_AMBER: "when passing or warning"}
+
+
+def words(value: str) -> str:
+    """A replacement setting's value in words; refuses one it does not know."""
+    try:
+        return WORDS[value]
+    except KeyError:
+        raise amber_setting.AmberSettingError(
+            f"unknown replacement setting {value!r}; values are "
+            f"{', '.join(REPLACEMENT_SETTINGS)}") from None
+
 
 def resolve(dataset_id: str, at: datetime | str, *, doc: dict | None = None):
     """The replacement setting for `dataset_id` as at `at` - value, level and
@@ -81,8 +98,9 @@ def conflicts(doc: dict) -> list[tuple[str, str]]:
                             and amber.value == amber_setting.HOLD):
                         out.append((f"dataset {dataset_id}",
                                     f"from {on.isoformat()} the replacement setting is "
-                                    f"green-or-amber ({replace.level}) while the amber setting "
-                                    f"is hold ({amber.level}) - an amber supply could replace "
-                                    f"accepted data where it may not even fill an empty slot"))
+                                    f"'{words(GREEN_OR_AMBER)}' ({replace.level}) while the warn "
+                                    f"setting is hold ({amber.level}) - a warning supply could "
+                                    f"replace accepted data where it may not even fill an empty "
+                                    f"slot"))
                         break
     return out

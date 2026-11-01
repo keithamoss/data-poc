@@ -97,6 +97,45 @@ DATASET_STATUSES = RECOGNISED_STATUSES
 STATUS_ORDER = ORDERED_STATUSES
 
 
+#: The words a person reads for each status (REQ-DASH-359 criterion 1,
+#: REQ-TEST-360 criterion 1): the LABEL for a pill, a legend or a status
+#: reached or held ('Fail', 'became Fail'); the VERB form for running prose
+#: ('failing because ...'); the COUNT form for a count ('2 failing'). Held
+#: equal to status-cases.json's vocabulary.labels block by tests/
+#: test_status_parity.py, as the page's own copy is by tests-js/
+#: status-parity.test.js - so the terminal's words and the page's cannot
+#: drift apart. The stored VALUES (the keys) do not change.
+STATUS_WORDS = {
+    "green": {"label": "Pass", "verb": "passing", "count": "passing"},
+    "amber": {"label": "Warn", "verb": "warning", "count": "warning"},
+    "red": {"label": "Fail", "verb": "failing", "count": "failing"},
+    "nodata": {"label": "No data", "verb": "no data", "count": "no data"},
+    "exhausted": {"label": "Schedule ended", "verb": "schedule ended",
+                  "count": "schedule ended"},
+    "inactive": {"label": "No rule defined", "verb": "no rule defined",
+                 "count": "no rule defined"},
+    "notcounted": {"label": "Not counted", "verb": "not counted", "count": "not counted"},
+    "turnedoff": {"label": "Turned off", "verb": "turned off", "count": "turned off"},
+}
+STATUS_WORD_FORMS = ("label", "verb", "count")
+
+
+def status_words(value: str, form: str = "label") -> str:
+    """A status in the words a person reads - 'Fail', 'failing' - never its
+    stored value. REFUSES a status it has no word for (REQ-QAC-047's rule):
+    a raw 'red' printed because nothing recognised it is exactly the leak
+    REQ-DASH-359 closes, and a guess is worse than a refusal."""
+    if form not in STATUS_WORD_FORMS:
+        raise ValueError(f"unknown status word form {form!r}; forms are "
+                         f"{', '.join(STATUS_WORD_FORMS)}")
+    words = STATUS_WORDS.get(value) if isinstance(value, str) else None
+    if words is None:
+        raise UnknownStatusError(
+            f"unrecognised status {value!r}: it has no words to show, so it is refused "
+            "rather than printed raw - see status-cases.json.")
+    return words[form]
+
+
 def is_retired(check: dict) -> bool:
     """Whether a check is retired, by the one rule both implementations
     apply: `retired_as_of` carries a real, hand-authored date. Never
@@ -132,7 +171,7 @@ def recognised_status(value: str, read_from: str, allowed=None) -> str:
         f"unrecognised status {value!r} read from {read_from!r}; "
         f"valid here are {sorted(allowed)}.{note} An unrecognised "
         "status is not evidence of health, so it is refused rather than "
-        "read as green - see status-cases.json."
+        "read as a pass - see status-cases.json."
     )
 
 

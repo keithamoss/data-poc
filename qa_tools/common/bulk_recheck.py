@@ -679,22 +679,32 @@ class Summary:
 
 def summary_lines(s: Summary) -> list[str]:
     """Criterion 15's summary - never the words rejected or refused for a
-    gate outcome."""
+    gate outcome, and every verdict in the new words (REQ-TEST-360)."""
+    from qa_tools.common import filing_queue
+
     lines = [f"{len(s.changed)} verdict(s) changed, {s.same} stayed the same, "
              f"{s.still_owed} still owed."
              + (f" {s.elsewhere} already run elsewhere." if s.elsewhere else "")]
     for r in s.changed:
         c = r.covered
         what = ", ".join(r.checks_changed) or "no single check's result"
-        lines.append(f"  {c.dataset_id} {c.period} ({c.supply}): now {r.now or 'no verdict'}, "
-                     f"was {c.status or 'no verdict'} - checks whose results changed: {what}")
+        lines.append(f"  {c.dataset_id} {c.period} ({c.supply}): now {_said(r.now)}, "
+                     f"was {_said(c.status)} - checks whose results changed: {what}")
     worse = [r for r in s.ran if r.worse_promoted]
     for r in worse:
         c = r.covered
-        lines.append(f"  Promoted, then re-checked {r.now}: {c.dataset_id} {c.period} "
+        lines.append(f"  {filing_queue.rechecked_worse_heading(r.now)}: {c.dataset_id} {c.period} "
                      f"({c.supply}) - it stays promoted; demote it to take it out, or "
                      f"acknowledge its new verdict.")
     return lines
+
+
+def _said(status: str | None) -> str:
+    """A verdict in the new words (REQ-TEST-360 criterion 7), never the
+    stored value - 'no verdict' where there is none."""
+    from qa_tools.common.dataset_status import status_words
+
+    return status_words(status, "verb") if status else "no verdict"
 
 
 def estimate(n: int) -> str:

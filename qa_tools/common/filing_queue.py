@@ -205,12 +205,35 @@ def _rechecked_worse(conn, collection_id: str,
         if w is None:
             out.append(s)
             continue
-        out.append(replace(s, state=RECHECKED_WORSE, reason=(
-            f"Promoted, then re-checked {w.now}: {w.supply} in {w.period} was promoted on "
-            f"{w.promoted_on}, and the re-check recorded {w.recheck_at[:16].replace('T', ' ')} "
-            f"(decision {w.recheck_id}) came back {w.now}. It stays promoted until a person "
-            f"demotes it, or acknowledges its new verdict with a reason.")))
+        out.append(replace(s, state=RECHECKED_WORSE, verdict=w.now,
+                           reason=rechecked_worse_reason(w)))
     return out
+
+
+def rechecked_worse_heading(verdict: str) -> str:
+    """'Promoted, then failing on re-check' (REQ-PIPE-164 criterion 15 as
+    REQ-DOCS-362 A28 amends it; SETTLED by Keith 2026-11-01) - worded from
+    the verdict VALUE, which status_words refuses if it does not know."""
+    from qa_tools.common.dataset_status import status_words
+
+    return f"Promoted, then {status_words(verdict, 'verb')} on re-check"
+
+
+def rechecked_worse_reason(w) -> str:
+    """The re-checked-worse reason (REQ-TEST-360 criterion 6), carrying the
+    date it was promoted, read from the decision log: 'Promoted, then
+    failing on re-check: <supply> in <period> was promoted passing on
+    <date>, and the re-check recorded <instant> (decision <id>) came back
+    failing. ...' (SETTLED by Keith 2026-11-01)."""
+    from qa_tools.common import display_time
+    from qa_tools.common.dataset_status import status_words
+
+    on = f" on {display_time.format_day(w.promoted_at)}" if w.promoted_at else ""
+    return (f"{rechecked_worse_heading(w.now)}: {w.supply} in {w.period} was promoted "
+            f"{status_words(w.promoted_on, 'verb')}{on}, and the re-check recorded "
+            f"{w.recheck_at[:16].replace('T', ' ')} (decision {w.recheck_id}) came back "
+            f"{status_words(w.now, 'verb')}. It stays promoted until a person demotes it, "
+            f"or acknowledges its new verdict with a reason.")
 
 
 def waiting_over_promoted(conn: supply_db.SupplyConnection,

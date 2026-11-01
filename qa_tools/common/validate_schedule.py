@@ -717,8 +717,8 @@ def _expects_nothing_errors(raw: dict, src: Source) -> list[ConfigError]:
                 src.name, f"dataset {dataset_id!r}",
                 "expects no supply in any period at all.",
                 "Something in this dataset's calendar, participation, dates or "
-                "not_expected leaves nothing behind. A dataset expecting nothing sits "
-                "green forever - which is the exhausted-schedule state arriving by "
+                "not_expected leaves nothing behind. A dataset expecting nothing passes "
+                "forever - which is the exhausted-schedule state arriving by "
                 "accident."))
     return out
 
@@ -959,8 +959,8 @@ def _replacement_setting_errors(raw: dict, src: Source, today: date | None = Non
     out = _amber_setting_errors(raw, src, today, ref, module=replacement_setting)
     return out + [ConfigError(
         src.name, f"replacement_setting ({where})", f"{problem}.",
-        "Make the replacement setting green (or never) for those dates, or the amber "
-        "setting promote or promote-and-acknowledge - by a NEW version of whichever you "
+        "Make the replacement setting 'green' (or 'never') for those dates, or the warn "
+        "setting (amber_setting) promote or promote-and-acknowledge - by a NEW version of whichever you "
         "change, since a past version is frozen.")
         for where, problem in replacement_setting.conflicts(raw)]
 

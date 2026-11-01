@@ -130,6 +130,10 @@ class SlotState:
     closed: bool = False
     #: An open pair's two files, as they arrived (REQ-PIPE-194 criterion 2).
     files: tuple[str, ...] = ()
+    #: A promoted supply re-checked worse: the VALUE its re-check came back
+    #: (REQ-TEST-360 criterion 3), so a heading is worded from it rather than
+    #: cut out of the reason's text.
+    verdict: str | None = None
 
     @property
     def needs_action(self) -> bool:

@@ -132,7 +132,7 @@ class TestItIsJudgedAgainstTheLogInsideTheTransaction:
         assert dl.decisions_for(conn, dataset) == []
 
     def test_promoting_a_red_supply_without_a_reason_is_refused(self, conn, dataset):
-        with pytest.raises(dl.DecisionRefused, match="came back red"):
+        with pytest.raises(dl.DecisionRefused, match="came back failing"):
             with dl.apply_decision(conn, a_decision(dataset, supply_is_red=True)):
                 pass
 

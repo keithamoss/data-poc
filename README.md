@@ -330,7 +330,7 @@ already downloaded, on demand, before you use it:
 
 Both print a short pass/warn/fail/error report and exit 1 on any real
 failure/error - including, for a kept supply, one the promotion gate held
-back on a red, such as a re-check against the warehouse that failed - 2 if
+back on a Fail, such as a re-check against the warehouse that failed - 2 if
 a stage of the run itself failed, and 0 otherwise (so a shell script can
 gate on it). `--reference-file`/
 `--reference-folder` is required — the distribution-drift check needs a
@@ -547,7 +547,7 @@ it end to end rather than assumed:
   `severity: warning` in the contract, so their real `fail_threshold` is
   `None` — and the dashboard's checks-building code defaults a missing
   `fail_threshold` to `0`, which made `checkStatus()` (`current > fail`)
-  read any healthy positive row count as red. Fixed by excluding
+  read any healthy positive row count as a Fail. Fixed by excluding
   `row_count` from the per-column checks entirely
   (what was then `pipeline/build_cp_dashboard_data.py`), the same way
   `build_dashboard_data.py` already handles Birth Registrations' rowCount

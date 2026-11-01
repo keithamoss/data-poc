@@ -32,13 +32,13 @@ describe("the Columns not green cell", () => {
     ];
     const t = text(w, w.columnsNotGreenCell(units));
     expect(t).toContain("1 of 3");
-    expect(t).toContain("1 red, 0 amber · incl. Supply-level checks");
+    expect(t).toContain("1 failing, 0 warning · incl. Supply-level checks");
   });
 
   it("reads 'All M green' rather than a bare 0", () => {
     const w = load();
     const t = text(w, w.columnsNotGreenCell([unit("a", { r1: "green", r2: "green" }), unit("b", { r2: "green" })]));
-    expect(t).toContain("All 2 green");
+    expect(t).toContain("All 2 passing");
     expect(t).not.toMatch(/\b0 of\b/);
   });
 
@@ -79,7 +79,7 @@ describe("the Columns not green cell", () => {
     // latest count the visible text says does not exist.
     const label = html.match(/aria-label="([^"]+)"/)[1];
     expect(label).toContain("no column has a verdict on this date");
-    expect(label).not.toMatch(/latest \d+ red/);
+    expect(label).not.toMatch(/latest \d+ failing/);
   });
 
   it("says when no column has a verdict, and when there is one run so far", () => {

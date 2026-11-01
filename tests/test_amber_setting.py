@@ -167,7 +167,7 @@ class TestTheGate:
 
     def test_hold_never_promotes_amber_and_never_says_held(self):
         ok, why = self._gate("hold")
-        assert not ok and "amber, waiting for a person" in why
+        assert not ok and "warning, waiting for a person" in why
         assert "held" not in why.replace("hold", "")
 
     def test_the_other_two_promote(self):

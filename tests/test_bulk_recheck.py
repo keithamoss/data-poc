@@ -307,7 +307,7 @@ class TestRunning:
         out = capsys.readouterr().out
         assert s.still_owed == 2 and "Traceback" not in out
         assert "still owed" in out and "\nmothman pipeline process" in out
-        assert "now red, was" in out
+        assert "now failing, was" in out
 
     def test_the_summary_names_changes_and_never_says_rejected_or_refused(self):
         c = bulk.Covered(DS, "s1", "2099-S1", "promoted", "green", STALE)
@@ -315,8 +315,8 @@ class TestRunning:
                                        (CHECK,))])
         text = "\n".join(bulk.summary_lines(s))
         assert "1 verdict(s) changed, 0 stayed the same, 0 still owed." in text
-        assert "now red, was green" in text and CHECK in text
-        assert "Promoted, then re-checked red" in text
+        assert "now failing, was passing" in text and CHECK in text
+        assert "Promoted, then failing on re-check" in text
         assert "rejected" not in text.lower() and "refused" not in text.lower()
 
     def test_the_terminal_runs_only_its_own_owed_rechecks(self, conn, monkeypatch):
