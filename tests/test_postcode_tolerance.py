@@ -15,9 +15,9 @@ import qa_tools.tools.run_soda as run_soda
 from fixture_ids import CP_REF_RUN_ID
 from qa_tools.common import supply_db
 
-CHECK = ("data-asset-1.child-protection-family-support.child-protection.cp-clients."
+CHECK = ("quarterly.child-protection-family-support.child-protection.cp-clients."
          "postcode.invalidValues_datacontract")
-SODA = ("data-asset-1.child-protection-family-support.child-protection.cp-clients."
+SODA = ("quarterly.child-protection-family-support.child-protection.cp-clients."
         "postcode.invalid_percent_soda")
 
 

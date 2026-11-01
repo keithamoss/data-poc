@@ -372,7 +372,7 @@ class TestEveryDatasetACheckCountsTowardIsAReader:
     implicit), so reevaluation.plan never even listed it when the table it
     is filed under arrived."""
 
-    CHECK = ("data-asset-1.child-protection-family-support.child-protection."
+    CHECK = ("quarterly.child-protection-family-support.child-protection."
              "cp-investigations.cp_client_id.relationships_dbt")
 
     def test_a_waiting_supply_in_another_dataset_the_check_reads_is_a_reader(

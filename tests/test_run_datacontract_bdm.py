@@ -93,3 +93,8 @@ def test_every_sql_rule_has_its_own_authored_name(monkeypatch, bdm_duckdb_dir):
     names = [r["check_name"] for r in sql]
     assert len(names) == len(set(names)), f"SQL checks sharing a name: {names}"
     assert "datacontract:custom_sql" not in {r["check_name"] for r in results}
+
+import pytest  # noqa: E402
+
+#: Birth Registrations is the daily asset's (the asset split).
+pytestmark = pytest.mark.asset("daily")

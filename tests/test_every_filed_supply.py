@@ -434,3 +434,6 @@ class TestTheDoorsOtherBranches:
                                      state=filing_queue.SUPERSEDED, supply="cp-carers@a")
         filing_tui._decide_on(state, offer=(fd.UN_SUPERSEDE,))
         assert shown and not any("earlier version" in c for c in shown)
+
+#: Birth Registrations is the daily asset's (the asset split).
+pytestmark = pytest.mark.asset("daily")

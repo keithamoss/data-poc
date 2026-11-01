@@ -384,7 +384,7 @@ def test_birth_registrations_recency_test_declares_it_names_no_row():
 
     from qa_tools.collections.base import DbtSpec
 
-    doc = yaml.safe_load(open("dbt_project/models/civil-registration/schema.yml"))
+    doc = yaml.safe_load(open("assets/daily/dbt/models/civil-registration/schema.yml"))
     [recency] = [t for t in doc.get("data_tests") or doc.get("tests") or []
                  if t.get("name") == "recency"]
     assert recency["config"]["meta"]["names_no_row"] is True

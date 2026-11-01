@@ -13,7 +13,7 @@ import yaml
 from qa_tools.common import list_setting_members, supply_db
 
 REAL = Path(__file__).resolve().parent.parent
-SCHEMA = Path("dbt_project/models/linkage-products/schema.yml")
+SCHEMA = Path("assets/quarterly/dbt/models/linkage-products/schema.yml")
 
 
 @pytest.fixture
@@ -66,7 +66,7 @@ class TestCriterionThirteenThePresenceGate:
         assert "names the member_setting 'census_yrs', which is no declared list setting" in text
 
     def test_a_geocoding_dataset_lacking_its_share_check(self, repo):
-        path = repo / "contract" / "department-of-health" / "linkage-products-soda-checks.yml"
+        path = repo / "assets" / "quarterly" / "department-of-health" / "linkage-products-soda-checks.yml"
         doc = yaml.safe_load(path.read_text())
         block = doc["checks for geo_cp_clients"]
         block[:] = [c for c in block if "geo_cp_clients_not_geocoded_percent" not in c]
@@ -97,7 +97,7 @@ class TestCriterionSevenOfRequirement300BreakingEntries:
                                      if not e["date"].startswith("2022-08-01")]
         _write(repo, doc)
         assert list_setting_members.problems(repo) == [
-            "check data-asset-1.department-of-health.linkage-products.geo-cp-clients.census_year."
+            "check quarterly.department-of-health.linkage-products.geo-cp-clients.census_year."
             "unexpected_set_members_dbt has no breaking changelog entry dated 2022-08-01 for the "
             "version of census_years it changes to (REQ-QAC-300 criterion 7)."]
 
@@ -168,7 +168,7 @@ class TestCriterionFourNotEvaluatedWithoutAPeriod:
         from qa_tools.tools import run_dbt
 
         coll = collections.by_id("linkage-products")
-        one = ("data-asset-1.department-of-health.linkage-products.geo-cp-clients.census_year."
+        one = ("quarterly.department-of-health.linkage-products.geo-cp-clients.census_year."
                "missing_set_members_dbt")
         records = run_dbt._not_evaluated_for_want_of_a_period(
             coll, collections.adapter(coll).dbt, "lp_probe", "2026-11-01T10:00:00+00:00", [one])

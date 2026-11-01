@@ -160,3 +160,8 @@ def test_evaluate_evidently_bdm_forwards_the_given_reference_not_the_module_defa
     )
     psi = next(r for r in results if r["check_name"] == "drift:PSI")
     assert psi["reference_run_id"] == _REF_RUN_ID
+
+import pytest  # noqa: E402
+
+#: Birth Registrations is the daily asset's (the asset split).
+pytestmark = pytest.mark.asset("daily")

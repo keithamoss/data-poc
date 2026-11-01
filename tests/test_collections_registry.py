@@ -473,10 +473,10 @@ class TestTheCheckFileGate:
 
     def test_a_check_file_outside_its_agencys_folder_fails_naming_it(self, third_collection,
                                                                     tmp_path):
-        moved = tmp_path / "contract" / "registry-services" / "fake-things-soda-checks.yml"
+        moved = tmp_path / "assets" / "daily" / "registry-services" / "fake-things-soda-checks.yml"
         (tmp_path / "contract" / "fake-agency" / "fake-things-soda-checks.yml").rename(moved)
         got = gate.check_file_problems()
-        assert ("contract/registry-services/fake-things-soda-checks.yml is "
+        assert ("assets/daily/registry-services/fake-things-soda-checks.yml is "
                 f"{FAKE_ID!r}'s, which belongs in its agency's folder contract/fake-agency/") in got
 
     def test_a_collection_file_at_the_top_of_contract_fails(self, third_collection, tmp_path):

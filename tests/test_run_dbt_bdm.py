@@ -87,3 +87,6 @@ def test_audit_table_correction_overrides_run_results_failures_field(_dbt_bdm):
     covered = [r for r in results if r["check_name"].removeprefix("dbt:") in (run_dbt._AUDIT_COUNTED | run_dbt._AUDIT_SUMMED | {"multiple_birth_sibling", "recency"})]
     assert covered, "no results matched any _AUDIT_AGGREGATE_SQL-covered test - fixture/test drifted from real schema.yml"
     assert all(isinstance(r["metric_value"], int) and r["metric_value"] >= 0 for r in covered)
+
+#: Birth Registrations is the daily asset's (the asset split).
+pytestmark = pytest.mark.asset("daily")

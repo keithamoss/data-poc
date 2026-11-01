@@ -101,3 +101,6 @@ class TestCriticFindingsOn174:
                              base_codeowners="/contract/calendar.yaml @someone-else\n")
         text = "\n".join(f.fix for f in found)
         assert "May approve: nobody" in text, text
+
+#: Birth Registrations is the daily asset's (the asset split).
+pytestmark = pytest.mark.asset("daily")

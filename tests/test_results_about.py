@@ -27,7 +27,7 @@ import attempt_support
 from qa_tools.common import carried, filing, promotion, qa_store, supply_db, supply_status
 from attempt_support import ANY_CHECK
 
-CHECK = "data-asset-1.child-protection-family-support.child-protection"
+CHECK = "quarterly.child-protection-family-support.child-protection"
 CLIENT_REF = f"{CHECK}.cp-notifications.cp_client_id.relationships_dbt"
 CLIENTS_OWN = f"{CHECK}.cp-clients.cp_client_id.unique_dbt"
 KEYS = {"agency_id": "child-protection-family-support", "collection_id": "child-protection"}

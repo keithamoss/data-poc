@@ -16,7 +16,7 @@ import pytest
 import filing_support
 from qa_tools.common import assignment, left_out, supply_db
 
-P = "data-asset-1.child-protection-family-support.child-protection"
+P = "quarterly.child-protection-family-support.child-protection"
 REL = f"{P}.cp-placements.carer_id.relationships_dbt"
 SODA = f"{P}.cp-placements.carer_id.reference_soda"
 

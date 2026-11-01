@@ -129,3 +129,6 @@ class TestReadingTheRealCommittedHistory:
         has no recorded stats, and the caller falls back."""
         assert ec.reference_value_counts(self.AGENCY, self.COLLECTION, "no_such_run", "sex") is None
         assert ec.recorded_row_counts(self.AGENCY, self.COLLECTION, "no_such_run") is None
+
+#: Birth Registrations is the daily asset's (the asset split).
+pytestmark = pytest.mark.asset("daily")

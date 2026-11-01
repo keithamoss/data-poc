@@ -17,7 +17,7 @@ import yaml
 from qa_tools.common import list_setting_members, supply_db
 
 REPO = Path(__file__).resolve().parent.parent
-SODA = REPO / "contract" / "department-of-health" / "linkage-products-soda-checks.yml"
+SODA = REPO / "assets" / "quarterly" / "department-of-health" / "linkage-products-soda-checks.yml"
 
 
 def _schema(conn, run_id, tables: dict[str, tuple[str, list[tuple]]]):

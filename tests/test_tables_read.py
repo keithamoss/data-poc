@@ -579,4 +579,4 @@ class TestTheReservedNameIsGuardedBeforeItReachesGit:
         hook = next(h for repo in config["repos"] for h in repo.get("hooks", [])
                      if h["id"] == "mothman-check-hierarchy")
 
-        assert _re.search(hook["files"], "contract/child-protection-family-support/child-protection-contract.yaml")
+        assert _re.search(hook["files"], "assets/quarterly/child-protection-family-support/child-protection-contract.yaml")

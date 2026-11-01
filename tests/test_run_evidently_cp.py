@@ -121,7 +121,7 @@ class TestACollectionWithNoEvidentlyCheck:
         from qa_tools.common import check_lifecycle, evidently_common
 
         monkeypatch.setattr(check_lifecycle, "load_evidently_checks", lambda path: {
-            "data-asset-1.department-of-health.linkage-products.linkage-keys.row_drop_evidently":
+            "quarterly.department-of-health.linkage-products.linkage-keys.row_drop_evidently":
                 {"method": "row_drop"}})
         import pytest
 

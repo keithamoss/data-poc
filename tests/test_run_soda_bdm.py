@@ -89,3 +89,8 @@ def test_a_check_soda_cannot_evaluate_is_recorded_as_an_error(monkeypatch, bdm_d
     others = [r for r in results if r is not mine[0]]
     assert others and all(r["status"] in ("pass", "warn", "fail") for r in others), \
         "the checks Soda could evaluate keep their own results"
+
+import pytest  # noqa: E402
+
+#: Birth Registrations is the daily asset's (the asset split).
+pytestmark = pytest.mark.asset("daily")

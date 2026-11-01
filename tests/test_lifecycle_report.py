@@ -244,21 +244,21 @@ class TestAKeptRunIdNothingRecognisesIsRefusedPlainly:
 
 class TestTheCheckColumnSaysWhichCheck:
     """Keith, 2026-10-06 (post-build-review #124): at normal widths the
-    Check column showed only the shared "data-asset-1.registry-services.
+    Check column showed only the shared "daily.registry-services.
     civil-..." prefix. It shows `column.check` now; the tool has its own
     column."""
 
     def test_a_column_check(self):
         from cli import common
 
-        r = {"check_id": "data-asset-1.child-protection-family-support.child-protection."
+        r = {"check_id": "quarterly.child-protection-family-support.child-protection."
                          "cp-placements.cp_client_id.relationships_dbt"}
         assert common.check_label(r) == "cp_client_id.relationships"
 
     def test_a_dataset_level_check_has_no_column(self):
         from cli import common
 
-        r = {"check_id": "data-asset-1.child-protection-family-support.child-protection."
+        r = {"check_id": "quarterly.child-protection-family-support.child-protection."
                          "cp-placements.row_count_soda"}
         assert common.check_label(r) == "row_count"
 

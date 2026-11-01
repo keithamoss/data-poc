@@ -59,3 +59,8 @@ def test_unrecognised_threshold_shape_falls_back_to_the_old_zero_default():
     unexpected future shape doesn't crash a real pipeline run."""
     qd = _quality_definition(mustBeGreaterThan=5)
     assert fail_threshold_from_quality_definition(qd, "error") == 0
+
+import pytest  # noqa: E402
+
+#: Birth Registrations is the daily asset's (the asset split).
+pytestmark = pytest.mark.asset("daily")

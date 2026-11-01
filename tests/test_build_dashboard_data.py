@@ -65,7 +65,7 @@ def _check(run_id, column_name, value, status="pass", **overrides):
         "warn_threshold": 0.0, "fail_threshold": 5.0, "status": status,
         "row_count_total": 3, "row_count_invalid": 0,
         "engine": "dbt-core 1.12 + dbt-duckdb (real)",
-        "check_id": f"data-asset-1.registry-services.civil-registration.birth-registrations.{column_name}.accepted_values_dbt",
+        "check_id": f"daily.registry-services.civil-registration.birth-registrations.{column_name}.accepted_values_dbt",
     }
     rec.update(overrides)
     return rec
@@ -172,7 +172,7 @@ def test_a_retired_checks_metadata_is_carried_through(tmp_path, monkeypatch):
     collection gets retired_as_of/retired_reason attached in the
     dashboard-data output - the frontend's retired-checks toggle reads
     these two fields directly."""
-    sex_check_id = "data-asset-1.registry-services.civil-registration.birth-registrations.sex.accepted_values_dbt"
+    sex_check_id = "daily.registry-services.civil-registration.birth-registrations.sex.accepted_values_dbt"
     monkeypatch.setattr(bdd, "collect_checks", lambda ref: [
         CheckMetadata(check_id=sex_check_id, category="conformity", tool="dbt", config_hash="abc123", source_file="fake.yml",
                       retired_as_of="2026-09-17", retired_reason="Superseded by a stricter rule."),
@@ -195,7 +195,7 @@ def test_a_checks_description_and_changelog_are_carried_through(tmp_path, monkey
     check-detail panel's new "What this check does"/changelog sections
     read description/changelog straight off the check record - same
     lifecycle_by_id lookup Phase 5b's retired_as_of/reason already use."""
-    sex_check_id = "data-asset-1.registry-services.civil-registration.birth-registrations.sex.accepted_values_dbt"
+    sex_check_id = "daily.registry-services.civil-registration.birth-registrations.sex.accepted_values_dbt"
     changelog = [{"date": "2026-06-01T10:00:00Z", "description": "Tightened threshold",
                   "author": "Keith Moss", "breaking": False}]
     monkeypatch.setattr(bdd, "collect_checks", lambda ref: [
@@ -241,7 +241,7 @@ def test_a_checks_description_and_changelog_are_carried_through(tmp_path, monkey
 # their tool exactly. Instead the tool's own verdict is carried through
 # and used as the source of truth, with threshold math as the fallback.
 ROWCOUNT_CHECK_ID = (
-    "data-asset-1.registry-services.civil-registration"
+    "daily.registry-services.civil-registration"
     ".birth-registrations.sex.rowCount_datacontract"
 )
 
@@ -339,7 +339,7 @@ def _build_with_authored_check(tmp_path, monkeypatch, **authored):
     """Builds the real dashboard JSON with one check carrying whatever
     authored prose a test wants, and returns that check as the page
     would receive it."""
-    check_id = ("data-asset-1.registry-services.civil-registration"
+    check_id = ("daily.registry-services.civil-registration"
                 ".birth-registrations.sex.accepted_values_dbt")
     meta = CheckMetadata(check_id=check_id, category="validity", tool="dbt",
                          config_hash="abc123", source_file="schema.yml",
@@ -427,9 +427,9 @@ def _custom_sql(run_id, value, status, check_id):
                   check_id=check_id)
 
 
-RANGE_ID = ("data-asset-1.registry-services.civil-registration."
+RANGE_ID = ("daily.registry-services.civil-registration."
             "birth-registrations.date_of_birth.range_check_datacontract")
-FRESH_ID = ("data-asset-1.registry-services.civil-registration."
+FRESH_ID = ("daily.registry-services.civil-registration."
             "birth-registrations.date_of_birth.freshness_datacontract")
 
 
@@ -582,3 +582,6 @@ def test_a_stats_record_in_the_old_single_table_shape_is_refused(tmp_path, monke
 
     with pytest.raises(ValueError, match="run_002.*row_counts"):
         bdd.build(_BDM)
+
+#: Birth Registrations is the daily asset's (the asset split).
+pytestmark = pytest.mark.asset("daily")

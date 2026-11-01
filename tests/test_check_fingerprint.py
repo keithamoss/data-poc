@@ -172,7 +172,7 @@ class TestRealChecks:
                 c.check_id
 
     def test_changing_one_soda_expression_moves_that_check_alone(self, tmp_path):
-        rel = "contract/registry-services/bdm-birth-registrations-soda-checks.yml"
+        rel = "assets/daily/registry-services/bdm-birth-registrations-soda-checks.yml"
         before = {c.check_id: c.config_hash for c in cl.parse_soda_check_metadata(ROOT / rel)}
         text = (ROOT / rel).read_text()
         target = next(c for c in cl.parse_soda_check_metadata(ROOT / rel)
@@ -184,7 +184,7 @@ class TestRealChecks:
         assert {i for i in before if before[i] != after[i]} == {target.check_id}
 
     def test_changing_one_evidently_threshold_moves_that_check_alone(self):
-        rel = "contract/child-protection-family-support/child-protection-evidently-checks.yml"
+        rel = "assets/quarterly/child-protection-family-support/child-protection-evidently-checks.yml"
         checks = cl.load_evidently_checks(ROOT / rel)
         before = {c.check_id: c.config_hash
                   for c in cl.parse_evidently_check_metadata(checks, source=rel)}

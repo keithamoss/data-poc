@@ -28,7 +28,7 @@ import attempt_support
 from qa_tools.common import qa_results_writer, qa_store, supply_db
 
 #: Results about invented check ids (REQ-QAC-176 criterion 14 refuses them otherwise).
-pytestmark = pytest.mark.usefixtures("invented_check_ids")
+pytestmark = [pytest.mark.usefixtures("invented_check_ids"), pytest.mark.asset("daily")]  # Birth Registrations is the daily asset's
 
 AGENCY = "registry-services"
 COLLECTION = "civil-registration"

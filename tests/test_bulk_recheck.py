@@ -25,8 +25,8 @@ from qa_tools.common import filing_decisions as fd
 from test_supersession import DS, REAL_PERSON, WHEN, _filed
 
 AG, COL = "child-protection-family-support", "child-protection"
-CHECK = "data-asset-1.child-protection-family-support.child-protection.cp-carers.row_count_soda"
-OTHER = ("data-asset-1.child-protection-family-support.child-protection.cp-carers.carer_id."
+CHECK = "quarterly.child-protection-family-support.child-protection.cp-carers.row_count_soda"
+OTHER = ("quarterly.child-protection-family-support.child-protection.cp-carers.carer_id."
          "missing_count_soda")
 STALE = "v1:" + "a" * 64
 

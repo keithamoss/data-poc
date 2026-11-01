@@ -7,7 +7,7 @@ from qa_tools.common import qa_results_reader as reader
 
 
 def _row(received, attempt=1):
-    return {"check_id": "data-asset-1.child-protection-family-support.child-protection."
+    return {"check_id": "quarterly.child-protection-family-support.child-protection."
                         "cp-carers.encoding_file",
             "run_id": "r1", "received_at": received, "status": "pass", "finding": "fine",
             "filename": "cp_carers.csv", "delivery": "d", "load_attempt": attempt}

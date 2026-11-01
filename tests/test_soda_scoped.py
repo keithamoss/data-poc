@@ -16,7 +16,7 @@ import yaml
 from fixture_ids import BDM_DIRTY_RUN_ID, CP_DIRTY_RUN_ID
 from qa_tools.common import asked_for, left_out, qa_results_writer, soda_common, supply_db
 
-P = "data-asset-1.child-protection-family-support.child-protection"
+P = "quarterly.child-protection-family-support.child-protection"
 
 
 def _ids(text: str) -> set[str]:

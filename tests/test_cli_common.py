@@ -246,3 +246,6 @@ class TestARequiredCollectionIsRequired:
             got = CliRunner().invoke(cli, list(path))
             assert got.exit_code == 2 and "Missing option" in got.output, (path, got.output)
         assert ran == []
+
+#: Birth Registrations is the daily asset's (the asset split).
+pytestmark = pytest.mark.asset("daily")

@@ -101,3 +101,8 @@ def test_generate_daily_batch_is_fully_reproducible():
         # legitimately contain None, and elementwise == on object/string-
         # dtype columns doesn't treat None == None as True.
         assert a[col].equals(b[col]), col
+
+import pytest  # noqa: E402
+
+#: Birth Registrations is the daily asset's (the asset split).
+pytestmark = pytest.mark.asset("daily")

@@ -433,3 +433,6 @@ def test_ci_installs_what_the_rollup_comparison_runs():
     npm = next(i for i, r in enumerate(runs) if r.strip() == "npm ci")
     tests = next(i for i, r in enumerate(runs) if 'pytest -m "not needs_deployment"' in r)
     assert npm < tests
+
+#: Birth Registrations is the daily asset's (the asset split).
+pytestmark = pytest.mark.asset("daily")

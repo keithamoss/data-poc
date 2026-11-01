@@ -86,15 +86,15 @@ def test_collect_checks_reads_old_and_new_from_real_git_history(tmp_path, monkey
     _use_sources(monkeypatch, [("schema.yml", vcl.cl.parse_dbt_check_metadata)],
                  [])
 
-    (repo / "schema.yml").write_text(_dbt_schema("data-asset-1.registry-services.civil-registration.birth-registrations.col.not_null_dbt"))
+    (repo / "schema.yml").write_text(_dbt_schema("daily.registry-services.civil-registration.birth-registrations.col.not_null_dbt"))
     _git(repo, "add", "-A")
     _git(repo, "commit", "-q", "-m", "introduce the check")
 
     old_checks = vcl.collect_checks("HEAD")
     new_checks = vcl.collect_checks(None)
 
-    assert [c.check_id for c in old_checks] == ["data-asset-1.registry-services.civil-registration.birth-registrations.col.not_null_dbt"]
-    assert [c.check_id for c in new_checks] == ["data-asset-1.registry-services.civil-registration.birth-registrations.col.not_null_dbt"]
+    assert [c.check_id for c in old_checks] == ["daily.registry-services.civil-registration.birth-registrations.col.not_null_dbt"]
+    assert [c.check_id for c in new_checks] == ["daily.registry-services.civil-registration.birth-registrations.col.not_null_dbt"]
 
 
 def test_collect_checks_treats_a_missing_source_at_the_working_tree_as_no_checks(tmp_path, monkeypatch):
@@ -112,11 +112,11 @@ def test_collect_checks_treats_a_missing_source_at_the_working_tree_as_no_checks
         "evidently-checks-retired.yml",  # deliberately never created
     ])
 
-    (repo / "schema.yml").write_text(_dbt_schema("data-asset-1.registry-services.civil-registration.birth-registrations.col.not_null_dbt"))
+    (repo / "schema.yml").write_text(_dbt_schema("daily.registry-services.civil-registration.birth-registrations.col.not_null_dbt"))
 
     checks = vcl.collect_checks(None)
 
-    assert [c.check_id for c in checks] == ["data-asset-1.registry-services.civil-registration.birth-registrations.col.not_null_dbt"]
+    assert [c.check_id for c in checks] == ["daily.registry-services.civil-registration.birth-registrations.col.not_null_dbt"]
 
 
 def test_main_fails_on_an_undocumented_config_change(tmp_path, monkeypatch, capsys):
@@ -125,13 +125,13 @@ def test_main_fails_on_an_undocumented_config_change(tmp_path, monkeypatch, caps
     _use_sources(monkeypatch, [("schema.yml", vcl.cl.parse_dbt_check_metadata)],
                  [])
 
-    (repo / "schema.yml").write_text(_dbt_schema("data-asset-1.registry-services.civil-registration.birth-registrations.col.not_null_dbt"))
+    (repo / "schema.yml").write_text(_dbt_schema("daily.registry-services.civil-registration.birth-registrations.col.not_null_dbt"))
     _git(repo, "add", "-A")
     _git(repo, "commit", "-q", "-m", "introduce the check")
 
     # change a real config value (error_if) with no new changelog entry,
     # committed - the exact scenario the CI gate exists to catch
-    (repo / "schema.yml").write_text(_dbt_schema("data-asset-1.registry-services.civil-registration.birth-registrations.col.not_null_dbt", extra_config="error_if: \">95\""))
+    (repo / "schema.yml").write_text(_dbt_schema("daily.registry-services.civil-registration.birth-registrations.col.not_null_dbt", extra_config="error_if: \">95\""))
     _git(repo, "add", "-A")
     _git(repo, "commit", "-q", "-m", "tighten the threshold, forgot the changelog")
 
@@ -156,7 +156,7 @@ def test_main_fails_when_a_check_id_is_deleted_outright(tmp_path, monkeypatch, c
     ],
                  [])
 
-    (repo / "schema.yml").write_text(_dbt_schema("data-asset-1.registry-services.civil-registration.birth-registrations.col.not_null_dbt"))
+    (repo / "schema.yml").write_text(_dbt_schema("daily.registry-services.civil-registration.birth-registrations.col.not_null_dbt"))
     _git(repo, "add", "-A")
     _git(repo, "commit", "-q", "-m", "introduce the check")
 
@@ -170,7 +170,7 @@ def test_main_fails_when_a_check_id_is_deleted_outright(tmp_path, monkeypatch, c
     assert exit_code == 1
     stderr = capsys.readouterr().err
     assert "disappeared" in stderr
-    assert "data-asset-1.registry-services.civil-registration.birth-registrations.col.not_null_dbt" in stderr
+    assert "daily.registry-services.civil-registration.birth-registrations.col.not_null_dbt" in stderr
 
 
 def test_main_passes_when_a_check_is_properly_retired(tmp_path, monkeypatch, capsys):
@@ -186,7 +186,7 @@ def test_main_passes_when_a_check_is_properly_retired(tmp_path, monkeypatch, cap
     ],
                  [])
 
-    (repo / "schema.yml").write_text(_dbt_schema("data-asset-1.registry-services.civil-registration.birth-registrations.col.not_null_dbt"))
+    (repo / "schema.yml").write_text(_dbt_schema("daily.registry-services.civil-registration.birth-registrations.col.not_null_dbt"))
     (repo / "schema-retired.yml").write_text("models: []\n")
     _git(repo, "add", "-A")
     _git(repo, "commit", "-q", "-m", "introduce the check")
@@ -201,7 +201,7 @@ def test_main_passes_when_a_check_is_properly_retired(tmp_path, monkeypatch, cap
                 tests:
                   - not_null:
                       meta:
-                        check_id: data-asset-1.registry-services.civil-registration.birth-registrations.col.not_null_dbt
+                        check_id: daily.registry-services.civil-registration.birth-registrations.col.not_null_dbt
                         category: completeness
                         changelog: []
                         retired_as_of: "2026-09-16"
@@ -225,7 +225,7 @@ def test_main_passes_when_nothing_changed(tmp_path, monkeypatch, capsys):
     _use_sources(monkeypatch, [("schema.yml", vcl.cl.parse_dbt_check_metadata)],
                  [])
 
-    (repo / "schema.yml").write_text(_dbt_schema("data-asset-1.registry-services.civil-registration.birth-registrations.col.not_null_dbt"))
+    (repo / "schema.yml").write_text(_dbt_schema("daily.registry-services.civil-registration.birth-registrations.col.not_null_dbt"))
     _git(repo, "add", "-A")
     _git(repo, "commit", "-q", "-m", "introduce the check")
 
@@ -272,7 +272,7 @@ def _one_check(tmp_path, monkeypatch, failure_indicates, description=DEFAULT_DES
     _use_sources(monkeypatch, [("schema.yml", vcl.cl.parse_dbt_check_metadata)],
                  [])
     (repo / "schema.yml").write_text(
-        _dbt_schema_with_prose("data-asset-1.registry-services.civil-registration.birth-registrations.c.not_null_dbt",
+        _dbt_schema_with_prose("daily.registry-services.civil-registration.birth-registrations.c.not_null_dbt",
                                failure_indicates, description))
     _git(repo, "add", "-A")
     _git(repo, "commit", "-qm", "one")
@@ -380,7 +380,7 @@ def test_the_gate_is_off_by_default_and_fatal_only_when_asked(tmp_path, monkeypa
     _use_sources(monkeypatch, [("schema.yml", vcl.cl.parse_dbt_check_metadata)],
                  [])
     (repo / "schema.yml").write_text(
-        _dbt_schema_with_prose("data-asset-1.registry-services.civil-registration.birth-registrations.c.not_null_dbt", None))
+        _dbt_schema_with_prose("daily.registry-services.civil-registration.birth-registrations.c.not_null_dbt", None))
     _git(repo, "add", "-A")
     _git(repo, "commit", "-qm", "one")
     _git(repo, "commit", "-q", "--allow-empty", "-m", "two")
@@ -407,7 +407,7 @@ def test_a_contract_from_before_rule_ids_is_still_read_as_the_old_side(tmp_path,
                  [])
     monkeypatch.setattr(vcl, "diff_base", lambda **_: "HEAD")
 
-    today = (Path(__file__).resolve().parent.parent / "contract" / "child-protection-family-support"
+    today = (Path(__file__).resolve().parent.parent / "assets" / "quarterly" / "child-protection-family-support"
              / "child-protection-contract.yaml").read_text()
     before = re.sub(r"(?m)^(\s*)- id: \S+\n\1  ", r"\1- ", today)
     assert before != today and "- id:" not in before
@@ -427,7 +427,7 @@ def test_a_contract_from_before_rule_ids_is_still_read_as_the_old_side(tmp_path,
 # unseen - matches_regex.sql backs 11 real checks and editing it tripped
 # nothing.
 
-_BDM = "data-asset-1.registry-services.civil-registration.birth-registrations"
+_BDM = "daily.registry-services.civil-registration.birth-registrations"
 
 _MATCHES_REGEX = """{% test matches_regex(model, column_name, regex) %}
 select * from {{ model }} where not regexp_like({{ column_name }}, '{{ regex }}')
@@ -684,9 +684,9 @@ def test_moving_a_singular_test_into_a_collections_folder_is_not_a_change(
     hash covers its SQL, and named the file by its path, so filing the test
     under tests/<collection-id>/ read as an undocumented change."""
     repo = _dbt_repo(tmp_path, monkeypatch)
-    (repo / "dbt_project" / "tests" / "civil-registration").mkdir()
+    (repo / "assets" / "daily" / "dbt" / "tests" / "civil-registration").mkdir()
     _git(repo, "mv", "dbt_project/tests/sibling_rule.sql",
-         "dbt_project/tests/civil-registration/sibling_rule.sql")
+         "assets/daily/dbt/tests/civil-registration/sibling_rule.sql")
     _commit(repo, "file the test under its collection")
     monkeypatch.setattr(vcl, "diff_base", lambda **_: "HEAD~1")
     assert vcl.main() == 0, capsys.readouterr().err
@@ -704,9 +704,9 @@ def test_an_edit_to_any_collections_check_source_moves_the_fingerprint(tmp_path,
     import asset_folders
 
     asset_folders.point(tmp_path / "contract")
-    edits = ["contract/registry-services/bdm-birth-registrations-evidently-checks.yml",
-             "dbt_project/models/child-protection/stg_cp_clients.sql",
-             "dbt_project/tests/civil-registration/recency.sql"]
+    edits = ["assets/daily/registry-services/bdm-birth-registrations-evidently-checks.yml",
+             "assets/quarterly/dbt/models/child-protection/stg_cp_clients.sql",
+             "assets/daily/dbt/tests/civil-registration/recency.sql"]
     for rel in edits:
         before = vcl.sources_fingerprint()
         path = tmp_path / rel

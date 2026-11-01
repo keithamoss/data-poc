@@ -801,3 +801,6 @@ class TestARefileIntoAnOpenPair:
             fd.apply(request, effective_at=_at(other_day + timedelta(days=1), "12:00").isoformat(),
                      conn=conn)
         assert _open(conn, target)
+
+#: Birth Registrations is the daily asset's (the asset split).
+pytestmark = pytest.mark.asset("daily")

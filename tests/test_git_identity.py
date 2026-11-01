@@ -153,3 +153,6 @@ class TestAGitHubActionsRunnerAttributesToTheWorkflow:
 class _Result:
     def __init__(self, returncode, stdout):
         self.returncode, self.stdout = returncode, stdout
+
+#: Birth Registrations is the daily asset's (the asset split).
+pytestmark = pytest.mark.asset("daily")

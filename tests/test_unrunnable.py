@@ -8,7 +8,7 @@ import pytest
 
 from qa_tools.common import period_schema, supply_db, unrunnable
 
-P = "data-asset-1.child-protection-family-support.child-protection"
+P = "quarterly.child-protection-family-support.child-protection"
 PLACEMENTS_READS_CLIENTS = f"{P}.cp-placements.cp_client_id.relationships_dbt"
 PLACEMENTS_READS_CARERS = f"{P}.cp-placements.carer_id.relationships_dbt"
 NOTIFICATIONS_READS_CLIENTS = f"{P}.cp-notifications.cp_client_id.relationships_dbt"

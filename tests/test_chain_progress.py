@@ -122,3 +122,8 @@ def test_no_check_chain_call_site_is_left_without_a_progress_indicator():
     assert bare == [], (
         "these start the real check chain with no progress indicator, so a "
         "human waits ~13.5s at a frozen screen:\n" + "\n".join(bare))
+
+import pytest  # noqa: E402
+
+#: Birth Registrations is the daily asset's (the asset split).
+pytestmark = pytest.mark.asset("daily")

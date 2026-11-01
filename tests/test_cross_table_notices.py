@@ -12,7 +12,7 @@ from __future__ import annotations
 from pipeline import cross_table_notices as ctn
 from qa_tools.common import root_cause
 
-CHECK = "data-asset-1.child-protection-family-support.child-protection.cp-notifications"
+CHECK = "quarterly.child-protection-family-support.child-protection.cp-notifications"
 REF_DBT = f"{CHECK}.cp_client_id.relationships_dbt"
 REF_SODA = f"{CHECK}.cp_client_id.relationships_soda"
 N2 = "cp-notifications@202411031000000800"

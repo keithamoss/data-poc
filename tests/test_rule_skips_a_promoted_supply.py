@@ -64,3 +64,6 @@ def test_an_amber_supply_a_person_promoted_gets_no_withheld_note(conn, dataset, 
     actions = [d["action"] for d in dl.decisions_for(conn, dataset)]
     assert actions == [dl.PROMOTE], actions
     assert "a person has already decided" in out.refused[dataset]
+
+#: Birth Registrations is the daily asset's (the asset split).
+pytestmark = pytest.mark.asset("daily")

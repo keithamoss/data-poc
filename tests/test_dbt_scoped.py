@@ -18,7 +18,7 @@ from fixture_ids import CP_DIRTY_RUN_ID
 from qa_tools.common import asked_for, dbt_common, left_out, qa_results_writer, supply_db
 
 CP = "child-protection"
-P = "data-asset-1.child-protection-family-support.child-protection"
+P = "quarterly.child-protection-family-support.child-protection"
 
 
 @pytest.fixture

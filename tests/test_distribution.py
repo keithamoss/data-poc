@@ -5,9 +5,9 @@ from pathlib import Path
 
 from qa_tools.common import distribution
 
-LP = (Path(__file__).resolve().parent.parent / "contract" / "department-of-health"
+LP = (Path(__file__).resolve().parent.parent / "assets" / "quarterly" / "department-of-health"
       / "linkage-products-soda-checks.yml")
-CID = "data-asset-1.department-of-health.linkage-products.linkage-keys.linkage_key.large_key_groups_soda"
+CID = "quarterly.department-of-health.linkage-products.linkage-keys.linkage_key.large_key_groups_soda"
 
 
 def test_the_large_key_groups_check_declares_its_bins():

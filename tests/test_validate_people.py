@@ -167,3 +167,6 @@ class TestWhoMayRaiseADecision:
         got = people.person_by_email("fpycnkgvmt@privaterelay.appleid.com", config)
         assert people.actor_name(got) == got["email"]
         assert people.actor_name(got) != got["name"]
+
+#: Birth Registrations is the daily asset's (the asset split).
+pytestmark = pytest.mark.asset("daily")

@@ -13,9 +13,9 @@ import pytest
 from qa_tools.common import check_id as ci
 from qa_tools.common import validate_check_lifecycle as vcl
 
-_REAL = ("data-asset-1.registry-services.civil-registration.birth-registrations"
+_REAL = ("daily.registry-services.civil-registration.birth-registrations"
          ".registration_number.unique_dbt")
-_TABLE_LEVEL = ("data-asset-1.child-protection-family-support.child-protection.cp-carers"
+_TABLE_LEVEL = ("quarterly.child-protection-family-support.child-protection.cp-carers"
                 ".rowCount_datacontract")
 
 
@@ -132,8 +132,8 @@ def test_every_real_contract_rule_sits_under_the_column_its_id_names():
     intended - the id and the attachment were free to disagree before,
     and nothing would have said so."""
     from qa_tools.common.check_lifecycle import contract_rule_attachments
-    for path in ("contract/registry-services/bdm-birth-registrations-contract.yaml",
-                 "contract/child-protection-family-support/child-protection-contract.yaml"):
+    for path in ("assets/daily/registry-services/bdm-birth-registrations-contract.yaml",
+                 "assets/quarterly/child-protection-family-support/child-protection-contract.yaml"):
         assert ci.validate_column_matches(contract_rule_attachments(path)) == [], path
 
 
@@ -162,20 +162,20 @@ class TestHierarchyAgreement:
 
     def test_a_collection_the_dataset_does_not_sit_under_is_an_error(self):
         errors = ci.validate_hierarchy_agreement([
-            "data-asset-1.registry-services.child-protection.birth-registrations.c.unique_dbt"])
+            "daily.registry-services.child-protection.birth-registrations.c.unique_dbt"])
         assert len(errors) == 1
         assert "civil-registration" in errors[0]
 
     def test_an_agency_the_dataset_does_not_sit_under_is_an_error(self):
         errors = ci.validate_hierarchy_agreement([
-            "data-asset-1.child-protection-family-support.civil-registration"
+            "quarterly.child-protection-family-support.civil-registration"
             ".birth-registrations.c.unique_dbt"])
         assert len(errors) == 1
         assert "registry-services" in errors[0]
 
     def test_a_dataset_the_hierarchy_does_not_define_is_named(self):
         errors = ci.validate_hierarchy_agreement([
-            "data-asset-1.registry-services.civil-registration.birth_registrations.c.unique_dbt"])
+            "daily.registry-services.civil-registration.birth_registrations.c.unique_dbt"])
         assert len(errors) == 1
         assert "birth_registrations" in errors[0]
 

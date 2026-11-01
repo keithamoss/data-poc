@@ -18,7 +18,7 @@ from qa_tools.common import validate_check_lifecycle as vcl
 
 CP = "child-protection"
 BDM = "civil-registration"
-P = "data-asset-1.child-protection-family-support.child-protection"
+P = "quarterly.child-protection-family-support.child-protection"
 CLIENTS_UNIQUE = f"{P}.cp-clients.cp_client_id.unique_dbt"
 CARERS_UNIQUE = f"{P}.cp-carers.carer_id.unique_dbt"
 

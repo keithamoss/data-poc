@@ -77,3 +77,8 @@ class TestReadingThemBack:
         in_flight_log.record("c", "2026-09-25T10:00:00+08:00", [_entry("d", [])],
                               observations_dir=tmp_path)
         assert len(in_flight_log.observations(tmp_path)) == 1
+
+import pytest  # noqa: E402
+
+#: Birth Registrations is the daily asset's (the asset split).
+pytestmark = pytest.mark.asset("daily")

@@ -167,3 +167,8 @@ def test_the_browser_check_fails_a_page_showing_its_data_file_error(tmp_path):
                for e in errors), errors
     control = cdr.render_errors(cdr.TEMPLATE_PATH, "template")
     assert not any("data-file error" in e for e in control), control
+
+import pytest  # noqa: E402
+
+#: Birth Registrations is the daily asset's (the asset split).
+pytestmark = pytest.mark.asset("daily")

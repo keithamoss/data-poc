@@ -20,7 +20,7 @@ from qa_tools.common import target_agreement
 from generator import driver
 
 DS = "birth-registrations"
-PREFIX = "data-asset-1.registry-services.civil-registration.birth-registrations."
+PREFIX = "daily.registry-services.civil-registration.birth-registrations."
 
 
 def _r(check: str, status: str, **extra) -> dict:

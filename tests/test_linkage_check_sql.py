@@ -19,7 +19,7 @@ import yaml
 
 from qa_tools.common import supply_db
 
-CHECKS = (Path(__file__).resolve().parent.parent / "contract" / "department-of-health"
+CHECKS = (Path(__file__).resolve().parent.parent / "assets" / "quarterly" / "department-of-health"
           / "linkage-products-soda-checks.yml")
 
 

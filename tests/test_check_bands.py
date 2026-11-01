@@ -94,7 +94,7 @@ class TestUnparseable:
               - missing_count(sex):
                   warn: when somewhat high
                   attributes:
-                    check_id: data-asset-1.registry-services.civil-registration.birth-registrations.sex.x_soda
+                    check_id: daily.registry-services.civil-registration.birth-registrations.sex.x_soda
                     category: completeness
             """))
         with pytest.raises(cb.CatalogueError, match=r"sex\.x_soda.*soda\.yml|soda\.yml.*sex\.x_soda"):
@@ -293,9 +293,9 @@ class TestAUserDefinedMetricsBandIsRead:
 
         from qa_tools.common import check_bands
 
-        path = (Path(__file__).resolve().parent.parent / "contract" / "department-of-health"
+        path = (Path(__file__).resolve().parent.parent / "assets" / "quarterly" / "department-of-health"
                 / "linkage-products-soda-checks.yml")
-        cid = ("data-asset-1.department-of-health.linkage-products.linkage-keys."
+        cid = ("quarterly.department-of-health.linkage-products.linkage-keys."
                "linkage_key.large_key_groups_soda")
         metric, warn, fail = check_bands.soda_bounds(path)[cid]
         assert metric == "large_key_group_percent"

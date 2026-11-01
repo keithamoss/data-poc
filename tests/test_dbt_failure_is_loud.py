@@ -116,3 +116,6 @@ def test_a_real_test_failure_is_not_an_error(tmp_path, supply_dsn, bdm_duckdb_di
     assert results, "the build produced no results at all"
     assert not [r for r in results if r["status"] == "error"], \
         "this fixture is meant to produce test failures, not errored nodes"
+
+#: Birth Registrations is the daily asset's (the asset split).
+pytestmark = pytest.mark.asset("daily")

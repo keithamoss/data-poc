@@ -364,3 +364,6 @@ class TestTheS3Offer:
         monkeypatch.setattr(click, "prompt", lambda *a, **k: "not known")
         times = {"a.csv": datetime(2026, 9, 1, 1, tzinfo=timezone.utc)}
         assert common._ask_original(["a.csv"], times) == "not known"
+
+#: Birth Registrations is the daily asset's (the asset split).
+pytestmark = pytest.mark.asset("daily")

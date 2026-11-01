@@ -13,8 +13,8 @@ import yaml
 from qa_tools.common import linked_datasets
 
 REAL = Path(__file__).resolve().parent.parent
-LP_SODA = Path("contract/department-of-health/linkage-products-soda-checks.yml")
-LP_CONTRACT = Path("contract/department-of-health/linkage-products-contract.yaml")
+LP_SODA = Path("assets/quarterly/department-of-health/linkage-products-soda-checks.yml")
+LP_CONTRACT = Path("assets/quarterly/department-of-health/linkage-products-contract.yaml")
 GEO = ("geo-cp-clients", "geo-ed-presentations")
 
 

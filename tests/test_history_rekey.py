@@ -423,7 +423,7 @@ def test_a_dataset_with_only_file_checks_is_not_missing_its_data_tools(
     qa_store.record_file_results(
         clean_qa_history, "r1",
         [{"dataset_id": "cp-placements", "status": "fail",
-          "check_id": "data-asset-1.child-protection-family-support.child-protection."
+          "check_id": "quarterly.child-protection-family-support.child-protection."
                       "cp-placements.fields_per_row_file"}],
         agency_id=AGENCY, collection_id=COLLECTION, supply_state="staged",
         load_attempt=1, delivery="d", filename="cp_placements.csv", fingerprints=ANY_CHECK)

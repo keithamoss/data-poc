@@ -112,7 +112,7 @@ class TestSamplesAreNotLostToANameAnotherTableShares:
     def test_notifications_missing_client_id_records_its_own_samples(self, monkeypatch,
                                                                        cp_duckdb_dir):
         results = _run(monkeypatch, cp_duckdb_dir, _DIRTY_RUN_ID, "2026-04-01T09:00:00Z")
-        check = ("data-asset-1.child-protection-family-support.child-protection."
+        check = ("quarterly.child-protection-family-support.child-protection."
                  "cp-notifications.cp_client_id.missing_count_soda")
         (record,) = [r for r in results if r["check_id"] == check]
         assert record["status"] != "pass", "the dirty fixture should fail this check"

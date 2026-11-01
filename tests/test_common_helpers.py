@@ -88,3 +88,6 @@ def test_failing_sample_keys_via_values_resolves_real_rows():
     conn.execute("CREATE TABLE audit (sex VARCHAR)")
     conn.execute("INSERT INTO audit VALUES ('X')")
     assert failing_sample_keys_via_values(conn, "audit", "sex", "model", "sex", ["id"]) == ["1"]
+
+#: Birth Registrations is the daily asset's (the asset split).
+pytestmark = pytest.mark.asset("daily")

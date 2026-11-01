@@ -19,9 +19,9 @@ from qa_tools.common import asked_for, check_lifecycle, config_yaml, left_out
 from qa_tools.common import qa_results_writer, supply_db
 
 ROOT = Path(__file__).resolve().parent.parent
-CONTRACTS = ["contract/child-protection-family-support/child-protection-contract.yaml",
-             "contract/registry-services/bdm-birth-registrations-contract.yaml"]
-P = "data-asset-1.child-protection-family-support.child-protection"
+CONTRACTS = ["assets/quarterly/child-protection-family-support/child-protection-contract.yaml",
+             "assets/daily/registry-services/bdm-birth-registrations-contract.yaml"]
+P = "quarterly.child-protection-family-support.child-protection"
 
 
 def _rules(doc):

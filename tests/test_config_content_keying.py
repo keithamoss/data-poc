@@ -27,7 +27,7 @@ from qa_tools.tools import run_datacontract, run_dbt
 REAL = Path(__file__).resolve().parent.parent
 CONTRACT = REAL / "contract"
 CP_CONTRACT = CONTRACT / "child-protection-family-support" / "child-protection-contract.yaml"
-CP_SCHEMA = REAL / "dbt_project" / "models" / "child-protection" / "schema.yml"
+CP_SCHEMA = REAL / "assets" / "quarterly" / "dbt" / "models" / "child-protection" / "schema.yml"
 
 #: Same-length substitutions, so an edit keeps the file's size.
 DATASET_NAME = ("Client Register", "Client RegisteR")

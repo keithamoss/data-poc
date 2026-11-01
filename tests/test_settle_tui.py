@@ -420,3 +420,6 @@ class TestThePointerMatchesTheMenus:
         pointer = supply_files.where_to_settle(DS).split(" > ")
         assert pointer[2] in asked[0]
         assert pointer[3] == filing_tui._MENU_QUEUE
+
+#: Birth Registrations is the daily asset's (the asset split).
+pytestmark = pytest.mark.asset("daily")

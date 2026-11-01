@@ -22,6 +22,7 @@ from __future__ import annotations
 import collection_modules
 
 import os
+import re
 from datetime import date
 
 import pytest
@@ -54,15 +55,23 @@ os.environ["PY_COLORS"] = "0"
 # fixture, because test modules import the CLI - which builds the selected
 # asset's command groups - while they are collected, before any fixture runs;
 # the `selected_asset` fixture below then states it again for every test, so
-# a test that selected another cannot leak it into the next. Today's tree is
-# one asset; a tree with more has no default here, so each test must say.
+# a test that selected another cannot leak it into the next.
+#
+# THE SUITE'S ASSET IS STATED HERE, AND A TEST ABOUT ANOTHER STATES ITS OWN
+# (PROVISIONAL, the asset split, 2026-11-02): `quarterly`, which holds three
+# of the four collections, unless the test - or its class or module - carries
+# `@pytest.mark.asset("daily")`. Stated in the suite, never taken from the
+# ambient variable (REQ-PIPE-363 criterion 9). A test module imported at
+# collection sees this asset, so a module whose import-time reads are another
+# asset's selects it per test instead.
 from qa_tools.common import assets as _assets  # noqa: E402
 
-if len(_assets.names()) != 1:
+SUITE_ASSET = "quarterly"
+if SUITE_ASSET not in _assets.names():
     raise pytest.UsageError(
-        f"{len(_assets.names())} asset folders - choose the asset each test acts for "
-        f"explicitly (REQ-PIPE-363 criterion 9) rather than taking a default")
-TEST_ASSET = _assets.names()[0]
+        f"the suite's asset {SUITE_ASSET!r} is not an asset folder ({', '.join(_assets.names())}) "
+        f"- state the asset the suite acts for in tests/conftest.py")
+TEST_ASSET = SUITE_ASSET
 os.environ[_assets.ASSET_ENV] = TEST_ASSET
 
 import fixture_ids
@@ -176,17 +185,50 @@ def stated_test_environment():
         os.environ[environments.ENVIRONMENT_ENV] = before
 
 
+_MODULE_ASSET = re.compile(r"""^pytestmark\b.*?asset\(["']([a-z0-9-]+)["']\)""", re.M)
+
+
+def pytest_collectstart(collector):
+    """A test module is IMPORTED under the asset its module-level pytestmark
+    names (the suite's otherwise), so its import-time reads - a collection
+    looked up by id, a fixture id built from the hierarchy - are that asset's."""
+    if isinstance(collector, pytest.Module):
+        import asset_cli
+
+        try:
+            text = collector.path.read_text()
+        except OSError:
+            text = ""
+        m = _MODULE_ASSET.search(text)
+        os.environ[_assets.ASSET_ENV] = m.group(1) if m else TEST_ASSET
+        asset_cli.rebuild_for_selected()
+
+
+def pytest_collection_finish(session):
+    os.environ[_assets.ASSET_ENV] = TEST_ASSET
+
+
+def asset_of(node) -> str:
+    """The asset a test acts for: its closest `asset` marker's, or the suite's."""
+    mark = node.get_closest_marker("asset")
+    return mark.args[0] if mark is not None else TEST_ASSET
+
+
 @pytest.fixture(autouse=True)
-def selected_asset(monkeypatch):
+def selected_asset(monkeypatch, request):
     """Every test acts for TEST_ASSET unless it selects another, with the
     resolver pointed at the real asset folders and no connection claimed
     (REQ-PIPE-343 criterion 6: the suite's exemption from one asset per
     process is that each TEST starts unclaimed - each still opens one asset's
     database, and a process a test spawns starts with no exemption at all)."""
-    monkeypatch.setenv(_assets.ASSET_ENV, TEST_ASSET)
+    import asset_cli
+
+    asset = asset_of(request.node)
+    monkeypatch.setenv(_assets.ASSET_ENV, asset)
     _assets.use_root(None)
     _assets.release_claim()
-    yield TEST_ASSET
+    asset_cli.rebuild_for_selected()
+    yield asset
     _assets.use_root(None)
     _assets.release_claim()
 

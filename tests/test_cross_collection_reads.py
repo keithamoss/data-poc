@@ -147,7 +147,7 @@ def test_recheck_execute_asks_the_resolver(coll, monkeypatch):
     assert seen["foreign"] == ("cp_clients", "ed_presentations")
 
 
-LP = "data-asset-1.department-of-health.linkage-products.linkage-keys.cp-clients.referential_soda"
+LP = "quarterly.department-of-health.linkage-products.linkage-keys.cp-clients.referential_soda"
 
 
 class TestADeclaredReadAcrossCollectionsIsGated:
@@ -179,7 +179,7 @@ class TestADeclaredReadAcrossCollectionsIsGated:
         assert "names no calendar" in p and "cp-clients" in p
 
     def test_a_read_within_the_collection_is_not_this_gates(self):
-        own = "data-asset-1.department-of-health.linkage-products.linkage-keys.x.y_soda"
+        own = "quarterly.department-of-health.linkage-products.linkage-keys.x.y_soda"
         assert run_reads.declaration_problems({own: ["linkage_keys"]}) == []
 
 
@@ -279,7 +279,7 @@ class TestDbtReadsAnotherCollectionThroughSource:
         from qa_tools.common import validate_collections as vc
 
         root = self._tree(tmp_path)
-        bad = root / "dbt_project" / "tests" / "linkage-products" / "bad_ref.sql"
+        bad = root / "assets" / "quarterly" / "dbt" / "tests" / "linkage-products" / "bad_ref.sql"
         bad.parent.mkdir(parents=True, exist_ok=True)
         bad.write_text("select * from {{ ref('stg_cp_clients') }} where 1 = 0\n")
         [p] = vc.dbt_cross_collection_ref_problems(root, collections.all_collections())
@@ -290,7 +290,7 @@ class TestDbtReadsAnotherCollectionThroughSource:
         from qa_tools.common import validate_collections as vc
 
         root = self._tree(tmp_path)
-        ok = root / "dbt_project" / "tests" / "linkage-products" / "ok.sql"
+        ok = root / "assets" / "quarterly" / "dbt" / "tests" / "linkage-products" / "ok.sql"
         ok.parent.mkdir(parents=True, exist_ok=True)
         ok.write_text("select * from {{ source('raw', 'cp_clients') }} where 1 = 0\n")
         assert vc.dbt_cross_collection_ref_problems(root, collections.all_collections()) == []

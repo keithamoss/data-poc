@@ -104,7 +104,7 @@ class TestTheHandWrittenChecksAgreeWithTheMapping:
     """REQ-QAC-333 criteria 3 and 8."""
 
     def _soda(self, repo):
-        return repo / "contract" / "department-of-health" / "linkage-products-soda-checks.yml"
+        return repo / "assets" / "quarterly" / "department-of-health" / "linkage-products-soda-checks.yml"
 
     def test_a_check_stating_another_code_is_refused_naming_both(self, repo):
         path = self._soda(repo)
@@ -143,7 +143,7 @@ class TestTheQueriesThemselvesAgreeWithTheMapping:
     naming the check, the dataset and both values."""
 
     def _soda(self, repo):
-        return repo / "contract" / "department-of-health" / "linkage-products-soda-checks.yml"
+        return repo / "assets" / "quarterly" / "department-of-health" / "linkage-products-soda-checks.yml"
 
     def _replace(self, repo, old, new):
         path = self._soda(repo)

@@ -273,7 +273,7 @@ class TestNeverInAStatus:
     column-order WARNING would have turned a green supply amber and changed
     what the amber setting does with it."""
 
-    _DS = "data-asset-1.registry-services.civil-registration.birth-registrations"
+    _DS = "daily.registry-services.civil-registration.birth-registrations"
 
     def _record(self, tail, status):
         return {"dataset_id": "birth-registrations", "check_id": f"{self._DS}.{tail}",

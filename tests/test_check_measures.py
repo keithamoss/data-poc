@@ -28,10 +28,15 @@ def test_every_declared_rule_kind_names_its_measure():
 
 
 def test_measure_joins_the_phrase_and_the_unit():
-    cid = "data-asset-1.registry-services.civil-registration.birth-registrations.mother_surname.not_null_dbt"
+    cid = "daily.registry-services.civil-registration.birth-registrations.mother_surname.not_null_dbt"
     assert measure(cid, "count") == "Rows with no value (count)"
 
 
 def test_an_unmapped_kind_falls_back_to_the_unit_alone():
-    cid = "data-asset-1.registry-services.civil-registration.birth-registrations.mother_surname.brand_new_soda"
+    cid = "daily.registry-services.civil-registration.birth-registrations.mother_surname.brand_new_soda"
     assert measure(cid, "%") == "Value (%)"
+
+import pytest  # noqa: E402
+
+#: Birth Registrations is the daily asset's (the asset split).
+pytestmark = pytest.mark.asset("daily")

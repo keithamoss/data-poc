@@ -264,3 +264,6 @@ class TestTheMapCanBeCheckedWithoutWriting:
         assert result.exit_code == 1, result.output
         assert "stale" in result.output
         assert stale.read_text() == "stale\n"
+
+#: Birth Registrations is the daily asset's (the asset split).
+pytestmark = pytest.mark.asset("daily")

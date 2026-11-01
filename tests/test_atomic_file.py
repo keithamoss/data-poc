@@ -86,3 +86,6 @@ def test_an_interrupted_dashboard_build_leaves_the_previous_file_whole(tmp_path,
 
     assert json.loads(out.read_text()) == previous
     assert [p.name for p in out.parent.iterdir()] == ["a_dashboard.json"], "no temp file left"
+
+#: Birth Registrations is the daily asset's (the asset split).
+pytestmark = pytest.mark.asset("daily")

@@ -78,7 +78,7 @@ class TestAnEditedCheckIsSeen:
         tables_read.declared_reads()
         assert calls == [], "worked out again with nothing changed"
 
-        contract = tmp_path / "contract" / "child-protection-family-support" / "child-protection-contract.yaml"
+        contract = tmp_path / "assets" / "quarterly" / "child-protection-family-support" / "child-protection-contract.yaml"
         text = contract.read_text()
         assert "cp_carers" in text
         edited = text.replace("cp_carers", "cp_carerz", 1)
