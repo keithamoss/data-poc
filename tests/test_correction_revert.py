@@ -18,8 +18,8 @@ from qa_tools.common import agreement, agreement_freeze, asset_time
 
 
 def _docs():
-    cal = copy.deepcopy(yaml.safe_load(agreement.CALENDAR_YAML.read_text()))
-    asset = copy.deepcopy(yaml.safe_load(asset_time.DATA_ASSET_YAML.read_text()))
+    cal = copy.deepcopy(yaml.safe_load(agreement.calendar_yaml().read_text()))
+    asset = copy.deepcopy(yaml.safe_load(asset_time.data_asset_yaml().read_text()))
     return cal, asset
 
 

@@ -388,6 +388,14 @@ def connect(read_only: bool = False, dsn: str | None = None,
     from qa_tools.common import environments
 
     env = environments.for_connection()
+    # THE STATED ASSET TOO, AND ONE PER PROCESS (REQ-PIPE-363 criterion 6,
+    # REQ-PIPE-343 criterion 5): refused with no default before anything is
+    # opened, and a process that has opened a connection for one asset cannot
+    # open one for another - so no shipped process holds two assets'
+    # databases, or their credentials, at once.
+    from qa_tools.common import assets
+
+    assets.claim_for_connection(assets.selected().name)
     target = dsn if dsn is not None else supply_db_dsn()
     from qa_tools.common import db_identity, postgres_version
 

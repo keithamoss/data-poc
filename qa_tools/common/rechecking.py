@@ -148,6 +148,9 @@ class Worse:
     #: The re-check that found it.
     recheck_id: int
     recheck_at: str
+    #: When the promote decision took effect, from the decision log
+    #: (REQ-TEST-360 criterion 6: 'was promoted passing on <date>').
+    promoted_at: str | None = None
 
 
 def worse_than_promoted(conn, dataset_id: str | None = None,
@@ -176,8 +179,8 @@ def worse_than_promoted(conn, dataset_id: str | None = None,
         holds = decision_log.held(conn, ds, period)
         if not holds or holds.held_as != decision_log.PROMOTED or holds.holder != held_supply:
             continue
-        (promote_id, promoted_on), = conn.execute(
-            f"SELECT id, promoted_status FROM {decision_log.TABLE} WHERE id = ?",
+        (promote_id, promoted_on, promoted_at), = conn.execute(
+            f"SELECT id, promoted_status, effective_at FROM {decision_log.TABLE} WHERE id = ?",
             [holds.decision_id]).fetchall()
         if promoted_on not in _RANK or promote_id > recheck_id:
             continue
@@ -202,7 +205,9 @@ def worse_than_promoted(conn, dataset_id: str | None = None,
             continue
         if is_worse(promoted_on, now):
             out.append(Worse(ds, held_supply, period, promoted_on, now, recheck_id,
-                             at.isoformat() if hasattr(at, "isoformat") else str(at)))
+                             at.isoformat() if hasattr(at, "isoformat") else str(at),
+                             promoted_at.isoformat() if hasattr(promoted_at, "isoformat")
+                             else (str(promoted_at) if promoted_at else None)))
     return out
 
 

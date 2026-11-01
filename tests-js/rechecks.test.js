@@ -24,14 +24,14 @@ describe("a promoted supply re-checked worse in the outstanding queue", () => {
     const html = dashboard.window.outstandingItemHtml(ITEM);
     const div = dashboard.window.document.createElement("div");
     div.innerHTML = html;
-    expect(div.querySelector(".queue-head b").textContent).toBe("Promoted, then re-checked red");
+    expect(div.querySelector(".queue-head b").textContent).toBe("Promoted, then failing on re-check");
     expect(div.textContent).toContain("Notifications, 2024-Q3");
   });
 
   it("names amber where the re-check came back amber", () => {
     dashboard = loadDashboard();
     expect(dashboard.window.outstandingKindLabel("promoted-then-rechecked",
-      { ...ITEM, verdict: "amber" })).toBe("Promoted, then re-checked amber");
+      { ...ITEM, verdict: "amber" })).toBe("Promoted, then warning on re-check");
   });
 });
 
@@ -41,7 +41,7 @@ describe("a re-check in words", () => {
     expect(dashboard.window.recheckWords({
       at: "2024-08-07T02:30:00+00:00", person: "Keith Moss", reason: "our check was <wrong>",
       before: "red", after: "green" })).toBe(
-      "re-checked Wednesday, 7 August 2024 by Keith Moss - our check was &lt;wrong&gt;");
+      "re-checked Wednesday, 7 August 2024 by Keith Moss - <span data-recorded-text>our check was &lt;wrong&gt;</span>");
   });
 
   it("names the check we corrected, and 'and other checks' where others moved", () => {
@@ -150,8 +150,8 @@ describe("the outstanding marker names a re-checked-worse supply with its verdic
     const div = dashboard.window.document.createElement("div");
     div.innerHTML = dashboard.window.outstandingMarker("agency", ITEM.agencyId,
       { items: [ITEM, amber, other], blockers: [] });
-    expect(div.textContent).toContain("1 re-checked red after promotion");
-    expect(div.textContent).toContain("1 re-checked amber after promotion");
-    expect(div.textContent).not.toContain("re-checked worse");
+    expect(div.textContent).toContain("1 failing on re-check after promotion");
+    expect(div.textContent).toContain("1 warning on re-check after promotion");
+    expect(div.textContent).not.toContain("worse on re-check");
   });
 });

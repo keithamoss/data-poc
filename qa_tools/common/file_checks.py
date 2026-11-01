@@ -39,7 +39,14 @@ from pathlib import Path
 from qa_tools.common import config_yaml
 
 ROOT = Path(__file__).resolve().parent.parent.parent
-DEFINITIONS_PATH = ROOT / "contract" / "file-checks.yaml"
+
+
+def definitions_path() -> Path:
+    """The selected asset's file-checks.yaml, resolved now (REQ-PIPE-342 criterion
+    6; it was the import-time constant DEFINITIONS_PATH)."""
+    from qa_tools.common import assets
+
+    return assets.selected().file("file-checks.yaml")
 
 #: The fifth tool suffix (check_id.TOOLS) and the value of `qa.check_result.tool`.
 TOOL = "file"
@@ -85,7 +92,7 @@ class Definition:
 
 def definitions(path: Path | str | None = None) -> list[Definition]:
     """Every file check in the committed configuration, in NAMES order."""
-    doc = config_yaml.parse(Path(path or DEFINITIONS_PATH).read_text()) or {}
+    doc = config_yaml.parse(Path(path or definitions_path()).read_text()) or {}
     out = [Definition(check=str(raw["check"]), severity=str(raw["severity"]),
                       formats=tuple(raw.get("formats") or ("csv",)),
                       name=str(raw.get("name") or raw["check"]).strip(),

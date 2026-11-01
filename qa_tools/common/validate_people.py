@@ -28,19 +28,19 @@ from pathlib import Path
 
 import yaml
 
-from qa_tools.common.people import PEOPLE_YAML
+from qa_tools.common.people import people_yaml
 
 
 def _data_asset_id() -> str | None:
-    from qa_tools.common.hierarchy import DATA_ASSET_YAML
+    from qa_tools.common.hierarchy import data_asset_yaml
 
     try:
-        return (yaml.safe_load(Path(DATA_ASSET_YAML).read_text()) or {}).get("data_asset_id")
+        return (yaml.safe_load(Path(data_asset_yaml()).read_text()) or {}).get("data_asset_id")
     except (OSError, yaml.YAMLError):
         return None
 
 
-def problems(path: Path | str = PEOPLE_YAML) -> list[str]:
+def problems(path: Path | str | None = None) -> list[str]:
     """Every problem with this file, or an empty list.
 
     A MISSING FILE IS NOT A PROBLEM, on the same terms
@@ -48,7 +48,7 @@ def problems(path: Path | str = PEOPLE_YAML) -> list[str]:
     until real people are added, and a gate that fails on an empty
     config fails on a fresh clone.
     """
-    path = Path(path)
+    path = Path(path or people_yaml())
     if not path.exists():
         return []
     try:
@@ -180,7 +180,7 @@ def main() -> int:
         for line in found:
             print(f"  - {line}")
         return 1
-    doc = yaml.safe_load(Path(PEOPLE_YAML).read_text()) if Path(PEOPLE_YAML).exists() else {}
+    doc = yaml.safe_load(people_yaml().read_text()) if people_yaml().exists() else {}
     people = (doc or {}).get("people") or []
     placeholders = sum(1 for p in people if (p or {}).get("placeholder"))
     print(f"people validation OK - {len(people)} person/people, "

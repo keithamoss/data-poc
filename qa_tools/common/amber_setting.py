@@ -92,7 +92,11 @@ def _typed(value):
 
 
 def _name(key) -> str:
-    """A setting's name in words: 'amber_setting' -> 'amber setting'."""
+    """A setting's name in words: 'replacement_setting' -> 'replacement
+    setting'; the amber setting is worded the warn setting, as the page and
+    every message say it (the Pass / Warn / Fail relabel)."""
+    if _path(key) == (KEY,):
+        return "warn setting"
     return _path(key)[-1].replace("_", " ")
 
 
@@ -115,9 +119,9 @@ class Resolved:
 
 
 def _doc(path: Path | None = None) -> dict:
-    from qa_tools.common.hierarchy import DATA_ASSET_YAML
+    from qa_tools.common.hierarchy import data_asset_yaml
 
-    with open(path or DATA_ASSET_YAML) as f:
+    with open(path or data_asset_yaml()) as f:
         return config_yaml.parse(f) or {}
 
 
@@ -222,7 +226,7 @@ def describe(dataset_id: str, on: date, *, doc: dict | None = None, key=KEY) -> 
 
 def resolve(dataset_id: str, at: datetime | str, *, doc: dict | None = None,
             key=KEY, values: tuple[str, ...] = AMBER_SETTINGS,
-            label: str = "amber setting") -> Resolved:
+            label: str = "warn setting") -> Resolved:
     """The setting for `dataset_id` as at the instant `at` - the instant
     the decision about a supply takes effect (criterion 4)."""
     from qa_tools.common import asset_time

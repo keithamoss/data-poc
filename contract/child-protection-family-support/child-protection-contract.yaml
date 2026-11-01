@@ -457,7 +457,7 @@ schema:
       - name: notification_id
         logicalType: string
         physicalType: varchar(20)
-        description: "Primary key. dirty(amber/red) presets inject near-duplicates here."
+        description: "Primary key. The warning and failing dirty presets inject near-duplicates here."
         required: true
         unique: true
         quality:
@@ -625,7 +625,7 @@ schema:
         logicalType: string
         physicalType: varchar(50)
         required: true
-        description: "Closed value set. The dirty(amber/red) presets inject unknown codes here - the deliberate traffic-light demo column for this collection, same role sex plays for Birth Registrations."
+        description: "Closed value set. The warning and failing dirty presets inject unknown codes here - the deliberate traffic-light demo column for this collection, same role sex plays for Birth Registrations."
         quality:
           - id: data-asset-1:child-protection-family-support:child-protection:cp-notifications:concern_type:invalidValues_datacontract
             metric: invalidValues

@@ -74,7 +74,7 @@ from dataclasses import dataclass
 
 from qa_tools.common import hierarchy
 from qa_tools.common.dataset_status import dataset_status
-from qa_tools.common.people import PEOPLE_YAML, github_usernames_for, parse_people_config
+from qa_tools.common.people import github_usernames_for, parse_people_config, people_yaml
 from qa_tools.common.ticket_check_summary import build_check_summary
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
@@ -212,7 +212,7 @@ def open_ticket(owner: str, repo: str, scope: DatasetScope, status: str,
     usernames = github_usernames_for(scope.id, scope.agency_id, people_config or _EMPTY_PEOPLE_CONFIG)
 
     body = (
-        f"**{scope.name}** (`{scope.id}`) is currently reading **{status}** - "
+        f"**{scope.name}** (`{scope.id}`) is currently reading **{_label(status)}** - "
         f"the worst status among its own real checks across every column.\n\n"
         f"Opened automatically by this project's real QA pipeline "
         f"(`qa_tools/common/ticket_sync.py`) - see the live dashboard's own "
@@ -232,7 +232,7 @@ def open_ticket(owner: str, repo: str, scope: DatasetScope, status: str,
     )
     args = [
         "issue", "create", "--repo", f"{owner}/{repo}",
-        "--title", f"{scope.name} is {status}",
+        "--title", f"{scope.name} is {_verb(status)}",
         "--body", body,
         "--label", f"{TICKET_LABEL},{_dataset_label(scope.id)}",
     ]
@@ -243,6 +243,23 @@ def open_ticket(owner: str, repo: str, scope: DatasetScope, status: str,
     # exactly the new issue's real URL to stdout and nothing else.
     return int(out.strip().rsplit("/", 1)[-1])
 
+
+
+def _label(status: str) -> str:
+    """A status as a ticket names it ('**Fail**'), through status_words - the
+    dashboard's words, so a ticket re-enabled later says what the page says
+    (REQ-TEST-360 criterion 10). The ticket duplicate this causes once is
+    accepted (SETTLED by Keith 2026-11-01): _already_said compares worded
+    bodies, so each open ticket may get one repeat 'Still failing' comment."""
+    from qa_tools.common.dataset_status import status_words
+
+    return status_words(status, "label")
+
+
+def _verb(status: str) -> str:
+    from qa_tools.common.dataset_status import status_words
+
+    return status_words(status, "verb")
 
 
 def _check_section(scope: DatasetScope, status: str, dataset: dict | None) -> str:
@@ -274,8 +291,8 @@ def sync_dataset(owner: str, repo: str, scope: DatasetScope, dataset: dict, peop
     if existing is None:
         if status in ("red", "amber"):
             issue_number = open_ticket(owner, repo, scope, status, people_config, dataset)
-            return f"{scope.id}: opened #{issue_number} ({status})"
-        return f"{scope.id}: {status}, no open ticket - nothing to do"
+            return f"{scope.id}: opened #{issue_number} ({_verb(status)})"
+        return f"{scope.id}: {_verb(status)}, no open ticket - nothing to do"
 
     # THE POST-EVERY-RUN RULE IS RETIRED (REQ-GHUB-109 criterion 2).
     # REQ-GHUB-027 criterion 7 used to post a comment even when it was
@@ -289,10 +306,10 @@ def sync_dataset(owner: str, repo: str, scope: DatasetScope, dataset: dict, peop
     # new fact, which is worse than either rule alone. So this one
     # follows the other: say something, or say nothing.
     if status == "red":
-        body = (f"Still **red** as of this run - {scope.name} continues to fail "
+        body = (f"Still **failing** as of this run - {scope.name} continues to fail "
                 f"its own checks." + _check_section(scope, status, dataset))
     else:
-        body = (f"Resolved to **{status}** as of this run. This ticket does NOT "
+        body = (f"Resolved to **{_label(status)}** as of this run. This ticket does NOT "
                 f"auto-close - close it once you've confirmed the fix, or leave "
                 f"it open if follow-up is still needed."
                 + _check_section(scope, status, dataset))
@@ -302,12 +319,12 @@ def sync_dataset(owner: str, repo: str, scope: DatasetScope, dataset: dict, peop
         # rather than remembering: a process that lost its memory,
         # restarted, or ran from a second place would otherwise post a
         # duplicate, and there are now two callers of this module.
-        return f"{scope.id}: #{existing} unchanged ({status}), nothing posted"
+        return f"{scope.id}: #{existing} unchanged ({_verb(status)}), nothing posted"
 
     comment(owner, repo, existing, body)
     if status == "red":
-        return f"{scope.id}: #{existing} still red, commented"
-    return f"{scope.id}: #{existing} resolved to {status}, commented (not closed)"
+        return f"{scope.id}: #{existing} still failing, commented"
+    return f"{scope.id}: #{existing} resolved to {_label(status)}, commented (not closed)"
 
 
 def _already_said(owner: str, repo: str, issue_number: int, body: str) -> bool:
@@ -350,7 +367,7 @@ def main() -> None:
     if not slug or "/" not in slug:
         raise SystemExit("contract/data-asset.yaml names no ticket_repository (owner/repo)")
     owner, repo = slug.split("/", 1)
-    people_config = parse_people_config(PEOPLE_YAML)
+    people_config = parse_people_config(people_yaml())
     for line in sync_all(owner, repo, people_config):
         print(line)
 

@@ -7,6 +7,8 @@ tests hold the resolver to exactly that.
 """
 from __future__ import annotations
 
+import collection_modules
+
 import dataclasses
 import json
 from dataclasses import dataclass
@@ -317,8 +319,8 @@ class TestTheGeneratedPeriodsAreEachGenerators:
     test above monkeypatches."""
 
     def test_each_collection_gets_its_own_generators_periods(self):
-        from generator.collections import child_protection as cp_provider
-        from generator.collections import civil_registration as generate_runs
+        cp_provider = collection_modules.provider_module("child-protection")
+        generate_runs = collection_modules.provider_module("civil-registration")
 
         assert si.generated_periods("cp-carers") == cp_provider.generated_periods()
         assert si.generated_periods("birth-registrations") == generate_runs.generated_periods()
@@ -418,7 +420,7 @@ class TestALinkCanStandOnTheHistorysLastDay:
         assert d.on == ANCHOR + timedelta(days=8)
 
     def test_the_req_gen_205_b_links_are_on_the_last_day(self):
-        from generator.collections import emergency_department as ed
+        ed = collection_modules.provider_module("emergency-department")
 
         periods = ed.generated_periods()
         found = {}

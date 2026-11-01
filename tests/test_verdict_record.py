@@ -43,7 +43,7 @@ def _agreement(mutate):
     """The committed agreement with one change made to a copy."""
     # As it stood before REQ-GEN-207's growth: these cases edit the first
     # version, meaning the 2023 one (tests/before_growth.py).
-    doc = before_growth.calendar(copy.deepcopy(yaml.safe_load(agreement.CALENDAR_YAML.read_text())))
+    doc = before_growth.calendar(copy.deepcopy(yaml.safe_load(agreement.calendar_yaml().read_text())))
     mutate(doc)
     return agreement.from_doc(doc)
 

@@ -1083,8 +1083,10 @@ def slots_command(collection_id: str, dataset_id: str | None) -> None:
 @common.id_collection_option(
                help="Narrow to one collection - {legend}.")
 def amber_setting_command(collection_id: str | None) -> None:
-    """The amber setting in force for each dataset, and where it was set
-    (REQ-PIPE-122 NFR 1) - so a value nobody remembers setting can be found.
+    """The warn setting in force for each dataset - what happens to a supply
+    whose checks come back warning - and where it was set (REQ-PIPE-122 NFR
+    1; REQ-DASH-359 criterion 12), so a value nobody remembers setting can be
+    found. Configured as amber_setting in contract/data-asset.yaml.
 
     Plain lines, one per dataset, so the list can be read or grepped.
     """

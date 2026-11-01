@@ -40,6 +40,7 @@ up (criterion 11). Bounded: a supply promotes at most once.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import NamedTuple
 
 from qa_tools.common import replay_clock as _replay_clock
 from qa_tools.common import qa_store, supply_db
@@ -350,32 +351,52 @@ def complete(item, *, run_by: str | None = None, on_step=None):
         regated=_regated(touched, outcomes, period))
 
 
+class Regated(NamedTuple):
+    """One reader a re-evaluation touched, and what its re-gating did
+    (REQ-TEST-360 criterion 2): the status VALUE where there is one, or None
+    for a plain phrase ('no verdict', 'verdict could not be read'), beside
+    the WORDS a person reads - so a phrase is never handed to status_words,
+    and nothing decides from the words. The first four fields are the
+    outcome lifecycle_report.outcome_lines renders; supply and period are
+    what the renderers look the hold-back's reason up by."""
+
+    dataset_id: str
+    status: str | None
+    words: str
+    result: str
+    supply: str
+    period: str
+
+
 def _regated(touched, outcomes: dict, period: str) -> tuple:
-    """(dataset, supply, period, status, gate result) for every reader a
-    re-evaluation touched - each waiting one with what its re-gating did,
-    each promoted one 'still promoted' (criterion 6: never demoted)."""
+    """A Regated for every reader a re-evaluation touched - each waiting one
+    with what its re-gating did, each promoted one 'still promoted'
+    (criterion 6: never demoted)."""
     from qa_tools.common import supply_status
+    from qa_tools.common.dataset_status import status_words
 
     out = []
     with supply_db.connect(read_only=True, label="mothman:knock-on") as conn:
         for r in touched:
             try:
-                status = supply_status.status(conn, r.dataset_id, r.supply) or "no verdict"
+                status = supply_status.status(conn, r.dataset_id, r.supply)
+                words = status_words(status, "verb") if status else "no verdict"
             except Exception:  # noqa: BLE001 - said, never a traceback
-                status = "verdict could not be read"
+                status, words = None, "verdict could not be read"
             result = outcomes.get((r.dataset_id, r.supply)) if r.waiting else "still promoted"
-            out.append((r.dataset_id, r.supply, period, status,
-                        result or "still waiting for a person"))
+            out.append(Regated(r.dataset_id, status or None, words,
+                               result or "still waiting for a person", r.supply, period))
     return tuple(out)
 
 
 def _fails_the_rules(why: str) -> bool:
     """Whether a refusal is the supply FAILING the automatic rules - red, or
     amber under hold (criterion 12) - rather than waiting for some other
-    reason (a filled slot, a person's earlier decision)."""
+    reason (a filled slot, a person's earlier decision). By the refusal's
+    KIND, never its words (REQ-TEST-360 criterion 3)."""
     from qa_tools.common import promotion
 
-    return "status is red" in why or why == promotion.AMBER_WAITING_REASON
+    return promotion.refusal_kind(why) in (promotion.FAILING, promotion.WARN_HOLD)
 
 
 def _failing_checks(conn, dataset_id: str, supply: str) -> frozenset[str]:

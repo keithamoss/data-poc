@@ -144,7 +144,10 @@ class TestTheRun:
     def test_one_shout_for_every_waiting_supply_still_failing(self, monkeypatch, conn):
         rs = [knock_on.Reader("cp-placements", "cp-placements@1", True, {"cp_carers"}),
               knock_on.Reader("cp-clients", "cp-clients@1", True, {"cp_carers"})]
-        red = "this supply's status is red rather than green or amber, so it waits for a person"
+        from qa_tools.common import promotion
+
+        red = promotion.Refusal("this supply's status is Fail rather than Pass or Warn, so it "
+                                "waits for a person", promotion.FAILING)
         _r, _g, _c, _f, shouted = self._wire(
             monkeypatch, rs, refused={"cp-placements@1": red, "cp-clients@1": red})
         knock_on.complete(FakeItem())
@@ -345,7 +348,7 @@ class TestThePersonIsToldWhoWillBeReChecked:
         # moves the table out, promoting a non-holder moves one in.
         moving = fd.DEMOTE if holds and holds.holder == carers else fd.PROMOTE
         text = said(moving, carers)
-        assert "Placements" in text and "owed a re-check" in text and "may go red" in text
+        assert "Placements" in text and "owed a re-check" in text and "may start failing" in text
         assert placements not in text and carers not in text, \
             "plain terms: supply ids only in commands to paste (REQ-GHUB-142 NFR 2)"
 

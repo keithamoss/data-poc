@@ -169,9 +169,9 @@ def ticket_repository() -> str | None:
     about the data asset, one per deployment (REQ-PIPE-093 criterion 12).
     Never GITHUB_REPOSITORY, which names whichever repository a workflow
     happens to run in."""
-    from qa_tools.common.hierarchy import DATA_ASSET_YAML
+    from qa_tools.common.hierarchy import data_asset_yaml
 
-    doc = config_yaml.parse(Path(DATA_ASSET_YAML).read_text()) or {}
+    doc = config_yaml.parse(Path(data_asset_yaml()).read_text()) or {}
     repo = str(doc.get("ticket_repository") or "").strip()
     return repo or None
 

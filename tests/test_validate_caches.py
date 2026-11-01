@@ -2,6 +2,8 @@
 criteria 16 to 18): `mothman check`'s `caches` gate."""
 from __future__ import annotations
 
+import collection_modules
+
 import subprocess
 import sys
 from pathlib import Path
@@ -137,7 +139,7 @@ class TestTheValuesTheWideningFoundFollowTheirFile:
     now answers for its file as it stands when asked."""
 
     def test_emergency_departments_run_plan_follows_the_calendar(self, monkeypatch):
-        from generator.collections import emergency_department as ed
+        ed = collection_modules.provider_module("emergency-department")
 
         monkeypatch.setattr(ed, "generated_periods", lambda: list(range(12)))
         first = len(ed.run_plan())
@@ -160,7 +162,7 @@ class TestTheValuesTheWideningFoundFollowTheirFile:
     def test_child_protections_tables_follow_the_hierarchy(self, monkeypatch):
         from types import SimpleNamespace
 
-        from generator.collections import child_protection as cp
+        cp = collection_modules.provider_module("child-protection")
         from qa_tools.common import hierarchy
 
         assert "cp_clients" in cp.TABLES, "precondition - the real hierarchy's tables"

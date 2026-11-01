@@ -19,6 +19,8 @@ since genuinely testing "does this correctly parse the real tool's
 real output" requires actually running the real tool."""
 from __future__ import annotations
 
+import collection_modules
+
 import os
 from datetime import date
 
@@ -46,6 +48,22 @@ load_local_env()
 # imported.
 os.environ["_TYPER_FORCE_DISABLE_TERMINAL"] = "1"
 os.environ["PY_COLORS"] = "0"
+
+# THE ASSET EVERY TEST ACTS FOR, STATED HERE AND NEVER TAKEN FROM THE
+# AMBIENT MOTHMAN_ASSET (REQ-PIPE-363 criterion 9). At import rather than in a
+# fixture, because test modules import the CLI - which builds the selected
+# asset's command groups - while they are collected, before any fixture runs;
+# the `selected_asset` fixture below then states it again for every test, so
+# a test that selected another cannot leak it into the next. Today's tree is
+# one asset; a tree with more has no default here, so each test must say.
+from qa_tools.common import assets as _assets  # noqa: E402
+
+if len(_assets.names()) != 1:
+    raise pytest.UsageError(
+        f"{len(_assets.names())} asset folders - choose the asset each test acts for "
+        f"explicitly (REQ-PIPE-363 criterion 9) rather than taking a default")
+TEST_ASSET = _assets.names()[0]
+os.environ[_assets.ASSET_ENV] = TEST_ASSET
 
 import fixture_ids
 from generator.daily_batch import generate_daily_batch
@@ -156,6 +174,67 @@ def stated_test_environment():
         os.environ.pop(environments.ENVIRONMENT_ENV, None)
     else:
         os.environ[environments.ENVIRONMENT_ENV] = before
+
+
+@pytest.fixture(autouse=True)
+def selected_asset(monkeypatch):
+    """Every test acts for TEST_ASSET unless it selects another, with the
+    resolver pointed at the real asset folders and no connection claimed
+    (REQ-PIPE-343 criterion 6: the suite's exemption from one asset per
+    process is that each TEST starts unclaimed - each still opens one asset's
+    database, and a process a test spawns starts with no exemption at all)."""
+    monkeypatch.setenv(_assets.ASSET_ENV, TEST_ASSET)
+    _assets.use_root(None)
+    _assets.release_claim()
+    yield TEST_ASSET
+    _assets.use_root(None)
+    _assets.release_claim()
+
+
+@pytest.fixture
+def asset_folder(tmp_path):
+    """THE ONE FIXTURE THAT POINTS THE RESOLVER AT AN ASSET FOLDER
+    (REQ-PIPE-342 criterion 7), in place of monkeypatching a path constant.
+
+    `asset_folder({"calendar.yaml": text})` makes a copy of the selected
+    asset's configuration folder - every entry a link to the real one, except
+    each file named, which is written with the text given (a file below an
+    agency folder gets a real copy of that folder) - points the resolver at
+    it and returns it. `asset_folder(folder=path)` points at a folder the test
+    built itself, completed from the real one with whatever it lacks (as
+    tests/asset_folders.py completes one). Called again, it points at a fresh
+    copy."""
+    import shutil
+    from pathlib import Path
+
+    made = []
+
+    def point(files: dict | None = None, *, folder: Path | None = None) -> Path:
+        if folder is None:
+            source = _assets.selected().folder
+            folder = tmp_path / f"asset-folder-{len(made)}"
+            folder.mkdir()
+            files = files or {}
+            tops = {Path(rel).parts[0] for rel in files}
+            for entry in source.iterdir():
+                if entry.name not in tops:
+                    (folder / entry.name).symlink_to(entry)
+                elif entry.is_dir():
+                    shutil.copytree(entry, folder / entry.name)
+            for rel, text in files.items():
+                path = folder / rel
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(text)
+        else:
+            import asset_folders
+
+            asset_folders.complete(folder)
+        made.append(folder)
+        _assets.use_root(None)
+        _assets.use_folder(folder)
+        return Path(folder)
+
+    return point
 
 
 def drop_qa_schema(conn) -> None:
@@ -714,7 +793,7 @@ def cp_raw_dir(tmp_path_factory):
     smaller scale, not a hand-rolled copy of CP's real cross-table
     structure."""
     from generator import dirty as dirty_mod
-    from generator.collections.child_protection import _add_extract_timestamp
+    _add_extract_timestamp = collection_modules.provider_module("child-protection")._add_extract_timestamp
     from synthetic_data_generator.child_protection import generate_child_protection_collection
     from synthetic_data_generator.population import generate_population
 

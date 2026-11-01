@@ -216,7 +216,7 @@ class TestNothingToSitBeneath:
         groups = _groups()
         assert n2 in {r.supply for r in groups.rows}, groups
         said = groups.lines.get(("cp-notifications", Q4, n2)) or []
-        assert ("red because cp-clients for 2025-Q1 is overdue; its checks run again once "
+        assert ("failing because cp-clients for 2025-Q1 is overdue; its checks run again once "
                 "one is promoted") in said, said
         out, offered = _queue(monkeypatch, capsys)
         assert any("cp-notifications" in c for c in offered), offered

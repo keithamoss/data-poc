@@ -111,9 +111,9 @@ intro: >
 releases:
   - date: "2026-11-01"
     summary: >
-      Any choice a builder made on your behalf now stays in view until you
-      answer it, linkage examples name their record, and Linkage Products
-      gains a quarterly geocoding release checked against its sources.
+      Every status now reads Pass, Warn or Fail with the colours unchanged,
+      any choice a builder made on your behalf stays in view until you answer
+      it, and Linkage Products gains a quarterly geocoding release.
     changes:
       - category: New
         items:
@@ -133,19 +133,11 @@ releases:
           - headline: Unanswered provisional choices are flagged
             components: ["Testing & dev tooling", "Docs & process"]
             description: >
-              The checks now warn whenever finished work holds a provisional
-              choice nobody has answered, naming where it is. The ones already
-              there are noted once, so only new ones are raised, and none of
+              The checks now warn whenever finished work holds
+              a provisional choice nobody has answered, naming
+              where it is. The ones already there are noted
+              once, so only new ones are raised, and none of
               them stops a build.
-      - category: Fixed
-        items:
-          - headline: Linkage examples name the record
-            components: ["QA checks & contract"]
-            description: >
-              A Linkage Products link that matches no record now shows its
-              dataset code and identifiers as an example, where it showed
-              nothing. A row whose identifier is missing is kept as an example
-              rather than left out.
       - category: Improved
         items:
           - headline: "`mothman lp qa` picks a table"
@@ -155,18 +147,57 @@ releases:
               Protection's does: `--table` names the linkage table or a
               geocoding table. Generation will offer `--skip-target-trial` once
               the geocoding trial arrives.
+          - headline: Pass, Warn and Fail
+            components: ["Dashboard UI", "Testing & dev tooling"]
+            description: >
+              Every status you read now says Pass, Warn or
+              Fail - in pills, legends, counts and badges, and
+              as passing, warning or failing in a sentence.
+              The colours are the same, so green is still a
+              pass.
+          - headline: Same words in the terminal
+            components: ["Testing & dev tooling", "GitHub workflow & people"]
+            description: >
+              The filing queue, re-check summaries and ticket
+              text use the dashboard's words, so "Promoted,
+              then failing on re-check" in the queue is the
+              same thing you see on the page.
           - headline: Examples compared fairly
             components: ["Dashboard UI"]
             description: >
-              Comparing two runs' example rows now matches them by value, so a
-              record failing in both reads as still failing. When the two runs
-              named their rows differently, the page says so.
+              Comparing two runs' example rows now matches
+              them by value, so a record failing in both reads
+              as still failing. When the two runs named their
+              rows differently, the page says so.
           - headline: A check that says what it samples
             components: ["QA checks & contract"]
             description: >
-              `mothman check` now fails a failed-rows check whose query does
-              not select its table's whole key, and a run stops rather than
-              quietly recording no examples.
+              `mothman check` now fails a failed-rows check
+              whose query does not select its table's whole
+              key, and a run stops rather than quietly
+              recording no examples.
+      - category: Fixed
+        items:
+          - headline: Trend dates stay apart
+            components: ["Dashboard UI"]
+            description: >
+              The dates under a check's trend no longer print
+              over each other; where three would collide, the
+              middle one is left out.
+          - headline: No false dip
+            components: ["Dashboard UI"]
+            description: >
+              A QA run that could not be checked is now a gap
+              in the column trend, rather than a drop to 0%
+              that looked like everything passed.
+          - headline: Linkage examples name the record
+            components: ["QA checks & contract"]
+            description: >
+              A Linkage Products link that matches no record
+              now shows its dataset code and identifiers as an
+              example, where it showed nothing. A row whose
+              identifier is missing is kept as an example
+              rather than left out.
   - date: "2026-10-31"
     summary: >
       Department of Health has a second collection, Linkage Products, and a

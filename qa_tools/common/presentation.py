@@ -29,7 +29,7 @@ def _default() -> Path:
     contract/ unless a test has moved it."""
     from qa_tools.common import hierarchy
 
-    return Path(hierarchy.DATA_ASSET_YAML).parent / "presentation.yaml"
+    return Path(hierarchy.data_asset_yaml()).parent / "presentation.yaml"
 
 
 def load(path: Path | None = None) -> dict:

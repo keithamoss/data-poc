@@ -166,7 +166,7 @@ class TestTheMapItself:
         text = self._map()
         assert text.startswith("<!--")
         assert "# Scenario map" in text
-        assert "which red was on purpose" in text
+        assert "which problems were on purpose" in text
         for section in sorted({s.section for s in sc.parse_register()}):
             assert f"## {section}" in text
 

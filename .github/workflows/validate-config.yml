@@ -65,6 +65,9 @@ jobs:
       # Empty on workflow_dispatch, where qa_tools/common/diff_base.py
       # falls back to HEAD~1.
       MOTHMAN_DIFF_BASE: ${{ github.event.before }}
+      # WHICH DATA ASSET each gate reads, with no default (REQ-PIPE-363
+      # criterion 1): today's one asset. REQ-PIPE-364 runs them per asset.
+      MOTHMAN_ASSET: data-asset-1
     steps:
       - name: Checkout
         uses: actions/checkout@v4

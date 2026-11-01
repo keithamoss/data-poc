@@ -15,8 +15,11 @@ from datetime import time, timedelta
 import pandas as pd
 import pytest
 
-from generator.collections import linkage_products as lp
+from collection_modules import provider_module
 from qa_tools.common import asset_time
+
+# BY PATH, as the driver loads it (REQ-PIPE-369 criterion 5).
+lp = provider_module("linkage-products")
 
 pytestmark = pytest.mark.filterwarnings("ignore::UserWarning")
 

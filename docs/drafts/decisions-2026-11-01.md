@@ -153,3 +153,29 @@ the rebuild needs no question asked twice. Drafts and builders read this file.
   with no synthetic/ folder runs, only generate refused; REQ-PIPE-372's setting
   named publish_to_gh_pages, removed once REQ-PIPE-255 is built; the quarterly
   Demo caption text.
+- PWF build-time wordings, SETTLED by Keith 2026-11-01 (all four accepted):
+  the warehouse clause's pill reads the verb ('..., and is passing'); the
+  re-check panel reads 'was passing; on re-check it is failing'; with no
+  verdict the heading reads 'Promoted, then worse on re-check'; D8d's trend
+  axis shows short dates and drops the middle label when it would collide.
+- running-thoughts #132 is DELETED under the delete-on-built rule once its
+  decisions are carried into REQ-DASH-359; REQ-DOCS-362 c4 gets an explicit
+  carve-out (it means 'do not reword history', not 'never delete a built
+  entry'). SETTLED by Keith 2026-11-01.
+- `mothman lp qa --folder` trials what the folder holds: the tables present
+  are checked against what is in place in the warehouse for the rest, as a
+  real arrival is. REPLACES the rule that a trial needs all 3 tables (no
+  Linkage Products delivery carries all three). SETTLED by Keith 2026-11-01.
+
+## Overnight (Keith 22:2x Perth, 2026-11-01: "Keep going overnight as far as you can")
+- Same build-run terms. Keith is asleep: a question a builder cannot settle from
+  this file takes the recommended option, marked PROVISIONAL in the
+  requirement's decisions with the question worded for Keith, and is listed in
+  the morning report's question list (REQ-TEST-374 c5). Nothing waits on him.
+- Order: geocoding fixes -> REQ-GEN-298 -> REQ-DASH-299; split groundwork ->
+  state-path sweep -> the move -> four streams; then one bootstrap per asset,
+  clear proven unmet_criteria, full gate, ONE push to
+  claude/qac-024-explanations-qx8hx8, check CI, write the morning report in
+  plans/morning-reports.md.
+- Anything significant (a defect needing a product decision, a criterion that
+  cannot be met) is stopped and reported, not decided.

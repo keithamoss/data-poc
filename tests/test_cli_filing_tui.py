@@ -465,7 +465,7 @@ class TestTheCommandReallyWritesTheLog:
         assert "promoted" in out
         # REQ-PIPE-122 NFR 1 (built 2026-10-05): the setting that decides
         # what an amber supply does, and where it was set.
-        assert "Amber setting:" in out and "set for the whole data asset" in out
+        assert "Warn setting:" in out and "set for the whole data asset" in out
 
 
 class TestEveryOperationIsReachableFromSomeDoor:

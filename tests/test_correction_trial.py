@@ -50,8 +50,8 @@ def _docs():
     # edit the version that governs the judged supplies (tests/before_growth.py).
     from tests import before_growth
 
-    cal = before_growth.calendar(copy.deepcopy(yaml.safe_load(agreement.CALENDAR_YAML.read_text())))
-    asset = before_growth.asset(copy.deepcopy(yaml.safe_load(asset_time.DATA_ASSET_YAML.read_text())))
+    cal = before_growth.calendar(copy.deepcopy(yaml.safe_load(agreement.calendar_yaml().read_text())))
+    asset = before_growth.asset(copy.deepcopy(yaml.safe_load(asset_time.data_asset_yaml().read_text())))
     for owner in (cal.get("calendars") or []) + (cal.get("datasets") or []) \
             + (cal.get("collections") or []):
         owner.pop("corrections", None)
@@ -370,9 +370,9 @@ class TestTheCalendarEntry:
         from cli import common
         from cli import schedule as schedule_cli
 
-        contract = agreement.CALENDAR_YAML.parent
+        contract = agreement.calendar_yaml().parent
         before = {p: p.read_bytes() for p in sorted(contract.rglob("*")) if p.is_file()}
-        assert agreement.CALENDAR_YAML in before, "test precondition - the calendar is read"
+        assert agreement.calendar_yaml() in before, "test precondition - the calendar is read"
 
         datasets, steps = iter([DATASET, None]), iter(
             [schedule_cli._CAL_PREVIEW, schedule_cli._CAL_DRAFT, schedule_cli._CAL_ANOTHER])

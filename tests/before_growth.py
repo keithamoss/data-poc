@@ -16,7 +16,9 @@ filtered or silently kept - and every block filtered must lose at least one.
 """
 from __future__ import annotations
 
-from generator.collections import child_protection as _cp
+import collection_modules
+
+_cp = collection_modules.provider_module("child-protection")
 
 #: The quarterly calendar's grown version, which Emergency Department's
 #: history still uses, and the amber and replacement settings' (REQ-GEN-207

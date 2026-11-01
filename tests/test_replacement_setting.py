@@ -13,7 +13,7 @@ import yaml
 import test_supersession as _base
 from qa_tools.common import (amber_setting, decision_log as dl, promotion, replacement_setting,
                              substitution, supersession)
-from qa_tools.common.hierarchy import DATA_ASSET_YAML
+from qa_tools.common.hierarchy import data_asset_yaml
 from test_supersession import DS, REAL_PERSON, TABLE, WHEN, _filed
 
 conn = _base.conn
@@ -23,7 +23,7 @@ AG, COL = "child-protection-family-support", "child-protection"
 
 
 def _doc():
-    return yaml.safe_load(DATA_ASSET_YAML.read_text())
+    return yaml.safe_load(data_asset_yaml().read_text())
 
 
 def _version(value, start="2023-01-01"):
@@ -160,7 +160,7 @@ class TestTheGate:
             f"replacement_version, reason FROM {dl.TABLE} WHERE dataset_id = ? AND supply = ? "
             "AND action = 'promote'", [DS, b]).fetchall()
         assert row[:5] == (dl.RULE, a, "green", amber_setting.ASSET, "2023-01-01")
-        assert "replacement setting 'green'" in row[5]
+        assert "replacement setting 'when passing'" in row[5]
 
     def test_green_does_not_replace_with_amber(self, conn, period, monkeypatch):
         _setting(monkeypatch, "green")

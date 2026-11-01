@@ -150,22 +150,30 @@ def write(contract_dir: Path, merged: dict, base: dict | None = None) -> None:
         source = cal_path if cal_path.exists() else REAL_CONTRACT_DIR / "calendar.yaml"
         base = yaml.safe_load(source.read_text())
     asset, cal = split(merged, base)
+    # THE ASSET'S CLOCK AND ITS SYNTHETIC DECLARATION, from the real file
+    # where `merged` names neither: they were read through their own path
+    # constants until the asset resolver (REQ-PIPE-342 criterion 6) pointed
+    # every reader at one folder, so a hand-written hierarchy never carried
+    # them.
+    real = yaml.safe_load((REAL_CONTRACT_DIR / "data-asset.yaml").read_text())
+    for key in ("timezone", "synthetic"):
+        if key not in asset and key in real:
+            asset[key] = real[key]
     (contract_dir / "data-asset.yaml").write_text(yaml.safe_dump(asset, sort_keys=False))
     cal_path.write_text(yaml.safe_dump(cal, sort_keys=False))
 
 
 def repoint(monkeypatch, directory: Path, merged: dict, base: dict | None = None) -> Path:
     """Write `merged` as the two files into `directory` and point every
-    reader at them - the hierarchy at the asset file, the agreement at the
-    calendar file. Returns the asset file's path."""
-    from qa_tools.common import agreement, hierarchy
+    reader at them, by pointing the asset resolver at `directory` - completed
+    from the real asset folder, so every other file still reads as committed
+    (REQ-PIPE-342 criterion 7). Returns the asset file's path."""
+    import asset_folders
 
     directory.mkdir(parents=True, exist_ok=True)
     write(directory, merged, base)
-    asset_path = directory / "data-asset.yaml"
-    monkeypatch.setattr(hierarchy, "DATA_ASSET_YAML", asset_path)
-    monkeypatch.setattr(agreement, "CALENDAR_YAML", directory / "calendar.yaml")
-    return asset_path
+    asset_folders.point(directory)
+    return directory / "data-asset.yaml"
 
 
 def participation(dataset_id: str, **version) -> dict:

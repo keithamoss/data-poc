@@ -101,4 +101,4 @@ def describe(run_id: str, own_table: str, why: str) -> str:
              CONTESTED: "two files for one table, waiting for a person to say what each file is",
              REFUSED: "the load refused the file"}[why]
     return (f"note: {run_id}: {own_table} cannot be read - {words} - so no tool runs "
-            f"and nothing is checked; its dataset reads red until that is resolved.")
+            f"and nothing is checked; its dataset reads as failing until that is resolved.")

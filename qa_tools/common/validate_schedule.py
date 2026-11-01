@@ -50,18 +50,16 @@ from pathlib import Path
 
 import yaml
 
-from qa_tools.common import asset_time, period_schema, schedule
+from qa_tools.common import asset_time, assets, period_schema, schedule
 from qa_tools.common.diff_base import diff_base
 from qa_tools.common.schemas import DataAsset
 
 ROOT = Path(__file__).resolve().parent.parent.parent
-CONTRACT_DIR = ROOT / "contract"
 
 #: Set by `mothman check` to say "you may tell me about a warning".
 #: Named here, beside the gate that emits it, and imported by the two
 #: callers rather than spelled out three times.
 WARNING_EXIT_VAR = "MOTHMAN_GATE_WARNING_EXIT"
-DATA_ASSET_YAML = CONTRACT_DIR / "data-asset.yaml"
 
 _MONTHS = ("January", "February", "March", "April", "May", "June",
             "July", "August", "September", "October", "November", "December")
@@ -97,7 +95,15 @@ class Source:
 
     @classmethod
     def default(cls) -> "Source":
-        return cls(DATA_ASSET_YAML, CONTRACT_DIR)
+        """The selected asset's own configuration, resolved now (REQ-PIPE-342
+        criterion 6) - it was two import-time constants, CONTRACT_DIR and
+        DATA_ASSET_YAML."""
+        asset = assets.selected()
+        return cls(asset.data_asset_yaml, asset.folder)
+
+    @property
+    def is_the_selected_assets(self) -> bool:
+        return self.asset_path == assets.selected().data_asset_yaml
 
 
 @dataclass(frozen=True)
@@ -569,7 +575,7 @@ def _dataset_errors(raw: dict, src: Source) -> list[ConfigError]:
         if not named:
             out.append(ConfigError(
                 src.name, scope,
-                f"is in {DATA_ASSET_YAML.name}'s hierarchy and names no `calendar:` in "
+                f"is in {assets.selected().data_asset_yaml.name}'s hierarchy and names no `calendar:` in "
                 f"{src.calendar_name} - "
                 f"neither on the dataset nor on its collection - and no deliberate no-calendar "
                 f"declaration.",
@@ -717,8 +723,8 @@ def _expects_nothing_errors(raw: dict, src: Source) -> list[ConfigError]:
                 src.name, f"dataset {dataset_id!r}",
                 "expects no supply in any period at all.",
                 "Something in this dataset's calendar, participation, dates or "
-                "not_expected leaves nothing behind. A dataset expecting nothing sits "
-                "green forever - which is the exhausted-schedule state arriving by "
+                "not_expected leaves nothing behind. A dataset expecting nothing passes "
+                "forever - which is the exhausted-schedule state arriving by "
                 "accident."))
     return out
 
@@ -962,8 +968,8 @@ def _replacement_setting_errors(raw: dict, src: Source, today: date | None = Non
     out = _amber_setting_errors(raw, src, today, ref, module=replacement_setting)
     return out + [ConfigError(
         src.name, f"replacement_setting ({where})", f"{problem}.",
-        "Make the replacement setting green (or never) for those dates, or the amber "
-        "setting promote or promote-and-acknowledge - by a NEW version of whichever you "
+        "Make the replacement setting 'green' (or 'never') for those dates, or the warn "
+        "setting (amber_setting) promote or promote-and-acknowledge - by a NEW version of whichever you "
         "change, since a past version is frozen.")
         for where, problem in replacement_setting.conflicts(raw)]
 
@@ -2304,7 +2310,7 @@ def validate(src: Source | None = None) -> list[ConfigError]:
     errors += _amber_setting_errors(raw, src)
     errors += _replacement_setting_errors(raw, src)
     errors += _list_setting_errors(raw, src)
-    if src.asset_path == DATA_ASSET_YAML and not errors:
+    if src.is_the_selected_assets and not errors:
         errors += _overlap_errors(src)
         errors += _daylight_saving_errors(src)
     return _attribute(errors, merged)
@@ -2579,7 +2585,7 @@ def main(src: Source | None = None) -> int:
     # is not there for the one that mattered. Printed AFTER the OK line
     # rather than instead of it, so it reads as an additional thing to
     # know rather than as the gate's verdict.
-    warned = _warn_about_runway() if src.asset_path == DATA_ASSET_YAML else False
+    warned = _warn_about_runway() if src.is_the_selected_assets else False
 
     # PASSED, WITH SOMETHING TO KNOW - and only when something asked to
     # be told. `mothman check` sets MOTHMAN_GATE_WARNING_EXIT so it can

@@ -49,7 +49,7 @@ class Confirmation:
 def _path(path):
     from qa_tools.common import scripted_decisions
 
-    return Path(path or scripted_decisions.SCRIPT_PATH)
+    return Path(path or scripted_decisions.script_path())
 
 
 def load(path: Path | str | None = None) -> list[Confirmation]:

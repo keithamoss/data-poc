@@ -60,9 +60,9 @@ class CheckpointRefused(RuntimeError):
 
 def require_synthetic() -> None:
     """Criterion 6: never on an asset that has not declared itself synthetic."""
-    from qa_tools.common.hierarchy import DATA_ASSET_YAML
+    from qa_tools.common.hierarchy import data_asset_yaml
 
-    doc = config_yaml.parse(Path(DATA_ASSET_YAML).read_text()) or {}
+    doc = config_yaml.parse(Path(data_asset_yaml()).read_text()) or {}
     # `is True`, NOT TRUTHINESS, as the reset command and the replay clock read
     # it - a string "false" is truthy (post-build-review #131 D9).
     if doc.get("synthetic") is not True:

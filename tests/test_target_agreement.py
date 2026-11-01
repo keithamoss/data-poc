@@ -37,21 +37,21 @@ class TestComparing:
     def test_a_red_check_is_named_against_an_amber_target(self):
         results = [_r("a.not_null_dbt", "fail"), _r("b.missing_percent_soda", "warn")]
         found = target_agreement.compare(DS, results, "amber", "TS-x", reads={})
-        assert found.verdict == "red" and found.checks == ("a.not_null_dbt red",)
+        assert found.verdict == "red" and found.checks == ("a.not_null_dbt Fail",)
         assert "TS-x" in str(found) and "built to amber" in str(found) and "read red" in str(found)
 
     def test_a_warning_is_named_against_a_green_target(self):
         found = target_agreement.compare(
             DS, [_r("a.not_null_dbt", "pass"), _r("b.missing_percent_soda", "warn")],
             "green", "lead-in", reads={})
-        assert found.verdict == "amber" and found.checks == ("b.missing_percent_soda amber",)
+        assert found.verdict == "amber" and found.checks == ("b.missing_percent_soda Warn",)
 
     def test_an_amber_that_did_not_warn_names_the_rule_meant_to(self):
         results = [_r("place_of_birth_facility.not_null_dbt", "pass"), _r("sex.not_null_dbt", "pass")]
         found = target_agreement.compare(DS, results, "amber", "TS-43", reads={},
                                          rules=("place_of_birth_facility.completeness",))
         assert found.verdict == "green"
-        assert found.checks == ("place_of_birth_facility.not_null_dbt green",)
+        assert found.checks == ("place_of_birth_facility.not_null_dbt Pass",)
 
     def test_a_gap_red_reads_as_its_measurement(self):
         """The gate's reading, not the page's (Keith, 2026-10-11): an ordinary
@@ -437,7 +437,7 @@ class TestAfterAReplayWithADisagreement:
         monkeypatch.setattr(target_agreement, "recorded_results",
                             lambda c, r: [_r("sex.not_null_dbt", "fail")])
         [found] = target_agreement.after_replay(None, [built])
-        assert found.verdict == "red" and found.checks == ("sex.not_null_dbt red",)
+        assert found.verdict == "red" and found.checks == ("sex.not_null_dbt Fail",)
 
 
 class TestARecordThatDoesNotAddUp:

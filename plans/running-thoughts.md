@@ -6083,28 +6083,9 @@ could never have computed it), and it belongs with batch 5's check work.
      said "Hmm maybe it's OK as it is". So nothing is scoped or built. Left
      here as a possible idea to come back to, not a commitment.
 
-132. **[todo, 2026-10-31]** **[Dashboard UI]** **[Pipeline & publishing]** **Pass / Warn / Fail everywhere, replacing Green / Amber / Red.**
-     Keith's decision, 2026-10-31 late morning. It came up when he asked "when
-     the hell did we decide to change the language?", because the
-     cross-table grid's cells read Pass / Warn / Fail while every other place
-     reads Green / Amber / Red. He was shown that the grid's words were a
-     builder's PROVISIONAL choice for REQ-DASH-272 (2026-10-25), never put to
-     him, and offered three options: (a) Green / Amber / Red everywhere, (b)
-     Pass / Warn / Fail in the grid only, (c) Pass / Warn / Fail everywhere.
-     He chose **(c)**, confirmed when asked which direction. That means status
-     pills, dataset rows, agency cards, group headings, the terminal's words
-     and the Python status mirror all change.
-     NOT SCOPED YET. Needs an inventory of every occurrence, including
-     compound labels ("Red promoted", "Amber promoted", the amber tag), prose
-     ("went amber", "the amber band"), CSS and data values versus displayed
-     words, the CLI, the changelog and docs. Then a requirement, sign-off and
-     the post-build-review note of how the provisional word slipped through
-     (post-build-review #292). Interacts with the geocoding batch's heading-count
-     question (REQ-DASH-299 Q1), which now follows this decision.
-
 133. **[parked, 2026-10-31]** **[Pipeline & publishing]** **[QA checks & contract]** **Rename the configuration and the stored values to Pass / Warn / Fail too.**
      Keith, 2026-10-31, answering the relabel's depth question: displayed
-     words only for now (running-thoughts #132), and "b/c parked for later".
+     words only for now (REQ-DASH-359, built 2026-11-01; it was running-thoughts #132), and "b/c parked for later".
      (b) is the configuration people type: `amber_setting`,
      `replacement_setting`'s values, `--dirty amber|red`, `green-or-amber`.
      (c) is everything, stored database values and the status constraint

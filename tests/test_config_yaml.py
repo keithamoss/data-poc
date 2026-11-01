@@ -113,12 +113,12 @@ class TestItIsWhatTheRunPathReads:
 
         # FRESH COPIES, so nothing built earlier in this process can answer
         # (REQ-PIPE-254 keys every built value on its file's path and text).
-        for name, module, attr in (("data-asset.yaml", hierarchy, "DATA_ASSET_YAML"),
-                                   ("data-asset.yaml", asset_time, "DATA_ASSET_YAML"),
-                                   ("calendar.yaml", agreement, "CALENDAR_YAML")):
-            copy = tmp_path / name
-            shutil.copyfile(getattr(module, attr), copy)
-            monkeypatch.setattr(module, attr, copy)
+        import asset_folders
+
+        for name, real in (("data-asset.yaml", hierarchy.data_asset_yaml()),
+                           ("calendar.yaml", agreement.calendar_yaml())):
+            shutil.copyfile(real, tmp_path / name)
+        asset_folders.point(tmp_path)
 
         def refuse(*a, **k):
             raise AssertionError("yaml.safe_load was called on the run path")

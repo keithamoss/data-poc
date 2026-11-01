@@ -9,12 +9,14 @@ to find the bugs for it.
 """
 from __future__ import annotations
 
+import asset_folders
+
 from datetime import date
 
 import pytest
 import yaml
 
-from qa_tools.common import amber_setting, asset_time, slots
+from qa_tools.common import amber_setting, slots
 from qa_tools.common import validate_schedule as vs
 from qa_tools.common.schemas import DataAsset
 
@@ -30,7 +32,7 @@ def sydney(tmp_path, monkeypatch):
         "changelog": [{"date": "2026-10-11", "author": "pytest", "change": "test"}]}]}
     path = tmp_path / "data-asset.yaml"
     path.write_text(yaml.safe_dump(doc))
-    monkeypatch.setattr(asset_time, "DATA_ASSET_YAML", path)
+    asset_folders.point(tmp_path)
     yield
 
 

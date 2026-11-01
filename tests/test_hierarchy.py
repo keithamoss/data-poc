@@ -14,6 +14,8 @@ them.
 """
 from __future__ import annotations
 
+import asset_folders
+
 import pytest
 import yaml
 
@@ -94,7 +96,7 @@ class TestFailsLoudly:
     def _write(self, tmp_path, monkeypatch, doc):
         path = tmp_path / "data-asset.yaml"
         path.write_text(yaml.safe_dump(doc))
-        monkeypatch.setattr(hierarchy, "DATA_ASSET_YAML", path)
+        asset_folders.point(tmp_path)
 
     def test_a_duplicate_dataset_id_is_an_error_not_a_last_one_wins(self, tmp_path, monkeypatch):
         self._write(tmp_path, monkeypatch, {

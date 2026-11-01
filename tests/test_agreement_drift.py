@@ -49,8 +49,8 @@ def _docs():
     # edit the version that governs the judged supplies (tests/before_growth.py).
     from tests import before_growth
 
-    cal = before_growth.calendar(copy.deepcopy(yaml.safe_load(agreement.CALENDAR_YAML.read_text())))
-    asset = before_growth.asset(copy.deepcopy(yaml.safe_load(asset_time.DATA_ASSET_YAML.read_text())))
+    cal = before_growth.calendar(copy.deepcopy(yaml.safe_load(agreement.calendar_yaml().read_text())))
+    asset = before_growth.asset(copy.deepcopy(yaml.safe_load(asset_time.data_asset_yaml().read_text())))
     for owner in (cal.get("calendars") or []) + (cal.get("datasets") or []) \
             + (cal.get("collections") or []):
         owner.pop("corrections", None)
@@ -333,7 +333,7 @@ class TestCriticFindingsOn173:
 
         report = processing_pass.PassReport(refused=["cp-clients"])
         pipeline._say_pass(report)
-        assert "recorded result is red" not in capsys.readouterr().out
+        assert "recorded result is a Fail" not in capsys.readouterr().out
         assert report.exit_status == processing_pass.EXIT_REFUSED  # (h)
 
 

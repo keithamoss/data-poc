@@ -54,7 +54,7 @@ def _sources(ref: str | None) -> tuple[list[tuple[str, object]], list[str]]:
     from qa_tools import collections
     from qa_tools.common import config_yaml, hierarchy
 
-    asset = hierarchy.DATA_ASSET_YAML
+    asset = hierarchy.data_asset_yaml()
     rel_asset = asset.relative_to(ROOT).as_posix() if asset.is_relative_to(ROOT) else None
     text = asset.read_text() if ref is None or rel_asset is None else _old_file_content(rel_asset, ref)
     colls = collections.collections_in(config_yaml.parse(text or "") or {})
