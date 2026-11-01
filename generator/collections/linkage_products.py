@@ -1051,9 +1051,11 @@ class LinkageProducts(Provider):
         # A DIRTIED SOURCE'S PLACED MIX DRIFTS (PROVISIONAL, REQ-GEN-298's
         # decisions): a record's match level follows its quarter's address
         # columns (REQ-GEN-295 criterion 5 as amended, GA2 a), so a file built
-        # from a source supply its own provider built red - TS-93a's and
-        # TS-100a's Client Registers - is built to the drift check's Warn, not
-        # only to its share's band. Found by the trial, which confirms it.
+        # from a source supply its own provider built red with gaps in the
+        # address columns it is placed by - TS-93a's and TS-100a's Client
+        # Registers - is built to the drift check's Warn, not only to its
+        # share's band. A red source dirtied elsewhere (2017-Q3's) is not.
+        # Found by the trial, which confirms it.
         dirty_built = set()
         for job in jobs:
             if base[job.slot_id] is None:
@@ -1062,7 +1064,7 @@ class LinkageProducts(Provider):
             for table, (d, rows, verdict) in list(files.items()):
                 src = hierarchy.dataset(d).linked[0][0]
                 used = _before(sources[src], src, job.period.name, at)
-                if used and used[-1].severity == "red":
+                if used and used[-1].severity == "red" and _addresses_gapped(d, used[-1].rows):
                     dirty_built.add((job.slot_id, d))
                     files[table] = (d, rows, worst(verdict, "amber"))
 
@@ -1440,6 +1442,19 @@ def in_warehouse(dataset_id: str, period: str, at, supplies):
         elif what == "reject" and held is supply:
             held = None
     return held
+
+
+def _addresses_gapped(dataset_id: str, rows) -> bool:
+    """Whether any address column a record of `dataset_id` is placed by holds
+    a blank or null in these source rows."""
+    from generator import synthetic_inputs
+
+    for column, _value in synthetic_inputs.placings()[dataset_id].place_by:
+        if column in rows.columns:
+            values = rows[column]
+            if values.isna().any() or (values.astype(str).str.strip() == "").any():
+                return True
+    return False
 
 
 def _draw(n: int, rng) -> list:
