@@ -47,6 +47,15 @@ NO_PERIOD_REASON = ("The declared set this check compares against is the one in 
                     "evaluated.")
 
 
+#: A TRIAL'S reason (post-build-review #299 item 3): a staged-only trial is
+#: filed to no period by design and decides nothing, so its set-member checks
+#: are recorded no data, as every check a trial cannot evaluate is.
+TRIAL_NO_PERIOD = "declared-set-not-in-trial"
+TRIAL_NO_PERIOD_REASON = ("A trial is checked without being filed, so no period - and no "
+                          "declared set in force for one - applies to it, and this check "
+                          "was not run. It did not fail; a trial decides nothing.")
+
+
 @dataclass(frozen=True)
 class InForce:
     """A list setting as it stood for one table in one period."""

@@ -182,3 +182,24 @@ def test_criterion_fifteen_no_distribution_of_an_area_code_or_an_identifier():
     assert {col for _t, col in stats.value_counts} == {"match_level"}
     assert not any(col in ("sa2_code", "lga_code") or col.startswith("id_")
                    for _t, col in stats.aggregates)
+
+
+class TestATrialsYearChecksSayTrialNotNoPeriod:
+    """post-build-review #299 item 3: a staged-only trial (`mothman lp qa`) is
+    filed to no period by design, and decides nothing - its year checks are
+    recorded no data with a trial's reason, never red 'filed to no period'."""
+
+    def test_a_trial_records_no_data_with_a_trials_reason(self):
+        from qa_tools import collections
+        from qa_tools.common import trial
+        from qa_tools.tools import run_dbt
+
+        coll = collections.by_id("linkage-products")
+        records = run_dbt._not_evaluated_for_want_of_a_period(
+            coll, collections.adapter(coll).dbt, trial.trial_run_id(),
+            "2026-11-01T10:00:00+00:00", None)
+        assert len(records) == 6
+        assert {r["status"] for r in records} == {"nodata"}
+        assert {r["not_evaluated_code"] for r in records} == {list_setting_members.TRIAL_NO_PERIOD}
+        assert all("trial" in r["not_evaluated_reason"] and "filed to no period" not in
+                   r["not_evaluated_reason"] for r in records)

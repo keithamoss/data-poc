@@ -99,10 +99,16 @@ def compute_dataset_stats(collection_id: str, conn, entry: dict) -> dict[str, An
 
     # A COLUMN SEVERAL TABLES DECLARE IS THE RUN'S OWN TABLE'S (REQ-QAC-297
     # criterion 11): value_counts is keyed by column, and the drift reference
-    # and the page's value bars both read a run's counts for its own dataset,
-    # so the run's own table is counted last and wins.
+    # and the page's value bars both read a run's counts for its own dataset.
+    # So such a column is recorded only from the run's own table, and a run
+    # owning none of them records none (post-build-review #299 item 1) - never
+    # whichever table happened to come last.
     own = _own_table(entry)
-    declared = sorted(spec.value_counts.items(), key=lambda kv: kv[0][0] == own)
+    shared: dict[str, set] = {}
+    for (t, col) in spec.value_counts:
+        shared.setdefault(col, set()).add(t)
+    declared = [((t, col), known) for (t, col), known in spec.value_counts.items()
+                if len(shared[col]) == 1 or t == own]
     return {
         "arrival_record": arrival_record(entry),
         "row_counts": {t: _count(conn, t) for t in tables if t in readable},

@@ -196,8 +196,17 @@ def _set_judged_against(conn, run_id: str, table: str, node: dict) -> dict:
 def _not_evaluated_for_want_of_a_period(coll, spec, run_id: str, run_timestamp: str,
                                          asked) -> list[dict]:
     """One not-evaluated record per set-member check in the run's scope -
-    red, could not run, with its structured reason (REQ-QAC-297 criterion 4)."""
+    red, could not run, with its structured reason (REQ-QAC-297 criterion 4);
+    no data with a trial's reason for a staged-only trial, which decides
+    nothing (post-build-review #299 item 3)."""
+    from qa_tools.common import trial
+
     wanted = None if asked is None else set(asked)
+    in_trial = trial.is_trial(run_id)
+    code, reason, status = (
+        (list_setting_members.TRIAL_NO_PERIOD, list_setting_members.TRIAL_NO_PERIOD_REASON, "nodata")
+        if in_trial else
+        (list_setting_members.NO_PERIOD, list_setting_members.NO_PERIOD_REASON, "fail"))
     out, seen = [], set()
     for node in parsed_test_nodes(PROFILES_DIR, DBT_PROJECT_DIR).values():
         if not _reads_declared_set(node):
@@ -214,12 +223,12 @@ def _not_evaluated_for_want_of_a_period(coll, spec, run_id: str, run_timestamp: 
             "check_id": check_id, "column_name": node.get("column_name") or "(table)",
             "check_name": f"dbt:{meta['name']}", "dimension": "completeness",
             "label": "Not evaluated - the supply has no period",
-            "run_id": run_id, "run_timestamp": run_timestamp, "status": "fail",
+            "run_id": run_id, "run_timestamp": run_timestamp, "status": status,
             "metric_value": None, "unit": None, "warn_threshold": None, "fail_threshold": None,
             "on_fail_action": "flag", "row_count_total": None, "row_count_invalid": None,
             "engine": ENGINE_TAG,
-            "not_evaluated_code": list_setting_members.NO_PERIOD,
-            "not_evaluated_reason": list_setting_members.NO_PERIOD_REASON,
+            "not_evaluated_code": code,
+            "not_evaluated_reason": reason,
         })
     return out
 

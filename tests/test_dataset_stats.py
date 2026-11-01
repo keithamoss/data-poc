@@ -139,3 +139,23 @@ def test_a_column_two_tables_share_records_the_runs_own_tables_counts():
 
     assert stats["value_counts"]["match_level"] == [
         ["address", 0], ["postcode", 1], ["suburb", 2], ["not geocoded", 0]]
+
+
+def test_a_run_owning_none_of_the_tables_sharing_a_column_records_none():
+    """post-build-review #299 item 1: a Linkage Keys run reads both geocoding
+    tables but owns neither, and recorded one of them's match_level counts as
+    its own. A column several tables declare is recorded only for the run that
+    owns one of them; a run owning none records none, never a guess."""
+    conn = duckdb.connect(":memory:")
+    conn.execute("CREATE TABLE linkage_keys (dataset VARCHAR)")
+    conn.execute("CREATE TABLE geo_cp_clients (match_level VARCHAR)")
+    conn.execute("CREATE TABLE geo_ed_presentations (match_level VARCHAR)")
+    conn.execute("INSERT INTO geo_cp_clients VALUES ('suburb')")
+    conn.execute("INSERT INTO geo_ed_presentations VALUES ('postcode')")
+    for dataset_id in ("linkage-keys", None):
+        arrival = {"run_id": "r", "run_index": 1, "delivery": "d",
+                   "received_at": "2026-05-01T10:30:00+00:00", "dataset_id": dataset_id}
+        stats = dataset_stats.compute_dataset_stats("linkage-products", conn, arrival)
+        assert "match_level" not in stats["value_counts"], dataset_id
+        assert set(stats["row_counts"]) == {"linkage_keys", "geo_cp_clients",
+                                            "geo_ed_presentations"}
