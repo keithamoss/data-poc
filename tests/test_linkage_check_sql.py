@@ -23,12 +23,13 @@ CHECKS = (Path(__file__).resolve().parent.parent / "contract" / "department-of-h
           / "linkage-products-soda-checks.yml")
 
 
-def _queries() -> dict[str, str]:
-    """check_id tail -> the SQL Soda runs for it."""
+def _queries(table: str = "linkage_keys") -> dict[str, str]:
+    """check_id tail -> the SQL Soda runs for it, for one table's own block
+    (the geocoding tables' blocks share tails with linkage_keys')."""
     doc = yaml.safe_load(CHECKS.read_text())
     out: dict[str, str] = {}
     for key, body in doc.items():
-        if not key.startswith("checks for"):
+        if key != f"checks for {table}":
             continue
         for entry in body:
             (head, spec), = entry.items()
