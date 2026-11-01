@@ -46427,6 +46427,7 @@ requirements:
     - 'SAME SEED, SAME BYTES (criterion 15): a second whole generation of this tree into another scratch directory compared identical with the first, every delivery, receipt, the bookkeeping and the placements (diff -r).'
     - 'PLANNED VERDICTS in the generated history: geo-cp-clients 43 green; geo-ed-presentations 51 green and 2 amber (2017-Q2 and 2021-Q4, built from ED''s red routine supplies missing 8 percent of postcodes) - each recorded as a target, green included.'
     - NO BOOTSTRAP AND NO FULL GATE in this run (Keith's build-run terms).
+    - 'CRITERIA 7 AND 13 COMPLETED BY REQ-GEN-298 (2026-11-01): the ordinary severities are drawn from the geocoding stream''s own seed and applied through REQ-GEN-298''s presets, and every amber or red planned verdict was confirmed by the generation-time trial in its slot''s period - 43 supplies of a whole generated history, all agreeing (REQ-GEN-298''s evidence).'
     unmet_criteria:
     - criterion: Criterion 2 by REQ-TEST-239's compare of a from-empty bootstrap before and after.
       why: Shown instead by generating the whole history at the base commit and at this tree and comparing every file byte for byte (evidence); REQ-TEST-239's compare needs a from-empty bootstrap on each side, which this run does not do.
@@ -46438,12 +46439,6 @@ requirements:
       owner: the end-of-run bootstrap (2026-11-01 build run)
       blocked_by:
         unowned: true
-    - criterion: Criterion 7's confirmation of each amber or red planned verdict by the generation-time trial in its slot's period.
-      why: The provider declares target_trial False; the trial in its slot's period is REQ-GEN-298 criteria 10 to 13.
-      owner: REQ-GEN-298
-      blocked_by:
-        requirements:
-        - REQ-GEN-298
   - id: REQ-PIPE-296
     title: The geocoding datasets run end to end through Linkage Products' existing QA adapter and its dbt folder, their delivery its own package in the quarterly bootstrap stream, the bootstrap's cost measured before and after
     date_written: '2026-10-25'
@@ -46765,6 +46760,9 @@ requirements:
     - qa_tools/common/period_overlay.py::rebuild_for_trial
     - qa_tools/common/target_agreement.py::trial_reads_agree
     - qa_tools/common/target_agreement.py::unaimed
+    - qa_tools/common/unrunnable.py::results_for_trial
+    - qa_tools/tools/run_evidently.py::_psi_result
+    - generator/collections/linkage_products.py::_addresses_gapped
     - plans/supply-model.md
     linked_tests:
     - tests/test_geocoding_faults.py::TestTheFaultsByConstruction
@@ -46779,8 +46777,17 @@ requirements:
     - tests/test_geocoding_trial.py::TestEveryTargetCarriesItsDayFileAndPeriod
     - tests/test_geocoding_trial.py::TestARealTrialInItsPeriod
     - tests/test_generator_providers.py::TestATrialIsRefusedBeforeAnythingIsWritten
+    - tests/test_geocoding_trial.py::TestATrialSpeaksOnlyForItsOwnCollectionsChecks
+    - tests/test_geocoding_trial.py::TestAnEmptySupplysDriftIsNotEvaluated
+    - tests/test_geocoding_faults.py::TestADirtiedSourcesDriftIsPlanned
     evidence:
-    - EVIDENCE_PLACEHOLDER
+    - '2026-11-01/02 Perth overnight, worktree bgeo from 39393c3, no bootstrap and no full gate (Keith''s build-run terms).'
+    - 'BYTE-IDENTITY, by generating every collection''s whole history into private scratch folders at 39393c3 and at this tree (generator.output.generated_into): all 514 non-geocoding delivery files and their 514 receipts byte-identical; the birth-registrations, cp-clients, ed-presentations and linkage-keys bookkeeping equal; all 79 existing scenario placements equal. Differences are geocoding only: 38 geocoding files changed, 4 new geocoding resupply deliveries, 74 geocoding receipts (their contents or their sequence numbers, shifted by the resupplies), the two geocoding bookkeeping keys (43 -> 45 and 53 -> 55 entries) and 13 new placements (TS-102 to TS-111, TS-93c, TS-100c, TS-101b). 379s to generate at base, 424s after, on a shared 4-core sandbox.'
+    - 'THE GENERATION-TIME TRIAL OVER THAT WHOLE HISTORY, against a scratch database (bgeo298_trial, never `supply`): 43 supplies tried in their slots'' periods - every geocoding amber, red and scenario file and criterion 8''s three - all agreeing, 47s wall clock on 4 workers (shared sandbox; REQ-PIPE-250''s bootstrap figure is the end-of-run bootstrap''s). Getting there, the trial refused the history four times and each was a real finding, fixed here: a Child Protection check recorded inside a Linkage Products trial (unrunnable), Evidently raising on TS-110''s empty file, sources a scenario''s file shape never wrote (carried), and drift the share-only plan could not foresee (PROVISIONAL decision).'
+    - 'DIAGNOSTIC, NOT A GATE: the same trial machinery over all 97 geocoding supplies, greens included (one skipped, its source a contested pair), all agreeing - so the comparison after replay should find no green disagreeing, which the end-of-run bootstrap confirms or refutes.'
+    - 'TESTS on the final code: tests/test_geocoding_faults.py, test_geocoding_trial.py, test_geocoding_generator.py, test_target_agreement.py, test_unrunnable.py and test_generator_providers.py - 170 passed, 1 skipped (test_target_agreement''s ''this checkout has no generated history''), 1 failed; the failure was a test of this change asserting too narrow a set, corrected, and its class re-run: 2 passed. Earlier, on the tree before the drift rule, 29 modules (the generator, scenario, geocoding, trial, evidently, overlay and registry modules) gave 766 passed and 16 failed: 3 of them this change''s tests, since corrected and re-run above, and 13 failing identically at 39393c3 for want of a generated history or a bootstrapped database (TestAScriptedDecisionsReCheckIsRun x2, TestThePlantedPairsAreSettled, TestTheEarlyEmergencyDepartmentSupplies x5, TestOnlyThePlantedAmbersWaitUnderHold, test_the_committed_map_is_not_stale, TestReadingTheRealCommittedHistory x3). ruff clean.'
+    - 'SEEN FAILING FIRST at 39393c3: 26 of the 29 new trial, overlay, rule, target and fault tests (the 3 that pass there guard behaviour that must not change); and each of the two trial-found defects'' tests - Child Protection checks in a Linkage Products trial, and Evidently on an empty frame (''current_data must contain at least one column'') - failed before its fix.'
+    - '`mothman lp generate-synthetic-data --help` offers --skip-target-trial (REQ-PIPE-296 criterion 9).'
     unmet_criteria:
     - criterion: 'Criterion 15 (2)''s second half - the trial of TS-100c''s quarter agrees with the results the replay records for the same supply.'
       why: 'The trial''s half is tested (tests/test_geocoding_trial.py::TestARealTrialInItsPeriod); the replay''s results come from a bootstrapped database.'

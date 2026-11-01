@@ -1165,6 +1165,7 @@ class LinkageProducts(Provider):
         # is one whose source the warehouse still does not hold then (TS-93c)
         # - its green resupply where it has one. A file measured against a
         # dirtied file drifts too, so it is built to Warn and tried.
+        drift_planned = set(dirty_built)
         for d, src, _cols in geo:
             t = tables[d]
             earlier: list = []
@@ -1179,6 +1180,7 @@ class LinkageProducts(Provider):
                                 if e[3] != "red" and in_warehouse(src, e[1], at, sources[src])
                                 is not None), None)
                     if ref is not None and (ref[0], d) in dirty_built and n == 1:
+                        drift_planned.add((job.slot_id, d))
                         dd, rows, verdict = files[t]
                         files[t] = (dd, rows, worst(verdict, "amber"))
                         m = meta.setdefault((job.slot_id, n), {})
@@ -1199,6 +1201,9 @@ class LinkageProducts(Provider):
         # WHICH FAULTS EACH FILE CARRIES, by (slot, dataset) - what a reader
         # of the plan needs to tell a fault from the rows' own shape.
         plan.state["geo_faults"] = applied
+        # THE FILES PLANNED TO DRIFT, by (slot, dataset): built from a dirtied
+        # source, or measured against such a file (PROVISIONAL).
+        plan.state["geo_drift"] = drift_planned
         plan.resolved.extend(resolved)
         plan.injected_by_stream[GEO_STREAM] = injected
 

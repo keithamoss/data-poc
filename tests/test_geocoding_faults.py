@@ -212,14 +212,18 @@ class TestTheOrdinarySeverities:
 
     def test_no_ordinary_fault_on_a_corrected_round_or_a_held_source(self, plan):
         ridden = lp._ridden_quarters()
-        held = {p for (_d, p) in plan.state["geo_named"]}
+        held = set(plan.state["geo_named"])
         scenario = {p.period for i, p in plan.resolved if i.dataset_id in (CP, ED)}
+        checked = 0
         for job in _geo(plan):
             if job.period.name in scenario:
                 continue
-            for (slot, _d) in _faults(plan):
+            for (slot, d) in _faults(plan):
                 if slot == job.slot_id:
-                    assert job.period.name not in ridden | held, job.period.name
+                    checked += 1
+                    assert job.period.name not in ridden, job.period.name
+                    assert (d, job.period.name) not in held, (d, job.period.name)
+        assert checked
 
 
 #: Each named scenario's dataset, quarter and fault (criteria 3 and 4).
@@ -344,6 +348,35 @@ class TestOnlyASupplyThatArrivesIsGeocoded:
             used = lp._before(cp, "cp-clients", job.period.name, arrived)
             assert all(s.carried for s in used)
         assert all(at_mod.parse_instant(s.received_at, "x") for s in left_out)
+
+
+class TestADirtiedSourcesDriftIsPlanned:
+    """Found by the trial (PROVISIONAL): geocoding TS-93a's and TS-100a's
+    dirtied Client Registers shifts the placed-level mix, so those files -
+    and 2019-Q4's, measured against TS-100c once it promotes - are planned
+    Warn and tried; a red source dirtied elsewhere (2017-Q3) is not."""
+
+    def test_the_drift_planned_files_are_amber_and_tried(self, plan):
+        by_period = {j.period.name: j for j in _geo(plan)}
+        want = {(by_period[q].slot_id, CP) for q in ("2019-Q1", "2019-Q3", "2019-Q4")}
+        drift = plan.state["geo_drift"]
+        assert want <= drift
+        assert {d for _s, d in drift} == {CP, ED}, "ED's gapped red sources too"
+        for slot, d in drift:
+            # AT LEAST AMBER: a drawn red there stays red.
+            assert plan.state["geocoding"][slot][1][_table(d)][2] in ("amber", "red")
+            assert d in plan.state["geo_meta"][(slot, 1)]["tried"]
+        assert (by_period["2017-Q3"].slot_id, CP) not in plan.state["geo_drift"]
+
+    def test_a_tried_files_reference_is_what_the_replay_promotes_before_it(self, plan):
+        by_period = {j.period.name: j for j in _geo(plan)}
+        refs = {q: plan.state["geo_meta"][(by_period[q].slot_id, 1)]["references"][CP]
+                for q in ("2019-Q1", "2019-Q4")}
+        q4_ref_at = plan.state["geocoding"][by_period["2019-Q3"].slot_id][0]
+        assert refs["2019-Q4"] == asset_time.isoformat(q4_ref_at), \
+            "TS-100c, promoted by its knock-on before 2019-Q4 arrives"
+        q1_ref_at = plan.state["geocoding"][by_period["2018-Q4"].slot_id][0]
+        assert refs["2019-Q1"] == asset_time.isoformat(q1_ref_at)
 
 
 def test_two_plans_place_the_same_faults(plan):

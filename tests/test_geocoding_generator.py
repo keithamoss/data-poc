@@ -44,7 +44,8 @@ def _clean(plan, job):
     """A quarter's files carrying no fault on purpose (REQ-GEN-298) - the
     rows exactly as the source and the geocoder made them."""
     return {t: f for t, f in _files(plan, job).items()
-            if (job.slot_id, f[0]) not in plan.state["geo_faults"]}
+            if (job.slot_id, f[0]) not in plan.state["geo_faults"]
+            and (job.slot_id, f[0]) not in plan.state["geo_drift"]}
 
 
 class TestTheStreams:
@@ -152,8 +153,12 @@ class TestTheRows:
 
     def test_the_years_widen_with_the_set(self, plan):
         def years(name):
+            # A FILE CARRYING NO FAULT ON PURPOSE: an unexpected-year fault
+            # adds 2026 (REQ-GEN-298).
             job = next(j for j in _geo_jobs(plan) if j.period.name == name)
-            return sorted(set(_files(plan, job)["geo_ed_presentations"][1]["census_year"]))
+            clean = _clean(plan, job)
+            assert clean, f"{name} holds a fault-free file"
+            return sorted(set(next(iter(clean.values()))[1]["census_year"]))
         assert years("2017-Q2") == [2011]
         assert years("2017-Q3") == [2011, 2016]
         assert years("2022-Q3") == [2011, 2016, 2021]

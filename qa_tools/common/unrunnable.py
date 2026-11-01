@@ -419,7 +419,6 @@ def results_for_trial(*, run_id: str, run_timestamp: str, resolution: supply_db.
     # record for it that recording then refused).
     known = (set(resolution.resolved) | set(resolution.absent) | set(resolution.ambiguous)
              | set(resolution.held))
-    from qa_tools.common import hierarchy
 
     def own_table(check: str) -> set[str]:
         parsed = check_id_mod.try_parse(check)
