@@ -255,7 +255,7 @@ class TestTheTerminal:
                         "tables:\n"
                         "    cp-investigations, cp-notifications, cp-placements\n"
                         "  With no cp-clients file left in 2025-Q1, they will very likely "
-                        "turn red: those checks cannot run until one is promoted."), note
+                        "start failing: those checks cannot run until one is promoted."), note
         assert not any(n.startswith("Then") for n in shown.notes), shown.notes
         assert not any("re-checks the cross-table" in line for line in shown.lines)
 
@@ -284,7 +284,7 @@ class TestTheTerminal:
         assert re.search(r"re-check 1 of \d - cp-\w+ for 2025-Q1", flat), out
         assert flat.index("Re-checking the 3 datasets") < flat.index("Settled"), out
         section = _readers_section(out)
-        assert "red - could not run: 2025-Q1 holds no cp-clients" in section, section
+        assert "failing - could not run: 2025-Q1 holds no cp-clients" in section, section
         for word in ("contested", "rejected", "refused", "knock-on:"):
             assert word not in section, (word, section)
         assert "knock-on:" not in out
@@ -350,13 +350,14 @@ def test_a_backstopped_reader_is_not_said_refused(private_supply_dsn):
     backstop' reaches the settlement's panel, which criterion 14 forbids the
     word 'refused' in - said in other words, the meaning kept."""
     from cli import settle_tui
-    from qa_tools.common import qa_store, supply_db
+    from qa_tools.common import knock_on, qa_store, supply_db
 
     with supply_db.connect(label="pytest") as conn:
         qa_store.ensure_schema(conn)
     readers = settle_tui._Readers("cp-clients", Q4, "child-protection", regated=(
-        ("cp-notifications", "cp-notifications@1", Q4, "amber",
-         "still waiting - refused by the agreement backstop"),))
+        knock_on.Regated("cp-notifications", "amber", "warning",
+                         "still waiting - refused by the agreement backstop",
+                         "cp-notifications@1", Q4),))
     said = " ".join(settle_tui.reader_lines(readers))
     assert "refused" not in said, said
     assert "agreement backstop" in said, said

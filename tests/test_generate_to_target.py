@@ -477,7 +477,7 @@ class TestAnInjectedTargetEndToEnd:
 
         [target] = self._record(generated[1])["targets"]
         text = scenario_map._target_text(target)
-        assert text.startswith(f"amber on {self.KEY} (") and "14:00 arrival" in text
+        assert text.startswith(f"Warn on {self.KEY} (") and "14:00 arrival" in text
 
 
 def record_delivery(record, book):

@@ -249,8 +249,8 @@ class TestPromotedThenRecheckedWorse:
         state, supply, _ = worse
         [item] = [s for s in filing_queue.awaiting(conn, parity.COL) if s.supply == supply]
         assert item.state == filing_queue.RECHECKED_WORSE
-        assert item.reason.startswith("Promoted, then re-checked red")
-        assert "promoted on green" in item.reason
+        assert item.reason.startswith("Promoted, then failing on re-check")
+        assert "was promoted passing on " in item.reason
 
     def test_it_owes_an_acknowledgement_whatever_the_amber_setting(self, conn, worse):
         from qa_tools.common import acknowledgement, slot_state
@@ -416,8 +416,8 @@ class TestTheDoorOffersIt:
 
         label = filing_tui._label(slot_state.SlotState(
             dataset_id=DS, period="2099-x", state=filing_queue.RECHECKED_WORSE,
-            supply=f"{DS}@1", reason="Promoted, then re-checked red: ..."))
-        assert "Promoted, then re-checked red" in label
+            supply=f"{DS}@1", verdict="red", reason="Promoted, then failing on re-check: ..."))
+        assert "Promoted, then failing on re-check" in label
 
     def test_the_reason_is_said_to_be_published(self, conn, minted, quiet, monkeypatch):
         """Criterion 14."""
@@ -497,7 +497,7 @@ class TestDecideWait:
         got = cli(_decide(state, supply, "--wait"))
         assert got.exit_code == 0, got.output
         said = _said(got.output)
-        assert f"{supply} in {state.period} was green, re-checked red" in said
+        assert f"{supply} in {state.period} was passing; on re-check it is failing" in said
         assert f"It is still promoted - {state.period} keeps it" in said
         assert (f"\nmothman supply decide --operation demote --dataset {DS} --period "
                 f"{state.period} --supply {supply}") in got.output
@@ -511,7 +511,7 @@ class TestDecideWait:
         got = cli(_decide(state, supply, "--wait"))
         said = _said(got.output)
         assert got.exit_code == 0, got.output
-        assert "was red, re-checked green" in said and "promoted it into" in said
+        assert "was failing; on re-check it is passing" in said and "promoted it into" in said
 
     def test_ctrl_c_leaves_it_owed_without_a_traceback(self, conn, minted, cli, monkeypatch):
         from cli import filing_tui
@@ -538,13 +538,13 @@ class TestCriticFindingsOn192:
 
         st = slot_state.SlotState(
             dataset_id=DS, period="2099-x", state=filing_queue.RECHECKED_WORSE,
-            supply=f"{DS}@1", reason="Promoted, then re-checked red: promoted on green, "
+            supply=f"{DS}@1", reason="Promoted, then failing on re-check: promoted passing, "
                                      "found by the re-check of 2026-10-15 (decision 4).")
         console = Console(record=True, width=300)
         console.print(filing_tui.queue_table([st]))
         said = console.export_text()
-        assert "Promoted, then re-checked red" in said
-        assert "promoted on green" in said and "decision 4" in said
+        assert "Promoted, then failing on re-check" in said
+        assert "promoted passing" in said and "decision 4" in said
 
     def test_f2_not_listed_while_its_recheck_is_still_owed(self, conn, minted, quiet,
                                                            monkeypatch):

@@ -74,7 +74,7 @@ def test_no_open_ticket_and_red_opens_a_new_one(monkeypatch, scope):
 
     result = sync_dataset("o", "r", scope, _red_dataset())
 
-    assert result == "birth-registrations: opened #42 (red)"
+    assert result == "birth-registrations: opened #42 (failing)"
     create_call = next(c for c in fake.calls if c[:2] == ["issue", "create"])
     assert "--label" in create_call
     label_value = create_call[create_call.index("--label") + 1]
@@ -92,10 +92,10 @@ def test_no_open_ticket_and_amber_opens_a_new_one(monkeypatch, scope):
 
     result = sync_dataset("o", "r", scope, _amber_dataset())
 
-    assert result == "birth-registrations: opened #42 (amber)"
+    assert result == "birth-registrations: opened #42 (warning)"
     create_call = next(c for c in fake.calls if c[:2] == ["issue", "create"])
     title = create_call[create_call.index("--title") + 1]
-    assert title == "Birth Registrations is amber"
+    assert title == "Birth Registrations is warning"
     body = create_call[create_call.index("--body") + 1]
     # NO LONGER INVITES /accept: REQ-QAC-017 was retired by REQ-PIPE-122
     # (2026-10-05), and a ticket telling people to use a retired command
@@ -161,7 +161,7 @@ def test_no_open_ticket_and_not_red_does_nothing(monkeypatch, scope):
 
     result = sync_dataset("o", "r", scope, _green_dataset())
 
-    assert result == "birth-registrations: green, no open ticket - nothing to do"
+    assert result == "birth-registrations: passing, no open ticket - nothing to do"
     assert not any(c[:2] == ["issue", "create"] for c in fake.calls)
     assert not any(c[:2] == ["issue", "comment"] for c in fake.calls)
 
@@ -172,12 +172,12 @@ def test_open_ticket_still_red_gets_a_still_red_comment_not_a_new_ticket(monkeyp
 
     result = sync_dataset("o", "r", scope, _red_dataset())
 
-    assert result == "birth-registrations: #7 still red, commented"
+    assert result == "birth-registrations: #7 still failing, commented"
     assert not any(c[:2] == ["issue", "create"] for c in fake.calls)
     comment_call = next(c for c in fake.calls if c[:2] == ["issue", "comment"])
     assert comment_call[2] == "7"
     body = comment_call[comment_call.index("--body") + 1]
-    assert "still" in body.lower() and "red" in body.lower()
+    assert "still" in body.lower() and "failing" in body.lower()
 
 
 def test_open_ticket_resolved_gets_a_resolved_comment_and_is_never_closed(monkeypatch, scope):
@@ -186,7 +186,7 @@ def test_open_ticket_resolved_gets_a_resolved_comment_and_is_never_closed(monkey
 
     result = sync_dataset("o", "r", scope, _green_dataset())
 
-    assert result == "birth-registrations: #7 resolved to green, commented (not closed)"
+    assert result == "birth-registrations: #7 resolved to Pass, commented (not closed)"
     comment_call = next(c for c in fake.calls if c[:2] == ["issue", "comment"])
     body = comment_call[comment_call.index("--body") + 1]
     assert "resolved" in body.lower()
@@ -259,7 +259,7 @@ def test_every_still_red_comment_carries_the_current_list(monkeypatch, scope):
     sync_dataset("o", "r", scope, _authored_dataset(5))
 
     body = _body_of(fake.calls, "comment")
-    assert "Still **red**" in body
+    assert "Still **failing**" in body
     assert "This value must never be empty." in body
 
 
@@ -285,7 +285,7 @@ def test_a_dataset_resolved_to_green_gets_no_list(monkeypatch, scope):
     sync_dataset("o", "r", scope, _authored_dataset(0))
 
     body = _body_of(fake.calls, "comment")
-    assert "Resolved to **green**" in body
+    assert "Resolved to **Pass**" in body
     assert "## Failing checks" not in body
     assert "must never be empty" not in body
 
@@ -340,7 +340,7 @@ def test_an_unchanged_red_ticket_gets_no_second_identical_comment(monkeypatch, s
     monkeypatch.setattr(ticket_sync, "_run_gh", again)
     result = sync_dataset("o", "r", scope, _red_dataset())
 
-    assert result == "birth-registrations: #7 unchanged (red), nothing posted"
+    assert result == "birth-registrations: #7 unchanged (failing), nothing posted"
     assert not any(c[:2] == ["issue", "comment"] for c in again.calls)
 
 
@@ -353,7 +353,7 @@ def test_a_CHANGED_state_still_posts(monkeypatch, scope):
 
     result = sync_dataset("o", "r", scope, _green_dataset())
 
-    assert "resolved to green, commented" in result
+    assert "resolved to Pass, commented" in result
     assert "resolved" in _last_comment_body(fake).lower()
 
 
@@ -367,11 +367,11 @@ def test_it_compares_against_the_LAST_comment_only(monkeypatch, scope):
     red_said = _last_comment_body(first)
 
     again = FakeGh(list_response=[{"number": 7}],
-                   comments=[red_said, "Resolved to **green** as of this run."])
+                   comments=[red_said, "Resolved to **Pass** as of this run."])
     monkeypatch.setattr(ticket_sync, "_run_gh", again)
     result = sync_dataset("o", "r", scope, _red_dataset())
 
-    assert "still red, commented" in result
+    assert "still failing, commented" in result
 
 
 def test_an_unreadable_thread_posts_rather_than_staying_silent(monkeypatch, scope):
@@ -387,4 +387,4 @@ def test_an_unreadable_thread_posts_rather_than_staying_silent(monkeypatch, scop
     fake = Unreadable(list_response=[{"number": 7}])
     monkeypatch.setattr(ticket_sync, "_run_gh", fake)
 
-    assert "still red, commented" in sync_dataset("o", "r", scope, _red_dataset())
+    assert "still failing, commented" in sync_dataset("o", "r", scope, _red_dataset())

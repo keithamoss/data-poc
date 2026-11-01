@@ -457,7 +457,7 @@ class TestConsequences:
         note, offer_nothing = filing_tui.door_note(_state("cp-clients", Q3, c2))
         assert not offer_nothing and "promoting that one re-checks this one." in note
         assert any(line.startswith("re-checks cp-clients' waiting supply received 9:00am")
-                   and line.endswith("if it is green, the rule promotes it.")
+                   and line.endswith("if it passes, the rule promotes it.")
                    for line in got.lines), got.lines
 
     def test_a_promotion_whose_read_supply_moved_raises_the_consequences_refusal(
@@ -727,11 +727,11 @@ class TestWhatTheRuleDid:
             gate = lifecycle_report.outcome_of(conn, _arrival(sc, "C2")).gate
         assert gate.startswith("promoted by the rule"), gate
         assert ("re-checked against the cp-notifications in place in the warehouse "
-                "(received 10:00am Thursday, 25 July 2024), green, because the "
+                "(received 10:00am Thursday, 25 July 2024), passing, because the "
                 "cp-notifications received with it was held back") in gate, gate
         got = recheck.Outcome(1, "r", True, "", status="green", period=Q3, promoted=True)
         text, _t, _s = filing_tui.outcome_panel("re-check", v2["C2"], Q3, got)
-        assert "It was promoted by the rule - " in text and "green, because the " \
+        assert "It was promoted by the rule - " in text and "passing, because the " \
             "cp-notifications received with it was held back" in text, text
 
     def test_crashed_sibling_wording(self, sc):
@@ -1024,7 +1024,7 @@ class TestCheapPaths:
         """_follow_up's owed panel names each in-warehouse reader red only
         for the owed re-check; regated_lines says 'still held back - <why>'."""
         from cli import filing_tui
-        from qa_tools.common import filing_decisions as fd, people, recheck, supply_db
+        from qa_tools.common import filing_decisions as fd, knock_on, people, recheck, supply_db
         from test_carry_forward import REAL_PERSON
 
         v1 = established(sc)
@@ -1045,11 +1045,11 @@ class TestCheapPaths:
         # A HELD-BACK READER RED OF ITS OWN (not owed a re-check) is said as
         # 'still held back' - and N1, red only for the owed re-check, as not
         # yet re-checked.
-        said = filing_tui.regated_lines([("cp-placements", "cp-placements@none", Q3, "red",
-                                          "still held back"),
-                                         ("cp-notifications", v1["N1"], Q3, "red",
-                                          "still promoted")])
-        assert "- cp-placements: red, still held back" in said, said
+        said = filing_tui.regated_lines([
+            knock_on.Regated("cp-placements", "red", "failing", "still held back",
+                             "cp-placements@none", Q3),
+            knock_on.Regated("cp-notifications", "red", "failing", "still promoted", v1["N1"], Q3)])
+        assert "- cp-placements: failing, still held back" in said, said
         assert "- cp-notifications: not yet re-checked, still promoted" in said, said
 
     def test_the_settle_flows_owed_panels(self, monkeypatch, capsys):
@@ -1159,7 +1159,7 @@ class TestCliUxReview:
             filing_tui.say_queue(conn, groups, CP)
         out = capsys.readouterr().out
         flat = _flat(out)
-        assert re.search(r"red - .* failed against the warehouse; decide cp-notifications "
+        assert re.search(r"failing - .* failed against the warehouse; decide cp-notifications "
                          r"\(received [^)]*\) first", flat), flat
         row = next(line for line in out.splitlines() if "cp-clients" in line
                    and "2024-Q4" in line)

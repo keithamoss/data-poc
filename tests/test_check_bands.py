@@ -122,7 +122,7 @@ class TestTheCommand:
         assert got.exit_code == 0, got.output
         text = " ".join(got.output.split())
         assert "place_of_birth_facility" in text and "301" in text and "600" in text
-        assert "no amber band" in text
+        assert "no warn band" in text
         assert "sibling_match" in text   # a single-tier check reading facility
 
 

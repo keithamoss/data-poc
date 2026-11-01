@@ -910,8 +910,11 @@ def _recheck_panel(who: str, where: str, got) -> tuple[str, str, str]:
     before and after, and what the gate did with a waiting supply - or, for a
     promoted one, that it stays promoted, naming demote and acknowledge where
     it came back red, each command on a line of its own."""
-    lines = [f"{who} in {where} was {got.before or 'without a verdict'}, re-checked "
-             f"{got.status or 'without a verdict'}."]
+    # THE VERDICTS IN WORDS (REQ-TEST-360 criterion 7), and never 're-checked
+    # failing', which reads as the re-check itself failing (UX MUST 3).
+    before = status_words(got.before, "verb") if got.before else "without a verdict"
+    now = status_words(got.status, "verb") if got.status else "without a verdict"
+    lines = [f"{who} in {where} was {before}; on re-check it is {now}."]
     if got.stays_promoted:
         lines.append(f"It is still promoted - {where} keeps it.")
         text = " ".join(lines)

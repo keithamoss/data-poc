@@ -17,9 +17,9 @@ from cli import scenarios as scenarios_cli
 from qa_tools.common import filing_queue, scenario_map, slot_state
 
 
-def _words(state: str, reason: str | None = None) -> str:
+def _words(state: str, reason: str | None = None, verdict: str | None = None) -> str:
     return filing_tui.listed_words(SimpleNamespace(state=SimpleNamespace(
-        state=state, reason=reason, files=())))
+        state=state, reason=reason, files=(), verdict=verdict)))
 
 
 class TestTheTerminalSaysWhere:
@@ -32,8 +32,8 @@ class TestTheTerminalSaysWhere:
             "in place in the warehouse, awaiting acknowledgement")
 
     def test_one_re_checked_worse_too(self):
-        assert _words(filing_queue.RECHECKED_WORSE, "Came back red: 2 checks") == (
-            "in place in the warehouse - came back red")
+        assert _words(filing_queue.RECHECKED_WORSE, "Came back failing: 2 checks", "red") == (
+            "in place in the warehouse - promoted, then failing on re-check")
 
     def test_a_period_standing_on_another_says_where_its_supply_is(self):
         line = filing_tui.stands_on_line(SimpleNamespace(
@@ -44,12 +44,12 @@ class TestTheTerminalSaysWhere:
 
     def test_the_line_a_person_picks_stays_within_80_columns(self, monkeypatch):
         monkeypatch.setattr(filing_tui, "arrived", lambda supply: "2024-08-13 09:00")
-        line = filing_tui._supply_line(SimpleNamespace(verdict="amber", state=SimpleNamespace(
+        line = filing_tui._supply_line(SimpleNamespace(verdict="nodata", state=SimpleNamespace(
             state=slot_state.AWAITING_ACKNOWLEDGEMENT, reason=None, files=(), supply="x@1")))
         # WITH questionary's pointer before it (post-build-review #266 S2):
-        # the full words were 78 columns, 81 once the pointer is drawn.
-        assert line == ("2024-08-13 09:00  in place in the warehouse, awaiting acknowledgeme\u2026"
-                        "  (amber)")
+        # the full words would run past 80 columns once the pointer is drawn.
+        assert line == ("2024-08-13 09:00  in place in the warehouse, awaiting acknowledge\u2026"
+                        "  (No data)")
         assert len(line) + 3 <= 80
 
     def test_the_scenario_list_says_in_the_warehouse_on(self):
@@ -119,7 +119,8 @@ def _real_states(monkeypatch):
             dataset_id="cp-investigations", period="2024-Q3",
             supply="cp-investigations@20240801010000000000",
             state=slot_state.AWAITING_ACKNOWLEDGEMENT)])
-        states.append(SimpleNamespace(state=worse.state, reason=worse.reason, files=()))
+        states.append(SimpleNamespace(state=worse.state, reason=worse.reason, files=(),
+                                      verdict=worse.verdict))
     reasons = {
         slot_state.REJECTED: f"by keith.moss@example.wa.gov.au, "
                              f"{display_time.format_instant(when)}",
