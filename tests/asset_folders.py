@@ -107,3 +107,38 @@ def real_folder_of(name: str) -> Path:
     default layout places it - for a test that builds one asset's case out of
     a file another asset defines (a second calendar, say)."""
     return assets._DEFAULT.asset(name).folder
+
+
+class SelectedFolder:
+    """The selected asset's real folder (plus any `parts` below it), resolved
+    each time it is USED rather than when a module is imported - so a module
+    constant serves a test of either asset (the asset split: a module is
+    imported under one asset, and a test marked for the other runs later).
+    Everything a Path offers is asked of the folder as it resolves then."""
+
+    def __init__(self, *parts: str):
+        self._parts = parts
+
+    def _path(self) -> Path:
+        return real_folder().joinpath(*self._parts)
+
+    def __truediv__(self, other) -> Path:
+        return self._path() / other
+
+    def __fspath__(self) -> str:
+        return str(self._path())
+
+    def __str__(self) -> str:
+        return str(self._path())
+
+    def __repr__(self) -> str:
+        return f"SelectedFolder({'/'.join(self._parts)!r}) -> {self._path()}"
+
+    def __eq__(self, other) -> bool:
+        return self._path() == (other._path() if isinstance(other, SelectedFolder) else other)
+
+    def __hash__(self) -> int:
+        return hash(self._path())
+
+    def __getattr__(self, name):
+        return getattr(self._path(), name)

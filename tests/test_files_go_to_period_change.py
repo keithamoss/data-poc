@@ -19,7 +19,7 @@ from qa_tools.common import agreement, schedule, slots
 from qa_tools.common.validate_schedule import (NOT_EXPECTED_PLACEHOLDER, Source,
                                                 fall_lines, validate)
 
-REAL = asset_folders.real_folder()
+REAL = asset_folders.SelectedFolder()
 CP = ("cp-carers", "cp-case-workers", "cp-clients", "cp-investigations",
       "cp-notifications", "cp-placements")
 

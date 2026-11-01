@@ -95,15 +95,22 @@ class TestEachSlotCarriesItsOwnTiming:
             assert slot.due_at.tzinfo is not None
             assert slot.claim_opens_at.tzinfo is not None
 
+    @pytest.mark.asset("daily")  # Birth Registrations is the daily asset's
     def test_a_daily_dataset_gets_its_own_different_time_of_day(self):
         """Birth Registrations is due at 14:00 and Child Protection at
-        09:00 - different contracts, different answers, same code."""
+        09:00 - different contracts, different answers, same code (each now
+        on its own asset: the Child Protection half is the next test)."""
         bdm = slots.slots_for_dataset("birth-registrations", until=BDM_UNTIL)[-1]
         assert bdm.due_at.hour == 14
+
+    def test_a_quarterly_dataset_gets_its_own_time_of_day(self):
         assert _cp_slots("cp-clients")[-1].due_at.hour == 9
 
     def test_grace_comes_from_the_datasets_own_contract(self):
         assert _cp_slots("cp-clients")[0].grace == timedelta(hours=8)
+
+    @pytest.mark.asset("daily")  # Birth Registrations is the daily asset's
+    def test_grace_comes_from_the_daily_datasets_own_contract(self):
         assert slots.slots_for_dataset("birth-registrations", until=BDM_UNTIL)[0].grace == timedelta(hours=1)
 
     def test_late_after_is_derived_from_due_and_grace_not_stored(self):

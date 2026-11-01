@@ -16,7 +16,7 @@ import yaml
 
 from qa_tools.common.validate_schedule import Source, validate
 
-REAL = asset_folders.real_folder()
+REAL = asset_folders.SelectedFolder()
 
 
 @pytest.fixture

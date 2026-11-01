@@ -14,7 +14,7 @@ import yaml
 
 from qa_tools.common.validate_schedule import Source, validate
 
-REAL = asset_folders.real_folder()
+REAL = asset_folders.SelectedFolder()
 
 
 def _v(effective_from, value):
@@ -134,6 +134,7 @@ class TestEveryCollectionOnACalendarStatesIt:
 class TestACadenceRuleCalendarKeepsDaysBefore:
     """Criterion 7, with REQ-PIPE-324 criterion 4's pointer."""
 
+    @pytest.mark.asset("daily")  # civil-registration is the daily asset's
     def test_a_non_zero_value_on_the_daily_calendar_is_refused(self, gate):
         def mutate(doc):
             _collection(doc, "civil-registration")["files_go_to_period"] = {

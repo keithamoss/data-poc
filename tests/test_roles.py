@@ -15,7 +15,7 @@ import yaml
 
 from qa_tools.common import filing_decisions, people, validate_people
 
-REAL = asset_folders.real_folder() / "people.yaml"
+REAL = asset_folders.SelectedFolder("people.yaml")
 KEITH = "fpycnkgvmt@privaterelay.appleid.com"
 
 
@@ -101,6 +101,7 @@ class TestRequiringARole:
             people.require_role(stranger, "manager", people.DATA_ASSET)
         assert "manager" in str(refused.value) and "data-asset level" in str(refused.value)
 
+    @pytest.mark.asset("daily")  # registry-services' manager is the daily asset's
     def test_an_agency_role_is_for_its_own_agency_only(self):
         keith = people.person_by_email(KEITH)
         people.require_role(keith, "manager", "agency", "registry-services")

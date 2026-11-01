@@ -138,7 +138,7 @@ def split(merged: dict, calendar_doc: dict) -> tuple[dict, dict]:
 
 
 #: The committed contract directory, the default base for a calendar file.
-REAL_CONTRACT_DIR = asset_folders.real_folder()
+REAL_CONTRACT_DIR = asset_folders.SelectedFolder()
 
 
 def write(contract_dir: Path, merged: dict, base: dict | None = None) -> None:

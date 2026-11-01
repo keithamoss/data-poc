@@ -19,7 +19,7 @@ from click.testing import CliRunner
 from cli import schedule as schedule_cli
 from qa_tools.common import agreement, files_go
 
-REAL = asset_folders.real_folder()
+REAL = asset_folders.SelectedFolder()
 
 
 @pytest.fixture(autouse=True)

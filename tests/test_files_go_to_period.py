@@ -20,7 +20,7 @@ import yaml
 
 from qa_tools.common import agreement, asset_time, assignment, schedule, slots
 
-REAL = asset_folders.real_folder() / "calendar.yaml"
+REAL = asset_folders.SelectedFolder("calendar.yaml")
 
 
 def _offset_version(effective_from, value, author="a test"):

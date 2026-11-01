@@ -630,7 +630,10 @@ class TestATableNameIsNotADatasetId:
         _asset_with([AGREED, SAMPLE], tmp_path, monkeypatch)
         assert sample_data.is_sample_table("cp-referrals") is False
 
-    @pytest.mark.parametrize("builder", ["cp", "bdm"])
+    @pytest.mark.parametrize("builder", [
+        # Each builder on the asset its collection is in (the asset split).
+        pytest.param("cp", marks=pytest.mark.asset("quarterly")),
+        pytest.param("bdm", marks=pytest.mark.asset("daily"))])
     def test_both_staging_paths_decide_from_the_table(self, builder, tmp_path, monkeypatch,
                                                       supply_dsn):
         """The unit tests above cannot catch a CALLER passing the wrong one -

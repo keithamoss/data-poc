@@ -48,11 +48,19 @@ def _calendar_doc(**version_overrides):
                     {"id": "d", "name": "D", "table": "t", "calendar": "c"}]}]}]}}
 
 
-class TestTheRealCalendars:
-    def test_both_real_calendars_load(self):
-        names = {c.name for c in schedule.calendars()}
-        assert names == {"quarterly", "daily"}
+#: Each real calendar and the asset that defines it (the asset split: the
+#: quarterly calendar is the quarterly asset's, the daily one the daily's).
+_ON_ITS_ASSET = [pytest.param("quarterly", marks=pytest.mark.asset("quarterly")),
+                 pytest.param("daily", marks=pytest.mark.asset("daily"))]
 
+
+class TestTheRealCalendars:
+    @pytest.mark.parametrize("name", _ON_ITS_ASSET)
+    def test_both_real_calendars_load(self, name):
+        names = {c.name for c in schedule.calendars()}
+        assert names == {name}
+
+    @pytest.mark.asset("quarterly")
     def test_quarterly_is_authored_dates_and_daily_is_a_rule(self):
         """Not a compromise between two shapes - they ARE different
         shapes. 365 enumerated daily dates would be absurd and the
@@ -60,6 +68,11 @@ class TestTheRealCalendars:
         are known well in advance and the real agreement is "closest
         business day to the 1st", which no day-of-month rule states."""
         assert not schedule.calendar("quarterly").current.is_cadence_rule
+
+    @pytest.mark.asset("daily")
+    def test_daily_is_a_rule(self):
+        """The other half of the test above, on the asset the daily
+        calendar is now defined in."""
         assert schedule.calendar("daily").current.cadence_rule == "daily"
 
     def test_every_real_dataset_names_a_calendar_that_exists(self):
@@ -271,6 +284,11 @@ class TestClaimWindow:
         to six hours from 2026-09-25 (REQ-GEN-205)."""
         on = date(2026, 9, 1)
         assert schedule.claim_window("cp-clients", on=on) == timedelta(days=14)
+
+    @pytest.mark.asset("daily")
+    def test_the_default_tracks_the_daily_calendars_own_scale(self):
+        """The other half of the test above, on the daily asset."""
+        on = date(2026, 9, 1)
         assert schedule.claim_window("birth-registrations", on=on) == timedelta(hours=4)
 
     def test_a_dataset_may_override_it_in_its_own_contract(self):
@@ -422,12 +440,14 @@ class TestAPeriodNamesAWarehouseSchema:
         assert schedule.schema_name(
             schedule.Period("2026-09-01", date(2026, 9, 1))) == "period_2026_09_01"
 
-    def test_a_schema_name_is_a_legal_bare_identifier(self):
+    @pytest.mark.parametrize("dataset_id, until", [
+        pytest.param("cp-clients", None, marks=pytest.mark.asset("quarterly")),
+        pytest.param("birth-registrations", date(2026, 9, 5), marks=pytest.mark.asset("daily"))])
+    def test_a_schema_name_is_a_legal_bare_identifier(self, dataset_id, until):
         import re
-        for dataset_id, until in (("cp-clients", None), ("birth-registrations", date(2026, 9, 5))):
-            for dataset_period in schedule.periods_for_dataset(dataset_id, until=until):
-                name = schedule.schema_name(dataset_period.period)
-                assert re.fullmatch(r"[a-z][a-z0-9_]*", name), name
+        for dataset_period in schedule.periods_for_dataset(dataset_id, until=until):
+            name = schedule.schema_name(dataset_period.period)
+            assert re.fullmatch(r"[a-z][a-z0-9_]*", name), name
 
     def test_two_different_periods_never_share_a_schema_name(self):
         names = [schedule.schema_name(p) for p in schedule.periods_for_calendar("quarterly")]
@@ -539,3 +559,16 @@ class TestNothingIsComputedFromAHolidayCalendar:
 #: The data asset this module's tests act for, unless a test says otherwise
 #: (C11, Keith 2026-11-02: every test module names its asset).
 pytestmark = pytest.mark.asset("quarterly")
+
+
+class TestAnUnknownCalendarNamesTheAssetsFile:
+    """The asset split: the refusal points at the calendar file the reader
+    can open - the selected asset's, by repository path - never at
+    contract/calendar.yaml, which no longer exists."""
+
+    def test_it_names_the_selected_assets_calendar_file(self):
+        from qa_tools.common import assets
+
+        with pytest.raises(schedule.UnknownCalendarError) as e:
+            schedule.calendar("nowhere")
+        assert f"{assets.folder_rel()}/calendar.yaml" in str(e.value), str(e.value)

@@ -19,7 +19,7 @@ import yaml
 from qa_tools.common import agreement_freeze as freeze
 from tests import before_growth
 
-CONTRACT = asset_folders.real_folder()
+CONTRACT = asset_folders.SelectedFolder()
 PERTH = timezone(timedelta(hours=8))
 #: The night this was built.
 NOW = datetime(2026, 10, 11, 3, 0, tzinfo=PERTH)

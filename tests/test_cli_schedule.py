@@ -33,11 +33,15 @@ class TestItIsWhereAHumanWouldLookForIt:
 
 
 class TestShow:
-    def test_it_prints_both_real_calendars_and_who_uses_them(self):
+    @pytest.mark.parametrize("calendar, user", [
+        # Each real calendar on the asset that defines it (the asset split).
+        pytest.param("quarterly", "cp-clients", marks=pytest.mark.asset("quarterly")),
+        pytest.param("daily", "birth-registrations", marks=pytest.mark.asset("daily"))])
+    def test_it_prints_both_real_calendars_and_who_uses_them(self, calendar, user):
         result = _runner.invoke(schedule_cli.schedule_group, ["show"])
         assert result.exit_code == 0, result.output
-        assert "quarterly" in result.output and "daily" in result.output
-        assert "birth-registrations" in result.output
+        assert calendar in result.output
+        assert user in result.output
 
     def test_one_dataset_shows_its_own_participation(self):
         """`--all` since 2026-09-25: the default is now a window around
