@@ -3162,3 +3162,294 @@ one or more component tags, and a date.
       - **CI on c9b4d7a (run 41156234338): GREEN**, every job: the fast half,
         the deployment half (bootstrap 34m55s on a cache miss), js-tests and
         on-demand. Run 01:37 to 02:48Z. D10 and D11 are confirmed fixed in CI.
+
+12. **[in-progress, 2026-11-02]** **[Docs & process]** **Build run and
+    overnight 2026-11-01 to 02: seven batches built, the move made, nothing
+    pushed yet.**
+
+    Where it stands: every batch up to REQ-DASH-299 is built and
+    critic-fixed, and the asset split's move is committed, with its 610
+    post-move test failures being fixed now. Nothing has reached the session
+    branch yet: it all sits on `wip/` branches, and the end-of-run bootstrap,
+    full gate, push and CI have not happened. There are 33 questions for you
+    below, each with a recommendation, and the first two are the items the
+    night STOPPED on rather than decided.
+
+    - **THE PLAN AND TERMS (Keith, 2026-11-01)**: build in this order:
+      REQ-PIPE-341 and REQ-TEST-374, then Pass / Warn / Fail, then geocoding,
+      then the asset split. Parallel streams in separate worktrees, a critic
+      per batch, questions to you. No bootstrap and no full gate between
+      batches, targeted tests only. At the end, ONE bootstrap per asset, one
+      full gate, one push, one CI run. Every checkpoint is pushed to a `wip/`
+      branch with `[skip ci]`. Source of record:
+      `docs/drafts/decisions-2026-11-01.md`.
+    - **THE LOST CONTAINER (afternoon)**: the usage limit stopped all four
+      builders, and the session came back in a new container, a fresh clone
+      at 3291b4c. Every local commit, worktree and agent transcript was gone
+      (plans/running-thoughts.md #135). You said "Rebuild all". The
+      decisions were replayed from the main transcript into the decisions
+      file, the drafts regenerated, and the code rebuilt. To stop it
+      recurring, you chose two measures: builders commit and push a
+      checkpoint at least every 30 minutes, and every 10-minute check-in
+      snapshots each worktree's uncommitted work to `wip/<branch>-snap`
+      through a throwaway index.
+    - **OVERNIGHT (Keith, ~22:20 Perth: "Keep going overnight as far as you
+      can")**: the same terms. A question a builder could not settle from the
+      decisions file took the recommended option, marked PROVISIONAL and
+      listed below (REQ-TEST-374 c5). Anything significant was stopped, not
+      decided.
+
+    **THE BATCHES**
+    - **REQ-PIPE-341, multi-column sample keys** (ad2a266, fixes 2929723,
+      post-build-review #296): a failing-row sample may name a row by several
+      columns, and a null key part is recorded empty and shown '(no value)'.
+      The critic found two defects, both fixed test-first: the page drew a
+      null key as a blank pill, and criteria 7 and 8 still contradicted your
+      amendment. It also found three minor issues, all fixed: dbt now honours
+      `names_no_row`, datacontract-cli samples by the adapter's key, and the
+      key gate works per collection.
+    - **REQ-TEST-374, the provisional-choice gate** (3ec7991, fixes ce2715b,
+      #295): `mothman check` warns on any new unanswered PROVISIONAL choice in
+      a built requirement, against a shrink-only baseline of 188. The critic
+      found only minor issues. Three were fixed: a gain check that passed
+      silently in a shallow clone, negated answers counted as answered, and
+      an untested warning path. Three were accepted as decisions.
+    - **Pass / Warn / Fail** (REQ-DASH-359, REQ-TEST-360, REQ-TEST-361,
+      REQ-DOCS-362; 23749b6, fixes f3e2b11; #297, #298): every status word on
+      the site is worded through one statusWords per side, and 41 built
+      criteria were amended. #289's D8d and D8e are fixed. The critic found
+      one defect: the e2e parsers still read the old words. It was fixed and
+      is now held to the template by a Vitest test. Three minor findings were
+      also fixed. Your four build-time wordings are SETTLED, and
+      running-thoughts #132 is deleted on build.
+    - **Geocoding, chunk G-A** (REQ-QAC-294, REQ-QAC-300, REQ-GEN-295,
+      REQ-PIPE-296, REQ-QAC-297, REQ-QAC-340; 7f171d7, fixes 006def3; #299):
+      the critic found no defects and six minor issues. Fixed: a run owning
+      no geocoding table recorded one's counts; a trial's year checks read
+      red; the LGA is now derived from the SA2. The folder trial now checks
+      what the folder holds (your answer, REQ-PIPE-202 c8 amended). Accepted
+      as it is: the value-share kind is generic in name only.
+    - **REQ-GEN-298, the geocoding history's faults and trial** (aae4511,
+      fixes f123a58, #301): ten named scenarios, and every drafted amber, red
+      and scenario supply is tried in its slot's period at generation time.
+      The critic's SIGNIFICANT finding is held for you: a drift-amber rule
+      that goes beyond signed REQ-GEN-295 c7 (question A2). It also found
+      three minor issues, all fixed: a trial's own checks were chosen by
+      table rather than collection; the carried-table rule was Child
+      Protection's alone and is now generic, byte-identical over all 614
+      delivery files; and a shared error said geocoding. Along the way it
+      found the linkage defect in question D1.
+    - **REQ-DASH-299, the geocoding pages** (e02d439, fixes 712eb10, #302,
+      #303): checks are named by what they find, examples are headed by what
+      each check measures, there are census-years and geocodes tiles, and
+      left-out checks show as Not checked rows. The criterion 2, 3 and 5
+      wording changes reach every check page, Birth Registrations included
+      (#302). The critic found two defects, both fixed test-first: browser
+      proof 7 looked for its file by period, and criterion 1's order was not
+      met. It also found five minor issues, all fixed. The most important:
+      the store did not refuse `notchecked`, which its decision claimed it
+      did. One PROVISIONAL choice was withdrawn because its premise was
+      false.
+    - **The split groundwork plus the state-path sweep** (REQ-PIPE-342,
+      REQ-PIPE-363, REQ-PIPE-369, REQ-QAC-368; f6865e1, #300): the asset
+      resolver, adapters and providers loaded by path, MOTHMAN_ASSET
+      selection, and every data/, reports/ and contract/ path asked of the
+      resolver at call time. The critic found two defects, both fixed
+      test-first: readers that built contract/ paths themselves, and
+      `pipeline checkpoint list` connecting with no asset selected. It also
+      found five minor issues, all fixed, including module-name collisions.
+      A new test now fails on any path built outside the resolver.
+    - **The move, IN PROGRESS** (de009e91 on `wip/bmove`, on base f123a582
+      with three inert prep commits): contract/ becomes `assets/<asset>/`,
+      two assets, quarterly and daily, through 69 renames and 10 divided
+      files. Every part equals the old file cut to its asset. All 378 checks'
+      config hashes are unchanged under the renamed ids (REQ-QAC-344 c3).
+      REQ-DASH-299 was merged in afterwards (84d0d9c), as a recorded
+      deviation from REQ-TEST-357 c5's base clause. Tests measured after the
+      move: 610 that pass at the base now fail. Most name a collection the
+      selected asset does not hold, or assert pre-split expectations. They
+      are being fixed now: follow-on commits up to 3a4433b, plus uncommitted
+      work in /home/user/bmove-wt. One choice was STOPPED, question A1.
+
+    **WHERE THE RUN STANDS**: nothing has been pushed to
+    `claude/qac-024-explanations-qx8hx8`. The work is on `wip/` branches:
+    `wip/build-2026-11-01` (this line, to fa1339a) and `wip/bmove`. Not yet
+    done: the end-of-run bootstrap (one per asset), clearing the
+    unmet_criteria it proves, the full gate, the one push, and CI.
+    STILL TO BUILD, in order:
+    1. The post-move test fixes.
+    2. The presets fold, and `mothman population` per asset.
+    3. eras.yaml.
+    4. The per-asset cache key.
+    5. The four post-move streams: the dashboard; the Cancer and Mental
+       Health collections; CI and publishing; docs and amendments.
+
+    **FLAKY TESTS, so a red is not misread**: `test_knock_on` fails on the
+    base tree too, so it is not this run's doing. Parallel sessions in other
+    worktrees drop each other's test databases unless MOTHMAN_TEST_DB_TAG is
+    set. Six of #299's "load-sensitive" failures passed once it was set.
+
+    **QUESTIONS FOR KEITH** (33 in all: 2 stopped, 14 flagged by the gate in
+    built requirements, 16 more in the split's unbuilt requirements, and 1
+    defect needing sign-off)
+
+    *A. THE TWO THAT STOPPED*
+    - **A1. The move's receipt numbering (REQ-TEST-357 c3)**: after the move,
+      each asset keeps its own generator bookkeeping. Quarterly receipts'
+      sequence numbers restart within the asset (order kept, 493 of 493),
+      and two quarterly delivery folders get different names. Child
+      Protection's BDM_20260801 becomes 2026-08-corrected, and ED's
+      upload-4402 becomes BDM_20260801. All 614 delivery FILES are
+      byte-identical, but c3's "the compare reports no difference" cannot
+      hold as signed. (a) The compare normalises per-asset sequence
+      numbering and folder names, and c3 is amended to say so. (b) Change
+      delivery naming so it does not depend on the sequence. (c) A shared
+      cross-asset counter. RECOMMENDED (a): (c) breaks the isolation the
+      split exists for, and (b) changes recorded data for no reader's gain.
+    - **A2. The drift-amber rule (REQ-GEN-295 c7, now unmet with an open
+      question)**: the dirtied Client Registers in TS-93a and TS-100a shift
+      the placed match-level mix. So drift reads Warn where the share plans
+      green. The build planned "a file from a red source with blanks in its
+      placing address columns is at least amber, and so is the next one",
+      which is narrower than c7 as signed. The code is unchanged pending
+      your answer. (a) Accept the rule and amend c7. (b) Plan amber from the
+      drift check's own inputs, banded by its own thresholds. (c) Drop
+      drift-amber planning and let the trial exclude those quarters.
+      RECOMMENDED (b): it predicts the check from what the check reads, so
+      it stays right for a future dirtied source, where (a) only fits
+      today's history.
+
+    *B. PROVISIONAL IN BUILT REQUIREMENTS (the gate's 14)*
+    - **B1. REQ-PIPE-202 d17**: a folder trial reads the rest from promoted
+      supplies in the period the filing rule gives its first table. Should
+      it also read a staged, undecided supply there, as a real arrival's
+      overlay does? RECOMMENDED: promoted only, as built.
+    - **B2. REQ-GEN-298 d31, scenario quarters**: three geocoding scenarios
+      share a quarter with another dataset's scenario (2017-Q4, 2025-Q1,
+      2025-Q4) because NFR 3's quarters ran out. (a) Accept. (b) Require a
+      quarter clear of every collection's scenarios. RECOMMENDED (a): they
+      are different datasets read by different checks.
+    - **B3. REQ-GEN-298 d32**: criterion 8's files are named TS-93c, TS-100c
+      and TS-101b as lettered siblings of the scenario holding their source.
+      Keep the letters, or number them TS-112 to TS-114? RECOMMENDED: keep
+      the letters, since each shows its sibling's could-not-run.
+    - **B4. REQ-GEN-298 d33**: ordinary geocoding ambers and reds may sit in
+      a quarter holding a LINKAGE scenario. (a) Allow it, as built. (b) Keep
+      them off, accepting fewer ambers. RECOMMENDED (a): they are separate
+      packages with separate checks.
+    - **B5. REQ-GEN-298 d34**: a red geocoding supply's green resupply
+      re-sends only the red files, 5 to 20 days later, built from the
+      source's latest supply. (a) As built. (b) Re-send the whole delivery.
+      (c) Rebuild from the original source supply. RECOMMENDED (a).
+    - **B6. REQ-GEN-298 d35**: the warehouse plan does not model
+      inheritance. This is unverified until the replay's trial-vs-replay
+      comparison (c15). (a) Leave it unmodelled and let that comparison say.
+      (b) Model it now. RECOMMENDED (a), moving to (b) if the replay finds
+      one such quarter.
+    - **B7. REQ-GEN-298 d36, fault sizes**: the year faults touch 1 to 3
+      records. (a) As built. (b) 5 to 10, so samples show several rows.
+      RECOMMENDED (a): one record fails the check, and a small fault leaves
+      the share and coverage checks alone.
+    - **B8. REQ-GEN-298 d37**: one geocoding scenario a quarter, which is
+      stricter than c7. (a) Keep it. (b) Relax it to c7's rule. RECOMMENDED
+      (a). (b) is the lever if you choose (b) on B2.
+    - **B9. REQ-GEN-298 d38**: trials run one per core. (a) As built. (b) A
+      fixed cap or a setting. RECOMMENDED (a), unless CI shows starvation.
+    - **B10. REQ-GEN-298 d45**: a trial's drift reference is the last earlier
+      delivery the plan promotes, as REQ-QAC-108 resolves it. (a) As built.
+      (b) The last earlier delivery, whatever became of it. RECOMMENDED (a):
+      (b) would disagree with the replay on 2019-Q2.
+    - **B11. REQ-DASH-299 d36**: in a key, a middle NULL part reads
+      '(no value)' and a middle empty part '—'. Should a null read '—' too,
+      as criterion 8's letter says? RECOMMENDED: keep '(no value)', your own
+      word for a null.
+    - **B12. REQ-DASH-299 d37**: the tile words sit per dataset
+      (`presentation.yaml` `datasets: {<id>: {relation}}`). Or should they
+      sit once per collection? RECOMMENDED: per dataset, since a collection
+      could hold different kinds of product.
+    - **B13. REQ-DASH-299 d38**: the geocodes tile names its source without
+      a period ('Child Protection's Client Register'). Should it add the
+      period on show? RECOMMENDED: no period. The cross-collection group
+      already names the supply.
+    - **B14. REQ-DASH-299 d39**: NOT A QUESTION. It is the withdrawn
+      PROVISIONAL #4 (criterion 1's order, a false premise, now fixed). The
+      gate flags it because the item says "WAS PROVISIONAL". RECOMMENDED:
+      confirm the withdrawal, then mark the item answered so the warning
+      clears.
+
+    *C. PROVISIONAL IN THE SPLIT'S UNBUILT REQUIREMENTS (16)*
+    From the groundwork (6):
+    - **C1. REQ-PIPE-342 d15**: shared `contract/environments.yaml` is read
+      through its own constant, not the resolver. Should the resolver own it
+      before the move? RECOMMENDED: no. The move's switch repoints it.
+    - **C2. REQ-PIPE-363 d8**: with MOTHMAN_ASSET unset, `mothman check`
+      runs each asset-reading gate once per asset, and ruff, yamllint,
+      agents, npm and pytest once. Is that the shape you want before
+      REQ-PIPE-364? RECOMMENDED: yes.
+    - **C3. REQ-PIPE-363 d9**: the asset is named in a confirmation's prefix
+      ('[... · Asset: data-asset-1] Record promote?'). Keep it there, or put
+      it in the toolbar and the stderr line only? RECOMMENDED: keep it.
+    - **C4. REQ-PIPE-363 d10**: bare `mothman` checks the asset before the
+      terminal check. Is that order right? RECOMMENDED: yes.
+    - **C5. REQ-PIPE-369 d5**: module names map hyphens to underscores. Asset
+      folder names must match `NAME_PATTERN`, and a clashing load is refused.
+      Confirm the reading and the rule? RECOMMENDED: confirm.
+    - **C6. REQ-QAC-368 d5**: "dbt packages installed" is decided by a stamp
+      file listing the digest and the package directories. Acceptable, or
+      compare against dbt's own package-lock.yml? RECOMMENDED: the stamp, as
+      built.
+
+    From the state-path sweep (3):
+    - **C7. REQ-PIPE-342 d18**: for an asset folder outside the repository,
+      `assets.folder_rel()` gives an absolute path. Is that right, or should
+      such a reader refuse? RECOMMENDED: the absolute path. Only a git-ref
+      read has no meaning there.
+    - **C8. REQ-PIPE-363 d11**: `mothman env tidy-test-databases` stays
+      exempt from asset selection, since test databases belong to no asset.
+      Keep it exempt, or refuse it? RECOMMENDED: keep it exempt.
+    - **C9. REQ-PIPE-365 d4**: dbt's scratch and the embedded ticket files
+      are per asset too. Per asset for both, or keep either repository-wide?
+      RECOMMENDED: per asset for both, as built.
+
+    From the move (7):
+    - **C10. REQ-PIPE-342 d20**: the feedback gate leaves a road-testing
+      link naming another asset's agency to that asset's pass, so a
+      mistyped agency is no longer caught. Accept this until REQ-PIPE-354,
+      or refuse such links now? RECOMMENDED: accept until REQ-PIPE-354.
+    - **C11. REQ-PIPE-363 d12**: the suite defaults to quarterly in
+      conftest, and other tests say `@pytest.mark.asset("daily")`. Is that
+      explicit enough, or should every module name its asset? RECOMMENDED:
+      the default plus marks.
+    - **C12. REQ-QAC-368 d7**: dbt does not resolve unqualified generic tests
+      from a package, so each asset's project carries a forwarding macros
+      file. The compiled SQL is byte-identical. Keep the file, or point
+      macro-paths and test-paths at `dbt_shared` instead, which departs from
+      c2's wording? RECOMMENDED: the forwarding file, as built.
+    - **C13. REQ-QAC-368 d8**: the dbt project is still named
+      `birth_registrations` in both assets. Rename it to `mothman_<asset>`
+      in the follow-on push, accepting that recorded unique_ids then differ
+      from the pre-split history? RECOMMENDED: yes, in the follow-on push.
+    - **C14. REQ-GEN-370 d7**: the scenario table is still repository-wide.
+      Each asset walks only its own injections, so an injection naming no
+      asset's dataset is no longer refused. Move injections into each
+      asset's synthetic/ now, or accept this until REQ-PIPE-352 c3?
+      RECOMMENDED: accept until then.
+    - **C15. REQ-TEST-366 d8**: a divided file is cut by member ids the map
+      declares per asset (0 differences over the ten files). Is that right,
+      or should each divided file list its parts? RECOMMENDED: the member
+      list, as built.
+    - **C16. REQ-TEST-366 d9**: the map also covers the dbt_shared/ moves
+      made in a prep commit earlier in the same push. Acceptable?
+      RECOMMENDED: yes.
+
+    *D. A DEFECT NEEDING SIGN-OFF*
+    - **D1. plans/qa-pipeline.md #89, linkage releases built from sources
+      whose file never arrived**: the row interface reported a Child
+      Protection supply even when a scenario's file shape left its
+      `cp_clients.csv` out (for example 2016-02-29 and 2023-06-08). This is
+      fixed for geocoding. Linkage still reads every reported supply,
+      because fixing it changes built REQ-GEN-334 deliveries. (a) Find the
+      affected releases and fix linkage the same way, as a regenerated
+      change. (b) Leave it and record the limit. RECOMMENDED (a): a release
+      describing a supply that never arrived is wrong data. Scope which
+      releases move before building.
