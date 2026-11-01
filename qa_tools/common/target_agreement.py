@@ -118,6 +118,28 @@ class ReadDisagreement:
         return f"{self.label} ({self.dataset_id}): {'; '.join(self.problems)}"
 
 
+def unaimed(dataset_id: str, results: Sequence[dict], aimed: Iterable[str], label: str,
+            reads: dict | None = None) -> ReadDisagreement | None:
+    """A NAMED SCENARIO'S ONE FAULT MOVES ONLY ITS OWN CHECK (REQ-GEN-298
+    criteria 3 and 7): every check of the dataset whose gate reading is
+    worse than green and whose id does not end with one of `aimed` is a
+    disagreement, naming the scenario and the check it moved. None where
+    only the aimed checks moved."""
+    from qa_tools.common import dataset_status, promotion
+
+    if reads is None:
+        reads = promotion._declared_reads()
+    aimed = tuple(aimed)
+    moved = []
+    for record in promotion._contributing_records(dataset_id, results, reads):
+        status = dataset_status.dashboard_status(promotion._gating_status(record))
+        check = record.get("check_id") or ""
+        if status in ("amber", "red") and not any(check.endswith(f".{a}") for a in aimed):
+            moved.append(f"its fault moved {_short(check)} to {_said(status)}, a check it is "
+                         f"not aimed at")
+    return ReadDisagreement(label, dataset_id, tuple(sorted(moved))) if moved else None
+
+
 def _tables_named(record: dict) -> set[str]:
     """The tables a not-evaluated record says it could not read."""
     named = set(record.get("unrunnable_tables") or record.get("held_tables") or ())

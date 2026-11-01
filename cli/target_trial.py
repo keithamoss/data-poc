@@ -60,6 +60,7 @@ def spec_of(one, written_to) -> dict:
                                 if delivery else None)})
     return {"label": one.label, "dataset_id": one.dataset_id, "target": one.target,
             "rules": list(one.rules), "period": one.period, "received_at": received,
+            "aimed": list(one.rules) if one.scenario else [],
             "table": hierarchy.dataset(one.dataset_id).table,
             "csv": str(targets.csv_of(one.delivery, written_to, one.filename,
                                       dataset_id=one.dataset_id)),
@@ -119,6 +120,12 @@ def try_in_period(collection_id: str, spec: dict) -> list:
         label=spec["label"])
     if reads_out:
         found.append(reads_out)
+    if spec.get("aimed"):
+        # A NAMED SCENARIO MOVES NO CHECK IT IS NOT AIMED AT (criterion 7).
+        moved = target_agreement.unaimed(spec["dataset_id"], results, spec["aimed"],
+                                         spec["label"])
+        if moved:
+            found.append(moved)
     return found
 
 

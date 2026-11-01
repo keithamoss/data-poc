@@ -646,9 +646,9 @@ def add_commands(group: click.Group, coll, *, with_target_trial: bool) -> None:
         # OFFERED ONLY WHERE THE PROVIDER DECLARES A TRIAL (criterion 4).
         generate = click.option(
             "--skip-target-trial", is_flag=True,
-            help="Do not try each injected target against the real tools after "
-                 "generating (about nine seconds each). A bootstrap still compares "
-                 "every targeted supply after its replay.")(generate)
+            help="Do not try each supply built to warn or fail, or for a scenario, "
+                 "against the real tools in its own quarter after generating. A bootstrap "
+                 "still compares every targeted supply after its replay.")(generate)
         generate.__click_params__.reverse()
     group.command("generate-synthetic-data",
                   help=f"Generate (or deterministically regenerate) the full synthetic {name} "

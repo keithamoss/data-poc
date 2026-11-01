@@ -32,7 +32,9 @@ class Built:
     dataset_id: str
     delivery: str
     target: str
-    #: The rules the target named, for a failure message.
+    #: The rules the target named, for a failure message - for a geocoding
+    #: scenario's file, the checks its one fault is aimed at, every other
+    #: check of the file to stay green (REQ-GEN-298 criterion 7).
     rules: tuple[str, ...] = ()
     #: An injected target's own scenario, and the delivery its trial is
     #: measured against - the last lead-in (REQ-GEN-185 criterion 2).
@@ -172,8 +174,10 @@ def _planned(dataset_id: str, book: dict, placed: list[dict]) -> list[Built]:
             sources = ((source["table"], source["dataset"],
                         _delivery_received(book, source["dataset"], held) if held else None,
                         held),)
+        aimed = tuple((entry.get("aimed") or {}).get(dataset_id) or ())
         out.append(Built(label, dataset_id, entry["delivery"], target, scenario=sid,
-                         reference=reference, day=_day_of(entry), filename=f"{table}.csv",
+                         rules=aimed, reference=reference, day=_day_of(entry),
+                         filename=f"{table}.csv",
                          period=period, tried=dataset_id in (entry.get("tried") or ()),
                          received_at=entry.get("received_at"), sources=sources))
         if target == "green":

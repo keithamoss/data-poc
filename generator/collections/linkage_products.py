@@ -138,6 +138,18 @@ GEO_ROW_FAULTS = {
 GEO_FAULT_VERDICT = {"missing_year": "red", "duplicate_year": "red", "unexpected_year": "red",
                      "left_out_amber": "amber", "left_out_red": "red",
                      "orphan_record": "red", "empty_file": "red"}
+#: THE CHECK EACH FAULT IS AIMED AT (criterion 7), by the end of its check id
+#: - "{source}" the source dataset's id - so a named scenario's trial refuses
+#: when any other check of its file moves.
+GEO_FAULT_AIMS = {"missing_year": "census_year.missing_set_members_dbt",
+                  "duplicate_year": "census_year.duplicated_set_members_dbt",
+                  "unexpected_year": "census_year.unexpected_set_members_dbt",
+                  "not_geocoded_amber": "match_level.value_share_soda",
+                  "not_geocoded_red": "match_level.value_share_soda",
+                  "left_out_amber": "{source}.coverage_soda",
+                  "left_out_red": "{source}.coverage_soda",
+                  "orphan_record": "{source}.referential_soda",
+                  "empty_file": "{source}.coverage_soda"}
 #: THE PRESETS (criterion 2): an ordinary amber raises the share into the
 #: amber band; an ordinary red takes one of these, the missing year only
 #: where two or more years are in force.
@@ -1101,6 +1113,14 @@ class LinkageProducts(Provider):
                     tried.append(d)
             state[job.slot_id] = (at, out)
             meta[(job.slot_id, 1)] = _meta(tried, out, warehouse, job.slot_id)
+            if hit is not None:
+                # ONE FAULT, AIMED AT ONE CHECK (criteria 3 and 7): every other
+                # check of the scenario's file must stay green in its trial.
+                d = hit[0].dataset_id
+                src = hierarchy.dataset(d).linked[0][0]
+                meta[(job.slot_id, 1)]["aimed"] = {d: sorted(
+                    GEO_FAULT_AIMS[f.partition("@")[0]].format(source=src)
+                    for f in hit[0].arrivals[0].row_faults)}
             if reds:
                 # A GREEN RESUPPLY FIVE TO TWENTY DAYS LATER (REQ-GEN-295
                 # criterion 13), of the red files alone, each built from its

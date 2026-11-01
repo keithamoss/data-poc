@@ -214,6 +214,22 @@ class TestTheTrialsOwnRule:
                             unstaged=["cp_clients"])
         assert found is not None and "for want of ed_presentations" in str(found)
 
+    def test_a_scenario_moving_a_check_it_is_not_aimed_at_is_a_disagreement(self):
+        """Criterion 7: the missing-year scenario's file may fail only its
+        missing-year check."""
+        from qa_tools.common import target_agreement
+
+        base = "data-asset-1.department-of-health.linkage-products.geo-cp-clients."
+        aimed = ["census_year.missing_set_members_dbt"]
+        results = [_record(base + "census_year.missing_set_members_dbt", status="fail",
+                           dataset_id="geo-cp-clients"),
+                   _record(base + "match_level.value_share_soda", status="warn",
+                           dataset_id="geo-cp-clients")]
+        found = target_agreement.unaimed("geo-cp-clients", results, aimed, "TS-102's file")
+        assert found is not None
+        assert "match_level.value_share_soda" in str(found) and "TS-102" in str(found)
+        assert target_agreement.unaimed("geo-cp-clients", results[:1], aimed, "x") is None
+
     def test_own_results_is_unchanged(self):
         """Criterion 15: own_results still drops a not-evaluated cross-table
         result - the comparison after replay relies on it."""

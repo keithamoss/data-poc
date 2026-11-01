@@ -395,7 +395,7 @@ Still to settle by driving the page: #8 and #17 - both since closed
     breakdown should also show the compared run, which is item 9's
     question arriving from the other direction.
 
-12. **[todo, 2026-09-24]** **[QA checks & contract]** **A completeness
+12. **[in-progress, 2026-11-01]** **[QA checks & contract]** **A completeness
     check for a TALL dataset: every event must have exactly one row per
     expected category.** Keith's own ask, 2026-09-24, with his own
     worked example - a geocoding dataset holding one row per geocoding
@@ -405,91 +405,8 @@ Still to settle by driving the page: #8 and #17 - both since closed
 
 - **You told us:** In a tall dataset every event should have exactly one row per expected category - one per census year, say.
 - **What we heard:** A check that every key has exactly one row for each member of a declared set, reporting missing, duplicate and unexpected members separately.
-
-    **UNPARKED (Keith, 2026-10-25)**, from the road-test participant: scope it now, WITH a synthetic geocoding dataset to build it against - addresses geocoded, one row per source record per ABS census year. Goes to delivery-scoper.
-
-    **The generalisable rule underneath it**, which is what makes this
-    worth building rather than one bespoke query: *for every key, there
-    must be exactly one row for each member of a declared set.* Stated
-    that way it has three distinct violations, and they mean different
-    things operationally - worth separating rather than reporting one
-    count:
-    - a **missing** member (five years present, one absent) - an
-      incomplete event;
-    - a **duplicate** member (two rows for the same event and year) - a
-      double-load or a bad join, and the one most likely to skew any
-      downstream aggregate silently;
-    - an **unexpected** member (a year not in the declared set) - the
-      source has started emitting something nobody agreed to, which is
-      the same event class as an unrecognised arrival artefact.
-
-    **This is the PoC's first TALL dataset, and that is the part likely
-    to bite.** Every dataset here today is wide - one row per entity -
-    and several existing patterns quietly assume it:
-    - the **primary key is composite** (event plus census year). The
-      contract expresses uniqueness as `unique: true` on a single
-      column, and the check panel's failing-row sample renders
-      "primary key only" as a single value per row. Neither is wrong,
-      but neither has ever had to carry a two-part key.
-    - **`row_count` bands become a multiple.** A supply of N events is
-      6N rows, so the absolute band that works for a wide table needs
-      to be stated against events, or against rows with the multiplier
-      made explicit - otherwise a supply missing a whole census year
-      still lands comfortably inside a row-count band.
-    - a bare **`unique`** check on the event column would fail by
-      design, since every event legitimately appears six times.
-
-    **The expected set GROWS, on a known five-year cadence** (Keith,
-    2026-09-24, confirming this is a certainty rather than the
-    hypothetical the first draft of this entry treated it as). ABS runs
-    a census every five years, so a seventh year arrives, then an
-    eighth. That makes the expected set a function of time, not a
-    constant, and it splits the check into two genuinely different
-    questions that are easy to conflate:
-
-    - *Does every event have a row for every census year that EXISTS?*
-      On this reading, the day a new census is processed, every
-      historical event in the table is instantly incomplete until it is
-      backfilled - the whole dataset goes red at once, for a reason
-      that is real but not a data-quality failure.
-    - *Does every event have a row for every census year it was
-      geocoded AGAINST?* Nothing ever goes red, and a backfill that
-      never happened is invisible, because nothing expected it.
-
-    Neither is right on its own. The likely answer is that the expected
-    set is DECLARED rather than inferred, and widening it is an explicit
-    act - so a backfill is something someone decides to require, and
-    the check goes red only against a set we have said we expect.
-
-    **And this project already has the machinery for that**, which is
-    worth saying because it looks like it needs something new. A
-    declared set widening every five years is exactly a check-definition
-    change: `check_lifecycle.py` already validates hand-authored check
-    metadata, `changelog:` already records dated definition changes, and
-    the trend chart already draws a real break at a breaking one so a
-    before/after comparison is not silently made across a moved
-    goalpost. What is unusual here - and useful - is that the change
-    date is known YEARS in advance, which is a strong argument for the
-    set being declared data rather than derived from whatever happens
-    to be in the table.
-
-    **Open:** where the expected set of census years is DECLARED - a
-    literal list in the contract beside the column, which is how
-    `valid values` already works, or derived from the data, which would
-    make a wholly-missing year invisible because nothing would expect
-    it; whether the
-    check reports per event or as a percentage of events, which is
-    `REQ-QAC`-style tiering and pairs with item 6's tolerance bands;
-    and which tool runs it - this is a `GROUP BY ... HAVING` shape,
-    so Soda's `failed rows` with a `fail query` or a dbt test, not any
-    built-in metric.
-
-    **Also unresolved, and prior to the check itself**: whether this
-    PoC gains a real geocoding dataset to demonstrate against, or
-    whether the pattern is shown on one of the existing collections.
-    There is no geocoding or census data in the repo today - checked -
-    so something has to be generated either way, and `plans/
-    data-generation.md` is where that lands rather than here.
+- **What we built:** Three checks on every geocoding dataset - missing, duplicated and unexpected census years - against the years declared for each quarter, a synthetic geocoding release to run them on, and each fault planted on purpose in a scenario the scenario map names. The page that shows them is still to come.
+- **Evidence:** REQ-QAC-297; REQ-QAC-300; REQ-GEN-295; REQ-GEN-298; REQ-DASH-299
 
 16. **[done, 2026-10-03]** **[Pipeline & publishing]** **A clean
     resupply cannot get through once a quarter has two undecided
@@ -526,7 +443,7 @@ Still to settle by driving the page: #8 and #17 - both since closed
 - **Evidence:** [Client Register](#/agency/child-protection-family-support/collection/child-protection/dataset/cp-clients)
 - **Card status:** fixed
 
-31. **[todo, 2026-10-25]** **[QA checks & contract]** **How is an address
+31. **[done, 2026-11-01]** **[QA checks & contract]** **How is an address
     that "could not be geocoded" represented, and handled?** A follow-up
     question Keith asked to be reminded of, 2026-10-25, while scoping the
     geocoding datasets (road-testing #12). Geocoding has one row per
@@ -538,6 +455,8 @@ Still to settle by driving the page: #8 and #17 - both since closed
 
 - **We noticed:** The geocoding checks treat a missing census-year row as red, but nothing yet says how an address that could not be geocoded arrives.
 - **What we heard:** Ask how "could not be geocoded" is represented and handled before the geocoding checks are settled.
+- **What we built:** An address that could not be geocoded is a row marked 'not geocoded' with its codes empty, never a missing row, and a share check warns above 5 percent of rows and fails above 10; the geocoding history plants both bands on purpose.
+- **Evidence:** REQ-QAC-294; REQ-QAC-297; REQ-GEN-295; REQ-GEN-298
 
 32. **[todo, 2026-10-30]** **[Dashboard UI]** **[QA checks & contract]** **The
     two coverage checks show their metric names.** Noticed by the agent
