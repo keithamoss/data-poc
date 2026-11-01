@@ -168,7 +168,10 @@ class TestTheScheduleGateFreezesEveryListSetting:
         import yaml
 
         monkeypatch.setattr(vs, "_content_at", lambda rel, ref: yaml.safe_dump(old))
-        src = vs.Source(asset_path=vs.DATA_ASSET_YAML, contract_dir=vs.DATA_ASSET_YAML.parent)
+        from qa_tools.common import hierarchy
+
+        src = vs.Source(asset_path=hierarchy.data_asset_yaml(),
+                        contract_dir=hierarchy.data_asset_yaml().parent)
         return vs._list_setting_errors(new, src, date(2026, 11, 1), ref="HEAD")
 
     def test_an_altered_past_census_version_is_refused(self, monkeypatch):

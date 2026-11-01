@@ -56,7 +56,7 @@ def _dbt(run_id: str, tests: list[str]) -> dict[str, int]:
 
     target = str(supply_db.dbt_target_path(run_id))
     run_dbt("build", ["stg_geo_cp_clients", *tests], target, tool.PROFILES_DIR,
-            tool.DBT_PROJECT_DIR, tool.ROOT, run_schema=supply_db.run_schema(run_id),
+            tool._project_dir(), tool.ROOT, run_schema=supply_db.run_schema(run_id),
             run_id=run_id, indirect_selection="empty")
     results = json.load(open(os.path.join(target, "run_results.json")))
     manifest = json.load(open(os.path.join(target, "manifest.json")))
@@ -140,7 +140,7 @@ class TestARunWithNoPeriodLeavesTheYearChecksOut:
         from qa_tools.common.dbt_common import parsed_test_nodes, run_dbt
         from qa_tools.tools import run_dbt as tool
 
-        nodes = parsed_test_nodes(tool.PROFILES_DIR, tool.DBT_PROJECT_DIR)
+        nodes = parsed_test_nodes(tool.PROFILES_DIR, tool._project_dir())
         assert {n["name"] for n in nodes.values() if tool._reads_declared_set(n)} >= set(ALL)
         run_id = "geo_probe_no_period"
         with supply_db.connect() as conn:
@@ -148,7 +148,7 @@ class TestARunWithNoPeriodLeavesTheYearChecksOut:
             assert not list_setting_members.exists(conn, schema)
         target = str(supply_db.dbt_target_path(run_id))
         run_dbt("build", ["stg_geo_cp_clients", *ALL], target, tool.PROFILES_DIR,
-                tool.DBT_PROJECT_DIR, tool.ROOT, run_schema=supply_db.run_schema(run_id),
+                tool._project_dir(), tool.ROOT, run_schema=supply_db.run_schema(run_id),
                 run_id=run_id, indirect_selection="empty",
                 exclude=[f"source:raw.{list_setting_members.RELATION}+"])
         results = json.load(open(os.path.join(target, "run_results.json")))["results"]

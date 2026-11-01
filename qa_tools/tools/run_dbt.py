@@ -216,7 +216,7 @@ def _not_evaluated_for_want_of_a_period(coll, spec, run_id: str, run_timestamp: 
         if in_trial else
         (list_setting_members.NO_PERIOD, list_setting_members.NO_PERIOD_REASON, "fail"))
     out, seen = [], set()
-    for node in parsed_test_nodes(PROFILES_DIR, DBT_PROJECT_DIR).values():
+    for node in parsed_test_nodes(PROFILES_DIR, _project_dir()).values():
         if not _reads_declared_set(node):
             continue
         table = _table_for_test(coll, spec, node)
