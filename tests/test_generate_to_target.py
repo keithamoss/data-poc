@@ -438,9 +438,9 @@ class TestAnInjectedTargetEndToEnd:
         restore = redirect(root)
         try:
             driver.generate("civil-registration")
-            book = json.loads(driver.BOOKKEEPING_PATH.read_text())[g.DATASET_ID]
-            placements = json.loads(si.PLACEMENTS_PATH.read_text())
-            deliveries = driver.DELIVERIES_DIR
+            book = json.loads(driver.bookkeeping_path().read_text())[g.DATASET_ID]
+            placements = json.loads(si.placements_path().read_text())
+            deliveries = driver.deliveries_dir()
         finally:
             restore()
             si.INJECTIONS = original
@@ -741,9 +741,9 @@ class TestLeadInsEndToEnd:
         restore = redirect(root)
         try:
             driver.generate("civil-registration")
-            book = json.loads(driver.BOOKKEEPING_PATH.read_text())[g.DATASET_ID]
-            records = json.loads(si.PLACEMENTS_PATH.read_text())
-            deliveries = driver.DELIVERIES_DIR
+            book = json.loads(driver.bookkeeping_path().read_text())[g.DATASET_ID]
+            records = json.loads(si.placements_path().read_text())
+            deliveries = driver.deliveries_dir()
         finally:
             restore()
             si.INJECTIONS = original

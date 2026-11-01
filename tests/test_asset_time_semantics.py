@@ -64,7 +64,7 @@ from pathlib import Path
 
 import pytest
 
-from qa_tools.common import asset_time
+from qa_tools.common import asset_time, assets
 
 # NEEDS A BOOTSTRAPPED DEPLOYMENT (plans/tooling.md #27). This module
 # reads `reports/*.json`, which is built from the deployment's recorded
@@ -111,7 +111,7 @@ def _built_datasets():
     """
     out = {}
     for name in _reports():
-        path = ROOT / "reports" / name
+        path = assets.reports_path(name)
         if not path.exists():
             pytest.skip(f"{name} not built - run `mothman dashboard build-data`")
         doc = json.loads(path.read_text())

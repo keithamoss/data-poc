@@ -1699,7 +1699,11 @@ def scratch_dir() -> Path:
     for why that matters in this repository.
     """
     key = hashlib.sha256(supply_db_dsn().encode("utf-8")).hexdigest()[:12]
-    return ROOT / "data" / "dbt_scratch" / key
+    # THE SELECTED ASSET'S data/, asked of the resolver now (REQ-PIPE-342
+    # criterion 6).
+    from qa_tools.common import assets
+
+    return assets.data_path("dbt_scratch", key)
 
 
 def staging_csv(physical: str) -> Path:

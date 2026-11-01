@@ -51,6 +51,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, Mapping
 
+from qa_tools.common import assets
 from qa_tools.common import scenarios as scenarios_mod
 from qa_tools.common.dataset_status import status_words
 
@@ -60,7 +61,14 @@ ROOT = Path(__file__).resolve().parent.parent.parent
 #: Under data/, because it is generator bookkeeping - the same place
 #: data/generator_bookkeeping.json lives, and for the same reason: the
 #: pipeline may not read either.
-PLACEMENTS_PATH = ROOT / "data" / "scenario_placements.json"
+PLACEMENTS_FILE = "scenario_placements.json"
+
+
+def placements_path() -> Path:
+    """The selected asset's placements record, asked of the resolver at call
+    time (REQ-PIPE-342 criterion 6, REQ-PIPE-365 criterion 1)."""
+    return assets.data_path(PLACEMENTS_FILE)
+
 
 #: The committed map itself.
 MAP_PATH = ROOT / "SCENARIOS.md"
@@ -134,7 +142,7 @@ def read_placements(path: Path | str | None = None) -> dict[str, Placement]:
     this builds a document, and a document that cannot be built stops
     a regeneration that had nothing else wrong with it.
     """
-    source = Path(path or PLACEMENTS_PATH)
+    source = Path(path or placements_path())
     if not source.is_file():
         return {}
     try:

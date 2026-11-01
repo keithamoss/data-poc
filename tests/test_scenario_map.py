@@ -7,11 +7,13 @@ as a defect nobody got round to.
 """
 from __future__ import annotations
 
+from state_paths import fixed
 import json
 from pathlib import Path
 
 import pytest
 
+from qa_tools.common import assets
 from qa_tools.common import scenario_map as sm
 from qa_tools.common import scenarios as sc
 
@@ -210,7 +212,9 @@ class TestTheCommittedMap:
         design; the MAP does not, which is what lets the dashboard
         build read it under the standing no-data rule."""
         source = Path(sm.__file__).read_text()
-        assert 'ROOT / "data" / "scenario_placements.json"' in source
+        # ASKED OF THE RESOLVER AT CALL TIME (REQ-PIPE-342 criterion 6): the
+        # selected asset's data/, today's data/ while there is one asset.
+        assert sm.placements_path() == assets.data_path("scenario_placements.json")
         assert "duckdb" not in source
         assert "supply_db" not in source
 
@@ -254,7 +258,7 @@ class TestTheMapCanBeCheckedWithoutWriting:
         stale = tmp_path / "SCENARIOS.md"
         stale.write_text("stale\n")
         monkeypatch.setattr(sm, "MAP_PATH", stale)
-        monkeypatch.setattr(sm, "PLACEMENTS_PATH", tmp_path / "placements.json")
+        monkeypatch.setattr(sm, "placements_path", fixed(tmp_path / "placements.json"))
         (tmp_path / "placements.json").write_text('{"placements": []}')
         result = CliRunner().invoke(scenarios_group, ["map", "--check"])
         assert result.exit_code == 1, result.output

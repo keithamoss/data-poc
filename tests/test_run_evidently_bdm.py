@@ -9,6 +9,7 @@ evidently.Report + DataDriftPreset/RowCount classes against a small,
 real, session-scoped BDM CSV fixture."""
 from __future__ import annotations
 
+from state_paths import fixed
 import qa_tools.tools.run_evidently as run_evidently
 from qa_tools.common.evidently_common import collection_checks
 
@@ -46,8 +47,8 @@ def _patch(monkeypatch, bdm_delivery_dirs):
     from qa_tools.common import delivery
 
     deliveries, receipts = bdm_delivery_dirs
-    monkeypatch.setattr(delivery, "DELIVERIES_DIR", deliveries)
-    monkeypatch.setattr(delivery, "RECEIPTS_DIR", receipts)
+    monkeypatch.setattr(delivery, "default_deliveries_dir", fixed(deliveries))
+    monkeypatch.setattr(delivery, "default_receipts_dir", fixed(receipts))
     monkeypatch.setattr(run_evidently, "write_qa_result", lambda *a, **k: None)
     # NOTHING IS RECORDED FOR THE REFERENCE: these fixtures stage it without
     # checking it, which is exactly a hand-supplied trial's reference (`mothman

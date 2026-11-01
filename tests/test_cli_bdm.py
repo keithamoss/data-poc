@@ -5,6 +5,7 @@ generator output, not hand-crafted rows), and drives the Click commands
 through click.testing.CliRunner, same as that file."""
 from __future__ import annotations
 
+from state_paths import fixed
 from qa_tools.common import hand_filing
 import os
 import re
@@ -42,8 +43,8 @@ def _patch_bdm_dirs(monkeypatch, raw_dir, duckdb_dir):
     from pathlib import Path
 
     from qa_tools.common import delivery
-    monkeypatch.setattr(delivery, "DELIVERIES_DIR", Path(raw_dir) / "deliveries")
-    monkeypatch.setattr(delivery, "RECEIPTS_DIR", Path(raw_dir) / "receipts")
+    monkeypatch.setattr(delivery, "default_deliveries_dir", fixed(Path(raw_dir) / "deliveries"))
+    monkeypatch.setattr(delivery, "default_receipts_dir", fixed(Path(raw_dir) / "receipts"))
     # The warehouse used to be three module attributes pointing at a
     # directory of per-run DuckDB files. It is now one database, named
     # by MOTHMAN_SUPPLY_DB, which the supply_db_path fixture sets for
@@ -64,8 +65,8 @@ def _patch_delivery_dirs(monkeypatch, root):
     from pathlib import Path
 
     from qa_tools.common import delivery
-    monkeypatch.setattr(delivery, "DELIVERIES_DIR", Path(root) / "deliveries")
-    monkeypatch.setattr(delivery, "RECEIPTS_DIR", Path(root) / "receipts")
+    monkeypatch.setattr(delivery, "default_deliveries_dir", fixed(Path(root) / "deliveries"))
+    monkeypatch.setattr(delivery, "default_receipts_dir", fixed(Path(root) / "receipts"))
 
 
 def test_the_cli_reports_where_the_generator_actually_wrote(monkeypatch):
@@ -137,8 +138,8 @@ def test_run_check_leaves_the_arrival_record_on_disk_exactly_as_it_found_it(
     raw_copy = tmp_path / "raw_copy"
     shutil.copytree(bdm_raw_dir, raw_copy)
 
-    monkeypatch.setattr(delivery, "DELIVERIES_DIR", raw_copy / "deliveries")
-    monkeypatch.setattr(delivery, "RECEIPTS_DIR", raw_copy / "receipts")
+    monkeypatch.setattr(delivery, "default_deliveries_dir", fixed(raw_copy / "deliveries"))
+    monkeypatch.setattr(delivery, "default_receipts_dir", fixed(raw_copy / "receipts"))
     # One supply database, named by the environment - the three
     # module attributes this replaces pointed at a directory of
     # per-run DuckDB files (REQ-PIPE-068).

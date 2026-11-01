@@ -31,6 +31,8 @@ import functools
 import os
 
 import rich_click as click
+
+from qa_tools.common import assets
 from rich.console import Console
 
 console = Console()
@@ -83,7 +85,7 @@ class CollectionCLI:
         self.datasets = list(coll.datasets)
         self.tables = [d.table for d in coll.datasets]
         self.label = label(coll)
-        self.contract_path = os.path.join(ROOT, "contract", coll.contract)
+        self.contract_path = os.path.join(ROOT, assets.folder_rel(), coll.contract)
 
     # ---- its commands ----------------------------------------------------------
 
@@ -114,7 +116,7 @@ class CollectionCLI:
         (REQ-PIPE-102)."""
         from generator import driver
 
-        return str(driver.DELIVERIES_DIR)
+        return str(driver.deliveries_dir())
 
     @property
     def has_target_trial(self) -> bool:

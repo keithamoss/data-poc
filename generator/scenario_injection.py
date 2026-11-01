@@ -42,15 +42,18 @@ from pathlib import Path
 from typing import Sequence
 
 from generator.targeting import Target
-from qa_tools.common import scenario_map
+from qa_tools.common import assets, scenario_map
 
 ROOT = Path(__file__).resolve().parent.parent
 
 #: Where the placements are recorded for the scenario map to read
 #: (criterion 7). Under `data/` because it is generator bookkeeping -
 #: qa_tools/common/scenario_map.py reads it from exactly here, and the
-#: pipeline may read neither it nor anything else under data/.
-PLACEMENTS_PATH = ROOT / "data" / "scenario_placements.json"
+#: pipeline may read neither it nor anything else under data/. Asked of the
+#: resolver at call time (REQ-PIPE-342 criterion 6); generator/output.py's
+#: redirect() points this one, and not the scenario map's reader, elsewhere.
+def placements_path() -> Path:
+    return assets.data_path(scenario_map.PLACEMENTS_FILE)
 
 
 class CannotPlace(RuntimeError):
@@ -1340,7 +1343,7 @@ def write_placements(placements: Sequence[Placement],
     being written are replaced outright either way, so a scenario that
     moved does not leave its old coordinate behind.
     """
-    target = Path(path or PLACEMENTS_PATH)
+    target = Path(path or placements_path())
     target.parent.mkdir(parents=True, exist_ok=True)
     records = []
     if merge and target.is_file():

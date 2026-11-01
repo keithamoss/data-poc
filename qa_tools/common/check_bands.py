@@ -49,7 +49,6 @@ from qa_tools.common import config_yaml
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 
-FILE_CHECKS = "contract/file-checks.yaml"
 
 #: Units a bound is stated in. A rule mixing ROWS and PERCENT is compared at
 #: a given row count; TABLE_ROWS bounds the table's size itself; RATIO and
@@ -427,8 +426,10 @@ def file_bounds(metadata, doc=None) -> dict[str, tuple]:
     """A file check fails (severity failure) or only warns (warning) on any
     problem with the file - it has no band of its own. One file-checks.yaml
     does not name, or names with another severity, is refused."""
+    from qa_tools import collections
+
     if doc is None:
-        doc = config_yaml.parse((ROOT / FILE_CHECKS).read_text()) or {}
+        doc = config_yaml.parse((ROOT / collections.file_checks()).read_text()) or {}
     severity = {str(c.get("check")): str(c.get("severity")) for c in doc.get("checks") or []}
     out = {}
     for m in metadata:
@@ -441,7 +442,7 @@ def file_bounds(metadata, doc=None) -> dict[str, tuple]:
         elif severity.get(name) == "failure":
             out[m.check_id] = ("file", (), trip)
         else:
-            raise CatalogueError(f"{m.check_id} ({FILE_CHECKS}): {name} has severity "
+            raise CatalogueError(f"{m.check_id} ({collections.file_checks()}): {name} has severity "
                                  f"{severity.get(name)!r}, neither failure nor warning")
     return out
 

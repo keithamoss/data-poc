@@ -48,9 +48,17 @@ def use(directory) -> str:
     return path
 
 
-def reports_dir(default: str) -> str:
+def reports_dir(default: str | None = None) -> str:
     """Where the results and dashboard files are written and read: the build's
     own `reports/` under `--out-dir`, else `default` - the caller's own
-    constant, so a test redirecting that constant still redirects it."""
+    call-time lookup, so a test redirecting that lookup still redirects it -
+    else the selected asset's reports folder, asked of the resolver now
+    (REQ-PIPE-342 criterion 6)."""
     out = out_dir()
-    return os.path.join(out, "reports") if out else default
+    if out:
+        return os.path.join(out, "reports")
+    if default is not None:
+        return default
+    from qa_tools.common import assets
+
+    return str(assets.reports_dir())

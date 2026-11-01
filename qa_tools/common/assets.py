@@ -45,6 +45,7 @@ from __future__ import annotations
 
 import importlib.util
 import os
+import re
 import sys
 import threading
 from dataclasses import dataclass
@@ -73,6 +74,16 @@ class NoModule(AssetError):
 class DbtPackagesMissing(AssetError):
     """The selected asset's dbt packages are not installed (REQ-QAC-368
     criterion 6)."""
+
+
+class BadAssetName(AssetNotSelected):
+    """An asset folder whose name is not lowercase letters, digits and single
+    hyphens - which could share a module name with another, or carry a module
+    path separator (post-build-review, the groundwork critic)."""
+
+
+class ModuleNameClash(AssetError):
+    """Two different asset modules would register one module name."""
 
 
 class OneAssetPerProcess(AssetError):
@@ -143,8 +154,16 @@ class _Assets:
     def names(self) -> list[str]:
         if not self.root.is_dir():
             return []
-        return sorted(p.name for p in self.root.iterdir()
-                      if p.is_dir() and not p.name.startswith((".", "_")))
+        found = sorted(p.name for p in self.root.iterdir()
+                       if p.is_dir() and not p.name.startswith((".", "_")))
+        bad = [n for n in found if not NAME_PATTERN.fullmatch(n)]
+        if bad:
+            raise BadAssetName(
+                f"asset folder name(s) {', '.join(map(repr, bad))} in {self.root} are not "
+                f"lowercase letters, digits and single hyphens - rename them. An asset's "
+                f"name becomes part of its modules' names, so 'a-b' and 'a_b' would be "
+                f"one module and a dot would be a module path.")
+        return found
 
     def asset(self, name: str) -> Asset:
         folder = self.root / name
@@ -152,6 +171,12 @@ class _Assets:
                      providers=folder / "synthetic" / "collections",
                      dbt_project=folder / "dbt",
                      data=ROOT / "data" / name, reports=ROOT / "reports" / name)
+
+
+#: AN ASSET'S NAME: lowercase letters and digits, words joined by single
+#: hyphens - so its module tag (hyphens as underscores) is unique and has no
+#: dot in it (post-build-review, the groundwork critic).
+NAME_PATTERN = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*")
 
 
 #: THE SWITCH. The move commit makes this `_Assets(ROOT / "assets")`.
@@ -204,6 +229,46 @@ def restore(layout) -> None:
     """Put back what use_root or use_folder returned."""
     global _layout
     _layout = layout
+
+
+def _describe(layout):
+    """A picklable description of a layout, for a process this one starts."""
+    if isinstance(layout, _Assets):
+        return ("root", str(layout.root))
+    if isinstance(layout, _Folder):
+        return ("folder", _describe(layout.base), layout.name, str(layout.folder),
+                str(layout.adapters) if layout.adapters is not None else None)
+    return ("default",)
+
+
+def _rebuild(described):
+    kind = described[0]
+    if kind == "root":
+        return _Assets(Path(described[1]))
+    if kind == "folder":
+        _, base, name, folder, adapters = described
+        return _Folder(_rebuild(base), name, Path(folder),
+                       Path(adapters) if adapters is not None else None)
+    return _DEFAULT
+
+
+def handoff() -> tuple:
+    """What a process this one starts needs to act for the same asset: the
+    selected asset's NAME and the LAYOUT it was found in - an assets/ root
+    from use_root (#55), a folder from use_folder - since a spawned
+    interpreter sees neither this one's selection nor its layout
+    (post-build-review, the groundwork critic). Passed to `adopt` as a pool's
+    initializer arguments; picklable."""
+    return (selected().name, _describe(_layout))
+
+
+def adopt(name: str, layout: tuple = ("default",)) -> Asset:
+    """A started process's first act: take the layout and the asset it was
+    handed (`handoff()`), then select the asset - refused as `select`
+    refuses."""
+    global _layout
+    _layout = _rebuild(layout)
+    return select(name)
 
 
 def names() -> list[str]:
@@ -260,6 +325,21 @@ def select(name: str) -> Asset:
         raise AssetNotSelected(_refusal(name, names()))
     os.environ[ASSET_ENV] = name
     return selected()
+
+
+def folder_rel() -> str:
+    """The selected asset's configuration folder relative to the repository
+    root, POSIX-style - `contract` today - for a reader that names its files
+    by repository path, as the lifecycle gate and a read at a git ref do
+    (REQ-PIPE-342 criterion 6). A folder outside the repository (a test's
+    copy, #55's injected configuration) is given ABSOLUTE, so joining it to
+    the repository root still names it; only a git-ref read has no meaning
+    there."""
+    folder = selected().folder
+    try:
+        return folder.relative_to(ROOT).as_posix()
+    except ValueError:
+        return folder.as_posix()
 
 
 # ---- state paths, per asset, at call time (REQ-PIPE-342 criterion 6) ----
@@ -346,6 +426,17 @@ def _load(kind: str, module: str):
     loaded = sys.modules.get(name)
     if loaded is not None and getattr(loaded, "__file__", None) == str(path):
         return loaded
+    # A CLASH IS REFUSED, NEVER REPLACED: another asset's module that maps to
+    # this name (asset 'x' module 'y_z' and asset 'x-y' module 'z') keeps its
+    # registration. The SAME asset, kind and module re-pointed at a new file
+    # (a test's adapter folder) is a reload, not a clash.
+    identity = (asset.name, kind, module)
+    owner = _owners.get(name)
+    if loaded is not None and owner is not None and owner != identity:
+        raise ModuleNameClash(
+            f"asset {asset.name!r}'s {kind} {module!r} ({path}) would be registered as "
+            f"{name}, which already holds asset {owner[0]!r}'s {owner[1]} {owner[2]!r} "
+            f"({getattr(loaded, '__file__', '?')}) - rename one of them")
     if not path.is_file():
         raise NoModule(f"asset {asset.name!r} has no {kind} {module!r} - {path} does not "
                        f"exist")
@@ -358,7 +449,12 @@ def _load(kind: str, module: str):
     except BaseException:
         sys.modules.pop(name, None)
         raise
+    _owners[name] = identity
     return loaded
+
+
+#: Which (asset, kind, module) each registered module name was loaded for.
+_owners: dict[str, tuple[str, str, str]] = {}
 
 
 def adapter_file(collection_id: str) -> str:

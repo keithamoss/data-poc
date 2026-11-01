@@ -8,6 +8,7 @@ would pass with the group unregistered.
 from __future__ import annotations
 
 
+from state_paths import fixed
 from datetime import datetime, timezone
 
 import pytest
@@ -25,8 +26,8 @@ WHEN = datetime(2026, 8, 25, 6, 0, tzinfo=timezone.utc)
 def dirs(tmp_path, monkeypatch):
     deliveries, receipts = tmp_path / "deliveries", tmp_path / "receipts"
     deliveries.mkdir(); receipts.mkdir()
-    monkeypatch.setattr(delivery, "DELIVERIES_DIR", deliveries)
-    monkeypatch.setattr(delivery, "RECEIPTS_DIR", receipts)
+    monkeypatch.setattr(delivery, "default_deliveries_dir", fixed(deliveries))
+    monkeypatch.setattr(delivery, "default_receipts_dir", fixed(receipts))
     return deliveries, receipts
 
 

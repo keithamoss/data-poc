@@ -51,12 +51,25 @@ from pathlib import Path
 
 import yaml
 
-from qa_tools.common import asset_time
+from qa_tools.common import asset_time, assets
 
 ROOT = Path(__file__).resolve().parent.parent.parent
-CALENDAR_REL = "contract/calendar.yaml"
-ASSET_REL = "contract/data-asset.yaml"
-PEOPLE_REL = "contract/people.yaml"
+
+
+# THE SELECTED ASSET'S FILES BY REPOSITORY PATH, asked of the resolver at call
+# time (REQ-PIPE-342 criterion 6) - read at git refs as well as in the working
+# tree, so a repository path rather than an absolute one. These were the
+# CALENDAR_REL, ASSET_REL and PEOPLE_REL constants.
+def calendar_rel() -> str:
+    return f"{assets.folder_rel()}/calendar.yaml"
+
+
+def asset_rel() -> str:
+    return f"{assets.folder_rel()}/data-asset.yaml"
+
+
+def people_rel() -> str:
+    return f"{assets.folder_rel()}/people.yaml"
 CODEOWNERS_REL = ".github/CODEOWNERS"
 
 #: PROVISIONAL (overnight #3, 2026-10-11): the role in contract/people.yaml
@@ -796,7 +809,7 @@ def check(old_cal: dict | None, new_cal: dict, old_asset: dict | None, new_asset
             continue
         # A CODE OWNER OF THE FILE IT IS DECLARED IN (REQ-GHUB-174
         # criterion 2), at the base - so a change cannot make its approver.
-        rel_file = ASSET_REL if owner[0] == "timezone" else CALENDAR_REL
+        rel_file = asset_rel() if owner[0] == "timezone" else calendar_rel()
         owners = code_owners(base_codeowners, rel_file)
         eligible = [p for p in allowed if str(p.get("github", "")).lower() in owners]
         for corr in entries[len(before):]:
@@ -909,8 +922,8 @@ def check(old_cal: dict | None, new_cal: dict, old_asset: dict | None, new_asset
         file = "data-asset.yaml" if owner[0] == "timezone" else "calendar.yaml"
         # WHO MAY APPROVE IS WHO THE GATE WILL ACCEPT (delivery-critic on 174,
         # L1): the asset's managers who are also code owners of this file.
-        owners = code_owners(base_codeowners, ASSET_REL if owner[0] == "timezone"
-                             else CALENDAR_REL)
+        owners = code_owners(base_codeowners, asset_rel() if owner[0] == "timezone"
+                             else calendar_rel())
         may = [p for p in allowed if str(p.get("github", "")).lower() in owners]
         # ONE ENTRY PER OWNER (Keith, 2026-10-11, morning-report (l)): every
         # changed item of one owner in one correction, as draft-correction
@@ -1082,8 +1095,8 @@ def drafts(old_cal: dict | None, new_cal: dict, old_asset: dict | None, new_asse
     out = []
     for owner in sorted(needs, key=_owner_label):
         rows = needs[owner]
-        owners = code_owners(base_codeowners, ASSET_REL if owner[0] == "timezone"
-                             else CALENDAR_REL)
+        owners = code_owners(base_codeowners, asset_rel() if owner[0] == "timezone"
+                             else calendar_rel())
         may = [p for p in approvers(base_people or {})
                if str(p.get("github", "")).lower() in owners]
         out.append(_paste_ready(owner, [(i.key, o, n) for i, o, n, _ in rows], may, today,

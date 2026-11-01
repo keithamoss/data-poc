@@ -70,6 +70,22 @@ class TestInstalling:
         assert ran == []
         assert sorted(p.name for p in (an_asset / "dbt_packages").iterdir()) == before
 
+    def test_a_deleted_package_installs_again(self, an_asset):
+        """The groundwork critic: the stamp alone said installed after the
+        package directory itself had gone, so dbt then failed to compile."""
+        import shutil
+
+        assert _dbt_deps().exit_code == 0
+        installed = an_asset / "dbt_packages" / "shared_probe"
+        if installed.is_symlink() or installed.is_file():
+            installed.unlink()
+        else:
+            shutil.rmtree(installed)
+        result = _dbt_deps()
+        assert result.exit_code == 0, result.output
+        assert "already installed" not in result.output
+        assert installed.exists()
+
     def test_an_edited_packages_file_installs_again(self, an_asset):
         assert _dbt_deps().exit_code == 0
         (an_asset / "packages.yml").write_text((an_asset / "packages.yml").read_text() + "\n")

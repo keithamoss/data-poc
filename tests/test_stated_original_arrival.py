@@ -4,6 +4,7 @@ every delivery records whether a person filed it, how and who
 (REQ-PIPE-147)."""
 from __future__ import annotations
 
+from state_paths import fixed
 from datetime import datetime, timedelta, timezone
 
 import pytest
@@ -235,8 +236,8 @@ class TestTheCommandLine:
         from qa_tools.common import git_identity
 
         monkeypatch.setattr(git_identity, "get_run_by", lambda: "a@b.c")
-        monkeypatch.setattr(delivery, "DELIVERIES_DIR", tmp_path / "deliveries")
-        monkeypatch.setattr(delivery, "RECEIPTS_DIR", tmp_path / "receipts")
+        monkeypatch.setattr(delivery, "default_deliveries_dir", fixed(tmp_path / "deliveries"))
+        monkeypatch.setattr(delivery, "default_receipts_dir", fixed(tmp_path / "receipts"))
         with pytest.raises(click.ClickException) as caught:
             common.file_or_trial([str(_csv(tmp_path))], "civil-registration", "run_",
                                  keep=True, route="file")
@@ -252,7 +253,7 @@ class TestTheCommandLine:
         def _none():
             raise git_identity.MissingGitIdentityError("no user.email")
         monkeypatch.setattr(git_identity, "get_run_by", _none)
-        monkeypatch.setattr(delivery, "DELIVERIES_DIR", tmp_path / "deliveries")
+        monkeypatch.setattr(delivery, "default_deliveries_dir", fixed(tmp_path / "deliveries"))
         with pytest.raises(click.ClickException) as caught:
             common.file_or_trial([str(_csv(tmp_path))], "civil-registration", "run_",
                                  keep=True, route="file", originally="not-known")
@@ -316,8 +317,8 @@ class TestItIsShownBesideTheReceipt:
 
         filed, _ = self._kept(tmp_path, tree)
         deliveries, receipts = tree
-        monkeypatch.setattr(delivery, "DELIVERIES_DIR", deliveries)
-        monkeypatch.setattr(delivery, "RECEIPTS_DIR", receipts)
+        monkeypatch.setattr(delivery, "default_deliveries_dir", fixed(deliveries))
+        monkeypatch.setattr(delivery, "default_receipts_dir", fixed(receipts))
         out = CliRunner().invoke(supply_group, ["deliveries", "--name", filed.delivery_name],
                                  terminal_width=200).output
         flat = " ".join(out.split())
@@ -331,8 +332,8 @@ class TestItIsShownBesideTheReceipt:
         deliveries, receipts = tree
         delivery.write_delivery("auto", {"x.csv": "a\n1\n"}, received_at=NOW,
                                 deliveries_dir=deliveries, receipts_dir=receipts)
-        monkeypatch.setattr(delivery, "DELIVERIES_DIR", deliveries)
-        monkeypatch.setattr(delivery, "RECEIPTS_DIR", receipts)
+        monkeypatch.setattr(delivery, "default_deliveries_dir", fixed(deliveries))
+        monkeypatch.setattr(delivery, "default_receipts_dir", fixed(receipts))
         out = CliRunner().invoke(supply_group, ["deliveries"], terminal_width=200).output
         assert "automatically" in out
 

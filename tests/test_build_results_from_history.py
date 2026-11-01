@@ -7,12 +7,13 @@ what CI itself reads, and exactly the "must never touch data/" rule
 this module exists to satisfy, so there's nothing to fake here."""
 from __future__ import annotations
 
+from state_paths import fixed
 from qa_tools.tools import results_history
 
 
 def test_bdm_rebuilds_from_real_committed_history(tmp_path, monkeypatch, deployment_history):
     results_path = tmp_path / "reports" / "results_rs_civil-registration.json"
-    monkeypatch.setattr(results_history, "ROOT", str(tmp_path))
+    monkeypatch.setattr(results_history, "reports_root", fixed(str(tmp_path / "reports")))
 
     output = results_history.build_results_from_history("civil-registration")
 
@@ -45,7 +46,7 @@ def test_bdm_rebuilds_from_real_committed_history(tmp_path, monkeypatch, deploym
 
 def test_cp_rebuilds_from_real_committed_history(tmp_path, monkeypatch, deployment_history):
     results_path = tmp_path / "reports" / "results_cpfs_child-protection.json"
-    monkeypatch.setattr(results_history, "ROOT", str(tmp_path))
+    monkeypatch.setattr(results_history, "reports_root", fixed(str(tmp_path / "reports")))
 
     output = results_history.build_results_from_history("child-protection")
 

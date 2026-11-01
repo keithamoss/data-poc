@@ -15,6 +15,14 @@ from pathlib import Path
 import yaml
 
 REPO = Path(__file__).resolve().parent.parent.parent
+
+
+def _asset_folder(root: Path) -> Path:
+    """The selected asset's configuration folder in the checkout at `root`,
+    asked of the resolver at call time (REQ-PIPE-342 criterion 6)."""
+    from qa_tools.common import assets
+
+    return root / assets.folder_rel()
 _ID = re.compile(r"^id_(\d+)$")
 
 
@@ -43,7 +51,7 @@ def _calendar_of(cal: dict, coll_id: str, ds_id: str) -> str | None:
 
 
 def _columns(root: Path, contract: str, table: str) -> list[str]:
-    doc = _load(root / "contract" / contract) or {}
+    doc = _load(_asset_folder(root) / contract) or {}
     for t in doc.get("schema") or []:
         if t.get("name") == table:
             return [p.get("name") for p in t.get("properties") or []]
@@ -152,8 +160,8 @@ CODE_COLUMN = "dataset"
 
 
 def problems(root: Path = REPO) -> list[str]:
-    asset = _load(root / "contract" / "data-asset.yaml") or {}
-    cal = _load(root / "contract" / "calendar.yaml") or {}
+    asset = _load(_asset_folder(root) / "data-asset.yaml") or {}
+    cal = _load(_asset_folder(root) / "calendar.yaml") or {}
     where = {ds.get("id"): (agency, coll, ds) for agency, coll, ds in _walk(asset)}
     out: list[str] = []
     #: (collection id, source dataset) -> the dataset declaring it alone, with no code
@@ -269,7 +277,7 @@ def _check_problems(root: Path, coll: dict, pid: str, mapping: dict, table: str)
     the source dataset's id where the entry has none."""
     stem = str(coll.get("contract", "")).rsplit("/", 1)[-1].removesuffix("-contract.yaml")
     folder = str(coll.get("contract", "")).rsplit("/", 1)[0]
-    path = root / "contract" / folder / f"{stem}-soda-checks.yml"
+    path = _asset_folder(root) / folder / f"{stem}-soda-checks.yml"
     out: list[str] = []
     have: dict[str, set] = {did: set() for did in mapping}
     for check_id, attrs, body, check_key in _soda_items(path, table):

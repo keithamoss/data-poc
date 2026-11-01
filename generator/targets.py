@@ -63,8 +63,8 @@ def written(bookkeeping: Path | None = None, placements: Path | None = None) -> 
     # READ AT CALL TIME, from the modules whose paths a test or a corpus
     # redirects (tests/equiv_support.apply_redirects) - the same two the
     # scenario map reads.
-    book = _read(bookkeeping or delivery.BOOKKEEPING_PATH)
-    placed = (_read(placements or scenario_map.PLACEMENTS_PATH).get("placements") or [])
+    book = _read(bookkeeping or delivery.bookkeeping_path())
+    placed = (_read(placements or scenario_map.placements_path()).get("placements") or [])
     out: list[Built] = []
     # WHOSE BOOKKEEPING IS WHOSE, from the providers (REQ-GEN-246 criterion
     # 6): a key no provider makes is refused by name, where it used to be
@@ -158,8 +158,8 @@ def just_written() -> tuple[list[Built], Path]:
     itself (REQ-GEN-043 criterion 7)."""
     from generator import driver, scenario_injection
 
-    return (written(driver.BOOKKEEPING_PATH, scenario_injection.PLACEMENTS_PATH),
-            Path(driver.DELIVERIES_DIR))
+    return (written(driver.bookkeeping_path(), scenario_injection.placements_path()),
+            Path(driver.deliveries_dir()))
 
 
 def _only(by_period: dict, period: str, scenario: str) -> dict:
@@ -183,7 +183,7 @@ def csv_of(delivery_name: str, deliveries_dir: Path | None = None,
            filename: str | None = None) -> Path:
     """A Birth Registrations delivery's one file - or, for one file of a
     two-file delivery (REQ-GEN-196), the file named."""
-    folder = Path(deliveries_dir or delivery.DELIVERIES_DIR, delivery_name)
+    folder = Path(deliveries_dir or delivery.default_deliveries_dir(), delivery_name)
     if filename is not None:
         path = folder / filename
         if not path.is_file():
@@ -214,7 +214,7 @@ def gate_outcomes(placements: Path | None = None) -> list[DeclaredGateOutcome]:
     """Every gate outcome the last generation's placements declare."""
     from qa_tools.common import scenario_map
 
-    placed = (_read(placements or scenario_map.PLACEMENTS_PATH).get("placements") or [])
+    placed = (_read(placements or scenario_map.placements_path()).get("placements") or [])
     return [DeclaredGateOutcome(scenario=p["scenario_id"], dataset_id=g["dataset_id"],
                                 delivery=g["delivery"], outcome=g["outcome"],
                                 because=g.get("because"), rechecked=bool(g.get("rechecked")))

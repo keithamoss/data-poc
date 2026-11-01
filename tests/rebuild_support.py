@@ -11,6 +11,7 @@ history first. The rebuild's output file is always redirected into
 """
 from __future__ import annotations
 
+from state_paths import fixed
 import pathlib
 
 from qa_tools import collections
@@ -103,5 +104,5 @@ def output_path(collection_id: str, tmp_path) -> pathlib.Path:
 def rebuild(collection_id: str, tmp_path, monkeypatch) -> dict:
     """Run the real rebuild, writing into tmp_path/reports/ rather than
     the repo's own reports/ (results_history.ROOT is the repo root)."""
-    monkeypatch.setattr(results_history, "ROOT", str(tmp_path))
+    monkeypatch.setattr(results_history, "reports_root", fixed(str(tmp_path / "reports")))
     return results_history.build_results_from_history(collection_id)

@@ -442,7 +442,9 @@ def _table_of_model(model: str) -> str:
 #: Written into an asset's dbt_packages/ once its packages install, holding
 #: the digest of the packages.yml they were installed for (REQ-QAC-368
 #: criterion 5) - so a second run can tell 'already installed' from 'the
-#: packages changed'.
+#: packages changed' - then, a line each, the package directories that
+#: install produced, so a package deleted since is not read as installed
+#: (post-build-review, the groundwork critic).
 PACKAGES_STAMP = ".mothman-packages.sha1"
 
 
@@ -457,9 +459,15 @@ def install_packages(project_dir, profiles_dir) -> bool:
 
     project = Path(project_dir)
     wanted = hashlib.sha1((project / "packages.yml").read_bytes()).hexdigest()
-    stamp = project / "dbt_packages" / PACKAGES_STAMP
-    if stamp.is_file() and stamp.read_text().strip() == wanted:
-        return False
+    packages = project / "dbt_packages"
+    stamp = packages / PACKAGES_STAMP
+    if stamp.is_file():
+        digest, *dirs = stamp.read_text().split()
+        present = all((packages / d).is_dir() and any((packages / d).iterdir()) for d in dirs)
+        # A stamp naming no directory (written before they were recorded)
+        # cannot vouch for any, so it installs once more.
+        if digest == wanted and dirs and present:
+            return False
     dbt = Path(sys.executable).parent / "dbt"
     done = subprocess.run([str(dbt), "deps", "--project-dir", str(project),
                            "--profiles-dir", str(profiles_dir)],
@@ -470,5 +478,6 @@ def install_packages(project_dir, profiles_dir) -> bool:
         said = "\n".join(p.strip() for p in (done.stdout, done.stderr) if p and p.strip())
         raise DbtRunFailed(f"dbt deps failed for {project}. dbt said:\n{said}")
     stamp.parent.mkdir(exist_ok=True)
-    stamp.write_text(wanted + "\n")
+    dirs = sorted(d.name for d in packages.iterdir() if d.is_dir())
+    stamp.write_text("\n".join([wanted, *dirs]) + "\n")
     return True

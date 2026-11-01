@@ -574,7 +574,7 @@ def at_ref(ref: str) -> tuple[dict, dict]:
     from qa_tools.common.validate_schedule import _content_at
 
     docs = []
-    for rel in (agreement_freeze.CALENDAR_REL, agreement_freeze.ASSET_REL):
+    for rel in (agreement_freeze.calendar_rel(), agreement_freeze.asset_rel()):
         text = _content_at(rel, ref)
         if text is None:
             raise Unreadable(f"{rel} could not be read at {ref!r} - is it a ref this "
@@ -620,7 +620,7 @@ def draft(ref: str | None = None, **given) -> list[str]:
 
     ref = ref or diff_base(root=validate_schedule.ROOT)
     base, work = at_ref(ref), working()
-    people = config_yaml.parse(_content_at(agreement_freeze.PEOPLE_REL, ref) or "") or {}
+    people = config_yaml.parse(_content_at(agreement_freeze.people_rel(), ref) or "") or {}
     return agreement_freeze.drafts(
         base[0], work[0], base[1], work[1], people,
         base_codeowners=_content_at(agreement_freeze.CODEOWNERS_REL, ref),
@@ -648,9 +648,9 @@ def may_approve(ref: str | None = None) -> list[str]:
     from qa_tools.common.validate_schedule import _content_at
 
     ref = ref or diff_base(root=validate_schedule.ROOT)
-    people = config_yaml.parse(_content_at(agreement_freeze.PEOPLE_REL, ref) or "") or {}
+    people = config_yaml.parse(_content_at(agreement_freeze.people_rel(), ref) or "") or {}
     owners = agreement_freeze.code_owners(_content_at(agreement_freeze.CODEOWNERS_REL, ref),
-                                          agreement_freeze.CALENDAR_REL)
+                                          agreement_freeze.calendar_rel())
     return [p.get("email") for p in agreement_freeze.approvers(people)
             if str(p.get("github", "")).lower() in owners and p.get("email")]
 

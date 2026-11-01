@@ -471,12 +471,12 @@ def _no_test_files_a_real_delivery():
     # THE REAL PATH IS CAPTURED HERE, once, BEFORE any test has run - and
     # that is the whole correctness of this guard rather than a detail.
     # The first version compared the target against the LIVE
-    # `delivery.DELIVERIES_DIR`, which several tests legitimately
+    # `delivery.default_deliveries_dir()`, which several tests legitimately
     # monkeypatch to a tmp_path: those two are then equal and the guard
     # fired on thirteen tests that were already doing the right thing.
     # Caught by the gate, which is where a guard this broad should be
     # caught.
-    real_tree = Path(delivery.DELIVERIES_DIR).resolve()
+    real_tree = Path(delivery.default_deliveries_dir()).resolve()
 
     # BOUND THROUGH THE REAL SIGNATURE rather than picking `deliveries_dir`
     # out of **kwargs, which is the second thing this guard got wrong:
@@ -491,13 +491,13 @@ def _no_test_files_a_real_delivery():
         bound = signature.bind(*args, **kwargs)
         bound.apply_defaults()
         named = bound.arguments.get("deliveries_dir")
-        target = Path(named or delivery.DELIVERIES_DIR).resolve()
+        target = Path(named or delivery.default_deliveries_dir()).resolve()
         if target == real_tree:
             raise AssertionError(
                 f"a test tried to file delivery "
                 f"{bound.arguments.get('name')!r} into this repo's real "
                 f"{real_tree} - point deliveries_dir and receipts_dir "
-                f"at tmp_path, or monkeypatch delivery.DELIVERIES_DIR "
+                f"at tmp_path, or monkeypatch delivery.default_deliveries_dir "
                 f"(see tests/conftest.py's _no_test_files_a_real_delivery)")
         return real(*args, **kwargs)
 
@@ -508,16 +508,16 @@ def _no_test_files_a_real_delivery():
     real_remove = delivery.remove_deliveries
     remove_signature = inspect.signature(real_remove)
 
-    real_receipts = Path(delivery.RECEIPTS_DIR).resolve()
+    real_receipts = Path(delivery.default_receipts_dir()).resolve()
 
     @functools.wraps(real_remove)
     def guarded_remove(*args, **kwargs):
         bound = remove_signature.bind(*args, **kwargs)
         bound.apply_defaults()
-        target = Path(bound.arguments.get("deliveries_dir") or delivery.DELIVERIES_DIR).resolve()
+        target = Path(bound.arguments.get("deliveries_dir") or delivery.default_deliveries_dir()).resolve()
         # THE RECEIPTS TOO (post-build-review #232): a clear redirecting only
         # the deliveries would still delete real receipts.
-        receipts = Path(bound.arguments.get("receipts_dir") or delivery.RECEIPTS_DIR).resolve()
+        receipts = Path(bound.arguments.get("receipts_dir") or delivery.default_receipts_dir()).resolve()
         if receipts == real_receipts:
             raise AssertionError(
                 f"a test tried to clear receipts from this repo's real {real_receipts} - point "
