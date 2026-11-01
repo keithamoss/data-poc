@@ -31,7 +31,7 @@ A scenario marked **not injected** has no generated data behind it.
 Either it is a pure unit test with nothing to look at, or it is meant
 for injection and has not been placed yet.
 
-**79 of 89 scenarios marked for injection have data behind them today.** 126 scenarios are registered in all; the rest are unit tests with nothing to look at.
+**92 of 102 scenarios marked for injection have data behind them today.** 139 scenarios are registered in all; the rest are unit tests with nothing to look at.
 
 ## Slot assignment
 
@@ -1488,6 +1488,203 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
 | Supplies | `linkage_keys__202111011730000800` |
 | Period | 2021-Q4 |
 | Set "in the warehouse on" to | 2021-11-01 |
+
+## The geocoding history, planted (REQ-GEN-298)
+
+### TS-93c - A Client Register geocode whose source was rejected - named, not planted
+
+**What it demonstrates.** Its two cp-clients checks read Fail, could not run, and the file is held back for the rest of the history, as TS-93b's linkage release is.
+
+**What it would look like if the rule were wrong.** The checks evaluated against another quarter's Client Register.
+
+*Config: quarterly, due 19:00; 2019-Q1's ordinary Client Register Geocodes, received while TS-93a's Client Register is held and then rejected, nothing replacing it.*
+
+| Where to look | |
+|---|---|
+| Dataset | geo-cp-clients |
+| Supplies | `geo_cp_clients__201902011843000800` |
+| Period | 2019-Q1 |
+| Set "in the warehouse on" to | 2019-02-01 |
+
+### TS-100c - A Client Register geocode cleared by a person's promotion - named, not planted
+
+**What it demonstrates.** Its cp-clients checks read Fail, could not run, until 10:00 on 2 August 2019, when the promotion's knock-on re-checks them and they pass.
+
+**What it would look like if the rule were wrong.** Still failing after the promotion.
+
+*Config: as TS-93c; 2019-Q3's ordinary Client Register Geocodes, received while TS-100a's Client Register is held.*
+
+| Where to look | |
+|---|---|
+| Dataset | geo-cp-clients |
+| Supplies | `geo_cp_clients__201908011817000800` |
+| Period | 2019-Q3 |
+| Set "in the warehouse on" to | 2019-08-01 |
+
+### TS-101b - An ED geocode while ED's same-round Fail is held - named, not planted
+
+**What it demonstrates.** Its ed-presentations checks read Fail, could not run, and clear through the knock-on once the resupply is promoted.
+
+**What it would look like if the rule were wrong.** ED's page coloured by a not-evaluated result.
+
+*Config: as TS-93c; 2021-Q4's ordinary ED Presentations Geocodes, built from ED's Fail supply of the morning, its share not geocoded in the warn band, received while that supply is held.*
+
+| Where to look | |
+|---|---|
+| Dataset | geo-ed-presentations |
+| Supplies | `geo_ed_presentations__202111011850000800` |
+| Period | 2021-Q4 |
+| Set "in the warehouse on" to | 2021-11-01 |
+
+### TS-102 - A missing census year
+
+**What it demonstrates.** Missing census years reads Fail, each sample the record and the missing year; every other check passes.
+
+**What it would look like if the rule were wrong.** The record read as left out, or the year check passing.
+
+*Config: quarterly, due 19:00 with 8 hours' grace; 2023-Q2's Client Register Geocodes, one census year's rows dropped for one to three records, the record's other years present - two or more years in force since 2017-Q3.*
+
+| Where to look | |
+|---|---|
+| Dataset | geo-cp-clients |
+| Supplies | `geo_cp_clients__202305011830000800` |
+| Period | 2023-Q2 |
+| Set "in the warehouse on" to | 2023-05-01 |
+
+### TS-103 - A duplicated census year
+
+**What it demonstrates.** Duplicated census years reads Fail; every other check passes.
+
+**What it would look like if the rule were wrong.** The repeat read as a second record.
+
+*Config: as TS-102; 2022-Q1's ED Presentations Geocodes, one census year's row repeated, identical in every column, for one to three presentations.*
+
+| Where to look | |
+|---|---|
+| Dataset | geo-ed-presentations |
+| Supplies | `geo_ed_presentations__202202011830000800` |
+| Period | 2022-Q1 |
+| Set "in the warehouse on" to | 2022-02-01 |
+
+### TS-104 - An unexpected census year
+
+**What it demonstrates.** Unexpected census years reads Fail on the 2026 rows; every other check passes.
+
+**What it would look like if the rule were wrong.** 2026 read as in the set, or caught by a type check.
+
+*Config: as TS-102; 2016-Q2's Client Register Geocodes, a row for census year 2026 for one to three records - 2026 joins the set only from 2027-Q3.*
+
+| Where to look | |
+|---|---|
+| Dataset | geo-cp-clients |
+| Supplies | `geo_cp_clients__201605011830000800` |
+| Period | 2016-Q2 |
+| Set "in the warehouse on" to | 2016-05-01 |
+
+### TS-105 - The share not geocoded in the warn band
+
+**What it demonstrates.** Share not geocoded reads Warn; the drift check over placed rows passes; the file promotes as a Warn does.
+
+**What it would look like if the rule were wrong.** Fail, or the drift check warning too.
+
+*Config: as TS-102; 2023-Q1's ED Presentations Geocodes, whole presentations turned not geocoded in every year, codes empty, until the share lies between 6 and 9 percent.*
+
+| Where to look | |
+|---|---|
+| Dataset | geo-ed-presentations |
+| Supplies | `geo_ed_presentations__202302011830000800` |
+| Period | 2023-Q1 |
+| Set "in the warehouse on" to | 2023-02-01 |
+
+### TS-106 - The share not geocoded in the fail band
+
+**What it demonstrates.** Share not geocoded reads Fail and the file is held back.
+
+**What it would look like if the rule were wrong.** Warn, or the format checks failing the empty codes.
+
+*Config: as TS-105; 2024-Q1's Client Register Geocodes, until the share lies between 12 and 18 percent.*
+
+| Where to look | |
+|---|---|
+| Dataset | geo-cp-clients |
+| Supplies | `geo_cp_clients__202402011830000800` |
+| Period | 2024-Q1 |
+| Set "in the warehouse on" to | 2024-02-01 |
+
+### TS-107 - Coverage in the warn band
+
+**What it demonstrates.** Source records matched reads Warn; the missing-year check, which counts only records present, passes.
+
+**What it would look like if the rule were wrong.** Missing census years failing, or coverage Pass.
+
+*Config: as TS-102; 2014-Q1's ED Presentations Geocodes, 0.5 to 1.5 percent of the quarter's presentations left out in every year.*
+
+| Where to look | |
+|---|---|
+| Dataset | geo-ed-presentations |
+| Supplies | `geo_ed_presentations__201402011830000800` |
+| Period | 2014-Q1 |
+| Set "in the warehouse on" to | 2014-02-01 |
+
+### TS-108 - Coverage in the fail band
+
+**What it demonstrates.** Source records matched reads Fail, a percentage only; the file is held back, so its Fail does not colour the Client Register.
+
+**What it would look like if the rule were wrong.** Failing rows recorded for coverage, or the Client Register coloured before the file is promoted.
+
+*Config: as TS-107; 2025-Q1's Client Register Geocodes, 3 to 6 percent of the quarter's clients left out.*
+
+| Where to look | |
+|---|---|
+| Dataset | geo-cp-clients |
+| Supplies | `geo_cp_clients__202502011830000800` |
+| Period | 2025-Q1 |
+| Set "in the warehouse on" to | 2025-02-01 |
+
+### TS-109 - A geocode for a record the quarter does not hold
+
+**What it demonstrates.** Rows matching no source record reads Fail, each sample the record and year; coverage passes.
+
+**What it would look like if the rule were wrong.** The orphan passed, or coverage falling.
+
+*Config: as TS-102; 2017-Q4's ED Presentations Geocodes, one record's rows in every year naming a presentation not in ED's 2017-Q4 supply - added, so every presentation still has its geocodes.*
+
+| Where to look | |
+|---|---|
+| Dataset | geo-ed-presentations |
+| Supplies | `geo_ed_presentations__201711011830000800` |
+| Period | 2017-Q4 |
+| Set "in the warehouse on" to | 2017-11-01 |
+
+### TS-110 - An empty geocoding file
+
+**What it demonstrates.** Source records matched reads Fail at 0 percent (REQ-QAC-340 criterion 4); the year checks find nothing to fail.
+
+**What it would look like if the rule were wrong.** Every check passing over nothing.
+
+*Config: as TS-102; 2025-Q4's geo_cp_clients.csv holds no rows while the quarter's Client Register holds its clients.*
+
+| Where to look | |
+|---|---|
+| Dataset | geo-cp-clients |
+| Supplies | `geo_cp_clients__202511011830000800` |
+| Period | 2025-Q4 |
+| Set "in the warehouse on" to | 2025-11-01 |
+
+### TS-111 - A Client Register coloured by its geocodes' promotion
+
+**What it demonstrates.** The file reads Warn on coverage and is promoted; from that instant the 2026-Q1 Client Register, promoted passing on the round before, reads with the Warn tag naming Linkage Products' 2026-Q1 Client Register Geocodes as the cause (REQ-PIPE-332 criterion 4), and earlier dates still show it passing.
+
+**What it would look like if the rule were wrong.** The Client Register demoted, or tagged before the promotion.
+
+*Config: as TS-107; 2026-Q1's Client Register Geocodes, 0.5 to 1.5 percent of clients left out, in a quarter whose amber setting promotes.*
+
+| Where to look | |
+|---|---|
+| Dataset | geo-cp-clients |
+| Supplies | `geo_cp_clients__202602011830000800` |
+| Period | 2026-Q1 |
+| Set "in the warehouse on" to | 2026-02-01 |
 
 
 <!-- scenario-map-data
@@ -3932,6 +4129,27 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    }
   },
   {
+   "id": "TS-93c",
+   "mode": "INJECT",
+   "title": "A Client Register geocode whose source was rejected - named, not planted",
+   "section": "The geocoding history, planted (REQ-GEN-298)",
+   "demonstrates": "Its two cp-clients checks read Fail, could not run, and the file is held back for the rest of the history, as TS-93b's linkage release is.",
+   "breaksAs": "The checks evaluated against another quarter's Client Register.",
+   "config": "Config: quarterly, due 19:00; 2019-Q1's ordinary Client Register Geocodes, received while TS-93a's Client Register is held and then rejected, nothing replacing it.",
+   "requirements": [
+    "REQ-GEN-298"
+   ],
+   "coordinates": {
+    "dataset": "geo-cp-clients",
+    "supplies": [
+     "geo_cp_clients__201902011843000800"
+    ],
+    "period": "2019-Q1",
+    "inPlaceOn": "2019-02-01",
+    "subject": "supply-history-row"
+   }
+  },
+  {
    "id": "TS-94",
    "mode": "INJECT",
    "title": "A failing linkage release promoted by a person",
@@ -4104,6 +4322,27 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    }
   },
   {
+   "id": "TS-100c",
+   "mode": "INJECT",
+   "title": "A Client Register geocode cleared by a person's promotion - named, not planted",
+   "section": "The geocoding history, planted (REQ-GEN-298)",
+   "demonstrates": "Its cp-clients checks read Fail, could not run, until 10:00 on 2 August 2019, when the promotion's knock-on re-checks them and they pass.",
+   "breaksAs": "Still failing after the promotion.",
+   "config": "Config: as TS-93c; 2019-Q3's ordinary Client Register Geocodes, received while TS-100a's Client Register is held.",
+   "requirements": [
+    "REQ-GEN-298"
+   ],
+   "coordinates": {
+    "dataset": "geo-cp-clients",
+    "supplies": [
+     "geo_cp_clients__201908011817000800"
+    ],
+    "period": "2019-Q3",
+    "inPlaceOn": "2019-08-01",
+    "subject": "supply-history-row"
+   }
+  },
+  {
    "id": "TS-101",
    "mode": "INJECT",
    "title": "Emergency Department's same-round Fail, clearing",
@@ -4122,6 +4361,240 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
     ],
     "period": "2021-Q4",
     "inPlaceOn": "2021-11-01",
+    "subject": "supply-history-row"
+   }
+  },
+  {
+   "id": "TS-101b",
+   "mode": "INJECT",
+   "title": "An ED geocode while ED's same-round Fail is held - named, not planted",
+   "section": "The geocoding history, planted (REQ-GEN-298)",
+   "demonstrates": "Its ed-presentations checks read Fail, could not run, and clear through the knock-on once the resupply is promoted.",
+   "breaksAs": "ED's page coloured by a not-evaluated result.",
+   "config": "Config: as TS-93c; 2021-Q4's ordinary ED Presentations Geocodes, built from ED's Fail supply of the morning, its share not geocoded in the warn band, received while that supply is held.",
+   "requirements": [
+    "REQ-GEN-298"
+   ],
+   "coordinates": {
+    "dataset": "geo-ed-presentations",
+    "supplies": [
+     "geo_ed_presentations__202111011850000800"
+    ],
+    "period": "2021-Q4",
+    "inPlaceOn": "2021-11-01",
+    "subject": "supply-history-row"
+   }
+  },
+  {
+   "id": "TS-102",
+   "mode": "INJECT",
+   "title": "A missing census year",
+   "section": "The geocoding history, planted (REQ-GEN-298)",
+   "demonstrates": "Missing census years reads Fail, each sample the record and the missing year; every other check passes.",
+   "breaksAs": "The record read as left out, or the year check passing.",
+   "config": "Config: quarterly, due 19:00 with 8 hours' grace; 2023-Q2's Client Register Geocodes, one census year's rows dropped for one to three records, the record's other years present - two or more years in force since 2017-Q3.",
+   "requirements": [
+    "REQ-GEN-298"
+   ],
+   "coordinates": {
+    "dataset": "geo-cp-clients",
+    "supplies": [
+     "geo_cp_clients__202305011830000800"
+    ],
+    "period": "2023-Q2",
+    "inPlaceOn": "2023-05-01",
+    "subject": "supply-history-row"
+   }
+  },
+  {
+   "id": "TS-103",
+   "mode": "INJECT",
+   "title": "A duplicated census year",
+   "section": "The geocoding history, planted (REQ-GEN-298)",
+   "demonstrates": "Duplicated census years reads Fail; every other check passes.",
+   "breaksAs": "The repeat read as a second record.",
+   "config": "Config: as TS-102; 2022-Q1's ED Presentations Geocodes, one census year's row repeated, identical in every column, for one to three presentations.",
+   "requirements": [
+    "REQ-GEN-298"
+   ],
+   "coordinates": {
+    "dataset": "geo-ed-presentations",
+    "supplies": [
+     "geo_ed_presentations__202202011830000800"
+    ],
+    "period": "2022-Q1",
+    "inPlaceOn": "2022-02-01",
+    "subject": "supply-history-row"
+   }
+  },
+  {
+   "id": "TS-104",
+   "mode": "INJECT",
+   "title": "An unexpected census year",
+   "section": "The geocoding history, planted (REQ-GEN-298)",
+   "demonstrates": "Unexpected census years reads Fail on the 2026 rows; every other check passes.",
+   "breaksAs": "2026 read as in the set, or caught by a type check.",
+   "config": "Config: as TS-102; 2016-Q2's Client Register Geocodes, a row for census year 2026 for one to three records - 2026 joins the set only from 2027-Q3.",
+   "requirements": [
+    "REQ-GEN-298"
+   ],
+   "coordinates": {
+    "dataset": "geo-cp-clients",
+    "supplies": [
+     "geo_cp_clients__201605011830000800"
+    ],
+    "period": "2016-Q2",
+    "inPlaceOn": "2016-05-01",
+    "subject": "supply-history-row"
+   }
+  },
+  {
+   "id": "TS-105",
+   "mode": "INJECT",
+   "title": "The share not geocoded in the warn band",
+   "section": "The geocoding history, planted (REQ-GEN-298)",
+   "demonstrates": "Share not geocoded reads Warn; the drift check over placed rows passes; the file promotes as a Warn does.",
+   "breaksAs": "Fail, or the drift check warning too.",
+   "config": "Config: as TS-102; 2023-Q1's ED Presentations Geocodes, whole presentations turned not geocoded in every year, codes empty, until the share lies between 6 and 9 percent.",
+   "requirements": [
+    "REQ-GEN-298"
+   ],
+   "coordinates": {
+    "dataset": "geo-ed-presentations",
+    "supplies": [
+     "geo_ed_presentations__202302011830000800"
+    ],
+    "period": "2023-Q1",
+    "inPlaceOn": "2023-02-01",
+    "subject": "supply-history-row"
+   }
+  },
+  {
+   "id": "TS-106",
+   "mode": "INJECT",
+   "title": "The share not geocoded in the fail band",
+   "section": "The geocoding history, planted (REQ-GEN-298)",
+   "demonstrates": "Share not geocoded reads Fail and the file is held back.",
+   "breaksAs": "Warn, or the format checks failing the empty codes.",
+   "config": "Config: as TS-105; 2024-Q1's Client Register Geocodes, until the share lies between 12 and 18 percent.",
+   "requirements": [
+    "REQ-GEN-298"
+   ],
+   "coordinates": {
+    "dataset": "geo-cp-clients",
+    "supplies": [
+     "geo_cp_clients__202402011830000800"
+    ],
+    "period": "2024-Q1",
+    "inPlaceOn": "2024-02-01",
+    "subject": "supply-history-row"
+   }
+  },
+  {
+   "id": "TS-107",
+   "mode": "INJECT",
+   "title": "Coverage in the warn band",
+   "section": "The geocoding history, planted (REQ-GEN-298)",
+   "demonstrates": "Source records matched reads Warn; the missing-year check, which counts only records present, passes.",
+   "breaksAs": "Missing census years failing, or coverage Pass.",
+   "config": "Config: as TS-102; 2014-Q1's ED Presentations Geocodes, 0.5 to 1.5 percent of the quarter's presentations left out in every year.",
+   "requirements": [
+    "REQ-GEN-298",
+    "REQ-QAC-340"
+   ],
+   "coordinates": {
+    "dataset": "geo-ed-presentations",
+    "supplies": [
+     "geo_ed_presentations__201402011830000800"
+    ],
+    "period": "2014-Q1",
+    "inPlaceOn": "2014-02-01",
+    "subject": "supply-history-row"
+   }
+  },
+  {
+   "id": "TS-108",
+   "mode": "INJECT",
+   "title": "Coverage in the fail band",
+   "section": "The geocoding history, planted (REQ-GEN-298)",
+   "demonstrates": "Source records matched reads Fail, a percentage only; the file is held back, so its Fail does not colour the Client Register.",
+   "breaksAs": "Failing rows recorded for coverage, or the Client Register coloured before the file is promoted.",
+   "config": "Config: as TS-107; 2025-Q1's Client Register Geocodes, 3 to 6 percent of the quarter's clients left out.",
+   "requirements": [
+    "REQ-GEN-298"
+   ],
+   "coordinates": {
+    "dataset": "geo-cp-clients",
+    "supplies": [
+     "geo_cp_clients__202502011830000800"
+    ],
+    "period": "2025-Q1",
+    "inPlaceOn": "2025-02-01",
+    "subject": "supply-history-row"
+   }
+  },
+  {
+   "id": "TS-109",
+   "mode": "INJECT",
+   "title": "A geocode for a record the quarter does not hold",
+   "section": "The geocoding history, planted (REQ-GEN-298)",
+   "demonstrates": "Rows matching no source record reads Fail, each sample the record and year; coverage passes.",
+   "breaksAs": "The orphan passed, or coverage falling.",
+   "config": "Config: as TS-102; 2017-Q4's ED Presentations Geocodes, one record's rows in every year naming a presentation not in ED's 2017-Q4 supply - added, so every presentation still has its geocodes.",
+   "requirements": [
+    "REQ-GEN-298"
+   ],
+   "coordinates": {
+    "dataset": "geo-ed-presentations",
+    "supplies": [
+     "geo_ed_presentations__201711011830000800"
+    ],
+    "period": "2017-Q4",
+    "inPlaceOn": "2017-11-01",
+    "subject": "supply-history-row"
+   }
+  },
+  {
+   "id": "TS-110",
+   "mode": "INJECT",
+   "title": "An empty geocoding file",
+   "section": "The geocoding history, planted (REQ-GEN-298)",
+   "demonstrates": "Source records matched reads Fail at 0 percent (REQ-QAC-340 criterion 4); the year checks find nothing to fail.",
+   "breaksAs": "Every check passing over nothing.",
+   "config": "Config: as TS-102; 2025-Q4's geo_cp_clients.csv holds no rows while the quarter's Client Register holds its clients.",
+   "requirements": [
+    "REQ-QAC-340",
+    "REQ-GEN-298"
+   ],
+   "coordinates": {
+    "dataset": "geo-cp-clients",
+    "supplies": [
+     "geo_cp_clients__202511011830000800"
+    ],
+    "period": "2025-Q4",
+    "inPlaceOn": "2025-11-01",
+    "subject": "supply-history-row"
+   }
+  },
+  {
+   "id": "TS-111",
+   "mode": "INJECT",
+   "title": "A Client Register coloured by its geocodes' promotion",
+   "section": "The geocoding history, planted (REQ-GEN-298)",
+   "demonstrates": "The file reads Warn on coverage and is promoted; from that instant the 2026-Q1 Client Register, promoted passing on the round before, reads with the Warn tag naming Linkage Products' 2026-Q1 Client Register Geocodes as the cause (REQ-PIPE-332 criterion 4), and earlier dates still show it passing.",
+   "breaksAs": "The Client Register demoted, or tagged before the promotion.",
+   "config": "Config: as TS-107; 2026-Q1's Client Register Geocodes, 0.5 to 1.5 percent of clients left out, in a quarter whose amber setting promotes.",
+   "requirements": [
+    "REQ-PIPE-332",
+    "REQ-GEN-298"
+   ],
+   "coordinates": {
+    "dataset": "geo-cp-clients",
+    "supplies": [
+     "geo_cp_clients__202602011830000800"
+    ],
+    "period": "2026-Q1",
+    "inPlaceOn": "2026-02-01",
     "subject": "supply-history-row"
    }
   }

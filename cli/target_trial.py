@@ -54,10 +54,23 @@ def spec_of(one, written_to) -> dict:
     received = one.received_at or asset_time.isoformat(
         asset_time.start_of_day(date.fromisoformat(one.day)))
     sources = []
-    for table, dataset_id, delivery, at in one.sources:
+    for table, dataset_id, deliveries, at in one.sources:
+        csv = None
+        if deliveries:
+            # THE ONE DELIVERY RECEIVED THEN THAT HOLDS THE DATASET'S FILE.
+            held = []
+            for name in deliveries:
+                try:
+                    held.append(targets.csv_of(name, written_to, dataset_id=dataset_id))
+                except ValueError:
+                    continue
+            if len(held) != 1:
+                raise ValueError(f"{one.label}: {len(held)} of the deliveries received at {at} "
+                                 f"({', '.join(deliveries)}) hold a file for {dataset_id}, not "
+                                 f"one")
+            csv = str(held[0])
         sources.append({"table": table, "dataset_id": dataset_id, "received_at": at,
-                        "csv": (str(targets.csv_of(delivery, written_to, dataset_id=dataset_id))
-                                if delivery else None)})
+                        "csv": csv})
     return {"label": one.label, "dataset_id": one.dataset_id, "target": one.target,
             "rules": list(one.rules), "period": one.period, "received_at": received,
             "aimed": list(one.rules) if one.scenario else [],

@@ -184,12 +184,15 @@ class CollectionCLI:
             else:
                 ready.append(one)
         if run_reads.reads_for(provider.collection_id).foreign:
-            try:
-                specs = [target_trial.spec_of(one, written_to) for one in ready]
-            except ValueError as exc:
-                specs = []
-                found.append(target_agreement.ReadDisagreement(
-                    "the trial's files", provider.collection_id, (str(exc),)))
+            specs = []
+            for one in ready:
+                # A SUPPLY WHOSE FILES CANNOT BE FOUND IS ITS OWN DISAGREEMENT,
+                # never the end of every other trial.
+                try:
+                    specs.append(target_trial.spec_of(one, written_to))
+                except ValueError as exc:
+                    found.append(target_agreement.ReadDisagreement(
+                        one.label, one.dataset_id, (str(exc),)))
             disagreements, took, workers = target_trial.try_all(provider.collection_id,
                                                                 specs, say=say)
             found += disagreements

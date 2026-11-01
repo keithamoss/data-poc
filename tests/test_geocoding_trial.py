@@ -271,7 +271,8 @@ class TestEveryTargetCarriesItsDayFileAndPeriod:
                                                        "2023-Q2")
         assert two.tried and not built["g1"].tried
         assert two.reference == "g1", "the dataset's last supply before it planned green"
-        assert two.sources == (("cp_clients", "cp-clients", "cpd", "2023-02-01T01:00:00+00:00"),)
+        assert two.sources == (("cp_clients", "cp-clients", ("cpd",),
+                                "2023-02-01T01:00:00+00:00"),)
         assert two.label.startswith("TS-102's 2023-Q2")
 
     def test_a_held_source_is_staged_as_nothing(self, tmp_path):

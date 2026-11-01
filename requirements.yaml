@@ -33116,7 +33116,7 @@ requirements:
     - generator/targets.py::just_written
     - qa_tools/common/target_agreement.py::compare
     - qa_tools/common/target_agreement.py::after_replay
-    - cli/one_table.py::OneTableCLI::try_targets
+    - cli/collection_cli.py::CollectionCLI::try_targets
     - cli/collection_cli.py::CollectionCLI::generate_synthetic_data
     - cli/pipeline.py::generated_targets
     - cli/pipeline.py::disagreement_message
@@ -46409,7 +46409,7 @@ requirements:
     - generator/targets.py::written
     - generator/scenario_injection.py::CORRECTION_RIDERS
     - generator/correction_claims.py::check_all
-    - cli/one_table.py::OneTableCLI::try_targets
+    - cli/collection_cli.py::CollectionCLI::try_targets
     - contract/scripted_decisions.yaml
     linked_tests:
     - tests/test_geocoding_generator.py::TestTheStreams

@@ -59,8 +59,9 @@ class Built:
     #: Its receipt, where the provider recorded one - a trial in a period
     #: stages the supply as received.
     received_at: str | None = None
-    #: FOR A TRIAL IN A PERIOD (criterion 11): (table, dataset, delivery,
-    #: receipt) of each other collection's supply the plan promotes into the
+    #: FOR A TRIAL IN A PERIOD (criterion 11): (table, dataset, the
+    #: deliveries received at that instant, receipt) of each other collection's
+    #: supply the plan promotes into the
     #: period before this one's receipt - delivery and receipt None where it
     #: promotes none, so the trial stages nothing for that table.
     sources: tuple = ()
@@ -185,14 +186,18 @@ def _planned(dataset_id: str, book: dict, placed: list[dict]) -> list[Built]:
     return out
 
 
-def _delivery_received(book: dict, dataset_id: str, received_at: str) -> str:
-    """The delivery of `dataset_id`'s supply received at that instant, from
-    the generator's own record - refused by name where it holds none."""
+def _delivery_received(book: dict, dataset_id: str, received_at: str) -> tuple[str, ...]:
+    """Every delivery the generator's own record says was received at that
+    instant under `dataset_id` - several where a supply's tables arrive as
+    deliveries of their own at one instant; the trial takes the one holding
+    the dataset's file (cli/target_trial.spec_of). Refused by name where the
+    record holds none."""
     at = asset_time.parse_instant(received_at, dataset_id)
-    for entry in book.get(dataset_id) or ():
-        if entry.get("received_at") and asset_time.parse_instant(
-                entry["received_at"], entry.get("run_id", dataset_id)) == at:
-            return entry["delivery"]
+    found = tuple(entry["delivery"] for entry in book.get(dataset_id) or ()
+                  if entry.get("received_at") and asset_time.parse_instant(
+                      entry["received_at"], entry.get("run_id", dataset_id)) == at)
+    if found:
+        return found
     raise ValueError(f"the generator's record holds no {dataset_id} supply received "
                      f"{received_at}, which a geocoding supply's trial would stage")
 
