@@ -13,6 +13,8 @@ import random
 
 import pytest
 
+import asset_params
+
 from qa_tools.common import asked_for, check_id, qa_results_writer, qa_store, supply_db
 from qa_tools.common import validate_check_lifecycle as vcl
 
@@ -35,8 +37,7 @@ def _active(collection: str, tool: str) -> set[str]:
 
 class TestWhatACollectionHolds:
 
-    @pytest.mark.asset("daily")
-    @pytest.mark.parametrize("collection", [CP, BDM])
+    @pytest.mark.parametrize("collection", asset_params.per_asset([CP, BDM]))
     @pytest.mark.parametrize("tool", asked_for.TOOLS)
     def test_every_active_check_of_that_tool_and_collection(self, collection, tool):
         got = asked_for.collection_checks(collection, tool)

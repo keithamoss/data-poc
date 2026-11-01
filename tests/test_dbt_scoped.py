@@ -13,6 +13,8 @@ import random
 
 import pytest
 
+import asset_params
+
 import qa_tools.tools.run_dbt as run_dbt
 from fixture_ids import CP_DIRTY_RUN_ID
 from qa_tools.common import asked_for, dbt_common, left_out, qa_results_writer, supply_db
@@ -55,8 +57,7 @@ def _ran(run_id: str) -> set[str]:
 
 class TestTheSelection:
 
-    @pytest.mark.asset("daily")
-    @pytest.mark.parametrize("collection", [CP, "civil-registration"])
+    @pytest.mark.parametrize("collection", asset_params.per_asset([CP, "civil-registration"]))
     def test_every_active_dbt_check_names_a_test(self, collection):
         """Through the project's own node-to-check-id lookup, never a list
         of node names kept by hand (NFR 1) - and every check that can be
@@ -64,15 +65,23 @@ class TestTheSelection:
         names = run_dbt.test_names_by_check_id(collection)
         assert set(asked_for.collection_checks(collection, "dbt")) <= set(names)
 
-    def test_each_collection_claims_only_its_own_tests(self):
+    @pytest.mark.parametrize("asset", [pytest.param("quarterly", marks=pytest.mark.asset("quarterly")),
+                                       pytest.param("daily", marks=pytest.mark.asset("daily"))])
+    def test_each_collection_claims_only_its_own_tests(self, asset):
         """Critic F4: Child Protection's lookup claimed two Birth Registrations
-        singular tests, which names_by_check_id's contract says it must not."""
-        cp = run_dbt.test_names_by_check_id("child-protection")
-        br = run_dbt.test_names_by_check_id("civil-registration")
-        assert cp and br
-        assert all(".child-protection." in c for c in cp), sorted(
-            c for c in cp if ".child-protection." not in c)
-        assert all(".civil-registration." in c for c in br)
+        singular tests, which names_by_check_id's contract says it must not.
+        Since the asset split each asset's dbt project is its own, so each
+        collection is asked on its own asset, beside its siblings there."""
+        from qa_tools import collections
+
+        claimed = {c.id: run_dbt.test_names_by_check_id(c.id)
+                   for c in collections.all_collections()}
+        assert any(claimed.values()), claimed
+        for cid, names in claimed.items():
+            if asked_for.collection_checks(cid, "dbt"):
+                assert names, f"{cid} has dbt checks and its lookup claims none"
+            assert all(f".{cid}." in c for c in names), sorted(
+                c for c in names if f".{cid}." not in c)
 
     def test_the_project_is_parsed_once_while_it_is_unchanged(self, monkeypatch):
         """Criterion 5: the worker's partial parse is kept, and the lookup

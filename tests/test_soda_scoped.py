@@ -78,7 +78,17 @@ class TestTheHandedText:
 
 
 @pytest.fixture
-def _quiet(monkeypatch, cp_duckdb_dir, bdm_duckdb_dir):
+def _quiet(monkeypatch, request):
+    """The staged runs of each collection the selected asset holds (the
+    asset split: one asset's database holds one asset's supplies)."""
+    from qa_tools import collections
+
+    held = {c.id for c in collections.all_collections()}
+    staged = [name for cid, name in (("child-protection", "cp_duckdb_dir"),
+                                     ("civil-registration", "bdm_duckdb_dir")) if cid in held]
+    assert staged, "the selected asset holds neither collection these cases stage"
+    for name in staged:
+        request.getfixturevalue(name)
     import qa_tools.tools.run_soda as shared
 
     monkeypatch.setattr(shared, "write_qa_result", lambda *a, **k: None)

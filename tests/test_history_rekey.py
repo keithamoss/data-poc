@@ -26,6 +26,8 @@ from __future__ import annotations
 
 import pytest
 
+import asset_params
+
 import rebuild_support
 from qa_tools.common import qa_results_reader as reader
 from qa_tools.common import tables_read as tr
@@ -322,8 +324,7 @@ class TestOneAgreedOrdering:
             assert len(keys) == len(results), (
                 f"{name}: {len(results) - len(keys)} duplicate (run_id, check_id) pairs")
 
-    @pytest.mark.asset("daily")
-    @pytest.mark.parametrize("module", rebuild_support.REBUILDS)
+    @pytest.mark.parametrize("module", asset_params.per_asset(rebuild_support.REBUILDS))
     def test_both_rebuilds_apply_it(self, module, clean_qa_history, tmp_path, monkeypatch):
         """Results recorded out of order come back from the real rebuild
         in the agreed order. A path that skipped it would produce results

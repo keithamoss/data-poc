@@ -9,6 +9,8 @@ import contextlib
 
 import pytest
 
+import asset_params
+
 from qa_tools import collections
 from qa_tools.common import evidently_common, supply_db
 from qa_tools.tools import run_evidently
@@ -49,8 +51,7 @@ def fake_db(monkeypatch):
     return seen
 
 
-@pytest.mark.asset("quarterly")
-@pytest.mark.parametrize("collection_id", COLLECTIONS)
+@pytest.mark.parametrize("collection_id", asset_params.per_asset(COLLECTIONS))
 def test_the_runs_rows_are_read_from_the_entrys_column(collection_id, fake_db, monkeypatch):
     coll, entry, check_id = _entry(collection_id)
     result = run_evidently._psi_result(coll, entry, check_id, run_evidently._table_of(check_id),
@@ -59,8 +60,7 @@ def test_the_runs_rows_are_read_from_the_entrys_column(collection_id, fake_db, m
     assert result["column_name"] == "some_other_column"
 
 
-@pytest.mark.asset("quarterly")
-@pytest.mark.parametrize("collection_id", COLLECTIONS)
+@pytest.mark.parametrize("collection_id", asset_params.per_asset(COLLECTIONS))
 def test_the_reference_is_looked_up_by_the_entrys_column(collection_id, fake_db, monkeypatch):
     asked = []
 

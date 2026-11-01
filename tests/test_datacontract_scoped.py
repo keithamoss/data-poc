@@ -14,6 +14,8 @@ from pathlib import Path
 
 import pytest
 
+import asset_params
+
 from fixture_ids import BDM_DIRTY_RUN_ID, CP_DIRTY_RUN_ID
 from qa_tools.common import asked_for, check_lifecycle, config_yaml, left_out
 from qa_tools.common import qa_results_writer, supply_db
@@ -40,8 +42,7 @@ def _check_id(rule) -> str:
 class TestEveryRuleHasAnId:
     """Criteria 1 and 2."""
 
-    @pytest.mark.asset("daily")
-    @pytest.mark.parametrize("path", CONTRACTS)
+    @pytest.mark.parametrize("path", asset_params.per_asset(CONTRACTS))
     def test_its_id_is_its_check_id_with_colons(self, path):
         """ODCS forbids a '.' in an id (Keith, 2026-10-12: ':' for '.')."""
         doc = config_yaml.parse((ROOT / path).read_text())
@@ -76,8 +77,19 @@ class TestEveryRuleHasAnId:
 
 
 @pytest.fixture
-def _quiet(monkeypatch, cp_duckdb_dir, bdm_duckdb_dir):
+def _quiet(monkeypatch, request):
+    """The staged runs of each collection the selected asset holds - Child
+    Protection's on the quarterly asset, Birth Registrations' on the daily
+    (the asset split: one asset's database holds one asset's supplies)."""
     import qa_tools.tools.run_datacontract as shared
+    from qa_tools import collections
+
+    held = {c.id for c in collections.all_collections()}
+    staged = [name for cid, name in (("child-protection", "cp_duckdb_dir"),
+                                     ("civil-registration", "bdm_duckdb_dir")) if cid in held]
+    assert staged, "the selected asset holds neither collection these cases stage"
+    for name in staged:
+        request.getfixturevalue(name)
 
     monkeypatch.setattr(shared, "write_qa_result", lambda *a, **k: None)
     monkeypatch.setattr(shared.asked_for, "record", lambda *a, **k: None)
