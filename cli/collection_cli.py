@@ -31,6 +31,8 @@ import functools
 import os
 
 import rich_click as click
+
+from qa_tools.common import assets
 from rich.console import Console
 
 console = Console()
@@ -83,7 +85,7 @@ class CollectionCLI:
         self.datasets = list(coll.datasets)
         self.tables = [d.table for d in coll.datasets]
         self.label = label(coll)
-        self.contract_path = os.path.join(ROOT, "contract", coll.contract)
+        self.contract_path = os.path.join(ROOT, assets.folder_rel(), coll.contract)
 
     # ---- its commands ----------------------------------------------------------
 
@@ -114,7 +116,7 @@ class CollectionCLI:
         (REQ-PIPE-102)."""
         from generator import driver
 
-        return str(driver.DELIVERIES_DIR)
+        return str(driver.deliveries_dir())
 
     @property
     def has_target_trial(self) -> bool:
@@ -169,7 +171,7 @@ class CollectionCLI:
             # A RECORD THAT DOES NOT ADD UP fails like any disagreement, not
             # as a traceback (post-build-review #157 finding 7).
             delivery.remove_deliveries(driver.provider_delivery_names(provider),
-                                       driver.DELIVERIES_DIR, driver.RECEIPTS_DIR)
+                                       driver.deliveries_dir(), driver.receipts_dir())
             raise self.TargetTrialFailed(f"what the generator built could not be read, so the "
                                          f"deliveries just written were removed: {exc}") from exc
         tried = [b for b in built if (b.injected or b.tried)
@@ -213,7 +215,7 @@ class CollectionCLI:
                     found.append(disagreement)
         if found:
             removed = delivery.remove_deliveries(driver.provider_delivery_names(provider),
-                                                 written_to, driver.RECEIPTS_DIR)
+                                                 written_to, driver.receipts_dir())
             raise self.TargetTrialFailed(
                 f"{len(found)} disagreement(s) among {len(tried)} tried supplies: they did not "
                 f"read as built, so the {removed} {self.label} deliveries just written were "

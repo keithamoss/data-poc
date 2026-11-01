@@ -115,7 +115,7 @@ def deliveries_print(collection_id: str, deliveries_dir: Path | None = None,
     digest of its file and of its receipt."""
     from qa_tools.common import arrivals, delivery
 
-    receipts_dir = Path(receipts_dir or delivery.RECEIPTS_DIR)
+    receipts_dir = Path(receipts_dir or delivery.default_receipts_dir())
     out = []
     for a in arrivals.arrivals_for(collection_id, "", deliveries_dir, receipts_dir):
         for names in a.files_by_dataset.values():

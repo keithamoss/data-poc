@@ -10,7 +10,7 @@ than in the test file's fixtures:
    parallel bootstrap runs each collection in a process spawned by
    `bootstrap._run_concurrently`, and a monkeypatch made in the test
    process does not exist there: a spawned child imports every module
-   afresh, so `delivery.DELIVERIES_DIR` would be the REAL data/deliveries
+   afresh, so `delivery.default_deliveries_dir()` would be the REAL data/deliveries
    again. The redirection travels as an environment variable instead,
    which a spawned child does inherit, and is re-applied by
    `redirected_run_collection` on the child's side.
@@ -22,6 +22,8 @@ from __future__ import annotations
 import functools
 import os
 from pathlib import Path
+
+from state_paths import fixed
 
 #: The environment variable carrying the corpus root into spawned children.
 CORPUS_ENV = "MOTHMAN_EQUIV_CORPUS"
@@ -47,10 +49,10 @@ def apply_redirects(root: Path) -> dict:
 
     root = Path(root)
     targets = {
-        (delivery, "DELIVERIES_DIR"): root / "deliveries",
-        (delivery, "RECEIPTS_DIR"): root / "receipts",
-        (delivery, "BOOKKEEPING_PATH"): root / "generator_bookkeeping.json",
-        (scenario_map, "PLACEMENTS_PATH"): root / "scenario_placements.json",
+        (delivery, "default_deliveries_dir"): fixed(root / "deliveries"),
+        (delivery, "default_receipts_dir"): fixed(root / "receipts"),
+        (delivery, "bookkeeping_path"): fixed(root / "generator_bookkeeping.json"),
+        (scenario_map, "placements_path"): fixed(root / "scenario_placements.json"),
         (in_flight_log, "OBSERVATIONS_DIR"): root / "observations" / "in_flight",
         # A CUT-DOWN CORPUS CANNOT CARRY THE REAL SCRIPTS: they name supplies
         # it does not have, and the player refuses rather than finish a
@@ -61,7 +63,7 @@ def apply_redirects(root: Path) -> dict:
         # run_pipeline() ENDS by writing `<ROOT>/reports/<results_json>`,
         # and the real ones are what the dashboard build and its e2e tests
         # read.
-        (results_history, "ROOT"): str(root),
+        (results_history, "reports_root"): fixed(str(root / "reports")),
         # DBT'S TARGETS AND THE STAGING CSVs, which would otherwise sit under
         # the REAL data/dbt_scratch/ for as long as the bootstrap runs - and a
         # module beside this one on the same xdist run (REQ-TEST-252's "nothing

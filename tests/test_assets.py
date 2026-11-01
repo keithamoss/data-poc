@@ -190,6 +190,48 @@ class TestLoadingByPath:
         assert quarterly.__name__ == "mothman_adapter_quarterly_same_name"
         assert daily.__name__ == "mothman_adapter_daily_same_name"
 
+    @pytest.mark.parametrize("bad", ["a_b", "Daily", "a.b", "-a", "a--b"])
+    def test_a_folder_name_outside_the_pattern_is_refused(self, tmp_path, bad):
+        """Lowercase letters, digits and single hyphens only (groundwork
+        critic, post-build-review): 'a-b' and 'a_b' would register one module
+        name, and a dot is a module-path separator."""
+        root = _two_assets(tmp_path)
+        (root / bad).mkdir()
+        assets.use_root(root)
+        with pytest.raises(assets.BadAssetName) as exc:
+            assets.names()
+        assert repr(bad) in str(exc.value)
+
+    def test_two_assets_claiming_one_module_name_are_refused(self, monkeypatch, tmp_path):
+        """Asset 'x' module 'y_z' and asset 'x-y' module 'z' both make
+        mothman_adapter_x_y_z: the second is refused, the first kept."""
+        root = tmp_path / "assets"
+        (root / "x" / "collections").mkdir(parents=True)
+        (root / "x-y" / "collections").mkdir(parents=True)
+        (root / "x" / "collections" / "y_z.py").write_text("WHO = 'x'\n")
+        (root / "x-y" / "collections" / "z.py").write_text("WHO = 'x-y'\n")
+        assets.use_root(root)
+        monkeypatch.setenv(assets.ASSET_ENV, "x")
+        first = assets.load("adapter", "y_z")
+        monkeypatch.setenv(assets.ASSET_ENV, "x-y")
+        with pytest.raises(assets.ModuleNameClash) as exc:
+            assets.load("adapter", "z")
+        assert "mothman_adapter_x_y_z" in str(exc.value)
+        assert sys.modules["mothman_adapter_x_y_z"] is first and first.WHO == "x"
+
+    def test_the_same_module_pointed_at_another_file_is_reloaded(self, monkeypatch, tmp_path):
+        """Re-pointing one asset's adapter folder (the suite's fixture) is not
+        a clash: the same asset, kind and module, from its new file."""
+        root = _two_assets(tmp_path)
+        assets.use_root(root)
+        monkeypatch.setenv(assets.ASSET_ENV, "daily")
+        assert assets.load("adapter", "same_name").WHO == "daily"
+        other = tmp_path / "other"
+        other.mkdir()
+        (other / "same_name.py").write_text("WHO = 'moved'\n")
+        assets.use_folder(root / "daily", adapters=other)
+        assert assets.load("adapter", "same_name").WHO == "moved"
+
     def test_a_missing_module_says_which_file(self, monkeypatch, tmp_path):
         assets.use_root(_two_assets(tmp_path))
         monkeypatch.setenv(assets.ASSET_ENV, "daily")
@@ -225,18 +267,30 @@ class TestOneAssetPerProcess:
         assert assets.claimed() is None
 
     def test_a_process_a_test_spawns_does_not_inherit_the_exemption(self):
+        """ABLE TO FAIL (groundwork critic): the child must refuse a second
+        asset AND accept it once the claim is released - so a rule that never
+        refuses fails the first half, and one that always refuses (or a child
+        that cannot claim at all) fails the second. The parent holds the
+        suite's exemption while it spawns."""
+        assets.release_claim()
         with ProcessPoolExecutor(max_workers=1, mp_context=get_context("spawn")) as pool:
-            refused = pool.submit(_claim_two, "data-asset-1", "data-asset-2").result()
-        assert refused
+            refused, after_release = pool.submit(_claim_two, "data-asset-1",
+                                                 "data-asset-2").result()
+        assert (refused, after_release) == (True, True)
 
 
-def _claim_two(first: str, second: str) -> bool:
+def _claim_two(first: str, second: str) -> tuple[bool, bool]:
+    """(was a second asset refused, was it accepted after an explicit release)."""
+    assert assets.claimed() is None
     assets.claim_for_connection(first)
     try:
         assets.claim_for_connection(second)
+        refused = False
     except assets.OneAssetPerProcess:
-        return True
-    return False
+        refused = True
+    assets.release_claim()
+    assets.claim_for_connection(second)
+    return refused, assets.claimed() == second
 
 
 class TestTheConnectionGuard:
@@ -288,6 +342,45 @@ class TestTheBootstrapHandsItsStreamsTheAsset:
         got = bootstrap._run_concurrently(["civil-registration"], sequential=True)
         assert got == {"civil-registration": (
             "data-asset-1", str(ROOT / "qa_tools" / "collections" / "civil_registration.py"))}
+
+
+    def test_a_stream_process_is_handed_the_layout_too(self, monkeypatch, tmp_path):
+        """The groundwork critic: handed the name alone, a child of a
+        use_root deployment (#55) looks for the asset in today's tree."""
+        from qa_tools.common import bootstrap
+
+        root = _two_assets(tmp_path)
+        assets.use_root(root)
+        monkeypatch.setenv(assets.ASSET_ENV, "daily")
+        monkeypatch.setattr(bootstrap, "_run_stream", _which_adapter_file)
+        got = bootstrap._run_concurrently(["same_name"], sequential=True)
+        assert got == {"same_name": str(root / "daily" / "collections" / "same_name.py")}
+
+    def test_a_manifest_worker_is_handed_the_asset_and_layout(self, monkeypatch, tmp_path):
+        """parallel_orchestrate's pool hands both explicitly rather than
+        relying on fork: forced onto a spawn context, its worker still sees
+        the asset and the folder this process points at."""
+        import concurrent.futures
+
+        from qa_tools.common import parallel_orchestrate
+
+        folder = tmp_path / "pointed"
+        folder.mkdir()
+        assets.use_folder(folder)
+        real = concurrent.futures.ProcessPoolExecutor
+        monkeypatch.setattr(parallel_orchestrate, "ProcessPoolExecutor",
+                            lambda **kw: real(mp_context=get_context("spawn"), **kw))
+        got = parallel_orchestrate.run_manifest([{"n": 1}, {"n": 2}], _asset_folder_of,
+                                                max_workers=1)
+        assert got == [("data-asset-1", str(folder))] * 2
+
+
+def _which_adapter_file(key: str, sequential: bool):
+    return str(assets.module_file("adapter", key))
+
+
+def _asset_folder_of(entry: dict) -> list:
+    return [(assets.selected().name, str(assets.selected().folder))]
 
 
 def _which_asset_and_adapter(key: str, sequential: bool):

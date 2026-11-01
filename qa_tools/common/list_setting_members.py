@@ -205,9 +205,9 @@ def declared(root: Path = REPO) -> list[SetMemberCheck]:
 
 def problems(root: Path = REPO) -> list[str]:
     """Each gate's refusals, naming the dataset, the check or the period."""
-    from qa_tools.common import amber_setting
+    from qa_tools.common import amber_setting, linked_datasets
 
-    doc = amber_setting._doc(root / "contract" / "data-asset.yaml")
+    doc = amber_setting._doc(linked_datasets._asset_folder(root) / "data-asset.yaml")
     checks = declared(root)
     return (_declaration_problems(checks, doc, root) + _coverage_problems(checks, doc)
             + _breaking_entry_problems(checks, doc))
@@ -232,7 +232,7 @@ def _declaration_problems(checks, doc, root) -> list[str]:
             out.append(f"{c.dataset_id}: {c.test} names the member_setting "
                        f"{c.member_setting!r}, which is no declared list setting.")
     have = {(c.dataset_id, c.test) for c in checks}
-    asset = yaml.safe_load((root / "contract" / "data-asset.yaml").read_text()) or {}
+    asset = yaml.safe_load((linked_datasets._asset_folder(root) / "data-asset.yaml").read_text()) or {}
     for _agency, coll, ds in linked_datasets._walk(asset):
         linked = ds.get("linked_datasets") or []
         if len(linked) != 1 or linked[0].get("code") is not None:
@@ -254,7 +254,7 @@ def _soda_checks(root, coll, ds):
 
     folder, _, name = str(coll.get("contract", "")).rpartition("/")
     stem = name.removesuffix("-contract.yaml")
-    return linked_datasets._soda_bodies(root / "contract" / folder / f"{stem}-soda-checks.yml",
+    return linked_datasets._soda_bodies(linked_datasets._asset_folder(root) / folder / f"{stem}-soda-checks.yml",
                                         ds.get("table"))
 
 

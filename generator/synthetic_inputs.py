@@ -16,7 +16,16 @@ from pathlib import Path
 import yaml
 
 REPO = Path(__file__).resolve().parent.parent
-PATH = Path("contract") / "synthetic_inputs.yaml"
+NAME = "synthetic_inputs.yaml"
+
+
+def _path(root: Path) -> Path:
+    """The selected asset's synthetic_inputs.yaml in the checkout at `root`,
+    asked of the resolver at call time (REQ-PIPE-342 criterion 6; it was the
+    import-time constant PATH)."""
+    from qa_tools.common.linked_datasets import _asset_folder
+
+    return _asset_folder(root) / NAME
 
 
 @dataclass(frozen=True)
@@ -40,7 +49,7 @@ class Placing:
 
 
 def _doc(root: Path) -> dict:
-    path = root / PATH
+    path = _path(root)
     return (yaml.safe_load(path.read_text()) or {}) if path.exists() else {}
 
 
@@ -58,7 +67,9 @@ def placings(root: Path = REPO) -> dict[str, Placing]:
 
 
 def _table(root: Path, contract: str, table: str) -> dict:
-    doc = yaml.safe_load((root / "contract" / contract).read_text()) or {}
+    from qa_tools.common.linked_datasets import _asset_folder
+
+    doc = yaml.safe_load((_asset_folder(root) / contract).read_text()) or {}
     return next((t for t in doc.get("schema") or [] if t.get("name") == table), {}) or {}
 
 
@@ -72,13 +83,14 @@ def problems(root: Path = REPO) -> list[str]:
     """REQ-QAC-294 criterion 3's gate: each declared column is in the source's
     contract, and each declared value is among the placed column's allowed
     values; naming the dataset and the column or value."""
-    from qa_tools.common.linked_datasets import _walk
+    from qa_tools.common import assets
+    from qa_tools.common.linked_datasets import _asset_folder, _walk
 
-    asset = yaml.safe_load((root / "contract" / "data-asset.yaml").read_text()) or {}
+    asset = yaml.safe_load((_asset_folder(root) / "data-asset.yaml").read_text()) or {}
     where = {ds.get("id"): (coll, ds) for _a, coll, ds in _walk(asset)}
     out = []
     for p in placings(root).values():
-        head = f"{PATH.as_posix()}: {p.dataset}"
+        head = f"{assets.folder_rel()}/{NAME}: {p.dataset}"
         if p.dataset not in where:
             out.append(f"{head} is not in the hierarchy (contract/data-asset.yaml).")
             continue

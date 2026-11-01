@@ -93,7 +93,14 @@ def run_manifest(
         return results
 
     ordered_results: list[list[dict] | None] = [None] * len(manifest)
-    with ProcessPoolExecutor(max_workers=max_workers or os.cpu_count()) as ex:
+    # THE ASSET AND ITS LAYOUT ARE HANDED TO EACH WORKER (assets.handoff),
+    # never left to a fork's inherited memory - the same hand-off the
+    # bootstrap's spawned streams get (REQ-PIPE-369 criterion 4).
+    from qa_tools.common import assets
+
+    with ProcessPoolExecutor(max_workers=max_workers or os.cpu_count(),
+                             initializer=assets.adopt,
+                             initargs=assets.handoff()) as ex:
         futures = {ex.submit(worker, entry, *worker_args): i for i, entry in enumerate(manifest)}
         try:
             for future in as_completed(futures):

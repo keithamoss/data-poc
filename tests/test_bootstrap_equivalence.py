@@ -160,7 +160,7 @@ def _drop_database(name: str) -> None:
 
 def _real_tree_listing():
     from qa_tools.common import delivery
-    tree = Path(delivery.DELIVERIES_DIR)
+    tree = Path(delivery.default_deliveries_dir())
     return sorted(p.name for p in tree.iterdir()) if tree.exists() else None
 
 

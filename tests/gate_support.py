@@ -23,6 +23,7 @@ append-only, so a period another test promoted into cannot be cleaned up.
 """
 from __future__ import annotations
 
+from state_paths import fixed
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -334,9 +335,9 @@ def install_fake_tools(monkeypatch, scenario: Scenario) -> None:
     from qa_tools.common import delivery
     from qa_tools.tools import run_datacontract, run_dbt, run_evidently, run_soda
 
-    monkeypatch.setattr(delivery, "DELIVERIES_DIR", scenario.deliveries)
-    monkeypatch.setattr(delivery, "RECEIPTS_DIR", scenario.receipts)
-    monkeypatch.setattr(delivery, "BOOKKEEPING_PATH", scenario.root / "bookkeeping.json")
+    monkeypatch.setattr(delivery, "default_deliveries_dir", fixed(scenario.deliveries))
+    monkeypatch.setattr(delivery, "default_receipts_dir", fixed(scenario.receipts))
+    monkeypatch.setattr(delivery, "bookkeeping_path", fixed(scenario.root / "bookkeeping.json"))
 
     for module, tool in ((run_dbt, "dbt"), (run_soda, "soda"),
                          (run_datacontract, "datacontract"), (run_evidently, "evidently")):

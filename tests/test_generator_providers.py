@@ -308,7 +308,7 @@ class TestTheRegistryRoutesTheRest:
 
         ran = []
         monkeypatch.setattr(driver, "generate",
-                            lambda cid: ran.append((cid, str(driver.DELIVERIES_DIR))))
+                            lambda cid: ran.append((cid, str(driver.deliveries_dir()))))
         with generated_into(tmp_path):
             pass
         expected = [c.id for c in registry.all_collections()]

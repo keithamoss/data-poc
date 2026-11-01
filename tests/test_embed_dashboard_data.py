@@ -14,6 +14,7 @@ its own tests (tests/test_ticket_status.py); this only covers embed()'s
 own read-file-or-default-to-empty-list wiring."""
 from __future__ import annotations
 
+from state_paths import fixed
 import json
 import re
 from pathlib import Path
@@ -148,11 +149,11 @@ def _run_embed_and_extract_ticket_status(monkeypatch, tmp_path, raw_issues=None)
     out_html = tmp_path / "out.html"
     monkeypatch.setattr(edd, "DASHBOARD_HTML", out_html)
     if raw_issues is None:
-        monkeypatch.setattr(edd, "OPEN_TICKETS_JSON", tmp_path / "does_not_exist.json")
+        monkeypatch.setattr(edd, "open_tickets_json", fixed(tmp_path / "does_not_exist.json"))
     else:
         tickets_path = tmp_path / "open_tickets.json"
         tickets_path.write_text(json.dumps(raw_issues))
-        monkeypatch.setattr(edd, "OPEN_TICKETS_JSON", tickets_path)
+        monkeypatch.setattr(edd, "open_tickets_json", fixed(tickets_path))
 
     edd.embed()
 
@@ -189,11 +190,11 @@ def _run_embed_and_extract_leaderboard(monkeypatch, tmp_path, raw_ticket_resolut
     out_html = tmp_path / "out.html"
     monkeypatch.setattr(edd, "DASHBOARD_HTML", out_html)
     if raw_ticket_resolutions is None:
-        monkeypatch.setattr(edd, "TICKET_RESOLUTIONS_JSON", tmp_path / "does_not_exist.json")
+        monkeypatch.setattr(edd, "ticket_resolutions_json", fixed(tmp_path / "does_not_exist.json"))
     else:
         path = tmp_path / "ticket_resolutions.json"
         path.write_text(json.dumps(raw_ticket_resolutions))
-        monkeypatch.setattr(edd, "TICKET_RESOLUTIONS_JSON", path)
+        monkeypatch.setattr(edd, "ticket_resolutions_json", fixed(path))
 
     edd.embed()
 
@@ -424,10 +425,9 @@ def test_deriving_the_sequences_opens_nothing_under_data(monkeypatch, tmp_path):
     import builtins
     from pathlib import Path
 
-    from qa_tools.common import hierarchy, schedule
+    from qa_tools.common import assets, hierarchy, schedule
 
-    root = Path(edd.__file__).resolve().parent.parent
-    data_dir = root / "data"
+    data_dir = assets.data_dir()
     opened: list[str] = []
     real_open = builtins.open
 

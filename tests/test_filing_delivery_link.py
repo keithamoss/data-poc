@@ -4,6 +4,7 @@ writing no filing at all. Added after the delivery-critic found these
 untested (overnight sprint 4)."""
 from __future__ import annotations
 
+from state_paths import fixed
 from datetime import datetime, timedelta, timezone
 
 import pytest
@@ -73,7 +74,7 @@ class TestATrialWritesNoFiling:
         from cli import common
         from qa_tools.common import delivery, delivery_log
 
-        monkeypatch.setattr(delivery, "DELIVERIES_DIR", tmp_path / "deliveries")
+        monkeypatch.setattr(delivery, "default_deliveries_dir", fixed(tmp_path / "deliveries"))
         path = tmp_path / "anything.csv"
         path.write_text("a\n1\n")
         filed = common.file_or_trial([str(path)], "civil-registration", "run_",

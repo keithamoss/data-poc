@@ -1352,10 +1352,10 @@ def named_placements(provider, plan: Plan) -> list:
                 f"correction's claim."),
         arrivals=tuple({"date": p.round_date.isoformat(), "at": "", "delivery": n}
                        for n in names))
-    from generator.driver import DELIVERIES_DIR, RECEIPTS_DIR
+    from generator import driver
 
     recognised = arrivals_mod.arrivals_for(provider.collection_id, provider.run_prefix,
-                                           DELIVERIES_DIR, RECEIPTS_DIR)
+                                           driver.deliveries_dir(), driver.receipts_dir())
     scenario_injection.resolve_run_ids([placement], recognised)
     return [placement]
 
@@ -1533,10 +1533,10 @@ def geo_named_placements(provider, plan: Plan) -> list:
             arrivals=({"date": asset_time.local_date(at).isoformat(),
                        "at": asset_time.localise(at).strftime("%H:%M"),
                        "delivery": plan.state.get("geo_delivery", {}).get(job.slot_id, "")},)))
-    from generator.driver import DELIVERIES_DIR, RECEIPTS_DIR
+    from generator import driver
 
     recognised = arrivals_mod.arrivals_for(provider.collection_id, provider.run_prefix,
-                                           DELIVERIES_DIR, RECEIPTS_DIR)
+                                           driver.deliveries_dir(), driver.receipts_dir())
     scenario_injection.resolve_run_ids(out, recognised)
     return out
 

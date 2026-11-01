@@ -10,6 +10,7 @@ effect (same as any other real pipeline run) and must never run for
 real under pytest."""
 from __future__ import annotations
 
+from state_paths import fixed
 import pytest
 from click.testing import CliRunner
 
@@ -290,7 +291,7 @@ def test_running_the_pipeline_does_not_destroy_the_committed_delivery_log(
     _log_one(clean_delivery_log, "monday")
     # Nothing on disk, so a delivery still recorded is one the prune
     # has every reason to think is gone - the worst case for the log.
-    monkeypatch.setattr(delivery, "DELIVERIES_DIR", tmp_path / "no-deliveries")
+    monkeypatch.setattr(delivery, "default_deliveries_dir", fixed(tmp_path / "no-deliveries"))
 
     calls = []
     monkeypatch.setattr(pipeline_cli, "_run_collection", lambda coll, sequential: calls.append(coll.short))
@@ -326,8 +327,8 @@ def test_a_delivery_still_present_keeps_its_record_across_a_run(
     # (REQ-PIPE-061).
     delivery.write_receipts("monday", "2026-09-25T09:00:00+08:00", receipts,
                             files=["cp_clients.csv"], sequence=1)
-    monkeypatch.setattr(delivery, "DELIVERIES_DIR", deliveries)
-    monkeypatch.setattr(delivery, "RECEIPTS_DIR", receipts)
+    monkeypatch.setattr(delivery, "default_deliveries_dir", fixed(deliveries))
+    monkeypatch.setattr(delivery, "default_receipts_dir", fixed(receipts))
 
     calls = []
     monkeypatch.setattr(pipeline_cli, "_run_collection", lambda coll, sequential: calls.append(coll.short))

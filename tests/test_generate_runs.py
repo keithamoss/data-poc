@@ -19,6 +19,7 @@ explicit call: "fix the issue where tests and production share an output
 directory") - see the `raw_dir` fixture's own docstring."""
 from __future__ import annotations
 
+from state_paths import fixed
 import collection_modules
 
 import re
@@ -55,7 +56,7 @@ def raw_dir(tmp_path_factory):
     hence the manual save/restore instead."""
     root = tmp_path_factory.mktemp("bdm_gen")
     restore = generator_isolation.redirect(root)
-    yield Path(driver.DELIVERIES_DIR)
+    yield Path(driver.deliveries_dir())
     restore()
 
 
@@ -63,7 +64,7 @@ def raw_dir(tmp_path_factory):
 def deliveries_dir(raw_dir):
     """Where the generator's one copy actually goes (REQ-PIPE-102).
     Depends on raw_dir so the redirection above is already in place."""
-    return Path(driver.DELIVERIES_DIR)
+    return Path(driver.deliveries_dir())
 
 
 @pytest.fixture(scope="module")
@@ -82,7 +83,7 @@ def manifest(raw_dir, real_data_before):
     `manifest` because every test below reads it as "the list of what
     was generated", which is what it is."""
     driver.generate("civil-registration")
-    with open(driver.BOOKKEEPING_PATH) as f:
+    with open(driver.bookkeeping_path()) as f:
         return json.load(f)[generate_runs.DATASET_ID]
 
 
@@ -303,10 +304,10 @@ def test_generating_never_touches_the_real_delivery_tree(tmp_path, monkeypatch):
                 for p in sorted(root.rglob("*"))]
 
     before = {name: _fingerprint(path)
-              for name, path in (("deliveries", delivery.DELIVERIES_DIR),
-                                  ("receipts", delivery.RECEIPTS_DIR))}
-    book_before = (delivery.BOOKKEEPING_PATH.read_bytes()
-                   if delivery.BOOKKEEPING_PATH.exists() else None)
+              for name, path in (("deliveries", delivery.default_deliveries_dir()),
+                                  ("receipts", delivery.default_receipts_dir()))}
+    book_before = (delivery.bookkeeping_path().read_bytes()
+                   if delivery.bookkeeping_path().exists() else None)
     # NO PRECONDITION THAT THE REAL TREE EXISTS, and that was a real
     # bug in this test's first version - it asserted one, passed
     # locally where data/deliveries/ is populated, and failed in CI
@@ -328,26 +329,25 @@ def test_generating_never_touches_the_real_delivery_tree(tmp_path, monkeypatch):
     # truncated.
     from generator import scenario_injection
 
-    placements_before = (scenario_injection.PLACEMENTS_PATH.read_bytes()
-                          if scenario_injection.PLACEMENTS_PATH.exists() else None)
+    placements_before = (scenario_injection.placements_path().read_bytes()
+                          if scenario_injection.placements_path().exists() else None)
 
-    monkeypatch.setattr(driver, "DELIVERIES_DIR", tmp_path / "deliveries")
-    monkeypatch.setattr(driver, "RECEIPTS_DIR", tmp_path / "receipts")
-    monkeypatch.setattr(driver, "BOOKKEEPING_PATH", tmp_path / "bookkeeping.json")
-    monkeypatch.setattr(scenario_injection, "PLACEMENTS_PATH",
-                         tmp_path / "scenario_placements.json")
+    monkeypatch.setattr(driver, "deliveries_dir", fixed(tmp_path / "deliveries"))
+    monkeypatch.setattr(driver, "receipts_dir", fixed(tmp_path / "receipts"))
+    monkeypatch.setattr(driver, "bookkeeping_path", fixed(tmp_path / "bookkeeping.json"))
+    monkeypatch.setattr(scenario_injection, "placements_path", fixed(tmp_path / "scenario_placements.json"))
 
     driver.generate("civil-registration")
 
     assert list((tmp_path / "deliveries").iterdir()), "nothing was generated into the redirected tree"
     assert _fingerprint(tmp_path / "deliveries"), "test precondition - the generator must have written somewhere"
     assert (tmp_path / "bookkeeping.json").exists()
-    for name, path in (("deliveries", delivery.DELIVERIES_DIR), ("receipts", delivery.RECEIPTS_DIR)):
+    for name, path in (("deliveries", delivery.default_deliveries_dir()), ("receipts", delivery.default_receipts_dir())):
         assert _fingerprint(path) == before[name], f"the real {name} tree was written to by a test run"
-    assert (delivery.BOOKKEEPING_PATH.read_bytes()
-            if delivery.BOOKKEEPING_PATH.exists() else None) == book_before
-    assert (scenario_injection.PLACEMENTS_PATH.read_bytes()
-            if scenario_injection.PLACEMENTS_PATH.exists() else None) \
+    assert (delivery.bookkeeping_path().read_bytes()
+            if delivery.bookkeeping_path().exists() else None) == book_before
+    assert (scenario_injection.placements_path().read_bytes()
+            if scenario_injection.placements_path().exists() else None) \
         == placements_before, (
             "the real scenario_placements.json was written to by a test run")
 
@@ -477,7 +477,7 @@ def test_every_lead_in_and_following_supply_arrives_on_time(manifest):
     from generator import scenario_injection as si
     from qa_tools.common import asset_time, slots
 
-    placements = json.loads(Path(si.PLACEMENTS_PATH).read_text())
+    placements = json.loads(Path(si.placements_path()).read_text())
     if isinstance(placements, dict):
         placements = placements.get("placements", placements)
     if isinstance(placements, dict):

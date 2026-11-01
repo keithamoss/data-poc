@@ -15,6 +15,7 @@ Two layers, each driven through its real entry point:
 """
 from __future__ import annotations
 
+from state_paths import fixed
 import json
 import random
 import uuid
@@ -82,8 +83,8 @@ def _run(run_id: str, *, dataset_id, supply, scope="arrival", decision=None, res
 @pytest.fixture
 def history(clean_qa_history, tmp_path, monkeypatch):
     """Rebuild into tmp_path and build from there - never the real reports/."""
-    monkeypatch.setattr(results_history, "ROOT", str(tmp_path))
-    monkeypatch.setattr(bdd, "REPORTS", str(tmp_path / "reports"))
+    monkeypatch.setattr(results_history, "reports_root", fixed(str(tmp_path / "reports")))
+    monkeypatch.setattr(bdd, "reports_root", fixed(str(tmp_path / "reports")))
 
     class History:
         conn = clean_qa_history

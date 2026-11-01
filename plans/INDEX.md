@@ -1054,6 +1054,8 @@ one when this line suggests it matters.
   - *touches:* `pipeline/cross_table_grid.py`
 - **#299** `done` 2026-11-01 - Post-build critic on the geocoding chunk (REQ-QAC-294, REQ-QAC-300, REQ-GEN-295, REQ-PIPE-296, REQ-QAC-297, REQ-QAC-340; 7f171d7)...
   - *touches:* `tests/test_dataset_stats.py`, `tests/test_geocoding_gates.py`, `tests/test_terminal_routes.py`
+- **#300** `done` 2026-11-01 - Critic on the asset-split groundwork (REQ-PIPE-342, REQ-PIPE-363, REQ-PIPE-369, REQ-QAC-368), fixed in the state-path...
+  - *touches:* `tests/test_state_paths_at_call_time.py`, `tests/test_cli_asset_selection.py`
 
 ## plans/road-testing.md
 

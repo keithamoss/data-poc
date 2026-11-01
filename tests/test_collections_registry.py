@@ -3,6 +3,7 @@ the hierarchy, behind every dispatch site whose code survives the series -
 and the gate that keeps it the only one."""
 from __future__ import annotations
 
+from state_paths import fixed
 import collection_modules
 
 import contextlib
@@ -217,11 +218,11 @@ class TestAThirdCollectionAtEverySite:
         # records that the shared driver asked for it (REQ-GEN-246), with
         # everything the driver writes kept out of the real data/.
         scratch = Path(tempfile.mkdtemp())
-        for name, value in (("DELIVERIES_DIR", scratch / "deliveries"),
-                            ("RECEIPTS_DIR", scratch / "receipts"),
-                            ("BOOKKEEPING_PATH", scratch / "bookkeeping.json")):
-            monkeypatch.setattr(driver, name, value)
-        monkeypatch.setattr(scenario_injection, "PLACEMENTS_PATH", scratch / "placements.json")
+        for name, value in (("deliveries_dir", scratch / "deliveries"),
+                            ("receipts_dir", scratch / "receipts"),
+                            ("bookkeeping_path", scratch / "bookkeeping.json")):
+            monkeypatch.setattr(driver, name, fixed(value))
+        monkeypatch.setattr(scenario_injection, "placements_path", fixed(scratch / "placements.json"))
         real = driver.generate
         monkeypatch.setattr(driver, "generate", lambda cid: real(cid) if cid == FAKE_ID else [])
         monkeypatch.setattr("qa_tools.common.scenario_map.write_map", lambda: None)
@@ -285,7 +286,7 @@ class TestAThirdCollectionAtEverySite:
         assert expected[:2] == ["birth-registrations", "cp-clients"]
         _datasets_json(built / f"fka_{FAKE_ID}_dashboard.json",
                        {"datasets": [{"id": FAKE_DATASET, "name": "Fake Things"}]})
-        monkeypatch.setattr(ticket_sync, "REPORTS_DIR", str(built))
+        monkeypatch.setattr(ticket_sync, "reports_dir", fixed(str(built)))
         got = [(s.id, s.agency_id, s.collection_id) for s, _ in ticket_sync._load_scopes()]
         assert got[-1] == (FAKE_DATASET, "fake-agency", FAKE_ID)
         assert [g[0] for g in got] == [*expected, FAKE_DATASET]

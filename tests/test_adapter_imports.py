@@ -50,6 +50,33 @@ class TestTheGate:
         assert "emergency_department.py" in problems[0]
         assert line.split()[1] in problems[0]
 
+    #: REACHED AT RUN TIME RATHER THAN IMPORTED (the groundwork critic): a
+    #: registry or provider lookup, a load by path, or importlib.
+    @pytest.mark.parametrize("line, needle", [
+        ("from qa_tools import collections\n_o = collections.adapter('child-protection')",
+         "collections.adapter('child-protection')"),
+        ("from qa_tools import collections as reg\n_o = reg.adapter_module('x')",
+         "reg.adapter_module('x')"),
+        ("from generator import collections as gc\n_p = gc.provider('emergency-department')",
+         "gc.provider('emergency-department')"),
+        ("from qa_tools.common import assets\n_m = assets.load('adapter', 'x')",
+         "assets.load('adapter', 'x')"),
+        ("import importlib", "import importlib"),
+        ("from importlib import import_module", "from importlib import import_module"),
+        ("_m = __import__('qa_tools.collections.child_protection')", "__import__("),
+    ])
+    def test_an_adapter_reaching_one_at_run_time_fails(self, adapters, line, needle):
+        _imports(adapters, line)
+        problems = gate.adapter_import_problems()
+        assert len(problems) == 1, problems
+        assert "emergency_department.py" in problems[0] and needle in problems[0]
+
+    def test_a_registry_lookup_that_is_not_an_adapter_passes(self, adapters):
+        _imports(adapters, "import json\nfrom qa_tools import collections\n"
+                           "_c = collections.by_id('x')\n_j = json.loads('{}')\n"
+                           "def _read(f):\n    return json.load(f)")
+        assert gate.adapter_import_problems() == []
+
     def test_shared_code_and_the_standard_library_pass(self, adapters):
         _imports(adapters, "import re\nfrom qa_tools.collections.base import CollectionAdapter\n"
                            "from qa_tools.common import hierarchy\nfrom generator.collections.base import Plan")

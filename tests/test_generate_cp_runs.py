@@ -28,6 +28,7 @@ output directory") - see the `raw_dir` fixture's own docstring
 counterpart, has the full account)."""
 from __future__ import annotations
 
+from state_paths import fixed
 import collection_modules
 
 import re
@@ -62,7 +63,7 @@ def raw_dir(tmp_path_factory):
     """
     root = tmp_path_factory.mktemp("cp_gen")
     restore = generator_isolation.redirect(root)
-    yield Path(driver.DELIVERIES_DIR)
+    yield Path(driver.deliveries_dir())
     restore()
 
 
@@ -82,7 +83,7 @@ def manifest(raw_dir, real_data_before):
     `manifest` because every test below reads it as "the list of what
     was generated", which is what it is."""
     driver.generate("child-protection")
-    with open(driver.BOOKKEEPING_PATH) as f:
+    with open(driver.bookkeeping_path()) as f:
         return json.load(f)[cp_provider.DATASET_ID]
 
 
@@ -387,16 +388,16 @@ def test_generating_never_touches_the_real_delivery_tree(tmp_path, monkeypatch):
                 for p in sorted(root.rglob("*"))]
 
     before = {name: _fingerprint(path)
-              for name, path in (("deliveries", delivery.DELIVERIES_DIR),
-                                  ("receipts", delivery.RECEIPTS_DIR))}
-    book_before = (delivery.BOOKKEEPING_PATH.read_bytes()
-                   if delivery.BOOKKEEPING_PATH.exists() else None)
+              for name, path in (("deliveries", delivery.default_deliveries_dir()),
+                                  ("receipts", delivery.default_receipts_dir()))}
+    book_before = (delivery.bookkeeping_path().read_bytes()
+                   if delivery.bookkeeping_path().exists() else None)
     # THE SCENARIO PLACEMENTS TOO (post-build-review #225): Child
     # Protection's injected scenarios are written there on every
     # generation, and the redirects below once missed it.
     from generator import scenario_injection
 
-    real_placements = scenario_injection.PLACEMENTS_PATH
+    real_placements = scenario_injection.placements_path()
     placements_before = (real_placements.stat().st_mtime_ns, real_placements.read_bytes()) \
         if real_placements.exists() else None
     # NO PRECONDITION THAT THE REAL TREE EXISTS, and that was a real
@@ -408,19 +409,19 @@ def test_generating_never_touches_the_real_delivery_tree(tmp_path, monkeypatch):
     # would bring it into existence, which the comparison below catches
     # either way.
 
-    monkeypatch.setattr(driver, "DELIVERIES_DIR", tmp_path / "deliveries")
-    monkeypatch.setattr(driver, "RECEIPTS_DIR", tmp_path / "receipts")
-    monkeypatch.setattr(driver, "BOOKKEEPING_PATH", tmp_path / "bookkeeping.json")
-    monkeypatch.setattr(scenario_injection, "PLACEMENTS_PATH", tmp_path / "scenario_placements.json")
+    monkeypatch.setattr(driver, "deliveries_dir", fixed(tmp_path / "deliveries"))
+    monkeypatch.setattr(driver, "receipts_dir", fixed(tmp_path / "receipts"))
+    monkeypatch.setattr(driver, "bookkeeping_path", fixed(tmp_path / "bookkeeping.json"))
+    monkeypatch.setattr(scenario_injection, "placements_path", fixed(tmp_path / "scenario_placements.json"))
 
     driver.generate("child-protection")
 
     assert list((tmp_path / "deliveries").iterdir()), "nothing was generated into the redirected tree"
     assert _fingerprint(tmp_path / "deliveries"), "test precondition - the generator must have written somewhere"
-    for name, path in (("deliveries", delivery.DELIVERIES_DIR), ("receipts", delivery.RECEIPTS_DIR)):
+    for name, path in (("deliveries", delivery.default_deliveries_dir()), ("receipts", delivery.default_receipts_dir())):
         assert _fingerprint(path) == before[name], f"the real {name} tree was written to by a test run"
-    assert (delivery.BOOKKEEPING_PATH.read_bytes()
-            if delivery.BOOKKEEPING_PATH.exists() else None) == book_before
+    assert (delivery.bookkeeping_path().read_bytes()
+            if delivery.bookkeeping_path().exists() else None) == book_before
     assert ((real_placements.stat().st_mtime_ns, real_placements.read_bytes())
             if real_placements.exists() else None) == placements_before, \
         "the real scenario placements file was written to by a test run"
@@ -723,7 +724,7 @@ class TestTheContestedClientRegisterPairs:
     def _placed():
         from generator import scenario_injection as si
 
-        return json.loads(Path(si.PLACEMENTS_PATH).read_text())["placements"]
+        return json.loads(Path(si.placements_path()).read_text())["placements"]
 
     def _placement(self, sid):
         [record] = [p for p in self._placed() if p["scenario_id"] == sid]
@@ -734,7 +735,7 @@ class TestTheContestedClientRegisterPairs:
         from qa_tools.common import delivery
 
         return {f: r[0] for f, r in delivery.read_file_receipts(
-            name, driver.RECEIPTS_DIR).items()}
+            name, driver.receipts_dir()).items()}
 
     @staticmethod
     def _slot(record):

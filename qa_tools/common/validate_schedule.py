@@ -903,7 +903,7 @@ def _freeze_errors(raw: dict, cal_raw: dict, src: Source,
     old_cal, old_asset = previous(cal_path), previous(asset_path)
     if old_cal is None and old_asset is None:
         return []
-    people = previous(ROOT / freeze.PEOPLE_REL) or {}
+    people = previous(ROOT / freeze.people_rel()) or {}
 
     # THE CLOCK (criterion 12): where the files on disk differ from HEAD the
     # change is not committed yet - it is being made now. Otherwise each

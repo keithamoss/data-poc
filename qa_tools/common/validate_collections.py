@@ -96,6 +96,35 @@ def _reaches_another_module(name: str, adapters: set[str], providers: set[str]) 
     return False
 
 
+#: CALLS THAT REACH ANOTHER ADAPTER OR A PROVIDER AT RUN TIME, whatever the
+#: module they were called on is named locally (post-build-review, the
+#: groundwork critic): the registry's adapter lookups, the providers', and a
+#: load by path. The registry's other lookups (by_id, all_collections) name
+#: no adapter and stay allowed.
+RUN_TIME_REACHES = frozenset({"adapter", "adapter_module", "adapters", "provider", "providers"})
+#: The resolver's loads by path - only on `assets`, so json.load stays allowed.
+ASSET_LOADS = frozenset({"load", "module_file"})
+
+
+def _reaches_at_run_time(node) -> bool:
+    """Whether a node imports importlib, calls __import__, or calls one of
+    RUN_TIME_REACHES on a module or ASSET_LOADS on assets."""
+    if isinstance(node, ast.Import):
+        return any(a.name.split(".")[0] == "importlib" for a in node.names)
+    if isinstance(node, ast.ImportFrom):
+        return node.level == 0 and (node.module or "").split(".")[0] == "importlib"
+    if isinstance(node, ast.Call):
+        func = node.func
+        if isinstance(func, ast.Name):
+            return func.id == "__import__"
+        if not isinstance(func, ast.Attribute):
+            return False
+        return func.attr in RUN_TIME_REACHES or (
+            func.attr in ASSET_LOADS and isinstance(func.value, ast.Name)
+            and func.value.id == "assets")
+    return False
+
+
 def adapter_import_problems(package: Path | None = None) -> list[str]:
     """Every import statement in the selected asset's adapters that reaches
     another adapter, a generator provider or anything under assets/
@@ -115,6 +144,12 @@ def adapter_import_problems(package: Path | None = None) -> list[str]:
             continue
         text = path.read_text()
         for node in ast.walk(ast.parse(text)):
+            if _reaches_at_run_time(node):
+                problems.append(
+                    f"{path.name}: `{ast.get_source_segment(text, node)}` - an adapter reaches "
+                    f"no other adapter or provider at run time either: no registry or provider "
+                    f"lookup of one, no load by path, no importlib (REQ-PIPE-369 criterion 3)")
+                continue
             if isinstance(node, ast.Import):
                 names = [a.name for a in node.names]
             elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
@@ -241,7 +276,7 @@ def check_file_problems(root: Path | None = None) -> list[str]:
     """`root` holds contract/ and dbt_project/ - the repository unless a
     test names another; the hierarchy is read from root/contract."""
     from qa_tools import collections
-    from qa_tools.common import hierarchy
+    from qa_tools.common import assets, hierarchy
 
     root = root or hierarchy.data_asset_yaml().parent.parent
     try:
@@ -250,18 +285,28 @@ def check_file_problems(root: Path | None = None) -> list[str]:
         return []  # config_problems() reports a hierarchy that cannot be read
     problems: list[str] = []
     owner = {}
+
+    def shown(rel: str) -> str:
+        """A path named relative to the checkout being checked - the asset's
+        folder may be given absolute when it is outside this repository
+        (assets.folder_rel)."""
+        path = root / rel
+        try:
+            return path.relative_to(root).as_posix()
+        except ValueError:
+            return path.as_posix()
     for c in declared:
         if not c.contract.startswith(f"{c.agency_id}/"):
             problems.append(f"{c.id!r}'s contract {c.contract!r} is not in its agency's folder "
-                            f"{c.folder}/")
+                            f"{shown(c.folder)}/")
         # Its contract is config_problems()'s (REQ-PIPE-240 criterion 7).
         for kind in ("soda", "evidently"):
             if not (root / c.check_file(kind)).is_file():
                 problems.append(f"collection {c.id!r} is missing its {kind} check file "
-                                f"{c.check_file(kind)}")
+                                f"{shown(c.check_file(kind))}")
         owner[c.stem] = c
 
-    contract = root / "contract"
+    contract = root / assets.folder_rel()
     agencies = {c.agency_id for c in declared}
     for path in sorted(contract.rglob("*")) if contract.is_dir() else []:
         if not path.is_file():
@@ -280,7 +325,7 @@ def check_file_problems(root: Path | None = None) -> list[str]:
                 "" if where in agencies else f", in {where}/, which is no agency's folder"))
         elif path.parent != root / c.folder:
             problems.append(f"{rel} is {c.id!r}'s, which belongs in its agency's folder "
-                            f"{c.folder}/")
+                            f"{shown(c.folder)}/")
 
     problems += _dbt_layout_problems(root, declared)
     problems += dbt_cross_collection_ref_problems(root, declared)
