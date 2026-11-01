@@ -157,15 +157,17 @@ class TestAFileOfAnotherCollection:
     """Criterion 5, at the terminal: refused naming the collection, before any
     question and with no trial on offer."""
 
-    def test_cp_refuses_a_birth_registrations_file(self, monkeypatch, tmp_path):
+    def test_cp_refuses_an_emergency_department_file(self, monkeypatch, tmp_path):
+        # Another collection of the same asset: since the split, Birth
+        # Registrations is another asset's, which this one does not know.
         folder = tmp_path / "d"
         folder.mkdir()
-        _csv(folder, "birth_registrations_2026-01-01.csv")
+        _csv(folder, "ed_presentations.csv")
         wrote = []
         monkeypatch.setattr(hand_filing, "file_supply", lambda *a, **k: wrote.append(1))
         out = _runner.invoke(cp.qa_command, ["--folder", str(folder), "--commit"])
         assert out.exit_code != 0
-        assert "civil-registration" in _flat(out.output) and not wrote
+        assert "emergency-department" in _flat(out.output) and not wrote
         assert "TRIAL instead" not in out.output
 
 

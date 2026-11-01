@@ -17,7 +17,6 @@ import sys
 from pathlib import Path
 
 import pytest
-import yaml
 
 from qa_tools.common import assets
 
@@ -53,31 +52,10 @@ def _said(result) -> str:
 
 
 @pytest.fixture
-def two_assets(tmp_path) -> Path:
-    """assets/ with two folders: `quarterly`, today's configuration without
-    Civil Registration, and `daily`, today's configuration whole - each
-    reaching today's adapters and providers by its own folders."""
-    root = tmp_path / "assets"
-    real = ROOT / "contract"
-    for name in ("quarterly", "daily"):
-        folder = root / name
-        folder.mkdir(parents=True)
-        for entry in real.iterdir():
-            if entry.name != "data-asset.yaml":
-                (folder / entry.name).symlink_to(entry)
-        doc = yaml.safe_load((real / "data-asset.yaml").read_text())
-        if name == "quarterly":
-            for agency in doc["hierarchy"]["agencies"]:
-                agency["collections"] = [c for c in agency["collections"]
-                                         if c["id"] != "civil-registration"]
-            doc["hierarchy"]["agencies"] = [a for a in doc["hierarchy"]["agencies"]
-                                            if a["collections"]]
-        (folder / "data-asset.yaml").write_text(yaml.safe_dump(doc, sort_keys=False))
-        (folder / "collections").symlink_to(ROOT / "qa_tools" / "collections")
-        (folder / "synthetic").mkdir()
-        (folder / "synthetic" / "collections").symlink_to(ROOT / "generator" / "collections")
-    (root / "environments.yaml").symlink_to(real / "environments.yaml")
-    return root
+def two_assets() -> Path:
+    """The repository's own assets/, which holds two folders since the move:
+    `quarterly` without Civil Registration and `daily` with it alone."""
+    return ROOT / "assets"
 
 
 class TestWithNoAssetSet:
