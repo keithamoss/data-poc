@@ -216,3 +216,21 @@ the rebuild needs no question asked twice. Drafts and builders read this file.
 - B14 SETTLED by Keith 2026-11-02: the withdrawal of REQ-DASH-299's
   PROVISIONAL #4 is confirmed; mark that item answered. The gate's rule is
   unchanged.
+- C1-C5, C8-C10, C14-C16 SETTLED by Keith 2026-11-02 as RECOMMENDED
+  (environments.yaml shared; `mothman check` per-asset gates per asset with
+  the tools once; asset named in confirmation prompts; bare mothman checks the
+  asset before the terminal; module-name pattern and clash refusal confirmed;
+  tidy-test-databases exempt; dbt scratch and ticket files per asset; feedback
+  cross-asset links accepted until REQ-PIPE-354; scenario table accepted until
+  REQ-PIPE-352 c3; the move map's member lists and dbt_shared coverage).
+- C13 SETTLED by Keith 2026-11-02 as recommended: both dbt projects renamed
+  mothman_<asset> in the follow-on push; recorded unique_ids change once.
+- CHANGED by Keith 2026-11-02 (against the recommendation), all to BUILD:
+  - C6: "dbt packages installed" is decided by dbt's own package-lock.yml,
+    not a stamp file (REQ-QAC-368 d5).
+  - C7: a repo-relative path request for an asset folder outside the
+    repository REFUSES (REQ-PIPE-342 d18).
+  - C11: every test module names its asset; no quarterly default, and an
+    unmarked module is refused (REQ-PIPE-363 d12).
+  - C12: no forwarding macros file; each asset's dbt project points
+    macro-paths and test-paths at dbt_shared; REQ-QAC-368 c2 amended.
