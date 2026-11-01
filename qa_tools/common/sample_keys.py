@@ -5,13 +5,13 @@ collection's adapter (criterion 1). Every sampler - Soda's, dbt's two and
 datacontract-cli's - records through this module, so the shape, the order and
 the loudness are one rule rather than four:
 
-- ONE COLUMN: the bare value as text, exactly as before; a row whose key is
-  null is left out, as it always was (criterion 8), so no one-column sample
-  of any collection changes.
-- SEVERAL COLUMNS: an ordered list of that row's key values, each as text, a
-  null part kept as null - never the text 'None' and never dropped (criteria
-  2, 7 and 8 as AMENDED 2026-11-01, Keith, post-build-review #294). The page
-  shows a null part as '(no value)'.
+- ONE COLUMN: the bare value as text, as before.
+- SEVERAL COLUMNS: an ordered list of that row's key values, each as text.
+- A NULL KEY, OR KEY PART, IS RECORDED AS null - an empty key part, never the
+  text 'None' (datacontract-cli's old str(None)) and never dropped (Soda's and
+  dbt's old filters) - in every tool, one column included (criteria 7 and 8 as
+  AMENDED 2026-11-01, Keith, post-build-review #294 D1). The page shows it as
+  '(no value)'.
 - ORDER: by the parts in key order, each compared as text by code point, a
   null part after every non-null part in its position - in Python by a sort
   key that never compares None with a string, in dbt's SQL by each column cast
@@ -44,9 +44,9 @@ def _text(value) -> str | None:
 
 
 def value_of(row: Mapping, columns: Sequence[str], *, check, table) -> str | list | None:
-    """One row's sample: the bare text of a one-column key (None where it is
-    null, which the caller leaves out), or the ordered list of every key
-    column's text, null parts kept. Raises where a key column is absent."""
+    """One row's sample: the bare text of a one-column key, or the ordered
+    list of every key column's text - null kept as None either way. Raises
+    where a key column is absent."""
     if isinstance(columns, str):
         raise TypeError(f"a sample key is a list of columns, not the string {columns!r} "
                         "(REQ-PIPE-341 criterion 1)")
@@ -65,16 +65,14 @@ def value_of(row: Mapping, columns: Sequence[str], *, check, table) -> str | lis
 def sort_key(sample):
     """Text by code point, a null part after every non-null one in its
     position - never comparing None with a string."""
-    if isinstance(sample, list):
-        return tuple((1, "") if p is None else (0, p) for p in sample)
-    return ((0, sample),)
+    parts = sample if isinstance(sample, list) else [sample]
+    return tuple((1, "") if p is None else (0, p) for p in parts)
 
 
 def pick(samples: Iterable, limit: int = FAILING_SAMPLE_LIMIT) -> list:
-    """The samples a result records: one-column null values left out, then
-    the lowest `limit` in the shared order."""
-    kept = [s for s in samples if s is not None]
-    return sorted(kept, key=sort_key)[:limit]
+    """The samples a result records: the lowest `limit` in the shared order,
+    a null key last."""
+    return sorted(samples, key=sort_key)[:limit]
 
 
 def recorded(columns: Sequence[str], samples: list) -> dict:

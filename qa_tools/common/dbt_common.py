@@ -333,17 +333,21 @@ def _sample_rows(conn, sql: str, key_columns: list[str], *, check, table) -> lis
         raise sample_keys.SampleNotRecordable(
             f"check {check!r} on table {table!r}: its failing-row sample query raised "
             f"{type(exc).__name__}: {' '.join(str(exc).split())}") from exc
+    # A NULL KEY IS KEPT, never dropped (post-build-review #294 D1); the
+    # ORDER BY puts it last, as PostgreSQL's ascending order does.
     if len(key_columns) == 1:
-        return [str(r[0]) for r in rows if r[0] is not None]
+        return [None if r[0] is None else str(r[0]) for r in rows]
     return [list(r) for r in rows]
 
 
 def _order(key_columns: list[str]) -> str:
     # ORDERED, so the same data records the same sample (post-build-review
-    # #129): a one-column key in its own type's order, exactly as before; a
+    # #129): a one-column key in its own type's order, as before; a
     # several-column key as text, C collation, nulls last - the order every
     # tool's samples share (sample_keys).
-    return key_columns[0] if len(key_columns) == 1 else sample_keys.order_by_sql(key_columns)
+    if len(key_columns) == 1:
+        return f"{key_columns[0]} NULLS LAST"
+    return sample_keys.order_by_sql(key_columns)
 
 
 def failing_sample_keys_direct(conn, relation_name: str, key_columns: list[str],

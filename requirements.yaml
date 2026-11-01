@@ -45909,10 +45909,10 @@ requirements:
     unmet_criteria:
     - {"criterion": "Criterion 3, in part - the per-code identifier count implied inside the own-row queries.", "why": "The gate now checks codes in query text and valid-values lists, which column each id_j is compared with and both-sides casts; the id_counts attribute beside the queries is checked, the count inside them is not.", "owner": "not scheduled", "blocked_by": {"unowned": true}}
     - criterion: Criterion 6, the failing-rows half - the referential check records its failing rows as dataset code and identifier values.
-      why: All three failing linkage referential results on the bootstrap recorded failing_sample_keys as an empty list (post-build-review #291); the sample key is one column today and these rows need a composite one. Keith chose (b), 2026-10-31 - fold the fix into REQ-PIPE-341 criterion 3.
-      owner: REQ-PIPE-341 (signed 2026-10-31), the composite failing-sample key
+      why: All three failing linkage referential results on the bootstrap recorded failing_sample_keys as an empty list (post-build-review #291). REQ-PIPE-341 is BUILT (2026-11-01) - the composite key, the amended queries and a real-Soda proof over the committed check file (tests/test_sample_keys_composite.py) - and this entry is removed by its criterion 7's before-and-after compare, written and waiting on a from-empty bootstrap.
+      owner: 'the end-of-run bootstrap (2026-11-01 build run)'
       blocked_by:
-        requirements: [REQ-PIPE-341]
+        unowned: true
   - id: REQ-GEN-334
     title: The Linkage Products provider writes, for every quarter, a linkage delivery on the quarter's own round, received after that quarter's Emergency Department promotion takes effect in an ordinary quarter and within its due time and grace, built from the last source supply received before it
     date_written: '2026-10-25'
@@ -46771,7 +46771,7 @@ requirements:
     date_written: '2026-10-31'
     story: As whoever maintains the pipeline, I want a failing sample to carry every column that identifies a row, not one, so that a check on a table keyed by several columns - a geocoding table's identifiers and census year, a linkage row's dataset and identifiers - records something a person can look up.
     moscow: should
-    status: not_started
+    status: built
     signed_off:
       by: Keith
       date: '2026-10-31'
@@ -46783,8 +46783,8 @@ requirements:
     - THE SYSTEM SHALL have the results writer, the results reader and the dashboard build carry a several-column sample unchanged to the page; and the page SHALL render each part escaped and joined in declared order (REQ-DASH-299 criterion 8), SHALL compare a run's samples with the compared run's BY VALUE - today's Set of the samples compares arrays by reference, so every several-column sample would read 'new' - and SHALL escape every sample it shows, a one-column one included (today's sample and compare pills interpolate the key unescaped) (architect B3).
     - IF a Soda failed-rows query on a table does not select every column of that table's sample key, THEN `mothman check` SHALL fail, naming the check and the missing columns; and THE SYSTEM SHALL amend Linkage Keys' referential, expected-identifiers and no-surplus-identifiers queries to select dataset and id_1 to id_N - the last two select dataset and linkage_key today and would otherwise record nothing under the new key (architect B3).
     - 'WHEN a several-column sample is recorded, THE SYSTEM SHALL NOT record any column outside the declared key (plans/qa-pipeline.md #15).'
-    - 'WHEN the change that builds this is made, THE SYSTEM SHALL show by REQ-TEST-239''s before-and-after compare of a from-empty bootstrap that no recorded sample of Birth Registrations, Child Protection or Emergency Department changed, SHALL list what changed for Linkage Keys, and SHALL show that the three failing linkage referential results post-build-review #291 found recorded empty (linkage_keys__201808011730000800 for ed-presentations, linkage_keys__202205011730000800 and linkage_keys__202211011730000800 for cp-clients, or their counterparts in the new bootstrap) now record their failing rows as dataset code and identifier values - which MEETS REQ-QAC-333 criterion 6, whose unmet_criteria entry SHALL be removed in that change, its evidence citing this compare (Keith, 2026-10-31, #291 b).'
-    - IF a sampler cannot record a failing result's sample as declared - a key column absent from a row Soda captured, a datacontract-cli failed sample lacking a key column (dropped today by its 'if pk_column in s' filter, datacontract_common.py:271), or a dbt sample query raising (swallowed today and returned as [] at dbt_common.py:339-340) - THEN THE SYSTEM SHALL fail that tool's recording for the run, naming the check, the table and the missing column or the query's error, in every sampler and not Soda alone, and SHALL NOT record an empty sample; a one-column key's null VALUE is still left out as today, so no recorded sample of any collection changes (architect v5 SHOULD).
+    - 'WHEN the change that builds this is made, THE SYSTEM SHALL show by REQ-TEST-239''s before-and-after compare of a from-empty bootstrap that no recorded sample of Birth Registrations, Child Protection or Emergency Department changed, SHALL list what changed for Linkage Keys, and SHALL show that the three failing linkage referential results post-build-review #291 found recorded empty (linkage_keys__201808011730000800 for ed-presentations, linkage_keys__202205011730000800 and linkage_keys__202211011730000800 for cp-clients, or their counterparts in the new bootstrap) now record their failing rows as dataset code and identifier values - which MEETS REQ-QAC-333 criterion 6, whose unmet_criteria entry SHALL be removed in that change, its evidence citing this compare (Keith, 2026-10-31, #291 b). AMENDED 2026-11-01 (Keith, post-build-review #294): a failing row whose key is null is recorded with an empty key part, never as the text None and never dropped.'
+    - 'IF a sampler cannot record a failing result''s sample as declared - a key column absent from a row Soda captured, a datacontract-cli failed sample lacking a key column (dropped today by its ''if pk_column in s'' filter, datacontract_common.py:271), or a dbt sample query raising (swallowed today and returned as [] at dbt_common.py:339-340) - THEN THE SYSTEM SHALL fail that tool''s recording for the run, naming the check, the table and the missing column or the query''s error, in every sampler and not Soda alone, and SHALL NOT record an empty sample; a one-column key''s null VALUE is still left out as today, so no recorded sample of any collection changes (architect v5 SHOULD). AMENDED 2026-11-01 (Keith, post-build-review #294): a failing row whose key is null is recorded with an empty key part, never as the text None and never dropped.'
     - 'THE SYSTEM SHALL record, with every result whose sample key has several columns, the ordered names of those columns, carried unchanged by the reader and the dashboard build to the page, so that the page lays a sample out without reading configuration (REQ-DASH-299 criteria 6 to 8), a one-column result recording none as today; and WHERE a result and its compared run recorded different key columns, THE SYSTEM SHALL say in the compare block ''These examples cannot be compared: the compared run named its rows by different columns.'' (PROPOSED) rather than show every sample as new (architect v5 SHOULD and NIT).'
     - THE SYSTEM SHALL give each Linkage Keys check whose query criterion 5 amends - the referential, expected-identifiers and no-surplus-identifiers checks - a non-breaking changelog entry dated the change, saying it now selects the row's dataset and identifiers so its examples can name them and its verdicts are unchanged (architect v5 NIT).
     non_functional_requirements:
@@ -46808,6 +46808,88 @@ requirements:
     - 'ONE SORT RULE FOR EVERY TOOL (architect v5 SHOULD): a several-column sample holding None cannot be sorted by Python''s default comparison, and SQL ordering follows the database''s collation, so without a stated rule two tools would pick different examples for the same data. Text by code point, nulls last, the same in Python and SQL. REJECTED dropping rows with a null part, which hides exactly the samples a null-identifier fault produces.'
     - 'LOUD, NOT SILENT, IN EVERY SAMPLER (architect v5 SHOULD): criterion 5''s gate reads Soda''s queries only; dbt''s swallowed exception and datacontract-cli''s column filter lose samples the same way #291 did. Failing the tool''s recording makes the next one a red run rather than a post-build finding. REJECTED a logged warning, which nobody reads.'
     - 'THE KEY''S COLUMN NAMES ARE RECORDED, NOT LOOKED UP (architect v5 SHOULD and NIT): the page cannot tell id parts from census_year, and an adapter''s declaration read at build would describe today''s key, not the one a past result used; recorded with the result, an old result keeps its own shape and a compare across a change of key shape can say so instead of showing every sample as new. REJECTED carrying the adapter''s current declaration in the build.'
+    - 'NAMES_NO_ROW, ONE DECLARATION ACROSS TOOLS (Keith, decisions 2026-11-01): a check whose failure judges the whole table and names no row - Birth Registrations'' freshness check, datacontract-cli''s duplicate check on the non-key source_system_record_id - DECLARES `names_no_row: true`, a Soda attribute or a contract customProperty, both outside the definition fingerprint. The criterion-5 gate and every sampler honour it, and it records no sample; verdicts unchanged. REJECTED a metric check, and sampling the newest record. dbt keeps its adapter''s singular_unsampled for recency, whose sample path returns nothing without raising.'
+    - 'A NULL KEY IS RECORDED AS JSON null, ONE COLUMN INCLUDED (Keith, decisions 2026-11-01 and post-build-review #294 D1, criteria 7 and 8 amended): an empty key part, never the text ''None'' and never dropped, in every tool - datacontract-cli recorded a null one-column key as str(None), and Soda and dbt dropped such rows. Ordered last. This overrides criterion 8''s older ''a one-column key''s null VALUE is still left out'', and is the one correction criterion 7''s compare allows outside Linkage Keys, listing each result it touches. How a null key READS on the page, ''(no value)'', is REQ-DASH-299''s (the geocoding dashboard build); until then the page shows it as an empty part and never as the text null.'
+    - 'VALIDATE_SODA WARNS ON A FAILED-ROWS CHECK WHOSE TABLE DECLARES NO KEY (Keith, decisions 2026-11-01), rather than silently skipping it; a warning, not a failure.'
+    - 'ONE SHARED MODULE, qa_tools/common/sample_keys.py: the value, order, limit, record and loud-failure rules every sampler calls, so the four tools cannot drift. A key given as a bare string is refused (TypeError) - iterated, it would be read as letters.'
+    - 'THE GATE PARSES THE OUTERMOST SELECT WITH sqlglot (already installed through dbt): output names by alias or column name, `*` and a `fail condition` count as the whole row. Unparseable SQL stays Soda''s own parse gate''s to refuse.'
+    - 'DATACONTRACT-CLI PROVEN BY EXPERIMENT (criterion 2): against the installed version, a model with two primaryKey columns returns both in every failed sample and no other non-failing column (tests/test_sample_keys_composite.py). Its sample columns are the contract''s primaryKey and unique properties less any classified sensitive, so a guard test holds every sampled rule''s key to such columns.'
+    - 'CRITERION 3''s GEOCODING HALF WAITS FOR THE TABLES: no geocoding table exists yet; REQ-PIPE-296 adds them and declares their keys (id_1 to id_N and census_year) in the adapter that gains them.'
+    implemented_by:
+    - qa_tools/common/sample_keys.py::value_of
+    - qa_tools/common/sample_keys.py::pick
+    - qa_tools/common/sample_keys.py::recorded
+    - qa_tools/common/sample_keys.py::order_by_sql
+    - qa_tools/common/soda_common.py::failing_sample_keys
+    - qa_tools/common/dbt_common.py::failing_sample_keys_direct
+    - qa_tools/common/dbt_common.py::failing_sample_keys_via_values
+    - qa_tools/common/datacontract_common.py::failing_sample_keys
+    - qa_tools/common/datacontract_common.py::names_no_row_from_quality_definition
+    - qa_tools/common/validate_soda.py::problems
+    - qa_tools/common/validate_soda.py::warnings
+    - qa_tools/tools/run_soda.py::evaluate
+    - qa_tools/tools/run_dbt.py::evaluate
+    - qa_tools/tools/run_datacontract.py::evaluate
+    - qa_tools/collections/base.py::CollectionAdapter
+    - pipeline/build_dashboard_data.py::build_one_table
+    - dashboard/qa-reporting-dashboard.template.html
+    - contract/department-of-health/linkage-products-soda-checks.yml
+    linked_tests:
+    - tests/test_sample_keys_composite.py::test_every_adapter_declares_each_tables_key_as_a_list
+    - tests/test_sample_keys_composite.py::test_the_existing_one_column_keys_are_unchanged
+    - tests/test_sample_keys_composite.py::test_linkage_keys_is_named_by_its_dataset_and_every_identifier
+    - tests/test_sample_keys_composite.py::test_a_several_column_sample_keeps_a_null_part_as_null_never_the_text_none
+    - tests/test_sample_keys_composite.py::test_a_missing_key_column_is_refused_naming_check_table_and_column
+    - tests/test_sample_keys_composite.py::test_several_column_samples_order_by_parts_as_text_nulls_last_and_are_limited
+    - tests/test_sample_keys_composite.py::test_a_several_column_result_records_its_columns_and_a_one_column_result_none
+    - tests/test_sample_keys_composite.py::test_soda_refuses_a_captured_row_without_a_key_column
+    - tests/test_sample_keys_composite.py::test_soda_records_nothing_for_a_check_declaring_it_names_no_row
+    - tests/test_sample_keys_composite.py::test_dbt_direct_samples_every_key_column_as_text_in_c_order_nulls_last
+    - tests/test_sample_keys_composite.py::test_dbt_via_values_samples_every_key_column
+    - tests/test_sample_keys_composite.py::test_dbt_a_sample_query_that_raises_fails_the_recording
+    - tests/test_sample_keys_composite.py::test_datacontract_records_every_key_column
+    - tests/test_sample_keys_composite.py::test_datacontract_refuses_a_sample_lacking_a_key_column
+    - tests/test_sample_keys_composite.py::test_datacontract_cli_samples_every_primary_key_column_by_experiment
+    - tests/test_sample_keys_composite.py::test_every_sampled_contract_rule_can_record_its_tables_key
+    - tests/test_sample_keys_composite.py::test_real_soda_over_the_real_linkage_checks_names_each_failing_row
+    - tests/test_validate_soda.py::test_a_failed_rows_query_missing_key_columns_is_refused_naming_them
+    - tests/test_validate_soda.py::test_a_check_declaring_it_names_no_row_is_not_held_to_the_key
+    - tests/test_validate_soda.py::test_a_failed_rows_check_on_a_table_with_no_declared_key_warns
+    - tests/test_validate_soda.py::test_the_real_files_select_every_key_and_warn_of_nothing
+    - tests/test_qa_results_reader.py::test_a_several_column_sample_and_its_key_columns_round_trip_unchanged
+    - tests/test_build_from_the_record.py::TestASeveralColumnSampleReachesThePageUnchanged::test_samples_and_key_columns_are_carried
+    - tests/test_common_helpers.py::test_failing_sample_keys_direct_fails_loudly_on_a_real_query_error
+    - tests/test_sample_keys_composite.py::test_datacontract_one_column_null_key_is_null_never_the_text_none
+    - tests/test_sample_keys_composite.py::test_one_column_samples_order_as_before_a_null_kept_last
+    - tests-js/sample-keys-compare.test.js
+    - tests/test_dashboard_e2e.py::TestASeveralColumnSampleOnTheRealPage
+    - tests/test_sample_keys_equivalence.py
+    - tests/test_thirty_linked_datasets.py::TestEveryLinkageResultNamesItsRowsByTheWholeKey::test_each_result_records_the_key_columns
+    evidence:
+    - '2026-11-01 Perth, worktree b341: tests/test_sample_keys_composite.py, test_sample_keys_deterministic.py, test_common_helpers.py, test_collections_registry.py, test_validate_soda.py, test_check_fingerprint.py, test_linkage_check_sql.py, test_linked_datasets.py, test_qa_results_reader.py, test_build_from_the_record.py, test_check_lifecycle.py, test_validate_check_lifecycle.py, the six test_run_{soda,dbt,datacontract}_{bdm,cp}.py, test_soda_scoped.py and test_linkage_scenarios.py green; vitest sample-keys-compare, sample-fine-print, tool-verdict-status and dashboard-loads green. No bootstrap, no full suite (Keith''s terms for the build run).'
+    - 'SEEN FAILING FIRST: the new sampler, adapter, gate, build and page tests before each change; the real-Soda Linkage Keys test against the pre-build check file raised SampleNotRecordable on ''Expected identifiers present'' (dataset and linkage_key selected, id_1 and id_2 missing) - the #291 shape, now loud. The real files'' gate found exactly five: the four Linkage Keys queries criterion 5 names, and Birth Registrations'' freshness check, which now declares names_no_row.'
+    - 'EVERY CONSUMER, BY GREP for failing_sample_key over qa_tools, pipeline, dashboard, cli and generator (NFR 1): soda_common.failing_sample_keys, dbt_common.failing_sample_keys_direct and failing_sample_keys_via_values, datacontract_common.failing_sample_keys, run_soda/run_dbt/run_datacontract.evaluate, sample_keys, pipeline/build_dashboard_data (slot and history entry), and the template''s sample block, compare block and pills. The writer, the reader and results_history carry it through qa.check_result.extra untouched, which test_qa_results_reader proves for the new shape.'
+    unmet_criteria:
+    - criterion: 'Criterion 7 - REQ-TEST-239''s before-and-after compare of a from-empty bootstrap.'
+      why: 'Written as tests/test_sample_keys_equivalence.py (on demand) and not run: each side is a from-empty bootstrap of half an hour or more, which this build run does not do (Keith''s terms).'
+      owner: 'the end-of-run bootstrap (2026-11-01 build run)'
+      blocked_by:
+        unowned: true
+    - criterion: 'NFR 1, the page asserted in a real browser.'
+      why: 'Written as tests/test_dashboard_e2e.py::TestASeveralColumnSampleOnTheRealPage and not run: it builds the dashboard from a bootstrapped database.'
+      owner: 'the end-of-run bootstrap (2026-11-01 build run)'
+      blocked_by:
+        unowned: true
+    - criterion: 'Criterion 8 at scale - the on-demand thirty-linked run records every linkage result under the whole key.'
+      why: 'Written as tests/test_thirty_linked_datasets.py::TestEveryLinkageResultNamesItsRowsByTheWholeKey and not run: the module is on demand and needs a full copy run.'
+      owner: 'the end-of-run bootstrap (2026-11-01 build run)'
+      blocked_by:
+        unowned: true
+    - criterion: 'Criterion 3, the geocoding half - each geocoding table''s key as id_1 to id_N and census_year.'
+      why: 'No geocoding table exists yet; the list shape takes such a key unchanged.'
+      owner: REQ-PIPE-296, which adds the geocoding tables
+      blocked_by:
+        requirements: [REQ-PIPE-296]
   - id: REQ-TEST-374
     title: mothman check warns on every unanswered PROVISIONAL choice in a built requirement, naming each
     date_written: '2026-11-01'

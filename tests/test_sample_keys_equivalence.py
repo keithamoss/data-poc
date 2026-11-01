@@ -12,13 +12,13 @@ bootstrap of about half an hour or more, deferred to the end-of-run bootstrap
     mothman debug equivalence capture <commit before the build> req-pipe-341-before
     mothman debug equivalence capture <the build's commit> req-pipe-341-after
 
-THE ONE DELIBERATE CHANGE OUTSIDE LINKAGE, and why it is allowed here: a
-datacontract-cli sample whose one-column key was NULL was recorded as the
-text 'None' (`str(s[pk_column])`). The decision of 2026-11-01 (Keith,
-post-build-review #294) is that a key is never recorded as the text None, and
-criterion 8 leaves a one-column null out - so an after-sample equal to the
-before-sample with every 'None' removed is unchanged in substance, and each
-such case is listed rather than hidden.
+THE ONE DELIBERATE CHANGE OUTSIDE LINKAGE, and why it is allowed here
+(criterion 7 as amended 2026-11-01, Keith, post-build-review #294 D1): a null
+key is now recorded as null, an empty key part, in every tool. It was the text
+'None' in datacontract-cli's samples (`str(s[pk_column])`) and dropped by Soda
+and dbt. So an after-sample whose non-null keys equal the before-sample's keys
+other than 'None' - nulls, last, the only difference - is that one correction,
+and each such result is listed rather than hidden.
 """
 from __future__ import annotations
 
@@ -78,12 +78,13 @@ def test_no_sample_of_the_other_collections_changed(sides):
         if now["samples"] == was["samples"] and now["columns"] is None:
             continue
         if (now["columns"] is None and isinstance(was["samples"], list)
-                and now["samples"] == [k for k in was["samples"] if k != "None"]):
+                and [k for k in now["samples"] if k is not None]
+                == [k for k in was["samples"] if k != "None"]):
             none_dropped.append(key)
             continue
         changed.append((key, was["samples"], now["samples"]))
     assert seen, "no result of the other collections - this would prove nothing"
-    print(f"\n{len(none_dropped)} result(s) lost a 'None' text key and nothing else: "
+    print(f"\n{len(none_dropped)} result(s) changed only by a null key now recorded as null: "
           f"{none_dropped[:20]}")
     assert not changed, changed[:10]
 

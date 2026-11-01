@@ -71,7 +71,8 @@ def test_failing_sample_keys_direct_returns_real_pk_values():
     conn = duckdb.connect(":memory:")
     conn.execute("CREATE TABLE audit (id INTEGER)")
     conn.execute("INSERT INTO audit VALUES (1), (2), (NULL)")
-    assert failing_sample_keys_direct(conn, "audit", ["id"]) == ["1", "2"]
+    # A null key is kept, last (post-build-review #294 D1) - it was dropped.
+    assert failing_sample_keys_direct(conn, "audit", ["id"]) == ["1", "2", None]
 
 
 def test_failing_sample_keys_via_values_fails_loudly_on_a_real_query_error():

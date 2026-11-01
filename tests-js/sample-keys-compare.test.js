@@ -61,4 +61,10 @@ describe("a failing-row sample pill", () => {
     expect(html).toContain("&lt;b&gt;CP&lt;/b&gt;");
     expect(html).toContain("C&amp;1");
   });
+
+  it("never prints a null key as the text null", () => {
+    const w = load();
+    expect(w.samplePill(null, "transparent")).not.toContain("null");
+    expect(w.samplePill(["CP", null], "transparent")).not.toContain("null");
+  });
 });

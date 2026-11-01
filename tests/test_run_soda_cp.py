@@ -130,10 +130,11 @@ class TestSamplesAreNotLostToANameAnotherTableShares:
             schema = supply_db.run_schema(_DIRTY_RUN_ID)
             for r in sampled:
                 table = hierarchy.dataset(r["dataset_id"]).table
-                pk = collections.adapter("child-protection").sample_key[table]
+                [pk] = collections.adapter("child-protection").sample_key[table]
                 keys = {str(row[0]) for row in conn.execute(
                     f'SELECT {pk} FROM "{schema}".{table}').fetchall()}
-                assert set(r["failing_sample_keys"]) <= keys, \
+                # A null key is recorded as null (post-build-review #294 D1).
+                assert set(r["failing_sample_keys"]) - {None} <= keys, \
                     (r["check_id"], r["failing_sample_keys"])
 
 

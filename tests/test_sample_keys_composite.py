@@ -85,8 +85,10 @@ def test_several_column_samples_order_by_parts_as_text_nulls_last_and_are_limite
         ["A", "10", None], ["A", "2", "x"], ["A", "2", None], ["A", None, None], ["B", "1", None]]
 
 
-def test_one_column_samples_order_as_before_and_leave_nulls_out():
-    assert sample_keys.pick(["K-3", "K-1", "K-2"]) == ["K-1", "K-2", "K-3"]
+def test_one_column_samples_order_as_before_a_null_kept_last():
+    """Post-build-review #294 D1 (Keith 2026-11-01): a null key is recorded as
+    an empty key part, never dropped - one column included."""
+    assert sample_keys.pick(["K-3", None, "K-1", "K-2"]) == ["K-1", "K-2", "K-3", None]
 
 
 def test_a_several_column_result_records_its_columns_and_a_one_column_result_none():
@@ -110,9 +112,9 @@ def test_soda_records_every_key_column_null_parts_kept():
         ["CP", "C-1", None], ["CP", None, None], ["ED", "P-2", None]]
 
 
-def test_soda_one_column_key_is_exactly_as_before():
+def test_soda_one_column_key_is_the_bare_value_a_null_kept():
     captured = {("t", "c"): [{"pk": "K-2", "o": 1}, {"pk": None}, {"pk": "K-1"}]}
-    assert soda_common.failing_sample_keys(captured, "c", ["pk"], "t") == ["K-1", "K-2"]
+    assert soda_common.failing_sample_keys(captured, "c", ["pk"], "t") == ["K-1", "K-2", None]
 
 
 def test_soda_refuses_a_captured_row_without_a_key_column():
@@ -164,9 +166,9 @@ def test_dbt_via_values_samples_every_key_column(audit):
         conn.execute("DROP TABLE public.composite_values")
 
 
-def test_dbt_one_column_samples_are_exactly_as_before(audit):
-    assert dbt_common.failing_sample_keys_direct(audit, "public.composite_probe", ["id_1"]) == [
-        "1", "2", "3", "9", "10"]
+def test_dbt_one_column_samples_in_their_own_order_a_null_kept_last(audit):
+    assert dbt_common.failing_sample_keys_direct(audit, "public.composite_probe", ["id_1"],
+                                                 limit=10) == ["1", "2", "3", "9", "10", None]
 
 
 def test_dbt_a_sample_query_that_raises_fails_the_recording(audit):
@@ -188,9 +190,10 @@ def test_datacontract_records_every_key_column():
         ["CP", None, None], ["ED", "P-1", None]]
 
 
-def test_datacontract_one_column_key_is_exactly_as_before():
-    check = SimpleNamespace(name="n", failedSamples=[{"pk": "K-2"}, {"pk": "K-1"}])
-    assert datacontract_common.failing_sample_keys(check, ["pk"]) == ["K-1", "K-2"]
+def test_datacontract_one_column_null_key_is_null_never_the_text_none():
+    """It was str(None), the text 'None' (post-build-review #294 D1)."""
+    check = SimpleNamespace(name="n", failedSamples=[{"pk": "K-2"}, {"pk": None}, {"pk": "K-1"}])
+    assert datacontract_common.failing_sample_keys(check, ["pk"]) == ["K-1", "K-2", None]
 
 
 def test_datacontract_refuses_a_sample_lacking_a_key_column():
@@ -283,3 +286,52 @@ def test_every_sampled_contract_rule_can_record_its_tables_key():
                         assert p.get("primaryKey") or p.get("unique"), (c.id, table, k)
                         assert (p.get("classification") or "").lower() not in sensitive, (c.id, k)
     assert seen, "no sampled contract rule found - this would prove nothing"
+
+
+def test_real_soda_over_the_real_linkage_checks_names_each_failing_row(supply_dsn):
+    """Post-build-review #291 at unit scale: real Soda, the committed Linkage
+    Keys checks file, a fixture with one fault of each kind. Every captured
+    sample records dataset and id_1 to id_2 - the referential ones included,
+    which were recorded empty - and no captured row lacks a key column, so no
+    sampler refuses (criterion 8)."""
+    from soda.scan import Scan
+
+    from qa_tools import collections as registry
+
+    key = registry.adapter("linkage-products").sample_key["linkage_keys"]
+    path = registry.by_id("linkage-products").check_file("soda")
+    schema = "sample_probe_linkage"
+    with supply_db.connect(label="test-linkage-samples") as conn:
+        conn.execute(f"DROP SCHEMA IF EXISTS {schema} CASCADE")
+        conn.execute(f"CREATE SCHEMA {schema}")
+        conn.execute(f"CREATE TABLE {schema}.linkage_keys "
+                     "(linkage_key text, dataset text, id_1 text, id_2 text)")
+        conn.execute(f"CREATE TABLE {schema}.cp_clients (cp_client_id text)")
+        conn.execute(f"CREATE TABLE {schema}.ed_presentations (presentation_id text)")
+        for row in [("k1", "DOC_CLIENTS", "C-1", None), ("k2", "DOC_CLIENTS", "C-404", None),
+                    ("k3", "EDDC_PRESENTATION", "P-1", None),
+                    ("k4", "EDDC_PRESENTATION", "P-404", None),
+                    ("k5", "DOC_CLIENTS", None, None), ("k6", "DOC_CLIENTS", "C-1", "extra")]:
+            conn.execute(f"INSERT INTO {schema}.linkage_keys VALUES (?, ?, ?, ?)", list(row))
+        conn.execute(f"INSERT INTO {schema}.cp_clients VALUES ('C-1')")
+        conn.execute(f"INSERT INTO {schema}.ed_presentations VALUES ('P-1')")
+    try:
+        scan = Scan()
+        scan.set_data_source_name("probe")
+        scan.add_configuration_yaml_str(supply_db.soda_config_yaml("probe", schema))
+        scan.add_sodacl_yaml_file(path)
+        sampler = soda_common.CaptureSampler()
+        scan.sampler = sampler
+        scan.disable_telemetry()
+        soda_common.execute_scan(scan)
+        got = {name: soda_common.failing_sample_keys(sampler.captured, name, key, table)
+               for (table, name) in sampler.captured}
+    finally:
+        with supply_db.connect(label="test-linkage-samples") as conn:
+            conn.execute(f"DROP SCHEMA {schema} CASCADE")
+    assert got["Client Register links match a client"] == [
+        ["DOC_CLIENTS", "C-404", None], ["DOC_CLIENTS", None, None]]
+    assert got["ED Presentations links match a presentation"] == [
+        ["EDDC_PRESENTATION", "P-404", None]]
+    assert got["Expected identifiers present"] == [["DOC_CLIENTS", None, None]]
+    assert got["No surplus identifiers"] == [["DOC_CLIENTS", "C-1", "extra"]]

@@ -109,6 +109,34 @@ intro: >
   all three.
 
 releases:
+  - date: "2026-11-01"
+    summary: >
+      Example failing rows can now name a record by several columns, so Linkage
+      Products' examples say which record failed.
+    changes:
+      - category: Fixed
+        items:
+          - headline: Linkage examples name the record
+            components: ["QA checks & contract"]
+            description: >
+              A Linkage Products link that matches no record now shows its
+              dataset code and identifiers as an example, where it showed
+              nothing. A row whose identifier is missing is kept as an example
+              rather than left out.
+      - category: Improved
+        items:
+          - headline: Examples compared fairly
+            components: ["Dashboard UI"]
+            description: >
+              Comparing two runs' example rows now matches them by value, so a
+              record failing in both reads as still failing. When the two runs
+              named their rows differently, the page says so.
+          - headline: A check that says what it samples
+            components: ["QA checks & contract"]
+            description: >
+              `mothman check` now fails a failed-rows check whose query does
+              not select its table's whole key, and a run stops rather than
+              quietly recording no examples.
   - date: "2026-10-31"
     summary: >
       Department of Health has a second collection, Linkage Products, and a
