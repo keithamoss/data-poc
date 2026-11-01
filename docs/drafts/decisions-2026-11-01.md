@@ -179,3 +179,12 @@ the rebuild needs no question asked twice. Drafts and builders read this file.
   plans/morning-reports.md.
 - Anything significant (a defect needing a product decision, a criterion that
   cannot be met) is stopped and reported, not decided.
+- STOPPED OVERNIGHT, FOR KEITH (the move, 2026-11-02 early): after the move each
+  asset keeps its own generator bookkeeping, so quarterly receipts' sequence
+  numbers restart within the asset (order kept) and two quarterly delivery
+  directories are named differently. All 614 delivery FILES are byte-identical.
+  REQ-TEST-357 c3 ("the compare reports no difference") cannot hold as signed.
+  Recommendation: the compare normalises per-asset sequence numbering and
+  delivery-folder names, and c3 is amended to say so - a shared cross-asset
+  counter would break the isolation the split exists for. Alternative: change
+  delivery naming so it does not depend on the sequence.
