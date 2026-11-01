@@ -736,30 +736,60 @@ def contested_own_checks(contested: Iterable[str],
         if check_id_mod.parse(cid).dataset in datasets)
 
 
-def borrow_from_period(conn, run_id: str, period_name: str, tables) -> list[str]:
-    """Let a TRIAL read what is in place in a period for the tables its folder
-    did not carry (REQ-PIPE-202 criterion 8 as amended 2026-11-01, Keith): a
-    view onto each table's one promoted version in the period's schema, its
-    resolution recorded as read from the period - what a real arrival reads
-    for a table nothing staged for its period. Returns the logical names it
-    could borrow; a table the period holds none of stays absent, and a trial
-    records it no data."""
-    found = promoted_in(conn, period_name, list(tables))
+#: borrow_from_period's default: the real load log, as a real arrival's run reads.
+_REAL_LOAD_LOG = object()
+
+
+def borrow_from_period(conn, run_id: str, period_name: str, tables, *,
+                       loaded=_REAL_LOAD_LOG) -> list[str]:
+    """Let a TRIAL read the tables its folder did not carry (REQ-PIPE-202
+    criterion 8 as amended 2026-11-01, Keith) AS A REAL ARRIVAL'S OVERLAY
+    READS A SIBLING (decision 17 as CHANGED by Keith 2026-11-02, morning
+    report B1): the one supply filed to the period and still staged -
+    undecided - where exactly one is (period_overlay.staged_for_period,
+    behind the real load-record gate); where several are, contested and
+    recorded so, the period's promoted version, as where none is. Returns
+    the logical names it could borrow; a table neither holds stays absent,
+    and a trial records it no data. `loaded` is the load-record gate, the
+    real load log unless given (None skips it, as the overlay's own tests
+    do)."""
+    from qa_tools.common import load_log, period_overlay
+
+    wanted = sorted(set(tables))
+    if loaded is _REAL_LOAD_LOG:
+        loaded = load_log.loaded_tables(None, conn)
+    staged = period_overlay.staged_for_period(conn, period_name, wanted,
+                                              staging=supply_db.STAGING_SCHEMA, loaded=loaded)
+    supply_of_staged = period_overlay.filed_tables(conn, period_name, set(wanted))
+    found = promoted_in(conn, period_name, wanted)
     schema = supply_db.run_schema(run_id)
-    source = period_schema(period_name)
     mine = supply_db.resolution_for(conn, run_id)
     borrowed = []
-    for logical, physicals in sorted(found.items()):
-        if len(physicals) != 1:
-            continue
+    for logical in wanted:
+        candidates = sorted(staged.get(logical) or ())
+        if len(candidates) == 1:
+            physical, source_schema, origin = (candidates[0], supply_db.STAGING_SCHEMA,
+                                               FROM_STAGING)
+        else:
+            physicals = found.get(logical) or []
+            if len(physicals) != 1:
+                if len(candidates) > 1:
+                    mine.ambiguous[logical] = candidates
+                continue
+            physical, source_schema, origin = physicals[0], period_schema(period_name), FROM_PERIOD
         conn.execute(f'CREATE OR REPLACE VIEW "{schema}"."{logical}" AS '
-                     f'SELECT * FROM "{source}"."{physicals[0]}"')
-        mine.resolved[logical] = physicals[0]
-        mine.source[logical] = FROM_PERIOD
-        mine.ambiguous.pop(logical, None)
+                     f'SELECT * FROM "{source_schema}"."{physical}"')
+        mine.resolved[logical] = physical
+        mine.source[logical] = origin
+        if len(candidates) > 1:
+            mine.ambiguous[logical] = candidates
+        else:
+            mine.ambiguous.pop(logical, None)
+        if origin == FROM_STAGING and supply_of_staged.get(physical):
+            mine.supply_of[logical] = supply_of_staged[physical]
         if logical in mine.absent:
             mine.absent.remove(logical)
         borrowed.append(logical)
-    if borrowed:
+    if borrowed or mine.ambiguous:
         supply_db.record_resolution(conn, mine)
     return borrowed

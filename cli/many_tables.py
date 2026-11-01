@@ -171,9 +171,11 @@ class ManyTablesCLI(CollectionCLI):
         (REQ-PIPE-202 criterion 8 as amended 2026-11-01, Keith): for the period
         a supply of the first table it holds would be filed to if received at
         `at` - the filing rule a real arrival is filed by, asked and not
-        recorded - each table's promoted version there. One the period holds
-        none of stays absent and is recorded no data, as any table a trial
-        cannot read is."""
+        recorded - each table as a real arrival's overlay reads a sibling
+        there: the one supply staged for the period and not yet decided, else
+        its promoted version (decision 17 as CHANGED by Keith 2026-11-02,
+        morning report B1). One the period holds none of stays absent and is
+        recorded no data, as any table a trial cannot read is."""
         from qa_tools.common import filing, hierarchy, period_schema, supply_db
 
         missing = [t for t in self.tables if t not in present]
