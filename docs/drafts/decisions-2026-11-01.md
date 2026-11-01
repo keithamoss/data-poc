@@ -238,3 +238,7 @@ the rebuild needs no question asked twice. Drafts and builders read this file.
   Products releases read only source supplies whose file actually arrived, the
   same rule as geocoding (plans/qa-pipeline.md #89); a regenerated change to
   built REQ-GEN-334 deliveries, and the report lists every release that moved.
+- END-OF-RUN PUSH WAITS for the fast critical CI set (running-thoughts #136,
+  REQ-TEST next free above 374) to be signed and built, so the push runs the
+  fast set, not the full test.yml (~145 billable minutes on a cache miss, with
+  the month near its allowance). SETTLED by Keith 2026-11-02.
