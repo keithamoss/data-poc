@@ -95,17 +95,42 @@ def status_rank(current, warn, fail, status: str | None = None) -> int:
 _UNRANKED = -2
 
 
+#: KIND FAMILIES SHOWN IN A DECLARED ORDER (REQ-DASH-299 criterion 1): checks
+#: of one family tied on status are shown in this order, whatever order
+#: their results arrived in - dbt with one thread breaks ties by unique_id,
+#: which is alphabetical. Keyed by generic kind ("tool:kind"), never by a
+#: dataset's name. A kind in no family keeps its arrival order.
+KIND_ORDER: tuple[tuple[str, ...], ...] = (
+    ("dbt:missing_set_members", "dbt:duplicated_set_members", "dbt:unexpected_set_members"),
+)
+_KIND_PLACE = {kind: (family, place) for family, kinds in enumerate(KIND_ORDER)
+               for place, kind in enumerate(kinds)}
+
+
 def rank_for_headline(checks_out: list[dict]) -> None:
     """Sorts checks_out (each already carrying current/warn/fail, and
     current_status where the tool gave a real verdict) worst status
     first, in place. Python's sort is stable, so checks tied on status
     keep whatever relative order they arrived in (e.g. dbt before
     datacontract-cli, matching each engine's place in the underlying
-    results list) - no further tie-break needed."""
-    checks_out.sort(
-        key=lambda c: status_rank(c["current"], c["warn"], c["fail"], c.get("current_status")),
-        reverse=True,
-    )
+    results list) - EXCEPT a declared kind family's (KIND_ORDER): within
+    each run of equal status, that family's checks are put in its declared
+    order in the places they occupy, every other check left where it is."""
+    rank = lambda c: status_rank(c["current"], c["warn"], c["fail"], c.get("current_status"))  # noqa: E731
+    checks_out.sort(key=rank, reverse=True)
+    start = 0
+    while start < len(checks_out):
+        end = start
+        while end < len(checks_out) and rank(checks_out[end]) == rank(checks_out[start]):
+            end += 1
+        for family in range(len(KIND_ORDER)):
+            at = [i for i in range(start, end)
+                  if _KIND_PLACE.get(tool_ref(checks_out[i].get("check_id") or ""), (None,))[0] == family]
+            ordered = sorted((checks_out[i] for i in at),
+                             key=lambda c: _KIND_PLACE[tool_ref(c["check_id"])][1])
+            for i, c in zip(at, ordered):
+                checks_out[i] = c
+        start = end
 
 
 def display_name(check_name: str, engine_short: str, label: str | None) -> str:
