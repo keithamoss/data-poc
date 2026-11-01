@@ -197,6 +197,9 @@ jobs:
       # `sandbox`, which describes an agent session's container and is not
       # what this is. It publishes nothing.
       MOTHMAN_ENVIRONMENT: ci
+      # WHICH DATA ASSET, with no default (REQ-PIPE-363 criterion 1): today's
+      # one asset, until the split names two.
+      MOTHMAN_ASSET: data-asset-1
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -317,6 +320,9 @@ jobs:
       MOTHMAN_TEST_DSN: postgresql://postgres:ci-not-a-secret@localhost:5432/postgres
       MOTHMAN_SUPPLY_DSN: postgresql://postgres:ci-not-a-secret@localhost:5432/supply
       MOTHMAN_ENVIRONMENT: ci
+      # WHICH DATA ASSET, with no default (REQ-PIPE-363 criterion 1): today's
+      # one asset, until the split names two.
+      MOTHMAN_ASSET: data-asset-1
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -377,6 +383,9 @@ jobs:
       MOTHMAN_TEST_DSN: postgresql://postgres:ci-not-a-secret@localhost:5432/postgres
       MOTHMAN_SUPPLY_DSN: postgresql://postgres:ci-not-a-secret@localhost:5432/supply
       MOTHMAN_ENVIRONMENT: ci
+      # WHICH DATA ASSET, with no default (REQ-PIPE-363 criterion 1): today's
+      # one asset, until the split names two.
+      MOTHMAN_ASSET: data-asset-1
     steps:
       - name: Checkout
         uses: actions/checkout@v4

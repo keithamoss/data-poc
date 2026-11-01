@@ -28,9 +28,13 @@ from datetime import date, timedelta
 from pathlib import Path
 from types import MappingProxyType
 
-from qa_tools.common import config_yaml
+from qa_tools.common import assets, config_yaml
 
-CALENDAR_YAML = Path(__file__).resolve().parent.parent.parent / "contract" / "calendar.yaml"
+
+def calendar_yaml() -> Path:
+    """The selected asset's calendar.yaml, resolved now (REQ-PIPE-342
+    criterion 6; it was the import-time constant CALENDAR_YAML)."""
+    return assets.selected().file("calendar.yaml")
 
 #: The key a participation version uses to say which periods it owes.
 PARTICIPATES = "participates"
@@ -493,9 +497,11 @@ def _own_dates(raw: dict, dataset_id: str):
                              versions=tuple(versions))
 
 
-def load(path: Path = CALENDAR_YAML) -> Agreement:
-    """Read one calendar.yaml into an `Agreement`. The one loader."""
+def load(path: Path | None = None) -> Agreement:
+    """Read one calendar.yaml into an `Agreement` - the selected asset's
+    unless `path` names another. The one loader."""
 
+    path = path or calendar_yaml()
     with open(path) as f:
         doc = config_yaml.parse(f) or {}
     return from_doc(doc, path)
@@ -579,10 +585,10 @@ def current() -> Agreement:
 
     KEYED ON THE PATH AND THE FILE'S TEXT (REQ-PIPE-254): the file is read
     on every call and the Agreement built again only when its text has
-    changed, so an edited file, or a test pointing CALENDAR_YAML elsewhere,
+    changed, so an edited file, or a test pointing the asset folder elsewhere,
     is answered on the next call with nothing to clear, and the committed
     file is answered again once the patch is undone."""
-    path = CALENDAR_YAML
+    path = calendar_yaml()
     return _BUILT.from_file(path, lambda text: from_doc(
         config_yaml.parse(text, name=str(path)) or {}, path))
 

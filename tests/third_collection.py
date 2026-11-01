@@ -10,7 +10,6 @@ declares no adapter at all, for the refusal half of the criterion.
 from __future__ import annotations
 
 import shutil
-import sys
 import types
 
 import pytest
@@ -20,6 +19,8 @@ from qa_tools import collections
 from qa_tools.collections.base import CollectionAdapter, DatacontractSpec
 from qa_tools.common import hierarchy
 
+import collection_modules
+
 FAKE_ID, FAKE_SHORT, FAKE_PREFIX = "fake-collection", "fk", "fk_run_"
 FAKE_DATASET, FAKE_TABLE = "fake-things", "fake_things"
 BARE_ID, BARE_SHORT = "bare-collection", "bare"
@@ -28,7 +29,10 @@ BARE_ID, BARE_SHORT = "bare-collection", "bare"
 #: are shared, so a site test records what the SHARED code was asked for by
 #: patching qa_tools.tools.orchestrate. Since REQ-GEN-246 generation is
 #: shared too: the fake provider's plan() records each call.
-PROVIDER_MODULE = "generator.collections.fake_collection"
+#: Both are registered where the by-path lookup finds them (REQ-PIPE-369
+#: criterion 5) - never under a package name.
+PROVIDER_MODULE = collection_modules.name("provider", "fake_collection")
+ADAPTER_MODULE = collection_modules.name("adapter", "fake_collection")
 #: Its declared seeds, well clear of the real providers'.
 FAKE_SEEDS = ((900_000, 901_000),)
 
@@ -36,18 +40,18 @@ FAKE_SEEDS = ((900_000, 901_000),)
 def _hierarchy(tmp_path, *, bare: bool) -> None:
     """contract/ under tmp_path, laid out as the real one (REQ-QAC-241):
     every collection's check files in its agency's folder."""
-    doc = yaml.safe_load(hierarchy.DATA_ASSET_YAML.read_text())
+    doc = yaml.safe_load(hierarchy.data_asset_yaml().read_text())
     contract_dir = tmp_path / "contract"
     for c in collections.all_collections():
         for kind in ("contract", "soda", "evidently"):
             dest = tmp_path / c.check_file(kind)
             dest.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy(hierarchy.DATA_ASSET_YAML.parent.parent / c.check_file(kind), dest)
+            shutil.copy(hierarchy.data_asset_yaml().parent.parent / c.check_file(kind), dest)
     agencies = doc["hierarchy"]["agencies"]
     stems = [("fake-things", True)] + ([("bare-things", True)] if bare else [])
     (contract_dir / "fake-agency").mkdir()
     for stem, _ in stems:
-        shutil.copy(hierarchy.DATA_ASSET_YAML.parent / collections.by_id("child-protection").contract,
+        shutil.copy(hierarchy.data_asset_yaml().parent / collections.by_id("child-protection").contract,
                     contract_dir / "fake-agency" / f"{stem}-contract.yaml")
         for kind in ("soda-checks", "evidently-checks"):
             (contract_dir / "fake-agency" / f"{stem}-{kind}.yml").write_text("checks: []\n")
@@ -70,13 +74,13 @@ def _hierarchy(tmp_path, *, bare: bool) -> None:
     # resolved): the quarterly one, so it replays in Child Protection's stream.
     from qa_tools.common import agreement
 
-    cal = yaml.safe_load(agreement.CALENDAR_YAML.read_text())
+    cal = yaml.safe_load(agreement.calendar_yaml().read_text())
     for cid in [FAKE_ID] + ([BARE_ID] if bare else []):
         cal["collections"].append({"id": cid, "calendar": "quarterly"})
     (contract_dir / "calendar.yaml").write_text(yaml.safe_dump(cal, sort_keys=False))
     # How the dashboard describes the asset sits beside the hierarchy
     # (REQ-DASH-244); the third collection has no entry until a test gives it one.
-    shutil.copy(hierarchy.DATA_ASSET_YAML.parent / "presentation.yaml",
+    shutil.copy(hierarchy.data_asset_yaml().parent / "presentation.yaml",
                 contract_dir / "presentation.yaml")
 
 
@@ -106,33 +110,30 @@ def _provider(calls: list) -> types.ModuleType:
     return module
 
 
-def _install(monkeypatch, tmp_path, *, bare: bool) -> list:
+def _install(monkeypatch, tmp_path, asset_folder, *, bare: bool) -> list:
     _hierarchy(tmp_path, bare=bare)
-    monkeypatch.setattr(hierarchy, "DATA_ASSET_YAML", tmp_path / "contract" / "data-asset.yaml")
-    from qa_tools.common import agreement
-
-    monkeypatch.setattr(agreement, "CALENDAR_YAML", tmp_path / "contract" / "calendar.yaml")
+    asset_folder(folder=tmp_path / "contract")
     calls: list = []
-    monkeypatch.setitem(sys.modules, PROVIDER_MODULE, _provider(calls))
-    adapter = types.ModuleType("qa_tools.collections.fake_collection")
+    collection_modules.install(monkeypatch, "provider", "fake_collection", _provider(calls))
+    adapter = types.ModuleType(ADAPTER_MODULE)
     adapter.ADAPTER = CollectionAdapter(
         collection_id=FAKE_ID, label="Fake Things",
         datacontract=DatacontractSpec(labels_by_check_tail={"pair_datacontract": "Fake pair"}),
         sample_key={FAKE_TABLE: ["fake_id"]})
-    monkeypatch.setitem(sys.modules, "qa_tools.collections.fake_collection", adapter)
+    collection_modules.install(monkeypatch, "adapter", "fake_collection", adapter)
     return calls
 
 
 @pytest.fixture
-def third_collection(monkeypatch, tmp_path):
+def third_collection(monkeypatch, tmp_path, asset_folder):
     """The hierarchy with a third collection that has an adapter. Yields the
     list every call into its code is recorded in."""
-    calls = _install(monkeypatch, tmp_path, bare=False)
+    calls = _install(monkeypatch, tmp_path, asset_folder, bare=False)
     yield calls
 
 
 @pytest.fixture
-def without_adapter(monkeypatch, tmp_path):
+def without_adapter(monkeypatch, tmp_path, asset_folder):
     """As third_collection, plus a fourth collection with no adapter."""
-    calls = _install(monkeypatch, tmp_path, bare=True)
+    calls = _install(monkeypatch, tmp_path, asset_folder, bare=True)
     yield calls

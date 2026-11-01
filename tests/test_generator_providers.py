@@ -10,6 +10,8 @@ one, a scenario naming a dataset no provider makes.
 """
 from __future__ import annotations
 
+import collection_modules
+
 import json
 import subprocess
 import sys
@@ -78,7 +80,7 @@ def writing(third_collection, monkeypatch, tmp_path):
     tmp_path/out."""
     module = types.ModuleType(PROVIDER_MODULE)
     module.PROVIDER = _Writing()
-    monkeypatch.setitem(sys.modules, PROVIDER_MODULE, module)
+    collection_modules.install(monkeypatch, "provider", "fake_collection", module)
     # NOT THE CORRECTION CHECK (tests/test_correction_claims.py owns it):
     # since Linkage Products rides REQ-GEN-205, that check plans Child
     # Protection's whole history to find linkage's quarters, which reads every
@@ -181,10 +183,13 @@ class TestImportingAProviderCostsNoToolImport:
     def test_every_provider_module_imports_without_pandas_or_numpy(self):
         found = providers.providers()
         assert found
-        names = [type(p).__module__ for p in found]
-        code = ("import importlib, sys\n"
-                f"for name in {names!r}:\n"
-                "    importlib.import_module(name)\n"
+        # BY THE REGISTRY'S OWN LOOKUP, as the driver loads them (REQ-GEN-370
+        # criterion 2) - a provider is not importable by a package name.
+        ids = [p.collection_id for p in found]
+        code = ("import sys\n"
+                "from generator import collections as by_path\n"
+                f"for collection_id in {ids!r}:\n"
+                "    by_path.provider_module(collection_id)\n"
                 "import generator.driver, generator.collections\n"
                 "from generator import validate_providers\n"
                 "assert validate_providers.problems() == []\n"

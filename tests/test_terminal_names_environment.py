@@ -16,24 +16,25 @@ ROOT = Path(__file__).resolve().parent.parent
 
 
 class TestTheStatement:
-    """Criteria 5, 6 and 7."""
+    """Criteria 5, 6 and 7 - and the asset beside the environment since
+    REQ-PIPE-363 criterion 8."""
 
     def test_a_non_publishing_environment_says_not_production(self, monkeypatch):
         monkeypatch.setenv("MOTHMAN_ENVIRONMENT", "sandbox")
         assert common.environment_statement() == \
-            "Environment: Claude Code sandbox (not production)"
+            "Environment: Claude Code sandbox (not production) · Asset: data-asset-1"
 
     def test_production_says_its_label_and_nothing_else(self, monkeypatch):
         from qa_tools.common import environments
 
         monkeypatch.setenv("MOTHMAN_ENVIRONMENT", "production")
         label = environments.get("production").label
-        assert common.environment_statement() == f"Environment: {label}"
+        assert common.environment_statement() == f"Environment: {label} · Asset: data-asset-1"
 
     def test_the_label_comes_from_the_configuration_not_the_variable(self, monkeypatch):
         monkeypatch.setenv("MOTHMAN_ENVIRONMENT", "ci")
         assert common.environment_statement() == \
-            "Environment: Continuous integration (not production)"
+            "Environment: Continuous integration (not production) · Asset: data-asset-1"
 
     def test_no_environment_states_nothing(self, monkeypatch):
         monkeypatch.delenv("MOTHMAN_ENVIRONMENT", raising=False)
@@ -68,7 +69,7 @@ class TestAConfirmationNamesTheEnvironment:
         monkeypatch.setattr(questionary, "confirm",
                             lambda message, **kw: message)
         assert common.confirm("Record promote?", yes=False)
-        assert asked == ["[Claude Code sandbox (not production)] Record promote?"]
+        assert asked == ["[Claude Code sandbox (not production) · Asset: data-asset-1] Record promote?"]
 
     def test_the_typed_confirmation_asks_for_the_id(self, monkeypatch):
         monkeypatch.setenv("MOTHMAN_ENVIRONMENT", "production")
@@ -90,7 +91,7 @@ class TestAOneOffCommand:
     def test_a_command_that_connects_states_it_on_standard_error(self):
         result = self._run("supply", "failures")
         assert result.returncode == 0, result.stderr
-        assert result.stderr.splitlines()[0] == "Environment: Test suite (not production)"
+        assert result.stderr.splitlines()[0] == "Environment: Test suite (not production) · Asset: data-asset-1"
         assert "Environment:" not in result.stdout
 
     def test_a_command_that_never_connects_says_nothing(self):

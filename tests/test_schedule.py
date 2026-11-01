@@ -14,6 +14,8 @@ something other than what its author wrote, and nothing ever says so.
 """
 from __future__ import annotations
 
+import collection_modules
+
 from datetime import date, timedelta
 
 import pytest
@@ -109,7 +111,9 @@ class TestTheDailyCalendarStartsWhereTheFeedDoes:
         the date could not detect them disagreeing.
         """
         from generator.anchor_date import get_anchor_date
-        from generator.collections.civil_registration import END_DAYS, GROWN_DAYS, N_DELIVERIES
+        END_DAYS = collection_modules.provider_module("civil-registration").END_DAYS
+        GROWN_DAYS = collection_modules.provider_module("civil-registration").GROWN_DAYS
+        N_DELIVERIES = collection_modules.provider_module("civil-registration").N_DELIVERIES
 
         return get_anchor_date() - timedelta(days=N_DELIVERIES + GROWN_DAYS + END_DAYS - 1)
 
@@ -518,7 +522,7 @@ class TestNothingIsComputedFromAHolidayCalendar:
         agreed; it does not constitute it."""
         import yaml as _yaml
         from qa_tools.common import agreement
-        raw = _yaml.safe_load(agreement.CALENDAR_YAML.read_text())
+        raw = _yaml.safe_load(agreement.calendar_yaml().read_text())
         authored = [(d["period"], str(d["date"]))
                     for c in raw["calendars"] if c["name"] == "quarterly"
                     for d in c["versions"][-1]["dates"]]

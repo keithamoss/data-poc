@@ -65,6 +65,8 @@ if [ -n "${CLAUDE_ENV_FILE:-}" ]; then
     # in code, because a build that guesses is a build that can be
     # labelled as somewhere it is not.
     echo 'export MOTHMAN_ENVIRONMENT="sandbox"'
+    # WHICH DATA ASSET, with no default (REQ-PIPE-363 criterion 1).
+    echo 'export MOTHMAN_ASSET="data-asset-1"'
   } >> "$CLAUDE_ENV_FILE"
 fi
 
@@ -114,7 +116,7 @@ fi
 # marked as something else is reported, never re-marked: that is a person's
 # decision (`mothman env mark` at a terminal).
 if [ "${PG_UP:-}" = "1" ]; then
-  if MOTHMAN_ENVIRONMENT=sandbox \
+  if MOTHMAN_ENVIRONMENT=sandbox MOTHMAN_ASSET=data-asset-1 \
      MOTHMAN_SUPPLY_DSN="postgresql://${PGUSER_NAME}:${PGPASS}@localhost:5432/supply" \
      uv run mothman env mark --confirm sandbox >/dev/null 2>&1; then
     say "Warehouse is marked as this sandbox's."

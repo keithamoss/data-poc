@@ -216,7 +216,7 @@ class TestTheConfigGateAcceptsItAndStaysStrict:
         # asks for: redirecting one and not the other validates a
         # temporary hierarchy against real contracts and reports nonsense.
         return validate_schedule.validate(validate_schedule.Source(
-            path, validate_schedule.CONTRACT_DIR))
+            path, validate_schedule.Source.default().contract_dir))
 
     def test_a_deliberate_declaration_passes_the_gate(self, tmp_path, monkeypatch):
         found = self._errors([AGREED, SAMPLE, PROJECT], tmp_path, monkeypatch)

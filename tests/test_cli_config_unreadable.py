@@ -7,22 +7,23 @@ could say anything: the file is read while the command modules import.
 """
 from __future__ import annotations
 
+import asset_folders
+
 import subprocess
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 
-# Imports cli.app the way the console script does, with the asset config
-# pointed at a broken copy first - every reader takes the path from these
-# two module constants.
+# Imports cli.app the way the console script does, with the asset resolver
+# pointed first at a folder holding a broken copy - every reader takes its
+# path from the resolver (REQ-PIPE-342 criterion 6).
 _DRIVER = """
 import sys, runpy
 from pathlib import Path
-from qa_tools.common import asset_time, hierarchy
+from qa_tools.common import assets
 broken = Path(sys.argv[1])
-hierarchy.DATA_ASSET_YAML = broken
-asset_time.DATA_ASSET_YAML = broken
+assets.use_folder(broken.parent)
 sys.argv = ["mothman", *sys.argv[2:]]
 runpy.run_module("cli.app", run_name="__main__")
 """
@@ -35,6 +36,7 @@ def _broken_copy(tmp_path: Path) -> Path:
     lines[i] = "   " + lines[i]
     path = tmp_path / "data-asset.yaml"
     path.write_text("\n".join(lines))
+    asset_folders.complete(tmp_path)
     return path, i + 1
 
 

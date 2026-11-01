@@ -2,6 +2,8 @@
 same decision path a person uses (REQ-GEN-135)."""
 from __future__ import annotations
 
+import asset_folders
+
 import re
 from datetime import date, datetime, timedelta
 from pathlib import Path
@@ -126,7 +128,7 @@ class TestPlayback:
             player.finish()
 
     def test_never_on_an_asset_that_is_not_synthetic(self, monkeypatch, tmp_path):
-        monkeypatch.setattr("qa_tools.common.hierarchy.DATA_ASSET_YAML", _not_synthetic(tmp_path))
+        asset_folders.point(_not_synthetic(tmp_path).parent)
         with pytest.raises(sd.ScriptRefused, match="synthetic"):
             sd.Player("child-protection", scripts=[_script()], placements={})
 
@@ -138,7 +140,7 @@ def _not_synthetic(tmp_path: Path) -> Path:
     with no hierarchy, not one that is merely not synthetic."""
     from qa_tools.common import hierarchy
 
-    text = Path(hierarchy.DATA_ASSET_YAML).read_text()
+    text = Path(hierarchy.data_asset_yaml()).read_text()
     assert "\nsynthetic: true\n" in text
     asset = tmp_path / "data-asset.yaml"
     asset.write_text(text.replace("\nsynthetic: true\n", "\nsynthetic: false\n"))
@@ -508,7 +510,7 @@ class TestAPeriodScopedDecisionIsPlayed:
 
     def test_refused_on_an_asset_that_is_not_synthetic(self, monkeypatch, tmp_path):
         """Criterion 11."""
-        monkeypatch.setattr("qa_tools.common.hierarchy.DATA_ASSET_YAML", _not_synthetic(tmp_path))
+        asset_folders.point(_not_synthetic(tmp_path).parent)
         with pytest.raises(sd.ScriptRefused, match="synthetic"):
             sd.Player("child-protection", scripts=[_period_script()], placements={})
 

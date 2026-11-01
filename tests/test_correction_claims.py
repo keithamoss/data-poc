@@ -7,6 +7,8 @@ first and seen to fail.
 """
 from __future__ import annotations
 
+import collection_modules
+
 from dataclasses import dataclass
 from datetime import date
 
@@ -138,7 +140,7 @@ class TestAnotherCollectionsCorrectionEmptiesItsQuarters:
         assert cc.foreign_altered("emergency-department") == set()
 
     def test_child_protection_writes_nothing_there(self):
-        from generator.collections import child_protection as cp
+        cp = collection_modules.provider_module("child-protection")
 
         plan = cp.PROVIDER.plan()
         empty = {job.period.name for job in plan.jobs if cp.PROVIDER.slot(plan, job) is None}

@@ -28,6 +28,8 @@ output directory") - see the `raw_dir` fixture's own docstring
 counterpart, has the full account)."""
 from __future__ import annotations
 
+import collection_modules
+
 import re
 
 import json
@@ -39,8 +41,10 @@ import pandas as pd
 import pytest
 
 import generator_isolation
-from generator.collections import child_protection as cp_provider
-from generator.collections.child_protection import TABLES, ChildProtectionProvider, _pick_dirty_tables
+cp_provider = collection_modules.provider_module("child-protection")
+TABLES = collection_modules.provider_module("child-protection").TABLES
+ChildProtectionProvider = collection_modules.provider_module("child-protection").ChildProtectionProvider
+_pick_dirty_tables = collection_modules.provider_module("child-protection")._pick_dirty_tables
 from qa_tools.common import asset_time
 from generator import driver
 
@@ -518,7 +522,7 @@ def test_resupply_subset_holds_no_state_between_chains():
 def test_a_birth_registrations_supply_cannot_be_split():
     """One CSV is indivisible, and the provider says so rather than
     leaving the method off."""
-    from generator.collections.civil_registration import BirthRegistrationsProvider
+    BirthRegistrationsProvider = collection_modules.provider_module("civil-registration").BirthRegistrationsProvider
 
     df = pd.DataFrame({"id": [1, 2, 3]})
     assert BirthRegistrationsProvider().resupply_subset(df, previous_dirty_seed=1, seed=2) is df

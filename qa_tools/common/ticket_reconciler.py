@@ -197,7 +197,7 @@ def policy_from_config(config: dict | None = None) -> str:
 
         from qa_tools.common import hierarchy
 
-        with open(hierarchy.DATA_ASSET_YAML) as handle:
+        with open(hierarchy.data_asset_yaml()) as handle:
             config = config_yaml.parse(handle) or {}
     value = (config or {}).get("ticket_policy") or DEFAULT_POLICY
     if value not in POLICIES:

@@ -29,7 +29,7 @@ def _version(start, value):
 
 
 def _doc(asset=("2023-01-01", "promote"), collection=None, dataset=None):
-    doc = yaml.safe_load(hierarchy.DATA_ASSET_YAML.read_text())
+    doc = yaml.safe_load(hierarchy.data_asset_yaml().read_text())
     doc["amber_setting"] = {"versions": [_version(*asset)]} if asset else None
     if doc["amber_setting"] is None:
         del doc["amber_setting"]
@@ -49,7 +49,7 @@ class TestTheValues:
         assert AMBER_SETTINGS == ("hold", "promote-and-acknowledge", "promote")
 
     def test_the_asset_file_lists_them_in_that_order(self):
-        text = hierarchy.DATA_ASSET_YAML.read_text()
+        text = hierarchy.data_asset_yaml().read_text()
         positions = [text.index(f"#   {v} ") for v in AMBER_SETTINGS]
         assert positions == sorted(positions)
 
@@ -71,7 +71,7 @@ class TestTheValues:
             DataAsset.model_validate(doc)
 
     def test_the_real_configuration_is_valid(self):
-        DataAsset.model_validate(yaml.safe_load(hierarchy.DATA_ASSET_YAML.read_text()))
+        DataAsset.model_validate(yaml.safe_load(hierarchy.data_asset_yaml().read_text()))
 
 
 class TestResolving:
@@ -372,7 +372,7 @@ class TestTheConfigurationAsItStands:
                    for _, p in amber_setting.standing_problems(doc, self.TODAY))
 
     def test_the_real_configuration_has_no_standing_problem(self):
-        doc = yaml.safe_load(hierarchy.DATA_ASSET_YAML.read_text())
+        doc = yaml.safe_load(hierarchy.data_asset_yaml().read_text())
         assert amber_setting.standing_problems(doc, self.TODAY) == []
 
 

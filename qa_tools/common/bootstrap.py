@@ -758,11 +758,20 @@ def _run_concurrently(names: list[str], sequential: bool) -> dict[str, float]:
     half-initialised connections or imported tool state.
 
     A failure in either fails the bootstrap: `.result()` re-raises it.
+
+    EACH PROCESS IS HANDED THE ASSET BESIDE ITS COLLECTIONS (REQ-PIPE-369
+    criterion 4): a spawned interpreter never sees this one's selection, and
+    selects the asset itself before it loads any adapter by path - never an
+    adapter object, which a path-loaded module cannot be unpickled into.
     """
     import multiprocessing
     from concurrent.futures import ProcessPoolExecutor
 
+    from qa_tools.common import assets
+
     context = multiprocessing.get_context("spawn")
-    with ProcessPoolExecutor(max_workers=len(names), mp_context=context) as pool:
+    with ProcessPoolExecutor(max_workers=len(names), mp_context=context,
+                             initializer=assets.select,
+                             initargs=(assets.selected().name,)) as pool:
         futures = {n: pool.submit(_run_stream, n, sequential) for n in names}
         return {n: f.result() for n, f in futures.items()}

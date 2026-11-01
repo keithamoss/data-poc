@@ -697,12 +697,13 @@ def test_an_edit_to_any_collections_check_source_moves_the_fingerprint(tmp_path,
     Evidently file or a collection's dbt folder must be seen."""
     import shutil
 
-    from qa_tools.common import hierarchy
 
     for top in ("contract", "dbt_project/models", "dbt_project/tests", "dbt_project/macros"):
         shutil.copytree(vcl.ROOT / top, tmp_path / top)
     monkeypatch.setattr(vcl, "ROOT", tmp_path)
-    monkeypatch.setattr(hierarchy, "DATA_ASSET_YAML", tmp_path / "contract" / "data-asset.yaml")
+    import asset_folders
+
+    asset_folders.point(tmp_path / "contract")
     edits = ["contract/registry-services/bdm-birth-registrations-evidently-checks.yml",
              "dbt_project/models/child-protection/stg_cp_clients.sql",
              "dbt_project/tests/civil-registration/recency.sql"]

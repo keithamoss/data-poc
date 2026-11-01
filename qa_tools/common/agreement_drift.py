@@ -246,11 +246,11 @@ def _accounted(sources: set[str], declared: dict, items, kinds: set[str],
 
 def _load_docs():
     from qa_tools.common import agreement, config_yaml
-    from qa_tools.common.asset_time import DATA_ASSET_YAML
+    from qa_tools.common.asset_time import data_asset_yaml
 
-    with open(agreement.CALENDAR_YAML) as f:
+    with open(agreement.calendar_yaml()) as f:
         cal_doc = config_yaml.parse(f) or {}
-    with open(DATA_ASSET_YAML) as f:
+    with open(data_asset_yaml()) as f:
         asset_doc = config_yaml.parse(f) or {}
     return cal_doc, asset_doc
 

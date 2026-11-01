@@ -180,6 +180,34 @@ _DOCS_PATHS = ("plans/", "docs/", "requirements.yaml", "CHANGELOG.yaml", "CLAUDE
                "SCENARIOS.md", "README.md", "provisional-baseline.yaml")
 
 
+#: Gates that read no asset's configuration: run once, whatever
+#: MOTHMAN_ASSET says. pytest selects each test's asset itself (REQ-PIPE-363
+#: criterion 9).
+_REPOSITORY_WIDE = frozenset({"ruff", "yamllint", "agents", "npm test", "pytest"})
+
+
+def _asset_passes(label: str) -> list[dict]:
+    """The environment additions for each run of one gate. WITH NO ASSET
+    SELECTED - a fresh clone (REQ-PIPE-363 criterion 5, NFR PORTABILITY) - a
+    gate that reads an asset's configuration runs once for each asset folder
+    found, each run told its asset; with one selected, once, for it.
+    REQ-PIPE-364 builds its per-asset passes on this."""
+    from qa_tools.common import assets
+
+    if label in _REPOSITORY_WIDE or os.environ.get(assets.ASSET_ENV):
+        return [{}]
+    return [{assets.ASSET_ENV: name} for name in assets.names()] or [{}]
+
+
+def _worst(codes: list[int]) -> int:
+    """One gate's result over its passes: the first failure, else a warning,
+    else passed."""
+    failed = [c for c in codes if c not in (0, WARNING_EXIT, 127)]
+    if failed:
+        return failed[0]
+    return next((c for c in codes if c != 0), 0)
+
+
 def _changed_paths() -> list[str]:
     """Every path the working tree changes against HEAD - staged,
     unstaged and untracked - as git names it."""
@@ -203,6 +231,17 @@ def _outside_docs(paths: list[str]) -> list[str]:
 
 
 def _run_captured(label: str, argv: list[str], can_warn: bool) -> tuple[int, str]:
+    """One gate, captured, over each of its asset passes."""
+    codes, outputs = [], []
+    for extra in _asset_passes(label):
+        code, output = _run_captured_once(label, argv, can_warn, extra)
+        codes.append(code)
+        outputs.append(output)
+    return _worst(codes), "".join(outputs)
+
+
+def _run_captured_once(label: str, argv: list[str], can_warn: bool,
+                       extra: dict) -> tuple[int, str]:
     """One gate with its output captured rather than streamed - for
     `--docs`, whose gates run side by side (REQ-TEST-253 criterion 3):
     nine one-to-eight-second checks one after another were 33 seconds,
@@ -210,9 +249,9 @@ def _run_captured(label: str, argv: list[str], can_warn: bool) -> tuple[int, str
     if shutil.which(argv[0]) is None:
         return 127, (f"{argv[0]!r} is not installed - skipping {label}. "
                      f"See CLAUDE.md's environment-setup bullet.\n")
-    env = None
+    env = {**os.environ, **extra} if (extra or can_warn) else None
     if can_warn:
-        env = {**os.environ, WARNING_EXIT_VAR: str(WARNING_EXIT)}
+        env[WARNING_EXIT_VAR] = str(WARNING_EXIT)
     done = subprocess.run(argv, cwd=ROOT, env=env, capture_output=True, text=True)
     return done.returncode, (done.stdout or "") + (done.stderr or "")
 
@@ -241,10 +280,14 @@ def _run(label: str, argv: list[str], can_warn: bool = False) -> int:
             f"{argv[0]!r} is not installed - skipping {label}. "
             f"See CLAUDE.md's environment-setup bullet.", style="yellow")
         return 127
-    env = None
-    if can_warn:
-        env = {**os.environ, WARNING_EXIT_VAR: str(WARNING_EXIT)}
-    return subprocess.run(argv, cwd=ROOT, env=env).returncode
+    codes = []
+    for extra in _asset_passes(label):
+        # NOTHING TO ADD, NOTHING PASSED: the gate inherits this environment.
+        env = {**os.environ, **extra} if (extra or can_warn) else None
+        if can_warn:
+            env[WARNING_EXIT_VAR] = str(WARNING_EXIT)
+        codes.append(subprocess.run(argv, cwd=ROOT, env=env).returncode)
+    return _worst(codes)
 
 
 @click.command("check")

@@ -48,7 +48,7 @@ class TestTheDashboardCadenceComesFromTheAgreement:
 
         import yaml
 
-        doc = before_growth.calendar(copy.deepcopy(yaml.safe_load(agreement.CALENDAR_YAML.read_text())))
+        doc = before_growth.calendar(copy.deepcopy(yaml.safe_load(agreement.calendar_yaml().read_text())))
         entry = next(d for d in doc["datasets"] if d["id"] == "cp-clients")
         entry["participation"]["versions"] = copy.deepcopy(entry["participation"]["versions"])
         entry["participation"]["versions"][0]["days_before"] = 60
@@ -102,7 +102,7 @@ class TestOneLoaderOneImmutableValue:
             return real_open(file, *args, **kwargs)
 
         monkeypatch.setattr(builtins, "open", watching)
-        agreement.load(agreement.CALENDAR_YAML)
+        agreement.load(agreement.calendar_yaml())
         assert opened and not [p for p in opened if "/data/" in p], opened
 
 

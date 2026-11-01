@@ -47321,6 +47321,7 @@ requirements:
     - 'CALL TIME FOR STATE PATHS TOO, BEFORE THE MOVE (Keith, 2026-11-01, the groundwork-first plan): the ~200 hard-coded data/ and reports/ references become per-asset call-time lookups as their own groundwork stream before the move, because the groundwork builder found the sweep is not mechanical move work. Criterion 6 carries it, with REQ-PIPE-365 criterion 1.'
     - 'GROUNDWORK FIRST (Keith, 2026-11-01): the resolver is built first and maps today''s contract/ as one asset, so every existing test passes on today''s layout; the move then only switches it on. Then ONE move commit proven by REQ-TEST-239 (REQ-TEST-357), then four post-move streams: the dashboard; the Cancer and Mental Health collections; CI and publishing; docs and the amendments.'
     - 'UNTIL REQ-QAC-344 RENAMES IT, TODAY''S ONE ASSET IS NAMED data-asset-1 in statements and module names (groundwork builder, 2026-11-01): expected, not a defect.'
+    - 'PROVISIONAL (groundwork builder, 2026-11-01): contract/environments.yaml stays read through environments.ENVIRONMENTS_PATH, not the resolver - it is shared by every asset rather than an asset-wide file, so the move''s switch repoints it. Question for Keith: should the resolver own the shared file''s path too, before the move?'
     open_questions: []
   - id: REQ-PIPE-363
     title: A command is told which asset it acts for by MOTHMAN_ASSET, with no default; only that asset's commands exist, the terminal names the asset, and check and --help work with none set
@@ -47363,6 +47364,9 @@ requirements:
     - 'THE BARE WIZARD REFUSES BEFORE ITS BANNER (CLI UX v3 MUST 2): _main_menu_loop builds its flag hint from _COLLECTIONS[0], which raises IndexError with no collections; criterion 7 follows REQ-TEST-114 criterion 8''s pattern for the environment.'
     - 'THE ASSET IS NAMED WHERE THE ENVIRONMENT IS (CLI UX v3 MUST 3): environment_statement() gains the asset, and `mothman env current` and `env list` name it.'
     - NO NEW OR RENAMED COMMANDS beyond `mothman env dbt-deps` (REQ-QAC-368), which sits in the env group beside reset-synthetic and mark (CLI UX v3).
+    - 'PROVISIONAL (groundwork builder, 2026-11-01): with MOTHMAN_ASSET unset, `mothman check` runs each gate that reads an asset once per asset folder found, each told its asset, and ruff, yamllint, agents, npm test and pytest once (pytest selects its own asset); REQ-PIPE-364 builds its per-asset reporting on this. Question for Keith: is that the shape you want before REQ-PIPE-364 lands?'
+    - 'PROVISIONAL (groundwork builder, 2026-11-01): the asset is also named in a confirmation''s prefix, ''[Claude Code sandbox (not production) · Asset: data-asset-1] Record promote?'', reading criterion 8''s ''wherever REQ-TEST-114 names the environment'' as including its criterion 4. Question for Keith: keep it there, or the toolbar and the stderr line only?'
+    - 'PROVISIONAL (groundwork builder, 2026-11-01): bare `mothman` checks the asset before the terminal check, so a non-TTY session meets the missing variable rather than the ''needs a terminal'' refusal. Question for Keith: is that order right?'
     open_questions: []
   - id: REQ-PIPE-364
     title: mothman check runs every configuration gate once per asset folder, needing no asset and no database, keeps identifiers unique within each asset, and compares nothing across assets
@@ -47462,6 +47466,7 @@ requirements:
     - 'ONE SHARED LOCAL PACKAGE, NOT A COPY (Keith, 2026-10-31, sign-off Q4c): dbt_shared/ holds the regex macro and generic tests. REJECTED copying the macro into each project, which two assets could let drift.'
     - '`mothman env dbt-deps` IN THE env GROUP (CLI UX v3 SHOULD 4): beside reset-synthetic and mark; idempotent. REJECTED leaving a bare `dbt deps` per asset in each setup script, which every new setup would have to learn the paths of.'
     - 'PROJECT NAMED FOR THE ASSET (delivery-scoper, v3; SETTLED by Keith 2026-11-01 with v4): mothman_<asset>, so dbt''s own logs and artefacts say which asset they came from.'
+    - 'PROVISIONAL (groundwork builder, 2026-11-01): ''already installed'' is decided by a stamp, dbt_packages/.mothman-packages.sha1, holding the digest of the packages.yml the packages were installed for; a dbt_packages/ installed by a bare `dbt deps` has no stamp, so the first `mothman env dbt-deps` installs once more. Question for Keith: acceptable, or compare against dbt''s own package-lock.yml instead?'
     open_questions: []
   - id: REQ-PIPE-369
     title: Each asset's QA adapters live under assets/<asset>/collections/ and are loaded by file path, never as a package, and a spawned process is handed the asset and the collection id
@@ -47496,6 +47501,7 @@ requirements:
     - 'THE ASSET CROSSES PROCESS BOUNDARIES, NOT JUST THE ID (architect v3 SHOULD 3): tests select the asset in-process by fixture, but bootstrap.py''s spawn context (line 765 today) starts a fresh interpreter that never sees that selection, and re-imports by module name what it unpickles, which a path-loaded module does not have. Criterion 4 hands over both ids. REJECTED passing the collection id alone, as v3 had it.'
     - 'COVERAGE BY source PLUS include_namespace_packages - criterion 6 AMENDED (Keith, 2026-11-01): coverage.py does not walk into folders without an __init__.py, and include is ignored when source is set, so v4''s ''list them in include'' could not work. The intent - path-loaded files are measured - is unchanged. coverage''s source_dirs refuses a folder that does not exist, so assets joins source in the move. REJECTED include.'
     - 'ONE TEST HELPER (delivery-scoper, v3): about ten test modules import an adapter or provider by package name today; they move onto one loader so the lookup is tested once.'
+    - 'PROVISIONAL (groundwork builder, 2026-11-01): the asset segment of the module name takes hyphens as underscores, as the module segment does - mothman_adapter_data_asset_1_civil_registration, mothman_provider_data_asset_1_child_protection - so the name is a valid identifier. Question for Keith: confirm that reading of the settled ''mothman_adapter_<asset>_<module name>''.'
     open_questions: []
   - id: REQ-GEN-370
     title: Each asset's synthetic-only configuration and generator providers live under assets/<asset>/synthetic/, read only by the generator, the bootstrap and the gates, and an asset with that folder removed still runs on real supplies

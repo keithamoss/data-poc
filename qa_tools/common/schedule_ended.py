@@ -66,7 +66,7 @@ def turned_off_pass_line(counts: tuple[int, int]) -> str | None:
     return (f"{supplies} {'supply' if supplies == 1 else 'supplies'} across {datasets} "
             f"{'dataset' if datasets == 1 else 'datasets'} received while turned off - "
             f"held, not needing a person; place, reject, or change effective_to/"
-            f"effective_from in {supply_holds.SCHEDULE_FILE} if the period should be owed.")
+            f"effective_from in {supply_holds.schedule_file()} if the period should be owed.")
 
 
 def pass_line(counts: tuple[int, int]) -> str | None:
@@ -76,7 +76,7 @@ def pass_line(counts: tuple[int, int]) -> str | None:
         return None
     return (f"{supplies} {'supply' if supplies == 1 else 'supplies'} across {datasets} "
             f"{'dataset' if datasets == 1 else 'datasets'} held because the dataset's "
-            f"schedule has ended - add dates in {supply_holds.SCHEDULE_FILE}; the next "
+            f"schedule has ended - add dates in {supply_holds.schedule_file()}; the next "
             f"pass files them.")
 
 

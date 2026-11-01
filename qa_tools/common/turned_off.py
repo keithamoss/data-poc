@@ -177,7 +177,7 @@ def refusal(dataset_id: str, period: str, agreement=None) -> str | None:
 
     return (f"{dataset_id} owes nothing in {period}: it is {gap_words(turn, dataset_id)}. "
             f"Nothing was recorded. A period becomes owed by changing effective_to or "
-            f"effective_from in {supply_holds.SCHEDULE_FILE}.")
+            f"effective_from in {supply_holds.schedule_file()}.")
 
 
 def timeline(dataset_id: str, agreement=None, docs=None) -> list[dict]:

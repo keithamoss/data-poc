@@ -35,6 +35,7 @@ def list_command() -> None:
             "yes" if env.publishes else "",
             env.description.replace("\n", " ").strip())
     console.print(table)
+    _state_the_asset()
     if here is None:
         console.print(
             f"\n{environments.ENVIRONMENT_ENV} is not set, so this checkout cannot "
@@ -57,6 +58,39 @@ def current_command() -> None:
     console.print(f"{env.id} - {env.label}", style="green")
     if env.publishes:
         console.print("This is the publishing environment.", style="bold yellow")
+    _state_the_asset()
+
+
+def _state_the_asset() -> None:
+    """Which asset this terminal acts for, beside its environment
+    (REQ-PIPE-363 criterion 8) - or why it acts for none. Reads the asset
+    folder names only."""
+    from qa_tools.common import assets
+
+    asset = assets.selected_or_none()
+    if asset is not None:
+        console.print(f"Asset: {asset.name}", style="green")
+    else:
+        console.print(assets.why_not_selected(), style="yellow")
+
+
+@env_group.command("dbt-deps")
+def dbt_deps_command() -> None:
+    """Install the selected asset's dbt packages into its own dbt project.
+
+    Once per asset (REQ-QAC-368 criterion 5): nothing changes, and it says
+    'already installed', when they are installed for its packages.yml as it
+    reads now. Opens no database.
+    """
+    from qa_tools.common import assets, dbt_common
+    from qa_tools.tools import run_dbt
+
+    asset = assets.selected()
+    if dbt_common.install_packages(asset.dbt_project, run_dbt.PROFILES_DIR):
+        console.print(f"Installed the dbt packages for asset {asset.name!r} into "
+                      f"{asset.dbt_packages}.", style="green")
+    else:
+        console.print(f"Asset {asset.name!r}: dbt packages already installed.", style="green")
 
 
 @env_group.command("reset-synthetic")

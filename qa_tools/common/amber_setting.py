@@ -68,9 +68,9 @@ class Resolved:
 
 
 def _doc(path: Path | None = None) -> dict:
-    from qa_tools.common.hierarchy import DATA_ASSET_YAML
+    from qa_tools.common.hierarchy import data_asset_yaml
 
-    with open(path or DATA_ASSET_YAML) as f:
+    with open(path or data_asset_yaml()) as f:
         return config_yaml.parse(f) or {}
 
 

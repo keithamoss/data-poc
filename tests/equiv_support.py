@@ -57,7 +57,7 @@ def apply_redirects(root: Path) -> dict:
         # history missing one (REQ-GEN-135 criterion 6). Here, not only in
         # run_into_fresh_database, so a SPAWNED collection gets it too - the
         # on-demand equivalence test failed on every run without it.
-        (scripted_decisions, "SCRIPT_PATH"): root / "no_scripted_decisions.yaml",
+        (scripted_decisions, "script_path"): functools.partial(Path, root / "no_scripted_decisions.yaml"),
         # run_pipeline() ENDS by writing `<ROOT>/reports/<results_json>`,
         # and the real ones are what the dashboard build and its e2e tests
         # read.

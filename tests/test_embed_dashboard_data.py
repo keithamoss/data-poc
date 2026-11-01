@@ -467,7 +467,7 @@ def test_the_schedule_ended_notice_names_the_file_dates_are_authored_in(monkeypa
     match = re.search(r"const SCHEDULE_RUNWAY = (.*?);\n", out_html.read_text())
     assert match, "SCHEDULE_RUNWAY const not found in built output"
     assert json.loads(match.group(1))["configFile"] == "contract/calendar.yaml"
-    assert supply_holds.SCHEDULE_FILE == "contract/calendar.yaml"
+    assert supply_holds.schedule_file() == "contract/calendar.yaml"
 
 
 def test_slot_due_dates_carry_only_the_slots_due_off_their_period_date(monkeypatch, tmp_path):

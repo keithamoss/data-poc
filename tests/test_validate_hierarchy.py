@@ -8,6 +8,8 @@ that nothing had noticed.
 """
 from __future__ import annotations
 
+import asset_folders
+
 import yaml
 
 from qa_tools.common import hierarchy, validate_hierarchy
@@ -23,7 +25,7 @@ def _contract(tmp_path, monkeypatch, filename, doc, describes):
     right - these tests are about what the gate REJECTS in a contract
     file, not about which files it finds."""
     (tmp_path / filename).write_text(yaml.safe_dump(doc))
-    monkeypatch.setattr(validate_hierarchy, "CONTRACT_DIR", tmp_path)
+    asset_folders.point(tmp_path, link=("data-asset.yaml",))
     monkeypatch.setattr(validate_hierarchy, "contracts",
                          lambda: ((filename, describes),))
 
@@ -92,7 +94,7 @@ class TestItFailsUsefully:
         assert any("not both independently" in e for e in validate_hierarchy.validate())
 
     def test_a_missing_contract_file_is_an_error_not_a_skip(self, tmp_path, monkeypatch):
-        monkeypatch.setattr(validate_hierarchy, "CONTRACT_DIR", tmp_path)
+        asset_folders.point(tmp_path, link=("data-asset.yaml",))
         monkeypatch.setattr(validate_hierarchy, "contracts",
                              lambda: (("gone.yaml", "birth-registrations"),))
         assert validate_hierarchy.validate() == ["gone.yaml: no such contract"]
@@ -205,8 +207,8 @@ class TestTheContractListIsDerivedNotMaintained:
         for name in {d.contract for d in hierarchy.all_datasets()}:
             (tmp_path / name).parent.mkdir(parents=True, exist_ok=True)
             (tmp_path / name).write_text(
-                (validate_hierarchy.CONTRACT_DIR / name).read_text())
-        monkeypatch.setattr(validate_hierarchy, "CONTRACT_DIR", tmp_path)
+                (validate_hierarchy.contract_dir() / name).read_text())
+        asset_folders.point(tmp_path, link=("data-asset.yaml",))
         errors = validate_hierarchy.validate()
         assert any("orphan-contract.yaml" in e for e in errors), errors
 

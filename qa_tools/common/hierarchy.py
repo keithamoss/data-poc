@@ -47,9 +47,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from types import MappingProxyType
 
-from qa_tools.common import config_yaml
+from qa_tools.common import assets, config_yaml
 
-DATA_ASSET_YAML = Path(__file__).resolve().parent.parent.parent / "contract" / "data-asset.yaml"
+
+def data_asset_yaml() -> Path:
+    """The selected asset's data-asset.yaml, resolved now (REQ-PIPE-342
+    criterion 6) - it was the import-time constant DATA_ASSET_YAML, which
+    captured one folder for the life of the process."""
+    return assets.selected().data_asset_yaml
 
 
 class UnknownDatasetError(KeyError):
@@ -136,7 +141,7 @@ def _require(node: dict, key: str, where: str):
     loaded.
     """
     if key not in node:
-        raise ValueError(f"{DATA_ASSET_YAML}: {where} declares no `{key}:`")
+        raise ValueError(f"{data_asset_yaml()}: {where} declares no `{key}:`")
     return node[key]
 
 
@@ -146,7 +151,7 @@ _BUILT = config_yaml.Built()
 def _load() -> tuple[str, "MappingProxyType[str, Dataset]", "MappingProxyType[str, Dataset]"]:
     """(data_asset_id, {dataset id: Dataset}, {table: Dataset}) for the file
     as it reads now."""
-    path = DATA_ASSET_YAML
+    path = data_asset_yaml()
     return _from_text(path, config_yaml.read(path))
 
 
@@ -164,7 +169,7 @@ def _build(path: Path, text: str) -> tuple[str, "MappingProxyType[str, Dataset]"
 
     data_asset_id = doc.get("data_asset_id")
     if not data_asset_id:
-        raise ValueError(f"{DATA_ASSET_YAML} declares no data_asset_id")
+        raise ValueError(f"{path} declares no data_asset_id")
 
     hierarchy = doc.get("hierarchy") or {}
     datasets: dict[str, Dataset] = {}
@@ -193,12 +198,12 @@ def _build(path: Path, text: str) -> tuple[str, "MappingProxyType[str, Dataset]"
                 # last, so it is an error rather than a last-wins.
                 if entry.dataset_id in datasets:
                     raise ValueError(
-                        f"{DATA_ASSET_YAML}: dataset id {entry.dataset_id!r} is defined twice"
+                        f"{path}: dataset id {entry.dataset_id!r} is defined twice"
                     )
                 datasets[entry.dataset_id] = entry
 
     if not datasets:
-        raise ValueError(f"{DATA_ASSET_YAML} defines no datasets under hierarchy.agencies")
+        raise ValueError(f"{path} defines no datasets under hierarchy.agencies")
     by_table: dict[str, Dataset] = {}
     for entry in datasets.values():
         by_table.setdefault(entry.table, entry)
@@ -226,7 +231,7 @@ def dataset(dataset_id: str) -> Dataset:
         return datasets[dataset_id]
     except KeyError:
         raise UnknownDatasetError(
-            f"{dataset_id!r} is not a dataset in {DATA_ASSET_YAML.name}. "
+            f"{dataset_id!r} is not a dataset in {data_asset_yaml().name}. "
             f"Known: {', '.join(sorted(datasets))}"
         ) from None
 
@@ -253,7 +258,7 @@ def dataset_for_table(table: str, tables: "MappingProxyType[str, Dataset] | None
         return tables[table]
     except KeyError:
         raise UnknownDatasetError(
-            f"no dataset maps to table {table!r} in {DATA_ASSET_YAML.name}. "
+            f"no dataset maps to table {table!r} in {data_asset_yaml().name}. "
             f"Known tables: {', '.join(sorted(tables))}"
         ) from None
 
@@ -266,7 +271,7 @@ def contract_path(collection_id: str) -> Path:
     drifts, and this one is how a file's own dataset gets resolved from
     its name (REQ-GEN-043).
     """
-    return DATA_ASSET_YAML.parent / datasets_in_collection(collection_id)[0].contract
+    return data_asset_yaml().parent / datasets_in_collection(collection_id)[0].contract
 
 
 def datasets_in_collection(collection_id: str) -> list[Dataset]:
@@ -278,7 +283,7 @@ def datasets_in_collection(collection_id: str) -> list[Dataset]:
     found = [d for d in all_datasets() if d.collection_id == collection_id]
     if not found:
         raise UnknownDatasetError(
-            f"{collection_id!r} is not a collection in {DATA_ASSET_YAML.name}. "
+            f"{collection_id!r} is not a collection in {data_asset_yaml().name}. "
             f"Known: {', '.join(sorted({d.collection_id for d in all_datasets()}))}"
         )
     return found

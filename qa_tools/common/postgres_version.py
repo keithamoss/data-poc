@@ -41,9 +41,9 @@ _majors: dict = {}
 
 
 def _declared_value(path=None):
-    from qa_tools.common.hierarchy import DATA_ASSET_YAML
+    from qa_tools.common.hierarchy import data_asset_yaml
 
-    text = Path(path or DATA_ASSET_YAML).read_text()
+    text = Path(path or data_asset_yaml()).read_text()
     if text not in _majors:
         if len(_majors) > 16:
             _majors.clear()

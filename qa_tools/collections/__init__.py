@@ -22,11 +22,10 @@ READS CONFIGURATION AND NOTHING ELSE: no connection is opened here.
 """
 from __future__ import annotations
 
-import importlib
 import re
 from dataclasses import dataclass
 
-from qa_tools.common import config_yaml, hierarchy
+from qa_tools.common import assets, config_yaml, hierarchy
 
 #: A collection id as the hierarchy writes them - and the only shape that
 #: may become a module name.
@@ -163,7 +162,7 @@ def _load() -> tuple[Collection, ...]:
     """Every collection, built from data-asset.yaml as it reads now and
     keyed on its content (REQ-PIPE-254): an edited or swapped hierarchy is
     seen on the next call, an unchanged one is not built again."""
-    path = hierarchy.DATA_ASSET_YAML
+    path = hierarchy.data_asset_yaml()
     text = config_yaml.read(path)
     return _BUILT.get(str(path), text, lambda: _build(path, text))
 
@@ -207,7 +206,7 @@ def all_collections() -> list[Collection]:
 
 def _refuse(kind: str, value: str, known: list[str]):
     raise UnknownCollectionError(
-        f"{value!r} is not a collection {kind} in {hierarchy.DATA_ASSET_YAML.name}. "
+        f"{value!r} is not a collection {kind} in {hierarchy.data_asset_yaml().name}. "
         f"Known: {', '.join(known)}")
 
 
@@ -250,21 +249,26 @@ def collection_of(dataset_id: str) -> Collection:
     return by_id(hierarchy.dataset(dataset_id).collection_id)
 
 
-def adapter(collection: Collection | str):
-    """The collection's adapter, from this package only (criterion 4)."""
+def adapter_module(collection: Collection | str):
+    """The collection's adapter module, loaded by path from the selected
+    asset's adapter folder (REQ-PIPE-369 criterion 2) - the id checked against
+    the hierarchy's id pattern BEFORE any path is built from it."""
     c = collection if isinstance(collection, Collection) else resolve(collection)
     if not ID_PATTERN.fullmatch(c.id):
         raise UnknownCollectionError(
             f"collection id {c.id!r} is not a hierarchy id, so it cannot name an adapter")
-    name = f"{__name__}.{c.module_name}"
     try:
-        return importlib.import_module(name).ADAPTER
-    except ModuleNotFoundError as exc:
-        if exc.name != name:
-            raise
+        return assets.load("adapter", c.module_name)
+    except assets.NoModule:
         raise NoAdapterError(
-            f"collection {c.id!r} has no adapter - {name.replace('.', '/')}.py does not "
-            f"exist, so nothing knows how to run it") from None
+            f"collection {c.id!r} has no adapter - "
+            f"{assets.module_file('adapter', c.module_name)} does not exist, so nothing "
+            f"knows how to run it") from None
+
+
+def adapter(collection: Collection | str):
+    """The collection's adapter (criterion 4)."""
+    return adapter_module(collection).ADAPTER
 
 
 def adapters() -> list:

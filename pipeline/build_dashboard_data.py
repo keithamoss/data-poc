@@ -129,7 +129,7 @@ _SUPPLY_LEVEL_CHECK_NAMES = {"row_count", "datacontract:row_count", "evidently:r
 
 def _contract(contract: str) -> dict:
     """A collection's contract, beside the hierarchy that names it."""
-    return _contract_at(str(hierarchy.DATA_ASSET_YAML.parent / contract))
+    return _contract_at(str(hierarchy.data_asset_yaml().parent / contract))
 
 
 def _contract_at(path: str) -> dict:

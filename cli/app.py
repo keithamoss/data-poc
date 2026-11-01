@@ -44,10 +44,15 @@ try:
     from . import (check, collection_cli, common, dashboard, debug, env, filing_tui, github,
                    pipeline, plans, population, scenarios, schedule, supply)
     from qa_tools import collections as _registry
+    from qa_tools.common import assets as _assets
 
     # EVERY COLLECTION'S GROUP, FROM THE REGISTRY (REQ-TEST-245 criterion 1),
     # built here inside the YAML guard: building them reads the hierarchy.
-    _COLLECTIONS = _registry.all_collections()
+    # THE SELECTED ASSET'S ONLY, AND NONE WITHOUT ONE (REQ-PIPE-363 criterion
+    # 2): with MOTHMAN_ASSET unset or naming no folder nothing of any asset is
+    # read, so `--help` and `mothman check` still run (criterion 5).
+    _ASSET = _assets.selected_or_none()
+    _COLLECTIONS = _registry.all_collections() if _ASSET is not None else []
     _GROUPS = [collection_cli.make_group(c) for c in _COLLECTIONS]
 except yaml.YAMLError as _exc:
     # READ AT IMPORT TIME by several command modules, so this is the only
@@ -240,11 +245,32 @@ class _MothmanGroup(click.RichGroup):
     refusal it already is, not a traceback (REQ-PIPE-144 criterion 29;
     delivery-critic, overnight sprint 4). The message names the remedy."""
 
+    def resolve_command(self, ctx, args):
+        """A command that does not exist, said for what it is (REQ-PIPE-363
+        criteria 3 and 4): with no asset selected, the missing variable - not
+        'No such command' for a collection whose group was simply never
+        built; with one, 'No such command' and that asset's own collection
+        commands beneath it, reading nothing of any other asset."""
+        name = str(args[0]) if args else ""
+        if args and not name.startswith("-") and self.get_command(ctx, name) is None:
+            why = _assets.why_not_selected()
+            if why is not None:
+                raise click.ClickException(why)
+            ctx.fail("\n".join([f"No such command {name!r}.",
+                                 f"Commands for asset {_ASSET.name!r}:"]
+                                + [f"  {n}" for n in _COLLECTION_NAMES]))
+        return super().resolve_command(ctx, args)
+
     def invoke(self, ctx):
         from qa_tools.common import arrival_lifecycle, environments, qa_store, supply_db
 
         try:
             return super().invoke(ctx)
+        except _assets.AssetError as exc:
+            # NO ASSET, OR ANOTHER ASSET'S DATABASE IN THIS PROCESS
+            # (REQ-PIPE-363 criterion 6, REQ-PIPE-343 criterion 5): a refusal
+            # by design, whose message says what to do.
+            raise click.ClickException(str(exc)) from None
         except qa_store.SchemaVersionError as exc:
             raise click.ClickException(str(exc)) from None
         except arrival_lifecycle.StageFailed as exc:
@@ -269,6 +295,9 @@ class _MothmanGroup(click.RichGroup):
 def cli(ctx: click.Context) -> None:
     """mothman - the unified CLI/TUI for this PoC's real pipeline."""
     if ctx.invoked_subcommand is None:
+        # NO ASSET, NO MENU, AND NOT EVEN A BANNER (REQ-PIPE-363 criterion 7):
+        # first, so a person without a terminal meets the real cause too.
+        _assets.selected()
         common.require_tty("mothman <command> --help (see the available commands)")
         # NO ENVIRONMENT, NO MENU (REQ-TEST-114 criterion 8): REQ-PIPE-093's
         # refusal in place of a menu whose first item would fail anyway.
@@ -328,7 +357,11 @@ cli.add_command(check.check_command)
 from rich_click.rich_panel import RichCommandPanel  # noqa: E402
 
 _COLLECTION_NAMES = [g.name for g in _GROUPS]
-cli.add_panel(RichCommandPanel("Collections", commands=_COLLECTION_NAMES))
+# WITH NO ASSET, THE PANEL SAYS HOW TO GET ONE (REQ-PIPE-363 criterion 5).
+cli.add_panel(RichCommandPanel(
+    "Collections", commands=_COLLECTION_NAMES,
+    help=None if _ASSET is not None
+    else f"Set {_assets.ASSET_ENV} to one of: {', '.join(_assets.names()) or '(no asset folders found)'}"))
 cli.add_panel(RichCommandPanel("Tools", commands=[n for n in sorted(cli.commands)
                                                   if n not in _COLLECTION_NAMES]))
 

@@ -9,6 +9,8 @@ file must never contain - a missing timezone, an invented zone name.
 """
 from __future__ import annotations
 
+import asset_folders
+
 from datetime import UTC, date, datetime, timedelta, timezone
 
 import pytest
@@ -19,7 +21,7 @@ from qa_tools.common import asset_time
 def _repoint(tmp_path, monkeypatch, text):
     path = tmp_path / "data-asset.yaml"
     path.write_text(text)
-    monkeypatch.setattr(asset_time, "DATA_ASSET_YAML", path)
+    asset_folders.point(tmp_path)
 
 
 def _versions(*pairs) -> str:
