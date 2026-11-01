@@ -10,9 +10,10 @@ from click.testing import CliRunner
 
 from cli import common
 
-from cli.collection_cli import of as _cli_of
 
-bdm, cp = _cli_of('bdm'), _cli_of('cp')
+from asset_cli import LazyCollectionCli  # noqa: E402
+
+bdm, cp = LazyCollectionCli("bdm"), LazyCollectionCli("cp")
 from qa_tools.common import hand_filing
 
 _runner = CliRunner()
@@ -36,6 +37,7 @@ class TestAReferenceIsATrialsOnly:
     and required only for a trial, and one given for a kept supply is refused
     saying why."""
 
+    @pytest.mark.asset("daily")
     @pytest.mark.parametrize("args, flag", [
         (["--file", "{f}", "--reference-file", "{f}", "--commit"], "--reference-file"),
     ])
@@ -53,6 +55,7 @@ class TestAReferenceIsATrialsOnly:
                                              str(folder), "--commit"])
         assert out.exit_code != 0 and "last promoted supply" in _flat(out.output)
 
+    @pytest.mark.asset("daily")
     def test_a_trial_without_a_reference_is_refused_naming_the_flag(self, tmp_path):
         f = _csv(tmp_path, "birth_registrations_2026-01-01.csv")
         out = _runner.invoke(bdm.qa_command, ["--file", f, "--trial"])
@@ -213,7 +216,8 @@ class TestARecordedArrivalIsNeverRecordedAgain:
                      "delivery": "e"}]
         choices = cp.picker_choices(manifest)
         assert choices[0].endswith("- recorded") and not choices[1].endswith("- recorded")
-        assert bdm.picker_choices(manifest)[0].endswith("- recorded")
+        # Another one-table collection of the same asset (the asset split).
+        assert LazyCollectionCli("ed").picker_choices(manifest)[0].endswith("- recorded")
 
     def test_an_unrecorded_arrival_may_be_kept(self, monkeypatch):
         monkeypatch.setattr(common, "recorded_runs", lambda ids: set())

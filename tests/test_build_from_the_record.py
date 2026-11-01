@@ -30,7 +30,7 @@ from qa_tools.tools import results_history
 
 CP = "child-protection"
 AGENCY = "child-protection-family-support"
-CHECK = f"data-asset-1.{AGENCY}.{CP}"
+CHECK = f"quarterly.{AGENCY}.{CP}"
 CLIENT_REF = f"{CHECK}.cp-notifications.cp_client_id.relationships_dbt"
 WORKER_REF = f"{CHECK}.cp-notifications.assigned_worker_id.relationships_dbt"
 WHEN = "2026-09-26T10:00:00+08:00"
@@ -444,8 +444,8 @@ def test_hierarchy_knows_the_tables_these_use():
 LP_AGENCY, LP = "department-of-health", "linkage-products"
 #: A check declared in ANOTHER collection that reads the Client Register - by
 #: the checks file's own declaration, so the writer files it cross-table.
-FOREIGN_REF = f"data-asset-1.{LP_AGENCY}.{LP}.linkage-keys.cp-clients.referential_soda"
-FOREIGN_COVERAGE = f"data-asset-1.{LP_AGENCY}.{LP}.linkage-keys.cp-clients.coverage_soda"
+FOREIGN_REF = f"quarterly.{LP_AGENCY}.{LP}.linkage-keys.cp-clients.referential_soda"
+FOREIGN_COVERAGE = f"quarterly.{LP_AGENCY}.{LP}.linkage-keys.cp-clients.coverage_soda"
 
 
 class TestAResultRecordedUnderAnotherCollectionReachesTheTableItRead:

@@ -33,7 +33,9 @@ STREAMS = [boot.STREAM_JOIN.join(g) for g in boot.streams(SHORTS)]
 
 def _key(collection_ids) -> str:
     return boot.STREAM_JOIN.join(_SHORT[c] for c in collection_ids)
-assert SHORTS[:2] == ["bdm", "cp"], SHORTS
+#: The first collection of the asset the suite acts for (the asset split: it was
+#: Birth Registrations, whose asset is now the daily one).
+FIRST = SHORTS[0]
 
 
 @pytest.fixture(autouse=True)
@@ -161,8 +163,8 @@ class TestWhatItRuns:
         assert spy == [*(f"gen-{s}" for s in SHORTS), *STREAMS, "record"]
 
     def test_one_collection_leaves_the_other_alone(self, spy):
-        boot.bootstrap(collection="bdm")
-        assert spy == ["gen-bdm", "bdm"]
+        boot.bootstrap(collection=FIRST)
+        assert spy == [f"gen-{FIRST}", FIRST]
 
     def test_it_generates_before_checking(self, spy):
         """Order matters and is easy to get backwards: checks over data
@@ -175,12 +177,12 @@ class TestWhatItRuns:
         """A command that takes minutes and prints nothing reads as
         hung, and the first thing a newcomer does is kill it."""
         steps = []
-        boot.bootstrap(collection="bdm", on_step=steps.append)
+        boot.bootstrap(collection=FIRST, on_step=steps.append)
         assert len(steps) >= 3
         assert any("Generating" in s for s in steps)
 
     def test_it_works_with_no_progress_callback(self, spy):
-        boot.bootstrap(collection="bdm")
+        boot.bootstrap(collection=FIRST)
 
 
 def _in_process(monkeypatch, called=None):
@@ -242,7 +244,7 @@ class TestCollectionsRunSideBySide:
         called, _ = spy
         monkeypatch.setattr(correction_replay, "confirm_due",
                             lambda **k: called.append("confirm") or [])
-        boot.bootstrap(collection="bdm")
+        boot.bootstrap(collection=FIRST)
         assert "confirm" not in called
 
     def test_every_stream_is_dispatched_together(self, spy):

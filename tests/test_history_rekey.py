@@ -234,7 +234,7 @@ class TestCompletenessIsWhatThisDatasetActuallyOwes:
 
         real = vcl.collect_checks
         new_check = SimpleNamespace(check_id=(
-            f"data-asset-1.{AGENCY}.{COLLECTION}.{dataset}.col.drift_evidently"))
+            f"quarterly.{AGENCY}.{COLLECTION}.{dataset}.col.drift_evidently"))
         monkeypatch.setattr(vcl, "collect_checks", lambda *a, **k: [*real(*a, **k), new_check])
 
         assert reader.expected_tools_for(dataset) == ("evidently",)

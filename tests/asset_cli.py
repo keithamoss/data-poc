@@ -36,3 +36,28 @@ def rebuild_for_selected() -> None:
     for panel in getattr(app.cli, "panels", None) or []:
         if getattr(panel, "name", None) == "Collections":
             panel.commands = list(app._COLLECTION_NAMES)
+
+
+class LazyCollectionCli:
+    """A collection's command object (cli.collection_cli.of), looked up when
+    it is used rather than when a module is imported - so a module naming
+    both assets' collections imports under either, and each test reaches its
+    own asset's. Attribute writes go to the real object, so monkeypatch.setattr
+    and its undo act on it."""
+
+    def __init__(self, short: str):
+        object.__setattr__(self, "_short", short)
+
+    def _real(self):
+        from cli.collection_cli import of
+
+        return of(object.__getattribute__(self, "_short"))
+
+    def __getattr__(self, name):
+        return getattr(self._real(), name)
+
+    def __setattr__(self, name, value):
+        setattr(self._real(), name, value)
+
+    def __delattr__(self, name):
+        delattr(self._real(), name)

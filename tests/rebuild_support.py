@@ -41,7 +41,9 @@ def check(collection_id: str, name: str, tool: str, dataset: str | None = None) 
     """One verified record, in the shape a tool's evaluation returns."""
     agency, collection = ids(collection_id)
     dataset = dataset or dataset_of(collection_id)
-    return {"check_id": f"data-asset-1.{agency}.{collection}.{dataset}.col.{name}_{tool}",
+    from qa_tools.common import hierarchy
+
+    return {"check_id": f"{hierarchy.data_asset_id()}.{agency}.{collection}.{dataset}.col.{name}_{tool}",
             "dataset_id": dataset, "status": "pass", "engine": tool}
 
 

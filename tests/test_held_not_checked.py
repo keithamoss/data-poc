@@ -165,11 +165,11 @@ class TestTheHoldStoreDecidesWhichTables:
 
 HELD = {"cp_clients": "cp_clients__20260930010000000000"}
 READS = {
-    f"data-asset-1.{AGENCY}.{CP}.cp-placements.client_id.referential_integrity_soda":
+    f"quarterly.{AGENCY}.{CP}.cp-placements.client_id.referential_integrity_soda":
         ["cp_clients"],
-    f"data-asset-1.{AGENCY}.{CP}.cp-notifications.client_id.referential_integrity_soda":
+    f"quarterly.{AGENCY}.{CP}.cp-notifications.client_id.referential_integrity_soda":
         ["cp_clients"],
-    f"data-asset-1.{AGENCY}.{CP}.cp-carers.carer_id.some_other_check_soda":
+    f"quarterly.{AGENCY}.{CP}.cp-carers.carer_id.some_other_check_soda":
         ["cp_carers"],
 }
 
@@ -208,12 +208,12 @@ class TestACrossTableCheckReadingItGoesRed:
     def test_the_held_datasets_own_checks_produce_nothing(self):
         """Criterion 9's other half - no check result is recorded
         against a supply that has no period."""
-        own = {f"data-asset-1.{AGENCY}.{CP}.cp-clients.id.not_null_soda": ["cp_clients"]}
+        own = {f"quarterly.{AGENCY}.{CP}.cp-clients.id.not_null_soda": ["cp_clients"]}
         assert held_blast_radius.results_for(
             held=HELD, reads=own, run_id="r1", run_timestamp="t") == []
 
     def test_a_check_reading_two_held_tables_reports_both(self):
-        both = {f"data-asset-1.{AGENCY}.{CP}.cp-placements.x.joint_check_soda":
+        both = {f"quarterly.{AGENCY}.{CP}.cp-placements.x.joint_check_soda":
                 ["cp_clients", "cp_carers"]}
         out = held_blast_radius.results_for(
             held={"cp_clients": "a", "cp_carers": "b"}, reads=both,

@@ -6,13 +6,16 @@ pty - scripts/dev/tui_screenshot.py's own real-terminal capture is what
 covers genuine end-to-end interactive rendering."""
 from __future__ import annotations
 
+import pytest
+
 from click.testing import CliRunner
 
 import cli.app as app
 import cli.common as common
-from cli.collection_cli import of as _cli_of
 
-bdm, cp = _cli_of("bdm"), _cli_of("cp")
+from asset_cli import LazyCollectionCli  # noqa: E402
+
+bdm, cp, ed = LazyCollectionCli("bdm"), LazyCollectionCli("cp"), LazyCollectionCli("ed")
 
 _runner = CliRunner()
 
@@ -25,11 +28,11 @@ def test_bare_mothman_with_no_real_terminal_fails_with_a_clear_message():
     assert "real interactive terminal" in result.output
 
 
+@pytest.mark.asset("daily")
 def test_qa_menu_picks_bdm_and_calls_its_run_qa_interactive(monkeypatch):
     monkeypatch.setattr(common, "select", lambda *a, **k: bdm.label)
     called = []
     monkeypatch.setattr(bdm, "run_qa_interactive", lambda: called.append("bdm"))
-    monkeypatch.setattr(cp, "run_qa_interactive", lambda: called.append("cp"))
 
     app._qa_menu()
 
@@ -37,9 +40,10 @@ def test_qa_menu_picks_bdm_and_calls_its_run_qa_interactive(monkeypatch):
 
 
 def test_qa_menu_picks_cp_and_calls_its_run_qa_interactive(monkeypatch):
+    # The other collection beside it is the same asset's (the asset split).
     monkeypatch.setattr(common, "select", lambda *a, **k: cp.label)
     called = []
-    monkeypatch.setattr(bdm, "run_qa_interactive", lambda: called.append("bdm"))
+    monkeypatch.setattr(ed, "run_qa_interactive", lambda: called.append("ed"))
     monkeypatch.setattr(cp, "run_qa_interactive", lambda: called.append("cp"))
 
     app._qa_menu()
@@ -52,12 +56,13 @@ def test_qa_menu_back_choice_does_not_run_anything(monkeypatch):
 
     def _fail_if_called():
         raise AssertionError("Back must not run the QA flow")
-    monkeypatch.setattr(bdm, "run_qa_interactive", _fail_if_called)
+    monkeypatch.setattr(ed, "run_qa_interactive", _fail_if_called)
     monkeypatch.setattr(cp, "run_qa_interactive", _fail_if_called)
 
     app._qa_menu()  # must not raise
 
 
+@pytest.mark.asset("daily")
 def test_generate_menu_first_run_skips_confirmation_and_generates(monkeypatch):
     monkeypatch.setattr(common, "select", lambda *a, **k: bdm.label)
     monkeypatch.setattr(bdm, "manifest_exists", lambda: False)
@@ -73,6 +78,7 @@ def test_generate_menu_first_run_skips_confirmation_and_generates(monkeypatch):
     assert generated == [True]
 
 
+@pytest.mark.asset("daily")
 def test_generate_menu_existing_manifest_respects_a_declined_confirmation(monkeypatch):
     monkeypatch.setattr(common, "select", lambda *a, **k: bdm.label)
     monkeypatch.setattr(bdm, "manifest_exists", lambda: True)

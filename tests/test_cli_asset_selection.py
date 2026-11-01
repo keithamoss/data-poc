@@ -86,7 +86,7 @@ class TestWithNoAssetSet:
         result = _mothman("--help", asset=None)
         assert result.returncode == 0, _said(result)
         assert "Collections" in result.stdout
-        assert "Set MOTHMAN_ASSET to one of: data-asset-1" in result.stdout
+        assert "Set MOTHMAN_ASSET to one of: daily, quarterly" in result.stdout
         # No collection's group is built, so none is listed.
         assert not re.search(r"^\W*(bdm|cp)\s", result.stdout, re.M), result.stdout
 
@@ -101,7 +101,7 @@ class TestWithNoAssetSet:
         said = _said(result)
         assert "No such command" not in said and "Traceback" not in said, said
         assert "MOTHMAN_ASSET is not set" in said
-        assert "Set it to one of: data-asset-1" in said and "deliberately no default" in said
+        assert "Set it to one of: daily, quarterly" in said and "deliberately no default" in said
 
     def test_a_mistyped_asset_is_named_the_same_way(self):
         result = _mothman("cp", "qa", asset="data-asset-one")
@@ -127,7 +127,7 @@ class TestWithNoAssetSet:
         result = _mothman(*command, asset=None)
         assert result.returncode != 0, _said(result)
         said = _said(result)
-        assert "MOTHMAN_ASSET is not set" in said and "Set it to one of: data-asset-1" in said
+        assert "MOTHMAN_ASSET is not set" in said and "Set it to one of: daily, quarterly" in said
         assert "Traceback" not in said, said
 
     def test_tidying_test_databases_needs_no_asset(self):
@@ -142,7 +142,7 @@ class TestWithNoAssetSet:
         result = _mothman("collections", asset=asset)
         assert result.returncode != 0
         said = _said(result)
-        assert "MOTHMAN_ASSET" in said and "Set it to one of: data-asset-1" in said
+        assert "MOTHMAN_ASSET" in said and "Set it to one of: daily, quarterly" in said
         assert "Traceback" not in said, said
 
 
@@ -169,7 +169,7 @@ class TestTheAssetIsNamed:
 
         monkeypatch.setenv("MOTHMAN_ENVIRONMENT", "sandbox")
         assert common.environment_statement() == \
-            "Environment: Claude Code sandbox (not production) · Asset: data-asset-1"
+            "Environment: Claude Code sandbox (not production) · Asset: quarterly"
 
     def test_on_every_wizard_prompt(self, monkeypatch):
         import questionary
@@ -180,17 +180,17 @@ class TestTheAssetIsNamed:
         question = common._with_environment_toolbar(questionary.text("m"))
         last = question.application.layout.container.children[-1]
         text = "".join(fragment for _, fragment in last.content.content.text)
-        assert "· Asset: data-asset-1" in text
+        assert "· Asset: quarterly" in text
 
     def test_in_env_current(self):
-        result = _mothman("env", "current", asset="data-asset-1")
+        result = _mothman("env", "current", asset="quarterly")
         assert result.returncode == 0, _said(result)
-        assert "Asset: data-asset-1" in result.stdout
+        assert "Asset: quarterly" in result.stdout
 
     def test_in_env_list(self):
-        result = _mothman("env", "list", asset="data-asset-1")
+        result = _mothman("env", "list", asset="quarterly")
         assert result.returncode == 0, _said(result)
-        assert "Asset: data-asset-1" in result.stdout
+        assert "Asset: quarterly" in result.stdout
 
     def test_env_list_says_when_none_is_set(self):
         result = _mothman("env", "list", asset=None)
