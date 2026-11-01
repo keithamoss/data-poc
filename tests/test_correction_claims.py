@@ -155,6 +155,7 @@ def _widen_daily(cal, asset):
                                              "change": "wider"}]})
 
 
+@pytest.mark.asset("daily")  # a change to the daily calendar's window
 class TestAVersionLevelChangeClaimsOnlyTheFilingsItChanges:
     """REQ-GEN-205 criterion 10's narrowing for a version-level change
     (TS-62's): only the days whose filing it would change, by the impact
@@ -192,6 +193,7 @@ def _widen_daily_from(day):
     return widen
 
 
+@pytest.mark.asset("daily")  # TS-62 and TS-47 are the daily asset's
 class TestTS62sVersionStandsAfterTheHistoryREQGEN199Quotes:
     """REQ-GEN-205 criterion 25: TS-62's version takes effect after
     2026-09-08, TS-47's following day, and after the last day any REQ-GEN-199
@@ -257,7 +259,7 @@ class TestAWrittenArrivalIsAskedOnlyWhatAConfirmationCouldMove:
         ridden by one scenario, as a version-level correction would be."""
         import dataclasses
 
-        rider = dataclasses.replace(si.INJECTIONS[0], correction="CAB-W")
+        rider = dataclasses.replace(si.this_assets_injections()[0], correction="CAB-W")
         monkeypatch.setattr(si, "INJECTIONS", [rider])
         return _declare(_docs(), _widen_daily, "CAB-W", "2026-09-25")
 
@@ -289,7 +291,8 @@ class TestADateLevelCorrectionIsAskedToo:
         import dataclasses
 
         monkeypatch.setattr(si, "INJECTIONS",
-                            [dataclasses.replace(si.INJECTIONS[0], correction="CAB-1")])
+                            [dataclasses.replace(si.this_assets_injections()[0],
+                                                 correction="CAB-1")])
 
     def _docs(self, to):
         return _declare(_docs(), lambda cal, asset: _move_q3(cal, asset, to), "CAB-1",
@@ -333,7 +336,8 @@ def test_the_req_gen_199_link_day_plans_only_injections_carrying_its_links(monke
 
     monkeypatch.setattr(si, "generated_periods", recording)
     cc.last_req_gen_199_link_day()
-    carrying = {i.dataset_id for i in si.INJECTIONS
+    # The selected asset's own injections, which generation walks (the split).
+    carrying = {i.dataset_id for i in si.this_assets_injections()
                 if any(cc._REQ_GEN_199.match(link.scenario_id) for link in i.links)}
     assert carrying, "no REQ-GEN-199 link to resolve"
     assert set(asked) == carrying, f"asked {sorted(set(asked))}, carrying {sorted(carrying)}"

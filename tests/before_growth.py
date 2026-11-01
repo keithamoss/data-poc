@@ -18,8 +18,6 @@ from __future__ import annotations
 
 import collection_modules
 
-_cp = collection_modules.provider_module("child-protection")
-
 #: The quarterly calendar's grown version, which Emergency Department's
 #: history still uses, and the amber and replacement settings' (REQ-GEN-207
 #: criterion 5; left in place by REQ-GEN-238 criterion 3).
@@ -27,10 +25,15 @@ GROWN_FROM = "2013-01-01"
 #: Child Protection's earliest participation and defaults since REQ-GEN-238:
 #: the grown start moved on by the whole years the provider drops, read from
 #: the provider rather than written twice (post-build-review #284).
-CP_GROWN_FROM = f"{int(GROWN_FROM[:4]) + _cp.GROWN_DROPPED // 4}-01-01"
+def cp_grown_from() -> str:
+    """Asked when needed, under an asset holding Child Protection - the
+    provider is that asset's (the asset split)."""
+    cp = collection_modules.provider_module("child-protection")
+    return f"{int(GROWN_FROM[:4]) + cp.GROWN_DROPPED // 4}-01-01"
 #: Every grown version's date: the two above, cp-carers' turn back on after
 #: TS-63 (REQ-GEN-218) and Emergency Department's gap (REQ-GEN-251).
-GROWN_DATES = frozenset({GROWN_FROM, CP_GROWN_FROM, "2022-06-01", "2015-10-01", "2015-12-01"})
+def grown_dates() -> frozenset:
+    return frozenset({GROWN_FROM, cp_grown_from(), "2022-06-01", "2015-10-01", "2015-12-01"})
 #: Where the history started before the growth: no version effective before it
 #: may survive the filter.
 ORIGINAL_FROM = "2023-01-01"
@@ -38,23 +41,36 @@ ORIGINAL_FROM = "2023-01-01"
 GROWN_COLLECTIONS = ("child-protection", "emergency-department")
 
 
+def _grown_here() -> tuple[str, ...]:
+    """The grown collections the selected asset holds - none in an asset
+    whose history did not grow (the asset split)."""
+    from qa_tools import collections
+
+    held = {c.id for c in collections.all_collections()}
+    return tuple(c for c in GROWN_COLLECTIONS if c in held)
+
+
 def _datasets_of(doc: dict) -> set[str]:
     from qa_tools.common import hierarchy
 
-    return {d.dataset_id for c in GROWN_COLLECTIONS for d in hierarchy.datasets_in_collection(c)}
+    return {d.dataset_id for c in _grown_here() for d in hierarchy.datasets_in_collection(c)}
 
 
 def calendar(doc: dict) -> dict:
     """`doc` (a parsed calendar.yaml) with every grown version removed, in
-    place; returns it."""
+    place; returns it. An asset holding no grown collection had nothing
+    grow, so its calendar is returned as it is (the asset split)."""
+    if not _grown_here():
+        return doc
     lost: dict[str, int] = {}
+    dates = grown_dates()
 
     def keep(where: str, versions):
-        kept = [v for v in versions if str(v.get("effective_from")) not in GROWN_DATES]
+        kept = [v for v in versions if str(v.get("effective_from")) not in dates]
         early = [str(v.get("effective_from")) for v in kept
                  if str(v.get("effective_from")) < ORIGINAL_FROM]
         assert not early, f"{where}: version(s) {early} predate {ORIGINAL_FROM} and are " \
-                          f"not named in GROWN_DATES - a grown version moved"
+                          f"not named in grown_dates() - a grown version moved"
         lost[where] = len(versions) - len(kept)
         return kept
 

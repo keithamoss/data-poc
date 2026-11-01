@@ -64,10 +64,26 @@ def named(text: str) -> set[str]:
 
 
 def _source(obj) -> str:
+    """`obj`'s CODE - parsed and printed back, so its comments and
+    docstrings, which are prose rather than anything it touches, are left
+    out; its raw source where it does not parse alone."""
+    import ast
+    import textwrap
+
     try:
-        return inspect.getsource(obj)
+        raw = textwrap.dedent(inspect.getsource(obj))
     except (OSError, TypeError):
         return ""
+    try:
+        tree = ast.parse(raw)
+    except SyntaxError:
+        return raw
+    for node in ast.walk(tree):
+        body = getattr(node, "body", None)
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.Module)) \
+                and body and _is_docstring(body[0]):
+            node.body = body[1:] or [ast.Pass()]
+    return ast.unparse(tree)
 
 
 def _helpers(func, module, seen: set) -> str:
@@ -96,6 +112,13 @@ def _helpers(func, module, seen: set) -> str:
     return "\n".join(out)
 
 
+def _is_docstring(stmt) -> bool:
+    import ast
+
+    return (isinstance(stmt, ast.Expr) and isinstance(stmt.value, ast.Constant)
+            and isinstance(stmt.value.value, str))
+
+
 def _class_level(cls) -> str:
     import ast
     import textwrap
@@ -110,6 +133,8 @@ def _class_level(cls) -> str:
     lines = textwrap.dedent(source).splitlines()
     out = [ast.unparse(d) for d in node.decorator_list]
     for stmt in node.body:
+        if _is_docstring(stmt):
+            continue  # prose, not something the test touches
         if isinstance(stmt, (ast.FunctionDef, ast.AsyncFunctionDef)):
             # A fixture defined in the class is the test's own setup.
             if any("fixture" in ast.unparse(d) for d in stmt.decorator_list):
@@ -165,11 +190,14 @@ def module_level_text(path: Path) -> str:
     lines = source.splitlines()
     out = []
     for node in tree.body:
+        if _is_docstring(node):
+            continue
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
             # A class body's own statements run at import too.
             if isinstance(node, ast.ClassDef):
                 for stmt in node.body:
-                    if not isinstance(stmt, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                    if not isinstance(stmt, (ast.FunctionDef, ast.AsyncFunctionDef)) \
+                            and not _is_docstring(stmt):
                         out.append("\n".join(lines[stmt.lineno - 1:stmt.end_lineno]))
             continue
         out.append("\n".join(lines[node.lineno - 1:node.end_lineno]))
