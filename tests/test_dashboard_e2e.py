@@ -8920,3 +8920,74 @@ class TestCrossCollectionReviewFixes:
         assert got["words"], "precondition: an amber cell"
         assert set(got["words"]) == {got["warn"]}, got
         assert got["links"] and min(got["links"]) >= 24, got
+
+
+class TestASeveralColumnSampleOnTheRealPage:
+    """REQ-PIPE-341 NFR 1, the last transform asserted in a real browser: a
+    several-column sample's pills are escaped, two runs' identical samples are
+    matched BY VALUE (a Set of arrays matched none, so every one read 'new'),
+    two runs with different key columns are said to be incomparable, and the
+    real built Linkage Keys referential results carry their dataset and
+    identifiers with a null part kept rather than dropped. WRITTEN, NOT YET
+    RUN: deferred to the end-of-run bootstrap (2026-11-01 build run)."""
+
+    _COLS = ["dataset", "id_1", "id_2"]
+
+    def _panel(self, page, html, cols_of_compare):
+        _goto(page, html, _BDM)
+        return page.evaluate("""([cols, compareCols]) => {
+          const ctx = resolveContext(STATE);
+          const col = ctx.ds.columns.find(c => c.checks && c.checks.length);
+          const ck = col.checks.find(c => c.history && c.history.length > 1);
+          if (!ck) return null;
+          ck.history.forEach((h, i) => {
+            const last = i === ck.history.length - 1;
+            // FRESH ARRAYS PER POINT: equal by value, never the same object.
+            h.failing_sample_keys = [["<b>CP</b>", "C-1", null], ["CP", "C-2", null]];
+            h.failing_sample_key_columns = last ? cols.slice() : compareCols && compareCols.slice();
+            if (!h.failing_sample_key_columns) delete h.failing_sample_key_columns;
+            h.row_count_invalid = 2; h.row_count_total = 10;
+          });
+          openColumnDrawer(ctx.ag, ctx.col, ctx.ds, col);
+          openCheckPanel(ctx.ag, ctx.col, ctx.ds, col, ck);
+          const body = document.querySelector('#check-panel-body');
+          return {html: body.innerHTML, text: body.innerText};
+        }""", [self._COLS, cols_of_compare])
+
+    def test_identical_samples_are_still_failing_and_escaped(self, clean_page, built_dashboard_html):
+        got = self._panel(clean_page, built_dashboard_html, self._COLS)
+        assert got, "no check with two runs on the Birth Registrations page"
+        assert "Still failing in both runs (2)" in got["text"]
+        assert "New since the compared run" not in got["text"]
+        assert "<b>CP</b>" not in got["html"] and "&lt;b&gt;CP&lt;/b&gt;" in got["html"]
+
+    def test_a_different_key_shape_is_said_to_be_incomparable(self, clean_page, built_dashboard_html):
+        got = self._panel(clean_page, built_dashboard_html, None)
+        assert got
+        assert ("These examples cannot be compared: the compared run named its rows by "
+                "different columns.") in got["text"]
+        assert "New since the compared run" not in got["text"]
+
+    def test_the_real_linkage_referential_results_name_their_records(
+            self, clean_page, built_dashboard_html):
+        """Post-build-review #291: they were recorded empty."""
+        _goto(clean_page, built_dashboard_html)
+        failing = clean_page.evaluate("""(dsId) => {
+          const d = DATA.agencies.flatMap(a => a.collections).flatMap(c => c.datasets)
+            .find(d => d.id === dsId);
+          const out = [];
+          for (const col of (d && d.columns) || [])
+            for (const ck of col.checks || [])
+              if ((ck.check_id || "").endsWith(".referential_soda"))
+                for (const h of ck.history || [])
+                  if (h.row_count_invalid > 0) out.push({keys: h.failing_sample_keys,
+                                                        cols: h.failing_sample_key_columns});
+          return out;
+        }""", _LINKAGE_DATASET)
+        assert failing, "no failing referential result on the built page"
+        for entry in failing:
+            assert entry["cols"] == self._COLS, entry
+            assert entry["keys"], entry
+            for key in entry["keys"]:
+                assert len(key) == 3 and key[0] and key[1] is not None, key
+                assert "None" not in key, key
