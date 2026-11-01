@@ -1168,7 +1168,45 @@ def pytest_collection_modifyitems(config, items):
             items[:] = kept
     _mark_deployment(items)
     _mark_asset(items)
+    _group_by_asset(items)
     _group_for_distribution(items)
+
+
+def _group_by_asset(items):
+    """Each module's tests one asset at a time - the suite's first, then the
+    other - keeping their order otherwise, so the module- and class-scoped
+    fixtures built for one asset are rebuilt at most once for the other
+    (pytest_runtest_protocol below)."""
+    position = {}
+    for i, item in enumerate(items):
+        position.setdefault(item.nodeid.split("::", 1)[0], i)
+    items.sort(key=lambda it: (position[it.nodeid.split("::", 1)[0]],
+                               asset_of(it) != TEST_ASSET))
+
+
+@pytest.hookimpl(tryfirst=True)
+def pytest_runtest_protocol(item, nextitem):
+    """WHEN THE NEXT TEST ACTS FOR ANOTHER ASSET, its module- and
+    class-scoped fixtures are torn down after this one, so it gets fixtures
+    built for its own asset rather than ones built for this test's (the asset
+    split). Session fixtures - the worker's database - are kept. Otherwise
+    pytest's own protocol, unchanged."""
+    from _pytest.runner import runtestprotocol
+
+    if nextitem is None or asset_of(nextitem) == asset_of(item):
+        return None
+
+    class _AboveTheModule:
+        """The next test's chain above its module, so only those survive."""
+
+        def listchain(self):
+            return [n for n in nextitem.listchain()
+                    if not isinstance(n, (pytest.Module, pytest.Class, pytest.Function))]
+
+    item.ihook.pytest_runtest_logstart(nodeid=item.nodeid, location=item.location)
+    runtestprotocol(item, nextitem=_AboveTheModule())
+    item.ihook.pytest_runtest_logfinish(nodeid=item.nodeid, location=item.location)
+    return True
 
 
 def _mark_asset(items):

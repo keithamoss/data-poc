@@ -28,6 +28,9 @@ PERTH = timezone(timedelta(hours=8))
 WHEN = datetime(2026, 8, 24, 14, 36, 3, tzinfo=PERTH)
 
 _BDM_FILE = "birth_registrations_2026-08-24.csv"
+#: Another collection of Child Protection's asset, for the tests about
+#: attribution BETWEEN collections - within one asset since the split.
+_ED_FILE = "ed_presentations.csv"
 _CP_FILES = ("cp_clients.csv", "cp_notifications.csv", "cp_investigations.csv",
              "cp_placements.csv", "cp_carers.csv", "cp_case_workers.csv")
 
@@ -102,7 +105,7 @@ class TestADeliveryIsRecognisedNotLabelled:
         assert {a.collection_id for a in _for(dirs, "child-protection", "cp_run_")} \
             == {"child-protection"}
         # And the same delivery is NOT claimed by the other collection.
-        assert _for(dirs) == []
+        assert _for(dirs, "emergency-department", "ed_run_") == []
 
     def test_a_delivery_nothing_can_place_is_reported_not_guessed_at(self, dirs):
         _write(dirs, "mystery-drop", {"covering_note.pdf": "%PDF-1.4\n"})
@@ -110,7 +113,7 @@ class TestADeliveryIsRecognisedNotLabelled:
         assert [x.name for x in arrivals.unplaceable(d, r)] == ["mystery-drop"]
         # Reported, and the run does not fail (criterion 13).
         with pytest.warns(UserWarning, match="covering_note.pdf"):
-            assert _for(dirs) == []
+            assert _for(dirs, "emergency-department", "ed_run_") == []
         with pytest.warns(UserWarning):
             assert _for(dirs, "child-protection", "cp_run_") == []
 
@@ -126,26 +129,26 @@ class TestADeliveryIsRecognisedNotLabelled:
         One delivery, two runs: the DELIVERY is the transport unit and
         the RUN is the per-collection QA unit, and they were only ever
         the same thing by coincidence of this PoC's generated data."""
-        _write(dirs, "mixed", {_BDM_FILE: "registration_number\n1\n", "cp_clients.csv": "a\n1\n"})
+        _write(dirs, "mixed", {_ED_FILE: "presentation_id\n1\n", "cp_clients.csv": "a\n1\n"})
 
-        bdm = _for(dirs)
+        ed = _for(dirs, "emergency-department", "ed_run_")
         cp = _for(dirs, "child-protection", "cp_run_")
 
-        assert [a.delivery_name for a in bdm] == ["mixed"]
+        assert [a.delivery_name for a in ed] == ["mixed"]
         assert [a.delivery_name for a in cp] == ["mixed"]
-        assert bdm[0].run_id.startswith("birth_registrations__")
+        assert ed[0].run_id.startswith("ed_presentations__")
         assert cp[0].run_id.startswith("cp_clients__")
         # Each side sees only its OWN files - attribution is per file,
         # on its own dataset's terms.
-        assert bdm[0].files_by_dataset == {"birth-registrations": (_BDM_FILE,)}
+        assert ed[0].files_by_dataset == {"ed-presentations": (_ED_FILE,)}
         assert cp[0].files_by_dataset == {"cp-clients": ("cp_clients.csv",)}
 
     def test_a_spanning_delivery_names_both_collections(self, dirs):
-        _write(dirs, "mixed", {_BDM_FILE: "registration_number\n1\n", "cp_clients.csv": "a\n1\n"})
+        _write(dirs, "mixed", {_ED_FILE: "presentation_id\n1\n", "cp_clients.csv": "a\n1\n"})
         d, r = dirs
         [one] = delivery.list_deliveries(d, r)
         assert arrivals.recognise(one).collections == (
-            "child-protection", "civil-registration")
+            "child-protection", "emergency-department")
 
 
 class TestRunIdsComeFromWhatArrivedAndWhen:

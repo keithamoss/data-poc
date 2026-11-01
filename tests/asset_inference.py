@@ -96,6 +96,29 @@ def _helpers(func, module, seen: set) -> str:
     return "\n".join(out)
 
 
+def _class_level(cls) -> str:
+    import ast
+    import textwrap
+
+    source = _source(cls)
+    if not source:
+        return ""
+    try:
+        node = ast.parse(textwrap.dedent(source)).body[0]
+    except SyntaxError:
+        return source
+    lines = textwrap.dedent(source).splitlines()
+    out = [ast.unparse(d) for d in node.decorator_list]
+    for stmt in node.body:
+        if isinstance(stmt, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            # A fixture defined in the class is the test's own setup.
+            if any("fixture" in ast.unparse(d) for d in stmt.decorator_list):
+                out.append("\n".join(lines[stmt.lineno - 1:stmt.end_lineno]))
+            continue
+        out.append("\n".join(lines[stmt.lineno - 1:stmt.end_lineno]))
+    return "\n".join(out)
+
+
 def text_of(item) -> str:
     """Everything a test names: its own source, its class's, its id and
     parameters, the module helpers and constants it uses and the source of
@@ -104,7 +127,9 @@ def text_of(item) -> str:
     module = sys.modules.get(getattr(func, "__module__", ""), None)
     parts = [item.name, _source(func)]
     if getattr(item, "cls", None) is not None:
-        parts.append(_source(item.cls))
+        # The class's own statements and decorators - never its other tests,
+        # which may be another asset's.
+        parts.append(_class_level(item.cls))
     callspec = getattr(item, "callspec", None)
     if callspec is not None:
         parts.append(repr(callspec.params))
