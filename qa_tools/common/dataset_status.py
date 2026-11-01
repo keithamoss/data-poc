@@ -74,7 +74,11 @@ ORDERED_STATUSES = {"nodata": -1, "green": 0, "amber": 1, "red": 2}
 # below is where a caller handles it explicitly instead.
 # `notcounted` is a GROUP's status: every dataset in it is left out of its
 # rollup (post-build-review #135). It replaced a false green.
-UNORDERED_STATUSES = {"exhausted", "inactive", "notcounted", "turnedoff"}
+# `notchecked` is a CHECK's status when its run left it out of scope for the
+# period (REQ-DASH-299 criterion 17) - DISPLAY ONLY: no tool records it, the
+# build makes the row from a left_out entry, and a check that ran and errored
+# stays red. Unordered, and at a level of its own (LEFT_OUT_STATUSES below).
+UNORDERED_STATUSES = {"exhausted", "inactive", "notchecked", "notcounted", "turnedoff"}
 
 RECOGNISED_STATUSES = set(ORDERED_STATUSES) | UNORDERED_STATUSES
 
@@ -89,7 +93,11 @@ RECOGNISED_STATUSES = set(ORDERED_STATUSES) | UNORDERED_STATUSES
 # dataset's schedule, so a check result carrying one is correct rather
 # than a symptom of something upstream writing at the wrong level.
 CHECK_STATUSES = set(ORDERED_STATUSES) | {"inactive"}
-DATASET_STATUSES = RECOGNISED_STATUSES
+# A LEFT-OUT ROW'S LEVEL (REQ-DASH-299 criterion 17): notchecked alone, and
+# notchecked nowhere else - not on a recorded check result, not on a dataset
+# tile - so a mis-written result cannot read as quiet and uncounted.
+LEFT_OUT_STATUSES = {"notchecked"}
+DATASET_STATUSES = RECOGNISED_STATUSES - LEFT_OUT_STATUSES
 
 # Retained under its original name because callers outside this module
 # index it directly. Same mapping, now including nodata - whose absence
@@ -114,6 +122,7 @@ STATUS_WORDS = {
                   "count": "schedule ended"},
     "inactive": {"label": "No rule defined", "verb": "no rule defined",
                  "count": "no rule defined"},
+    "notchecked": {"label": "Not checked", "verb": "not checked", "count": "not checked"},
     "notcounted": {"label": "Not counted", "verb": "not counted", "count": "not counted"},
     "turnedoff": {"label": "Turned off", "verb": "turned off", "count": "turned off"},
 }
@@ -163,7 +172,10 @@ def recognised_status(value: str, read_from: str, allowed=None) -> str:
     if value in allowed:
         return value
     note = ""
-    if value in RECOGNISED_STATUSES:
+    if value in LEFT_OUT_STATUSES:
+        note = (f" {value!r} is display only - the dashboard build makes it from a "
+                "run's left_out entry, and no tool records it.")
+    elif value in RECOGNISED_STATUSES:
         note = (f" {value!r} is a real status, but not one a {read_from!r} "
                 "may carry - something wrote a dataset-level status onto a "
                 "check result.")
@@ -224,7 +236,7 @@ _DASHBOARD_STATUS_BY_TOOL_STATUS = {
 #: headline; "nobody defined a rule" is a standing fact somebody can act
 #: on; "no run within tolerance as of this date" is temporal and may
 #: resolve itself tomorrow.
-_QUIET_PRECEDENCE = ("exhausted", "inactive", "nodata", "notcounted", "turnedoff")
+_QUIET_PRECEDENCE = ("exhausted", "inactive", "nodata", "notchecked", "notcounted", "turnedoff")
 
 
 def rollup_statuses(statuses) -> str:

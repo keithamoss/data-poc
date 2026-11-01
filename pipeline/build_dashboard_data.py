@@ -405,6 +405,18 @@ def _left_out_fields(why) -> dict:
             **({"calendar": calendar} if calendar else {})}
 
 
+def _left_out_between(check_id: str, lifecycle_by_id: dict) -> dict:
+    """The tables a left-out check is BETWEEN, from the tables it declares it
+    reads (configuration), so that the page shows its row where it would be
+    shown had it ran - in its collection's group (REQ-DASH-337 criterion 6 as
+    amended by REQ-DASH-299, A1). A left-out check has no result to read its
+    tables from. Empty where it declares none beyond its own."""
+    meta = lifecycle_by_id.get(check_id)
+    reads = {t: None for t in (getattr(meta, "reads_tables", None) or ())}
+    between = _between(check_id, reads) if reads else None
+    return {"between": between} if between else {}
+
+
 # ---- one dataset ------------------------------------------------------------
 
 def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], dataset_stats: dict,
@@ -1021,7 +1033,7 @@ def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], da
         "noPromoted": no_promoted,
         "notInAgreement": [
             {"runId": run_id, "supplyId": facts[run_id]["supply_id"], "checkId": check,
-             **_left_out_fields(why)}
+             **_left_out_fields(why), **_left_out_between(check, lifecycle_by_id)}
             for run_id, checks in sorted((not_in_agreement or {}).items(),
                                          key=lambda kv: facts.get(kv[0], {}).get("rank", 0))
             if run_id in facts and facts[run_id]["dataset_id"] == dataset_id

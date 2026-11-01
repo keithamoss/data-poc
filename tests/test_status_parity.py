@@ -97,8 +97,11 @@ class TestTheWordsAreTheOnesBothSidesAgreed:
         assert self._table(), "the labels block is empty"
         assert STATUS_WORDS == self._table()
 
-    def test_every_status_a_dataset_may_carry_has_words(self):
-        assert set(self._table()) == set(CASES["vocabulary"]["by_level"]["dataset"])
+    def test_every_status_any_level_may_carry_has_words(self):
+        """Every level's statuses - a left-out row's notchecked included
+        (REQ-DASH-299 criterion 17) - and nothing else."""
+        levels = {k: v for k, v in CASES["vocabulary"]["by_level"].items() if not k.startswith("_")}
+        assert set(self._table()) == set().union(*levels.values())
 
     @pytest.mark.parametrize("form", ["label", "verb", "count"])
     def test_status_words_gives_each_form(self, form):
@@ -120,6 +123,36 @@ class TestTheWordsAreTheOnesBothSidesAgreed:
         for words in self._table().values():
             for said in words.values():
                 assert not re.search(r"\b(green|amber|red)\b", said, re.I), said
+
+
+class TestEveryLevelCase:
+    """REQ-DASH-299 criterion 17: notchecked is a left-out row's alone - a
+    check result or a dataset tile carrying it is refused, naming it."""
+
+    _ALLOWED = {"check": None, "dataset": "DATASET_STATUSES", "left_out": "LEFT_OUT_STATUSES"}
+
+    def _allowed(self, level):
+        from qa_tools.common import dataset_status
+
+        name = self._ALLOWED[level]
+        return None if name is None else getattr(dataset_status, name)
+
+    def test_the_left_out_level_matches_the_table(self):
+        from qa_tools.common.dataset_status import LEFT_OUT_STATUSES
+
+        assert LEFT_OUT_STATUSES == set(CASES["vocabulary"]["by_level"]["left_out"])
+
+    @pytest.mark.parametrize("case", CASES["level_cases"]["cases"],
+                             ids=_ids(CASES["level_cases"]["cases"]))
+    def test_it_returns_or_refuses_what_the_table_says(self, case):
+        from qa_tools.common.dataset_status import recognised_status
+
+        allowed = self._allowed(case["level"])
+        if case.get("expect_error"):
+            with pytest.raises(UnknownStatusError, match=case["status"]):
+                recognised_status(case["status"], case["level"], allowed)
+        else:
+            assert recognised_status(case["status"], case["level"], allowed) == case["expect"]
 
 
 class TestEveryCheckCase:
