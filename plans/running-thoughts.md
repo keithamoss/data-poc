@@ -6145,3 +6145,24 @@ could never have computed it), and it belongs with batch 5's check work.
        afterwards as its own batch. REJECTED (b), the whole separation after
        the split, which moves the configuration twice, and (c), the whole
        separation before the split.
+135. **[done, 2026-11-01]** **[Docs & process]** **[Testing & dev tooling]** **A replaced container lost a day of unpushed work; every checkpoint is now pushed to a `wip/` branch.**
+     2026-11-01, afternoon Perth: under Keith's "no push until the very end"
+     the whole build run (REQ-PIPE-341, REQ-TEST-374, Pass / Warn / Fail,
+     six geocoding requirements, the split groundwork) and a day of signed
+     register edits lived only in local commits and worktrees. The usage
+     limit stopped all four builders, and the session came back in a NEW
+     container: a fresh clone at the last pushed commit (3291b4c). Every
+     local commit, every worktree, and every subagent transcript was gone.
+     What survived was the main session's own transcript, holding every
+     decision Keith made and every script the main session ran, so the
+     DECISIONS were recoverable and the CODE was not.
+     **DECIDED (Keith, 2026-11-01, 'Rebuild all')**: replay the decisions from
+     the transcript, regenerate the lost drafts from the same inputs, rebuild
+     the code - and from now on push every local checkpoint to a branch
+     under `wip/` (e.g. `wip/build-2026-11-01`), commit messages carrying
+     `[skip ci]` as well. Both workflows fire only on `claude/**`, so a
+     `wip/` push bills no Actions minutes; the one real push to the session
+     branch still happens once, at the end, and carries the CI run.
+     #128's 10-minute wake-up chain brings a session back sooner; it does
+     not survive a container replacement, which only a remote copy does.
+
