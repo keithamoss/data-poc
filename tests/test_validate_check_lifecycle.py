@@ -11,6 +11,7 @@ from __future__ import annotations
 import subprocess
 import textwrap
 
+from qa_tools.common import assets
 from qa_tools.common import validate_check_lifecycle as vcl
 
 
@@ -478,9 +479,9 @@ def _dbt_repo(tmp_path, monkeypatch):
     _use_sources(monkeypatch, [("schema.yml", vcl.cl.parse_dbt_check_metadata)],
                  [])
     (repo / "dbt_shared" / "macros").mkdir(parents=True)
-    (repo / "dbt_project" / "tests").mkdir(parents=True)
+    (repo / assets.dbt_rel() / "tests").mkdir(parents=True)
     (repo / "dbt_shared" / "macros" / "matches_regex.sql").write_text(_MATCHES_REGEX)
-    (repo / "dbt_project" / "tests" / "sibling_rule.sql").write_text("select 1 where false\n")
+    (repo / assets.dbt_rel() / "tests" / "sibling_rule.sql").write_text("select 1 where false\n")
     (repo / "schema.yml").write_text(_regex_schema())
     _git(repo, "add", "-A")
     _git(repo, "commit", "-q", "-m", "introduce the checks")
@@ -517,7 +518,7 @@ def test_an_unexplained_macro_edit_fails_naming_the_file_once_and_every_check_it
 
 def test_an_unexplained_singular_sql_edit_fails_naming_that_check_alone(tmp_path, monkeypatch, capsys):
     repo = _dbt_repo(tmp_path, monkeypatch)
-    (repo / "dbt_project" / "tests" / "sibling_rule.sql").write_text("select 1 where true\n")
+    (repo / assets.dbt_rel() / "tests" / "sibling_rule.sql").write_text("select 1 where true\n")
     _commit(repo, "change the singular test, no changelog")
 
     assert vcl.main() == 1
@@ -531,7 +532,7 @@ def test_a_singular_test_also_covers_the_project_macros_its_sql_uses(tmp_path, m
     repo = _dbt_repo(tmp_path, monkeypatch)
     (repo / "dbt_shared" / "macros" / "helper.sql").write_text(
         "{% macro clean_name(c) %} trim({{ c }}) {% endmacro %}\n")
-    (repo / "dbt_project" / "tests" / "sibling_rule.sql").write_text(
+    (repo / assets.dbt_rel() / "tests" / "sibling_rule.sql").write_text(
         "select {{ clean_name('x') }} where false\n")
     _commit(repo, "the singular test starts using a project macro (new check text, so a changelog)")
     # Re-baseline: the commit above changed the singular test, which the gate
@@ -550,7 +551,7 @@ def test_a_singular_test_also_covers_the_project_macros_its_sql_uses(tmp_path, m
 def test_a_singular_sql_edit_passes_once_its_check_has_a_changelog_entry(tmp_path, monkeypatch, capsys):
     """REQ-QAC-223 criterion 9's other half for singular SQL (#182)."""
     repo = _dbt_repo(tmp_path, monkeypatch)
-    (repo / "dbt_project" / "tests" / "sibling_rule.sql").write_text("select 1 where true\n")
+    (repo / assets.dbt_rel() / "tests" / "sibling_rule.sql").write_text("select 1 where true\n")
     (repo / "schema.yml").write_text(_regex_schema(
         changelog_on_rule='[{"date": "2026-10-14", "change": "Rule now flags every row."}]'))
     _commit(repo, "change the singular test and say why")
@@ -577,9 +578,9 @@ def test_a_macro_in_a_subfolder_is_still_covered(tmp_path, monkeypatch, capsys):
 
 def test_a_singular_test_in_a_subfolder_is_still_covered(tmp_path, monkeypatch, capsys):
     repo = _dbt_repo(tmp_path, monkeypatch)
-    sub = repo / "dbt_project" / "tests" / "rules"
+    sub = repo / assets.dbt_rel() / "tests" / "rules"
     sub.mkdir()
-    (repo / "dbt_project" / "tests" / "sibling_rule.sql").rename(sub / "sibling_rule.sql")
+    (repo / assets.dbt_rel() / "tests" / "sibling_rule.sql").rename(sub / "sibling_rule.sql")
     _commit(repo, "move the singular test into a subfolder")
     (sub / "sibling_rule.sql").write_text("select 1 where true\n")
     _commit(repo, "change the singular test, no changelog")
@@ -684,9 +685,12 @@ def test_moving_a_singular_test_into_a_collections_folder_is_not_a_change(
     hash covers its SQL, and named the file by its path, so filing the test
     under tests/<collection-id>/ read as an undocumented change."""
     repo = _dbt_repo(tmp_path, monkeypatch)
-    (repo / "assets" / "daily" / "dbt" / "tests" / "civil-registration").mkdir()
-    _git(repo, "mv", "dbt_project/tests/sibling_rule.sql",
-         "assets/daily/dbt/tests/civil-registration/sibling_rule.sql")
+    from qa_tools import collections
+
+    folder = collections.all_collections()[0].id  # the selected asset's first collection
+    (repo / assets.dbt_rel() / "tests" / folder).mkdir()
+    _git(repo, "mv", f"{assets.dbt_rel()}/tests/sibling_rule.sql",
+         f"{assets.dbt_rel()}/tests/{folder}/sibling_rule.sql")
     _commit(repo, "file the test under its collection")
     monkeypatch.setattr(vcl, "diff_base", lambda **_: "HEAD~1")
     assert vcl.main() == 0, capsys.readouterr().err
@@ -698,15 +702,17 @@ def test_an_edit_to_any_collections_check_source_moves_the_fingerprint(tmp_path,
     import shutil
 
 
-    for top in ("contract", "dbt_project/models", "dbt_project/tests", "dbt_project/macros"):
-        shutil.copytree(vcl.ROOT / top, tmp_path / top)
+    # The repository's asset folders and shared dbt package; the selected
+    # asset's own check sources are what its fingerprint covers (the split).
+    for top in ("assets", "dbt_shared"):
+        shutil.copytree(vcl.ROOT / top, tmp_path / top,
+                        ignore=shutil.ignore_patterns("dbt_packages", "target", "logs"))
     monkeypatch.setattr(vcl, "ROOT", tmp_path)
-    import asset_folders
-
-    asset_folders.point(tmp_path / "contract")
-    edits = ["assets/daily/registry-services/bdm-birth-registrations-evidently-checks.yml",
-             "assets/quarterly/dbt/models/child-protection/stg_cp_clients.sql",
-             "assets/daily/dbt/tests/civil-registration/recency.sql"]
+    folder = assets.folder_rel()
+    edits = [f"{folder}/child-protection-family-support/child-protection-evidently-checks.yml",
+             f"{assets.dbt_rel()}/models/child-protection/stg_cp_clients.sql",
+             f"{assets.dbt_rel()}/tests/child-protection/"
+             + sorted((tmp_path / assets.dbt_rel() / "tests" / "child-protection").iterdir())[0].name]
     for rel in edits:
         before = vcl.sources_fingerprint()
         path = tmp_path / rel
