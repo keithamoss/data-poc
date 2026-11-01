@@ -570,6 +570,8 @@ class TestNeitherHalfOfCIQuietlyStopsCovering:
                    "@pytest.mark.needs_deployment",
                    "deployment_history",
                    "generator_isolation",
+                   # generator_isolation's redirect, imported from where it lives.
+                   "from generator.output import redirect",
                    "PLACEMENTS_PATH\",",
                    "\"placements_path\",",
                    # A module that builds its own reports/ under a temporary
