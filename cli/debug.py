@@ -321,3 +321,29 @@ def equivalence_compare_command(a: str, b: str, surfaces: tuple[str, ...],
             differing.append(code)
     if differing:
         raise SystemExit(1)
+
+
+@debug_group.command("snapshot-worktrees")
+@click.option("--remote", default="origin", show_default=True,
+              help="The remote the snapshots are pushed to.")
+@click.option("--dry-run", is_flag=True,
+              help="Build each snapshot but push nothing.")
+def snapshot_worktrees_command(remote: str, dry_run: bool) -> None:
+    """Copy every worktree's uncommitted work to wip/<branch>-snap on the remote.
+
+    A safety net for long agent builds (plans/running-thoughts.md #135): each
+    worktree's uncommitted state, untracked files included, is committed in a
+    throwaway index and pushed by sha, so a lost container costs minutes, not
+    a day. The worktree's own branch, staging and files are never touched. A
+    worktree with nothing uncommitted pushes nothing."""
+    from pathlib import Path
+
+    from cli import worktree_snapshot
+
+    repo = Path(__file__).resolve().parent.parent
+    for snap in worktree_snapshot.snapshot_all(repo, remote, push=not dry_run):
+        if snap.sha is None:
+            console.print(f"{snap.branch}: no uncommitted changes", highlight=False)
+        else:
+            where = "built, not pushed" if dry_run else f"pushed to wip/{snap.branch}-snap"
+            console.print(f"{snap.branch}: snapshot {snap.sha[:7]} {where}", highlight=False)

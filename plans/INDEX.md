@@ -541,6 +541,7 @@ one when this line suggests it matters.
 - **#134** `investigate` 2026-10-31 - The synthetic data generator and the bootstrap as separate components, strictly separated from each other and from the...
   - *touches:* `contract/data-asset.yaml`, `contract/scripted_decisions.yaml`, `contract/synthetic_inputs.yaml`
 - **#135** `done` 2026-11-01 - A replaced container lost a day of unpushed work; every checkpoint is now pushed to a wip/ branch. 2026-11-01,...
+  - *touches:* `cli/worktree_snapshot.py`, `tests/test_worktree_snapshot.py`
 
 ## plans/aws.md
 
