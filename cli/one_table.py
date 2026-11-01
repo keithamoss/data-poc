@@ -62,7 +62,7 @@ class OneTableCLI(CollectionCLI):
         except ValueError as exc:
             # A RECORD THAT DOES NOT ADD UP fails like any disagreement, not
             # as a traceback (post-build-review #157 finding 7).
-            delivery.remove_deliveries(driver.previous_delivery_names(provider.dataset_id),
+            delivery.remove_deliveries(driver.provider_delivery_names(provider),
                                        driver.DELIVERIES_DIR, driver.RECEIPTS_DIR)
             raise self.TargetTrialFailed(f"what the generator built could not be read, so the "
                                          f"deliveries just written were removed: {exc}") from exc
@@ -84,7 +84,7 @@ class OneTableCLI(CollectionCLI):
             if disagreement:
                 found.append(disagreement)
         if found:
-            removed = delivery.remove_deliveries(driver.previous_delivery_names(provider.dataset_id),
+            removed = delivery.remove_deliveries(driver.provider_delivery_names(provider),
                                                  written_to, driver.RECEIPTS_DIR)
             raise self.TargetTrialFailed(
                 f"{len(found)} of {len(tried)} injected target(s) did not read as built, so "

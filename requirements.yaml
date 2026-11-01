@@ -37318,7 +37318,7 @@ requirements:
     source: "Keith, plans/publishing-and-history.md item 6 (2026-10-15 night); main session position.md calls 5, 27 and 28. Drafted by delivery-scoper 2026-10-15, revised rounds 2 and 3/4; a PROPOSAL, not signed."
     acceptance_criteria:
       - "THE SYSTEM SHALL define each collection's Evidently checks in contract/<agency-id>/<stem>-evidently-checks.yml, and its retired ones in contract/<agency-id>/<stem>-evidently-checks-retired.yml, where <stem> is the collection's contract file name less '-contract.yaml'."
-      - "THE SYSTEM SHALL keep each agency's contract, Soda, Evidently and retired-check files under contract/<agency-id>/, and only the asset-wide files (data-asset.yaml, calendar.yaml, people.yaml, environments.yaml, file-checks.yaml, scripted_decisions.yaml) at the top of contract/; WHEN `mothman check` runs, IF a collection's file sits outside its agency's folder, THEN THE SYSTEM SHALL fail naming it."
+      - THE SYSTEM SHALL keep each agency's contract, Soda, Evidently and retired-check files under contract/<agency-id>/, and only the asset-wide files (data-asset.yaml, calendar.yaml, people.yaml, environments.yaml, file-checks.yaml, scripted_decisions.yaml, presentation.yaml, synthetic_inputs.yaml) at the top of contract/; WHEN `mothman check` runs, IF a collection's file sits outside its agency's folder, THEN THE SYSTEM SHALL fail naming it. AMENDED 2026-11-01 by REQ-QAC-294.
       - "THE SYSTEM SHALL write every date in those files quoted, or coerce it to a string on reading, and SHALL carry every Evidently check's check_id, category, introduced_date, description, failure_indicates, technical_note, column, method, thresholds and changelog unchanged, with an unchanged config_hash for every one."
       - "THE SYSTEM SHALL keep each collection's dbt models, sources, schema files and singular tests under dbt_project/models/<collection_id>/ and dbt_project/tests/<collection_id>/, leaving shared macros and generic tests where they are."
       - "WHEN `mothman check` runs, IF a dbt model, source, schema file or singular test sits outside every collection's folder and is not a shared macro or generic test, or two collections declare a singular test of the same name, THEN THE SYSTEM SHALL fail naming each."
@@ -45928,7 +45928,7 @@ requirements:
     - THE SYSTEM SHALL build each delivery's rows from each linked dataset's LAST generated supply filed to that quarter and RECEIVED BEFORE that delivery's own receipt (geocoding Q13), its identifier values written under REQ-QAC-330 criterion 5's mapping.
     - THE SYSTEM SHALL declare that the provider depends on each linked collection's provider, and SHALL obtain each linked dataset's rows from that provider through a declared row interface keyed by the period a supply is FILED to (REQ-PIPE-321) and its receipt instant - never by its round's date and never by reading data/deliveries; and IF a provider it depends on is absent or generates after it, THEN generation SHALL refuse before writing anything, naming both.
     - THE SYSTEM SHALL write ordinary linkage products that pass every own-row and referential check and lie inside every coverage band, linking 90 to 96 percent of each linked dataset's rows, each linkage_key a scrambled token from the provider's own seed, the same source record carrying the same key in every quarter.
-    - THE SYSTEM SHALL write each quarter's linkage product as its own delivery on the quarter's own round date - linkage_keys.csv due 14:00 (PROVISIONAL), after Emergency Department's morning arrivals for that quarter - filed, checked and gated as its own package (REQ-PIPE-266, REQ-PIPE-336 criterion 6); the geocoding delivery due 15:00 is added by the geocoding requirements (REQ-GEN-295).
+    - THE SYSTEM SHALL write each quarter's linkage product as its own delivery on the quarter's own round date - linkage_keys.csv due 18:00 with 8 hours' grace and received 17:05 to 17:55, after Emergency Department's afternoon arrivals for that quarter (15:00 to 17:00) - filed, checked and gated as its own package (REQ-PIPE-266, REQ-PIPE-336 criterion 6); the geocoding delivery, due 19:00 with 8 hours' grace and received 18:05 to 18:55, is added by REQ-GEN-295. AMENDED 2026-11-01 by REQ-GEN-295.
     - THE SYSTEM SHALL NOT move any Emergency Department arrival to make it promoted before a release, so that WHERE Emergency Department's supply for the quarter is not promoted when a release is checked - held, red and waiting, or a resupply arriving after the release - the checks reading ed_presentations read red, could not run, until a supply is promoted and the knock-on re-check clears them (Keith, L2).
     - THE SYSTEM SHALL declare the provider's seed range disjoint from every other provider's, so that REQ-GEN-246's overlap gate passes and adding it changes no byte any other collection writes.
     - WHEN `mothman lp generate-synthetic-data` runs twice with the same seed and configuration, THE SYSTEM SHALL write byte-identical deliveries and receipts both times.
@@ -46290,7 +46290,7 @@ requirements:
     date_written: '2026-10-25'
     story: As whoever maintains the pipeline, I want a geocoding dataset declared for each source dataset that carries an address, in the collection Department of Health already releases each quarter, each naming the source it geocodes and the source columns its identifiers hold, so that each can be checked on its own rows and against the source supply it was built from.
     moscow: should
-    status: not_started
+    status: built
     signed_off:
       by: Keith
       date: '2026-10-31'
@@ -46350,12 +46350,47 @@ requirements:
     - 'NO AMENDMENT TO REQ-QAC-330 (delivery-scoper, v5, from its text): its criteria 5 and 6 are about Linkage Keys'' own entries, which keep their codes; an optional code on the shared schema changes none of them.'
     - 'THE VALID-VALUES RULE IS THE CODE COLUMN''S (architect v5 BLOCKING 2): it exists so Linkage Keys'' dataset column can only hold declared codes; applied to every valid-values list it fails match_level''s, and a code-less entry has no codes to compare. Criterion 14 limits it, test first. REJECTED exempting geocoding by name.'
     - 'AMENDMENT A8, FINAL TEXT PROPOSED - REQ-QAC-241 criterion 2 (architect v6 SHOULD; WORDING SIGNED by Keith 2026-10-31). CURRENT, as signed: <<<THE SYSTEM SHALL keep each agency''s contract, Soda, Evidently and retired-check files under contract/<agency-id>/, and only the asset-wide files (data-asset.yaml, calendar.yaml, people.yaml, environments.yaml, file-checks.yaml, scripted_decisions.yaml) at the top of contract/; WHEN `mothman check` runs, IF a collection''s file sits outside its agency''s folder, THEN THE SYSTEM SHALL fail naming it.>>> PROPOSED: <<<THE SYSTEM SHALL keep each agency''s contract, Soda, Evidently and retired-check files under contract/<agency-id>/, and only the asset-wide files (data-asset.yaml, calendar.yaml, people.yaml, environments.yaml, file-checks.yaml, scripted_decisions.yaml, presentation.yaml, synthetic_inputs.yaml) at the top of contract/; WHEN `mothman check` runs, IF a collection''s file sits outside its agency''s folder, THEN THE SYSTEM SHALL fail naming it. AMENDED <date applied> by REQ-QAC-294.>>> presentation.yaml is added because validate_collections.ASSET_WIDE already holds it and the signed list never did - an existing drift, recorded rather than carried. ASSET-WIDE, NOT AN AGENCY''S FOLDER: the collections gate allows only check files under an agency folder, and the file is generator configuration about the asset''s synthetic history, as scripted_decisions.yaml is. Under the asset split it belongs to the quarterly asset alone, whose collections it names; asset-split A21''s list gains it.'
+    - 'THE CONTRACT TAKES THE COLLECTION''S ID AND NAME (build, 2026-11-01): with three datasets the hierarchy gate requires the Linkage Products contract to carry id linkage-products and name Linkage Products, as Child Protection''s does; its id had been linkage-keys while the collection held one dataset.'
+    - 'ALLOWED VALUES, FORMATS AND THE KEY IN ODCS''S OWN TERMS (build, 2026-11-01): match_level''s values as the property''s enum, the SA2 and LGA formats as logicalTypeOptions.pattern, and the key as primaryKey with primaryKeyPosition on id_1 and census_year. datacontract-cli derives schema checks from them, which run_datacontract records none of (_QUALITY_CHECK_TYPES), so they add no second alarm beside REQ-QAC-297''s Soda checks. REJECTED an invalidValues quality rule, which would have been a recorded check of its own.'
+    - 'A SUBURB IS FINER THAN A POSTCODE (Keith, 2026-11-01, REQ-GEN-295 decision ''codes are fixed, match level follows the quarter'': ''a blank suburb must drop it to postcode''): cp-clients'' place_by lists suburb then postcode.'
+    - 'THE PARTICIPATION GATE IS GENERIC (build): it applies to any dataset declaring exactly one code-less linked entry, compares the periods each owes through the one schedule, and names the earliest period in the symmetric difference.'
+    - 'THE PLACING GATE IS THE PROVIDERS GATE''S (build): contract/synthetic_inputs.yaml is generator-only configuration, so generator/synthetic_inputs.py holds its reader and its gate and generator/validate_providers.py calls it, as the collections gate calls linked_datasets''.'
+    - AMENDMENT A8 APPLIED 2026-11-01 to REQ-QAC-241 criterion 2 as signed (presentation.yaml and synthetic_inputs.yaml in the asset-wide list).
+    implemented_by:
+    - contract/data-asset.yaml
+    - contract/calendar.yaml
+    - contract/synthetic_inputs.yaml
+    - contract/department-of-health/linkage-products-contract.yaml
+    - contract/presentation.yaml
+    - qa_tools/common/schemas.py::LinkedDataset
+    - qa_tools/common/hierarchy.py::Dataset
+    - qa_tools/common/linked_datasets.py::problems
+    - qa_tools/common/linked_datasets.py::participation_problems
+    - qa_tools/common/linked_datasets.py::_check_problems
+    - qa_tools/common/linked_datasets.py::_query_problems
+    - qa_tools/common/validate_collections.py::ASSET_WIDE
+    - generator/synthetic_inputs.py::problems
+    - generator/synthetic_inputs.py::placings
+    - generator/validate_providers.py::problems
+    linked_tests:
+    - tests/test_geocoding_declarations.py::TestTheDeclarations
+    - tests/test_geocoding_declarations.py::TestTheCalendar
+    - tests/test_geocoding_declarations.py::TestCriterionFour
+    - tests/test_geocoding_declarations.py::TestCriterionFiveEachRuleReadsItsOwnBlock
+    - tests/test_geocoding_declarations.py::TestCriterionFourteenValidValuesAreTheCodeColumns
+    - tests/test_geocoding_declarations.py::TestCriterionThreeThePlacingConfiguration
+    - tests/test_linked_datasets.py::test_the_real_configuration_passes
+    evidence:
+    - '2026-11-01 Perth, worktree bgeo, branch bgeo from 60575ac. Green on this tree: tests/test_geocoding_declarations.py, test_linked_datasets.py, test_linkage_check_sql.py, test_cross_collection_reads.py, test_sample_keys_composite.py, test_collections_registry.py; and every configuration gate run one by one with `mothman check --only` - hierarchy, collections, providers, caches, schedule (which holds the agreement freeze), patterns, soda, columns, guard, premise, yamllint, ruff - with no exemption added (criterion 13).'
+    - 'SEEN FAILING FIRST (criteria 5 and 14): with the geocoding check blocks present, a deleted Linkage Keys referential check was masked by the geocoding block''s own referential check, a geocoding id_counts keyed by its source dataset was read as an undeclared code, and match_level''s valid values failed against the linkage codes - four tests red against the whole-file rule, green after it was scoped to each declaring dataset''s own ''checks for <table>'' block and the valid-values rule to a check on the code column.'
+    - 'PARTICIPATION (criterion 11): geo-cp-clients owes the 51 periods cp-clients owes after files_go_to_period 1 (2015-Q2 to 2027-Q4), geo-ed-presentations the 59 ed-presentations owes with its 2015-Q4 gap, both read through schedule.periods_for_dataset; the gate names the first period they disagree.'
+    - NO BOOTSTRAP AND NO FULL GATE in this run (Keith's build-run terms).
   - id: REQ-GEN-295
     title: The Linkage Products provider, restructured into declared delivery streams, writes for every quarter each source has a geocoding delivery of its own due 19:00, after the linkage delivery, built from the last source supply received before it - one row per distinct identifier set per census year in force, codes from a keyed hash, a record with no address written not geocoded
     date_written: '2026-10-25'
     story: As Keith planting scenarios, I want each quarter's synthetic geocoding built from exactly the source rows a geocoder could have seen, in every quarter Child Protection's and Emergency Department's histories hold, so that the ordinary history's verdicts are known by construction and every fault in it is one the generator put there on purpose.
     moscow: should
-    status: not_started
+    status: built
     signed_off:
       by: Keith
       date: '2026-10-31'
@@ -46412,16 +46447,81 @@ requirements:
     - 'GA1 (a) IS WHAT KEEPS THE YEAR CHECKS CLEAN BY CONSTRUCTION (Keith, 2026-10-31): ordinary rows satisfy the three year checks exactly, so any missing, duplicate or unexpected year is an injection (REQ-GEN-298). Under (b), Child Protection''s own duplicated cp_client_id rows (generator/dirty.py apply_cp_clients_presets, about 2 amber and 10 red) would be duplicate years on most amber and red Child Protection quarters (architect headline 1). REJECTED (b).'
     - 'THE SET IN FORCE FOR THE PERIOD, not today''s: criterion 4 reads REQ-QAC-300''s one resolution, so generator and checks cannot disagree.'
     - 'A SECOND SEED RANGE (architect nit): [70000, 71000) holds linkage''s 70001.. slots, their +500 resupplies and two fixed seeds near 70999, so geocoding''s slots and resupplies would leave little room. [71000, 72000) is unclaimed by every provider as of 2026-10-31 (the seed_ranges of child_protection, civil_registration, emergency_department and linkage_products read).'
-    - 'AMENDMENT A4, FINAL TEXT PROPOSED - REQ-GEN-334 criterion 8 (Keith, 2026-10-31, Q9 a: ''REQ-GEN-334 c8''s stale 14:00/15:00 amended''; WORDING SIGNED by Keith 2026-10-31). CURRENT, as signed 2026-10-30: ''THE SYSTEM SHALL write each quarter''s linkage product as its own delivery on the quarter''s own round date - linkage_keys.csv due 14:00 (PROVISIONAL), after Emergency Department''s morning arrivals for that quarter - filed, checked and gated as its own package (REQ-PIPE-266, REQ-PIPE-336 criterion 6); the geocoding delivery due 15:00 is added by the geocoding requirements (REQ-GEN-295).'' PROPOSED: ''THE SYSTEM SHALL write each quarter''s linkage product as its own delivery on the quarter''s own round date - linkage_keys.csv due 18:00 with 8 hours'' grace and received 17:05 to 17:55, after Emergency Department''s afternoon arrivals for that quarter (15:00 to 17:00) - filed, checked and gated as its own package (REQ-PIPE-266, REQ-PIPE-336 criterion 6); the geocoding delivery, due 19:00 with 8 hours'' grace and received 18:05 to 18:55, is added by REQ-GEN-295. AMENDED <date applied> by REQ-GEN-295.'' NOTE FOR SIGNING: this states 18:00 without ''PROVISIONAL'', so signing it settles linkage''s due time too, which REQ-GEN-334''s decision ''DUE 18:00, NOT 14:00'' still marks PROVISIONAL; and ''morning'' was wrong as built (ED lands 15:00 to 17:00 Perth). Wording only - it describes what is built (contract/calendar.yaml, linkage_products.RECEIVED_FROM).'
+    - 'AMENDMENT A4, FINAL TEXT PROPOSED - REQ-GEN-334 criterion 8 (Keith, 2026-10-31, Q9 a: ''REQ-GEN-334 c8''s stale 14:00/15:00 amended''; WORDING SIGNED by Keith 2026-10-31). CURRENT, as signed 2026-10-30: ''THE SYSTEM SHALL write each quarter''s linkage product as its own delivery on the quarter''s own round date - linkage_keys.csv due 14:00 (PROVISIONAL), after Emergency Department''s morning arrivals for that quarter - filed, checked and gated as its own package (REQ-PIPE-266, REQ-PIPE-336 criterion 6); the geocoding delivery due 15:00 is added by the geocoding requirements (REQ-GEN-295).'' PROPOSED: ''THE SYSTEM SHALL write each quarter''s linkage product as its own delivery on the quarter''s own round date - linkage_keys.csv due 18:00 with 8 hours'' grace and received 17:05 to 17:55, after Emergency Department''s afternoon arrivals for that quarter (15:00 to 17:00) - filed, checked and gated as its own package (REQ-PIPE-266, REQ-PIPE-336 criterion 6); the geocoding delivery, due 19:00 with 8 hours'' grace and received 18:05 to 18:55, is added by REQ-GEN-295. AMENDED <date applied> by REQ-GEN-295.'' NOTE FOR SIGNING: this states 18:00 without ''PROVISIONAL'', so signing it settles linkage''s due time too, which REQ-GEN-334''s decision ''DUE 18:00, NOT 14:00'' still marks PROVISIONAL; and ''morning'' was wrong as built (ED lands 15:00 to 17:00 Perth). Wording only - it describes what is built (contract/calendar.yaml, linkage_products.RECEIVED_FROM). SETTLED by Keith 2026-10-31 by his signing of this amendment, applied 2026-11-01.'
     - 'THE DRIVER IS IN SCOPE (architect v5 SHOULD): the driver assumes one dataset per provider (bookkeeping, previous delivery names, run numbering by the length of one manifest), so geocoding jobs interleaved with linkage ones would renumber linkage''s bookkeeping and break criterion 2''s byte-identity. Keyed by stream, linkage''s jobs in today''s order. REJECTED fixing only the job order (appending geocoding after all linkage jobs), which keeps byte-identity by accident and leaves bookkeeping under the wrong dataset id.'
     - 'CONFIRMATION, SAID HONESTLY (architect v5 BLOCKING 1): v5 criterion 7 called every planned verdict confirmed by the trial, but Linkage Products has no trial today and the built trial tries injected targets only (cli/one_table.py:69). Criterion 7 now says which verdicts each place confirms, and REQ-GEN-298 criteria 10 to 13 build the trial in its slot''s period (Keith, v5 round (a)).'
     - 'CODES ARE FIXED, MATCH LEVEL FOLLOWS THE QUARTER (Keith, 2026-11-01): criterion 5 said codes AND match level never change; criterion 6 (GA2 a) places a record no finer than that quarter''s address columns, so a blank suburb must drop it to postcode. Criterion 5 amended to codes. REJECTED fixing the match level, which is less faithful to the source.'
+    - 'STREAMS ARE DECLARED ON THE PROVIDER, NUMBERED AND KEPT BY THE DRIVER (build, 2026-11-01): Provider.streams() names each kind of delivery and its datasets; a Job carries its stream; the driver numbers entries within each stream, writes a one-dataset stream''s bookkeeping under that dataset and a several-dataset stream''s entries under every dataset whose file the delivery carries, reads what every stream wrote last time (provider_delivery_names, also used by the trial''s removals), checks instants over every stream''s entries together, and excludes all the provider''s own keys from the other-collection tie check. A period''s injected scenarios are the provider''s first stream''s.'
+    - 'THE LINKAGE STREAM''S JOBS RUN FIRST, then the geocoding stream''s (build): keyed by stream as decided, and the order keeps every linkage delivery name - names are chosen against those already taken - as before; the byte compare in this requirement''s evidence is the proof, not the order.'
+    - 'WHICH YEARS A RECORD IS WRITTEN FOR IS READ FROM ITS CHECKS (build): the stream finds each dataset''s member column and list setting from its set-member checks (list_setting_members.declared), so no setting is named in the provider.'
+    - 'THE GEOCODER''S FAILURES ARE A KEYED HASH OF THE RECORD AGAINST A RATE DRAWN PER SUPPLY (build): a record fails when its hash falls under the supply''s rate, 0.5 to 1.5 percent drawn from the job''s seed, so failures nest from quarter to quarter and a record fails for all its years together.'
+    - 'THE CODE POOLS (build): 400 SA2 and 60 LGA codes in the ABS formats, each led by Western Australia''s state digit, drawn from the stream''s keyed hash; never a real correspondence.'
+    - 'PER-DATASET PERIODS (build): Provider.generated_periods_for(dataset) answers the periods a provider writes for one dataset - the geocoding stream writes geo-cp-clients from 2016-Q1 and geo-ed-presentations from 2013-Q1 - read by scenario_injection.generated_periods and the correction claim check; every other provider''s answer is its whole plan''s.'
+    - AMENDMENT A4 APPLIED 2026-11-01 to REQ-GEN-334 criterion 8 as signed; the 18:00 comments in contract/calendar.yaml and the provider no longer carry the 'PROVISIONAL' marker.
+    implemented_by:
+    - generator/collections/base.py::Stream
+    - generator/collections/base.py::Job
+    - generator/collections/base.py::Provider
+    - generator/driver.py::generate
+    - generator/driver.py::provider_delivery_names
+    - generator/driver.py::no_instant_shared_with_another_collection
+    - generator/collections/linkage_products.py::LinkageProducts
+    - generator/collections/linkage_products.py::geocoded
+    - generator/collections/linkage_products.py::geocode_rows
+    - generator/collections/linkage_products.py::area_codes
+    - generator/collections/linkage_products.py::planned_verdict
+    - generator/collections/linkage_products.py::members_in_force
+    - generator/collections/linkage_products.py::_refuse_geocoding_unschedulable
+    - generator/targets.py::written
+    - generator/scenario_injection.py::CORRECTION_RIDERS
+    - generator/correction_claims.py::check_all
+    - cli/one_table.py::OneTableCLI::try_targets
+    - contract/scripted_decisions.yaml
+    linked_tests:
+    - tests/test_geocoding_generator.py::TestTheStreams
+    - tests/test_geocoding_generator.py::TestWhenAndFromWhat
+    - tests/test_geocoding_generator.py::TestTheRows
+    - tests/test_geocoding_generator.py::TestGeocodeRowsByConstruction
+    - tests/test_geocoding_generator.py::TestThePlannedVerdict
+    - tests/test_geocoding_generator.py::test_two_plans_build_the_same_geocodes
+    - tests/test_geocoding_generator.py::test_the_received_window_is_inside_the_due_time_and_grace
+    - tests/test_scripted_decisions.py::TestAnEmptiedQuarterIsMarkedNotSupplied::test_the_committed_marks_are_exactly_the_emptied_quarters
+    - tests/test_linkage_scenarios.py::test_the_ordinary_severity_mix
+    evidence:
+    - '2026-11-01 Perth, worktree bgeo, branch bgeo from 60575ac. Green on this tree: tests/test_geocoding_generator.py, test_linkage_scenarios.py, test_correction_claims.py, test_generate_to_target.py, test_generator_providers.py, test_target_agreement.py; test_scenario_injection.py and test_scripted_decisions.py green apart from tests that fail identically at the base commit 60575ac for want of a generated history or a bootstrapped database (TestTheEarlyEmergencyDepartmentSupplies, TestThePlantedPairsAreSettled, TestAScriptedDecisionsReCheckIsRun).'
+    - 'BYTE-IDENTITY (criteria 2 and 15), by generating every collection''s whole history into a scratch directory at 60575ac and again at this tree (generator.output.generated_into): all 514 delivery files and 514 receipts of the base are byte-identical after, the four existing bookkeeping keys (birth-registrations, cp-clients, ed-presentations, linkage-keys) are equal, and scenario_placements.json is equal; the only differences are 96 new geocoding files in 54 new delivery directories of their own and two new bookkeeping keys, geo-cp-clients (43 entries) and geo-ed-presentations (53). 155 s before, 258 s after.'
+    - 'SAME SEED, SAME BYTES (criterion 15): a second whole generation of this tree into another scratch directory compared identical with the first, every delivery, receipt, the bookkeeping and the placements (diff -r).'
+    - 'PLANNED VERDICTS in the generated history: geo-cp-clients 43 green; geo-ed-presentations 51 green and 2 amber (2017-Q2 and 2021-Q4, built from ED''s red routine supplies missing 8 percent of postcodes) - each recorded as a target, green included.'
+    - NO BOOTSTRAP AND NO FULL GATE in this run (Keith's build-run terms).
+    unmet_criteria:
+    - criterion: Criterion 2 by REQ-TEST-239's compare of a from-empty bootstrap before and after.
+      why: Shown instead by generating the whole history at the base commit and at this tree and comparing every file byte for byte (evidence); REQ-TEST-239's compare needs a from-empty bootstrap on each side, which this run does not do.
+      owner: the end-of-run bootstrap (2026-11-01 build run)
+      blocked_by:
+        unowned: true
+    - criterion: Criterion 7's confirmation after replay - REQ-GEN-186 criterion 3's comparison of every recorded geocoding target, green included, with the recorded verdicts.
+      why: The targets are recorded (generator/targets.py, tested); the comparison reads a replayed database.
+      owner: the end-of-run bootstrap (2026-11-01 build run)
+      blocked_by:
+        unowned: true
+    - criterion: Criterion 7's confirmation of each amber or red planned verdict by the generation-time trial in its slot's period.
+      why: The provider declares target_trial False; the trial in its slot's period is REQ-GEN-298 criteria 10 to 13.
+      owner: REQ-GEN-298
+      blocked_by:
+        requirements:
+        - REQ-GEN-298
+    - criterion: Criterion 13 - each geocoding dataset's ordinary severities drawn from the stream's own seed with the collections' mix, applying REQ-GEN-298's presets.
+      why: The presets that make a drawn amber or red geocoding supply are REQ-GEN-298's; until they exist every ordinary geocoding supply is written from its source's rows alone, its verdict planned from them (criterion 7), and no severity is drawn.
+      owner: REQ-GEN-298
+      blocked_by:
+        requirements:
+        - REQ-GEN-298
   - id: REQ-PIPE-296
     title: The geocoding datasets run end to end through Linkage Products' existing QA adapter and its dbt folder, their delivery its own package in the quarterly bootstrap stream, the bootstrap's cost measured before and after
     date_written: '2026-10-25'
     story: As whoever maintains the pipeline, I want the geocoding datasets filed, staged, checked, recorded, gated and bootstrapped through the Linkage Products adapter like every other dataset, so that nothing about geocoding is special-cased and its cost is known.
     moscow: should
-    status: not_started
+    status: built
     signed_off:
       by: Keith
       date: '2026-10-31'
@@ -46456,12 +46556,70 @@ requirements:
     - 'CROSS-COLLECTION READS ARE IN THIS BATCH (Keith, 2026-10-31, G1 = b, REQ-PIPE-331 built): REVERSES v3''s ''no cross-collection read in v1''; REQ-QAC-340''s checks read the source tables through REQ-PIPE-331''s resolver.'
     - 'MOSTLY ITEM 6''s ALREADY: what remains is the end-to-end facts only real datasets make true, as REQ-PIPE-233 and REQ-PIPE-336 found.'
     - 'THE lp COMMANDS CHANGE SHAPE (delivery-scoper, v6, from cli/collection_cli.py): one dataset selects the one-table shape, several the many-table one, so adding two geocoding datasets changes `mothman lp qa` for anyone using it. Said as a criterion rather than discovered at build. REJECTED pinning Linkage Products to the one-table shape, which would need its name in cli/.'
+    - 'DRIFT CHECKS ON SEVERAL DATASETS OF ONE COLLECTION (build, 2026-11-01): evidently_common.collection_checks refused psi checks on two datasets because they would need a reference each; the reference has been resolved per run''s own dataset since REQ-PIPE-105, so the refusal is removed and run_evidently evaluates each run''s own table''s drift checks. drift_dataset answers None where a collection''s are on several.'
+    - 'A SHARED COLUMN''S VALUE COUNTS ARE THE RUN''S OWN TABLE''S (build, test first): value_counts stays keyed by column, the shape every reader reads, and the run''s own table is counted last.'
+    implemented_by:
+    - qa_tools/collections/linkage_products.py::ADAPTER
+    - qa_tools/collections/base.py::DbtSpec
+    - dbt_project/models/linkage-products/sources.yml
+    - dbt_project/models/linkage-products/schema.yml
+    - dbt_project/models/linkage-products/stg_geo_cp_clients.sql
+    - dbt_project/models/linkage-products/stg_geo_ed_presentations.sql
+    - qa_tools/tools/dataset_stats.py::compute_dataset_stats
+    - cli/collection_cli.py::_cached
+    linked_tests:
+    - tests/test_cross_collection_reads.py::TestTheOneResolver
+    - tests/test_sample_keys_composite.py::test_linkage_keys_is_named_by_its_dataset_and_every_identifier
+    - tests/test_dataset_stats.py::test_a_column_two_tables_share_records_the_runs_own_tables_counts
+    - tests/test_geocoding_checks.py::TestTheSetReachesDbtWithThePeriodsViews
+    evidence:
+    - '2026-11-01 Perth, worktree bgeo, branch bgeo from 60575ac. Green on this tree: tests/test_cross_collection_reads.py, test_sample_keys_composite.py, test_dataset_stats.py, test_geocoding_checks.py, test_collections_registry.py; `mothman lp qa --help` shows the many-table shape with --table [linkage_keys|geo_cp_clients|geo_ed_presentations], with no Linkage Products name in cli/.'
+    - 'ADAPTER BUDGET (criterion 1): linkage-products adapter 23 lines of logic against REQ-TEST-249''s 150 (validate_collections.line_report).'
+    - 'SEEN FAILING FIRST: a Client Register geocoding run recorded ED Presentations'' match_level counts, because value_counts is keyed by column and both geocoding tables declare match_level - red before the run''s own table was counted last, green after (tests/test_dataset_stats.py).'
+    - 'EVERY CONSUMER OF THE KEY (NFR 2): the geocoding tables'' failing-sample key is [id_1, census_year], read by soda_common.failing_sample_keys, dbt_common.failing_sample_keys_direct (the set-member tests'' audit rows carry id_1 and census_year), datacontract_common.failing_sample_keys and sample_keys.recorded; every Soda failed-rows query on a geocoding table selects id_1 and census_year.'
+    unmet_criteria:
+    - criterion: Criterion 3 - a geocoding delivery filed, staged, checked with all four tools, recorded and gated as its own package.
+      why: Needs the quarterly stream replayed.
+      owner: the end-of-run bootstrap (2026-11-01 build run)
+      blocked_by:
+        unowned: true
+    - criterion: Criterion 4 - the bootstrap replaying the geocoding deliveries in receipt order with Child Protection, Emergency Department and the linkage deliveries.
+      why: Needs a from-empty bootstrap.
+      owner: the end-of-run bootstrap (2026-11-01 build run)
+      blocked_by:
+        unowned: true
+    - criterion: Criterion 5 - a geocoding delivery omitting one dataset's file leaves that slot unfilled, the other filed and checked.
+      why: The generated history has such quarters (2015-Q2 to 2016-Q1 carry geo_ed_presentations alone); their filing is read from a replayed database.
+      owner: the end-of-run bootstrap (2026-11-01 build run)
+      blocked_by:
+        unowned: true
+    - criterion: Criterion 6 - each geocoding dataset shown on the dashboard like every other dataset.
+      why: Needs a dashboard built from recorded results.
+      owner: the end-of-run bootstrap (2026-11-01 build run)
+      blocked_by:
+        unowned: true
+    - criterion: Criterion 7 - the from-empty bootstrap measured before and after, by collection and stream, recorded here and in CLAUDE.md's running log.
+      why: Needs two from-empty bootstraps.
+      owner: the end-of-run bootstrap (2026-11-01 build run)
+      blocked_by:
+        unowned: true
+    - criterion: Criterion 8 - CI's deployment half run against a bootstrap holding the geocoding datasets, its duration recorded against REQ-TEST-260's allowance.
+      why: The one CI run at the end of the build run.
+      owner: the end-of-run bootstrap (2026-11-01 build run)
+      blocked_by:
+        unowned: true
+    - criterion: Criterion 9's --skip-target-trial on `mothman lp generate-synthetic-data`, once the provider declares its trial.
+      why: The provider declares target_trial False until REQ-GEN-298 criterion 10 builds the trial; the option is offered by the many-table shape as soon as it is declared.
+      owner: REQ-GEN-298
+      blocked_by:
+        requirements:
+        - REQ-GEN-298
   - id: REQ-QAC-297
     title: Every geocoding dataset gets three generic set-member checks in dbt on census_year, red on a single row, a not-geocoded share check amber above 5 percent and red above 10, and the ordinary checks - Linkage Keys' two identifier checks, match level allowed values, area-code format and match-level drift
     date_written: '2026-10-25'
     story: As whoever maintains the pipeline, I want, for a geocoding table, checks that say whether every record has exactly one row for each census year in force - missing, duplicated and unexpected years each its own result - beside a banded share of rows not geocoded and a few structural checks, so that an incomplete geocode, a double-load, a year nobody agreed and a geocoder placing fewer addresses are different alarms.
     moscow: should
-    status: not_started
+    status: built
     signed_off:
       by: Keith
       date: '2026-10-31'
@@ -46516,6 +46674,56 @@ requirements:
     - 'VALUE COUNTS ON match_level ONLY (architect S9; UX Q3 and QAC-297 c9): the drift check needs them anyway, and the page''s existing value bars read them (Keith, 2026-10-31, G3 a). REJECTED value counts on sa2_code or lga_code - a published distribution of where people live.'
     - 'AN EMPTY SUPPLY PASSES THESE CHECKS (Keith, Q8): REQ-QAC-340''s coverage check fails it in this batch, so v3''s ''KNOWN GAP until REQ-QAC-340'' is closed rather than carried.'
     - A NULL CENSUS YEAR IS UNEXPECTED (PROPOSED v2, kept).
+    - 'THE DECLARED-SET RELATION IS GENERIC (build, 2026-11-01): list_setting_members, rows of (table_name, setting, ordinal, member, version, added) for every list setting in force for each of the collection''s tables on the period''s round date, written as a view in the run''s own schema by period_overlay.rebuild_for_arrival and mirrored into dbt''s sources schema like every other view; the macro filters it by its model''s table and its member_setting. Declared once, in Linkage Products'' sources.yml, the only folder reading it.'
+    - 'NO PERIOD IS FOUND BY THE RELATION''S ABSENCE (build): run_dbt excludes source:raw.list_setting_members+ - dbt finds the dependents - and records each excluded set-member check red, not evaluated, with not_evaluated_code declared-set-needs-period and its reason; they are not noted as left out, since they carry their own records.'
+    - 'THE PRESENCE GATE KEYS ON THE GEOCODING SHAPE (build, from decision 8 of REQ-QAC-294: a geocoding dataset is a linked product with one source and no code): such a dataset needs all three set-member tests, a value-share check and both identifier checks, found by kind (the check id''s tail), naming none.'
+    - 'THE IDENTIFIER, LEVEL AND FORMAT CHECKS ARE FAILED-ROWS QUERIES SELECTING THE KEY (build): id_1 and census_year, so every sample names a record and a year; match_level''s allowed values as a failed-rows query because an empty value is a violation, which invalid_count does not count.'
+    - 'GENERIC KIND PHRASES IN MEASURES (build): dbt:missing_set_members, dbt:duplicated_set_members, dbt:unexpected_set_members and soda:value_share, worded for any set and any value, so tests/test_check_measures.py holds until REQ-DASH-299 declares the geocoding words on the checks.'
+    implemented_by:
+    - dbt_project/macros/set_member_violations.sql
+    - dbt_project/tests/generic/missing_set_members.sql
+    - dbt_project/tests/generic/duplicated_set_members.sql
+    - dbt_project/tests/generic/unexpected_set_members.sql
+    - qa_tools/collections/base.py::DbtSpec
+    - qa_tools/tools/run_dbt.py::_counted
+    - qa_tools/tools/run_dbt.py::_reads_declared_set
+    - qa_tools/tools/run_dbt.py::_not_evaluated_for_want_of_a_period
+    - qa_tools/common/list_setting_members.py::create
+    - qa_tools/common/list_setting_members.py::rows_for
+    - qa_tools/common/list_setting_members.py::_declaration_problems
+    - qa_tools/common/period_overlay.py::rebuild_for_arrival
+    - qa_tools/tools/run_evidently.py::_excluding
+    - qa_tools/common/evidently_common.py::collection_checks
+    - pipeline/dashboard_check_labels.py::MEASURES
+    - contract/department-of-health/linkage-products-soda-checks.yml
+    - contract/department-of-health/linkage-products-evidently-checks.yml
+    - qa_tools/collections/linkage_products.py::ADAPTER
+    linked_tests:
+    - tests/test_geocoding_checks.py::TestTheSetReachesDbtWithThePeriodsViews
+    - tests/test_geocoding_checks.py::TestEachYearCheckCountsItsOwnViolation
+    - tests/test_geocoding_checks.py::TestARunWithNoPeriodLeavesTheYearChecksOut
+    - tests/test_geocoding_checks.py::TestTheShareAndThePairOnRealSoda
+    - tests/test_geocoding_checks.py::test_drift_excludes_the_declared_value_from_both_sides
+    - tests/test_geocoding_gates.py::TestCriterionThirteenThePresenceGate
+    - tests/test_geocoding_gates.py::TestCriterionFourNotEvaluatedWithoutAPeriod
+    - tests/test_geocoding_gates.py::test_criterion_fifteen_no_distribution_of_an_area_code_or_an_identifier
+    - tests/test_check_measures.py::test_every_declared_rule_kind_names_its_measure
+    evidence:
+    - '2026-11-01 Perth, worktree bgeo, branch bgeo from 60575ac. Green on this tree: tests/test_geocoding_checks.py (real dbt-core, Soda Core and Evidently in this worker''s own database), test_geocoding_gates.py, test_check_measures.py, test_check_bands.py, test_validate_soda.py, test_distribution.py, test_run_evidently_cp.py; the soda, columns and collections gates green.'
+    - 'PROVEN BY EXPERIMENT (criterion 3): two runs of 2017-Q2 and 2017-Q3 over the same two records read [2011] and [2011, 2016] from their own relation - 0 then 2 missing years - with identical node checksums in both manifests, so one parse served both and nothing about the set is in the project or its vars. (criterion 4): with no relation, the selector source:raw.list_setting_members+ leaves all three tests out and the build runs clean. (criteria 5 to 7): 3 missing, 1 duplicated and 2 unexpected on a hand-built supply. (criterion 12): an empty supply passes all three year checks, and the share check reads 0.0, pass. (criterion 11): frames whose unplaced share rises from 2 to 51 percent drift above 0.25 unexcluded and below 0.10 with ''not geocoded'' excluded from both sides.'
+    - NO BOOTSTRAP AND NO FULL GATE in this run (Keith's build-run terms).
+    unmet_criteria:
+    - criterion: Criterion 9's MEASURES phrase declared on the check ('Rows not geocoded').
+      why: Declaring a check's own phrase, read ahead of MEASURES, is REQ-DASH-299 criterion 1's mechanism and wording; until it is built the share check reads the generic kind's phrase added to MEASURES ('Share of rows with the value').
+      owner: REQ-DASH-299
+      blocked_by:
+        requirements:
+        - REQ-DASH-299
+    - criterion: Every check here recorded for a replayed geocoding supply - status, samples by id_1 and census_year, and the set it was judged against.
+      why: Needs the quarterly stream replayed.
+      owner: the end-of-run bootstrap (2026-11-01 build run)
+      blocked_by:
+        unowned: true
   - id: REQ-GEN-298
     title: The geocoding history carries each fault on purpose - missing, duplicate and unexpected census years, an amber and a red not-geocoded share, and REQ-QAC-340's five cross-collection routes - in ordinary supplies and in one named scenario for each, every drafted injection confirmed by a real-tool trial
     date_written: '2026-10-25'
@@ -46670,7 +46878,7 @@ requirements:
     date_written: '2026-10-25'
     story: As an agency's accountable data owner, I want the expected census years to widen on dates we declare, as a real geocoder's deliveries would, with earlier supplies judged against the earlier set, so that the day a new census is processed does not turn every historical geocode red for a reason that is not a data-quality failure.
     moscow: should
-    status: not_started
+    status: built
     signed_off:
       by: Keith
       date: '2026-10-31'
@@ -46718,12 +46926,58 @@ requirements:
     - 'THE FOURTH VERSION IS DECLARED NOW (Keith, 2026-10-31, v6 Q1 (a)): 2026 is added effective 2027-08-01 although the synthetic history ends with 2026-Q3, as an effective-dated setting exists to declare the future ahead. Its tile and the third trend break are proven in Vitest only. REJECTED (b), adding it once the history reaches 2027.'
     - 'THE KEY IS A PATH, THE VALUE IS TYPED, THE ASSET-LEVEL DEMAND IS THE SETTING''S OWN (architect v6 SHOULD): _settings and _resolve_on read a top-level key only, so ''list_settings'' would have been one setting whose value is a mapping; Resolved.value is str, so a list arrived as text; and resolve and standing_problems demand an asset-level value Keith never asked census years to have (Q14: once for the collection). REJECTED declaring census_years at the asset level to satisfy the demand, which would make it every collection''s.'
     - 'timeline()''s HARD-CODED KEY IS AN EXISTING DEFECT, LATENT (delivery-scoper, v7, verified in the code): amber_setting.py:115 reads amber_setting''s version dates whatever setting is meant, and describe() resolves the default key, so timeline cannot describe replacement_setting at all. Nothing shows a replacement timeline today (build_dashboard_data.py:981 embeds amber''s only), so no reader has seen a wrong one - the architect''s ''already affects replacement_setting'' is true of the function, not yet of a page. Written up as plans/post-build-review.md #293 (PROPOSED) and fixed test-first by criterion 12.'
+    - 'THE SET IS RECORDED FROM THE RELATION THE CHECK READ (build, 2026-11-01): the run''s list_setting_members relation carries each member''s version and whether it was added, so a result names the set it was judged against without re-resolving configuration, and the relation and the record cannot disagree.'
+    - 'THE BREAKING-ENTRY GATE READS EACH CHECK''S OWN TIMELINE (build): for each set-member check, every change of its setting''s resolved value for its dataset needs a breaking changelog entry dated that change''s effective_from, so a dataset-level override is gated on the datasets it reaches.'
+    - 'requires_asset_value IS A FUNCTION OF THE KEY (build): True for any top-level setting, False for anything under list_settings - the signed flag, with no per-setting declaration to keep in step.'
+    - 'timeline() DEFECT CLOSED (plans/post-build-review.md #293 as proposed): timeline reads version dates from the key it is given.'
+    implemented_by:
+    - qa_tools/common/amber_setting.py::LIST_SETTINGS
+    - qa_tools/common/amber_setting.py::resolve_on_date
+    - qa_tools/common/amber_setting.py::timeline
+    - qa_tools/common/amber_setting.py::describe
+    - qa_tools/common/amber_setting.py::requires_asset_value
+    - qa_tools/common/amber_setting.py::list_setting_keys
+    - qa_tools/common/amber_setting.py::standing_problems
+    - qa_tools/common/amber_setting.py::_settings
+    - qa_tools/common/schemas.py::ListSetting
+    - qa_tools/common/schemas.py::ListSettingVersion
+    - qa_tools/common/validate_schedule.py::_list_setting_errors
+    - qa_tools/common/list_setting_members.py::in_force
+    - qa_tools/common/list_setting_members.py::_coverage_problems
+    - qa_tools/common/list_setting_members.py::_breaking_entry_problems
+    - qa_tools/common/list_setting_members.py::InForce
+    - qa_tools/tools/run_dbt.py::_set_judged_against
+    - contract/data-asset.yaml
+    - dbt_project/models/linkage-products/schema.yml
+    linked_tests:
+    - tests/test_list_settings.py::TestCriterionTwelveSeenFailingFirst
+    - tests/test_list_settings.py::TestThePathAndTheTypedValue
+    - tests/test_list_settings.py::TestCriterionElevenTheAssetLevelDemandIsTheSettingsOwn
+    - tests/test_list_settings.py::TestCriterionEightTheFreezeIsAmberSettings
+    - tests/test_list_settings.py::TestTheScheduleGateFreezesEveryListSetting
+    - tests/test_list_settings.py::TestCriterionTenEachVersionLandsInItsQuarter
+    - tests/test_list_settings.py::TestTheSchemaAcceptsAnyListSetting
+    - tests/test_geocoding_gates.py::TestCriterionFiveOfRequirement300Coverage
+    - tests/test_geocoding_gates.py::TestCriterionSevenOfRequirement300BreakingEntries
+    - tests/test_geocoding_gates.py::TestCriterionNineOfRequirement300TheSetIsRecorded
+    - tests/test_amber_setting.py::TestTheValues::test_the_asset_file_lists_them_in_that_order
+    evidence:
+    - '2026-11-01 Perth, worktree bgeo, branch bgeo from 60575ac. Green on this tree: tests/test_list_settings.py, test_geocoding_gates.py, test_amber_setting.py, test_amber_setting_added_on.py, test_cli_amber_setting.py, test_validate_schedule.py and the replacement-setting tests - every existing amber and replacement test unchanged (NFR 1); the schedule gate green with census_years declared.'
+    - 'SEEN FAILING FIRST (criterion 12): timeline() given replacement_setting''s key, and census_years declared on the collection alone resolving on a date, both failed against today''s code (timeline took no key; there was no date resolver), and pass after.'
+    - 'LANDINGS (criterion 10), through contract/calendar.yaml and the one resolution, for both geocoding datasets: 2017-Q2 (round 2017-05-01) [2011], 2017-Q3 (2017-08-01) [2011, 2016], 2022-Q2 [2011, 2016], 2022-Q3 [2011, 2016, 2021], 2027-Q2 [2011, 2016, 2021], 2027-Q3 all four.'
+    - NO BOOTSTRAP AND NO FULL GATE in this run (Keith's build-run terms).
+    unmet_criteria:
+    - criterion: Criterion 9 end to end - a year check's recorded result carrying member_set_version, member_set and member_set_added.
+      why: The fields are written from the run's own declared-set relation (run_dbt._set_judged_against, tested against a real relation in tests/test_geocoding_gates.py), but no recorded result exists until a bootstrap replays a geocoding supply; read back from qa.check_result there.
+      owner: the end-of-run bootstrap (2026-11-01 build run)
+      blocked_by:
+        unowned: true
   - id: REQ-QAC-340
     title: Each geocoding dataset is checked against its source supply for the period - an orphan check and a coverage check, amber below 100 percent and red below 98, that fails when source records have no geocoding row at all - on Linkage Keys' referential and coverage pattern, generic, its verdicts counting against the source supply as linkage's do
     date_written: '2026-10-25'
     story: As a data team leader, I want each period's geocoding checked against the source supply it was built from, with the result showing on the source's own page and counting there, so that a source record left out entirely, an empty geocoding file, or geocodes for records that do not exist are found rather than reading green.
     moscow: should
-    status: not_started
+    status: built
     signed_off:
       by: Keith
       date: '2026-10-31'
@@ -46769,6 +47023,38 @@ requirements:
     - 'BOTH SIDES CAST TO TEXT (post-build-review #288 D1): the loader infers types from the file, so an all-digit identifier stages as a number.'
     - 'DECLARED ON THE GEOCODING TABLE, NONE ON THE SOURCE (REQ-QAC-333 decision 12): a check declared on cp_clients reading the geocoding table would read red, not yet due, for three months of every period.'
     - 'ATTRIBUTION ON BOTH SIDES (UX delta, PARTLY): v4 asked it of REQ-QAC-297 only; these are the checks most likely to be the source''s fault, hence criterion 10.'
+    - 'THE PAIR''S PHRASES ARE REQ-DASH-299''s (build, 2026-11-01): the generic rewording of soda:referential and soda:coverage to ''Rows matching no source record'' and ''Source records matched'' is REQ-DASH-299 criterion 2''s and is not made here; the orphan check is named ''Rows matching no source record'' in its file.'
+    - 'THE ORPHAN CHECK''S SAMPLE IS id_1 AND census_year (build): the geocoding table''s key, so an orphan names its record and each year it was released for.'
+    implemented_by:
+    - contract/department-of-health/linkage-products-soda-checks.yml
+    - qa_tools/common/linked_datasets.py::_check_problems
+    - qa_tools/common/linked_datasets.py::_query_problems
+    - qa_tools/collections/linkage_products.py::ADAPTER
+    linked_tests:
+    - tests/test_geocoding_checks.py::TestTheShareAndThePairOnRealSoda
+    - tests/test_geocoding_declarations.py::TestCriterionFiveEachRuleReadsItsOwnBlock
+    - tests/test_linked_datasets.py::test_the_real_configuration_passes
+    - tests/test_thirty_linked_datasets.py::TestEachFakeGeocodingDatasetIsCheckedAgainstItsSource
+    evidence:
+    - '2026-11-01 Perth, worktree bgeo, branch bgeo from 60575ac. Green on this tree: tests/test_geocoding_checks.py, test_geocoding_declarations.py, test_linked_datasets.py, test_linkage_check_sql.py; the collections gate (REQ-QAC-333 criteria 3 and 8, scoped per check block) green with both pairs present.'
+    - 'PROVEN ON REAL SODA: integer source identifiers matched text ones, both cast; one of two records missing reads coverage 50.0, red; 99 of 100 covered warns and 97 of 100 fails (bands 100 and 98); an empty geocoding supply against two source records reads coverage 0.0, red, and its orphan check passes (criterion 4).'
+    - THE THIRTY-DATASET FIXTURE (criterion 11) installs into a copy with two fake geocoding datasets, of two and three identifier columns, each with its pair in its own block, and changes no product file (changed_product_files empty), its linked-datasets gate passing in the copy; the on-demand replay itself was not run.
+    unmet_criteria:
+    - criterion: Criteria 5 to 8 - each evaluated result counted toward both supplies, a not-evaluated one toward the geocoding supply only, the promoted source supply shown red or amber from the geocoding supply's promotion, and the knock-on and out-of-scope rules - for recorded geocoding results.
+      why: REQ-PIPE-331, REQ-PIPE-332 and REQ-DASH-337's generic machinery, unchanged; shown for these checks only by a replayed history.
+      owner: the end-of-run bootstrap (2026-11-01 build run)
+      blocked_by:
+        unowned: true
+    - criterion: Criterion 9 - the checks shown on the source's page, the geocoding page and the agency page.
+      why: Needs a dashboard built from recorded results.
+      owner: the end-of-run bootstrap (2026-11-01 build run)
+      blocked_by:
+        unowned: true
+    - criterion: Criterion 11 - REQ-TEST-339's thirty-dataset test with the fake geocoding datasets checked end to end.
+      why: 'Written as tests/test_thirty_linked_datasets.py::TestEachFakeGeocodingDatasetIsCheckedAgainstItsSource (on demand) and not run: it generates and replays a stream into a scratch database.'
+      owner: the end-of-run bootstrap (2026-11-01 build run)
+      blocked_by:
+        unowned: true
   - id: REQ-PIPE-341
     title: A failing-row sample may name a row by several columns - each table's sample key an ordered list - so a sample can say which record and which census year, and Linkage Keys' referential sample, recorded empty today, names its dataset and identifiers
     date_written: '2026-10-31'

@@ -112,11 +112,24 @@ releases:
   - date: "2026-11-01"
     summary: >
       Any choice a builder made on your behalf now stays in view until you
-      answer it, and example failing rows can name a record by several
-      columns, so Linkage Products' examples say which record failed.
+      answer it, linkage examples name their record, and Linkage Products
+      gains a quarterly geocoding release checked against its sources.
     changes:
       - category: New
         items:
+          - headline: Geocoding releases
+            components: ["QA checks & contract", "Data generation"]
+            description: >
+              Linkage Products now holds a quarterly geocoding release for
+              Child Protection clients and Emergency Department presentations,
+              each record placed in synthetic ABS areas for every census year
+              in force and checked against the supply it came from.
+          - headline: Census years that grow
+            components: ["QA checks & contract"]
+            description: >
+              The census years a geocode must cover are declared once, with the
+              date each new census joins, so every supply is judged against the
+              years agreed for its own quarter.
           - headline: Unanswered provisional choices are flagged
             components: ["Testing & dev tooling", "Docs & process"]
             description: >
@@ -135,6 +148,13 @@ releases:
               rather than left out.
       - category: Improved
         items:
+          - headline: "`mothman lp qa` picks a table"
+            components: ["Testing & dev tooling"]
+            description: >
+              With three datasets, `mothman lp qa` now works as Child
+              Protection's does: `--table` names the linkage table or a
+              geocoding table. Generation will offer `--skip-target-trial` once
+              the geocoding trial arrives.
           - headline: Examples compared fairly
             components: ["Dashboard UI"]
             description: >

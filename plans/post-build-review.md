@@ -13261,7 +13261,12 @@ twice. It deliberately did not re-find the `TypeError`.
      each. The gate needs a requirement of its own before it is built
      (drafted as docs/drafts/provisional-gate.yaml, for sign-off; Keith chose to baseline the 190 existing markers and gate only new ones). REJECTED
      a failing gate and the report list alone.
-293. **[todo, 2026-11-01]** **[Pipeline & publishing]** **A latent defect and a signed-list drift, found by the geocoding v6 architect review.**
+293. **[done, 2026-11-01]** **[Pipeline & publishing]** **A latent defect and a signed-list drift, found by the geocoding v6 architect review.**
+     **CLOSED 2026-11-01 by the geocoding build:** timeline() now reads the
+     version dates of the key it is given and describe() resolves that key,
+     fixed test-first (REQ-QAC-300 criterion 12, tests/test_list_settings.py,
+     seen failing against the old signature); amendment A8 applied to
+     REQ-QAC-241 criterion 2 in the change that built REQ-QAC-294.
      - **amber_setting.timeline() reads the amber setting's version dates
        whatever setting is meant** (qa_tools/common/amber_setting.py:115),
        and describe() resolves the default key, so neither can describe

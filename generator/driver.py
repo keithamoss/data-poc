@@ -76,6 +76,13 @@ def previous_delivery_names(key: str) -> list[str]:
     return [e["delivery"] for e in book.get(key, []) if e.get("delivery")]
 
 
+def provider_delivery_names(provider) -> list[str]:
+    """What `provider` wrote last time across every one of its delivery
+    streams, each keyed by its own datasets (REQ-GEN-295 criterion 1)."""
+    keys = [d for st in provider.streams() for d in st.dataset_ids]
+    return list(dict.fromkeys(n for k in keys for n in previous_delivery_names(k)))
+
+
 def no_two_arrivals_share_an_instant(manifest: list[dict]) -> None:
     """Refuse a history where two supplies claim one receipt instant.
 
@@ -167,7 +174,7 @@ def generate(collection_id: str) -> list[dict]:
     # jobs never shift another's run numbering or entries.
     streams = provider.streams()
     keys = [d for st in streams for d in st.dataset_ids]
-    previous = list(dict.fromkeys(n for k in keys for n in previous_delivery_names(k)))
+    previous = provider_delivery_names(provider)
     # Delivery names are arbitrary BY DESIGN, which means they can collide -
     # and a collision would write two arrivals into one directory, silently
     # merging deliveries that never arrived together.

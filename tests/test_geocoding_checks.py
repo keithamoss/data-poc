@@ -131,6 +131,33 @@ class TestEachYearCheckCountsItsOwnViolation:
             "missing_set_members": 0, "duplicated_set_members": 0, "unexpected_set_members": 0}
 
 
+class TestARunWithNoPeriodLeavesTheYearChecksOut:
+    """Criterion 4 against the installed dbt: with no declared-set relation -
+    a supply filed to no period - the relation's dependents are excluded by
+    run_dbt's own selector, and the build runs without error."""
+
+    def test_the_relations_dependents_are_left_out_and_nothing_errors(self):
+        from qa_tools.common.dbt_common import parsed_test_nodes, run_dbt
+        from qa_tools.tools import run_dbt as tool
+
+        nodes = parsed_test_nodes(tool.PROFILES_DIR, tool.DBT_PROJECT_DIR)
+        assert {n["name"] for n in nodes.values() if tool._reads_declared_set(n)} >= set(ALL)
+        run_id = "geo_probe_no_period"
+        with supply_db.connect() as conn:
+            schema = _schema(conn, run_id, {"geo_cp_clients": _geo([_row("A", 2011)])})
+            assert not list_setting_members.exists(conn, schema)
+        target = str(supply_db.dbt_target_path(run_id))
+        run_dbt("build", ["stg_geo_cp_clients", *ALL], target, tool.PROFILES_DIR,
+                tool.DBT_PROJECT_DIR, tool.ROOT, run_schema=supply_db.run_schema(run_id),
+                run_id=run_id, indirect_selection="empty",
+                exclude=[f"source:raw.{list_setting_members.RELATION}+"])
+        results = json.load(open(os.path.join(target, "run_results.json")))["results"]
+        ran = {r["unique_id"].split(".")[2] for r in results}
+        assert "stg_geo_cp_clients" in ran
+        assert not ran & set(ALL)
+        assert {r["status"] for r in results} <= {"success", "pass"}
+
+
 # ---- Soda: the share, and the orphan and coverage pair ------------------------
 
 def _soda(run_id: str, table: str) -> dict[str, tuple]:
