@@ -36,7 +36,7 @@ import os
 from types import MappingProxyType
 
 from qa_tools import collections
-from qa_tools.common import asked_for, config_yaml, hierarchy, left_out, supply_db
+from qa_tools.common import asked_for, config_yaml, hierarchy, left_out, sample_keys, supply_db
 from qa_tools.common.check_lifecycle import dbt_check_id_lookup
 from qa_tools.common.dbt_common import (
     ENGINE_TAG, NothingLeftToBuild, exclude_unreadable, failing_sample_keys_direct,
@@ -136,7 +136,7 @@ def _unreadable_in(run_id: str) -> frozenset[str]:
         conn.close()
 
 
-def _failing_sample_keys(conn, adapter, test_name, column, table, node, status, built) -> list[str]:
+def _failing_sample_keys(conn, adapter, test_name, column, table, node, status, built) -> list:
     if status not in ("warn", "fail"):
         return []
     relation_name = node.get("relation_name")
@@ -148,10 +148,11 @@ def _failing_sample_keys(conn, adapter, test_name, column, table, node, status, 
     singular = node.get("test_metadata") is None
     if (test_name in _SAMPLED_DIRECTLY
             or (singular and test_name not in adapter.dbt.singular_unsampled)):
-        return failing_sample_keys_direct(conn, relation_name, key)
+        return failing_sample_keys_direct(conn, relation_name, key, check=test_name, table=table)
     if test_name in ("unique", "accepted_values"):
         value_column = "unique_field" if test_name == "unique" else "value_field"
-        return failing_sample_keys_via_values(conn, relation_name, value_column, model, column, key)
+        return failing_sample_keys_via_values(conn, relation_name, value_column, model, column, key,
+                                              check=test_name, table=table)
     return []  # relationships - see the module docstring
 
 
@@ -277,7 +278,9 @@ def evaluate(collection_id: str, run_id: str, run_timestamp: str) -> list[dict]:
                 "on_fail_action": "flag",
                 "row_count_total": n_total_by_table[table],
                 "row_count_invalid": failures,
-                "failing_sample_keys": sample,
+                # EVERY KEY COLUMN, AND THEIR NAMES WHERE THERE ARE SEVERAL
+                # (REQ-PIPE-341 criteria 2 and 9).
+                **sample_keys.recorded(adapter.sample_key[table], sample),
                 "engine": ENGINE_TAG,
             })
     finally:

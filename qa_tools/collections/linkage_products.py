@@ -7,8 +7,10 @@ from qa_tools.collections.base import CollectionAdapter, SodaSpec
 ADAPTER = CollectionAdapter(
     collection_id="linkage-products",
     label="Linkage Products",
-    # A failing-row sample keeps only the key (plans/qa-pipeline.md #15).
-    sample_key={"linkage_keys": "linkage_key"},
+    # A failing-row sample keeps only the key (plans/qa-pipeline.md #15): a
+    # row's dataset and every identifier column the contract declares
+    # (REQ-PIPE-341 criterion 3), so a referential failure names its record.
+    sample_key={"linkage_keys": ["dataset", "id_1", "id_2"]},
     soda=SodaSpec(
         data_source="lp_collection",
         column_by_name={

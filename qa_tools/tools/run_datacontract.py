@@ -23,12 +23,13 @@ import os
 from types import MappingProxyType
 
 from qa_tools import collections
-from qa_tools.common import asked_for, config_yaml, hierarchy, left_out, supply_db
+from qa_tools.common import asked_for, config_yaml, hierarchy, left_out, sample_keys, supply_db
 from qa_tools.common.check_lifecycle import name_by_check_id, parse_contract_check_metadata
 from qa_tools.common.datacontract_common import (
     DIMENSION_BY_METRIC, ENGINE_TAG, LABEL_BY_METRIC, SAMPLEABLE_METRICS,
     check_id_from_quality_definition, fail_threshold_from_quality_definition,
-    failing_sample_keys, run_against_warehouse, selection_for,
+    failing_sample_keys, names_no_row_from_quality_definition, run_against_warehouse,
+    selection_for,
 )
 from qa_tools.common.qa_results_writer import _declared_reads_tables, run_owner, write_qa_result
 
@@ -171,8 +172,12 @@ def evaluate(collection_id: str, run_id: str, run_timestamp: str) -> list[dict]:
             "on_fail_action": "quarantine" if diag.get("severity") == "error" else "flag",
             "row_count_total": diag.get("row_count"),
             "row_count_invalid": row_count_invalid,
-            "failing_sample_keys": (failing_sample_keys(c, adapter.sample_key[table])
-                                    if metric in SAMPLEABLE_METRICS else []),
+            # EVERY KEY COLUMN, AND THEIR NAMES WHERE THERE ARE SEVERAL
+            # (REQ-PIPE-341 criteria 2 and 9).
+            **sample_keys.recorded(adapter.sample_key[table], (failing_sample_keys(
+                c, adapter.sample_key[table], table=table,
+                names_no_row=names_no_row_from_quality_definition(c.qualityDefinition))
+                if metric in SAMPLEABLE_METRICS else [])),
             "engine": ENGINE_TAG,
         })
 

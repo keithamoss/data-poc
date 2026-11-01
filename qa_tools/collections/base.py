@@ -82,8 +82,11 @@ class CollectionAdapter:
     #: How the bootstrap names this collection's work when it reports it -
     #: the words it has always used, so nothing it prints changes.
     label: str
-    #: Each table's key column, the only value a failing-row sample keeps -
-    #: never full row content (plans/qa-pipeline.md #15).
+    #: Each table's failing-sample key, an ORDERED LIST of columns - one
+    #: column a list of one (REQ-PIPE-341 criterion 1). Only these values ever
+    #: leave a sampler - never full row content (plans/qa-pipeline.md #15);
+    #: qa_tools/common/sample_keys.py says what a sample of one or several
+    #: columns records.
     sample_key: dict = field(default_factory=dict)
     #: What each shared tool module reads (REQ-QAC-242 criterion 2).
     dbt: DbtSpec = field(default_factory=DbtSpec)

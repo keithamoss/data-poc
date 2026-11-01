@@ -17,7 +17,7 @@ import threading
 from pathlib import Path
 
 
-from qa_tools.common import supply_db
+from qa_tools.common import sample_keys, supply_db
 
 # dbt-postgres since REQ-PIPE-087 (post-build-review #124: the tag still
 # named the retired DuckDB adapter). The builders map both spellings, so a
@@ -26,7 +26,7 @@ ENGINE_TAG = "dbt-core 1.12 + dbt-postgres"
 
 # Matches datacontract-cli's own hardcoded sample cap - see
 # datacontract_common.py and plans/qa-pipeline.md #15.
-FAILING_SAMPLE_LIMIT = 5
+FAILING_SAMPLE_LIMIT = sample_keys.FAILING_SAMPLE_LIMIT
 
 _NUM_RE = re.compile(r"([\d.]+)")
 
@@ -323,40 +323,58 @@ def test_nodes(manifest: dict) -> dict[str, dict]:
     }
 
 
-def failing_sample_keys_direct(conn, relation_name: str, pk_column: str,
-                                limit: int = FAILING_SAMPLE_LIMIT) -> list[str]:
+def _sample_rows(conn, sql: str, key_columns: list[str], *, check, table) -> list:
+    """Run one sample query; a query that raises fails the recording, naming
+    the check, the table and the error (REQ-PIPE-341 criterion 8) - it was
+    swallowed and returned as [], which records an empty sample."""
+    try:
+        rows = conn.execute(sql).fetchall()
+    except Exception as exc:
+        raise sample_keys.SampleNotRecordable(
+            f"check {check!r} on table {table!r}: its failing-row sample query raised "
+            f"{type(exc).__name__}: {' '.join(str(exc).split())}") from exc
+    if len(key_columns) == 1:
+        return [str(r[0]) for r in rows if r[0] is not None]
+    return [list(r) for r in rows]
+
+
+def _order(key_columns: list[str]) -> str:
+    # ORDERED, so the same data records the same sample (post-build-review
+    # #129): a one-column key in its own type's order, exactly as before; a
+    # several-column key as text, C collation, nulls last - the order every
+    # tool's samples share (sample_keys).
+    return key_columns[0] if len(key_columns) == 1 else sample_keys.order_by_sql(key_columns)
+
+
+def failing_sample_keys_direct(conn, relation_name: str, key_columns: list[str],
+                                limit: int = FAILING_SAMPLE_LIMIT, *, check=None,
+                                table=None) -> list:
     """For test shapes whose --store-failures audit table already carries
-    the model's own primary key column verbatim (not_null - the whole
-    failing row; the singular tests that already select their home
-    table's PK directly) - just read it straight out.
+    the model's own key columns verbatim (not_null - the whole failing row;
+    the singular tests that already select their home table's key directly)
+    - just read them straight out.
     relation_name comes from the test's own manifest node (already
     fully-qualified/quoted for this warehouse), not constructed by hand."""
-    try:
-        # ORDERED, so the same data records the same sample (post-build-review
-        # #129): without it LIMIT took whichever rows came first.
-        rows = conn.execute(f"SELECT {pk_column} FROM {relation_name} "
-                            f"ORDER BY {pk_column} LIMIT {limit}").fetchall()
-    except Exception:
-        return []
-    return [str(r[0]) for r in rows if r[0] is not None]
+    return _sample_rows(
+        conn, f"SELECT {sample_keys.select_sql(key_columns)} FROM {relation_name} "
+              f"ORDER BY {_order(key_columns)} LIMIT {limit}",
+        key_columns, check=check, table=table or relation_name)
 
 
 def failing_sample_keys_via_values(conn, relation_name: str, value_column: str,
-                                    model: str, filter_column: str, pk_column: str,
-                                    limit: int = FAILING_SAMPLE_LIMIT) -> list[str]:
+                                    model: str, filter_column: str, key_columns: list[str],
+                                    limit: int = FAILING_SAMPLE_LIMIT, *, check=None,
+                                    table=None) -> list:
     """For test shapes whose audit table is pre-aggregated to the
     offending VALUE, not the failing row (accepted_values' `value_field`,
     unique's `unique_field`, both grouped-by-value + a count) - resolves
-    back to real failing rows' own primary keys via one follow-up query
+    back to real failing rows' own keys via one follow-up query
     against the model itself, keyed on those values."""
-    try:
-        rows = conn.execute(
-            f"SELECT {pk_column} FROM {model} WHERE {filter_column} "
-            f"IN (SELECT {value_column} FROM {relation_name}) ORDER BY {pk_column} LIMIT {limit}"
-        ).fetchall()
-    except Exception:
-        return []
-    return [str(r[0]) for r in rows if r[0] is not None]
+    return _sample_rows(
+        conn, f"SELECT {sample_keys.select_sql(key_columns)} FROM {model} WHERE {filter_column} "
+              f"IN (SELECT {value_column} FROM {relation_name}) "
+              f"ORDER BY {_order(key_columns)} LIMIT {limit}",
+        key_columns, check=check, table=table or model)
 
 
 #: The prefix every staging model's name carries over its table's.

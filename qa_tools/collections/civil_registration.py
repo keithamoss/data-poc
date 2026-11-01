@@ -35,7 +35,7 @@ ADAPTER = CollectionAdapter(
             "freshness_datacontract": "Freshness",
         },
     ),
-    sample_key={"birth_registrations": "registration_number"},
+    sample_key={"birth_registrations": ["registration_number"]},
     dbt=DbtSpec(
         singular_home={"multiple_birth_sibling": "birth_registrations",
                        "recency": "birth_registrations"},

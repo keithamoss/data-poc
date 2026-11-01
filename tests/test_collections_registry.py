@@ -529,7 +529,7 @@ class TestTheSharedToolModules:
         monkeypatch.setattr(dc, "_authored_names", lambda path: {check.qualityDefinition: "Pair"})
         monkeypatch.setattr(dc, "check_id_from_quality_definition", lambda q: q)
         monkeypatch.setattr(dc, "fail_threshold_from_quality_definition", lambda *a: 0)
-        monkeypatch.setattr(dc, "failing_sample_keys", lambda c, key: sampled.append(key) or [])
+        monkeypatch.setattr(dc, "failing_sample_keys", lambda c, key, **k: sampled.append(key) or [])
         monkeypatch.setattr(dc, "write_qa_result", lambda *a, **k: written.append(a))
 
         [r] = dc.evaluate(FAKE_ID, "fake_things__1", "2026-01-01T00:00:00Z")
@@ -563,7 +563,7 @@ class TestTheSharedToolModules:
         monkeypatch.setattr(dc, "_authored_names", lambda path: {})
         monkeypatch.setattr(dc, "check_id_from_quality_definition", lambda q: q)
         monkeypatch.setattr(dc, "fail_threshold_from_quality_definition", lambda *a: 0)
-        monkeypatch.setattr(dc, "failing_sample_keys", lambda c, key: [])
+        monkeypatch.setattr(dc, "failing_sample_keys", lambda c, key, **k: [])
         monkeypatch.setattr(dc, "write_qa_result", lambda *a, **k: None)
         monkeypatch.setattr(dc.left_out, "note", lambda run_id, tool, ids: notes.extend(ids))
 
@@ -773,7 +773,7 @@ class TestTheSharedToolModules:
         monkeypatch.setattr(run_dbt, "run_dbt", lambda command, select, *a, **k: built_runs.append(select))
         monkeypatch.setattr(run_dbt, "_check_ids", lambda path: {
             (f"stg_{FAKE_TABLE}", "things", "not_null"): "fake.not_null_dbt"})
-        monkeypatch.setattr(run_dbt, "failing_sample_keys_direct", lambda *a: [])
+        monkeypatch.setattr(run_dbt, "failing_sample_keys_direct", lambda *a, **k: [])
         monkeypatch.setattr(run_dbt.left_out, "note", lambda run_id, tool, ids: notes.extend(ids))
         monkeypatch.setattr(run_dbt, "write_qa_result", lambda *a, **k: None)
         got = run_dbt.evaluate(FAKE_ID, "fake_things__1", "2026-01-01T00:00:00Z")

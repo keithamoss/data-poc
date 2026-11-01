@@ -15,7 +15,7 @@ import functools
 import copy
 
 import yaml
-from qa_tools.common import config_yaml
+from qa_tools.common import config_yaml, sample_keys
 
 ENGINE_TAG = "datacontract-cli 1.2.0"
 
@@ -259,13 +259,34 @@ def fail_threshold_from_quality_definition(quality_definition: str | None, sever
     return 0 if threshold is _NO_THRESHOLD else threshold
 
 
-def failing_sample_keys(check, pk_column: str) -> list[str]:
-    """Pulls just pk_column's value out of check.failedSamples -
-    datacontract-cli's own _samples_for() already restricts each sample
-    dict to {identifier column(s), the failing field}, so this never
-    touches full row content; pk_column narrows further to exactly one
-    column, matching every other tool's samples. Empty when the tool
-    didn't capture any (metric not sampleable, or a passing check)."""
+def failing_sample_keys(check, key_columns: list[str], *, names_no_row: bool = False,
+                        table=None) -> list:
+    """The key of each of check.failedSamples - datacontract-cli's own
+    _samples_for() already restricts each sample dict to {identifier
+    column(s), the failing field}, its identifiers being every primaryKey or
+    unique property (proven against the installed version for a two-column
+    key, tests/test_sample_keys_composite.py), so this never touches full row
+    content; only the key columns leave here (sample_keys, REQ-PIPE-341).
+    Empty when the tool captured none (metric not sampleable, or a passing
+    check).
+
+    A sample lacking a key column raises (criterion 8): it was dropped by
+    `if pk_column in s`. A rule whose failure names no row - a duplicate check
+    on a non-key column, whose samples are the duplicated VALUE - declares
+    `names_no_row` and records nothing."""
+    if names_no_row:
+        return []
     samples = getattr(check, "failedSamples", None) or []
+    name = getattr(check, "name", None)
     # SORTED, so the same data records the same sample (post-build-review #129).
-    return sorted(str(s[pk_column]) for s in samples if pk_column in s)
+    return sample_keys.pick(
+        sample_keys.value_of(s, key_columns, check=name, table=table) for s in samples)
+
+
+def names_no_row_from_quality_definition(quality_definition: str | None) -> bool:
+    """Whether a rule's customProperties declare `names_no_row: true`."""
+    if not quality_definition:
+        return False
+    doc = config_yaml.parse(quality_definition) or {}
+    return any(p.get("property") == "names_no_row" and sample_keys.names_no_row(p.get("value"))
+               for p in doc.get("customProperties") or [])
