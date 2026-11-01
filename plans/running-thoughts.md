@@ -6170,3 +6170,20 @@ could never have computed it), and it belongs with batch 5's check work.
      #128's 10-minute wake-up chain brings a session back sooner; it does
      not survive a container replacement, which only a remote copy does.
 
+    **Added the same day (Keith: "what steps are you taking to make sure we don't lose an entire day's work again?" - he chose both of the following).** Pushing checkpoints left two gaps: a builder's work between commits, and uncommitted edits sitting only on the container's disk. So (1) every builder brief says commit and push a checkpoint at least every 30 minutes, and (2) every 10-minute check-in snapshots each worktree's uncommitted work, new files included, to `wip/<branch>-snap`. The snapshot goes through a throwaway index file, so an agent's own branch, staging and files are never touched. The first version used `git add -N` and `git reset`, which unstaged whatever the agents had staged, and was replaced within minutes. The script lives in the session scratchpad; on a new container, recreate it from this copy:
+
+    ```
+    #!/bin/bash
+    # Snapshot every worktree (tracked + untracked, gitignore honoured) to wip/<branch>-snap.
+    # Uses a throwaway index file, so the worktree's own index, branch and files are never touched.
+    cd /home/user/data-poc || exit 1
+    git worktree list --porcelain | awk '/^worktree /{print $2}' | while read -r wt; do
+      br=$(git -C "$wt" branch --show-current); [ -z "$br" ] && continue
+      tmp=$(mktemp); rm -f "$tmp"
+      ( cd "$wt" && export GIT_INDEX_FILE="$tmp" && git read-tree HEAD && git add -A . && tree=$(git write-tree) &&
+        if [ "$tree" = "$(git rev-parse HEAD^{tree})" ]; then echo "$br: no uncommitted changes"
+        else c=$(git commit-tree "$tree" -p HEAD -m "snapshot of $br $(date -u +%FT%TZ) [skip ci]") &&
+             git push -q -f origin "$c:refs/heads/wip/$br-snap" && echo "$br: snapshot ${c:0:7} pushed"; fi )
+      rm -f "$tmp"
+    done
+    ```
