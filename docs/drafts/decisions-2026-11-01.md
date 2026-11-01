@@ -188,3 +188,15 @@ the rebuild needs no question asked twice. Drafts and builders read this file.
   delivery-folder names, and c3 is amended to say so - a shared cross-asset
   counter would break the isolation the split exists for. Alternative: change
   delivery naming so it does not depend on the sequence.
+
+## Keith's morning answers (2026-11-02, morning report 12)
+- A1 SETTLED by Keith 2026-11-02: the equivalence compare NORMALISES per-asset
+  receipt sequence numbers and delivery-folder names (comparing contents and
+  order); REQ-TEST-357 c3 is amended to say so. REJECTED a shared cross-asset
+  counter (breaks isolation) and sequence-free delivery naming.
+- A2 SETTLED by Keith 2026-11-02: REQ-GEN-295 c7's drift-warning planning is
+  computed from the same inputs the real drift check uses (reference and
+  current value counts), replacing the fitted 'red source with blank address
+  fields' rule; c7 is amended to say verdicts are planned from the not-geocoded
+  share AND the drift check. REJECTED accepting the fitted rule, and dropping
+  drift planning.
