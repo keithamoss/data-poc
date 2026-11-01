@@ -85,53 +85,57 @@ describe("which checks the page names", () => {
   });
 });
 
+// REQ-DASH-337 criterion 12 as amended by REQ-DASH-299 (A2): every reason
+// begins 'Not checked: '.
 describe("what the section says", () => {
   it("words each entry from its structured code, never its text (REQ-DASH-337 c12)", () => {
     const w = load();
     expect(w.notInAgreementReason({code: "not_in_agreement", period: "2013-Q2",
                                    reason: "anything at all"}))
-      .toBe("Not part of the agreement for 2013-Q2.");
+      .toBe("Not checked: not part of the agreement for 2013-Q2.");
     expect(w.notInAgreementReason({code: "not_supplied_by_decision", period: "2026-Q2",
-                                   reason: "not part of the agreement for 2026-Q2"}))
-      .toBe("Not supplied for 2026-Q2, by decision.");
+                                   dataset: "no-such", reason: "not part of the agreement for 2026-Q2"}))
+      .toBe("Not checked: no-such not supplied for 2026-Q2, by decision.");
     expect(w.notInAgreementReason({code: "calendar_differs", period: "2026-Q2",
                                    dataset: "no-such", calendar: "monthly"}))
       .toBe("Not checked: no-such was on the monthly calendar for 2026-Q2.");
   });
 
   it("reads an entry recorded before the codes as not part of the agreement", () => {
-    // The build reads a pre-code entry's period into its `period` field.
     const w = load();
     expect(w.notInAgreementReason({reason: "not part of the agreement for 2013-Q2", period: "2013-Q2"}))
-      .toBe("Not part of the agreement for 2013-Q2.");
+      .toBe("Not checked: not part of the agreement for 2013-Q2.");
   });
 
   it("never words an entry from its reason text (REQ-DASH-337 c12)", () => {
     const w = load();
-    // A reason saying one thing and a code saying another: the code wins, and
-    // a period found only in the text is not read from it.
-    expect(w.notInAgreementReason({code: "not_supplied_by_decision", period: "2026-Q2",
-      reason: "not part of the agreement for 2013-Q2"})).toBe("Not supplied for 2026-Q2, by decision.");
+    expect(w.notInAgreementReason({code: "not_supplied_by_decision", period: "2026-Q2", dataset: "x",
+      reason: "not part of the agreement for 2013-Q2"})).toBe("Not checked: x not supplied for 2026-Q2, by decision.");
     expect(w.notInAgreementReason({reason: "not part of the agreement for 2013-Q2"}))
       .not.toContain("2013-Q2");
   });
 
-  it("is neither red nor a result: no status pill, a Not run tag", () => {
+  // A1: no separate block - each left-out check is a quiet row in the list it
+  // belongs to, tagged 'Not checked' where a run check has its pill.
+  it("is a quiet row tagged Not checked, in the section's own list, with no block", () => {
     const w = load();
     const rows = w.notInAgreementShown(COL, dataset(["n__2013"], LEFT_OUT));
     const host = w.document.createElement("div");
-    host.innerHTML = w.notInAgreementBlock(rows);
+    host.innerHTML = w.crossTableGridHtml([], w.leftOutRowModels(COL, rows)).html;
     w.wireNotInAgreement(host, COL, rows);
-    const block = host.querySelector(".not-in-agreement");
-    expect(block.dataset.notInAgreement).toBe("3");
-    expect(host.querySelectorAll(".pill")).toHaveLength(0);
-    const first = host.querySelector(".nia-row");
+    expect(host.querySelector(".not-in-agreement")).toBeNull();
+    const left = host.querySelectorAll(".xt-left-out");
+    expect(left).toHaveLength(3);
+    expect(host.querySelectorAll("button")).toHaveLength(0);
+    const first = left[0];
     expect(first.querySelector(".nm").textContent).toBe("Assigned worker reference");
     expect(first.querySelector(".bt").textContent).toBe("Notifications → Case Workers");
     expect(first.querySelector(".tr").textContent).toBe("dbt:relationships");
-    expect(first.querySelector(".why").textContent).toBe("Not part of the agreement for 2013-Q2.");
-    expect(first.querySelector(".nia-tag").textContent).toBe("Not run");
-    expect(block.textContent).toMatch(/neither a Fail nor a result/);
+    expect(first.querySelector(".why").textContent).toBe("Not checked: not part of the agreement for 2013-Q2.");
+    expect(first.querySelector(".pill").textContent).toBe("Not checked");
+    expect(first.querySelector(".pill").classList.contains("notchecked")).toBe(true);
+    expect(host.querySelectorAll("[data-not-checked-note]")).toHaveLength(1);
+    expect(host.textContent).toMatch(/neither a Fail nor a result/);
   });
 
   it("sets authored names as text, never as markup", () => {
@@ -140,14 +144,14 @@ describe("what the section says", () => {
     ds.columns[0].checks[2].name = "<img src=x onerror=alert(1)>";
     const rows = w.notInAgreementShown(COL, ds);
     const host = w.document.createElement("div");
-    host.innerHTML = w.notInAgreementBlock(rows);
+    host.innerHTML = w.crossTableGridHtml([], w.leftOutRowModels(COL, rows)).html;
     w.wireNotInAgreement(host, COL, rows);
     expect(host.querySelector("img")).toBeNull();
-    expect(host.querySelector(".nia-row .nm").textContent).toBe("<img src=x onerror=alert(1)>");
+    expect(host.querySelector(".xt-left-out .nm").textContent).toBe("<img src=x onerror=alert(1)>");
   });
 
-  it("draws nothing for no rows", () => {
+  it("draws no note for no left-out rows", () => {
     const w = load();
-    expect(w.notInAgreementBlock([])).toBe("");
+    expect(w.crossTableGridHtml([], []).html).not.toContain("data-not-checked-note");
   });
 });

@@ -7007,7 +7007,7 @@ class TestNotInTheAgreementOnThePage:
         _goto(page, built, state={"tier": "dataset", "agencyId": self.CP_AGENCY,
                                   "collectionId": "child-protection", "datasetId": dataset_id},
               in_place_on=on)
-        return page.locator('.scope-section[data-scope="cross-table"] .not-in-agreement')
+        return page.locator('.scope-section[data-scope="cross-table"]')
 
     def test_the_run_on_show_says_which_checks_it_left_out_and_why(
             self, clean_page, built_dashboard_html):
@@ -7017,24 +7017,33 @@ class TestNotInTheAgreementOnThePage:
         first = left[0]
         assert first["runDate"], first
         mine = [e for e in left if e["runId"] == first["runId"]]
-        block = self._section(clean_page, built_dashboard_html, first["datasetId"],
-                              first["runDate"])
-        assert block.count() == 1, "the cross-table section says nothing about the left-out checks"
-        rows = block.locator(".nia-row")
+        section = self._section(clean_page, built_dashboard_html, first["datasetId"],
+                                first["runDate"])
+        assert section.count() == 1, "the page has no cross-table section"
+        # A1 (REQ-DASH-299): NO SEPARATE BLOCK - each left-out check is a quiet
+        # row among the page's own checks, tagged 'Not checked'.
+        assert clean_page.locator(".not-in-agreement").count() == 0
+        _open_groups(clean_page)
+        rows = section.locator(".xt-left-out")
         assert rows.count() == len(mine)
         assert sorted(rows.evaluate_all("els => els.map(e => e.dataset.checkId)")) == \
             sorted(e["checkId"] for e in mine)
         whys = rows.locator(".why").all_inner_texts()
         reason = mine[0]["reason"]
-        assert whys == [reason[0].upper() + reason[1:] + "."] * len(mine), whys
-        # NEITHER RED NOR A RESULT: no status pill on a left-out row, and the
-        # check is not among the section's result rows.
-        assert block.locator(".pill").count() == 0
+        # A2: every reason begins 'Not checked: '.
+        assert whys == [f"Not checked: {reason}."] * len(mine), whys
+        assert all(w.startswith("Not checked: not part of the agreement for ") for w in whys), whys
+        # NEITHER A FAIL NOR A RESULT: the neutral 'Not checked' pill where a
+        # run check carries its status, never a button to a result.
+        assert rows.locator(".pill").all_inner_texts() == ["Not checked"] * len(mine)
+        assert rows.locator("button").count() == 0
         listed = clean_page.locator('.scope-section[data-scope="cross-table"] button.scope-check')
         keys = listed.evaluate_all("els => els.map(e => e.dataset.check)")
         assert not ({e["checkId"].rsplit(".", 2)[-2] + "." + e["checkId"].rsplit(".", 1)[-1]
                      for e in mine} & set(keys)), keys
-        assert "neither a Fail nor a result" in block.inner_text()
+        notes = section.locator("[data-not-checked-note]")
+        assert notes.count() >= 1
+        assert "neither a Fail nor a result" in notes.first.inner_text()
 
     def test_a_later_run_that_ran_them_says_nothing(self, clean_page, built_dashboard_html):
         _goto(clean_page, built_dashboard_html)
@@ -7045,8 +7054,9 @@ class TestNotInTheAgreementOnThePage:
                              for o in left)]
         assert later, left
         e = later[0]
-        assert self._section(clean_page, built_dashboard_html, e["datasetId"],
-                             e["nextRunDate"]).count() == 0
+        section = self._section(clean_page, built_dashboard_html, e["datasetId"], e["nextRunDate"])
+        assert section.count() == 1, "the page has no cross-table section"
+        assert section.locator(f'.xt-left-out[data-check-id="{e["checkId"]}"]').count() == 0
 
 
 class TestAnUnsettledApplicationNeverReachesThePage:
@@ -8630,17 +8640,37 @@ class TestChecksThatReadAnotherCollection:
 
     def test_the_not_supplied_quarter_reads_not_supplied_by_decision(
             self, clean_page, built_dashboard_html):
-        """Criterion 12 on scenario (j)'s period: the release's checks of the
-        dataset marked not supplied read 'Not supplied for <period>, by
-        decision.' - worded from the entry's code."""
+        """Criterion 12 as amended by REQ-DASH-299 (A2), and A1 and A5, on
+        scenario (j)'s period: the release's checks of the dataset marked not
+        supplied sit in that dataset's collection group as 'Not checked' rows
+        reading 'Not checked: <dataset> not supplied for <period>, by
+        decision.', the group's pill 'Not checked' and never Pass or 'No data',
+        its count naming them 'not checked', its note once, and no separate
+        block anywhere on the page."""
         hx = _hierarchy_index()
         coords = _scenario(clean_page, built_dashboard_html, _NOT_SUPPLIED)
+        entries = [e for e in _built_datasets(built_dashboard_html)[_LINKAGE_DATASET]["notInAgreement"]
+                   if e.get("code") == "not_supplied_by_decision" and e.get("period") == coords["period"]]
+        assert entries, f"precondition: Linkage Keys records checks left out on {coords['period']}"
+        marked = entries[0]["dataset"]
         self._linkage_page(clean_page, built_dashboard_html, hx, coords["inPlaceOn"])
-        block = clean_page.locator(".not-in-agreement")
-        assert block.count() == 1, "no left-out block on the not-supplied quarter's release"
-        whys = [w.inner_text() for w in block.locator(".why").all()]
-        assert whys, "the left-out block lists no checks"
-        assert f"Not supplied for {coords['period']}, by decision." in whys, whys
+        assert clean_page.locator(".not-in-agreement").count() == 0
+        group = clean_page.locator(f'.xt-group[data-xt-group="{hx["ds_col"][marked]}"]')
+        assert group.count() == 1, f"no {hx['ds_col'][marked]} group on the release"
+        group.locator(".xt-group-toggle").click()
+        rows = group.locator(".xt-left-out")
+        assert rows.count() >= 1, "the group holds no left-out row"
+        assert set(rows.locator(".pill").all_inner_texts()) == {"Not checked"}
+        whys = rows.locator(".why").all_inner_texts()
+        want = f"Not checked: {hx['ds_name'][marked]} not supplied for {coords['period']}, by decision."
+        assert want in whys, whys
+        counts = group.locator(".xt-group-counts").inner_text()
+        assert f"{rows.count()} not checked" in counts, counts
+        head = group.locator(".xt-group-head .pill").inner_text().strip()
+        assert head not in ("Pass", "No data"), head
+        if rows.count() == group.locator(".xt-row").count():
+            assert head == "Not checked", head
+        assert group.locator("[data-not-checked-note]").count() == 1
 
     def test_the_large_key_group_check_shows_its_histogram(
             self, clean_page, built_dashboard_html):
@@ -9268,3 +9298,285 @@ class TestTheColourWordGuardCanFail:
         entry = self._first_page_with(clean_page, html, "[data-arrived-as]")
         hits = _colour_words(clean_page, entry["id"])
         assert any(re.search(r"Arrived (green|amber|red)", h) for h in hits), hits
+
+
+# ---- REQ-DASH-299: the geocoding pages ---------------------------------------
+
+#: REQ-GEN-298's geocoding scenarios, by the fault each plants.
+_MISSING_YEAR, _DUPLICATE_YEAR, _UNEXPECTED_YEAR, _G1_ROUTE = "TS-102", "TS-103", "TS-104", "TS-111"
+_GEO = "geo-cp-clients"
+_YEAR_PHRASES = ["Missing census years", "Duplicated census years", "Unexpected census years"]
+
+
+@pytest.mark.shared_page
+class TestTheGeocodingPages:
+    """REQ-DASH-299 criterion 15, in a real browser against the built
+    dashboard. Every proof first asserts that what it inspects exists - the
+    scenario's period from the scenario map, then the row, line or marker - so
+    none can pass on an empty page (UX v5 M2). Written 2026-11-01 against an
+    empty warehouse; run by the end-of-run bootstrap."""
+
+    def _geo_state(self, hx, dataset_id=_GEO, **extra):
+        return _dataset_state(hx, dataset_id, **extra)
+
+    def _year_checks(self, built, dataset_id=_GEO):
+        ds = _built_datasets(built)[dataset_id]
+        (col,) = [c for c in ds["columns"] if c["name"] == "census_year"]
+        checks = [ck for ck in col["checks"] if not ck.get("retired")]
+        assert checks, f"precondition: {dataset_id}'s census_year carries checks"
+        return checks
+
+    def _check_panel(self, page, built, hx, dataset_id, kind, on):
+        (ck,) = [c for c in self._year_checks(built, dataset_id) if c["tool_ref"] == f"dbt:{kind}"]
+        _goto(page, built, state=self._geo_state(hx, dataset_id, columnName="census_year",
+                                                 checkKey=ck["key"]), in_place_on=on)
+        return page.locator("#check-panel")
+
+    def _lines(self, panel):
+        lines = [t.strip() for t in panel.locator(".sample-line").all_inner_texts()]
+        assert lines, "precondition: the check's panel shows example lines"
+        return lines
+
+    def test_1_the_three_year_checks_read_as_three_problems_in_order(
+            self, clean_page, built_dashboard_html):
+        """On the page: the census_year column's cards list the three year
+        checks missing, duplicated, unexpected - whatever order dbt recorded
+        them in (post-build critic, item 2) - each panel naming its phrase."""
+        checks = self._year_checks(built_dashboard_html)
+        by_phrase = {ck.get("measures"): ck for ck in checks if ck.get("measures") in _YEAR_PHRASES}
+        assert set(by_phrase) == set(_YEAR_PHRASES), sorted(by_phrase)
+        hx = _hierarchy_index()
+        _goto(clean_page, built_dashboard_html, state=self._geo_state(hx, columnName="census_year"))
+        cards = clean_page.locator(".check-card").evaluate_all("els => els.map(e => e.dataset.check)")
+        wanted = [by_phrase[p]["key"] for p in _YEAR_PHRASES]
+        assert all(k in cards for k in wanted), cards
+        assert [k for k in cards if k in wanted] == wanted, cards
+        for phrase in _YEAR_PHRASES:
+            _goto(clean_page, built_dashboard_html, state=self._geo_state(
+                hx, columnName="census_year", checkKey=by_phrase[phrase]["key"]))
+            assert f"{phrase} (" in clean_page.locator("#check-panel").inner_text()
+
+    def test_2_a_missing_year_is_a_constructed_line_never_a_row(
+            self, clean_page, built_dashboard_html):
+        hx = _hierarchy_index()
+        coords = _scenario(clean_page, built_dashboard_html, _MISSING_YEAR)
+        panel = self._check_panel(clean_page, built_dashboard_html, hx, _GEO,
+                                  "missing_set_members", coords["inPlaceOn"])
+        assert panel.locator(".sample-heading").inner_text().startswith(
+            "Examples: Missing census years (key only)")
+        lines = self._lines(panel)
+        assert any(re.fullmatch(r"source record \S+ · \d{4}: no row", ln) for ln in lines), lines
+        assert not any(ln.split(" · ")[0].endswith("/ —") for ln in lines), lines
+
+    def test_3_a_duplicate_and_an_unexpected_year_say_what_they_are(
+            self, clean_page, built_dashboard_html):
+        hx = _hierarchy_index()
+        dup = _scenario(clean_page, built_dashboard_html, _DUPLICATE_YEAR)
+        lines = self._lines(self._check_panel(clean_page, built_dashboard_html, hx,
+                                              "geo-ed-presentations", "duplicated_set_members",
+                                              dup["inPlaceOn"]))
+        assert any(ln.endswith(": more than one row") for ln in lines), lines
+        unx = _scenario(clean_page, built_dashboard_html, _UNEXPECTED_YEAR)
+        lines = self._lines(self._check_panel(clean_page, built_dashboard_html, hx, _GEO,
+                                              "unexpected_set_members", unx["inPlaceOn"]))
+        hits = [ln for ln in lines if "· 2026: not expected for this period" in ln]
+        assert hits, lines
+        assert not any("in force" in ln or re.search(r"\d+ rows?\b", ln) for ln in hits), hits
+
+    @pytest.mark.parametrize("on,members,sub", [
+        ("2015-06-30", "2011", None),
+        ("2020-06-30", "2011, 2016", "2016 added on 1 Aug 2017"),
+        ("2024-06-30", "2011, 2016, 2021", "2021 added on 1 Aug 2022"),
+    ])
+    def test_4_the_census_years_tile_names_the_set_each_version_held(
+            self, clean_page, built_dashboard_html, on, members, sub):
+        hx = _hierarchy_index()
+        _goto(clean_page, built_dashboard_html, state=self._geo_state(hx), in_place_on=on)
+        tile = clean_page.locator('.sla-strip [data-list-setting="census_years"]')
+        assert tile.count() == 1, f"no census-years tile on {on}"
+        assert tile.locator(".k").inner_text().strip().lower() == "census years"
+        assert tile.locator("[data-list-setting-members]").inner_text().strip() == members
+        added = tile.locator("[data-list-setting-added]")
+        if sub is None:
+            assert added.count() == 0
+        else:
+            assert added.inner_text().strip() == sub
+
+    def test_4_no_tile_before_the_first_recorded_result(self, clean_page, built_dashboard_html):
+        hx = _hierarchy_index()
+        runs = sorted(r["run_date"] for r in _built_datasets(built_dashboard_html)[_GEO]["runs"])
+        assert runs, "precondition: Client Register Geocodes has runs"
+        before = (date.fromisoformat(runs[0][:10]) - timedelta(days=1)).isoformat()
+        _goto(clean_page, built_dashboard_html, state=self._geo_state(hx), in_place_on=before)
+        assert clean_page.locator("[data-list-setting]").count() == 0
+
+    def test_5_a_year_check_breaks_at_each_widening_in_the_history(
+            self, clean_page, built_dashboard_html):
+        """Exactly two breaking markers, each between the last point before a
+        widening and the first on or after it - located, not only counted."""
+        hx = _hierarchy_index()
+        (ck,) = [c for c in self._year_checks(built_dashboard_html)
+                 if c["tool_ref"] == "dbt:missing_set_members"]
+        dates = [h["run_date"][:10] for h in ck["history"]]
+        n = len(dates)
+        assert n > 2, dates
+        xs = [42 + i * (480 - 42 - 16) / (n - 1) for i in range(n)]  # trendChart's own geometry
+        mids = []
+        for cut in ("2017-08-01", "2022-08-01"):
+            after = next((i for i, d in enumerate(dates) if d >= cut), None)
+            assert after not in (None, 0), (cut, dates[:3], dates[-3:])
+            mids.append((xs[after - 1] + xs[after]) / 2)
+        _goto(clean_page, built_dashboard_html, state=self._geo_state(
+            hx, columnName="census_year", checkKey=ck["key"]))
+        got = clean_page.locator("#check-panel .break-glyph").evaluate_all(
+            "els => els.map(e => Number(/translate\\(([\\d.]+)/.exec(e.getAttribute('transform'))[1]))")
+        assert len(got) == 2, got
+        assert sorted(got) == pytest.approx(sorted(mids), abs=0.2), (got, mids)
+
+    def test_6_the_geocodes_tile_links_its_source_and_match_level_has_value_bars(
+            self, clean_page, built_dashboard_html):
+        hx = _hierarchy_index()
+        on = "2024-06-30"
+        _goto(clean_page, built_dashboard_html, state=self._geo_state(hx), in_place_on=on)
+        tile = clean_page.locator('.sla-strip [data-linked-source="cp-clients"]')
+        assert tile.count() == 1, "no geocodes tile"
+        assert tile.locator(".k").inner_text().strip().lower() == "geocodes"
+        before = _render_count(clean_page)
+        tile.locator("a.dataset-link").click()
+        clean_page.wait_for_function(
+            "(b) => Number(document.documentElement.dataset.renderCount || 0) > b", arg=before)
+        assert clean_page.evaluate("() => [STATE.datasetId, CURRENT_IN_PLACE_ON]") == ["cp-clients", on]
+        _goto(clean_page, built_dashboard_html, state=self._geo_state(hx, columnName="match_level"),
+              in_place_on=on)
+        bars = clean_page.locator(".value-bars .value-bar-row .lbl").all_inner_texts()
+        assert bars, "match_level shows no value bars"
+        assert set(bars) <= {"address", "postcode", "suburb", "not geocoded"}, bars
+
+    def test_7_no_area_code_or_nine_digit_run_on_a_geocoding_page(
+            self, clean_page, built_dashboard_html):
+        """Criterion 13, on every geocoding page shown for a scenario's
+        period: the dataset page's strip and EVERY check panel of its
+        census_year and match_level columns. The supply's file is found
+        through its receipt (qa.supply_receipt) - a delivery folder's name is
+        arbitrary (generator/delivery_names.py) and never holds the period."""
+        import csv
+
+        from qa_tools.common import delivery, qa_store, supply_db
+
+        hx = _hierarchy_index()
+        built = _built_datasets(built_dashboard_html)
+        for sid, dataset_id in ((_MISSING_YEAR, _GEO), (_DUPLICATE_YEAR, "geo-ed-presentations"),
+                                (_UNEXPECTED_YEAR, _GEO)):
+            coords = _scenario(clean_page, built_dashboard_html, sid)
+            ds = built[dataset_id]
+            supplies = {r["supply_id"] for r in ds["runs"] if r["run_id"] in coords["supplies"]}
+            assert supplies, f"precondition: {sid}'s runs are {dataset_id}'s"
+            with supply_db.connect(read_only=True, label="test-e2e") as conn:
+                found = conn.execute(
+                    f'SELECT delivery, filename FROM "{qa_store.SCHEMA}".supply_receipt '
+                    "WHERE supply_id = ANY(?)", [sorted(supplies)]).fetchall()
+            assert found, f"precondition: {sid}'s supply has a receipt"
+            codes = set()
+            for name, filename in found:
+                path = delivery.default_deliveries_dir() / name / filename
+                assert path.is_file(), path
+                with path.open(newline="") as fh:
+                    codes |= {v for row in csv.DictReader(fh) for k, v in row.items()
+                              if k in ("sa2_code", "lga_code") and v}
+            assert codes, f"precondition: {sid}'s file holds area codes"
+            on = coords["inPlaceOn"]
+            _goto(clean_page, built_dashboard_html, state=self._geo_state(hx, dataset_id), in_place_on=on)
+            shown = clean_page.locator(".sla-strip").all_inner_texts()
+            panels = [ck for col in ds["columns"] if col["name"] in ("census_year", "match_level")
+                      for ck in col["checks"] if not ck.get("retired")]
+            assert len(panels) >= 4, [ck["key"] for ck in panels]
+            for ck in panels:
+                col = ck["check_id"].split(".")[4]
+                _goto(clean_page, built_dashboard_html, state=self._geo_state(
+                    hx, dataset_id, columnName=col, checkKey=ck["key"]), in_place_on=on)
+                panel = clean_page.locator("#check-panel")
+                assert panel.count() == 1, ck["key"]
+                shown += panel.locator(".sample-line, .sample-heading, [data-value-text]").all_inner_texts()
+            text = " ".join(shown)
+            assert not re.search(r"\b\d{9}\b", text), (sid, text[:500])
+            assert not any(c in text for c in codes), sid
+
+    def test_8_another_collections_check_is_headed_by_its_phrase(
+            self, clean_page, built_dashboard_html):
+        ds = _built_datasets(built_dashboard_html)["birth-registrations"]
+        found = [(c, ck) for c in ds["columns"] for ck in c.get("checks") or []
+                 if ck.get("measures") and any(h.get("failing_sample_keys") for h in ck.get("history") or [])]
+        assert found, "precondition: a Birth Registrations check records examples"
+        col, ck = found[0]
+        on = [h for h in ck["history"] if h.get("failing_sample_keys")][-1]["run_date"][:10]
+        hx = _hierarchy_index()
+        _goto(clean_page, built_dashboard_html, state=_dataset_state(
+            hx, "birth-registrations", columnName=col["name"], checkKey=ck["key"]), in_place_on=on)
+        heading = clean_page.locator("#check-panel .sample-heading")
+        assert heading.count() == 1
+        assert heading.inner_text().startswith(f"Examples: {ck['measures']} (key only)")
+
+    def test_9_the_g1_route_tags_the_older_client_register_supply(
+            self, clean_page, built_dashboard_html):
+        """The tag is amberPromotedTag's ('Promoted, warning'), naming
+        "Linkage Products' <period> Client Register Geocodes", from the
+        geocoding promotion's date and not before (REQ-DOCS-362 criterion 2)."""
+        hx = _hierarchy_index()
+        coords = _scenario(clean_page, built_dashboard_html, _G1_ROUTE)
+        found = clean_page.evaluate("""([cause, period]) => {
+            const ds = rawRealDatasetById("cp-clients");
+            for(const [runId, h] of Object.entries(ds.promotedHealth || {})){
+              if(h.promotedOn !== "green") continue;
+              const t = (h.timeline || []).find(t=> t.status === "amber" && t.causeDataset === cause
+                                                  && t.causePeriod === period);
+              if(t) return {runId, on: assetDateStrOf(t.at), period: t.causePeriod};
+            }
+            return null;
+        }""", [_GEO, coords["period"]])
+        assert found, (f"precondition: {_G1_ROUTE}'s {coords['period']} geocoding promotion turned "
+                       "an older Client Register supply amber")
+        assert found["period"] == coords["period"]
+        want = f"Linkage Products' {found['period']} {hx['ds_name'][_GEO]}"
+        row = f'tr[data-run-id="{found["runId"]}"]'
+        state = _dataset_state(hx, "cp-clients")
+        _goto(clean_page, built_dashboard_html, state=state, in_place_on=found["on"])
+        tag = clean_page.locator(f"{row} [data-amber-promoted]")
+        assert tag.count() == 1
+        assert tag.locator(".pill").inner_text().strip() == "Promoted, warning"
+        assert want in tag.locator("[data-amber-promoted-why]").inner_text()
+        day_before = (date.fromisoformat(found["on"]) - timedelta(days=1)).isoformat()
+        _goto(clean_page, built_dashboard_html, state=state, in_place_on=day_before)
+        assert clean_page.locator(row).count() == 1
+        assert clean_page.locator(f"{row} [data-amber-promoted]").count() == 0
+
+    def test_10_ed_presentations_shows_its_own_coverage_verdict(
+            self, clean_page, built_dashboard_html):
+        """#289 D1 and D2, re-proved on the geocoding pages: ED Presentations'
+        own page shows the geocoding coverage verdict about its own supply, and
+        the coverage card's comparison reads a drop as worse."""
+        hx = _hierarchy_index()
+        ds = _built_datasets(built_dashboard_html)["ed-presentations"]
+        cov = [ck for ck in _cross_table_checks(ds) if ck.get("tool_ref") == "soda:coverage"
+               and "geo-ed-presentations" in [ck["between"]["declared_on"], *ck["between"]["reads"]]]
+        assert cov, "precondition: ED Presentations carries the geocoding coverage check"
+        ck = cov[0]
+        own = [h for h in ck["history"] if h.get("supply_id")]
+        assert len(own) >= 2, "precondition: two results about ED Presentations' own supplies"
+        _goto(clean_page, built_dashboard_html, state=_dataset_state(hx, "ed-presentations"),
+              in_place_on=own[-1]["run_date"][:10])
+        _open_groups(clean_page)
+        row = clean_page.locator(f'.xt-row[data-check="{ck["key"]}"]')
+        assert row.count() >= 1
+        assert row.first.locator(".xt-pill .pill").inner_text().strip() in ("Pass", "Warn", "Fail")
+        # A DROP IN COVERAGE READS WORSE (#289 D2), through the page's own rule.
+        assert (ck.get("band") or {}).get("warn", {}).get("op") == "<", ck.get("band")
+        assert clean_page.evaluate("(ck) => deltaVerdict(ck, -5).tone", ck) == "worse"
+
+    def test_12_the_agency_page_lists_across_collections(self, clean_page, built_dashboard_html):
+        hx = _hierarchy_index()
+        lp = hx["ds_col"][_GEO]
+        _goto(clean_page, built_dashboard_html, state={"tier": "agency", "agencyId": hx["ds_agency"][_GEO]})
+        across = clean_page.locator(f'[data-collection="{lp}"] [data-across-collections], [data-across-collections]')
+        assert across.count() >= 1, "no 'Across collections' sub-heading on the agency page"
+        assert across.first.locator("h4").inner_text().strip().lower() == "across collections"
+        assert "Child Protection's Client Register" in across.first.inner_text()

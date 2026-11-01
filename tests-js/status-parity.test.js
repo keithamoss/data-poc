@@ -72,6 +72,10 @@ describe("the vocabulary is the one both sides agreed", () => {
     for (const s of v.check) expect(v.dataset).toContain(s);
   });
 
+  it("holds a left-out row's level exactly as the table does (REQ-DASH-299 c17)", () => {
+    expect([...vocab().left_out].sort()).toEqual([...CASES.vocabulary.by_level.left_out].sort());
+  });
+
   it("gives every status the table names a label to render", () => {
     // A status with no label renders "undefined" in a pill, which is a
     // different way of saying nothing went wrong.
@@ -161,6 +165,22 @@ describe("every dataset rollup case", () => {
     it(`${c.id} returns what the table says`, () => {
       const w = load();
       expect(w.rollupStatuses(c.statuses), c.why).toBe(c.expect);
+    });
+  }
+});
+
+// REQ-DASH-299 criterion 17: notchecked is a left-out row's alone.
+describe("every level case", () => {
+  const allowed = (w, level) => ({ check: undefined, dataset: w.statusVocabulary().dataset,
+    left_out: w.statusVocabulary().left_out })[level];
+  for (const c of CASES.level_cases.cases) {
+    it(`${c.id} ${c.expect_error ? "is refused" : "is recognised"}`, () => {
+      const w = load();
+      if (c.expect_error) {
+        expect(() => w.recognisedStatus(c.status, c.level, allowed(w, c.level))).toThrow(new RegExp(c.status));
+      } else {
+        expect(w.recognisedStatus(c.status, c.level, allowed(w, c.level))).toBe(c.expect);
+      }
     });
   }
 });

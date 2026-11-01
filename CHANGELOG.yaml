@@ -113,7 +113,8 @@ releases:
     summary: >
       Every status now reads Pass, Warn or Fail with the colours unchanged,
       any choice a builder made on your behalf stays in view until you answer
-      it, and Linkage Products gains a quarterly geocoding release.
+      it, and Linkage Products gains a quarterly geocoding release with
+      pages that say what it found.
     changes:
       - category: New
         items:
@@ -138,6 +139,13 @@ releases:
               records not geocoded, records left out, a record the source does
               not hold and an empty file - in ordinary supplies and once each
               in a scenario the scenario map names.
+          - headline: Geocoding pages that explain themselves
+            components: ["Dashboard UI"]
+            description: >
+              A geocoding dataset's page names its three year checks
+              by what they find, shows each example as a record and a
+              census year, and says which census years its quarter
+              was held to and which dataset it geocodes.
           - headline: Unanswered provisional choices are flagged
             components: ["Testing & dev tooling", "Docs & process"]
             description: >
@@ -184,6 +192,20 @@ releases:
               them by value, so a record failing in both reads
               as still failing. When the two runs named their
               rows differently, the page says so.
+          - headline: Examples say what they show
+            components: ["Dashboard UI"]
+            description: >
+              On every check, the examples are now headed by what the
+              check measures - "Examples: Duplicate values (key only)" -
+              and a result with no examples says so plainly rather than
+              pointing you at a plans file.
+          - headline: Checks that did not run, in place
+            components: ["Dashboard UI"]
+            description: >
+              A cross-table check left out of a supply's run now sits
+              where it would have run, marked Not checked with its
+              reason, and a group's heading counts it without letting
+              it change the group's status.
           - headline: A check that says what it samples
             components: ["QA checks & contract"]
             description: >

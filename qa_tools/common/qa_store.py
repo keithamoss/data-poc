@@ -2223,6 +2223,7 @@ def record_results(conn: supply_db.SupplyConnection, run_key: str,
     (criterion 14).
     """
     refuse_outside_an_attempt(conn, run_key)
+    _refuse_display_only(results, run_key, tool)
     stamps = _stamps(fingerprints, results, run_key)
     if scope == CROSS_TABLE_SCOPE and results and (
             reads is None or len(reads) != len(results) or not all(reads)):
@@ -2237,6 +2238,27 @@ def record_results(conn: supply_db.SupplyConnection, run_key: str,
                                 collection_id=collection_id, scope=scope,
                                 supply_state=supply_state, stamps=stamps,
                                 reads=reads if scope == CROSS_TABLE_SCOPE else None)
+
+
+class DisplayOnlyStatus(ValueError):
+    """A result offered with a status only the dashboard may derive."""
+
+
+#: Statuses the dashboard build derives and no tool may record (REQ-DASH-299
+#: criterion 17; Keith, 2026-10-31, v7 round (a)): 'notchecked' is made from
+#: a run's left_out entry, so a recorded one would let a broken tool turn a
+#: check quiet. A check that ran and errored is recorded 'error', a Fail.
+DISPLAY_ONLY_STATUSES = frozenset({"notchecked"})
+
+
+def _refuse_display_only(results: Sequence[Mapping[str, Any]], run_key: str, tool: str) -> None:
+    found = sorted({str(r.get("check_id")) for r in results
+                    if r.get("status") in DISPLAY_ONLY_STATUSES})
+    if found:
+        raise DisplayOnlyStatus(
+            f"run {run_key!r}: {tool} offered {', '.join(found)} with the status 'notchecked', "
+            "which only the dashboard derives, from a run's left_out entry - no tool records "
+            "it, so nothing is written (REQ-DASH-299 criterion 17).")
 
 
 def _stamps(fingerprints: Mapping[str, str], results: Sequence[Mapping[str, Any]],

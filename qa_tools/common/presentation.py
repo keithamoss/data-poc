@@ -51,6 +51,39 @@ def for_collection(collection_id: str, path: Path | None = None) -> dict:
     return entry
 
 
+def list_setting_label(setting: str, path: Path | None = None) -> str | None:
+    """A list setting's display name - 'Census years' - keying the page's
+    tile for the set a result was judged against (REQ-DASH-299 criterion 9)."""
+    entry = (load(path).get("list_settings") or {}).get(setting)
+    label = entry.get("label") if isinstance(entry, dict) else None
+    return str(label) if label else None
+
+
+def relation_word(dataset_id: str, path: Path | None = None) -> str | None:
+    """A dataset's word for its relation to the one source it links with no
+    code - 'Geocodes' - keying the page's tile naming that source
+    (REQ-DASH-299 criterion 10)."""
+    entry = (load(path).get("datasets") or {}).get(dataset_id)
+    word = entry.get("relation") if isinstance(entry, dict) else None
+    return str(word) if word else None
+
+
+def _single_codeless_source(dataset) -> str | None:
+    """The source a dataset links with no code - its linked_datasets a
+    single entry with no code (REQ-QAC-294 criterion 2) - or None."""
+    linked = tuple(getattr(dataset, "linked", ()) or ())
+    return linked[0][0] if len(linked) == 1 and linked[0][1] is None else None
+
+
+def linked_source(dataset, path: Path | None = None) -> dict | None:
+    """{datasetId, relation} for a dataset linking one source with no code,
+    else None - the page's relation tile (REQ-DASH-299 criterion 10)."""
+    source = _single_codeless_source(dataset)
+    if source is None:
+        return None
+    return {"datasetId": source, "relation": relation_word(dataset.dataset_id, path)}
+
+
 def problems(path: Path | None = None) -> list[str]:
     """Every registered collection the dashboard could not describe."""
     from qa_tools import collections
@@ -70,4 +103,25 @@ def problems(path: Path | None = None) -> list[str]:
             if not isinstance(entry.get(key), str):
                 out.append(f"collection {coll.id!r}'s entry in contract/presentation.yaml has "
                            f"no `{key}`")
+    out += _tile_word_problems(path)
+    return out
+
+
+def _tile_word_problems(path: Path) -> list[str]:
+    """Every list setting the asset declares, and every dataset linking one
+    source with no code, has its tile's word (REQ-DASH-299 criteria 9 and 10;
+    NFR 2) - so the page never shows a tile it cannot name."""
+    from qa_tools.common import amber_setting, config_yaml, hierarchy
+
+    out = []
+    doc = config_yaml.load(Path(hierarchy.data_asset_yaml())) or {}
+    for _container, name in amber_setting.list_setting_keys(doc):
+        if not list_setting_label(name, path):
+            out.append(f"list setting {name!r} has no `label` under `list_settings:` in "
+                       f"contract/presentation.yaml, so its tile on the dataset page has no name")
+    for ds in hierarchy.all_datasets():
+        if _single_codeless_source(ds) is not None and not relation_word(ds.dataset_id, path):
+            out.append(f"dataset {ds.dataset_id!r} links one source with no code but has no "
+                       f"`relation` under `datasets:` in contract/presentation.yaml, so its tile "
+                       f"on the dataset page has no name")
     return out

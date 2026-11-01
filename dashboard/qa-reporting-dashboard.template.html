@@ -247,6 +247,11 @@ button{font:inherit; color:inherit;}
    tell the two statuses apart. */
 .pill.turnedoff, .pill.notcounted, .turnoff-marker{background:transparent; color:var(--ink-muted);
   border:1px solid var(--ink-muted);}
+/* NOT CHECKED (REQ-DASH-299 criterion 17): a check its run left out for the
+   period. Quiet like the two above, with a DASHED border so it cannot be
+   read as a group's 'Not counted'; the words tell them apart. */
+.pill.notchecked{background:transparent; color:var(--ink-muted); border:1px dashed var(--ink-muted);}
+.pill.notchecked .ico{display:none;}
 .pill.turnedoff .ico, .pill.notcounted .ico, .pill.sm.turnoff-marker .ico,
 .turnoff-marker .ico{background:var(--ink-muted); width:8px; height:2px; border-radius:1px;}
 
@@ -795,8 +800,18 @@ span.scenario-subject-label{display:inline-block; margin:0 6px 0 0;}
    the status column is a fixed width, so an empty head cell and a row's pill
    take the same room and the headings sit over their columns. */
 .xt-grid{--xt-pill-col:84px;}
-.xt-grid .xt-head, .xt-grid .scope-check.xt-row{display:grid; grid-template-columns:minmax(0,1.3fr) minmax(0,1fr) minmax(0,1fr) var(--xt-pill-col); gap:4px 16px; align-items:start;}
-.xt-grid[data-columns="1"] .xt-head, .xt-grid[data-columns="1"] .scope-check.xt-row{grid-template-columns:minmax(0,1.3fr) minmax(0,2fr) var(--xt-pill-col);}
+.xt-grid .xt-head, .xt-grid .scope-check.xt-row, .xt-grid .xt-left-out{display:grid; grid-template-columns:minmax(0,1.3fr) minmax(0,1fr) minmax(0,1fr) var(--xt-pill-col); gap:4px 16px; align-items:start;}
+.xt-grid[data-columns="1"] .xt-head, .xt-grid[data-columns="1"] .scope-check.xt-row, .xt-grid[data-columns="1"] .xt-left-out{grid-template-columns:minmax(0,1.3fr) minmax(0,2fr) var(--xt-pill-col);}
+/* A LEFT-OUT ROW (REQ-DASH-337 criterion 6 as amended by REQ-DASH-299, A1):
+   where the check would sit had it run, quiet, its reason under its name. */
+.xt-left-out{padding:8px 2px; color:var(--ink-muted);}
+.xt-left-out .nm{font-weight:600; font-size:13px; color:var(--ink);}
+.xt-left-out .bt, .xt-left-out .why{display:block; font-size:12.5px; color:var(--ink-muted); overflow-wrap:anywhere;}
+.xt-left-out .tr{display:block; font-size:11px; color:var(--ink-faint); font-family:"IBM Plex Mono",monospace; overflow-wrap:anywhere;}
+.xt-left-out .bt:empty, .xt-left-out .tr:empty{display:none;}
+.across-collections{margin-top:12px;}
+.across-collections-head{font-size:12px; font-weight:600; color:var(--ink-muted); text-transform:uppercase; letter-spacing:.04em; margin:0 0 4px;}
+.xt-not-checked-note{font-size:12px; color:var(--ink-muted); margin:4px 2px 2px; max-width:70ch;}
 .xt-view-block{margin:6px 0 10px;}
 .xt-view-label{font-size:11.5px; font-weight:600; letter-spacing:.04em; text-transform:uppercase; color:var(--ink-muted); margin-bottom:4px;}
 .xt-grid .xt-head{font-size:12px; font-weight:600; color:var(--ink-muted); padding:4px 2px;}
@@ -841,7 +856,7 @@ span.scenario-subject-label{display:inline-block; margin:0 6px 0 0;}
 .xt-caption{font-size:12px; color:var(--ink); margin-bottom:10px;}
 @media (max-width:600px){
   .xt-grid .xt-head{display:none;}
-  .xt-grid .scope-check.xt-row, .xt-grid[data-columns="1"] .scope-check.xt-row{grid-template-columns:minmax(0,1fr) auto;}
+  .xt-grid .scope-check.xt-row, .xt-grid[data-columns="1"] .scope-check.xt-row, .xt-grid .xt-left-out{grid-template-columns:minmax(0,1fr) auto;}
   .xt-row .xt-name{grid-column:1; grid-row:1;}
   .xt-row .xt-pill{grid-column:2; grid-row:1;}
   .xt-row .xt-cell{grid-column:1 / -1;}
@@ -1604,10 +1619,95 @@ const DATACONTRACT_SAMPLES_RETURNED = 5;
 // A several-column key's parts are joined in declared order, and a NULL key or
 // part - recorded for every tool since post-build-review #294 D1 - reads
 // '(no value)' (Keith's wording; REQ-DASH-299 keeps it).
+//
+// TRAILING EMPTY PARTS ARE DROPPED FROM THE DISPLAY ONLY (REQ-DASH-299
+// criterion 8; Keith, v5 round (b)): an always-empty id_2 adds nothing, while
+// an empty part followed by a present one shows '—' (a null one '(no value)',
+// as above). Each part is escaped on its own before joining; the recorded
+// sample is never changed.
+const emptyPart = p => p == null || p === "";
+function sampleParts(parts){
+  const kept = parts.slice();
+  while(kept.length > 1 && emptyPart(kept[kept.length - 1])) kept.pop();
+  return kept.map(p => p == null ? "(no value)" : p === "" ? "—" : escHtml(String(p)));
+}
+function sampleKeyText(key){
+  return Array.isArray(key) ? sampleParts(key).join(" / ") : (key == null ? "(no value)" : escHtml(String(key)));
+}
 function samplePill(key, bg){
-  const part = p => p == null ? "(no value)" : escHtml(String(p));
-  const text = Array.isArray(key) ? key.map(part).join(" / ") : part(key);
-  return `<span data-value-text style="font:11px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; background:${bg}; border-radius:4px; padding:2px 6px;">${text}</span>`;
+  return `<span data-value-text style="font:11px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; background:${bg}; border-radius:4px; padding:2px 6px;">${sampleKeyText(key)}</span>`;
+}
+// THE WORDS AROUND A CHECK'S EXAMPLES (REQ-DASH-299 criteria 3 to 5), site-wide:
+// headed by what the check MEASURES - its declared phrase or its kind's, the
+// build's `measures` - and neutral where it names none, so no heading calls a
+// constructed pair a row.
+function sampleHeading(check){
+  const p = check && check.measures;
+  return p ? `Examples: ${escHtml(p)} (key only)` : "Examples (key only)";
+}
+// '<phrase>, this run' / '<phrase>, compared run'; 'Flagged, ...' with no phrase.
+function flaggedLabel(check, which){
+  const p = check && check.measures;
+  return `${p ? escHtml(p) : "Flagged"}, ${which}`;
+}
+const SAMPLE_COMPARE_HEADING = "Examples vs. the compared run";
+const NO_EXAMPLES_RECORDED = "No examples were recorded for this result.";
+// A SET-MEMBER CHECK'S SAMPLE (REQ-QAC-297 criterion 1; REQ-DASH-299 criteria 6
+// and 7) laid out from the key column names recorded with it (REQ-PIPE-341
+// criterion 9): the check's own column is the member, the rest the record.
+// Worded from the check's KIND alone - generic, no set named here - and never
+// a row count, which no sample records. A missing member has no row, so its
+// line is a pair the check constructs and says so.
+const SET_MEMBER_SAMPLE_WORDS = {
+  missing_set_members: "no row",
+  duplicated_set_members: "more than one row",
+  unexpected_set_members: "not expected for this period",
+};
+function checkKind(check){ return String((check && check.tool_ref) || "").split(":")[1] || ""; }
+function checkColumnOf(check){ return String((check && check.check_id) || "").split(".")[4] || null; }
+// 'source record' where the dataset links one source with no code (its
+// linkedSource, from linked_datasets), 'record' otherwise.
+function sampleRecordNoun(datasetId){
+  const raw = datasetId ? rawRealDatasetById(datasetId) : null;
+  return raw && raw.linkedSource ? "source record" : "record";
+}
+function setMemberSampleLine(check, point, key, datasetId){
+  const words = SET_MEMBER_SAMPLE_WORDS[checkKind(check)];
+  const cols = point && point.failing_sample_key_columns;
+  const member = checkColumnOf(check);
+  if(!words || !Array.isArray(key) || !Array.isArray(cols) || cols.length !== key.length) return null;
+  const at = cols.indexOf(member);
+  if(at === -1) return null;
+  const ids = sampleParts(key.filter((_, i)=> i !== at)).join(" / ");
+  const year = key[at] == null ? "(no value)" : escHtml(String(key[at]));
+  return `${sampleRecordNoun(datasetId)} ${ids} · ${year}: ${words}`;
+}
+// One example as shown: a set-member check's line, any other check's pill.
+function sampleKeyHtml(check, point, key, bg, datasetId){
+  const line = setMemberSampleLine(check, point, key, datasetId);
+  return line == null ? samplePill(key, bg)
+    : `<div class="sample-line" data-value-text style="font:11px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; background:${bg}; border-radius:4px; padding:2px 6px;">${line}</div>`;
+}
+// THE EXAMPLES BLOCK (criteria 3 and 5): the heading with today's count
+// suffix and the samples, or - where a result records violations and no
+// sample - one sentence saying so; nothing for a result recording only a
+// percentage and no row count.
+function sampleBlockHtml(check, point, datasetId){
+  const keys = (point && point.failing_sample_keys) || [];
+  if(keys.length){
+    const lines = keys.map(k => setMemberSampleLine(check, point, k, datasetId));
+    const asLines = lines.every(l => l != null);
+    return `
+      <div style="margin-top:10px;" data-sample-block>
+        <div class="sample-heading" style="font-size:11px; color:var(--ink-faint); margin-bottom:5px;">${sampleHeading(check)}${point.row_count_invalid > keys.length ? ` — ${keys.length} of ${fmtInt(point.row_count_invalid)}` : ""}</div>
+        <div style="display:flex; ${asLines ? "flex-direction:column; align-items:flex-start;" : "flex-wrap:wrap;"} gap:5px;">
+          ${keys.map(k => sampleKeyHtml(check, point, k, "rgba(127,127,127,.12)", datasetId)).join("")}
+        </div>
+        ${(fp => fp ? `<div class="sample-fine-print" style="font-size:11px; color:var(--ink-muted); margin-top:5px;">${fp}</div>` : "")(sampleFinePrint(check.tool_ref, keys.length, point.row_count_invalid))}
+      </div>`;
+  }
+  return point && point.row_count_invalid ? `
+      <div class="no-examples" style="font-size:11.5px; color:var(--ink-faint); margin-top:8px;">${NO_EXAMPLES_RECORDED}</div>` : "";
 }
 const SAMPLE_KEYS_INCOMPARABLE = "These examples cannot be compared: the compared run named its rows by different columns.";
 // A run's samples against the compared run's, BY VALUE: a Set of arrays
@@ -1674,6 +1774,52 @@ function latestArrivalTileHtml(ds){
   return `<div class="sla-tile"><div class="k">Latest arrival</div>`
     + `<div class="v" style="font-size:14px;" title="When we received this supply" data-latest-arrival>`
     + `${escHtml(fmtArrival(a))} <span title="${ARRIVAL_FOLLOWS_FILING}">${qualifier}</span></div>${period}</div>`;
+}
+// THE SET A PERIOD WAS HELD TO (REQ-DASH-299 criterion 9): a tile keyed by the
+// list setting's display name (contract/presentation.yaml, carried by the
+// build), naming the members of the version the newest result on or before the
+// date on show RECORDED - never re-resolved - with '<added> added on <date>'
+// where that version added members to the one before. Generic: any recorded
+// list setting, any dataset. Absent on a date before any such result.
+function recordedListSettings(ds, dateStr){
+  const newest = {};
+  ((ds && ds.columns) || []).forEach(c=> (c.checks || []).forEach(ck=>{
+    if(ck.retired) return;
+    (ck.history || []).forEach(h=>{
+      const m = h.member_set;
+      if(!m || !m.setting) return;
+      if(dateStr && h.run_date && String(h.run_date).slice(0, 10) > dateStr) return;
+      const was = newest[m.setting];
+      if(!was || (h.rank != null && was.rank != null ? h.rank > was.rank : String(h.run_date) > String(was.run_date)))
+        newest[m.setting] = {rank: h.rank, run_date: h.run_date, set: m};
+    });
+  }));
+  return Object.keys(newest).sort().map(k=> newest[k].set);
+}
+function listSettingTilesHtml(ds, dateStr){
+  return recordedListSettings(ds, dateStr).filter(m=> m.label).map(m=> {
+    const added = (m.added || []).length
+      ? `<div class="sla-files-go" data-list-setting-added style="color:var(--ink-muted); font-size:12px; margin-top:4px; line-height:1.4;">${escHtml(m.added.join(", "))} added on ${shortDay(String(m.version).slice(0, 10))}</div>` : "";
+    return `<div class="sla-tile" data-list-setting="${escAttr(m.setting)}"><div class="k">${escHtml(m.label)}</div>`
+      + `<div class="v" style="font-size:14px;" data-list-setting-members>${escHtml((m.members || []).join(", "))}</div>${added}</div>`;
+  }).join("");
+}
+// WHAT A DATASET LINKING ONE SOURCE WITH NO CODE IS ABOUT (REQ-DASH-299
+// criterion 10): a tile keyed by its word for the relation ('Geocodes'),
+// naming the source in REQ-DASH-337 criterion 11's long form - without the
+// period, a relation rather than a supply - linked to the source's page at the
+// date on show, through datasetRefLink. Absent for every other dataset.
+function linkedSourceTileHtml(ds){
+  const raw = (ds && rawRealDatasetById(ds.id)) || ds || {};
+  const ls = raw.linkedSource;
+  if(!ls || !ls.datasetId || !ls.relation) return "";
+  return `<div class="sla-tile" data-linked-source="${escAttr(ls.datasetId)}"><div class="k">${escHtml(ls.relation)}</div>`
+    + `<div class="v" style="font-size:14px;" data-linked-source-name>${causeName(ds.id, ls.datasetId, null, true)}</div></div>`;
+}
+// BOTH TILES, ON EVERY STRIP OF A SHOWN PAGE, a blocked one's included
+// (criterion 10, "WHILE shown"; post-build critic, item 4).
+function relationTilesHtml(ds, dateStr){
+  return `${linkedSourceTileHtml(ds)}${listSettingTilesHtml(ds, dateStr)}`;
 }
 function latestArrivalWords(ds){
   const a = ds && ds.lastArrival;
@@ -2102,6 +2248,7 @@ const STATUS_WORDS = {
   nodata: {label:"No data", verb:"no data", count:"no data"},
   exhausted: {label:"Schedule ended", verb:"schedule ended", count:"schedule ended"},
   inactive: {label:"No rule defined", verb:"no rule defined", count:"no rule defined"},
+  notchecked: {label:"Not checked", verb:"not checked", count:"not checked"},
   notcounted: {label:"Not counted", verb:"not counted", count:"not counted"},
   turnedoff: {label:"Turned off", verb:"turned off", count:"turned off"},
 };
@@ -2153,7 +2300,11 @@ function statusWords(value, form){
 // the same reason as the others: it is not a verdict.
 // `turnedoff` likewise (REQ-DASH-180 criterion 11): a group every dataset of
 // which is out of the rollup because it is turned off and owes nothing.
-const UNORDERED_STATUSES = ["exhausted", "inactive", "notcounted", "turnedoff"];
+// `notchecked` (REQ-DASH-299 criterion 17): a CHECK left out of its run's
+// scope for the period - DISPLAY ONLY, made by the build from a left_out entry
+// and recorded by no tool - at a level of its own, LEFT_OUT_STATUSES.
+const UNORDERED_STATUSES = ["exhausted", "inactive", "notchecked", "notcounted", "turnedoff"];
+const LEFT_OUT_STATUSES = ["notchecked"];
 // Recognition is scoped to WHERE a status was read from. `exhausted` is
 // a property of a dataset's SCHEDULE - a check result carrying one means
 // something upstream wrote a dataset-level status onto a check, and a
@@ -2166,7 +2317,8 @@ const CHECK_STATUSES = Object.keys(STATUS_ORDER).concat(["inactive"]);
 // Deduped: `inactive` is in both lists on purpose - it is a valid
 // CHECK status and an unordered one - so a plain concat would list it
 // twice and the shared table's own vocabulary case would catch it.
-const DATASET_STATUSES = [...new Set(CHECK_STATUSES.concat(UNORDERED_STATUSES))];
+const DATASET_STATUSES = [...new Set(CHECK_STATUSES.concat(UNORDERED_STATUSES))]
+  .filter(s=> LEFT_OUT_STATUSES.indexOf(s) === -1);
 // Fails rather than guessing, and that is the whole point. The previous
 // behaviour returned ANY truthy recorded status, so an unrecognised one
 // passed straight out to a rollup that could not order it -
@@ -2181,7 +2333,9 @@ const DATASET_STATUSES = [...new Set(CHECK_STATUSES.concat(UNORDERED_STATUSES))]
 function recognisedStatus(value, readFrom, allowed){
   const valid = allowed || CHECK_STATUSES;
   if(valid.indexOf(value) !== -1) return value;
-  const note = DATASET_STATUSES.indexOf(value) !== -1
+  const note = LEFT_OUT_STATUSES.indexOf(value) !== -1
+    ? ` "${value}" is display only - the dashboard build makes it from a run's left_out entry, and no tool records it.`
+    : DATASET_STATUSES.indexOf(value) !== -1
     ? ` "${value}" is a real status, but not one a ${readFrom} may carry - something wrote a dataset-level status onto a check result.`
     : "";
   throw new Error(`unrecognised status "${value}" read from ${readFrom}; valid here are ${valid.join(", ")}.${note} An unrecognised status is not evidence of health, so it is refused rather than read as a pass - see status-cases.json.`);
@@ -2222,6 +2376,7 @@ function statusVocabulary(){
     unordered: UNORDERED_STATUSES.slice(),
     check: CHECK_STATUSES.slice(),
     dataset: DATASET_STATUSES.slice(),
+    left_out: LEFT_OUT_STATUSES.slice(),
     labels: Object.fromEntries(Object.entries(STATUS_WORDS).map(([k, w])=> [k, Object.assign({}, w)])),
   };
 }
@@ -3737,7 +3892,7 @@ function rollup(datasets){
 // lose a reduce that starts from "green").
 function rollupStatuses(statuses){
   const live = statuses.filter(s=> s!=="nodata" && s!=="exhausted" && s!=="inactive"
-    && s!=="notcounted" && s!=="turnedoff");
+    && s!=="notchecked" && s!=="notcounted" && s!=="turnedoff");
   if(!live.length){
     // THE QUIET STATES, IN ORDER OF WHAT A READER CAN DO ABOUT THEM.
     // An ended schedule is why nothing is happening at all, so it stays
@@ -3752,6 +3907,9 @@ function rollupStatuses(statuses){
     // panel distinguished "no rule" from "rule passed".
     if(statuses.includes("inactive")) return "inactive";
     if(statuses.includes("nodata")) return "nodata";
+    // A CHECK LEFT OUT FOR THE PERIOD (REQ-DASH-299 criterion 17): after
+    // nodata, which may resolve itself, and before a group's notcounted.
+    if(statuses.includes("notchecked")) return "notchecked";
     // Last of the quiet states: a group with nothing counted is not a
     // verdict and not "nothing yet" either - and never green (#135).
     if(statuses.includes("notcounted")) return "notcounted";
@@ -5983,7 +6141,7 @@ function xtOtherCollection(col, check){
 function xtGroupDatasets(rows, collectionId){
   const ids = new Set();
   rows.forEach(r=>{
-    const b = (r.cards[0] || {}).between || {};
+    const b = ((r.cards ? r.cards[0] : r.ck) || {}).between || {};
     [b.declared_on, ...(b.reads || [])].forEach(id=>{ if(id && collectionOfDataset(id) === collectionId) ids.add(id); });
   });
   const c = hierarchyCollections().find(x=> x.id === collectionId);
@@ -5992,8 +6150,10 @@ function xtGroupDatasets(rows, collectionId){
 }
 // "2 failing, 1 warning, 3 passing" - the count of a group's checks at each
 // status, worst first, in the count form (REQ-DASH-359 criterion 3).
+// A LEFT-OUT ROW COUNTS 'not checked', AFTER THE OTHERS (REQ-DASH-337
+// criterion 7 as amended by REQ-DASH-299, A5): '3 checks: 1 passing, 2 not checked'.
 function xtStatusCounts(rows){
-  const order = ["red", "amber", "green", "nodata", "inactive"];
+  const order = ["red", "amber", "green", "nodata", "inactive", "notchecked"];
   const n = {};
   rows.forEach(r=>{ n[r.status] = (n[r.status] || 0) + 1; });
   return order.filter(s=> n[s]).map(s=> `${n[s]} ${statusWords(s, "count")}`).join(", ");
@@ -6395,7 +6555,8 @@ function xtAriaLabel(row, views){
 }
 // THE SECTION'S BODY: the head, one button per row, the key line - with a
 // view no row holds a result in left out (criterion 6), never a column of dashes.
-function crossTableGridHtml(rows){
+function crossTableGridHtml(rows, leftOut){
+  const out = leftOut || [];
   const views = ["staged", "warehouse"].filter(v=> rows.some(r=> xtCellText(r, v)));
   const shown = views.length ? views : ["warehouse"];
   const head = `<div class="xt-head" aria-hidden="true"><span>Check</span>${shown.map(v=> `<span>${v === "staged" ? "Against what's staged" : "Against what's in the warehouse"}</span>`).join("")}<span></span></div>`;
@@ -6407,11 +6568,17 @@ function crossTableGridHtml(rows){
       </button>`;
   const key = `
       <div class="xt-key">The marks are dbt, Soda and datacontract-cli, in that order: <span class="xt-marks">✓</span> passed, <span class="xt-marks">!</span> warned, <span class="xt-marks">✗</span> failed, <span class="xt-marks">○</span> could not be evaluated, and a middle dot (<span class="xt-marks">·</span>) means that tool has no such check. Select a check for each tool's full result.</div>`;
-  const indexed = rows.map((r, i)=> ({r, i}));
+  // LEFT-OUT ROWS JOIN THE LIST THEY BELONG TO, after its run rows (A1).
+  const order = hierarchyCollections().map(c=> c.id);
+  const at = g=> g == null ? -1 : (order.indexOf(g) === -1 ? order.length : order.indexOf(g));
+  const indexed = [...rows.map((r, i)=> ({r, i})), ...out.map(r=> ({r, i: null}))]
+    .map((x, n)=> ({...x, n})).sort((a, b)=> at(a.r.group) - at(b.r.group) || a.n - b.n);
+  const anyRow = x=> x.r.leftOut ? leftOutRowHtml(x.r, shown) : rowHtml(x.r, x.i);
+  const withNote = items=> items.some(x=> x.r.leftOut) ? notCheckedNote() : "";
   const own = indexed.filter(x=> x.r.group == null);
   // A PAGE WITH NO CHECK INVOLVING ANOTHER COLLECTION IS UNCHANGED (criterion 6).
-  if(own.length === rows.length){
-    return {views: shown, html: `<div class="xt-grid" data-columns="${shown.length}">${head}${own.map(x=> rowHtml(x.r, x.i)).join("")}${key}</div>`};
+  if(own.length === indexed.length){
+    return {views: shown, html: `<div class="xt-grid" data-columns="${shown.length}">${head}${own.map(anyRow).join("")}${withNote(own)}${key}</div>`};
   }
   // ONE GROUP PER OTHER COLLECTION, COLLAPSED ON LOAD, failing ones too
   // (criterion 7, Keith L-Q6): a heading naming the collection, its worst
@@ -6444,10 +6611,10 @@ function crossTableGridHtml(rows){
           </button>
           ${links.length ? `<span class="xt-group-links" data-xt-group-links>${andList(links)}</span>` : ""}
         </div>
-        <div class="xt-grid xt-group-body" id="${bodyId}" data-columns="${shown.length}"${isOpen(g.id) ? "" : " hidden"}>${head}${g.items.map(x=> rowHtml(x.r, x.i)).join("")}</div>
+        <div class="xt-grid xt-group-body" id="${bodyId}" data-columns="${shown.length}"${isOpen(g.id) ? "" : " hidden"}>${head}${g.items.map(anyRow).join("")}${withNote(g.items)}</div>
       </div>`;
   }).join("");
-  const ownHtml = own.length ? `<div class="xt-grid" data-columns="${shown.length}">${head}${own.map(x=> rowHtml(x.r, x.i)).join("")}</div>` : "";
+  const ownHtml = own.length ? `<div class="xt-grid" data-columns="${shown.length}">${head}${own.map(anyRow).join("")}${withNote(own)}</div>` : "";
   return {views: shown, html: `${ownHtml}${groupHtml}<div class="xt-grid xt-key-only">${key}</div>`};
 }
 // THE CROSS-TABLE SECTION'S PILL (REQ-DASH-337's UX review, D4): the worst
@@ -6580,37 +6747,55 @@ function notInAgreementShown(col, ds){
 // An entry recorded before the codes existed carries no code and was only ever
 // not part of the agreement. Its period is the entry's own field - the build
 // reads a pre-code entry's period once, so nothing here reads the reason.
+// EVERY REASON BEGINS 'Not checked: ' (REQ-DASH-337 criterion 12 as amended
+// by REQ-DASH-299, A2), so all three read alike under A1; a dataset is named
+// by its hierarchy name, short - the row sits on that dataset's page or under
+// a heading naming its collection.
 function notInAgreementReason(entry){
   const e = entry || {};
   const period = e.period || "its period";
   const code = e.code || "not_in_agreement";
-  if(code === "not_supplied_by_decision") return `Not supplied for ${period}, by decision.`;
-  if(code === "calendar_differs"){
+  const named = ()=> {
     const d = e.dataset ? realDatasetIndex()[e.dataset] : null;
-    const name = (d && d.name) || e.dataset || "a dataset it reads";
-    return `Not checked: ${name} was on ${e.calendar ? "the " + e.calendar : "another"} calendar for ${period}.`;
+    return (d && d.name) || (e.dataset && datasetNameAnywhere(e.dataset)) || e.dataset || "a dataset it reads";
+  };
+  // THE STATUS'S OWN WORD, through statusWords (REQ-DASH-359 criterion 1).
+  const lead = statusWords("notchecked", "label");
+  if(code === "not_supplied_by_decision") return `${lead}: ${named()} not supplied for ${period}, by decision.`;
+  if(code === "calendar_differs"){
+    return `${lead}: ${named()} was on ${e.calendar ? "the " + e.calendar : "another"} calendar for ${period}.`;
   }
-  return `Not part of the agreement for ${period}.`;
+  return `${lead}: not part of the agreement for ${period}.`;
 }
-function notInAgreementBlock(rows){
-  if(!rows.length) return "";
-  const lines = rows.map((r, i)=> `
-      <div class="nia-row" data-nia="${i}" data-check-id="${escAttr(r.entry.checkId)}">
-        <span class="label"><span class="nm"></span><span class="bt"></span><span class="tr"></span><span class="why"></span></span>
-        <span class="nia-tag">Not run</span>
-      </div>`).join("");
-  return `<div class="not-in-agreement" data-not-in-agreement="${rows.length}">
-      <div class="nia-head">Not run for this supply</div>
-      ${lines}
-      <div class="nia-note">${rows.length === 1 ? "This check reads a table" : "These checks read a table"} that ${rows.every(r=> (r.entry.code || "not_in_agreement") === "not_in_agreement")
-        ? "is not part of the delivery agreement for the supply's period" : "was out of scope for the supply's period, for the reason given"}, so ${rows.length === 1 ? "it was" : "they were"} left out of
-        its run. ${rows.length === 1 ? "It is" : "They are"} neither a Fail nor a result, and ${rows.length === 1 ? "does" : "do"} not count toward this dataset's status.</div>
-    </div>`;
+// A LEFT-OUT CHECK'S ROW (REQ-DASH-337 criterion 6 as amended by REQ-DASH-299,
+// A1): where it would be shown had it run - in its collection's group, or
+// among the page's own checks - a quiet row with the 'Not checked' pill where
+// a run check carries its status, its reason under its name, and no button:
+// there is no result to open. It counts toward no status (A1); a group's
+// heading counts it 'not checked' (A5).
+function leftOutRowModels(col, rows){
+  return (rows || []).map((r, j)=> {
+    const ck = r.ck.between || !r.entry.between ? r.ck : {...r.ck, between: r.entry.between};
+    return {leftOut: true, j, entry: r.entry, ck, status: "notchecked", group: xtOtherCollection(col, ck)};
+  });
+}
+function leftOutRowHtml(r, views){
+  return `
+      <div class="xt-row xt-left-out" data-left-out="${r.j}" data-check-id="${escAttr(r.entry.checkId)}">
+        <span class="xt-name label"><span class="nm"></span><span class="bt"></span><span class="tr"></span><span class="why"></span></span>
+        ${views.map(v=> `<span class="xt-cell" data-view="${v}" data-empty><span class="xt-view">${XT_VIEW[v]} </span>—</span>`).join("")}
+        <span class="xt-pill">${pill("notchecked", "sm")}</span>
+      </div>`;
+}
+// SAID ONCE, AFTER THE ROWS of a group or of the page's own list that holds a
+// left-out row (A1; UX v5 S2). Its status word through statusWords.
+function notCheckedNote(){
+  return `<div class="xt-not-checked-note" data-not-checked-note>${statusWords("notchecked", "label")} means the check did not run on this supply, for the reason given. It is neither a ${statusWords("red", "label")} nor a result, and does not count toward this dataset's status.</div>`;
 }
 // Authored prose set as text, never interpolated (REQ-DASH-026).
 function wireNotInAgreement(scopeWrap, col, rows){
-  scopeWrap.querySelectorAll(".not-in-agreement .nia-row").forEach(el=>{
-    const r = rows[Number(el.dataset.nia)];
+  scopeWrap.querySelectorAll(".xt-left-out").forEach(el=>{
+    const r = rows[Number(el.dataset.leftOut)];
     if(!r) return;
     el.querySelector(".nm").textContent = r.ck.name || r.entry.checkId;
     el.querySelector(".bt").textContent = crossTableBetween(col, r.ck);
@@ -6671,6 +6856,22 @@ function recheckNote(col, point, why){
     ? `Re-checked ${fmtInstant(point.recorded_at)}, ${when}.`
     : `Checked ${fmtInstant(point.recorded_at)}, ${when}.`;
 }
+// WHICH OTHER COLLECTIONS' DATASETS A CHECK READS (REQ-DASH-337 criterion 17,
+// A3 by REQ-DASH-299): in criterion 11's long form without the period -
+// "Child Protection's Client Register" - as text, never inside a button's link.
+function acrossCollectionsReads(col, check){
+  const b = check && check.between;
+  if(!b) return [];
+  return [b.declared_on, ...(b.reads || [])].filter(id=> id && inAnotherCollection(id, col))
+    .map(id=> { const cn = collectionNameOf(collectionOfDataset(id)); return `${possessive(cn, cn)} ${datasetNameAnywhere(id)}`; });
+}
+// A tool's display name - 'datacontract-cli', 'Soda' - from XT_TOOLS, never
+// its raw key (post-build critic, item 7); an unlisted tool reads as its key.
+function toolDisplayName(toolRef){
+  const t = String(toolRef || "").split(":")[0];
+  const found = XT_TOOLS.find(([k])=> k === t);
+  return found ? found[1] : t;
+}
 function collectionCrossTableSection(ag, col){
   const entries = collectionCrossTableChecks(col);
   if(!entries.length) return "";
@@ -6681,18 +6882,32 @@ function collectionCrossTableSection(ag, col){
   // that produced a false green once already, and there is no reason
   // for this page to keep its own arithmetic.
   const worst = rollupStatuses(entries.map(e=> checkStatus(e.check)));
-  const rows = entries.map(e=> `
+  const row = (e, across)=> `
     <button class="scope-check" data-nav='${JSON.stringify({tier:"dataset", agencyId:ag.id, collectionId:col.id, datasetId:e.dataset.id})}'>
       <span class="label"><span class="nm">${escHtml(e.check.label || e.check.name || e.check.check_id)}</span>
-        <span class="ds">${escHtml(crossTableSource(col, e))}</span></span>
+        <span class="ds">${escHtml(across.length ? [`Reads ${andList(across)}`, toolDisplayName(e.check.tool_ref)].filter(Boolean).join(" · ") : crossTableSource(col, e))}</span></span>
       ${pill(checkStatus(e.check),"sm")}
-    </button>`).join("");
+    </button>`;
+  // A CHECK READING ANOTHER COLLECTION'S DATASET IS LISTED AFTER THE
+  // COLLECTION'S OWN, under its own sub-heading (A3) - never called one
+  // 'between two tables in this collection'. A collection with none renders
+  // as before.
+  const own = entries.filter(e=> !acrossCollectionsReads(col, e.check).length);
+  const across = entries.filter(e=> acrossCollectionsReads(col, e.check).length);
+  const ownBlurb = `<div class="blurb">Checks about the relationship between two tables in this collection.
+      A failure is a disagreement between them rather than a fault in either one alone, so it
+      counts against every table the check reads.</div>`;
+  const acrossHtml = across.length ? `
+    <div class="across-collections" data-across-collections>
+      <h4 class="across-collections-head">Across collections</h4>
+      <div class="blurb">Checks that read a dataset of another collection; a failure counts against every dataset the check reads.</div>
+      ${across.map(e=> row(e, acrossCollectionsReads(col, e.check))).join("")}
+    </div>` : "";
   return `<div class="scope-section" data-scope="cross-table" style="margin-bottom:14px;">
     <div class="head"><h3>Cross-table checks</h3>${pill(worst,"sm")}</div>
-    <div class="blurb">Checks about the relationship between two tables in this collection.
-      A failure is a disagreement between them rather than a fault in either one alone, so it
-      counts against every table the check reads.</div>
-    ${rows}
+    ${own.length ? ownBlurb : ""}
+    ${own.map(e=> row(e, [])).join("")}
+    ${acrossHtml}
   </div>`;
 }
 
@@ -10014,6 +10229,7 @@ function renderDataset(view, agencyId, collectionId, datasetId){
       ${outstandingQueue("dataset", ds.id)}
       <div class="sla-strip">
         <div class="sla-tile"><div class="k">Waiting since</div><div class="v mono">${ds.blocked.openedAt ? fmtInstant(ds.blocked.openedAt) : "—"}</div></div>
+        ${relationTilesHtml(ds, CURRENT_IN_PLACE_ON)}
         <div class="sla-tile"><div class="k">Rows, latest run</div><div class="v mono">—</div></div>
       </div>
       <div id="supply-history-wrap"></div>
@@ -10089,9 +10305,11 @@ function renderDataset(view, agencyId, collectionId, datasetId){
       ${slaTileHtml(rawRealDatasetById(ds.id) || ds, CURRENT_IN_PLACE_ON)}
       ${ds.blocked ? `
       <div class="sla-tile"><div class="k">Waiting since</div><div class="v mono" title="When we received the supply that is waiting for a person">${ds.blocked.openedAt ? fmtInstant(ds.blocked.openedAt) : "—"} (${escHtml(blockerLabel(ds.blocked))})</div></div>
+      ${relationTilesHtml(ds, CURRENT_IN_PLACE_ON)}
       <div class="sla-tile"><div class="k">Delivery format</div><div class="v" style="font-size:14px;">${ds.deliveryFormat}</div></div>
       <div class="sla-tile"><div class="k">Rows, latest run</div><div class="v mono">—</div></div>` : `
       ${latestArrivalTileHtml(ds)}
+      ${relationTilesHtml(ds, CURRENT_IN_PLACE_ON)}
       <div class="sla-tile"><div class="k">Delivery format</div><div class="v" style="font-size:14px;">${ds.deliveryFormat}</div></div>
       <div class="sla-tile"><div class="k">Rows, latest run</div><div class="v mono">${fmtInt(ds.rowCount)} <span style="font-size:11.5px; color:${rowDelta>=0?'var(--good)':'var(--bad)'};">(${rowDelta>=0?'+':''}${fmtInt(rowDelta)})</span></div></div>`}
     </div>
@@ -10177,9 +10395,9 @@ function renderDataset(view, agencyId, collectionId, datasetId){
     // THE CROSS-TABLE SECTION IS A GRID (REQ-DASH-272 criterion 6): one row
     // per check, a cell per view; on an awaiting page its caption says whose
     // results they are, in the blurb's slot.
-    if(sc.scope === "cross-table" && listed.length){
+    if(sc.scope === "cross-table" && (listed.length || outside.length)){
       xtRows = crossTableGridRows(col, ds, listed, CURRENT_IN_PLACE_ON);
-      const grid = crossTableGridHtml(xtRows);
+      const grid = crossTableGridHtml(xtRows, leftOutRowModels(col, outside));
       xtViews = grid.views;
       // NO RED ROW UNDER A NON-RED PILL: the head follows the rows' pills,
       // which are the gate's reading (criterion 6).
@@ -10192,7 +10410,6 @@ function renderDataset(view, agencyId, collectionId, datasetId){
       <div class="head"><h3>${sc.title}</h3>${checks.length ? pill(head,"sm") : ""}</div>
       ${caption}
       ${grid.html}
-      ${notInAgreementBlock(outside)}
     </div>`;
     }
     const ordered = listed;
@@ -10205,7 +10422,6 @@ function renderDataset(view, agencyId, collectionId, datasetId){
       <div class="head"><h3>${sc.title}</h3>${checks.length ? pill(worst,"sm") : ""}</div>
       <div class="blurb">${sc.blurb}</div>
       ${rows}
-      ${notInAgreementBlock(outside)}
     </div>`;
   }).join("");
   wireNotInAgreement(scopeWrap, col, notInAgreement);
@@ -10795,15 +11011,7 @@ function openCheckPanel(ag, col, ds, column, check, opts){
   // .md) between reporting and case-management.
   const sampleKeys = currentPoint.failing_sample_keys || [];
   const comparedSampleKeys = hasCompareRun ? (comparePoint.failing_sample_keys || []) : [];
-  const sampleBlock = sampleKeys.length ? `
-      <div style="margin-top:10px;">
-        <div style="font-size:11px; color:var(--ink-faint); margin-bottom:5px;">Example failing rows (primary key only)${currentPoint.row_count_invalid > sampleKeys.length ? ` — ${sampleKeys.length} of ${fmtInt(currentPoint.row_count_invalid)}` : ""}:</div>
-        <div style="display:flex; flex-wrap:wrap; gap:5px;">
-          ${sampleKeys.map(k => samplePill(k, "rgba(127,127,127,.12)")).join("")}
-        </div>
-        ${(fp => fp ? `<div class="sample-fine-print" style="font-size:11px; color:var(--ink-muted); margin-top:5px;">${fp}</div>` : "")(sampleFinePrint(check.tool_ref, sampleKeys.length, currentPoint.row_count_invalid))}
-      </div>` : (currentPoint.row_count_invalid ? `
-      <div style="font-size:11.5px; color:var(--ink-faint); margin-top:8px;">No failing-row sample available for this check - not every check type this pipeline runs supports per-row samples yet (see plans/qa-pipeline.md #15).</div>` : "");
+  const sampleBlock = sampleBlockHtml(check, currentPoint, ds.id);
 
   // #45: diffs the current run's sampled failing-row keys against the
   // COMPARED run's own sample - "still failing" (both), "new since the
@@ -10817,13 +11025,13 @@ function openCheckPanel(ag, col, ds, column, check, opts){
   const keyGroup = (label, keys, bg) => keys.length ? `
       <div style="margin-top:8px;">
         <div style="font-size:11px; color:var(--ink-faint); margin-bottom:5px;">${label} (${keys.length}):</div>
-        <div style="display:flex; flex-wrap:wrap; gap:5px;">${keys.map(k=>samplePill(k,bg)).join("")}</div>
+        <div style="display:flex; flex-wrap:wrap; gap:5px;">${keys.map(k=>sampleKeyHtml(check, currentPoint, k, bg, ds.id)).join("")}</div>
       </div>` : "";
   const diffBlock = (hasCompareRun && (sampleKeys.length || comparedSampleKeys.length)) ? (()=>{
     const diff = compareSampleKeys(currentPoint, comparePoint);
     const head = `
       <div style="margin-top:14px; padding-top:12px; border-top:1px solid var(--line);">
-        <div style="font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--ink-faint); font-weight:700;">Failing rows vs. the compared run</div>`;
+        <div style="font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--ink-faint); font-weight:700;">${SAMPLE_COMPARE_HEADING}</div>`;
     if (!diff.comparable) return `${head}
         <div class="sample-keys-incomparable" style="font-size:11.5px; color:var(--ink-faint); margin-top:8px;">${SAMPLE_KEYS_INCOMPARABLE}</div>
       </div>`;
@@ -10841,8 +11049,8 @@ function openCheckPanel(ag, col, ds, column, check, opts){
       <h4>Row-level detail</h4>
       <div class="stat-row">
         <div class="stat"><div class="k">Rows checked, ${currentLabel.toLowerCase()}</div><div class="v">${fmtInt(currentPoint.row_count_total)}</div></div>
-        <div class="stat"><div class="k">Rows flagged, ${currentLabel.toLowerCase()}</div><div class="v">${currentPoint.row_count_invalid!=null ? fmtInt(currentPoint.row_count_invalid) : "—"}</div></div>
-        ${(hasCompareRun && comparePoint.row_count_invalid!=null) ? `<div class="stat"><div class="k">Rows flagged, compared run</div><div class="v">${fmtInt(comparePoint.row_count_invalid)}</div></div>` : ""}
+        <div class="stat"><div class="k">${flaggedLabel(check, currentLabel.toLowerCase())}</div><div class="v">${currentPoint.row_count_invalid!=null ? fmtInt(currentPoint.row_count_invalid) : "—"}</div></div>
+        ${(hasCompareRun && comparePoint.row_count_invalid!=null) ? `<div class="stat"><div class="k">${flaggedLabel(check, "compared run")}</div><div class="v">${fmtInt(comparePoint.row_count_invalid)}</div></div>` : ""}
       </div>
       ${sampleBlock}
       ${diffBlock}

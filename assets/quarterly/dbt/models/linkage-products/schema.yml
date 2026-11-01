@@ -19,6 +19,7 @@ models:
               meta:
                 check_id: quarterly.department-of-health.linkage-products.geo-cp-clients.census_year.missing_set_members_dbt
                 name: Census year present for every record
+                measures: Missing census years
                 category: completeness
                 introduced_date: "2013-01-01"
                 description: >
@@ -46,6 +47,7 @@ models:
               meta:
                 check_id: quarterly.department-of-health.linkage-products.geo-cp-clients.census_year.duplicated_set_members_dbt
                 name: Each census year once per record
+                measures: Duplicated census years
                 category: uniqueness
                 introduced_date: "2013-01-01"
                 description: >
@@ -73,6 +75,7 @@ models:
               meta:
                 check_id: quarterly.department-of-health.linkage-products.geo-cp-clients.census_year.unexpected_set_members_dbt
                 name: Only agreed census years
+                measures: Unexpected census years
                 category: conformity
                 introduced_date: "2013-01-01"
                 description: >
@@ -105,6 +108,7 @@ models:
               meta:
                 check_id: quarterly.department-of-health.linkage-products.geo-ed-presentations.census_year.missing_set_members_dbt
                 name: Census year present for every record
+                measures: Missing census years
                 category: completeness
                 introduced_date: "2013-01-01"
                 description: >
@@ -132,6 +136,7 @@ models:
               meta:
                 check_id: quarterly.department-of-health.linkage-products.geo-ed-presentations.census_year.duplicated_set_members_dbt
                 name: Each census year once per record
+                measures: Duplicated census years
                 category: uniqueness
                 introduced_date: "2013-01-01"
                 description: >
@@ -159,6 +164,7 @@ models:
               meta:
                 check_id: quarterly.department-of-health.linkage-products.geo-ed-presentations.census_year.unexpected_set_members_dbt
                 name: Only agreed census years
+                measures: Unexpected census years
                 category: conformity
                 introduced_date: "2013-01-01"
                 description: >

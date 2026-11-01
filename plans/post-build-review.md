@@ -13552,3 +13552,54 @@ twice. It deliberately did not re-find the `TypeError`.
        "no such supply" refusal now says "a supply's trial".
      - **7. TS-93c, TS-100c and TS-101b's lettered names (left)**: already a
        question for Keith on REQ-GEN-298; unchanged.
+
+302. **[done, 2026-11-02]** **[Dashboard UI]** **[QA checks & contract]** **REQ-DASH-299's change to built page wording, site-wide (criteria 2, 3 and 5; NFR 3).**
+     Written up here because these change every check page of every
+     collection, Birth Registrations included - not only the geocoding pages
+     the requirement is about. All three were signed by Keith on 2026-10-31.
+     - **Criterion 2, the two cross-collection kinds as siblings**: MEASURES'
+       soda:referential reads 'Rows matching no source record' (was 'Links to
+       records that are not there') and soda:coverage 'Source records matched'
+       (was 'Records linked'), for Linkage Keys' checks and the geocoding
+       checks alike. No test asserted the old phrases (grep, 2026-11-01);
+       tests/test_check_measures.py now pins the new ones.
+     - **Criterion 3, every check's examples**: 'Example failing rows (primary
+       key only)' is now 'Examples: <what the check measures> (key only)',
+       'Rows flagged, this run' is '<phrase>, this run', and 'Failing rows vs.
+       the compared run' is 'Examples vs. the compared run'. A check naming no
+       phrase reads 'Examples (key only)' and 'Flagged, this run' (criterion
+       4); none in committed configuration does.
+     - **Criterion 5, a result with no examples**: 'No examples were recorded
+       for this result.' replaces the sentence that guessed a reason and
+       pointed readers at plans/qa-pipeline.md #15.
+     - **Left as decided**: the fine print under the examples, which says how
+       the tool chose them, is unchanged (the requirement's own decision).
+
+303. **[done, 2026-11-02]** **[Dashboard UI]** **[QA pipeline]** **[Testing & dev tooling]** **Post-build critic on REQ-DASH-299 (the geocoding pages; e02d4397): two defects and five minor findings, all fixed; one PROVISIONAL choice withdrawn.**
+     Each was checked against the code before it went here; the defect fixes
+     are test-first and were seen failing first.
+     - **1. Browser proof 7 looked for its file by period (defect, fixed)**:
+       it globbed `data/deliveries/*<period>*/`, and a delivery folder's name
+       is arbitrary (generator/delivery_names.py). It now finds the supply's
+       file through qa.supply_receipt, over all three fault scenarios, and
+       inspects every census_year and match_level panel, not one.
+     - **2. Criterion 1's order was not met (defect, fixed)**: the build keeps
+       arrival order and dbt with one thread breaks ties by unique_id, so the
+       year checks read duplicated, missing, unexpected. KIND_ORDER in
+       pipeline/dashboard_check_labels.py declares the set-member family's
+       order by generic kind and rank_for_headline sorts equals by it
+       (tests/test_geocoding_page_build.py, three tests, two seen failing);
+       proof 1 asserts the order on the page. PROVISIONAL #4, whose premise was
+       false, is withdrawn by a decision saying so.
+     - **3. 'Not checked: ' written three times (fixed)**: through statusWords.
+     - **4. The tiles vanished on a blocked page (fixed)**: relationTilesHtml
+       in every strip; a Vitest render of a held page proves it.
+     - **5. The store did not refuse notchecked (fixed)**: the decision said it
+       did. qa_store.record_results now raises DisplayOnlyStatus before any
+       write (tests/test_notchecked_refused.py, seen failing); a decision
+       records that the claim was ahead of the code.
+     - **6. Weak proofs (fixed)**: proof 5 locates each break marker between
+       its two points; proof 9 is tied to TS-111's period.
+     - **7. Nits (fixed)**: A1-A5 marked applied and dated; the agency row
+       names the tool by display name; each remaining PROVISIONAL question
+       carries a recommendation.

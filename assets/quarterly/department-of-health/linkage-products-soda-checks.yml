@@ -275,6 +275,7 @@ checks for geo_cp_clients:
       attributes:
         check_id: quarterly.department-of-health.linkage-products.geo-cp-clients.match_level.value_share_soda
         name: Share not geocoded
+        measures: Rows not geocoded
         reads_columns: ["geo_cp_clients.match_level"]
         category: completeness
         introduced_date: "2013-01-01"
@@ -463,6 +464,7 @@ checks for geo_ed_presentations:
       attributes:
         check_id: quarterly.department-of-health.linkage-products.geo-ed-presentations.match_level.value_share_soda
         name: Share not geocoded
+        measures: Rows not geocoded
         reads_columns: ["geo_ed_presentations.match_level"]
         category: completeness
         introduced_date: "2013-01-01"
