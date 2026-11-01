@@ -1796,14 +1796,10 @@ function recordedListSettings(ds, dateStr){
   }));
   return Object.keys(newest).sort().map(k=> newest[k].set);
 }
-function shortDay(iso){
-  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || ""));
-  return m ? `${Number(m[3])} ${_MONTH_FULL[Number(m[2]) - 1].slice(0, 3)} ${m[1]}` : escHtml(String(iso || ""));
-}
 function listSettingTilesHtml(ds, dateStr){
   return recordedListSettings(ds, dateStr).filter(m=> m.label).map(m=> {
     const added = (m.added || []).length
-      ? `<div class="sla-files-go" data-list-setting-added style="color:var(--ink-muted); font-size:12px; margin-top:4px; line-height:1.4;">${escHtml(m.added.join(", "))} added on ${shortDay(m.version)}</div>` : "";
+      ? `<div class="sla-files-go" data-list-setting-added style="color:var(--ink-muted); font-size:12px; margin-top:4px; line-height:1.4;">${escHtml(m.added.join(", "))} added on ${shortDay(String(m.version).slice(0, 10))}</div>` : "";
     return `<div class="sla-tile" data-list-setting="${escAttr(m.setting)}"><div class="k">${escHtml(m.label)}</div>`
       + `<div class="v" style="font-size:14px;" data-list-setting-members>${escHtml((m.members || []).join(", "))}</div>${added}</div>`;
   }).join("");
