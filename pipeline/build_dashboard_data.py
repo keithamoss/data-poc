@@ -42,7 +42,8 @@ from pipeline import (acknowledgements, period_slots, closed_slots, corrections,
                       file_check_panel, owed_nothing, placements, promotion_timeline,
                       recorded_arrival, re_checks, red_promoted, slot_timeline,
                       warehouse_counts)
-from pipeline.dashboard_check_labels import (dashboard_status, display_name, measure, pooled_url_key,
+from pipeline.dashboard_check_labels import (dashboard_status, display_name, measure, measures_phrase,
+                                             pooled_url_key,
                                              rank_for_headline, tool_ref, url_key)
 from qa_tools import collections
 from qa_tools.common import (agreement, amber_setting, asset_time, assets, build_output, carry_forward, census,
@@ -693,7 +694,13 @@ def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], da
                 "dimension": slot["dimension"],
                 "unit": slot["unit"],
                 # REQ-DASH-228: the chart's axis title and table header.
-                "measure": measure(slot["check_id"], slot["unit"]),
+                "measure": measure(slot["check_id"], slot["unit"],
+                                   lifecycle.measures if lifecycle else None),
+                # WHAT IT MEASURES, the bare phrase - declared on the check or
+                # its kind's (REQ-DASH-299 criterion 1) - which heads its
+                # examples and labels its counts; None where neither names one.
+                "measures": measures_phrase(slot["check_id"],
+                                            lifecycle.measures if lifecycle else None),
                 # item 74 Bug A: None stays None - it means "this check has no
                 # bound of that kind", NOT "zero tolerance".
                 "warn": slot["warn"],

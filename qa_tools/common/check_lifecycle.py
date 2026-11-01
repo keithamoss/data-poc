@@ -172,6 +172,13 @@ class CheckMetadata:
     # already been rejected.
     failure_indicates: str | None = None
     technical_note: str | None = None
+    # WHAT THE CHECK MEASURES, IN ITS OWN WORDS (REQ-DASH-299 criterion 1):
+    # a phrase declared on the check - 'Missing census years' - read by the
+    # dashboard build AHEAD of pipeline/dashboard_check_labels.py's MEASURES
+    # for its kind, so that no dataset's word is written into shared code.
+    # Outside the config hash, as `name` is: rewording is not a change to
+    # what the check does.
+    measures: str | None = None
 
     # EVERY TABLE THIS CHECK READS BESIDES THE ONE IT IS FILED AGAINST
     # (REQ-PIPE-036 criterion 10), as LOGICAL names. Declared rather
@@ -294,6 +301,7 @@ def _lifecycle_fields(meta: dict) -> dict:
         "name": _authored(meta, "name"),
         "failure_indicates": _authored(meta, "failure_indicates"),
         "technical_note": _authored(meta, "technical_note"),
+        "measures": _authored(meta, "measures"),
         "reads_tables": _table_list(meta, "reads_tables"),
         "reads_columns": _table_list(meta, "reads_columns"),
     }

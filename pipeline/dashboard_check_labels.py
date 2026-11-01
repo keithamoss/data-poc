@@ -284,8 +284,10 @@ MEASURES: dict[str, str] = {
     "soda:approval_compliance": "Placements with an unapproved carer",
     "datacontract:approval_compliance": "Placements with an unapproved carer",
     # Checks across collections (REQ-QAC-333) - generic kinds, any linked dataset
-    "soda:referential": "Links to records that are not there",
-    "soda:coverage": "Records linked",
+    # Siblings (REQ-DASH-299 criterion 2, Keith 2026-10-31, Q11 a): the rows
+    # that match nothing, and the source records that are matched.
+    "soda:referential": "Rows matching no source record",
+    "soda:coverage": "Source records matched",
     "soda:expected_ids": "Expected identifiers missing",
     "soda:no_surplus_ids": "Surplus identifiers",
     "soda:large_key_groups": "Keys linking many records",
@@ -306,10 +308,19 @@ MEASURES: dict[str, str] = {
 }
 
 
-def measure(check_id: str, unit: str | None) -> str:
+def measures_phrase(check_id: str, declared: str | None = None) -> str | None:
+    """What a check measures, in words: the phrase the check DECLARES in its
+    own check file (REQ-DASH-299 criterion 1) ahead of MEASURES' phrase for
+    its kind - so 'Missing census years' lives on the geocoding check and
+    never in this shared module - or None where neither names one."""
+    return (declared or None) or MEASURES.get(tool_ref(check_id))
+
+
+def measure(check_id: str, unit: str | None, declared: str | None = None) -> str:
     """The y-axis title and table header for a check's trend chart:
-    'Rows with no value (count)'. A kind missing from MEASURES falls back
-    to the unit alone, 'Value (count)', rather than guessing (REQ-DASH-228
-    criterion 3)."""
-    phrase = MEASURES.get(tool_ref(check_id), "Value")
+    'Rows with no value (count)'. The check's own declared phrase wins
+    (REQ-DASH-299 criterion 1); a kind missing from MEASURES, with none
+    declared, falls back to the unit alone, 'Value (count)', rather than
+    guessing (REQ-DASH-228 criterion 3)."""
+    phrase = measures_phrase(check_id, declared) or "Value"
     return f"{phrase} ({unit})" if unit else phrase
