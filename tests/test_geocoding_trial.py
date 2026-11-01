@@ -429,10 +429,31 @@ class TestATrialSpeaksOnlyForItsOwnCollectionsChecks:
                                    absent=["cp_clients", "ed_presentations",
                                            "geo_ed_presentations", "linkage_keys"])
         out = unrunnable.results_for_trial(run_id="trial_x", run_timestamp="t",
+                                           collection_id="linkage-products",
                                            resolution=res, reads=promotion._declared_reads())
         assert out, "the run's own checks reading cp_clients are recorded not evaluated"
         assert {r["collection_id"] for r in out} == {"linkage-products"}, \
             sorted({r["check_id"] for r in out if r["collection_id"] != "linkage-products"})[:3]
+
+    def test_another_collections_check_reading_only_a_known_table_is_not_its_own(self):
+        """REQ-GEN-298 critic finding 2 (post-build-review #301), seen
+        failing first: deciding by TABLE MEMBERSHIP let a Child Protection
+        check through whenever every table it reads is one this Linkage
+        Products trial knows - here a Client Register check reading only
+        cp_clients, which the trial lists as absent. The check's collection
+        decides, not its tables."""
+        from qa_tools.common import unrunnable
+
+        cp = "data-asset-1.child-protection-family-support.child-protection"
+        cp_check = f"{cp}.cp-clients.cp_client_id.not_null_dbt"
+        res = supply_db.Resolution(run_id="trial_x", schema="qa_trial_x",
+                                   resolved={"geo_cp_clients": "geo_cp_clients__1"},
+                                   absent=["cp_clients"])
+        out = unrunnable.results_for_trial(run_id="trial_x", run_timestamp="t",
+                                           collection_id="linkage-products",
+                                           resolution=res, reads={cp_check: ["cp_clients"]},
+                                           left_out_ids={cp_check})
+        assert out == []
 
 
 class TestAnEmptySupplysDriftIsNotEvaluated:

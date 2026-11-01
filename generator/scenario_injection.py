@@ -635,6 +635,16 @@ def supply_arrivals(placement) -> list[dict]:
     return [a for a in placement.arrivals if carries(a.get("file_shape"), table)]
 
 
+def carries_file(shape: str | None, files: dict[str, str], name: str) -> bool:
+    """Whether the delivery `files` makes, once `shape` is applied, still
+    carries `name` as a readable extract: not left out, not renamed so
+    nothing claims it, and not made unreadable (Provider.carries_table)."""
+    shaped = apply_file_shape(shape, files)
+    if name not in shaped:
+        return False
+    return shaped[name] == files[name] or shaped[name] != unreadable(files[name])
+
+
 def apply_file_shape(shape: str | None, files: dict[str, str]) -> dict[str, str]:
     """One delivery's file set, as the named shape wants it.
 

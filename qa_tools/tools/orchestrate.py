@@ -247,7 +247,8 @@ def _run_one_inner(collection_id: str, entry: dict, run_id: str, run_timestamp: 
     # and gets neither a record nor red.
     outside = (_out_of_agreement(entry, run_id, resolution, run_timestamp) if readable
                else {})
-    missing = (_unrunnable_results(entry, run_id, run_timestamp, resolution, outside)
+    missing = (_unrunnable_results(collection_id, entry, run_id, run_timestamp, resolution,
+                                   outside)
                if readable else [])
     if missing:
         print(unrunnable.describe(missing))
@@ -356,14 +357,16 @@ def _out_of_agreement(entry: dict, run_id: str, resolution,
                         if run_timestamp else None))
 
 
-def _unrunnable_results(entry: dict, run_id: str, run_timestamp: str, resolution,
+def _unrunnable_results(collection_id: str, entry: dict, run_id: str, run_timestamp: str,
+                        resolution,
                         outside: dict[str, str] | None = None) -> list[dict]:
     """The could-not-run records for this run - see unrunnable.py. A TRIAL is
     reconciled, so it records what it could not read too."""
     if trial.is_trial(run_id):
         noted = left_out.peek(run_id)
         return unrunnable.results_for_trial(
-            run_id=run_id, run_timestamp=run_timestamp, resolution=resolution,
+            run_id=run_id, run_timestamp=run_timestamp, collection_id=collection_id,
+            resolution=resolution,
             reads=promotion._declared_reads(),
             left_out_ids=set().union(*noted.values()) if noted else set())
     owner = run_owner(run_id)

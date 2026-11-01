@@ -13501,3 +13501,54 @@ twice. It deliberately did not re-find the `TypeError`.
        counted as load-sensitive pass with MOTHMAN_TEST_DB_TAG set - parallel
        sessions in other worktrees were dropping this session's test
        databases.
+
+301. **[done, 2026-11-02]** **[Data generation]** **[QA pipeline]** **Post-build critic on REQ-GEN-298 (the geocoding history's faults and the generation-time trial; aae4511): one significant finding, held for Keith; four minor findings fixed; two left by decision.**
+     Each was checked against the code before it went here; the defect fixes
+     are test-first and were seen failing first.
+     - **1. The drift-amber plan adds a rule to a signed criterion (significant,
+       held for Keith, code unchanged)**: generator/collections/linkage_products.py
+       plans a geocoding file built from a red source with blanks in its
+       placing address columns at least amber, and the next file measured
+       against it too, for the drift check. Signed REQ-GEN-295 criterion 7
+       plans from the not-geocoded share alone, and the rule was narrowed until
+       the trial agreed, so it is a change to agreed behaviour rather than a
+       fix. REQ-GEN-295 criterion 7 is back in its unmet_criteria (owner Keith,
+       blocked_by unowned), and its open_questions carries the question with
+       three options: (a) accept the rule and amend criterion 7; (b) plan amber
+       from the real drift check's own inputs - the placed-level mix against
+       the reference the replay resolves, banded by the drift check's
+       thresholds; (c) drop drift-amber planning and let the trial exclude
+       those quarters, which until an exclusion exists means the trial refuses
+       the current history. (b) is recommended. REQ-GEN-298's decision no
+       longer carries a PROVISIONAL marker; it points at the question.
+     - **2. A trial's own checks were decided by table membership (fixed)**:
+       unrunnable.results_for_trial took a check as the trial's own when every
+       table it reads was known to the run, which let a Child Protection
+       check on cp-clients reading only cp_clients through into a Linkage
+       Products trial listing cp_clients absent. It now takes the trial's
+       collection_id and keeps a check only when the check's own collection
+       matches; the orchestrator passes it (tests/test_geocoding_trial.py,
+       TestATrialSpeaksOnlyForItsOwnCollectionsChecks).
+     - **3. The carried-table rule was Child Protection's alone (fixed,
+       generically)**: Provider.carries_table now runs the arrival's own files
+       (a new arrival_files hook) through its scenario's file shape for every
+       provider that declares them, through scenario_injection.carries_file;
+       Child Protection keeps only its case-workers rule and Emergency
+       Department declares arrival_files, its files() building from the same
+       hook. Emergency Department's scenarios use no file shape today, so this
+       changes no output: a whole generation at aae4511 and at the fixed tree
+       is byte-identical in every file - 614 delivery files, 614 receipts, the
+       bookkeeping and the placements, the 514 base deliveries among them
+       (tests/test_geocoding_faults.py, TestEveryProvidersFileShapeDecidesWhatIsCarried).
+     - **4. REQ-GEN-298's PROVISIONAL items were not yet questions (fixed)**:
+       each now names its alternatives and an explicit recommendation;
+       inheritance says it is unverified until the replay. The answered item
+       that merely mentioned v6's provisional text no longer reads as a marker.
+     - **5. Four unmet_criteria name the end-of-run bootstrap as owner with
+       blocked_by unowned (accepted, not changed)**: that is the overnight
+       run's convention - blocked_by {unowned: true} with the owner in prose -
+       so it stays.
+     - **6. A shared error string said geocoding (fixed)**: generator/targets.py's
+       "no such supply" refusal now says "a supply's trial".
+     - **7. TS-93c, TS-100c and TS-101b's lettered names (left)**: already a
+       question for Keith on REQ-GEN-298; unchanged.

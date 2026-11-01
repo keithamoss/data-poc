@@ -183,7 +183,7 @@ class TestATrialRecordsWhatItCouldNotRead:
 
     def test_one_record_per_check_reading_an_unreadable_table(self):
         out = unrunnable.results_for_trial(
-            run_id="trial_x", run_timestamp="t",
+            run_id="trial_x", run_timestamp="t", collection_id="child-protection",
             resolution=_res(resolved={"cp_placements": "x"}, absent=["cp_clients", "cp_carers"]),
             reads={PLACEMENTS_READS_BOTH: ["cp_clients", "cp_carers"],
                    PLACEMENTS_READS_CLIENTS: ["cp_clients"]})
@@ -196,7 +196,7 @@ class TestATrialRecordsWhatItCouldNotRead:
 
     def test_nothing_unreadable_records_nothing(self):
         assert unrunnable.results_for_trial(
-            run_id="trial_x", run_timestamp="t",
+            run_id="trial_x", run_timestamp="t", collection_id="child-protection",
             resolution=_res(resolved={"cp_placements": "x", "cp_clients": "y"}),
             reads={PLACEMENTS_READS_CLIENTS: ["cp_clients"]}) == []
 
@@ -212,7 +212,7 @@ class TestATrialExplainsItsOwnTablesChecksToo:
 
     def test_explained_left_out_checks_are_recorded_and_others_are_not(self):
         out = unrunnable.results_for_trial(
-            run_id="trial_x", run_timestamp="t",
+            run_id="trial_x", run_timestamp="t", collection_id="child-protection",
             resolution=_res(resolved={"cp_clients": "y"}, absent=["cp_carers"]),
             reads={}, left_out_ids={self.CARERS_OWN, self.CLIENTS_OWN})
         assert [r["check_id"] for r in out] == [self.CARERS_OWN]

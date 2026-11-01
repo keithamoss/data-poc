@@ -239,11 +239,17 @@ class EmergencyDepartment(Provider):
             datetime.combine(delivery_obj.received_date, time(7, 0)) + timedelta(minutes=minute),
             f"received_at for {entry['run_id']}")
 
+    def arrival_files(self, plan: Plan, job: Job, n: int, delivery_obj) -> dict[str, str]:
+        """The one Presentations file, before any scenario shape - so a shape
+        leaving it out or making it unreadable reads as not carried
+        (Provider.carries_table; post-build-review #301 finding 3)."""
+        return {FILE: delivery_obj.payload[COLUMNS].to_csv(index=False)}
+
     def files(self, plan: Plan, job: Job, n: int, delivery_obj, entry: dict, name: str):
         from generator import receipt_instants, scenario_injection
         from qa_tools.common import asset_time
 
-        csvs = {FILE: delivery_obj.payload[COLUMNS].to_csv(index=False)}
+        csvs = self.arrival_files(plan, job, n, delivery_obj)
         first = asset_time.parse_instant(entry["received_at"], entry["run_id"])
         injected = plan.injected_by_period.get(job.period.name)
         if injected is not None:
