@@ -105,7 +105,7 @@ describe("the rollup (criteria 6 to 11)", () => {
   it("reads 'Turned off' where every dataset is out by turn-off, never green", () => {
     const w = load();
     expect(w.rollup([off, { ...off, id: "o2" }])).toBe("turnedoff");
-    expect(w.eval("STATUS_LABEL").turnedoff).toBe("Turned off");
+    expect(w.statusWords("turnedoff", "label")).toBe("Turned off");
   });
 
   it("reads 'Not counted' where all are out but not all by turn-off", () => {

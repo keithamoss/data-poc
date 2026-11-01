@@ -30,17 +30,17 @@ describe("the datasets-not-green line", () => {
   it("counts only what the rollup counts, and says so", () => {
     const w = load();
     const t = text(w, w.datasetsNotGreenLine(FOUR, "red"));
-    expect(t).toContain("2 of 3 counted datasets not green");
-    expect(t).toContain("1 red, 1 amber");
+    expect(t).toContain("2 of 3 counted datasets not passing");
+    expect(t).toContain("1 failing, 1 warning");
   });
 
   it("drops 'counted' when the rollup leaves nothing out, and never shows a bare 0", () => {
     const w = load();
-    expect(text(w, w.datasetsNotGreenLine(FOUR.slice(0, 3), "red"))).toContain("2 of 3 datasets not green");
+    expect(text(w, w.datasetsNotGreenLine(FOUR.slice(0, 3), "red"))).toContain("2 of 3 datasets not passing");
     // Singular for one (Keith, 2026-10-14, post-build-review #186).
-    expect(text(w, w.datasetsNotGreenLine([FOUR[2]], "green"))).toBe("All 1 dataset green");
-    expect(text(w, w.datasetsNotGreenLine([FOUR[2], FOUR[3]], "green"))).toBe("All 1 counted dataset green");
-    expect(text(w, w.datasetsNotGreenLine([FOUR[0]], "red"))).toContain("1 of 1 dataset not green");
+    expect(text(w, w.datasetsNotGreenLine([FOUR[2]], "green"))).toBe("All 1 dataset passing");
+    expect(text(w, w.datasetsNotGreenLine([FOUR[2], FOUR[3]], "green"))).toBe("All 1 counted dataset passing");
+    expect(text(w, w.datasetsNotGreenLine([FOUR[0]], "red"))).toContain("1 of 1 dataset not passing");
   });
 
   it("shows nothing for a group whose status is Not counted", () => {
@@ -54,7 +54,7 @@ describe("the datasets-not-green line", () => {
   it("leaves out a turned-off dataset the rollup leaves out", () => {
     const w = load();
     const off = { id: "e", status: "red", turnedOffOutOfRollup: true };
-    expect(text(w, w.datasetsNotGreenLine([...FOUR, off], "red"))).toContain("2 of 3 counted datasets not green");
+    expect(text(w, w.datasetsNotGreenLine([...FOUR, off], "red"))).toContain("2 of 3 counted datasets not passing");
     expect(w.datasetsNotGreenLine([off], "turnedoff")).toBe("");
   });
 });
@@ -88,8 +88,8 @@ describe("the weekly trend", () => {
     const w = load();
     const series = w.groupWeeklySeries(["a", "b", "c", "d"], "2026-02-10", "2026-03-10", on);
     const html = w.datasetsTrendHtml(series);
-    expect(text(w, html)).toContain("Datasets red and amber, each week");
-    expect(html).toContain('aria-label="Datasets red and amber each week, 5 weeks from 10 Feb 2026 to 10 Mar 2026; latest 1 red and 1 amber of 3"');
+    expect(text(w, html)).toContain("Datasets failing and warning, each week");
+    expect(html).toContain('aria-label="Datasets failing and warning each week, 5 weeks from 10 Feb 2026 to 10 Mar 2026; latest 1 failing and 1 warning of 3"');
   });
 
   it("does not claim a count in a quiet trend's name (post-build-review #186)", () => {
@@ -98,7 +98,7 @@ describe("the weekly trend", () => {
     const html = w.datasetsTrendHtml(series, true);
     const label = html.match(/aria-label="([^"]+)"/)[1];
     expect(label).toContain("no dataset has a verdict on this date");
-    expect(label).not.toMatch(/latest \d+ red/);
+    expect(label).not.toMatch(/latest \d+ failing/);
   });
 
   it("leaves out a week in which no dataset was counted (post-build-review #186)", () => {

@@ -32,7 +32,7 @@ describe("a supply's outcome", () => {
     const html = w.outcomeCell("cp-carers", "r1", {r2: RUNS[1]});
     expect(html).toContain('data-outcome="superseded"');
     expect(html).toContain("by the rule");
-    expect(html).toContain("replacement setting 'green'");
+    expect(html).toContain("replacement setting 'when passing'");
     expect(html).not.toContain("pill");
   });
 
@@ -63,7 +63,7 @@ describe("red promoted", () => {
     const w = withRaw(raw);
     const html = w.redPromotedBadge("cp-carers", "r1", "2026-03-05");
     expect(html).toContain("data-red-promoted");
-    expect(html).toContain("Went in green");
+    expect(html).toContain("Went in passing");
     expect(html).toContain("the promote of Client Register");
   });
 
@@ -72,7 +72,7 @@ describe("red promoted", () => {
     const root = w.document.createElement("div");
     root.innerHTML = w.redPromotedBadge("cp-carers", "r1", "2026-03-05");
     const pill = root.querySelector(".pill.red");
-    expect(pill && pill.textContent.trim()).toBe("Red promoted");
+    expect(pill && pill.textContent.trim()).toBe("Promoted, failing");
     const why = root.querySelector("[data-red-promoted-why]");
     expect(why.textContent).toContain("the promote of Client Register");
     expect(root.innerHTML).not.toContain("var(--red)");
@@ -85,7 +85,7 @@ describe("red promoted", () => {
       {id: "cp-carers", name: "Carers", verdictOf: {inPlaceRunId: "r1"}},
       {id: "cp-clients", name: "Clients", verdictOf: {inPlaceRunId: null}}]}]};
     const html = w.redPromotedMarker(ag);
-    expect(html).toContain("1 red promoted");
+    expect(html).toContain("1 promoted while failing");
     expect(html).toContain("Carers");
     expect(w.redPromotedMarker({id: "x", collections: []})).toBe("");
   });
@@ -122,7 +122,7 @@ describe("a supply promoted while red", () => {
     expect(html).toContain("data-red-promoted");
     // Keith, 2026-10-24 (post-build-review #266 Q6 = A): already red before
     // its promotion reads "Went in red", naming when and after what.
-    expect(html).toContain(`Went in red. Red since the arrival of X, ${w.fmtInstant("2026-01-10T01:00:00+00:00")}; promoted ${w.fmtInstant("2026-01-20T01:00:00+00:00")}.`);
+    expect(html).toContain(`Went in failing. Failing since the arrival of X, ${w.fmtInstant("2026-01-10T01:00:00+00:00")}; promoted ${w.fmtInstant("2026-01-20T01:00:00+00:00")}.`);
   });
 });
 
@@ -143,8 +143,8 @@ describe("a supply already red before its promotion", () => {
     const root = w.document.createElement("div");
     root.innerHTML = w.redPromotedBadge("cp-notifications", "n", "2014-02-20");
     const why = root.querySelector("[data-red-promoted-why]").textContent;
-    expect(why).toBe(`Went in red. Red since the arrival of Notifications, ${w.fmtInstant("2014-02-11T01:00:00.000003+00:00")}; promoted ${w.fmtInstant("2014-02-16T04:52:10+00:00")}.`);
-    expect(why).not.toContain("turned red");
+    expect(why).toBe(`Went in failing. Failing since the arrival of Notifications, ${w.fmtInstant("2014-02-11T01:00:00.000003+00:00")}; promoted ${w.fmtInstant("2014-02-16T04:52:10+00:00")}.`);
+    expect(why).not.toContain("started failing");
   });
 
   it("a red that came after the promotion still went in green and turned", () => {
@@ -154,7 +154,7 @@ describe("a supply already red before its promotion", () => {
     const root = w.document.createElement("div");
     root.innerHTML = w.redPromotedBadge("cp-notifications", "n", "2014-03-01");
     const why = root.querySelector("[data-red-promoted-why]").textContent;
-    expect(why).toBe(`Went in green, turned red ${w.fmtInstant("2014-02-25T01:00:00+00:00")} after the promote of Case Workers.`);
+    expect(why).toBe(`Went in passing, started failing ${w.fmtInstant("2014-02-25T01:00:00+00:00")}, after the promote of Case Workers.`);
   });
 });
 
@@ -193,7 +193,7 @@ describe("a promoted supply's pill", () => {
     const w = withRaw(raw);
     const got = pillOf(w, w.supplyRowStatus("cp-carers", {run_id: "r1", status: "green"}, "2026-03-05"));
     expect(got.pill).toContain("red");
-    expect(got.arrived.textContent).toBe("Arrived Green");
+    expect(got.arrived.textContent).toBe("Arrived passing");
   });
 
   it("reads as it arrived before anything changed it", () => {
@@ -210,7 +210,7 @@ describe("a promoted supply's pill", () => {
         {at: "2026-02-15T01:00:00+00:00", status: "green", cause: "y"}]}}});
     const got = pillOf(w, w.supplyRowStatus("cp-carers", {run_id: "r1", status: "red"}, "2026-03-05"));
     expect(got.pill).toContain("green");
-    expect(got.arrived.textContent).toBe("Arrived Red");
+    expect(got.arrived.textContent).toBe("Arrived failing");
   });
 
   it("never reads greener than the page at the arrival itself (post-build-review #132 A1)", () => {

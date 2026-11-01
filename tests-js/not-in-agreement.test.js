@@ -131,7 +131,7 @@ describe("what the section says", () => {
     expect(first.querySelector(".tr").textContent).toBe("dbt:relationships");
     expect(first.querySelector(".why").textContent).toBe("Not part of the agreement for 2013-Q2.");
     expect(first.querySelector(".nia-tag").textContent).toBe("Not run");
-    expect(block.textContent).toMatch(/neither red nor a result/);
+    expect(block.textContent).toMatch(/neither a Fail nor a result/);
   });
 
   it("sets authored names as text, never as markup", () => {

@@ -92,7 +92,7 @@ describe("the view (criteria 3, 4, 8, 12 and 14)", () => {
     expect(heads).toContain("Status when promoted");
     const row = div.querySelector('tr[data-kind="substituted"]');
     expect(row.textContent).toContain("Decided by Robin Hale");
-    expect(row.textContent).toContain("Amber");
+    expect(row.textContent).toContain("Warn");
     expect(row.textContent).toContain("Acknowledged");
     expect(div.querySelector('tr[data-kind="promoted"]').textContent)
       .toContain("Applied automatically by the schedule");

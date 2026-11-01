@@ -1751,7 +1751,7 @@ function slaTileHtml(d, dateStr){
   }
   const value = s.notOwedYet ? notOwedYetText(s.notOwedYet, d) : (s.cadence ? cadenceLabel(s.cadence) : "");
   const why = s.reason
-    ? `<div class="sla-why" style="color:var(--ink-faint); font-size:12px; margin-top:4px; line-height:1.4;">${recordedText(s.reason)}</div>` : "";
+    ? `<div class="sla-why" style="color:var(--ink-faint); font-size:12px; margin-top:4px; line-height:1.4;">${escHtml(s.reason)}</div>` : "";
   // WHICH PERIOD ITS COLLECTION'S FILES GO INTO, 0 included (REQ-DASH-326
   // criterion 7): the build's words, from the one phrase function the
   // terminal prints (qa_tools/common/files_go.py), on every authored-calendar
@@ -4236,13 +4236,17 @@ function unitCounts(units){
         let p = points.get(key);
         if(!p){
           p = {key, supply: h.supply_id && h.cause ? h.supply_id : null, rank, date: h.date,
-               runId: key, own: false, seen: points.size, source: h};
+               runId: key, own: false, seen: points.size, source: h, evaluated: false};
           points.set(key, p);
         } else if(rank != null && (p.rank == null || rank < p.rank)){
           // DATED BY ITS LOWEST-RANKED RESULT (criterion 16), and named by it.
           p.rank = rank; p.date = h.date; p.source = h;
         }
         if(!h.recorded_by && !p.own){ p.own = true; p.runId = h.run_id; }
+        // WHETHER ANY RESULT ON THIS POINT WAS EVALUATED (REQ-DASH-359
+        // criterion 19, #289 D8e): a point none of whose results was is left
+        // out of the line, as plotted() leaves one out of a check's trend.
+        if(!notEvaluated(h)) p.evaluated = true;
         const was = perPoint.get(key);
         if(!was || was.rank == null || rank == null || rank > was.rank){
           perPoint.set(key, {rank, status: historyStatus(h, ck)});
@@ -4288,7 +4292,7 @@ function unitCounts(units){
       if(s !== "red" && s !== "amber" && s !== "green") return;
       const p = points.get(key);
       if(!byPoint.has(key)) byPoint.set(key, {runId: p.runId, rank: p.rank, date: p.date, own: p.own,
-                                             source: p.source,
+                                             source: p.source, notEvaluated: !p.evaluated,
                                              counted:0, red:0, amber:0, sectionNames:[], order: p});
       const was = worst.get(key);
       if(!was || STATUS_ORDER[s] > STATUS_ORDER[was]) worst.set(key, s);
@@ -4376,6 +4380,9 @@ function twoLinePaths(series, x, y, quiet){
   const line = (key, colour, dashed)=>{
     let paths = "";
     for(let i=0;i<series.length-1;i++){
+      // A NOT-EVALUATED POINT BREAKS THE LINE (REQ-DASH-359 criterion 19):
+      // never drawn as a 0% dip between two runs that were evaluated.
+      if(series[i].notEvaluated || series[i+1].notEvaluated) continue;
       const a = share(series[i], key), b = share(series[i+1], key);
       if(a <= 0 && b <= 0) continue;
       paths += `<path d="M${x(i).toFixed(1)},${y(a).toFixed(1)} L${x(i+1).toFixed(1)},${y(b).toFixed(1)}" fill="none" stroke="${colour}" stroke-width="1.5" vector-effect="non-scaling-stroke" stroke-linecap="round" stroke-linejoin="round"${dashed ? ` stroke-dasharray="${SPARK_DOTS}"` : ""} data-series="${key}"/>`;
@@ -4439,6 +4446,27 @@ function columnsNotGreenKey(){
 // and a 'View as table' listing newest first. Drawn from unitCounts(), so
 // the dataset page's latest point and its row in the dataset list are the
 // same numbers (criterion 8).
+// A TREND'S DATED X-AXIS LABELS, NEVER OVERPRINTING (REQ-DASH-359 criterion
+// 18, #289 D8d): first, middle and last, the ends anchored inward, each in
+// the short date. Their extents are worked out in the chart's own units -
+// the font is monospaced, so a label is 0.6em a character - and the middle
+// label is left out where it would touch either end's, so the three never
+// overprint at any width: the SVG scales with its viewBox, so a phone and a
+// desktop see the same layout.
+const AXIS_FONT = 9.5, AXIS_CHAR = 0.6 * AXIS_FONT, AXIS_GAP = 6;
+function xAxisTicks(n, xOf, labelOf, y){
+  if(!n) return "";
+  const anchor = i=> n===1 ? "middle" : i===0 ? "start" : i===n-1 ? "end" : "middle";
+  const extent = i=>{
+    const w = String(labelOf(i)).length * AXIS_CHAR, x = xOf(i), a = anchor(i);
+    return a === "start" ? [x, x+w] : a === "end" ? [x-w, x] : [x-w/2, x+w/2];
+  };
+  const clashes = (i, j)=>{ const [l, r] = extent(i), [jl, jr] = extent(j); return l < jr + AXIS_GAP && jl < r + AXIS_GAP; };
+  // THE LAST DATE ALWAYS, then the first and the middle wherever they fit.
+  const kept = [n-1];
+  [0, Math.floor((n-1)/2)].forEach(i=>{ if(kept.indexOf(i) === -1 && !kept.some(k=> clashes(i, k))) kept.push(i); });
+  return kept.sort((a, b)=> a - b).map(i=> `<text x="${xOf(i).toFixed(1)}" y="${y}" font-size="${AXIS_FONT}" text-anchor="${anchor(i)}" fill="var(--ink-faint)" font-family="IBM Plex Mono, monospace" data-x-label>${escHtml(labelOf(i))}</text>`).join("");
+}
 function unitTrendBlock(series, o){
   const id = "utrend"+(chartSeq++);
   const n = series.length;
@@ -4450,10 +4478,8 @@ function unitTrendBlock(series, o){
   const quiet = !!o.quiet;
   const plot = n < 2 ? "" : twoLinePaths(series, x, y, quiet);
   const yLabels = [0, 0.5, 1].map(v=> `<text x="${padL-6}" y="${(y(v)+3).toFixed(1)}" font-size="9.5" text-anchor="end" fill="var(--ink-faint)" font-family="IBM Plex Mono, monospace">${Math.round(v*100)}%</text>`).join("");
-  const tickIdx = [0, Math.floor((n-1)/2), n-1].filter((v,i,a)=> a.indexOf(v)===i);
   // The end labels anchor inward so the last date is not clipped at the edge.
-  const anchor = i=> n===1 ? "middle" : i===0 ? "start" : i===n-1 ? "end" : "middle";
-  const xLabels = tickIdx.map(i=> `<text x="${x(i).toFixed(1)}" y="${H-6}" font-size="9.5" text-anchor="${anchor(i)}" fill="var(--ink-faint)" font-family="IBM Plex Mono, monospace">${shortDay(series[i].date)}</text>`).join("");
+  const xLabels = xAxisTicks(n, x, i=> shortDay(series[i].date), H-6);
   const last = series[n-1];
   const label = quiet ? noVerdictTrendLabel(o.unitWord, series, o.noun)
     : `${o.unitWord} failing and warning on each QA run, ${n} ${pluralize(n, "run")} from ${shortDay(series[0].date)} to ${shortDay(last.date)}; latest ${last.red} failing and ${last.amber} warning of ${last.counted}`;
@@ -4796,13 +4822,9 @@ function trendChart(check, compareIdx, onPointClick, datasetRuns, sourceOf){
   // land on the baseline and read as a real threshold sitting at zero.
   const warnY = warn==null ? null : ys(warn).toFixed(1);
   const failY = fail==null ? null : ys(fail).toFixed(1);
-  // sparse x labels: first, mid, last
-  const tickIdx = [0, Math.floor((n-1)/2), n-1].filter((v,i,a)=>a.indexOf(v)===i);
-  // THE ENDS ANCHOR INWARD (#258 L8): a long date centred on the first or last
-  // point ran off the chart's edge.
-  const anchorOf = i=> i === tickIdx[0] && tickIdx.length > 1 ? "start"
-    : i === tickIdx[tickIdx.length - 1] && tickIdx.length > 1 ? "end" : "middle";
-  const xlabels = tickIdx.map(i=> `<text x="${xs(i).toFixed(1)}" y="${H-6}" font-size="9.5" text-anchor="${anchorOf(i)}" fill="var(--ink-faint)" font-family="IBM Plex Mono, monospace">${fmtDateShort(history[i].date)}</text>`).join("");
+  // sparse x labels: first, mid, last - THE ENDS ANCHOR INWARD (#258 L8), in
+  // the short date, and never overprinting (REQ-DASH-359 criterion 18).
+  const xlabels = xAxisTicks(n, xs, i=> shortDay(history[i].date), H-6);
   const yTicks=[0,warn,fail].filter(v=>v!=null).filter((v,i,a)=>a.indexOf(v)===i);
   const ylabels = yTicks.map(v=> `<text x="${padL-6}" y="${(ys(v)+3).toFixed(1)}" font-size="9.5" text-anchor="end" fill="var(--ink-faint)" font-family="IBM Plex Mono, monospace">${fmtMetric(v,unit)}</text>`).join("");
   const last = history[n-1];
@@ -5149,7 +5171,7 @@ function collectionCarryForwardLines(col, dateStr){
 function collectionTurnOffLine(col){
   const t = ((col && col.datasets) || []).map(d=> d.turnOff).find(t=> t && t.level === "collection");
   if(!t) return "";
-  return `<div class="collection-turn-off" data-collection-turn-off style="margin-top:6px; font-size:12px; color:var(--ink-muted);">${turningOrTurned(t)} with ${escHtml(t.turnOff.collection)}: ${recordedText(t.reason)}</div>`;
+  return `<div class="collection-turn-off" data-collection-turn-off style="margin-top:6px; font-size:12px; color:var(--ink-muted);">${turningOrTurned(t)} with ${escHtml(t.turnOff.collection)}: ${escHtml(t.reason)}</div>`;
 }
 // 'Turning off' until the effective_to has passed, 'Turned off' after (#195 D5).
 function turningOrTurned(t){
@@ -5160,7 +5182,7 @@ function turnOffReasonLine(ds){
   const t = ds && ds.turnOff;
   if(!t || !t.reason) return "";
   const who = t.level === "collection" ? `${turningOrTurned(t)} with ${escHtml(t.turnOff.collection)}: ` : "";
-  return `<div class="turn-off-why" data-turn-off-reason style="margin:-4px 0 12px; color:var(--ink-muted); font-size:13px; max-width:70ch;">${who}${recordedText(t.reason)}</div>`;
+  return `<div class="turn-off-why" data-turn-off-reason style="margin:-4px 0 12px; color:var(--ink-muted); font-size:13px; max-width:70ch;">${who}${escHtml(t.reason)}</div>`;
 }
 function turnOffMarker(d, dateStr){
   const t = turnOffOn(d, dateStr);
