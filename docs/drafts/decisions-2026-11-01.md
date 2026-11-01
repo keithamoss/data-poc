@@ -162,3 +162,7 @@ the rebuild needs no question asked twice. Drafts and builders read this file.
   decisions are carried into REQ-DASH-359; REQ-DOCS-362 c4 gets an explicit
   carve-out (it means 'do not reword history', not 'never delete a built
   entry'). SETTLED by Keith 2026-11-01.
+- `mothman lp qa --folder` trials what the folder holds: the tables present
+  are checked against what is in place in the warehouse for the rest, as a
+  real arrival is. REPLACES the rule that a trial needs all 3 tables (no
+  Linkage Products delivery carries all three). SETTLED by Keith 2026-11-01.
