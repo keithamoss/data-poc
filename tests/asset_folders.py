@@ -99,4 +99,11 @@ def real_folder() -> Path:
     assets/<asset>/ - what a test reading "the real one" reads since the
     split (it was contract/). Asked when called, so a module evaluating it at
     import gets the asset it is imported under (tests/conftest.py)."""
-    return Path(__file__).resolve().parent.parent / "assets" / assets.selected().name
+    return real_folder_of(assets.selected().name)
+
+
+def real_folder_of(name: str) -> Path:
+    """The named asset's committed configuration folder, as the resolver's
+    default layout places it - for a test that builds one asset's case out of
+    a file another asset defines (a second calendar, say)."""
+    return assets._DEFAULT.asset(name).folder
