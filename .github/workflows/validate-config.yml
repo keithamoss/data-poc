@@ -98,6 +98,13 @@ jobs:
       - name: Gate - requirements validation (item 75)
         run: uv run mothman dashboard validate-requirements
 
+      # REQ-TEST-374: a new unanswered PROVISIONAL choice in a built
+      # requirement is a WARNING. MOTHMAN_GATE_WARNING_EXIT is deliberately
+      # not set here, so the step exits 0 on one and fails only on a stale
+      # or gained baseline entry.
+      - name: Unanswered provisional choices in built requirements (REQ-TEST-374)
+        run: uv run mothman dashboard validate-provisional
+
       - name: Validate CHANGELOG.yaml (schema + component tags)
         run: uv run mothman dashboard validate-changelog
 

@@ -227,7 +227,7 @@ class TestTheDocsGate:
     gated by the checks it can affect, in seconds."""
 
     DOCS = {"plans", "requirements", "sprints", "changelog", "feedback", "scenarios",
-            "scenario map", "premise", "yamllint"}
+            "scenario map", "premise", "yamllint", "provisional"}
 
     @pytest.fixture
     def only_docs_changed(self, monkeypatch):
@@ -293,3 +293,29 @@ def test_yamllint_lints_only_what_git_tracks():
     from pathlib import Path
     cfg = _yaml.safe_load((Path(__file__).resolve().parent.parent / ".yamllint").read_text())
     assert ".gitignore" in (cfg.get("ignore-from-file") or [])
+
+
+class TestTheProvisionalGate:
+    """REQ-TEST-374: unanswered `PROVISIONAL` choices in built requirements
+    are a warning, in the docs tier, never a failure."""
+
+    def _gate(self):
+        return next(g for g in check_cli._GATES if g[0] == "provisional")
+
+    def test_it_is_a_gate_that_can_warn(self):
+        label, argv, _why, can_warn = self._gate()
+        assert can_warn
+        assert argv[-1] == "validate-provisional"
+
+    def test_it_is_in_the_docs_tier(self):
+        assert "provisional" in check_cli._DOCS_GATES
+
+    def test_its_baseline_may_change_under_docs(self):
+        assert check_cli._outside_docs(["provisional-baseline.yaml"]) == []
+
+    def test_a_warning_from_it_passes_the_command(self, record):
+        calls, codes = record
+        codes["uv"] = check_cli.WARNING_EXIT
+        result = _runner.invoke(check_cli.check_command, ["--only", "provisional"])
+        assert result.exit_code == 0, result.output
+        assert "passed, with a warning" in result.output

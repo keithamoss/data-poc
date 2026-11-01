@@ -46809,27 +46809,47 @@ requirements:
     - 'LOUD, NOT SILENT, IN EVERY SAMPLER (architect v5 SHOULD): criterion 5''s gate reads Soda''s queries only; dbt''s swallowed exception and datacontract-cli''s column filter lose samples the same way #291 did. Failing the tool''s recording makes the next one a red run rather than a post-build finding. REJECTED a logged warning, which nobody reads.'
     - 'THE KEY''S COLUMN NAMES ARE RECORDED, NOT LOOKED UP (architect v5 SHOULD and NIT): the page cannot tell id parts from census_year, and an adapter''s declaration read at build would describe today''s key, not the one a past result used; recorded with the result, an old result keeps its own shape and a compare across a change of key shape can say so instead of showing every sample as new. REJECTED carrying the adapter''s current declaration in the build.'
   - id: REQ-TEST-374
-    title: mothman check warns on every unanswered PROVISIONAL choice in a built requirement, naming each
+    title: mothman check warns on every unanswered `PROVISIONAL` choice in a built requirement, naming each
     date_written: '2026-11-01'
     story: 'As Keith, I want every provisional choice a builder made on my behalf to stay in front of me until I answer it, so that later work cannot quietly treat it as settled, as happened with Pass / Warn / Fail (post-build-review #292).'
     moscow: should
-    status: not_started
+    status: built
     signed_off:
       by: Keith
       date: '2026-11-01'
     source: 'Keith, 2026-11-01, answering post-build-review #292 (Report list + gate).'
     acceptance_criteria:
-    - WHEN `mothman check` runs, THE SYSTEM SHALL list every requirement whose status is built and whose decisions, criteria or non-functional requirements contain the word PROVISIONAL, naming the requirement id, the field and the item number, under its own gate row.
-    - 'THE SYSTEM SHALL count only PROVISIONAL markers added after the gate is built: the markers present when it is built are written once to a committed baseline (each as requirement id, field and a fingerprint of the item text) that only ever shrinks - an entry is removed when its marker is answered or its item changes - and `mothman check` SHALL fail if the baseline gains an entry.'
+    - WHEN `mothman check` runs, THE SYSTEM SHALL list every requirement whose status is built and whose decisions, criteria or non-functional requirements contain the word `PROVISIONAL`, naming the requirement id, the field and the item number, under its own gate row.
+    - 'THE SYSTEM SHALL count only `PROVISIONAL` markers added after the gate is built: the markers present when it is built are written once to a committed baseline (each as requirement id, field and a fingerprint of the item text) that only ever shrinks - an entry is removed when its marker is answered or its item changes - and `mothman check` SHALL fail if the baseline gains an entry.'
     - THE SYSTEM SHALL report that gate as 'passed, with a warning' while any such item exists, and SHALL NOT fail the build on it.
-    - THE SYSTEM SHALL NOT count a PROVISIONAL that is quoted inside an amendment's CURRENT text (between <<< and >>>), nor one marked answered in the same item (an item that also names Keith's answer, e.g. 'SETTLED', 'answered', or 'SIGNED by Keith').
-    - WHEN an overnight build writes its report to plans/morning-reports.md, THE SYSTEM SHALL list every PROVISIONAL choice it made in that report's question list, each as a question with a recommendation, never only in a requirement's decisions.
-    - WHEN the test suite runs, THE SYSTEM SHALL show, each seen failing first, that a built requirement carrying an unanswered PROVISIONAL is listed by the gate, and that a quoted or answered one is not.
+    - 'THE SYSTEM SHALL NOT count a `PROVISIONAL` that is quoted (the word in backticks or single quotes, a mention rather than a marker) or that sits inside an amendment''s quoted text (between <<< and >>>), nor one in an item that names Keith''s answer as ''SETTLED by Keith'' or ''answered by Keith'' followed by a date (YYYY-MM-DD); a bare ''answered'', ''to be answered by Keith'' with no date, and ''SIGNED by Keith'' SHALL NOT count as an answer. AMENDED 2026-11-01 (Keith, answering the gate''s critic). CURRENT, as signed 2026-11-01: <<<THE SYSTEM SHALL NOT count a PROVISIONAL that is quoted inside an amendment''s CURRENT text (between <<< and >>>), nor one marked answered in the same item (an item that also names Keith''s answer, e.g. ''SETTLED'', ''answered'', or ''SIGNED by Keith'').>>>'
+    - WHEN an overnight build writes its report to plans/morning-reports.md, THE SYSTEM SHALL list every `PROVISIONAL` choice it made in that report's question list, each as a question with a recommendation, never only in a requirement's decisions.
+    - WHEN the test suite runs, THE SYSTEM SHALL show, each seen failing first, that a built requirement carrying an unanswered `PROVISIONAL` is listed by the gate, and that a quoted or answered one is not.
     non_functional_requirements:
     - 'SPEED: the gate reads requirements.yaml once and adds under a second to `mothman check --docs`.'
     dependencies: []
+    linked_tests:
+    - tests/test_validate_provisional.py
+    - tests/test_cli_check.py::TestTheProvisionalGate
+    - tests/test_cli_check.py::TestTheDocsGate
+    implemented_by:
+    - qa_tools/common/validate_provisional.py::is_unanswered_marker
+    - qa_tools/common/validate_provisional.py::scan
+    - qa_tools/common/validate_provisional.py::main
+    - cli/dashboard.py::validate_provisional_command
+    - cli/check.py::_GATES
+    - cli/check.py::_DOCS_GATES
+    - provisional-baseline.yaml
+    - .github/workflows/validate-config.yml
+    - plans/morning-reports.md
+    evidence:
+    - '2026-11-01, REBUILT (the first build was lost with a replaced container): the baseline written once from the register holds 188 entries on 74 built requirements (decision 3''s 190 on 75 was counted under the bare-word rule). tests/test_validate_provisional.py and tests/test_cli_check.py: 59 passed, each new test seen failing first (the module absent, then the gate unwired). Parsing requirements.yaml with the C loader takes 0.19s, inside the one-second NFR.'
+    - 'Criterion 5 is the instruction in plans/morning-reports.md''s intro, which every overnight run reads before writing its report there; the gate itself keeps any choice that misses the report in view.'
     decisions:
     - 'WARN, NOT FAIL (Keith, 2026-11-01): a provisional choice is a question waiting on a person, not a defect; a red CI would block unrelated work. REJECTED a failing gate, and REJECTED the report list alone, which is the process that already slipped.'
-    - 'BUILT REQUIREMENTS ONLY: a PROVISIONAL marker on an unsigned draft is normal and is resolved at sign-off; the risk is one that survives into built work.'
+    - 'BUILT REQUIREMENTS ONLY: a `PROVISIONAL` marker on an unsigned draft is normal and is resolved at sign-off; the risk is one that survives into built work.'
     - 'NEW MARKERS ONLY (Keith, 2026-11-01): the 190 markers on 75 built requirements found that day are baselined, not reviewed. REJECTED sweeping them first and REJECTED warning on all 190 from day one. The baseline is shrink-only, the same pattern as the collections gate''s allowlist.'
+    - 'WHAT COUNTS AS ANSWERED (Keith, 2026-11-01, answering the gate''s critic; criterion 4 amended to match): an item is answered only where it says ''SETTLED by Keith'' or ''answered by Keith'' followed by a date - the words, then a YYYY-MM-DD; a quoted word (backticks or single quotes) is a mention, not a marker; text inside <<< >>> is ignored, so neither a quoted marker nor a quoted answer counts. REJECTED the bare-word rule criterion 4 was signed with (any of ''SETTLED'', ''answered'' or ''SIGNED by Keith'' anywhere in the item), under which ''not yet answered'', ''to be answered by Keith'' and a WORDING sign-off each silenced a choice nobody had answered. Of the six older answered markers the answer named for rewording (REQ-PIPE-086 d29, REQ-PIPE-107 d19, REQ-TEST-114 d15, REQ-PIPE-151 d39, REQ-PIPE-173 d12, REQ-DASH-204 d32), all six already carry the dated form on this rebuild, so none was changed.'
+    - 'THE QUOTED WORD: this requirement''s own items write `PROVISIONAL` in backticks, so the gate never flags its own requirement (tests/test_validate_provisional.py::test_this_requirement_never_flags_itself).'
+    - 'A GAIN IS JUDGED AGAINST THE PUSH''S BASE (diff_base, as the schedule and check-lifecycle gates are): an entry the working baseline holds and the base commit''s did not fails. Where the base holds no baseline yet - the commit introducing it - there is nothing to compare and no gain is judged. A STALE entry (answered, reworded or its requirement gone) also fails, so shrinking is forced rather than remembered; `--prune` takes stale entries off and never adds one, and `--write-baseline` refuses once the file exists. REJECTED matching on item number, which shifts whenever an item is inserted above: an entry is requirement id, field and a 16-hex SHA-256 of the whitespace-normalised item text.'
     open_questions: []

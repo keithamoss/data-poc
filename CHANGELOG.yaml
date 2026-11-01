@@ -109,6 +109,20 @@ intro: >
   all three.
 
 releases:
+  - date: "2026-11-01"
+    summary: >
+      Any choice a builder made on your behalf now stays in view until you
+      answer it.
+    changes:
+      - category: New
+        items:
+          - headline: Unanswered provisional choices are flagged
+            components: ["Testing & dev tooling", "Docs & process"]
+            description: >
+              The checks now warn whenever finished work holds a provisional
+              choice nobody has answered, naming where it is. The ones already
+              there are noted once, so only new ones are raised, and none of
+              them stops a build.
   - date: "2026-10-31"
     summary: >
       Department of Health has a second collection, Linkage Products, and a
