@@ -206,6 +206,11 @@ class Provider:
         inheritance scenarios)."""
         return []
 
+    def carries_table(self, plan: Plan, job: Job, n: int, delivery_obj, table: str) -> bool:
+        """Whether arrival `n` of `job` writes `table`'s file, readable - True
+        unless the provider shapes its file sets (generated_supplies)."""
+        return True
+
 
 class GenerationOrderRefused(ValueError):
     """A provider whose declared dependency is absent or generates after it
@@ -225,6 +230,11 @@ class GeneratedSupply:
     #: reader can tell whether the gate promotes it (REQ-GEN-298 criterion
     #: 11: a generation-time trial stages only what the plan promotes).
     severity: str | None = None
+    #: WHETHER THE DELIVERY ACTUALLY CARRIES THE TABLE'S FILE, readable
+    #: (Provider.carries_table): a scenario's file shape can leave it out, so
+    #: the supply was planned but never arrives (REQ-GEN-298, found building
+    #: the geocoding trial: TS-104's 2016-Q2 Client Register).
+    carried: bool = True
 
 
 def generated_supplies(provider: "Provider", dataset_id: str) -> list[GeneratedSupply]:
@@ -251,7 +261,9 @@ def generated_supplies(provider: "Provider", dataset_id: str) -> list[GeneratedS
             rows = provider.table_rows(delivery_obj, table)
             if rows is not None:
                 out.append(GeneratedSupply(job.period.name, received, rows,
-                                           entry.get("dirty_severity")))
+                                           entry.get("dirty_severity"),
+                                           provider.carries_table(plan, job, n, delivery_obj,
+                                                                  table)))
     from qa_tools.common import asset_time
 
     return sorted(out, key=lambda s: asset_time.parse_instant(s.received_at, "a receipt"))

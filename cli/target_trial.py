@@ -176,7 +176,14 @@ def try_all(collection_id: str, specs: list[dict], say=None) -> tuple[list, floa
         for spec, future in futures:
             say(f"Trying {spec['label']} against the real tools in {spec['period']} "
                 f"(built to {spec['target']})")
-            found += future.result()
+            try:
+                found += future.result()
+            except Exception as exc:  # noqa: BLE001 - a lost worker is that trial's disagreement
+                from qa_tools.common import target_agreement
+
+                found.append(target_agreement.ReadDisagreement(
+                    spec["label"], spec["dataset_id"],
+                    (f"the trial's worker was lost ({type(exc).__name__}: {exc})",)))
     return found, time.monotonic() - started, workers
 
 

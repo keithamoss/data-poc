@@ -76,8 +76,15 @@ def _book(tmp_path, bdm, cp=()):
 
 
 def _entry(period, delivery, at="14:30", severity=None):
+    # A QUARTER'S SUPPLY IS RECEIVED ON A REAL DAY - its quarter's first,
+    # here - since every target now carries the day it was built for
+    # (REQ-GEN-298 criterion 12).
+    day = period
+    if "-Q" in period:
+        year, q = period.split("-Q")
+        day = f"{year}-{(int(q) - 1) * 3 + 1:02d}-01"
     return {"run_id": delivery, "period": period, "delivery": delivery,
-            "received_at": f"{period}T{at}:00+08:00", "dirty_severity": severity}
+            "received_at": f"{day}T{at}:00+08:00", "dirty_severity": severity}
 
 
 class TestWhatWasBuilt:

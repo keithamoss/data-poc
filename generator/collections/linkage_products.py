@@ -1317,10 +1317,12 @@ NAMED_HELD_SOURCE = (("TS-93c", "geo-cp-clients", "TS-93b"),
 
 def _before(supplies, dataset_id: str, period: str, at) -> list:
     """The source's supplies filed to `period` and received before `at`,
-    oldest first."""
+    oldest first - only those whose file arrives (GeneratedSupply.carried):
+    the geocoding stream geocodes what the geocoder could have been sent.
+    The linkage stream does not ask, so its releases are unchanged."""
     from qa_tools.common import asset_time
 
-    return [s for s in supplies if s.period == period
+    return [s for s in supplies if s.period == period and s.carried
             and asset_time.parse_instant(s.received_at, dataset_id) < at]
 
 
@@ -1350,7 +1352,10 @@ def in_warehouse(dataset_id: str, period: str, at, supplies):
     scripted decision's instant cannot be said."""
     from qa_tools.common import amber_setting, asset_time, scripted_decisions
 
-    quarter = [s for s in supplies if s.period == period]
+    # ONLY A SUPPLY WHOSE FILE ARRIVES (GeneratedSupply.carried): a delivery
+    # its scenario's file shape leaves the table out of is no supply of the
+    # dataset, and takes no supply index (scenario_injection.carries).
+    quarter = [s for s in supplies if s.period == period and s.carried]
     events = []
     for s in quarter:
         received = asset_time.parse_instant(s.received_at, dataset_id)
@@ -1653,7 +1658,9 @@ def _refuse_geocoding_unschedulable(jobs, sources, state, linkage_arrivals,
             slot = next(s for s in slots.slots_for_dataset(
                 d, until=job.period.round_date + timedelta(days=1))
                 if s.period.name == job.period.name)
-            mine = [s for s in sources[src] if s.period == job.period.name]
+            mine = [s for s in sources[src] if s.period == job.period.name and s.carried]
+            if not mine:
+                continue
             first = asset_time.parse_instant(mine[0].received_at, src)
             took = first
             if asset_time.local_date(first) == job.period.round_date:

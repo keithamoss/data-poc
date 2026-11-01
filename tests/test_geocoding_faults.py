@@ -324,6 +324,28 @@ class TestWhatIsTriedAndAgainstWhat:
         assert lp.in_warehouse("cp-clients", q, later, sources["cp-clients"]) is not None
 
 
+class TestOnlyASupplyThatArrivesIsGeocoded:
+    """Found running the trial (2026-11-01), seen failing first: a Child
+    Protection scenario's file shape left cp_clients.csv out of its
+    2016-02-29 10:00 delivery, yet the row interface reported a Client
+    Register supply there, so TS-104's geocodes were built from - and its
+    trial would have staged - a supply that never arrives."""
+
+    def test_the_left_out_file_is_no_supply_the_geocoding_stream_reads(self, plan):
+        from qa_tools.common import asset_time as at_mod
+
+        cp = plan.state["sources"]["cp-clients"]
+        left_out = [s for s in cp if not s.carried]
+        assert left_out, "the history holds a delivery whose shape leaves cp_clients out"
+        for job in _geo(plan):
+            if plan.state["geocoding"][job.slot_id] is None:
+                continue
+            arrived = plan.state["geocoding"][job.slot_id][0]
+            used = lp._before(cp, "cp-clients", job.period.name, arrived)
+            assert all(s.carried for s in used)
+        assert all(at_mod.parse_instant(s.received_at, "x") for s in left_out)
+
+
 def test_two_plans_place_the_same_faults(plan):
     """NFR 1: the same seed and configuration place the same injections."""
     again = lp.PROVIDER.plan()

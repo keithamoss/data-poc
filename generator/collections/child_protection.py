@@ -1048,6 +1048,31 @@ class ChildProtection(Provider):
         return _cp_received_at(delivery_obj.payload, delivery_obj.received_date,
                                f"received_at for {entry['run_id']}")
 
+    def carries_table(self, plan, job, n, delivery_obj, table: str) -> bool:
+        """Whether this arrival writes `table`'s file as a readable extract -
+        the same file set files() writes: a grown quarter's case workers only
+        where owed, and a scenario's file shape (scenario_injection.
+        apply_file_shape) leaving a file out, renaming it so nothing claims
+        it, or making it unreadable."""
+        from generator import scenario_injection
+        from qa_tools.common import hierarchy
+
+        period = job.period.name
+        if (table == hierarchy.dataset(_CASE_WORKERS).table and period in plan.state["grown_names"]
+                and period not in plan.state["case_workers_owed"]):
+            return False
+        injected = plan.injected_by_period.get(period)
+        if injected is None:
+            return True
+        shape = injected[0].arrivals[n - 1].file_shape
+        if shape is None:
+            return True
+        original = "a,b\n1,2\n"
+        shaped = scenario_injection.apply_file_shape(shape, {f"{t}.csv": original
+                                                             for t in _tables()})
+        return shaped.get(f"{table}.csv") == original or (
+            f"{table}.csv" in shaped and shape != "one_file_unreadable")
+
     def files(self, plan: Plan, job: Job, n: int, delivery_obj, entry: dict, name: str):
         from generator import receipt_instants, scenario_injection
 
