@@ -562,6 +562,17 @@ Rough layout:
   pays a flat ~1s of worker startup (1.4s -> 2.2s). Use **`-n0`** to
   force serial - the one case genuinely worse in parallel is
   print-debugging several tests at once, where output interleaves.
+  **TWO TEST SESSIONS ON ONE SERVER MUST EACH SET `MOTHMAN_TEST_DB_TAG`**
+  (relearned 2026-11-01): a session's worker databases are named
+  `mothman_test_<tag>_gwN` and dropped `WITH (FORCE)` when it starts, so
+  two untagged sessions - parallel worktrees, a builder and its critic -
+  kill each other's databases mid-run. The symptom is "database
+  mothman_test_gw1 does not exist" or a test that fails beside another
+  run and passes alone, and it read as "load-sensitive" or "flaky" in
+  several reports that night before the cause was found. Give every
+  concurrent session its own short tag, e.g. the branch name
+  (`MOTHMAN_TEST_DB_TAG=bmove`), and re-check any "flaky" failure with
+  one set before believing it.
   **`--dist loadgroup` plus `tests/conftest.py`'s distribution groups**
   (REQ-TEST-281, 2026-10-24; it was `--dist loadfile`): every module
   stays whole on one worker, as loadfile kept it, except
