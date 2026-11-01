@@ -95,7 +95,8 @@ def evaluate(collection_id: str, run_id: str, run_timestamp: str) -> list[dict]:
     # run whose id names no table, which asks for the whole contract.
     options = (selection_for(path, asked)
                if scoped and run_owner(run_id) is not None else {})
-    run = run_against_warehouse(path, supply_db.run_schema(run_id), **options)
+    run = run_against_warehouse(path, supply_db.run_schema(run_id), **options,
+                                sample_key=collections.adapter(coll).sample_key)
     unreadable = _unreadable_in(run_id, collection_id)
     declared = _declared_reads_tables()
     names = _authored_names(path)

@@ -110,9 +110,23 @@ def test_the_real_files_select_every_key_and_warn_of_nothing():
     assert validate_soda.warnings() == []
 
 
-def test_the_gate_reads_the_registry_keys():
+
+
+def test_two_collections_sharing_a_table_name_are_each_held_to_their_own_key(tmp_path):
+    """Post-build-review: keys merged by bare table name across adapters, so
+    one collection's key judged another's file."""
+    a = _failed_rows(tmp_path, "SELECT x FROM linkage_keys")
+    b = _failed_rows(tmp_path, "SELECT x FROM linkage_keys")
+    keys = {("coll-a", "linkage_keys"): ["x"], ("coll-b", "linkage_keys"): ["y"]}
+    found = validate_soda.problems([a, b], sample_keys=keys,
+                                   collection_of={str(a): "coll-a", str(b): "coll-b"})
+    assert len(found) == 1 and "missing y (" in found[0], found
+
+
+def test_the_registry_keys_are_by_collection_and_table():
     from qa_tools import collections
 
     keys = validate_soda.declared_sample_keys()
-    assert keys and keys["linkage_keys"] == collections.adapter("linkage-products").sample_key[
-        "linkage_keys"]
+    assert keys[("linkage-products", "linkage_keys")] == collections.adapter(
+        "linkage-products").sample_key["linkage_keys"]
+    assert all(isinstance(k, tuple) and len(k) == 2 for k in keys)

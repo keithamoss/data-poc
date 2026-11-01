@@ -44,14 +44,35 @@ def check_files() -> list[str]:
     return sorted(soda_common.soda_check_files())
 
 
-def declared_sample_keys() -> dict[str, list[str]]:
-    """Every table's failing-sample key, from every registered adapter."""
+def declared_sample_keys() -> dict[tuple[str, str], list[str]]:
+    """Every table's failing-sample key, by (collection, table) - two
+    collections may name a table alike, and each file is held to its own
+    collection's key, never another's."""
     from qa_tools import collections
 
-    keys: dict[str, list[str]] = {}
-    for adapter in collections.adapters():
-        keys.update(adapter.sample_key)
-    return keys
+    return {(c.id, table): cols for c in collections.all_collections()
+            for table, cols in collections.adapter(c).sample_key.items()}
+
+
+def _collection_of_files() -> dict[str, str]:
+    """Each registered collection's live Soda file, by path, to its id."""
+    from qa_tools import collections
+
+    return {_resolved(c.check_file("soda")): c.id for c in collections.all_collections()}
+
+
+def _resolved(path) -> str:
+    path = str(path)
+    return os.path.normpath(path if os.path.isabs(path) else os.path.join(ROOT, path))
+
+
+def _keys_for(path, keys: dict, collection_of: dict) -> dict[str, list[str]]:
+    """The {table: key} one file is held to: its own collection's, or - for a
+    map keyed by bare table name, as a caller may pass for one file - that."""
+    if not any(isinstance(k, tuple) for k in keys):
+        return keys
+    cid = collection_of.get(str(path)) or collection_of.get(_resolved(path))
+    return {table: cols for (c, table), cols in keys.items() if c == cid}
 
 
 def _selected(query: str) -> set[str] | None:
@@ -88,18 +109,20 @@ def _failed_rows_checks(doc: dict):
                    sample_keys.names_no_row(attrs.get("names_no_row")))
 
 
-def _key_findings(paths, keys) -> tuple[list[str], list[str]]:
+def _key_findings(paths, keys, collection_of=None) -> tuple[list[str], list[str]]:
     import yaml
 
     found, warned = [], []
+    collection_of = _collection_of_files() if collection_of is None else collection_of
     for path in paths:
         name = os.path.basename(str(path))
+        file_keys = _keys_for(path, keys, collection_of)
         with open(path) as f:
             doc = yaml.safe_load(f) or {}
         for table, check, query, no_row in _failed_rows_checks(doc):
             if no_row:
                 continue
-            key = keys.get(table)
+            key = file_keys.get(table)
             if not key:
                 warned.append(f"{name}: failed-rows check {check!r} is on table {table!r}, "
                               f"which declares no failing-sample key, so its samples cannot be "
@@ -117,14 +140,14 @@ def _key_findings(paths, keys) -> tuple[list[str], list[str]]:
     return found, warned
 
 
-def warnings(paths=None, sample_keys=None) -> list[str]:
+def warnings(paths=None, sample_keys=None, collection_of=None) -> list[str]:
     """What the gate warns of without failing: a failed-rows check on a table
     with no declared key."""
     keys = declared_sample_keys() if sample_keys is None else sample_keys
-    return _key_findings(paths or check_files(), keys)[1]
+    return _key_findings(paths or check_files(), keys, collection_of)[1]
 
 
-def problems(paths=None, sample_keys=None) -> list[str]:
+def problems(paths=None, sample_keys=None, collection_of=None) -> list[str]:
     import yaml
     from soda.scan import Scan
 
@@ -148,7 +171,7 @@ def problems(paths=None, sample_keys=None) -> list[str]:
                                  f"project does not use - compute it ourselves, as the volume "
                                  f"check does (REQ-QAC-108)")
     keys = declared_sample_keys() if sample_keys is None else sample_keys
-    found += _key_findings(paths or check_files(), keys)[0]
+    found += _key_findings(paths or check_files(), keys, collection_of)[0]
     return found
 
 

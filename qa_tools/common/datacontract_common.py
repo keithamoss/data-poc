@@ -11,8 +11,10 @@ plumbing like the rest of this module. See plans/qa-pipeline.md #84.
 """
 from __future__ import annotations
 
-import functools
+import contextlib
+import contextvars
 import copy
+import functools
 
 import yaml
 from qa_tools.common import config_yaml, sample_keys
@@ -48,9 +50,53 @@ class SelectionRefused(RuntimeError):
 _SELECTION_CHECKS = ("Check that quality rule id exists", "Check that schema name exists")
 
 
+#: The failing-sample key each table declares, for the datacontract-cli run in
+#: progress (REQ-PIPE-341) - see declared_sample_keys.
+_DECLARED_KEYS: contextvars.ContextVar = contextvars.ContextVar("declared_sample_keys",
+                                                                default=None)
+
+
+def _install_key_override() -> None:
+    """datacontract-cli takes a failed sample's identifier columns from the
+    contract's primaryKey and unique properties only (ibis_check_execute
+    _sample_field_meta), so a table keyed by columns that are neither -
+    Linkage Keys' dataset and id columns - would have samples without its key,
+    and criterion 8 would refuse them. Marking the columns primaryKey is no
+    answer: it makes the tool create uniqueness checks of its own. So, while a
+    run declares keys, its identifiers ARE the declared key - still less any
+    column the contract classifies sensitive, which the tool drops itself.
+    Installed once; outside declared_sample_keys it changes nothing."""
+    from datacontract.engines.ibis import ibis_check_execute as ice
+
+    if getattr(ice._sample_field_meta, "_declared_key_override", False):
+        return
+    original = ice._sample_field_meta
+
+    def sample_field_meta(data_contract, server, model):
+        identifiers, sensitive = original(data_contract, server, model)
+        declared = (_DECLARED_KEYS.get() or {}).get(model)
+        return (list(declared) if declared is not None else identifiers), sensitive
+
+    sample_field_meta._declared_key_override = True
+    ice._sample_field_meta = sample_field_meta
+
+
+@contextlib.contextmanager
+def declared_sample_keys(keys: dict):
+    """For the datacontract-cli run inside: each table's failed samples carry
+    its declared key columns, {table: [columns]}."""
+    _install_key_override()
+    token = _DECLARED_KEYS.set(dict(keys))
+    try:
+        yield
+    finally:
+        _DECLARED_KEYS.reset(token)
+
+
 def run_against_warehouse(contract_path: str, schema: str, *,
                           quality_ids: set[str] | None = None,
-                          schema_name: str | None = None):
+                          schema_name: str | None = None,
+                          sample_key: dict | None = None):
     """Test the contract against the WAREHOUSE, not the file that arrived.
 
     `quality_ids` and `schema_name` ARE THE TOOL'S OWN OPTIONS (REQ-PIPE-190,
@@ -134,7 +180,10 @@ def run_against_warehouse(contract_path: str, schema: str, *,
                       config={"DATACONTRACT_POSTGRES_USERNAME": fields["user"],
                               "DATACONTRACT_POSTGRES_PASSWORD": fields["password"]},
                       **selected)
-    run = dc.test()
+    # EACH TABLE'S DECLARED KEY IN ITS SAMPLES (REQ-PIPE-341), not only the
+    # columns the contract marks primaryKey or unique.
+    with declared_sample_keys(sample_key or {}):
+        run = dc.test()
     refused = [c for c in run.checks if c.name in _SELECTION_CHECKS
                and getattr(c.result, "value", c.result) != "passed"]
     if selected and refused:

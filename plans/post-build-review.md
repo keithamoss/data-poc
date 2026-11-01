@@ -13294,3 +13294,35 @@ twice. It deliberately did not re-find the `TypeError`.
      - Not defects: criterion 3's geocoding half (REQ-PIPE-296) and criterion
        7's compare wait on later work and the end bootstrap.
 
+
+295. **[done, 2026-11-01]** **[QA checks & contract]** **[Dashboard UI]** **Critic on the REQ-PIPE-341 rebuild (b341, ad2a266).** Six findings, each checked against the code; every defect fixed test first and seen failing.
+     - **DEFECT, the page showed a null key as a blank pill**: samplePill rendered a
+       null key or part as "". Nulls are now recorded for Birth Registrations,
+       Child Protection and ED, so blank pills would appear. DECIDED: show
+       '(no value)' now (Keith's wording) rather than leave it to REQ-DASH-299,
+       escaping unchanged; REQ-DASH-299's decisions note it only keeps it.
+       Vitest `sample-keys-compare`.
+     - **DEFECT (register), criteria 7 and 8 contradicted the signed amendment**:
+       criterion 8 still said a one-column null was left out and criterion 7 that
+       no Birth Registrations, Child Protection or ED sample changed. DECIDED:
+       each contradicting clause replaced, the old text kept as 'it read
+       <<<...>>>' beside the AMENDED 2026-11-01 marker; criterion 7's compare
+       allows exactly the amendment's correction outside Linkage Keys - a null
+       key newly recorded where it was dropped, or recorded as null where it was
+       the text None - and nothing else. Read back with yaml.safe_load.
+     - **MINOR, dbt ignored names_no_row**: it exempted recency by the adapter's
+       singular_unsampled list. DECIDED: dbt reads `names_no_row` from the test's
+       own meta; recency declares it; singular_unsampled had no other user and is
+       removed.
+     - **MINOR, datacontract-cli sampled only primaryKey/unique columns**: a rule
+       on linkage_keys would have raised. DECIDED: while a run declares keys, the
+       tool's identifier lookup returns the adapter's key
+       (datacontract_common.declared_sample_keys), tested against a contract
+       marking none of them. REJECTED marking them primaryKey, which makes the
+       tool add uniqueness checks.
+     - **MINOR, the key gate merged keys by bare table name**: DECIDED: keyed by
+       (collection, table), each Soda file held to its own collection's key;
+       tested with two collections sharing a table name.
+     - **NIT, accepted**: one-column sort order is dbt's native type against
+       Soda and datacontract-cli's text. It predates this build and criterion 2
+       covers several-column keys only; recorded as a REQ-PIPE-341 decision.
