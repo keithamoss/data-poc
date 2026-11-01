@@ -73,6 +73,21 @@ def _count(conn, table: str) -> int:
     return conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
 
 
+def _own_table(entry: dict) -> str | None:
+    """The table the run is for: its arrival's dataset, else what its id says
+    (run_owner) - None for a fixture's or a trial's run naming none."""
+    from qa_tools.common import hierarchy
+    from qa_tools.common.qa_results_writer import run_owner
+
+    try:
+        if entry.get("dataset_id"):
+            return hierarchy.dataset(entry["dataset_id"]).table
+    except hierarchy.UnknownDatasetError:
+        return None
+    owner = run_owner(entry["run_id"]) if entry.get("run_id") else None
+    return owner[1] if owner else None
+
+
 def compute_dataset_stats(collection_id: str, conn, entry: dict) -> dict[str, Any]:
     """`conn` has this run's own view schema on its search path, which holds
     exactly the arrival's rows - so nothing here scopes by a row column. A
@@ -82,11 +97,17 @@ def compute_dataset_stats(collection_id: str, conn, entry: dict) -> dict[str, An
     tables = [d.table for d in coll.datasets]
     readable = _readable(conn)
 
+    # A COLUMN SEVERAL TABLES DECLARE IS THE RUN'S OWN TABLE'S (REQ-QAC-297
+    # criterion 11): value_counts is keyed by column, and the drift reference
+    # and the page's value bars both read a run's counts for its own dataset,
+    # so the run's own table is counted last and wins.
+    own = _own_table(entry)
+    declared = sorted(spec.value_counts.items(), key=lambda kv: kv[0][0] == own)
     return {
         "arrival_record": arrival_record(entry),
         "row_counts": {t: _count(conn, t) for t in tables if t in readable},
         "value_counts": {col: _value_counts(conn, t, col, known)
-                         for (t, col), known in spec.value_counts.items() if t in readable},
+                         for (t, col), known in declared if t in readable},
         "check_aggregates": {f"{t}.{col}": _aggregate(conn, t, col, s)
                              for (t, col), s in spec.aggregates.items() if t in readable},
     }

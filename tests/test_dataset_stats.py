@@ -119,3 +119,23 @@ def test_cp_stats_leave_out_a_table_the_run_cannot_read():
     assert stats["value_counts"] == {}
     assert not any(k.startswith(("cp_case_workers.", "cp_notifications."))
                    for k in stats["check_aggregates"])
+
+
+def test_a_column_two_tables_share_records_the_runs_own_tables_counts():
+    """REAL DEFECT, 2026-11-01 (REQ-QAC-297 criterion 11): value_counts is
+    keyed by column, and Linkage Products declares match_level on both
+    geocoding tables, so the later table's counts overwrote the run's own -
+    a Client Register geocoding run would have recorded, and drifted against,
+    ED Presentations' match levels. The run's own table's counts win."""
+    conn = duckdb.connect(":memory:")
+    conn.execute("CREATE TABLE geo_cp_clients (match_level VARCHAR)")
+    conn.execute("CREATE TABLE geo_ed_presentations (match_level VARCHAR)")
+    conn.execute("INSERT INTO geo_cp_clients VALUES ('suburb'), ('suburb'), ('postcode')")
+    conn.execute("INSERT INTO geo_ed_presentations VALUES ('postcode'), ('not geocoded')")
+    arrival = {"run_id": "r", "run_index": 1, "delivery": "d",
+               "received_at": "2026-05-01T10:30:00+00:00", "dataset_id": "geo-cp-clients"}
+
+    stats = dataset_stats.compute_dataset_stats("linkage-products", conn, arrival)
+
+    assert stats["value_counts"]["match_level"] == [
+        ["address", 0], ["postcode", 1], ["suburb", 2], ["not geocoded", 0]]

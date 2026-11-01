@@ -49,8 +49,9 @@ def collection_checks(collection_id: str) -> EvidentlyChecks:
     """A collection's Evidently checks, read from its own check file
     (REQ-QAC-241 criterion 10) - no check id is a Python constant.
 
-    Each check is found by its `method`: one or more `psi` checks, all on
-    one dataset (Emergency Department declares two, REQ-QAC-231), and a
+    Each check is found by its `method`: one or more `psi` checks, on one
+    dataset or several (Emergency Department declares two on one,
+    REQ-QAC-231; Linkage Products one on each geocoding table), and a
     `row_drop` check per table, whose dataset is the check id's fourth
     segment (asset.agency.collection.dataset...) and whose table is that
     dataset's in the hierarchy."""
@@ -71,12 +72,10 @@ def collection_checks(collection_id: str) -> EvidentlyChecks:
         return EvidentlyChecks({}, (), {})
     if not psi:
         raise ValueError(f"{rel}: expected at least one psi check, found none")
-    datasets = {i.split(".")[3] for i in psi}
-    if len(datasets) > 1:
-        # ONE DRIFT DATASET: its last promoted supply is the run's reference
-        # (orchestrate's reference choice), so drift checks on two datasets
-        # would each need a reference of their own.
-        raise ValueError(f"{rel}: every psi check must be on one dataset, found {sorted(datasets)}")
+    # DRIFT CHECKS ON SEVERAL DATASETS (REQ-QAC-297 criterion 11): each run
+    # evaluates its OWN dataset's, against that dataset's last promoted
+    # supply, which is the reference orchestrate already resolves per run
+    # (REQ-PIPE-105) - so two datasets no longer need one shared reference.
     row_drop = {hierarchy.dataset(i.split(".")[3]).table: i
                 for i, m in checks.items() if m.get("method") == "row_drop"}
     return EvidentlyChecks(checks, tuple(psi), row_drop)

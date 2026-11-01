@@ -37,11 +37,25 @@ __all__ = ["ENGINE_TAG", "evaluate"]
 
 
 def drift_dataset(collection_id: str) -> str | None:
-    """The dataset a collection's drift checks are about - the check ids'
-    fourth segment (asset.agency.collection.dataset...), one for all of them -
-    None for a collection that declares none."""
-    psi = collection_checks(collection_id).psi
-    return psi[0].split(".")[3] if psi else None
+    """The dataset a collection's drift checks are about, for a run that names
+    no dataset of its own - the check ids' fourth segment
+    (asset.agency.collection.dataset...) where they share one; None where the
+    collection declares none, or declares them on several datasets, whose
+    references are each run's own (REQ-QAC-297 criterion 11)."""
+    datasets = {c.split(".")[3] for c in collection_checks(collection_id).psi}
+    return next(iter(datasets)) if len(datasets) == 1 else None
+
+
+def _excluding(frame, entry: dict):
+    """A drift frame without the values the check declares excluded, from
+    reference and current alike (REQ-QAC-297 criterion 11) - so a value
+    another check already measures, such as an unplaced level, does not raise
+    a second alarm for one fault. Generic: any column, any values."""
+    excluded = [str(v) for v in (entry.get("exclude_values") or ())]
+    if not excluded:
+        return frame
+    column = entry["column"]
+    return frame[~frame[column].astype(str).isin(excluded)].reset_index(drop=True)
 
 
 def _table_of(check_id: str) -> str:
@@ -81,11 +95,12 @@ def _reference_frame(coll, reference_run_id: str, table: str, column: str):
 
 
 def _psi_result(coll, entry, check_id, table, run_id, run_timestamp, reference_run_id) -> dict:
-    current = _current_frame(run_id, table, entry["column"])
+    current = _excluding(_current_frame(run_id, table, entry["column"]), entry)
     if reference_run_id is None:
         psi, snapshot, status = None, None, NO_REFERENCE
     else:
-        reference = _reference_frame(coll, reference_run_id, table, entry["column"])
+        reference = _excluding(_reference_frame(coll, reference_run_id, table, entry["column"]),
+                               entry)
         psi, snapshot = compute_psi(current, reference, entry["column"])
         status = status_for(psi, entry)
     return {
@@ -207,13 +222,16 @@ def evaluate(collection_id: str, run_id: str, run_timestamp: str,
              reference_run_id: str | None = None, assessment=None) -> list[dict]:
     coll = collections.by_id(collection_id)
     checks = collection_checks(coll.id)
-    psi_table = _table_of(checks.psi[0]) if checks.psi else None
 
     asked_for.ask(run_id, run_timestamp, coll.agency_id, coll.id, "evidently")
     results = []
-    if psi_table is not None and _psi_applies(run_id, psi_table):
-        results.extend(_psi_result(coll, checks.checks[c], c, psi_table, run_id,
-                                   run_timestamp, reference_run_id) for c in checks.psi)
+    # EACH DATASET'S DRIFT CHECKS, for the run that is FOR it (REQ-QAC-297
+    # criterion 11): a run evaluates the drift checks on its own table only.
+    for psi_table in dict.fromkeys(_table_of(c) for c in checks.psi):
+        if _psi_applies(run_id, psi_table):
+            results.extend(_psi_result(coll, checks.checks[c], c, psi_table, run_id,
+                                       run_timestamp, reference_run_id)
+                           for c in checks.psi if _table_of(c) == psi_table)
     # EACH DRIFT CHECK'S SNAPSHOT BY ITS ID (REQ-QAC-231): read by nothing, and
     # left out of the equivalence capture, so the shape is free to say which.
     raw_output = {"psi": {r["check_id"]: r.pop("_snapshot") for r in results} or None}
