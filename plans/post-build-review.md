@@ -13553,6 +13553,8 @@ twice. It deliberately did not re-find the `TypeError`.
      - **7. TS-93c, TS-100c and TS-101b's lettered names (left)**: already a
        question for Keith on REQ-GEN-298; unchanged.
 
+     **Follow-up, 2026-11-02 (found sorting the base failures)**: the walled-off guard `tests/test_arrivals.py::TestTheGeneratorsBookkeepingIsWalledOff::test_only_the_sanctioned_modules_reach_what_the_generator_built` went red when this build split the generation-time trial out of cli/one_table.py into cli/collection_cli.py and cli/target_trial.py. Same sanctioned purpose - a check that records and files nothing - so the sanctioned set was updated with its reason, not widened for anything new.
+
 302. **[done, 2026-11-02]** **[Dashboard UI]** **[QA checks & contract]** **REQ-DASH-299's change to built page wording, site-wide (criteria 2, 3 and 5; NFR 3).**
      Written up here because these change every check page of every
      collection, Birth Registrations included - not only the geocoding pages

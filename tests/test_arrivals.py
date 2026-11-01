@@ -382,8 +382,12 @@ class TestTheGeneratorsBookkeepingIsWalledOff:
     #: changes nothing - never a filing, which is what criterion 7 protects.
     #: Any OTHER walled module reaching it fails below, so the exception
     #: cannot grow by accident.
+    #: REQ-GEN-298 (2026-11-01) moved the generation-time trial out of
+    #: cli/one_table.py into cli/collection_cli.py, and its in-period form into
+    #: cli/target_trial.py: the same sanctioned reader, split in two, still
+    #: feeding a check that records and files nothing.
     SANCTIONED_TARGET_READERS = {"qa_tools/common/bootstrap.py", "cli/pipeline.py",
-                                 "cli/one_table.py"}
+                                 "cli/collection_cli.py", "cli/target_trial.py"}
 
     def test_only_the_sanctioned_modules_reach_what_the_generator_built(self):
         reached = []
