@@ -818,7 +818,18 @@ def _content_at(rel_path: str, ref: str) -> str | None:
     estimate based on a DEEP CLONE and a full history walk, which this
     is not, and reopened on 2026-09-23 once the cheap version was found
     to be already running in this repo.
+
+    A PATH THE MOVE CREATED is read at its old path in the push that carries
+    the move, a divided file cut to its asset's part (REQ-TEST-366 criteria 2
+    and 5) - the amber, replacement and list-setting freeze, the agreement
+    freeze, the people file and correction_trial's base reads all come here.
     """
+    from qa_tools.common import moved_paths
+
+    return moved_paths.read_at(rel_path, ref, ROOT, _git_show)
+
+
+def _git_show(rel_path: str, ref: str) -> str | None:
     result = subprocess.run(["git", "show", f"{ref}:{rel_path}"], cwd=ROOT,
                              capture_output=True, text=True)
     return result.stdout if result.returncode == 0 else None
@@ -841,8 +852,14 @@ def _version_added_on(rel_path: str, ref: str, start: str) -> date | None:
     from qa_tools.common import agreement_freeze
 
     base_at = agreement_freeze.committer_instant(ref, root=ROOT)
+    # THE WALK FOLLOWS THE MOVE (REQ-TEST-366 criterion 6): in the push that
+    # carries it, the commits before the move touched the file at its old path,
+    # and _content_at reads each of them there.
+    from qa_tools.common import moved_paths
+
+    paths = [rel_path, *filter(None, [moved_paths.old_path(rel_path, ROOT)])]
     result = subprocess.run(["git", "log", "--reverse", "--format=%H %cI", f"{ref}..HEAD",
-                             "--", rel_path], cwd=ROOT, capture_output=True, text=True)
+                             "--", *paths], cwd=ROOT, capture_output=True, text=True)
     if result.returncode != 0:
         return None
     for line in result.stdout.splitlines():

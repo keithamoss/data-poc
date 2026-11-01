@@ -649,8 +649,8 @@ def may_approve(ref: str | None = None) -> list[str]:
 
     ref = ref or diff_base(root=validate_schedule.ROOT)
     people = config_yaml.parse(_content_at(agreement_freeze.people_rel(), ref) or "") or {}
-    owners = agreement_freeze.code_owners(_content_at(agreement_freeze.CODEOWNERS_REL, ref),
-                                          agreement_freeze.calendar_rel())
+    owners = agreement_freeze._base_owners(_content_at(agreement_freeze.CODEOWNERS_REL, ref),
+                                           agreement_freeze.calendar_rel())
     return [p.get("email") for p in agreement_freeze.approvers(people)
             if str(p.get("github", "")).lower() in owners and p.get("email")]
 

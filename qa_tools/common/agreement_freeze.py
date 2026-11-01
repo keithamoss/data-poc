@@ -571,6 +571,16 @@ def code_owners(codeowners_text: str | None, path: str) -> set[str]:
     return owners
 
 
+def _base_owners(base_codeowners: str | None, path: str) -> set[str]:
+    """code_owners of `path` in CODEOWNERS as it stood at the base - matched
+    against the path the file HAD there, in the push that carries the asset
+    move (REQ-TEST-366 criterion 2), since the base CODEOWNERS names the old
+    path."""
+    from qa_tools.common import assets, moved_paths
+
+    return code_owners(base_codeowners, moved_paths.old_path(path, assets.ROOT) or path)
+
+
 # ---- the gate -------------------------------------------------------
 
 @dataclass
@@ -810,7 +820,7 @@ def check(old_cal: dict | None, new_cal: dict, old_asset: dict | None, new_asset
         # A CODE OWNER OF THE FILE IT IS DECLARED IN (REQ-GHUB-174
         # criterion 2), at the base - so a change cannot make its approver.
         rel_file = asset_rel() if owner[0] == "timezone" else calendar_rel()
-        owners = code_owners(base_codeowners, rel_file)
+        owners = _base_owners(base_codeowners, rel_file)
         eligible = [p for p in allowed if str(p.get("github", "")).lower() in owners]
         for corr in entries[len(before):]:
             corr = corr or {}
@@ -922,7 +932,7 @@ def check(old_cal: dict | None, new_cal: dict, old_asset: dict | None, new_asset
         file = "data-asset.yaml" if owner[0] == "timezone" else "calendar.yaml"
         # WHO MAY APPROVE IS WHO THE GATE WILL ACCEPT (delivery-critic on 174,
         # L1): the asset's managers who are also code owners of this file.
-        owners = code_owners(base_codeowners, asset_rel() if owner[0] == "timezone"
+        owners = _base_owners(base_codeowners, asset_rel() if owner[0] == "timezone"
                              else calendar_rel())
         may = [p for p in allowed if str(p.get("github", "")).lower() in owners]
         # ONE ENTRY PER OWNER (Keith, 2026-10-11, morning-report (l)): every
@@ -1095,7 +1105,7 @@ def drafts(old_cal: dict | None, new_cal: dict, old_asset: dict | None, new_asse
     out = []
     for owner in sorted(needs, key=_owner_label):
         rows = needs[owner]
-        owners = code_owners(base_codeowners, asset_rel() if owner[0] == "timezone"
+        owners = _base_owners(base_codeowners, asset_rel() if owner[0] == "timezone"
                              else calendar_rel())
         may = [p for p in approvers(base_people or {})
                if str(p.get("github", "")).lower() in owners]
