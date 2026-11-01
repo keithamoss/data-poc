@@ -1182,7 +1182,7 @@ def reference_suffix(result: dict) -> str:
         return ""
     measured = result.get("measured_status")
     if measured and result.get("status") == "fail" and measured != "fail":
-        return f" [dim](measured {measured} - red because {reason})[/dim]"
+        return f" [dim](measured {measured} - failing because {reason})[/dim]"
     if result.get("reference_not_evaluated"):
         return f" [dim]({reason})[/dim]"
     return ""

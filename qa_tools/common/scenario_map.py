@@ -52,6 +52,7 @@ from pathlib import Path
 from typing import Iterable, Mapping
 
 from qa_tools.common import scenarios as scenarios_mod
+from qa_tools.common.dataset_status import status_words
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 
@@ -166,11 +167,12 @@ The synthetic history this proof of concept runs on has deliberately
 awkward supplies in it - a delivery that arrives in the wrong order, a
 file nothing can place, a table that will not load. They are there on
 purpose, so the model can be seen working on real pages rather than
-only in a green test run.
+only in a passing test run.
 
-The dashboard does not label them. A supply that reads red reads red,
-the same as a real one would, because that is the point. **This is the
-list that says which red was on purpose, and where to look at it.**
+The dashboard does not label them. A supply that is failing reads as
+failing, the same as a real one would, because that is the point. **This
+is the list that says which problems were on purpose, and where to look
+at it.**
 
 Each entry gives coordinates - the dataset, the supplies, the period,
 and the date to set the In the warehouse on picker to - and never a link. The
@@ -197,7 +199,7 @@ def _sentence(text: str) -> str:
 
 
 def _target_text(target: Mapping) -> str:
-    """"amber on place_of_birth_facility.completeness (450 of 2,078 blank),
+    """"Warn on place_of_birth_facility.completeness (450 of 2,078 blank),
     the 2026-09-14 14:00 arrival" - what the rows were built to, never
     what the tools found."""
     moved = [m for m in target.get("moved") or () if m.get("to") == target.get("built_to")]
@@ -205,7 +207,10 @@ def _target_text(target: Mapping) -> str:
         f"{m['rule']} ({m.get('nulls', m.get('values'))} of {m['of_rows']:,})" for m in moved
     ) or ", ".join(target.get("rules") or ()) or "the seed's choice"
     on = "" if target.get("built_to") == "green" else f" on {rules}"
-    return f"{target.get('built_to')}{on}, the {target.get('date')} {target.get('at')} arrival"
+    # THE STATUS IN WORDS (REQ-DASH-359 criterion 13): 'Warn on ...', never
+    # the generator's stored target value.
+    built = status_words(target.get("built_to"), "label")
+    return f"{built}{on}, the {target.get('date')} {target.get('at')} arrival"
 
 
 def _entry(scenario: scenarios_mod.Scenario, placement: Placement | None) -> list[str]:

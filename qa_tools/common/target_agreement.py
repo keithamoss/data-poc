@@ -68,17 +68,25 @@ def responsible(dataset_id: str, results: Sequence[dict], target: str,
         if status not in _RANK:
             # A QUIET STATUS - no reference, nothing measured - is a verdict
             # of its own, never green (post-build-review #157 finding 6).
-            quiet.append(f"{_short(check)} {status}")
+            quiet.append(f"{_short(check)} {_said(status)}")
         elif _RANK[status] > allowed:
-            worse.append(f"{_short(check)} {status}")
+            worse.append(f"{_short(check)} {_said(status)}")
         elif rules and any(f".{rule.split('.')[0]}." in check for rule in rules):
-            named.append(f"{_short(check)} {status}")
+            named.append(f"{_short(check)} {_said(status)}")
     found = sorted(worse) or sorted(quiet) or sorted(named)
     if not found and _RANK.get(target, 0) > 0:
         # BETTER THAN BUILT, WITH NO RULE NAMED: an ordinary amber carries
         # none, so say what happened rather than nothing (finding 6).
         found = [f"no check {'warned' if target == 'amber' else 'failed'}"]
     return tuple(found)
+
+
+def _said(status) -> str:
+    """A check's status in the dashboard's words (REQ-TEST-360 criterion 7):
+    'Fail', never the stored 'red'; refused where it has none."""
+    from qa_tools.common.dataset_status import status_words
+
+    return status_words(status, "label")
 
 
 def _short(check_id: str) -> str:

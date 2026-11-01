@@ -354,6 +354,15 @@ class Refusal(str):
         return out
 
 
+def _status_label(status) -> str:
+    """A status as the gate's reason names it ('Fail'). REFUSES one it has
+    no word for (UnknownStatusError), never passing the raw value through -
+    an unrecognised status is not evidence of anything (REQ-QAC-047)."""
+    from qa_tools.common.dataset_status import status_words
+
+    return status_words(status, "label")
+
+
 def refusal_kind(why) -> str | None:
     """A refusal's kind, or None for a reason that is plain text."""
     return getattr(why, "kind", None)
@@ -568,13 +577,7 @@ def should_promote(*, status: str,
                               "asked of it and a pass means only that", NO_ACTIVE_CHECKS)
     if status not in PROMOTES_ITSELF:
         # Criterion 3.
-        from qa_tools.common.dataset_status import UnknownStatusError, status_words
-
-        try:
-            said = status_words(status, "label")
-        except UnknownStatusError:
-            said = "not one a person can read"
-        return False, Refusal(f"this supply's status is {said} rather than Pass or "
+        return False, Refusal(f"this supply's status is {_status_label(status)} rather than Pass or "
                               "Warn, so it waits for a person",
                               FAILING if status == "red" else NOT_PROMOTABLE)
     if status == "amber" and amber_setting == AMBER_HOLD:
@@ -1145,7 +1148,7 @@ def judge(conn, item: dict, status, *, results: Sequence[dict], reads: dict[str,
     past = gap_reds(dataset_id, results, reads=reads)
     if past:
         reason = (f"every check contributing to this dataset passed or warned, apart "
-                  f"from {len(past)} recorded red only because its reference crossed "
+                  f"from {len(past)} recorded failing only because its reference crossed "
                   f"an owed period, which warns rather than blocks "
                   f"({', '.join(past)}); and its slot for this period was unfilled")
     if replacing is not None:

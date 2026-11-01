@@ -153,7 +153,7 @@ def describe(results) -> str:
     tables = sorted({r["held_table"] for r in reddened})
     return (f"{len(reddened)} check(s) could not be evaluated because "
             f"{len(tables)} held table(s) were not staged into this run - "
-            f"{', '.join(tables)}. They read red naming the held table; none "
+            f"{', '.join(tables)}. They read as failing, naming the held table; none "
             f"of them is a verdict on anybody's data.")
 
 

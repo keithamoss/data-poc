@@ -1222,7 +1222,7 @@ def _absent_words(tables: list[str]) -> str:
             return table
     names = ", ".join(name(t) for t in tables)
     return (f"Held back: its cross-table checks of the {names} could not be checked - no "
-            f"{names} is in place for this period - and a check that could not run is red. "
+            f"{names} is in place for this period - and a check that could not run is a Fail. "
             f"None of its checks of its own data failed; it is re-checked when the "
             f"{names} arrives.")
 

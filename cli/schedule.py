@@ -522,7 +522,7 @@ def check_agreement_command(dataset_id: str | None) -> None:
     difference no declared correction accounts for refuses the dataset -
     its new supplies are held until the agreement is restored or the change
     is declared. Exits 3 where any dataset is refused - its own status, never
-    the 1 that red data gives - and 2 where any could not be checked, which
+    the 1 that failing data gives - and 2 where any could not be checked, which
     outranks a refusal as it does in the processing pass.
     """
     # REQ-PIPE-173: the backstop's own report, the same computation the

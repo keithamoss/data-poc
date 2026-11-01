@@ -438,7 +438,7 @@ def own_checks_passed(conn, dataset_id: str, supply: str) -> bool:
 def failed_recheck_words(conn, dataset_id: str, supply: str) -> str | None:
     """CLI UX review S5 (PROVISIONAL, Keith Q1 = a): a counted row whose
     re-check against the warehouse failed while the supply that caused that
-    re-check still waits - 'red - <check> failed against the warehouse;
+    re-check still waits - 'failing - <check> failed against the warehouse;
     decide <dataset> (received <instant>) first'."""
     from qa_tools.common import display_time, filing, gate, supersession
 
@@ -460,7 +460,7 @@ def failed_recheck_words(conn, dataset_id: str, supply: str) -> str | None:
     words = gate._check_words(checks[0]) if checks else "a cross-table check"
     got = filing.received_at_of(by_ds, by, conn=conn)
     when = display_time.format_instant(got) if got else by
-    return f"red - {words} failed against the warehouse; decide {by_ds} (received {when}) first"
+    return f"failing - {words} failed against the warehouse; decide {by_ds} (received {when}) first"
 
 
 def _overdue_words(root: Root) -> str:

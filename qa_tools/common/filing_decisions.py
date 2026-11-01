@@ -525,7 +525,7 @@ def _held_back_consequences(conn, request: Request) -> list[str]:
             continue
         seen.add((w_ds, w_supply))
         out.append(f"re-checks {w_ds}' waiting supply received "
-                   f"{_received_words(conn, w_ds, w_supply)}; if it is green, the rule "
+                   f"{_received_words(conn, w_ds, w_supply)}; if it passes, the rule "
                    f"promotes it.")
     # ONCE PER LOGICAL CHECK (post-build critic D2): dbt, Soda and datacontract
     # each record the same check, and _check_name names it without the tool -
@@ -696,7 +696,7 @@ def _readers_rechecked(conn, request: Request, besides=frozenset()) -> list[str]
 
     name = hierarchy.dataset(ds).dataset_name
     head = (f"Checks in other datasets read {name} in {period}. Each of these supplies is "
-            f"owed a re-check by this decision, and may go red:")
+            f"owed a re-check by this decision, and may start failing:")
     if op == CARRY_FORWARD:
         head = (f"Checks in other datasets read {name} in {period}. Each of these supplies "
                 f"is re-checked against the {name} carried forward, once, after this "
@@ -962,7 +962,7 @@ def _settlement_consequences(conn, request: Request
         notes.append("\n".join(
             [f"Then {runs}, one at a time, while you wait:"]
             + [f"    {f.file.filename} against {f.checked_in}" for f in p.runs]
-            + ["  A supply that comes out green may be promoted by the promotion gate "
+            + ["  A supply that comes out passing may be promoted by the promotion gate "
                "with no further decision."]))
         done.append(f"{runs} owed.")
     # THE DATASETS THE CONTEST STOPPED, RE-CHECKED WHILE YOU WAIT (REQ-PIPE-211
@@ -983,7 +983,7 @@ def _settlement_consequences(conn, request: Request
                     f"not their own tables:\n    {shown}")
             if decision_log.promoted_into(conn, request.dataset_id, p.period) is None:
                 note += (f"\n  With no {request.dataset_id} file left in {p.period}, they will "
-                         f"very likely turn red: those checks cannot run until one is "
+                         f"very likely start failing: those checks cannot run until one is "
                          f"promoted.")
             notes.append(note)
     return lines, done, notes

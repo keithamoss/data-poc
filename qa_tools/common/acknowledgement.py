@@ -66,7 +66,7 @@ def why_not_owed(conn: supply_db.SupplyConnection, dataset_id: str, supply: str,
         if slot_state._amber_waiting(conn, dataset_id, supply):
             # THE CASE A LEAD IS LIKELIEST TO HIT (#107): "it's amber, I've
             # looked" - under hold the answer is to promote it.
-            return (f"it is amber and waiting under the amber setting 'hold', not promoted - "
+            return (f"it is warning and waiting under the warn setting 'hold', not promoted - "
                     f"to accept it, promote it: `mothman supply decide --operation promote "
                     f"--dataset {dataset_id} --period {slot} --supply {supply} "
                     f"--reason '<why>'`")
@@ -74,16 +74,16 @@ def why_not_owed(conn: supply_db.SupplyConnection, dataset_id: str, supply: str,
 
         collection = hierarchy.dataset(dataset_id).collection_id
         return (f"it is not the supply promoted into {slot} - an acknowledgement is "
-                f"for a promoted amber supply, or one re-checked worse than it was "
+                f"for a promoted supply that is warning, or one re-checked worse than it was "
                 f"promoted on, and only while it is still in its period. "
                 f"`mothman supply slots --collection {collection} --dataset {dataset_id}` "
                 f"shows what {slot} holds")
     _, _, owed, setting = found
     if not owed:
         if setting is None:
-            return ("it was not promoted as an amber supply under promote-and-acknowledge "
-                    "- either it was not amber, or a person promoted it")
-        return f"it was promoted under the amber setting '{setting}', which asks for none"
+            return ("it was not promoted warning under promote-and-acknowledge "
+                    "- either it was not warning, or a person promoted it")
+        return f"it was promoted under the warn setting '{setting}', which asks for none"
     done = acknowledged_by(conn, dataset_id, supply, slot)
     if done:
         return (f"it is already acknowledged, by {done['actor']} at {done['at']} - "

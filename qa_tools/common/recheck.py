@@ -423,9 +423,17 @@ def _run_claimed(owed_id: int, *, run_by: str | None = None, on_step=None) -> Ou
     why = why or (None if promoted else "it waits for a person")
     then = f"Promoted into {period}." if promoted else f"Not promoted - {why}."
     return Outcome(item.id, run_key, True,
-                   f"Checked against {period}: {verdict or 'no verdict'}. {then}",
+                   f"Checked against {period}: {_said(verdict)}. {then}",
                    status=verdict, period=period, promoted=promoted, waits_because=why,
                    before=before)
+
+
+def _said(verdict: str | None) -> str:
+    """A verdict in a message's words (REQ-TEST-360 criterion 7): 'failing',
+    never the stored 'red'; 'no verdict' where there is none."""
+    from qa_tools.common.dataset_status import status_words
+
+    return status_words(verdict, "verb") if verdict else "no verdict"
 
 
 def _run_gate(item) -> Outcome:
@@ -467,8 +475,8 @@ def _promoted_outcome(item, run_key: str, period: str, before: str | None) -> Ou
             verdict = None
         promoted_on = rechecking.promoted_on(conn, item.dataset_id, period)
     clear(item.id, run_key, found_worse=rechecking.is_worse(promoted_on, verdict))
-    message = (f"Checked against {period}: {verdict or 'no verdict'} (was "
-               f"{before or 'no verdict'}). It is still promoted - {period} keeps it.")
+    message = (f"Checked against {period}: {_said(verdict)} (was "
+               f"{_said(before)}). It is still promoted - {period} keeps it.")
     if verdict == "red":
         message += (
             f" To take it out of {period}, demote it:\n"

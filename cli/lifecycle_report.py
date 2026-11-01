@@ -213,7 +213,7 @@ def rechecked_promotion_words(conn, dataset_id: str, supply: str) -> str | None:
         when = display_time.format_instant(theirs_at) if theirs_at else by_supply
         because = f"because the {by_ds} waiting for a decision (received {when}) is held back"
     return (f"{names} re-checked against the {against_ds} in place in the warehouse "
-            f"(received {on}), green, {because}")
+            f"(received {on}), passing, {because}")
 
 
 def report(found, *, say=None) -> list[Outcome]:

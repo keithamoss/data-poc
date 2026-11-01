@@ -162,7 +162,7 @@ def run_foreground(recorded: bulk.Recorded) -> bulk.Summary:
                 console.print("    already run elsewhere - its verdict is that run's",
                               markup=False)
             elif r.changed:
-                console.print(f"    now {r.now or 'no verdict'}, was {c.status or 'no verdict'}",
+                console.print(f"    now {bulk._said(r.now)}, was {bulk._said(c.status)}",
                               markup=False, style="bold")
     except KeyboardInterrupt:
         s.owed = n - len(s.ran)

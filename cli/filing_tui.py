@@ -62,6 +62,7 @@ from rich.table import Table
 from rich.text import Text
 
 from cli import common
+from qa_tools.common.dataset_status import status_words
 from qa_tools.common import (asset_time, decision_log, filing_decisions,
                              filing_queue, git_identity, hierarchy, inheritance, people,
                              qa_store, slot_state, substitution, supply_db)
@@ -94,8 +95,8 @@ _WHAT_IT_DOES = {
     filing_decisions.CARRY_FORWARD: "carry forward - inherit the newest promoted supply",
     filing_decisions.MARK_NOT_SUPPLIED: ("mark as not supplied - accept that this closed "
                                          "period was missed, with a reason"),
-    filing_decisions.ACKNOWLEDGE: ("acknowledge - say you have looked at this amber "
-                                   "supply and why it is acceptable"),
+    filing_decisions.ACKNOWLEDGE: ("acknowledge - say you have looked at this supply, "
+                                   "now warning, and why it is acceptable"),
     filing_decisions.SUPERSEDE: ("supersede - set this supply aside for a newer version; "
                                  "it is kept, and can be brought back"),
     filing_decisions.UN_SUPERSEDE: ("un-supersede - bring a superseded version back to be "
@@ -177,13 +178,13 @@ _HOW_IT_READS = {
     slot_state.NOT_SUPPLIED_ACCEPTED: "[dim]not supplied (accepted)[/dim]",
     # REQ-PIPE-122 criteria 17 and 18: each distinguishable from a red
     # supply awaiting a decision, and the first never called "held".
-    slot_state.AMBER_WAITING: "[yellow]amber, waiting for a person (amber setting: hold)[/yellow]",
+    slot_state.AMBER_WAITING: "[yellow]warning, waiting for a person (warn setting: hold)[/yellow]",
     slot_state.AWAITING_ACKNOWLEDGEMENT: "[yellow]promoted, awaiting acknowledgement[/yellow]",
     filing_queue.COULD_NOT_LOAD: "[red]could not be loaded[/red]",
     filing_queue.ANOTHER_VERSION_WAITING:
         "[yellow]another version waiting - the period holds a promoted one[/yellow]",
     # REQ-PIPE-164 criterion 15 - _words() gives its new verdict from the reason.
-    filing_queue.RECHECKED_WORSE: "[red]Promoted, then re-checked worse[/red]",
+    filing_queue.RECHECKED_WORSE: "[red]Promoted, then worse on re-check[/red]",
     # REQ-GHUB-229: a version set aside, listed among its period's supplies.
     filing_queue.SUPERSEDED: "[dim]superseded[/dim]",
 }
@@ -197,7 +198,7 @@ _LISTED_AS = {
     slot_state.AWAITING_ACKNOWLEDGEMENT: "in place in the warehouse, awaiting acknowledgement",
     slot_state.AWAITING_DECISION: "waiting on a decision",
     slot_state.RETURNED: "taken back out by a person, waiting on a decision",
-    slot_state.AMBER_WAITING: "amber and held for a person",
+    slot_state.AMBER_WAITING: "warning and held for a person",
     filing_queue.ANOTHER_VERSION_WAITING: "waiting behind the promoted supply",
     filing_queue.COULD_NOT_LOAD: "could not be loaded",
     slot_state.REJECTED: "turned down",
@@ -733,7 +734,8 @@ def _say_carry_forward_readers(carried) -> None:
     try:
         with open_log() as conn:
             for r in readers:
-                status = supply_status.status(conn, r.dataset_id, r.supply) or "no verdict"
+                status = supply_status.status(conn, r.dataset_id, r.supply)
+                status = status_words(status, "verb") if status else "no verdict"
                 # ONE DATE STYLE IN ONE FOLLOW-UP (CLI UX critic minor, #267):
                 # the instant as the consequences above it say one.
                 lines.append(f"- {hierarchy.dataset(r.dataset_id).dataset_name}, received "
@@ -1080,8 +1082,8 @@ def _own_red_words(conn, state) -> str:
            if not r.get("reads") and (r.get("status") or "") in ("fail", "error")]
     if not own:
         return words
-    return ("red - 1 of its own checks fails" if len(own) == 1
-            else f"red - {len(own)} of its own checks fail")
+    return ("failing - 1 of its own checks fails" if len(own) == 1
+            else f"failing - {len(own)} of its own checks fail")
 
 
 def queue_groups(conn, waiting, *, held=()):
@@ -1295,6 +1297,16 @@ def listed_words(entry: "filing_queue.FiledSupply") -> str:
     return words
 
 
+def verdict_words(verdict: str) -> str:
+    """A listed supply's verdict in words (REQ-GHUB-229 criterion 4 as
+    REQ-DOCS-362 amends it; REQ-TEST-360 criterion 7): Pass, Warn or Fail -
+    never the stored value - or the queue's own phrase where there is none,
+    which is never handed to status_words."""
+    if verdict in (filing_queue.NO_VERDICT, filing_queue.VERDICT_UNREADABLE):
+        return verdict
+    return status_words(verdict, "label")
+
+
 #: The columns questionary's pointer takes before every choice it lists.
 _POINTER_WIDTH = 3
 
@@ -1307,7 +1319,7 @@ def _supply_line(entry: "filing_queue.FiledSupply") -> str:
     are shortened with _short where the line would run past, never wrapped
     - the arrival and the verdict always stay, and the table above holds
     the words in full."""
-    head, tail = f"{arrived(entry.state.supply)}  ", f"  ({entry.verdict})"
+    head, tail = f"{arrived(entry.state.supply)}  ", f"  ({verdict_words(entry.verdict)})"
     words = listed_words(entry) or "-"
     room = 80 - _POINTER_WIDTH - len(head) - len(tail)
     return head + (words if len(words) <= room else _short(words, room)) + tail
@@ -2154,7 +2166,8 @@ def _choose_a_supply(state: slot_state.SlotState, period_scoped: tuple[str, ...]
     table = Table("Arrived", "Where it stands", "Verdict", box=None, pad_edge=False)
     for e in entries:
         table.add_row(arrived(e.state.supply),
-                      escape(gating.get(e.state.supply) or listed_words(e)), e.verdict)
+                      escape(gating.get(e.state.supply) or listed_words(e)),
+                      verdict_words(e.verdict))
     console.print(f"[bold]{len(entries)}[/bold] supplies filed to {state.dataset_id} "
                   f"{state.period}\n")
     console.print(table)
@@ -2274,9 +2287,9 @@ def _print_amber_settings(dataset_ids: list[str]) -> None:
     if not said:
         return
     if len(set(said.values())) == 1:
-        console.print(f"\nAmber setting: {next(iter(said.values()))}")
+        console.print(f"\nWarn setting: {next(iter(said.values()))}")
         return
-    console.print("\nAmber setting:")
+    console.print("\nWarn setting:")
     for ds, text in said.items():
         console.print(f"  {ds}  {text}")
 

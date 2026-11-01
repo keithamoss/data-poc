@@ -8504,7 +8504,7 @@ function renderAgency(view, agencyId){
       ${columnsNotGreenKey()}
       <div class="overflow-x">
       <table class="dataset-table">
-        <thead><tr><th>Dataset</th><th>Status</th><th>Latest arrival</th><th>Rows, latest run</th><th>Last QA run</th><th>Columns not green</th></tr></thead>
+        <thead><tr><th>Dataset</th><th>Status</th><th>Latest arrival</th><th>Rows, latest run</th><th>Last QA run</th><th>Columns not passing</th></tr></thead>
         <tbody>
         ${col.datasets.map(ds=>{
           // REQ-PIPE-053, checked BEFORE the no-data row. Both render
@@ -11855,7 +11855,7 @@ function renderScenariosPanel(body){
   const intro = `<div style="font-size:13px; color:var(--ink-muted); margin-bottom:14px; max-width:64ch;">
     The sample data has deliberately awkward supplies in it — a delivery that arrives
     in the wrong order, a file nothing can place, a table that will not load. Nothing
-    on the pages labels them, because a red supply should read the way a real one
+    on the pages labels them, because a failing supply should read the way a real one
     would. <b>This is the list that says which problems were on purpose.</b>
     <div style="margin-top:6px;">${placed} of ${injected} ${pluralize(injected,"scenario")}
       marked for the data ${placed===1?"has":"have"} somewhere to go today.</div>

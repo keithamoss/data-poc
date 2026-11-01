@@ -388,7 +388,7 @@ def _check_shape(decision: Decision) -> None:
     if decision.action == ACKNOWLEDGE:
         if decision.actor_kind != PERSON:
             raise DecisionRefused(
-                "only a person acknowledges an amber supply - it records that "
+                "only a person acknowledges a supply that is warning - it records that "
                 "somebody looked, which a rule cannot do.")
         if not decision.to_slot:
             raise DecisionRefused(
@@ -396,7 +396,7 @@ def _check_shape(decision: Decision) -> None:
         if not (decision.reason or "").strip():
             raise DecisionRefused(
                 "an acknowledgement needs a reason - what you looked at and why "
-                "the amber is acceptable. That is what makes it more than a click.")
+                "the warning is acceptable. That is what makes it more than a click.")
     if decision.action == KEEP:
         # REQ-PIPE-170 criterion 6: a person's call on what a file really is.
         if decision.actor_kind != PERSON:
@@ -662,7 +662,7 @@ def _judge(conn: supply_db.SupplyConnection, decision: Decision) -> None:
     if decision.action == REJECT:
         needs_reason = "rejecting a supply"
     elif decision.action == PROMOTE and decision.supply_is_red:
-        needs_reason = "promoting a supply whose checks came back red"
+        needs_reason = "promoting a supply whose checks came back failing"
     elif decision.action == PROMOTE and decision.to_slot:
         # (A re-file no longer fills its target - REQ-PIPE-141 - so it
         # supersedes nothing promoted there; it waits to be promoted.)

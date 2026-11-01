@@ -186,8 +186,8 @@ def process_command() -> None:
 
     \b
     Exit status:
-      0   everything it attempted completed, and nothing it recorded is red
-      1   everything completed, and at least one recorded result is red
+      0   everything it attempted completed, and nothing it recorded is failing
+      1   everything completed, and at least one recorded result is failing
       2   an arrival, an owed item or a stage failed - it is left for the next pass
       3   a dataset is refused: its judged past no longer matches the delivery
           agreement and no correction declares why (see check-agreement)
@@ -295,7 +295,7 @@ def _say_pass(report) -> None:
     for line in report.tickets:
         console.print(line, style="dim")
     if report.red and not report.failures:
-        console.print("At least one recorded result is red.", style="yellow")
+        console.print("At least one recorded result is a Fail.", style="yellow")
 
 
 def generated_into(root):

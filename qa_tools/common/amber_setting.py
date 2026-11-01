@@ -144,7 +144,7 @@ def describe(dataset_id: str, on: date, *, doc: dict | None = None) -> str:
     doc = doc if doc is not None else _doc()
     r = _resolve_on(doc, dataset_id, on)
     if r is None:
-        raise AmberSettingError(f"no amber setting is in effect for {dataset_id} on "
+        raise AmberSettingError(f"no warn setting is in effect for {dataset_id} on "
                                 f"{on.isoformat()}")
     since = date.fromisoformat(r.version)
     return (f"{r.value.replace('-', ' ')} ({_level_words(doc, dataset_id, r.level)}, "
@@ -153,7 +153,7 @@ def describe(dataset_id: str, on: date, *, doc: dict | None = None) -> str:
 
 def resolve(dataset_id: str, at: datetime | str, *, doc: dict | None = None,
             key: str = KEY, values: tuple[str, ...] = AMBER_SETTINGS,
-            label: str = "amber setting") -> Resolved:
+            label: str = "warn setting") -> Resolved:
     """The setting for `dataset_id` as at the instant `at` - the instant
     the decision about a supply takes effect (criterion 4)."""
     from qa_tools.common import asset_time

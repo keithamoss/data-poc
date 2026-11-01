@@ -176,9 +176,9 @@ def bands_command(dataset_id: str | None, rows: int | None) -> None:
                 r.name or r.column or "(the table)")
             amber = r.amber(n)
             if amber:
-                head = "amber at " + ", ".join(_band_text(lo, hi) for lo, hi in amber)
+                head = "warn at " + ", ".join(_band_text(lo, hi) for lo, hi in amber)
             else:
-                head = "no amber band - closed by " + ", ".join(
+                head = "no warn band - closed by " + ", ".join(
                     _short(c, ds) for c in r.closed_by(n))
             _say(f"{what} - {r.category}, {r.measure}: {head}", indent=2)
             for c in r.checks:

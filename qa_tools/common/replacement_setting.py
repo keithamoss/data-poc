@@ -97,8 +97,9 @@ def conflicts(doc: dict) -> list[tuple[str, str]]:
                             and amber.value == amber_setting.HOLD):
                         out.append((f"dataset {dataset_id}",
                                     f"from {on.isoformat()} the replacement setting is "
-                                    f"green-or-amber ({replace.level}) while the amber setting "
-                                    f"is hold ({amber.level}) - an amber supply could replace "
-                                    f"accepted data where it may not even fill an empty slot"))
+                                    f"'{words(GREEN_OR_AMBER)}' ({replace.level}) while the warn "
+                                    f"setting is hold ({amber.level}) - a warning supply could "
+                                    f"replace accepted data where it may not even fill an empty "
+                                    f"slot"))
                         break
     return out
