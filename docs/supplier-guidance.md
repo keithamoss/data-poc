@@ -19,15 +19,15 @@ however you send them:
 Each file is checked when it arrives. Some checks compare one table with
 another - every notification names a client the client file holds, for
 example. If the file a check needs has not arrived yet, that check cannot
-run, and a check that cannot run reads **red**: nothing is reported green
-that nobody could check.
+run, and a check that cannot run reads **Fail**: nothing is reported as a
+pass that nobody could check.
 
 So if you send the notifications file on Monday and the clients file on
-Wednesday, the notifications file reads red from Monday until Wednesday.
+Wednesday, the notifications file reads Fail from Monday until Wednesday.
 
-**That red clears by itself.** Once the later file arrives and is promoted,
+**That Fail clears by itself.** Once the later file arrives and is promoted,
 the earlier one is checked again against it, and nobody needs to do
-anything. But for those two days the data team sees a red and may be told
+anything. But for those two days the data team sees a Fail and may be told
 about it - which is the whole reason for this page.
 
 **A zip avoids it.** The files of one zip arrive at one instant and are

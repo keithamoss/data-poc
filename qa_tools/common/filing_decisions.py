@@ -443,7 +443,7 @@ def _held_back_consequences(conn, request: Request) -> list[str]:
          against the warehouse once it is promoted (REQ-PIPE-121);
       8. promoting a supply whose knock-on re-runs a check already recorded
          red for the same pair (T13, S5) - the in-warehouse reader very
-         likely 'Promoted, then re-checked worse';
+         likely 'Promoted, then worse on re-check';
       9. promoting a supply whose promotion would change a waiting supply's
          counted verdict - one it holds back, or one whose verdict against
          it passes (Order B) - which it re-checks, and the rule promotes it
@@ -516,7 +516,7 @@ def _held_back_consequences(conn, request: Request) -> list[str]:
                        f"{_received_words(conn, reader.dataset_id, reader.supply)}) is "
                        f"re-checked against this supply. {check} already failed for that pair "
                        f"(re-check {at}), so {reader.dataset_id} will very likely become "
-                       f"\"Promoted, then re-checked worse\".")
+                       f"\"Promoted, then worse on re-check\".")
     # 9: waiting supplies whose counted verdict this promotion changes.
     seen = set()
     for w_ds, w_supply in _held_back_by_this(conn, ds, supply, period) + \

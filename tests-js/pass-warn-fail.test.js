@@ -120,3 +120,34 @@ describe("a replacement setting's value (criterion 12)", () => {
     expect(() => w.replacementWords("amber")).toThrow(/unknown replacement setting/);
   });
 });
+
+// REQ-DASH-359 criterion 14: text recorded at the time is shown as recorded,
+// inside an element marked for REQ-TEST-361's guard to pass over.
+describe("recorded text is marked as recorded", () => {
+  it("an acknowledgement's reason, as text and as a title", () => {
+    dashboard = loadDashboard();
+    const w = dashboard.window;
+    w.rawRealDatasetById = () => ({ id: "x", acknowledgements: { r1: {
+      promotedAt: "2024-07-26T01:00:00+00:00",
+      acks: [{ at: "2024-07-27T01:00:00+00:00", actor: "Ana", reason: "read red, fine", withdrawn: null }] } } });
+    const root = w.document.createElement("div");
+    root.innerHTML = w.acknowledgementBadge("x", "r1", "2024-08-01");
+    expect(root.querySelector("[data-acknowledged]").hasAttribute("data-recorded-title")).toBe(true);
+    expect(root.querySelector("[data-acknowledgement-reason]").hasAttribute("data-recorded-text")).toBe(true);
+  });
+
+  it("a re-check's reason, inside the sentence that names it", () => {
+    dashboard = loadDashboard();
+    const root = dashboard.window.document.createElement("div");
+    root.innerHTML = dashboard.window.recheckWords({ at: "2024-08-07T02:30:00+00:00", person: "K",
+      reason: "it read amber" });
+    expect(root.querySelector("[data-recorded-text]").textContent).toBe("it read amber");
+  });
+
+  it("an excuse's reason", () => {
+    dashboard = loadDashboard();
+    const root = dashboard.window.document.createElement("div");
+    root.innerHTML = dashboard.window.recordedText("went red on Monday");
+    expect(root.querySelector("[data-recorded-text]").textContent).toBe("went red on Monday");
+  });
+});

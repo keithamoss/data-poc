@@ -178,3 +178,18 @@ def test_a_replacement_settings_value_is_said_in_words():
         _clean(replacement_setting.words(value), "replacement_setting.words")
     with pytest.raises(amber_setting.AmberSettingError):
         replacement_setting.words("amber")
+
+
+def test_the_warn_setting_commands_help_says_warn_setting():
+    """The earlier critic's minor finding: `mothman supply amber-setting`'s
+    help said 'the amber setting'. The command's name is something people
+    type and stays (REQ-TEST-360 NFR COMPATIBILITY); its words change."""
+    from click.testing import CliRunner
+
+    from cli import supply
+
+    got = CliRunner().invoke(supply.supply_group, ["amber-setting", "--help"])
+    assert got.exit_code == 0, got.output
+    flat = " ".join(got.output.split())
+    assert "The warn setting in force for each dataset" in flat, flat
+    assert "amber setting" not in flat.lower()

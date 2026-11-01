@@ -387,7 +387,7 @@ class TestConsequences:
         assert worse[0].startswith("cp-notifications (in the warehouse, received ")
         assert "is re-checked against this supply." in worse[0]
         assert worse[0].endswith('so cp-notifications will very likely become '
-                                 '"Promoted, then re-checked worse".')
+                                 '"Promoted, then worse on re-check".')
         assert got.key, "a consequence beyond the slot needs its key with --yes"
         del v1
 

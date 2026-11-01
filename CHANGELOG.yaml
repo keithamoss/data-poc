@@ -109,6 +109,38 @@ intro: >
   all three.
 
 releases:
+  - date: "2026-11-01"
+    summary: >
+      Every status now reads Pass, Warn or Fail, on the dashboard and in the
+      terminal alike, with the colours unchanged.
+    changes:
+      - category: Improved
+        items:
+          - headline: Pass, Warn and Fail
+            components: ["Dashboard UI", "Testing & dev tooling"]
+            description: >
+              Every status you read now says Pass, Warn or Fail - in pills,
+              legends, counts and badges, and as passing, warning or failing in
+              a sentence. The colours are the same, so green is still a pass.
+          - headline: Same words in the terminal
+            components: ["Testing & dev tooling", "GitHub workflow & people"]
+            description: >
+              The filing queue, re-check summaries and ticket text use the
+              dashboard's words, so "Promoted, then failing on re-check" in the
+              queue is the same thing you see on the page.
+      - category: Fixed
+        items:
+          - headline: Trend dates stay apart
+            components: ["Dashboard UI"]
+            description: >
+              The dates under a check's trend no longer print over each other;
+              where three would collide, the middle one is left out.
+          - headline: No false dip
+            components: ["Dashboard UI"]
+            description: >
+              A QA run that could not be checked is now a gap in the column
+              trend, rather than a drop to 0% that looked like everything
+              passed.
   - date: "2026-10-31"
     summary: >
       Department of Health has a second collection, Linkage Products, and a

@@ -13294,3 +13294,24 @@ twice. It deliberately did not re-find the `TypeError`.
      - Not defects: criterion 3's geocoding half (REQ-PIPE-296) and criterion
        7's compare wait on later work and the end bootstrap.
 
+295. **[todo, 2026-11-01]** **[Dashboard UI]** **[Testing & dev tooling]**
+   **Built wording changed site-wide: statuses read Pass / Warn / Fail.**
+   REQ-DASH-359 and REQ-TEST-360: every status a person reads is worded
+   through one statusWords per side (status-cases.json's labels block, held
+   equal by a parity test on each side); compound labels as REQ-DASH-359
+   criteria 5 and 6 word them ('Promoted, failing', 'Promoted, then failing
+   on re-check', '1 failing on re-check after promotion'); colours, CSS
+   classes, data attributes and stored values unchanged. Code that read
+   worded status text moved onto values, test-first (REQ-TEST-360 criterion
+   3): a structured refusal kind, a (dataset, value, words, result) outcome
+   tuple, the overdue reason without its status word, and the re-checked-worse
+   state's own verdict. 41 built criteria amended (REQ-DOCS-362 A1-A39, two
+   carrying a second criterion) and REQ-DASH-299 by B1. A real-browser guard
+   added (REQ-TEST-361), written and waiting on the end-of-run bootstrap; its
+   terminal half runs now. #289 D8d (the check trend's long dates overprint)
+   and D8e (a not-evaluated point drawn as a 0% dip) fixed, D8e test-first.
+   Re-counted inventory at build: 33 product files (the template, 8 cli/
+   modules, 23 qa_tools/common modules, pipeline/cross_table_grid.py), 35
+   test files, 126 scenario-register entries re-read (169 lines reworded),
+   SCENARIOS.md regenerated with every coordinate unchanged. This does NOT
+   close #292's process gap; that is REQ-TEST-374.

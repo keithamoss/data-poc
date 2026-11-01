@@ -1158,7 +1158,8 @@ def judge(conn, item: dict, status, *, results: Sequence[dict], reads: dict[str,
             decision_log.refuse_if_stood_on(conn, dataset_id, held.holder,
                                             decision_log.SUPERSEDE)
         except decision_log.DecisionRefused as exc:
-            why = (f"the replacement setting '{replacing.value}' would replace "
+            why = (f"the replacement setting '{replacement_setting.words(replacing.value)}' "
+                   f"would replace "
                    f"{held.holder}, but a later period stands on it - {exc}")
             if record:
                 _record_withheld(conn, agency_id=agency_id, collection_id=collection_id,
@@ -1166,8 +1167,10 @@ def judge(conn, item: dict, status, *, results: Sequence[dict], reads: dict[str,
                                  period=period, reason=why, effective_at=effective_at)
             return Judged(why=why, withheld=True)
         # THE SETTING THAT AUTHORISED IT IS THE REASON (criterion 5).
+        # IN WORDS, NEVER THE RAW VALUE (REQ-DASH-359 criterion 12).
         reason = (f"{reason} It replaces {held.holder} under the replacement "
-                  f"setting '{replacing.value}' (set for the {replacing.level}, version "
+                  f"setting '{replacement_setting.words(replacing.value)}' (set for the "
+                  f"{replacing.level}, version "
                   f"{replacing.version}); {held.holder} is superseded, not rejected.")
     return Judged(work={"dataset_id": dataset_id, "supply": item["supply"],
                         "period": period, "physical_tables": item["physical_tables"],

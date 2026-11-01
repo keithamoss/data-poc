@@ -160,7 +160,7 @@ class TestTheGate:
             f"replacement_version, reason FROM {dl.TABLE} WHERE dataset_id = ? AND supply = ? "
             "AND action = 'promote'", [DS, b]).fetchall()
         assert row[:5] == (dl.RULE, a, "green", amber_setting.ASSET, "2023-01-01")
-        assert "replacement setting 'green'" in row[5]
+        assert "replacement setting 'when passing'" in row[5]
 
     def test_green_does_not_replace_with_amber(self, conn, period, monkeypatch):
         _setting(monkeypatch, "green")
