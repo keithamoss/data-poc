@@ -32,9 +32,10 @@ data/supply.duckdb
 data/dbt_scratch/
 reports/results_*.json
 reports/*_dashboard.json
-dbt_project/target/
-dbt_project/logs/
-dbt_project/dbt_packages
+# Each asset's dbt project (REQ-QAC-368 criterion 7).
+assets/*/dbt/target/
+assets/*/dbt/logs/
+assets/*/dbt/dbt_packages/
 .dbt/
 qa_tools/dbt_profiles/.user.yml
 dashboard/snapshots/*.html
