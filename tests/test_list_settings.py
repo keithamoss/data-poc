@@ -157,3 +157,63 @@ class TestTheSchemaAcceptsAnyListSetting:
 
         with pytest.raises(ValidationError):
             ListSetting.model_validate({"versions": [_v("2013-01-01", "2011")]})
+
+
+class TestTheScheduleGateFreezesEveryListSetting:
+    """Criterion 8 through the gate itself: the schedule gate runs the amber
+    setting's own guard for each entry list_settings declares."""
+
+    def _errors(self, monkeypatch, old, new):
+        from qa_tools.common import validate_schedule as vs
+        import yaml
+
+        monkeypatch.setattr(vs, "_content_at", lambda rel, ref: yaml.safe_dump(old))
+        src = vs.Source(asset_path=vs.DATA_ASSET_YAML, contract_dir=vs.DATA_ASSET_YAML.parent)
+        return vs._list_setting_errors(new, src, date(2026, 11, 1), ref="HEAD")
+
+    def test_an_altered_past_census_version_is_refused(self, monkeypatch):
+        old = _doc(coll_list=FOUR)
+        old["synthetic"] = True
+        new = copy.deepcopy(old)
+        new["hierarchy"]["agencies"][0]["collections"][0]["list_settings"]["census_years"][
+            "versions"][2]["value"] = [2011, 2021]
+        errors = self._errors(monkeypatch, old, new)
+        assert len(errors) == 1 and "2022-08-01" in errors[0].problem \
+            and errors[0].scope == "list_settings/census_years (collection c1)", errors
+
+    def test_the_unchanged_configuration_passes(self, monkeypatch):
+        old = _doc(coll_list=FOUR)
+        assert self._errors(monkeypatch, old, copy.deepcopy(old)) == []
+
+    def test_the_committed_census_years(self):
+        from qa_tools.common.amber_setting import _doc as committed
+
+        doc = committed()
+        assert amber_setting.list_setting_keys(doc) == [PATH]
+        r = amber_setting.timeline("geo-cp-clients", doc=doc, key=PATH)
+        assert [(e["from"], e["value"]) for e in r] == [
+            ("2013-01-01", (2011,)), ("2017-08-01", (2011, 2016)),
+            ("2022-08-01", (2011, 2016, 2021)), ("2027-08-01", (2011, 2016, 2021, 2026))]
+        assert r[2]["text"] == "2011, 2016 and 2021 (set for Linkage Products, since 1 Aug 2022)"
+
+
+class TestCriterionTenEachVersionLandsInItsQuarter:
+    """Read through contract/calendar.yaml and the one resolution, so a
+    corrected round date moving a quarter across a version's start fails
+    here rather than silently re-judging the quarter."""
+
+    @pytest.mark.parametrize("period,round_date,years", [
+        ("2017-Q2", date(2017, 5, 1), (2011,)),
+        ("2017-Q3", date(2017, 8, 1), (2011, 2016)),
+        ("2022-Q2", date(2022, 5, 1), (2011, 2016)),
+        ("2022-Q3", date(2022, 8, 1), (2011, 2016, 2021)),
+        ("2027-Q2", date(2027, 5, 1), (2011, 2016, 2021)),
+        ("2027-Q3", date(2027, 8, 1), (2011, 2016, 2021, 2026)),
+    ])
+    @pytest.mark.parametrize("dataset", ["geo-cp-clients", "geo-ed-presentations"])
+    def test_landing(self, dataset, period, round_date, years):
+        from qa_tools.common import schedule
+
+        dp = next(p for p in schedule.periods_for_dataset(dataset) if p.name == period)
+        assert dp.round_date == round_date
+        assert amber_setting.resolve_on_date(dataset, dp.round_date, key=PATH).value == years

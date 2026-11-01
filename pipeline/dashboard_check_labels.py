@@ -289,6 +289,12 @@ MEASURES: dict[str, str] = {
     "soda:expected_ids": "Expected identifiers missing",
     "soda:no_surplus_ids": "Surplus identifiers",
     "soda:large_key_groups": "Keys linking many records",
+    # Generic set-member and value-share kinds (REQ-QAC-297) - worded for any
+    # set and any value; a check may declare its own phrase (REQ-DASH-299).
+    "dbt:missing_set_members": "Missing set members",
+    "dbt:duplicated_set_members": "Duplicated set members",
+    "dbt:unexpected_set_members": "Unexpected set members",
+    "soda:value_share": "Share of rows with the value",
     # File checks - declared, though the dashboard does not chart them yet
     # (plans/running-thoughts.md #96)
     "file:column_order": "Columns out of order",

@@ -36,7 +36,8 @@ import os
 from types import MappingProxyType
 
 from qa_tools import collections
-from qa_tools.common import asked_for, config_yaml, hierarchy, left_out, sample_keys, supply_db
+from qa_tools.common import (asked_for, config_yaml, hierarchy, left_out, list_setting_members,
+                             sample_keys, supply_db)
 from qa_tools.common.check_lifecycle import dbt_check_id_lookup
 from qa_tools.common.dbt_common import (
     ENGINE_TAG, NothingLeftToBuild, exclude_unreadable, failing_sample_keys_direct,
@@ -56,8 +57,23 @@ PROFILES_DIR = os.path.join(os.path.dirname(__file__), "..", "dbt_profiles")
 #: see schema.yml) are summed. Every singular test is row-shaped.
 _AUDIT_COUNTED = frozenset({"not_null", "accepted_range", "matches_regex", "expression_is_true"})
 _AUDIT_SUMMED = frozenset({"accepted_values", "unique"})
-#: The generic shapes whose audit rows carry the key directly.
+#: The generic shapes whose audit rows carry the key directly - the counted
+#: set, so an adapter's row_counted_tests (DbtSpec) extends both at once.
 _SAMPLED_DIRECTLY = _AUDIT_COUNTED
+
+
+def _counted(spec) -> frozenset:
+    """The counted and directly-sampled tests: dbt's own, and those the
+    collection's adapter declares (REQ-QAC-297 criterion 2)."""
+    return _AUDIT_COUNTED | frozenset(getattr(spec, "row_counted_tests", ()) or ())
+
+
+def _reads_declared_set(node: dict) -> bool:
+    """Whether a test reads the run's declared-set relation - a set-member
+    test, found by what it depends on, never by its name."""
+    return any(n.split(".")[-1] == list_setting_members.RELATION
+               and n.startswith("source.")
+               for n in ((node.get("depends_on") or {}).get("nodes") or ()))
 
 
 def _models(coll) -> list[str]:
@@ -137,6 +153,7 @@ def _unreadable_in(run_id: str) -> frozenset[str]:
 
 
 def _failing_sample_keys(conn, adapter, test_name, column, table, node, status, built) -> list:
+    sampled_directly = _counted(adapter.dbt)
     if status not in ("warn", "fail"):
         return []
     # A TEST WHOSE FAILURE NAMES NO ROW declares it in its own meta - the one
@@ -151,13 +168,60 @@ def _failing_sample_keys(conn, adapter, test_name, column, table, node, status, 
     if built and model not in built:
         return []
     singular = node.get("test_metadata") is None
-    if test_name in _SAMPLED_DIRECTLY or singular:
+    if test_name in sampled_directly or singular:
         return failing_sample_keys_direct(conn, relation_name, key, check=test_name, table=table)
     if test_name in ("unique", "accepted_values"):
         value_column = "unique_field" if test_name == "unique" else "value_field"
         return failing_sample_keys_via_values(conn, relation_name, value_column, model, column, key,
                                               check=test_name, table=table)
     return []  # relationships - see the module docstring
+
+
+def _no_declared_set(run_id: str) -> bool:
+    conn = supply_db.connect(read_only=True, label="mothman:dbt-declared-set")
+    try:
+        return not list_setting_members.exists(conn, supply_db.run_schema(run_id))
+    finally:
+        conn.close()
+
+
+def _set_judged_against(conn, run_id: str, table: str, node: dict) -> dict:
+    setting = ((node.get("test_metadata") or {}).get("kwargs") or {}).get("member_setting")
+    if not setting or not _reads_declared_set(node):
+        return {}
+    found = list_setting_members.read(conn, supply_db.run_schema(run_id), table, setting)
+    return found.as_record() if found is not None else {}
+
+
+def _not_evaluated_for_want_of_a_period(coll, spec, run_id: str, run_timestamp: str,
+                                         asked) -> list[dict]:
+    """One not-evaluated record per set-member check in the run's scope -
+    red, could not run, with its structured reason (REQ-QAC-297 criterion 4)."""
+    wanted = None if asked is None else set(asked)
+    out, seen = [], set()
+    for node in parsed_test_nodes(PROFILES_DIR, DBT_PROJECT_DIR).values():
+        if not _reads_declared_set(node):
+            continue
+        table = _table_for_test(coll, spec, node)
+        check_id = _check_id_for(coll, spec, node) if table else None
+        if check_id is None or check_id in seen or (wanted is not None and check_id not in wanted):
+            continue
+        seen.add(check_id)
+        meta = node["test_metadata"]
+        out.append({
+            "agency_id": coll.agency_id, "collection_id": coll.id,
+            "dataset_id": hierarchy.dataset_for_table(table).dataset_id,
+            "check_id": check_id, "column_name": node.get("column_name") or "(table)",
+            "check_name": f"dbt:{meta['name']}", "dimension": "completeness",
+            "label": "Not evaluated - the supply has no period",
+            "run_id": run_id, "run_timestamp": run_timestamp, "status": "fail",
+            "metric_value": None, "unit": None, "warn_threshold": None, "fail_threshold": None,
+            "on_fail_action": "flag", "row_count_total": None, "row_count_invalid": None,
+            "engine": ENGINE_TAG,
+            "not_evaluated_code": list_setting_members.NO_PERIOD,
+            "not_evaluated_reason": list_setting_members.NO_PERIOD_REASON,
+        })
+    return out
 
 
 def evaluate(collection_id: str, run_id: str, run_timestamp: str) -> list[dict]:
@@ -185,6 +249,16 @@ def evaluate(collection_id: str, run_id: str, run_timestamp: str) -> list[dict]:
         print(f"note: {run_id}: {exc}")
         return []
 
+    # A RUN FILED TO NO PERIOD HAS NO DECLARED SET (REQ-QAC-297 criterion 4):
+    # the relation is built only with the period's views, so every test
+    # reading it is left out of the selection - dbt finds them as the
+    # relation's dependents - and recorded not evaluated, with its reason.
+    no_period = _no_declared_set(run_id)
+    if no_period:
+        exclude = [*(exclude or []), f"source:raw.{list_setting_members.RELATION}+"]
+    not_evaluated = _not_evaluated_for_want_of_a_period(
+        coll, spec, run_id, run_timestamp, asked if scoped else None) if no_period else []
+
     run_dbt("build", selection_for(coll.id, asked) if scoped else models + list(spec.singular_home),
             target_path, PROFILES_DIR, DBT_PROJECT_DIR, ROOT,
             run_schema=supply_db.run_schema(run_id), run_id=run_id, exclude=exclude,
@@ -200,10 +274,13 @@ def evaluate(collection_id: str, run_id: str, run_timestamp: str) -> list[dict]:
         # SAID, so the run can reconcile it (REQ-PIPE-115 criterion 17).
         ran = {r["unique_id"] for r in run_results["results"]}
         wanted = set(asked)
+        # A set-member test left out for want of a period is not among them:
+        # it carries its own not-evaluated record (REQ-QAC-297 criterion 4).
         left_out.note(run_id, "dbt", [
             _check_id_for(coll, spec, node) for uid, node in nodes.items()
             if uid not in ran and _table_for_test(coll, spec, node) is not None
-            and _check_id_for(coll, spec, node) in wanted])
+            and _check_id_for(coll, spec, node) in wanted
+            and not (no_period and _reads_declared_set(node))])
 
     conn = supply_db.connect_dbt(run_id)
     try:
@@ -241,7 +318,7 @@ def evaluate(collection_id: str, run_id: str, run_timestamp: str) -> list[dict]:
             relation_name = node.get("relation_name")
             unaudited = ("error", "skipped")
             model_built = f"stg_{table}" in built
-            if test_name in _AUDIT_COUNTED or test_name in _AUDIT_SUMMED or meta is None:
+            if test_name in _counted(spec) or test_name in _AUDIT_SUMMED or meta is None:
                 if relation_name and status not in unaudited and model_built:
                     aggregate = ("COALESCE(SUM(n_records), 0)" if test_name in _AUDIT_SUMMED
                                  else "COUNT(*)")
@@ -285,10 +362,14 @@ def evaluate(collection_id: str, run_id: str, run_timestamp: str) -> list[dict]:
                 # EVERY KEY COLUMN, AND THEIR NAMES WHERE THERE ARE SEVERAL
                 # (REQ-PIPE-341 criteria 2 and 9).
                 **sample_keys.recorded(adapter.sample_key[table], sample),
+                # THE SET IT WAS JUDGED AGAINST (REQ-QAC-300 criterion 9), from
+                # the same relation the test read - never re-resolved.
+                **_set_judged_against(conn, run_id, table, node),
                 "engine": ENGINE_TAG,
             })
     finally:
         conn.close()
+    results.extend(not_evaluated)
     write_qa_result(coll.agency_id, coll.id, run_id, run_timestamp, "dbt", run_results,
                     verified=results)
     return results

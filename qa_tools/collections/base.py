@@ -42,6 +42,13 @@ class DbtSpec:
     #: Each test type's dimension and cross-tool label.
     dimension_by_test: dict = field(default_factory=dict)
     label_by_test: dict = field(default_factory=dict)
+    #: The collection's own GENERIC tests whose audit table holds one row per
+    #: violation (REQ-QAC-297 criterion 2): each is recounted from that table
+    #: AND sampled directly from it. One declaration serves both, because
+    #: run_dbt's built-in sampled-directly set is its counted set - so a test
+    #: named here is read exactly as dbt's own not_null is. run_dbt.py names
+    #: none of them.
+    row_counted_tests: frozenset = frozenset()
 
 
 @dataclass(frozen=True)

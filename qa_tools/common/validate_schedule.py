@@ -850,10 +850,13 @@ def _version_added_on(rel_path: str, ref: str, start: str) -> date | None:
             continue
         if not isinstance(doc, dict):
             continue
-        # EITHER SETTING (REQ-PIPE-123 criterion 1): the replacement setting
-        # is versioned by the same mechanism, so dated the same way.
+        # EVERY SETTING (REQ-PIPE-123 criterion 1, REQ-QAC-300 criterion 2):
+        # the replacement setting and each entry list_settings declares are
+        # versioned by the same mechanism, so dated the same way - the list
+        # settings iterated, never named.
         if any(start in amber_setting._versions(setting)
-               for key in (amber_setting.KEY, "replacement_setting")
+               for key in (amber_setting.KEY, "replacement_setting",
+                           *amber_setting.list_setting_keys(doc))
                for setting in amber_setting._settings(doc, key).values()):
             return asset_time.local_date(datetime.fromisoformat(stamp))
     return None
@@ -963,6 +966,37 @@ def _replacement_setting_errors(raw: dict, src: Source, today: date | None = Non
         "setting promote or promote-and-acknowledge - by a NEW version of whichever you "
         "change, since a past version is frozen.")
         for where, problem in replacement_setting.conflicts(raw)]
+
+
+def _list_setting_errors(raw: dict, src: Source, today: date | None = None,
+                         ref: str | None = None) -> list[ConfigError]:
+    """REQ-QAC-300 criterion 8: every list setting's past is frozen by the
+    amber setting's own guard, run once per entry list_settings declares -
+    in the configuration as it stands or as it stood, so removing one is
+    seen too."""
+    from types import SimpleNamespace
+
+    from qa_tools.common import amber_setting
+
+    ref = ref or diff_base(root=ROOT)
+    previous = (_content_at(str(src.asset_path.relative_to(ROOT)), ref)
+                if src.asset_path.is_relative_to(ROOT) else None)
+    try:
+        old_doc = (yaml.safe_load(previous) or {}) if previous else {}
+    except yaml.YAMLError:
+        old_doc = {}
+    keys = sorted(set(amber_setting.list_setting_keys(raw))
+                  | set(amber_setting.list_setting_keys(old_doc if isinstance(old_doc, dict) else {})))
+    out: list[ConfigError] = []
+    for key in keys:
+        module = SimpleNamespace(
+            KEY="/".join(key),
+            standing_problems=lambda doc, today, key=key: amber_setting.standing_problems(
+                doc, today, key=key),
+            past_change_problems=lambda old, new, today, key=key, **kw: (
+                amber_setting.past_change_problems(old, new, today, key=key, **kw)))
+        out += _amber_setting_errors(raw, src, today, ref, module=module)
+    return out
 
 
 def _amber_setting_errors(raw: dict, src: Source, today: date | None = None,
@@ -2269,6 +2303,7 @@ def validate(src: Source | None = None) -> list[ConfigError]:
     errors += _freeze_errors(raw, cal_raw, src)
     errors += _amber_setting_errors(raw, src)
     errors += _replacement_setting_errors(raw, src)
+    errors += _list_setting_errors(raw, src)
     if src.asset_path == DATA_ASSET_YAML and not errors:
         errors += _overlap_errors(src)
         errors += _daylight_saving_errors(src)

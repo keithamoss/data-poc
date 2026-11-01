@@ -419,6 +419,39 @@ hierarchy:
           run_prefix: lp_run_
           contract: department-of-health/linkage-products-contract.yaml
           delivery_boundary: directory   # REQ-PIPE-057 - see above.
+          # THE CENSUS YEARS EVERY GEOCODING DATASET OWES (REQ-QAC-300): one
+          # entry of the generic container of list-valued settings, read by the
+          # amber setting's own mechanism - effective-dated, nearest level wins,
+          # past frozen. A supply is judged against the version in force on its
+          # period's ROUND DATE. Each version adds the census whose data the ABS
+          # first released in the quarter before (Keith, 2026-10-31, Q10 b).
+          list_settings:
+            census_years:
+              versions:
+                - effective_from: "2013-01-01"
+                  value: [2011]
+                  changelog:
+                    - date: "2026-11-01"
+                      author: REQ-QAC-300
+                      change: Adds 2011 from 2013-01-01, the first period any geocoding dataset owes - the 2011 census's data was first released by the ABS in 2012, so it is in every geocode of the synthetic history.
+                - effective_from: "2017-08-01"
+                  value: [2011, 2016]
+                  changelog:
+                    - date: "2026-11-01"
+                      author: REQ-QAC-300
+                      change: Adds 2016 from 2017-Q3 (round 2017-08-01), the first round after the ABS's first release of the 2016 census's data in late June 2017.
+                - effective_from: "2022-08-01"
+                  value: [2011, 2016, 2021]
+                  changelog:
+                    - date: "2026-11-01"
+                      author: REQ-QAC-300
+                      change: Adds 2021 from 2022-Q3 (round 2022-08-01), the first round after the ABS's first release of the 2021 census's data in late June 2022.
+                - effective_from: "2027-08-01"
+                  value: [2011, 2016, 2021, 2026]
+                  changelog:
+                    - date: "2026-11-01"
+                      author: REQ-QAC-300
+                      change: Adds 2026 from 2027-Q3 (round 2027-08-01), the first round after the ABS's first release of the 2026 census's data, expected mid-2027 - census night was in August 2026.
           datasets:
             - id: linkage-keys
               name: Linkage Keys

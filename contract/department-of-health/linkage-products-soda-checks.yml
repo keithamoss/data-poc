@@ -258,3 +258,379 @@ checks for linkage_keys:
           Department's ED Presentations supply carries identifiers the linkage
           unit could not match.
         changelog: []
+
+# --- geo-cp-clients: a geocoding table (REQ-QAC-297, REQ-QAC-340) -----------------------
+# Its own block, so linked_datasets' gate reads these checks for geo-cp-clients alone
+# (REQ-QAC-294 criterion 5): id_counts are keyed by the source dataset's id,
+# the entry having no code. Identifiers are compared as text, both sides cast.
+checks for geo_cp_clients:
+  # The share of rows not geocoded - a generic value-share check: the
+  # percentage of the supply's rows whose column holds one declared value.
+  - geo_cp_clients_not_geocoded_percent:
+      geo_cp_clients_not_geocoded_percent query: |
+        SELECT COALESCE(100.0 * COUNT(*) FILTER (WHERE match_level = 'not geocoded') / NULLIF(COUNT(*), 0), 0)
+        FROM geo_cp_clients
+      warn: when > 5
+      fail: when > 10
+      attributes:
+        check_id: data-asset-1.department-of-health.linkage-products.geo-cp-clients.match_level.value_share_soda
+        name: Share not geocoded
+        reads_columns: ["geo_cp_clients.match_level"]
+        category: completeness
+        introduced_date: "2013-01-01"
+        share_value: not geocoded
+        unit: percent
+        direction: above
+        description: >
+          Only a small share of rows may be left unplaced; a larger share warns,
+          and a larger one again fails.
+        failure_indicates: >
+          Either the geocoder placed fewer records than usual, or the source
+          supply it was sent was missing more addresses than usual.
+        changelog: []
+
+  # Identifiers: the ones the source declares, present, and none after them.
+  - failed rows:
+      name: Expected identifiers present
+      fail query: |
+        SELECT id_1, census_year FROM geo_cp_clients
+        WHERE id_1 IS NULL OR TRIM(CAST(id_1 AS TEXT)) = ''
+      samples limit: 100000
+      attributes:
+        check_id: data-asset-1.department-of-health.linkage-products.geo-cp-clients.id_1.expected_ids_soda
+        reads_columns: ["geo_cp_clients.id_1", "geo_cp_clients.census_year"]
+        category: completeness
+        introduced_date: "2013-01-01"
+        id_counts: {cp-clients: 1}
+        description: >
+          Each row must carry every identifier its source record is identified
+          by; one missing fails.
+        failure_indicates: >
+          The geocoding release holds a row that cannot be traced back to the
+          record it places.
+        changelog: []
+  - failed rows:
+      name: No surplus identifiers
+      fail query: |
+        SELECT id_1, census_year FROM geo_cp_clients
+        WHERE id_2 IS NOT NULL AND TRIM(CAST(id_2 AS TEXT)) <> ''
+      samples limit: 100000
+      attributes:
+        check_id: data-asset-1.department-of-health.linkage-products.geo-cp-clients.id_1.no_surplus_ids_soda
+        reads_columns: ["geo_cp_clients.id_1", "geo_cp_clients.id_2", "geo_cp_clients.census_year"]
+        category: conformity
+        introduced_date: "2013-01-01"
+        id_counts: {cp-clients: 1}
+        description: >
+          A row must carry no identifier beyond those its source record is
+          identified by; one surplus fails.
+        failure_indicates: >
+          The geocoder has started sending an identifier nobody agreed, or the
+          identifiers have shifted a column.
+        changelog: []
+
+  # The match level, one of its allowed values, never empty.
+  - failed rows:
+      name: Known match level
+      fail query: |
+        SELECT id_1, census_year FROM geo_cp_clients
+        WHERE match_level IS NULL
+           OR match_level NOT IN ('address', 'postcode', 'suburb', 'not geocoded')
+      samples limit: 100000
+      attributes:
+        check_id: data-asset-1.department-of-health.linkage-products.geo-cp-clients.match_level.invalid_count_soda
+        reads_columns: ["geo_cp_clients.id_1", "geo_cp_clients.census_year", "geo_cp_clients.match_level"]
+        category: conformity
+        introduced_date: "2013-01-01"
+        description: >
+          Every row must say how precisely it was placed, as one of the agreed
+          levels; a single empty or unrecognised value fails.
+        failure_indicates: >
+          The geocoder has started using a level nobody agreed, or released a row
+          without saying how it was placed.
+        changelog: []
+
+  # Area codes in their formats when placed, and empty when not.
+  - failed rows:
+      name: SA2 code in its format
+      fail query: |
+        SELECT id_1, census_year FROM geo_cp_clients
+        WHERE (match_level <> 'not geocoded'
+               AND (sa2_code IS NULL OR NOT regexp_like(CAST(sa2_code AS TEXT), '^[0-9]{9}$')))
+           OR (match_level = 'not geocoded'
+               AND sa2_code IS NOT NULL AND TRIM(CAST(sa2_code AS TEXT)) <> '')
+      samples limit: 100000
+      attributes:
+        check_id: data-asset-1.department-of-health.linkage-products.geo-cp-clients.sa2_code.invalid_count_soda
+        reads_columns: ["geo_cp_clients.id_1", "geo_cp_clients.census_year", "geo_cp_clients.match_level", "geo_cp_clients.sa2_code"]
+        category: conformity
+        introduced_date: "2013-01-01"
+        description: >
+          A placed row must carry a Statistical Area Level 2 code in the agreed
+          format, and an unplaced row none; one that breaks either fails.
+        failure_indicates: >
+          The geocoder released a code from the wrong classification, truncated
+          one, or gave a code to a record it could not place.
+        changelog: []
+  - failed rows:
+      name: LGA code in its format
+      fail query: |
+        SELECT id_1, census_year FROM geo_cp_clients
+        WHERE (match_level <> 'not geocoded'
+               AND (lga_code IS NULL OR NOT regexp_like(CAST(lga_code AS TEXT), '^[0-9]{5}$')))
+           OR (match_level = 'not geocoded'
+               AND lga_code IS NOT NULL AND TRIM(CAST(lga_code AS TEXT)) <> '')
+      samples limit: 100000
+      attributes:
+        check_id: data-asset-1.department-of-health.linkage-products.geo-cp-clients.lga_code.invalid_count_soda
+        reads_columns: ["geo_cp_clients.id_1", "geo_cp_clients.census_year", "geo_cp_clients.match_level", "geo_cp_clients.lga_code"]
+        category: conformity
+        introduced_date: "2013-01-01"
+        description: >
+          A placed row must carry a Local Government Area code in the agreed
+          format, and an unplaced row none; one that breaks either fails.
+        failure_indicates: >
+          The geocoder released a code from the wrong classification, truncated
+          one, or gave a code to a record it could not place.
+        changelog: []
+
+  # Against the source supply for the period (REQ-QAC-340): the orphan and
+  # coverage pair, of Linkage Keys' two check kinds.
+  - failed rows:
+      name: Rows matching no source record
+      fail query: |
+        SELECT g.id_1, g.census_year FROM geo_cp_clients g
+        LEFT JOIN cp_clients s ON CAST(s.cp_client_id AS TEXT) = CAST(g.id_1 AS TEXT)
+        WHERE s.cp_client_id IS NULL
+      samples limit: 100000
+      attributes:
+        check_id: data-asset-1.department-of-health.linkage-products.geo-cp-clients.cp-clients.referential_soda
+        reads_columns: ["geo_cp_clients.id_1", "geo_cp_clients.census_year", "cp_clients.cp_client_id"]
+        reads_tables: [cp_clients]
+        linked_dataset: cp-clients
+        linked_check: referential
+        id_columns: [cp_client_id]
+        category: consistency
+        introduced_date: "2013-01-01"
+        description: >
+          Every row must match a record in Child Protection's Client Register for the same quarter;
+          one that matches none fails.
+        failure_indicates: >
+          Either the geocoder misidentified a record or placed one it was never
+          sent, or Child Protection's Client Register supply for the quarter has lost or re-identified
+          records since the geocoder was sent it.
+        changelog: []
+  - geo_cp_clients_coverage_percent:
+      geo_cp_clients_coverage_percent query: |
+        SELECT 100.0 * COUNT(g.id_1) / NULLIF(COUNT(*), 0)
+        FROM cp_clients s
+        LEFT JOIN (SELECT DISTINCT CAST(id_1 AS TEXT) AS id_1 FROM geo_cp_clients) g
+          ON g.id_1 = CAST(s.cp_client_id AS TEXT)
+      warn: when < 100
+      fail: when < 98
+      attributes:
+        check_id: data-asset-1.department-of-health.linkage-products.geo-cp-clients.cp-clients.coverage_soda
+        reads_tables: [cp_clients]
+        linked_dataset: cp-clients
+        linked_check: coverage
+        id_columns: [cp_client_id]
+        unit: percent
+        direction: below
+        category: completeness
+        introduced_date: "2013-01-01"
+        description: >
+          Every record in Child Protection's Client Register for the quarter must have at least one
+          row in this release; fewer warns, and a larger shortfall fails.
+        failure_indicates: >
+          Either the geocoder left records out, or Child Protection's Client Register supply for the
+          quarter carries records added since the geocoder was sent it, or
+          records with an empty identifier.
+        changelog: []
+
+# --- geo-ed-presentations: a geocoding table (REQ-QAC-297, REQ-QAC-340) -----------------------
+# Its own block, so linked_datasets' gate reads these checks for geo-ed-presentations alone
+# (REQ-QAC-294 criterion 5): id_counts are keyed by the source dataset's id,
+# the entry having no code. Identifiers are compared as text, both sides cast.
+checks for geo_ed_presentations:
+  # The share of rows not geocoded - a generic value-share check: the
+  # percentage of the supply's rows whose column holds one declared value.
+  - geo_ed_presentations_not_geocoded_percent:
+      geo_ed_presentations_not_geocoded_percent query: |
+        SELECT COALESCE(100.0 * COUNT(*) FILTER (WHERE match_level = 'not geocoded') / NULLIF(COUNT(*), 0), 0)
+        FROM geo_ed_presentations
+      warn: when > 5
+      fail: when > 10
+      attributes:
+        check_id: data-asset-1.department-of-health.linkage-products.geo-ed-presentations.match_level.value_share_soda
+        name: Share not geocoded
+        reads_columns: ["geo_ed_presentations.match_level"]
+        category: completeness
+        introduced_date: "2013-01-01"
+        share_value: not geocoded
+        unit: percent
+        direction: above
+        description: >
+          Only a small share of rows may be left unplaced; a larger share warns,
+          and a larger one again fails.
+        failure_indicates: >
+          Either the geocoder placed fewer records than usual, or the source
+          supply it was sent was missing more addresses than usual.
+        changelog: []
+
+  # Identifiers: the ones the source declares, present, and none after them.
+  - failed rows:
+      name: Expected identifiers present
+      fail query: |
+        SELECT id_1, census_year FROM geo_ed_presentations
+        WHERE id_1 IS NULL OR TRIM(CAST(id_1 AS TEXT)) = ''
+      samples limit: 100000
+      attributes:
+        check_id: data-asset-1.department-of-health.linkage-products.geo-ed-presentations.id_1.expected_ids_soda
+        reads_columns: ["geo_ed_presentations.id_1", "geo_ed_presentations.census_year"]
+        category: completeness
+        introduced_date: "2013-01-01"
+        id_counts: {ed-presentations: 1}
+        description: >
+          Each row must carry every identifier its source record is identified
+          by; one missing fails.
+        failure_indicates: >
+          The geocoding release holds a row that cannot be traced back to the
+          record it places.
+        changelog: []
+  - failed rows:
+      name: No surplus identifiers
+      fail query: |
+        SELECT id_1, census_year FROM geo_ed_presentations
+        WHERE id_2 IS NOT NULL AND TRIM(CAST(id_2 AS TEXT)) <> ''
+      samples limit: 100000
+      attributes:
+        check_id: data-asset-1.department-of-health.linkage-products.geo-ed-presentations.id_1.no_surplus_ids_soda
+        reads_columns: ["geo_ed_presentations.id_1", "geo_ed_presentations.id_2", "geo_ed_presentations.census_year"]
+        category: conformity
+        introduced_date: "2013-01-01"
+        id_counts: {ed-presentations: 1}
+        description: >
+          A row must carry no identifier beyond those its source record is
+          identified by; one surplus fails.
+        failure_indicates: >
+          The geocoder has started sending an identifier nobody agreed, or the
+          identifiers have shifted a column.
+        changelog: []
+
+  # The match level, one of its allowed values, never empty.
+  - failed rows:
+      name: Known match level
+      fail query: |
+        SELECT id_1, census_year FROM geo_ed_presentations
+        WHERE match_level IS NULL
+           OR match_level NOT IN ('address', 'postcode', 'suburb', 'not geocoded')
+      samples limit: 100000
+      attributes:
+        check_id: data-asset-1.department-of-health.linkage-products.geo-ed-presentations.match_level.invalid_count_soda
+        reads_columns: ["geo_ed_presentations.id_1", "geo_ed_presentations.census_year", "geo_ed_presentations.match_level"]
+        category: conformity
+        introduced_date: "2013-01-01"
+        description: >
+          Every row must say how precisely it was placed, as one of the agreed
+          levels; a single empty or unrecognised value fails.
+        failure_indicates: >
+          The geocoder has started using a level nobody agreed, or released a row
+          without saying how it was placed.
+        changelog: []
+
+  # Area codes in their formats when placed, and empty when not.
+  - failed rows:
+      name: SA2 code in its format
+      fail query: |
+        SELECT id_1, census_year FROM geo_ed_presentations
+        WHERE (match_level <> 'not geocoded'
+               AND (sa2_code IS NULL OR NOT regexp_like(CAST(sa2_code AS TEXT), '^[0-9]{9}$')))
+           OR (match_level = 'not geocoded'
+               AND sa2_code IS NOT NULL AND TRIM(CAST(sa2_code AS TEXT)) <> '')
+      samples limit: 100000
+      attributes:
+        check_id: data-asset-1.department-of-health.linkage-products.geo-ed-presentations.sa2_code.invalid_count_soda
+        reads_columns: ["geo_ed_presentations.id_1", "geo_ed_presentations.census_year", "geo_ed_presentations.match_level", "geo_ed_presentations.sa2_code"]
+        category: conformity
+        introduced_date: "2013-01-01"
+        description: >
+          A placed row must carry a Statistical Area Level 2 code in the agreed
+          format, and an unplaced row none; one that breaks either fails.
+        failure_indicates: >
+          The geocoder released a code from the wrong classification, truncated
+          one, or gave a code to a record it could not place.
+        changelog: []
+  - failed rows:
+      name: LGA code in its format
+      fail query: |
+        SELECT id_1, census_year FROM geo_ed_presentations
+        WHERE (match_level <> 'not geocoded'
+               AND (lga_code IS NULL OR NOT regexp_like(CAST(lga_code AS TEXT), '^[0-9]{5}$')))
+           OR (match_level = 'not geocoded'
+               AND lga_code IS NOT NULL AND TRIM(CAST(lga_code AS TEXT)) <> '')
+      samples limit: 100000
+      attributes:
+        check_id: data-asset-1.department-of-health.linkage-products.geo-ed-presentations.lga_code.invalid_count_soda
+        reads_columns: ["geo_ed_presentations.id_1", "geo_ed_presentations.census_year", "geo_ed_presentations.match_level", "geo_ed_presentations.lga_code"]
+        category: conformity
+        introduced_date: "2013-01-01"
+        description: >
+          A placed row must carry a Local Government Area code in the agreed
+          format, and an unplaced row none; one that breaks either fails.
+        failure_indicates: >
+          The geocoder released a code from the wrong classification, truncated
+          one, or gave a code to a record it could not place.
+        changelog: []
+
+  # Against the source supply for the period (REQ-QAC-340): the orphan and
+  # coverage pair, of Linkage Keys' two check kinds.
+  - failed rows:
+      name: Rows matching no source record
+      fail query: |
+        SELECT g.id_1, g.census_year FROM geo_ed_presentations g
+        LEFT JOIN ed_presentations s ON CAST(s.presentation_id AS TEXT) = CAST(g.id_1 AS TEXT)
+        WHERE s.presentation_id IS NULL
+      samples limit: 100000
+      attributes:
+        check_id: data-asset-1.department-of-health.linkage-products.geo-ed-presentations.ed-presentations.referential_soda
+        reads_columns: ["geo_ed_presentations.id_1", "geo_ed_presentations.census_year", "ed_presentations.presentation_id"]
+        reads_tables: [ed_presentations]
+        linked_dataset: ed-presentations
+        linked_check: referential
+        id_columns: [presentation_id]
+        category: consistency
+        introduced_date: "2013-01-01"
+        description: >
+          Every row must match a record in Emergency Department's ED Presentations for the same quarter;
+          one that matches none fails.
+        failure_indicates: >
+          Either the geocoder misidentified a record or placed one it was never
+          sent, or Emergency Department's ED Presentations supply for the quarter has lost or re-identified
+          records since the geocoder was sent it.
+        changelog: []
+  - geo_ed_presentations_coverage_percent:
+      geo_ed_presentations_coverage_percent query: |
+        SELECT 100.0 * COUNT(g.id_1) / NULLIF(COUNT(*), 0)
+        FROM ed_presentations s
+        LEFT JOIN (SELECT DISTINCT CAST(id_1 AS TEXT) AS id_1 FROM geo_ed_presentations) g
+          ON g.id_1 = CAST(s.presentation_id AS TEXT)
+      warn: when < 100
+      fail: when < 98
+      attributes:
+        check_id: data-asset-1.department-of-health.linkage-products.geo-ed-presentations.ed-presentations.coverage_soda
+        reads_tables: [ed_presentations]
+        linked_dataset: ed-presentations
+        linked_check: coverage
+        id_columns: [presentation_id]
+        unit: percent
+        direction: below
+        category: completeness
+        introduced_date: "2013-01-01"
+        description: >
+          Every record in Emergency Department's ED Presentations for the quarter must have at least one
+          row in this release; fewer warns, and a larger shortfall fails.
+        failure_indicates: >
+          Either the geocoder left records out, or Emergency Department's ED Presentations supply for the
+          quarter carries records added since the geocoder was sent it, or
+          records with an empty identifier.
+        changelog: []

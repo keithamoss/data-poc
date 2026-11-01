@@ -358,6 +358,13 @@ def rebuild_for_arrival(arrival, *, tables: Sequence[str], foreign: Sequence[str
                       if sample_data.newest(versions) is not None}
             supply_db.add_run_views(conn, arrival.run_id, newest,
                                      sample_data.SCHEMA, out.resolution)
+        # THE DECLARED SET IN FORCE FOR THE PERIOD (REQ-QAC-297 criterion 3),
+        # in this one build of the run's view schema, read by the set-member
+        # tests through source(). A run with no period never reaches here.
+        from qa_tools.common import list_setting_members
+
+        list_setting_members.create(conn, supply_db.run_schema(arrival.run_id),
+                                    list_setting_members.rows_for(tables, period))
         name_held_siblings(conn, out.resolution, arrival)
         # THE RUN'S OWN HELD TABLE BY ITS SUPPLY ID (REQ-PIPE-279 criterion 1),
         # from the same holds that withheld it.
