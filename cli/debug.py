@@ -203,6 +203,8 @@ def capture_arrival_golden_command(yes: bool) -> None:
     import json
     from pathlib import Path
 
+    from qa_tools.common import assets
+
     from . import common
 
     root = Path(__file__).resolve().parent.parent
@@ -211,7 +213,7 @@ def capture_arrival_golden_command(yes: bool) -> None:
 
     reports = [c.dashboard_file for c in collections.all_collections()]
 
-    missing = [r for r in reports if not (root / "reports" / r).exists()]
+    missing = [r for r in reports if not assets.reports_path(r).exists()]
     if missing:
         raise click.ClickException(
             f"{', '.join(missing)} not built - run `mothman dashboard build-data` first.")
@@ -224,7 +226,7 @@ def capture_arrival_golden_command(yes: bool) -> None:
 
     captured: dict[str, dict] = {}
     for name in reports:
-        doc = json.loads((root / "reports" / name).read_text())
+        doc = json.loads(assets.reports_path(name).read_text())
         for ds in doc["datasets"]:
             by_run = ds.get("arrivalByRun") or {}
             captured[ds["id"]] = {

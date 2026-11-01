@@ -37,20 +37,20 @@ def redirect(root: Path):
     from generator import driver, scenario_injection
 
     root = Path(root)
-    names = {"DELIVERIES_DIR": root / "deliveries",
-             "RECEIPTS_DIR": root / "receipts",
-             "BOOKKEEPING_PATH": root / "generator_bookkeeping.json"}
-    original = {name: getattr(driver, name) for name in names}
-    for name, value in names.items():
-        setattr(driver, name, value)
-
-    placements = scenario_injection.PLACEMENTS_PATH
-    scenario_injection.PLACEMENTS_PATH = root / "scenario_placements.json"
+    # THE CALL-TIME LOOKUPS ARE REPLACED, not constants (REQ-PIPE-342
+    # criterion 6): each of the driver's three, and the placements, answers
+    # `root` until restored.
+    names = {(driver, "deliveries_dir"): root / "deliveries",
+             (driver, "receipts_dir"): root / "receipts",
+             (driver, "bookkeeping_path"): root / "generator_bookkeeping.json",
+             (scenario_injection, "placements_path"): root / "scenario_placements.json"}
+    original = {key: getattr(*key) for key in names}
+    for (module, name), value in names.items():
+        setattr(module, name, lambda value=value: value)
 
     def restore():
-        for name, value in original.items():
-            setattr(driver, name, value)
-        scenario_injection.PLACEMENTS_PATH = placements
+        for (module, name), value in original.items():
+            setattr(module, name, value)
 
     return restore
 

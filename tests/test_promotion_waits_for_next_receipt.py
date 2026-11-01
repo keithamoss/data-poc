@@ -7,6 +7,7 @@ stubbed: the instant it hands the promotion must land before the next
 file of the same dataset arrived, never after it."""
 from __future__ import annotations
 
+from state_paths import fixed
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
@@ -70,8 +71,8 @@ class TestTheNextReceiptIsKnownInAReplay:
 
         self._tree(tmp_path, [("Extract A", "2023-04-03T09:00:00+00:00"),
                               ("Extract B", "2023-04-03T09:00:30+00:00")])
-        monkeypatch.setattr(delivery, "DELIVERIES_DIR", tmp_path / "deliveries")
-        monkeypatch.setattr(delivery, "RECEIPTS_DIR", tmp_path / "receipts")
+        monkeypatch.setattr(delivery, "default_deliveries_dir", fixed(tmp_path / "deliveries"))
+        monkeypatch.setattr(delivery, "default_receipts_dir", fixed(tmp_path / "receipts"))
         first, second = arrivals.arrivals_for("child-protection", "")
         assert promotion.next_receipt(first) == second.received_at
         assert promotion.next_receipt(second) is None

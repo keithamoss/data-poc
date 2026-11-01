@@ -244,8 +244,8 @@ def _check_map() -> None:
     judged, which is said as a warning rather than passed as current."""
     import os
 
-    if not scenario_map.PLACEMENTS_PATH.is_file():
-        console.print(f"Cannot check SCENARIOS.md: no {scenario_map.PLACEMENTS_PATH.name} on "
+    if not scenario_map.placements_path().is_file():
+        console.print(f"Cannot check SCENARIOS.md: no {scenario_map.placements_path().name} on "
                       f"this machine (run `mothman pipeline bootstrap`).", style="yellow")
         if os.environ.get("MOTHMAN_GATE_WARNING_EXIT"):
             raise SystemExit(int(os.environ["MOTHMAN_GATE_WARNING_EXIT"]))

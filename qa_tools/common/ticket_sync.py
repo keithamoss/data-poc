@@ -72,15 +72,20 @@ import os
 import subprocess
 from dataclasses import dataclass
 
-from qa_tools.common import hierarchy
+from qa_tools.common import assets, hierarchy
 from qa_tools.common.dataset_status import dataset_status
 from qa_tools.common.people import github_usernames_for, parse_people_config, people_yaml
 from qa_tools.common.ticket_check_summary import build_check_summary
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
-#: Where each collection's built dashboard JSON lives - named by its
-#: adapter (REQ-PIPE-240) until REQ-PIPE-248 names every one from its id.
-REPORTS_DIR = os.path.join(ROOT, "reports")
+
+
+def reports_dir() -> str:
+    """Where each collection's built dashboard JSON lives - the selected
+    asset's reports folder, asked of the resolver at call time (REQ-PIPE-342
+    criterion 6); it was the REPORTS_DIR constant."""
+    return str(assets.reports_dir())
+
 
 # Every real ticket this module ever opens carries this label too (on top
 # of its own dataset:<id> one) - the "one unified queue, filterable"
@@ -136,7 +141,7 @@ def _load_scopes() -> list[tuple[DatasetScope, dict]]:
     scopes: list[tuple[DatasetScope, dict]] = []
     for adapter in collections.adapters():
         dashboard_file = collections.by_id(adapter.collection_id).dashboard_file
-        with open(os.path.join(REPORTS_DIR, dashboard_file)) as f:
+        with open(os.path.join(reports_dir(), dashboard_file)) as f:
             doc = json.load(f)
         for ds in doc["datasets"]:
             scopes.append((_scope_for(ds), ds))

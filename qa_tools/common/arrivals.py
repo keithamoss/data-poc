@@ -367,7 +367,7 @@ def arrivals_from_records(collection_id: str, deliveries_dir: Path | None = None
     from qa_tools.common import delivery_log, qa_store, s3_arrival
 
     hierarchy.datasets_in_collection(collection_id)  # raises if unknown
-    root = Path(deliveries_dir or delivery.DELIVERIES_DIR)
+    root = Path(deliveries_dir or delivery.default_deliveries_dir())
     with delivery_log._db(conn) as db:
         rows = db.execute(
             f'SELECT d.name, d.anomalies, f.filename, f.dataset_id, f.contested_by, '

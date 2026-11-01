@@ -11,6 +11,7 @@ from __future__ import annotations
 import pytest
 
 import rebuild_support
+from qa_tools.common import assets
 from qa_tools.common import qa_results_reader as reader
 from qa_tools.common import qa_results_writer as writer
 from qa_tools.common import tables_read as tr
@@ -184,7 +185,7 @@ class TestItReachesEveryParticipatingDataset:
         import json as _json
         from pathlib import Path
 
-        built = Path("reports/cpfs_child-protection_dashboard.json")
+        built = assets.reports_path("cpfs_child-protection_dashboard.json")
         if not built.is_file():
             pytest.skip("the dashboard data has not been built in this checkout")
         data = _json.loads(built.read_text())
@@ -200,7 +201,7 @@ class TestItReachesEveryParticipatingDataset:
         import json as _json
         from pathlib import Path
 
-        built = Path("reports/cpfs_child-protection_dashboard.json")
+        built = assets.reports_path("cpfs_child-protection_dashboard.json")
         if not built.is_file():
             pytest.skip("the dashboard data has not been built in this checkout")
         for ds in _json.loads(built.read_text())["datasets"]:
@@ -216,7 +217,7 @@ class TestItReachesEveryParticipatingDataset:
 
         from qa_tools.common.validate_check_lifecycle import collect_checks
 
-        built = Path("reports/cpfs_child-protection_dashboard.json")
+        built = assets.reports_path("cpfs_child-protection_dashboard.json")
         if not built.is_file():
             pytest.skip("the dashboard data has not been built in this checkout")
         declared = set(tr.declared_by_check_id(collect_checks(None)))
@@ -251,7 +252,7 @@ class TestPooledChecksKeepSeparateIdentities:
         import json as _json
         from pathlib import Path
 
-        built = Path("reports/cpfs_child-protection_dashboard.json")
+        built = assets.reports_path("cpfs_child-protection_dashboard.json")
         if not built.is_file():
             pytest.skip("the dashboard data has not been built in this checkout")
         return _json.loads(built.read_text())

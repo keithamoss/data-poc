@@ -9,6 +9,7 @@ derived from it.
 """
 from __future__ import annotations
 
+from state_paths import fixed
 import pytest
 
 from qa_tools.common import delivery_boundary, hierarchy
@@ -80,6 +81,6 @@ class TestNothingIsReadFromASourceThatHasNotSaid:
         from qa_tools.common import delivery
 
         _sources(monkeypatch, {"silent": ""})
-        monkeypatch.setattr(delivery, "DELIVERIES_DIR", tmp_path / "nothing-here")
+        monkeypatch.setattr(delivery, "default_deliveries_dir", fixed(tmp_path / "nothing-here"))
         with pytest.raises(delivery_boundary.DeliveryBoundaryError):
             delivery.survey()

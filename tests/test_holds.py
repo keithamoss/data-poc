@@ -10,6 +10,7 @@ supply that never arrived.
 """
 from __future__ import annotations
 
+from state_paths import fixed
 from datetime import datetime, timedelta, timezone
 
 import psycopg
@@ -26,8 +27,8 @@ WHEN = datetime(2026, 8, 25, 6, 0, tzinfo=timezone(timedelta(hours=8)))
 def dirs(tmp_path, monkeypatch):
     deliveries, receipts = tmp_path / "deliveries", tmp_path / "receipts"
     deliveries.mkdir(); receipts.mkdir()
-    monkeypatch.setattr(delivery, "DELIVERIES_DIR", deliveries)
-    monkeypatch.setattr(delivery, "RECEIPTS_DIR", receipts)
+    monkeypatch.setattr(delivery, "default_deliveries_dir", fixed(deliveries))
+    monkeypatch.setattr(delivery, "default_receipts_dir", fixed(receipts))
     return deliveries, receipts
 
 

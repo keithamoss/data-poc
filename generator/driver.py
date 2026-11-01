@@ -35,11 +35,25 @@ from __future__ import annotations
 import json
 import os
 
-from qa_tools.common import delivery
+from qa_tools.common import assets, delivery
 
-DELIVERIES_DIR = delivery.DELIVERIES_DIR
-RECEIPTS_DIR = delivery.RECEIPTS_DIR
-BOOKKEEPING_PATH = delivery.BOOKKEEPING_PATH
+
+# WHERE THE GENERATOR WRITES, asked of the resolver at CALL TIME (REQ-PIPE-342
+# criterion 6) - the selected asset's delivery tree, receipts and bookkeeping.
+# The generator's OWN three, separate from qa_tools.common.delivery's defaults
+# as the constants they replace were: generator/output.py's redirect() points
+# these, and only these, somewhere else.
+
+def deliveries_dir():
+    return assets.deliveries_dir()
+
+
+def receipts_dir():
+    return assets.receipts_dir()
+
+
+def bookkeeping_path():
+    return assets.data_path(delivery.BOOKKEEPING_FILE)
 
 
 def write_bookkeeping(key: str, manifest: list[dict]) -> None:
@@ -55,7 +69,7 @@ def write_bookkeeping(key: str, manifest: list[dict]) -> None:
     from arrival plus slot state. The generator reads it back for two
     purposes only: to delete what it wrote last time, and to say what each
     supply was built to (generator/targets.py, REQ-GEN-186)."""
-    path = BOOKKEEPING_PATH
+    path = bookkeeping_path()
     book = {}
     if path.exists():
         with open(path) as f:
@@ -68,7 +82,7 @@ def write_bookkeeping(key: str, manifest: list[dict]) -> None:
 
 def previous_delivery_names(key: str) -> list[str]:
     """What the collection keyed `key` wrote last time, from the bookkeeping."""
-    path = BOOKKEEPING_PATH
+    path = bookkeeping_path()
     if not path.exists():
         return []
     with open(path) as f:
@@ -104,7 +118,7 @@ def no_instant_shared_with_another_collection(key: str, manifest: list[dict]) ->
     later of the two."""
     from qa_tools.common import asset_time
 
-    path = BOOKKEEPING_PATH
+    path = bookkeeping_path()
     if not path.exists():
         return
     with open(path) as f:
@@ -163,7 +177,7 @@ def generate(collection_id: str) -> list[dict]:
     # Delivery names are arbitrary BY DESIGN, which means they can collide -
     # and a collision would write two arrivals into one directory, silently
     # merging deliveries that never arrived together.
-    taken_names: set[str] = delivery.existing_delivery_names(DELIVERIES_DIR) - set(previous)
+    taken_names: set[str] = delivery.existing_delivery_names(deliveries_dir()) - set(previous)
     manifest: list[dict] = []
     writes: list[tuple] = []
     for job in plan.jobs:
@@ -192,11 +206,11 @@ def generate(collection_id: str) -> list[dict]:
     no_instant_shared_with_another_collection(provider.dataset_id, manifest)
 
     # 2. Only then is the last history cleared, and the new one written.
-    delivery.remove_deliveries(previous, DELIVERIES_DIR, RECEIPTS_DIR)
+    delivery.remove_deliveries(previous, deliveries_dir(), receipts_dir())
     for name, files, received, entry, delivery_obj, n in writes:
         delivery.write_delivery(
             name, files, received_at=received,
-            deliveries_dir=DELIVERIES_DIR, receipts_dir=RECEIPTS_DIR,
+            deliveries_dir=deliveries_dir(), receipts_dir=receipts_dir(),
             # STORAGE, because in this PoC the generator IS storage
             # (REQ-PIPE-105 criterion 4): it stands in for the moment our
             # own object store took a supplier's file.
@@ -223,7 +237,7 @@ def generate(collection_id: str) -> list[dict]:
     if plan.resolved:
         placed = [placement for _, placement in plan.resolved]
         recognised = arrivals.arrivals_for(collection_id, provider.run_prefix,
-                                           DELIVERIES_DIR, RECEIPTS_DIR)
+                                           deliveries_dir(), receipts_dir())
         # AGAINST WHAT RECOGNITION FOUND, not against what was meant to be
         # written - see each function's own docstring.
         scenario_injection.check_suppressed_days_are_empty(placed, recognised)
@@ -233,5 +247,5 @@ def generate(collection_id: str) -> list[dict]:
         written = scenario_injection.write_placements(placed, merge=True)
         print(f"Recorded {len(placed)} scenario placement(s) -> {written}")
     print(f"\nWrote {len(manifest)} deliveries across {len(plan.jobs)} scheduled slots "
-          f"to {os.path.abspath(DELIVERIES_DIR)}")
+          f"to {os.path.abspath(deliveries_dir())}")
     return manifest

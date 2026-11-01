@@ -8,6 +8,7 @@ The page's lookup of these answers is tests-js/warehouse-counts.test.js.
 """
 from __future__ import annotations
 
+from state_paths import fixed
 import uuid
 
 import pytest
@@ -26,8 +27,8 @@ OWN_CHECK = CLIENT_REF.replace("cp_client_id.relationships_dbt", "notification_i
 @pytest.fixture
 def build(clean_qa_history, tmp_path, monkeypatch):
     """Rebuild into tmp_path and build from there - never the real reports/."""
-    monkeypatch.setattr(results_history, "ROOT", str(tmp_path))
-    monkeypatch.setattr(bdd, "REPORTS", str(tmp_path / "reports"))
+    monkeypatch.setattr(results_history, "reports_root", fixed(str(tmp_path / "reports")))
+    monkeypatch.setattr(bdd, "reports_root", fixed(str(tmp_path / "reports")))
 
     def datasets():
         rebuild_support.rebuild(CP, tmp_path, monkeypatch)
@@ -424,8 +425,8 @@ class TestTheBuildAgreesWithResultsAboutOnTheDeployment:
         from pipeline import warehouse_counts
         from qa_tools.common import asset_time, supply_status
 
-        monkeypatch.setattr(results_history, "ROOT", str(tmp_path))
-        monkeypatch.setattr(bdd, "REPORTS", str(tmp_path / "reports"))
+        monkeypatch.setattr(results_history, "reports_root", fixed(str(tmp_path / "reports")))
+        monkeypatch.setattr(bdd, "reports_root", fixed(str(tmp_path / "reports")))
         results_history.build_results_from_history(CP)
         pages = bdd.build_datasets(CP)
         pairs = [(page["id"], card, supply)

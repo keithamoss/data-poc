@@ -18,6 +18,7 @@ from datetime import date, timedelta
 import pytest
 
 from generator import scenario_injection as si
+from qa_tools.common import assets
 
 
 @dataclass(frozen=True)
@@ -276,8 +277,8 @@ class TestTheRecordTheScenarioMapReads:
         assert by_id["TS-1"]["supplies"] == ["run_028"]
         assert by_id["TS-4"]["supplies"] == by_id["TS-1"]["supplies"]
 
-        recorded = json.loads(si.PLACEMENTS_PATH.read_text())["placements"] \
-            if si.PLACEMENTS_PATH.exists() else []
+        recorded = json.loads(si.placements_path().read_text())["placements"] \
+            if si.placements_path().exists() else []
         by_id = {r["scenario_id"]: r for r in recorded}
         assert ("TS-1" in by_id) == ("TS-4" in by_id), sorted(by_id)
         if "TS-1" in by_id:
@@ -370,7 +371,7 @@ class TestNothingSaysScenarioOnTheDashboard:
         names = [c.dashboard_file for c in collections.all_collections()]
         assert len(names) >= 3, names
         for name in names:
-            path = root / "reports" / name
+            path = assets.reports_path(name)
             if not path.is_file():
                 pytest.skip(f"{name} not built - run `mothman dashboard build-data`")
             found = {f"TS-{m}" for m in pattern.findall(path.read_text())} & ids

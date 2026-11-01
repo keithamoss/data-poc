@@ -28,7 +28,7 @@ from __future__ import annotations
 import os
 
 from qa_tools import collections
-from qa_tools.common import asset_time, atomic_file, build_output
+from qa_tools.common import asset_time, assets, atomic_file, build_output
 from qa_tools.common.qa_results_reader import (
     RESULT_TOOLS, canonical_order, current_runs_only, list_run_ids, read_check_reads,
     read_cross_table_results, read_cross_table_results_reading, read_dataset_stats, read_one, replaced_runs, run_facts,
@@ -39,12 +39,19 @@ __all__ = ["build_results_from_history", "results_path", "write_results_file"]
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 
 
+def reports_root() -> str:
+    """The selected asset's reports folder, asked of the resolver at call time
+    (REQ-PIPE-342 criterion 6) - it was `<ROOT>/reports`."""
+    return str(assets.reports_dir())
+
+
 def results_path(collection_id: str) -> str:
-    """`<ROOT>/reports/<the collection's results_file>` - the one file both the
-    live batch and the rebuild write, named from its agency short and id
-    (REQ-PIPE-248 criterion 7). Under `--out-dir` the reports directory is the
-    build's own (REQ-TEST-281)."""
-    return os.path.join(build_output.reports_dir(os.path.join(ROOT, "reports")),
+    """The selected asset's reports folder's `<the collection's results_file>` -
+    the one file both the live batch and the rebuild write, named from its
+    agency short and id (REQ-PIPE-248 criterion 7), the folder asked of the
+    resolver at call time (REQ-PIPE-342 criterion 6). Under `--out-dir` the
+    reports directory is the build's own (REQ-TEST-281)."""
+    return os.path.join(build_output.reports_dir(reports_root()),
                         collections.by_id(collection_id).results_file)
 
 

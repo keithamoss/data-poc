@@ -71,7 +71,7 @@ NOT a file this script reads directly - it's a real `gh issue list`
 call only `.github/workflows/deploy-pages.yml` can make (a real GitHub
 API call needs a real token; this script has no token of its own and
 must stay callable locally with none). That workflow writes the raw `gh`
-JSON to OPEN_TICKETS_JSON below before calling this script; qa_tools/
+JSON to open_tickets_json() below before calling this script; qa_tools/
 common/ticket_status.py's parse_open_tickets() (a pure function, no
 `gh`/network access here either) reshapes it. Locally (`mothman pipeline
 run`/`mothman dashboard rebuild`, no real token, no such file) this
@@ -104,7 +104,7 @@ people/roles config", 2026-09-18, scoped via AskUserQuestion) -
 `{agencies: {agencyId: [...]}, datasets: {datasetId: [...]}}`, real
 people assigned to each real scope (qa_tools/common/people.py's own
 dataset-then-agency resolution - contract/people.yaml is a real,
-committed file this script CAN read directly, unlike OPEN_TICKETS_JSON/
+committed file this script CAN read directly, unlike open_tickets_json()/
 QA_COMMENTS_JSON - no `gh`/token needed, so no CI-only raw-fetch step
 for this one). Each record's real `email` field
 (people.py's own richer shape, needed by ticket_sync.py's `--assignee`
@@ -124,7 +124,7 @@ same real-source-not-a-file-this-script-reads-directly treatment as
 TICKET_STATUS above, for the same reason (a real `gh` call
 needs a real token this script doesn't have): `.github/workflows/
 deploy-pages.yml` writes the raw ticket close/reopen history for every
-real qa-ticket issue to TICKET_RESOLUTIONS_JSON below (via `python3 -m
+real qa-ticket issue to ticket_resolutions_json() below (via `python3 -m
 qa_tools.common.leaderboard`, that module's own real `gh` boundary), and
 this script calls leaderboard.build_leaderboard() (pure, no `gh`/network
 here either) to turn it into the final embed. Empty [] locally with no
@@ -188,6 +188,7 @@ from dashboard.plans_md import feedback_data, parse_plans
 from qa_tools.common.sprint_state import dependency_data
 from dashboard.requirements_yaml import parse_requirements
 from qa_tools.common import asset_time
+from qa_tools.common import assets
 from qa_tools.common import build_output
 from qa_tools.common import environments
 from qa_tools.common import hierarchy
@@ -209,8 +210,19 @@ CHANGELOG_YAML = os.path.join(ROOT, "CHANGELOG.yaml")
 PLANS_DIR = os.path.join(ROOT, "plans")
 DEMO_CAST_PATH = os.path.join(os.path.dirname(__file__), "demos", "qa_wizard.cast")
 REQUIREMENTS_YAML = os.path.join(ROOT, "requirements.yaml")
-OPEN_TICKETS_JSON = os.path.join(ROOT, "reports", "open_tickets.json")
-TICKET_RESOLUTIONS_JSON = os.path.join(ROOT, "reports", "ticket_resolutions.json")
+OPEN_TICKETS_FILE = "open_tickets.json"
+TICKET_RESOLUTIONS_FILE = "ticket_resolutions.json"
+
+
+# IN THE SELECTED ASSET'S REPORTS FOLDER, asked of the resolver at call time
+# (REQ-PIPE-342 criterion 6) - these were the OPEN_TICKETS_JSON and
+# TICKET_RESOLUTIONS_JSON constants.
+def open_tickets_json() -> str:
+    return str(assets.reports_path(OPEN_TICKETS_FILE))
+
+
+def ticket_resolutions_json() -> str:
+    return str(assets.reports_path(TICKET_RESOLUTIONS_FILE))
 
 def data_dir_for(page_path) -> str:
     """The directory beside a built page its data files go in
@@ -372,11 +384,11 @@ def output_paths() -> tuple[str, str, str]:
     directory and its own `reports/` - never the real tree's (REQ-TEST-281)."""
     out = build_output.out_dir()
     if not out:
-        return DASHBOARD_HTML, OPEN_TICKETS_JSON, TICKET_RESOLUTIONS_JSON
-    reports = build_output.reports_dir(os.path.join(ROOT, "reports"))
+        return DASHBOARD_HTML, open_tickets_json(), ticket_resolutions_json()
+    reports = build_output.reports_dir()
     return (os.path.join(out, build_output.PAGE_NAME),
-            os.path.join(reports, os.path.basename(OPEN_TICKETS_JSON)),
-            os.path.join(reports, os.path.basename(TICKET_RESOLUTIONS_JSON)))
+            os.path.join(reports, OPEN_TICKETS_FILE),
+            os.path.join(reports, TICKET_RESOLUTIONS_FILE))
 
 
 def place_page_assets(page_path) -> None:

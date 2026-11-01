@@ -45,6 +45,8 @@ from collections import Counter
 from datetime import UTC, datetime
 from pathlib import Path
 
+from qa_tools.common import assets
+
 ROOT = Path(__file__).resolve().parent.parent.parent
 
 #: Bumped when what a capture records changes; `compare` refuses two
@@ -443,13 +445,20 @@ def summary(snap: dict) -> dict[str, int]:
 NOT_GENERATED = ("dbt_scratch",)
 
 
+def _in_tree(tree: Path, folder: Path) -> Path:
+    """The selected asset's state folder - its data/ or reports/, asked of
+    the resolver at call time (REQ-PIPE-342 criterion 6) - as it sits in the
+    checkout at `tree` rather than in this one."""
+    return tree / folder.relative_to(assets.ROOT)
+
+
 def generated_files(tree: Path) -> dict[str, str]:
     """S4: every file the bootstrap left under `tree`'s data/ - every
     delivery, every receipt, and the generators' own records - except
     dbt's scratch. Named by WHERE it is rather than file by file, so this
     module never names the generator's bookkeeping, which no QA module may
     (REQ-GEN-043 criterion 7, tests/test_arrivals.py)."""
-    data = tree / "data"
+    data = _in_tree(tree, assets.data_dir())
     out = {}
     if not data.is_dir():
         return out
@@ -550,7 +559,7 @@ def reports(tree: Path, ctx: dict | None = None) -> dict:
     normalised (REPORT_KEYS_REMOVED always; ids and clock instants by
     `report_context` when the database is to hand)."""
     out = {}
-    for f in sorted((tree / "reports").glob("*.json")):
+    for f in sorted(_in_tree(tree, assets.reports_dir()).glob("*.json")):
         out[f.name] = _normalise_report(json.loads(f.read_text()), ctx)
     return out
 

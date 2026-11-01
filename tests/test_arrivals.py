@@ -364,8 +364,11 @@ class TestTheGeneratorsBookkeepingIsWalledOff:
                 if isinstance(node, ast.Constant) and isinstance(node.value, str) \
                         and "generator_bookkeeping" in node.value and id(node) not in docstrings:
                     offenders.append(f"{rel}:{node.lineno}")
-                if isinstance(node, ast.Attribute) and node.attr == "BOOKKEEPING_PATH":
-                    offenders.append(f"{rel}:{node.lineno} (BOOKKEEPING_PATH)")
+                # The call-time lookup and its file name (REQ-PIPE-342
+                # criterion 6) are the same artefact by another name.
+                if isinstance(node, ast.Attribute) and node.attr in (
+                        "BOOKKEEPING_PATH", "bookkeeping_path", "BOOKKEEPING_FILE"):
+                    offenders.append(f"{rel}:{node.lineno} ({node.attr})")
         assert offenders == [], (
             "the generator's bookkeeping is named inside a pipeline/QA/dashboard module - "
             "filing a supply from a declaration is exactly what criterion 7 forbids:\n  "

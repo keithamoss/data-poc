@@ -536,7 +536,10 @@ class TestNeitherHalfOfCIQuietlyStopsCovering:
     #: half against an empty deployment is the real check; this is the
     #: cheap one that catches the known shapes before a push.
     GENERATED = (r'["\']reports["\']\s*/', r"reports/[\w-]+\.json",
-                 r"scenario_placements")
+                 r"scenario_placements",
+                 # THROUGH THE RESOLVER (REQ-PIPE-342 criterion 6), the same
+                 # artefacts by their call-time lookups.
+                 r"\breports_(?:path|dir)\(", r"\bplacements_path\(")
 
     def _modules_reading_reports(self) -> set[str]:
         """Test modules that name a generated artefact."""
@@ -568,6 +571,7 @@ class TestNeitherHalfOfCIQuietlyStopsCovering:
                    "deployment_history",
                    "generator_isolation",
                    "PLACEMENTS_PATH\",",
+                   "\"placements_path\",",
                    # A module that builds its own reports/ under a temporary
                    # or copied tree and reads only that one says so.
                    "READS ONLY ITS OWN REPORTS")

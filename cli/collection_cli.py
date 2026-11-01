@@ -114,7 +114,7 @@ class CollectionCLI:
         (REQ-PIPE-102)."""
         from generator import driver
 
-        return str(driver.DELIVERIES_DIR)
+        return str(driver.deliveries_dir())
 
     @property
     def has_target_trial(self) -> bool:

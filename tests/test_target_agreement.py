@@ -8,6 +8,7 @@ what a real tool produced (criterion 4).
 """
 from __future__ import annotations
 
+from state_paths import fixed
 import dataclasses
 import json
 
@@ -232,7 +233,7 @@ class TestTheTrialAtGeneration:
 
         lonely = targets.Built("TS-z's arrival", DS, "d", "amber", injected=True)
         monkeypatch.setattr(targets, "just_written", lambda: ([lonely], tmp_path / "deliveries"))
-        monkeypatch.setattr(driver, "RECEIPTS_DIR", tmp_path / "receipts")
+        monkeypatch.setattr(driver, "receipts_dir", fixed(tmp_path / "receipts"))
         monkeypatch.setattr(driver, "previous_delivery_names", lambda key: [])
         with pytest.raises(bdm.TargetTrialFailed, match="no lead-in"):
             bdm.try_targets(say=lambda _m: None)
@@ -456,8 +457,8 @@ class TestARecordThatDoesNotAddUp:
     def test_at_generation_it_fails_the_trial_cleanly(self, monkeypatch, tmp_path):
         from cli.collection_cli import of as _cli_of
         bdm = _cli_of('bdm')
-        monkeypatch.setattr(driver, "DELIVERIES_DIR", tmp_path / "deliveries")
-        monkeypatch.setattr(driver, "RECEIPTS_DIR", tmp_path / "receipts")
+        monkeypatch.setattr(driver, "deliveries_dir", fixed(tmp_path / "deliveries"))
+        monkeypatch.setattr(driver, "receipts_dir", fixed(tmp_path / "receipts"))
 
         def broken():
             raise ValueError("TS-43: no supply arriving 2026-09-05 14:00")

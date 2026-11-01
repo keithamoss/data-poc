@@ -38,11 +38,28 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 
-from qa_tools.common import arrival_patterns, asset_time, delivery_boundary
+from qa_tools.common import arrival_patterns, asset_time, assets, delivery_boundary
 
 ROOT = Path(__file__).resolve().parent.parent.parent
-DELIVERIES_DIR = ROOT / "data" / "deliveries"
-RECEIPTS_DIR = ROOT / "data" / "receipts"
+
+
+# WHERE THE SELECTED ASSET'S DELIVERIES, RECEIPTS AND BOOKKEEPING LIVE, asked
+# of the resolver at CALL TIME (REQ-PIPE-342 criterion 6, REQ-PIPE-365
+# criterion 1) - these were module constants, which a module imported before
+# a test selected its asset would have kept pointing at the wrong folder.
+# Each is the DEFAULT a reader here uses when its caller names no directory,
+# and the one thing a test redirects them all through (monkeypatch the
+# function). generator/driver.py has its own three, so redirecting the
+# generator's output leaves these alone, as the constants did.
+
+def default_deliveries_dir() -> Path:
+    """The selected asset's delivery tree."""
+    return assets.deliveries_dir()
+
+
+def default_receipts_dir() -> Path:
+    """The selected asset's receipts, beside its delivery tree."""
+    return assets.receipts_dir()
 
 #: WHERE A RECEIPT'S INSTANT CAME FROM (REQ-PIPE-105 criteria 3 and 4).
 #:
@@ -69,7 +86,14 @@ RECEIPTS_DIR = ROOT / "data" / "receipts"
 RECEIVED_FROM_STORAGE = "storage"
 RECEIVED_FROM_OUR_CLOCK = "our-clock"
 RECEIPT_SOURCES = (RECEIVED_FROM_STORAGE, RECEIVED_FROM_OUR_CLOCK)
-BOOKKEEPING_PATH = ROOT / "data" / "generator_bookkeeping.json"
+#: The generator's bookkeeping file's name - named here and only here among
+#: the QA modules (REQ-GEN-043 criterion 7, tests/test_arrivals.py).
+BOOKKEEPING_FILE = "generator_bookkeeping.json"
+
+
+def bookkeeping_path() -> Path:
+    """The selected asset's generator bookkeeping, at call time."""
+    return assets.data_path(BOOKKEEPING_FILE)
 
 # Names that would be a receipt record if we trusted one from inside a
 # delivery. We do not - see the module docstring. Matched loosely and
@@ -211,8 +235,8 @@ def remove_deliveries(names, deliveries_dir: Path | None = None,
     before writing again. Each one owns its own output, and neither
     needs to know which deliveries belong to the other.
     """
-    deliveries_dir = Path(deliveries_dir or DELIVERIES_DIR)
-    receipts_dir = Path(receipts_dir or RECEIPTS_DIR)
+    deliveries_dir = Path(deliveries_dir or default_deliveries_dir())
+    receipts_dir = Path(receipts_dir or default_receipts_dir())
     removed = 0
     for name in names:
         path = deliveries_dir / name
@@ -248,7 +272,7 @@ def existing_delivery_names(deliveries_dir: Path | None = None) -> set[str]:
     merged into one. Seeding from disk is what makes the guarantee hold
     across every writer rather than within each one.
     """
-    deliveries_dir = Path(deliveries_dir or DELIVERIES_DIR)
+    deliveries_dir = Path(deliveries_dir or default_deliveries_dir())
     if not deliveries_dir.is_dir():
         return set()
     return {p.name for p in deliveries_dir.iterdir() if p.is_dir()}
@@ -317,8 +341,8 @@ def write_delivery(name: str, files: dict[str, str | bytes],
     file name to its own. A mapping missing a file is refused rather than
     defaulted: a file with no instant has not been received.
     """
-    deliveries_dir = deliveries_dir or DELIVERIES_DIR
-    receipts_dir = receipts_dir or RECEIPTS_DIR
+    deliveries_dir = deliveries_dir or default_deliveries_dir()
+    receipts_dir = receipts_dir or default_receipts_dir()
     if received_from is None:
         received_from = (RECEIVED_FROM_STORAGE if received_at is not None
                           else RECEIVED_FROM_OUR_CLOCK)
@@ -388,7 +412,7 @@ def write_receipts(name: str, received_at: "datetime | Mapping[str, datetime]",
     write_delivery() would refuse still needs receipts in the real
     format - four tests used to hand-copy it.
     """
-    receipts_dir = Path(receipts_dir or RECEIPTS_DIR)
+    receipts_dir = Path(receipts_dir or default_receipts_dir())
     instants = (dict(received_at) if isinstance(received_at, Mapping)
                 else {f: received_at for f in (files or ())})
     receipt_dir = receipts_dir / name
@@ -447,7 +471,7 @@ def next_sequence(receipts_dir: Path | None = None) -> int:
     because a future deployment inherits this function's behaviour and
     not this paragraph.
     """
-    receipts_dir = Path(receipts_dir or RECEIPTS_DIR)
+    receipts_dir = Path(receipts_dir or default_receipts_dir())
     if not receipts_dir.is_dir():
         return 1
     highest = 0
@@ -505,7 +529,7 @@ def read_file_receipts(name: str, receipts_dir: Path | None = None
     is to regenerate rather than to migrate - the same call REQ-PIPE-061
     made when the sequence arrived.
     """
-    receipts_dir = Path(receipts_dir or RECEIPTS_DIR)
+    receipts_dir = Path(receipts_dir or default_receipts_dir())
     receipt_dir = receipts_dir / name
     if not receipt_dir.is_dir():
         if (receipts_dir / f"{name}.json").exists():
@@ -558,7 +582,7 @@ def read_delivery(name: str, deliveries_dir: Path | None = None,
     `files`, so a caller cannot read one by accident - which is the
     whole reason they are excluded rather than merely flagged.
     """
-    deliveries_dir = Path(deliveries_dir or DELIVERIES_DIR)
+    deliveries_dir = Path(deliveries_dir or default_deliveries_dir())
     path = deliveries_dir / name
     if not path.is_dir():
         raise DeliveryFormatError(f"no delivery directory at {path}")
@@ -608,7 +632,7 @@ def _receipt_extras(name: str, receipts_dir, files) -> tuple[dict[str, str], dic
     A receipt written before these keys existed reads as automated with
     nothing stated - true of every delivery the generators wrote.
     """
-    receipt_dir = Path(receipts_dir or RECEIPTS_DIR) / name
+    receipt_dir = Path(receipts_dir or default_receipts_dir()) / name
     stated: dict[str, str] = {}
     seen: list[tuple[str, dict]] = []
     for filename in files:
@@ -698,7 +722,7 @@ def survey(deliveries_dir: Path | None = None,
     # configuration rather than about whatever happened to be on disk.
     delivery_boundary.check_all()
 
-    deliveries_dir = Path(deliveries_dir or DELIVERIES_DIR)
+    deliveries_dir = Path(deliveries_dir or default_deliveries_dir())
     # A freshly-cloned machine has no data/ at all. Absence is a state
     # to handle, not a precondition to assert - a test that asserted
     # this tree exists passed locally and went red in CI on 2026-09-23.

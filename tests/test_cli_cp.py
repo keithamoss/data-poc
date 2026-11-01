@@ -6,6 +6,7 @@ the Click commands through click.testing.CliRunner, same pattern as
 tests/test_cli_bdm.py."""
 from __future__ import annotations
 
+from state_paths import fixed
 from qa_tools.common import hand_filing
 import os
 import re
@@ -29,8 +30,8 @@ def _patch_delivery_dirs(monkeypatch, delivery_dirs):
     see tests/test_cli_bdm.py's identical helper for why patching the
     raw dir alone is no longer enough."""
     from qa_tools.common import delivery
-    monkeypatch.setattr(delivery, "DELIVERIES_DIR", delivery_dirs[0])
-    monkeypatch.setattr(delivery, "RECEIPTS_DIR", delivery_dirs[1])
+    monkeypatch.setattr(delivery, "default_deliveries_dir", fixed(delivery_dirs[0]))
+    monkeypatch.setattr(delivery, "default_receipts_dir", fixed(delivery_dirs[1]))
 
 
 def _patch_cp_dirs(monkeypatch, raw_dir, duckdb_dir, delivery_dirs=None):
