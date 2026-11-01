@@ -647,8 +647,9 @@ Rough layout:
   **Amended 2026-10-18 (REQ-TEST-260): "after every push" now means
   after the ONE push per finished piece of work the commit-cadence rule
   below allows, its run checked at the next natural pause as before.**
-  Every push costs about 39 billable minutes on a private repository
-  against 2,000 a month, so a push exists to carry finished work, never
+  Every push costs about 80-150 billable minutes on a private repository
+  (re-measured 2026-11-02; see the commit-cadence rule below) against
+  2,000 a month, so a push exists to carry finished work, never
   to ask CI a question a local gate can answer; `mothman github ci-usage`
   says where the month stands before a push late in it.
   **Amended again, 2026-09-18 evening (Keith's own explicit call): run selective
@@ -1021,11 +1022,36 @@ Rough layout:
   Work is committed locally as checkpoints with no test claims, and
   PUSHED ONCE PER FINISHED, GATE-GREEN PIECE OF WORK - not once per
   checkpoint, not once per register edit. Rules A to C apply to that one
-  push. The arithmetic that forces it: a full `test.yml` run bills about
-  39 minutes, so the allowance is about 50 pushes a month, about 12 a
-  week, against roughly 320 the week before this rule; `mothman github
-  ci-usage --days 7` reports the real figure, and REQ-DOCS-259's flip
-  waits on a measured week that fits.
+  push. The arithmetic that forces it: a full `test.yml` run billed about
+  39 minutes when this rule was written (run 40134013333, 2026-10-24),
+  so the allowance was about 50 pushes a month, about 12 a week, against
+  roughly 320 the week before this rule; `mothman github ci-usage --days
+  7` reports the real figure, and REQ-DOCS-259's flip waits on a measured
+  week that fits.
+
+  **RE-MEASURED 2026-11-02: it is now about 80 minutes a push on a
+  bootstrap-cache hit and about 145 on a miss**, so the allowance is
+  nearer 14-25 pushes a month, 3-6 a week. `ci-usage --days 7` that day:
+  5 pushes, 450 billable minutes, 1,929 scaled to a month - fitting, but
+  with one push of headroom. Per job, 2026-10-24 (miss) against
+  2026-10-31 (run 41156234338, miss; run 41173122058, hit):
+
+  | Job | 10-24 miss | 10-31 miss | 10-31 hit |
+  |---|---|---|---|
+  | `test` (tests needing no deployment) | 15m | 67m | 34m |
+  | `test-deployment`: bootstrap | 12m | 35m | restored |
+  | `test-deployment`: its tests | 7m | 33m | 33m |
+  | `on-demand` | 4m | 5m | 7m |
+  | `js-tests` | 2m | 2m | 3m |
+
+  The growth is the SUITES, not one step: the no-deployment half went
+  15m to 34m even on a cache hit, and the deployment half's tests 7m to
+  33m, as Linkage Products and geocoding landed (and the no-deployment
+  half doubled again on the miss run, 34m to 67m, which looks like
+  runner variance rather than code and is worth re-checking before
+  acting on). Treat a push as ~80 minutes when the bootstrap inputs are
+  unchanged and ~145 when they change, and check `ci-usage` before any
+  push late in a month.
 
   Why it changed: holding every commit until the critic's fixes and a
   final full gate kept the tree dirty for an hour at a time, and any
