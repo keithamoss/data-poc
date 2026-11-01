@@ -734,3 +734,32 @@ def contested_own_checks(contested: Iterable[str],
     return frozenset(
         cid for cid in check_ids
         if check_id_mod.parse(cid).dataset in datasets)
+
+
+def borrow_from_period(conn, run_id: str, period_name: str, tables) -> list[str]:
+    """Let a TRIAL read what is in place in a period for the tables its folder
+    did not carry (REQ-PIPE-202 criterion 8 as amended 2026-11-01, Keith): a
+    view onto each table's one promoted version in the period's schema, its
+    resolution recorded as read from the period - what a real arrival reads
+    for a table nothing staged for its period. Returns the logical names it
+    could borrow; a table the period holds none of stays absent, and a trial
+    records it no data."""
+    found = promoted_in(conn, period_name, list(tables))
+    schema = supply_db.run_schema(run_id)
+    source = period_schema(period_name)
+    mine = supply_db.resolution_for(conn, run_id)
+    borrowed = []
+    for logical, physicals in sorted(found.items()):
+        if len(physicals) != 1:
+            continue
+        conn.execute(f'CREATE OR REPLACE VIEW "{schema}"."{logical}" AS '
+                     f'SELECT * FROM "{source}"."{physicals[0]}"')
+        mine.resolved[logical] = physicals[0]
+        mine.source[logical] = FROM_PERIOD
+        mine.ambiguous.pop(logical, None)
+        if logical in mine.absent:
+            mine.absent.remove(logical)
+        borrowed.append(logical)
+    if borrowed:
+        supply_db.record_resolution(conn, mine)
+    return borrowed

@@ -117,12 +117,37 @@ class TestAKeptFolderIsWhateverRecognitionPlaces:
         out = _flat(capsys.readouterr().out)
         assert "CLIENTS_EXTRACT_FINAL.csv" in out and "left behind" in out
 
-    def test_a_trial_folder_still_needs_all_six(self, tmp_path):
+    def test_a_trial_folder_checks_what_it_holds_against_the_warehouse(self, tmp_path,
+                                                                       monkeypatch):
+        """Keith, 2026-11-01 (SETTLED, REQ-PIPE-202 criterion 8 as amended): a
+        trial of a folder holding ONE table checks that table, the rest read
+        from what is in place in the warehouse for the period it would be
+        filed to, as a real arrival reads them - it used to be refused,
+        'a trial needs all six'."""
+        from types import SimpleNamespace
+
+        from qa_tools.common import filing, period_schema
+        from qa_tools.tools import orchestrate, stage
+
         folder = tmp_path / "d"
         folder.mkdir()
         _csv(folder, "cp_clients.csv")
-        with pytest.raises(click.ClickException, match="all 6"):
-            cp.run_check_local_folder(str(folder), str(folder), "me", keep=False)
+        staged, borrowed = [], []
+        monkeypatch.setattr(stage, "stage_table",
+                            lambda coll, run_id, table, path, **kw: staged.append((run_id, table)))
+        monkeypatch.setattr(filing, "assignment_at",
+                            lambda ds, supply, at: SimpleNamespace(slot="2026-Q2"))
+        monkeypatch.setattr(period_schema, "borrow_from_period",
+                            lambda conn, run_id, period, tables: borrowed.append(
+                                (run_id, period, sorted(tables))) or list(tables),
+                            raising=False)
+        monkeypatch.setattr(orchestrate, "run_single", lambda *a, **kw: [])
+        monkeypatch.setattr(common, "discard_reference", lambda run_id: None)
+        cp.run_check_local_folder(str(folder), str(folder), "me", keep=False)
+        assert {t for _r, t in staged} == {"cp_clients"}
+        [(run_id, period, tables)] = borrowed
+        assert period == "2026-Q2" and run_id.startswith("trial")
+        assert tables == sorted(t for t in cp.tables if t != "cp_clients")
 
 
 class TestAFileOfAnotherCollection:

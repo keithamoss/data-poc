@@ -106,7 +106,8 @@ class ManyTablesCLI(CollectionCLI):
         return sorted(os.path.join(folder, n) for n in os.listdir(folder)
                       if os.path.isfile(os.path.join(folder, n)))
 
-    def _all_by_pattern(self, folder: str, recorded: bool = False) -> dict[str, str]:
+    def _all_by_pattern(self, folder: str, recorded: bool = False,
+                        partial: bool = False) -> dict[str, str]:
         """{table: path} for every table, each file ATTRIBUTED BY ITS
         DATASET'S ARRIVAL PATTERN (REQ-PIPE-202 criterion 8) - never by
         assuming `<table>.csv`. All tables and ONE file each: a table two files
@@ -138,6 +139,14 @@ class ManyTablesCLI(CollectionCLI):
             raise click.ClickException(
                 f"{folder}: " + "; ".join(lines) + f" - {todo}. Neither file was checked.")
         missing = [t for t in self.tables if t not in found]
+        if partial and found:
+            # A TRIAL CHECKS WHAT ITS FOLDER HOLDS (REQ-PIPE-202 criterion 8 as
+            # amended 2026-11-01, Keith): the rest is read from the warehouse.
+            return {table: paths[0] for table, paths in found.items()}
+        if partial:
+            raise click.ClickException(
+                f"nothing in {folder} matches any of {self.upper}'s tables, so there is "
+                f"nothing to check.")
         if missing:
             raise click.ClickException(
                 f"{folder} is missing a file for: {', '.join(missing)} - {wording.a_or_an(self.upper)} "
@@ -145,18 +154,41 @@ class ManyTablesCLI(CollectionCLI):
                 f"a partial set")
         return {table: paths[0] for table, paths in found.items()}
 
-    def _require_all(self, folder: str) -> None:
-        self._all_by_pattern(folder)
-
     def _load_delivery_from_folder(self, folder: str, run_id: str, received_at=None,
-                                   recorded: bool = False) -> None:
-        """Stage every table for one run id from an arbitrary folder."""
+                                   recorded: bool = False, partial: bool = False) -> None:
+        """Stage every table for one run id from an arbitrary folder - or, for a
+        trial (`partial`), every table the folder holds."""
         from qa_tools.tools import stage
 
-        paths = self._all_by_pattern(folder, recorded=recorded)
+        paths = self._all_by_pattern(folder, recorded=recorded, partial=partial)
         for table in self.tables:
-            stage.stage_table(self.collection_id, run_id, table, paths[table],
-                              received_at=received_at)
+            if table in paths:
+                stage.stage_table(self.collection_id, run_id, table, paths[table],
+                                  received_at=received_at)
+
+    def _borrow_the_rest(self, run_id: str, present, at) -> None:
+        """A TRIAL'S OTHER TABLES, from what is in place in the warehouse
+        (REQ-PIPE-202 criterion 8 as amended 2026-11-01, Keith): for the period
+        a supply of the first table it holds would be filed to if received at
+        `at` - the filing rule a real arrival is filed by, asked and not
+        recorded - each table's promoted version there. One the period holds
+        none of stays absent and is recorded no data, as any table a trial
+        cannot read is."""
+        from qa_tools.common import filing, hierarchy, period_schema, supply_db
+
+        missing = [t for t in self.tables if t not in present]
+        if not missing:
+            return
+        first = next(t for t in self.tables if t in present)
+        dataset_id = hierarchy.dataset_for_table(first).dataset_id
+        period = filing.assignment_at(dataset_id, f"{dataset_id}@trial", at).slot
+        if not period:
+            console.print(f"No period would take this {first} supply now, so the other "
+                          f"tables are not read from the warehouse.", style="yellow",
+                          markup=False, highlight=False)
+            return
+        with supply_db.connect(label=f"mothman:{self.short}-trial-warehouse") as conn:
+            period_schema.borrow_from_period(conn, run_id, period, missing)
 
     def _refuse_a_contested_arrival(self, entry: dict) -> None:
         """Refuse an arrival whose table two files claim, naming both and
@@ -247,8 +279,9 @@ class ManyTablesCLI(CollectionCLI):
         """The Local files mode's check body. KEEP OR TRIAL FIRST
         (REQ-PIPE-086 criterion 14). Kept: whatever recognition places in the
         folder is the delivery - one table or all of them - and the WHOLE
-        FOLDER IS ONE DELIVERY (REQ-PIPE-103). A trial needs every table and a
-        reference."""
+        FOLDER IS ONE DELIVERY (REQ-PIPE-103). A trial checks the tables the
+        folder holds, the rest read from the warehouse (REQ-PIPE-202 criterion
+        8 as amended 2026-11-01, Keith), and needs a reference."""
         from cli import common
         from qa_tools.common import asset_time, delivery
         from qa_tools.tools import orchestrate
@@ -272,9 +305,9 @@ class ManyTablesCLI(CollectionCLI):
                     f"nothing in {folder} matches any dataset's arrival pattern, so there is "
                     f"nothing to file. Pass --trial to check it without filing.")
         else:
-            by_table = self._all_by_pattern(folder)
+            by_table = self._all_by_pattern(folder, partial=True)
             common.require_reference_for_trial(reference_folder, "--reference-folder")
-            paths = [by_table[t] for t in self.tables]
+            paths = [by_table[t] for t in self.tables if t in by_table]
         filed = common.file_or_trial(
             paths, self.collection_id, self.run_prefix, keep=keep, route=route,
             originally=originally, storage_times=storage_times)
@@ -286,15 +319,17 @@ class ManyTablesCLI(CollectionCLI):
             return self._check_filed_delivery(filed, run_by, on_step), filed
         run_id = filed.run_id
         folder = os.path.dirname(filed.paths[0])
-        if reference_folder is None or len(filed.paths) != len(self.tables):
-            # A KEPT FOLDER THAT FELL BACK TO A TRIAL: a trial needs every
-            # table and its reference, which nobody was asked for.
-            self._require_all(folder)
+        if reference_folder is None:
+            # A KEPT FOLDER THAT FELL BACK TO A TRIAL: a trial needs its
+            # reference, which nobody was asked for.
             reference_folder = common.reference_for_fallback_trial(
                 reference_folder, "--reference-folder", "folder")
         reference_run_id = common.reference_run_id()
-        self._load_delivery_from_folder(reference_folder, reference_run_id)
-        self._load_delivery_from_folder(folder, run_id, received_at=filed.received_at)
+        self._load_delivery_from_folder(reference_folder, reference_run_id, partial=True)
+        self._load_delivery_from_folder(folder, run_id, received_at=filed.received_at,
+                                        partial=True)
+        self._borrow_the_rest(run_id, self._all_by_pattern(folder, partial=True),
+                              filed.received_at or asset_time.now())
         entry = {"run_id": run_id, "dirty_severity": None,
                  "received_at": asset_time.isoformat(
                      filed.received_at
@@ -634,9 +669,10 @@ def add_commands(group: click.Group, coll, *, with_target_trial: bool) -> None:
                        "promoted supply.")
     @click.option("--folder", "folder_path", default=None,
                   type=click.Path(exists=True, file_okay=False),
-                  help=f"Local files mode: an already-downloaded delivery folder (instead of "
-                       f"--run-id). Kept, whatever recognition places in it is the delivery; a "
-                       f"trial needs {wording.all_of(len(tables), 'tables')}.")
+                  help="Local files mode: an already-downloaded delivery folder (instead of "
+                       "--run-id). Kept, whatever recognition places in it is the delivery; a "
+                       "trial checks the tables it holds against what the warehouse has for "
+                       "the rest.")
     @click.option("--reference-folder", default=None, type=click.Path(exists=True, file_okay=False),
                   help="Local files mode: a known-good reference delivery folder to compare "
                        "distribution drift against. A trial's only: a kept supply is measured "
