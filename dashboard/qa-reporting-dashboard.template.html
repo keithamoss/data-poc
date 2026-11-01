@@ -1618,18 +1618,22 @@ const DATACONTRACT_SAMPLES_RETURNED = 5;
 // Every pill is ESCAPED, a one-column key included (it was interpolated raw).
 // A several-column key's parts are joined in declared order, and a NULL key or
 // part - recorded for every tool since post-build-review #294 D1 - reads
-// '(no value)' (Keith's wording; REQ-DASH-299 keeps it).
+// '(no value)' (Keith's wording) for the whole key; a null PART reads '—', as
+// below.
 //
 // TRAILING EMPTY PARTS ARE DROPPED FROM THE DISPLAY ONLY (REQ-DASH-299
 // criterion 8; Keith, v5 round (b)): an always-empty id_2 adds nothing, while
-// an empty part followed by a present one shows '—' (a null one '(no value)',
-// as above). Each part is escaped on its own before joining; the recorded
-// sample is never changed.
+// an empty or NULL part followed by a present one shows '—' (decision 36 as
+// CHANGED by Keith 2026-11-02, morning report B11: a null part reads as an
+// empty one, criterion 8's letter); a key of nothing at all reads
+// '(no value)', as a null key does. Each part is escaped on its own before
+// joining; the recorded sample is never changed.
 const emptyPart = p => p == null || p === "";
 function sampleParts(parts){
   const kept = parts.slice();
   while(kept.length > 1 && emptyPart(kept[kept.length - 1])) kept.pop();
-  return kept.map(p => p == null ? "(no value)" : p === "" ? "—" : escHtml(String(p)));
+  if(kept.length === 1 && kept[0] == null) return ["(no value)"];
+  return kept.map(p => emptyPart(p) ? "—" : escHtml(String(p)));
 }
 function sampleKeyText(key){
   return Array.isArray(key) ? sampleParts(key).join(" / ") : (key == null ? "(no value)" : escHtml(String(key)));
