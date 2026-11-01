@@ -2077,8 +2077,9 @@ const STATUS_WORDS = {
 // Whether a value is a status this page has words for - for a caller that
 // shows a note only where there is a status to name.
 // A REPLACEMENT SETTING'S VALUE IN WORDS (REQ-DASH-359 criterion 12), never
-// the raw green or green-or-amber; held equal to qa_tools/common/
-// replacement_setting.py's WORDS by tests/test_status_words_shown.py.
+// the raw green or green-or-amber - the same words as qa_tools/common/
+// replacement_setting.py's WORDS, each held to criterion 12's words by its
+// own side's test (tests-js/pass-warn-fail.test.js).
 const REPLACEMENT_WORDS = {never:"never", green:"when passing", "green-or-amber":"when passing or warning"};
 function replacementWords(value){
   if(!Object.prototype.hasOwnProperty.call(REPLACEMENT_WORDS, value)) throw new Error(`unknown replacement setting "${value}"`);
@@ -7945,7 +7946,7 @@ function noPromotedMarker(scope){
     });
   }));
   if(!by.size) return "";
-  return [...by.values()].map(({line, readers})=> `<div class="no-promoted-marker" data-no-promoted-marker="${escAttr(line.datasetId)}" style="margin-top:4px; font-size:12px; color:var(--ink); display:flex; align-items:center; gap:5px;">${pill("red","sm")}<span>${escHtml(`No promoted ${line.name || line.datasetId}: holds ${readers.size} ${readers.size === 1 ? "dataset" : "datasets"} red`)}</span></div>`).join("");
+  return [...by.values()].map(({line, readers})=> `<div class="no-promoted-marker" data-no-promoted-marker="${escAttr(line.datasetId)}" style="margin-top:4px; font-size:12px; color:var(--ink); display:flex; align-items:center; gap:5px;">${pill("red","sm")}<span>${escHtml(`No promoted ${line.name || line.datasetId}: holds ${readers.size} ${readers.size === 1 ? "dataset" : "datasets"} at Fail`)}</span></div>`).join("");
 }
 // THE READERS A CAUSING DATASET'S OWN NOTICE ENDS WITH (criterion 17): every
 // dataset of its collection whose line names it on the date on show.

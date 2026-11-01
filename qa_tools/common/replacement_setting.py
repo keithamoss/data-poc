@@ -36,8 +36,9 @@ PERMITS = {NEVER: frozenset(), GREEN: frozenset({"green"}),
 
 #: Each value as a person reads it (REQ-DASH-359 criterion 12): never the
 #: raw value green or green-or-amber, which are stored configuration. The
-#: page's REPLACEMENT_WORDS is held equal to this by tests/
-#: test_status_words_shown.py.
+#: page's REPLACEMENT_WORDS holds the same words; each side is held to
+#: criterion 12's words by its own test (tests/test_status_words_shown.py,
+#: tests-js/pass-warn-fail.test.js).
 WORDS = {NEVER: "never", GREEN: "when passing", GREEN_OR_AMBER: "when passing or warning"}
 
 

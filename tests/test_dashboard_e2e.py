@@ -2390,7 +2390,7 @@ class TestSupplyAndTableLevelSections:
         by_scope = {s["scope"]: s["status"] for s in self._sections(clean_page)}
         assert set(by_scope) == {"supply", "table", "cross-table"}
         for status in by_scope.values():
-            assert status in {"Green", "Amber", "Red", "No rule defined", "No data"}
+            assert status in {"Pass", "Warn", "Fail", "No rule defined", "No data"}
         # they are genuinely rolled up independently, not all three
         # showing the dataset's own status
         assert len(set(by_scope.values())) > 1
@@ -2854,7 +2854,7 @@ class TestTheExecutiveLegendCountsWhatIsActuallyThere:
         _goto(clean_page, built_dashboard_html, in_place_on=self.ALL_QUIET)
         statuses = clean_page.evaluate("() => DATA.agencies.map(a => a.status)")
         assert "green" not in statuses, "precondition - no agency should be green at this as-of"
-        assert re.search(r"Green[^(]*\(0\b", self._legend(clean_page)), (
+        assert re.search(r"Pass[^(]*\(0\b", self._legend(clean_page)), (
             f"legend claims green agencies that do not exist: {self._legend(clean_page)}")
 
     def test_the_quiet_states_are_named_and_counted(self, clean_page, built_dashboard_html):
@@ -3279,7 +3279,7 @@ class TestAnUncheckedColumnSaysSoAtEveryLevel:
     def test_the_pill_is_labelled_in_words_not_only_by_colour(self, clean_page,
                                                               built_dashboard_html):
         _goto(clean_page, built_dashboard_html, state=self.STATE)
-        assert clean_page.evaluate("() => STATUS_LABEL.inactive") == "No rule defined"
+        assert clean_page.evaluate("() => statusWords('inactive', 'label')") == "No rule defined"
 
 
 @pytest.mark.shared_page
@@ -3988,7 +3988,7 @@ class TestScenariosTab:
 
         assert "/scenarios" in clean_page.url
         body = clean_page.locator("#scenarios-panel-body").inner_text()
-        assert "which red was on purpose" in body.lower()
+        assert "which problems were on purpose" in body.lower()
         assert "TS-1" in body, body[:300]
 
     def test_an_entry_with_no_coordinates_is_plain_text_not_a_link(
@@ -4740,7 +4740,7 @@ class TestAHeldOrContestedDatasetReadsRed:
         assert got["status"] == "red"
         assert got["checks"] and got["checks"] != ["nodata"]
         text = " ".join(page.locator("#view").inner_text().split())
-        assert "The dataset stays red until a person resolves it" in text
+        assert "The dataset stays at Fail until a person resolves it" in text
 
     def test_its_check_panel_does_not_show_an_earlier_run_as_current(
             self, page, dashboard_html_with_blockers):
@@ -5227,20 +5227,20 @@ class TestTheDatasetPageSaysWhatItsTrendPlots:
 
         _goto(clean_page, built_dashboard_html, row["nav"], self._ON)
         trend = clean_page.locator('[data-unit-trend="dataset"]')
-        assert trend.locator(".unit-trend-title").inner_text().strip() == "Columns red and amber, each QA run"
+        assert trend.locator(".unit-trend-title").inner_text().strip() == "Columns failing and warning, each QA run"
         assert trend.locator(".chart-axis-title").inner_text().strip() == "% of columns"
         assert trend.locator(".legend-key").is_visible()
         trend.locator("[data-toggle-unit-table]").click()
         latest = trend.locator(".trend-table tbody tr").first.locator("td").all_inner_texts()
         assert [int(latest[1]), int(latest[2])] == [red, amber]
-        assert latest[3] == f"{n} of {m} not green"
+        assert latest[3] == f"{n} of {m} not passing"
 
         tile = clean_page.locator('.col-tile[data-status="red"], .col-tile[data-status="amber"]').first
         if tile.count() == 0:
             tile = clean_page.locator(".col-tile").first
         tile.click()
         panel = clean_page.locator('[data-unit-trend="column"]')
-        assert panel.locator(".unit-trend-title").inner_text().strip() == "Checks on this column red and amber, each QA run"
+        assert panel.locator(".unit-trend-title").inner_text().strip() == "Checks on this column failing and warning, each QA run"
         assert panel.locator(".chart-axis-title").inner_text().strip() == "% of checks"
         panel.locator("[data-toggle-unit-table]").click()
         cells = panel.locator(".trend-table tbody tr").first.locator("td").all_inner_texts()
@@ -5250,7 +5250,7 @@ class TestTheDatasetPageSaysWhatItsTrendPlots:
           return {red: has('red'), amber: has('amber'), counted: has('red') + has('amber') + has('green')};
         }""")
         assert [int(cells[1]), int(cells[2])] == [listed["red"], listed["amber"]]
-        assert cells[3].endswith(f"of {listed['counted']} not green")
+        assert cells[3].endswith(f"of {listed['counted']} not passing")
 
 
 class TestDatasetsNotGreenOnCardsAndHeadings:
@@ -6485,7 +6485,7 @@ class TestACrossTableCheckOnTS80:
         # ONE ROW FOR THE CHECK, its three tools as marks (REQ-DASH-272
         # criterion 6, amending REQ-DASH-264 criterion 2).
         assert len(rows) == 1, rows
-        assert "Notifications → Client Register" in rows[0] and "Green" in rows[0], rows
+        assert "Notifications → Client Register" in rows[0] and "Pass" in rows[0], rows
         # Criterion 7 as amended by REQ-DASH-272: where the result came from is
         # said in the row's accessible name (and the panel), every time.
         labels = [x for x in self._labels(clean_page) if x.startswith("Client reference")]
@@ -6533,7 +6533,7 @@ class TestACrossTableCheckOnTS80:
         rows = self._rows(clean_page, built_dashboard_html, "cp-clients", "2020-11-01")
         client_refs = [r for r in rows if r.startswith("Client reference")]
         assert len(client_refs) == 3, rows
-        assert any("Red" in r for r in client_refs), client_refs
+        assert any("Fail" in r for r in client_refs), client_refs
         labels = clean_page.locator('.scope-section[data-scope="cross-table"] .scope-check .bt')
         assert {t for t in labels.all_inner_texts() if t.startswith(("Notif", "Invest", "Place"))} == {
             "Notifications → Client Register", "Investigations → Client Register",
@@ -6562,7 +6562,7 @@ class TestACrossTableCheckOnTS80:
         assert "Checked 8:20am" not in labels
         # Criterion 5: the section's own pill follows its rows.
         head = clean_page.locator('.scope-section[data-scope="cross-table"] .head .pill')
-        assert "Red" in head.inner_text(), head.inner_text()
+        assert "Fail" in head.inner_text(), head.inner_text()
 
     def test_a_row_that_could_not_be_checked_names_both_of_the_pairs_files(
             self, clean_page, built_dashboard_html):
@@ -7034,7 +7034,7 @@ class TestNotInTheAgreementOnThePage:
         keys = listed.evaluate_all("els => els.map(e => e.dataset.check)")
         assert not ({e["checkId"].rsplit(".", 2)[-2] + "." + e["checkId"].rsplit(".", 1)[-1]
                      for e in mine} & set(keys)), keys
-        assert "neither red nor a result" in block.inner_text()
+        assert "neither a Fail nor a result" in block.inner_text()
 
     def test_a_later_run_that_ran_them_says_nothing(self, clean_page, built_dashboard_html):
         _goto(clean_page, built_dashboard_html)
@@ -7407,7 +7407,7 @@ class TestAnotherTableCouldNotBeRead:
         # is not in the warehouse - a second cause, a second line).
         markers = {m["attrs"]["data-no-promoted-marker"]: m["text"]
                    for m in _shown(clean_page, "[data-no-promoted-marker]")}
-        assert markers["cp-clients"].endswith("No promoted Client Register: holds 3 datasets red"), \
+        assert markers["cp-clients"].endswith("No promoted Client Register: holds 3 datasets at Fail"), \
             markers
         assert "Placements" not in markers["cp-clients"], "never each reader on the card"
         assert len(_shown(clean_page, '[data-no-promoted-marker="cp-clients"]')) == 1
@@ -7545,9 +7545,9 @@ class TestWarehouseAndStagingViews:
         # and every row. (The page's own pill also reads the deployment's
         # blockers, which a variant page embeds from the deployment.)
         head = clean_page.locator('.scope-section[data-scope="cross-table"] .head .pill')
-        assert head.inner_text().strip() == "Green", "S4: Clients reads Green"
+        assert head.inner_text().strip() == "Pass", "S4: Clients reads Pass"
         grid = _grid(clean_page)
-        assert all(r["pill"] == "Green" for r in grid["rows"]), grid["rows"]
+        assert all(r["pill"] == "Pass" for r in grid["rows"]), grid["rows"]
         assert grid["heads"] == ["Check", "Against what's in the warehouse"], grid["heads"]
         assert not any(r["empty"] for r in grid["rows"]), "no column of dashes"
         assert not any("5 August" in (r["warehouse"] or "") for r in grid["rows"]
@@ -7610,7 +7610,7 @@ class TestWarehouseAndStagingViews:
                                  "2024"), row
         assert row["warehouse"] == ("In the warehouse: Fail ✗ ✗ ✗ Investigations received "
                                     "Thursday, 25 July 2024 — why it is held back"), row
-        assert row["pill"] == "Red", row
+        assert row["pill"] == "Fail", row
         assert ("Read against the Investigations supply received 10:00am Monday, 5 August 2024, "
                 "not in place in the warehouse yet") in row["aria"], row["aria"]
         assert ("against the Investigations in place in the warehouse (received 10:00am Thursday, "
@@ -7810,13 +7810,13 @@ class TestRecheckedAfterWeFixedACheck:
         page = cp_pages.page()
         _goto(clean_page, page, state=self.C, in_place_on="2024-08-07")
         row = _row_of(clean_page, self.KEY_C2)
-        assert row["pill"].strip() == "Green", row
-        assert ("Arrived Red · re-checked Wednesday, 7 August 2024 by Keith Moss - our check "
+        assert row["pill"].strip() == "Pass", row
+        assert ("Arrived failing · re-checked Wednesday, 7 August 2024 by Keith Moss - our check "
                 "was wrong") in row["status"], row
         _goto(clean_page, page, state=self.C, in_place_on="2024-08-06")
         row = _row_of(clean_page, self.KEY_C2)
-        assert row["pill"].strip() == "Red", "the verdict that stood then"
-        assert ("Re-checked 10:30am Wednesday, 7 August 2024: became Green - our check was "
+        assert row["pill"].strip() == "Fail", "the verdict that stood then"
+        assert ("Re-checked 10:30am Wednesday, 7 August 2024: became Pass - our check was "
                 "wrong") in row["status"], row
         assert "Arrived" not in row["status"], row
         since = " ".join(t["text"] for t in _shown(clean_page, "[data-changed-since]"))
@@ -7835,7 +7835,7 @@ class TestRecheckedAfterWeFixedACheck:
         for on in ("2024-08-06", "2024-08-07"):
             _goto(clean_page, page, state=self.C, in_place_on=on)
             row = _row_of(clean_page, self.KEY_C2)
-            assert row["pill"].strip() == "Red", (on, row)
+            assert row["pill"].strip() == "Fail", (on, row)
             assert row["outcome"].strip() == "Waiting", (on, row)
         assert ("Re-checked Wednesday, 7 August 2024 by Keith Moss - just to be sure"
                 in row["status"]), row
@@ -7860,23 +7860,23 @@ class TestRecheckedAfterWeFixedACheck:
         page = cp_pages.page()
         _goto(clean_page, page, state=self.N, in_place_on="2024-08-09")
         (badge,) = _shown(clean_page, ".view-head [data-red-promoted] [data-red-promoted-why]")
-        assert badge["text"] == ("Went in green, re-checked Friday, 9 August 2024 by Keith Moss "
+        assert badge["text"] == ("Went in passing, re-checked Friday, 9 August 2024 by Keith Moss "
                                  "- the fix found more."), badge
         row = _row_of(clean_page, self.KEY_N1)
-        assert "Red promoted" in row["status"] and row["outcome"].startswith("Promoted"), row
+        assert "Promoted, failing" in row["status"] and row["outcome"].startswith("Promoted"), row
         # THE ROW DOES NOT REPEAT THE BADGE'S SENTENCE (Keith, 2026-10-29).
         assert row["status"].lower().count("re-checked friday, 9 august 2024 by keith moss") \
             == 1, row
         _goto(clean_page, page, state={"tier": "agency", "agencyId": CP_AGENCY},
               in_place_on="2024-08-09")
         markers = " ".join(m["text"] for m in _shown(clean_page, ".red-promoted-marker"))
-        assert "red promoted: Notifications" in markers, markers
+        assert "promoted while failing: Notifications" in markers, markers
 
         _goto(clean_page, page, state=self.N, in_place_on="2024-08-08")
         assert _shown(clean_page, ".view-head [data-red-promoted]") == []
         assert _shown(clean_page, "[data-turns-red-later]") == []
         (later,) = _shown(clean_page, ".view-head [data-rechecked-later]")
-        assert later["text"] == ("Re-checked 10:30am Friday, 9 August 2024: became Red - "
+        assert later["text"] == ("Re-checked 10:30am Friday, 9 August 2024: became Fail - "
                                  "the fix found more"), later
 
         cp_pages.at("2024-08-10T10:30:00+08:00")
@@ -7884,7 +7884,7 @@ class TestRecheckedAfterWeFixedACheck:
         page = cp_pages.page()
         _goto(clean_page, page, state=self.N, in_place_on="2024-08-10")
         (badge,) = _shown(clean_page, ".view-head [data-red-promoted] [data-red-promoted-why]")
-        assert badge["text"] == ("Went in green, re-checked Friday, 9 August 2024 by Keith Moss "
+        assert badge["text"] == ("Went in passing, re-checked Friday, 9 August 2024 by Keith Moss "
                                  "- the fix found more; acknowledged by Keith Moss, 10:30am "
                                  "Saturday, 10 August 2024."), badge
 
@@ -7906,7 +7906,7 @@ class TestRecheckedAfterWeFixedACheck:
         page = cp_pages.page()
         _goto(clean_page, page, state=self.N, in_place_on="2024-08-09")
         (tag,) = _shown(clean_page, ".view-head [data-rechecked-amber]")
-        assert tag["text"] == "Promoted green, re-checked amber - awaiting acknowledgement", tag
+        assert tag["text"] == "Promoted, then warning on re-check - awaiting acknowledgement", tag
         # RIGHT AFTER THE STATUS PILL AND BEFORE THE TURN-OFF MARKER (criterion
         # 9; post-build-review #283, L2 wave-2 critic 4 - "after any pill" held
         # whatever the order, the header carrying other pills before it). The
@@ -7934,13 +7934,13 @@ class TestRecheckedAfterWeFixedACheck:
         assert order["marker"] is not None, f"precondition: a turn-off marker shown {order}"
         assert order["tag"] == 1 and order["marker"] > order["tag"], order
         row = _row_of(clean_page, self.KEY_N1)
-        assert "Promoted green, re-checked amber - awaiting acknowledgement" in row["status"], row
+        assert "Promoted, then warning on re-check - awaiting acknowledgement" in row["status"], row
         cp_pages.at("2024-08-10T10:30:00+08:00")
         cp_pages.sc.acknowledge(v1["N1"], "2024-Q4", at="2024-08-10T10:30:00+08:00")
         page = cp_pages.page()
         _goto(clean_page, page, state=self.N, in_place_on="2024-08-10")
         (tag,) = _shown(clean_page, ".view-head [data-rechecked-amber]")
-        assert tag["text"] == "Promoted green, re-checked amber - acknowledged by Keith Moss", tag
+        assert tag["text"] == "Promoted, then warning on re-check - acknowledged by Keith Moss", tag
 
     def test_a_bulk_recheck_names_the_check_and_its_drawer_has_one_line(
             self, clean_page, cp_pages):
@@ -7960,9 +7960,9 @@ class TestRecheckedAfterWeFixedACheck:
         page = cp_pages.page()
         _goto(clean_page, page, state=self.C, in_place_on="2024-08-08")
         row = _row_of(clean_page, self.KEY_C2)
-        assert row["pill"].strip() == "Green", row
+        assert row["pill"].strip() == "Pass", row
         (name,) = row["links"]
-        assert f"Arrived Red · re-checked after we corrected {name}" in row["status"], row
+        assert f"Arrived failing · re-checked after we corrected {name}" in row["status"], row
         link = clean_page.locator(f'.supply-history tr[data-run-id*="{self.KEY_C2}"] a.recheck-check')
         assert link.get_attribute("href").startswith("#/agency/")
         link.click()
@@ -7983,8 +7983,8 @@ class TestRecheckedAfterWeFixedACheck:
         clean_page.wait_for_selector("#check-panel.open")
         assert _shown(clean_page, "#check-panel [data-bulk-recheck]") == []
         row = _row_of(clean_page, self.KEY_C2)
-        assert row["pill"].strip() == "Red", row
-        assert "Re-checked 10:30am Thursday, 8 August 2024: became Green - we " \
+        assert row["pill"].strip() == "Fail", row
+        assert "Re-checked 10:30am Thursday, 8 August 2024: became Pass - we " \
                f"corrected {name}" in row["status"], row
 
 
@@ -8003,7 +8003,7 @@ class TestTheUxCriticsFindingsOn7093c20:
         assert grid and grid["rows"], grid
         assert not [r for r in grid["rows"] if "held back" in (r["warehouse"] or "")], grid
         assert _shown(clean_page, "[data-held-back]") == []
-        assert not [r for r in grid["rows"] if r["pill"] == "Red"], grid["rows"]
+        assert not [r for r in grid["rows"] if r["pill"] == "Fail"], grid["rows"]
 
     def test_ts82_a_failed_re_check_is_its_own_root(self, clean_page, built_dashboard_html):
         """ROOT NAMING A on TS-82, 28 August 2017: the Client Register's notice
@@ -8089,7 +8089,7 @@ class TestTheUxCriticsFindingsOn7093c20:
         _goto(clean_page, built_dashboard_html, state={"tier": "exec"}, in_place_on="2019-11-01")
         (marker,) = _shown(clean_page, f'.card[data-agency="{CP_AGENCY}"] '
                                        '[data-no-promoted-marker="cp-clients"]')
-        assert marker["text"].endswith("No promoted Client Register: holds 3 datasets red"), marker
+        assert marker["text"].endswith("No promoted Client Register: holds 3 datasets at Fail"), marker
         assert marker["links"] == []
 
     def test_the_grid_headings_sit_over_their_columns(self, clean_page, built_dashboard_html):
@@ -8546,9 +8546,9 @@ class TestChecksThatReadAnotherCollection:
         assert why.count() == 1, f"{case}: no {status} label on the supply's row"
         assert want in why.inner_text(), f"{why.inner_text()!r} does not name {want!r}"
         if status == "amber":
-            assert why.inner_text().startswith("Went in green. Amber since ")
+            assert why.inner_text().startswith("Went in passing. Warning since ")
             assert clean_page.locator(f"{row} [data-amber-promoted] .pill.amber").inner_text() \
-                .strip() == "Amber promoted"
+                .strip() == "Promoted, warning"
 
         day_before = (date.fromisoformat(case["on"]) - timedelta(days=1)).isoformat()
         _goto(clean_page, built_dashboard_html, state=state, in_place_on=day_before)
@@ -8581,7 +8581,7 @@ class TestChecksThatReadAnotherCollection:
         assert any(w.startswith("Warn ") for ws in words.values() for w in ws), words
 
     def test_a_coverage_card_states_its_band_below(self, clean_page, built_dashboard_html):
-        """Criterion 13: a coverage check's card reads 'amber below 90%, red
+        """Criterion 13: a coverage check's card reads 'warn below 90%, fail
         below 85%' in the direction its result records - never 'warn > 90%'."""
         hx = _hierarchy_index()
         below = [ck for ck in _cross_table_checks(
@@ -8596,9 +8596,9 @@ class TestChecksThatReadAnotherCollection:
             card = clean_page.locator(f'.check-card[href$="/check/{ck["key"]}"]')
             assert card.count() == 1, f"no card for {ck['key']}"
             text = card.locator(".thresholds").inner_text()
-            for side, colour in (("warn", "amber"), ("fail", "red")):
+            for side in ("warn", "fail"):
                 v = ck["band"][side]["value"]
-                assert f"{colour} below {v:g}{ck['unit']}" in text, f"{ck['key']}: {text!r}"
+                assert f"{side} below {v:g}{ck['unit']}" in text, f"{ck['key']}: {text!r}"
             assert "warn >" not in text and "fail >" not in text, text
 
     def test_a_child_protection_page_says_not_yet_checked_before_the_release(
@@ -8920,3 +8920,244 @@ class TestCrossCollectionReviewFixes:
         assert got["words"], "precondition: an amber cell"
         assert set(got["words"]) == {got["warn"]}, got
         assert got["links"] and min(got["links"]) >= 24, got
+
+
+# ---- REQ-TEST-361: no colour word read as a status ---------------------------
+
+#: The tabs and drawers the guard does NOT scan, each with its reason
+#: (REQ-TEST-361 criterion 3; MAINTAINABILITY NFR): a new one is added here on
+#: purpose, never by accident. Plans, Feedback and Demo are tiers of their own
+#: and are simply not visited; the two below are drawers in every page's DOM.
+_GUARD_SKIPPED_DRAWERS = {
+    "#requirements-panel": "the Requirements tab shows the register's records as written",
+    "#changelog-panel": "the Release Notes tab shows past changelog entries as written",
+}
+#: The marked elements the guard passes over, each with its reason.
+_GUARD_SKIPPED_MARKS = {
+    "[data-recorded-text]": "recorded text shown as recorded (REQ-DASH-359 criterion 14): "
+                            "a decision's reason, a ticket comment, a check's changelog entry",
+    "[data-value-text]": "a data value, not a status - a failing row's key or a value bar's "
+                         "label; a synthetic surname such as 'Green' is data",
+}
+#: An element whose TITLE is recorded text (an acknowledgement's reason).
+_GUARD_SKIPPED_TITLE = "[data-recorded-title]"
+
+#: Reads everything a person can read on the page - textContent, so a group
+#: collapsed on load is covered; every title and aria-label; every SVG
+#: <title> - and returns each colour word with the element it sits in. Never
+#: source text, CSS or a comment (criterion 6): only what the DOM shows.
+_GUARD_SCAN = """(skip) => {
+  const COLOUR = /\\b(green|amber|red)\\b/i;
+  const skipped = el => !!(el && el.closest && el.closest(skip.blocks));
+  const name = el => {
+    if(!el || !el.tagName) return "?";
+    const attrs = [...el.attributes].filter(a => a.name.startsWith("data-") || a.name === "class")
+      .map(a => `${a.name}="${a.value}"`).slice(0, 3).join(" ");
+    return `<${el.tagName.toLowerCase()}${attrs ? " " + attrs : ""}>`;
+  };
+  const hits = [];
+  let scanned = 0;
+  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+  for(let n = walker.nextNode(); n; n = walker.nextNode()){
+    const el = n.parentElement;
+    if(!el || ["SCRIPT", "STYLE", "NOSCRIPT"].includes(el.tagName) || skipped(el)) continue;
+    const text = n.nodeValue || "";
+    scanned += text.trim().length;
+    const m = text.match(COLOUR);
+    if(m) hits.push({element: name(el), text: text.trim().slice(0, 160)});
+  }
+  document.querySelectorAll("[title], [aria-label]").forEach(el => {
+    if(skipped(el)) return;
+    for(const attr of ["title", "aria-label"]){
+      if(attr === "title" && el.closest(skip.title)) continue;
+      const v = el.getAttribute(attr);
+      if(v && COLOUR.test(v)) hits.push({element: name(el) + ` @${attr}`, text: v.slice(0, 160)});
+    }
+  });
+  return {scanned, hits, pills: document.querySelectorAll(".pill").length};
+}"""
+
+
+def _guard_skip() -> dict:
+    return {"blocks": ", ".join([*_GUARD_SKIPPED_DRAWERS, *_GUARD_SKIPPED_MARKS]),
+            "title": _GUARD_SKIPPED_TITLE}
+
+
+def _colour_words(page, where: str, *, pills: bool = True) -> list[str]:
+    """Every colour word a person can read on the page, as '<where>: <element>
+    "<text>"' - after asserting the page is not empty and holds a status pill,
+    so an empty page cannot pass (REQ-TEST-361 criterion 4; CLAUDE.md test
+    rule 3). Names the element and the matched text only, never a whole
+    sample (PRIVACY NFR)."""
+    got = page.evaluate(_GUARD_SCAN, _guard_skip())
+    assert got["scanned"] > 0, f"{where}: the page holds no text to scan"
+    if pills:
+        assert got["pills"] > 0, f"{where}: the page holds no status pill"
+    return [f"{where}: {h['element']} {h['text']!r}" for h in got["hits"]]
+
+
+def _hover_trends(page) -> list[str]:
+    """Hover one point of each check trend on the page and read its tooltip
+    (REQ-TEST-361 criterion 2: hover-only text)."""
+    said = []
+    for hit in page.locator("svg .hitrect").all()[:3]:
+        box = hit.bounding_box()
+        if not box:
+            continue
+        page.mouse.move(box["x"] + box["width"] * 0.9, box["y"] + box["height"] / 2)
+        svg_id = hit.evaluate("el => el.closest('svg').id")
+        tip = page.locator(f"#{svg_id}-tip")
+        if tip.count():
+            said.append(tip.text_content() or "")
+    return said
+
+
+#: The markers whose surfaces criterion 1 names, by the attribute each sets.
+_GUARD_SURFACES = {
+    "promoted-failing": "[data-red-promoted]",
+    "promoted-warning": "[data-amber-promoted]",
+    "acknowledgement owed": "[data-awaiting-acknowledgement]",
+    "re-checked worse": "[data-rechecked-amber], [data-red-promoted-recheck]",
+    "Arrived <X>": "[data-arrived-as]",
+    "Re-checked <t>: became <X>": "[data-rechecked-later]",
+}
+
+
+def _scenario_pages(page, html: Path):
+    """Every placed scenario's dataset page at its in-the-warehouse date, from
+    the page's own scenario map, in map order."""
+    hx = _hierarchy_index()
+    _goto(page, html)
+    entries = page.evaluate(
+        "() => (SCENARIO_MAP || []).filter(s => s.coordinates).map(s => ({id: s.id, ...s.coordinates}))")
+    assert entries, "precondition: the scenario map places at least one scenario"
+    for e in entries:
+        if e["dataset"] in hx["ds_col"]:
+            yield e, _dataset_state(hx, e["dataset"]), e["inPlaceOn"]
+
+
+@pytest.mark.needs_deployment
+class TestNoColourWordIsReadAsAStatus:
+    """REQ-TEST-361 criteria 1 to 4 and 6: the built dashboard, driven in a
+    real browser, shows no 'green', 'amber' or 'red' a person can read as a
+    status - collapsed groups and hover-only tooltips included, recorded text
+    and data values apart."""
+
+    def test_every_tier_the_scenarios_tab_and_one_dataset_page_per_collection(
+            self, clean_page, built_dashboard_html):
+        hx = _hierarchy_index()
+        hits: list[str] = []
+        _goto(clean_page, built_dashboard_html)
+        hits += _colour_words(clean_page, "Executive tier")
+        agencies = sorted(set(hx["ds_agency"].values()))
+        assert agencies, "precondition: the hierarchy names an agency"
+        for agency in agencies:
+            _goto(clean_page, built_dashboard_html, state={"tier": "agency", "agencyId": agency})
+            _open_groups(clean_page)
+            hits += _colour_words(clean_page, f"Agencies tier, {agency}")
+        _goto(clean_page, built_dashboard_html, state={"tier": "scenarios"})
+        hits += _colour_words(clean_page, "Scenarios tab", pills=False)
+        for collection in hx["order"]:
+            dataset = next(d for d, c in hx["ds_col"].items() if c == collection)
+            _goto(clean_page, built_dashboard_html, state=_dataset_state(hx, dataset))
+            _open_groups(clean_page)
+            hits += _colour_words(clean_page, f"dataset page, {dataset}")
+            for tip in _hover_trends(clean_page):
+                if re.search(r"\b(green|amber|red)\b", tip, re.I):
+                    hits.append(f"dataset page, {dataset}: chart tooltip {tip!r}")
+        assert not hits, "\n".join(hits)
+
+    def test_a_column_panel_its_trend_tooltip_and_the_cross_table_grid(
+            self, clean_page, built_dashboard_html):
+        hx = _hierarchy_index()
+        _goto(clean_page, built_dashboard_html, state=_dataset_state(hx, _LINKAGE_DATASET))
+        _open_groups(clean_page)
+        assert clean_page.locator(".xt-row").count(), "precondition: a cross-table grid row"
+        hits = _colour_words(clean_page, "cross-table grid")
+        tile = clean_page.locator(".col-tile").first
+        assert tile.count(), "precondition: a column tile"
+        tile.click()
+        clean_page.locator("#drawer[aria-hidden='false']").wait_for()
+        hits += _colour_words(clean_page, "column panel")
+        for tip in _hover_trends(clean_page):
+            if re.search(r"\b(green|amber|red)\b", tip, re.I):
+                hits.append(f"column panel: chart tooltip {tip!r}")
+        assert not hits, "\n".join(hits)
+
+    def test_the_scenario_pages_every_named_surface_and_scenario_j(
+            self, clean_page, built_dashboard_html):
+        """The promoted-failing, promoted-warning, acknowledgement-owed and
+        re-checked-worse supplies, an 'Arrived <X>' row and a 'Re-checked <t>:
+        became <X>' row - each found from the scenario map's pages and
+        asserted to exist (RELIABILITY NFR) - and scenario (j)'s period."""
+        hits: list[str] = []
+        seen: set[str] = set()
+        for entry, state, on in _scenario_pages(clean_page, built_dashboard_html):
+            _goto(clean_page, built_dashboard_html, state=state, in_place_on=on)
+            _open_groups(clean_page)
+            found = {k for k, sel in _GUARD_SURFACES.items() if clean_page.locator(sel).count()}
+            if not found - seen and entry["id"] != _NOT_SUPPLIED:
+                continue
+            seen |= found
+            hits += _colour_words(clean_page, f"{entry['id']} on {on}")
+            if seen == set(_GUARD_SURFACES) and entry["id"] == _NOT_SUPPLIED:
+                break
+        missing = set(_GUARD_SURFACES) - seen
+        assert not missing, f"no scenario page shows {sorted(missing)}"
+        coords = _scenario(clean_page, built_dashboard_html, _NOT_SUPPLIED)
+        hx = _hierarchy_index()
+        _goto(clean_page, built_dashboard_html, state=_dataset_state(hx, _LINKAGE_DATASET),
+              in_place_on=coords["inPlaceOn"])
+        _open_groups(clean_page)
+        hits += _colour_words(clean_page, f"scenario (j) {_NOT_SUPPLIED} on {coords['period']}")
+        assert not hits, "\n".join(hits)
+
+    def test_the_needs_action_queue_and_its_markers(self, clean_page, built_dashboard_html):
+        _goto(clean_page, built_dashboard_html)
+        assert clean_page.locator("[data-outstanding], .outstanding-marker, .queue-head").count(), (
+            "precondition: the needs-action queue or a marker is on the page")
+        hits = _colour_words(clean_page, "needs-action queue")
+        assert not hits, "\n".join(hits)
+
+
+@pytest.mark.needs_deployment
+class TestTheColourWordGuardCanFail:
+    """REQ-TEST-361 criterion 4: the guard fails when a colour word comes
+    back - restoring the literal 'Red promoted' in the template, and a raw
+    stored value printed as 'Arrived ${entry.status}'. Each page is the real
+    embed() of a copy of the template carrying that one regression."""
+
+    def _variant(self, built_dashboard_html, tmp_path, monkeypatch, old: str, new: str) -> Path:
+        from dashboard import embed_dashboard_data as edd
+
+        source = TEMPLATE_HTML.read_text()
+        assert source.count(old) >= 1, f"precondition: the template says {old!r}"
+        copy = tmp_path / "template.html"
+        copy.write_text(source.replace(old, new))
+        monkeypatch.setattr(edd, "TEMPLATE_HTML", str(copy))
+        return _embed_variant(built_dashboard_html, tmp_path / "out")
+
+    def _first_page_with(self, page, html: Path, selector: str):
+        for entry, state, on in _scenario_pages(page, html):
+            _goto(page, html, state=state, in_place_on=on)
+            if page.locator(selector).count():
+                return entry
+        raise AssertionError(f"precondition: no scenario page shows {selector}")
+
+    def test_restoring_red_promoted_fails_it(self, clean_page, built_dashboard_html, tmp_path,
+                                              monkeypatch):
+        html = self._variant(built_dashboard_html, tmp_path, monkeypatch,
+                             '<span class="ico"></span>Promoted, failing</span>',
+                             '<span class="ico"></span>Red promoted</span>')
+        entry = self._first_page_with(clean_page, html, "[data-red-promoted]")
+        hits = _colour_words(clean_page, entry["id"])
+        assert any("Red promoted" in h for h in hits), hits
+
+    def test_restoring_a_raw_value_leak_fails_it(self, clean_page, built_dashboard_html, tmp_path,
+                                                  monkeypatch):
+        html = self._variant(built_dashboard_html, tmp_path, monkeypatch,
+                             'Arrived ${statusWords(entry.status, "verb")}',
+                             "Arrived ${entry.status}")
+        entry = self._first_page_with(clean_page, html, "[data-arrived-as]")
+        hits = _colour_words(clean_page, entry["id"])
+        assert any(re.search(r"Arrived (green|amber|red)", h) for h in hits), hits

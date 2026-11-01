@@ -110,3 +110,13 @@ describe("a supply-history row", () => {
     noStoredValue(text);
   });
 });
+
+describe("a replacement setting's value (criterion 12)", () => {
+  it("is said in words, never as the raw green or green-or-amber", () => {
+    const w = withRaw({});
+    expect(w.replacementWords("never")).toBe("never");
+    expect(w.replacementWords("green")).toBe("when passing");
+    expect(w.replacementWords("green-or-amber")).toBe("when passing or warning");
+    expect(() => w.replacementWords("amber")).toThrow(/unknown replacement setting/);
+  });
+});
