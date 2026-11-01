@@ -2,6 +2,7 @@
 name (REQ-PIPE-202 criteria 1, 2 and 11)."""
 from __future__ import annotations
 
+import asset_folders
 import pytest
 import yaml
 
@@ -28,7 +29,7 @@ class TestThePattern:
         assert arrival_patterns.dataset_for_filename(name) is None
 
     def test_the_pattern_and_its_comment_in_the_configuration(self):
-        text = (ROOT / "contract" / "data-asset.yaml").read_text()
+        text = (asset_folders.real_folder() / "data-asset.yaml").read_text()
         doc = yaml.safe_load(text)
         found = [ds for agency in doc["hierarchy"]["agencies"]
                  for col in agency["collections"] for ds in col["datasets"]

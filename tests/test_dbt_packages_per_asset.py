@@ -6,6 +6,7 @@ package, so installing it needs no network.
 """
 from __future__ import annotations
 
+import asset_folders
 import subprocess
 from pathlib import Path
 
@@ -25,7 +26,7 @@ def an_asset(tmp_path, monkeypatch) -> Path:
     root = tmp_path / "assets"
     folder = root / "one"
     folder.mkdir(parents=True)
-    for entry in (ROOT / "contract").iterdir():
+    for entry in (asset_folders.real_folder()).iterdir():
         (folder / entry.name).symlink_to(entry)
     (folder / "collections").symlink_to(ROOT / "qa_tools" / "collections")
     dbt = folder / "dbt"

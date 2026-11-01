@@ -9,8 +9,8 @@ untouched.
 """
 from __future__ import annotations
 
+import asset_folders
 from datetime import date, datetime, timedelta
-from pathlib import Path
 
 import pytest
 import yaml
@@ -18,7 +18,7 @@ import yaml
 from qa_tools.common import agreement, asset_time, in_force, period_overlap, schedule, slots
 from tests import before_growth
 
-REAL = Path(__file__).resolve().parent.parent / "contract" / "calendar.yaml"
+REAL = asset_folders.real_folder() / "calendar.yaml"
 
 
 def _with(tmp_path, dataset_id="cp-clients", versions=None, first=None):

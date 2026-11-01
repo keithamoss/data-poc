@@ -8,9 +8,9 @@ functions those screens call.
 """
 from __future__ import annotations
 
+import asset_folders
 import shutil
 from datetime import UTC, date, datetime
-from pathlib import Path
 
 import pytest
 import yaml
@@ -19,7 +19,7 @@ from click.testing import CliRunner
 from cli import schedule as schedule_cli
 from qa_tools.common import agreement, files_go
 
-REAL = Path(__file__).resolve().parent.parent / "contract"
+REAL = asset_folders.real_folder()
 
 
 @pytest.fixture(autouse=True)

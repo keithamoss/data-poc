@@ -12,6 +12,8 @@ hard failure scoped to one dataset.
 """
 from __future__ import annotations
 
+import asset_folders
+
 from datetime import date
 
 import pytest
@@ -50,7 +52,7 @@ def q1_2028_authored(tmp_path, monkeypatch):
     import shutil
 
     contract_dir = tmp_path / "contract"
-    shutil.copytree("contract", contract_dir)
+    shutil.copytree(asset_folders.real_folder(), contract_dir)
     doc = agreement_split.merged_view(contract_dir)
     quarterly = next(c for c in doc["calendars"] if c["name"] == "quarterly")
     quarterly["versions"][-1]["dates"].append({"period": "2028-Q1", "date": "2028-02-01"})
@@ -164,7 +166,7 @@ class TestItWarnsOncePerCalendarNotOncePerDataset:
 
 
         contract_dir = tmp_path / "contract"
-        shutil.copytree("contract", contract_dir)
+        shutil.copytree(asset_folders.real_folder(), contract_dir)
         doc = agreement_split.merged_view(contract_dir)
         # A second authored calendar, also nearly out, with one dataset
         # on it. NEARLY out rather than fully out, and the dates below
@@ -227,7 +229,7 @@ class TestTheThresholdIsConfigurable:
 
 
         contract_dir = tmp_path / "contract"
-        shutil.copytree("contract", contract_dir)
+        shutil.copytree(asset_folders.real_folder(), contract_dir)
         doc = agreement_split.merged_view(contract_dir)
         next(c for c in doc["calendars"] if c["name"] == "quarterly")["runway_warning_slots"] = 1
         agreement_split.repoint(monkeypatch, contract_dir, doc)
@@ -241,7 +243,7 @@ class TestTheThresholdIsConfigurable:
 
 
         contract_dir = tmp_path / "contract"
-        shutil.copytree("contract", contract_dir)
+        shutil.copytree(asset_folders.real_folder(), contract_dir)
         doc = agreement_split.merged_view(contract_dir)
         next(c for c in doc["calendars"] if c["name"] == "quarterly")["runway_warning_slots"] = 0
         agreement_split.repoint(monkeypatch, contract_dir, doc)

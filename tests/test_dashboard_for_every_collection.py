@@ -12,6 +12,8 @@ and their output is proved unchanged by the equivalence capture.
 """
 from __future__ import annotations
 
+from qa_tools.common import assets
+
 import json
 
 import pytest
@@ -175,7 +177,7 @@ class TestAThirdCollectionIsLinked:
     def test_its_dataset_and_agency_get_links_from_the_registry(self, described):
         from qa_tools.common import github_links
 
-        links = github_links.build_folder_links(sha="abc123", root=hierarchy.data_asset_yaml().parent.parent)
+        links = github_links.build_folder_links(sha="abc123", root=assets.ROOT)
         assert links["agencies"][FAKE_AGENCY].endswith(f"/tree/abc123/contract/{FAKE_AGENCY}")
         assert links["datasets"][FAKE_DATASET].startswith(
             f"https://github.com/keithamoss/data-poc/blob/abc123/contract/{FAKE_AGENCY}/")

@@ -12,9 +12,9 @@ contract's slaProperties, which this requirement deletes outright.
 """
 from __future__ import annotations
 
+import asset_folders
 import shutil
 from datetime import date, timedelta
-from pathlib import Path
 
 import pytest
 import yaml
@@ -23,7 +23,7 @@ from qa_tools.common import agreement, schedule, slots
 from qa_tools.common.validate_schedule import Source, validate
 from tests import before_growth
 
-REAL_CONTRACT_DIR = Path(__file__).resolve().parent.parent / "contract"
+REAL_CONTRACT_DIR = asset_folders.real_folder()
 
 
 # ---- the loader ------------------------------------------------------

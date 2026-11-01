@@ -8,9 +8,9 @@ schedule gate - or the slots - what follows. The real file is untouched.
 """
 from __future__ import annotations
 
+import asset_folders
 import shutil
 from datetime import date
-from pathlib import Path
 
 import pytest
 import yaml
@@ -19,7 +19,7 @@ from qa_tools.common import agreement, schedule, slots
 from qa_tools.common.validate_schedule import (NOT_EXPECTED_PLACEHOLDER, Source,
                                                 fall_lines, validate)
 
-REAL = Path(__file__).resolve().parent.parent / "contract"
+REAL = asset_folders.real_folder()
 CP = ("cp-carers", "cp-case-workers", "cp-clients", "cp-investigations",
       "cp-notifications", "cp-placements")
 

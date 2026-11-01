@@ -9,6 +9,8 @@ declares no adapter at all, for the refusal half of the criterion.
 """
 from __future__ import annotations
 
+from qa_tools.common import assets
+
 import shutil
 import types
 
@@ -44,9 +46,10 @@ def _hierarchy(tmp_path, *, bare: bool) -> None:
     contract_dir = tmp_path / "contract"
     for c in collections.all_collections():
         for kind in ("contract", "soda", "evidently"):
-            dest = tmp_path / c.check_file(kind)
+            # Into the test's own asset folder, laid out as the real one.
+            dest = contract_dir / c.agency_id / c.check_file(kind).rsplit("/", 1)[-1]
             dest.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy(hierarchy.data_asset_yaml().parent.parent / c.check_file(kind), dest)
+            shutil.copy(assets.ROOT / c.check_file(kind), dest)
     agencies = doc["hierarchy"]["agencies"]
     stems = [("fake-things", True)] + ([("bare-things", True)] if bare else [])
     (contract_dir / "fake-agency").mkdir()

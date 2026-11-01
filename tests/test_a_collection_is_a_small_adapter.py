@@ -18,6 +18,7 @@ half. The copy reuses this checkout's interpreter, dbt packages and browser.
 
 from __future__ import annotations
 
+import asset_folders
 import json
 import os
 import subprocess
@@ -219,7 +220,7 @@ class TestNothingReachesTheRepository:
     """Criterion 6."""
 
     def test_the_real_hierarchy_never_names_it(self, copy):
-        assert fake_collection.COLLECTION_ID not in (ROOT / "contract" / "data-asset.yaml").read_text()
+        assert fake_collection.COLLECTION_ID not in (asset_folders.real_folder() / "data-asset.yaml").read_text()
         assert copy.tree != ROOT
 
     @pytest.mark.parametrize("name", ["data", "reports"])

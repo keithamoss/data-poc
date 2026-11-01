@@ -8,15 +8,15 @@ days before; the real file is untouched.
 """
 from __future__ import annotations
 
+import asset_folders
 import shutil
-from pathlib import Path
 
 import pytest
 import yaml
 
 from qa_tools.common.validate_schedule import Source, validate
 
-REAL = Path(__file__).resolve().parent.parent / "contract"
+REAL = asset_folders.real_folder()
 
 
 @pytest.fixture

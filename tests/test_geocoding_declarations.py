@@ -4,6 +4,7 @@ thing, and asks the gate the collections gate calls; the real files are
 untouched. Nothing here reads supply rows or the database."""
 from __future__ import annotations
 
+import asset_folders
 import shutil
 from pathlib import Path
 
@@ -20,7 +21,7 @@ GEO = ("geo-cp-clients", "geo-ed-presentations")
 
 @pytest.fixture
 def repo(tmp_path):
-    shutil.copytree(REAL / "contract", tmp_path / "contract")
+    shutil.copytree(asset_folders.real_folder(), tmp_path / "contract")
     return tmp_path
 
 
@@ -138,7 +139,7 @@ class TestTheDeclarations:
             assert "SYNTHETIC" in text and "geocoding product" in text and "no address" in text
         purpose = doc["description"]["purpose"]
         assert "linkage" in purpose and "geocoding release" in purpose
-        pres = yaml.safe_load((REAL / "contract" / "presentation.yaml").read_text())
+        pres = yaml.safe_load((asset_folders.real_folder() / "presentation.yaml").read_text())
         provenance = next(v for k, v in _walk_presentation(pres) if k == "linkage-products")["provenance"]
         assert "linkage and geocoding releases" in provenance
 

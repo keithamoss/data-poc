@@ -26,7 +26,7 @@ ROOT = vs.ROOT
 @pytest.fixture
 def sydney(tmp_path, monkeypatch):
     """The asset's clock in Sydney; everything else the real configuration."""
-    doc = yaml.safe_load((ROOT / "contract" / "data-asset.yaml").read_text())
+    doc = yaml.safe_load((asset_folders.real_folder() / "data-asset.yaml").read_text())
     doc["timezone"] = {"versions": [{
         "effective_from": "1970-01-01", "zone": "Australia/Sydney",
         "changelog": [{"date": "2026-10-11", "author": "pytest", "change": "test"}]}]}
@@ -76,7 +76,7 @@ class TestSettingsChangelogsAreStructured:
     """Criteria 16 and 17."""
 
     def _doc(self):
-        return yaml.safe_load((ROOT / "contract" / "data-asset.yaml").read_text())
+        return yaml.safe_load((asset_folders.real_folder() / "data-asset.yaml").read_text())
 
     def test_a_plain_string_entry_is_refused(self):
         doc = self._doc()

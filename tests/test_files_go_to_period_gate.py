@@ -6,15 +6,15 @@ in one way and requires the gate to name it. The real file is untouched.
 """
 from __future__ import annotations
 
+import asset_folders
 import shutil
-from pathlib import Path
 
 import pytest
 import yaml
 
 from qa_tools.common.validate_schedule import Source, validate
 
-REAL = Path(__file__).resolve().parent.parent / "contract"
+REAL = asset_folders.real_folder()
 
 
 def _v(effective_from, value):
@@ -223,7 +223,7 @@ class TestAdoptingTheKeyOnFrozenHistory:
         old_asset["synthetic"] = new_asset["synthetic"] = synthetic
         return freeze.check(old_cal, new_cal, old_asset, new_asset, people,
                             instant_of=lambda key: self.AT, today=self.AT.date(),
-                            base_codeowners=(REAL.parent / ".github" / "CODEOWNERS").read_text())
+                            base_codeowners=(REAL.parent.parent / ".github" / "CODEOWNERS").read_text())
 
     def _with(self, cal, values, eff="2000-01-01"):
         new = self._copy.deepcopy(cal)

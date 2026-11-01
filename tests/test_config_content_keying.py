@@ -25,7 +25,7 @@ from qa_tools.common import (agreement, arrival_patterns, asset_time, config_yam
 from qa_tools.tools import run_datacontract, run_dbt
 
 REAL = Path(__file__).resolve().parent.parent
-CONTRACT = REAL / "contract"
+CONTRACT = asset_folders.real_folder()
 CP_CONTRACT = CONTRACT / "child-protection-family-support" / "child-protection-contract.yaml"
 CP_SCHEMA = REAL / "assets" / "quarterly" / "dbt" / "models" / "child-protection" / "schema.yml"
 

@@ -4,6 +4,7 @@ contract folder, changes one thing, and asks the gate - the collections gate
 calls the same function. The real files are untouched."""
 from __future__ import annotations
 
+import asset_folders
 import shutil
 from pathlib import Path
 
@@ -17,7 +18,7 @@ REAL = Path(__file__).resolve().parent.parent
 
 @pytest.fixture
 def repo(tmp_path):
-    shutil.copytree(REAL / "contract", tmp_path / "contract")
+    shutil.copytree(asset_folders.real_folder(), tmp_path / "contract")
     return tmp_path
 
 

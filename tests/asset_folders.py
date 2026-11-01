@@ -92,3 +92,11 @@ class pointed:
 
     def __exit__(self, *exc) -> None:
         assets.restore(self.before)
+
+
+def real_folder() -> Path:
+    """The selected asset's committed configuration folder,
+    assets/<asset>/ - what a test reading "the real one" reads since the
+    split (it was contract/). Asked when called, so a module evaluating it at
+    import gets the asset it is imported under (tests/conftest.py)."""
+    return Path(__file__).resolve().parent.parent / "assets" / assets.selected().name

@@ -208,6 +208,27 @@ def pytest_collection_finish(session):
     os.environ[_assets.ASSET_ENV] = TEST_ASSET
 
 
+#: The worker's own database and the asset its identity row names - marked for
+#: the suite's asset at session start (supply_dsn), and re-marked for the
+#: asset a test selects whenever that differs, so a test of either asset
+#: passes the identity guard (REQ-PIPE-107) on its own worker's database and
+#: no other. Only the worker's database is ever re-marked.
+_WORKER_DB: dict = {}
+
+
+def _mark_worker_db_for(asset: str) -> None:
+    import psycopg
+
+    from qa_tools.common import db_identity, supply_db
+
+    dsn = _WORKER_DB.get("dsn")
+    if not dsn or _WORKER_DB.get("asset") == asset or os.environ.get(supply_db.SUPPLY_DSN_ENV) != dsn:
+        return
+    with psycopg.connect(dsn, autocommit=True) as conn:
+        db_identity.mark(conn, db_identity.Identity(asset, "test"))
+    _WORKER_DB["asset"] = asset
+
+
 def asset_of(node) -> str:
     """The asset a test acts for: its closest `asset` marker's, or the suite's."""
     mark = node.get_closest_marker("asset")
@@ -228,6 +249,7 @@ def selected_asset(monkeypatch, request):
     _assets.use_root(None)
     _assets.release_claim()
     asset_cli.rebuild_for_selected()
+    _mark_worker_db_for(asset)
     yield asset
     _assets.use_root(None)
     _assets.release_claim()
@@ -408,6 +430,7 @@ def supply_dsn(worker_id, stated_test_environment):
     # empty by design, so building from it produces an empty dashboard.
     globals()["DEPLOYMENT_SUPPLY_DSN"] = before
     os.environ[supply_db.SUPPLY_DSN_ENV] = dsn
+    _WORKER_DB.update(dsn=dsn, asset=TEST_ASSET)
     yield dsn
     if before is None:
         os.environ.pop(supply_db.SUPPLY_DSN_ENV, None)

@@ -11,6 +11,7 @@ itself.
 """
 from __future__ import annotations
 
+import asset_folders
 import importlib.util
 import os
 import re
@@ -81,7 +82,7 @@ class TestTheFixture:
         assert len({c["agency_id"] for c in thirty_collections.added()}) >= 5
 
     def test_it_writes_nothing_to_the_repository(self, thirty):
-        real = (ROOT / "contract" / "data-asset.yaml").read_text()
+        real = (asset_folders.real_folder() / "data-asset.yaml").read_text()
         added = thirty_collections.added()
         assert added and not [c["id"] for c in added if c["id"] in real]
         for c in thirty_collections.added():

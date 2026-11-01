@@ -10,10 +10,10 @@ collection, which is the change REQ-PIPE-181 exists to make one edit.
 """
 from __future__ import annotations
 
+import asset_folders
 import copy
 import shutil
 from datetime import date, timedelta
-from pathlib import Path
 
 import pytest
 import yaml
@@ -22,7 +22,7 @@ from qa_tools.common import agreement, schedule, slots
 from qa_tools.common.validate_schedule import Source, validate
 from tests import before_growth
 
-REAL_CONTRACT_DIR = Path(__file__).resolve().parent.parent / "contract"
+REAL_CONTRACT_DIR = asset_folders.real_folder()
 LOG = [{"date": "2023-01-01", "author": "a test", "change": "a test"}]
 
 
@@ -415,7 +415,7 @@ class TestACollectionsDefaultsFreeze:
         people = yaml.safe_load((REAL_CONTRACT_DIR / "people.yaml").read_text())
         new_cal = copy.deepcopy(old_cal)
         change(new_cal)
-        codeowners = (REAL_CONTRACT_DIR.parent / ".github" / "CODEOWNERS").read_text()
+        codeowners = (REAL_CONTRACT_DIR.parent.parent / ".github" / "CODEOWNERS").read_text()
         return freeze.check(old_cal, new_cal, asset, copy.deepcopy(asset), people,
                             instant_of=lambda key: at, today=at.date(),
                             base_codeowners=codeowners)

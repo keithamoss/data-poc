@@ -24,6 +24,7 @@ workers a class at a time (REQ-TEST-281).
 """
 from __future__ import annotations
 
+import asset_folders
 import json
 import re
 import os
@@ -8331,7 +8332,7 @@ def _hierarchy_index() -> dict:
     names}, from the asset's own hierarchy."""
     import yaml
 
-    h = yaml.safe_load((ROOT / "contract" / "data-asset.yaml").read_text())["hierarchy"]
+    h = yaml.safe_load((asset_folders.real_folder() / "data-asset.yaml").read_text())["hierarchy"]
     order, col_name, ds_col, ds_name, ds_agency = [], {}, {}, {}, {}
     for ag in h["agencies"]:
         for c in ag.get("collections") or []:

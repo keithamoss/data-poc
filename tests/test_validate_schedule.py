@@ -13,6 +13,7 @@ gets tested against a shape nobody uses.
 """
 from __future__ import annotations
 
+import asset_folders
 import copy
 from datetime import date
 import shutil
@@ -25,7 +26,7 @@ from qa_tools.common import validate_schedule
 import agreement_split
 from qa_tools.common.validate_schedule import Source, validate
 
-REAL_CONTRACT_DIR = Path(__file__).resolve().parent.parent / "contract"
+REAL_CONTRACT_DIR = asset_folders.real_folder()
 
 
 @pytest.fixture
@@ -836,7 +837,7 @@ class TestTheDiffBase:
 
         monkeypatch.setenv("MOTHMAN_DIFF_BASE", "HEAD")
         monkeypatch.setattr(mod, "_content_at", spy)
-        src = Source(mod.ROOT / "contract" / "data-asset.yaml", REAL_CONTRACT_DIR)
+        src = Source(asset_folders.real_folder() / "data-asset.yaml", REAL_CONTRACT_DIR)
         mod._freeze_errors({}, {}, src)
         assert seen and set(seen) == {"HEAD"}, (
             f"the past-date guard compared against {seen} - a push of several "

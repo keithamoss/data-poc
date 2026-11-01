@@ -12,15 +12,15 @@ worked example).
 """
 from __future__ import annotations
 
+import asset_folders
 from datetime import date, datetime, timedelta
-from pathlib import Path
 
 import pytest
 import yaml
 
 from qa_tools.common import agreement, asset_time, assignment, schedule, slots
 
-REAL = Path(__file__).resolve().parent.parent / "contract" / "calendar.yaml"
+REAL = asset_folders.real_folder() / "calendar.yaml"
 
 
 def _offset_version(effective_from, value, author="a test"):

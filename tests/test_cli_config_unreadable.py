@@ -30,7 +30,7 @@ runpy.run_module("cli.app", run_name="__main__")
 
 
 def _broken_copy(tmp_path: Path) -> Path:
-    text = (ROOT / "contract" / "data-asset.yaml").read_text()
+    text = (asset_folders.real_folder() / "data-asset.yaml").read_text()
     lines = text.split("\n")
     i = next(n for n, line in enumerate(lines) if line.startswith("timezone:"))
     lines[i] = "   " + lines[i]

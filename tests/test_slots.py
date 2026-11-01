@@ -7,6 +7,7 @@ is that sentence in a different form.
 """
 from __future__ import annotations
 
+import asset_folders
 from datetime import date, datetime, timedelta, timezone
 
 import pytest
@@ -198,7 +199,7 @@ class TestNotExpectedMeansNoSlot:
         # not the other leaves the tree looking for contracts that are
         # not beside it.
         contract_dir = tmp_path / "contract"
-        shutil.copytree("contract", contract_dir)
+        shutil.copytree(asset_folders.real_folder(), contract_dir)
         doc = agreement_split.merged_view(contract_dir)
         for agency in doc["hierarchy"]["agencies"]:
             for collection in agency["collections"]:
@@ -301,7 +302,7 @@ class TestTheClaimWindowIsEffectiveDated:
         import shutil
 
         contract_dir = tmp_path / "contract"
-        shutil.copytree("contract", contract_dir)
+        shutil.copytree(asset_folders.real_folder(), contract_dir)
         # The participation is a stand-in - 09:00, no grace, no override -
         # because the timing that matters here comes from the calendar.
         agreement_split.repoint(monkeypatch, contract_dir, self._two_windows(),

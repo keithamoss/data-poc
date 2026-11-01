@@ -7,15 +7,15 @@ one implementation every route shares (filing_decisions.apply).
 """
 from __future__ import annotations
 
+import asset_folders
 import copy
-from pathlib import Path
 
 import pytest
 import yaml
 
 from qa_tools.common import filing_decisions, people, validate_people
 
-REAL = Path(__file__).resolve().parent.parent / "contract" / "people.yaml"
+REAL = asset_folders.real_folder() / "people.yaml"
 KEITH = "fpycnkgvmt@privaterelay.appleid.com"
 
 

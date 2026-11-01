@@ -3,6 +3,7 @@
 TestTheApprover; this is the committed file and its parser."""
 from __future__ import annotations
 
+import asset_folders
 from pathlib import Path
 
 import pytest
@@ -24,7 +25,7 @@ class TestTheCommittedFile:
     def test_every_owner_of_the_agreement_is_an_approver_in_people_yaml(self):
         """Criterion 2's match goes through people.yaml's github field, so a
         code owner nobody can name as approver is a file out of step."""
-        people = yaml.safe_load((ROOT / "contract" / "people.yaml").read_text())
+        people = yaml.safe_load((asset_folders.real_folder() / "people.yaml").read_text())
         handles = {str(p.get("github", "")).lower() for p in freeze.approvers(people)}
         assert freeze.code_owners(CODEOWNERS, "contract/calendar.yaml") <= handles
 
@@ -87,9 +88,9 @@ class TestCriticFindingsOn174:
         import copy
         from datetime import date, datetime, timedelta, timezone
 
-        cal = yaml.safe_load((ROOT / "contract" / "calendar.yaml").read_text())
-        asset = yaml.safe_load((ROOT / "contract" / "data-asset.yaml").read_text())
-        people_doc = yaml.safe_load((ROOT / "contract" / "people.yaml").read_text())
+        cal = yaml.safe_load((asset_folders.real_folder() / "calendar.yaml").read_text())
+        asset = yaml.safe_load((asset_folders.real_folder() / "data-asset.yaml").read_text())
+        people_doc = yaml.safe_load((asset_folders.real_folder() / "people.yaml").read_text())
         new = copy.deepcopy(cal)
         quarterly = next(c for c in new["calendars"] if c["name"] == "quarterly")
         for d in quarterly["versions"][-1]["dates"]:

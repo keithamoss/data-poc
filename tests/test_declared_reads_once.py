@@ -10,6 +10,7 @@ never seen again in that process.
 """
 from __future__ import annotations
 
+import asset_folders
 import shutil
 
 import pytest
@@ -71,7 +72,7 @@ class TestAnEditedCheckIsSeen:
             if src.exists():
                 (tmp_path / rel).parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy(src, tmp_path / rel)
-        shutil.copytree(vcl.ROOT / "contract", tmp_path / "contract", dirs_exist_ok=True)
+        shutil.copytree(asset_folders.real_folder(), tmp_path / "contract", dirs_exist_ok=True)
         monkeypatch.setattr(vcl, "ROOT", tmp_path)
         before = tables_read.declared_reads()
         calls = _counting(monkeypatch)

@@ -9,9 +9,9 @@ runs. The approvers are the real contract/people.yaml's.
 """
 from __future__ import annotations
 
+import asset_folders
 import copy
 from datetime import datetime, timedelta, timezone
-from pathlib import Path
 
 import pytest
 import yaml
@@ -19,7 +19,7 @@ import yaml
 from qa_tools.common import agreement_freeze as freeze
 from tests import before_growth
 
-CONTRACT = Path(__file__).resolve().parent.parent / "contract"
+CONTRACT = asset_folders.real_folder()
 PERTH = timezone(timedelta(hours=8))
 #: The night this was built.
 NOW = datetime(2026, 10, 11, 3, 0, tzinfo=PERTH)
@@ -37,7 +37,7 @@ def _load(name):
 
 
 #: The real committed .github/CODEOWNERS, as the base (REQ-GHUB-174).
-CODEOWNERS = (CONTRACT.parent / ".github" / "CODEOWNERS").read_text()
+CODEOWNERS = (CONTRACT.parent.parent / ".github" / "CODEOWNERS").read_text()
 
 
 @pytest.fixture

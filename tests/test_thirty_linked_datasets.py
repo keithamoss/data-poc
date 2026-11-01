@@ -24,6 +24,7 @@ are never touched.
 
 from __future__ import annotations
 
+import asset_folders
 import csv
 import json
 import os
@@ -326,7 +327,7 @@ class TestNoProductFileChanged:
         assert _snapshot(ROOT / name) == copy.before[name]
 
     def test_the_real_hierarchy_never_names_them(self, copy):
-        assert fx.PRODUCT["collection"] not in (ROOT / "contract" / "data-asset.yaml").read_text()
+        assert fx.PRODUCT["collection"] not in (asset_folders.real_folder() / "data-asset.yaml").read_text()
         assert copy.tree != ROOT
 
 

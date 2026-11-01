@@ -4,6 +4,7 @@ test copies the real configuration, changes one thing and asks the gate; the
 real files are untouched."""
 from __future__ import annotations
 
+import asset_folders
 import shutil
 from pathlib import Path
 
@@ -18,7 +19,7 @@ SCHEMA = Path("assets/quarterly/dbt/models/linkage-products/schema.yml")
 
 @pytest.fixture
 def repo(tmp_path):
-    shutil.copytree(REAL / "contract", tmp_path / "contract")
+    shutil.copytree(asset_folders.real_folder(), tmp_path / "contract")
     (tmp_path / SCHEMA).parent.mkdir(parents=True)
     shutil.copy(REAL / SCHEMA, tmp_path / SCHEMA)
     for coll in ("child-protection", "civil-registration", "emergency-department"):

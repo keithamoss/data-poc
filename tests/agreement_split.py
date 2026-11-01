@@ -15,6 +15,7 @@ directly, never through this.
 """
 from __future__ import annotations
 
+import asset_folders
 import copy
 from pathlib import Path
 
@@ -137,7 +138,7 @@ def split(merged: dict, calendar_doc: dict) -> tuple[dict, dict]:
 
 
 #: The committed contract directory, the default base for a calendar file.
-REAL_CONTRACT_DIR = Path(__file__).resolve().parent.parent / "contract"
+REAL_CONTRACT_DIR = asset_folders.real_folder()
 
 
 def write(contract_dir: Path, merged: dict, base: dict | None = None) -> None:
