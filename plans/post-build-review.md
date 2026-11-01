@@ -13355,3 +13355,49 @@ twice. It deliberately did not re-find the `TypeError`.
      - **NIT, accepted**: one-column sort order is dbt's native type against
        Soda and datacontract-cli's text. It predates this build and criterion 2
        covers several-column keys only; recorded as a REQ-PIPE-341 decision.
+
+299. **[done, 2026-11-01]** **[QA checks & contract]** **[Data generation]** **[Pipeline & publishing]** **Post-build critic on the geocoding chunk (REQ-QAC-294, REQ-QAC-300, REQ-GEN-295, REQ-PIPE-296, REQ-QAC-297, REQ-QAC-340; 7f171d7): no defects, six minor findings.**
+     Each was checked against the code before it went here; the fixes are
+     test-first and were seen failing first.
+     - **1. A run owning no geocoding table recorded one's match_level
+       counts (fixed)**: a Linkage Keys run reads both geocoding tables and
+       recorded whichever came last. A column several tables declare is now
+       recorded only from the run's own table, and a run owning none records
+       none (tests/test_dataset_stats.py).
+     - **2. The value-share kind is generic in name only (accepted, not
+       changed)**: its SQL is written per table and nothing reads
+       share_value. This repo has no Soda template mechanism - every Soda
+       check is hand-written YAML, and Linkage Products' checks are
+       hand-written by Keith's own decision ("HAND-WRITTEN, NOT GENERATED, FOR
+       NOW", 2026-10-28) - so making it generic means building a generator
+       for checks, which is a product decision, not a fix. Left as it is, per
+       the coordinator's standing exception.
+     - **3. A staged-only trial's year checks read red "filed to no period"
+       (fixed)**: a trial is filed to no period by design and decides
+       nothing, so they are recorded no data with a trial's reason
+       (tests/test_geocoding_gates.py).
+     - **4. A folder trial needed every table (Keith's answer, built)**:
+       SETTLED by Keith 2026-11-01 - `mothman <short> qa --folder` trials
+       what the folder holds, the rest read from what is in place in the
+       warehouse, as a real arrival reads it. REQ-PIPE-202 criterion 8
+       amended, the old text kept. Which period's warehouse is PROVISIONAL,
+       with its question for Keith on REQ-PIPE-202: the period the filing
+       rule would give the first table at the trial's instant, promoted
+       versions only (tests/test_terminal_routes.py, a folder holding one
+       table).
+     - **5. Nits (fixed)**: REQ-GEN-295's A4 and REQ-QAC-294's A8 decisions
+       headed "FINAL TEXT SIGNED"; REQ-GEN-334's stale due-time clause
+       reworded to point at the settled ones, its baseline entry pruned.
+     - **6. SA2 and LGA hashed independently (fixed)**: the LGA is derived
+       from the SA2, so an SA2 sits in one LGA. Byte-identity holds: a whole
+       generation at base and after the change agree on all 514 base
+       deliveries and receipts, the four existing bookkeeping keys and the
+       placements; only the 96 geocoding files differ.
+     - **The failure accounting** asked for alongside: the first 90-module run
+       (51 failed, 2 errors) printed no per-test list and ran beside other
+       gates; the same 90 modules on the same tree with nothing beside them
+       gave 21 failed and 0 errors, exactly the 21 that fail on base 60575ac
+       for want of a generated history or a bootstrapped database. The six
+       counted as load-sensitive pass with MOTHMAN_TEST_DB_TAG set - parallel
+       sessions in other worktrees were dropping this session's test
+       databases.

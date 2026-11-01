@@ -363,16 +363,17 @@ def test_qa_command_local_folder_without_reference_folder_is_a_real_clean_error(
     assert "--reference-folder" in result.output
 
 
-def test_qa_command_local_folder_errors_on_a_partial_delivery(tmp_path):
-    partial = tmp_path / "partial_delivery"
-    partial.mkdir()
-    (partial / "cp_clients.csv").write_text("id\n1\n")
-    # the other 5 real tables are deliberately missing
+def test_qa_command_local_folder_errors_on_a_folder_holding_no_table(tmp_path):
+    """A trial checks the tables its folder holds (REQ-PIPE-202 criterion 8 as
+    amended 2026-11-01, Keith) - a folder holding none of them is refused."""
+    empty = tmp_path / "no_tables"
+    empty.mkdir()
+    (empty / "README.txt").write_text("a covering note\n")
 
-    result = _runner.invoke(cp.qa_command, ["--folder", str(partial), "--reference-folder", str(partial)])
+    result = _runner.invoke(cp.qa_command, ["--folder", str(empty), "--reference-folder", str(empty)])
 
     assert result.exit_code != 0
-    assert "missing" in result.output.lower()
+    assert "nothing to check" in result.output.lower()
 
 
 # ---- S3 QA source mode (plans/tooling.md #1 Phase 3) -----------------
