@@ -55,6 +55,7 @@ def test_a_declared_phrase_wins_over_the_kinds():
     assert measures_phrase(cid, None) == "Rows with no value"
 
 
+@pytest.mark.asset("quarterly")  # the geocoding datasets are the quarterly asset's
 def test_each_geocoding_dataset_declares_its_four_phrases():
     """REQ-DASH-299 criterion 1: the three year checks and the share check,
     on each geocoding dataset - read from the check files, not from code."""

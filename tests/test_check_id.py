@@ -21,7 +21,7 @@ _TABLE_LEVEL = ("quarterly.child-protection-family-support.child-protection.cp-c
 
 def test_parses_a_real_check_id_into_named_segments():
     c = ci.parse(_REAL)
-    assert c.data_asset == "data-asset-1"
+    assert c.data_asset == "daily"  # REQ-QAC-344: an id names its asset
     assert c.agency == "registry-services"
     assert c.collection == "civil-registration"
     assert c.dataset == "birth-registrations"
@@ -67,12 +67,20 @@ def test_a_malformed_check_id_raises_and_names_itself(bad):
     assert repr(bad) in str(e.value), "the error must name the offending id"
 
 
-def test_every_real_check_id_in_this_repo_matches_the_grammar():
+#: Each asset, with a floor below which its register is suspiciously small (the
+#: asset split: 378 checks in one asset became 291 quarterly and 87 daily).
+_EACH_ASSET = [pytest.param(200, marks=pytest.mark.asset("quarterly"), id="quarterly"),
+               pytest.param(50, marks=pytest.mark.asset("daily"), id="daily")]
+
+
+@pytest.mark.parametrize("floor", _EACH_ASSET)
+def test_every_real_check_id_in_this_repo_matches_the_grammar(floor):
     """The grammar is only worth having if it describes what is actually
     authored. This asserts against every real check definition across all
-    four tools and both datasets, not a fixture."""
+    four tools and both datasets, not a fixture - each asset's register on
+    its own asset."""
     ids = [c.check_id for c in vcl.collect_checks(None)]
-    assert len(ids) > 200, "collect_checks() returned suspiciously few checks"
+    assert len(ids) > floor, "collect_checks() returned suspiciously few checks"
     assert ci.validate_grammar(ids) == []
 
 
@@ -157,9 +165,10 @@ class TestHierarchyAgreement:
     to nothing is worse than one that fails, because it looks resolved.
     """
 
-    def test_every_real_check_id_agrees_with_the_hierarchy(self):
+    @pytest.mark.parametrize("floor", _EACH_ASSET)
+    def test_every_real_check_id_agrees_with_the_hierarchy(self, floor):
         ids = [c.check_id for c in vcl.collect_checks(None)]
-        assert len(ids) > 200, "collect_checks() returned suspiciously few checks"
+        assert len(ids) > floor, "collect_checks() returned suspiciously few checks"
         assert ci.validate_hierarchy_agreement(ids) == []
 
     def test_a_collection_the_dataset_does_not_sit_under_is_an_error(self):
@@ -170,7 +179,10 @@ class TestHierarchyAgreement:
 
     def test_an_agency_the_dataset_does_not_sit_under_is_an_error(self):
         errors = ci.validate_hierarchy_agreement([
-            "quarterly.child-protection-family-support.civil-registration"
+            # Only the agency wrong: the dataset is the daily asset's, so
+            # the id names that asset (REQ-QAC-344's rename read the
+            # agency and gave this deliberately wrong id the other one).
+            "daily.child-protection-family-support.civil-registration"
             ".birth-registrations.c.unique_dbt"])
         assert len(errors) == 1
         assert "registry-services" in errors[0]
