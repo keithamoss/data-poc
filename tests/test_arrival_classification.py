@@ -14,8 +14,13 @@ from datetime import datetime, timedelta, timezone
 from qa_tools.common import arrival_classification as classify_mod
 from qa_tools.common.schedule import Period
 from qa_tools.common.slots import Slot
+import pytest
 
 PERTH = timezone(timedelta(hours=8))
+
+
+#: REQ-TEST-375: in the hand-picked set every push runs in CI.
+pytestmark = pytest.mark.critical
 
 
 def _slot(name: str, due: datetime, grace_hours: int = 1) -> Slot:

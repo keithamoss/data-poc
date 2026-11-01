@@ -50,6 +50,7 @@ def _check_status(check: dict) -> str:
     )
 
 
+@pytest.mark.critical
 class TestTheVocabularyIsTheOneBothSidesAgreed:
     """The table declares the vocabulary; this module must not have its
     own. A status added to one implementation and not the other is the
@@ -81,6 +82,7 @@ class TestTheVocabularyIsTheOneBothSidesAgreed:
         assert CHECK_STATUSES < DATASET_STATUSES
 
 
+@pytest.mark.critical
 class TestTheWordsAreTheOnesBothSidesAgreed:
     """REQ-DASH-359 NFR 1, REQ-TEST-360 criterion 1: the terminal's words for
     each status are status-cases.json's vocabulary.labels block, exactly -
@@ -125,6 +127,7 @@ class TestTheWordsAreTheOnesBothSidesAgreed:
                 assert not re.search(r"\b(green|amber|red)\b", said, re.I), said
 
 
+@pytest.mark.critical
 class TestEveryLevelCase:
     """REQ-DASH-299 criterion 17: notchecked is a left-out row's alone - a
     check result or a dataset tile carrying it is refused, naming it."""
@@ -155,6 +158,7 @@ class TestEveryLevelCase:
             assert recognised_status(case["status"], case["level"], allowed) == case["expect"]
 
 
+@pytest.mark.critical
 class TestEveryCheckCase:
     @pytest.mark.parametrize("case", [c for c in CASES["check_cases"]
                                       if not c.get("expect_error")],
@@ -172,6 +176,7 @@ class TestEveryCheckCase:
             _check_status(case["check"])
 
 
+@pytest.mark.critical
 class TestEveryRollupCase:
     @pytest.mark.parametrize("case", [c for c in CASES["rollup_cases"]
                                       if not c.get("expect_error")],
@@ -189,6 +194,7 @@ class TestEveryRollupCase:
             worst_of(case["statuses"])
 
 
+@pytest.mark.critical
 class TestEveryDatasetRollupCase:
     """The FILTERING rollup, as opposed to the ordering one above.
 
@@ -204,6 +210,7 @@ class TestEveryDatasetRollupCase:
         assert rollup_statuses(case["statuses"]) == case["expect"], case["why"]
 
 
+@pytest.mark.critical
 class TestEveryRetiredCase:
     @pytest.mark.parametrize("case", CASES["retired_cases"],
                              ids=_ids(CASES["retired_cases"]))
@@ -211,6 +218,7 @@ class TestEveryRetiredCase:
         assert is_retired(case["check"]) is case["expect_retired"], case["why"]
 
 
+@pytest.mark.critical
 class TestTheErrorSaysEnoughToActOn:
     """A failure that does not name the value or where it was read from
     replaces a silent wrong answer with a loud useless one. The whole

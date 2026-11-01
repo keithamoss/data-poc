@@ -9,6 +9,10 @@ import pytest
 from dashboard.plans_md import _parse_numbered_items, _parse_threads, parse_plans
 
 
+#: REQ-TEST-375: in the hand-picked set every push runs in CI.
+pytestmark = pytest.mark.critical
+
+
 def test_parses_a_single_numbered_item_with_one_component(tmp_path):
     text = """1. **[done, 2026-09-18]** **[Dashboard UI]** A real feature shipped.
 """

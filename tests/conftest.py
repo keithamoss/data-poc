@@ -1093,7 +1093,60 @@ def pytest_collection_modifyitems(config, items):
             config.hook.pytest_deselected(items=dropped)
             items[:] = kept
     _mark_deployment(items)
+    _refuse_a_critical_test_ci_cannot_run(items)
     _group_for_distribution(items)
+
+
+#: The hand-picked set every push runs in CI (REQ-TEST-375). Applied BY HAND
+#: on the test modules themselves, never derived from duration or kind.
+CRITICAL = "critical"
+
+#: pytest-playwright's own fixtures. A test whose fixture closure holds any of
+#: them drives a browser, which the push job never installs.
+BROWSER_FIXTURES = frozenset({"browser", "browser_type", "context", "page", "playwright"})
+
+
+def _drives_a_browser(item) -> bool:
+    """A browser by its fixtures, by the browser-test markers, or by a module
+    that launches Playwright itself (read once per module: no fixture or mark
+    says so there)."""
+    if BROWSER_FIXTURES & set(getattr(item, "fixturenames", ())):
+        return True
+    if item.get_closest_marker("shared_page") or item.get_closest_marker("fresh_load"):
+        return True
+    path = getattr(item, "path", None)
+    if path is None:
+        return False
+    if path not in _LAUNCHES_PLAYWRIGHT:
+        try:
+            _LAUNCHES_PLAYWRIGHT[path] = "sync_playwright" in path.read_text()
+        except OSError:
+            _LAUNCHES_PLAYWRIGHT[path] = False
+    return _LAUNCHES_PLAYWRIGHT[path]
+
+
+_LAUNCHES_PLAYWRIGHT: dict = {}
+
+
+def _refuse_a_critical_test_ci_cannot_run(items):
+    """REQ-TEST-375 criterion 3: a `critical` test that needs a deployment or a
+    browser fails COLLECTION, naming it. The push job has neither, so such a
+    test there would skip or error - and a skip in a job that fails on any skip
+    is a red nobody can fix from the test's own file. Runs before `-m`
+    deselects anything, so a local full run catches it too."""
+    bad = []
+    for item in items:
+        if item.get_closest_marker(CRITICAL) is None:
+            continue
+        if item.get_closest_marker(NEEDS_DEPLOYMENT) is not None:
+            bad.append(f"{item.nodeid} (needs a deployment)")
+        elif _drives_a_browser(item):
+            bad.append(f"{item.nodeid} (drives a browser)")
+    if bad:
+        raise pytest.UsageError(
+            "these tests are marked critical but push CI has no deployment and no "
+            "browser - unmark them, or mark only the classes that need neither:\n  "
+            + "\n  ".join(bad))
 
 
 def _mark_deployment(items):

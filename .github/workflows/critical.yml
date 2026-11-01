@@ -1,0 +1,135 @@
+name: Critical tests
+
+# REQ-TEST-375 (Keith, signed 2026-11-02): the interim fast CI set. Every push
+# runs ONLY the hand-picked `critical` pytest mark - the tests guarding this
+# project's standing rules and its core filing, promotion, status, slot and
+# arrival logic - plus the JS suite beside it. The full suite, both halves,
+# the bootstrap and the coverage floor live in test.yml, which is now started
+# BY HAND (before a merge to the main branch, or when Keith asks); the full
+# gate runs locally before every push, its result line in the commit message.
+#
+# WHY: a private repository gets 2,000 Actions minutes a month, and test.yml
+# had grown to ~80 billable minutes a push on a cache hit, ~145 on a miss.
+#
+# WHAT A GREEN RUN HERE PROVES, and no more: the critical set passed on a
+# clean runner with no deployment, no browser and no coverage measurement,
+# and the JS suite passed. It says nothing about the deployment half, the
+# browser tests or coverage - those are the local gate's claim.
+#
+# `claude/**` only, deliberately (Keith, 2026-11-02): `wip/` checkpoint
+# pushes bill nothing. See test.yml's trigger comment for why a glob.
+on:
+  push:
+    branches: ["claude/**"]
+  workflow_dispatch:
+
+concurrency:
+  group: critical-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  critical:
+    runs-on: ubuntu-latest
+    # A backstop for a hang only. The budget below is what fails a slow set.
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: ci-not-a-secret
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      MOTHMAN_TEST_DSN: postgresql://postgres:ci-not-a-secret@localhost:5432/postgres
+      MOTHMAN_SUPPLY_DSN: postgresql://postgres:ci-not-a-secret@localhost:5432/supply
+      MOTHMAN_ENVIRONMENT: ci
+      MOTHMAN_ASSET: data-asset-1
+      # Criterion 7 and Keith's 2026-11-02 answer: the PYTEST STEP's budget,
+      # not the job's (the job is about 6-7 minutes with setup), measured on
+      # today's 4-core runner and revisited when the repository goes private.
+      CRITICAL_BUDGET_SECONDS: "300"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Install uv
+        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+      - name: Sync dependencies
+        run: uv sync --dev
+      - name: Create the warehouse database
+        run: |
+          PGPASSWORD=ci-not-a-secret psql -h localhost -U postgres \
+            -c 'CREATE DATABASE supply'
+          PGPASSWORD=ci-not-a-secret psql -h localhost -U postgres \
+            -c "ALTER SYSTEM SET log_min_messages = 'fatal'" \
+            -c "ALTER SYSTEM SET log_min_error_statement = 'panic'" \
+            -c 'SELECT pg_reload_conf()'
+      - name: Install dbt_utils
+        run: uv run dbt deps --project-dir dbt_project --profiles-dir qa_tools/dbt_profiles
+      - name: Mark the warehouse database as CI's
+        run: uv run mothman env mark --confirm ci
+      # No bootstrap, no Playwright, no coverage (criterion 4). The critical
+      # job fails on zero tests selected, on any skip, and over its budget
+      # (criteria 6 and 7) - a skip here is a test in the wrong set, and a
+      # green that ran nothing proves nothing.
+      - name: Run the critical tests
+        run: |
+          started=$(date +%s)
+          set +e
+          uv run pytest -m "critical and not needs_deployment" -rs \
+            -p no:cacheprovider --durations=15 --junitxml=critical-junit.xml
+          code=$?
+          set -e
+          took=$(( $(date +%s) - started ))
+          echo "Critical pytest step took ${took}s (budget ${CRITICAL_BUDGET_SECONDS}s)"
+          uv run python3 - "$took" "$CRITICAL_BUDGET_SECONDS" <<'PY'
+          import sys
+          import xml.etree.ElementTree as ET
+          took, budget = int(sys.argv[1]), int(sys.argv[2])
+          try:
+              root = ET.parse("critical-junit.xml").getroot()
+          except (OSError, ET.ParseError) as exc:
+              sys.exit(f"no JUnit report to read ({exc}) - pytest did not finish")
+          suites = [root] if root.tag == "testsuite" else list(root)
+          tests = sum(int(s.get("tests", 0)) for s in suites)
+          skipped = sum(int(s.get("skipped", 0)) for s in suites)
+          problems = []
+          if tests == 0:
+              problems.append("ZERO tests selected - a green that ran nothing proves nothing")
+          if skipped:
+              problems.append(f"{skipped} test(s) SKIPPED - a skip here is a test in the wrong set")
+          if took > budget:
+              cases = sorted(((float(c.get("time", 0)), f"{c.get('classname')}::{c.get('name')}")
+                              for c in root.iter("testcase")), reverse=True)[:15]
+              problems.append(f"OVER BUDGET: {took}s against {budget}s. Slowest critical tests:\n"
+                              + "\n".join(f"  {t:7.1f}s  {n}" for t, n in cases))
+          print(f"{tests} critical tests, {skipped} skipped, {took}s")
+          if problems:
+              sys.exit("\n".join(problems))
+          PY
+          exit $code
+
+  js-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+      - name: Install dependencies
+        run: npm ci
+      - name: Run dashboard JS test suite
+        run: npm test

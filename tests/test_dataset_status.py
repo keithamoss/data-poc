@@ -6,6 +6,11 @@ pipeline/build_dashboard_data.py produces."""
 from __future__ import annotations
 
 from qa_tools.common.dataset_status import dataset_status, status_by_run, status_for_value
+import pytest
+
+
+#: REQ-TEST-375: in the hand-picked set every push runs in CI.
+pytestmark = pytest.mark.critical
 
 
 def _check(current, warn, fail, retired_as_of=None):

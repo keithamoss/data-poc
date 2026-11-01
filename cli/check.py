@@ -25,12 +25,11 @@ locally (CLAUDE.md's own "run selective tests for smaller changes"
 convention), which leaves everything else - including the JS suite -
 still running in a couple of seconds.
 
-This mirrors what .github/workflows/test.yml really runs, which is the
-point: a green run here is real evidence about CI rather than a
-different set of checks that happens to share some names. It is still
-not a SUBSTITUTE for checking the actual run - CI's environment can
-diverge from local on things no local command can see (see CLAUDE.md's
-own standing rule on that).
+Since REQ-TEST-375 (Keith, 2026-11-02) this full gate is the ONLY place the
+whole suite and its coverage floor run on every push: push CI runs just the
+`critical` mark (critical.yml) and test.yml is started by hand. So the full
+gate enforces `fail_under` itself and ends with one result line to paste into
+the commit message - the record of what ran, on which tree.
 """
 from __future__ import annotations
 
@@ -290,6 +289,99 @@ def _run(label: str, argv: list[str], can_warn: bool = False) -> int:
     return _worst(codes)
 
 
+#: What the full gate measures coverage over - the same four packages test.yml
+#: measures, so the floor means the same thing here as in a hand-started run.
+#: `fail_under` itself is read from pyproject.toml by pytest-cov (REQ-TEST-375
+#: criterion 9: enforced in this gate, never in push CI).
+COVERAGE_PACKAGES = ("qa_tools", "pipeline", "generator", "dashboard")
+
+
+def _pytest_argv(argv: list[str], reports: Path) -> list[str]:
+    """The pytest gate with coverage enforced, and the two reports the
+    result line is read from."""
+    return [*argv, *(f"--cov={p}" for p in COVERAGE_PACKAGES),
+            f"--cov-report=json:{reports / 'coverage.json'}",
+            f"--junitxml={reports / 'junit.xml'}"]
+
+
+def _tree_state() -> str:
+    """The exact tree the gate ran on: HEAD's when clean, else the tree a
+    commit of everything now in the working tree would have - written through
+    a scratch index, so the real index is never touched."""
+    import tempfile
+
+    head = subprocess.check_output(["git", "rev-parse", "--short", "HEAD"], cwd=ROOT,
+                                   text=True).strip()
+    changed = _changed_paths()
+    if not changed:
+        return f"HEAD {head} (clean)"
+    with tempfile.TemporaryDirectory() as scratch:
+        index = Path(scratch) / "index"
+        real = subprocess.check_output(["git", "rev-parse", "--git-path", "index"], cwd=ROOT,
+                                       text=True).strip()
+        real_path = Path(real) if Path(real).is_absolute() else ROOT / real
+        if real_path.exists():
+            shutil.copy(real_path, index)
+        env = {**os.environ, "GIT_INDEX_FILE": str(index)}
+        subprocess.check_call(["git", "add", "-A"], cwd=ROOT, env=env)
+        tree = subprocess.check_output(["git", "write-tree"], cwd=ROOT, env=env,
+                                       text=True).strip()
+    return f"tree {tree[:10]} (HEAD {head} + {len(changed)} uncommitted paths)"
+
+
+def _pytest_counts(junit: Path) -> tuple[int, int, int] | None:
+    """(passed, failed, skipped) from pytest's JUnit report; errors count as
+    failed. None when pytest wrote no report."""
+    import xml.etree.ElementTree as ET
+
+    try:
+        root = ET.parse(junit).getroot()
+    except (OSError, ET.ParseError):
+        return None
+    suites = [root] if root.tag == "testsuite" else list(root)
+    total = sum(int(s.get("tests", 0)) for s in suites)
+    failed = sum(int(s.get("failures", 0)) + int(s.get("errors", 0)) for s in suites)
+    skipped = sum(int(s.get("skipped", 0)) for s in suites)
+    return total - failed - skipped, failed, skipped
+
+
+def _coverage_percent(report: Path) -> float | None:
+    import json
+
+    try:
+        return float(json.loads(report.read_text())["totals"]["percent_covered"])
+    except (OSError, ValueError, KeyError):
+        return None
+
+
+def _fail_under() -> float | None:
+    import tomllib
+
+    config = tomllib.loads((ROOT / "pyproject.toml").read_text())
+    return config.get("tool", {}).get("coverage", {}).get("report", {}).get("fail_under")
+
+
+def result_line(*, tree: str, tree_after: str, counts, coverage, floor, elapsed: float,
+                failed_gates: list[str], not_run: list[str] = ()) -> str:
+    """REQ-TEST-375 criterion 10: the full gate's result, on one line, fit to
+    paste into a commit message. It never claims more than ran: a missing
+    report says so, and a tree that changed mid-run is not a claim about
+    either tree."""
+    minutes, seconds = divmod(round(elapsed), 60)
+    tests = ("pytest wrote no report" if counts is None
+             else f"{counts[0]} passed, {counts[1]} failed, {counts[2]} skipped")
+    cov = "coverage not measured" if coverage is None else f"coverage {coverage:.2f}%"
+    if coverage is not None and floor is not None:
+        cov += f" (floor {floor:g}%)"
+    gates = "; ".join(filter(None, [
+        f"FAILED: {', '.join(failed_gates)}" if failed_gates else "",
+        f"not run (no toolchain): {', '.join(not_run)}" if not_run else ""])) \
+        or "every gate passed"
+    where = (tree if tree == tree_after
+             else f"TREE CHANGED DURING THE RUN ({tree} -> {tree_after}), so this is no claim")
+    return f"Full gate (mothman check): {gates}; {tests}; {cov}; {minutes}m{seconds:02d}s; {where}"
+
+
 @click.command("check")
 @click.option("--no-pytest", is_flag=True,
               help="Skip the Python suite (the slow one). Everything else still runs.")
@@ -341,9 +433,17 @@ def check_command(no_pytest: bool, docs: bool, only: str | None) -> None:
             if output:
                 console.out(output.rstrip("\n"), highlight=False)
             results.append((label, code, why, can_warn, took))
+    full = not (docs or no_pytest or only is not None)
+    gate_started = time.monotonic()
+    tree = _tree_state() if full else ""
+    import tempfile
+
+    reports = Path(tempfile.mkdtemp(prefix="mothman-check-"))
     for label, argv, why, can_warn in (() if docs else gates):
         if no_pytest and label == "pytest":
             continue
+        if label == "pytest":
+            argv = _pytest_argv(argv, reports)
         started = time.monotonic()
         code = _run(label, argv, can_warn)
         results.append((label, code, why, can_warn, time.monotonic() - started))
@@ -373,6 +473,15 @@ def check_command(no_pytest: bool, docs: bool, only: str | None) -> None:
               if code not in (0, 127) and not _warned(code, can_warn)]
     skipped = [label for label, code, _, _, _t in results if code == 127]
     warned = [label for label, code, _, can_warn, _t in results if _warned(code, can_warn)]
+    if full:
+        line = result_line(tree=tree, tree_after=_tree_state(),
+                           counts=_pytest_counts(reports / "junit.xml"),
+                           coverage=_coverage_percent(reports / "coverage.json"),
+                           floor=_fail_under(), elapsed=time.monotonic() - gate_started,
+                           failed_gates=failed, not_run=skipped)
+        console.print("Paste into the commit message:", style="bold")
+        console.out(line, highlight=False)
+    shutil.rmtree(reports, ignore_errors=True)
     if failed:
         raise click.ClickException(f"{len(failed)} gate(s) failed: {', '.join(failed)}")
 

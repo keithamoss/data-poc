@@ -28,6 +28,10 @@ ROLE = "mothman_publisher_test"
 PASSWORD = "publisher-test-password"
 
 
+#: REQ-TEST-375: in the hand-picked set every push runs in CI.
+pytestmark = pytest.mark.critical
+
+
 @pytest.fixture
 def publisher(supply_dsn):
     """The real role, created the real way, with a connection as it."""

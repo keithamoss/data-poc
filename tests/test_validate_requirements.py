@@ -18,6 +18,10 @@ from qa_tools.common.validate_requirements import _linked_test_exists, _python_s
 ROOT = Path(__file__).resolve().parent.parent
 
 
+#: REQ-TEST-375: in the hand-picked set every push runs in CI.
+pytestmark = pytest.mark.critical
+
+
 def _valid_entry(**overrides):
     entry = {
         "id": "REQ-QAC-001",

@@ -54,6 +54,10 @@ EARLY_SLOT = "2023-Q4"
 LATE_SLOT = "2023-Q3"
 
 
+#: REQ-TEST-375: in the hand-picked set every push runs in CI.
+pytestmark = pytest.mark.critical
+
+
 @pytest.fixture
 def clean(supply_dsn):
     """This worker's own empty filing table."""

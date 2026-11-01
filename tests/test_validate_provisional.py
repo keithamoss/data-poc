@@ -26,6 +26,10 @@ WARN = 78
 # ---------------------------------------------------------------- the rule
 
 
+#: REQ-TEST-375: in the hand-picked set every push runs in CI.
+pytestmark = pytest.mark.critical
+
+
 @pytest.mark.parametrize("text", [
     "PROVISIONAL: amber rather than red.",
     "BUILT overnight, PROVISIONAL, not yet answered.",

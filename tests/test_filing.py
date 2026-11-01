@@ -26,6 +26,10 @@ from qa_tools.common import assignment, delivery, filing
 PERTH = timezone(timedelta(hours=8))
 
 
+#: REQ-TEST-375: in the hand-picked set every push runs in CI.
+pytestmark = pytest.mark.critical
+
+
 @pytest.fixture
 def filings(supply_dsn):
     """An empty filing table for one test.

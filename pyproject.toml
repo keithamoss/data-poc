@@ -158,6 +158,7 @@ pythonpath = ["."]
 # than a silently empty selection.
 markers = [
     "needs_deployment: needs a bootstrapped deployment database (and reports/ built from it)",
+    "critical: the hand-picked set every push runs in CI (REQ-TEST-375); applied by hand, never derived",
     "on_demand: deselected unless --run-on-demand is given (slow; run when its subject changes)",
     "full_capture: deselected unless --run-full-capture is given (two full bootstraps; never in CI)",
     "closed_periods: opts a test back in to REQ-PIPE-132's closed-period queue items (tests/test_outstanding.py)",

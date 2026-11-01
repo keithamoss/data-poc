@@ -1,6 +1,8 @@
-"""CI runs the tests marked on_demand on every push (post-build-review #128,
-Keith 2026-10-06): a slow test deselected locally and run nowhere had already
-failed unnoticed for two days."""
+"""CI runs the tests marked on_demand whenever the full workflow runs
+(post-build-review #128, Keith 2026-10-06): a slow test deselected locally and
+run nowhere had already failed unnoticed for two days. Since REQ-TEST-375 (Keith,
+2026-11-02) the full workflow is started by hand, before a merge to the main
+branch or when Keith asks, so that is when they run."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -19,9 +21,9 @@ def test_a_job_runs_every_on_demand_test():
     assert any("--run-on-demand" in r and "-m on_demand" in r for r in runs)
 
 
-def test_it_runs_on_every_push_rather_than_on_a_schedule():
+def test_it_runs_whenever_the_full_workflow_does_rather_than_on_a_schedule():
     triggers = yaml.safe_load(WORKFLOW.read_text())[True]  # YAML reads `on:` as True
-    assert "push" in triggers
+    assert "workflow_dispatch" in triggers and "schedule" not in triggers
     assert "if" not in _jobs()["on-demand"], "the job must not be skipped conditionally"
 
 

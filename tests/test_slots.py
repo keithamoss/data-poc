@@ -20,6 +20,10 @@ CP_DATASETS = ["cp-clients", "cp-notifications", "cp-investigations",
 BDM_UNTIL = date(2026, 9, 22)
 
 
+#: REQ-TEST-375: in the hand-picked set every push runs in CI.
+pytestmark = pytest.mark.critical
+
+
 def _cp_slots(dataset_id):
     return slots.slots_for_dataset(dataset_id)
 

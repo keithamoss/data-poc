@@ -31,6 +31,7 @@ from __future__ import annotations
 import ast
 import re
 from pathlib import Path
+import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -82,6 +83,10 @@ ALLOWED = {
     ("qa_tools/common/build_output.py", "reports"):
         "an --out-dir build's own layout, DIR/reports/, not an asset's state tree",
 }
+
+
+#: REQ-TEST-375: in the hand-picked set every push runs in CI.
+pytestmark = pytest.mark.critical
 
 
 def _modules():

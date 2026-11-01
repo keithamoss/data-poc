@@ -81,14 +81,14 @@ def test_the_python_suite_goes_last(record):
     still ahead of you."""
     calls, _ = record
     _runner.invoke(check_cli.check_command, [])
-    assert calls[-1] == ["uv", "run", "pytest"]
+    assert calls[-1][:3] == ["uv", "run", "pytest"]
 
 
 def test_no_pytest_skips_only_the_python_suite(record):
     calls, _ = record
     result = _runner.invoke(check_cli.check_command, ["--no-pytest"])
     assert result.exit_code == 0, result.output
-    assert ["uv", "run", "pytest"] not in calls
+    assert not any(c[:3] == ["uv", "run", "pytest"] for c in calls)
     assert ["npm", "test", "--silent"] in calls
     assert len(calls) == len(check_cli._GATES) - 1
 
@@ -319,3 +319,53 @@ class TestTheProvisionalGate:
         result = _runner.invoke(check_cli.check_command, ["--only", "provisional"])
         assert result.exit_code == 0, result.output
         assert "passed, with a warning" in result.output
+
+
+class TestTheFullGateIsTheWholeSuitesRecord:
+    """REQ-TEST-375 criteria 9 and 10: push CI runs only the critical set, so
+    the full gate enforces the coverage floor and prints the line a commit
+    message carries."""
+
+    def test_the_python_suite_runs_with_coverage_and_its_floor(self, record):
+        calls, _ = record
+        result = _runner.invoke(check_cli.check_command, [])
+        assert result.exit_code == 0, result.output
+        pytest_argv = calls[-1]
+        for package in check_cli.COVERAGE_PACKAGES:
+            assert f"--cov={package}" in pytest_argv
+        # The floor is pyproject's, so nothing may override it to zero here.
+        assert not any(a.startswith("--cov-fail-under") for a in pytest_argv)
+        assert check_cli._fail_under() is not None
+
+    def test_it_prints_one_paste_ready_result_line(self, record):
+        result = _runner.invoke(check_cli.check_command, [])
+        assert "Paste into the commit message:" in result.output
+        [line] = [ln for ln in result.output.splitlines()
+                  if ln.startswith("Full gate (mothman check):")]
+        assert "every gate passed" in line
+
+    def test_a_partial_gate_prints_no_result_line(self, record):
+        result = _runner.invoke(check_cli.check_command, ["--no-pytest"])
+        assert "Full gate (mothman check):" not in result.output
+
+    def test_the_line_reads_its_counts_from_pytests_own_report(self, tmp_path):
+        junit = tmp_path / "junit.xml"
+        junit.write_text('<testsuites><testsuite tests="10" failures="1" errors="1" '
+                         'skipped="2"/></testsuites>')
+        assert check_cli._pytest_counts(junit) == (6, 2, 2)
+        assert check_cli._pytest_counts(tmp_path / "absent.xml") is None
+
+    def test_the_line_names_counts_coverage_time_and_tree(self):
+        line = check_cli.result_line(tree="HEAD abc1234 (clean)", tree_after="HEAD abc1234 (clean)",
+                                     counts=(6240, 0, 0), coverage=94.123, floor=92,
+                                     elapsed=1357, failed_gates=[])
+        assert line == ("Full gate (mothman check): every gate passed; 6240 passed, 0 failed, "
+                        "0 skipped; coverage 94.12% (floor 92%); 22m37s; HEAD abc1234 (clean)")
+
+    def test_it_never_claims_more_than_ran(self):
+        line = check_cli.result_line(tree="tree a", tree_after="tree b", counts=None,
+                                     coverage=None, floor=92, elapsed=5,
+                                     failed_gates=["pytest"], not_run=["npm test"])
+        assert "FAILED: pytest" in line and "not run (no toolchain): npm test" in line
+        assert "pytest wrote no report" in line and "coverage not measured" in line
+        assert "TREE CHANGED DURING THE RUN" in line

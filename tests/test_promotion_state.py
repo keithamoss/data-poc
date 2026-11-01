@@ -23,6 +23,10 @@ COLLECTION = "child-protection"
 WHEN = "2026-09-29T09:00:00+08:00"
 
 
+#: REQ-TEST-375: in the hand-picked set every push runs in CI.
+pytestmark = pytest.mark.critical
+
+
 @pytest.fixture
 def conn(supply_dsn):
     with supply_db.connect(label="test-promotion-state") as c:
