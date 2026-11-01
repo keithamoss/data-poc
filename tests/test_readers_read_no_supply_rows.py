@@ -66,7 +66,9 @@ SLOT = "2023-Q4"
 SUPPLY = "readers-s"
 RECEIVED = datetime(2023, 8, 1, 12, tzinfo=PERTH)
 AT = datetime(2026, 10, 11, tzinfo=timezone.utc)
-BDM = "civil-registration"
+#: The quarterly asset's other collection: the build of each collection in
+#: one asset reads only as the publisher.
+ED = "emergency-department"
 CP = "child-protection"
 
 
@@ -78,7 +80,7 @@ def _record_history() -> None:
 
     when = "2023-08-01T12:00:00+08:00"
     by = "tests@example.gov.au"
-    for collection_id, short, table in ((BDM, "bdm", "birth_registrations"),
+    for collection_id, short, table in ((ED, "ed", "ed_presentations"),
                                         (CP, "cp", "cp_clients")):
         agency, collection = rebuild_support.ids(collection_id)
         run_id = f"readers_{short}_run_1"
@@ -195,11 +197,11 @@ class TestTheDashboardBuild:
 
         role, _ = publisher
         built = {}
-        for collection_id in (BDM, CP):
+        for collection_id in (ED, CP):
             rebuild_support.rebuild(collection_id, tmp_path, monkeypatch)
             built[collection_id] = str(rebuild_support.output_path(collection_id, tmp_path))
         monkeypatch.setattr(build_dashboard_data, "results_path", lambda cid: built[cid])
-        for collection_id in (BDM, CP):
+        for collection_id in (ED, CP):
             assert build_dashboard_data.build(collection_id), f"{collection_id} built nothing"
         _assert_only_the_publisher_read(role, statements)
 

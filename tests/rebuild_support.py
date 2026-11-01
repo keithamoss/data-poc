@@ -34,7 +34,11 @@ def ids(collection_id: str) -> tuple[str, str]:
 
 def dataset_of(collection_id: str) -> str:
     """A real dataset of that collection, for check ids and records."""
-    return "cp-placements" if collection_id == "child-protection" else "birth-registrations"
+    if collection_id == "child-protection":
+        return "cp-placements"
+    # Any other collection's first dataset, read from the registry - the
+    # selected asset's (the asset split), so it is never another asset's.
+    return collections.by_id(collection_id).datasets[0].dataset_id
 
 
 def check(collection_id: str, name: str, tool: str, dataset: str | None = None) -> dict:

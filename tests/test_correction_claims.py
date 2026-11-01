@@ -49,6 +49,12 @@ class TestWhatACorrectionAlters:
         got = cc.altered("CAB-1", ["cp-clients"], docs=docs)
         assert got == {"cp-clients": {"2023-Q3", "2023-Q4"}}
 
+    def test_a_moved_date_is_not_a_version_level_change(self, docs):
+        # The other half of TestAVersionLevelChangeClaimsOnlyTheFilingsItChanges'
+        # own version-level test: a moved quarter date is the quarterly
+        # asset's, and the widened window the daily asset's (the asset split).
+        assert not cc.is_version_level("CAB-1", docs=docs)
+
     def test_its_claim_adds_the_period_before_and_after(self, docs):
         got = cc.claimed("CAB-1", {"cp-clients": _quarters()}, docs=docs)
         assert got == {"cp-clients": ["2023-Q2", "2023-Q3", "2023-Q4", "2024-Q1"]}
@@ -178,9 +184,8 @@ class TestAVersionLevelChangeClaimsOnlyTheFilingsItChanges:
         at = asset_time.wall_clock(date(2026, 9, 20), "12:00")
         assert cc.filing_changes("CAB-W", "birth-registrations", [at], docs=widened) == set()
 
-    def test_it_is_a_version_level_change(self, widened, docs):
+    def test_it_is_a_version_level_change(self, widened):
         assert cc.is_version_level("CAB-W", docs=widened)
-        assert not cc.is_version_level("CAB-1", docs=docs)
 
 
 def _widen_daily_from(day):
