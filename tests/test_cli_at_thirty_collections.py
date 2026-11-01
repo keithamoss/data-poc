@@ -36,8 +36,8 @@ HEAVY = ("pandas", "numpy", "duckdb", "soda", "dbt", "datacontract", "evidently"
 @pytest.fixture(scope="module")
 def thirty(tmp_path_factory) -> Path:
     tree = thirty_collections.build(tmp_path_factory.mktemp("thirty") / "tree")
-    assert (tree / "contract" / "data-asset.yaml").is_file()
-    people = tree / "contract" / "people.yaml"
+    assert (tree / "assets" / "quarterly" / "data-asset.yaml").is_file()
+    people = tree / "assets" / "quarterly" / "people.yaml"
     doc = yaml.safe_load(people.read_text())
     doc["people"].append({"email": DECIDER, "name": "Thirty Collections", "github": "thirty-collections"})
     people.write_text(yaml.safe_dump(doc, sort_keys=False))

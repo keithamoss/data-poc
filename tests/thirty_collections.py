@@ -87,7 +87,11 @@ def added() -> list[dict]:
 def build(dest: Path) -> Path:
     """Copy the tracked tree into `dest` and register the twenty-eight more."""
     copy_tracked_tree(dest)
-    hierarchy_path = dest / "contract" / "data-asset.yaml"
+    # INTO THE QUARTERLY ASSET OF THE COPY (the asset split): its hierarchy,
+    # adapters and providers sit in its folder; the copy is run with that
+    # asset selected.
+    folder = dest / "assets" / "quarterly"
+    hierarchy_path = folder / "data-asset.yaml"
     doc = yaml.safe_load(hierarchy_path.read_text())
     agencies = doc["hierarchy"]["agencies"]
     # NOTHING ADDED MAY COLLIDE WITH A REAL COLLECTION - refused here by
@@ -116,13 +120,13 @@ def build(dest: Path) -> Path:
                             "contract": f"{agency_id}/{cid}-contract.yaml",
                             "delivery_boundary": "directory", "datasets": datasets})
             module = _module(cid)
-            (dest / "qa_tools" / "collections" / f"{module}.py").write_text(
+            (folder / "collections" / f"{module}.py").write_text(
                 "from qa_tools.collections.base import CollectionAdapter\n\n"
                 f"ADAPTER = CollectionAdapter(collection_id={cid!r}, label={name!r})\n")
             if short.endswith("w") or short.endswith("s"):
                 continue  # a collection with no synthetic generator, as a real one has
             first = datasets[0]["id"]
-            (dest / "generator" / "collections" / f"{module}.py").write_text(
+            (folder / "synthetic" / "collections" / f"{module}.py").write_text(
                 "from generator.collections.base import Plan, Provider\n\n\n"
                 "class _Fixture(Provider):\n"
                 f"    collection_id = {cid!r}\n"
