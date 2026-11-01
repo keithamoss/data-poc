@@ -78,3 +78,6 @@
 
 ## v6 delta round (Keith, 2026-10-31)
 - REQ-GEN-298 criterion 11, which sources the trial stages: (a) only the source supplies the generator's plan promotes before the geocoding delivery, which is what the warehouse will hold then (REQ-GEN-334 c12's scheduling already computes this). A held source is not staged, and the trial expects could-not-run, so trial and replay agree. REJECTED (b), every filed source. This needs a signed amendment to REQ-PIPE-331 criterion 3 ('never a staged one'), whose wording comes in v7.
+- v7 'notchecked' (Keith, 2026-10-31, (a)): DISPLAY ONLY - no tool can record a result as notchecked, and the results store refuses it; it is derived where a check has no result. A check that ran and errored stays Fail. REJECTED (b), letting a tool record notchecked, under which a broken tool could turn every check quiet.
+- v7 delta SIGNED (Keith, 2026-10-31, 'Sounds good'): every change in geocoding-v7-delta.yaml, with the FINAL TEXT of A1, A5, A6, A7 and A8, written into requirements.yaml. A2, A3 and A4 (v6, each applying an answer already given: J3 a, J4 a, Q9 a) still carry 'WORDING NOT YET SIGNED' - put to Keith separately.
+- A2, A3, A4 wordings SIGNED (Keith, 2026-10-31, 'Sounds good').
