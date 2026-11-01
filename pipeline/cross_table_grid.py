@@ -488,11 +488,11 @@ def _clause(dataset_id, supply, holder, stands_on, when, health, run_of, receipt
     if status != "red":
         tail = [text(".")]
     elif went_red or since is None:
-        tail = [text(": it was promoted while red.")]
+        tail = [text(": it was promoted while failing.")]
     else:
         cause = since.get("cause") or "a later check"
         by = since.get("by")
-        tail = [text(f": it turned red {display_time.format_instant(since['at'])}, after "
+        tail = [text(f": it started failing {display_time.format_instant(since['at'])}, after "
                      f"{cause}{f' by {by}' if by else ''}.")]
     return {"clause": lead, "status": status, "tail": tail}
 

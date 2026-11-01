@@ -82,6 +82,43 @@ describe("the vocabulary is the one both sides agreed", () => {
   });
 });
 
+// REQ-DASH-359 NFR 1: the page keeps its own copy of the words, held
+// equal to status-cases.json's vocabulary.labels block here - and the
+// Python twin to the same block by tests/test_status_parity.py - so the
+// page's words and the terminal's cannot drift apart.
+describe("the words are the ones both sides agreed", () => {
+  const table = withoutUnderscores(CASES.vocabulary.labels);
+
+  it("holds exactly the table's words", () => {
+    expect(Object.keys(table).length).toBeGreaterThan(0);
+    expect(vocab().labels).toEqual(table);
+  });
+
+  it("gives every form through statusWords", () => {
+    const w = load();
+    for (const [value, words] of Object.entries(table)) {
+      for (const form of ["label", "verb", "count"]) {
+        expect(w.statusWords(value, form)).toBe(words[form]);
+      }
+    }
+  });
+
+  it("refuses a status it has no word for, rather than showing it raw", () => {
+    const w = load();
+    for (const bad of ["purple", "", undefined, "Fail", "pass"]) {
+      expect(() => w.statusWords(bad, "label")).toThrow(/unrecognised status/);
+    }
+  });
+
+  it("uses no colour as a word", () => {
+    for (const words of Object.values(table)) {
+      for (const said of Object.values(words)) {
+        expect(said).not.toMatch(/\b(green|amber|red)\b/i);
+      }
+    }
+  });
+});
+
 describe("every check case", () => {
   for (const c of CASES.check_cases.filter((x) => !x.expect_error)) {
     it(`${c.id} returns what the table says`, () => {

@@ -34,6 +34,22 @@ LABEL = "replacement setting"
 PERMITS = {NEVER: frozenset(), GREEN: frozenset({"green"}),
            GREEN_OR_AMBER: frozenset({"green", "amber"})}
 
+#: Each value as a person reads it (REQ-DASH-359 criterion 12): never the
+#: raw value green or green-or-amber, which are stored configuration. The
+#: page's REPLACEMENT_WORDS is held equal to this by tests/
+#: test_status_words_shown.py.
+WORDS = {NEVER: "never", GREEN: "when passing", GREEN_OR_AMBER: "when passing or warning"}
+
+
+def words(value: str) -> str:
+    """A replacement setting's value in words; refuses one it does not know."""
+    try:
+        return WORDS[value]
+    except KeyError:
+        raise amber_setting.AmberSettingError(
+            f"unknown replacement setting {value!r}; values are "
+            f"{', '.join(REPLACEMENT_SETTINGS)}") from None
+
 
 def resolve(dataset_id: str, at: datetime | str, *, doc: dict | None = None):
     """The replacement setting for `dataset_id` as at `at` - value, level and
