@@ -69,6 +69,11 @@ class NoModule(AssetError):
     """An asset's adapter or provider file does not exist."""
 
 
+class DbtPackagesMissing(AssetError):
+    """The selected asset's dbt packages are not installed (REQ-QAC-368
+    criterion 6)."""
+
+
 class OneAssetPerProcess(AssetError):
     """A connection for a second asset in a process that already opened one
     for another (REQ-PIPE-343 criterion 5)."""
@@ -167,8 +172,8 @@ class _Folder:
     """Another layout with one asset's configuration folder pointed
     elsewhere - every other path of it, and every other asset, unchanged."""
 
-    def __init__(self, base, name: str, folder: Path):
-        self.base, self.name, self.folder = base, name, folder
+    def __init__(self, base, name: str, folder: Path, adapters: Path | None = None):
+        self.base, self.name, self.folder, self.adapters = base, name, folder, adapters
 
     def names(self) -> list[str]:
         return self.base.names()
@@ -177,18 +182,20 @@ class _Folder:
         found = self.base.asset(name)
         if name != self.name:
             return found
-        return Asset(name=name, folder=self.folder, adapters=found.adapters,
+        return Asset(name=name, folder=self.folder, adapters=self.adapters or found.adapters,
                      providers=found.providers, dbt_project=found.dbt_project,
                      data=found.data, reports=found.reports)
 
 
-def use_folder(folder: Path, name: str | None = None):
+def use_folder(folder: Path, name: str | None = None, *, adapters: Path | None = None):
     """Point one asset's configuration at another folder - by default the
-    selected asset's - and return what the resolver pointed at before. The
-    suite's one fixture (REQ-PIPE-342 criterion 7) is built on this."""
+    selected asset's - and, with `adapters`, its adapter folder too; return
+    what the resolver pointed at before. The suite's one fixture
+    (REQ-PIPE-342 criterion 7) is built on this."""
     global _layout
     before = _layout
-    _layout = _Folder(before, name or selected().name, Path(folder))
+    _layout = _Folder(before, name or selected().name, Path(folder),
+                      Path(adapters) if adapters is not None else None)
     return before
 
 
@@ -278,6 +285,23 @@ def deliveries_dir() -> Path:
 
 def receipts_dir() -> Path:
     return data_path("receipts")
+
+
+# ---- the asset's dbt project (REQ-QAC-368) ----
+
+def dbt_project_ready() -> Path:
+    """The selected asset's dbt project, once its packages are installed -
+    refused before dbt is invoked when they are not (REQ-QAC-368 criterion
+    6), naming the asset and the one command that fixes it, rather than
+    failing later with a FileNotFoundError on manifest.json."""
+    asset = selected()
+    packages = asset.dbt_packages
+    if not packages.is_dir() or not any(packages.iterdir()):
+        raise DbtPackagesMissing(
+            f"asset {asset.name!r} has no dbt packages installed - {packages} is missing or "
+            f"empty, so dbt cannot compile its checks. Run `mothman env dbt-deps` (with "
+            f"{ASSET_ENV}={asset.name}), then run this again.")
+    return asset.dbt_project
 
 
 # ---- adapters and providers, by path (REQ-PIPE-369, REQ-GEN-370) ----

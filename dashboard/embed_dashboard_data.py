@@ -198,7 +198,7 @@ from qa_tools.common import schedule
 from qa_tools.common.changelog import build_changelog
 from qa_tools.common.github_links import build_check_source_links, build_folder_links, current_commit_sha
 from qa_tools.common.leaderboard import build_leaderboard
-from qa_tools.common.people import assignees_for, parse_people_config
+from qa_tools.common.people import assignees_for, parse_people_config, people_yaml
 from qa_tools.common.ticket_status import parse_open_tickets
 from qa_tools.common import ticket_sync
 
@@ -732,7 +732,7 @@ def embed() -> None:
     def _public(record: dict) -> dict:
         return {k: v for k, v in record.items() if k != "email"}
 
-    people_config = parse_people_config()
+    people_config = parse_people_config(people_yaml())
     dataset_assignments = {}
     dataset_agency = ticket_sync.DATASET_AGENCY
     for dataset_id, agency_id in dataset_agency.items():

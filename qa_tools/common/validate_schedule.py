@@ -575,7 +575,7 @@ def _dataset_errors(raw: dict, src: Source) -> list[ConfigError]:
         if not named:
             out.append(ConfigError(
                 src.name, scope,
-                f"is in {src.name}'s hierarchy and names no `calendar:` in "
+                f"is in {assets.selected().data_asset_yaml.name}'s hierarchy and names no `calendar:` in "
                 f"{src.calendar_name} - "
                 f"neither on the dataset nor on its collection - and no deliberate no-calendar "
                 f"declaration.",

@@ -48,8 +48,16 @@ from qa_tools.common.qa_results_writer import write_qa_result
 __all__ = ["ENGINE_TAG", "evaluate", "selection_for", "test_names_by_check_id"]
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
-DBT_PROJECT_DIR = os.path.join(ROOT, "dbt_project")
 PROFILES_DIR = os.path.join(os.path.dirname(__file__), "..", "dbt_profiles")
+
+def _project_dir() -> str:
+    """The selected asset's dbt project, resolved now and refused before dbt
+    is invoked when its packages are not installed (REQ-QAC-368 criteria 3
+    and 6). It was the import-time constant DBT_PROJECT_DIR."""
+    from qa_tools.common import assets
+
+    return str(assets.dbt_project_ready())
+
 
 #: Row-shaped audit tables (the full failing row kept) are counted; the
 #: value-aggregated ones (accepted_values, unique: (value, n_records) pairs,
@@ -108,7 +116,7 @@ def test_names_by_check_id(collection_id: str) -> dict[str, list[str]]:
     through `_check_id_for` (REQ-PIPE-189 NFR 1)."""
     coll = collections.by_id(collection_id)
     spec = collections.adapter(coll).dbt
-    return names_by_check_id(parsed_test_nodes(PROFILES_DIR, DBT_PROJECT_DIR),
+    return names_by_check_id(parsed_test_nodes(PROFILES_DIR, _project_dir()),
                              lambda node: _check_id_for(coll, spec, node))
 
 
@@ -186,7 +194,7 @@ def evaluate(collection_id: str, run_id: str, run_timestamp: str) -> list[dict]:
         return []
 
     run_dbt("build", selection_for(coll.id, asked) if scoped else models + list(spec.singular_home),
-            target_path, PROFILES_DIR, DBT_PROJECT_DIR, ROOT,
+            target_path, PROFILES_DIR, _project_dir(), ROOT,
             run_schema=supply_db.run_schema(run_id), run_id=run_id, exclude=exclude,
             indirect_selection="empty" if scoped else None)
 

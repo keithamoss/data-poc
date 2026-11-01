@@ -199,7 +199,9 @@ def asset_folder(tmp_path):
     each file named, which is written with the text given (a file below an
     agency folder gets a real copy of that folder) - points the resolver at
     it and returns it. `asset_folder(folder=path)` points at a folder the test
-    built itself. Called again, it points at a fresh copy."""
+    built itself, completed from the real one with whatever it lacks (as
+    tests/asset_folders.py completes one). Called again, it points at a fresh
+    copy."""
     import shutil
     from pathlib import Path
 
@@ -221,6 +223,10 @@ def asset_folder(tmp_path):
                 path = folder / rel
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_text(text)
+        else:
+            import asset_folders
+
+            asset_folders.complete(folder)
         made.append(folder)
         _assets.use_root(None)
         _assets.use_folder(folder)

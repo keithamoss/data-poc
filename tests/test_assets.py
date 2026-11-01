@@ -234,3 +234,59 @@ def _claim_two(first: str, second: str) -> bool:
     except assets.OneAssetPerProcess:
         return True
     return False
+
+
+class TestTheConnectionGuard:
+    """Every connection says which asset it is for, before it opens
+    (REQ-PIPE-363 criterion 6, REQ-PIPE-343 criterion 5)."""
+
+    def test_no_asset_is_refused_before_any_connection_opens(self, supply_dsn, monkeypatch):
+        import psycopg
+
+        from qa_tools.common import supply_db
+
+        monkeypatch.delenv(assets.ASSET_ENV, raising=False)
+        opened = []
+        monkeypatch.setattr(psycopg, "connect", lambda *a, **k: opened.append(a))
+        with pytest.raises(assets.AssetNotSelected):
+            supply_db.connect(read_only=True, reuse=False)
+        assert opened == []
+
+    def test_a_second_assets_connection_in_one_test_is_refused(self, supply_dsn, monkeypatch,
+                                                              tmp_path):
+        import psycopg
+
+        from qa_tools.common import supply_db
+
+        supply_db.connect(read_only=True, reuse=False).close()
+        assert assets.claimed() == "data-asset-1"
+        assets.use_root(_two_assets(tmp_path))
+        monkeypatch.setenv(assets.ASSET_ENV, "quarterly")
+        opened = []
+        monkeypatch.setattr(psycopg, "connect", lambda *a, **k: opened.append(a))
+        with pytest.raises(assets.OneAssetPerProcess):
+            supply_db.connect(read_only=True, reuse=False)
+        assert opened == []
+
+
+class TestTheBootstrapHandsItsStreamsTheAsset:
+    """REQ-PIPE-369 criterion 4: a stream's spawned process is handed the
+    asset beside the collection, and selects it itself."""
+
+    def test_each_stream_process_selects_the_asset_it_was_handed(self, monkeypatch):
+        from qa_tools.common import bootstrap
+
+        # The parent knows its asset; its environment no longer says so, so
+        # a child that merely inherited the environment would know none.
+        here = assets.selected()
+        monkeypatch.delenv(assets.ASSET_ENV)
+        monkeypatch.setattr(assets, "selected", lambda: here)
+        monkeypatch.setattr(bootstrap, "_run_stream", _which_asset_and_adapter)
+        got = bootstrap._run_concurrently(["civil-registration"], sequential=True)
+        assert got == {"civil-registration": (
+            "data-asset-1", str(ROOT / "qa_tools" / "collections" / "civil_registration.py"))}
+
+
+def _which_asset_and_adapter(key: str, sequential: bool):
+    """What a stream process would load - run in the spawned child."""
+    return os.environ.get(assets.ASSET_ENV), assets.adapter_file(key)

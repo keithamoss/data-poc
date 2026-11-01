@@ -74,7 +74,7 @@ from dataclasses import dataclass
 
 from qa_tools.common import hierarchy
 from qa_tools.common.dataset_status import dataset_status
-from qa_tools.common.people import github_usernames_for, parse_people_config
+from qa_tools.common.people import github_usernames_for, parse_people_config, people_yaml
 from qa_tools.common.ticket_check_summary import build_check_summary
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
@@ -350,7 +350,7 @@ def main() -> None:
     if not slug or "/" not in slug:
         raise SystemExit("contract/data-asset.yaml names no ticket_repository (owner/repo)")
     owner, repo = slug.split("/", 1)
-    people_config = parse_people_config()
+    people_config = parse_people_config(people_yaml())
     for line in sync_all(owner, repo, people_config):
         print(line)
 

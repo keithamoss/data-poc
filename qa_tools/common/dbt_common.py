@@ -437,3 +437,38 @@ def exclude_unreadable(*, models, unreadable):
 
 def _table_of_model(model: str) -> str:
     return model[len(MODEL_PREFIX):] if model.startswith(MODEL_PREFIX) else model
+
+
+#: Written into an asset's dbt_packages/ once its packages install, holding
+#: the digest of the packages.yml they were installed for (REQ-QAC-368
+#: criterion 5) - so a second run can tell 'already installed' from 'the
+#: packages changed'.
+PACKAGES_STAMP = ".mothman-packages.sha1"
+
+
+def install_packages(project_dir, profiles_dir) -> bool:
+    """Install one dbt project's packages into its own dbt_packages/ with
+    `dbt deps`; False, changing nothing, when they are already installed for
+    the packages.yml as it reads now (REQ-QAC-368 criterion 5)."""
+    import hashlib
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    project = Path(project_dir)
+    wanted = hashlib.sha1((project / "packages.yml").read_bytes()).hexdigest()
+    stamp = project / "dbt_packages" / PACKAGES_STAMP
+    if stamp.is_file() and stamp.read_text().strip() == wanted:
+        return False
+    dbt = Path(sys.executable).parent / "dbt"
+    done = subprocess.run([str(dbt), "deps", "--project-dir", str(project),
+                           "--profiles-dir", str(profiles_dir)],
+                          capture_output=True, text=True,
+                          # NO DATABASE: installing packages opens no connection.
+                          env={**os.environ, "DBT_SEND_ANONYMOUS_USAGE_STATS": "False"})
+    if done.returncode != 0:
+        said = "\n".join(p.strip() for p in (done.stdout, done.stderr) if p and p.strip())
+        raise DbtRunFailed(f"dbt deps failed for {project}. dbt said:\n{said}")
+    stamp.parent.mkdir(exist_ok=True)
+    stamp.write_text(wanted + "\n")
+    return True

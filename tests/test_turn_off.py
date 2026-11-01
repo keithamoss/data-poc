@@ -387,9 +387,12 @@ def _off_for_a_while(doc=None, *, back: str = "2026-01-01") -> dict:
 def using(monkeypatch, tmp_path):
     """Point every reader of the committed agreement at `doc`."""
     def apply(doc):
-        path = tmp_path / "calendar.yaml"
-        path.write_text(yaml.safe_dump(doc, sort_keys=False))
-        asset_folders.point(tmp_path)
+        # A FOLDER NAMED AS THE REAL ONE IS, so a message naming the file to
+        # edit relative to the repository reads as it does for the real one.
+        folder = tmp_path / "contract"
+        folder.mkdir(exist_ok=True)
+        (folder / "calendar.yaml").write_text(yaml.safe_dump(doc, sort_keys=False))
+        asset_folders.point(folder)
         return agreement.current()
     yield apply
 

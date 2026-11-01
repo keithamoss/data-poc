@@ -74,6 +74,25 @@ def _state_the_asset() -> None:
         console.print(assets.why_not_selected(), style="yellow")
 
 
+@env_group.command("dbt-deps")
+def dbt_deps_command() -> None:
+    """Install the selected asset's dbt packages into its own dbt project.
+
+    Once per asset (REQ-QAC-368 criterion 5): nothing changes, and it says
+    'already installed', when they are installed for its packages.yml as it
+    reads now. Opens no database.
+    """
+    from qa_tools.common import assets, dbt_common
+    from qa_tools.tools import run_dbt
+
+    asset = assets.selected()
+    if dbt_common.install_packages(asset.dbt_project, run_dbt.PROFILES_DIR):
+        console.print(f"Installed the dbt packages for asset {asset.name!r} into "
+                      f"{asset.dbt_packages}.", style="green")
+    else:
+        console.print(f"Asset {asset.name!r}: dbt packages already installed.", style="green")
+
+
 @env_group.command("reset-synthetic")
 def reset_synthetic_command() -> None:
     """Delete this SYNTHETIC asset's whole QA history, to start from empty.
