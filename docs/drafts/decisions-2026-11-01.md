@@ -234,3 +234,7 @@ the rebuild needs no question asked twice. Drafts and builders read this file.
     unmarked module is refused (REQ-PIPE-363 d12).
   - C12: no forwarding macros file; each asset's dbt project points
     macro-paths and test-paths at dbt_shared; REQ-QAC-368 c2 amended.
+- D1 CHANGED by Keith 2026-11-02 (recommended was scope first): FIX NOW. Linkage
+  Products releases read only source supplies whose file actually arrived, the
+  same rule as geocoding (plans/qa-pipeline.md #89); a regenerated change to
+  built REQ-GEN-334 deliveries, and the report lists every release that moved.
