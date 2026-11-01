@@ -191,7 +191,8 @@ def generate(collection_id: str) -> list[dict]:
         # A PERIOD'S INJECTED SCENARIOS ARE THE PROVIDER'S OWN STREAM'S - its
         # first - never another stream's job in the same period.
         injected = (plan.injected_by_period.get(job.period.name)
-                    if job.stream == streams[0].name else None)
+                    if job.stream == streams[0].name
+                    else plan.injected_by_stream.get(job.stream, {}).get(job.period.name))
         for n, (delivery_obj, entry) in enumerate(zip(deliveries, entries), start=1):
             entry["received_at"] = provider.received_at(plan, job, n, delivery_obj, entry)
             name = delivery_names.delivery_name(job.period.round_date, job.seed, attempt=n,

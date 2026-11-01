@@ -2560,6 +2560,113 @@ INJECTIONS: tuple[Injection, ...] = (
                          "and the other five clean", severity_tables=("cp_clients",)),
         ),
     ),
+    # THE GEOCODING HISTORY'S FAULTS ON PURPOSE (REQ-GEN-298), one fault alone
+    # in its file and one scenario a quarter, each quarter clear of every
+    # scenario of the geocoded dataset's source and of the linkage delivery and
+    # off REQ-GEN-205's corrected rounds (criterion 7, refused by the provider
+    # otherwise). A ROW FAULT here is one of the Linkage Products provider's
+    # GEO_ROW_FAULTS, named for the geocoding dataset it is applied to. Anchors
+    # count back from each geocoding dataset's newest generated quarter.
+    Injection(
+        scenario_id="TS-102",
+        dataset_id="geo-cp-clients",
+        anchor=-14,  # 2023-Q2
+        config="quarterly, due 19:00 on the round with 8 hours' grace, files_go_to_period 0; the geocoding delivery is received at 18:30, after the quarter's linkage release and after its source supply is promoted. For a few Client Register records, one census year's row is missing while the record's other years are there - two or more years being in force since 2017-Q3.",
+        arrivals=(
+            ExtraArrival(0, "18:30", None,
+                         "the delivery, one census year's rows dropped for a few Client Register records", row_faults=('missing_year@geo-cp-clients',)),
+        ),
+    ),
+    Injection(
+        scenario_id="TS-103",
+        dataset_id="geo-ed-presentations",
+        anchor=-18,  # 2022-Q1
+        config="quarterly, due 19:00 on the round with 8 hours' grace, files_go_to_period 0; the geocoding delivery is received at 18:30, after the quarter's linkage release and after its source supply is promoted. For a few ED presentations, one census year's row appears twice, identical in every column.",
+        arrivals=(
+            ExtraArrival(0, "18:30", None,
+                         "the delivery, one census year's row repeated for a few ED presentations", row_faults=('duplicate_year@geo-ed-presentations',)),
+        ),
+    ),
+    Injection(
+        scenario_id="TS-104",
+        dataset_id="geo-cp-clients",
+        anchor=-42,  # 2016-Q2
+        config="quarterly, due 19:00 on the round with 8 hours' grace, files_go_to_period 0; the geocoding delivery is received at 18:30, after the quarter's linkage release and after its source supply is promoted. A few Client Register records carry a row for census year 2026, which joins the set only from 2027-Q3.",
+        arrivals=(
+            ExtraArrival(0, "18:30", None,
+                         "the delivery, a 2026 row for a few Client Register records", row_faults=('unexpected_year@geo-cp-clients',)),
+        ),
+    ),
+    Injection(
+        scenario_id="TS-105",
+        dataset_id="geo-ed-presentations",
+        anchor=-14,  # 2023-Q1
+        config="quarterly, due 19:00 on the round with 8 hours' grace, files_go_to_period 0; the geocoding delivery is received at 18:30, after the quarter's linkage release and after its source supply is promoted. Whole ED presentations are turned not geocoded, in every year and with their codes empty, until the share not geocoded lies in the share check's warn band.",
+        arrivals=(
+            ExtraArrival(0, "18:30", None,
+                         "the delivery, ED Presentations' share not geocoded in the warn band", row_faults=('not_geocoded_amber@geo-ed-presentations',)),
+        ),
+    ),
+    Injection(
+        scenario_id="TS-106",
+        dataset_id="geo-cp-clients",
+        anchor=-11,  # 2024-Q1
+        config="quarterly, due 19:00 on the round with 8 hours' grace, files_go_to_period 0; the geocoding delivery is received at 18:30, after the quarter's linkage release and after its source supply is promoted. Whole Client Register records are turned not geocoded, in every year and with their codes empty, until the share not geocoded lies in the share check's fail band.",
+        arrivals=(
+            ExtraArrival(0, "18:30", None,
+                         "the delivery, Client Register Geocodes' share not geocoded in the fail band", row_faults=('not_geocoded_red@geo-cp-clients',)),
+        ),
+    ),
+    Injection(
+        scenario_id="TS-107",
+        dataset_id="geo-ed-presentations",
+        anchor=-49,  # 2014-Q1
+        config="quarterly, due 19:00 on the round with 8 hours' grace, files_go_to_period 0; the geocoding delivery is received at 18:30, after the quarter's linkage release and after its source supply is promoted. 0.5 to 1.5 percent of the quarter's ED presentations are left out of the file in every year - the coverage check's warn band.",
+        arrivals=(
+            ExtraArrival(0, "18:30", None,
+                         "the delivery, ED Presentations Geocodes leaving 0.5 to 1.5 percent of presentations out", row_faults=('left_out_amber@geo-ed-presentations',)),
+        ),
+    ),
+    Injection(
+        scenario_id="TS-108",
+        dataset_id="geo-cp-clients",
+        anchor=-7,  # 2025-Q1
+        config="quarterly, due 19:00 on the round with 8 hours' grace, files_go_to_period 0; the geocoding delivery is received at 18:30, after the quarter's linkage release and after its source supply is promoted. 3 to 6 percent of the quarter's Client Register records are left out of the file in every year - the coverage check's fail band.",
+        arrivals=(
+            ExtraArrival(0, "18:30", None,
+                         "the delivery, Client Register Geocodes leaving 3 to 6 percent of clients out", row_faults=('left_out_red@geo-cp-clients',)),
+        ),
+    ),
+    Injection(
+        scenario_id="TS-109",
+        dataset_id="geo-ed-presentations",
+        anchor=-35,  # 2017-Q4
+        config="quarterly, due 19:00 on the round with 8 hours' grace, files_go_to_period 0; the geocoding delivery is received at 18:30, after the quarter's linkage release and after its source supply is promoted. One record's rows, in every year, name an ED presentation the quarter's supply does not hold.",
+        arrivals=(
+            ExtraArrival(0, "18:30", None,
+                         "the delivery, one record naming a presentation that is not there", row_faults=('orphan_record@geo-ed-presentations',)),
+        ),
+    ),
+    Injection(
+        scenario_id="TS-110",
+        dataset_id="geo-cp-clients",
+        anchor=-4,  # 2025-Q4
+        config="quarterly, due 19:00 on the round with 8 hours' grace, files_go_to_period 0; the geocoding delivery is received at 18:30, after the quarter's linkage release and after its source supply is promoted. geo_cp_clients.csv holds no rows at all, while the quarter's Client Register holds its clients.",
+        arrivals=(
+            ExtraArrival(0, "18:30", None,
+                         "the delivery, an empty geo_cp_clients.csv", row_faults=('empty_file@geo-cp-clients',)),
+        ),
+    ),
+    Injection(
+        scenario_id="TS-111",
+        dataset_id="geo-cp-clients",
+        anchor=-3,  # 2026-Q1
+        config="quarterly, due 19:00 on the round with 8 hours' grace, files_go_to_period 0; the geocoding delivery is received at 18:30, after the quarter's linkage release and after its source supply is promoted. 0.5 to 1.5 percent of the quarter's Client Register records are left out in every year, so the file reads Warn on coverage and is promoted, the amber setting promoting; from that instant the quarter's Client Register, promoted passing on the round before, reads with the Warn tag naming Client Register Geocodes (REQ-PIPE-332 criterion 4's route).",
+        arrivals=(
+            ExtraArrival(0, "18:30", None,
+                         "the delivery, Client Register Geocodes leaving 0.5 to 1.5 percent of clients out, promoted on its Warn", row_faults=('left_out_amber@geo-cp-clients',)),
+        ),
+    ),
     Injection(
         scenario_id="TS-100a",
         dataset_id="cp-clients",

@@ -93,6 +93,56 @@ GEO_RECEIVED_FROM = time(18, 5)
 #: The synthetic geocoder's own failures, independently of the source: 0.5 to
 #: 1.5 percent of a supply's records not placed (criterion 6).
 GEOCODER_FAILURE = (0.005, 0.015)
+#: THE GEOCODING STREAM'S ORDINARY SEVERITY DRAW (REQ-GEN-295 criterion 13),
+#: from the stream's own seed - never the linkage stream's RUN_PLAN_SEED.
+GEO_RUN_PLAN_SEED = 71_998
+#: A geocoding slot's fault draw is its seed plus this, and a red's resupply
+#: its seed plus one more (REQ-GEN-298), so the rows every clean quarter is
+#: built from are drawn exactly as before.
+GEO_FAULT_SPAN = 500
+#: THE UNEXPECTED CENSUS YEAR (REQ-GEN-298 criterion 5; Keith, Q14, as moved
+#: in the v5 round): 2026 joins the set only from 2027-Q3, after the history
+#: ends, so in every quarter only the unexpected-year check catches it.
+UNEXPECTED_YEAR = 2026
+#: RECORDS LEFT OUT, as a percentage of the source supply's records
+#: (REQ-GEN-298 criterion 4): the coverage check's amber and red routes.
+LEFT_OUT = {"amber": (0.5, 1.5), "red": (3.0, 6.0)}
+#: Where inside the share check's band a share fault aims, as margins from
+#: its warn and fail bounds, in percentage points (criterion 1): amber
+#: between warn + 1 and fail - 1, red between fail + 2 and fail + 8.
+SHARE_AIM = {"amber": (1.0, -1.0), "red": (2.0, 8.0)}
+
+#: THE GEOCODING STREAM'S NAMED ROW FAULTS (REQ-GEN-298 criteria 1 and 4),
+#: named as data as ROW_FAULTS are - each "name@<geocoding dataset id>", the
+#: dataset the fault is applied to. A SHAPE OF THE FILE'S ROWS, NEVER A
+#: VERDICT: the real tools decide, and the generation-time trial confirms.
+GEO_ROW_FAULTS = {
+    "missing_year": "one census year's rows dropped for chosen records (two or more years "
+                    "in force)",
+    "duplicate_year": "one census year's row repeated, identical in every column, for "
+                      "chosen records",
+    "unexpected_year": f"a row for census year {UNEXPECTED_YEAR}, outside the set in force, "
+                       f"for chosen records",
+    "not_geocoded_amber": "whole records turned 'not geocoded' in every year until the share "
+                          "lies in the share check's amber band",
+    "not_geocoded_red": "whole records turned 'not geocoded' in every year until the share "
+                        "lies in the share check's red band",
+    "left_out_amber": "0.5 to 1.5 percent of the source's records left out in every year",
+    "left_out_red": "3 to 6 percent of the source's records left out in every year",
+    "orphan_record": "one record's rows, in every year, naming a record the quarter's source "
+                     "does not hold",
+    "empty_file": "the file holds no rows at all",
+}
+#: The verdict each fault is built to; the share faults' is the share's own,
+#: banded by the check (planned_verdict).
+GEO_FAULT_VERDICT = {"missing_year": "red", "duplicate_year": "red", "unexpected_year": "red",
+                     "left_out_amber": "amber", "left_out_red": "red",
+                     "orphan_record": "red", "empty_file": "red"}
+#: THE PRESETS (criterion 2): an ordinary amber raises the share into the
+#: amber band; an ordinary red takes one of these, the missing year only
+#: where two or more years are in force.
+GEO_AMBER_PRESET = "not_geocoded_amber"
+GEO_RED_PRESETS = ("missing_year", "duplicate_year", "unexpected_year", "not_geocoded_red")
 #: The synthetic code pools, in the ABS ASGS formats - never a real
 #: correspondence (REQ-QAC-294 NFR 4): nine-digit SA2 and five-digit LGA codes,
 #: each led by Western Australia's state digit.
@@ -278,6 +328,201 @@ def planned_verdict(dataset_id: str, rows, catalogue) -> str:
     if total and checks[0].warns(bad, total):
         return "amber"
     return "green"
+
+
+_RANK = {"green": 0, "amber": 1, "red": 2}
+
+
+def worst(*verdicts: str) -> str:
+    """The worst of several planned verdicts."""
+    return max(verdicts, key=lambda v: _RANK[v]) if verdicts else "green"
+
+
+def parse_geo_fault(fault: str, where: str, dataset_id: str) -> str:
+    """A geocoding row fault's name, refused naming the scenario where the
+    name is unknown or it names a dataset other than the one it is applied
+    to (REQ-GEN-298 criterion 1)."""
+    name, _, did = fault.partition("@")
+    if name not in GEO_ROW_FAULTS:
+        raise CannotGenerate(f"{where}: unknown geocoding row fault {name!r} - known faults "
+                             f"are {', '.join(sorted(GEO_ROW_FAULTS))}; nothing was written")
+    if did != dataset_id:
+        raise CannotGenerate(f"{where}: geocoding row fault {fault!r} must name the dataset "
+                             f"it is applied to ({name}@{dataset_id}); nothing was written")
+    return name
+
+
+def _share_check(dataset_id: str, catalogue):
+    checks = [c for c in catalogue.checks if c.dataset_id == dataset_id
+              and c.check_id.endswith(".value_share_soda")]
+    if len(checks) != 1:
+        raise CannotGenerate(f"{dataset_id} declares {len(checks)} value-share checks - one is "
+                             f"needed to plan its supplies' verdicts; nothing was written")
+    return checks[0]
+
+
+def _keys(rows, ids: list[str]):
+    """Each row's record, its identifier values joined as one text value."""
+    import pandas as pd
+
+    if not len(rows):
+        return pd.Series([], dtype=str, index=rows.index)
+    return rows[ids].astype(str).agg("\x1f".join, axis=1)
+
+
+def apply_geo_faults(dataset_id: str, rows, faults, *, source_rows, id_columns, years,
+                     rng, where: str, catalogue):
+    """One geocoding file's rows with its named faults applied (REQ-GEN-298
+    criteria 1, 4 and 6), and the verdict the file is built to: the share's
+    own band (planned_verdict) and each fault's. Pure: the same inputs and
+    draw give the same rows. Refused - never shifted or relaxed - where a
+    fault cannot be placed."""
+    import pandas as pd
+
+    from generator import dirty, synthetic_inputs
+
+    placing = synthetic_inputs.placings()[dataset_id]
+    member_col, _setting = member_setting_of(dataset_id)
+    ids = [c for c in rows.columns if c.startswith("id_")][:len(id_columns)]
+    level = placing.placed_column
+    unplaced = placing.unplaced_value
+    rows = rows.copy()
+    built: list[str] = []
+
+    def records():
+        key = _keys(rows, ids)
+        order = list(dict.fromkeys(key.tolist()))
+        placed_all = (rows[level] != unplaced).groupby(key).all() if len(rows) else {}
+        return key, order, [k for k in order if bool(placed_all[k])]
+
+    def share() -> float:
+        return 100.0 * int((rows[level] == unplaced).sum()) / len(rows) if len(rows) else 0.0
+
+    for fault in faults:
+        name = parse_geo_fault(fault, where, dataset_id)
+        key, order, placed = records()
+        if not order and name != "empty_file":
+            raise CannotGenerate(f"{where}: {dataset_id} has no record to carry {name}; "
+                                 f"nothing was written")
+        if name in ("missing_year", "duplicate_year", "unexpected_year"):
+            pool = placed or order
+            k = min(len(pool), int(rng.integers(1, 4)))
+            chosen = {pool[i] for i in sorted(rng.choice(len(pool), size=k, replace=False))}
+            mask = key.isin(chosen)
+            if name == "missing_year":
+                if len(years) < 2:
+                    raise CannotGenerate(
+                        f"{where}: a missing census year needs two or more years in force, "
+                        f"and {dataset_id}'s quarter holds {list(years)} - dropping its only "
+                        f"year would leave the record out, which is coverage's fault; nothing "
+                        f"was written")
+                year = years[int(rng.integers(len(years)))]
+                rows = rows[~(mask & (rows[member_col].astype(str) == str(year)))]
+            elif name == "duplicate_year":
+                year = years[int(rng.integers(len(years)))]
+                one = rows[mask & (rows[member_col].astype(str) == str(year))]
+                # generator/dirty.py's duplicate, IDENTICAL IN EVERY COLUMN: no
+                # near-duplicate columns (criterion 1).
+                twice = dirty.inject_duplicate_rows(one, 1.0, int(rng.integers(2 ** 31)))
+                rows = pd.concat([rows, twice.iloc[len(one):]], ignore_index=True)
+            else:
+                extra = rows[mask].drop_duplicates(subset=ids, keep="last").copy()
+                extra[member_col] = UNEXPECTED_YEAR
+                for k2 in extra.index:
+                    if extra.at[k2, level] != unplaced:
+                        rec = "\x1f".join(str(extra.at[k2, c]) for c in ids)
+                        extra.at[k2, "sa2_code"], extra.at[k2, "lga_code"] = area_codes(
+                            dataset_id, rec, UNEXPECTED_YEAR)
+                rows = pd.concat([rows, extra], ignore_index=True)
+            built.append(GEO_FAULT_VERDICT[name])
+        elif name in ("not_geocoded_amber", "not_geocoded_red"):
+            band = name.rsplit("_", 1)[1]
+            check = _share_check(dataset_id, catalogue)
+            warn, fail = check.warn[0].value, check.fail[0].value
+            lo, hi = ((warn + SHARE_AIM["amber"][0], fail + SHARE_AIM["amber"][1])
+                      if band == "amber" else
+                      (fail + SHARE_AIM["red"][0], fail + SHARE_AIM["red"][1]))
+            want = float(rng.uniform(lo, hi))
+            # WHOLE RECORDS, every year, codes emptied (criterion 6): so only
+            # the share check catches it.
+            per_record = key.value_counts()
+            bad = int((rows[level] == unplaced).sum())
+            turned = []
+            for i in rng.permutation(len(placed)):
+                if 100.0 * bad / len(rows) >= want:
+                    break
+                turned.append(placed[int(i)])
+                bad += int(per_record[placed[int(i)]])
+            m = key.isin(set(turned))
+            rows.loc[m, level] = unplaced
+            rows.loc[m, "sa2_code"] = ""
+            rows.loc[m, "lga_code"] = ""
+            if planned_verdict(dataset_id, rows, catalogue) != band:
+                raise CannotGenerate(f"{where}: {dataset_id}'s not-geocoded share {share():.2f} "
+                                     f"percent is not in the share check's {band} band; "
+                                     f"nothing was written")
+        elif name in ("left_out_amber", "left_out_red"):
+            band = name.rsplit("_", 1)[1]
+            lo, hi = LEFT_OUT[band]
+            # MEASURED AS THE COVERAGE CHECK MEASURES IT: the share of the
+            # source supply's rows whose record has no geocoding row.
+            source = [_joined(r) for r in _records(source_rows, id_columns)] \
+                if source_rows is not None else []
+            if not source:
+                raise CannotGenerate(f"{where}: {dataset_id}'s source holds no record to leave "
+                                     f"out; nothing was written")
+            counts: dict = {}
+            for v in source:
+                counts[v] = counts.get(v, 0) + 1
+            want = float(rng.uniform(lo, hi))
+            out, gone = set(), 0
+            for i in rng.permutation(len(order)):
+                rec = order[int(i)]
+                if 100.0 * gone / len(source) >= want:
+                    break
+                n = counts.get(rec, 0)
+                if 100.0 * (gone + n) / len(source) > hi:
+                    continue
+                out.add(rec)
+                gone += n
+            left = 100.0 * gone / len(source)
+            if not lo <= left <= hi:
+                raise CannotGenerate(f"{where}: {left:.2f} percent of {dataset_id}'s source "
+                                     f"records left out, outside {lo} to {hi}; nothing was "
+                                     f"written")
+            # WHOLE RECORDS, every year (criterion 6): the missing-year check
+            # counts only records present, so it does not catch it.
+            rows = rows[~key.isin(out)]
+            built.append(GEO_FAULT_VERDICT[name])
+        elif name == "orphan_record":
+            source = ({_joined(r) for r in _records(source_rows, id_columns)}
+                      if source_rows is not None else set())
+            rec = (placed or order)[int(rng.integers(len(placed or order)))]
+            parts = rec.split("\x1f")
+            new = parts[:-1] + [f"{parts[-1]}9"]
+            if _joined(tuple(new)) in source or _joined(tuple(new)) in set(order):
+                raise CannotGenerate(f"{where}: the orphan identifier {_joined(tuple(new))!r} "
+                                     f"matches a record; nothing was written")
+            # ADDED, never renamed: a renamed record would also leave its
+            # source record uncovered, a second fault in the supply.
+            extra = rows[key == rec].copy()
+            for c, v in zip(ids, new):
+                extra[c] = v
+            for k2 in extra.index:
+                if extra.at[k2, level] != unplaced:
+                    extra.at[k2, "sa2_code"], extra.at[k2, "lga_code"] = area_codes(
+                        dataset_id, _joined(tuple(new)), extra.at[k2, member_col])
+            rows = pd.concat([rows, extra], ignore_index=True)
+            built.append(GEO_FAULT_VERDICT[name])
+        elif name == "empty_file":
+            if source_rows is None or not len(source_rows):
+                raise CannotGenerate(f"{where}: an empty {dataset_id} file needs a source "
+                                     f"supply holding rows (REQ-QAC-340 criterion 4); nothing "
+                                     f"was written")
+            rows = rows.iloc[0:0]
+            built.append(GEO_FAULT_VERDICT[name])
+    rows = rows.reset_index(drop=True)
+    return rows, worst(planned_verdict(dataset_id, rows, catalogue), *built)
 
 
 def _token(code: str, value: str) -> str:
@@ -502,8 +747,9 @@ class LinkageProducts(Provider):
     collection_id = COLLECTION_ID
     dataset_id = DATASET_ID
     amber_dataset = DATASET_ID
-    # THE GEOCODING STREAM HAS NO TRIAL YET (criterion 7): REQ-GEN-298's.
-    target_trial = False
+    # THE GENERATION-TIME TRIAL (REQ-GEN-298 criterion 10), in each tried
+    # supply's slot's period: every geocoding amber, red and scenario file.
+    target_trial = True
     # A SECOND RANGE FOR THE GEOCODING STREAM (criterion 14).
     seed_ranges = ((70_000, 71_000), (71_000, 72_000))
     generating_note = "one linkage release and one geocoding release a quarter"
@@ -551,8 +797,10 @@ class LinkageProducts(Provider):
                                                        RUN_PLAN_SEED)] + [
             (f"lp_slot_{i:02d}", BASE_SEED + i, BASE_SEED + i + RESUPPLY_SPAN)
             for i in range(1, n + 1)] + ([
-                ("the geocoding stream's keyed hash", GEO_KEY_SEED, GEO_KEY_SEED)] if geo else []) + [
-            (f"geo_slot_{i:02d}", GEO_BASE_SEED + i, GEO_BASE_SEED + i)
+                ("the geocoding stream's keyed hash", GEO_KEY_SEED, GEO_KEY_SEED),
+                ("the geocoding stream's severity draw", GEO_RUN_PLAN_SEED,
+                 GEO_RUN_PLAN_SEED)] if geo else []) + [
+            (f"geo_slot_{i:02d}", GEO_BASE_SEED + i, GEO_BASE_SEED + i + GEO_FAULT_SPAN + 1)
             for i in range(1, geo + 1)]
 
     def _sources(self) -> dict:
@@ -708,8 +956,15 @@ class LinkageProducts(Provider):
         return asset_time.wall_clock(job.period.round_date, hhmm)
 
     def _plan_geocoding(self, plan: Plan) -> None:
+        """The geocoding stream's jobs, every file built before the first
+        write: its rows from its source's last supply received before it
+        (REQ-GEN-295), then the faults on purpose (REQ-GEN-298) - a named
+        scenario's own, or the presets an ordinary amber or red is drawn to -
+        each file's planned verdict, which files the generation-time trial
+        tries, and the source supply the warehouse holds when it arrives."""
         import numpy as np
 
+        from generator import scenario_injection, targeting
         from qa_tools.common import asset_time, check_bands, hierarchy
 
         geo = geocoded()
@@ -720,27 +975,162 @@ class LinkageProducts(Provider):
         jobs = [Job(f"geo_slot_{i:02d}", GEO_BASE_SEED + i, None, p, stream=GEO_STREAM)
                 for i, p in enumerate(self._geo_periods(), start=1)]
         owes = {d: {p.name for p in self._geo_periods(d)} for d, _src, _cols in geo}
-        state = {}
+        ridden = _ridden_quarters()
+        # THE NAMED SCENARIOS, ONE FAULT EACH (REQ-GEN-298 criteria 3 and 4),
+        # refused before anything is written where criterion 7 says so.
+        injected: dict = {}
+        resolved = []
+        for d, _src, _cols in geo:
+            mine = scenario_injection.for_dataset(d)
+            periods_d = self._geo_periods(d)
+            scenario_injection.no_two_scenarios_share_a_period(mine, {d: periods_d})
+            for inj in mine:
+                placement = scenario_injection.resolve(inj, periods_d)
+                if placement.period in injected:
+                    raise CannotGenerate(
+                        f"{inj.scenario_id}: {placement.period}'s geocoding delivery already "
+                        f"carries {injected[placement.period][0].scenario_id} - one geocoding "
+                        f"scenario a quarter; nothing was written")
+                injected[placement.period] = (inj, placement)
+                resolved.append((inj, placement))
+        _refuse_geocoding_scenario_quarters(resolved, plan.resolved, ridden)
+        tables = {d: hierarchy.dataset(d).table for d, _src, _cols in geo}
+        base, rates = {}, {}
         for job in jobs:
-            at = self._geo_received(job)
+            hit = injected.get(job.period.name)
+            if hit is not None:
+                first = hit[0].arrivals[0]
+                at = asset_time.wall_clock(job.period.round_date
+                                           + timedelta(days=first.day_offset), first.at)
+            else:
+                at = self._geo_received(job)
             rng = np.random.default_rng(job.seed)
             files = {}
             for d, src, cols in geo:
                 rate = float(rng.uniform(*GEOCODER_FAILURE))
-                owed = owes[d]
                 # THE LAST SOURCE SUPPLY FILED TO THE QUARTER AND RECEIVED
                 # BEFORE THIS DELIVERY (criterion 3).
-                before = [s for s in sources[src] if s.period == job.period.name
-                          and asset_time.parse_instant(s.received_at, src) < at]
-                if job.period.name not in owed or not before:
+                before = _before(sources[src], src, job.period.name, at)
+                if job.period.name not in owes[d] or not before:
                     continue
+                rates[(job.slot_id, d)] = rate
                 rows = geocode_rows(d, before[-1].rows, cols,
                                     members_in_force(d, job.period), rate)
-                files[hierarchy.dataset(d).table] = (d, rows, planned_verdict(d, rows, catalogue))
-            state[job.slot_id] = (at, files) if files else None
-        _refuse_geocoding_unschedulable(jobs, sources, state, plan.state["arrivals"], plan.jobs)
+                files[tables[d]] = (d, rows, planned_verdict(d, rows, catalogue))
+            base[job.slot_id] = (at, files) if files else None
+        _refuse_geocoding_unschedulable(jobs, sources, base, plan.state["arrivals"], plan.jobs)
+
+        # WHAT THE WAREHOUSE HOLDS FOR EACH SOURCE WHEN THE FILE ARRIVES
+        # (criterion 11): the source supply the plan promotes there before
+        # the receipt, or none.
+        warehouse = {}
+        for job in jobs:
+            if base[job.slot_id] is None:
+                continue
+            at, files = base[job.slot_id]
+            for _t, (d, _rows, _v) in files.items():
+                src = hierarchy.dataset(d).linked[0][0]
+                warehouse[(job.slot_id, d)] = in_warehouse(src, job.period.name, at,
+                                                           sources[src])
+        named = _named_held_sources(plan.resolved, jobs, base, warehouse)
+
+        # THE ORDINARY SEVERITIES, FROM THE STREAM'S OWN SEED (REQ-GEN-295
+        # criterion 13): the collections' mix per geocoding dataset, kept off
+        # every quarter where a drawn fault could not be told apart from
+        # something else - a correction's rounds, a scenario of the dataset or
+        # of its source, a source the warehouse does not hold, a file already
+        # planned worse than green from its source's own rows.
+        claims = {src: _claimed_by(src) for _d, src, _cols in geo}
+        draw = np.random.default_rng(GEO_RUN_PLAN_SEED)
+        severity: dict = {}
+        for d, src, _cols in geo:
+            mine = [job for job in jobs if base[job.slot_id] is not None
+                    and tables[d] in base[job.slot_id][1]]
+            blocked = frozenset(
+                k for k, job in enumerate(mine)
+                if job.period.name in ridden or job.period.name in injected
+                or (d, job.period.name) in named or job.period.name in claims[src]
+                or warehouse[(job.slot_id, d)] is None
+                or base[job.slot_id][1][tables[d]][2] != "green")
+            drawn = targeting.outside_hold(
+                _draw(len(mine), draw), [job.period.round_date for job in mine], d,
+                keep_clean=frozenset({0}), unavailable=blocked)
+            for job, sev in zip(mine, _place_reds(drawn, blocked)):
+                if sev is not None:
+                    severity[(job.slot_id, d)] = sev
+
+        state, resupply, meta = {}, {}, {}
+        for job in jobs:
+            if base[job.slot_id] is None:
+                state[job.slot_id] = None
+                continue
+            at, files = base[job.slot_id]
+            hit = injected.get(job.period.name)
+            rng = np.random.default_rng(job.seed + GEO_FAULT_SPAN)
+            out, tried, reds = {}, [], []
+            for table, (d, rows, verdict) in files.items():
+                src = hierarchy.dataset(d).linked[0][0]
+                years = members_in_force(d, job.period)
+                sev = severity.get((job.slot_id, d))
+                if hit is not None and hit[0].dataset_id == d:
+                    faults = hit[0].arrivals[0].row_faults
+                    where = hit[0].scenario_id
+                elif sev == "amber":
+                    faults, where = (f"{GEO_AMBER_PRESET}@{d}",), f"the {job.period.name} {d} amber"
+                elif sev == "red":
+                    usable = [f for f in GEO_RED_PRESETS if f != "missing_year" or len(years) >= 2]
+                    faults = (f"{usable[int(rng.integers(len(usable)))]}@{d}",)
+                    where = f"the {job.period.name} {d} red"
+                    reds.append(d)
+                else:
+                    faults, where = (), ""
+                if faults:
+                    rows, verdict = apply_geo_faults(
+                        d, rows, faults, source_rows=_before(sources[src], src, job.period.name,
+                                                             at)[-1].rows,
+                        id_columns=hierarchy.dataset(d).linked[0][2], years=years, rng=rng,
+                        where=where, catalogue=catalogue)
+                out[table] = (d, rows, verdict)
+                # TRIED AT GENERATION (criterion 13): every amber or red, every
+                # named scenario's file and each file criterion 8 names.
+                if (verdict != "green" or (hit is not None and hit[0].dataset_id == d)
+                        or (d, job.period.name) in named):
+                    tried.append(d)
+            state[job.slot_id] = (at, out)
+            meta[(job.slot_id, 1)] = _meta(tried, out, warehouse, job.slot_id)
+            if reds:
+                # A GREEN RESUPPLY FIVE TO TWENTY DAYS LATER (REQ-GEN-295
+                # criterion 13), of the red files alone, each built from its
+                # source's last supply received before it.
+                again = asset_time.wall_clock(
+                    job.period.round_date + timedelta(days=_delay(
+                        np.random.default_rng(job.seed + GEO_FAULT_SPAN + 1))),
+                    at.strftime("%H:%M"))
+                files2 = {}
+                for d in reds:
+                    src, cols = hierarchy.dataset(d).linked[0][0], hierarchy.dataset(d).linked[0][2]
+                    rows = geocode_rows(d, _before(sources[src], src, job.period.name,
+                                                   again)[-1].rows, cols,
+                                        members_in_force(d, job.period),
+                                        rates[(job.slot_id, d)])
+                    files2[tables[d]] = (d, rows, planned_verdict(d, rows, catalogue))
+                resupply[job.slot_id] = (again, files2)
+                meta[(job.slot_id, 2)] = _meta([], files2, {}, job.slot_id)
         plan.jobs.extend(jobs)
         plan.state["geocoding"] = state
+        plan.state["geo_resupply"] = resupply
+        plan.state["geo_meta"] = meta
+        plan.state["geo_named"] = named
+        plan.resolved.extend(resolved)
+        plan.injected_by_stream[GEO_STREAM] = injected
+
+    def _geo_arrivals(self, plan: Plan, job: Job) -> list:
+        """(receipt, files) for each of a geocoding quarter's deliveries."""
+        first = plan.state["geocoding"][job.slot_id]
+        if first is None:
+            return []
+        again = plan.state.get("geo_resupply", {}).get(job.slot_id)
+        return [first] + ([again] if again is not None else [])
 
     def _rows(self, plan: Plan, job: Job, n: int):
         import numpy as np
@@ -767,12 +1157,12 @@ class LinkageProducts(Provider):
         from qa_tools.common import asset_time
 
         if job.stream == GEO_STREAM:
-            found = plan.state["geocoding"][job.slot_id]
-            if found is None:
+            found = self._geo_arrivals(plan, job)
+            if not found:
                 return None
-            at, files = found
             return [Delivery(received_date=asset_time.local_date(at), severity=None,
-                             payload={t: rows for t, (_d, rows, _v) in files.items()})]
+                             payload={t: rows for t, (_d, rows, _v) in files.items()})
+                    for at, files in found]
         arrivals = plan.state["arrivals"][job.slot_id]
         if not arrivals:
             return None  # a scenario's quarter with no release at all ((k))
@@ -784,14 +1174,20 @@ class LinkageProducts(Provider):
         if job.stream == GEO_STREAM:
             # NUMBERED WITHIN ITS STREAM, and each file's planned verdict
             # recorded, green included (criterion 7).
-            _at, files = plan.state["geocoding"][job.slot_id]
-            return [{"run_id": f"{self.run_prefix}{GEO_STREAM}_{run_index_start + n:03d}",
-                     "run_index": run_index_start + n, "slot_id": job.slot_id,
-                     "period": job.period.name, "received_at": None,
-                     "dirty_severity": None, "seed": job.seed,
-                     "row_counts": {t: int(len(rows)) for t, (_d, rows, _v) in files.items()},
-                     "planned": {d: v for _t, (d, _rows, v) in files.items()}}
-                    for n, _d in enumerate(deliveries, start=1)]
+            out = []
+            for n, (_at, files) in enumerate(self._geo_arrivals(plan, job), start=1):
+                entry = {"run_id": f"{self.run_prefix}{GEO_STREAM}_{run_index_start + n:03d}",
+                         "run_index": run_index_start + n, "slot_id": job.slot_id,
+                         "period": job.period.name, "received_at": None,
+                         "dirty_severity": None, "seed": job.seed,
+                         "row_counts": {t: int(len(rows)) for t, (_d, rows, _v) in files.items()},
+                         "planned": {d: v for _t, (d, _rows, v) in files.items()}}
+                # WHAT THE GENERATION-TIME TRIAL TRIES, AND AGAINST WHICH SOURCE
+                # (REQ-GEN-298 criteria 11 and 13) - recorded only where a file
+                # is tried, so an untried entry reads as it always has.
+                entry.update(plan.state["geo_meta"].get((job.slot_id, n)) or {})
+                out.append(entry)
+            return out
         return [{"run_id": f"{self.run_prefix}{run_index_start + n:03d}",
                  "run_index": run_index_start + n, "slot_id": job.slot_id,
                  "period": job.period.name, "received_at": None,
@@ -803,13 +1199,16 @@ class LinkageProducts(Provider):
         from qa_tools.common import asset_time
 
         if job.stream == GEO_STREAM:
-            return asset_time.isoformat(plan.state["geocoding"][job.slot_id][0])
+            return asset_time.isoformat(self._geo_arrivals(plan, job)[n - 1][0])
         return asset_time.isoformat(plan.state["arrivals"][job.slot_id][n - 1][0])
 
     def files(self, plan: Plan, job: Job, n: int, delivery_obj, entry: dict, name: str):
         from qa_tools.common import asset_time
 
         if job.stream == GEO_STREAM:
+            if n == 1:
+                # WHERE CRITERION 8's NAMED FILES ARE (geo_named_placements).
+                plan.state.setdefault("geo_delivery", {})[job.slot_id] = name
             return ({f"{t}.csv": rows.to_csv(index=False)
                      for t, rows in delivery_obj.payload.items()},
                     asset_time.parse_instant(entry["received_at"], entry["run_id"]))
@@ -823,8 +1222,10 @@ class LinkageProducts(Provider):
         return f"{entry['row_counts'][TABLE]:6d} linkage keys"
 
     def extra_placements(self, plan: Plan) -> list:
-        """(j), NAMED, NOT PLANTED (REQ-GEN-335 criterion 7)."""
-        return named_placements(self, plan)
+        """(j), NAMED, NOT PLANTED (REQ-GEN-335 criterion 7); and the geocoding
+        files whose source a source-side scenario keeps out of the warehouse
+        (REQ-GEN-298 criterion 8)."""
+        return named_placements(self, plan) + geo_named_placements(self, plan)
 
 
 #: (j)'s scenario id (REQ-GEN-335 criterion 7): named on the first generated
@@ -874,6 +1275,199 @@ def named_placements(provider, plan: Plan) -> list:
                                            DELIVERIES_DIR, RECEIPTS_DIR)
     scenario_injection.resolve_run_ids([placement], recognised)
     return [placement]
+
+
+# ---- the geocoding stream's faults on purpose (REQ-GEN-298) ----------------
+
+#: CRITERION 8's FILES, NAMED NOT PLANTED: each ordinary geocoding file of a
+#: quarter whose source a source-side scenario keeps out of the warehouse when
+#: it is checked - (its scenario id, the geocoding dataset, the linkage
+#: scenario placed in that quarter). Lettered siblings of the scenarios that
+#: hold the source (PROVISIONAL, REQ-GEN-298's decisions).
+NAMED_HELD_SOURCE = (("TS-93c", "geo-cp-clients", "TS-93b"),
+                     ("TS-100c", "geo-cp-clients", "TS-100b"),
+                     ("TS-101b", "geo-ed-presentations", "TS-101"))
+
+
+def _before(supplies, dataset_id: str, period: str, at) -> list:
+    """The source's supplies filed to `period` and received before `at`,
+    oldest first."""
+    from qa_tools.common import asset_time
+
+    return [s for s in supplies if s.period == period
+            and asset_time.parse_instant(s.received_at, dataset_id) < at]
+
+
+def _claimed_by(dataset_id: str) -> dict[str, list[str]]:
+    """{period: the scenario ids of `dataset_id` claiming it}."""
+    from generator import scenario_injection
+
+    out: dict[str, list[str]] = {}
+    for inj in scenario_injection.INJECTIONS:
+        if inj.dataset_id != dataset_id:
+            continue
+        for name in scenario_injection.claimed_periods(
+                inj, scenario_injection.generated_periods(inj.dataset_id)):
+            out.setdefault(name, []).append(inj.scenario_id)
+    return out
+
+
+def in_warehouse(dataset_id: str, period: str, at, supplies):
+    """THE SOURCE SUPPLY THE PLAN PROMOTES INTO `period` BEFORE `at`
+    (REQ-GEN-298 criterion 11), or None where it promotes none: of the
+    quarter's supplies received before `at`, the last the gate promotes by
+    rule - a clean one, or an amber where the amber setting in force at its
+    receipt promotes (REQ-PIPE-122) - with the scripted decisions about the
+    source in that quarter played in (REQ-GEN-135). The effective instant of a
+    same-round promotion is before `at` by construction
+    (_refuse_geocoding_unschedulable). Refused, naming the supply, where a
+    scripted decision's instant cannot be said."""
+    from qa_tools.common import amber_setting, asset_time, scripted_decisions
+
+    quarter = [s for s in supplies if s.period == period]
+    events = []
+    for s in quarter:
+        received = asset_time.parse_instant(s.received_at, dataset_id)
+        if received >= at:
+            continue
+        promotes = s.severity is None or (
+            s.severity == "amber"
+            and amber_setting.resolve(dataset_id, received).value != amber_setting.HOLD)
+        events.append((received, "promote" if promotes else "hold", s))
+    claimed = set(_claimed_by(dataset_id).get(period, ()))
+    for script in scripted_decisions.load():
+        if (script.dataset_id != dataset_id or script.scenario not in claimed
+                or script.operation not in scripted_decisions.CHAIN_OPERATIONS):
+            continue
+        if script.supply_index is None or not 0 <= script.supply_index < len(quarter):
+            raise CannotGenerate(
+                f"{script.scenario}'s scripted {script.operation} of {dataset_id} names supply "
+                f"{script.supply_index}, which its {period} plan does not hold, so whether the "
+                f"source is in the warehouse at {at.isoformat()} cannot be said; nothing was "
+                f"written")
+        target = quarter[script.supply_index]
+        received = asset_time.parse_instant(target.received_at, dataset_id)
+        when = (asset_time.wall_clock(asset_time.local_date(received)
+                                      + timedelta(days=script.day_offset), script.at)
+                if script.at else received + timedelta(hours=script.after_hours))
+        if when < at:
+            events.append((when, script.operation, target))
+    held = None
+    for _when, what, supply in sorted(events, key=lambda e: e[0]):
+        if what == "promote":
+            held = supply
+        elif what == "reject" and held is supply:
+            held = None
+    return held
+
+
+def _draw(n: int, rng) -> list:
+    """The collections' mix (REQ-GEN-335 criterion 1), from the given draw:
+    about a quarter amber, two reds, the oldest clean."""
+    if n < 4:
+        return [None] * n
+    n_amber = max(1, round(n * 0.25))
+    rest = [None] * ((n - 1) - n_amber - 2) + ["amber"] * n_amber + ["red"] * 2
+    rng.shuffle(rest)
+    return [None] + rest
+
+
+def _meta(tried, files: dict, warehouse: dict, slot_id: str) -> dict:
+    """What a geocoding entry records for the generation-time trial: the
+    datasets tried, and for each the source table and the receipt of the
+    source supply the warehouse holds then - None where it holds none."""
+    if not tried:
+        return {}
+    from qa_tools.common import hierarchy
+
+    out = {}
+    for d in tried:
+        src = hierarchy.dataset(d).linked[0][0]
+        held = warehouse.get((slot_id, d))
+        out[d] = {"dataset": src, "table": hierarchy.dataset(src).table,
+                  "received_at": held.received_at if held is not None else None}
+    return {"tried": sorted(tried), "sources": out}
+
+
+def _named_held_sources(resolved, jobs, base, warehouse) -> dict:
+    """{(geocoding dataset, period): scenario id} for criterion 8's files,
+    refused where the quarter's file is not there or its source is in the
+    warehouse after all - a name that would point at nothing."""
+    by_scenario = {inj.scenario_id: placement.period for inj, placement in resolved}
+    out = {}
+    for sid, d, linkage_sid in NAMED_HELD_SOURCE:
+        period = by_scenario.get(linkage_sid)
+        job = next((j for j in jobs if j.period.name == period), None)
+        if period is None or job is None or base.get(job.slot_id) is None or \
+                (job.slot_id, d) not in warehouse:
+            raise CannotGenerate(f"{sid}: no {d} file in {period or linkage_sid + 's quarter'} "
+                                 f"to name; nothing was written")
+        if warehouse[(job.slot_id, d)] is not None:
+            raise CannotGenerate(f"{sid}: {d}'s {period} source is in the warehouse when the "
+                                 f"file arrives, so it shows nothing of {linkage_sid}; nothing "
+                                 f"was written")
+        out[(d, period)] = sid
+    return out
+
+
+def geo_named_placements(provider, plan: Plan) -> list:
+    """Criterion 8's files as placements, nothing planted (REQ-GEN-045)."""
+    from generator import scenario_injection
+    from qa_tools.common import arrivals as arrivals_mod, asset_time
+
+    named = plan.state.get("geo_named") or {}
+    if not named:
+        return []
+    out = []
+    by_period = {j.period.name: j for j in plan.jobs if j.stream == GEO_STREAM}
+    for (d, period), sid in sorted(named.items(), key=lambda x: x[1]):
+        job = by_period[period]
+        at, _files = plan.state["geocoding"][job.slot_id]
+        src = _source_name(d)
+        out.append(scenario_injection.Placement(
+            scenario_id=sid, dataset=d, period=period, period_date=job.period.round_date,
+            config=(f"quarterly, due 19:00 on the round; the {period} geocoding delivery is an "
+                    f"ordinary one, received at {asset_time.localise(at).strftime('%H:%M')} while "
+                    f"{src} is not in the warehouse for {period}. Nothing planted."),
+            arrivals=({"date": asset_time.local_date(at).isoformat(),
+                       "at": asset_time.localise(at).strftime("%H:%M"),
+                       "delivery": plan.state.get("geo_delivery", {}).get(job.slot_id, "")},)))
+    from generator.driver import DELIVERIES_DIR, RECEIPTS_DIR
+
+    recognised = arrivals_mod.arrivals_for(provider.collection_id, provider.run_prefix,
+                                           DELIVERIES_DIR, RECEIPTS_DIR)
+    scenario_injection.resolve_run_ids(out, recognised)
+    return out
+
+
+def _source_name(dataset_id: str) -> str:
+    from qa_tools.common import hierarchy
+
+    return hierarchy.dataset(hierarchy.dataset(dataset_id).linked[0][0]).dataset_name
+
+
+def _refuse_geocoding_scenario_quarters(resolved, linkage_resolved, ridden) -> None:
+    """REQ-GEN-298 criterion 7, before anything is written: a geocoding
+    scenario never on a round REQ-GEN-205's corrections alter, nor in a
+    quarter holding another scenario of its source dataset or of the linkage
+    delivery - said, and never moved."""
+    from qa_tools.common import hierarchy
+
+    linkage = {placement.period: inj.scenario_id for inj, placement in linkage_resolved}
+    for inj, placement in resolved:
+        if placement.period in ridden:
+            raise CannotGenerate(f"{inj.scenario_id}: {placement.period} is a round "
+                                 f"REQ-GEN-205's correction alters - choose another quarter "
+                                 f"(its anchor is not moved for you); nothing was written")
+        src = hierarchy.dataset(inj.dataset_id).linked[0][0]
+        others = list(_claimed_by(src).get(placement.period, ()))
+        if placement.period in linkage:
+            others.append(linkage[placement.period])
+        if others:
+            raise CannotGenerate(
+                f"{inj.scenario_id}: {placement.period} already holds {', '.join(others)}, so "
+                f"its outcome would depend on theirs - choose another quarter (its anchor is "
+                f"not moved for you); nothing was written")
 
 
 def _ridden_quarters() -> set[str]:

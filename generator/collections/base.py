@@ -78,6 +78,10 @@ class Plan:
     injected_by_period: dict = field(default_factory=dict)
     #: The provider's own planning and running state; the driver never reads it.
     state: dict = field(default_factory=dict)
+    #: stream name -> {period name: (injection, placement)} for a stream other
+    #: than the provider's first whose datasets carry scenarios of their own
+    #: (REQ-GEN-298: the geocoding stream's).
+    injected_by_stream: dict = field(default_factory=dict)
 
 
 class Provider:
@@ -217,6 +221,10 @@ class GeneratedSupply:
     period: str
     received_at: str
     rows: Any
+    #: The severity the provider built the supply to - None for clean - so a
+    #: reader can tell whether the gate promotes it (REQ-GEN-298 criterion
+    #: 11: a generation-time trial stages only what the plan promotes).
+    severity: str | None = None
 
 
 def generated_supplies(provider: "Provider", dataset_id: str) -> list[GeneratedSupply]:
@@ -242,7 +250,8 @@ def generated_supplies(provider: "Provider", dataset_id: str) -> list[GeneratedS
             received = provider.received_at(plan, job, n, delivery_obj, entry)
             rows = provider.table_rows(delivery_obj, table)
             if rows is not None:
-                out.append(GeneratedSupply(job.period.name, received, rows))
+                out.append(GeneratedSupply(job.period.name, received, rows,
+                                           entry.get("dirty_severity")))
     from qa_tools.common import asset_time
 
     return sorted(out, key=lambda s: asset_time.parse_instant(s.received_at, "a receipt"))
