@@ -27,6 +27,16 @@ correction route, because a past setting is inert: nothing is re-judged
 from it. A new version may not be dated before the day it is added, except
 on an asset that declares itself synthetic, where scenario playback needs
 to author the past.
+
+ANY EFFECTIVE-DATED SETTING, SCALAR OR LIST (REQ-QAC-300 criterion 2). Every
+function here takes the setting's key as a PATH - a top-level name such as
+'amber_setting', or a tuple into a container such as ('list_settings',
+'<name>') - read the same way at the asset, collection and dataset levels.
+A resolved value is typed as the setting's value: text for amber_setting and
+replacement_setting, a tuple of the declared members in declared order for a
+list setting. Only a setting that declares it demands an asset-level value
+(requires_asset_value): amber and replacement do; a list setting does not, and
+its coverage is the schedule gate's to refuse over the periods its readers owe.
 """
 from __future__ import annotations
 
@@ -49,6 +59,42 @@ DATASET, COLLECTION, ASSET = "dataset", "collection", "data asset"
 #: ("by the same mechanism, and with the same protection of its past").
 KEY = "amber_setting"
 
+#: The container of LIST-valued settings, by name (REQ-QAC-300 criterion 1):
+#: any collection or dataset may declare entries under it. Its entries are
+#: read by path, (LIST_SETTINGS, name), and none is named in shared code.
+LIST_SETTINGS = "list_settings"
+
+
+def _path(key) -> tuple[str, ...]:
+    """A key as a path: 'amber_setting' -> ('amber_setting',)."""
+    return (key,) if isinstance(key, str) else tuple(key)
+
+
+def _get(node, key):
+    """The setting at `key`'s path in a level's node, or None."""
+    for part in _path(key):
+        if not isinstance(node, dict):
+            return None
+        node = node.get(part)
+    return node if isinstance(node, dict) else None
+
+
+def requires_asset_value(key) -> bool:
+    """Whether a setting demands an asset-level value (REQ-QAC-300 criterion
+    11): True for the scalar settings, False for every list setting."""
+    return _path(key)[0] != LIST_SETTINGS
+
+
+def _typed(value):
+    """A version's value as the setting's type: a list's members as a tuple in
+    declared order, never its str(); anything else as text, as before."""
+    return tuple(value) if isinstance(value, list) else str(value)
+
+
+def _name(key) -> str:
+    """A setting's name in words: 'amber_setting' -> 'amber setting'."""
+    return _path(key)[-1].replace("_", " ")
+
 
 class AmberSettingError(ValueError):
     """The configuration cannot answer - no asset-level value in effect."""
@@ -58,7 +104,8 @@ class AmberSettingError(ValueError):
 class Resolved:
     """The setting that applies, and where it came from (criterion 19)."""
 
-    value: str
+    #: str for a scalar setting; a tuple of members for a list setting
+    value: object
     level: str
     version: str           # the version's effective_from
 
@@ -93,37 +140,49 @@ def _nodes_for(doc: dict, dataset_id: str) -> tuple[dict | None, dict | None]:
     return None, None
 
 
-def _resolve_on(doc: dict, dataset_id: str, on: date, key: str = KEY) -> Resolved | None:
+def _resolve_on(doc: dict, dataset_id: str, on: date, key=KEY) -> Resolved | None:
     collection, dataset = _nodes_for(doc, dataset_id)
     for level, node in ((DATASET, dataset), (COLLECTION, collection), (ASSET, doc)):
-        version = _in_effect((node or {}).get(key), on)
+        version = _in_effect(_get(node or {}, key), on)
         if version:
-            return Resolved(value=str(version["value"]), level=level,
+            return Resolved(value=_typed(version["value"]), level=level,
                             version=str(version["effective_from"]))
     return None
 
 
-def timeline(dataset_id: str, *, doc: dict | None = None) -> list[dict]:
+def resolve_on_date(dataset_id: str, on: date, *, doc: dict | None = None,
+                    key=KEY) -> Resolved | None:
+    """The setting in force for `dataset_id` on the DATE `on` - nearest level
+    wins - or None where no version covers it (REQ-QAC-300 criterion 2). The
+    caller says which date: a period's round date, for a list setting a
+    period is judged against (criterion 4)."""
+    return _resolve_on(doc if doc is not None else _doc(), dataset_id, on, key)
+
+
+def timeline(dataset_id: str, *, doc: dict | None = None, key=KEY) -> list[dict]:
     """Every change to this dataset's resolved setting, oldest first:
     {from, value, level, version} - what the dashboard embeds so the page
     can show the setting in force on the date on show (NFR 1, built
-    2026-10-05). Read from configuration only."""
+    2026-10-05). Read from configuration only. The version dates are read
+    from the KEY GIVEN (REQ-QAC-300 criterion 2), where they were once read
+    from amber_setting's whatever was resolved (plans/post-build-review.md
+    #293)."""
     doc = doc if doc is not None else _doc()
     collection, dataset = _nodes_for(doc, dataset_id)
     starts = sorted({str(v["effective_from"])
                      for node in (dataset, collection, doc)
-                     for v in (((node or {}).get("amber_setting") or {}).get("versions") or [])
+                     for v in ((_get(node or {}, key) or {}).get("versions") or [])
                      if isinstance(v, dict) and v.get("effective_from")})
     out: list[dict] = []
     for start in starts:
-        r = _resolve_on(doc, dataset_id, date.fromisoformat(start))
+        r = _resolve_on(doc, dataset_id, date.fromisoformat(start), key)
         if r is None:
             continue
         if out and (out[-1]["value"], out[-1]["level"], out[-1]["version"]) == (
                 r.value, r.level, r.version):
             continue
         out.append({"from": start, "value": r.value, "level": r.level, "version": r.version,
-                    "text": describe(dataset_id, date.fromisoformat(start), doc=doc)})
+                    "text": describe(dataset_id, date.fromisoformat(start), doc=doc, key=key)})
     return out
 
 
@@ -136,23 +195,33 @@ def _level_words(doc: dict, dataset_id: str, level: str) -> str:
     return "set for the whole data asset"
 
 
-def describe(dataset_id: str, on: date, *, doc: dict | None = None) -> str:
+def _value_words(value) -> str:
+    """A resolved value in words: a scalar with its hyphens spaced, a list as
+    'a, b and c' (REQ-QAC-300 criterion 2)."""
+    if isinstance(value, tuple):
+        items = [str(v) for v in value]
+        return items[0] if len(items) == 1 else f"{', '.join(items[:-1])} and {items[-1]}"
+    return str(value).replace("-", " ")
+
+
+def describe(dataset_id: str, on: date, *, doc: dict | None = None, key=KEY) -> str:
     """The setting in force for `dataset_id` on `on`, in words - for
     example 'promote and acknowledge (set for Child Protection, since 5
-    Oct 2026)' (NFR 1). Raises AmberSettingError where none is in force,
-    as resolve() does - there is no default."""
+    Oct 2026)' (NFR 1), or for a list '2011, 2016 and 2021 (set for Linkage
+    Products, since 1 Aug 2022)'. Raises AmberSettingError where none is in
+    force, as resolve() does - there is no default."""
     doc = doc if doc is not None else _doc()
-    r = _resolve_on(doc, dataset_id, on)
+    r = _resolve_on(doc, dataset_id, on, key)
     if r is None:
-        raise AmberSettingError(f"no amber setting is in effect for {dataset_id} on "
+        raise AmberSettingError(f"no {_name(key)} is in effect for {dataset_id} on "
                                 f"{on.isoformat()}")
     since = date.fromisoformat(r.version)
-    return (f"{r.value.replace('-', ' ')} ({_level_words(doc, dataset_id, r.level)}, "
+    return (f"{_value_words(r.value)} ({_level_words(doc, dataset_id, r.level)}, "
             f"since {since.day} {since.strftime('%b %Y')})")
 
 
 def resolve(dataset_id: str, at: datetime | str, *, doc: dict | None = None,
-            key: str = KEY, values: tuple[str, ...] = AMBER_SETTINGS,
+            key=KEY, values: tuple[str, ...] = AMBER_SETTINGS,
             label: str = "amber setting") -> Resolved:
     """The setting for `dataset_id` as at the instant `at` - the instant
     the decision about a supply takes effect (criterion 4)."""
@@ -164,6 +233,9 @@ def resolve(dataset_id: str, at: datetime | str, *, doc: dict | None = None,
     found = _resolve_on(doc, dataset_id, on, key)
     if found is not None:
         return found
+    if not requires_asset_value(key):
+        raise AmberSettingError(f"no version of {_name(key)} covers {on.isoformat()} for "
+                                f"{dataset_id}.")
     raise AmberSettingError(
         f"no {label} is in effect for {dataset_id} on {on.isoformat()} - the data "
         f"asset level must state one (one of {', '.join(values)}), and there is no "
@@ -172,7 +244,7 @@ def resolve(dataset_id: str, at: datetime | str, *, doc: dict | None = None,
 
 # ---- the configuration's guards (criteria 6 to 9 and 20) --------------
 
-def standing_problems(doc: dict, today: date, key: str = KEY) -> list[tuple[str, str]]:
+def standing_problems(doc: dict, today: date, key=KEY) -> list[tuple[str, str]]:
     """[(where, problem)] in the configuration as it stands - no history
     needed (delivery-critic on REQ-PIPE-122, F4 and F5).
 
@@ -189,24 +261,34 @@ def standing_problems(doc: dict, today: date, key: str = KEY) -> list[tuple[str,
         for start in sorted({s for s in starts if starts.count(s) > 1}):
             problems.append((where, f"two versions share the date {start}, so which "
                                     f"applies is ambiguous"))
-    if isinstance(doc.get(key), dict) and not _in_effect(doc[key], today):
+    asset = _get(doc, key)
+    if requires_asset_value(key) and asset is not None and not _in_effect(asset, today):
         problems.append((ASSET, f"no version is in effect today ({today.isoformat()}) - the "
                                 f"data asset level must always state one"))
     return problems
 
-def _settings(doc: dict, key: str = KEY) -> dict[str, dict]:
-    """{where: setting} for every level that states one."""
-    out: dict[str, dict] = {}
-    if isinstance(doc.get(key), dict):
-        out[ASSET] = doc[key]
+def _levels(doc: dict):
+    """(where, node) for the asset and every collection and dataset."""
+    yield ASSET, doc
     for agency in ((doc.get("hierarchy") or {}).get("agencies") or []):
         for collection in (agency.get("collections") or []):
-            if isinstance(collection.get(key), dict):
-                out[f"collection {collection.get('id')}"] = collection[key]
+            yield f"collection {collection.get('id')}", collection
             for dataset in (collection.get("datasets") or []):
-                if isinstance(dataset.get(key), dict):
-                    out[f"dataset {dataset.get('id')}"] = dataset[key]
-    return out
+                yield f"dataset {dataset.get('id')}", dataset
+
+
+def _settings(doc: dict, key=KEY) -> dict[str, dict]:
+    """{where: setting} for every level that states one, `key` a path."""
+    return {where: setting for where, node in _levels(doc)
+            if (setting := _get(node, key)) is not None}
+
+
+def list_setting_keys(doc: dict) -> list[tuple[str, str]]:
+    """The path of every entry list_settings declares at any level, sorted -
+    so a reader iterates them rather than naming one (REQ-QAC-300 criterion 2)."""
+    names = {name for _where, node in _levels(doc)
+             for name in ((node.get(LIST_SETTINGS) if isinstance(node, dict) else None) or {})}
+    return [(LIST_SETTINGS, name) for name in sorted(names)]
 
 
 #: The author a converted plain-string changelog entry is given
@@ -244,7 +326,7 @@ def _versions(setting: dict) -> dict[str, dict]:
 
 
 def past_change_problems(old: dict, new: dict, today: date, *,
-                         synthetic: bool, added=None, key: str = KEY) -> list[tuple[str, str]]:
+                         synthetic: bool, added=None, key=KEY) -> list[tuple[str, str]]:
     """[(where, problem)] for every change that rewrites a setting's past.
 
     `today` is on the asset's clock. A version is PAST once its date is

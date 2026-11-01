@@ -48,7 +48,8 @@ from __future__ import annotations
 import re
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, StrictInt, field_validator, model_validator
+from pydantic import (BaseModel, ConfigDict, Field, StrictBool, StrictFloat, StrictInt, StrictStr,
+                      field_validator, model_validator)
 
 from qa_tools.common.vocab import (
     CHANGELOG_CATEGORIES,
@@ -550,6 +551,20 @@ class ReplacementSetting(_Strict):
     versions: list[ReplacementSettingVersion] = Field(min_length=1)
 
 
+class ListSettingVersion(_Strict):
+    """One effective-dated value of a LIST setting (REQ-QAC-300 criterion 2):
+    the amber setting's shape, its value a list of scalars. Generic - any
+    entry of list_settings at any level is read by this one model, so no
+    setting's name is known here."""
+    effective_from: str = Field(pattern=_DATE_PATTERN)
+    value: list[StrictStr | StrictInt | StrictFloat | StrictBool] = Field(min_length=1)
+    changelog: list[ConfigChangelogEntry] = Field(min_length=1)
+
+
+class ListSetting(_Strict):
+    versions: list[ListSettingVersion] = Field(min_length=1)
+
+
 class NotExpectedPeriod(_Strict):
     """A reason is REQUIRED, not decoration: "no November file" with
     nothing beside it is indistinguishable, six months later, from
@@ -592,6 +607,8 @@ class DatasetConfig(_Strict):
     arrival_pattern: NonEmptyStr | None = None
     amber_setting: AmberSetting | None = None
     replacement_setting: ReplacementSetting | None = None
+    #: Any list-valued effective-dated settings, by name (REQ-QAC-300).
+    list_settings: dict[str, ListSetting] | None = None
     #: The datasets this one links, and how each is identified (REQ-QAC-330
     #: criterion 5) - the one place every reader learns what it covers.
     linked_datasets: list[LinkedDataset] | None = None
@@ -615,6 +632,8 @@ class CollectionConfig(_Strict):
     delivery_boundary: NonEmptyStr | None = None
     amber_setting: AmberSetting | None = None
     replacement_setting: ReplacementSetting | None = None
+    #: Any list-valued effective-dated settings, by name (REQ-QAC-300).
+    list_settings: dict[str, ListSetting] | None = None
     datasets: list[DatasetConfig] = Field(min_length=1)
 
 
@@ -664,6 +683,9 @@ class DataAsset(_Strict):
     #: setting's reason: the one rule that lets automation displace accepted
     #: data is never switched on, or off, by saying nothing.
     replacement_setting: ReplacementSetting
+    #: Any list-valued effective-dated settings, by name (REQ-QAC-300
+    #: criterion 2) - optional at every level, with no asset-level demand.
+    list_settings: dict[str, ListSetting] | None = None
 
 
 # ---------------------------------------------------------------------
