@@ -183,7 +183,6 @@ class TestItReachesEveryParticipatingDataset:
 
     def test_a_dataset_that_only_READS_a_check_still_carries_it(self):
         import json as _json
-        from pathlib import Path
 
         built = assets.reports_path("cpfs_child-protection_dashboard.json")
         if not built.is_file():
@@ -199,7 +198,6 @@ class TestItReachesEveryParticipatingDataset:
 
     def test_every_dataset_in_the_collection_carries_the_section(self):
         import json as _json
-        from pathlib import Path
 
         built = assets.reports_path("cpfs_child-protection_dashboard.json")
         if not built.is_file():
@@ -213,7 +211,6 @@ class TestItReachesEveryParticipatingDataset:
         on the tables it reads - a cp_client_id column on cp_carers
         would be an invented column."""
         import json as _json
-        from pathlib import Path
 
         from qa_tools.common.validate_check_lifecycle import collect_checks
 
@@ -250,7 +247,6 @@ class TestPooledChecksKeepSeparateIdentities:
 
     def _built(self):
         import json as _json
-        from pathlib import Path
 
         built = assets.reports_path("cpfs_child-protection_dashboard.json")
         if not built.is_file():

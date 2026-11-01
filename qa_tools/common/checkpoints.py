@@ -127,7 +127,15 @@ def _dbname(dsn: str) -> str:
 
 def _admin(dsn: str | None = None):
     """A connection to the server's maintenance database, for creating and
-    dropping whole databases - never one of the databases being copied."""
+    dropping whole databases - never one of the databases being copied.
+
+    FOR THE SELECTED ASSET, AND REFUSED WITHOUT ONE (REQ-PIPE-363 criterion 6,
+    REQ-PIPE-343 criterion 5): a checkpoint is a copy of one asset's supply
+    database, so this connection is claimed for that asset before it opens,
+    as supply_db.connect() claims its own."""
+    from qa_tools.common import assets
+
+    assets.claim_for_connection(assets.selected().name)
     return psycopg.connect(_with_dbname(dsn or supply_db.supply_db_dsn(), "postgres"),
                            autocommit=True, application_name="mothman:checkpoints")
 

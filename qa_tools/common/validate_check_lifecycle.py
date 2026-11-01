@@ -29,6 +29,7 @@ import sys
 import tempfile
 from pathlib import Path
 
+from qa_tools.common import assets
 from qa_tools.common import check_id as cid
 from qa_tools.common import check_lifecycle as cl
 from qa_tools.common.diff_base import diff_base
@@ -64,7 +65,7 @@ def _sources(ref: str | None) -> tuple[list[tuple[str, object]], list[str]]:
         for c in colls:
             yaml_sources += [(c.check_file(kind), _PARSERS[kind]),
                              (c.check_file(kind, retired=True), _PARSERS[kind])]
-    yaml_sources.append((collections.FILE_CHECKS, cl.parse_file_check_metadata))
+    yaml_sources.append((collections.file_checks(), cl.parse_file_check_metadata))
     evidently = [f for c in colls for f in (c.check_file("evidently"),
                                              c.check_file("evidently", retired=True))]
     return yaml_sources, evidently
@@ -95,7 +96,7 @@ def sources_fingerprint() -> str:
     for rel_dir in dirs:
         if (ROOT / rel_dir).is_dir():
             paths += sorted(p for p in (ROOT / rel_dir).rglob("*") if p.is_file())
-    contract = ROOT / "contract"
+    contract = ROOT / assets.folder_rel()
     if contract.is_dir():
         paths += sorted(contract.rglob("*.y*ml"))
     for path in dict.fromkeys(paths):

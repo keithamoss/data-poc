@@ -240,7 +240,7 @@ def check_file_problems(root: Path | None = None) -> list[str]:
     """`root` holds contract/ and dbt_project/ - the repository unless a
     test names another; the hierarchy is read from root/contract."""
     from qa_tools import collections
-    from qa_tools.common import hierarchy
+    from qa_tools.common import assets, hierarchy
 
     root = root or hierarchy.data_asset_yaml().parent.parent
     try:
@@ -260,7 +260,7 @@ def check_file_problems(root: Path | None = None) -> list[str]:
                                 f"{c.check_file(kind)}")
         owner[c.stem] = c
 
-    contract = root / "contract"
+    contract = root / assets.folder_rel()
     agencies = {c.agency_id for c in declared}
     for path in sorted(contract.rglob("*")) if contract.is_dir() else []:
         if not path.is_file():

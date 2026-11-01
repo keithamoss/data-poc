@@ -91,7 +91,7 @@ class Collection:
 
     @property
     def folder(self) -> str:
-        return f"contract/{self.agency_id}"
+        return f"{assets.folder_rel()}/{self.agency_id}"
 
     @property
     def stem(self) -> str:
@@ -135,7 +135,12 @@ class Collection:
 #: The checks no collection owns: shared dbt SQL, and the file checks
 #: derived once for every dataset (REQ-QAC-241 criterion 8).
 SHARED_DBT_DIRS = ("dbt_project/macros", "dbt_project/tests/generic")
-FILE_CHECKS = "contract/file-checks.yaml"
+
+
+def file_checks() -> str:
+    """The selected asset's file checks, by repository path, asked at call
+    time (REQ-PIPE-342 criterion 6) - it was the FILE_CHECKS constant."""
+    return f"{assets.folder_rel()}/file-checks.yaml"
 
 
 def collections_in(doc: dict) -> list[Collection]:

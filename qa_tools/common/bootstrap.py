@@ -760,8 +760,9 @@ def _run_concurrently(names: list[str], sequential: bool) -> dict[str, float]:
     A failure in either fails the bootstrap: `.result()` re-raises it.
 
     EACH PROCESS IS HANDED THE ASSET BESIDE ITS COLLECTIONS (REQ-PIPE-369
-    criterion 4): a spawned interpreter never sees this one's selection, and
-    selects the asset itself before it loads any adapter by path - never an
+    criterion 4), AND THE LAYOUT IT WAS FOUND IN (assets.handoff): a spawned
+    interpreter never sees this one's selection or a use_root/use_folder
+    layout, and adopts both itself before it loads any adapter by path - never an
     adapter object, which a path-loaded module cannot be unpickled into.
     """
     import multiprocessing
@@ -771,7 +772,7 @@ def _run_concurrently(names: list[str], sequential: bool) -> dict[str, float]:
 
     context = multiprocessing.get_context("spawn")
     with ProcessPoolExecutor(max_workers=len(names), mp_context=context,
-                             initializer=assets.select,
-                             initargs=(assets.selected().name,)) as pool:
+                             initializer=assets.adopt,
+                             initargs=assets.handoff()) as pool:
         futures = {n: pool.submit(_run_stream, n, sequential) for n in names}
         return {n: f.result() for n, f in futures.items()}

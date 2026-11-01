@@ -355,7 +355,6 @@ class TestNothingSaysScenarioOnTheDashboard:
     @pytest.mark.needs_deployment
     def test_no_supply_or_dataset_record_carries_a_scenario_id(self):
         import re
-        from pathlib import Path
 
         from qa_tools.common import scenarios
 
@@ -365,7 +364,6 @@ class TestNothingSaysScenarioOnTheDashboard:
         # WITH OR WITHOUT ITS HYPHEN: a change reference spelt "...-TS62"
         # names the scenario as surely as "TS-62" does.
         pattern = re.compile(r"\bTS-?([0-9]+[a-z]?)\b")
-        root = Path(__file__).resolve().parent.parent
         # EVERY REGISTERED COLLECTION'S FILE (REQ-PIPE-240): two names written
         # here left Emergency Department's unread, and it carried two.
         names = [c.dashboard_file for c in collections.all_collections()]

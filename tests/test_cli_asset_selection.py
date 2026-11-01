@@ -117,6 +117,26 @@ class TestWithNoAssetSet:
         assert "MOTHMAN_ASSET is not set" in said
         assert "\\/\\/" not in said and "Traceback" not in said, said
 
+    #: THE GROUNDWORK CRITIC'S TWO (REQ-PIPE-363 criterion 6, post-build-review):
+    #: `scenarios list` read the placements through an import-time constant,
+    #: and `pipeline checkpoint list` opened its own connection to the server
+    #: without asking which asset it acts for.
+    @pytest.mark.parametrize("command", [("scenarios", "list"),
+                                         ("pipeline", "checkpoint", "list")])
+    def test_a_command_reading_state_or_connecting_is_refused(self, command):
+        result = _mothman(*command, asset=None)
+        assert result.returncode != 0, _said(result)
+        said = _said(result)
+        assert "MOTHMAN_ASSET is not set" in said and "Set it to one of: data-asset-1" in said
+        assert "Traceback" not in said, said
+
+    def test_tidying_test_databases_needs_no_asset(self):
+        """PROVISIONAL (REQ-PIPE-363): the suite's own databases belong to no
+        asset - each test selects its own - so this one connection is exempt."""
+        result = _mothman("env", "tidy-test-databases", "--dry-run",
+                          "--older-than-hours", "100000", asset=None)
+        assert result.returncode == 0, _said(result)
+
     @pytest.mark.parametrize("asset", [None, "nowhere"])
     def test_a_command_that_reads_the_asset_is_refused_before_it_reads(self, asset):
         result = _mothman("collections", asset=asset)
