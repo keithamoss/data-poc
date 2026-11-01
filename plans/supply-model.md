@@ -4454,6 +4454,138 @@ criteria 9 and 12); ED's own page is not coloured by them.
 **Breaks as**: ED's page coloured by a not-evaluated result, or the release
 re-timed to avoid the Fail.
 
+### The geocoding history, planted (REQ-GEN-298)
+
+Each geocoding fault scenario sits in a quarter of its own, clear of every
+scenario of the geocoded dataset's source and of the linkage delivery, and off
+REQ-GEN-205's corrected rounds (criterion 7, refused by the provider
+otherwise). A fault is a NAMED ROW FAULT on one geocoding file
+(`ExtraArrival.row_faults`, `name@<geocoding dataset id>`), applied by the
+Linkage Products provider - a shape, never a verdict - and the only fault in
+its file, every other check of the file passing. Every scenario's geocoding
+delivery is received at 18:30 on the round, after the quarter's linkage
+release, and is due 19:00. The ordinary quarters carry the collections'
+severity mix per geocoding dataset (REQ-GEN-295 criterion 13): about a quarter
+amber on the share not geocoded, two reds each with a green resupply five to
+twenty days later, the oldest clean. Every drafted amber, red and scenario file
+is tried against the real tools in its slot's period before anything is
+written (criterion 13); the expectations below are what the checks are built
+to say, none yet confirmed by a bootstrap.
+
+**TS-102 `[INJECT]` A missing census year.** PLANTED by REQ-GEN-298
+criterion 3.
+*Config: quarterly, due 19:00 with 8 hours' grace; 2023-Q2's Client Register
+Geocodes, one census year's rows dropped for one to three records, the
+record's other years present - two or more years in force since 2017-Q3.*
+**Expect**: Missing census years reads Fail, each sample the record and the
+missing year; every other check passes.
+**Breaks as**: the record read as left out, or the year check passing.
+
+**TS-103 `[INJECT]` A duplicated census year.** PLANTED by REQ-GEN-298
+criterion 3.
+*Config: as TS-102; 2022-Q1's ED Presentations Geocodes, one census year's row
+repeated, identical in every column, for one to three presentations.*
+**Expect**: Duplicated census years reads Fail; every other check passes.
+**Breaks as**: the repeat read as a second record.
+
+**TS-104 `[INJECT]` An unexpected census year.** PLANTED by REQ-GEN-298
+criteria 3 and 5.
+*Config: as TS-102; 2016-Q2's Client Register Geocodes, a row for census year
+2026 for one to three records - 2026 joins the set only from 2027-Q3.*
+**Expect**: Unexpected census years reads Fail on the 2026 rows; every other
+check passes.
+**Breaks as**: 2026 read as in the set, or caught by a type check.
+
+**TS-105 `[INJECT]` The share not geocoded in the warn band.** PLANTED by
+REQ-GEN-298 criterion 3.
+*Config: as TS-102; 2023-Q1's ED Presentations Geocodes, whole presentations
+turned not geocoded in every year, codes empty, until the share lies between
+6 and 9 percent.*
+**Expect**: Share not geocoded reads Warn; the drift check over placed rows
+passes; the file promotes as a Warn does.
+**Breaks as**: Fail, or the drift check warning too.
+
+**TS-106 `[INJECT]` The share not geocoded in the fail band.** PLANTED by
+REQ-GEN-298 criterion 3.
+*Config: as TS-105; 2024-Q1's Client Register Geocodes, until the share lies
+between 12 and 18 percent.*
+**Expect**: Share not geocoded reads Fail and the file is held back.
+**Breaks as**: Warn, or the format checks failing the empty codes.
+
+**TS-107 `[INJECT]` Coverage in the warn band.** PLANTED by REQ-GEN-298
+criterion 4 (REQ-QAC-340's route 1).
+*Config: as TS-102; 2014-Q1's ED Presentations Geocodes, 0.5 to 1.5 percent of
+the quarter's presentations left out in every year.*
+**Expect**: Source records matched reads Warn; the missing-year check, which
+counts only records present, passes.
+**Breaks as**: Missing census years failing, or coverage Pass.
+
+**TS-108 `[INJECT]` Coverage in the fail band.** PLANTED by REQ-GEN-298
+criterion 4 (route 2).
+*Config: as TS-107; 2025-Q1's Client Register Geocodes, 3 to 6 percent of the
+quarter's clients left out.*
+**Expect**: Source records matched reads Fail, a percentage only; the file is
+held back, so its Fail does not colour the Client Register.
+**Breaks as**: failing rows recorded for coverage, or the Client Register
+coloured before the file is promoted.
+
+**TS-109 `[INJECT]` A geocode for a record the quarter does not hold.**
+PLANTED by REQ-GEN-298 criterion 4 (route 3).
+*Config: as TS-102; 2017-Q4's ED Presentations Geocodes, one record's rows in
+every year naming a presentation not in ED's 2017-Q4 supply - added, so every
+presentation still has its geocodes.*
+**Expect**: Rows matching no source record reads Fail, each sample the record
+and year; coverage passes.
+**Breaks as**: the orphan passed, or coverage falling.
+
+**TS-110 `[INJECT]` An empty geocoding file.** PLANTED by REQ-GEN-298
+criterion 4 (route 4).
+*Config: as TS-102; 2025-Q4's geo_cp_clients.csv holds no rows while the
+quarter's Client Register holds its clients.*
+**Expect**: Source records matched reads Fail at 0 percent (REQ-QAC-340
+criterion 4); the year checks find nothing to fail.
+**Breaks as**: every check passing over nothing.
+
+**TS-111 `[INJECT]` A Client Register coloured by its geocodes' promotion.**
+PLANTED by REQ-GEN-298 criterion 4 (route 5, the G1 route).
+*Config: as TS-107; 2026-Q1's Client Register Geocodes, 0.5 to 1.5 percent of
+clients left out, in a quarter whose amber setting promotes.*
+**Expect**: the file reads Warn on coverage and is promoted; from that instant
+the 2026-Q1 Client Register, promoted passing on the round before, reads with
+the Warn tag naming Linkage Products' 2026-Q1 Client Register Geocodes as the
+cause (REQ-PIPE-332 criterion 4), and earlier dates still show it passing.
+**Breaks as**: the Client Register demoted, or tagged before the promotion.
+
+**TS-93c `[INJECT]` A Client Register geocode whose source was rejected -
+named, not planted.** NAMED by REQ-GEN-298 criterion 8 on 2019-Q1, TS-93a's
+quarter.
+*Config: quarterly, due 19:00; 2019-Q1's ordinary Client Register Geocodes,
+received while TS-93a's Client Register is held and then rejected, nothing
+replacing it.*
+**Expect**: its two cp-clients checks read Fail, could not run, and the file
+is held back for the rest of the history, as TS-93b's linkage release is.
+**Breaks as**: the checks evaluated against another quarter's Client
+Register.
+
+**TS-100c `[INJECT]` A Client Register geocode cleared by a person's
+promotion - named, not planted.** NAMED by REQ-GEN-298 criterion 8 on
+2019-Q3, TS-100a's quarter.
+*Config: as TS-93c; 2019-Q3's ordinary Client Register Geocodes, received while
+TS-100a's Client Register is held.*
+**Expect**: its cp-clients checks read Fail, could not run, until 10:00 on 2
+August 2019, when the promotion's knock-on re-checks them and they pass.
+**Breaks as**: still failing after the promotion.
+
+**TS-101b `[INJECT]` An ED geocode while ED's same-round Fail is held -
+named, not planted.** NAMED by REQ-GEN-298 criterion 8 on 2021-Q4, TS-101's
+quarter.
+*Config: as TS-93c; 2021-Q4's ordinary ED Presentations Geocodes, built from
+ED's Fail supply of the morning, its share not geocoded in the warn band,
+received while that supply is held.*
+**Expect**: its ed-presentations checks read Fail, could not run, and clear
+through the knock-on once the resupply is promoted.
+**Breaks as**: ED's page coloured by a not-evaluated result.
+
 ### The activity feed
 
 Keith, 2026-09-22, arising from TS-10 and TS-15: the existing

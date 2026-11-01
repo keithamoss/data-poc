@@ -40,13 +40,21 @@ def _files(plan, job):
     return {} if found is None else found[1]
 
 
+def _clean(plan, job):
+    """A quarter's files carrying no fault on purpose (REQ-GEN-298) - the
+    rows exactly as the source and the geocoder made them."""
+    return {t: f for t, f in _files(plan, job).items()
+            if (job.slot_id, f[0]) not in plan.state["geo_faults"]}
+
+
 class TestTheStreams:
     def test_two_streams_each_its_own_datasets(self):
         streams = lp.PROVIDER.streams()
         assert [(s.name, s.dataset_ids) for s in streams] == [
             (lp.LINKAGE_STREAM, ("linkage-keys",)), (lp.GEO_STREAM, GEO)]
         assert lp.PROVIDER.target_datasets == ("linkage-keys", *GEO)
-        assert lp.PROVIDER.target_trial is False
+        # THE TRIAL IN A SLOT'S PERIOD (REQ-GEN-298 criterion 10).
+        assert lp.PROVIDER.target_trial is True
 
     def test_the_geocoding_seeds_lie_in_their_own_range(self):
         lp.PROVIDER.check_seeds()
@@ -136,7 +144,7 @@ class TestWhenAndFromWhat:
 class TestTheRows:
     def test_one_row_per_distinct_record_and_year_in_force(self, plan):
         for job in _geo_jobs(plan):
-            for _t, (d, rows, _v) in _files(plan, job).items():
+            for _t, (d, rows, _v) in _clean(plan, job).items():
                 years = lp.members_in_force(d, job.period)
                 assert set(rows["census_year"]) <= set(years)
                 per = rows.groupby("id_1")["census_year"].apply(sorted)
@@ -231,7 +239,7 @@ class TestThePlannedVerdict:
 
         cat = check_bands.catalogue()
         for job in _geo_jobs(plan):
-            for _t, (d, rows, verdict) in _files(plan, job).items():
+            for _t, (d, rows, verdict) in _clean(plan, job).items():
                 assert verdict == lp.planned_verdict(d, rows, cat)
 
     def test_an_ed_supply_missing_addresses_is_planned_amber_not_green(self, plan):
@@ -245,8 +253,10 @@ class TestThePlannedVerdict:
         from generator import targets
 
         book = {"geo-ed-presentations": [{"period": "2017-Q2", "delivery": "d1",
+                                          "received_at": "2017-05-01T18:34:00+08:00",
                                           "planned": {"geo-ed-presentations": "amber"}},
                                          {"period": "2017-Q3", "delivery": "d2",
+                                          "received_at": "2017-08-01T18:21:00+08:00",
                                           "planned": {"geo-ed-presentations": "green"}}]}
         (tmp_path / "book.json").write_text(json.dumps(book))
         (tmp_path / "placed.json").write_text(json.dumps({"placements": []}))

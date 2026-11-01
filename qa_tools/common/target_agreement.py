@@ -106,6 +106,69 @@ def compare(dataset_id: str, results: Sequence[dict], target: str, label: str,
                         responsible(dataset_id, results, target, rules, reads) if results else ())
 
 
+@dataclass(frozen=True)
+class ReadDisagreement:
+    """A generation-time trial whose cross-collection reads did not come out
+    as the trial staged them (REQ-GEN-298 criterion 15)."""
+    label: str
+    dataset_id: str
+    problems: tuple[str, ...]
+
+    def __str__(self) -> str:
+        return f"{self.label} ({self.dataset_id}): {'; '.join(self.problems)}"
+
+
+def _tables_named(record: dict) -> set[str]:
+    """The tables a not-evaluated record says it could not read."""
+    named = set(record.get("unrunnable_tables") or record.get("held_tables") or ())
+    for key in ("unrunnable_table", "held_table"):
+        if record.get(key):
+            named.add(record[key])
+    return named
+
+
+def trial_reads_agree(dataset_id: str, results: Sequence[dict], *, staged: Iterable[str],
+                      unstaged: Iterable[str], label: str,
+                      reads: dict | None = None) -> ReadDisagreement | None:
+    """THE TRIAL'S OWN RULE FOR ITS CROSS-TABLE RESULTS (REQ-GEN-298 criterion
+    15), applied beside compare() over own_results(), which it leaves as it is
+    - own_results serves the comparison after replay, where a could-not-run
+    quarter is no failure. For each check of the tried dataset that reads a
+    table the trial was given: IF it reads one the trial STAGED and is recorded
+    not evaluated, or reads one the trial staged NOTHING for and is recorded
+    evaluated or not evaluated for want of a different table, THEN a
+    disagreement naming the supply, the check and the table. None where every
+    such read came out as staged."""
+    from qa_tools.common import carried, check_id, promotion
+
+    if reads is None:
+        reads = promotion._declared_reads()
+    staged, unstaged = set(staged), set(unstaged)
+    problems = []
+    for record in results:
+        check = record.get("check_id") or ""
+        parsed = check_id.try_parse(check)
+        if parsed is None or parsed.dataset != dataset_id:
+            continue
+        declared = set(reads.get(check, ()))
+        given, missing = declared & staged, declared & unstaged
+        if not (given or missing):
+            continue
+        why = carried.not_evaluated_reason(record)
+        named = _tables_named(record)
+        if given and why and (not named or named & given):
+            problems.append(f"{_short(check)} was recorded not evaluated though the trial "
+                            f"staged {', '.join(sorted(given))}")
+        if missing and not why:
+            problems.append(f"{_short(check)} was evaluated though the trial staged no "
+                            f"{', '.join(sorted(missing))}")
+        elif missing and not (named & missing):
+            problems.append(f"{_short(check)} was recorded not evaluated for want of "
+                            f"{', '.join(sorted(named)) or 'no table named'}, not of "
+                            f"{', '.join(sorted(missing))}, which the trial staged nothing for")
+    return ReadDisagreement(label, dataset_id, tuple(problems)) if problems else None
+
+
 def recorded_results(conn, run_key: str) -> list[dict]:
     """One run's recorded results as the gate read them when it ran: the
     run's own and its cross-table ones, each record's extras merged back

@@ -132,6 +132,91 @@ class CollectionCLI:
         generate_collection(self.collection_id,
                             trial=self.has_target_trial if trial is None else trial)
 
+    # ---- the target trial (REQ-GEN-186; REQ-GEN-298 criterion 10) ----------
+
+    def try_targets(self, collection_id: str | None = None, say=None) -> int:
+        """Run the four real tools on every supply the generator just wrote to a
+        target it tries - every injected target, and for a provider recording
+        planned verdicts every amber, red and scenario supply (REQ-GEN-298
+        criterion 13) - recording nothing (REQ-GEN-186 criterion 1). Returns
+        how many were tried.
+
+        ONE METHOD FOR EVERY COLLECTION, naming none (REQ-GEN-298 criterion
+        10), moved from cli/one_table.py. EACH SUPPLY FROM ITS OWN RECORD
+        (criterion 12): its dataset, table, file and reference, never the
+        command's one dataset. A collection whose checks read another
+        collection's tables tries each supply IN ITS SLOT'S PERIOD, in
+        parallel (cli/target_trial.py); one whose checks read only its own
+        tries each as a local file, as it always has.
+
+        A DISAGREEMENT FAILS GENERATION AND TAKES THE HISTORY WITH IT
+        (REQ-GEN-186 criterion 2): every delivery just written - every stream's
+        - is removed before the failure is raised, naming every disagreement.
+        The verdict is the promotion gate's own reading of the trial's results
+        (qa_tools/common/target_agreement.py), checked on the supply's own day."""
+        from cli import target_trial
+        from generator import collections as providers
+        from generator import driver, targets
+        from qa_tools.common import delivery, run_reads, target_agreement
+
+        provider = providers.provider(collection_id or self.collection_id)
+        say = say or (lambda msg: console.print(msg, style="dim"))
+        # WHERE THE GENERATOR JUST WROTE (targets.just_written) - never the
+        # pipeline's view of data/.
+        try:
+            built, written_to = targets.just_written()
+        except ValueError as exc:
+            # A RECORD THAT DOES NOT ADD UP fails like any disagreement, not
+            # as a traceback (post-build-review #157 finding 7).
+            delivery.remove_deliveries(driver.provider_delivery_names(provider),
+                                       driver.DELIVERIES_DIR, driver.RECEIPTS_DIR)
+            raise self.TargetTrialFailed(f"what the generator built could not be read, so the "
+                                         f"deliveries just written were removed: {exc}") from exc
+        tried = [b for b in built if (b.injected or b.tried)
+                 and b.dataset_id in provider.target_datasets]
+        found = []
+        ready = []
+        for one in tried:
+            if one.reference is None:
+                found.append(target_agreement.Disagreement(
+                    one.label, one.dataset_id, one.target, None,
+                    ("it has no lead-in to be measured against",)))
+            else:
+                ready.append(one)
+        if run_reads.reads_for(provider.collection_id).foreign:
+            try:
+                specs = [target_trial.spec_of(one, written_to) for one in ready]
+            except ValueError as exc:
+                specs = []
+                found.append(target_agreement.ReadDisagreement(
+                    "the trial's files", provider.collection_id, (str(exc),)))
+            disagreements, took, workers = target_trial.try_all(provider.collection_id,
+                                                                specs, say=say)
+            found += disagreements
+            # MEASURED AND SAID (criterion 13), with REQ-PIPE-296's measurement.
+            say(f"Tried {len(specs)} supplies in their slots' periods in {took:.0f}s on "
+                f"{workers} worker(s)")
+        else:
+            for one in ready:
+                say(f"Trying {one.label} against the real tools (built to {one.target})")
+                results, _filed = self.run_check_local_file(
+                    str(targets.csv_of(one.delivery, written_to, one.filename,
+                                       dataset_id=one.dataset_id)),
+                    str(targets.csv_of(one.reference, written_to, dataset_id=one.dataset_id)),
+                    target_trial.RUN_BY, keep=False, run_date=one.day)
+                disagreement = target_agreement.compare(one.dataset_id, results, one.target,
+                                                        one.label, one.rules)
+                if disagreement:
+                    found.append(disagreement)
+        if found:
+            removed = delivery.remove_deliveries(driver.provider_delivery_names(provider),
+                                                 written_to, driver.RECEIPTS_DIR)
+            raise self.TargetTrialFailed(
+                f"{len(found)} disagreement(s) among {len(tried)} tried supplies: they did not "
+                f"read as built, so the {removed} {self.label} deliveries just written were "
+                f"removed:\n" + "\n".join(f"  - {d}" for d in found))
+        return len(tried)
+
     def manifest_exists(self) -> bool:
         """Is there anything to pick from? With no deliveries on disk there
         are no arrivals, which is what the picker needs to know."""

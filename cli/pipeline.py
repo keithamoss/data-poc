@@ -318,9 +318,9 @@ def generate_collection(collection_id: str, *, trial: bool) -> None:
 
     THE TRIAL RUNS WHERE THE PROVIDER DECLARES ONE, and is REFUSED BY NAME
     where it does not (criterion 6) - never silently skipped, which is what
-    a Child Protection trial used to be. The trial is the one-table
-    shape's try_targets() (cli/one_table.py), reached through the
-    collection's command object.
+    a Child Protection trial used to be. The trial is the shared
+    collection command's try_targets() (cli/collection_cli.py), reached
+    through the collection's command object.
 
     THE TRIAL FIRST, THE MAP ONCE IT AGREES (post-build-review #157 finding
     7): the map is committed, and a history the trial refused to emit
@@ -342,13 +342,10 @@ def generate_collection(collection_id: str, *, trial: bool) -> None:
         raise TargetTrialUnavailable(
             f"{collection_id} has no target trial: its generator provider declares none, so "
             f"there is nothing to try against the real tools")
-    if trial and len(provider_collection(collection_id).datasets) > 1:
-        # BEFORE ANYTHING IS WRITTEN (post-build-review #232): the trial is a
-        # one-table collection's, and generating first left a whole history
-        # on disk behind an AttributeError.
-        raise click.ClickException(
-            f"{collection_id} cannot run a target trial: only a one-table collection has one, "
-            f"and its provider should not declare it")
+    # A COLLECTION OF SEVERAL DATASETS HAS ITS TRIAL TOO (REQ-GEN-298 criterion
+    # 10): the trial is the shared collection command's, and each supply is
+    # tried against its own dataset's table - the refusal post-build-review
+    # #232 added for want of that is lifted.
     driver.generate(collection_id)
     if trial:
         from cli.collection_cli import of

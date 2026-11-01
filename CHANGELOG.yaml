@@ -130,6 +130,14 @@ releases:
               The census years a geocode must cover are declared once, with the
               date each new census joins, so every supply is judged against the
               years agreed for its own quarter.
+          - headline: Geocoding faults on purpose
+            components: ["Data generation"]
+            description: >
+              The geocoding history now carries each fault its checks look
+              for - a missing, repeated or unexpected census year, too many
+              records not geocoded, records left out, a record the source does
+              not hold and an empty file - in ordinary supplies and once each
+              in a scenario the scenario map names.
           - headline: Unanswered provisional choices are flagged
             components: ["Testing & dev tooling", "Docs & process"]
             description: >
@@ -145,8 +153,15 @@ releases:
             description: >
               With three datasets, `mothman lp qa` now works as Child
               Protection's does: `--table` names the linkage table or a
-              geocoding table. Generation will offer `--skip-target-trial` once
-              the geocoding trial arrives.
+              geocoding table.
+          - headline: Geocoding supplies tried before they are kept
+            components: ["Data generation", "Testing & dev tooling"]
+            description: >
+              Generating Linkage Products now runs the real checks over every
+              geocoding supply built to warn or fail, each in its own quarter
+              beside the source it will be checked against, and refuses the
+              history if one reads otherwise. `mothman lp
+              generate-synthetic-data --skip-target-trial` skips it.
           - headline: Pass, Warn and Fail
             components: ["Dashboard UI", "Testing & dev tooling"]
             description: >

@@ -395,12 +395,24 @@ class TestTheProvidersGateKnowsWhatAProviderMayDeclare:
         problems = validate_providers.problems()
         assert any(expected in p for p in problems), problems
 
-    def test_a_target_trial_on_a_multi_table_collection_fails(self, monkeypatch):
+    def test_a_target_trial_naming_no_target_datasets_fails(self, monkeypatch):
+        """REQ-GEN-298 criterion 10 lifted the one-table rule; a trial still
+        compares each supply in its own dataset, so it must name them."""
         from generator import validate_providers
 
         monkeypatch.setattr(providers.provider("child-protection"), "target_trial", True)
+        monkeypatch.setattr(providers.provider("child-protection"), "target_datasets", ())
         problems = validate_providers.problems()
-        assert any("child-protection declares a target trial" in p for p in problems), problems
+        assert any("child-protection declares a target trial and no target_datasets" in p
+                   for p in problems), problems
+
+    def test_a_collection_of_several_datasets_may_declare_a_trial(self):
+        """Linkage Products declares one (REQ-GEN-298 criterion 10)."""
+        from generator import validate_providers
+
+        assert providers.provider("linkage-products").target_trial
+        assert len(collections_registry().by_id("linkage-products").datasets) > 1
+        assert validate_providers.problems() == []
 
     def test_a_provider_module_naming_no_collection_fails(self, tmp_path):
         from generator import validate_providers
@@ -417,16 +429,19 @@ class TestTheProvidersGateKnowsWhatAProviderMayDeclare:
         assert validate_providers.problems() == []
 
 
-class TestATrialIsRefusedBeforeAnythingIsWritten:
-    def test_a_multi_table_collection_cannot_be_asked_for_a_trial(self, monkeypatch):
-        import click
+def collections_registry():
+    from qa_tools import collections
 
+    return collections
+
+
+class TestATrialIsRefusedBeforeAnythingIsWritten:
+    def test_a_collection_declaring_no_trial_cannot_be_asked_for_one(self, monkeypatch):
         from cli import pipeline as pipeline_cli
 
         written = []
-        monkeypatch.setattr(providers.provider("child-protection"), "target_trial", True)
         monkeypatch.setattr(driver, "generate", lambda cid: written.append(cid))
-        with pytest.raises(click.ClickException, match="only a one-table collection"):
+        with pytest.raises(pipeline_cli.TargetTrialUnavailable, match="has no target trial"):
             pipeline_cli.generate_collection("child-protection", trial=True)
         assert written == []
 

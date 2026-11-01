@@ -14,7 +14,10 @@ before it promoted. The warehouse builders still give a run a view of
 its own table at staging time; this REPLACES that schema once the
 period is known. A supply with no filing - held, unfiled, a trial - is
 left with what staging gave it (REQ-PIPE-079 criterion 9: no invented
-period, no period-scoped run).
+period, no period-scoped run) - except a GENERATION-TIME TRIAL, which runs in
+the period of the slot the generator built it for and reads every other
+table only from what it staged in its own scope (criterion 9 as amended by
+A6; _build_trial).
 
 "STAGED FOR THE PERIOD" MEANS FILED TO IT AND STILL IN STAGING. Filing
 says which period a supply claims; promotion MOVES a supply's tables out
@@ -36,7 +39,7 @@ is recorded as rejected on REQ-PIPE-105.
 """
 from __future__ import annotations
 
-from collections.abc import Collection, Sequence
+from collections.abc import Collection, Mapping, Sequence
 
 from qa_tools.common import period_schema, supply_db
 
@@ -95,11 +98,18 @@ def filed_tables(conn, period: str, wanted: Collection[str] | None = None) -> di
     return filed
 
 
+class TrialSuppliedRefused(ValueError):
+    """A run that is not a generation-time trial was given trial-supplied
+    tables (REQ-PIPE-331 criterion 3 as amended by A7)."""
+
+
 def build(conn, run_id: str, *, period: str, own_table: str, arrival_key: str,
           tables: Sequence[str], loaded: frozenset[str] | None,
           held: Collection[str] = (),
           own_physical: Collection[str] | None = None,
-          warehouse_for: Collection[str] = ()) -> period_schema.PeriodResolution:
+          warehouse_for: Collection[str] = (),
+          trial_supplied: Mapping[str, str | None] | None = None
+          ) -> period_schema.PeriodResolution:
     """Replace this run's view schema with the period overlay, and
     record what it resolved.
 
@@ -111,7 +121,15 @@ def build(conn, run_id: str, *, period: str, own_table: str, arrival_key: str,
     `held` applies to the run's OWN table only, as it did at staging. A
     held supply has no filing, so it can never be staged-for-period for
     a sibling to read.
+
+    `trial_supplied` IS A GENERATION-TIME TRIAL'S OWN BRANCH (REQ-PIPE-331
+    criterion 3 as amended by A7; REQ-GEN-298 criterion 11), and only a
+    trial's: see _build_trial.
     """
+    if trial_supplied is not None:
+        return _build_trial(conn, run_id, period=period, own_table=own_table,
+                            arrival_key=arrival_key, tables=tables, loaded=loaded,
+                            trial_supplied=trial_supplied)
     staging = supply_db.staging_schema_for(run_id)
     others = [t for t in tables if t != own_table]
     staged = staged_for_period(conn, period, others, staging=staging, loaded=loaded)
@@ -170,6 +188,66 @@ def build(conn, run_id: str, *, period: str, own_table: str, arrival_key: str,
         out.resolution.held[own_table] = withheld
         if own_table in out.resolution.absent:
             out.resolution.absent.remove(own_table)
+    return out
+
+
+def _build_trial(conn, run_id: str, *, period: str, own_table: str, arrival_key: str,
+                 tables: Sequence[str], loaded: frozenset[str] | None,
+                 trial_supplied: Mapping[str, str | None]) -> period_schema.PeriodResolution:
+    """A GENERATION-TIME TRIAL IN ITS SLOT'S PERIOD (REQ-PIPE-079 criterion 9
+    as amended by A6; REQ-PIPE-331 criterion 3 as amended by A7): the run's
+    own table from its own trial staging, and every other table ONLY from
+    `trial_supplied` - {table: the physical table the trial staged in its own
+    scope, or None} - absent where the mapping names none. Neither
+    period_schema.promoted_in nor staged_for_period is called, so nothing in
+    the real database's period or staging schemas is read: generation runs
+    before any replay, and over an existing history the real period holds
+    whatever happened to be promoted (architect v6, isolation).
+
+    Refused by name for a run that is not a trial (trial.is_trial)."""
+    from qa_tools.common import trial
+
+    if not trial.is_trial(run_id):
+        raise TrialSuppliedRefused(
+            f"{run_id!r} is not a trial, so it may not be given trial-supplied tables "
+            f"({', '.join(sorted(trial_supplied))}) - a run that is not a generation-time "
+            f"trial reads another collection's tables from its period's warehouse alone "
+            f"(REQ-PIPE-331 criterion 3)")
+    staging = supply_db.staging_schema_for(run_id)
+    own = supply_db.candidates_in(conn, staging, [own_table], arrival=arrival_key,
+                                   loaded=loaded).get(own_table) or []
+    staged: dict[str, list[str]] = {table: [] for table in tables}
+    staged[own_table] = sorted(own)
+    for table in tables:
+        if table == own_table:
+            continue
+        physical = trial_supplied.get(table)
+        if physical:
+            staged[table] = [physical]
+    return period_schema.create_overlay_views(conn, run_id, period, staged, {})
+
+
+def rebuild_for_trial(run_id: str, *, period: str, own_table: str, arrival_key: str,
+                      tables: Sequence[str], trial_supplied: Mapping[str, str | None],
+                      dsn: str | None = None) -> period_schema.PeriodResolution:
+    """A generation-time trial's one call (REQ-GEN-298 criterion 10): its view
+    schema for its slot's period through the trial branch, and the declared
+    set in force for that period (REQ-QAC-297 criterion 3), so its year checks
+    and its cross-collection checks are evaluated as the replay will
+    evaluate them. Records nothing that outlives the trial: its resolution is
+    the trial's, discarded with it."""
+    from qa_tools.common import list_setting_members, load_log, trial
+
+    loaded = load_log.loaded_tables(trial.scope_for(run_id))
+    conn = supply_db.connect(dsn=dsn, label="mothman:trial-in-period")
+    try:
+        out = build(conn, run_id, period=period, own_table=own_table, arrival_key=arrival_key,
+                    tables=tables, loaded=loaded, trial_supplied=trial_supplied)
+        list_setting_members.create(conn, supply_db.run_schema(run_id),
+                                    list_setting_members.rows_for(tables, period))
+        supply_db.record_resolution(conn, out.resolution)
+    finally:
+        conn.close()
     return out
 
 

@@ -36,62 +36,6 @@ class OneTableCLI(CollectionCLI):
         self.dataset_id = coll.datasets[0].dataset_id
         self.table = coll.datasets[0].table
 
-    # ---- the target trial (REQ-GEN-186) ----------------------------------
-
-    def try_targets(self, collection_id: str | None = None, say=None) -> int:
-        """Run the four real tools on every injected target the generator just
-        wrote, against its last lead-in, through the same trial path
-        `mothman <short> qa --trial` uses - recording nothing (REQ-GEN-186
-        criterion 1). Returns how many were tried.
-
-        A DISAGREEMENT FAILS GENERATION AND TAKES THE HISTORY WITH IT
-        (criterion 2): every delivery just written is removed before the
-        failure is raised. The verdict is the promotion gate's own reading of
-        the trial's results (qa_tools/common/target_agreement.py), checked on
-        the supply's own day. About nine seconds a trial (2026-10-11)."""
-        from generator import collections as providers
-        from generator import driver, targets
-        from qa_tools.common import delivery, target_agreement
-
-        provider = providers.provider(collection_id or self.collection_id)
-        say = say or (lambda msg: console.print(msg, style="dim"))
-        # WHERE THE GENERATOR JUST WROTE (targets.just_written) - never the
-        # pipeline's view of data/.
-        try:
-            built, written_to = targets.just_written()
-        except ValueError as exc:
-            # A RECORD THAT DOES NOT ADD UP fails like any disagreement, not
-            # as a traceback (post-build-review #157 finding 7).
-            delivery.remove_deliveries(driver.provider_delivery_names(provider),
-                                       driver.DELIVERIES_DIR, driver.RECEIPTS_DIR)
-            raise self.TargetTrialFailed(f"what the generator built could not be read, so the "
-                                         f"deliveries just written were removed: {exc}") from exc
-        tried = [b for b in built if b.injected and b.dataset_id in provider.target_datasets]
-        found = []
-        for one in tried:
-            say(f"Trying {one.label} against the real tools (built to {one.target})")
-            if one.reference is None:
-                found.append(target_agreement.Disagreement(
-                    one.label, one.dataset_id, one.target, None,
-                    ("it has no lead-in to be measured against",)))
-                continue
-            results, _filed = self.run_check_local_file(
-                str(targets.csv_of(one.delivery, written_to, one.filename)),
-                str(targets.csv_of(one.reference, written_to)),
-                "target-trial", keep=False, run_date=one.day)
-            disagreement = target_agreement.compare(one.dataset_id, results, one.target,
-                                                    one.label, one.rules)
-            if disagreement:
-                found.append(disagreement)
-        if found:
-            removed = delivery.remove_deliveries(driver.provider_delivery_names(provider),
-                                                 written_to, driver.RECEIPTS_DIR)
-            raise self.TargetTrialFailed(
-                f"{len(found)} of {len(tried)} injected target(s) did not read as built, so "
-                f"the {removed} {self.label} deliveries just written were removed:\n"
-                + "\n".join(f"  - {d}" for d in found))
-        return len(tried)
-
     # ---- arrivals ----------------------------------------------------------
 
     def load_manifest(self) -> list[dict]:

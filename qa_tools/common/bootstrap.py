@@ -272,9 +272,14 @@ def bootstrap(collection: str = "all", force: bool = False,
             # BY STREAM (REQ-PIPE-262): collections sharing a calendar are one
             # receipt-ordered stream, as the live pass is, so who opens a
             # period never depends on which process ran ahead.
-            # GENERATION FIRST, all of it - 4.6s measured, not worth
-            # overlapping - so no pipeline recognises a delivery tree a
-            # generator is still writing.
+            # GENERATION FIRST, all of it, so no pipeline recognises a delivery
+            # tree a generator is still writing. NOT CHEAP ANY MORE (REQ-GEN-298
+            # NFR 4, correcting the old '4.6s measured'): the whole history took
+            # 416s to generate on this sandbox before the geocoding trials
+            # (2026-11-01), and those trials run the real tools over about 50
+            # supplies before anything is kept, on the quarterly bootstrap's
+            # critical path - their wall clock is said by the generate command,
+            # measured with REQ-PIPE-296's.
             for name in names:
                 say(f"Generating synthetic data ({_label(name)})")
                 _generate(name, trial=not skip_target_trial)

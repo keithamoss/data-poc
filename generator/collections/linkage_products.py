@@ -371,12 +371,14 @@ def _keys(rows, ids: list[str]):
 
 
 def apply_geo_faults(dataset_id: str, rows, faults, *, source_rows, id_columns, years,
-                     rng, where: str, catalogue):
+                     rng, where: str, catalogue, seed: int):
     """One geocoding file's rows with its named faults applied (REQ-GEN-298
     criteria 1, 4 and 6), and the verdict the file is built to: the share's
     own band (planned_verdict) and each fault's. Pure: the same inputs and
     draw give the same rows. Refused - never shifted or relaxed - where a
-    fault cannot be placed."""
+    fault cannot be placed. `seed` is the declared seed `rng` was made from,
+    handed on to generator/dirty.py, which seeds its own draw (REQ-GEN-246
+    criterion 2: no seed outside the provider's declared schedule)."""
     import pandas as pd
 
     from generator import dirty, synthetic_inputs
@@ -423,7 +425,7 @@ def apply_geo_faults(dataset_id: str, rows, faults, *, source_rows, id_columns, 
                 one = rows[mask & (rows[member_col].astype(str) == str(year))]
                 # generator/dirty.py's duplicate, IDENTICAL IN EVERY COLUMN: no
                 # near-duplicate columns (criterion 1).
-                twice = dirty.inject_duplicate_rows(one, 1.0, int(rng.integers(2 ** 31)))
+                twice = dirty.inject_duplicate_rows(one, 1.0, seed)
                 rows = pd.concat([rows, twice.iloc[len(one):]], ignore_index=True)
             else:
                 extra = rows[mask].drop_duplicates(subset=ids, keep="last").copy()
@@ -1059,7 +1061,7 @@ class LinkageProducts(Provider):
                 if sev is not None:
                     severity[(job.slot_id, d)] = sev
 
-        state, resupply, meta = {}, {}, {}
+        state, resupply, meta, applied = {}, {}, {}, {}
         for job in jobs:
             if base[job.slot_id] is None:
                 state[job.slot_id] = None
@@ -1085,11 +1087,12 @@ class LinkageProducts(Provider):
                 else:
                     faults, where = (), ""
                 if faults:
+                    applied[(job.slot_id, d)] = tuple(faults)
                     rows, verdict = apply_geo_faults(
                         d, rows, faults, source_rows=_before(sources[src], src, job.period.name,
                                                              at)[-1].rows,
                         id_columns=hierarchy.dataset(d).linked[0][2], years=years, rng=rng,
-                        where=where, catalogue=catalogue)
+                        where=where, catalogue=catalogue, seed=job.seed + GEO_FAULT_SPAN)
                 out[table] = (d, rows, verdict)
                 # TRIED AT GENERATION (criterion 13): every amber or red, every
                 # named scenario's file and each file criterion 8 names.
@@ -1121,6 +1124,9 @@ class LinkageProducts(Provider):
         plan.state["geo_resupply"] = resupply
         plan.state["geo_meta"] = meta
         plan.state["geo_named"] = named
+        # WHICH FAULTS EACH FILE CARRIES, by (slot, dataset) - what a reader
+        # of the plan needs to tell a fault from the rows' own shape.
+        plan.state["geo_faults"] = applied
         plan.resolved.extend(resolved)
         plan.injected_by_stream[GEO_STREAM] = injected
 

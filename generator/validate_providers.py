@@ -51,9 +51,13 @@ def declaration_problems() -> list[str]:
             if value is not None and value not in owned:
                 out.append(f"{where}'s {field}: dataset {value!r} is not one of {coll.id}'s "
                            f"({', '.join(owned)})")
-        if provider.target_trial and len(coll.datasets) > 1:
-            out.append(f"{coll.id} declares a target trial, which only a one-table collection "
-                       f"has - its {len(coll.datasets)} tables have no single target to try")
+        # A TRIAL OF A COLLECTION OF SEVERAL DATASETS IS NO LONGER REFUSED
+        # (REQ-GEN-298 criterion 10): each tried supply names its own dataset
+        # and file, and is tried against its own table. What a trial still
+        # needs is somewhere each supply's verdict is compared.
+        if provider.target_trial and not provider.target_datasets:
+            out.append(f"{coll.id} declares a target trial and no target_datasets - a trial "
+                       f"compares each supply in its own dataset, so it must name them")
         if provider.target_levers is not None:
             if provider.target_levers not in (NULL_RATE, CLIENT_POSTCODES):
                 out.append(f"{where} declares lever set {provider.target_levers!r}, which "

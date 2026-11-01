@@ -43,8 +43,25 @@ class Built:
     #: reads the supply as the replay will.
     day: str | None = None
     #: One file of a two-file delivery (REQ-GEN-196 criterion 19): a pair's
-    #: two supplies share a delivery, so the file is part of the key.
+    #: two supplies share a delivery, so the file is part of the key - and a
+    #: geocoding delivery's two files each its own supply (REQ-GEN-298
+    #: criterion 12). None for a one-file delivery, whose file the trial finds
+    #: by the dataset's own name (csv_of).
     filename: str | None = None
+    #: THE SLOT'S PERIOD (REQ-GEN-298 criterion 12): a trial of a collection
+    #: whose checks read another collection's tables runs in it.
+    period: str | None = None
+    #: TRIED AT GENERATION THOUGH NOT INJECTED (REQ-GEN-298 criterion 13): a
+    #: geocoding amber, red or scenario file, or one criterion 8 names.
+    tried: bool = False
+    #: Its receipt, where the provider recorded one - a trial in a period
+    #: stages the supply as received.
+    received_at: str | None = None
+    #: FOR A TRIAL IN A PERIOD (criterion 11): (table, dataset, delivery,
+    #: receipt) of each other collection's supply the plan promotes into the
+    #: period before this one's receipt - delivery and receipt None where it
+    #: promotes none, so the trial stages nothing for that table.
+    sources: tuple = ()
 
 
 def _read(path: Path) -> dict:
@@ -78,7 +95,11 @@ def written(bookkeeping: Path | None = None, placements: Path | None = None) -> 
             raise ValueError(f"the generator's record holds supplies for {key}, which no "
                              f"provider makes: {exc}") from None
     for key in sorted(book, key=lambda k: not owners[k].target_trial):
-        if owners[key].target_trial:
+        if any(key in (e.get("planned") or {}) for e in book[key]):
+            # EVERY PLANNED VERDICT, GREEN INCLUDED (REQ-GEN-295 criterion 7),
+            # each with its day, file and period (REQ-GEN-298 criterion 12).
+            out += _planned(key, book, placed)
+        elif owners[key].target_trial:
             out += _trialled(key, book[key], placed)
         else:
             ambers = [e for e in book[key] if e.get("dirty_severity") == "amber"]
@@ -95,15 +116,81 @@ def written(bookkeeping: Path | None = None, placements: Path | None = None) -> 
                 raise ValueError(f"{owners[key].collection_id} built ordinary ambers but "
                                  f"its provider declares no amber_dataset to compare them in")
             out += [Built(f"the ordinary amber for {entry['period']}", where,
-                          entry["delivery"], "amber")
+                          entry["delivery"], "amber", day=_day_of(entry),
+                          period=entry["period"], received_at=entry.get("received_at"))
                     for entry in ambers]
-            # EVERY PLANNED VERDICT, GREEN INCLUDED (REQ-GEN-295 criterion 7):
-            # a supply the provider planned from its own rows - the geocoding
-            # stream's - is a target whatever it was planned to be.
-            out += [Built(f"the planned {entry['planned'][key]} for {entry['period']}", key,
-                          entry["delivery"], entry["planned"][key])
-                    for entry in book[key] if key in (entry.get("planned") or {})]
+    # A RECORD LACKING ITS DAY OR PERIOD IS REFUSED BY NAME (REQ-GEN-298
+    # criterion 12), never tried with no period.
+    for b in out:
+        if not b.day or not b.period:
+            raise ValueError(f"the generator's record of {b.label} ({b.dataset_id}, delivery "
+                             f"{b.delivery}) gives no {'day' if not b.day else 'period'}, so it "
+                             f"cannot be tried in its slot's period")
     return out
+
+
+def _day_of(entry: dict) -> str | None:
+    """The day a supply was built for: its period where that is a day (a
+    daily collection's), else its receipt's own date."""
+    from datetime import date
+
+    try:
+        return date.fromisoformat(entry["period"]).isoformat()
+    except (KeyError, TypeError, ValueError):
+        pass
+    if not entry.get("received_at"):
+        return None
+    return asset_time.local_date(
+        asset_time.parse_instant(entry["received_at"], entry.get("run_id", "a receipt"))).isoformat()
+
+
+def _planned(dataset_id: str, book: dict, placed: list[dict]) -> list[Built]:
+    """Every supply of a dataset the provider planned from its own rows - the
+    geocoding stream's - as a target whatever it was planned to be: its day,
+    its own file, its slot's period, whether it is tried at generation, the
+    source supply the warehouse holds when it arrives, and as its reference the
+    dataset's last supply before it planned green."""
+    from qa_tools.common import hierarchy
+
+    table = hierarchy.dataset(dataset_id).table
+    named = {(p.get("dataset"), p.get("period")): p["scenario_id"] for p in placed
+             if p.get("scenario_id")}
+    out: list[Built] = []
+    reference = None
+    for entry in book[dataset_id]:
+        target = (entry.get("planned") or {}).get(dataset_id)
+        if target is None:
+            continue
+        period = entry["period"]
+        sid = named.get((dataset_id, period))
+        label = (f"{sid}'s {period} {table}.csv" if sid
+                 else f"the planned {target} for {period}")
+        source = (entry.get("sources") or {}).get(dataset_id)
+        sources = ()
+        if source:
+            held = source.get("received_at")
+            sources = ((source["table"], source["dataset"],
+                        _delivery_received(book, source["dataset"], held) if held else None,
+                        held),)
+        out.append(Built(label, dataset_id, entry["delivery"], target, scenario=sid,
+                         reference=reference, day=_day_of(entry), filename=f"{table}.csv",
+                         period=period, tried=dataset_id in (entry.get("tried") or ()),
+                         received_at=entry.get("received_at"), sources=sources))
+        if target == "green":
+            reference = entry["delivery"]
+    return out
+
+
+def _delivery_received(book: dict, dataset_id: str, received_at: str) -> str:
+    """The delivery of `dataset_id`'s supply received at that instant, from
+    the generator's own record - refused by name where it holds none."""
+    at = asset_time.parse_instant(received_at, dataset_id)
+    for entry in book.get(dataset_id) or ():
+        if entry.get("received_at") and asset_time.parse_instant(
+                entry["received_at"], entry.get("run_id", dataset_id)) == at:
+            return entry["delivery"]
+    raise ValueError(f"the generator's record holds no {dataset_id} supply received "
+                     f"{received_at}, which a geocoding supply's trial would stage")
 
 
 def _trialled(dataset_id: str, entries: list[dict], placed: list[dict]) -> list[Built]:
@@ -116,7 +203,8 @@ def _trialled(dataset_id: str, entries: list[dict], placed: list[dict]) -> list[
     for entry in entries:
         if entry.get("dirty_severity") == "amber":
             out.append(Built(f"the ordinary amber for {entry['period']}", dataset_id,
-                             entry["delivery"], "amber", day=entry["period"]))
+                             entry["delivery"], "amber", day=_day_of(entry),
+                             period=entry["period"], received_at=entry.get("received_at")))
     for record in placed:
         # EVERY DAY BUILT GREEN, targeted placement or not (post-build-review
         # #172): TS-73's green following day has no target of its own and
@@ -131,7 +219,7 @@ def _trialled(dataset_id: str, entries: list[dict], placed: list[dict]) -> list[
             role = "lead-in" if period in lead_in else "following day"
             out.append(Built(f"{scenario}'s green {role} {period}", dataset_id,
                              _only(by_period, period, scenario)["delivery"], "green",
-                             scenario=scenario, day=period))
+                             scenario=scenario, day=period, period=period))
         for target in record.get("targets") or ():
             if target.get("filename"):
                 # A PAIR'S FILE, keyed by its delivery and filename, on the
@@ -140,13 +228,14 @@ def _trialled(dataset_id: str, entries: list[dict], placed: list[dict]) -> list[
                                  target["delivery"], target["built_to"],
                                  rules=tuple(target.get("rules") or ()), scenario=scenario,
                                  reference=reference, injected=True, day=target["day"],
-                                 filename=target["filename"]))
+                                 filename=target["filename"], period=target["day"]))
                 continue
             entry = _arriving_at(by_period, target["date"], target["at"], scenario)
             out.append(Built(f"{scenario}'s {target['date']} {target['at']} arrival",
                              dataset_id, entry["delivery"], target["built_to"],
                              rules=tuple(target.get("rules") or ()), scenario=scenario,
-                             reference=reference, injected=True, day=target["date"]))
+                             reference=reference, injected=True, day=target["date"],
+                             period=entry["period"], received_at=entry.get("received_at")))
     return out
 
 
@@ -180,15 +269,25 @@ def _arriving_at(by_period: dict, day: str, at: str, scenario: str) -> dict:
 
 
 def csv_of(delivery_name: str, deliveries_dir: Path | None = None,
-           filename: str | None = None) -> Path:
-    """A Birth Registrations delivery's one file - or, for one file of a
-    two-file delivery (REQ-GEN-196), the file named."""
+           filename: str | None = None, dataset_id: str | None = None) -> Path:
+    """A delivery's file for one supply: the file named (one file of a
+    two-file delivery, REQ-GEN-196 - or of a geocoding delivery, REQ-GEN-298
+    criterion 12), else the one file the dataset's own name recognises, else
+    the delivery's one file. Refused by name where the delivery holds no file
+    for the dataset."""
     folder = Path(deliveries_dir or delivery.DELIVERIES_DIR, delivery_name)
     if filename is not None:
         path = folder / filename
         if not path.is_file():
             raise ValueError(f"delivery {delivery_name} holds no file {filename}")
         return path
+    if dataset_id is not None:
+        mine = sorted(p for p in folder.glob("*.csv")
+                      if delivery.dataset_for_filename(p.name) == dataset_id)
+        if len(mine) != 1:
+            raise ValueError(f"delivery {delivery_name} holds {len(mine)} files for "
+                             f"{dataset_id}, not one")
+        return mine[0]
     files = sorted(folder.glob("*.csv"))
     if len(files) != 1:
         raise ValueError(f"delivery {delivery_name} holds {len(files)} CSV files, not one")
