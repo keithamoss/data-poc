@@ -564,10 +564,15 @@ class LinkedDataset(_Strict):
     code its rows carry in the product's `dataset` column - the supplier's
     own, deliberately unlike any configuration name - and the ordered source
     columns id_1, id_2 and onward hold. Generic: any dataset may declare
-    what it links; Linkage Products is only the first."""
+    what it links; Linkage Products is only the first.
+
+    THE CODE IS OPTIONAL (REQ-QAC-294 criterion 2): a dataset whose table has
+    no dataset column - one product built from ONE source - declares exactly
+    one entry with no code. linked_datasets.problems() holds the pairing of a
+    code with a dataset column, and the one-entry rule."""
 
     dataset: NonEmptyStr
-    code: NonEmptyStr
+    code: NonEmptyStr | None = None
     id_columns: list[NonEmptyStr] = Field(min_length=1)
 
 

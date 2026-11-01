@@ -102,7 +102,8 @@ class Dataset:
     delivery_boundary: str = ""
     #: The datasets this one links, each (dataset id, the supplier's code,
     #: the source identifier columns id_1 onward hold) - REQ-QAC-330
-    #: criterion 5's one place. Empty for a dataset that links nothing.
+    #: criterion 5's one place. Empty for a dataset that links nothing. The
+    #: code is None for a code-less entry (REQ-QAC-294 criterion 2).
     linked: tuple = ()
 
     @property
@@ -184,7 +185,10 @@ def _build(path: Path, text: str) -> tuple[str, "MappingProxyType[str, Dataset]"
                                        f"collection {collection.get('id')!r}"),
                     arrival_pattern=(dataset.get("arrival_pattern") or "").strip(),
                     delivery_boundary=(collection.get("delivery_boundary") or "").strip(),
-                    linked=tuple((str(x.get("dataset")), str(x.get("code")),
+                    # A MISSING CODE STAYS None (REQ-QAC-294 criterion 2),
+                    # never the text 'None' - a code-less linked dataset.
+                    linked=tuple((str(x.get("dataset")),
+                                  None if x.get("code") is None else str(x.get("code")),
                                   tuple(str(c) for c in (x.get("id_columns") or ())))
                                  for x in (dataset.get("linked_datasets") or ())),
                 )

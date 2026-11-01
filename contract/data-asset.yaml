@@ -436,3 +436,22 @@ hierarchy:
                 - dataset: ed-presentations
                   code: EDDC_PRESENTATION
                   id_columns: [presentation_id]
+            # THE GEOCODING RELEASE (REQ-QAC-294 criterion 1): one dataset per
+            # geocoded source, each a linked dataset with NO code (criterion 2) -
+            # exactly one entry, the source it geocodes and the ordered source
+            # columns id_1 onward hold. With no dataset column, a row cannot say
+            # which source it is about, so a code-less dataset links one source.
+            - id: geo-cp-clients
+              name: Client Register Geocodes
+              table: geo_cp_clients
+              arrival_pattern: 'geo_cp_clients\.csv'
+              linked_datasets:
+                - dataset: cp-clients
+                  id_columns: [cp_client_id]
+            - id: geo-ed-presentations
+              name: ED Presentations Geocodes
+              table: geo_ed_presentations
+              arrival_pattern: 'geo_ed_presentations\.csv'
+              linked_datasets:
+                - dataset: ed-presentations
+                  id_columns: [presentation_id]

@@ -1,7 +1,9 @@
 # Open Data Contract Standard (ODCS) v3.2.0 contract for the Linkage Products
-# collection (REQ-QAC-330): one table, one CSV per quarter. A SYNTHETIC linkage
-# product standing in for one a real linkage unit would produce - it holds a
-# scrambled key and source identifiers only, no attribute of any person.
+# collection (REQ-QAC-330, REQ-QAC-294): a linkage release, linkage_keys, and a
+# geocoding release, one geo_<source> table per geocoded source dataset, each
+# one CSV per quarter. SYNTHETIC: the linkage product holds a scrambled key and
+# source identifiers only; each geocoding table holds area codes and a match
+# level only - no address, location or attribute of any person.
 # Written to docs/check-authoring-rules.md. What it links, and the source
 # columns id_1 onward hold, are declared once beside the dataset in
 # contract/data-asset.yaml (linked_datasets); N here is one more than the
@@ -11,10 +13,10 @@
 # ordinary release.
 apiVersion: v3.2.0
 kind: DataContract
-id: linkage-keys
+id: linkage-products
 status: draft
 version: 1.0.0
-name: Linkage Keys
+name: Linkage Products
 domain: department-of-health
 description:
   purpose: >
@@ -24,16 +26,21 @@ description:
     supplier's own code for the dataset the record is in, and that dataset's own
     identifier values. It holds a scrambled key and source identifiers only - no
     name, date of birth, address or any other attribute of a person, and no match
-    confidence or match type, because matching is always probabilistic. In a real
-    deployment this table is the asset's master join, and the most sensitive thing
-    it holds.
+    confidence or match type, because matching is always probabilistic. Beside it,
+    a synthetic geocoding release standing in for a geocoding product: for each
+    geocoded source dataset, one table placing each of its records in ABS SA2 and
+    LGA areas, one row per census year in force, with how precisely it was
+    placed - area codes and a match level only, never an address, a coordinate or
+    any attribute of the person. In a real deployment the linkage table is the
+    asset's master join, and with the geocodes, which re-attach an area to a
+    source record, the most sensitive thing it holds.
 servers:
   - server: production
     type: s3
     location: s3://gov-data-exchange/linkage-products/
     format: csv
     delimiter: comma
-    description: A quarterly linkage release, dropped into this bucket.
+    description: A quarterly linkage release and geocoding release, dropped into this bucket.
 schema:
   - name: linkage_keys
     physicalType: table
@@ -59,3 +66,97 @@ schema:
         physicalType: varchar(64)
         required: false
         description: "The record's second identifier value in its own dataset, held as text. No linked dataset declares a second identifier today, so it is blank in every row of an ordinary release."
+  - name: geo_cp_clients
+    physicalType: table
+    description: "SYNTHETIC. Stands in for a geocoding product: for each quarter, one row per Client Register record and census year in force, the record identified by its own identifier values in Child Protection's Client Register (cp_clients), carrying the ABS SA2 and LGA codes its address falls in and how precisely it was placed. It holds area codes and a match level only - no address text, coordinates, mesh block or SA1 code, name, date of birth or any other attribute of a real person, place or presentation. In a real deployment the identifiers re-attach each code to the source record, so a geocode is location data about that person."
+    properties:
+      - name: id_1
+        logicalType: string
+        physicalType: varchar(64)
+        required: true
+        primaryKey: true
+        primaryKeyPosition: 1
+        description: "The record's first identifier value in Child Protection's Client Register (cp_clients), held as text whatever the source column's type."
+      - name: id_2
+        logicalType: string
+        physicalType: varchar(64)
+        required: false
+        description: "The record's second identifier value, held as text. Child Protection's Client Register (cp_clients) declares one identifier today, so it is blank in every row of an ordinary release."
+      - name: census_year
+        logicalType: integer
+        physicalType: integer
+        required: true
+        primaryKey: true
+        primaryKeyPosition: 2
+        description: "The census year whose ABS boundaries the codes are drawn from. A record has one row for each census year in force for the quarter."
+      - name: sa2_code
+        logicalType: string
+        physicalType: varchar(9)
+        required: false
+        logicalTypeOptions:
+          pattern: "^[0-9]{9}$"
+        description: "The nine-digit ABS ASGS Statistical Area Level 2 code the record's address falls in, for the row's census year. Synthetic, drawn in the ABS format. Empty when the record is not geocoded."
+      - name: lga_code
+        logicalType: string
+        physicalType: varchar(5)
+        required: false
+        logicalTypeOptions:
+          pattern: "^[0-9]{5}$"
+        description: "The five-digit ABS Local Government Area code the record's address falls in, for the row's census year. Synthetic, drawn in the ABS format. Empty when the record is not geocoded."
+      - name: match_level
+        logicalType: string
+        physicalType: varchar(20)
+        required: true
+        enum:
+          - value: address
+          - value: postcode
+          - value: suburb
+          - value: not geocoded
+        description: "How precisely the record was placed: address, postcode or suburb, or not geocoded when it could not be placed, its codes then empty."
+  - name: geo_ed_presentations
+    physicalType: table
+    description: "SYNTHETIC. Stands in for a geocoding product: for each quarter, one row per ED Presentations record and census year in force, the record identified by its own identifier values in Emergency Department's ED Presentations (ed_presentations), carrying the ABS SA2 and LGA codes its address falls in and how precisely it was placed. It holds area codes and a match level only - no address text, coordinates, mesh block or SA1 code, name, date of birth or any other attribute of a real person, place or presentation. In a real deployment the identifiers re-attach each code to the source record, so a geocode is location data about that person."
+    properties:
+      - name: id_1
+        logicalType: string
+        physicalType: varchar(64)
+        required: true
+        primaryKey: true
+        primaryKeyPosition: 1
+        description: "The record's first identifier value in Emergency Department's ED Presentations (ed_presentations), held as text whatever the source column's type."
+      - name: id_2
+        logicalType: string
+        physicalType: varchar(64)
+        required: false
+        description: "The record's second identifier value, held as text. Emergency Department's ED Presentations (ed_presentations) declares one identifier today, so it is blank in every row of an ordinary release."
+      - name: census_year
+        logicalType: integer
+        physicalType: integer
+        required: true
+        primaryKey: true
+        primaryKeyPosition: 2
+        description: "The census year whose ABS boundaries the codes are drawn from. A record has one row for each census year in force for the quarter."
+      - name: sa2_code
+        logicalType: string
+        physicalType: varchar(9)
+        required: false
+        logicalTypeOptions:
+          pattern: "^[0-9]{9}$"
+        description: "The nine-digit ABS ASGS Statistical Area Level 2 code the record's address falls in, for the row's census year. Synthetic, drawn in the ABS format. Empty when the record is not geocoded."
+      - name: lga_code
+        logicalType: string
+        physicalType: varchar(5)
+        required: false
+        logicalTypeOptions:
+          pattern: "^[0-9]{5}$"
+        description: "The five-digit ABS Local Government Area code the record's address falls in, for the row's census year. Synthetic, drawn in the ABS format. Empty when the record is not geocoded."
+      - name: match_level
+        logicalType: string
+        physicalType: varchar(20)
+        required: true
+        enum:
+          - value: address
+          - value: postcode
+          - value: suburb
+          - value: not geocoded
+        description: "How precisely the record was placed: address, postcode or suburb, or not geocoded when it could not be placed, its codes then empty."

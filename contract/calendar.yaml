@@ -810,3 +810,54 @@ datasets:
             - date: "2026-10-30"
               author: REQ-QAC-330
               change: Owes a linkage release every quarter from 2013-01-01; due time and grace from Linkage Products' participation_defaults.
+  # THE GEOCODING DATASETS (REQ-QAC-294 criterion 11): each owes EXACTLY the
+  # periods its source owes, each side compared after its own collection's
+  # files_go_to_period (REQ-PIPE-321) - so geo-cp-clients owes period P where
+  # cp-clients owes the round before P, and geo-ed-presentations what
+  # ed-presentations owes, its 2015-Q4 gap included (REQ-GEN-251). Due 19:00
+  # with 8 hours' grace, the dataset's own expected time - an hour after the
+  # linkage release (Keith, 2026-10-31, Q6 a and Q9 a). The collections gate
+  # fails where a geocoding dataset's owed periods and its source's disagree.
+  - id: geo-cp-clients
+    participation:
+      versions:
+        - effective_from: "2015-04-01"
+          participates: all
+          expected_time: "19:00"
+          grace: 8h
+          changelog:
+            - date: "2026-11-01"
+              author: REQ-QAC-294
+              change: Owes a geocoding release every quarter from 2015-Q2, the first period Child Protection's Client Register owes, due at 19:00 with 8 hours' grace.
+  - id: geo-ed-presentations
+    participation:
+      versions:
+        - effective_from: "2013-01-01"
+          participates: all
+          expected_time: "19:00"
+          grace: 8h
+          changelog:
+            - date: "2026-11-01"
+              author: REQ-QAC-294
+              change: Owes a geocoding release every quarter from 2013-01-01, as Emergency Department's ED Presentations does, due at 19:00 with 8 hours' grace.
+        - effective_from: "2015-10-01"
+          participates: [February, May, August]
+          expected_time: "19:00"
+          grace: 8h
+          reason: >-
+            Not owed for 2015-Q4, because its source ED Presentations is not owed
+            then (the fictional gap of REQ-GEN-251), and a geocoding release
+            geocodes the source's supply for the same period.
+          changelog:
+            - date: "2026-11-01"
+              author: REQ-QAC-294
+              change: Not owed for 2015-Q4, mirroring ED Presentations' fictional gap.
+        - effective_from: "2015-12-01"
+          participates: all
+          expected_time: "19:00"
+          grace: 8h
+          reason: Owed every quarter again from 2016-Q1, as ED Presentations is.
+          changelog:
+            - date: "2026-11-01"
+              author: REQ-QAC-294
+              change: Owed every quarter again from 2016-Q1, after the 2015-Q4 gap it mirrors.

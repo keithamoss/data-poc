@@ -88,7 +88,11 @@ def problems() -> list[str]:
             provider.check_seeds()
         except collections.base.SeedOutOfRange as exc:
             out.append(str(exc))
-    return out + declaration_problems() + orphan_problems()
+    from generator import synthetic_inputs
+
+    # REQ-QAC-294 criterion 3: the generator-only placing configuration agrees
+    # with the contracts it names.
+    return out + declaration_problems() + orphan_problems() + synthetic_inputs.problems()
 
 
 def main() -> int:

@@ -181,7 +181,8 @@ def config_problems(package: Path | None = None) -> list[str]:
 #: The only files at the top of contract/ - the asset's own, not a
 #: collection's (REQ-QAC-241 criterion 2).
 ASSET_WIDE = ("data-asset.yaml", "calendar.yaml", "people.yaml", "environments.yaml",
-              "file-checks.yaml", "scripted_decisions.yaml", "presentation.yaml")
+              "file-checks.yaml", "scripted_decisions.yaml", "presentation.yaml",
+              "synthetic_inputs.yaml")
 _CHECK_FILE = re.compile(r"(?P<stem>.+)-(?:contract|soda-checks|evidently-checks)(?:-retired)?\.ya?ml")
 #: Shared dbt SQL that belongs to no collection (criterion 4).
 _SHARED_DBT = ("dbt_project/tests/generic/",)
