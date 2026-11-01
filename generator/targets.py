@@ -176,6 +176,12 @@ def _planned(dataset_id: str, book: dict, placed: list[dict]) -> list[Built]:
                         _delivery_received(book, source["dataset"], held) if held else None,
                         held),)
         aimed = tuple((entry.get("aimed") or {}).get(dataset_id) or ())
+        # THE REFERENCE THE PROVIDER RESOLVED AS THE REPLAY WILL, where it
+        # recorded one (a tried file): the dataset's delivery received then.
+        refs = entry.get("references") or {}
+        if dataset_id in refs:
+            reference = (_delivery_received(book, dataset_id, refs[dataset_id])[0]
+                         if refs[dataset_id] else None)
         out.append(Built(label, dataset_id, entry["delivery"], target, scenario=sid,
                          rules=aimed, reference=reference, day=_day_of(entry),
                          filename=f"{table}.csv",
@@ -183,6 +189,8 @@ def _planned(dataset_id: str, book: dict, placed: list[dict]) -> list[Built]:
                          received_at=entry.get("received_at"), sources=sources))
         if target == "green":
             reference = entry["delivery"]
+        elif dataset_id in refs:
+            reference = out[-1].reference
     return out
 
 

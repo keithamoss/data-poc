@@ -96,8 +96,17 @@ def _reference_frame(coll, reference_run_id: str, table: str, column: str):
 
 def _psi_result(coll, entry, check_id, table, run_id, run_timestamp, reference_run_id) -> dict:
     current = _excluding(_current_frame(run_id, table, entry["column"]), entry)
+    empty = None
     if reference_run_id is None:
         psi, snapshot, status = None, None, NO_REFERENCE
+    elif not len(current):
+        # NOTHING TO COMPARE (found building REQ-GEN-298: TS-110's empty
+        # geocoding file): Evidently refuses an empty frame, which took the
+        # whole run down with it - coverage's 0 percent Fail included
+        # (REQ-QAC-340 criterion 4). Recorded not evaluated, never a pass.
+        psi, snapshot, status = None, None, NO_REFERENCE
+        empty = ("The supply holds no rows to compare with the reference, so drift was not "
+                 "measured. This check did not fail - it could not be evaluated.")
     else:
         reference = _excluding(_reference_frame(coll, reference_run_id, table, entry["column"]),
                                entry)
@@ -125,6 +134,7 @@ def _psi_result(coll, entry, check_id, table, run_id, run_timestamp, reference_r
         "engine": ENGINE_TAG,
         "reference_run_id": reference_run_id,
         "_snapshot": snapshot,
+        **({"not_evaluated_reason": empty} if empty else {}),
     }
 
 

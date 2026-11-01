@@ -410,3 +410,55 @@ class TestARealTrialInItsPeriod:
             assert not mine[name].get("unrunnable_reason"), mine[name]
             assert mine[name]["status"] == "pass", mine[name]
         assert mine["census_year.missing_set_members_dbt"]["status"] == "fail"
+
+
+class TestATrialSpeaksOnlyForItsOwnCollectionsChecks:
+    """Found running the generation-time trial (2026-11-01), seen failing
+    first: a Linkage Products trial that could not read cp_clients wrote a
+    could-not-be-evaluated record for Child Protection's own relationships
+    check too - it reads cp_clients - and recording it then refused the
+    whole run (UnrecordableRead: cp_investigations is not in the run's
+    resolution). A `mothman lp qa --folder` trial holding no Client Register
+    meets the same."""
+
+    def test_a_check_reading_a_table_the_run_does_not_know_is_not_its_own(self):
+        from qa_tools.common import promotion, unrunnable
+
+        res = supply_db.Resolution(run_id="trial_x", schema="qa_trial_x",
+                                   resolved={"geo_cp_clients": "geo_cp_clients__1"},
+                                   absent=["cp_clients", "ed_presentations",
+                                           "geo_ed_presentations", "linkage_keys"])
+        out = unrunnable.results_for_trial(run_id="trial_x", run_timestamp="t",
+                                           resolution=res, reads=promotion._declared_reads())
+        assert out, "the run's own checks reading cp_clients are recorded not evaluated"
+        assert {r["collection_id"] for r in out} == {"linkage-products"}, \
+            sorted({r["check_id"] for r in out if r["collection_id"] != "linkage-products"})[:3]
+
+
+class TestAnEmptySupplysDriftIsNotEvaluated:
+    """Found running the generation-time trial (2026-11-01), seen failing
+    first: TS-110's empty geo_cp_clients.csv made Evidently raise
+    'current_data must contain at least one column', so the whole run was
+    incomplete and its coverage check - which REQ-QAC-340 criterion 4 says
+    fails at 0 percent on an empty supply - was never recorded."""
+
+    def test_drift_over_no_rows_is_recorded_not_evaluated(self, monkeypatch):
+        import pandas as pd
+
+        from qa_tools import collections
+        from qa_tools.tools import run_evidently
+
+        coll = collections.by_id("linkage-products")
+        entry = {"column": "match_level", "exclude_values": ["not geocoded"],
+                 "warn_threshold": 0.1, "fail_threshold": 0.25, "method": "psi"}
+        monkeypatch.setattr(run_evidently, "_current_frame",
+                            lambda run_id, table, column: pd.DataFrame({column: []}))
+        monkeypatch.setattr(run_evidently, "_reference_frame",
+                            lambda c, ref, table, column: pd.DataFrame(
+                                {column: ["postcode", "suburb"] * 50}))
+        check = ("data-asset-1.department-of-health.linkage-products.geo-cp-clients."
+                 "match_level.drift_psi_evidently")
+        out = run_evidently._psi_result(coll, entry, check, "geo_cp_clients", "trial_x", "t",
+                                        "trial_ref_x")
+        assert out["status"] == "nodata" and out["metric_value"] is None
+        assert "no rows" in (out.get("not_evaluated_reason") or "")

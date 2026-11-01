@@ -411,7 +411,23 @@ def results_for_trial(*, run_id: str, run_timestamp: str, resolution: supply_db.
     # and - for a check the tools LEFT OUT - its own dataset's table. A
     # left-out check nothing unreadable explains gets no record here, so
     # the reconciliation still refuses it.
-    candidates = {c: list(t) for c, t in reads.items()}
+    # ONLY THE RUN'S OWN CHECKS: one declaring a table the run's resolution
+    # does not know at all - resolved, absent, contested or held - belongs to
+    # another collection, and is no trial's to speak for (found running
+    # REQ-GEN-298's generation-time trial: Child Protection's relationships
+    # check reads cp_clients, and a Linkage Products trial without it wrote a
+    # record for it that recording then refused).
+    known = (set(resolution.resolved) | set(resolution.absent) | set(resolution.ambiguous)
+             | set(resolution.held))
+    from qa_tools.common import hierarchy
+
+    def own_table(check: str) -> set[str]:
+        parsed = check_id_mod.try_parse(check)
+        try:
+            return {hierarchy.dataset(parsed.dataset).table} if parsed else set()
+        except Exception:  # noqa: BLE001 - not one of ours, nothing to add
+            return set()
+    candidates = {c: list(t) for c, t in reads.items() if (set(t) | own_table(c)) <= known}
     for check in left_out_ids:
         candidates.setdefault(check, [])
     for check, declared in sorted(candidates.items()):

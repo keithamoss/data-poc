@@ -1067,11 +1067,18 @@ class ChildProtection(Provider):
         shape = injected[0].arrivals[n - 1].file_shape
         if shape is None:
             return True
-        original = "a,b\n1,2\n"
-        shaped = scenario_injection.apply_file_shape(shape, {f"{t}.csv": original
-                                                             for t in _tables()})
-        return shaped.get(f"{table}.csv") == original or (
-            f"{table}.csv" in shaped and shape != "one_file_unreadable")
+        # THE ARRIVAL'S OWN FILES, as files() builds them, through the same
+        # shape: a shape may rewrite a file from its real columns.
+        csvs = {}
+        for t in _tables():
+            df = delivery_obj.payload[t]
+            csvs[f"{t}.csv"] = df[[c for c in df.columns if not c.startswith("_")]].to_csv(
+                index=False)
+        name = f"{table}.csv"
+        shaped = scenario_injection.apply_file_shape(shape, csvs)
+        if name not in shaped:
+            return False
+        return shape != "one_file_unreadable" or shaped[name] == csvs[name]
 
     def files(self, plan: Plan, job: Job, n: int, delivery_obj, entry: dict, name: str):
         from generator import receipt_instants, scenario_injection

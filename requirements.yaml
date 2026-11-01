@@ -46444,12 +46444,6 @@ requirements:
       blocked_by:
         requirements:
         - REQ-GEN-298
-    - criterion: Criterion 13 - each geocoding dataset's ordinary severities drawn from the stream's own seed with the collections' mix, applying REQ-GEN-298's presets.
-      why: The presets that make a drawn amber or red geocoding supply are REQ-GEN-298's; until they exist every ordinary geocoding supply is written from its source's rows alone, its verdict planned from them (criterion 7), and no severity is drawn.
-      owner: REQ-GEN-298
-      blocked_by:
-        requirements:
-        - REQ-GEN-298
   - id: REQ-PIPE-296
     title: The geocoding datasets run end to end through Linkage Products' existing QA adapter and its dbt folder, their delivery its own package in the quarterly bootstrap stream, the bootstrap's cost measured before and after
     date_written: '2026-10-25'
@@ -46542,12 +46536,6 @@ requirements:
       owner: the end-of-run bootstrap (2026-11-01 build run)
       blocked_by:
         unowned: true
-    - criterion: Criterion 9's --skip-target-trial on `mothman lp generate-synthetic-data`, once the provider declares its trial.
-      why: The provider declares target_trial False until REQ-GEN-298 criterion 10 builds the trial; the option is offered by the many-table shape as soon as it is declared.
-      owner: REQ-GEN-298
-      blocked_by:
-        requirements:
-        - REQ-GEN-298
   - id: REQ-QAC-297
     title: Every geocoding dataset gets three generic set-member checks in dbt on census_year, red on a single row, a not-geocoded share check amber above 5 percent and red above 10, and the ordinary checks - Linkage Keys' two identifier checks, match level allowed values, area-code format and match-level drift
     date_written: '2026-10-25'
@@ -46663,7 +46651,7 @@ requirements:
     date_written: '2026-10-25'
     story: As Keith showing the checks to the participant who asked for them, I want each fault planted in ordinary supplies and once each in a named scenario I can find from the scenario map - a promoted Client Register changing colour when its quarter's geocodes are checked among them - so that each check can be seen going amber or red for its own reason on a real page.
     moscow: should
-    status: not_started
+    status: built
     signed_off:
       by: Keith
       date: '2026-10-31'
@@ -46745,6 +46733,76 @@ requirements:
     - 'THE ONE-TABLE RULE IS LIFTED IN BOTH PLACES (builder): cli/pipeline.py''s refusal and generator/validate_providers.py''s both said only a one-table collection may declare a trial; both go, and the gate now refuses a trial declaring no target_datasets instead. Their tests were replaced in the same change.'
     - 'MEASURED BEFORE THE TRIALS (2026-11-01): generating every collection''s whole history into a scratch folder took 416s on this shared sandbox at the base 39393c3; the trials'' own wall clock is said by the generate command and is the end-of-run bootstrap''s to record.'
     - 'AMENDMENTS A6 AND A7 APPLIED 2026-11-01, each criterion marked ''AMENDED 2026-11-01 by REQ-GEN-298'' with its signed final text (criterion 14).'
+    - 'PROVISIONAL - question for Keith: a geocoding file built from a source supply its own provider built red is planned at least amber, and so is the dataset''s next file measured against it once that file promotes. Found by the trial: a record''s match level follows its quarter''s address columns (REQ-GEN-295 criterion 5 as amended, GA2 a), so geocoding TS-93a''s and TS-100a''s deliberately dirtied Client Registers shifts the placed-level mix and the drift check reads Warn on TS-93c and TS-100c, and on 2019-Q4, whose drift reference the replay resolves to TS-100c once its knock-on promotes it. REQ-GEN-295 criterion 7''s share-only planning cannot see drift; the alternatives are geocoding those two quarters at the previous quarter''s levels (against GA2 a) or recording no target for them (against criterion 7''s ''every supply''). Keep the amber plan?'
+    - 'PROVISIONAL - question for Keith: a trial''s drift reference is the dataset''s last earlier delivery the plan promotes before the tried file''s receipt - not a red one, nor one whose source the warehouse still lacks then (so 2019-Q2 is measured against 2018-Q4, TS-93c never promoting) - as REQ-QAC-108 resolves it after replay; a promoted amber counts. SUPERSEDES the ''last supply planned green'' choice above.'
+    - 'DEFECT FOUND RUNNING THE TRIAL, FIXED TEST-FIRST (qa_tools/common/unrunnable.py results_for_trial): a trial that could not read a table wrote a could-not-be-evaluated record for every check in the asset reading it, another collection''s included - Child Protection''s relationships checks read cp_clients - and recording it then refused the whole run (UnrecordableRead). A check is now the trial''s only where every table it reads, its own included, is one the run''s resolution knows. Affected `mothman lp qa --folder` trials holding no Client Register too.'
+    - 'DEFECT FOUND RUNNING THE TRIAL, FIXED TEST-FIRST (qa_tools/tools/run_evidently.py _psi_result): Evidently raises on an empty current frame, so TS-110''s empty file left the whole run incomplete and its coverage Fail (REQ-QAC-340 criterion 4) unrecorded; drift over no rows is now recorded not evaluated with a reason, never a pass.'
+    - 'DEFECT FOUND RUNNING THE TRIAL, FIXED FOR GEOCODING ONLY (GeneratedSupply.carried, ChildProtection.carries_table): the row interface (REQ-GEN-334 criterion 6) offered a Child Protection supply whose file a scenario''s file shape leaves out - five, among them TS-104''s 2016-Q2 source - so geocoding was built from a supply that never arrives. The geocoding stream now reads only supplies whose file arrives; the linkage stream is unchanged, so its built deliveries stay byte-identical, and the linkage half is written up for Keith as plans/qa-pipeline.md #89.'
+    implemented_by:
+    - generator/collections/linkage_products.py::GEO_ROW_FAULTS
+    - generator/collections/linkage_products.py::GEO_FAULT_AIMS
+    - generator/collections/linkage_products.py::apply_geo_faults
+    - generator/collections/linkage_products.py::in_warehouse
+    - generator/collections/linkage_products.py::LinkageProducts
+    - generator/collections/linkage_products.py::geo_named_placements
+    - generator/collections/linkage_products.py::_refuse_geocoding_scenario_quarters
+    - generator/collections/linkage_products.py::_named_held_sources
+    - generator/collections/base.py::GeneratedSupply
+    - generator/collections/base.py::generated_supplies
+    - generator/collections/base.py::Plan
+    - generator/collections/child_protection.py::ChildProtection::carries_table
+    - generator/driver.py::generate
+    - generator/scenario_injection.py::INJECTIONS
+    - generator/targets.py::Built
+    - generator/targets.py::written
+    - generator/targets.py::csv_of
+    - generator/validate_providers.py::problems
+    - cli/collection_cli.py::CollectionCLI::try_targets
+    - cli/target_trial.py::try_in_period
+    - cli/target_trial.py::try_all
+    - cli/target_trial.py::spec_of
+    - cli/pipeline.py::generate_collection
+    - qa_tools/common/period_overlay.py::build
+    - qa_tools/common/period_overlay.py::rebuild_for_trial
+    - qa_tools/common/target_agreement.py::trial_reads_agree
+    - qa_tools/common/target_agreement.py::unaimed
+    - plans/supply-model.md
+    linked_tests:
+    - tests/test_geocoding_faults.py::TestTheFaultsByConstruction
+    - tests/test_geocoding_faults.py::TestTheOrdinarySeverities
+    - tests/test_geocoding_faults.py::TestTheNamedScenarios
+    - tests/test_geocoding_faults.py::TestWhatIsTriedAndAgainstWhat
+    - tests/test_geocoding_faults.py::TestOnlyASupplyThatArrivesIsGeocoded
+    - tests/test_geocoding_faults.py::test_two_plans_place_the_same_faults
+    - tests/test_geocoding_trial.py::TestTheOverlaysTrialBranch
+    - tests/test_geocoding_trial.py::TestTheDeclaredSetIsTheTrialsPeriods
+    - tests/test_geocoding_trial.py::TestTheTrialsOwnRule
+    - tests/test_geocoding_trial.py::TestEveryTargetCarriesItsDayFileAndPeriod
+    - tests/test_geocoding_trial.py::TestARealTrialInItsPeriod
+    - tests/test_generator_providers.py::TestATrialIsRefusedBeforeAnythingIsWritten
+    evidence:
+    - EVIDENCE_PLACEHOLDER
+    unmet_criteria:
+    - criterion: 'Criterion 15 (2)''s second half - the trial of TS-100c''s quarter agrees with the results the replay records for the same supply.'
+      why: 'The trial''s half is tested (tests/test_geocoding_trial.py::TestARealTrialInItsPeriod); the replay''s results come from a bootstrapped database.'
+      owner: the end-of-run bootstrap (2026-11-01 build run)
+      blocked_by:
+        unowned: true
+    - criterion: 'Criterion 8''s ''what it shows'' - TS-93c, TS-100c and TS-101b recorded could-not-run, held back, and TS-100c and TS-101b cleared by the knock-on.'
+      why: 'Named and tried at generation; what the replay records for them needs a from-empty bootstrap.'
+      owner: the end-of-run bootstrap (2026-11-01 build run)
+      blocked_by:
+        unowned: true
+    - criterion: 'Criterion 13''s measurement reported with REQ-PIPE-296''s - the trials'' wall clock in a from-empty quarterly bootstrap against REQ-PIPE-250''s budget.'
+      why: 'The trials report their own wall clock (this run''s evidence, on a shared sandbox); the bootstrap figure is the end-of-run bootstrap''s.'
+      owner: the end-of-run bootstrap (2026-11-01 build run)
+      blocked_by:
+        unowned: true
+    - criterion: 'Criteria 3 and 4 on the dashboard - each scenario''s check reading Warn or Fail for its own reason, and TS-111''s Client Register carrying the Warn tag from the geocoding promotion.'
+      why: 'Needs a dashboard built from a replayed history (REQ-DASH-299 criterion 15 proves the pages).'
+      owner: the end-of-run bootstrap (2026-11-01 build run)
+      blocked_by:
+        unowned: true
   - id: REQ-DASH-299
     title: 'The dashboard names the geocoding checks by what they find, heads every check''s examples ''Examples: <what it measures> (key only)'', shows a failing sample as record and year, shows the census years in force and the dataset geocoded in the page''s strip, and keeps a left-out cross-collection check in its group'
     date_written: '2026-10-25'

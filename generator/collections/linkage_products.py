@@ -1048,6 +1048,24 @@ class LinkageProducts(Provider):
                                                            sources[src])
         named = _named_held_sources(plan.resolved, jobs, base, warehouse)
 
+        # A DIRTIED SOURCE'S PLACED MIX DRIFTS (PROVISIONAL, REQ-GEN-298's
+        # decisions): a record's match level follows its quarter's address
+        # columns (REQ-GEN-295 criterion 5 as amended, GA2 a), so a file built
+        # from a source supply its own provider built red - TS-93a's and
+        # TS-100a's Client Registers - is built to the drift check's Warn, not
+        # only to its share's band. Found by the trial, which confirms it.
+        dirty_built = set()
+        for job in jobs:
+            if base[job.slot_id] is None:
+                continue
+            at, files = base[job.slot_id]
+            for table, (d, rows, verdict) in list(files.items()):
+                src = hierarchy.dataset(d).linked[0][0]
+                used = _before(sources[src], src, job.period.name, at)
+                if used and used[-1].severity == "red":
+                    dirty_built.add((job.slot_id, d))
+                    files[table] = (d, rows, worst(verdict, "amber"))
+
         # THE ORDINARY SEVERITIES, FROM THE STREAM'S OWN SEED (REQ-GEN-295
         # criterion 13): the collections' mix per geocoding dataset, kept off
         # every quarter where a drawn fault could not be told apart from
@@ -1139,6 +1157,38 @@ class LinkageProducts(Provider):
                     files2[tables[d]] = (d, rows, planned_verdict(d, rows, catalogue))
                 resupply[job.slot_id] = (again, files2)
                 meta[(job.slot_id, 2)] = _meta([], files2, {}, job.slot_id)
+        # EACH FILE'S DRIFT REFERENCE, AS THE REPLAY WILL RESOLVE IT
+        # (REQ-QAC-108; PROVISIONAL): the dataset's last earlier delivery the
+        # plan promotes before this one's receipt - a red one is held, and so
+        # is one whose source the warehouse still does not hold then (TS-93c)
+        # - its green resupply where it has one. A file measured against a
+        # dirtied file drifts too, so it is built to Warn and tried.
+        for d, src, _cols in geo:
+            t = tables[d]
+            earlier: list = []
+            for job in jobs:
+                if state.get(job.slot_id) is None or t not in state[job.slot_id][1]:
+                    continue
+                arrivals = [(1, state[job.slot_id])] + (
+                    [(2, resupply[job.slot_id])] if t in resupply.get(job.slot_id, (0, {}))[1]
+                    else [])
+                for n, (at, files) in arrivals:
+                    ref = next((e for e in reversed(earlier)
+                                if e[3] != "red" and in_warehouse(src, e[1], at, sources[src])
+                                is not None), None)
+                    if ref is not None and (ref[0], d) in dirty_built and n == 1:
+                        dd, rows, verdict = files[t]
+                        files[t] = (dd, rows, worst(verdict, "amber"))
+                        m = meta.setdefault((job.slot_id, n), {})
+                        if d not in m.get("tried", ()):
+                            fresh = _meta(sorted(set(m.get("tried", ())) | {d}), files,
+                                          warehouse, job.slot_id)
+                            m.update(fresh)
+                    m = meta.get((job.slot_id, n)) or {}
+                    if d in m.get("tried", ()):
+                        m.setdefault("references", {})[d] = (
+                            asset_time.isoformat(ref[2]) if ref is not None else None)
+                    earlier.append((job.slot_id, job.period.name, at, files[t][2]))
         plan.jobs.extend(jobs)
         plan.state["geocoding"] = state
         plan.state["geo_resupply"] = resupply
