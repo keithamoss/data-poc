@@ -10,9 +10,9 @@ until the day one is edited.
 
 FILES, NOT PATTERNS, ARE COMPARED: every file git would consider part of the
 checkout under those paths - tracked, or new and not ignored - hashed as it
-is in the working tree. Ignored files are left out on purpose: `dbt deps`
-installs dbt_packages/ under dbt_project/, and a key that moved with it
-would never hit. A new module not yet added to git is IN, because it can
+is in the working tree. Ignored files are left out on purpose: `mothman env
+dbt-deps` installs dbt_packages/ under each asset's dbt project
+(assets/<asset>/dbt/), and a key that moved with it would never hit. A new module not yet added to git is IN, because it can
 change what a replay does.
 
 THE FIRST AFFECTED ARRIVAL IS COMPUTED, NEVER TYPED IN (criterion 5, and a
@@ -38,8 +38,9 @@ ROOT = Path(__file__).resolve().parent.parent.parent
 #: through it, and a terminal change must not cost a full bootstrap).
 #:
 #: SINCE THE ASSET SPLIT (post-build-review, 2026-11-02): every asset's folder -
-#: its configuration, adapters, providers and dbt project - and the shared dbt
-#: package, where contract/ and dbt_project/ were. ONE KEY FOR THE REPOSITORY,
+#: its configuration, adapters, providers and dbt project - and dbt_shared/,
+#: the macros and tests both assets' dbt projects read through their
+#: macro-paths and test-paths (C12), where contract/ and dbt_project/ were. ONE KEY FOR THE REPOSITORY,
 #: not one per asset: a change to either asset restarts both, which costs time
 #: and never leaves a stale verdict - this module's own rule. A key per asset
 #: is the cache-key work still to come with Keith.

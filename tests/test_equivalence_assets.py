@@ -191,6 +191,25 @@ class TestDeliveriesAcrossTheSplit:
             "BR_1": [("br.csv", "h-br", 1)], "BR_2": [("br.csv", "h-br2", 4)]}})
         assert eq.compare(SPLIT_BEFORE, renamed, ["S4"])["S4"]
 
+    def test_two_post_split_captures_compare_names_and_sequences_raw(self):
+        # M1 (post-build-review #313): A1 normalises only ACROSS the split -
+        # a pre-split side against a post-split one. Two captures that both
+        # have the two assets compare their folder names and receipt
+        # sequences as recorded, so a renamed folder or renumbered receipts
+        # between two post-split commits is a difference.
+        renamed = _split_after()
+        renamed["per_asset"]["quarterly"] = _side({"quarterly": {
+            "moved-elsewhere": [("cp.csv", "h-cp", 5)],
+            "BDM_20260801": [("ed.csv", "h-ed", 9)]}})["surfaces"]
+        renamed["surfaces"] = eq.union(renamed["per_asset"])
+        found = eq.compare(_split_after(), renamed, ["S1", "S4", "S5"])
+        assert found["S1"] and found["S4"] and found["S5"]
+        assert any("moved-elsewhere" in line for line in found["S4"])
+
+    def test_two_post_split_captures_still_normalise_nothing_they_share(self):
+        assert eq.compare(_split_after(), _split_after(), ["S1", "S4", "S5"]) == \
+            {"S1": [], "S4": [], "S5": []}
+
     @pytest.mark.asset("daily")
     def test_a_capture_records_each_receipt_as_its_record(self, tmp_path):
         (tmp_path / "assets" / "daily").mkdir(parents=True)

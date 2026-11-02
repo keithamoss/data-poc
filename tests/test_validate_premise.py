@@ -188,6 +188,25 @@ class TestTheWalkNeverEntersASkippedDirectory:
         assert [p.relative_to(tmp_path).as_posix() for p in files] == ["plans/a.md"]
 
 
+class TestEachAssetsDbtWorkingFoldersAreSkipped:
+    """Since the asset split each asset's dbt project is assets/<asset>/dbt/,
+    so its installed packages (third-party dbt_utils code) and its target/
+    are under that path - skipped as dbt_project/'s were, never scanned
+    (post-build-review #313 L3)."""
+
+    def test_installed_packages_and_target_are_not_scanned(self, tmp_path, monkeypatch):
+        from qa_tools.common import validate_premise as vp
+
+        for asset in ("quarterly", "daily"):
+            for sub in ("dbt_packages/dbt_utils", "target"):
+                (tmp_path / "assets" / asset / "dbt" / sub).mkdir(parents=True)
+                (tmp_path / "assets" / asset / "dbt" / sub / "f.sql").write_text("x")
+            (tmp_path / "assets" / asset / "dbt" / "dbt_project.yml").write_text("x")
+        monkeypatch.setattr(vp, "ROOT", tmp_path)
+        assert [p.relative_to(tmp_path).as_posix() for p in vp._files()] == [
+            "assets/daily/dbt/dbt_project.yml", "assets/quarterly/dbt/dbt_project.yml"]
+
+
 #: The data asset this module's tests act for, unless a test says otherwise
 #: (C11, Keith 2026-11-02: every test module names its asset).
 pytestmark = pytest.mark.asset("quarterly")

@@ -14048,7 +14048,11 @@ twice. It deliberately did not re-find the `TypeError`.
        path to open (repository path inside, the folder itself outside), and
        only the readers that need a repository path - git-ref reads,
        CODEOWNERS, GitHub links - refuse. Refusing everywhere would also stop
-       the dashboard build reading #55's injected configuration. Recorded on
+       the dashboard build reading #55's injected configuration. (CORRECTED
+       by #313: the line drawn here does NOT keep an injected-folder
+       dashboard build working - the build embeds the GitHub links, and they
+       refuse, so it stops there. #313 also found the schedule gate's git-ref guards and
+       the check-level links this pass had missed.) Recorded on
        REQ-PIPE-342 rather than asked, as an engineering reading of his
        answer; say if it should be stricter.
      - **Left as signed, for Keith to decide**: REQ-QAC-368 criterion 6's
@@ -14056,3 +14060,85 @@ twice. It deliberately did not re-find the `TypeError`.
        stale lock; REQ-QAC-368's title still says "one local dbt package";
        and REQ-TEST-357 criterion 2's "normalising only" predates A1's
        amendment of criterion 3.
+
+313. **[done, 2026-11-03]** **[QA checks & contract]** **[Testing & dev tooling]** **The critic's pass over the bfol follow-ons (#312): three defects fixed test-first, two stale-docs items tidied, one changelog entry rewritten; five questions for Keith.**
+     Each finding checked against the code before it was written up here.
+     - **M1. A1's delivery normalisation was too wide (defect, fixed).**
+       `equivalence.compare` ran `normalise_deliveries` wherever it
+       normalised asset ids - either side holding more than one asset - so
+       comparing two POST-split captures hid a renamed delivery folder and
+       renumbered receipts. Now it normalises deliveries only where the two
+       sides' asset-id sets differ (a pre-split side against a post-split
+       one); the asset-id normalisation keeps its own condition. Seen failing
+       first: tests/test_equivalence_assets.py::TestDeliveriesAcrossTheSplit::test_two_post_split_captures_compare_names_and_sequences_raw
+       (quarterly's delivery renamed, receipts 1,2 renumbered 5,9 - compared
+       equal before the fix). The cross-split tests (changed contents,
+       receipts out of order, a changed receipt field, within one layout)
+       stay green. REQ-TEST-239's A1 decision and REQ-TEST-357's "A1 BUILT"
+       decision both said "only where it already normalises asset ids", which
+       described the defect; both corrected.
+     - **M2. The schedule gate's git-ref reads read an outside folder as "no
+       previous state" (defect, fixed).** The agreement freeze, the amber,
+       replacement and list-setting guards returned None for a path outside
+       the repository, so every past-item edit in an asset folder outside it
+       passed unseen. Under C7 they now refuse (OutsideTheRepository) before
+       reading, as the lifecycle gate's collect_checks does, through one
+       helper, `validate_schedule._repo_path`. Scoped to the SELECTED ASSET'S
+       configuration folder: a hand-written Source outside the repository that
+       is not an asset's folder still reads as having no previous state, which
+       is true of it. Seen failing first (4 cases):
+       tests/test_assets.py::TestARepositoryPathForAFolderOutsideIt::test_the_schedule_gates_reads_at_a_git_ref_are_refused.
+     - **M3. The check-level GitHub links raised the wrong error (defect,
+       fixed).** `github_links._rel_path` raised a raw ValueError out of
+       `relative_to` for a check file outside the repository; it now raises
+       OutsideTheRepository, as build_folder_links does. Seen failing first:
+       tests/test_github_links.py::test_check_links_for_a_folder_outside_the_repository_are_refused.
+       **Correction to #312 and to REQ-PIPE-342's C7 decision**: both read as
+       though the line drawn there kept an injected-folder dashboard build
+       working. It does not. The dashboard build embeds both the check-level
+       and the folder links, and both refuse, so a build for a deployment
+       whose configuration lives outside the repository stops at the links.
+       Recorded on REQ-PIPE-342; whether the build should leave the links out
+       or refuse is NOT decided here (For Keith, below).
+     - **L3. Stale setup instructions (tidied).** README.md's two `uv run dbt
+       deps --project-dir dbt_project` blocks now run `mothman env dbt-deps`
+       once per asset (`MOTHMAN_ASSET=<asset>`; its help says "once per
+       asset"), with the paragraph's two paths beside them moved to
+       `assets/<asset>/dbt/`. The premise gate skipped `dbt_project/target`
+       and `dbt_project/dbt_packages`, which no longer exist, so it was
+       scanning each asset's installed dbt_utils code; it now skips
+       `assets/*/dbt/target` and `assets/*/dbt/dbt_packages` (a behaviour
+       change, so a test first:
+       tests/test_validate_premise.py::TestEachAssetsDbtWorkingFoldersAreSkipped,
+       failing before). The other entries keep their old prefix match, which
+       also covers `.github/` and `.gitignore` through `.git`. Comments fixed
+       in qa_tools/common/replay_inputs.py (the module docstring, and INPUTS'
+       "shared dbt package", which C12 made macro-paths and test-paths) and
+       .github/workflows/test.yml's history comment. **CLAUDE.md NOT EDITED**:
+       its two `uv run dbt deps --project-dir dbt_project` lines (the uv
+       dependencies bullet and the fresh-session setup list) were in this
+       finding, but the fixing agent's own rules let no agent message
+       authorise a CLAUDE.md change, so the replacement is left for the main
+       session or Keith: each becomes
+       `for asset in quarterly daily; do MOTHMAN_ASSET=$asset uv run mothman env dbt-deps; done`
+       (and "re-run only if `dbt_project/packages.yml` changes" becomes
+       "...if an asset's `assets/<asset>/dbt/packages.yml` changes"). README
+       still names `dbt_project/` in its tour of the tree (lines ~128, ~186,
+       ~197); left alone as outside this finding.
+     - **L5. The 2026-11-02 What's New entry (rewritten).** The day's summary
+       was two sentences; it is one, 24 words. The "Two assets, not one" item
+       is in the second person and says what you can now do. The header is
+       unchanged.
+     - **For Keith** (left as they are, his calls):
+       1. Whether a stale package lock should also block a run (REQ-QAC-368
+          criterion 6 still refuses only a missing or empty dbt_packages/).
+       2. REQ-TEST-357 criterion 2's "normalising only" wording, which
+          contradicts criterion 3 as amended by A1.
+       3. REQ-QAC-368's title, which still says "one local dbt package".
+       4. Whether to add a regression test for #312's post-create.sh wiring
+          fix (an environment/wiring fault, the class CLAUDE.md asks him
+          about first).
+       5. Links or refuse for an out-of-repository deployment: today a
+          dashboard build whose asset configuration lies outside the
+          repository refuses at the GitHub links (M3 above); the alternative
+          is to build without them.

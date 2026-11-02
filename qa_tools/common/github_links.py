@@ -59,8 +59,21 @@ def current_commit_sha(root: Path | str = ROOT) -> str:
 
 
 def _rel_path(source_file: str, root: Path) -> str:
+    """A check file's repository path - REFUSED (OutsideTheRepository) for a
+    file the checkout at `root` does not hold, as build_folder_links refuses
+    its folder (C7, REQ-PIPE-342 decision 18; post-build-review #313 M3):
+    a link is a repository path, never an absolute one."""
+    from qa_tools.common import assets
+
     p = Path(source_file)
-    return str(p.relative_to(root)) if p.is_absolute() else source_file
+    if not p.is_absolute():
+        return source_file
+    try:
+        return str(p.relative_to(root))
+    except ValueError:
+        raise assets.OutsideTheRepository(
+            f"check file {p} is outside the repository ({root}), so it has no repository "
+            f"path - a link into the repository cannot name it.") from None
 
 
 def _find_line(text: str, needle: str) -> int | None:

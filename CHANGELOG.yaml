@@ -111,18 +111,18 @@ intro: >
 releases:
   - date: "2026-11-02"
     summary: >
-      The project is now two data assets, quarterly and daily. Each push runs a
-      fast set of key tests, trials read waiting supplies, linkage releases
-      describe only arrived files, and a key's gap reads one way.
+      Quarterly and daily collections are now two separate data assets, and each
+      push runs a quick set of key tests, alongside three smaller changes.
     changes:
       - category: New
         items:
           - headline: Two assets, not one
             components: ["Pipeline & publishing", "QA checks & contract"]
             description: >
-              The quarterly collections and daily Birth Registrations are now two
-              separate data assets, each with its own configuration, checks and
-              history. Every command acts for one asset and tells you which first.
+              You can now run the quarterly collections and daily Birth
+              Registrations as two separate data assets, each with its own
+              configuration, checks and history. Every command acts for the asset
+              you choose, and names it first.
       - category: Improved
         items:
           - headline: A fast critical test set on every push

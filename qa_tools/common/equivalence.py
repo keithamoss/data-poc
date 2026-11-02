@@ -1287,12 +1287,16 @@ def compare(a: dict, b: dict, surfaces: list[str], *, limit: int = 5,
                           f"{b.get(key)}) - recapture one so they compare like with like")
     # ACROSS THE SPLIT (REQ-TEST-357 criteria 2 and 3): where either side was
     # captured as more than one asset, or the two name different assets, each
-    # side's asset ids and its identity row are normalised, and its delivery
-    # folders' names and receipt sequences (A1) - nothing else.
+    # side's asset ids and its identity row are normalised - nothing else.
+    # Delivery folders' names and receipt sequences (A1) are normalised ONLY
+    # where the two sides' asset-id sets differ, a pre-split side against a
+    # post-split one: between two captures of the same assets a renamed
+    # folder or a renumbered receipt is a real change (post-build-review #313).
     sa_all, sb_all = a["surfaces"], b["surfaces"]
-    if len(_asset_ids(a)) > 1 or len(_asset_ids(b)) > 1 or (
-            _asset_ids(a) and _asset_ids(b) and _asset_ids(a) != _asset_ids(b)):
-        sa_all, sb_all = normalise_deliveries(a, b)
+    ids_a, ids_b = _asset_ids(a), _asset_ids(b)
+    if len(ids_a) > 1 or len(ids_b) > 1 or (ids_a and ids_b and ids_a != ids_b):
+        if ids_a and ids_b and set(ids_a) != set(ids_b):
+            sa_all, sb_all = normalise_deliveries(a, b)
         sa_all = normalise_assets(sa_all, _asset_ids(a))
         sb_all = normalise_assets(sb_all, _asset_ids(b))
     out = {}

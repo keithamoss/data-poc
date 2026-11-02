@@ -109,5 +109,17 @@ def test_a_dataset_opens_its_contract_at_its_own_entry_and_an_agency_its_folder(
             assert lines[int(url.rsplit("#L", 1)[1]) - 1].strip() == f"- name: {d.table}"
             assert contract in folders["titles"]["datasets"][d.dataset_id]
 
+def test_check_links_for_a_folder_outside_the_repository_are_refused(tmp_path):
+    """A check's link is a repository path, so a check file in an asset
+    folder the repository does not hold is refused as build_folder_links
+    refuses it - OutsideTheRepository, never a raw ValueError out of
+    relative_to (C7, REQ-PIPE-342 decision 18; post-build-review #313 M3)."""
+    import asset_folders
+
+    asset_folders.point(tmp_path / "daily")
+    with pytest.raises(assets.OutsideTheRepository):
+        github_links.build_check_source_links(sha="abc123")
+
+
 #: Birth Registrations is the daily asset's (the asset split).
 pytestmark = pytest.mark.asset("daily")

@@ -38,6 +38,7 @@ itself (criterion 8 and the third NFR):
 """
 from __future__ import annotations
 
+import fnmatch
 import re
 import sys
 from pathlib import Path
@@ -119,7 +120,7 @@ NEGATION_MARKERS = (
 #: skipped - see `_lines_to_scan`.
 SKIP_SUFFIXES = (".pyc", ".gz", ".woff2", ".cast", ".png", ".jpg", ".ico")
 SKIP_DIRS = (".git", ".venv", "node_modules", "data", "reports", "_site",
-             "dbt_project/target", "dbt_project/dbt_packages", ".playwright-mcp",
+             "assets/*/dbt/target", "assets/*/dbt/dbt_packages", ".playwright-mcp",
              "__pycache__", ".pytest_cache", "dashboard/snapshots")
 
 #: Build outputs, which carry whatever the template said and are
@@ -136,8 +137,14 @@ def _is_allowed(rel: str) -> str | None:
 
 
 def _skipped(rel: str) -> bool:
-    return any(part in rel.split("/") for part in SKIP_DIRS) \
-        or any(rel.startswith(d) for d in SKIP_DIRS)
+    """A path in a skipped directory: one named as a path part, or under a
+    skipped path - which may name each asset with `*` (assets/*/dbt/..., one
+    dbt project per asset since the split; post-build-review #313 L3)."""
+    parts = rel.split("/")
+    return any(part in parts for part in SKIP_DIRS) \
+        or any(rel.startswith(d) if "*" not in d
+               else fnmatch.fnmatchcase("/".join(parts[:d.count("/") + 1]), d)
+               for d in SKIP_DIRS)
 
 
 def _files() -> list[Path]:

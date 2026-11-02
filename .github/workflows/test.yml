@@ -58,8 +58,8 @@ name: Run test suite
 # step that installs dbt_utils (several real dbt checks use macros that
 # package ships, not dbt-core itself - `dbt build` won't even compile
 # without it). deploy-pages.yml never needed this (it never runs a real
-# `dbt build`, only reads pre-committed qa_results/ JSON) and
-# dbt_project/dbt_packages/ is gitignored, never committed, so every
+# `dbt build`, only reads pre-committed qa_results/ JSON) and each
+# asset's assets/<asset>/dbt/dbt_packages/ is gitignored, never committed, so every
 # fresh CI checkout genuinely needs this run fresh - this job's own
 # real dbt-core integration tests (Phase 6 step 2) were failing on
 # every single push since they landed, invisible locally because this

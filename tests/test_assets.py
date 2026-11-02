@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import os
 import sys
+from datetime import date
 from concurrent.futures import ProcessPoolExecutor
 from multiprocessing import get_context
 from pathlib import Path
@@ -173,6 +174,25 @@ class TestARepositoryPathForAFolderOutsideIt:
         monkeypatch.setenv(assets.ASSET_ENV, "daily")
         with pytest.raises(assets.OutsideTheRepository):
             vcl.collect_checks("HEAD")
+
+    @pytest.mark.parametrize("guard", ["freeze", "amber", "replacement", "list"])
+    def test_the_schedule_gates_reads_at_a_git_ref_are_refused(self, monkeypatch, tmp_path, guard):
+        """Never read as 'no previous state', which passed any edit to a past
+        agreement item or setting version unseen (post-build-review #313 M2)."""
+        from qa_tools.common import validate_schedule as vs
+
+        assets.use_root(_two_assets(tmp_path))
+        monkeypatch.setenv(assets.ASSET_ENV, "daily")
+        src = vs.Source.default()
+        (src.agreement_path).write_text("calendars: {}\n")
+        raw = {"data_asset_id": "daily"}
+        today = date(2026, 11, 2)
+        call = {"freeze": lambda: vs._freeze_errors(raw, {}, src, ref="HEAD"),
+                "amber": lambda: vs._amber_setting_errors(raw, src, today, ref="HEAD"),
+                "replacement": lambda: vs._replacement_setting_errors(raw, src, today, ref="HEAD"),
+                "list": lambda: vs._list_setting_errors(raw, src, today, ref="HEAD")}[guard]
+        with pytest.raises(assets.OutsideTheRepository):
+            call()
 
     def test_a_reader_that_only_opens_files_still_finds_them(self, monkeypatch, tmp_path):
         """folder_on_disk() is a path to open, not a repository path."""
