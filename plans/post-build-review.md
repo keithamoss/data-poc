@@ -14017,3 +14017,42 @@ twice. It deliberately did not re-find the `TypeError`.
        7 passed, 5 skipped, 7 failed, every failure and skip a missing
        generated history (this checkout has no bootstrap) - the two map tests
        pass (9 passed) with bmove's own placements copied in, then removed.
+
+312. **[done, 2026-11-03]** **[QA checks & contract]** **[Testing & dev tooling]** **The asset split's settled follow-ons (bfol): two small defects found on the way, fixed; one reading of C7 recorded for Keith.**
+     - **Built, each from Keith's morning answers**: C6 (dbt's own
+       package-lock.yml decides "installed"), C7 (a repository path for an
+       asset folder outside the repository refuses), C12 (no forwarding
+       macros file; macro-paths and test-paths read dbt_shared/), C13 (both
+       dbt projects named mothman_<asset>), A1 (the equivalence compare
+       normalises delivery names and receipt sequences across the split), a
+       guard against rebinding a test module's `pytestmark`, and the asset
+       split's What's New entry. The detail is on REQ-QAC-368, REQ-PIPE-342,
+       REQ-TEST-357, REQ-TEST-239 and REQ-TEST-375.
+     - **Defect: .devcontainer/post-create.sh still ran a bare `dbt deps`
+       against dbt_project/**, which the move deleted, so a fresh dev
+       container's setup failed at that step (REQ-QAC-368 criterion 4 names
+       the script). Fixed: it runs `mothman env dbt-deps` once per asset. A
+       wiring fault in a setup script, so no regression test was written -
+       CLAUDE.md asks Keith first for this class.
+     - **Defect: the cached dbt parse was blind to dbt_shared/.**
+       `dbt_common._project_fingerprint` keyed the parse on the project
+       folder alone, skipping dbt_packages/, so an edit to a shared macro
+       never invalidated it in a long-lived process. C12 makes dbt_shared/ a
+       macro-path outside the project, so the fingerprint now reads every
+       macro-path and test-path outside the folder; seen failing first
+       (tests/test_dbt_packages_per_asset.py::TestTheParseCacheSeesTheSharedFolder).
+     - **For Keith - C7's line.** Refusing in folder_rel() alone broke 49
+       tests, because the registry's check-file paths, the lifecycle gate's
+       working-tree read, the collections gate and the linked-dataset readers
+       all OPEN files through it. Those now ask assets.folder_on_disk(), a
+       path to open (repository path inside, the folder itself outside), and
+       only the readers that need a repository path - git-ref reads,
+       CODEOWNERS, GitHub links - refuse. Refusing everywhere would also stop
+       the dashboard build reading #55's injected configuration. Recorded on
+       REQ-PIPE-342 rather than asked, as an engineering reading of his
+       answer; say if it should be stricter.
+     - **Left as signed, for Keith to decide**: REQ-QAC-368 criterion 6's
+       refusal still tests only for a missing or empty dbt_packages/, not a
+       stale lock; REQ-QAC-368's title still says "one local dbt package";
+       and REQ-TEST-357 criterion 2's "normalising only" predates A1's
+       amendment of criterion 3.
