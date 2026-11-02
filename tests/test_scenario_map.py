@@ -196,16 +196,11 @@ class TestTheCommittedMap:
     # bootstrapped before running anything; in the split it has to say
     # which half it belongs to. The sibling tests here read source
     # rather than placements, so they stay in the fast half.
-    @pytest.mark.needs_deployment
-    def test_the_committed_map_is_not_stale(self):
-        """The same shape plans/INDEX.md's own gate has. A generated
-        file that can drift from its source is one that will."""
-        assert sm.MAP_PATH.read_text() == sm.build_map(
-            sc.parse_register(), sm.read_placements()), (
-            "SCENARIOS.md is stale - run `mothman scenarios map`")
+    # One map per asset since REQ-PIPE-352 criterion 3 - each checked
+    # against its own history by TestEachAssetHasItsOwnMap below.
 
     def test_the_map_lives_outside_data(self):
-        assert "data" not in sm.MAP_PATH.relative_to(sm.ROOT).parts
+        assert "data" not in sm.map_path().relative_to(sm.ROOT).parts
 
     def test_building_the_map_reads_nothing_under_data_except_the_record(self):
         """The record is generator bookkeeping and lives under data/ by
@@ -247,23 +242,80 @@ class TestTheMapCanBeCheckedWithoutWriting:
     def test_check_passes_on_a_current_map_and_writes_nothing(self, tmp_path):
         from click.testing import CliRunner
         from cli.scenarios import scenarios_group
-        before = sm.MAP_PATH.read_text()
+        before = sm.map_path().read_text()
         result = CliRunner().invoke(scenarios_group, ["map", "--check"])
-        assert sm.MAP_PATH.read_text() == before
+        assert sm.map_path().read_text() == before
         assert result.exit_code in (0, 78), result.output
 
     def test_check_fails_on_a_stale_map(self, tmp_path, monkeypatch):
         from click.testing import CliRunner
         from cli.scenarios import scenarios_group
-        stale = tmp_path / "SCENARIOS.md"
+        stale = tmp_path / "SCENARIOS-daily.md"
         stale.write_text("stale\n")
-        monkeypatch.setattr(sm, "MAP_PATH", stale)
+        monkeypatch.setattr(sm, "map_path", fixed(stale))
         monkeypatch.setattr(sm, "placements_path", fixed(tmp_path / "placements.json"))
         (tmp_path / "placements.json").write_text('{"placements": []}')
         result = CliRunner().invoke(scenarios_group, ["map", "--check"])
         assert result.exit_code == 1, result.output
         assert "stale" in result.output
         assert stale.read_text() == "stale\n"
+
+_EACH_ASSET = [pytest.param(a, marks=pytest.mark.asset(a), id=a) for a in ("daily", "quarterly")]
+
+
+class TestEachAssetHasItsOwnMap:
+    """REQ-PIPE-352 criterion 3 (SETTLED by Keith 2026-11-01; built inside
+    the move, Keith 2026-11-02): each asset's map is generated from that
+    asset's own history, at SCENARIOS-<asset>.md, the register staying one;
+    and a scenario naming a dataset the asset holds and one it does not fails
+    `mothman check`, naming the scenario and the asset."""
+
+    @pytest.mark.parametrize("asset", _EACH_ASSET)
+    def test_the_map_is_the_assets_own_file(self, asset):
+        assert sm.map_path() == sm.ROOT / f"SCENARIOS-{asset}.md"
+        assert sm.map_path().is_file(), f"no committed map for {asset}"
+        assert not (sm.ROOT / "SCENARIOS.md").exists(), "the one shared map is replaced"
+
+    @pytest.mark.needs_deployment
+    @pytest.mark.parametrize("asset", _EACH_ASSET)
+    def test_each_committed_map_is_current_for_its_own_history(self, asset):
+        assert sm.map_path().read_text() == sm.build_for_selected(), (
+            f"SCENARIOS-{asset}.md is stale - run `mothman scenarios map`")
+
+    @pytest.mark.parametrize("asset,mine,theirs", [
+        pytest.param("daily", "TS-78a", "TS-80", marks=pytest.mark.asset("daily"), id="daily"),
+        pytest.param("quarterly", "TS-80", "TS-78a", marks=pytest.mark.asset("quarterly"),
+                     id="quarterly")])
+    def test_a_map_carries_its_own_scenarios_and_not_the_others(self, asset, mine, theirs):
+        """TS-78a is Birth Registrations', TS-80 the Client Register's."""
+        text = sm.build_for_selected(placements_path="/nonexistent/placements.json")
+        assert f"### {mine} " in text, f"{asset}'s map leaves out its own {mine}"
+        assert f"### {theirs} " not in text, f"{asset}'s map carries {theirs}"
+
+    @pytest.mark.parametrize("asset", _EACH_ASSET)
+    def test_the_real_register_names_no_scenario_across_assets(self, asset):
+        from generator import scenario_injection as si
+
+        assert si.mixed_asset_problems() == []
+
+    @pytest.mark.asset("daily")
+    def test_a_scenario_naming_both_fails_the_gate_naming_it_and_the_asset(self, monkeypatch):
+        import dataclasses
+
+        from click.testing import CliRunner
+
+        from cli.scenarios import scenarios_group
+        from generator import scenario_injection as si
+
+        own = next(i for i in si.INJECTIONS if i.scenario_id == "TS-78a")
+        stray = dataclasses.replace(own, dataset_id="cp-clients", also_demonstrates=())
+        monkeypatch.setattr(si, "INJECTIONS", si.INJECTIONS + (stray,))
+        [problem] = si.mixed_asset_problems()
+        assert "TS-78a" in problem and "'daily'" in problem and "cp-clients" in problem
+        result = CliRunner().invoke(scenarios_group, ["validate"])
+        assert result.exit_code != 0, result.output
+        assert "TS-78a" in result.output
+
 
 #: Birth Registrations is the daily asset's (the asset split).
 pytestmark = pytest.mark.asset("daily")

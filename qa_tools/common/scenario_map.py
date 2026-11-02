@@ -70,8 +70,16 @@ def placements_path() -> Path:
     return assets.data_path(PLACEMENTS_FILE)
 
 
-#: The committed map itself.
-MAP_PATH = ROOT / "SCENARIOS.md"
+#: The committed maps, one per asset (REQ-PIPE-352 criterion 3).
+MAP_STEM = "SCENARIOS"
+
+
+def map_path() -> Path:
+    """The selected asset's committed map, SCENARIOS-<asset>.md at the
+    repository root, asked of the resolver at call time. One map per asset,
+    each generated from that asset's own history (REQ-PIPE-352 criterion 3,
+    SETTLED by Keith 2026-11-01); the register they are built from stays one."""
+    return ROOT / f"{MAP_STEM}-{assets.selected().name}.md"
 
 
 #: WHAT A SCENARIO'S LINK LANDS ON (REQ-DASH-208 criterion 2) - named
@@ -315,7 +323,7 @@ def read_map_data(map_path: Path | str | None = None) -> list[dict]:
     block returns nothing rather than raising, because the document is
     still a document without it.
     """
-    text = Path(map_path or MAP_PATH).read_text()
+    text = Path(map_path or globals()["map_path"]()).read_text()
     start = text.find(_DATA_OPEN)
     if start < 0:
         return []
@@ -362,11 +370,23 @@ def build_map(scenarios: Iterable[scenarios_mod.Scenario],
     return "\n".join(lines).rstrip() + "\n"
 
 
+def build_for_selected(register_path: Path | str | None = None,
+                       placements_path: Path | str | None = None) -> str:
+    """The selected asset's map: the one register, less every scenario whose
+    injections name only datasets another asset holds, with this asset's own
+    placements (REQ-PIPE-352 criterion 3). A scenario with no injection - a
+    unit test, or one not yet placed - names no asset and is in every map."""
+    from generator import scenario_injection
+
+    leave_out = scenario_injection.other_assets_scenarios()
+    entries = [s for s in scenarios_mod.parse_register(register_path) if s.id not in leave_out]
+    return build_map(entries, read_placements(placements_path))
+
+
 def write_map(map_path: Path | str | None = None,
                register_path: Path | str | None = None,
                placements_path: Path | str | None = None) -> Path:
-    """Rebuild the committed map. Returns the path written."""
-    out = Path(map_path or MAP_PATH)
-    out.write_text(build_map(scenarios_mod.parse_register(register_path),
-                              read_placements(placements_path)))
+    """Rebuild the selected asset's committed map. Returns the path written."""
+    out = Path(map_path or globals()["map_path"]())
+    out.write_text(build_for_selected(register_path, placements_path))
     return out

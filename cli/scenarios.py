@@ -31,11 +31,11 @@ def scenarios_group() -> None:
 
 @scenarios_group.command("map")
 @click.option("--out", "out_path", default=None,
-               help="Write somewhere other than the committed SCENARIOS.md.")
+               help="Write somewhere other than the asset's committed SCENARIOS-<asset>.md.")
 @click.option("--check", "check", is_flag=True,
-              help="Write nothing; fail if the committed SCENARIOS.md is out of date.")
+              help="Write nothing; fail if the asset's committed SCENARIOS-<asset>.md is out of date.")
 def map_command(out_path: str | None, check: bool) -> None:
-    """Rebuild the committed scenario map from the register.
+    """Rebuild the selected asset's committed scenario map from the register.
 
     Regenerated in the same act as the synthetic history itself, so the
     two cannot disagree - this command is for rebuilding it on its own,
@@ -45,7 +45,11 @@ def map_command(out_path: str | None, check: bool) -> None:
         _check_map()
         return
     path = scenario_map.write_map(map_path=out_path)
-    entries = scenarios.parse_register()
+    from generator import scenario_injection
+
+    # THIS ASSET'S SCENARIOS, as its map carries them (REQ-PIPE-352 criterion 3).
+    leave_out = scenario_injection.other_assets_scenarios()
+    entries = [s for s in scenarios.parse_register() if s.id not in leave_out]
     placements = scenario_map.read_placements()
     injected = [s for s in entries if s.is_injected]
     placed = [s for s in injected
@@ -112,6 +116,8 @@ def validate_command() -> None:
     # EACH SCENARIO LINK'S DATE BETWEEN ITS EVENTS (REQ-GEN-201), from
     # configuration and the calendar alone.
     found += scenario_injection.link_problems(scripts=script)
+    # A SCENARIO IS ONE ASSET'S (REQ-PIPE-352 criterion 3).
+    found += scenario_injection.mixed_asset_problems()
     # SCRIPTED CORRECTION CONFIRMATIONS (REQ-GEN-205 criterion 5), against
     # the declared corrections.
     from qa_tools.common import correction_apply, correction_trial, scripted_corrections
@@ -239,19 +245,20 @@ def _bounds_text(c) -> str:
 
 def _check_map() -> None:
     """`map --check` (REQ-TEST-253 criterion 1): the docs gate's view of
-    SCENARIOS.md. The map is built from the register AND the generator's
+    the selected asset's SCENARIOS-<asset>.md. The map is built from the register AND the generator's
     recorded placements; with no placements on this machine it cannot be
     judged, which is said as a warning rather than passed as current."""
     import os
 
     if not scenario_map.placements_path().is_file():
-        console.print(f"Cannot check SCENARIOS.md: no {scenario_map.placements_path().name} on "
+        console.print(f"Cannot check {scenario_map.map_path().name}: no "
+                      f"{scenario_map.placements_path().name} on "
                       f"this machine (run `mothman pipeline bootstrap`).", style="yellow")
         if os.environ.get("MOTHMAN_GATE_WARNING_EXIT"):
             raise SystemExit(int(os.environ["MOTHMAN_GATE_WARNING_EXIT"]))
         return
-    built = scenario_map.build_map(scenarios.parse_register(), scenario_map.read_placements())
-    if scenario_map.MAP_PATH.read_text() != built:
-        console.print("SCENARIOS.md is stale - run `mothman scenarios map`.", style="red")
+    path = scenario_map.map_path()
+    if not path.is_file() or path.read_text() != scenario_map.build_for_selected():
+        console.print(f"{path.name} is stale - run `mothman scenarios map`.", style="red")
         raise SystemExit(1)
-    console.print("SCENARIOS.md is current.", style="green")
+    console.print(f"{path.name} is current.", style="green")

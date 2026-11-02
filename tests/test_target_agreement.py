@@ -512,7 +512,7 @@ class TestARecordThatDoesNotAddUp:
         monkeypatch.setattr(bdm, "try_targets", disagree)
         with pytest.raises(bdm.TargetTrialFailed):
             bdm.generate_synthetic_data()
-        assert wrote == [], "the committed SCENARIOS.md is not rewritten for a history not emitted"
+        assert wrote == [], "the committed scenario map is not rewritten for a history not emitted"
 
 
 class TestAPipelineRunComparesToo:

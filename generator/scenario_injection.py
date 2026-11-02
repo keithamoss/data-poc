@@ -1039,6 +1039,44 @@ def this_assets_injections() -> tuple["Injection", ...]:
     return tuple(i for i in INJECTIONS if i.dataset_id in mine)
 
 
+def _datasets_named() -> dict[str, set]:
+    """Each scenario id -> the dataset ids its injections name, its own and
+    those whose also_demonstrates lists it."""
+    out: dict[str, set] = {}
+    for injection in INJECTIONS:
+        for sid in (injection.scenario_id, *injection.also_demonstrates):
+            out.setdefault(sid, set()).add(injection.dataset_id)
+    return out
+
+
+def other_assets_scenarios() -> set[str]:
+    """The scenarios whose injections name no dataset the selected asset
+    declares - another asset's, left out of this asset's map (REQ-PIPE-352
+    criterion 3). Read from this asset's own hierarchy alone."""
+    from qa_tools.common import hierarchy
+
+    mine = {d.dataset_id for d in hierarchy.all_datasets()}
+    return {sid for sid, named in _datasets_named().items() if not named & mine}
+
+
+def mixed_asset_problems() -> list[str]:
+    """REQ-PIPE-352 criterion 3: a scenario naming both a dataset the selected
+    asset holds and one it does not, named with the asset - each asset's pass
+    reading only its own hierarchy, so a dataset outside it may be the other
+    asset's or no asset's."""
+    from qa_tools.common import assets, hierarchy
+
+    mine = {d.dataset_id for d in hierarchy.all_datasets()}
+    asset = assets.selected().name
+    out = []
+    for sid, named in sorted(_datasets_named().items()):
+        if named & mine and named - mine:
+            out.append(f"{sid} names datasets asset {asset!r} holds "
+                       f"({', '.join(sorted(named & mine))}) and datasets it does not "
+                       f"({', '.join(sorted(named - mine))}) - a scenario is one asset's")
+    return out
+
+
 def unprovided_scenarios() -> list[str]:
     """Every injected scenario naming a dataset no generator provider makes,
     with why - checked before anything is written (REQ-GEN-246 criterion 8)."""

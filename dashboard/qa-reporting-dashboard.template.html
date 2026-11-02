@@ -2759,7 +2759,7 @@ const SLOT_DUE_DATES = {};
 // and is itself a real one - criterion 13 asks the page to SAY nothing
 // is waiting rather than render an empty box.
 // SCENARIO_MAP - REQ-DASH-046: the committed scenario map
-// (SCENARIOS.md), embedded as structured entries by
+// (SCENARIOS-<asset>.md), embedded as structured entries by
 // dashboard/embed_dashboard_data.py from the machine-readable block
 // inside that same markdown file. One committed file for both readers,
 // so there is no sidecar to drift from it.
@@ -12126,7 +12126,7 @@ function renderScenariosPanel(body){
   if(!SCENARIO_MAP.length){
     body.innerHTML = `<div style="font-size:13px; color:var(--ink-muted);">
       No scenario map embedded — this page renders the repo's own committed
-      <code>SCENARIOS.md</code>, rebuilt with the synthetic history itself.
+      <code>SCENARIOS-&lt;asset&gt;.md</code>, rebuilt with the synthetic history itself.
     </div>`;
     return;
   }

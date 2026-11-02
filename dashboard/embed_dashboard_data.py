@@ -696,7 +696,8 @@ def embed() -> None:
     # purpose: this is asset-level and spans both collections, and
     # computing it per-collection is how it would have become two
     # queues - which is the thing the requirement exists to prevent.
-    # SCENARIO_MAP - REQ-DASH-046. Read from the COMMITTED SCENARIOS.md
+    # SCENARIO_MAP - REQ-DASH-046. Read from the asset's COMMITTED
+    # SCENARIOS-<asset>.md (REQ-PIPE-352 criterion 3)
     # and nothing else: the coordinates were written there by the
     # generator, which is the only thing that knows where a scenario
     # landed, and this build may open nothing under data/.

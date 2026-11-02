@@ -305,11 +305,11 @@ class TestNoProductFileChanged:
 
     def test_after_the_run_only_the_generated_scenario_map_differs(self, copy):
         """The replay itself writes nothing into product code. The one tracked
-        file it rewrites is SCENARIOS.md, which every generation rebuilds from
+        file it rewrites is the asset's SCENARIOS-<asset>.md, which every generation rebuilds from
         the recorded placements (cli/pipeline.generate_collection) - and this
         copy places none of the real scenarios. That is the run's output, not
         a file the fixture had to change."""
-        assert copy.changed_after_run == ["SCENARIOS.md changed (M)"]
+        assert copy.changed_after_run == ["SCENARIOS-quarterly.md changed (M)"]
 
     def test_the_check_would_catch_an_edit_to_product_code(self, tmp_path):
         tree = fx.build(tmp_path / "tree")
