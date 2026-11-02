@@ -12,6 +12,8 @@ from types import SimpleNamespace
 
 import pytest
 
+import asset_params
+
 from qa_tools.common import run_reads
 
 #: Linkage Products' own tables: the linkage release and, since REQ-QAC-294,
@@ -25,11 +27,12 @@ class TestTheOneResolver:
         assert reads.own == LP_OWN
         assert reads.foreign == ("cp_clients", "ed_presentations")
 
-    def test_a_collection_reading_only_its_own_tables_has_no_foreign(self):
-        for coll in ("child-protection", "emergency-department", "civil-registration"):
-            reads = run_reads.reads_for(coll)
-            assert reads.own, coll
-            assert reads.foreign == (), coll
+    @pytest.mark.parametrize("coll", asset_params.per_asset(
+        ["child-protection", "emergency-department", "civil-registration"]))
+    def test_a_collection_reading_only_its_own_tables_has_no_foreign(self, coll):
+        reads = run_reads.reads_for(coll)
+        assert reads.own, coll
+        assert reads.foreign == (), coll
 
     def test_foreign_readers_of_a_linked_table(self):
         assert run_reads.foreign_readers("cp_clients") == ["linkage-products"]

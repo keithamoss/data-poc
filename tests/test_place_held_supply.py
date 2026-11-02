@@ -636,6 +636,7 @@ class TestEveryListingSaysPlaced:
             assert f"None -> {target}" not in said
 
 
+@pytest.mark.asset("daily")  # a Birth Registrations pair
 class TestAPairHeldWholeIsPlacedTogether:
     """Criterion 37: both files into the period in one transaction, still
     contested; the second file's move named and confirmed; --wait refused."""
@@ -767,6 +768,7 @@ class TestASettlementsRefileTargetIsChosen:
     """Criterion 42, amending REQ-PIPE-193 criterion 19: the chooser, with
     the next period as its first choice - never a typed period."""
 
+    @pytest.mark.asset("daily")  # a Birth Registrations pair's refile target
     def test_it_opens_on_the_next_period(self, monkeypatch):
         from cli import common, filing_tui, settle_tui
         from pair_support import DS as BR, _at

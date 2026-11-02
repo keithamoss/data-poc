@@ -62,6 +62,7 @@ class TestAgainstTheRealConfig:
             "cp_placements", "cp_carers", "cp_case_workers",
         ]
 
+    @pytest.mark.asset("daily")  # Birth Registrations is the daily asset's
     def test_birth_registrations_has_a_collection_like_child_protection_does(self):
         # Criterion: "model a collection for Birth Registrations by the
         # same mechanism Child Protection uses, rather than skipping the

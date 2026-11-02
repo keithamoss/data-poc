@@ -143,6 +143,7 @@ class TestOnlyAWaitingOrPromotedSupplyIsRechecked:
         assert f"\n  mothman supply decide --operation un-supersede --dataset {DS} --period " \
                f"{state.period} --supply {older}" in said
 
+    @pytest.mark.asset("daily")  # a Birth Registrations pair
     def test_one_file_of_an_open_pair_is_settled_first(self, conn, minted, quiet):
         state, pair = parity.ex_two_files(conn, minted)
         with pytest.raises(fd.OpenPair) as got:

@@ -10,7 +10,7 @@ import pytest
 
 import subprocess
 
-from qa_tools.common import github_links
+from qa_tools.common import assets, github_links
 
 
 def _git(repo, *args):
@@ -96,9 +96,11 @@ def test_a_dataset_opens_its_contract_at_its_own_entry_and_an_agency_its_folder(
     every = collections.all_collections()
     assert every, "the registry must hold collections for this test to mean anything"
     for coll in every:
+        # The asset's own folder through the resolver (the asset split).
+        folder = f"{assets.folder_rel()}/{coll.agency_id}"
         assert folders["agencies"][coll.agency_id] == (
-            f"https://github.com/keithamoss/data-poc/tree/abc123/contract/{coll.agency_id}")
-        assert f"contract/{coll.agency_id}/" in folders["titles"]["agencies"][coll.agency_id]
+            f"https://github.com/keithamoss/data-poc/tree/abc123/{folder}")
+        assert f"{folder}/" in folders["titles"]["agencies"][coll.agency_id]
         contract = coll.check_file("contract")
         lines = (github_links.ROOT / contract).read_text().splitlines()
         for d in coll.datasets:

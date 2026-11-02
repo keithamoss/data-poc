@@ -92,8 +92,12 @@ def test_dirty_module_resolves_to_generators_own_copy():
     (2026-09-14: a duplicate once resolved first)."""
     from generator import dirty as dirty_mod
 
+    import generator
+
+    # The shared generator package's own copy (the asset split: the provider
+    # itself lives in assets/<asset>/synthetic/collections/ now).
     dirty_dir = os.path.dirname(dirty_mod.__file__)
-    generator_dir = os.path.dirname(os.path.dirname(cp_provider.__file__))
+    generator_dir = os.path.dirname(generator.__file__)
     assert os.path.normpath(dirty_dir) == os.path.normpath(generator_dir)
     assert hasattr(dirty_mod, "apply_cp_clients_presets")
 
