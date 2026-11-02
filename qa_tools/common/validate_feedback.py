@@ -51,7 +51,8 @@ def route_problem(path: str, tree: dict) -> str | None:
         return f"route '#{path}' is not one the dashboard has"
     agency = parts[1]
     if agency not in tree:
-        # ANOTHER ASSET'S ROUTE (PROVISIONAL, the asset split, 2026-11-02): the
+        # ANOTHER ASSET'S ROUTE (SETTLED by Keith 2026-11-02, REQ-DOCS-219's
+        # unmet criterion 10; REJECTED reading every asset's hierarchy now): the
         # feedback file is repository-wide while each pass reads one asset's
         # hierarchy, so a link to an agency this asset does not hold is left to
         # the pass of the asset that does - reading the other asset to tell it

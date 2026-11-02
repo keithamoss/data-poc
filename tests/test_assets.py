@@ -66,6 +66,21 @@ class TestTheRealLayout:
         assert assets.receipts_dir() == ROOT / "data" / "quarterly" / "receipts"
 
 
+    @pytest.mark.parametrize("name", ["results_x_y.json", "x_y_dashboard.json",
+                                      "open_tickets.json", "ticket_resolutions.json"])
+    def test_each_assets_reports_are_gitignored(self, monkeypatch, name):
+        """State, never configuration (CLAUDE.md): reports/<asset>/ is rebuilt
+        from the database, so git must not offer it for commit. Found after
+        the move, when reports/daily/ showed as untracked."""
+        import subprocess
+
+        for asset in assets.names():
+            monkeypatch.setenv(assets.ASSET_ENV, asset)
+            probe = assets.reports_path(name).relative_to(ROOT)
+            result = subprocess.run(["git", "check-ignore", "-q", str(probe)], cwd=ROOT)
+            assert result.returncode == 0, f"{probe} is not gitignored"
+
+
 class TestSelection:
     """MOTHMAN_ASSET, with no default (REQ-PIPE-363 criteria 1 and 6)."""
 

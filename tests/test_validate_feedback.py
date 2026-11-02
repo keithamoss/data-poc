@@ -126,7 +126,11 @@ def test_the_shared_parser_itself_refuses_a_non_relative_target(tmp_path):
     ("REQ-DASH-999", "not in requirements.yaml"),
     ("REQ-DASH-002", "retired - cite REQ-DASH-001"),
     ("sprint 9", "not in the introduction's list"),
-    ("[x](#/agency/nope)", "agency 'nope'"),
+    # NO CASE FOR AN UNKNOWN AGENCY (SETTLED by Keith 2026-11-02, the move
+    # critic's decision 1): each asset's pass reads only its own hierarchy, so
+    # an agency it does not hold is left to the other asset's pass. The case
+    # `[x](#/agency/nope)` comes back with REQ-PIPE-354, which decides cross-asset
+    # links - REQ-DOCS-219's unmet criterion 10 records the gap.
     ("[x](#/agency/ag/collection/col/dataset/zzz)", "dataset 'zzz'"),
     ("[x](#/nowhere)", "not one the dashboard has"),
 ])

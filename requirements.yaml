@@ -36502,8 +36502,21 @@ requirements:
     - "THE REVIEWER IS NEVER NAMED (Keith, 2026-10-14, Q7, option A). No name, role, agency or verbatim quote anywhere; cards say 'you'. REJECTED: a first name with their agreement."
     - "#3 IS A CURRENT ENTRY, NOT A RESTORED ONE. It was deleted on 2026-10-12 (03cb93e) as fixed by REQ-PIPE-167 and reopened by Keith the same evening (35edcab) as a different concept, so it gets an ordinary card in place. Its card names REQ-PIPE-167 only if the card says plainly that REQ-PIPE-167 is the half that was built - otherwise its derived status would read Built for something still unscoped."
     - 'BUILT 2026-10-14. The approved intro paragraph and CLAUDE.md exception went in word for word (Keith, 2026-10-14). #1 and #2, deleted at road-testing sprint 1''s close after this requirement was signed, came back as card-only entries under their own numbers (Keith, 2026-10-14) - 21 cards, as NFR 7 expected. The two old #14s'' first lines were settled with Keith: ''Arrived at'' is We noticed, ''Client reference'' is You told us. #3 carries no evidence, per the decision that it names REQ-PIPE-167 only if the card says that is the half built, which would derive Built for something still unscoped. Building the parser found that plans_md joined a paragraph after a list onto the list''s last bullet (post-build-review #185), fixed first. road_testing_sprints() lives in plans_md so the build and the gate read the sprint list the same way.'
+    - "A LINK TO AN AGENCY THE ASSET DOES NOT HOLD WAITS FOR REQ-PIPE-354 (SETTLED by Keith 2026-11-02, the move critic's decision 1): plans/road-testing.md is repository-wide while each asset's feedback pass reads only its own hierarchy (REQ-PIPE-342 criterion 8), so route_problem passes over a link naming an agency the selected asset does not hold, leaving it to the other asset's pass - and a mistyped agency is no longer caught. Collection and dataset checks under a held agency are unchanged. The test that pinned the refusal (an unknown agency fails) was removed from tests/test_validate_feedback.py with a note; it comes back with REQ-PIPE-354's moved notice, which decides cross-asset links. REJECTED reading every asset's hierarchy now."
     open_questions:
     - "If a second person road-tests the PoC, do their cards share this file and tab (which would need a 'who' grouping without naming anyone)? Out of scope for this draft and not asked now; recorded so it is asked rather than assumed."
+    unmet_criteria:
+    - criterion: >-
+        Criterion 10, in part - a dashboard link naming an agency that no asset's
+        hierarchy holds (a mistyped agency) no longer fails the validator.
+      why: >-
+        SETTLED by Keith 2026-11-02 (the move critic's decision 1): since the asset
+        split each asset's pass reads only its own hierarchy (REQ-PIPE-342 criterion 8),
+        so an agency this asset does not hold may be the other asset's and is left to
+        that pass. Telling the two apart waits for REQ-PIPE-354's moved notice.
+      owner: REQ-PIPE-354, which decides how a link crosses assets
+      blocked_by:
+        requirements: [REQ-PIPE-354]
     linked_tests:
     - 'tests/test_validate_feedback.py'
     - 'tests/test_plans_md.py::test_a_paragraph_after_a_list_is_not_glued_onto_its_last_bullet'
@@ -38013,6 +38026,7 @@ requirements:
       - "NO PLANS PROSE DELETED IN THIS CHANGE, deliberately: plans/publishing-and-history.md item 6 feeds every requirement of this series up to REQ-PIPE-248, and CLAUDE.md's batch rule 4 deletes a thread whole once its last dependent requirement is built."
       - "SEEDS ARE MEASURED AS WELL AS DECLARED (Keith, 2026-10-18, after the delivery-critic on this requirement): the gate keeps checking each provider's declared seed_schedule(), and a test now records every seed the generator's own code draws during a real generation of each collection and fails on one no declared window holds - criterion 2's 'any seed a provider derives' made a check, not a promise."
       - "THIRD-COLLECTION HARDENING AS GATE CHECKS (Keith, 2026-10-18: 'fix now'): the providers gate refuses a provider filed under another collection, a dataset or amber dataset its collection does not own, a target trial on a multi-table collection, a lever set generator/targeting.py does not know or one two collections share, and a provider module naming no collection; a trial asked of a multi-table collection is refused before anything is written (post-build-review #232)."
+      - "A SCENARIO NAMING A DATASET IN NEITHER ASSET WAITS FOR REQ-PIPE-354, AND IS NAMED, NOT SILENT (SETTLED by Keith 2026-11-02, the move critic's decision 2): since the asset split the scenario table is still one repository-wide list, so each asset's generation walks only the injections naming a dataset it declares (scenario_injection.this_assets_injections) and criterion 8's refusal now sees only those. An injection whose dataset no asset declares cannot be told from another asset's without reading that asset, which REQ-PIPE-342 criterion 8 forbids, so it is passed over - with a UserWarning naming each scenario dropped, once per asset per process. REJECTED reading both assets now, and waiting silently."
     evidence:
       - "2026-10-18, CRITERION 4 (REQ-TEST-239): `mothman debug equivalence compare after-243 after-246` - after-243 a full capture of 2e3e76e (REQ-PIPE-243's after, this change's before), after-246 of 86fdc05, 12 commits apart: S1 recorded-results same, S4 generated-files same, S5 reports same. S7 help-and-menus differs only by `mothman github ci-usage`, which REQ-TEST-260 added between the two captures. Bootstrap 1245s against 1298s, +53s (Birth Registrations 457s against 429s, Child Protection 1165s against 1213s)."
       - "2026-10-18, TESTS on the tree of b3f9f4f plus the register edit: tests/test_generator_providers.py, test_scenario_map.py, test_scenario_injection.py, test_generate_runs.py, test_generate_cp_runs.py, test_generate_to_target.py, test_scenario_links.py, test_scenario_subjects.py, test_bootstrap.py and test_collections_registry.py - 367 passed. The full gate runs once after REQ-PIPE-248 (Keith, 2026-10-18)."
@@ -38020,6 +38034,7 @@ requirements:
     linked_tests:
       - tests/test_generator_providers.py
       - tests/test_scenario_map.py::TestItIsRebuiltWithTheHistory
+      - tests/test_scenario_injection.py::TestAnInjectionNamingNoAssetsDataset
       - tests/test_bootstrap.py
       - tests/test_generate_runs.py
       - tests/test_generate_cp_runs.py
@@ -38039,6 +38054,19 @@ requirements:
       - generator/targets.py::_trialled
       - cli/pipeline.py::generate_collection
       - cli/pipeline.py::target_datasets
+    unmet_criteria:
+      - criterion: >-
+          Criterion 8, in part - a scenario naming a dataset that NO asset declares (a
+          typo'd dataset id) is no longer refused at generation: each asset passes it
+          over as possibly another asset's, with a warning naming it.
+        why: >-
+          SETTLED by Keith 2026-11-02 (the move critic's decision 2): telling another
+          asset's scenario from a typo means reading the other asset, which REQ-PIPE-342
+          criterion 8 forbids until REQ-PIPE-354 decides cross-asset references. A
+          dataset an asset declares but no provider makes is still refused.
+        owner: REQ-PIPE-354, with the per-asset scenario check of REQ-PIPE-352 criterion 3
+        blocked_by:
+          requirements: [REQ-PIPE-354]
     open_questions: []
 
   - id: REQ-QAC-247
@@ -47841,7 +47869,7 @@ requirements:
     - 'A GUARD FOR CALL TIME (state-path sweep, 2026-11-01): tests/test_state_paths_at_call_time.py fails on any product module that builds a contract/, data/ or reports/ path itself (a string starting with one, or the bare word as a path component) or calls a resolver lookup at import time (module or class body, default argument, decorator), so the geocoding merge and later code cannot reintroduce one. Its allowlist is shrink-only - an entry nothing matches fails too - and holds only messages naming a file for a person, the cache key''s repository-wide input globs, environments.yaml, and an --out-dir build''s own reports/.'
     - 'PROVISIONAL (state-path sweep, 2026-11-01): a reader that names the asset''s files by repository path - the lifecycle gate, the agreement freeze''s git-ref reads - asks assets.folder_rel(), which gives ''contract'' today and, for an asset folder outside the repository (a test''s copy, #55''s injected configuration), the folder''s ABSOLUTE path, so joining it to the repository root still finds it; only a read at a git ref has no meaning there. Question for Keith: is an absolute path the right answer for an asset outside the repository, or should such a reader refuse it?'
     - 'WHAT LANDED (2026-11-02): the move commit de009e91 - contract/ is assets/, one folder per asset (quarterly: Child Protection, Emergency Department, Linkage Products; daily: Civil Registration), environments.yaml at the top of assets/, the resolver switched to assets/ and CODEOWNERS'' paths updated in the same commit (criterion 9). Follow-ons: the collections gate takes the repository as its root and knows an asset folder''s parts - dbt/, collections/ and synthetic/ each with a gate of its own - listing the asset-wide files (data-asset, calendar, people, file-checks, presentation) and the synthetic ones (120fa04f); the caches gate scans assets/ with allowlist keys `assets/*/...`, naming no asset. `mothman check --no-pytest` passes every gate on that tree with MOTHMAN_DIFF_BASE=f123a582, each asset-reading gate once per asset.'
-    - 'PROVISIONAL (the move build, 2026-11-02): the feedback gate leaves a road-testing link naming an agency the selected asset does not hold to the other asset''s pass, since plans/road-testing.md is repository-wide and reading the other asset would break criterion 8 - so a mistyped agency in a link is no longer caught. Question for Keith: acceptable until REQ-PIPE-354''s moved notice decides cross-asset links, or should the gate refuse such links now?'
+    - 'CROSS-ASSET FEEDBACK LINKS WAIT FOR REQ-PIPE-354 (SETTLED by Keith 2026-11-02, the move critic''s decision 1; was PROVISIONAL): the feedback gate leaves a road-testing link naming an agency the selected asset does not hold to the other asset''s pass, since plans/road-testing.md is repository-wide and reading the other asset would break criterion 8 - so a mistyped agency in a link is not caught until REQ-PIPE-354''s moved notice decides cross-asset links. Recorded as REQ-DOCS-219''s unmet criterion 10. REJECTED reading every asset''s hierarchy now.'
     open_questions: []
   - id: REQ-PIPE-363
     title: A command is told which asset it acts for by MOTHMAN_ASSET, with no default; only that asset's commands exist, the terminal names the asset, and check and --help work with none set
@@ -48067,7 +48095,7 @@ requirements:
     - 'THE GATES AND THE SETTING RESOLVER ARE ALLOWED READERS (architect v3 SHOULD 1): validate_collections reads scripted_decisions.yaml and synthetic_inputs.yaml today, and REQ-GEN-371 makes the setting resolver and validate_schedule read eras.yaml; v3''s criterion would have failed working code.'
     - 'SEED RANGES UNIQUE WITHIN AN ASSET (delivery-scoper, v3): providers of two assets never run in one generator process.'
     - 'WHAT LANDED (2026-11-02): providers under assets/<asset>/synthetic/collections/ and scripted_decisions.yaml and synthetic_inputs.yaml under assets/<asset>/synthetic/ (the move commit de009e91), read there through Asset.synthetic (fe2a8fd3). NOT YET DONE: criterion 4''s fold of daily_batch.py and the apply_*_presets into their providers, and criterion 6''s per-asset `mothman population` - synthetic_data_generator/agency_datasets.py also imports daily_batch, so the fold needs population to load the daily provider by path while it builds both assets'' tables, a design question for this requirement''s own build.'
-    - 'PROVISIONAL (the move build, 2026-11-02): the scenario table (generator/scenario_injection.py INJECTIONS) is still one repository-wide list, so generation, correction claims and `mothman scenarios validate` walk only the injections naming a dataset the selected asset declares (scenario_injection.this_assets_injections); another asset''s are passed over, and an injection naming a dataset in no asset is no longer refused at generation, since telling it from another asset''s would read that asset. Question for Keith: move each asset''s injections into its own synthetic/ (with REQ-PIPE-352 criterion 3''s per-asset scenario check) to restore the refusal, or accept this until then?'
+    - 'ONE SCENARIO TABLE UNTIL EACH ASSET HOLDS ITS OWN (SETTLED by Keith 2026-11-02, the move critic''s decision 2; was PROVISIONAL): generator/scenario_injection.py INJECTIONS stays one repository-wide list, so generation, correction claims and `mothman scenarios validate` walk only the injections naming a dataset the selected asset declares (scenario_injection.this_assets_injections); another asset''s are passed over, and one naming a dataset in no asset is no longer refused - it WAITS for REQ-PIPE-354, and meanwhile a warning names each scenario dropped. Recorded as REQ-GEN-246''s unmet criterion 8. REJECTED reading both assets now, and dropping silently.'
     open_questions: []
   - id: REQ-GEN-371
     title: Each asset's synthetic-era setting versions - back-dated, or named a synthetic era in their changelog - move from data-asset.yaml to synthetic/eras.yaml, and the merged timeline is unchanged

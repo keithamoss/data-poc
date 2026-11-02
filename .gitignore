@@ -32,6 +32,9 @@ data/supply.duckdb
 data/dbt_scratch/
 reports/results_*.json
 reports/*_dashboard.json
+# Each asset's own reports/<asset>/ (the asset split) - all of it rebuilt
+# from that asset's database, so all of it state.
+reports/*/
 # Each asset's dbt project (REQ-QAC-368 criterion 7).
 assets/*/dbt/target/
 assets/*/dbt/logs/
