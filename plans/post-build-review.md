@@ -13714,7 +13714,9 @@ twice. It deliberately did not re-find the `TypeError`.
        past still marks it, as before (tests-js/change-markers.test.js, seen
        failing).
      - **4. The browser module's twenty failures (cd7004d5's tree, 20 failed,
-       413 passed)**, each read against the code. NONE was caused by the move's
+       413 passed; ede7b538's after these fixes, 4 failed, 431 passed, no
+       skips - the three in 5 (a) to (c) and the load budget)**, each read
+       against the code. NONE was caused by the move's
        product code. Fixed:
        - Left behind by the move (C11): the agency 'View on GitHub' link now
          names `assets/<asset>/<agency>`; the fresh-tab Close test used Birth
@@ -13724,7 +13726,10 @@ twice. It deliberately did not re-find the `TypeError`.
        - Left behind by Pass / Warn / Fail: a group heading's count form
          ('1 warning, 1 passing', read from status-cases.json), the warehouse
          clause's 'and is passing', the stopped pass's 'Warn' pill, and the
-         trend axis's short last date ('8 Nov 2020', #289 D8d).
+         trend axis's short last date ('8 Nov 2020', #289 D8d); and outside
+         the browser module, tests/test_processing_pass.py's refusal reason
+         ('status is Fail', not 'red'), found re-running the modules around
+         StageFailed.
        - Left behind by the geocoding batch (its browser proofs were written
          against an empty warehouse and never run): the Client Register's
          Linkage Products group holds the Client Register Geocodes checks too,

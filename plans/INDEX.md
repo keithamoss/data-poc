@@ -1051,7 +1051,7 @@ one when this line suggests it matters.
 - **#304** `done` 2026-11-02 - Post-build critic on the asset split's move (bmove, f6bc05bf): three high findings, three for Keith, seven minor; fixed...
   - *touches:* `tests/test_replay_inputs.py`, `tests/test_scenario_injection.py`, `tests/test_settle_tui.py`, `tests/test_moved_paths.py`, `tests/test_assets.py`
 - **#305** `in-progress` 2026-11-02 - Finishing the asset split's move (bmove): three latent defects found on the way, all fixed; the browser module's twenty...
-  - *touches:* `tests/test_arrival_lifecycle.py`, `tests/test_equivalence.py`, `tests/test_dbt_singular_test_meta.py`, `tests/conftest.py`
+  - *touches:* `tests/test_arrival_lifecycle.py`, `tests/test_equivalence.py`, `tests/test_dbt_singular_test_meta.py`, `tests/conftest.py`, `tests/test_processing_pass.py`
 
 ## plans/road-testing.md
 
