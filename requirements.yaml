@@ -48808,3 +48808,95 @@ requirements:
     - 'SIGNING (Keith, 2026-10-31, draft Q4 (a)): the blanket rule signed once, the 43 amendments and C1 one by one. REJECTED (b), every path-only edit quoted and signed, and (c), leaving path-only criteria naming files that no longer exist. The rule widened (architect) to reports/, SCENARIOS.md and snapshot paths; data/ added by the scoper on the same reasoning; v3 widened it again to the assets/ layout - dbt_project/, qa_tools/collections/, generator/collections/ and the synthetic files.'
     - 'THE BLANKET SWEEP, counted by script on 2026-10-31 at commit 7e9bf6e over signed or built requirements, to be re-counted when applying - the v3 path classes (dbt_project/, qa_tools/collections/, generator/collections/, contract/scripted_decisions.yaml, contract/synthetic_inputs.yaml) are NOT in this count and are counted then. Asset-wide contract files, 99 criteria in 57 requirements: REQ-DASH-054 2; REQ-DASH-209 3; REQ-DASH-220 13; REQ-DASH-299 9, 10; REQ-DOCS-219 10; REQ-GEN-135 9; REQ-GEN-183 1; REQ-GEN-184 9; REQ-GEN-185 7; REQ-GEN-199 13, 29, 38; REQ-GEN-200 10; REQ-GEN-201 3; REQ-GEN-205 1, 4; REQ-GEN-218 1, 2; REQ-GEN-235 2; REQ-GEN-251 1; REQ-GEN-295 12; REQ-GEN-325 4; REQ-GEN-334 4; REQ-GHUB-082 14, 29; REQ-GHUB-171 5; REQ-GHUB-174 1, 2; REQ-PIPE-048 1; REQ-PIPE-049 4, 8, 9; REQ-PIPE-093 12, 13; REQ-PIPE-103 16; REQ-PIPE-110 12, 13, 14, 16, 17, 19, 23, 26; REQ-PIPE-111 1, 22; REQ-PIPE-112 1, 17; REQ-PIPE-122 1, 13, 24; REQ-PIPE-132 4; REQ-PIPE-134 2; REQ-PIPE-146 1, 6; REQ-PIPE-147 7; REQ-PIPE-156 1; REQ-PIPE-161 1; REQ-PIPE-163 22; REQ-PIPE-166 1; REQ-PIPE-169 13, 14; REQ-PIPE-179 4, 20, 28, 34, 37, 40; REQ-PIPE-202 1, 11; REQ-PIPE-254 1, 6; REQ-PIPE-320 1, 3; REQ-PIPE-322 9; REQ-QAC-176 22; REQ-QAC-231 1, 2, 8; REQ-QAC-241 8; REQ-QAC-294 1, 11, 12; REQ-QAC-300 1, 10; REQ-QAC-330 1, 2, 8; REQ-TEST-249 3, 6, 10. reports/: REQ-TEST-239 8, 12; REQ-TEST-252 15; REQ-TEST-249 6; REQ-TEST-281 4. SCENARIOS.md: REQ-PIPE-131 15; REQ-DASH-139 2; REQ-TEST-253 1, 2; REQ-GEN-201 10; REQ-GEN-325 4 (REQ-GEN-045 names ''a map'', not the file). Snapshots: REQ-PIPE-089 10; REQ-PIPE-255 22, 32; REQ-DASH-292 3, 4. data/: REQ-PIPE-102 3; REQ-GEN-201 5; REQ-GEN-334 6; REQ-GEN-295 3. (REQ-PIPE-107 1, REQ-PIPE-110 1 and 18, REQ-PIPE-240 1, REQ-PIPE-248 7, REQ-PIPE-255 1, 8 and 24, REQ-PIPE-257 8 and REQ-GHUB-258 1 also name a path and are covered by A15, A4, A9, A18, A23, A24, A25 and A26 instead.)'
     open_questions: []
+  - id: REQ-TEST-375
+    title: 'An interim fast CI set: a hand-picked critical pytest mark on every push, the full suite started by hand'
+    date_written: '2026-11-02'
+    story: 'As Keith, paying for every push out of 2,000 private-repository Actions minutes a month, I want each push to run only a hand-picked set of the tests that guard this project''s standing rules and core supply logic, in under five minutes, with the full suite and its coverage floor run locally before the push and on demand in CI, so that a push costs a few minutes rather than 80 to 145 while a broken rule still turns CI red.'
+    moscow: should
+    status: built
+    signed_off:
+      by: Keith
+      date: '2026-11-02'
+    source: 'Keith, plans/running-thoughts.md #136 and his scoping answers, 2026-11-02; drafted by delivery-scoper the same day (docs/drafts/fast-ci-v1.yaml, with the measured critical list). SIGNED by Keith 2026-11-02 with his answers to its six open questions.'
+    acceptance_criteria:
+    - 'THE SYSTEM SHALL register a `critical` pytest marker in pyproject.toml''s `markers`, described as the hand-picked set every push runs in CI.'
+    - 'THE SYSTEM SHALL apply the `critical` mark only by hand, to the modules and classes named in the list Keith signs off, and SHALL NOT derive it from measured duration or module kind.'
+    - 'IF a test carrying the `critical` mark also needs a deployment (carries or acquires `needs_deployment`) or drives a browser, THEN THE SYSTEM SHALL fail collection naming that test.'
+    - 'WHEN a commit is pushed to a watched branch, THE SYSTEM SHALL run `pytest -m "critical and not needs_deployment"` in a CI job that runs no bootstrap, installs no browser and enforces no coverage threshold.'
+    - 'WHEN a commit is pushed to a watched branch, THE SYSTEM SHALL run the JS test suite (`npm test`) as its own CI job, in parallel with the critical job.'
+    - 'IF the critical job''s pytest step selects zero tests, or reports any skipped test, THEN THE SYSTEM SHALL fail that job.'
+    - 'IF the critical job''s pytest step takes longer than its budget, THEN THE SYSTEM SHALL fail that job and print the step''s measured duration and the slowest critical tests.'
+    - 'THE SYSTEM SHALL keep the full test workflow - both pytest halves, the bootstrap and its cache, the on-demand job and the coverage combine - and SHALL start it only by `workflow_dispatch`, never on push.'
+    - 'THE SYSTEM SHALL enforce pyproject.toml''s `fail_under` in the local full gate (`mothman check`) and SHALL NOT enforce it in the push-triggered critical job.'
+    - 'WHEN `mothman check` runs the full gate, THE SYSTEM SHALL print a one-line result naming the tree''s commit or diff state, the pass/fail/skip counts, the coverage figure and the elapsed time, in a form fit to paste into a commit message.'
+    - 'THE SYSTEM SHALL leave validate-config.yml''s triggers and steps unchanged.'
+    - 'THE SYSTEM SHALL document, in CLAUDE.md in the same change, that push CI is the critical set only, that the full gate runs locally before every push, and how to start the full workflow by hand.'
+    non_functional_requirements:
+    - 'Performance: the critical job''s PYTEST STEP SHALL run in under 5 minutes (300s, the step''s own measured time, checked in the job itself), as measured on today''s 4-core public-repository runner and revisited when the repository goes private; the job overall is about 6-7 minutes with setup and is not gated.'
+    - 'Honesty of the budget: the over-budget failure is a real CI step reading pytest''s own elapsed time, so drift fails loudly on the push that caused it rather than being noticed weeks later in ci-usage.'
+    - 'Scalability: the set is a fixed, hand-picked list, so it does not grow with the suite; adding a test to it is a deliberate edit reviewed like any other, and the budget step is what stops the list creeping past 5 minutes as Linkage-style collections are added.'
+    - 'Reliability: the critical job needs PostgreSQL (several guards run against a per-worker test database) but never the supply database, a bootstrap or the bootstrap cache, so a cache miss cannot slow or break it.'
+    - 'Security: no new credential or secret; the critical job keeps the workflow''s existing `permissions: contents: read` and the non-secret service-container password, and the credential guard (test_publish.py TestGitHubHoldsNoCredentialAndRunsNoBuild) is itself in the set.'
+    - 'Privacy: no critical test reads supply rows of the deployment database; the ''a build reads no supply rows'' guards stay in the set so the rule is proven on every push, not only on a hand-started run.'
+    - 'Compatibility: the critical job runs through `uv run`, with `.python-version` pinning 3.11, exactly as test.yml does today; no Playwright install.'
+    - 'Maintainability: one new marker and one hand-kept list; the mark lives on the test modules themselves (module `pytestmark` or class decorator), never in a separate allowlist file that can drift from the tests.'
+    - 'Auditability: every push''s commit message carries the local full-gate result line, and a hand-started full CI run is recorded in the Actions history against its commit.'
+    - 'Cost: target a push at roughly 5-10 billable minutes (critical job plus JS job) against today''s ~80-145; a hand-started full run still costs the old figure and should be checked against `mothman github ci-usage` first.'
+    dependencies: []
+    linked_tests:
+    - 'tests/test_publish.py::TestNeitherHalfOfCIQuietlyStopsCovering'
+    - 'tests/test_publish.py::TestACriticalTestCIcannotRunFailsCollection'
+    - 'tests/test_publish.py::TestTheWorkflowCarriesEveryVariableThePipelineNeeds'
+    - 'tests/test_ci_on_demand.py'
+    - 'tests/test_cli_check.py::TestTheFullGateIsTheWholeSuitesRecord'
+    implemented_by:
+    - 'pyproject.toml'
+    - 'tests/conftest.py::_refuse_a_critical_test_ci_cannot_run'
+    - '.github/workflows/critical.yml'
+    - '.github/workflows/test.yml'
+    - 'cli/check.py::result_line'
+    - 'cli/check.py::_pytest_argv'
+    - 'CLAUDE.md'
+    evidence:
+    - '2026-11-02, tree 12c567b2 (this sandbox, 4 cores, load 9-18 from concurrent builders, so an upper bound): `uv run pytest -m "critical and not needs_deployment" -n auto` - 864 passed, 0 skipped, 0 failed; pytest 133.77s, wall clock 136s. 860 are the approved list (the draft''s measured count) plus the four tests of criterion 3''s own guard. Slowest single test 16.9s (test_filing.py::TestFilingRealArrivals).'
+    - '2026-11-02, tree 12c567b2: critical.yml''s own budget-and-skip checker, run against that real xdist JUnit report, passes it at 136s and fails it at 301s against 300s, printing the slowest tests; tests/test_publish.py::TestNeitherHalfOfCIQuietlyStopsCovering runs the same checker against zero-test, skipped and over-budget reports.'
+    - '2026-11-02, tree 12c567b2: criterion 3 by real experiment - marking test_status_parity.py::TestTheRealRecordedHistoryStillPasses critical made `pytest --collect-only` exit 4, naming its three tests "(needs a deployment)"; reverted.'
+    - '2026-11-02, tree 12c567b2: the workflow-reading tests - tests/test_ci_on_demand.py, test_ci_bootstrap_cache.py, test_ci_usage.py, test_devcontainer.py, test_db_identity.py, test_publish.py''s TestNeitherHalfOfCIQuietlyStopsCovering, TestACriticalTestCIcannotRunFailsCollection and TestTheWorkflowCarriesEveryVariableThePipelineNeeds, and the workflow tests of test_no_calendar.py, test_validate_provisional.py and test_replay_inputs.py - 74 passed; tests/test_cli_check.py 34 passed. Both workflows parse with yaml.safe_load and pass `yamllint --strict`.'
+    decisions:
+    - 'Keith 2026-11-02: the push CI set is a HAND-PICKED `critical` mark. Rejected: a measured `slow` mark (selects by cost rather than by what a test guards), and selecting whole module kinds.'
+    - 'Keith 2026-11-02: the delivery-scoper proposes the list against stated criteria with measured timings, and Keith signs the list off before it reaches CI.'
+    - 'Keith 2026-11-02: coverage `fail_under` is enforced in the LOCAL full gate, not in CI. Rejected: a lower coverage floor for the critical set in CI (a subset''s coverage is not the suite''s, so any floor there would be arbitrary).'
+    - 'Keith 2026-11-02: the full test.yml - both halves, the bootstrap, coverage - becomes a workflow started BY HAND (workflow_dispatch). Rejected: a nightly schedule (over the monthly allowance at ~80-145 minutes a run), and dropping the full suite from CI entirely.'
+    - 'Keith 2026-11-02: the JS tests run ALONGSIDE as their own job, so the Python critical set has the whole five minutes.'
+    - 'Keith 2026-11-02: the full gate runs locally before every push, its result in the commit message.'
+    - 'Keith 2026-11-02: validate-config.yml stays as it is (it already runs the configuration gates themselves on push; the critical set carries the TESTS of those gates).'
+    - 'Interim by design: this is the stop-gap ahead of the later test-time audit Keith asked for in running-thoughts #136, not a replacement for it.'
+    - 'Selection criteria for the list (proposed): tests guarding a standing rule (no supply rows read by a build, no credential in CI, status agrees with the tool''s own verdict, the results store refuses what it must, the provisional/lifecycle/requirements/plans gates, the state-path guard, the bookkeeping wall) plus core filing, promotion, status, slot and arrival logic. Excluded: anything needing a deployment or a browser.'
+    - 'THE BUDGET (Keith, 2026-11-02, open question 1): the 5 minutes cover the PYTEST STEP only; the job overall is about 6-7 minutes. The in-job budget is 300s, not the draft''s proposed 240s, since the step is what is gated.'
+    - 'WHAT STOPS A RED LOCAL GATE BEING PUSHED (Keith, 2026-11-02, open question 2): CONVENTION ONLY - the commit message states the gate run, from `mothman check`''s result line. REJECTED: a pre-push hook checking a gate stamp against HEAD''s tree, and a CI step reading the commit message.'
+    - 'RUNNER SIZE (Keith, 2026-11-02, open question 3): the budget is measured against TODAY''s 4-core public runner and revisited when the repository goes private. REJECTED: sizing the set for the 2-core private runner now.'
+    - 'WHO STARTS THE FULL WORKFLOW, AND WHEN (Keith, 2026-11-02, open question 5): by hand BEFORE A MERGE to the main branch, or when Keith asks or gives the say-so for a wide change. REJECTED: before every sign-off of a built requirement, and before every release-note-worthy push.'
+    - 'THE PUSH TRIGGER (Keith, 2026-11-02, open question 4): critical.yml watches `claude/**` only, deliberately, so `wip/` checkpoint pushes bill nothing. Kept as test.yml had it. REJECTED: also watching `work`.'
+    - 'THE TWO-HALVES GUARD (Keith, 2026-11-02, open question 6): tests/test_publish.py::TestNeitherHalfOfCIQuietlyStopsCovering is REWRITTEN IN THIS CHANGE to pin the new shape - test.yml dispatch-only with both halves and the coverage combine intact, critical.yml on push with no bootstrap, browser or coverage, the JS job beside it, and the push job''s own checker run against JUnit reports of each failing shape. REJECTED: a follow-up requirement.'
+    - 'THE LIST (Keith, 2026-11-02): APPROVED AS DRAFTED - 860 tests in 36 modules. Criterion 3 keeps three deployment-bound classes out even where the list names their module: test_status_parity.py::TestTheRealRecordedHistoryStillPasses and test_arrivals.py::TestNoRecordedResultCarriesBookkeeping (the bookkeeping wall''s observational half, which reads the deployment; its static half, TestTheGeneratorsBookkeepingIsWalledOff, is in). Neither ran in the draft''s measured not-needs_deployment set, so the approved count is unchanged. Added beside it: tests/test_publish.py::TestACriticalTestCIcannotRunFailsCollection, criterion 3''s own guard.'
+    - 'HOW THE MARK IS APPLIED: module `pytestmark` where the whole module qualifies, class decorators in test_publish.py, test_status_parity.py and test_arrivals.py. A browser is detected by pytest-playwright''s fixtures in a test''s closure (browser, browser_type, context, page, playwright), the shared_page/fresh_load marks, or a module launching sync_playwright itself. The refusal runs before `-m` deselects anything, so a local full run catches a bad mark too.'
+    - 'ON-DEMAND TESTS NOW RUN WHEN THE FULL WORKFLOW IS STARTED (post-build-review #128''s ''on every push'' superseded by this signed requirement): tests/test_ci_on_demand.py asserts a dispatch trigger and no schedule rather than a push trigger.'
+    - 'THE RESULT LINE names the exact tree: HEAD when clean, else the tree id a commit of the working tree would have, written through a scratch index so the real index is untouched; computed before and after the run, and a tree that changed mid-run is said to be no claim. Counts come from pytest''s JUnit report and coverage from its JSON report, never from parsing streamed output.'
+    - 'test.yml''s change is the trigger block only, to keep the merge with the asset-split branch (bmove, which also edits test.yml) easy.'
+    unmet_criteria:
+    - criterion: 'Criteria 4 to 7 and the Performance NFR, on GitHub''s runner - the critical job and the JS job run on a push, and the pytest step is seen under 300s with zero skips in the Actions log.'
+      why: 'critical.yml cannot run from this sandbox; its checker is exercised locally against JUnit reports of each shape, and the set''s wall time measured here (evidence).'
+      owner: 'the first push after the build run'
+      blocked_by:
+        unowned: true
+    - criterion: 'Criterion 8 on GitHub - a push starts no test.yml run, and a hand-started one still runs both halves and the coverage combine.'
+      why: 'Only GitHub can show which workflows a push started.'
+      owner: 'the first push after the build run'
+      blocked_by:
+        unowned: true
+    - criterion: 'Criterion 9''s floor on a full local gate - `mothman check` run whole with coverage enforced and its result line printed.'
+      why: 'The full gate needs a bootstrapped deployment and about 25 minutes, and this build ran beside other builders without one; the gate''s coverage arguments and result line are covered by tests/test_cli_check.py (evidence).'
+      owner: 'the first push after the build run'
+      blocked_by:
+        unowned: true
+    open_questions: []

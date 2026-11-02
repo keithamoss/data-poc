@@ -8,9 +8,14 @@ import test_supersession as _base
 from qa_tools.common import decision_log as dl, qa_store, supply_status
 from test_supersession import DS, _filed
 from attempt_support import ANY_CHECK
+import pytest
 
 conn = _base.conn
 period = _base.period
+
+
+#: REQ-TEST-375: in the hand-picked set every push runs in CI.
+pytestmark = pytest.mark.critical
 
 
 def _shown(conn, dataset_id: str, supply: str) -> list[dict]:

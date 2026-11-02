@@ -23,6 +23,10 @@ WHEN = "2026-09-27T10:00:00+08:00"
 LATER = "2026-09-27T14:00:00+08:00"
 
 
+#: REQ-TEST-375: in the hand-picked set every push runs in CI.
+pytestmark = pytest.mark.critical
+
+
 @pytest.fixture
 def conn(supply_dsn):
     with supply_db.connect(label="test-decision-log") as c:

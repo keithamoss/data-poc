@@ -634,6 +634,22 @@ Rough layout:
   setup steps a local session already had installed from earlier work,
   etc.). Check the actual run after every push that touches CI-relevant
   files, not just once in a while.
+  **Amended 2026-11-02 (REQ-TEST-375, Keith's call): push CI is the
+  CRITICAL SET ONLY, so what each place proves is now different.** A push
+  to `claude/**` runs `.github/workflows/critical.yml`: the hand-picked
+  `critical` pytest mark (no deployment, no browser, no coverage; fails on
+  zero tests, any skip, or a pytest step over 5 minutes) and `npm test`
+  beside it, about 6-7 minutes. A green push run proves ONLY that those
+  ~860 tests and the JS suite pass on a clean runner. The rest of the
+  suite, the deployment half, the browser tests and the coverage floor
+  are proved by the LOCAL full gate (`mothman check`, which enforces
+  `fail_under` and ends with a one-line result to paste into the commit
+  message) - by convention, nothing stops a red gate being pushed, which
+  is why the line goes in the message. The full `test.yml` is started BY
+  HAND (`gh workflow run test.yml --ref <branch>`, or the Actions tab)
+  before a merge to the main branch, or when Keith asks or gives the
+  say-so for a wide change. `wip/` pushes run no workflow. The after-push
+  check below still applies, to the critical run.
   **Amended, 2026-09-18 (Keith's own explicit call): don't block on it.**
   The lesson above stands - a real, verified CI result is still required
   before calling CI-relevant work done, never just assumed from local
@@ -647,14 +663,17 @@ Rough layout:
   **Amended 2026-10-18 (REQ-TEST-260): "after every push" now means
   after the ONE push per finished piece of work the commit-cadence rule
   below allows, its run checked at the next natural pause as before.**
-  Every push costs about 80-150 billable minutes on a private repository
-  (re-measured 2026-11-02; see the commit-cadence rule below) against
-  2,000 a month, so a push exists to carry finished work, never
+  A push cost about 80-150 billable minutes before REQ-TEST-375 (re-measured
+  2026-11-02; see the commit-cadence rule below) and targets about 5-10 since
+  (the critical job plus the JS job), against 2,000 a month, so a push exists to carry finished work, never
   to ask CI a question a local gate can answer; `mothman github ci-usage`
   says where the month stands before a push late in it.
   **Amended again, 2026-09-18 evening (Keith's own explicit call): run selective
   tests locally for smaller/medium changes, rely on CI for the full
-  suite.** For a change scoped to one or two modules, run just the
+  suite.** (SUPERSEDED IN PART 2026-11-02, REQ-TEST-375: push CI no longer
+  runs the full suite, so "let test.yml report the full-suite result"
+  below no longer happens on a push - the full local gate is that report
+  before a push, and a hand-started `test.yml` before a merge.) For a change scoped to one or two modules, run just the
   directly affected test file(s) locally (e.g. `uv run pytest
   tests/test_changelog.py -q`), not the whole suite - then push and let
   `test.yml` report the full-suite result, same as the "don't block on
@@ -894,6 +913,12 @@ Rough layout:
   can run at all, and since 2026-09-28 it does that one arrival at a
   time.
 
+  **SINCE REQ-TEST-375 (2026-11-02) THE TWO HALVES BELOW RUN ONLY WHEN
+  `test.yml` IS STARTED BY HAND**; a push runs `critical.yml`, whose job
+  fails on any skip itself, and a `critical` test needing a deployment or
+  a browser fails collection. The halves and the skip-count rule still
+  hold for a hand-started run.
+
   **CI RUNS IN TWO HALVES SINCE 2026-09-29** (plans/tooling.md #27), so
   the figure above is the OLD one and what to budget now is different.
   Measured on run 36573107713:
@@ -1011,8 +1036,10 @@ Rough layout:
     re-runs only `mothman check --docs` (under 15 seconds). A code or
     test edit re-runs the suite.
   - **C.** A small fix touching one or two modules runs its own test files
-    plus `--no-pytest`, then pushes, and CI runs the full suite. The full
-    local gate is for large or cross-cutting changes.
+    plus `--no-pytest`. Since REQ-TEST-375 (2026-11-02) CI no longer runs
+    the full suite on a push, so the full local gate runs before every
+    push and its result line goes in the message; a commit that ran only
+    selective tests says so and is not pushed alone.
   - **D.** Long work may be committed locally as checkpoints, with no test
     claims in those messages. A gate runs before anything is pushed.
 
@@ -1033,7 +1060,10 @@ Rough layout:
   bootstrap-cache hit and about 145 on a miss**, so the allowance is
   nearer 14-25 pushes a month, 3-6 a week. `ci-usage --days 7` that day:
   5 pushes, 450 billable minutes, 1,929 scaled to a month - fitting, but
-  with one push of headroom. Per job, 2026-10-24 (miss) against
+  with one push of headroom. **REQ-TEST-375 (2026-11-02) answers it**: a
+  push now runs only the critical set (target about 5-10 billable
+  minutes), and these figures are what a HAND-STARTED `test.yml` costs -
+  check `ci-usage` before starting one. Per job, 2026-10-24 (miss) against
   2026-10-31 (run 41156234338, miss; run 41173122058, hit):
 
   | Job | 10-24 miss | 10-31 miss | 10-31 hit |

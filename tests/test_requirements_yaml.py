@@ -34,6 +34,10 @@ requirements:
 """
 
 
+#: REQ-TEST-375: in the hand-picked set every push runs in CI.
+pytestmark = pytest.mark.critical
+
+
 def _write(tmp_path, content: str):
     path = tmp_path / "requirements.yaml"
     path.write_text(content)

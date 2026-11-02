@@ -25,6 +25,10 @@ SLOT = "2023-Q4"
 RECEIVED = datetime(2023, 8, 1, 12, tzinfo=PERTH)
 
 
+#: REQ-TEST-375: in the hand-picked set every push runs in CI.
+pytestmark = pytest.mark.critical
+
+
 @pytest.fixture
 def clean(supply_dsn):
     with supply_db.connect(label="test-verdict-record") as conn:

@@ -6,11 +6,16 @@ import test_supersession as _base
 from pipeline import red_promoted, slot_timeline
 from qa_tools.common import decision_log as dl, promotion, supersession, supply_status
 from test_supersession import DS, REAL_PERSON, WHEN, _filed
+import pytest
 
 conn = _base.conn
 period = _base.period
 
 AG, COL = "child-protection-family-support", "child-protection"
+
+
+#: REQ-TEST-375: in the hand-picked set every push runs in CI.
+pytestmark = pytest.mark.critical
 
 
 def _promote(conn, supply, table, period, *, status="green", kind=dl.RULE):

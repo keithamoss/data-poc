@@ -26,6 +26,10 @@ CHANGES_A_SLOT = (dl.PROMOTE, dl.REFILE, dl.SUBSTITUTE, dl.INHERIT, dl.REJECT,
 MOVES_A_SUPPLY = (dl.REJECT, dl.DEMOTE, dl.REFILE)
 
 
+#: REQ-TEST-375: in the hand-picked set every push runs in CI.
+pytestmark = pytest.mark.critical
+
+
 def oracle(rows, slot):
     """The rule, as REQ-PIPE-130 states it: (held_as, holder, id of the
     last entry that changed the slot). It began as post-build-review

@@ -30,6 +30,7 @@ from cli import dashboard as dashboard_cli
 ROOT = Path(__file__).resolve().parents[1]
 
 
+@pytest.mark.critical
 class TestThereIsExactlyOnePublishPath:
     """Criterion 10, and criterion 15 for the prompt specifically."""
 
@@ -111,6 +112,7 @@ class TestThereIsExactlyOnePublishPath:
                            "worktree_snapshot.py::snapshot_one"], pushers
 
 
+@pytest.mark.critical
 class TestTheGateCannotBeSkipped:
     """Criteria 4 and 5: the render check runs where the build runs, and
     only a build that passed it is published."""
@@ -216,6 +218,7 @@ class TestPublishingIsAlwaysAsked:
         assert capsys.readouterr().out == ""
 
 
+@pytest.mark.critical
 class TestGitHubHoldsNoCredentialAndRunsNoBuild:
     """Criterion 2, and criterion 9 for what CI keeps."""
 
@@ -382,6 +385,7 @@ class TestTheArtifactSaysWhereItCameFrom:
             "environment": None, "commit": None}
 
 
+@pytest.mark.critical
 class TestThePublishedContentCannotMixWithTheSource:
     """Criterion 13."""
 
@@ -511,21 +515,20 @@ class TestTheWorkflowCarriesEveryVariableThePipelineNeeds:
 
 
 class TestNeitherHalfOfCIQuietlyStopsCovering:
-    """The split CI depends on, asserted here rather than trusted
-    (plans/tooling.md #27).
+    """The shape CI depends on, asserted here rather than trusted
+    (plans/tooling.md #27; rewritten for REQ-TEST-375, Keith 2026-11-02).
 
-    CI runs `-m "not needs_deployment"` in one job and `-m
-    needs_deployment` in another, and the marker is what decides. Two
-    ways that goes wrong, and only one of them is loud: a test in the
-    WRONG half either fails outright (fine, somebody fixes it) or
-    SKIPS - which is the failure `.github/workflows/test.yml`'s own
-    bootstrap comment records having hit before, ten tests quietly
-    skipping in CI while passing locally.
+    TWO WORKFLOWS SINCE REQ-TEST-375. Every push runs critical.yml - the
+    hand-picked `critical` mark, no deployment, no browser, no coverage - and
+    the JS suite beside it. test.yml keeps the full suite in its two halves
+    (`-m "not needs_deployment"` and `-m needs_deployment`) with the coverage
+    combine, and is started only by hand.
 
-    So this checks the marker covers what it has to, mechanically. The
-    fixture half needs no checking - conftest derives it - and the half
-    that needs it is the five modules reading `reports/` files, where
-    nothing in a signature says so.
+    The marker is still what decides, and the old failure still applies to
+    both: a test in the WRONG set either fails outright (fine) or SKIPS - ten
+    tests once skipped quietly in CI while passing locally. So the
+    reports-readers check below stays, the push job fails on any skip, and a
+    `critical` test needing a deployment or a browser fails collection.
     """
 
     WORKFLOW = ROOT / "tests"
@@ -595,14 +598,86 @@ class TestNeitherHalfOfCIQuietlyStopsCovering:
             f"rather than fail. Add "
             f"`pytestmark = pytest.mark.needs_deployment`.")
 
-    def test_the_marker_is_registered(self):
+    FULL = ROOT / ".github" / "workflows" / "test.yml"
+    PUSH = ROOT / ".github" / "workflows" / "critical.yml"
+
+    @staticmethod
+    def _load(path) -> dict:
+        import yaml
+
+        return yaml.safe_load(path.read_text())
+
+    def _critical_step(self) -> str:
+        [run] = [s["run"] for s in self._load(self.PUSH)["jobs"]["critical"]["steps"]
+                 if "pytest" in s.get("run", "")]
+        return run
+
+    def test_the_markers_are_registered(self):
         """An unregistered marker makes a typo in `-m` select nothing,
         silently - a green job that ran no tests at all."""
         text = (ROOT / "pyproject.toml").read_text()
         assert "needs_deployment:" in text
+        assert "critical:" in text
 
-    def test_both_halves_are_named_in_the_workflow(self):
-        text = (ROOT / ".github" / "workflows" / "test.yml").read_text()
+    def test_the_full_workflow_is_started_only_by_hand(self):
+        assert set(self._load(self.FULL)[True]) == {"workflow_dispatch"}  # `on:` reads as True
+
+    def test_every_push_to_a_session_branch_runs_the_critical_set(self):
+        """`claude/**` only, deliberately: `wip/` checkpoint pushes bill nothing."""
+        assert self._load(self.PUSH)[True]["push"]["branches"] == ["claude/**"]
+        assert '-m "critical and not needs_deployment"' in self._critical_step()
+
+    def test_the_push_job_runs_no_bootstrap_no_browser_and_no_coverage(self):
+        job = self._load(self.PUSH)["jobs"]["critical"]
+        runs = "\n".join(s.get("run", "") for s in job["steps"])
+        for absent in ("bootstrap", "playwright", "--cov", "coverage"):
+            assert absent not in runs, absent
+
+    def test_the_js_suite_runs_beside_it_not_after_it(self):
+        job = self._load(self.PUSH)["jobs"]["js-tests"]
+        assert "needs" not in job
+        assert any(s.get("run") == "npm test" for s in job["steps"])
+
+    def test_the_push_job_carries_the_full_jobs_environment(self):
+        full = self._load(self.FULL)["jobs"]["test"]["env"]
+        push = self._load(self.PUSH)["jobs"]["critical"]["env"]
+        assert set(full) <= set(push), sorted(set(full) - set(push))
+
+    def _verdict(self, tmp_path, *, tests: int, skipped: int, took: int, budget: int = 300):
+        """Runs the push job's own checker (the heredoc in its pytest step)
+        against a JUnit report of the given shape."""
+        import re
+        import subprocess
+        import sys
+        import textwrap
+
+        [body] = re.findall(r"<<'PY'\n(.*?)\nPY\n", self._critical_step(), re.S)
+        cases = "".join(f'<testcase classname="m" name="t{i}" time="{i}.0"/>'
+                        for i in range(tests))
+        (tmp_path / "critical-junit.xml").write_text(
+            f'<testsuites><testsuite tests="{tests}" skipped="{skipped}">{cases}'
+            f'</testsuite></testsuites>')
+        return subprocess.run([sys.executable, "-c", textwrap.dedent(body), str(took),
+                               str(budget)], cwd=tmp_path, capture_output=True, text=True)
+
+    def test_a_clean_run_inside_the_budget_passes(self, tmp_path):
+        assert self._verdict(tmp_path, tests=3, skipped=0, took=100).returncode == 0
+
+    def test_zero_tests_selected_fails(self, tmp_path):
+        done = self._verdict(tmp_path, tests=0, skipped=0, took=5)
+        assert done.returncode != 0 and "ZERO tests" in done.stderr
+
+    def test_any_skip_fails(self, tmp_path):
+        done = self._verdict(tmp_path, tests=3, skipped=1, took=50)
+        assert done.returncode != 0 and "SKIPPED" in done.stderr
+
+    def test_over_the_budget_fails_naming_the_time_and_the_slowest_tests(self, tmp_path):
+        done = self._verdict(tmp_path, tests=3, skipped=0, took=301)
+        assert done.returncode != 0
+        assert "301s against 300s" in done.stderr and "m::t2" in done.stderr
+
+    def test_both_halves_are_still_named_in_the_full_workflow(self):
+        text = self.FULL.read_text()
         assert '-m "not needs_deployment"' in text
         assert "-m needs_deployment" in text
 
@@ -610,7 +685,41 @@ class TestNeitherHalfOfCIQuietlyStopsCovering:
         """Splitting the suite splits the measurement, so `fail_under`
         has to be enforced on the combination - not on either half,
         where it would be meaningless."""
-        text = (ROOT / ".github" / "workflows" / "test.yml").read_text()
+        text = self.FULL.read_text()
         assert "coverage combine" in text
         assert text.count("--cov-fail-under=0") == 2, (
             "each half must defer the threshold to the combine")
+
+
+@pytest.mark.critical
+class TestACriticalTestCIcannotRunFailsCollection:
+    """REQ-TEST-375 criterion 3, through conftest's own refusal."""
+
+    class _Item:
+        def __init__(self, nodeid, marks=(), fixtures=()):
+            import pytest as _pytest
+
+            self.nodeid, self.fixturenames, self.path = nodeid, list(fixtures), None
+            self._marks = {m: getattr(_pytest.mark, m) for m in marks}
+
+        def get_closest_marker(self, name):
+            return self._marks.get(name)
+
+    def _refuse(self, *items):
+        from tests.conftest import _refuse_a_critical_test_ci_cannot_run
+
+        _refuse_a_critical_test_ci_cannot_run(list(items))
+
+    def test_a_critical_test_needing_neither_is_accepted(self):
+        self._refuse(self._Item("t::ok", marks=("critical",), fixtures=("tmp_path",)))
+
+    def test_one_needing_a_deployment_is_refused_by_name(self):
+        with pytest.raises(pytest.UsageError, match=r"t::dep \(needs a deployment\)"):
+            self._refuse(self._Item("t::dep", marks=("critical", "needs_deployment")))
+
+    def test_one_driving_a_browser_is_refused_by_name(self):
+        with pytest.raises(pytest.UsageError, match=r"t::web \(drives a browser\)"):
+            self._refuse(self._Item("t::web", marks=("critical",), fixtures=("page",)))
+
+    def test_an_unmarked_test_needing_both_is_none_of_its_business(self):
+        self._refuse(self._Item("t::x", marks=("needs_deployment",), fixtures=("page",)))

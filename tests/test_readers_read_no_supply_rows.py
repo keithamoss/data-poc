@@ -70,6 +70,10 @@ BDM = "civil-registration"
 CP = "child-protection"
 
 
+#: REQ-TEST-375: in the hand-picked set every push runs in CI.
+pytestmark = pytest.mark.critical
+
+
 def _record_history() -> None:
     """A finished run per collection, through the real writer, carrying
     the fields the dashboard build reads rather than the minimum the

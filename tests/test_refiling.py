@@ -32,6 +32,10 @@ SLOTS = {
 }
 
 
+#: REQ-TEST-375: in the hand-picked set every push runs in CI.
+pytestmark = pytest.mark.critical
+
+
 def _refile(dataset_id, supply_id, to_slot, decision_id=1):
     """A re-file as REQ-PIPE-141 makes one: a new filing, on a connection."""
     from qa_tools.common import supply_db

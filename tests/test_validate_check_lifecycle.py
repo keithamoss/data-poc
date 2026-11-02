@@ -12,6 +12,11 @@ import subprocess
 import textwrap
 
 from qa_tools.common import validate_check_lifecycle as vcl
+import pytest
+
+
+#: REQ-TEST-375: in the hand-picked set every push runs in CI.
+pytestmark = pytest.mark.critical
 
 
 def _use_sources(monkeypatch, yaml_sources, evidently):

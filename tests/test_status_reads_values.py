@@ -16,6 +16,10 @@ import pytest
 from qa_tools.common import promotion
 
 
+#: REQ-TEST-375: in the hand-picked set every push runs in CI.
+pytestmark = pytest.mark.critical
+
+
 def _gate(status, **kw):
     args = dict(status=status, slot_filled=False, held_without_slot=False,
                 has_active_checks=True)

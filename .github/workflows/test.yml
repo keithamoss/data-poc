@@ -116,9 +116,12 @@ name: Run test suite
 # `claude/*` session branch, each continuing from the last), and its own
 # convention is to push straight to a session branch and never open a PR
 # unless asked. A pull_request trigger would have nothing to target.
+#
+# STARTED BY HAND SINCE REQ-TEST-375 (Keith, 2026-11-02): every push runs
+# critical.yml instead. Start this before a merge to the main branch, or when
+# Keith asks or gives the say-so for a wide change (`gh workflow run test.yml
+# --ref <branch>`, or the Actions tab).
 on:
-  push:
-    branches: ["claude/**"]
   workflow_dispatch:
 
 # A superseded run tells you nothing - this branch pushes several times a

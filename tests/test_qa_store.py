@@ -37,6 +37,10 @@ from qa_tools.common import qa_store, supply_db
 from attempt_support import ANY_CHECK
 
 
+#: REQ-TEST-375: in the hand-picked set every push runs in CI.
+pytestmark = pytest.mark.critical
+
+
 @pytest.fixture
 def db(supply_dsn):
     """A worker's own database, EMPTIED of QA metadata for each test.

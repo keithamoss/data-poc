@@ -57,6 +57,10 @@ FIXTURE_DATASET_STATS = {
 }
 
 
+#: REQ-TEST-375: in the hand-picked set every push runs in CI.
+pytestmark = pytest.mark.critical
+
+
 def _check(run_id, column_name, value, status="pass", **overrides):
     rec = {
         "column_name": column_name, "check_name": "dbt:accepted_values",

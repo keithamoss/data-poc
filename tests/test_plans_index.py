@@ -11,6 +11,11 @@ from pathlib import Path
 
 from dashboard.plans_index import _list_leads, build_index
 from dashboard.plans_md import parse_plans
+import pytest
+
+
+#: REQ-TEST-375: in the hand-picked set every push runs in CI.
+pytestmark = pytest.mark.critical
 
 
 def test_the_committed_index_is_current():

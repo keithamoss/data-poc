@@ -23,6 +23,10 @@ from qa_tools.common import agreement, asset_time, assignment, schedule, slots
 REAL = Path(__file__).resolve().parent.parent / "contract" / "calendar.yaml"
 
 
+#: REQ-TEST-375: in the hand-picked set every push runs in CI.
+pytestmark = pytest.mark.critical
+
+
 def _offset_version(effective_from, value, author="a test"):
     return {"effective_from": effective_from, "value": value,
             "changelog": [{"date": "2026-10-30", "author": author, "change": "a test's value"}]}

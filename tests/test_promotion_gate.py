@@ -18,6 +18,10 @@ import pytest
 from qa_tools.common import promotion
 
 
+#: REQ-TEST-375: in the hand-picked set every push runs in CI.
+pytestmark = pytest.mark.critical
+
+
 def a_supply(**over):
     """A supply that WOULD promote itself, so each test changes one thing."""
     fields = dict(status="green", slot_filled=False, held_without_slot=False,

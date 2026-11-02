@@ -18,6 +18,10 @@ TABLES = ["cp_clients", "cp_placements"]
 DATASET = {"cp_clients": "cp-clients", "cp_placements": "cp-placements"}
 
 
+#: REQ-TEST-375: in the hand-picked set every push runs in CI.
+pytestmark = pytest.mark.critical
+
+
 def _key() -> str:
     return "".join(random.choice("0123456789") for _ in range(18))
 

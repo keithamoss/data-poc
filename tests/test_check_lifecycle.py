@@ -14,6 +14,10 @@ import pytest
 from qa_tools.common import check_lifecycle as cl
 
 
+#: REQ-TEST-375: in the hand-picked set every push runs in CI.
+pytestmark = pytest.mark.critical
+
+
 def _write(tmp_path, name, content):
     path = tmp_path / name
     path.write_text(textwrap.dedent(content))

@@ -55,6 +55,7 @@ def _for(dirs, collection="civil-registration", prefix="run_"):
     return arrivals.arrivals_for(collection, prefix, d, r)
 
 
+@pytest.mark.critical
 class TestAnUnknownCollectionIsAnError:
     """post-build-review #41. `arrivals_for()` answered an unknown
     collection id with `[]` - a pipeline that processes nothing and
@@ -86,6 +87,7 @@ class TestAnUnknownCollectionIsAnError:
         assert _for(dirs) == []
 
 
+@pytest.mark.critical
 class TestADeliveryIsRecognisedNotLabelled:
     """Criterion 3 - the dataset comes from the filename, through that
     dataset's own configured pattern, and from nothing else."""
@@ -148,6 +150,7 @@ class TestADeliveryIsRecognisedNotLabelled:
             "child-protection", "civil-registration")
 
 
+@pytest.mark.critical
 class TestRunIdsComeFromWhatArrivedAndWhen:
     """REQ-PIPE-057 criterion 18, met at last by REQ-PIPE-105 - and
     this class asserted the opposite until 2026-10-02, so what it used
@@ -223,6 +226,7 @@ class TestRunIdsComeFromWhatArrivedAndWhen:
         assert [a.run_index for a in _for(dirs)] == [1, 2]
 
 
+@pytest.mark.critical
 class TestWhatAnArrivalHandsToThePipeline:
     """Criterion 7 at the boundary: as_entry() is what every
     orchestrator passes around, so it is the shape that decides what
@@ -300,6 +304,7 @@ class TestWhatAnArrivalHandsToThePipeline:
         assert {a.delivery_name for a in found} == {"2026-Q3"}
 
 
+@pytest.mark.critical
 class TestTheGeneratorsBookkeepingIsWalledOff:
     """Criterion 7, enforced STATICALLY rather than by observation.
 
