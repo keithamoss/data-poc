@@ -13634,3 +13634,24 @@ twice. It deliberately did not re-find the `TypeError`.
        postcode, which a release does not read). Every linkage release and
        delivery, every other delivery, every receipt and the bookkeeping are
        byte-identical before and after.
+
+306. **[done, 2026-11-02]** **[Data generation]** **[Pipeline & publishing]** **[Dashboard UI]** **Post-build critic on Keith's morning answers (#304; 7ce04572): no defects; four minor findings, all fixed.**
+     Each was checked against the code before it went here.
+     - **1. C6, C7, C11 and C12 had no answered form (fixed)**: each said
+       'CHANGED by Keith 2026-11-02' only, which validate_provisional would
+       flag once REQ-PIPE-342, 363 and 368 are built. Each now also says
+       'SETTLED by Keith 2026-11-02', the CHANGED wording kept.
+     - **2. A key of nothing read by order (fixed, test first)**: `[null, ""]`
+       read '(no value)' but `["", null]` and `["", "", ""]` read '—'. Every
+       key whose parts are all null or empty now reads '(no value)', as
+       REQ-DASH-299 decision 36 says (Vitest, seen failing first).
+     - **3. B1 copied the overlay's rule (fixed)**: borrow_from_period
+       re-implemented create_overlay_views' staged / contested / promoted
+       loop. Both now ask period_schema.choose_version, the rule once;
+       behaviour unchanged, every overlay and B1 test passing.
+     - **4. Generator counts did not fold (fixed)**: the generator's
+       value_counts left out '(invalid code)' folding and known zeros, so a
+       planned reference could differ in shape from the recorded one.
+       evidently_common.fold_value_counts is now the one copy, used by
+       dataset_stats and by the generator (with the adapter's known values),
+       guarded by a test against the shared function.
