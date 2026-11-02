@@ -14182,3 +14182,81 @@ twice. It deliberately did not re-find the `TypeError`.
        MOTHMAN_DIFF_BASE=f123a582) passed with warnings from schedule,
        sprints and scenario map; npm test 1138 passed. `mothman check
        --docs` passed with warnings from sprints and scenario map.
+
+314. **[done, 2026-11-03]** **[Dashboard UI]** **[QA pipeline]** **[Data generation]** **[Testing & dev tooling]** **Keith's answers to morning report 12's questions, built (bq14): Q1-Q3, Q5-Q11 and Q13; Q4, Q12 and Q14 not built, as he said.**
+     Each built test-first where behaviour changed; the register carries the
+     decisions, with what was rejected.
+     - **Q1 (REQ-DASH-225 c18, the page is the reference)**: one template
+       function, crossTableSectionHead, now reads a dataset's cross-table
+       section for its page and for its list row, so on a quiet date the row
+       counts the warehouse's cross-table verdict as one column (split naming
+       the section, the lines' name saying the same count) where it said "No
+       column has a verdict". Generic, no dataset named. Seen failing first:
+       TestColumnsNotGreenMatchesTheDatasetPage at the default date (a
+       child-protection row, 1 counted on the page against 0) and two new
+       tests-js/columns-not-green.test.js cases.
+     - **Q2 (REQ-DASH-299 c15(7) removed)**: the criterion's (7) and its test,
+       TestTheGeocodingPages::test_7_no_area_code_or_nine_digit_run_on_a_geocoding_page,
+       deleted (not skipped). **For Keith**: criterion 13 ("SHALL NOT show an
+       area code ...") is unchanged and now has no browser proof of its own;
+       samples are key-only by construction. Say if 13 should go too.
+     - **Q3 (REQ-TEST-361 c1)**: tests-js/colour-words-recheck-surfaces.test.js
+       renders a re-checked-worse supply (failing badge; warning tag awaiting
+       and acknowledged) and a 'Re-checked <t>: became <X>' row from the
+       template's own functions against mock data, holding each to the
+       real-page guard's rule, plus a case showing the rule fails on a raw
+       value. It passed on first run - it covers existing behaviour, so the
+       can-fail case is what proves it bites. The real-page union test no
+       longer requires the two; unmet criterion cleared. The rule is a JS copy
+       of _GUARD_SCAN, not shared code - the two can drift.
+     - **Q5 (REQ-PIPE-352)**: a map lists the asset's own placements plus the
+       scenarios naming one of its datasets (this_assets_scenarios replaces
+       other_assets_scenarios). Seen failing first against the old membership
+       (TS-5, placed by no one, was in both maps). **SCENARIOS-daily.md and
+       SCENARIOS-quarterly.md NOT regenerated**: no data/<asset>/scenario_placements.json
+       exists in this sandbox (the deployment databases are populated, the
+       generator's bookkeeping is not), so a rebuild here would drop every
+       placed coordinate. The end-of-run bootstrap regenerates both; until
+       then both committed maps are stale against the new rule.
+     - **Q6 and Q8 (REQ-GEN-246 c8, REQ-DOCS-219 c10)**: one helper,
+       qa_tools/common/every_asset.declared() over the new assets.every(),
+       reads every asset folder's data-asset.yaml through the one hierarchy
+       reader - configuration only, never a database (a test asserts it opens
+       none). The drop warning now names only a dataset no asset declares;
+       unprovided_scenarios lists it, so generation refuses it before writing;
+       the feedback validator fails a link naming an agency no asset declares
+       and leaves another asset's to its pass. The removed `[x](#/agency/nope)`
+       case is back. Both unmet criteria cleared. Seen failing first: five
+       cases across test_scenario_injection and test_validate_feedback.
+     - **Q7 (REQ-PIPE-193)**: supply_files.collection_step_asked is the
+       filing menu's condition, and where_to_settle asks it, reading the same
+       pending corrections, parked moves and nudges the menu reads (none
+       where unreadable, as the menu treats them). The existing pointer test
+       now stubs those three at their source rather than the menu's wrappers,
+       since both sides read the source; its assertion is unchanged. Seen
+       failing first (three cases). Worth knowing: on a one-collection asset
+       where_to_settle now opens a read-only connection per call.
+     - **Q9 (REQ-PIPE-342)**: embed_dashboard_data.github_links_or_none
+       catches OutsideTheRepository and embeds no links, printing "GITHUB_LINKS
+       left out: asset '<a>''s configuration (...) is not in this repository".
+       READ AS THE BUILD'S OUTPUT, not words on the page - the page already
+       hides 'View on GitHub' with no link. Say if the note should be on the
+       page.
+     - **Q10 (REQ-QAC-368 c6, amended)**: assets.dbt_project_ready() decides
+       by dbt_common.packages_installed, so a stale lock or a deleted package
+       is refused naming `mothman env dbt-deps`. Seen failing first (the stale
+       case reached dbt; the deleted case did not raise).
+     - **Q11**: REQ-TEST-357 c2 and REQ-QAC-368's title, Keith's wording as
+       written.
+     - **Q13 (REQ-PIPE-342)**: validate_schedule._repo_path refuses an outside
+       folder only when assets.root_injected() (use_root; false for
+       use_folder, which the suite's fixture uses). Started from the saved
+       broader diff. Seen failing first (four guards). The nine tests the
+       broader attempt broke: seven pass; test_turn_off's
+       test_the_gate_says_no_more_dates_are_needed_once_authored and
+       test_collection_defaults' test_the_calendar_entry_uses_the_same_renderer
+       fail with the same errors at 72776772 in a clean worktree, before any
+       of this.
+     - **Also found**: TestTheEarlyEmergencyDepartmentSupplies (5 tests)
+       fails "TS-<n> is not placed" here and identically at 72776772 - no
+       placements file in this sandbox; not this change's.

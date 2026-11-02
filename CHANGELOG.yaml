@@ -109,6 +109,26 @@ intro: >
   all three.
 
 releases:
+  - date: "2026-11-03"
+    summary: >
+      The dataset list now counts the checks that span tables, as each
+      dataset's page does, and two settings checks catch typos again.
+    changes:
+      - category: Fixed
+        items:
+          - headline: The dataset list agrees with the page
+            components: ["Dashboard UI"]
+            description: >
+              On a day with no supply yet, a dataset's row no longer says no
+              column has a verdict while its page shows a warning from the
+              checks that span tables. The row counts that section as the page
+              does.
+          - headline: Typos in another asset's names are caught again
+            components: ["Testing & dev tooling", "Data generation"]
+            description: >
+              A feedback link naming an agency no asset holds, or a scenario
+              naming a dataset no asset declares, is refused again. Names that
+              belong to the other asset are left to its own checks.
   - date: "2026-11-02"
     summary: >
       Quarterly and daily collections are now two separate data assets, and each
