@@ -132,8 +132,11 @@ class TestTheWarningNeverFailsAnything:
             assert "not failing the build" in line
 
     def test_a_warning_names_the_file_a_person_must_edit(self):
-        for line in runway.warning_lines(date(2026, 9, 23)):
-            assert "contract/calendar.yaml" in line
+        lines = runway.warning_lines(date(2026, 9, 23))
+        assert lines, "no warning - the check would prove nothing"
+        for line in lines:
+            # The selected asset's own calendar since the asset split.
+            assert "assets/quarterly/calendar.yaml" in line
             assert "candidate-dates" in line, "and how to get the dates proposed"
 
 

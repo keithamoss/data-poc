@@ -63,11 +63,20 @@ class TestCriterionSix:
             {"dataset": "cp-nope", "code": "X", "id_columns": ["a"]}))
         assert "cp-nope" in text and "not in the hierarchy" in text
 
-    @pytest.mark.asset("daily")
     def test_a_dataset_on_no_shared_calendar(self, repo):
-        text = _edit(repo, lambda ls: ls.append(
-            {"dataset": "birth-registrations", "code": "BR", "id_columns": ["registration_number"]}))
-        assert "birth-registrations" in text and "calendar" in text
+        """Within one asset (the asset split: Birth Registrations, the daily
+        dataset this linked, is another asset's): the Client Register put on
+        a calendar of its own, as test_a_dataset_naming_no_calendar puts it
+        on none."""
+        cal_path = repo / assets.folder_rel() / "calendar.yaml"
+        cal = yaml.safe_load(cal_path.read_text())
+        entry = next(d for d in cal["datasets"] if d["id"] == "cp-clients")
+        entry.pop("no_calendar", None)
+        entry["calendar"] = "monthly"
+        cal_path.write_text(yaml.safe_dump(cal, sort_keys=False))
+        text = "\n".join(linked_datasets.problems(repo))
+        assert ("linkage-keys links 'cp-clients', which is never on linkage-keys's calendar "
+                "'quarterly' (it is on 'monthly')") in text, text
 
     def test_a_source_column_its_contract_does_not_declare(self, repo):
         def change(ls):

@@ -289,8 +289,9 @@ class TestWhatTheTicketSays:
         assert "`birth_registrations_2026-11-02.csv`" in body
         assert "`birth_registrations_2026-11-02-1.csv`" in body
         assert "several choices" in body and "terminal" in body
-        assert ("mothman > Filing decisions > Birth Registrations > Supplies waiting on a "
-                "decision") in body
+        # A one-collection asset's pointer skips the collection step, as its
+        # menu does (SETTLED by Keith 2026-11-02, the move critic's decision 3).
+        assert "mothman > Filing decisions > Supplies waiting on a decision" in body
         assert "\n/" not in body and "choose-file" not in body
 
     def test_a_daily_period_is_written_in_words(self):

@@ -369,7 +369,7 @@ class TestTheConfigurationGate:
         (lambda c, _d: c["datasets"][0].update(id="cp-clients"), "dataset id 'cp-clients'"),
         (lambda c, _d: c["datasets"][0].update(table="cp_clients"), "the table 'cp_clients'"),
         (lambda c, _d: c.update(contract="fake-agency/no-such-contract.yaml"),
-         "contract file contract/fake-agency/no-such-contract.yaml is missing"),
+         "fake-agency/no-such-contract.yaml is missing"),
         # post-build-review #230: every picker shows a collection by its label
         # and dispatches on it, so two that share one would send a person to
         # the wrong collection.
