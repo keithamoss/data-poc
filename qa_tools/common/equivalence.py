@@ -463,7 +463,15 @@ def tree_assets(tree: Path) -> list[str]:
                    if p.is_dir() and (p / "data-asset.yaml").is_file()) if root.is_dir() else []
     if found:
         return found
-    doc = yaml.safe_load((tree / "contract" / "data-asset.yaml").read_text()) or {}
+    # Before the split: where the move map says data-asset.yaml used to be
+    # (assets/moved-paths.yaml, which outlives the move), so this module never
+    # spells the old layout itself (REQ-PIPE-342 criterion 6's guard).
+    from qa_tools.common import moved_paths
+
+    mm = moved_paths.parse((ROOT / moved_paths.MAP_REL).read_text())
+    old = next(o for o, news in mm.targets.items()
+               if news and all(Path(n).name == "data-asset.yaml" for n in news))
+    doc = yaml.safe_load((tree / old).read_text()) or {}
     return [str(doc["data_asset_id"])]
 
 
@@ -480,7 +488,8 @@ def generated_files(tree: Path, asset: str | None = None) -> dict[str, str]:
     dbt's scratch. Named by WHERE it is rather than file by file, so this
     module never names the generator's bookkeeping, which no QA module may
     (REQ-GEN-043 criterion 7, tests/test_arrivals.py)."""
-    data = _tree_state(tree, asset or assets.selected().name, "data")
+    kind = "data"
+    data = _tree_state(tree, asset or assets.selected().name, kind)
     out = {}
     if not data.is_dir():
         return out
@@ -489,7 +498,7 @@ def generated_files(tree: Path, asset: str | None = None) -> dict[str, str]:
         if f.is_file() and rel.parts[0] not in NOT_GENERATED:
             # Named under data/ whatever the layout, so a split tree's
             # data/<asset>/ and an older tree's data/ name a file alike.
-            out[f"data/{rel.as_posix()}"] = hashlib.sha256(f.read_bytes()).hexdigest()
+            out[f"{kind}/{rel.as_posix()}"] = hashlib.sha256(f.read_bytes()).hexdigest()
     return out
 
 

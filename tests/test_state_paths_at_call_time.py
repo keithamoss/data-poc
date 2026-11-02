@@ -78,9 +78,6 @@ ALLOWED = {
     # REPOSITORY-WIDE - not one asset's, so not the resolver's to answer.
     ("qa_tools/common/replay_inputs.py", "contract/**"):
         "the cache key's repository-wide input globs; the move rewrites them",
-    ("qa_tools/common/environments.py", "contract"):
-        "environments.yaml is repository-wide, read before an asset is selected "
-        "(assets.py: 'a file at the top - environments.yaml - is not an asset')",
     ("qa_tools/common/build_output.py", "reports"):
         "an --out-dir build's own layout, DIR/reports/, not an asset's state tree",
 }

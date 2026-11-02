@@ -76,7 +76,8 @@ repos:
         # for that; CI compares the whole push.
         entry: uv run mothman check --only schedule
         language: system
-        files: ^contract/.*\.ya?ml$
+        # Every asset's configuration (the asset split: it was contract/).
+        files: ^assets/.*\.ya?ml$
         pass_filenames: false
   # The hierarchy gate, at commit time for one specific reason beyond
   # the general one (Keith's own ask, 2026-09-26: "a guard against it
@@ -99,5 +100,6 @@ repos:
         name: no id takes a reserved scope name
         entry: uv run mothman check --only hierarchy
         language: system
-        files: ^contract/.*\.ya?ml$
+        # Every asset's configuration (the asset split: it was contract/).
+        files: ^assets/.*\.ya?ml$
         pass_filenames: false

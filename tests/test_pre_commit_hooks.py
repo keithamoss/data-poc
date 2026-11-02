@@ -89,10 +89,13 @@ class TestTheScheduleConfigIsGatedAtCommitTime:
     """
 
     def test_editing_the_asset_configuration_triggers_a_hook(self):
-        covering = [h["id"] for h in _local_hooks()
-                    if re.compile(h["files"]).search("contract/data-asset.yaml")]
+        from qa_tools.common import assets
+
+        # The asset's own file by repository path (the asset split).
+        rel = f"{assets.folder_rel()}/data-asset.yaml"
+        covering = [h["id"] for h in _local_hooks() if re.compile(h["files"]).search(rel)]
         assert covering, (
-            "nothing at commit time looks at contract/data-asset.yaml, where a "
+            f"nothing at commit time looks at {rel}, where a "
             "one-character calendar name can leave a dataset expecting nothing")
 
 
