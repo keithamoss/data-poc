@@ -347,3 +347,51 @@ the rebuild needs no question asked twice. Drafts and builders read this file.
   - only code building a repository path refuses an outside asset folder;
   plain file readers accept one (REQ-PIPE-342 d20). REJECTED refusing in
   every reader.
+
+## The split overview's decisions (Keith, 2026-11-03, Perth)
+- SPLIT D1 SETTLED by Keith 2026-11-03: the cut is right - each asset defines
+  its own hierarchy, calendar and time zone in assets/<asset>/; shared code
+  that only READS those definitions sits in one package the real pipeline and
+  the generator both import; the generator, bootstrap and scenarios stay out
+  of a real deployment. CHANGED: the package is named `asset_model/`, not
+  `domain/` (which read as though it held the definitions). REJECTED shared/,
+  model/ and core/. #134 v3 (docs/drafts/separation-v3.yaml) to be re-drafted
+  with the new name.
+- SPLIT D1b SETTLED by Keith 2026-11-03 (as recommended): ONE calendar
+  mechanism for every asset (named calendars of authored dates, each dataset
+  picking one), with per-asset dates; a project extraction with no cadence is
+  a calendar with no slots. REJECTED a per-asset calendar plug-in.
+- SPLIT D2 is decided FILE BY FILE (Keith 2026-11-03). people.yaml and
+  data-asset.yaml stay COPIED in each asset with NO agreement gate (as
+  recommended): each team owns its own; the shared lines are format and
+  comments. REJECTED a shared default for either. file-checks.yaml and the
+  dbt package files: pending.
+- SPLIT D2, file-checks.yaml, SETTLED by Keith 2026-11-03 (as recommended):
+  ONE SHARED default for every asset (beside dbt_shared/), which an asset may
+  add to or override; a new file-level check reaches every asset at once.
+  REJECTED a copy per asset, with or without a gate.
+- SPLIT D2, dbt packages, SETTLED by Keith 2026-11-03 (as recommended): every
+  asset uses the SAME dbt packages and versions; the per-project packages.yml
+  and package-lock.yml stay (dbt needs them in each project) and a gate FAILS
+  if they differ. REJECTED packages per asset, and one shared install folder.
+- SPLIT D3 SETTLED by Keith 2026-11-03: the three per-tool copies of an
+  allowed-value list (ODCS contract, Soda, dbt) STAY - the tool comparison is
+  still running and one or more checks, or a whole tool, will go. The QA
+  adapter's statistics READ THE LIST FROM THE CONTRACT at run time (as
+  recommended), so its hand copy (_SUBURB_VALID and any like it) goes; the
+  contract is the copy that survives whichever tool is dropped. CHANGED: the
+  generator's pools (generator/names_au.py) stay INDEPENDENT - test data need
+  not follow the rule exactly. REJECTED declaring once with every tool
+  reading, an agreement gate, one check per rule, and the contract driving the
+  generator. Applies to every collection, not only Civil Registration.
+- SPLIT D4 SETTLED by Keith 2026-11-03 (as recommended): the near-copies JOIN
+  #134 - the status order moves into asset_model/; the Child Protection
+  provider reads the quarterly calendar and the older providers (dirty.py's
+  fault rates) read thresholds through the readers Linkage Products uses; the
+  hand-written geocoding verdict table is derived. They go to the scoper with
+  #134 v3, #137's groups B-D, and the new work from D2 (a shared
+  file-checks default; the dbt-packages agreement gate) and D3 (adapters read
+  allowed values from the contract). REJECTED status order only, and waiting.
+- NEXT (Keith 2026-11-03): with all four split decisions made, #134 goes back
+  to delivery-scoper for a v4 carrying them, then to the architect and the
+  CLI and dashboard UX reviewers before sign-off.
