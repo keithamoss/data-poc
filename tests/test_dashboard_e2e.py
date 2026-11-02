@@ -1393,7 +1393,8 @@ class TestTicketBadge:
     def test_a_dataset_with_no_open_ticket_shows_no_badge(self, clean_page, dashboard_html_with_ticket):
         _goto(
             clean_page, dashboard_html_with_ticket,
-            state={"tier": "dataset", "agencyId": "registry-services", "collectionId": "civil-registration", "datasetId": "cp-clients"},
+            state={"tier": "dataset", "agencyId": "child-protection-family-support",
+                   "collectionId": "child-protection", "datasetId": "cp-clients"},
         )
         assert clean_page.locator("a.pill.tag[href*='github.com'][href*='issues']").count() == 0
 
@@ -1731,6 +1732,7 @@ class TestPlacedOnThePage:
         assert run_id
 
 
+@pytest.mark.asset("daily")  # Birth Registrations' page, so the class's page fixtures build it
 class TestAcknowledgementBadge:
     """REQ-PIPE-122 criterion 21, which replaced REQ-QAC-017's per-run
     /accept badge (retired by criterion 23): a promoted amber supply reads
@@ -2037,6 +2039,12 @@ class TestStatusMatchesEachToolsOwnVerdict:
           return [...out];
         }""")
         assert names == [], f"real checks are missing their tool verdict: {names}"
+
+
+@pytest.mark.asset("daily")
+class TestStatusMatchesEachToolsOwnVerdictOnTheDailyAsset(TestStatusMatchesEachToolsOwnVerdict):
+    """The same claims on the daily asset's page (C11): before the split one
+    page carried every collection, and each asset is a page of its own now."""
 
 
 # =====================================================================
@@ -2415,30 +2423,6 @@ class TestSupplyAndTableLevelSections:
             return !!(wrap.compareDocumentPosition(grid) & Node.DOCUMENT_POSITION_FOLLOWING);
         }""")
 
-    def test_an_empty_table_section_shows_and_a_one_table_cross_table_section_does_not(
-            self, clean_page, built_dashboard_html):
-        """Real on today's data - Birth Registrations has supply-level checks
-        and no table-level ones. It used to leave the empty section out;
-        since REQ-QAC-247 (Keith, 2026-10-18) a missing rule is shown, as it
-        always was for Child Protection, but a collection with one table
-        never shows a Cross-table section it could not fill.
-
-        IN PLACE ON ITS NEWEST SUPPLY'S DAY, read from the data: a daily
-        dataset read on today's date has no current supply once its history
-        ends, and every section reads "No data" (CLAUDE.md's shelf-life note)."""
-        from qa_tools import collections
-
-        built = json.loads((_reports_of(built_dashboard_html) / collections.by_id(
-            "civil-registration").dashboard_file).read_text())
-        newest = max(r["run_date"] for r in built["datasets"][0]["runs"])
-        _goto(clean_page, built_dashboard_html, _BDM, in_place_on=newest)
-
-        sections = self._sections(clean_page)
-        assert [s["scope"] for s in sections] == ["supply", "table"]
-        table = sections[1]
-        assert [r["name"] for r in table["rows"]] == ["No automated quality rule defined"]
-        assert table["status"] == "No rule defined"
-
     def test_each_section_carries_its_own_status(self, clean_page, built_dashboard_html):
         _goto(clean_page, built_dashboard_html, self._CP)
 
@@ -2537,6 +2521,39 @@ class TestSupplyAndTableLevelSections:
 # would have left the real dataset tiles hanging under a stale id with a
 # dead URL - failing silently, in the direction that looks fine.
 # =====================================================================
+
+
+@pytest.mark.asset("daily")  # Birth Registrations' page, so the class's page fixtures build it
+class TestSupplyAndTableLevelSectionsOnTheDailyAsset:
+    """TestSupplyAndTableLevelSections's Birth Registrations tests, on the daily asset's
+    page (C11)."""
+
+    _sections = TestSupplyAndTableLevelSections._sections
+
+    def test_an_empty_table_section_shows_and_a_one_table_cross_table_section_does_not(
+            self, clean_page, built_dashboard_html):
+        """Real on today's data - Birth Registrations has supply-level checks
+        and no table-level ones. It used to leave the empty section out;
+        since REQ-QAC-247 (Keith, 2026-10-18) a missing rule is shown, as it
+        always was for Child Protection, but a collection with one table
+        never shows a Cross-table section it could not fill.
+
+        IN PLACE ON ITS NEWEST SUPPLY'S DAY, read from the data: a daily
+        dataset read on today's date has no current supply once its history
+        ends, and every section reads "No data" (CLAUDE.md's shelf-life note)."""
+        from qa_tools import collections
+
+        built = json.loads((_reports_of(built_dashboard_html) / collections.by_id(
+            "civil-registration").dashboard_file).read_text())
+        newest = max(r["run_date"] for r in built["datasets"][0]["runs"])
+        _goto(clean_page, built_dashboard_html, _BDM, in_place_on=newest)
+
+        sections = self._sections(clean_page)
+        assert [s["scope"] for s in sections] == ["supply", "table"]
+        table = sections[1]
+        assert [r["name"] for r in table["rows"]] == ["No automated quality rule defined"]
+        assert table["status"] == "No rule defined"
+
 
 @pytest.mark.shared_page
 class TestTheRenderedTreeComesFromTheHierarchy:
@@ -3722,8 +3739,9 @@ class TestTheDisplayStandardHoldsInARealBrowser:
     layer a human sees, not at the layer that computes.
     """
 
+    #: The quarterly asset's datasets; Birth Registrations' page is the daily
+    #: class's below (C11).
     ALL_DATASETS = [
-        ("registry-services", "civil-registration", "birth-registrations"),
         ("child-protection-family-support", "child-protection", "cp-clients"),
         ("child-protection-family-support", "child-protection", "cp-carers"),
         ("child-protection-family-support", "child-protection", "cp-case-workers"),
@@ -3746,19 +3764,6 @@ class TestTheDisplayStandardHoldsInARealBrowser:
         assert not self.RAW.search(text), (
             f"{dataset_id} renders a raw timestamp: "
             f"{self.RAW.search(text).group(0)!r} in {text[:400]!r}")
-
-    def test_the_supply_history_timing_column_reads_as_a_sentence(
-            self, clean_page, built_dashboard_html):
-        """43 raw "2026-09-16T05:17:30.280161+00:00" strings were landing
-        in this one column when the requirement was written."""
-        _goto(clean_page, built_dashboard_html, state={
-            "tier": "dataset", "agencyId": "registry-services",
-            "collectionId": "civil-registration", "datasetId": "birth-registrations"})
-        cells = clean_page.locator("#view table tr td").all_inner_texts()
-        timings = [c for c in cells if re.search(r"\d{1,2}:\d{2}(am|pm)", c)]
-        assert timings, "no formatted timing rendered in the supply history at all"
-        for cell in timings:
-            assert re.search(r"\d{1,2}:\d{2}(am|pm) \w+day, \d{1,2} \w+ \d{4}", cell), cell
 
     def test_the_masthead_says_when_the_page_was_built(
             self, clean_page, built_dashboard_html):
@@ -3827,6 +3832,30 @@ class TestTheDisplayStandardHoldsInARealBrowser:
                       "2026-09-29T14:15:00+08:00"):
             in_browser = clean_page.evaluate(f"fmtInstant({value!r})")
             assert in_browser == display_time.format_instant(value), value
+
+
+@pytest.mark.asset("daily")  # Birth Registrations' page, so the class's page fixtures build it
+class TestTheDisplayStandardHoldsOnTheDailyAsset:
+    """TestTheDisplayStandardHoldsInARealBrowser's Birth Registrations
+    tests, on the daily asset's page (C11)."""
+
+    def test_no_dataset_page_shows_a_raw_timestamp(self, clean_page, built_dashboard_html):
+        TestTheDisplayStandardHoldsInARealBrowser().test_no_dataset_page_shows_a_raw_timestamp(
+            clean_page, built_dashboard_html, "registry-services", "civil-registration",
+            "birth-registrations")
+
+    def test_the_supply_history_timing_column_reads_as_a_sentence(
+            self, clean_page, built_dashboard_html):
+        """43 raw "2026-09-16T05:17:30.280161+00:00" strings were landing
+        in this one column when the requirement was written."""
+        _goto(clean_page, built_dashboard_html, state={
+            "tier": "dataset", "agencyId": "registry-services",
+            "collectionId": "civil-registration", "datasetId": "birth-registrations"})
+        cells = clean_page.locator("#view table tr td").all_inner_texts()
+        timings = [c for c in cells if re.search(r"\d{1,2}:\d{2}(am|pm)", c)]
+        assert timings, "no formatted timing rendered in the supply history at all"
+        for cell in timings:
+            assert re.search(r"\d{1,2}:\d{2}(am|pm) \w+day, \d{1,2} \w+ \d{4}", cell), cell
 
 
 @pytest.mark.shared_page
@@ -4321,10 +4350,9 @@ class TestArrivedVersusPromoted:
     layer says nothing about a render layer with its own transform.
     """
 
-    DATASETS = (
-        ("registry-services", "civil-registration", "birth-registrations"),
-        ("child-protection-family-support", "child-protection", "cp-carers"),
-    )
+    #: The dataset each test reads, one per asset (C11): Child Protection's
+    #: Carers here, Birth Registrations in the daily subclass below.
+    DATASET = ("child-protection-family-support", "child-protection", "cp-carers")
 
     def _open(self, page, html, agency, collection, dataset_id, in_place_on=None):
         _goto(page, html, state={"tier": "dataset", "agencyId": agency,
@@ -4344,9 +4372,9 @@ class TestArrivedVersusPromoted:
         assert days, f"precondition: {dataset_id}'s history has a date the panel shows"
         self._open(page, html, agency, collection, dataset_id, in_place_on=days[-1])
 
-    @pytest.mark.parametrize("agency,collection,dataset_id", DATASETS)
     def test_the_panel_agrees_with_the_data_about_whether_to_show_at_all(
-            self, clean_page, built_dashboard_html, agency, collection, dataset_id):
+            self, clean_page, built_dashboard_html):
+        agency, collection, dataset_id = self.DATASET
         """Criteria 1 and 3 together, and asserting them as ONE claim is
         deliberate: "show both" and "stay quiet" are the same rule read
         from its two sides, and a test for either alone passes on a page
@@ -4363,9 +4391,9 @@ class TestArrivedVersusPromoted:
             f"{dataset_id}: promotionState.differs is {differs} and the panel "
             f"rendered {shown} time(s)")
 
-    @pytest.mark.parametrize("agency,collection,dataset_id", DATASETS)
     def test_where_it_shows_it_names_both_supplies_and_says_why(
-            self, clean_page, built_dashboard_html, agency, collection, dataset_id):
+            self, clean_page, built_dashboard_html):
+        agency, collection, dataset_id = self.DATASET
         self._open_where_it_shows(clean_page, built_dashboard_html, agency, collection,
                                   dataset_id)
         panel = clean_page.locator('[data-testid="promotion-split"]')
@@ -4386,9 +4414,9 @@ class TestArrivedVersusPromoted:
         assert "promoted" in lower and "latest arrival" in lower
         assert state["explanation"] and state["explanation"] in text
 
-    @pytest.mark.parametrize("agency,collection,dataset_id", DATASETS)
     def test_it_shows_no_raw_period_code(
-            self, clean_page, built_dashboard_html, agency, collection, dataset_id):
+            self, clean_page, built_dashboard_html):
+        agency, collection, dataset_id = self.DATASET
         """A DAILY calendar names its periods by the day, so the period
         name is a bare ISO date - the one thing REQ-DASH-071 says a
         reader never sees. The panel is the newest place one could leak
@@ -4403,6 +4431,13 @@ class TestArrivedVersusPromoted:
         prose = [ln for ln in panel.inner_text().splitlines() if "@" not in ln]
         raw = [ln for ln in prose if re.search(r"\b\d{4}-\d{2}-\d{2}\b", ln)]
         assert not raw, f"{dataset_id} shows a raw period code: {raw}"
+
+
+@pytest.mark.asset("daily")  # Birth Registrations' page, so the class's page fixtures build it
+class TestArrivedVersusPromotedOnTheDailyAsset(TestArrivedVersusPromoted):
+    """The same claims for Birth Registrations, on the daily asset's page."""
+
+    DATASET = ("registry-services", "civil-registration", "birth-registrations")
 
 
 @pytest.mark.shared_page
@@ -9122,20 +9157,6 @@ class TestASeveralColumnSampleOnTheRealPage:
           return {html: body.innerHTML, text: body.innerText};
         }""", [self._COLS, cols_of_compare])
 
-    def test_identical_samples_are_still_failing_and_escaped(self, clean_page, built_dashboard_html):
-        got = self._panel(clean_page, built_dashboard_html, self._COLS)
-        assert got, "no check with two runs on the Birth Registrations page"
-        assert "Still failing in both runs (2)" in got["text"]
-        assert "New since the compared run" not in got["text"]
-        assert "<b>CP</b>" not in got["html"] and "&lt;b&gt;CP&lt;/b&gt;" in got["html"]
-
-    def test_a_different_key_shape_is_said_to_be_incomparable(self, clean_page, built_dashboard_html):
-        got = self._panel(clean_page, built_dashboard_html, None)
-        assert got
-        assert ("These examples cannot be compared: the compared run named its rows by "
-                "different columns.") in got["text"]
-        assert "New since the compared run" not in got["text"]
-
     def test_the_real_linkage_referential_results_name_their_records(
             self, clean_page, built_dashboard_html):
         """Post-build-review #291: they were recorded empty."""
@@ -9294,6 +9315,30 @@ def _scenario_pages(page, html: Path):
     for e in entries:
         if e["dataset"] in hx["ds_col"]:
             yield e, _dataset_state(hx, e["dataset"]), e["inPlaceOn"]
+
+
+@pytest.mark.asset("daily")  # Birth Registrations' page, so the class's page fixtures build it
+class TestASeveralColumnSampleOnTheRealPageOnTheDailyAsset:
+    """TestASeveralColumnSampleOnTheRealPage's Birth Registrations tests, on the daily asset's
+    page (C11)."""
+
+    _COLS = TestASeveralColumnSampleOnTheRealPage._COLS
+
+    _panel = TestASeveralColumnSampleOnTheRealPage._panel
+
+    def test_identical_samples_are_still_failing_and_escaped(self, clean_page, built_dashboard_html):
+        got = self._panel(clean_page, built_dashboard_html, self._COLS)
+        assert got, "no check with two runs on the Birth Registrations page"
+        assert "Still failing in both runs (2)" in got["text"]
+        assert "New since the compared run" not in got["text"]
+        assert "<b>CP</b>" not in got["html"] and "&lt;b&gt;CP&lt;/b&gt;" in got["html"]
+
+    def test_a_different_key_shape_is_said_to_be_incomparable(self, clean_page, built_dashboard_html):
+        got = self._panel(clean_page, built_dashboard_html, None)
+        assert got
+        assert ("These examples cannot be compared: the compared run named its rows by "
+                "different columns.") in got["text"]
+        assert "New since the compared run" not in got["text"]
 
 
 @pytest.mark.needs_deployment

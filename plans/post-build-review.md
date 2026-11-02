@@ -13603,3 +13603,65 @@ twice. It deliberately did not re-find the `TypeError`.
      - **7. Nits (fixed)**: A1-A5 marked applied and dated; the agency row
        names the tool by display name; each remaining PROVISIONAL question
        carries a recommendation.
+
+304. **[in-progress, 2026-11-02]** **[Pipeline & publishing]** **[Data generation]** **[Testing & dev tooling]** **Post-build critic on the asset split's move (bmove, f6bc05bf): three high findings, three for Keith, seven minor; fixed in 4f65fb07..HEAD on bmove.**
+     Each was checked against the code before it went here; the defect fixes
+     are test-first and were seen failing first.
+     - **1. The replay and cache inputs missed every asset file (high, fixed
+       4f65fb07)**: `replay_inputs.INPUTS` still listed `contract/**` and
+       `dbt_project/**`, so a check, contract or calendar edit changed neither
+       the CI cache key nor a resumed bootstrap's restart point. INPUTS now
+       carries `assets/**`, `dbt_shared/**` and each asset's providers;
+       tests/test_replay_inputs.py and test_ci_bootstrap_cache.py cover it.
+     - **2. CI and the session hook selected `data-asset-1` (high, fixed
+       4f65fb07)**: test.yml, validate-config.yml and
+       .claude/hooks/session-start.sh now act for each asset with its own
+       database and dbt project, and validate-config watches `assets/**` and
+       `dbt_shared/**`. STILL TO DO AT THE MERGE: `work`'s own
+       `.github/workflows/critical.yml` (absent on bmove) carries the same
+       `data-asset-1` and `dbt_project` lines and merges without a conflict.
+     - **3. The browser-test module was neither adapted to C11 nor run
+       (high)**: each test now runs under the asset whose collections it uses
+       - the daily ones in daily-marked classes, so a class's page fixtures
+       build the daily page (19384ce2, a9d91083 and the finishing commit).
+     - **4. Two gates weakened to avoid reading the other asset (for Keith,
+       SETTLED 2026-11-02, docs/drafts/decisions-2026-11-01.md, the move
+       critic's three decisions)**: the feedback gate's mistyped-agency check
+       WAITS for REQ-PIPE-354 - recorded as REQ-DOCS-219's unmet criterion 10,
+       its test case removed with a note saying where it comes back; a
+       scenario naming a dataset in neither asset WAITS too - REQ-GEN-246's
+       unmet criterion 8 - and its drop is no longer silent: a warning names
+       each scenario passed over (tests/test_scenario_injection.py, seen
+       failing). REJECTED reading every asset's hierarchy now.
+     - **5. The settle pointer named a collection step the daily menu skips
+       (for Keith, SETTLED 2026-11-02)**: on a one-collection asset
+       `supply_files.where_to_settle` drops the step; the menu is unchanged
+       (tests/test_settle_tui.py::TestThePointerMatchesTheMenus, seen
+       failing). REJECTED always showing the collection picker.
+     - **6. A "cannot run within one asset" test could (fixed 19384ce2)**:
+       test_a_dataset_on_another_calendar puts the Client Register on the
+       daily calendar within the quarterly asset.
+     - **7. ~70 user-visible strings named contract/ (fixed 761994df)**: they
+       name the selected asset's folder through the resolver, the dashboard
+       template's included.
+     - **8. test_bootstrap no longer asserts more than one stream (left, by
+       decision)**: one stream per asset is the real configuration since the
+       split; the test asserts the stream is merged, and its docstring says so.
+     - **9. Dead `_PreMove` and pre-move docstrings in the resolver (fixed
+       19384ce2).**
+     - **10. A skip that always fired in tests/test_moved_paths.py (fixed
+       19384ce2)**: the pre-move test went.
+     - **11. A union check reading the move map REQ-TEST-366 deletes (fixed
+       19384ce2)**: test_calendar_move_pin reads every asset's data-asset.yaml.
+     - **12. A stale PROVISIONAL question C11 had answered (fixed 761994df).**
+     - **13. Per-collection code in the shared tree (not a move regression)**:
+       REQ-PIPE-342 criterion 10 and REQ-GEN-370 criterion 4, later streams.
+     - **Found while finishing (defect, fixed)**: `reports/<asset>/` was not
+       gitignored after the move, so a daily build left `reports/daily/`
+       untracked (tests/test_assets.py, seen failing).
+     - **Found while finishing (not fixed - REQ-PIPE-352 criterion 3)**: the
+       one repository-wide SCENARIOS.md is rewritten from the SELECTED asset's
+       placements by every bootstrap, so the last asset bootstrapped wins (a
+       daily bootstrap wrote "23 of 102"). The committed map is the union of
+       both assets' placements and was restored; the per-asset
+       SCENARIOS-<asset>.md is criterion 3's, not built.
