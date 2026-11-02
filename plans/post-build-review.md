@@ -14052,7 +14052,7 @@ twice. It deliberately did not re-find the `TypeError`.
        by #313: the line drawn here does NOT keep an injected-folder
        dashboard build working - the build embeds the GitHub links, and they
        refuse, so it stops there. #313 also found the schedule gate's git-ref guards and
-       the check-level links this pass had missed.) Recorded on
+       the check-level links this pass had missed; the first are held for Keith.) Recorded on
        REQ-PIPE-342 rather than asked, as an engineering reading of his
        answer; say if it should be stricter.
      - **Left as signed, for Keith to decide**: REQ-QAC-368 criterion 6's
@@ -14061,7 +14061,7 @@ twice. It deliberately did not re-find the `TypeError`.
        and REQ-TEST-357 criterion 2's "normalising only" predates A1's
        amendment of criterion 3.
 
-313. **[done, 2026-11-03]** **[QA checks & contract]** **[Testing & dev tooling]** **The critic's pass over the bfol follow-ons (#312): three defects fixed test-first, two stale-docs items tidied, one changelog entry rewritten; five questions for Keith.**
+313. **[done, 2026-11-03]** **[QA checks & contract]** **[Testing & dev tooling]** **The critic's pass over the bfol follow-ons (#312): two defects fixed test-first, a third confirmed and its fix held back for Keith, two stale-docs items tidied, one changelog entry rewritten; six questions for Keith.**
      Each finding checked against the code before it was written up here.
      - **M1. A1's delivery normalisation was too wide (defect, fixed).**
        `equivalence.compare` ran `normalise_deliveries` wherever it
@@ -14078,16 +14078,31 @@ twice. It deliberately did not re-find the `TypeError`.
        decision both said "only where it already normalises asset ids", which
        described the defect; both corrected.
      - **M2. The schedule gate's git-ref reads read an outside folder as "no
-       previous state" (defect, fixed).** The agreement freeze, the amber,
-       replacement and list-setting guards returned None for a path outside
-       the repository, so every past-item edit in an asset folder outside it
-       passed unseen. Under C7 they now refuse (OutsideTheRepository) before
-       reading, as the lifecycle gate's collect_checks does, through one
-       helper, `validate_schedule._repo_path`. Scoped to the SELECTED ASSET'S
-       configuration folder: a hand-written Source outside the repository that
-       is not an asset's folder still reads as having no previous state, which
-       is true of it. Seen failing first (4 cases):
-       tests/test_assets.py::TestARepositoryPathForAFolderOutsideIt::test_the_schedule_gates_reads_at_a_git_ref_are_refused.
+       previous state" (defect, CONFIRMED; fix built and HELD BACK).** The
+       agreement freeze and the amber, replacement and list-setting guards
+       (`validate_schedule.py`, the `rel()`/`_content_at` reads) return None
+       for a path outside the repository, so an edit to a past item in an
+       asset folder outside it passes unseen. A refusal was built test-first
+       (one helper, `_repo_path`, refusing OutsideTheRepository for a file in
+       the SELECTED ASSET'S folder outside the repository, as collect_checks
+       refuses; a hand-written Source that is no asset's folder kept "no
+       previous state"), and its new test,
+       tests/test_assets.py::TestARepositoryPathForAFolderOutsideIt::test_the_schedule_gates_reads_at_a_git_ref_are_refused
+       (4 cases), failed before it and passed after. But a run of every
+       module touching the schedule gate or the asset-folder fixture (1068
+       tests) then failed nine existing tests in three modules -
+       tests/test_no_calendar.py::TestTheConfigGateAcceptsItAndStaysStrict
+       (7), tests/test_turn_off.py::TestCriticFindingsOn190::test_the_gate_says_no_more_dates_are_needed_once_authored,
+       tests/test_collection_defaults.py::TestWhereEachValueCameFrom::test_the_calendar_entry_uses_the_same_renderer -
+       each of which runs the WHOLE schedule gate over a test's copy of the
+       asset folder (the suite's fixture puts it outside the repository) to
+       test some other rule, and so now hits the refusal. They are not wrong
+       about their own rules, and keeping them would need either a switch in
+       product code only tests use (ruled out by CLAUDE.md's test rules) or
+       the fixture's copies moved inside the repository. Rather than weaken
+       or rewrite nine tests on an unsettled question, the fix and its test
+       were taken out again; the diff is kept outside the repository by the
+       session that built it. **For Keith, item 6 below.**
      - **M3. The check-level GitHub links raised the wrong error (defect,
        fixed).** `github_links._rel_path` raised a raw ValueError out of
        `relative_to` for a check file outside the repository; it now raises
@@ -14142,3 +14157,13 @@ twice. It deliberately did not re-find the `TypeError`.
           dashboard build whose asset configuration lies outside the
           repository refuses at the GitHub links (M3 above); the alternative
           is to build without them.
+       6. M2: how the schedule gate should treat its git-ref guards for an
+          asset folder outside the repository, given C7. (a) Refuse, as C7
+          says - and then the nine tests above need their copies inside the
+          repository (or a test-only switch, which the test rules forbid);
+          and a #55 deployment's schedule gate refuses outright. (b) Keep
+          "no previous state" for such a folder, as today - honest that git
+          holds no history of it, but every past-item edit there passes. (c)
+          Refuse only for the injected-root (#55) layout and keep (b) for
+          the suite's folder copies - which ties product behaviour to how a
+          test points the resolver. Until he answers, (b) stands.

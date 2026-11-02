@@ -830,24 +830,6 @@ def _content_at(rel_path: str, ref: str) -> str | None:
     return moved_paths.read_at(rel_path, ref, ROOT, _git_show)
 
 
-def _repo_path(path: Path) -> str | None:
-    """`path` by repository path, for a read at a git ref - None for a file
-    the repository does not hold that is not an asset's configuration (a
-    test's hand-written Source, which has no previous state), and REFUSED
-    (OutsideTheRepository) for a file in the selected asset's configuration
-    folder where that folder lies outside the repository (C7, Keith
-    2026-11-02; REQ-PIPE-342 decision 18, as the lifecycle gate's
-    collect_checks refuses): read as 'no previous state', the agreement
-    freeze, the amber, replacement and list-setting guards would pass any
-    edit to a past item unseen (post-build-review #313 M2)."""
-    if path.is_relative_to(ROOT):
-        return str(path.relative_to(ROOT))
-    asset = assets.selected_or_none()
-    if asset is not None and path.is_relative_to(asset.folder):
-        assets.folder_rel()
-    return None
-
-
 def _git_show(rel_path: str, ref: str) -> str | None:
     result = subprocess.run(["git", "show", f"{ref}:{rel_path}"], cwd=ROOT,
                              capture_output=True, text=True)
@@ -923,7 +905,7 @@ def _freeze_errors(raw: dict, cal_raw: dict, src: Source,
     cal_path, asset_path = src.agreement_path, src.asset_path
 
     def rel(path: Path) -> str | None:
-        return _repo_path(path)
+        return str(path.relative_to(ROOT)) if path.is_relative_to(ROOT) else None
 
     def previous(path: Path):
         name = rel(path)
@@ -1021,8 +1003,8 @@ def _list_setting_errors(raw: dict, src: Source, today: date | None = None,
     from qa_tools.common import amber_setting
 
     ref = ref or diff_base(root=ROOT)
-    name = _repo_path(src.asset_path)
-    previous = _content_at(name, ref) if name else None
+    previous = (_content_at(str(src.asset_path.relative_to(ROOT)), ref)
+                if src.asset_path.is_relative_to(ROOT) else None)
     try:
         old_doc = (yaml.safe_load(previous) or {}) if previous else {}
     except yaml.YAMLError:
@@ -1066,8 +1048,8 @@ def _amber_setting_errors(raw: dict, src: Source, today: date | None = None,
         "in effect - there is no default.")
         for where, problem in module.standing_problems(raw, today)]
     ref = ref or diff_base(root=ROOT)
-    name = _repo_path(src.asset_path)
-    previous = _content_at(name, ref) if name else None
+    previous = _content_at(str(src.asset_path.relative_to(ROOT)), ref) \
+        if src.asset_path.is_relative_to(ROOT) else None
     if previous is None:
         return standing
     try:
@@ -1082,7 +1064,7 @@ def _amber_setting_errors(raw: dict, src: Source, today: date | None = None,
         # ONLY NOW ask git when it was added (criterion 7 as amended): a
         # version dated before today is the one case the commit's date can
         # change, and every other run keeps to the single `git show`.
-        rel = name
+        rel = str(src.asset_path.relative_to(ROOT))
         problems = module.past_change_problems(
             old_doc, raw, today, synthetic=synthetic,
             added=lambda start: _version_added_on(rel, ref, start))
