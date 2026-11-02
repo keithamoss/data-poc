@@ -9545,7 +9545,9 @@ class TestNoColourWordIsReadAsAStatus:
         card = clean_page.locator("#drawer .check-card").first
         assert card.count(), "precondition: the column panel lists a check"
         card.click()
-        clean_page.locator("#drawer svg .hitrect").first.wait_for()
+        # The card opens the CHECK panel beside the drawer, and the trend is
+        # drawn there.
+        clean_page.locator("#check-panel svg .hitrect").first.wait_for()
         hits += _colour_words(clean_page, "check panel")
         for tip in _hover_trends(clean_page, ["check trend"]):
             if re.search(r"\b(green|amber|red)\b", tip, re.I):
@@ -9734,8 +9736,13 @@ class TestTheGeocodingPages:
         assert hits, lines
         assert not any("in force" in ln or re.search(r"\d+ rows?\b", ln) for ln in hits), hits
 
+    # One date in each version THE HISTORY HOLDS (criterion 15 (4)): the first
+    # version runs from 2013-Q1, but Client Register Geocodes' history starts
+    # with its source's, in 2016-Q1 (the Client Register's first supply is
+    # 2015-Q4), so its date is 2016-06-30 - 2015-06-30 has no result, and
+    # test_4_no_tile_before_the_first_recorded_result covers that side.
     @pytest.mark.parametrize("on,members,sub", [
-        ("2015-06-30", "2011", None),
+        ("2016-06-30", "2011", None),
         ("2020-06-30", "2011, 2016", "2016 added on 1 Aug 2017"),
         ("2024-06-30", "2011, 2016, 2021", "2021 added on 1 Aug 2022"),
     ])

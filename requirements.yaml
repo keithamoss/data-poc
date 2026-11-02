@@ -30580,7 +30580,8 @@ requirements:
       it; TS-5 already carried one. SCENARIOS.md regenerated in the same change.'
     implemented_by:
     - plans/supply-model.md
-    - SCENARIOS.md
+    - SCENARIOS-quarterly.md
+    - SCENARIOS-daily.md
     linked_tests:
     - tests/test_scenario_map.py
     source: "Found by delivery-scoper 2026-10-04 while drafting the batch's scenarios: several register entries in plans/supply-model.md assert the filing rule that REQ-PIPE-131 replaces. Scoped by delivery-scoper 2026-10-04."
@@ -47810,7 +47811,8 @@ requirements:
     - 'docs/supplier-guidance.md'
     - 'README.md'
     - 'plans/supply-model.md'
-    - 'SCENARIOS.md'
+    - 'SCENARIOS-quarterly.md'
+    - 'SCENARIOS-daily.md'
     evidence:
     - '2026-11-02 Perth, CLEARED BY REQ-DASH-299''s build (worktree b299): the tag REQ-DASH-299 criterion 15 (9) names is amberPromotedTag''s - [data-amber-promoted], its pill ''Promoted, warning'' and [data-amber-promoted-why] - checked against the template and asserted by tests/test_dashboard_e2e.py::TestTheGeocodingPages::test_9_the_g1_route_tags_the_older_client_register_supply (written; run by the end-of-run bootstrap).'
     - '2026-11-01: A1-A39 (41 criteria) and B1 applied by a script that stopped on any CURRENT not matching the live criterion verbatim (none did) and read each back with yaml.safe_load: 0 mismatches, 42 criteria changed, every requirement''s criterion count unchanged, no other requirement''s text changed.'

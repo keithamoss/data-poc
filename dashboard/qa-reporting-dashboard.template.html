@@ -4901,9 +4901,17 @@ function computeReportGaps(history, datasetRuns){
   }
   return gaps;
 }
-function computeChangeMarkers(history, changelog){
+function computeChangeMarkers(history, changelog, onShow){
   const markers = {};
+  // AN ENTRY AFTER THE DATE ON SHOW HAS NOT HAPPENED YET (post-build-review
+  // #305): a change declared ahead of its date (REQ-QAC-300's census-year
+  // widenings) draws nothing, rather than the fallback below breaking the
+  // line between two runs on the same definition.
+  const shown = onShow || (typeof CURRENT_IN_PLACE_ON !== "undefined" ? CURRENT_IN_PLACE_ON : null);
   (changelog||[]).forEach(entry=>{
+    const at = entry.date && typeof entry.date.getTime === "function" && !isNaN(entry.date.getTime())
+      ? entry.date.toISOString().slice(0, 10) : null;
+    if(shown && at && at > shown) return;
     let idx = history.findIndex(h=>h.date>=entry.date);
     if(idx===-1) idx = history.length-1; // entry postdates the last known run
     if(idx<=0) return; // no earlier point in view to split away from
