@@ -3193,6 +3193,26 @@ one or more component tags, and a date.
       checkpoint at least every 30 minutes, and every 10-minute check-in
       snapshots each worktree's uncommitted work to `wip/<branch>-snap`
       through a throwaway index.
+    - **DAYTIME 2026-11-02 (update, ~17:45 Perth)**: all 33 questions below
+      are ANSWERED (Keith, 2026-11-02 morning; source of record
+      `docs/drafts/decisions-2026-11-01.md`), and his answers are built on
+      `bans`, waiting to merge after the move. REQ-TEST-375 (push CI runs a
+      hand-picked critical set) was scoped, signed, built and merged into
+      `work`, and the end-of-run push waits for it, which it now can. The
+      move's post-move failures went 610 -> 12 under C11 (every test module
+      names its asset). A container restart mid-sweep cost one test run and
+      no work, thanks to the snapshots. Its critic found three understated
+      blockers - the cache key ignored `assets/` and `dbt_shared/`, CI and
+      the session hook still selected `data-asset-1`, and the browser tests
+      were neither adapted nor run - plus seven minors, all being fixed now.
+      It also raised three decisions, which Keith answered: the feedback
+      mistyped-agency check and the unknown-dataset scenario check both wait
+      for REQ-PIPE-354 (the scenario drop made visible meanwhile), and the
+      settle pointer drops the collection step on a one-collection asset.
+      Still to come: merge the move then `bans` into `work`, the follow-on
+      C6/C7/C12/C13/A1 work, then the end-of-run bootstrap per asset, full
+      gate, one push and the critical CI check. In parallel: the split
+      overview's four decisions, then #134 v3 to the reviewers.
     - **OVERNIGHT (Keith, ~22:20 Perth: "Keep going overnight as far as you
       can")**: the same terms. A question a builder could not settle from the
       decisions file took the recommended option, marked PROVISIONAL and
