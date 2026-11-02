@@ -1068,6 +1068,7 @@ one when this line suggests it matters.
 - **#313** `done` 2026-11-03 - The critic's pass over the bfol follow-ons (#312): two defects fixed test-first, a third confirmed and its fix held...
   - *touches:* `tests/test_equivalence_assets.py`, `tests/test_assets.py`, `tests/test_no_calendar.py`, `tests/test_turn_off.py`, `tests/test_collection_defaults.py`, `tests/test_github_links.py` +2 more
 - **#314** `done` 2026-11-03 - Keith's answers to morning report 12's questions, built (bq14): Q1-Q3, Q5-Q11 and Q13; Q4, Q12 and Q14 not built, as he...
+  - *touches:* `tests/test_dashboard_e2e.py`
 
 ## plans/road-testing.md
 

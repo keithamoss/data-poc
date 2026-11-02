@@ -14260,3 +14260,19 @@ twice. It deliberately did not re-find the `TypeError`.
      - **Also found**: TestTheEarlyEmergencyDepartmentSupplies (5 tests)
        fails "TS-<n> is not placed" here and identically at 72776772 - no
        placements file in this sandbox; not this change's.
+     - **Runs (code at 7da190ca; register, changelog and this entry at
+       7b2af74e)**: the 55 test modules naming the changed code plus
+       test_arrivals (e2e aside), 1985 passed, 14 failed, 5 skipped - all 14
+       fail identically at 72776772 in a clean worktree (the placements-file,
+       NotInteractive and unpacking failures above, plus test_scripted_decisions'
+       planted pairs, three test_correction_trial calendar-entry tests,
+       test_as_at_scenarios' planted ambers and the two committed-map-current
+       tests). Browser, against the quarterly deployment database read-only:
+       TestColumnsNotGreenMatchesTheDatasetPage 3 passed; the cross-table,
+       held, stale, TS-80, not-in-agreement and cross-collection classes plus
+       that one, 38 passed. NOT RUN: the rest of tests/test_dashboard_e2e.py,
+       and nothing against the daily deployment database's browser pages.
+       Critical set: quarterly 789 passed, 0 skipped; daily 106 passed, 0
+       skipped. `uv run ruff check .` clean. npm test 1146 passed.
+       `mothman check --no-pytest` (MOTHMAN_DIFF_BASE=f123a582) passed with
+       warnings from schedule, sprints and scenario map (no placements file).
