@@ -1632,7 +1632,8 @@ const emptyPart = p => p == null || p === "";
 function sampleParts(parts){
   const kept = parts.slice();
   while(kept.length > 1 && emptyPart(kept[kept.length - 1])) kept.pop();
-  if(kept.length === 1 && kept[0] == null) return ["(no value)"];
+  // A key of nothing at all - every part null or empty, in any order.
+  if(kept.every(emptyPart)) return ["(no value)"];
   return kept.map(p => emptyPart(p) ? "—" : escHtml(String(p)));
 }
 function sampleKeyText(key){

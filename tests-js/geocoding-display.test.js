@@ -141,6 +141,13 @@ describe("a several-column key on the page (criterion 8)", () => {
     expect(text(w, w.samplePill([null, null], "transparent"))).toBe("(no value)");
   });
 
+  it("reads a key whose parts are all null or empty as '(no value)', whatever the order", () => {
+    const w = load();
+    expect(text(w, w.samplePill([null, ""], "transparent"))).toBe("(no value)");
+    expect(text(w, w.samplePill(["", null], "transparent"))).toBe("(no value)");
+    expect(text(w, w.samplePill(["", "", ""], "transparent"))).toBe("(no value)");
+  });
+
   it("reads a null middle part of a set-member line's record as '—'", () => {
     const w = load();
     const check = { tool_ref: "dbt:missing_set_members",
