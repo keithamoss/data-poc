@@ -42,22 +42,44 @@ class TestOneInputList:
     """NFR: one input list shared with REQ-TEST-117, not a copy."""
 
     def test_the_list_is_criterion_1s(self):
+        # The asset split moved contract/ and dbt_project/ into assets/<asset>/
+        # and the shared dbt package into dbt_shared/ (post-build-review).
         assert set(ri.INPUTS) == {"generator/**", "synthetic_data_generator/**", "pipeline/**",
-                                  "qa_tools/**", "contract/**", "dbt_project/**", "cli/pipeline.py",
+                                  "qa_tools/**", "assets/**", "dbt_shared/**", "cli/pipeline.py",
                                   "pyproject.toml", "uv.lock", ".github/workflows/test.yml"}
 
     def test_a_replay_compares_it_less_the_generators(self):
         files = ri.input_files(ri.REPLAY_INPUTS)
         assert files and not any(p.startswith(("generator/", "synthetic_data_generator/"))
                                  for p in files)
-        assert "contract/data-asset.yaml" in files and "cli/pipeline.py" in files
+        # Every asset's configuration and the shared dbt package (the asset
+        # split moved both), and no asset's generator providers, whose effect
+        # is compared as the deliveries they produce.
+        for asset in ("daily", "quarterly"):
+            assert f"assets/{asset}/data-asset.yaml" in files, asset
+        assert any(p.startswith("dbt_shared/") for p in files)
+        assert not any("/synthetic/collections/" in p for p in files)
+        assert "cli/pipeline.py" in files
         assert not any(p.startswith("cli/") and p != "cli/pipeline.py" for p in files)
+
+    def test_an_edited_check_moves_the_key(self, monkeypatch):
+        """A check file under an asset is an input, so editing one changes the
+        cache key - the regression the asset split introduced, when the list
+        still named contract/ and matched no file at all."""
+        files = ri.input_files(ri.INPUTS)
+        checks = [p for p in files if p.startswith("assets/") and p.endswith("-soda-checks.yml")]
+        assert checks, "no asset's check file is an input"
+        before = ri.cache_key()
+        edited = dict(files, **{checks[0]: "edited"})
+        monkeypatch.setattr(ri, "input_files", lambda patterns=ri.INPUTS: dict(edited))
+        assert ri.cache_key() != before
 
     def test_ignored_files_are_not_inputs(self):
         """dbt deps installs dbt_packages/ under dbt_project/, and a key that
         moved with it would never hit."""
-        assert not any("dbt_packages/" in p or "/target/" in p
-                       for p in ri.input_files(("dbt_project/**",)))
+        found = ri.input_files(("assets/**",))
+        assert any("/dbt/" in p for p in found), "no asset dbt project is an input"
+        assert not any("dbt_packages/" in p or "/target/" in p for p in found)
 
     def test_ci_keys_its_cache_on_the_same_list(self):
         workflow = (ROOT / ".github" / "workflows" / "test.yml").read_text()

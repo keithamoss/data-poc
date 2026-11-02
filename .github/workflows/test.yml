@@ -189,7 +189,11 @@ jobs:
       # CLAUDE.md's own "local passing is necessary, never sufficient"
       # rule is about.
       MOTHMAN_TEST_DSN: postgresql://postgres:ci-not-a-secret@localhost:5432/postgres
-      MOTHMAN_SUPPLY_DSN: postgresql://postgres:ci-not-a-secret@localhost:5432/supply
+      # THE SERVER, not one database: each asset's is ${MOTHMAN_PG}/supply_<asset>,
+      # and a step acting for one asset names it beside MOTHMAN_ASSET (REQ-PIPE-343
+      # criterion 5: one process per asset). No MOTHMAN_SUPPLY_DSN or MOTHMAN_ASSET
+      # at job level, so nothing runs against an asset it did not name.
+      MOTHMAN_PG: postgresql://postgres:ci-not-a-secret@localhost:5432
       # WHICH PLACE THIS BUILD CAME FROM (REQ-PIPE-093). There is no
       # default and deliberately so - a build that guesses is a build that
       # can be labelled as somewhere it is not. `ci` was added to
@@ -197,9 +201,6 @@ jobs:
       # `sandbox`, which describes an agent session's container and is not
       # what this is. It publishes nothing.
       MOTHMAN_ENVIRONMENT: ci
-      # WHICH DATA ASSET, with no default (REQ-PIPE-363 criterion 1): today's
-      # one asset, until the split names two.
-      MOTHMAN_ASSET: data-asset-1
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -224,23 +225,35 @@ jobs:
       # warnings ("there is no transaction in progress") and expected
       # errors, which pushed pytest's summary out of reach (2026-10-05).
       # The tests report their own failures; the server need not.
-      - name: Create the warehouse database
+      # ONE DATABASE PER ASSET, named supply_<data_asset_id> (REQ-PIPE-343
+      # criterion 7), each asset's folder under assets/ naming one.
+      - name: Create each asset's warehouse database
         run: |
-          PGPASSWORD=ci-not-a-secret psql -h localhost -U postgres \
-            -c 'CREATE DATABASE supply'
+          for asset in $(cd assets && ls -d */ | tr -d /); do
+            PGPASSWORD=ci-not-a-secret psql -h localhost -U postgres \
+              -c "CREATE DATABASE supply_${asset}"
+          done
           PGPASSWORD=ci-not-a-secret psql -h localhost -U postgres \
             -c "ALTER SYSTEM SET log_min_messages = 'fatal'" \
             -c "ALTER SYSTEM SET log_min_error_statement = 'panic'" \
             -c 'SELECT pg_reload_conf()'
 
-      - name: Install dbt_utils
-        run: uv run dbt deps --project-dir dbt_project --profiles-dir qa_tools/dbt_profiles
-
       # EVERY CONNECTION CHECKS THE DATABASE'S RECORDED IDENTITY and refuses
       # one with none (REQ-PIPE-107), so CI marks its own as `ci`, typing
       # the environment id as anyone marking a database does.
-      - name: Mark the warehouse database as CI's
-        run: uv run mothman env mark --confirm ci
+      - name: Mark each asset's warehouse database as CI's
+        run: |
+          for asset in $(cd assets && ls -d */ | tr -d /); do
+            MOTHMAN_ASSET="$asset" MOTHMAN_SUPPLY_DSN="${MOTHMAN_PG}/supply_${asset}" \
+              uv run mothman env mark --confirm ci
+          done
+
+      # EACH ASSET'S OWN dbt PROJECT (assets/<asset>/dbt), one process each.
+      - name: Install each asset's dbt packages
+        run: |
+          for asset in $(cd assets && ls -d */ | tr -d /); do
+            MOTHMAN_ASSET="$asset" uv run mothman env dbt-deps
+          done
 
       - name: Install Playwright's Chromium
         run: uv run playwright install --with-deps chromium
@@ -318,11 +331,12 @@ jobs:
           --health-retries 10
     env:
       MOTHMAN_TEST_DSN: postgresql://postgres:ci-not-a-secret@localhost:5432/postgres
-      MOTHMAN_SUPPLY_DSN: postgresql://postgres:ci-not-a-secret@localhost:5432/supply
+      # THE SERVER, not one database: each asset's is ${MOTHMAN_PG}/supply_<asset>,
+      # and a step acting for one asset names it beside MOTHMAN_ASSET (REQ-PIPE-343
+      # criterion 5: one process per asset). No MOTHMAN_SUPPLY_DSN or MOTHMAN_ASSET
+      # at job level, so nothing runs against an asset it did not name.
+      MOTHMAN_PG: postgresql://postgres:ci-not-a-secret@localhost:5432
       MOTHMAN_ENVIRONMENT: ci
-      # WHICH DATA ASSET, with no default (REQ-PIPE-363 criterion 1): today's
-      # one asset, until the split names two.
-      MOTHMAN_ASSET: data-asset-1
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -338,20 +352,32 @@ jobs:
       - name: Sync dependencies
         run: uv sync --dev
 
-      - name: Create the warehouse database
+      # ONE DATABASE PER ASSET, named supply_<data_asset_id> (REQ-PIPE-343
+      # criterion 7), each asset's folder under assets/ naming one.
+      - name: Create each asset's warehouse database
         run: |
-          PGPASSWORD=ci-not-a-secret psql -h localhost -U postgres \
-            -c 'CREATE DATABASE supply'
+          for asset in $(cd assets && ls -d */ | tr -d /); do
+            PGPASSWORD=ci-not-a-secret psql -h localhost -U postgres \
+              -c "CREATE DATABASE supply_${asset}"
+          done
           PGPASSWORD=ci-not-a-secret psql -h localhost -U postgres \
             -c "ALTER SYSTEM SET log_min_messages = 'fatal'" \
             -c "ALTER SYSTEM SET log_min_error_statement = 'panic'" \
             -c 'SELECT pg_reload_conf()'
 
-      - name: Install dbt_utils
-        run: uv run dbt deps --project-dir dbt_project --profiles-dir qa_tools/dbt_profiles
+      - name: Mark each asset's warehouse database as CI's
+        run: |
+          for asset in $(cd assets && ls -d */ | tr -d /); do
+            MOTHMAN_ASSET="$asset" MOTHMAN_SUPPLY_DSN="${MOTHMAN_PG}/supply_${asset}" \
+              uv run mothman env mark --confirm ci
+          done
 
-      - name: Mark the warehouse database as CI's
-        run: uv run mothman env mark --confirm ci
+      # EACH ASSET'S OWN dbt PROJECT (assets/<asset>/dbt), one process each.
+      - name: Install each asset's dbt packages
+        run: |
+          for asset in $(cd assets && ls -d */ | tr -d /); do
+            MOTHMAN_ASSET="$asset" uv run mothman env dbt-deps
+          done
 
       # tests/test_a_collection_is_a_small_adapter.py drives a third
       # collection's dataset page in a real browser (REQ-TEST-252).
@@ -381,11 +407,12 @@ jobs:
           --health-retries 10
     env:
       MOTHMAN_TEST_DSN: postgresql://postgres:ci-not-a-secret@localhost:5432/postgres
-      MOTHMAN_SUPPLY_DSN: postgresql://postgres:ci-not-a-secret@localhost:5432/supply
+      # THE SERVER, not one database: each asset's is ${MOTHMAN_PG}/supply_<asset>,
+      # and a step acting for one asset names it beside MOTHMAN_ASSET (REQ-PIPE-343
+      # criterion 5: one process per asset). No MOTHMAN_SUPPLY_DSN or MOTHMAN_ASSET
+      # at job level, so nothing runs against an asset it did not name.
+      MOTHMAN_PG: postgresql://postgres:ci-not-a-secret@localhost:5432
       MOTHMAN_ENVIRONMENT: ci
-      # WHICH DATA ASSET, with no default (REQ-PIPE-363 criterion 1): today's
-      # one asset, until the split names two.
-      MOTHMAN_ASSET: data-asset-1
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -415,12 +442,13 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           key: ${{ steps.key.outputs.key }}
+          # Each asset's own state tree, data/<asset>/ (the asset split).
           path: |
             ci-cache
-            data/deliveries
-            data/receipts
-            data/generator_bookkeeping.json
-            data/scenario_placements.json
+            data/*/deliveries
+            data/*/receipts
+            data/*/generator_bookkeeping.json
+            data/*/scenario_placements.json
 
       # AND QUIETENS THE SERVER'S OWN LOG. GitHub prints the container's
       # log after every step, and the API returns only a job's last 5000
@@ -428,10 +456,14 @@ jobs:
       # warnings ("there is no transaction in progress") and expected
       # errors, which pushed pytest's summary out of reach (2026-10-05).
       # The tests report their own failures; the server need not.
-      - name: Create the warehouse database
+      # ONE DATABASE PER ASSET, named supply_<data_asset_id> (REQ-PIPE-343
+      # criterion 7), each asset's folder under assets/ naming one.
+      - name: Create each asset's warehouse database
         run: |
-          PGPASSWORD=ci-not-a-secret psql -h localhost -U postgres \
-            -c 'CREATE DATABASE supply'
+          for asset in $(cd assets && ls -d */ | tr -d /); do
+            PGPASSWORD=ci-not-a-secret psql -h localhost -U postgres \
+              -c "CREATE DATABASE supply_${asset}"
+          done
           PGPASSWORD=ci-not-a-secret psql -h localhost -U postgres \
             -c "ALTER SYSTEM SET log_min_messages = 'fatal'" \
             -c "ALTER SYSTEM SET log_min_error_statement = 'panic'" \
@@ -442,8 +474,10 @@ jobs:
       - name: Restore the cached database
         if: steps.cache.outputs.cache-hit == 'true'
         run: |
-          PGPASSWORD=ci-not-a-secret pg_restore -h localhost -U postgres \
-            --dbname supply --no-owner --exit-on-error ci-cache/supply.dump
+          for asset in $(cd assets && ls -d */ | tr -d /); do
+            PGPASSWORD=ci-not-a-secret pg_restore -h localhost -U postgres \
+              --dbname "supply_${asset}" --no-owner --exit-on-error "ci-cache/supply_${asset}.dump"
+          done
 
       # CRITERION 4: plainly, and with the key, whichever it was.
       - name: Say whether the database was restored or rebuilt
@@ -454,14 +488,22 @@ jobs:
             echo "Bootstrap REBUILT - no cache for key ${{ steps.key.outputs.key }}"
           fi
 
-      - name: Install dbt_utils
-        run: uv run dbt deps --project-dir dbt_project --profiles-dir qa_tools/dbt_profiles
-
       # EVERY CONNECTION CHECKS THE DATABASE'S RECORDED IDENTITY and refuses
       # one with none (REQ-PIPE-107), so CI marks its own as `ci`, typing
       # the environment id as anyone marking a database does.
-      - name: Mark the warehouse database as CI's
-        run: uv run mothman env mark --confirm ci
+      - name: Mark each asset's warehouse database as CI's
+        run: |
+          for asset in $(cd assets && ls -d */ | tr -d /); do
+            MOTHMAN_ASSET="$asset" MOTHMAN_SUPPLY_DSN="${MOTHMAN_PG}/supply_${asset}" \
+              uv run mothman env mark --confirm ci
+          done
+
+      # EACH ASSET'S OWN dbt PROJECT (assets/<asset>/dbt), one process each.
+      - name: Install each asset's dbt packages
+        run: |
+          for asset in $(cd assets && ls -d */ | tr -d /); do
+            MOTHMAN_ASSET="$asset" uv run mothman env dbt-deps
+          done
 
       - name: Install Playwright's Chromium
         run: uv run playwright install --with-deps chromium
@@ -491,7 +533,13 @@ jobs:
       # what the fixtures do.
       - name: Generate the QA history the suite reads
         if: steps.cache.outputs.cache-hit != 'true'
-        run: uv run mothman pipeline bootstrap
+        # ONE PROCESS PER ASSET, each with its own asset and database
+        # (REQ-PIPE-343 criterion 5).
+        run: |
+          for asset in $(cd assets && ls -d */ | tr -d /); do
+            MOTHMAN_ASSET="$asset" MOTHMAN_SUPPLY_DSN="${MOTHMAN_PG}/supply_${asset}" \
+              uv run mothman pipeline bootstrap
+          done
 
       # ON A MISS, KEEP WHAT WAS JUST MADE for the next run with the same
       # inputs - in GitHub's cache, never the repository (criterion 5).
@@ -499,31 +547,43 @@ jobs:
         if: steps.cache.outputs.cache-hit != 'true'
         run: |
           mkdir -p ci-cache
-          PGPASSWORD=ci-not-a-secret pg_dump -h localhost -U postgres \
-            --format custom --no-owner --file ci-cache/supply.dump supply
+          for asset in $(cd assets && ls -d */ | tr -d /); do
+            PGPASSWORD=ci-not-a-secret pg_dump -h localhost -U postgres \
+              --format custom --no-owner --file "ci-cache/supply_${asset}.dump" "supply_${asset}"
+          done
 
       - name: Save the bootstrapped database
         if: steps.cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
           key: ${{ steps.key.outputs.key }}
+          # Each asset's own state tree, data/<asset>/ (the asset split).
           path: |
             ci-cache
-            data/deliveries
-            data/receipts
-            data/generator_bookkeeping.json
-            data/scenario_placements.json
+            data/*/deliveries
+            data/*/receipts
+            data/*/generator_bookkeeping.json
+            data/*/scenario_placements.json
 
       - name: Build the dashboard data the suite reads
         run: |
-          uv run mothman dashboard rebuild-results
-          uv run mothman dashboard build-data
+          for asset in $(cd assets && ls -d */ | tr -d /); do
+            export MOTHMAN_ASSET="$asset" MOTHMAN_SUPPLY_DSN="${MOTHMAN_PG}/supply_${asset}"
+            uv run mothman dashboard rebuild-results
+            uv run mothman dashboard build-data
+          done
 
+      # EACH ASSET'S DEPLOYMENT TESTS IN A PROCESS OF THEIR OWN, pointed at
+      # that asset's database (REQ-PIPE-343 criterion 5); --only-asset leaves
+      # the other asset's tests to their own run. Coverage appends.
       - name: Run the tests that need a deployment
         run: |
-          uv run pytest -m needs_deployment -rs \
-            --cov=qa_tools --cov=pipeline --cov=generator --cov=dashboard \
-            --cov-report= --cov-fail-under=0
+          for asset in $(cd assets && ls -d */ | tr -d /); do
+            MOTHMAN_SUPPLY_DSN="${MOTHMAN_PG}/supply_${asset}" \
+              uv run pytest -m needs_deployment --only-asset "$asset" -rs \
+                --cov=qa_tools --cov=pipeline --cov=generator --cov=dashboard \
+                --cov-append --cov-report= --cov-fail-under=0
+          done
 
       - name: Keep this half's coverage for the combine
         uses: actions/upload-artifact@v4

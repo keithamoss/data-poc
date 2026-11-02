@@ -15,14 +15,15 @@ WORKFLOW = ROOT / ".github" / "workflows" / "test.yml"
 #: Criterion 1, as amended 2026-10-06 (cli/pipeline.py and nothing else
 #: under cli/).
 INPUTS = ("generator/**", "synthetic_data_generator/**", "pipeline/**", "qa_tools/**",
-          "contract/**", "dbt_project/**", "cli/pipeline.py", "pyproject.toml", "uv.lock",
+          "assets/**", "dbt_shared/**", "cli/pipeline.py", "pyproject.toml", "uv.lock",
           ".github/workflows/test.yml")
 #: What the cache must carry beside the dump - the generated inputs the
 #: tests and the dashboard build read (Keith's 2026-10-06 decision). The
 #: placements file is the fifth; it is not named here because this module
 #: reads none of them, and test_publish's guard rightly flags any test
 #: module that names a generated artefact.
-CARRIED = {"ci-cache", "data/deliveries", "data/receipts", "data/generator_bookkeeping.json"}
+#: Each asset's own, under data/<asset>/ since the asset split.
+CARRIED = {"ci-cache", "data/*/deliveries", "data/*/receipts", "data/*/generator_bookkeeping.json"}
 
 
 def _steps() -> list[dict]:
@@ -80,7 +81,7 @@ class TestAHitRestoresAndAMissRebuilds:
         step = _named("Restore the cached database")
         assert step["if"] == "steps.cache.outputs.cache-hit == 'true'"
         assert "pg_restore" in step["run"]
-        assert _index("Restore the cached database") < _index("Mark the warehouse")
+        assert _index("Restore the cached database") < _index("Mark each asset's warehouse")
 
     def test_a_miss_bootstraps_dumps_and_saves(self):
         miss = "steps.cache.outputs.cache-hit != 'true'"

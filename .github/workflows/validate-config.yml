@@ -46,8 +46,10 @@ on:
     # later session (plans/publishing-and-history.md #7).
     branches: ["claude/**"]
     paths:
-      - "contract/**"
-      - "dbt_project/**"
+      # Every asset's configuration and dbt project, and the shared dbt
+      # package (the asset split moved contract/ and dbt_project/).
+      - "assets/**"
+      - "dbt_shared/**"
       - "qa_tools/**"
       - "CHANGELOG.yaml"
       - "requirements.yaml"
@@ -65,9 +67,9 @@ jobs:
       # Empty on workflow_dispatch, where qa_tools/common/diff_base.py
       # falls back to HEAD~1.
       MOTHMAN_DIFF_BASE: ${{ github.event.before }}
-      # WHICH DATA ASSET each gate reads, with no default (REQ-PIPE-363
-      # criterion 1): today's one asset. REQ-PIPE-364 runs them per asset.
-      MOTHMAN_ASSET: data-asset-1
+      # NO MOTHMAN_ASSET: `mothman check` runs every gate that reads an
+      # asset's configuration once per folder under assets/, setting the asset
+      # itself (cli/check.py), so a job-wide one would only override it.
     steps:
       - name: Checkout
         uses: actions/checkout@v4

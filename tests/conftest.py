@@ -1123,6 +1123,9 @@ def pytest_addoption(parser):
     parser.addoption("--run-full-capture", action="store_true", default=False,
                      help="also run tests marked full_capture (two full bootstraps; "
                           "only when essential)")
+    parser.addoption("--only-asset", default=None, metavar="ASSET",
+                     help="run only the tests acting for this asset - one process per "
+                          "asset, each pointed at that asset's database (REQ-PIPE-343 c5)")
 
 
 #: Modules whose tests are spread across pytest-xdist workers CLASS BY CLASS
@@ -1191,6 +1194,17 @@ def pytest_collection_modifyitems(config, items):
             items[:] = kept
     _mark_deployment(items)
     _refuse_a_module_naming_no_asset(items)
+    only = config.getoption("--only-asset")
+    if only:
+        # DESELECTED, NOT SKIPPED, for the reason above: the other asset's
+        # tests run in a process of their own.
+        if only not in _assets.names():
+            raise pytest.UsageError(f"--only-asset {only!r} names no asset folder "
+                                    f"(known: {', '.join(_assets.names())})")
+        dropped = [i for i in items if asset_of(i) != only]
+        if dropped:
+            config.hook.pytest_deselected(items=dropped)
+            items[:] = [i for i in items if asset_of(i) == only]
     _group_by_asset(items)
     _group_for_distribution(items)
 
