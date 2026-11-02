@@ -75,7 +75,9 @@ class TestTheGateRecordsEveryRefusal:
         assert ds in out.refused
         (row,) = _refusals(conn, ds)
         assert row[0] == supply and row[1] == "2099-Q1" and row[3] == dl.RULE
-        assert "red" in row[2]
+        # The reason in the Pass / Warn / Fail words (REQ-DASH-359): "its
+        # status is Fail rather than Pass or Warn".
+        assert "status is Fail" in row[2], row[2]
         _gate(conn, ds)
         assert len(_refusals(conn, ds)) == 1, "a second gate over the same supply adds nothing"
 
