@@ -13709,8 +13709,10 @@ twice. It deliberately did not re-find the `TypeError`.
        widening ahead of time (2027-08-01), and computeChangeMarkers' "entry
        postdates the last known run" fallback put it on the newest point,
        so Client Register Geocodes' year checks showed a third break between
-       two runs on one definition. An entry after the date on show now draws
-       nothing (tests-js/change-markers.test.js, seen failing).
+       two runs on one definition. An entry after both the newest run and the
+       date on show now draws nothing; one after the newest run but already
+       past still marks it, as before (tests-js/change-markers.test.js, seen
+       failing).
      - **4. The browser module's twenty failures (cd7004d5's tree, 20 failed,
        413 passed)**, each read against the code. NONE was caused by the move's
        product code. Fixed:
