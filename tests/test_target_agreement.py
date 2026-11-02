@@ -71,8 +71,11 @@ class TestComparing:
 # ---- what the generator says it built (generator/targets.py) ----
 
 def _book(tmp_path, bdm, cp=()):
+    """A generator record holding each dataset given entries - one asset's
+    datasets only, as one asset's generator writes it (the asset split)."""
     path = tmp_path / "book.json"
-    path.write_text(json.dumps({"birth-registrations": bdm, "cp-clients": list(cp)}))
+    book = {"birth-registrations": list(bdm), "cp-clients": list(cp)}
+    path.write_text(json.dumps({k: v for k, v in book.items() if v}))
     return path
 
 
@@ -90,14 +93,14 @@ def _entry(period, delivery, at="14:30", severity=None):
 
 class TestWhatWasBuilt:
 
-    @pytest.mark.asset("quarterly")
+    @pytest.mark.asset("daily")  # Birth Registrations' record; Child Protection's is the next test
     def test_targets_lead_ins_and_ambers_in_both_collections(self, tmp_path):
         book = _book(tmp_path, [
             _entry("2026-08-20", "amb", severity="amber"),
             _entry("2026-09-03", "lead1"), _entry("2026-09-04", "lead2"),
             _entry("2026-09-05", "ts43", at="14:00"), _entry("2026-09-06", "after"),
             _entry("2026-09-07", "plain"),
-        ], cp=[_entry("2024-Q1", "cpamb", severity="amber"), _entry("2024-Q2", "cpclean")])
+        ])
         placed = tmp_path / "placed.json"
         placed.write_text(json.dumps({"placements": [{
             "scenario_id": "TS-43", "dataset": DS, "lead_in": ["2026-09-03", "2026-09-04"],
@@ -105,16 +108,25 @@ class TestWhatWasBuilt:
                                                    "built_to": "amber",
                                                    "rules": ["place_of_birth_facility.completeness"]}]}]}))
         built = {b.delivery: b for b in targets.written(book, placed)}
-        assert set(built) == {"amb", "lead1", "lead2", "ts43", "after", "cpamb"}
+        assert set(built) == {"amb", "lead1", "lead2", "ts43", "after"}
         assert built["ts43"].target == "amber" and built["ts43"].injected
         assert built["ts43"].reference == "lead2", "the LAST lead-in (REQ-GEN-185 c2)"
         assert built["ts43"].day == "2026-09-05"
         assert built["ts43"].rules == ("place_of_birth_facility.completeness",)
         assert {built[d].target for d in ("lead1", "lead2", "after")} == {"green"}
         assert not built["lead1"].injected
-        assert built["amb"].target == "amber" and built["cpamb"].dataset_id == "cp-clients"
+        assert built["amb"].target == "amber"
 
     @pytest.mark.asset("quarterly")
+    def test_a_child_protection_amber_is_built_and_a_clean_quarter_is_not(self, tmp_path):
+        """The Child Protection half of the test above, on its own asset."""
+        book = _book(tmp_path, [], cp=[_entry("2024-Q1", "cpamb", severity="amber"),
+                                       _entry("2024-Q2", "cpclean")])
+        built = {b.delivery: b for b in targets.written(book, tmp_path / "absent.json")}
+        assert set(built) == {"cpamb"}
+        assert built["cpamb"].target == "amber" and built["cpamb"].dataset_id == "cp-clients"
+
+    @pytest.mark.asset("daily")  # Birth Registrations' record
     def test_a_green_follow_with_no_target_is_still_compared(self, tmp_path):
         """#172 D1: a placement with no targets (TS-73's green_follow) skipped
         its green following day, so the day read RED on the page and nothing
@@ -129,7 +141,7 @@ class TestWhatWasBuilt:
         assert set(built) == {"after"}
         assert built["after"].target == "green" and not built["after"].injected
 
-    @pytest.mark.asset("quarterly")
+    @pytest.mark.asset("daily")  # Birth Registrations' record
     def test_a_record_the_placement_does_not_match_is_refused(self, tmp_path):
         book = _book(tmp_path, [_entry("2026-09-04", "lead2")])
         placed = tmp_path / "placed.json"
@@ -303,7 +315,8 @@ class TestSkippingTheTrial:
 
         # Every registered collection, in hierarchy order, none with a trial.
         assert seen == [(c.id, False) for c in collections.all_collections()]
-        assert [cid for cid, _ in seen[:2]] == ["civil-registration", "child-protection"]
+        # The quarterly asset's order (the asset split).
+        assert [cid for cid, _ in seen[:2]] == ["child-protection", "emergency-department"]
 
 
 # ---- after a replay (criteria 3, 6) ----
@@ -398,7 +411,7 @@ class TestAResumeLeavesTheCallersDatabaseAlone:
         from qa_tools.common import checkpoints, replay_inputs
 
         cp = types.SimpleNamespace(recorded=types.SimpleNamespace(readable=True, arrivals=[]),
-                                   collection_id="civil-registration", before=3, name="ckpt")
+                                   collection_id="child-protection", before=3, name="ckpt")
         monkeypatch.setattr(checkpoints, "require_synthetic", lambda: None)
         monkeypatch.setattr(checkpoints, "find", lambda name: cp)
         monkeypatch.setattr(replay_inputs, "first_affected",
@@ -421,7 +434,8 @@ class TestAResumeLeavesTheCallersDatabaseAlone:
 
         # Every registered collection, in hierarchy order, none with a trial.
         assert seen == [(c.id, False) for c in collections.all_collections()]
-        assert [cid for cid, _ in seen[:2]] == ["civil-registration", "child-protection"]
+        # The quarterly asset's order (the asset split).
+        assert [cid for cid, _ in seen[:2]] == ["child-protection", "emergency-department"]
 
 
 class TestEveryFailureNamesWhatToLookAt:

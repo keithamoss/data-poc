@@ -105,7 +105,10 @@ class _UnreachableWarehouse:
         raise psycopg.OperationalError("server closed the connection unexpectedly")
 
 
-@pytest.mark.parametrize("compute", ["bdm", "cp"])
+@pytest.mark.parametrize("compute", [
+    # Each collection on its own asset (the asset split).
+    pytest.param("bdm", marks=pytest.mark.asset("daily")),
+    pytest.param("cp", marks=pytest.mark.asset("quarterly"))])
 def test_a_warehouse_failure_fails_the_drift_check_rather_than_producing_a_number(
         compute, monkeypatch):
     """Criterion 4. A bare `except` that reads a CSV turns a database

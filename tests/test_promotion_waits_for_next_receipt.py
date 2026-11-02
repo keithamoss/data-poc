@@ -13,6 +13,8 @@ from types import SimpleNamespace
 
 import pytest
 
+import asset_params
+
 from qa_tools.common import knock_on, promotion
 from qa_tools.tools import orchestrate
 
@@ -22,7 +24,7 @@ RECEIVED = datetime(2023, 4, 3, 9, 0, tzinfo=timezone.utc)
 NEXT = RECEIVED + timedelta(seconds=30)
 
 
-@pytest.mark.parametrize("collection_id", COLLECTIONS, ids=["bdm", "cp"])
+@pytest.mark.parametrize("collection_id", asset_params.per_asset(COLLECTIONS, ids=["bdm", "cp"]))
 def test_the_promotion_lands_before_the_next_receipt(collection_id, monkeypatch):
     from qa_tools.common import gate
 
@@ -102,7 +104,7 @@ class TestWithinTheClaimWindowInAReplay:
         assert promotion.effective_at_for(received, seed="run_lag_probe") == \
             promotion.effective_at_for(received, seed="run_lag_probe", within=None)
 
-    @pytest.mark.parametrize("collection_id", COLLECTIONS, ids=["bdm", "cp"])
+    @pytest.mark.parametrize("collection_id", asset_params.per_asset(COLLECTIONS, ids=["bdm", "cp"]))
     @pytest.mark.parametrize("replaying", [True, False], ids=["replay", "live"])
     def test_both_collections_pass_it_on_every_route(self, collection_id, replaying,
                                                       monkeypatch):

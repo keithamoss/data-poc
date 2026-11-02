@@ -32,7 +32,7 @@ def offers(monkeypatch):
 
 
 @pytest.mark.parametrize("module", [pytest.param(bdm, marks=pytest.mark.asset("daily"), id="bdm"),
-                                    pytest.param(cp, id="cp")])
+                                    pytest.param(cp, marks=pytest.mark.asset("quarterly"), id="cp")])
 def test_a_kept_hand_filed_run_offers_the_decision(module, offers, monkeypatch):
     monkeypatch.setattr(module, "report_table", lambda results, run_id: "")
     filed = SimpleNamespace(run_id="handfiled_abc", delivery_name="handfiled-abc")
@@ -43,7 +43,7 @@ def test_a_kept_hand_filed_run_offers_the_decision(module, offers, monkeypatch):
 
 
 @pytest.mark.parametrize("module", [pytest.param(bdm, marks=pytest.mark.asset("daily"), id="bdm"),
-                                    pytest.param(cp, id="cp")])
+                                    pytest.param(cp, marks=pytest.mark.asset("quarterly"), id="cp")])
 def test_a_trial_offers_nothing(module, offers, monkeypatch):
     monkeypatch.setattr(module, "report_table", lambda results, run_id: "")
     filed = SimpleNamespace(run_id="trial_abc", delivery_name=None)
