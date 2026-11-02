@@ -100,21 +100,28 @@ class TestASlotIsOfferedOnceItsWindowOpens:
         assert "2026-09-05" in offered
 
 
+#: Each dataset and arrival on the asset its calendar is in (the asset split).
+_EACH_ON_ITS_ASSET = [
+    pytest.param(QUARTERLY, A_WEEK_EARLY, marks=pytest.mark.asset("quarterly"), id="quarterly"),
+    pytest.param(DAILY, datetime(2026, 9, 5, 6, tzinfo=PERTH), marks=pytest.mark.asset("daily"),
+                 id="daily")]
+
+
 class TestEveryCandidateIsOneTheWindowAllows:
     """Asserted as the RULE rather than as these two dates, so a later
     change to either calendar cannot quietly reopen it."""
 
-    def test_no_slot_with_an_open_window_is_ever_missing(self):
-        for dataset, at in ((QUARTERLY, A_WEEK_EARLY),
-                            (DAILY, datetime(2026, 9, 5, 6, tzinfo=PERTH))):
-            names = {s.period.name for s in _candidates(dataset, at)}
-            every = slots_mod.slots_for_dataset(
-                dataset, until=at.date() + timedelta(days=400))
-            missed = [s.period.name for s in every
-                      if s.claim_opens_at <= at and s.period.name not in names]
-            assert not missed, f"{dataset}: claimable but not offered: {missed}"
+    @pytest.mark.parametrize("dataset, at", _EACH_ON_ITS_ASSET)
+    def test_no_slot_with_an_open_window_is_ever_missing(self, dataset, at):
+        names = {s.period.name for s in _candidates(dataset, at)}
+        every = slots_mod.slots_for_dataset(
+            dataset, until=at.date() + timedelta(days=400))
+        missed = [s.period.name for s in every
+                  if s.claim_opens_at <= at and s.period.name not in names]
+        assert not missed, f"{dataset}: claimable but not offered: {missed}"
 
-    def test_and_the_rule_never_PICKS_one_whose_window_is_shut(self):
+    @pytest.mark.parametrize("dataset, at", _EACH_ON_ITS_ASSET)
+    def test_and_the_rule_never_PICKS_one_whose_window_is_shut(self, dataset, at):
         """The other direction, asserted where the design actually
         promises it. `slots_for_dataset()` has always returned the
         current period's slot before its window opens - the daily feed
@@ -122,12 +129,10 @@ class TestEveryCandidateIsOneTheWindowAllows:
         claimability. So the invariant to protect is about the CHOICE,
         not about the list, and a fix that widens the list must not
         widen what the rule will claim."""
-        for dataset, at in ((QUARTERLY, A_WEEK_EARLY),
-                            (DAILY, datetime(2026, 9, 5, 6, tzinfo=PERTH))):
-            got = assignment.current_slot(_candidates(dataset, at), at)
-            assert got is None or got.claim_opens_at <= at, (
-                f"{dataset}: picked {got.period.name}, whose window opens "
-                f"{got.claim_opens_at}, for an arrival at {at}")
+        got = assignment.current_slot(_candidates(dataset, at), at)
+        assert got is None or got.claim_opens_at <= at, (
+            f"{dataset}: picked {got.period.name}, whose window opens "
+            f"{got.claim_opens_at}, for an arrival at {at}")
 
 
 class TestTheSlotStaysVisibleOnceFilled:

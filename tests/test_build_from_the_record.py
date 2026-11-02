@@ -410,7 +410,9 @@ class TestTheSameHistoryBuildsTheSameBytes:
     run_seq and nothing the build emits."""
 
     def _build(self, history, interleave: bool, keys: dict) -> str:
-        coll = collections.by_id("civil-registration")
+        # Another collection OF THE SAME ASSET (the asset split: Civil
+        # Registration is another asset's, with a database of its own).
+        coll = collections.by_id("emergency-department")
         if interleave:
             _run(f"pytest_bdm_{uuid.uuid4().hex[:8]}", dataset_id=None, supply=None,
                  collection=coll.id, agency=coll.agency_id)
@@ -502,7 +504,9 @@ class TestAResultRecordedUnderAnotherCollectionReachesTheTableItRead:
     def test_a_collection_none_of_whose_tables_it_read_carries_nothing(self, history):
         self._foreign_run(f"cp-clients@{_key()}",
                           results=[_record(FOREIGN_REF, "linkage-keys", "fail")])
-        assert history.rebuild("civil-registration")["read_by_others"] == []
+        # A sibling none of whose tables the check read (the asset split: it
+        # was Civil Registration, another asset's now).
+        assert history.rebuild("emergency-department")["read_by_others"] == []
 
 
 class TestARecordedDistributionAndBandReachTheCard:

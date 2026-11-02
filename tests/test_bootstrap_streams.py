@@ -46,8 +46,15 @@ def _config(monkeypatch, layout: dict[str, dict[str, str | None | Exception]]):
 class TestStreamsComeFromConfiguration:
     """Criteria 1, 2 and 9."""
 
-    def test_the_real_configuration_puts_cp_and_ed_together_and_bdm_alone(self):
-        assert bootstrap.streams(["bdm", "cp", "ed"]) == [["bdm"], ["cp", "ed"]]
+    @pytest.mark.parametrize("shorts, expected", [
+        # Each asset's own collections (the asset split): the quarterly three
+        # share a calendar and are one stream; Birth Registrations is alone.
+        pytest.param(["cp", "ed", "lp"], [["cp", "ed", "lp"]], marks=pytest.mark.asset("quarterly"),
+                     id="quarterly"),
+        pytest.param(["bdm"], [["bdm"]], marks=pytest.mark.asset("daily"), id="daily")])
+    def test_the_real_configuration_puts_cp_and_ed_together_and_bdm_alone(self, shorts,
+                                                                            expected):
+        assert bootstrap.streams(shorts) == expected
 
     def test_moving_a_collection_to_another_calendar_moves_it_to_another_stream(
             self, monkeypatch):

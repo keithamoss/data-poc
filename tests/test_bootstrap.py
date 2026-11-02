@@ -152,8 +152,11 @@ class TestWhatItRuns:
         assert spy == [*(f"gen-{s}" for s in SHORTS), "concurrently", *STREAMS, "record"]
 
     def test_the_real_configuration_makes_more_than_one_stream_of_several(self):
-        """Otherwise the tests here would not exercise a merged stream."""
-        assert len(STREAMS) > 1 and any(boot.STREAM_JOIN in k for k in STREAMS), STREAMS
+        """Otherwise the tests here would not exercise a merged stream. One
+        stream per asset since the split (the quarterly asset's collections
+        share a calendar; Birth Registrations is the daily asset's alone), so
+        what stays is that the stream is merged."""
+        assert any(boot.STREAM_JOIN in k for k in STREAMS), STREAMS
 
     def test_sequential_runs_one_stream_after_another(self, spy):
         """REQ-TEST-116 criterion 5's reference, as REQ-PIPE-262 criterion 7

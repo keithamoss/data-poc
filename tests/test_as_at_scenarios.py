@@ -270,23 +270,33 @@ class TestTs79IsWrittenAfterGeneration:
 class TestTheLinksResolveBetweenTheirEvents:
     """Criterion 23: each link's date between its two events."""
 
-    def test_every_link_of_the_new_scenarios_stands(self):
-        new = [i for i in si.INJECTIONS
-               if i.scenario_id in ("TS-75a", "TS-76", "TS-77a", "TS-78a")]
-        assert len(new) == 4
+    # Each asset's own scenarios (the asset split): TS-75a, TS-76 and TS-77a
+    # are Child Protection's, TS-78a Birth Registrations'.
+    @pytest.mark.parametrize("ids", [
+        pytest.param(("TS-75a", "TS-76", "TS-77a"), marks=pytest.mark.asset("quarterly"),
+                     id="quarterly"),
+        pytest.param(("TS-78a",), marks=pytest.mark.asset("daily"), id="daily")])
+    def test_every_link_of_the_new_scenarios_stands(self, ids):
+        new = [i for i in si.this_assets_injections() if i.scenario_id in ids]
+        assert len(new) == len(ids)
         assert si.link_problems(new) == []
 
+    @pytest.mark.asset("quarterly")
     def test_the_dates(self):
         got = {}
-        for sid, periods in (("TS-75a", _cp_periods()), ("TS-76", _cp_periods()),
-                             ("TS-77a", _cp_periods()), ("TS-78a", _bdm_periods())):
-            got.update(dict(si.resolve(_injection(sid), periods).in_place_on))
+        for sid in ("TS-75a", "TS-76", "TS-77a"):
+            got.update(dict(si.resolve(_injection(sid), _cp_periods()).in_place_on))
         assert got == {"TS-75a": "2024-02-08", "TS-75b": "2024-02-25",
                        "TS-76": "2025-02-17", "TS-77a": "2023-05-17",
                        # TS-54 rides TS-76's placement and date (REQ-GEN-044).
                        "TS-54": "2025-02-17",
-                       "TS-77b": "2023-06-08", "TS-78a": "2026-08-31",
-                       "TS-78b": "2026-09-01"}
+                       "TS-77b": "2023-06-08"}
+
+    @pytest.mark.asset("daily")
+    def test_the_birth_registrations_dates(self):
+        """The other half of the test above, on the daily asset."""
+        got = dict(si.resolve(_injection("TS-78a"), _bdm_periods()).in_place_on)
+        assert got == {"TS-78a": "2026-08-31", "TS-78b": "2026-09-01"}
 
 
 def test_a_targeted_amber_is_never_named_with_a_severity():

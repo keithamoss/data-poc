@@ -35,7 +35,9 @@ class TestTheRealDeclaredPatterns:
     thing worth knowing is whether TODAY's files attribute correctly."""
 
     @pytest.mark.parametrize("filename,expected", [
-        ("birth_registrations_2026-09-07.csv", "birth-registrations"),
+        # Each file on the asset its dataset is in (the asset split).
+        pytest.param("birth_registrations_2026-09-07.csv", "birth-registrations",
+                     marks=pytest.mark.asset("daily")),
         ("cp_clients.csv", "cp-clients"),
         ("cp_case_workers.csv", "cp-case-workers"),
         ("cp_notifications.csv", "cp-notifications"),

@@ -13,18 +13,34 @@ import json
 from calendar_move_pin import PIN, UNTIL, capture
 
 
-def test_every_dataset_computes_what_it_did_before_the_move():
+@pytest.mark.parametrize("asset", [pytest.param("quarterly", marks=pytest.mark.asset("quarterly")),
+                                   pytest.param("daily", marks=pytest.mark.asset("daily"))])
+def test_every_dataset_computes_what_it_did_before_the_move(asset):
     """ROUND BY ROUND (REQ-PIPE-321 criterion 14): a collection at
     files_go_to_period N fills the period N after each round, so each
     period and slot is named by the round it is due on - the name the pin
     recorded at 0 - and every instant must be what was pinned. The pin is
     never re-captured."""
+    from pathlib import Path
+
+    from qa_tools.common import hierarchy, moved_paths
+
     pinned = json.loads(PIN.read_text())
+    assert pinned, "the pin holds no dataset - the comparison would prove nothing"
+    # EVERY PINNED DATASET IS SOME ASSET'S (the asset split), by the move map's
+    # repository-wide record of what went where - so a dataset lost from both
+    # assets fails here even though each asset's run below sees only its own.
+    root = Path(__file__).resolve().parent.parent
+    members = moved_paths.parse((root / moved_paths.MAP_REL).read_text()).members
+    assert set(pinned) <= set().union(*members.values()), "the datasets themselves changed"
+    # This asset's pinned datasets, each computing what it did.
+    mine = {d.dataset_id for d in hierarchy.all_datasets()}
+    pinned = {k: v for k, v in pinned.items() if k in mine}
+    assert pinned, "the pin holds none of this asset's datasets - this would prove nothing"
     now = capture(by_round=True)
     # A DATASET ADDED SINCE (Emergency Department's, REQ-QAC-231) has no
     # pinned past to keep, so the pin speaks for the datasets it holds: none
     # of them may be lost or renamed, and each computes what it did.
-    assert pinned, "the pin holds no dataset - the comparison would prove nothing"
     assert set(pinned) <= set(now), "the datasets themselves changed"
     for dataset_id, before in pinned.items():
         after = (_from_the_pinned_start(now[dataset_id], before)

@@ -9,11 +9,15 @@ from click.testing import CliRunner
 from cli import supply
 
 
-def test_amber_setting_lists_every_dataset_in_words():
+@pytest.mark.parametrize("dataset", [
+    # Each asset's own datasets (the asset split).
+    pytest.param("cp-clients", marks=pytest.mark.asset("quarterly")),
+    pytest.param("birth-registrations", marks=pytest.mark.asset("daily"))])
+def test_amber_setting_lists_every_dataset_in_words(dataset):
     result = CliRunner().invoke(supply.supply_group, ["amber-setting"])
     assert result.exit_code == 0, result.output
     flat = " ".join(result.output.split())
-    assert "birth-registrations" in flat and "cp-clients" in flat
+    assert dataset in flat
     assert "set for the whole data asset" in flat
 
 

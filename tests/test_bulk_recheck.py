@@ -162,6 +162,7 @@ class TestRefusals:
         p = bulk.plan(conn, CHECK)
         assert "already checked under its current definition" in bulk.nothing_to_cover(p)
 
+    @pytest.mark.asset("daily")  # the asset holding the register's retired check
     def test_a_retired_check_is_refused(self, conn):
         retired = next((c for c in bulk.current_checks().values() if c.retired_as_of), None)
         assert retired is not None, "the tree holds a retired check to try"
