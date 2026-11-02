@@ -47722,10 +47722,11 @@ requirements:
     - 'tests/test_dashboard_e2e.py::_GUARD_SKIPPED_MARKS'
     evidence:
     - '2026-11-01, tree f22855b: criterion 5''s tests/test_status_words_shown.py passes 53 of 53 (status_words in every form for every status, the outcome, root-cause, queue-state, re-checked-worse, bulk re-check, gate refusal, ticket and scenario-map wordings with NO_COLOR set, and the replacement setting''s words). The browser guard and its two self-tests are written in tests/test_dashboard_e2e.py and not run (unmet_criteria).'
+    - '2026-11-02, bmove tree 07a43526: tests/test_dashboard_e2e.py whole, 434 passed and 4 failed against each asset''s bootstrapped deployment database. Every REQ-TEST-361 guard class passed - TestNoColourWordIsReadAsAStatus (quarterly, 4 tests), TestNoColourWordIsReadAsAStatusOnTheDailyAsset (daily, 4 tests: scenario pages, tiers with the Scenarios tab and dataset page, a column panel with its trend tooltips, and the needs-action queue) and TestTheColourWordGuardCanFail (2) - and test_the_two_assets_show_every_surface failed naming the two criterion-1 surfaces in unmet_criteria. The other three failures are post-build-review #305 5(a), 5(c) and the load budget, none of this requirement''s. Each asset''s scenario scan now walks every scenario page and asserts the surfaces shown are exactly that asset''s _GUARD_SURFACES_BY_ASSET entry (post-build-review #306 2).'
     unmet_criteria:
-    - criterion: 'Criteria 1 to 4 and 6 - the real-browser guard and its two self-tests run against the built dashboard.'
-      why: 'Written in tests/test_dashboard_e2e.py and not run: they need a dashboard built from a bootstrapped history, and this build ran with an empty warehouse (Keith''s run terms, 2026-11-01).'
-      owner: 'the end-of-run bootstrap (2026-11-01 build run)'
+    - criterion: 'Criterion 1''s re-checked-worse supply and ''Re-checked <t>: became <X>'' row.'
+      why: 'Criteria 1 to 4 and 6 have run against dashboards built from each asset''s bootstrapped history (2026-11-02, bmove, evidence above) and the guard finds no colour word on any surface it scans, on either asset. Criterion 1 is still unmet on two of the six surfaces it names: no scenario page of either asset shows a re-checked-worse supply or a ''Re-checked <t>: became <X>'' row, so test_the_two_assets_show_every_surface fails naming them (post-build-review #305 5(b) and #306 4).'
+      owner: 'Keith - a scenario that produces each surface, or an amended criterion (post-build-review #305 5(b))'
       blocked_by:
         unowned: true
   - id: REQ-DOCS-362

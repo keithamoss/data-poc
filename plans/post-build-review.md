@@ -13774,3 +13774,86 @@ twice. It deliberately did not re-find the `TypeError`.
        - (e) **The move cannot be compared against its base**: f123a582's
          bootstrap stops on defect 2 above, so the e2e comparison against base
          was not possible; the failures were triaged on their merits instead.
+
+306. **[in-progress, 2026-11-02]** **[Pipeline & publishing]** **[Data generation]** **[Dashboard UI]** **[Testing & dev tooling]** **A second critic on the asset split's move (bmove, 73189349): three test defects and two nits fixed, two register entries restated; five things left for Keith.**
+     Each was checked against the code before it went here. These are test
+     defects (a test that could not fail, or proved less than it said), so
+     each was shown failing or skipping before its fix.
+     - **1. A class that skipped every run (fixed)**:
+       tests/test_scenario_injection.py's
+       TestTheChildProtectionScenariosAreReallyThere._tree() still looked for
+       the repository-root data/deliveries, which the move replaced with
+       data/<asset>/deliveries, so its two tree-reading tests skipped every
+       time ("no generated delivery tree", seen skipping first). It now reads
+       `assets.deliveries_dir()`; run under the quarterly asset, all five of
+       the class's tests pass and none skips.
+     - **2. The colour-word guard (REQ-TEST-361 criterion 1) covered only the
+       daily asset's scenario pages (fixed)**: TestNoColourWordIsReadAsAStatusOnTheDailyAsset
+       now also scans the daily asset's tiers, Scenarios tab and dataset page
+       (with its unit-trend tooltip); a Birth Registrations column panel, its
+       trend tooltip, a check panel's trend tooltip and the agency tier's
+       sparkline points; and the needs-action queue. The quarterly class's
+       three bodies became shared helpers, unchanged. The daily asset has NO
+       cross-table grid: no check of its one collection is scoped cross-table,
+       and the daily column-panel test asserts that from the build, so one
+       added later fails there until its grid is scanned. Scenario (j) is not
+       the daily asset's: TS-95 marks a Linkage Products dataset not supplied,
+       a quarterly collection. And the six-surface union is now READ FROM THE
+       PAGES: each asset's scenario scan walks every scenario page and fails
+       unless the surfaces they show are exactly that asset's
+       `_GUARD_SURFACES_BY_ASSET` entry, both ways, so the dictionary
+       test_the_two_assets_show_every_surface reads cannot drift from the
+       pages. Cheap: the quarterly scan went to about 49s for every page.
+       No colour word was found on any new daily surface.
+     - **3. TestAfterAReplay's widened guard proved no injected target
+       (fixed)**: `any(b.injected or b.scenario)` passed on the daily asset
+       with every `injected` flag stripped, because the trial sets `scenario`
+       on every green lead-in and following day too (seen passing with the
+       flags stripped, both parametrisations). It now requires an INJECTED
+       target on every asset that places a target on a dataset whose provider
+       declares target_trial (the daily asset's Birth Registrations), and
+       keeps `injected or scenario` only where none does. THE DISCRIMINATOR
+       IS NARROWER THAN "AN ASSET WHOSE PROVIDER DECLARES target_trial",
+       because both assets have one: the quarterly asset's Linkage Products
+       declares it too, but its targets are planned, not trialled, and none
+       of its placements carries a target. With the flags stripped the new
+       guard fails on daily and passes on quarterly; unstripped, both pass.
+     - **4. REQ-TEST-361's unmet criterion said criteria 1-4 and 6 were never
+       run (restated)**: they have run against each asset's bootstrapped
+       build. What is unmet is criterion 1's two surfaces no page shows
+       (#305 5(b)), now recorded as that, owned by Keith's decision.
+     - **5. Nits (fixed)**: test.yml's env comment described a job-level
+       MOTHMAN_SUPPLY_DSN the split removed - it now says each step names its
+       asset's; and three test functions' docstrings sat after an assignment,
+       so were not docstrings - two in tests/test_dashboard_e2e.py (the
+       third line the critic named never had one) and one more found by an
+       AST scan of tests/, tests/test_evidently_recorded_reference.py's
+       test_the_recorded_count_and_distribution_agree (pre-existing, not the
+       move's).
+     - **6. REQ-PIPE-352's PROVISIONAL decision understated the overlap
+       (restated, code unchanged)**: which scenarios a map lists comes only
+       from INJECTIONS, never from the asset's own placements, so every
+       scenario not in INJECTIONS is in both maps - including six the
+       quarterly asset has placed (TS-79a, TS-79b, TS-93c, TS-95, TS-100c,
+       TS-101b), each listed in SCENARIOS-daily.md as not injected. That is
+       why 53 scenarios are in both maps. The question for Keith is restated
+       on the requirement: membership from each asset's own placements, so an
+       unplaced scenario is in neither map, or in both.
+     - **LEFT FOR KEITH, not touched**: the scenario-map membership code; the
+       dropped-scenario warning naming 20 or 52 scenarios per run; the settle
+       pointer disagreeing with the menu while a correction is pending;
+       REQ-GEN-246 criterion 8 and REQ-DOCS-219 criterion 10 naming
+       REQ-PIPE-354 as an owner that never picks them up; and #305 5's four
+       browser-test items.
+     - **Seen while running, not fixed**: tests/test_scenario_injection.py's
+       check that no injected scenario is marked in what the dashboard renders
+       skips when `reports/<asset>/` holds no built dashboard file, which this
+       worktree's quarterly asset does not (`mothman dashboard build-data`
+       builds it). A local-build skip, not a move defect.
+     - **Runs (bmove)**: on 07a43526, tests/test_scenario_injection.py,
+       test_target_agreement.py, test_evidently_recorded_reference.py and
+       test_publish.py: 151 passed, 1 skipped (the local-build skip above);
+       tests/test_dashboard_e2e.py whole: 434 passed, 4 failed in 31m34s - the
+       three held in #305 5 (a) to (c) and the load budget, the same four as
+       #305 4 recorded, with the daily guard's three new tests among the
+       passes.
