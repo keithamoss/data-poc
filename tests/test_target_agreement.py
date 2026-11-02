@@ -348,9 +348,12 @@ class TestAfterAReplay:
             [found] = target_agreement.after_replay(conn, [missing])
         assert found.verdict is None and "nothing recorded" in found.checks[0]
 
-    @pytest.mark.asset("quarterly")
+    # EACH ASSET'S OWN DEPLOYMENT (C11): before the split one deployment
+    # held both collections' targets.
+    @pytest.mark.parametrize("asset", [pytest.param(a, marks=pytest.mark.asset(a), id=a)
+                                       for a in ("daily", "quarterly")])
     def test_every_targeted_supply_in_the_deployment_agrees_and_nothing_changes(
-            self, deployment_history):
+            self, deployment_history, asset):
         """The real corpus: injected targets, lead-ins and following days, and
         every ordinary amber in both collections. Reading changes nothing
         (criterion 6)."""
@@ -370,9 +373,20 @@ class TestAfterAReplay:
         # Every collection's targets, from what its provider declares, so a
         # new collection is covered without editing this (#248).
         from generator import collections
-        declared = {p.amber_dataset for p in collections.providers()} - {None}
+        # ITS AMBER DATASET AND ITS TARGET DATASETS (REQ-GEN-298 criterion 12:
+        # every geocoding supply's planned verdict is a target, compared in its
+        # own dataset - linkage_products' target_datasets names them).
+        declared = set()
+        for p in collections.providers():
+            declared |= {p.amber_dataset, *(getattr(p, "target_datasets", ()) or ())}
+        declared -= {None}
+        assert declared
         assert {b.dataset_id for b in built} == declared
-        assert any(b.injected for b in built) and any(b.target == "green" for b in built)
+        # A SCENARIO'S OWN TARGET IS AMONG THEM: an injected arrival's, or a
+        # planned supply a scenario names (REQ-GEN-298's geocoding scenarios,
+        # the quarterly asset's - recorded as planned, not injected).
+        assert any(b.injected or b.scenario for b in built)
+        assert any(b.target == "green" for b in built)
 
 
 class TestEveryBootstrapCallerFailsOnADisagreement:
