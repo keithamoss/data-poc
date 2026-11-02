@@ -271,3 +271,79 @@ the rebuild needs no question asked twice. Drafts and builders read this file.
   generated from that asset's own history) INSIDE the move, before it
   merges. REJECTED (b), merging the move with the scenario-map gate red
   until c3 is built separately.
+
+## Keith's answers to morning report 12's 14 questions (2026-11-03, Perth)
+- Q1 SETTLED by Keith 2026-11-03 (as recommended): the PAGE is right. The
+  dataset-list row counts cross-table verdicts too, so a Warn or Fail the
+  warehouse holds shows on the row even when the period on show has no supply
+  (REQ-DASH-225 c18 keeps the page as the reference). REJECTED amending the
+  test to leave cross-table sections out, and making the page say no verdict.
+- Q2 CHANGED by Keith 2026-11-03 ("get rid of it"): REQ-DASH-299 c15(7)'s
+  whole check - no nine-digit run AND no area code on a geocoding page - is
+  REMOVED, criterion and test. REJECTED amending the pattern, excluding
+  identifier cells, and masking Client Register ids on the page.
+- Q3 CHANGED by Keith 2026-11-03 (against the recommendation): REQ-TEST-361
+  c1 keeps 'a re-checked-worse supply' and the 'Re-checked <t>: became <X>'
+  row, but they are covered by a JS test (tests-js/, jsdom) against mock data,
+  not the real page; the real-page guard scans what the data shows.
+  REJECTED planting a scenario for each, and dropping them from c1.
+- Q4 CHANGED by Keith 2026-11-03: the synthetic ANCHOR_DATE becomes ROLLING
+  (follows the build date) rather than a fixed date bumped by hand. Needs
+  scoping before building (reproducibility and the equivalence compare depend
+  on a fixed anchor) - plans/running-thoughts.md #138. Until it is built the
+  anchor stays 2026-09-25. REJECTED a one-off bump, and leaving it fixed.
+- Q5 SETTLED by Keith 2026-11-03 (as recommended): each asset's scenario map
+  lists the scenarios its OWN asset placed, plus those naming one of its
+  datasets; an unplaced scenario naming no dataset is in neither map (the
+  register in plans/supply-model.md still holds everything). REJECTED
+  unplaced-in-both, and keeping membership from the injections table.
+  Replaces REQ-PIPE-352's PROVISIONAL membership choice.
+- Q6 SETTLED by Keith 2026-11-03 (as recommended): the dropped-scenario
+  warning stays quiet about scenarios belonging to the OTHER asset - reading
+  both assets' hierarchies, configuration only, to tell them apart - and warns
+  only for a dataset NEITHER asset declares (the typo case). This narrows
+  2026-11-02's "wait for REQ-PIPE-354" for the warning only: the refusal of
+  REQ-GEN-246 c8 still waits (see Q8). REJECTED a one-line summary, and the
+  full list on every run.
+- Q7 SETTLED by Keith 2026-11-03 (as recommended): the settle hint checks
+  the same condition the filing menu does - it names the collection step
+  whenever the menu will ask it (corrections, parked moves or nudges pending)
+  and leaves it out otherwise. REJECTED accepting the gap, and changing the
+  menu.
+- Q8 SETTLED by Keith 2026-11-03 (as recommended): RESTORE BOTH NOW, using
+  the both-hierarchies configuration read Q6 allows - the feedback validator
+  catches a mistyped agency again (REQ-DOCS-219 c10) and a scenario naming a
+  dataset neither asset declares is refused again (REQ-GEN-246 c8); both
+  unmet criteria clear. This REVERSES 2026-11-02's "wait for REQ-PIPE-354"
+  for these two. REJECTED adding them to REQ-PIPE-354, and a new requirement.
+- Q9 SETTLED by Keith 2026-11-03 (as recommended): for an asset folder
+  outside the repository the dashboard BUILDS, leaving that asset's GitHub
+  links out with a quiet note that its configuration is not in this
+  repository. REJECTED refusing the build.
+- Q10 SETTLED by Keith 2026-11-03 (as recommended): the pre-run check uses
+  the same package-lock rule as `mothman env dbt-deps` and REFUSES on stale
+  packages, naming `mothman env dbt-deps`; one meaning of "installed"
+  everywhere. REQ-QAC-368 c6 amended. REJECTED keeping it as signed.
+- Q11 SETTLED by Keith 2026-11-03, wording approved as written:
+  REQ-TEST-357 c2 ends "...collection by collection, normalising the
+  data_asset_id segment REQ-QAC-344 renames and the database identity row,
+  and the delivery names and receipt sequences criterion 3 lists."
+  REQ-QAC-368's title becomes "Each asset has a dbt project of its own under
+  assets/<asset>/dbt/, taking the shared macros and generic tests from
+  dbt_shared/ through its macro-paths and test-paths, and its packages are
+  installed by `mothman env dbt-deps`".
+- Q12 SETTLED by Keith 2026-11-03 (as recommended): NO regression test for
+  the .devcontainer/post-create.sh wiring fix - the hard-coded path is gone
+  and the script calls the one command that knows the paths. REJECTED a test
+  that every dbt path named in the setup scripts exists.
+- Q13 CHANGED by Keith 2026-11-03 (against the recommendation): the schedule
+  gate's git-ref guards (agreement freeze, amber, replacement and list-setting)
+  REFUSE an asset folder outside the repository only when a deployment has
+  deliberately injected its asset root elsewhere (REQ-PIPE-342's injection);
+  other outside paths keep reading as "no previous state". REJECTED refusing
+  every outside folder (moving nine tests' copies inside the repository), and
+  never refusing.
+- Q14 SETTLED by Keith 2026-11-03 (as recommended): C7's line stays as built
+  - only code building a repository path refuses an outside asset folder;
+  plain file readers accept one (REQ-PIPE-342 d20). REJECTED refusing in
+  every reader.

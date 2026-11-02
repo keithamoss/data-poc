@@ -6221,3 +6221,17 @@ could never have computed it), and it belongs with batch 5's check work.
      B, C and D go to delivery-scoper with #134, and nothing from them is
      built before Keith signs what the scoper drafts. The duplicate-table
      sighting goes with them to be confirmed or dismissed.
+
+138. **[todo, 2026-11-03]** **[Data generation]** **A rolling anchor date
+     for the synthetic data.** Keith, 2026-11-03, answering morning report 12
+     question 4: the demo data is generated up to a fixed ANCHOR_DATE
+     (2026-09-25, REQ-GEN-042), so once the real date passes a quarterly round
+     the "current" period has no supply and the dashboard goes quiet - which
+     is what broke three browser tests overnight. He chose "make it rolling"
+     over a one-off bump. To scope before building: everything is seeded, so
+     a regenerated history is byte-identical today, and REQ-TEST-239's
+     equivalence compare and the bootstrap cache key both rely on that; a
+     rolling anchor needs either the anchor recorded as an input (so the same
+     anchor reproduces the same bytes) or a rounding rule (e.g. the start of
+     the current week) so it moves rarely. Also: what a test should use as
+     "today", and how CI's cache behaves when the anchor rolls.
