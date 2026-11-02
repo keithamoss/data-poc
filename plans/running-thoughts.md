@@ -6158,3 +6158,19 @@ could never have computed it), and it belongs with batch 5's check work.
 136. **[todo, 2026-11-02]** **[Testing & dev tooling]** **A proper look at why the test suites take so long, and what a fast critical set in CI would be.**
     Keith, 2026-11-02 morning, after the CI cost re-measure (CLAUDE.md, commit-cadence rule: ~80 billable minutes a push on a cache hit, ~145 on a miss, both pytest halves several times what they were on 2026-10-24): "I think we can do something about these tests taking so long. I'd like to do another test audit and really dig into it at some point." In the meantime he asked whether a set of the most critical tests could run in CI in under five minutes, accepting the cost of running the full gate locally instead. **The interim fast set is BUILT as REQ-TEST-375** (signed 2026-11-02; its decisions carry the scoping answers below and the open-question answers, so this item's remaining work is the audit alone). **Still todo, NOT SCOPED: the test-time audit itself** - why the suites take so long, and what would make the full run cheap again.
     **Scoping answers, Keith 2026-11-02:** the fast CI set is a HAND-PICKED `critical` mark (rejected: a measured 'slow' mark, and whole module kinds); I propose the list against stated criteria with timings and Keith signs it off before it reaches CI. Coverage's `fail_under` is enforced in the LOCAL full gate, not CI (rejected: a lower CI floor). The deployment half and the full `test.yml` become a workflow started BY HAND (rejected: nightly, over the allowance; dropping it from CI entirely). The JS tests run ALONGSIDE as their own job, so the Python critical set has the whole five minutes. The full gate runs locally before every push, its result in the commit message.
+
+137. **[todo, 2026-11-02]** **[QA pipeline]** **Is the schedule code bigger
+     than it needs to be?** Keith, 2026-11-02, reading the split overview:
+     "how do we have 1,020 lines in schedule.py and 582 in slots.py? ...
+     that's not complex logic." Measured the same day: the four modules
+     proposed for domain/ are mostly prose. schedule.py is 446 lines of code
+     out of 1,020 (390 docstring lines), slots.py is 228 out of 582,
+     asset_time.py 157 out of 410, hierarchy.py 112 out of 293. The code
+     that is there goes mostly to versioning (every calendar, participation,
+     claim window and time zone is "in force from" a date, so history is
+     judged by the rule in force then), per-dataset overrides and partial
+     participation, and refusals that name the bad line of config. Seen in
+     passing: two functions both called `claim_window` (one in each
+     module), and `slots.fall_hold`, which is a hold rule rather than a slot
+     rule. Nobody has reviewed these modules for simplification. Keith to
+     say whether to do that before #134 moves them into domain/.
