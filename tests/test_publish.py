@@ -440,6 +440,7 @@ class TestThePublishedContentCannotMixWithTheSource:
             "the publish worktree was left registered"
 
 
+@pytest.mark.critical
 class TestTheWorkflowCarriesEveryVariableThePipelineNeeds:
     """Three CI-only failures in one night, each the same shape.
 
@@ -460,7 +461,12 @@ class TestTheWorkflowCarriesEveryVariableThePipelineNeeds:
     here means the gate stops covering the variable somebody just added.
     """
 
-    WORKFLOW = ROOT / ".github" / "workflows" / "test.yml"
+    #: Both workflows that run tests (REQ-TEST-375): the hand-started full
+    #: one, and the push job, which a missing variable would break on every
+    #: push instead.
+    @pytest.fixture(params=["test.yml", "critical.yml"])
+    def workflow(self, request):
+        return ROOT / ".github" / "workflows" / request.param
 
     def _required(self) -> set[str]:
         """Every environment variable something in the pipeline refuses to
@@ -469,16 +475,16 @@ class TestTheWorkflowCarriesEveryVariableThePipelineNeeds:
 
         return {supply_db.SUPPLY_DSN_ENV, environments.ENVIRONMENT_ENV}
 
-    def test_the_test_workflow_names_each_one(self):
-        text = self.WORKFLOW.read_text()
+    def test_the_test_workflow_names_each_one(self, workflow):
+        text = workflow.read_text()
         missing = sorted(name for name in self._required() if name not in text)
         assert not missing, (
-            f"test.yml runs the real pipeline and does not set {', '.join(missing)}. "
+            f"{workflow.name} runs the real pipeline and does not set {', '.join(missing)}. "
             f"Every one of these has no default on purpose - the pipeline refuses "
             f"rather than guessing - so a runner without it fails before any test "
             f"runs, and passes locally where a shell or .env has it.")
 
-    def test_it_also_names_the_test_dsn_it_creates_databases_with(self):
+    def test_it_also_names_the_test_dsn_it_creates_databases_with(self, workflow):
         """Separate from the list above because it is required by the SUITE
         rather than by the pipeline: conftest raises a UsageError without
         it rather than skipping, on the reasoning that a suite silently
@@ -486,21 +492,21 @@ class TestTheWorkflowCarriesEveryVariableThePipelineNeeds:
         nothing."""
         from tests.conftest import TEST_DSN_ENV
 
-        assert TEST_DSN_ENV in self.WORKFLOW.read_text()
+        assert TEST_DSN_ENV in workflow.read_text()
 
-    def test_the_environment_it_claims_to_be_is_one_the_asset_defines(self):
+    def test_the_environment_it_claims_to_be_is_one_the_asset_defines(self, workflow):
         """A value nobody defined would fail at run time with a list of the
         real ones - which is the right error and a slow way to find it."""
         import re
 
         from qa_tools.common import environments
 
-        text = self.WORKFLOW.read_text()
+        text = workflow.read_text()
         found = re.search(r"MOTHMAN_ENVIRONMENT:\s*(\S+)", text)
-        assert found, "test.yml does not set MOTHMAN_ENVIRONMENT"
+        assert found, f"{workflow.name} does not set MOTHMAN_ENVIRONMENT"
         assert found.group(1) in {e.id for e in environments.all_environments()}
 
-    def test_the_environment_it_claims_publishes_nothing(self):
+    def test_the_environment_it_claims_publishes_nothing(self, workflow):
         """A runner must never be an environment whose build is the
         published one - it has no route to a real database, and
         REQ-PIPE-092 moved publishing out of Actions entirely."""
@@ -509,7 +515,7 @@ class TestTheWorkflowCarriesEveryVariableThePipelineNeeds:
         from qa_tools.common import environments
 
         claimed = re.search(r"MOTHMAN_ENVIRONMENT:\s*(\S+)",
-                             self.WORKFLOW.read_text()).group(1)
+                             workflow.read_text()).group(1)
         by_id = {e.id: e for e in environments.all_environments()}
         assert by_id[claimed].publishes is False
 
@@ -633,11 +639,18 @@ class TestNeitherHalfOfCIQuietlyStopsCovering:
         for absent in ("bootstrap", "playwright", "--cov", "coverage"):
             assert absent not in runs, absent
 
+    def test_the_push_job_lints_the_yaml(self):
+        """yamllint --strict (duplicate keys) only ever ran in test.yml's fast
+        half; with that half started by hand, push CI must carry it."""
+        runs = [s.get("run", "") for s in self._load(self.PUSH)["jobs"]["critical"]["steps"]]
+        assert "uv run yamllint --strict ." in runs
+
     def test_the_js_suite_runs_beside_it_not_after_it(self):
         job = self._load(self.PUSH)["jobs"]["js-tests"]
         assert "needs" not in job
         assert any(s.get("run") == "npm test" for s in job["steps"])
 
+    @pytest.mark.critical
     def test_the_push_job_carries_the_full_jobs_environment(self):
         full = self._load(self.FULL)["jobs"]["test"]["env"]
         push = self._load(self.PUSH)["jobs"]["critical"]["env"]
@@ -723,3 +736,52 @@ class TestACriticalTestCIcannotRunFailsCollection:
 
     def test_an_unmarked_test_needing_both_is_none_of_its_business(self):
         self._refuse(self._Item("t::x", marks=("needs_deployment",), fixtures=("page",)))
+
+    def test_importing_a_helper_that_can_launch_one_is_not_driving_one(self, tmp_path):
+        """The accepted limit, pinned: cli.dashboard imports the render check,
+        and the publish guards that import it stub the check out."""
+        module = tmp_path / "test_uses_helper.py"
+        module.write_text("from cli import dashboard\n")
+        item = self._Item("t::helper", marks=("critical",))
+        item.path = module
+        self._refuse(item)
+
+    def test_a_module_launching_playwright_itself_is_refused(self, tmp_path):
+        module = tmp_path / "test_launches.py"
+        module.write_text("from playwright.sync_api import sync_" "playwright\n")
+        item = self._Item("t::own", marks=("critical",))
+        item.path = module
+        with pytest.raises(pytest.UsageError, match=r"t::own \(drives a browser\)"):
+            self._refuse(item)
+
+    def test_a_browser_reached_through_a_fixture_is_refused(self, tmp_path):
+        """The fixture lives in a module of its own, as a real one would: this
+        module must not itself name Playwright, or every critical test in it
+        would be refused by the module scan."""
+        import importlib.util
+        from types import SimpleNamespace
+
+        source = tmp_path / "launching_fixture.py"
+        source.write_text("def launches():\n    from playwright.sync_api import "
+                          "sync_" "playwright  # noqa: F401\n")
+        spec = importlib.util.spec_from_file_location("launching_fixture", source)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        item = self._Item("t::fixture", marks=("critical",), fixtures=("my_page",))
+        item._fixtureinfo = SimpleNamespace(
+            name2fixturedefs={"my_page": [SimpleNamespace(func=module.launches)]})
+        with pytest.raises(pytest.UsageError, match=r"t::fixture \(drives a browser\)"):
+            self._refuse(item)
+
+    def test_a_fixture_merely_defined_beside_playwright_code_is_not(self):
+        """Fixtures are judged by their own function, not their module:
+        conftest.py names playwright for fixtures that launch nothing."""
+        from types import SimpleNamespace
+
+        def plain():
+            return 1
+
+        item = self._Item("t::plain", marks=("critical",), fixtures=("plain",))
+        item._fixtureinfo = SimpleNamespace(
+            name2fixturedefs={"plain": [SimpleNamespace(func=plain)]})
+        self._refuse(item)

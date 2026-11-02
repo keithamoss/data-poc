@@ -13605,3 +13605,30 @@ twice. It deliberately did not re-find the `TypeError`.
      - **7. Nits (fixed)**: A1-A5 marked applied and dated; the agency row
        names the tool by display name; each remaining PROVISIONAL question
        carries a recommendation.
+
+305. **[done, 2026-11-02]** **[Testing & dev tooling]** **[Docs & process]** **Post-build critic on REQ-TEST-375 (the interim fast CI set; 1bf7cfc7): one defect decided by Keith, one coverage gap and two prose gaps fixed, two nits fixed or accepted.**
+     Each was checked against the code before it went here; the gap fix is
+     test-first and was seen failing first.
+     - **1. The one-publish-path guard names a second pusher (defect, SETTLED
+       by Keith 2026-11-02)**: tests/test_publish.py's
+       `test_only_one_function_in_the_cli_pushes_anything` allows
+       `worktree_snapshot.py::snapshot_one` beside `dashboard.py::_publish`.
+       The coordinator added that exception without sign-off. Keith signed
+       it: the snapshot pushes only wip/*-snap refs and publishes nothing.
+       REJECTED: moving the push out of cli/, and removing the command.
+       Recorded as a decision on REQ-PIPE-092 (criterion 9 owns the rule);
+       test_worktree_snapshot.py's two guards are now `critical`.
+     - **2. Push CI lost `yamllint --strict` (gap, fixed test-first)**: it
+       only ran in test.yml's fast half. critical.yml runs it as a step.
+     - **3. CLAUDE.md still said CI runs the full suite (fixed)**: the
+       coverage paragraph and "CI is not affected" now name the local gate
+       and the hand-started test.yml. test.yml's own "every push" comments
+       are corrected too.
+     - **4. The variable guard read only test.yml (fixed)**: it reads both
+       workflows; it and the environment check are `critical`, recorded on
+       REQ-TEST-375 as guard tests.
+     - **5. Browser detection read only the test's module (nit, widened and
+       limit accepted)**: fixture functions are read too. A product helper
+       is accepted as undetected (REQ-TEST-375's decision says why: an
+       import scan refused eleven approved tests, and a real browser launch
+       fails on the push runner anyway).

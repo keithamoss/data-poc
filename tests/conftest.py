@@ -22,6 +22,8 @@ from __future__ import annotations
 import collection_modules
 
 import os
+import re
+from pathlib import Path
 from datetime import date
 
 import pytest
@@ -1107,25 +1109,57 @@ BROWSER_FIXTURES = frozenset({"browser", "browser_type", "context", "page", "pla
 
 
 def _drives_a_browser(item) -> bool:
-    """A browser by its fixtures, by the browser-test markers, or by a module
-    that launches Playwright itself (read once per module: no fixture or mark
-    says so there)."""
+    """A browser by pytest-playwright's fixtures anywhere in the closure, by the
+    browser-test markers, or by Playwright named in source: the test's own
+    module, and the FUNCTION of every fixture in its closure (never a fixture's
+    whole module: conftest.py names playwright for fixtures that launch nothing).
+
+    ACCEPTED LIMIT (post-build-review): a browser reached through a PRODUCT
+    HELPER is not detected. Tried and rejected: scanning the repository modules
+    a test imports refused eleven approved test_publish.py tests, because
+    cli.dashboard imports the render check while those tests stub it - importing
+    code that can launch a browser is not driving one. It cannot pass quietly on
+    the push runner: no browser is installed there, so such a test fails, and if
+    it skips instead the job's zero-skip check fails it."""
     if BROWSER_FIXTURES & set(getattr(item, "fixturenames", ())):
         return True
     if item.get_closest_marker("shared_page") or item.get_closest_marker("fresh_load"):
         return True
     path = getattr(item, "path", None)
-    if path is None:
-        return False
-    if path not in _LAUNCHES_PLAYWRIGHT:
+    if path is not None and _names_playwright(path):
+        return True
+    info = getattr(item, "_fixtureinfo", None)
+    for defs in (getattr(info, "name2fixturedefs", None) or {}).values():
+        for fixturedef in defs:
+            if _function_names_playwright(getattr(fixturedef, "func", None)):
+                return True
+    return False
+
+
+_PLAYWRIGHT = re.compile(r"^\s*(?:from|import)\s+playwright\b|sync_playwright|async_playwright",
+                         re.M)
+_NAMES_PLAYWRIGHT: dict = {}
+
+
+def _names_playwright(path) -> bool:
+    """Whether a file imports or launches Playwright, read once per file."""
+    if path not in _NAMES_PLAYWRIGHT:
         try:
-            _LAUNCHES_PLAYWRIGHT[path] = "sync_playwright" in path.read_text()
+            _NAMES_PLAYWRIGHT[path] = bool(_PLAYWRIGHT.search(Path(path).read_text()))
         except OSError:
-            _LAUNCHES_PLAYWRIGHT[path] = False
-    return _LAUNCHES_PLAYWRIGHT[path]
+            _NAMES_PLAYWRIGHT[path] = False
+    return _NAMES_PLAYWRIGHT[path]
 
 
-_LAUNCHES_PLAYWRIGHT: dict = {}
+def _function_names_playwright(func) -> bool:
+    import inspect
+
+    if func is None:
+        return False
+    try:
+        return bool(_PLAYWRIGHT.search(inspect.getsource(func)))
+    except (OSError, TypeError):
+        return False
 
 
 def _refuse_a_critical_test_ci_cannot_run(items):

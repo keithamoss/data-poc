@@ -63,6 +63,7 @@ def test_a_snapshot_carries_tracked_and_untracked_changes_but_not_ignored_ones(r
     assert git(remote, "rev-parse", f"{pushed}^") == git(wt, "rev-parse", "HEAD")
 
 
+@pytest.mark.critical  # REQ-TEST-375: a guard test for REQ-PIPE-092's one named exception
 def test_the_worktree_is_left_exactly_as_it_was(repo):
     main, _ = repo
     wt = main.parent / "wt"
@@ -126,6 +127,7 @@ def test_the_command_reports_each_worktree(repo, monkeypatch):
     assert "feature: snapshot abc1234 built, not pushed" in out.output
 
 
+@pytest.mark.critical  # REQ-TEST-375: a guard test for REQ-PIPE-092's one named exception
 def test_it_only_ever_pushes_to_a_wip_snap_ref(repo):
     """Why the publish-path guard (tests/test_publish.py) lets this one pusher
     through: it publishes nothing. Every ref it writes is wip/<branch>-snap,
