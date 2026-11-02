@@ -1,15 +1,5 @@
 """The data asset's own clock, resolved from one place (REQ-PIPE-048).
 
-WHAT THIS REPLACES. Until 2026-09-23 the asset's timezone was a
-hardcoded `AWST_OFFSET = timedelta(hours=8)` in `pipeline/cadence.py`,
-and every wall-clock computation in the repo leaned on it - a comment
-saying "WA doesn't observe daylight saving" doing the work a
-configuration value should. Separately, `classify_arrival()` took any
-timestamp without an offset and silently treated it as UTC. Its own
-docstring admitted this. That is the bug this requirement is named for:
-a supply that arrived at 10pm in Perth read as having arrived the
-following afternoon.
-
 THREE RULES, and the third is the one that makes the other two safe:
 
 1. ONE configuration value. `contract/data-asset.yaml`'s `timezone:`,
@@ -31,10 +21,7 @@ THREE RULES, and the third is the one that makes the other two safe:
 A DATE IS NOT AN INSTANT, and `end_of_day()` is where that gets
 decided. A date means the whole of that day in the asset's own zone, so
 as an instant it is that day's last moment - which is what a comparison
-like "this run is on or before the as-of date" has always meant. It was
-previously true by coincidence, from comparing ISO date STRINGS
-lexicographically, and coincidence is a poor thing to build the next
-five requirements' comparisons on.
+like "this run is on or before the as-of date" has always meant.
 """
 from __future__ import annotations
 
@@ -45,7 +32,7 @@ from datetime import UTC, date, datetime, time, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from qa_tools.common import assets, config_yaml
+from qa_tools.common import assets, config_yaml, in_force
 
 
 def data_asset_yaml() -> Path:
@@ -143,14 +130,19 @@ def zone_on(day: date, versions: tuple[ZoneVersion, ...] | None = None) -> ZoneI
     many instants takes it once and passes it down rather than reading the
     file for each (REQ-PIPE-254 criterion 19). Without it the file is read
     now."""
-    from qa_tools.common import in_force
+    return _zone_in_force(versions, day, lambda v: v.effective_from)
 
+
+def _zone_in_force(versions, on, start) -> ZoneInfo:
+    """The zone of the version in force `on`, each version starting at
+    `start(version)`, or NoTimezoneVersion naming `on` and the earliest
+    start."""
     versions = timezone_versions() if versions is None else versions
-    found = in_force.version_on(versions, day)
+    found = in_force.version_on(versions, on, key=start)
     if found is None:
         raise NoTimezoneVersion(
-            f"no timezone version covers {day.isoformat()} - the earliest starts "
-            f"{versions[0].effective_from.isoformat()}. Not falling back to it.")
+            f"no timezone version covers {on.isoformat()} - the earliest starts "
+            f"{start(versions[0]).isoformat()}. Not falling back to it.")
     return found.zone
 
 
@@ -159,15 +151,7 @@ def zone_at(instant: datetime, versions: tuple[ZoneVersion, ...] | None = None) 
     a date (criterion 4)."""
     if instant.tzinfo is None or instant.utcoffset() is None:
         raise NaiveTimestampError(f"zone_at(): {instant!r} carries no UTC offset")
-    from qa_tools.common import in_force
-
-    versions = timezone_versions() if versions is None else versions
-    found = in_force.version_on(versions, instant, key=lambda v: v.starts_at)
-    if found is None:
-        raise NoTimezoneVersion(
-            f"no timezone version covers {instant.isoformat()} - the earliest starts "
-            f"{versions[0].starts_at.isoformat()}. Not falling back to it.")
-    return found.zone
+    return _zone_in_force(versions, instant, lambda v: v.starts_at)
 
 
 def zone_now() -> ZoneInfo:
@@ -217,6 +201,18 @@ def now() -> datetime:
     return datetime.now(UTC).astimezone(zone_now())
 
 
+def _parse_iso(value, where: str) -> datetime:
+    """`value` as a datetime - itself if it is one, else its ISO text, a
+    space separator accepted - naive or aware as written."""
+    if isinstance(value, datetime):
+        return value
+    text = str(value).strip()
+    try:
+        return datetime.fromisoformat(text.replace(" ", "T"))
+    except ValueError as exc:
+        raise ValueError(f"{where}: {text!r} is not an ISO timestamp - {exc}") from None
+
+
 def parse_instant(value, where: str) -> datetime:
     """One stored value as an aware instant, or `NaiveTimestampError`.
 
@@ -229,14 +225,7 @@ def parse_instant(value, where: str) -> datetime:
     `where` is the human answer to "and where did THAT come from" -
     a field name and its file, ideally.
     """
-    if isinstance(value, datetime):
-        parsed = value
-    else:
-        text = str(value).strip()
-        try:
-            parsed = datetime.fromisoformat(text.replace(" ", "T"))
-        except ValueError as exc:
-            raise ValueError(f"{where}: {text!r} is not an ISO timestamp - {exc}") from None
+    parsed = _parse_iso(value, where)
     if parsed.tzinfo is None or parsed.utcoffset() is None:
         try:
             zone = zone_on(parsed.date()).key
@@ -261,25 +250,28 @@ def localise(value: datetime, versions: tuple[ZoneVersion, ...] | None = None) -
     return instant.astimezone(zone_at(instant, versions))
 
 
+def parse_hhmm(hhmm: str) -> tuple[int, int]:
+    """"HH:MM" - a participation's expected time - as (hour, minute)."""
+    hour, minute = (int(x) for x in hhmm.split(":"))
+    return hour, minute
+
+
 def wall_clock(day: date, hhmm: str) -> datetime:
     """A wall-clock time on a given day in the asset's zone, as an
-    instant. `hhmm` is "HH:MM" - a contract's `expectedTime`.
-
-    Replaces `expected_moment_utc()`'s subtract-a-fixed-offset
-    arithmetic. Same answer today, and a correct one in a zone that
-    observes daylight saving.
+    instant. `hhmm` is "HH:MM" - a participation's expected time.
 
     In the zone in force ON that day (REQ-PIPE-112 criterion 3). A time
     that does not exist that day, or exists twice, raises rather than
     being guessed - the schedule gate refuses such a configuration first
     (criterion 8), so reaching this is a configuration the gate never saw.
     """
-    problem = wall_clock_problem(day, hhmm)
+    hour, minute = parse_hhmm(hhmm)
+    zone = zone_on(day)
+    problem = _wall_clock_problem(day, hour, minute, zone)
     if problem:
         raise ValueError(f"{hhmm} on {day.isoformat()} {problem} in "
-                         f"{zone_on(day).key} - daylight saving; no instant is guessed")
-    hour, minute = (int(x) for x in hhmm.split(":"))
-    return datetime(day.year, day.month, day.day, hour, minute, tzinfo=zone_on(day))
+                         f"{zone.key} - daylight saving; no instant is guessed")
+    return datetime(day.year, day.month, day.day, hour, minute, tzinfo=zone)
 
 
 def wall_clock_problem(day: date, hhmm: str) -> str | None:
@@ -288,8 +280,11 @@ def wall_clock_problem(day: date, hhmm: str) -> str | None:
     the wall-clock time through the zone rather than by consulting
     offsets (decision 14): a time in a spring-forward gap does not come
     back as itself, and one in a fall-back overlap has two offsets."""
-    hour, minute = (int(x) for x in hhmm.split(":"))
-    zone = zone_on(day)
+    hour, minute = parse_hhmm(hhmm)
+    return _wall_clock_problem(day, hour, minute, zone_on(day))
+
+
+def _wall_clock_problem(day: date, hour: int, minute: int, zone: ZoneInfo) -> str | None:
     first = datetime(day.year, day.month, day.day, hour, minute, tzinfo=zone, fold=0)
     second = first.replace(fold=1)
     back = first.astimezone(UTC).astimezone(zone)
@@ -347,16 +342,10 @@ def isoformat(value: datetime) -> str:
 # arrives with no offset - this project's synthetic feed included, whose
 # arrival calibration is written in hours-from-midnight UTC (see
 # generator/daily_batch.py's own comment). Somebody has to decide what
-# that means before it can be compared with anything.
-#
-# The bug REQ-PIPE-048 fixes was not that an assumption existed. It was
-# that the assumption was made INVISIBLY, at every read, forever -
-# classify_arrival() quietly attached UTC to whatever it was handed, so
-# no record existed of a decision having been taken at all. Making it
-# once, at the boundary where a supplier's value becomes our stored
-# record, and writing the offset into that record permanently, is a
-# different thing: the next reader sees what was decided rather than
-# inheriting it.
+# that means before it can be compared with anything. It is decided once,
+# at the boundary where a supplier's value becomes our stored record, and
+# written into that record, so the next reader sees what was decided
+# rather than inheriting it.
 #
 # Deliberately UTC and not the asset's own zone: changing it would move
 # every arrival verdict in committed history, and criterion 5 says a
@@ -373,18 +362,9 @@ def record_source_instant(value, where: str) -> str | None:
     value is kept as it is - if a supplier ever does send an offset, it
     is theirs to state, not ours to overwrite.
     """
-    if value is None:
+    if value is None or (not isinstance(value, datetime) and not str(value).strip()):
         return None
-    if isinstance(value, datetime):
-        parsed = value
-    else:
-        text = str(value).strip()
-        if not text:
-            return None
-        try:
-            parsed = datetime.fromisoformat(text.replace(" ", "T"))
-        except ValueError as exc:
-            raise ValueError(f"{where}: {text!r} is not an ISO timestamp - {exc}") from None
+    parsed = _parse_iso(value, where)
     if parsed.tzinfo is None or parsed.utcoffset() is None:
         parsed = parsed.replace(tzinfo=SOURCE_TIMESTAMP_OFFSET)
     return parsed.isoformat()
@@ -398,13 +378,10 @@ def arrival_key(received_at) -> str:
     SQL identifiers, and DuckDB's parameter binding covers values, not
     identifiers. Everything that reaches a name here is either ours or
     a validated dataset id.
+
+    Kept here rather than in supply_db because the committed-history
+    readers need it and never import a database driver - and it is a pure
+    function of an instant.
     """
     text = received_at if isinstance(received_at, str) else received_at.isoformat()
     return re.sub(r"[^0-9]", "", text)[:20] or "0"
-
-
-# Kept HERE rather than in supply_db, where it started, because the
-# committed-history readers need it and may never import duckdb - the
-# standing rule that CI and any read-committed-history path never
-# depends on live data access. It is a pure function of an instant, so
-# this is also simply where it belongs.
