@@ -437,12 +437,20 @@ def dbt_project_ready() -> Path:
     refused before dbt is invoked when they are not (REQ-QAC-368 criterion
     6), naming the asset and the one command that fixes it, rather than
     failing later with a FileNotFoundError on manifest.json."""
+    # ONE MEANING OF "INSTALLED" EVERYWHERE (Keith, 2026-11-03, morning
+    # report 12 Q10; criterion 6 as amended): dbt's own package-lock rule, the
+    # one `mothman env dbt-deps` decides by, so packages outdated by an edit to
+    # packages.yml, or deleted since, are refused as a missing folder is.
+    # REJECTED keeping the missing-or-empty folder test as first signed.
+    from qa_tools.common import dbt_common
+
     asset = selected()
-    packages = asset.dbt_packages
-    if not packages.is_dir() or not any(packages.iterdir()):
+    if not dbt_common.packages_installed(asset.dbt_project):
         raise DbtPackagesMissing(
-            f"asset {asset.name!r} has no dbt packages installed - {packages} is missing or "
-            f"empty, so dbt cannot compile its checks. Run `mothman env dbt-deps` (with "
+            f"asset {asset.name!r} has no current dbt packages installed - "
+            f"{asset.dbt_project / dbt_common.PACKAGE_LOCK} is missing or stale against "
+            f"packages.yml, or a package it names is missing from {asset.dbt_packages}, so "
+            f"dbt cannot compile its checks. Run `mothman env dbt-deps` (with "
             f"{ASSET_ENV}={asset.name}), then run this again.")
     return asset.dbt_project
 

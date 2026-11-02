@@ -4614,6 +4614,24 @@ function columnsNotGreenCell(units, quietStatus, noVerdict, ctx){
   const series = unitCounts(units);
   const faint = t=> `<span class="not-green-faint">${t}</span>`;
   if(!series.length) return faint("No column has a verdict on this date");
+  // THE CROSS-TABLE SECTION'S VERDICT ON A QUIET DATE (Keith, 2026-11-03,
+  // morning report 12 Q1; criterion 18): the page's tiles go quiet, but its
+  // cross-table section still reads the verdict the warehouse holds, so the
+  // row counts that section exactly as the page does - and the lines' name
+  // says the same count.
+  const xt = noVerdict && ctx ? crossTableSectionHead(ctx.col, ctx.ds, CURRENT_IN_PLACE_ON) : null;
+  if(xt && ["red", "amber", "green"].includes(xt.head)){
+    const red = xt.head === "red" ? 1 : 0, amber = xt.head === "amber" ? 1 : 0;
+    const split = `${red} failing, ${amber} warning${red + amber ? ` · incl. ${xt.name}` : ""}`;
+    const count = red + amber
+      ? `<b class="not-green-count">${red + amber} of 1</b><div class="not-green-split">${escHtml(split)}</div>`
+      : `<span class="not-green-count all-green">All 1 passing</span>`;
+    const lines = series.length < 2 ? "" : twoLineSparkline(series, {quiet: true, unitWord: "Columns", w: 120, h: 28,
+      label: ser=> `${noVerdictTrendLabel("Columns", ser).replace(/; no column has a verdict on this date$/, "")}; latest ${red} failing and ${amber} warning of 1`,
+      pointTitle: p=> pointSourceTitle(ctx.col, ctx.ds, p)});
+    const name = red + amber ? `${red + amber} of 1 columns not passing: ${split}` : "All 1 passing";
+    return `<div class="not-green-cell"><div class="not-green-text" role="group" aria-label="${escAttr(name)}">${count}</div><div class="not-green-lines">${lines}</div></div>`;
+  }
   if(noVerdict){
     // The name says what the text says (post-build-review #184): the lines
     // are history, and no latest count is claimed.
@@ -6651,6 +6669,28 @@ function crossTableGridHtml(rows, leftOut){
 function crossTableSectionStatus(quiet, worst, rows){
   const statuses = [...(quiet ? [] : [worst]), ...rows.map(r=> r.status)];
   return statuses.length ? rollupStatuses(statuses) : "nodata";
+}
+// THE CROSS-TABLE SECTION AS THE DATASET PAGE READS IT, ONCE, for the page
+// and for the dataset list's 'Columns not green' row (REQ-DASH-225 criterion
+// 18: the page is the reference; Keith, 2026-11-03, morning report 12 Q1): its
+// checks, the rows of its grid and the head's pill. Null where the dataset has
+// no cross-table checks and none left out for the agreement. Any dataset's,
+// never one named.
+function crossTableSectionHead(col, ds, dateStr){
+  const columns = scopedColumns(ds, "cross-table");
+  const checks = columns.flatMap(c=> (c.checks||[]).filter(ck=> !ck.retired));
+  const outside = notInAgreementShown(col, ds);
+  if(!checks.length && !outside.length) return null;
+  const listed = columns.flatMap(c=> (c.checks||[]).filter(ck=> !ck.retired).map(ck=> ({c, ck})));
+  // GOES QUIET WITH THE TILES (post-build-review #183), EXCEPT A HELD
+  // TABLE'S (REQ-DASH-264 criterion 5) - see the page's sections.
+  const quiet = ds.noDataInPlaceOn && !ds.crossTableRowsWhileHeld;
+  const worst = quiet ? "nodata" : rollupStatuses(checks.map(checkStatus));
+  const rows = listed.length || outside.length ? crossTableGridRows(col, ds, listed, dateStr) : [];
+  // The head's pill is drawn only over checks of the section's own.
+  const head = checks.length ? crossTableSectionStatus(quiet, worst, rows) : "nodata";
+  return {columns, checks, outside, listed, quiet, worst, rows, head,
+          name: (columns[0] && columns[0].name) || "Cross-table checks"};
 }
 // A GROUP OPENS AND CLOSES ON CLICK, and only on the page: nothing of it
 // reaches the URL (criterion 7). WHAT THE READER OPENED SURVIVES A RE-RENDER
@@ -10389,6 +10429,7 @@ function renderDataset(view, agencyId, collectionId, datasetId){
   // out for the agreement, said in the cross-table section - which appears for
   // them even where they are the only cross-table checks the page has.
   const notInAgreement = notInAgreementShown(col, ds);
+  const xtHead = crossTableSectionHead(col, ds, CURRENT_IN_PLACE_ON);
   let xtRows = [], xtViews = [];
   scopeWrap.innerHTML = COLUMN_SCOPES.map(sc=>{
     const columns = scopedColumns(ds, sc.scope);
@@ -10420,12 +10461,13 @@ function renderDataset(view, agencyId, collectionId, datasetId){
     // per check, a cell per view; on an awaiting page its caption says whose
     // results they are, in the blurb's slot.
     if(sc.scope === "cross-table" && (listed.length || outside.length)){
-      xtRows = crossTableGridRows(col, ds, listed, CURRENT_IN_PLACE_ON);
+      // ONE READING, SHARED WITH THE DATASET LIST'S ROW (crossTableSectionHead).
+      xtRows = xtHead.rows;
       const grid = crossTableGridHtml(xtRows, leftOutRowModels(col, outside));
       xtViews = grid.views;
       // NO RED ROW UNDER A NON-RED PILL: the head follows the rows' pills,
       // which are the gate's reading (criterion 6).
-      const head = crossTableSectionStatus(quiet, worst, xtRows);
+      const head = xtHead.head;
       const awaiting = ds.verdictOf && ds.verdictOf.state === "awaiting" && ds.lastArrival;
       const caption = awaiting
         ? `<div class="blurb xt-caption" data-xt-caption>Results for the supply received ${fmtInstant(ds.lastArrival.arrivedAt)}, awaiting a decision</div>`
