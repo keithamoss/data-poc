@@ -266,3 +266,8 @@ the rebuild needs no question asked twice. Drafts and builders read this file.
      names a collection step the menu skips): the POINTER DROPS the collection
      step when the asset has one collection; the menu is unchanged. REJECTED
      always showing the collection picker.
+- SCENARIOS.md AFTER THE MOVE, SETTLED by Keith 2026-11-02 ~21:55 Perth:
+  (a) build REQ-PIPE-352 criterion 3 (one SCENARIOS-<asset>.md per asset,
+  generated from that asset's own history) INSIDE the move, before it
+  merges. REJECTED (b), merging the move with the scenario-map gate red
+  until c3 is built separately.
