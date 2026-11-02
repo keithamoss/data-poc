@@ -37,6 +37,7 @@ from dataclasses import dataclass
 
 from qa_tools.common import (decision_log, hierarchy, inheritance, people,
                              promotion, rejection, substitution, supply_db)
+from qa_tools.common import assets as _assets
 
 #: The eight operations criterion 1 names, and the vocabulary both
 #: routes speak. They are the decision log's own action names rather
@@ -1416,7 +1417,7 @@ def held_responses(dataset_id: str, supply: str, held) -> str:
     from qa_tools.common import placing
 
     if held is not None and held.schedule_ended:
-        return ("Add the next delivery dates to contract/calendar.yaml and it files itself. "
+        return (f"Add the next delivery dates to {_assets.config_dir()}/calendar.yaml and it files itself. "
                 "Where a declared correction is needed:\n  mothman schedule draft-correction")
     return (f"Place it into the period it belongs to, at '{placing.where_to_decide(dataset_id)}', "
             f"or:\n  {placing.flag_form(dataset_id, supply)}\n"

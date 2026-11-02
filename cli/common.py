@@ -82,7 +82,7 @@ class NotInteractive(click.ClickException):
 def environment_statement() -> str | None:
     """Which environment this terminal is acting against, in the dashboard's
     own words (REQ-TEST-114 criteria 5 and 7): the label from
-    contract/environments.yaml for the environment actually resolved, plus
+    assets/environments.yaml for the environment actually resolved, plus
     'not production' wherever it does not publish - words, never colour
     alone, so they survive NO_COLOR, a pipe and a dumb terminal (criterion
     6). None when no environment resolves. Reads configuration and one

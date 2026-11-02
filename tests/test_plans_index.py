@@ -7,11 +7,12 @@ WITHOUT deleting anything - it is a derived view, and every entry it
 lists still exists in full in its own file.
 """
 from __future__ import annotations
+
+import pytest
 from pathlib import Path
 
 from dashboard.plans_index import _list_leads, build_index
 from dashboard.plans_md import parse_plans
-import pytest
 
 
 #: REQ-TEST-375: in the hand-picked set every push runs in CI.
@@ -172,3 +173,8 @@ def test_a_dotted_filename_survives_term_extraction():
         "- This reverses CLAUDE.md's earlier wording. And a new sentence.")
     assert leads == ["qa_tools/common/qa_results_writer.py",
                      "This reverses CLAUDE.md's earlier wording"], leads
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = [*(pytestmark if isinstance(pytestmark, list) else [pytestmark]), pytest.mark.asset("quarterly")]

@@ -17,6 +17,8 @@ from types import SimpleNamespace
 
 import pytest
 
+import asset_params
+
 from qa_tools.common import decision_log, promotion
 
 
@@ -42,8 +44,8 @@ def captured(monkeypatch):  # noqa: D401
 ARRIVAL = SimpleNamespace(received_at=None, run_id="run_001")
 
 
-@pytest.mark.parametrize("collection_id", ["civil-registration", "child-protection"],
-                         ids=["bdm", "cp"])
+@pytest.mark.parametrize("collection_id", asset_params.per_asset(
+    ["civil-registration", "child-protection"], ids=["bdm", "cp"]))
 def test_the_rule_not_the_operator_is_the_actor(collection_id, captured, monkeypatch):
     from qa_tools.tools import orchestrate
 
@@ -66,3 +68,8 @@ def test_the_rule_not_the_operator_is_the_actor(collection_id, captured, monkeyp
 
 def test_the_rule_has_a_name_of_its_own():
     assert promotion.RULE_ACTOR == "promotion rule"
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

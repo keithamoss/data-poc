@@ -33,6 +33,8 @@ the commit message - the record of what ran, on which tree.
 """
 from __future__ import annotations
 
+import re
+
 import os
 import shutil
 import subprocess
@@ -136,10 +138,11 @@ _GATES: tuple[tuple[str, list[str], str, bool], ...] = (
      "every road-testing entry carries a well-formed feedback card", False),
     ("scenarios", ["uv", "run", "mothman", "scenarios", "validate"],
      "every scripted decision names a registered scenario and a real decision", True),
-    # REQ-TEST-253: a plans/supply-model.md edit can make SCENARIOS.md
-    # stale, and until this gate only pytest noticed (2026-10-15).
+    # REQ-TEST-253: a plans/supply-model.md edit can make an asset's
+    # SCENARIOS-<asset>.md stale, and until this gate only pytest noticed
+    # (2026-10-15). One map per asset (REQ-PIPE-352 criterion 3).
     ("scenario map", ["uv", "run", "mothman", "scenarios", "map", "--check"],
-     "SCENARIOS.md matches the register and the recorded placements", True),
+     "SCENARIOS-<asset>.md matches the register and the asset's recorded placements", True),
     # REQ-GHUB-082 criterion 29. A person without a `github:` is shown
     # on the dashboard, assigned nothing, and discovers they cannot
     # raise a filing decision at the moment they try to raise one -
@@ -176,7 +179,9 @@ _DOCS_GATES = frozenset({"yamllint", "plans", "requirements", "sprints", "change
                          "feedback", "scenarios", "scenario map", "premise",
                          "provisional"})
 _DOCS_PATHS = ("plans/", "docs/", "requirements.yaml", "CHANGELOG.yaml", "CLAUDE.md",
-               "SCENARIOS.md", "README.md", "provisional-baseline.yaml")
+               "README.md", "provisional-baseline.yaml")
+#: Each asset's committed scenario map (REQ-PIPE-352 criterion 3).
+_DOCS_FILE_PATTERN = re.compile(r"SCENARIOS-[a-z0-9-]+\.md")
 
 
 #: Gates that read no asset's configuration: run once, whatever
@@ -226,7 +231,8 @@ def _changed_paths() -> list[str]:
 
 def _outside_docs(paths: list[str]) -> list[str]:
     return [p for p in paths
-            if not any(p == d or (d.endswith("/") and p.startswith(d)) for d in _DOCS_PATHS)]
+            if not any(p == d or (d.endswith("/") and p.startswith(d)) for d in _DOCS_PATHS)
+            and not _DOCS_FILE_PATTERN.fullmatch(p)]
 
 
 def _run_captured(label: str, argv: list[str], can_warn: bool) -> tuple[int, str]:

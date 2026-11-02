@@ -43,6 +43,7 @@ from typing import Sequence
 
 from generator.targeting import Target
 from qa_tools.common import assets, scenario_map
+from qa_tools.common import assets as _assets
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -868,7 +869,7 @@ def _refuse_outside_hold(injection: Injection, anchor_day: date) -> None:
         raise CannotPlace(
             f"{injection.scenario_id}: {', '.join(d.isoformat() for d in outside)} "
             f"fall(s) outside a hold amber-setting era, and the scenario's held supplies "
-            f"need it - move the anchor back inside the era (contract/data-asset.yaml's "
+            f"need it - move the anchor back inside the era ({_assets.config_dir()}/data-asset.yaml's "
             f"amber_setting), or add a version; it is not shifted for you")
 
 
@@ -920,13 +921,13 @@ def link_dates(injection: Injection, placement: Placement,
             return ref, (None if on is None else asset_time.start_of_day(on)), (
                 None if on is not None else
                 f"{reference!r} is not a declared correction - declare it in "
-                f"contract/calendar.yaml, or fix the link")
+                f"{_assets.config_dir()}/calendar.yaml, or fix the link")
         label = f"decision {ref!r}"
         named = [s for s in mine if s.name == ref]
         if not named:
             return label, None, (f"no scripted decision of {', '.join(ours)} is named "
                                  f"{ref!r} - give that decision `name: {ref}` in "
-                                 f"contract/scripted_decisions.yaml, or fix the link")
+                                 f"{_assets.config_dir()}/synthetic/scripted_decisions.yaml, or fix the link")
         if len(named) > 1:
             return label, None, (f"{len(named)} scripted decisions of {', '.join(ours)} "
                                  f"are named {ref!r}, so it names none of them - rename one")
@@ -1005,13 +1006,84 @@ def generated_periods(dataset_id: str) -> list:
     return provider.generated_periods_for(dataset_id)
 
 
+#: The assets whose dropped scenarios this process has already named, so the
+#: warning below is said once per asset, not on every call.
+_WARNED_DROPS: set = set()
+
+
+def this_assets_injections() -> tuple["Injection", ...]:
+    """The injections naming a dataset the selected asset declares.
+
+    ANOTHER ASSET'S SCENARIO IS NOT THIS ONE'S TO PLACE: the table below is
+    still one repository-wide list until each asset holds its own, so an
+    injection naming a dataset the selected asset does not declare is passed
+    over, and placed by its own asset's generation. Telling the other asset's
+    from a typo would mean reading the other asset, which waits for
+    REQ-PIPE-354 - but the drop is NEVER SILENT (SETTLED by Keith 2026-11-02,
+    REQ-GEN-246 criterion 8): a warning names each scenario passed over, once
+    per asset per process."""
+    import warnings
+
+    from qa_tools.common import assets, hierarchy
+
+    mine = {d.dataset_id for d in hierarchy.all_datasets()}
+    dropped = [i for i in INJECTIONS if i.dataset_id not in mine]
+    asset = assets.selected().name
+    if dropped and asset not in _WARNED_DROPS:
+        _WARNED_DROPS.add(asset)
+        named = ", ".join(f"{i.scenario_id} ({i.dataset_id})" for i in dropped)
+        warnings.warn(
+            f"asset {asset!r} passes over {len(dropped)} scenario(s) naming a dataset it does "
+            f"not declare - another asset's, or a dataset no asset declares (telling them "
+            f"apart waits for REQ-PIPE-354): {named}", UserWarning, stacklevel=2)
+    return tuple(i for i in INJECTIONS if i.dataset_id in mine)
+
+
+def _datasets_named() -> dict[str, set]:
+    """Each scenario id -> the dataset ids its injections name, its own and
+    those whose also_demonstrates lists it."""
+    out: dict[str, set] = {}
+    for injection in INJECTIONS:
+        for sid in (injection.scenario_id, *injection.also_demonstrates):
+            out.setdefault(sid, set()).add(injection.dataset_id)
+    return out
+
+
+def other_assets_scenarios() -> set[str]:
+    """The scenarios whose injections name no dataset the selected asset
+    declares - another asset's, left out of this asset's map (REQ-PIPE-352
+    criterion 3). Read from this asset's own hierarchy alone."""
+    from qa_tools.common import hierarchy
+
+    mine = {d.dataset_id for d in hierarchy.all_datasets()}
+    return {sid for sid, named in _datasets_named().items() if not named & mine}
+
+
+def mixed_asset_problems() -> list[str]:
+    """REQ-PIPE-352 criterion 3: a scenario naming both a dataset the selected
+    asset holds and one it does not, named with the asset - each asset's pass
+    reading only its own hierarchy, so a dataset outside it may be the other
+    asset's or no asset's."""
+    from qa_tools.common import assets, hierarchy
+
+    mine = {d.dataset_id for d in hierarchy.all_datasets()}
+    asset = assets.selected().name
+    out = []
+    for sid, named in sorted(_datasets_named().items()):
+        if named & mine and named - mine:
+            out.append(f"{sid} names datasets asset {asset!r} holds "
+                       f"({', '.join(sorted(named & mine))}) and datasets it does not "
+                       f"({', '.join(sorted(named - mine))}) - a scenario is one asset's")
+    return out
+
+
 def unprovided_scenarios() -> list[str]:
     """Every injected scenario naming a dataset no generator provider makes,
     with why - checked before anything is written (REQ-GEN-246 criterion 8)."""
     from generator import collections
 
     out = []
-    for injection in INJECTIONS:
+    for injection in this_assets_injections():
         try:
             collections.for_dataset(injection.dataset_id)
         except collections.NoProviderError as exc:
@@ -1077,7 +1149,8 @@ def link_problems(injections: Sequence[Injection] | None = None,
     for `mothman scenarios validate` - through link_dates(), the resolver
     the generator writes with (criterion 9)."""
     out = []
-    for injection in (injections if injections is not None else INJECTIONS):
+    # The selected asset's own (PROVISIONAL - this_assets_injections).
+    for injection in (injections if injections is not None else this_assets_injections()):
         if not injection.links:
             continue
         try:
@@ -1217,7 +1290,7 @@ def inheritance_placements(periods: Sequence) -> list[Placement]:
     inherited = [i for i, p in enumerate(periods[:-1]) if p.name not in delivered and i > 0]
     if not inherited:
         raise CannotPlace(f"TS-79: {INHERITING_DATASET} inherits in no generated quarter - "
-                          f"its participation in contract/calendar.yaml now covers every "
+                          f"its participation in {_assets.config_dir()}/calendar.yaml now covers every "
                           f"one, so there is no inheritance to link")
     out = []
     for sid, i, why in (("TS-79a", inherited[-1], "the newest quarter it inherits in "
@@ -1235,7 +1308,7 @@ def inheritance_placements(periods: Sequence) -> list[Placement]:
             scenario_id=sid, dataset=INHERITING_DATASET, period=p.name,
             period_date=p.round_date,
             config=(f"quarterly; {INHERITING_DATASET} is delivered only in the quarters "
-                    f"contract/calendar.yaml's participation names, so {p.name} - {why} - "
+                    f"{_assets.config_dir()}/calendar.yaml's participation names, so {p.name} - {why} - "
                     f"inherits {source}'s supply. Nothing generated for it."),
             in_place_on=((sid, middle.isoformat()),),
             subjects=((sid, scenario_map.STANDING_IN_PILL),)))

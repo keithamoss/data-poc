@@ -278,6 +278,7 @@ class TestWhatTheTicketSays:
         # REQ-PIPE-194 criteria 4 and 15: the one phrase for what to do.
         assert "say what each file is" in body
 
+    @pytest.mark.asset("daily")  # a Birth Registrations pair
     def test_two_files_say_the_decision_is_made_in_the_terminal(self):
         """REQ-PIPE-194 criterion 2: several choices, made in the terminal,
         both files as code, where in the TUI - and no GitHub command."""
@@ -288,8 +289,9 @@ class TestWhatTheTicketSays:
         assert "`birth_registrations_2026-11-02.csv`" in body
         assert "`birth_registrations_2026-11-02-1.csv`" in body
         assert "several choices" in body and "terminal" in body
-        assert ("mothman > Filing decisions > Birth Registrations > Supplies waiting on a "
-                "decision") in body
+        # A one-collection asset's pointer skips the collection step, as its
+        # menu does (SETTLED by Keith 2026-11-02, the move critic's decision 3).
+        assert "mothman > Filing decisions > Supplies waiting on a decision" in body
         assert "\n/" not in body and "choose-file" not in body
 
     def test_a_daily_period_is_written_in_words(self):
@@ -540,3 +542,8 @@ class TestAPersonsOperationGoesThroughTheSamePass:
         so the pass would find nothing changed and say nothing - which
         is why the refusal is said directly instead."""
         assert self._decided(False, monkeypatch) == []
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

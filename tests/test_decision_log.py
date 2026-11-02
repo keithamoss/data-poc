@@ -834,3 +834,8 @@ class TestAPersonsOneActTakesOneInstant:
             f"SELECT effective_at FROM {dl.TABLE} WHERE dataset_id = ? AND supply = 'other'",
             [dataset]).fetchall()]
         assert other == supply_status.instant(WHEN)
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = [*(pytestmark if isinstance(pytestmark, list) else [pytestmark]), pytest.mark.asset("quarterly")]

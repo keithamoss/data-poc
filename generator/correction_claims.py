@@ -21,6 +21,7 @@ from datetime import date, timedelta
 from typing import Mapping, Sequence
 
 from generator.scenario_injection import CannotPlace
+from qa_tools.common import assets as _assets
 
 
 def _docs_either_side(reference: str, docs):
@@ -63,7 +64,7 @@ def altered(reference: str, datasets: Sequence[str], *, docs=None,
     p, before, after = _docs_either_side(reference, docs)
     if p is None:
         raise CannotPlace(f"{reference!r} is not a declared correction - declare it in "
-                          f"contract/calendar.yaml first")
+                          f"{_assets.config_dir()}/calendar.yaml first")
     out: dict[str, set[str]] = {}
     for dataset_id in datasets:
         old, new = _slots(dataset_id, before[0], until), _slots(dataset_id, after[0], until)
@@ -123,7 +124,7 @@ def check(injections: Sequence, generated: Mapping[str, Sequence], *, docs=None,
         names = ", ".join(i.scenario_id for i in riding)
         if p is None:
             raise CannotPlace(f"{names} ride {reference!r}, which is not a declared "
-                              f"correction - declare it in contract/calendar.yaml first")
+                              f"correction - declare it in {_assets.config_dir()}/calendar.yaml first")
         if date.fromisoformat(p.date[:10]) > history_end:
             raise CannotPlace(f"{names}: correction {reference} is dated {p.date}, after the "
                               f"generated history ends ({history_end}) - move its date "
@@ -192,9 +193,12 @@ def check_all(collection_id: str | None = None) -> None:
     from generator.anchor_date import get_anchor_date
     from qa_tools.common import hierarchy
 
-    if not any(i.correction for i in scenario_injection.INJECTIONS):
+    # The selected asset's own scenarios only (PROVISIONAL, the asset split -
+    # scenario_injection.this_assets_injections).
+    injections = scenario_injection.this_assets_injections()
+    if not any(i.correction for i in injections):
         return
-    riding = {i.dataset_id for i in scenario_injection.INJECTIONS if i.correction}
+    riding = {i.dataset_id for i in injections if i.correction}
     generated, suppressed = {}, {}
     for d in hierarchy.all_datasets():
         if (collection_id is not None and d.collection_id != collection_id
@@ -207,9 +211,9 @@ def check_all(collection_id: str | None = None) -> None:
         generated[d.dataset_id] = provider.generated_periods_for(d.dataset_id)
         if provider.suppresses_others_corrections:
             suppressed[d.dataset_id] = foreign_altered(d.collection_id)
-    check(scenario_injection.INJECTIONS, generated, history_end=get_anchor_date(),
+    check(injections, generated, history_end=get_anchor_date(),
           suppressed=suppressed)
-    check_version_after(scenario_injection.INJECTIONS,
+    check_version_after(injections,
                         last_link_day=last_req_gen_199_link_day())
 
 
@@ -242,7 +246,7 @@ def last_req_gen_199_link_day() -> date | None:
     from generator import scenario_injection as si
 
     days = []
-    for inj in si.INJECTIONS:
+    for inj in si.this_assets_injections():
         # ONLY AN INJECTION CARRYING ONE OF ITS LINKS (post-build-review #290
         # D10): resolving every linked injection planned Linkage Products for
         # TS-96, and through it every source collection, whatever was being
@@ -296,7 +300,7 @@ def foreign_altered(collection_id: str, *, docs=None) -> set[str]:
 
     mine = set(_datasets_of(collection_id))
     riders: dict[str, set[str]] = {}
-    for inj in scenario_injection.INJECTIONS:
+    for inj in scenario_injection.this_assets_injections():
         if inj.correction:
             riders.setdefault(inj.correction, set()).add(inj.dataset_id)
     out: set[str] = set()
@@ -425,7 +429,7 @@ def check_written(dataset_ids, entries, injected_periods=frozenset(), *, docs=No
     from qa_tools.common import asset_time
 
     riders = {}
-    for inj in scenario_injection.INJECTIONS:
+    for inj in scenario_injection.this_assets_injections():
         if inj.correction:
             riders.setdefault(inj.correction, set()).add(inj.dataset_id)
     for reference, datasets in riders.items():

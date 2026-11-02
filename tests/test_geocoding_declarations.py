@@ -4,6 +4,9 @@ thing, and asks the gate the collections gate calls; the real files are
 untouched. Nothing here reads supply rows or the database."""
 from __future__ import annotations
 
+from qa_tools.common import assets
+
+import asset_folders
 import shutil
 from pathlib import Path
 
@@ -13,19 +16,19 @@ import yaml
 from qa_tools.common import linked_datasets
 
 REAL = Path(__file__).resolve().parent.parent
-LP_SODA = Path("contract/department-of-health/linkage-products-soda-checks.yml")
-LP_CONTRACT = Path("contract/department-of-health/linkage-products-contract.yaml")
+LP_SODA = Path("assets/quarterly/department-of-health/linkage-products-soda-checks.yml")
+LP_CONTRACT = Path("assets/quarterly/department-of-health/linkage-products-contract.yaml")
 GEO = ("geo-cp-clients", "geo-ed-presentations")
 
 
 @pytest.fixture
 def repo(tmp_path):
-    shutil.copytree(REAL / "contract", tmp_path / "contract")
+    shutil.copytree(asset_folders.real_folder(), tmp_path / assets.folder_rel())
     return tmp_path
 
 
 def _asset(repo):
-    return repo / "contract" / "data-asset.yaml"
+    return repo / assets.folder_rel() / "data-asset.yaml"
 
 
 def _dataset(doc, ds_id):
@@ -138,7 +141,7 @@ class TestTheDeclarations:
             assert "SYNTHETIC" in text and "geocoding product" in text and "no address" in text
         purpose = doc["description"]["purpose"]
         assert "linkage" in purpose and "geocoding release" in purpose
-        pres = yaml.safe_load((REAL / "contract" / "presentation.yaml").read_text())
+        pres = yaml.safe_load((asset_folders.real_folder() / "presentation.yaml").read_text())
         provenance = next(v for k, v in _walk_presentation(pres) if k == "linkage-products")["provenance"]
         assert "linkage and geocoding releases" in provenance
 
@@ -174,7 +177,7 @@ class TestTheCalendar:
                 assert (str(v.expected_time)[:5], v.grace) == ("19:00", timedelta(hours=8)), (ds, v)
 
     def test_a_participation_that_disagrees_with_its_source_fails_naming_the_first_period(self, repo):
-        cal_path = repo / "contract" / "calendar.yaml"
+        cal_path = repo / assets.folder_rel() / "calendar.yaml"
         cal = yaml.safe_load(cal_path.read_text())
         entry = next(d for d in cal["datasets"] if d["id"] == "geo-cp-clients")
         entry["participation"]["versions"][0]["effective_from"] = "2015-07-01"
@@ -232,11 +235,18 @@ class TestCriterionFour:
         assert "geo-cp-clients links 'cp-clients' by 3 identifier columns" in text, text
 
     def test_a_source_on_another_calendar(self, repo):
-        def change(doc):
-            _dataset(doc, "geo-cp-clients")["linked_datasets"][0].update(
-                dataset="birth-registrations", id_columns=["registration_number"])
-        text = _edit_asset(repo, change)
-        assert "geo-cp-clients links 'birth-registrations'" in text and "calendar" in text, text
+        """Within one asset (the asset split: Birth Registrations, the daily
+        source this used to name, is another asset's): the Client Register,
+        geo-cp-clients' own source, put on a calendar of its own."""
+        cal_path = repo / assets.folder_rel() / "calendar.yaml"
+        cal = yaml.safe_load(cal_path.read_text())
+        entry = next(d for d in cal["datasets"] if d["id"] == "cp-clients")
+        entry.pop("no_calendar", None)
+        entry["calendar"] = "monthly"
+        cal_path.write_text(yaml.safe_dump(cal, sort_keys=False))
+        text = "\n".join(linked_datasets.problems(repo))
+        assert ("geo-cp-clients links 'cp-clients', which is never on geo-cp-clients's "
+                "calendar 'quarterly' (it is on 'monthly')") in text, text
 
 
 class TestCriterionFiveEachRuleReadsItsOwnBlock:
@@ -311,7 +321,7 @@ class TestCriterionThreeThePlacingConfiguration:
     """contract/synthetic_inputs.yaml: generator-only, generic, gated."""
 
     def _edit(self, repo, change):
-        path = repo / "contract" / "synthetic_inputs.yaml"
+        path = repo / assets.folder_rel() / "synthetic" / "synthetic_inputs.yaml"
         doc = yaml.safe_load(path.read_text())
         change({d["dataset"]: d for d in doc["datasets"]})
         path.write_text(yaml.safe_dump(doc, sort_keys=False))
@@ -353,10 +363,11 @@ class TestCriterionThreeThePlacingConfiguration:
             d["geo-cp-clients"]["unplaced_value"] = "ungeocoded"
         assert "'ungeocoded'" in self._edit(repo, change)
 
-    def test_it_is_an_asset_wide_file(self):
+    def test_it_is_an_asset_wide_synthetic_file(self):
+        # In the asset's synthetic/ folder since the split (REQ-GEN-370).
         from qa_tools.common import validate_collections
 
-        assert "synthetic_inputs.yaml" in validate_collections.ASSET_WIDE
+        assert "synthetic_inputs.yaml" in validate_collections.SYNTHETIC
 
     def test_no_shared_module_carries_a_placing_word(self):
         """Architecture rule with no behaviour to observe (criterion 3): the
@@ -366,3 +377,8 @@ class TestCriterionThreeThePlacingConfiguration:
             text = (REAL / module).read_text()
             for word in ("place_by", "placed_column", "unplaced_value", "match_level"):
                 assert word not in text, (module, word)
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

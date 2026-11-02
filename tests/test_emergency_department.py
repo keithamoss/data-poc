@@ -147,3 +147,8 @@ def _fifteen_days_before(name: str) -> str:
 def _previous(name: str) -> str:
     year, q = (int(x) for x in name.split("-Q"))
     return f"{year - 1}-Q4" if q == 1 else f"{year}-Q{q - 1}"
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

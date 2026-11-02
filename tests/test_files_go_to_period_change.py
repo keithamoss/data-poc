@@ -8,9 +8,9 @@ schedule gate - or the slots - what follows. The real file is untouched.
 """
 from __future__ import annotations
 
+import asset_folders
 import shutil
 from datetime import date
-from pathlib import Path
 
 import pytest
 import yaml
@@ -19,7 +19,7 @@ from qa_tools.common import agreement, schedule, slots
 from qa_tools.common.validate_schedule import (NOT_EXPECTED_PLACEHOLDER, Source,
                                                 fall_lines, validate)
 
-REAL = Path(__file__).resolve().parent.parent / "contract"
+REAL = asset_folders.SelectedFolder()
 CP = ("cp-carers", "cp-case-workers", "cp-clients", "cp-investigations",
       "cp-notifications", "cp-placements")
 
@@ -366,3 +366,8 @@ def test_a_hold_after_a_fall_of_two_names_the_round_the_change_took_effect_from(
 
     held = type("H", (), {"doubly_fed": fed, "reason": {}})()
     assert files_go.held_words(held).endswith("agreement change from the 1 August 2026 round")
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

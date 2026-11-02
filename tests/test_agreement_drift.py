@@ -416,3 +416,8 @@ class TestATurnOffOverAJudgedPeriod:
                                 "turned_off_reason")}
         self._declare(cal, "dataset cp-clients participation 2023-01-01", version)
         assert _refusal(conn, cal, asset) is not None
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

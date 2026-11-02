@@ -1121,3 +1121,8 @@ def test_the_period_lock_has_an_advisory_lock_space_of_its_own():
     spaces = [gate.PERIOD_LOCK_SPACE, qa_store.ATTEMPT_LOCK_SPACE, recheck.OWED_CLAIM_SPACE,
               processing_pass.PASS_LOCK_SPACE, processing_pass.ARRIVAL_LOCK_SPACE]
     assert len(set(spaces)) == len(spaces), spaces
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

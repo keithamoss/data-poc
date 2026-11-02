@@ -36,22 +36,36 @@ ROOT = Path(__file__).resolve().parent.parent.parent
 #: Every input that shapes a bootstrap (REQ-TEST-117 criterion 1, as amended
 #: 2026-10-06: cli/pipeline.py and no other cli/ file - the bootstrap enters
 #: through it, and a terminal change must not cost a full bootstrap).
+#:
+#: SINCE THE ASSET SPLIT (post-build-review, 2026-11-02): every asset's folder -
+#: its configuration, adapters, providers and dbt project - and the shared dbt
+#: package, where contract/ and dbt_project/ were. ONE KEY FOR THE REPOSITORY,
+#: not one per asset: a change to either asset restarts both, which costs time
+#: and never leaves a stale verdict - this module's own rule. A key per asset
+#: is the cache-key work still to come with Keith.
 INPUTS = ("generator/**", "synthetic_data_generator/**", "pipeline/**", "qa_tools/**",
-          "contract/**", "dbt_project/**", "cli/pipeline.py", "pyproject.toml", "uv.lock",
+          "assets/**", "dbt_shared/**", "cli/pipeline.py", "pyproject.toml", "uv.lock",
           ".github/workflows/test.yml")
 
 #: What a replay compares as "every other input" (REQ-TEST-160 criterion 1):
 #: the generators are left out because their effect is compared directly, as
-#: the deliveries they produce.
+#: the deliveries they produce - the shared generator and, since the asset
+#: split, each asset's own providers under assets/<asset>/synthetic/collections/.
 GENERATORS = ("generator/**", "synthetic_data_generator/**")
-REPLAY_INPUTS = tuple(p for p in INPUTS if p not in GENERATORS)
+PROVIDERS = "assets/*/synthetic/collections/**"
+REPLAY_INPUTS = tuple(p for p in INPUTS if p not in GENERATORS) + ("!" + PROVIDERS,)
 
 #: Bumped when what the key covers changes shape, so an old cache never
-#: matches a new meaning.
-KEY_PREFIX = "bootstrap-v2-"
+#: matches a new meaning (v3: assets/ and dbt_shared/ since the split).
+KEY_PREFIX = "bootstrap-v3-"
 
 
 def _pathspec(pattern: str) -> str:
+    """A git pathspec for `pattern`; a leading `!` excludes what it matches."""
+    if pattern.startswith("!"):
+        # glob magic, so the `*` in assets/*/... stops at a slash and `**`
+        # reaches below - git's default exclude matches neither here.
+        return ":(exclude,glob)" + pattern[1:]
     return pattern[:-3] + "/" if pattern.endswith("/**") else pattern
 
 

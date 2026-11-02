@@ -64,7 +64,7 @@ def _check(run_id, column_name, value, status="pass", **overrides):
         "warn_threshold": 0.0, "fail_threshold": 5.0, "status": status,
         "row_count_total": 3, "row_count_invalid": 0,
         "engine": "dbt-core 1.12 + dbt-duckdb",
-        "check_id": f"data-asset-1.child-protection-family-support.child-protection.cp-notifications.{column_name}.accepted_values_dbt",
+        "check_id": f"quarterly.child-protection-family-support.child-protection.cp-notifications.{column_name}.accepted_values_dbt",
     }
     rec.update(overrides)
     return rec
@@ -109,7 +109,7 @@ def test_each_dataset_shows_its_own_runs():
         "cp_clients__1", "cp_clients__2", "cp_run_001"]
 
 
-_XT = ("data-asset-1.child-protection-family-support.child-protection."
+_XT = ("quarterly.child-protection-family-support.child-protection."
        "cp-notifications.assigned_worker_id.relationships_dbt")
 
 
@@ -182,9 +182,9 @@ class TestTwoChecksThatShareANameStayTwoCards:
     pooled checks share a column and tail their URL key names the
     dataset that declares each."""
 
-    _INV = ("data-asset-1.child-protection-family-support.child-protection."
+    _INV = ("quarterly.child-protection-family-support.child-protection."
             "cp-investigations.cp_client_id.relationships_dbt")
-    _PLA = ("data-asset-1.child-protection-family-support.child-protection."
+    _PLA = ("quarterly.child-protection-family-support.child-protection."
             "cp-placements.cp_client_id.relationships_dbt")
 
     def _cards(self, monkeypatch):
@@ -221,7 +221,7 @@ class TestACrossTableResultFromAnotherTablesRunReachesThePage:
     own run; Notifications' page left that result out and read red for
     three months after the gate had promoted on it."""
 
-    _REF = ("data-asset-1.child-protection-family-support.child-protection."
+    _REF = ("quarterly.child-protection-family-support.child-protection."
             "cp-notifications.cp_client_id.relationships_dbt")
     _OWN = "cp_notifications__202011010820000800"
     _RECHECK = "cp_clients__202011010830000800__1__r1"
@@ -290,7 +290,7 @@ class TestAResultFromAnotherTablesRunSaysWhichOwnRunItRead:
     it for every case now, the carried one included, because a result's
     reads name its own table too."""
 
-    _REF = ("data-asset-1.child-protection-family-support.child-protection."
+    _REF = ("quarterly.child-protection-family-support.child-protection."
             "cp-investigations.lead_worker_id.relationships_dbt")
     _OWN = ["cp_case_workers__202502010900000800", "cp_case_workers__202505010900000800"]
     _ELSEWHERE = "cp_investigations__202505010900000800"
@@ -321,3 +321,8 @@ class TestAResultFromAnotherTablesRunSaysWhichOwnRunItRead:
 
     def test_a_table_it_read_no_supply_of_names_nothing(self):
         assert self._read_run(None) is None
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

@@ -170,6 +170,7 @@ def test_embed_defaults_to_empty_ticket_status_when_file_absent(monkeypatch, tmp
     assert _run_embed_and_extract_ticket_status(monkeypatch, tmp_path) == {}
 
 
+@pytest.mark.asset("daily")
 def test_embed_reads_real_open_tickets_json_when_present(monkeypatch, tmp_path):
     raw_issues = [{
         "number": 42, "title": "Birth Registrations is red",
@@ -221,6 +222,7 @@ def test_embed_defaults_to_every_assigned_person_at_zero_when_file_absent(monkey
     assert all(row["streak"] == 0 for row in rows)
 
 
+@pytest.mark.asset("daily")
 def test_embed_reads_real_ticket_resolutions_json_when_present(monkeypatch, tmp_path):
     raw_tickets = [{
         "number": 1, "labels": [{"name": "dataset:birth-registrations"}],
@@ -328,6 +330,7 @@ def test_a_dataset_with_no_calendar_is_recorded_as_having_none(monkeypatch, tmp_
             f"{dataset_id} points at a calendar that was not embedded: {calendar!r}"
 
 
+@pytest.mark.asset("quarterly")
 def test_the_embedded_dates_come_from_the_authored_calendar_rather_than_a_rule(
         monkeypatch, tmp_path):
     """Criterion 2, positively. The quarterly calendar's own anchor is
@@ -466,10 +469,15 @@ def test_the_schedule_ended_notice_names_the_file_dates_are_authored_in(monkeypa
     edd.embed()
     match = re.search(r"const SCHEDULE_RUNWAY = (.*?);\n", out_html.read_text())
     assert match, "SCHEDULE_RUNWAY const not found in built output"
-    assert json.loads(match.group(1))["configFile"] == "contract/calendar.yaml"
-    assert supply_holds.schedule_file() == "contract/calendar.yaml"
+    from qa_tools.common import assets
+
+    # The selected asset's calendar, by repository path (the asset split).
+    expected = f"{assets.folder_rel()}/calendar.yaml"
+    assert json.loads(match.group(1))["configFile"] == expected
+    assert supply_holds.schedule_file() == expected
 
 
+@pytest.mark.asset("daily")
 def test_slot_due_dates_carry_only_the_slots_due_off_their_period_date(monkeypatch, tmp_path):
     """REQ-PIPE-167 criterion 5: the page is told a slot's own due date
     wherever it differs from the period's date - today, exactly Birth
@@ -499,7 +507,22 @@ def test_slot_due_dates_are_only_for_a_cadence_rule_calendar():
             self.due_at = datetime.fromisoformat(due).replace(tzinfo=timezone.utc)
 
     got = edd._slot_due_dates({
-        "cp-clients": [Slot("2026-05-01", "2026-02-01T01:00:00")],
+        "cp-clients": [Slot("2026-05-01", "2026-02-01T01:00:00")]})
+    assert got == {}
+
+
+@pytest.mark.asset("daily")  # Birth Registrations is the daily asset's
+def test_slot_due_dates_travel_for_the_daily_cadence_rule():
+    """The other half of the test above, on the asset the cadence-rule
+    calendar is defined in (the asset split)."""
+
+    class Slot:
+        def __init__(self, period_date, due):
+            from datetime import date, datetime, timezone
+            self.date = date.fromisoformat(period_date)
+            self.due_at = datetime.fromisoformat(due).replace(tzinfo=timezone.utc)
+
+    got = edd._slot_due_dates({
         "birth-registrations": [Slot("2026-06-18", "2026-06-17T06:00:00"),
                                 Slot("2026-06-30", "2026-06-30T06:00:00")]})
     assert got == {"birth-registrations": {"2026-06-18": "2026-06-17"}}
@@ -656,6 +679,7 @@ class TestABuildUnderAnOutDir:
     reading the reports an earlier step wrote there and writing nothing in the
     real tree."""
 
+    @pytest.mark.asset("daily")
     def test_the_page_its_files_and_its_assets_land_in_the_out_dir(self, monkeypatch, tmp_path):
         from qa_tools.common import build_output
 
@@ -694,3 +718,8 @@ class TestABuildUnderAnOutDir:
             assert results_history.results_path(c.id) == str(tmp_path / "reports" / c.results_file)
             assert bdd.results_path(c.id) == str(tmp_path / "reports" / c.results_file)
             assert bdd.out_path(c.id) == str(tmp_path / "reports" / c.dashboard_file)
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = [*(pytestmark if isinstance(pytestmark, list) else [pytestmark]), pytest.mark.asset("quarterly")]

@@ -1,0 +1,17 @@
+# THE SHARED LOCAL dbt PACKAGE (REQ-QAC-368 criterion 2): the macro and the
+# generic tests every asset's dbt project uses, held once and pulled into each
+# project by its packages.yml (`local:`), so two assets cannot let a copy
+# drift. Nothing a collection owns lives here - a collection's models, schema
+# files and singular tests sit in its asset's own project
+# (validate_collections' dbt-folder gate).
+#
+# A package, never run as a project of its own: dbt reads its macro-paths and
+# test-paths as part of whichever asset's project installed it, and a generic
+# test here is named in a schema file unqualified (`- matches_regex:`), as it
+# was when it sat in the project itself.
+name: 'dbt_shared'
+version: '1.0.0'
+config-version: 2
+
+macro-paths: ["macros"]
+test-paths: ["tests"]

@@ -308,3 +308,8 @@ class TestAMarkAfterTheCheckPutsItOutOfScope:
 def test_dataset_names_are_the_fixtures():
     assert DATASET["cp_case_workers"] == "cp-case-workers"
     assert CP == "child-protection"
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

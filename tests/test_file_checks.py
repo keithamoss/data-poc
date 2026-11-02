@@ -156,6 +156,7 @@ def _stage(path, received=_RECEIPT, run="run_001"):
                           delivery_name="drop-1")
 
 
+@pytest.mark.asset("daily")  # stages a Birth Registrations file (_stage)
 @pytest.mark.parametrize("fault, data", [
     (fc.ENCODING, f"{_HEADER}\nBR1,Ren\xe9e\n".encode("latin-1")),
     (fc.DELIMITER, b"registration_number;child_family_name\nBR1;SMITH\n"),
@@ -183,6 +184,7 @@ def test_each_failure_refuses_the_file_and_is_recorded(staging, fault, data):
         assert "SMITH" not in r[7]["finding"] and "Ren" not in r[7]["finding"]
 
 
+@pytest.mark.asset("daily")  # stages a Birth Registrations file (_stage)
 def test_a_column_order_warning_loads_as_usual(staging):
     """Criteria 12 and 18."""
     path = staging / "supply.csv"
@@ -193,6 +195,7 @@ def test_a_column_order_warning_loads_as_usual(staging):
     assert not load_log.failures()
 
 
+@pytest.mark.asset("daily")  # stages a Birth Registrations file (_stage)
 def test_a_clean_file_records_six_passes_against_its_load(staging):
     path = staging / "supply.csv"
     path.write_text(f"{_HEADER}\nBR1,SMITH\n")
@@ -203,6 +206,7 @@ def test_a_clean_file_records_six_passes_against_its_load(staging):
     assert loaded.loaded
 
 
+@pytest.mark.asset("daily")  # stages a Birth Registrations file (_stage)
 def test_a_reprocessed_file_keeps_both_attempts(staging):
     """Criterion 16: fixed and reprocessed under the same arrival, the
     second attempt's results sit beside the first's."""
@@ -218,6 +222,7 @@ def test_a_reprocessed_file_keeps_both_attempts(staging):
     assert any(r[1] == fc.FAIL for r in first)
 
 
+@pytest.mark.asset("daily")  # stages a Birth Registrations file (_stage)
 def test_re_staging_an_unchanged_file_records_nothing_new(staging):
     """No new load attempt, so no new results - the repetition
     load_log.record_load() exists to stop."""
@@ -228,6 +233,7 @@ def test_re_staging_an_unchanged_file_records_nothing_new(staging):
     assert len(_results()) == len(fc.NAMES)
 
 
+@pytest.mark.asset("daily")  # stages a Birth Registrations file (_stage)
 def test_an_evaluator_bug_fails_the_load_and_records_nothing(staging, monkeypatch):
     """Criterion 13, through the loader: it propagates rather than being
     absorbed by the loader's own catch-all."""
@@ -273,12 +279,13 @@ class TestNeverInAStatus:
     column-order WARNING would have turned a green supply amber and changed
     what the amber setting does with it."""
 
-    _DS = "data-asset-1.registry-services.civil-registration.birth-registrations"
+    _DS = "daily.registry-services.civil-registration.birth-registrations"
 
     def _record(self, tail, status):
         return {"dataset_id": "birth-registrations", "check_id": f"{self._DS}.{tail}",
                 "status": status}
 
+    @pytest.mark.asset("daily")
     def test_a_file_warning_does_not_change_a_green_supply(self):
         from qa_tools.common import promotion
 
@@ -286,6 +293,7 @@ class TestNeverInAStatus:
                    self._record("column_order_file", "warn")]
         assert promotion.status_of("birth-registrations", results, reads={}) == "green"
 
+    @pytest.mark.asset("daily")
     def test_file_checks_alone_are_no_active_checks(self):
         from qa_tools.common import promotion
 
@@ -350,3 +358,8 @@ class TestAHeaderIsNotValueShaped:
         f = _by_check(fc.evaluate(_write(tmp_path, b"7,name,1987-02-03\n1,Ann,2020\n"),
                                   COLUMNS))
         assert "1987-02-03" not in f[fc.HEADER_ROW].words
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

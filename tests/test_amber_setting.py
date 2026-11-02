@@ -33,7 +33,9 @@ def _doc(asset=("2023-01-01", "promote"), collection=None, dataset=None):
     doc["amber_setting"] = {"versions": [_version(*asset)]} if asset else None
     if doc["amber_setting"] is None:
         del doc["amber_setting"]
-    col = doc["hierarchy"]["agencies"][1]["collections"][0]
+    # Child Protection by its id, not by position (the asset split moved it).
+    col = next(c for a in doc["hierarchy"]["agencies"] for c in a["collections"]
+               if c["id"] == "child-protection")
     if collection:
         col["amber_setting"] = {"versions": [_version(*v) for v in collection]}
     if dataset:
@@ -410,3 +412,8 @@ class TestTheSettingIsVisible:
         assert text == "promote and acknowledge (set for Child Protection, since 5 Oct 2026)"
         assert amber_setting.describe("cp-clients", date(2026, 1, 1), doc=doc) == \
             "promote (set for the whole data asset, since 1 Jan 2023)"
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

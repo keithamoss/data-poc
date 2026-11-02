@@ -7,6 +7,8 @@ either by MEASURES or by every check of it declaring one.
 
 Reads configuration, never recorded results, so it sits in CI's fast half."""
 
+import pytest
+
 import re
 
 from pipeline.dashboard_check_labels import MEASURES, measure, measures_phrase, tool_ref
@@ -36,23 +38,24 @@ def test_every_declared_rule_kind_names_its_measure():
 
 
 def test_measure_joins_the_phrase_and_the_unit():
-    cid = "data-asset-1.registry-services.civil-registration.birth-registrations.mother_surname.not_null_dbt"
+    cid = "daily.registry-services.civil-registration.birth-registrations.mother_surname.not_null_dbt"
     assert measure(cid, "count") == "Rows with no value (count)"
 
 
 def test_an_unmapped_kind_falls_back_to_the_unit_alone():
-    cid = "data-asset-1.registry-services.civil-registration.birth-registrations.mother_surname.brand_new_soda"
+    cid = "daily.registry-services.civil-registration.birth-registrations.mother_surname.brand_new_soda"
     assert measure(cid, "%") == "Value (%)"
     assert measures_phrase(cid) is None
 
 
 def test_a_declared_phrase_wins_over_the_kinds():
-    cid = "data-asset-1.registry-services.civil-registration.birth-registrations.mother_surname.not_null_dbt"
+    cid = "daily.registry-services.civil-registration.birth-registrations.mother_surname.not_null_dbt"
     assert measure(cid, "count", "Mothers with no surname") == "Mothers with no surname (count)"
     assert measures_phrase(cid, "Mothers with no surname") == "Mothers with no surname"
     assert measures_phrase(cid, None) == "Rows with no value"
 
 
+@pytest.mark.asset("quarterly")  # the geocoding datasets are the quarterly asset's
 def test_each_geocoding_dataset_declares_its_four_phrases():
     """REQ-DASH-299 criterion 1: the three year checks and the share check,
     on each geocoding dataset - read from the check files, not from code."""
@@ -84,3 +87,8 @@ def test_the_cross_collection_kinds_read_as_siblings():
     """REQ-DASH-299 criterion 2 (Keith, 2026-10-31, Q11 a)."""
     assert MEASURES["soda:referential"] == "Rows matching no source record"
     assert MEASURES["soda:coverage"] == "Source records matched"
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("daily")

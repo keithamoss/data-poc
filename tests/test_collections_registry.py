@@ -44,15 +44,24 @@ class TestTheRegistry:
     def test_it_lists_the_hierarchys_collections_in_order(self):
         got = [(c.id, c.short, c.run_prefix) for c in collections.all_collections()]
         assert got == [(c["id"], c["short"], c["run_prefix"]) for _a, c in _declared()]
-        # And the two the rest of this suite leans on, as they are written.
-        assert got[:2] == [("civil-registration", "bdm", "run_"),
-                           ("child-protection", "cp", "cp_run_")]
+        # And the two the rest of this suite leans on, as they are written -
+        # the quarterly asset's first two since the split.
+        assert got[:2] == [("child-protection", "cp", "cp_run_"),
+                           ("emergency-department", "ed", "ed_run_")]
+
+    @pytest.mark.asset("daily")
+    def test_the_daily_assets_one_collection_is_birth_registrations(self):
+        got = [(c.id, c.short, c.run_prefix) for c in collections.all_collections()]
+        assert got == [("civil-registration", "bdm", "run_")]
+        assert collections.by_short("bdm").id == "civil-registration"
+        assert collections.by_run_prefix("run_").id == "civil-registration"
+        assert collections.dataset("birth-registrations").table == "birth_registrations"
 
     def test_a_collection_resolves_by_id_short_or_run_prefix(self):
         for value in ("child-protection", "cp", "cp_run_"):
             assert collections.resolve(value).id == "child-protection"
-        assert collections.by_short("bdm").id == "civil-registration"
-        assert collections.by_run_prefix("run_").id == "civil-registration"
+        assert collections.by_short("ed").id == "emergency-department"
+        assert collections.by_run_prefix("ed_run_").id == "emergency-department"
 
     def test_a_collection_names_its_report_files_by_its_agency_short(self):
         """REQ-PIPE-248 criterion 7 (Keith, 2026-10-18: rs and cpfs)."""
@@ -61,13 +70,14 @@ class TestTheRegistry:
         assert got == [(a["short"], f"results_{a['short']}_{c['id']}.json",
                         f"{a['short']}_{c['id']}_dashboard.json") for a, c in _declared()]
         assert got[:2] == [
-            ("rs", "results_rs_civil-registration.json", "rs_civil-registration_dashboard.json"),
             ("cpfs", "results_cpfs_child-protection.json",
-             "cpfs_child-protection_dashboard.json")]
+             "cpfs_child-protection_dashboard.json"),
+            ("doh", "results_doh_emergency-department.json",
+             "doh_emergency-department_dashboard.json")]
 
     def test_a_dataset_resolves_through_one_index(self):
         assert collections.collection_of("cp-carers").id == "child-protection"
-        assert collections.dataset("birth-registrations").table == "birth_registrations"
+        assert collections.dataset("ed-presentations").table == "ed_presentations"
 
     @pytest.mark.parametrize("lookup,value,field", [
         (collections.by_id, "no-such-collection", "id"),
@@ -226,7 +236,17 @@ class TestAThirdCollectionAtEverySite:
         real = driver.generate
         monkeypatch.setattr(driver, "generate", lambda cid: real(cid) if cid == FAKE_ID else [])
         monkeypatch.setattr("qa_tools.common.scenario_map.write_map", lambda: None)
-        monkeypatch.setattr(__import__("cli.collection_cli", fromlist=["of"]).of("bdm"), "try_targets", lambda **_: 0)
+        # Every real collection whose provider declares a target trial - read
+        # from the provider, never named (the asset split: Birth Registrations
+        # on the daily asset, Linkage Products on the quarterly).
+        from cli.collection_cli import of
+        from cli.pipeline import has_target_trial
+
+        trials = [c for c in collections.all_collections()
+                  if c.id not in (FAKE_ID, BARE_ID) and has_target_trial(c.id)]
+        assert trials, "no real collection declares a target trial - nothing to stub"
+        for c in trials:
+            monkeypatch.setattr(of(c.short), "try_targets", lambda **_: 0)
         monkeypatch.setattr("qa_tools.tools.orchestrate.run_pipeline",
                             lambda collection_id, *_, **__: self.ran.append(collection_id))
         # A STREAM of collections sharing a calendar (REQ-PIPE-262).
@@ -283,7 +303,8 @@ class TestAThirdCollectionAtEverySite:
             _datasets_json(built / c.dashboard_file,
                            {"datasets": [{"id": first.dataset_id, "name": first.dataset_name}]})
             expected.append(first.dataset_id)
-        assert expected[:2] == ["birth-registrations", "cp-clients"]
+        # The quarterly asset's hierarchy order (the asset split).
+        assert expected[:2] == ["cp-clients", "ed-presentations"]
         _datasets_json(built / f"fka_{FAKE_ID}_dashboard.json",
                        {"datasets": [{"id": FAKE_DATASET, "name": "Fake Things"}]})
         monkeypatch.setattr(ticket_sync, "reports_dir", fixed(str(built)))
@@ -325,14 +346,18 @@ class TestTheConfigurationGate:
         assert gate.config_problems(_package(tmp_path, *self.REAL, "fake_collection")) == []
 
     def test_a_collection_with_no_adapter_fails(self, third_collection, tmp_path):
-        got = gate.config_problems(_package(tmp_path, *self.REAL))
+        package = _package(tmp_path, *self.REAL)
+        got = gate.config_problems(package)
+        # Named by the adapter folder the gate read (the asset split: it was
+        # always qa_tools/collections/).
         assert got == [f"collection {FAKE_ID!r} has no adapter "
-                       "(qa_tools/collections/fake_collection.py)"]
+                       f"({package / 'fake_collection.py'})"]
 
     def test_an_adapter_naming_no_collection_fails(self, tmp_path):
         assert "no_such_collection" not in self.REAL
-        got = gate.config_problems(_package(tmp_path, *self.REAL, "no_such_collection"))
-        assert got == ["qa_tools/collections/no_such_collection.py names no declared "
+        package = _package(tmp_path, *self.REAL, "no_such_collection")
+        got = gate.config_problems(package)
+        assert got == [f"{package / 'no_such_collection.py'} names no declared "
                        "collection"]
 
     @pytest.mark.parametrize("edit,expected", [
@@ -344,7 +369,7 @@ class TestTheConfigurationGate:
         (lambda c, _d: c["datasets"][0].update(id="cp-clients"), "dataset id 'cp-clients'"),
         (lambda c, _d: c["datasets"][0].update(table="cp_clients"), "the table 'cp_clients'"),
         (lambda c, _d: c.update(contract="fake-agency/no-such-contract.yaml"),
-         "contract file contract/fake-agency/no-such-contract.yaml is missing"),
+         "fake-agency/no-such-contract.yaml is missing"),
         # post-build-review #230: every picker shows a collection by its label
         # and dispatches on it, so two that share one would send a person to
         # the wrong collection.
@@ -379,15 +404,20 @@ class TestTheLiteralGate:
     def _found(self, tmp_path, files):
         return {(rel, text) for rel, _line, text in gate.literal_findings(_tree(tmp_path, files))}
 
-    def test_it_finds_each_kind_of_collection_literal(self, tmp_path):
+    @pytest.mark.parametrize("cid, path, run", [
+        # Each asset's own literals - the gate runs once per asset folder
+        # (cli/check.py), so each asset's literals are found on its own run.
+        pytest.param("child-protection", "assets/quarterly/child-protection-family-support/"
+                     "child-protection-soda-checks.yml", ("cp_run_", 'f"cp_run_{n}"'),
+                     marks=pytest.mark.asset("quarterly")),
+        pytest.param("civil-registration", "contract/bdm-birth-registrations-soda-checks.yml",
+                     ("run_7", 'f"run_7{n}"'), marks=pytest.mark.asset("daily"))])
+    def test_it_finds_each_kind_of_collection_literal(self, tmp_path, cid, path, run):
         got = self._found(tmp_path, {"qa_tools/x.py": (
-            'A = "child-protection"\n'
-            'C = "contract/bdm-birth-registrations-soda-checks.yml"\n'
-            'D = f"cp_run_{n}"\n'
-            'E = f"run_7{n}"\n')})
-        assert got == {("qa_tools/x.py", "child-protection"),
-                       ("qa_tools/x.py", "contract/bdm-birth-registrations-soda-checks.yml"),
-                       ("qa_tools/x.py", "cp_run_"), ("qa_tools/x.py", "run_7")}
+            f'A = "{cid}"\n'
+            f'C = "{path}"\n'
+            f'D = {run[1]}\n')})
+        assert got == {("qa_tools/x.py", cid), ("qa_tools/x.py", path), ("qa_tools/x.py", run[0])}
 
     def test_a_short_alone_is_not_a_collection_literal(self, tmp_path):
         """post-build-review #235 (Keith, 2026-10-18): a short is too short to
@@ -426,6 +456,7 @@ class TestTheLiteralGate:
             ("dashboard/qa-reporting-dashboard.template.html", "cp-notifications"),
             ("dashboard/qa-reporting-dashboard.template.html", "cp_run_${n}")}
 
+    @pytest.mark.asset("daily")
     def test_an_unlisted_file_fails_naming_file_line_and_literal(self, tmp_path):
         root = _tree(tmp_path, {"cli/x.py": 'A = 1\nB = "civil-registration"\n'})
         assert gate.literal_problems(root, allowlist={}) == [
@@ -433,6 +464,7 @@ class TestTheLiteralGate:
             "(qa_tools.collections), or list the file on the migration allowlist with the "
             "requirement that rewires it"]
 
+    @pytest.mark.asset("daily")
     def test_a_listed_file_passes_and_the_list_only_shrinks(self, tmp_path):
         root = _tree(tmp_path, {"cli/x.py": 'B = "civil-registration"\n', "cli/y.py": "C = 1\n"})
         assert gate.literal_problems(root, allowlist={"cli/x.py": "REQ-TEST-245"}) == []
@@ -473,31 +505,35 @@ class TestTheCheckFileGate:
 
     def test_a_check_file_outside_its_agencys_folder_fails_naming_it(self, third_collection,
                                                                     tmp_path):
-        moved = tmp_path / "contract" / "registry-services" / "fake-things-soda-checks.yml"
+        moved = (tmp_path / "contract" / "child-protection-family-support"
+                 / "fake-things-soda-checks.yml")
         (tmp_path / "contract" / "fake-agency" / "fake-things-soda-checks.yml").rename(moved)
         got = gate.check_file_problems()
-        assert ("contract/registry-services/fake-things-soda-checks.yml is "
+        assert ("contract/child-protection-family-support/fake-things-soda-checks.yml is "
                 f"{FAKE_ID!r}'s, which belongs in its agency's folder contract/fake-agency/") in got
 
     def test_a_collection_file_at_the_top_of_contract_fails(self, third_collection, tmp_path):
         (tmp_path / "contract" / "fake-things-contract-retired.yaml").write_text("{}\n")
         got = gate.check_file_problems()
         assert any(p.startswith("contract/fake-things-contract-retired.yaml is at the top of "
-                                "contract/") for p in got), got
+                                "the asset's folder") for p in got), got
 
     def test_a_dbt_model_outside_every_collections_folder_fails(self, third_collection, tmp_path):
-        (tmp_path / "dbt_project" / "models" / "staging").mkdir(parents=True)
-        (tmp_path / "dbt_project" / "models" / "staging" / "stg_x.sql").write_text("select 1\n")
-        (tmp_path / "dbt_project" / "tests" / "generic").mkdir(parents=True)
-        (tmp_path / "dbt_project" / "tests" / "generic" / "shared.sql").write_text("select 1\n")
+        (tmp_path / "assets" / "quarterly" / "dbt" / "models" / "staging").mkdir(parents=True)
+        (tmp_path / "assets" / "quarterly" / "dbt" / "models" / "staging" / "stg_x.sql").write_text("select 1\n")
+        # A generic test is the shared package's (REQ-QAC-368), never a
+        # project's, so one in dbt_shared/ is no collection's problem.
+        (tmp_path / "dbt_shared" / "tests" / "generic").mkdir(parents=True)
+        (tmp_path / "dbt_shared" / "tests" / "generic" / "shared.sql").write_text("select 1\n")
         assert gate.check_file_problems() == [
-            "dbt_project/models/staging/stg_x.sql sits outside every collection's dbt folder "
-            "(dbt_project/models/<collection-id>/, dbt_project/tests/<collection-id>/)"]
+            "assets/quarterly/dbt/models/staging/stg_x.sql sits outside every collection's dbt "
+            "folder (assets/quarterly/dbt/models/<collection-id>/, "
+            "assets/quarterly/dbt/tests/<collection-id>/)"]
 
     def test_two_collections_declaring_one_singular_test_name_fails(self, third_collection,
                                                                    tmp_path):
         for collection in ("child-protection", FAKE_ID):
-            folder = tmp_path / "dbt_project" / "tests" / collection
+            folder = tmp_path / "assets" / "quarterly" / "dbt" / "tests" / collection
             folder.mkdir(parents=True)
             (folder / "same_rule.sql").write_text("select 1\n")
         [problem] = gate.check_file_problems()
@@ -844,9 +880,9 @@ class TestTheSharedToolModules:
 
         adapter = collection_modules.installed("adapter", "fake_collection")
         adapter.ADAPTER = dataclasses.replace(adapter.ADAPTER, legacy=frozenset({"no.such.flag"}))
-        got = gate.config_problems(_package(tmp_path, *TestTheConfigurationGate.REAL,
-                                            "fake_collection"))
-        assert got == ["qa_tools/collections/fake_collection.py declares legacy flag "
+        package = _package(tmp_path, *TestTheConfigurationGate.REAL, "fake_collection")
+        got = gate.config_problems(package)
+        assert got == [f"{package / 'fake_collection.py'} declares legacy flag "
                        "'no.such.flag', but every legacy flag is retired (REQ-QAC-247, REQ-PIPE-248) - "
                        "remove it, or unify the behaviour it preserved"]
 
@@ -962,12 +998,18 @@ class TestTheAdapterLineReport:
         from qa_tools.common import validate_collections as vc
 
         for coll in collections.all_collections():
-            path = tmp_path / "qa_tools" / "collections" / f"{coll.module_name}.py"
+            path = tmp_path / "collections" / f"{coll.module_name}.py"
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text('"""A docstring is not logic."""\n# nor is a comment\n\n'
                             + "".join(f"x{i} = {i}\n" for i in range(160)))
-        lines = vc.line_report(tmp_path)
+        lines = vc.line_report(tmp_path / "collections", tmp_path / "no-providers")
+        assert lines, "no adapter reported - the check below would prove nothing"
         assert all("adapter 160 lines" in line and "10 over" in line
                    and "no generator provider" in line for line in lines), lines
         assert vc.main() == 0
         assert "against a budget of 150" in capsys.readouterr().out
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

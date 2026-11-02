@@ -431,3 +431,8 @@ class TestOweNothingQuarter:
                 (ds,) = a.files_by_dataset
                 assert dl.promoted_into(conn, ds, q4), f"{ds} was not promoted into {q4}"
         del hierarchy
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

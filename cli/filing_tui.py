@@ -66,6 +66,7 @@ from qa_tools.common.dataset_status import status_words
 from qa_tools.common import (asset_time, decision_log, filing_decisions,
                              filing_queue, git_identity, hierarchy, inheritance, people,
                              qa_store, slot_state, substitution, supply_db)
+from qa_tools.common import assets as _assets
 
 console = Console()
 
@@ -223,7 +224,7 @@ def actor_at_the_keyboard() -> dict:
 
     THE GIT EMAIL, and no second notion of identity (criterion 14).
     `git_identity.get_run_by()` is what stamps every QA run, and
-    `contract/people.yaml` keys a person by exactly that address - so
+    `assets/<asset>/people.yaml` keys a person by exactly that address - so
     the allowlist is checked against something the operator has already
     configured rather than something this flow has to ask for.
     """
@@ -1877,7 +1878,7 @@ def held_flow(h) -> None:
                       "here.", style="yellow")
         return
     if not filing_queue.held_operations(h):
-        _show(f"{h.why}\nAdd the next delivery dates to contract/calendar.yaml - it files "
+        _show(f"{h.why}\nAdd the next delivery dates to {_assets.config_dir()}/calendar.yaml - it files "
               f"itself on the next processing pass. Where a declared correction is "
               f"needed:\nmothman schedule draft-correction",
               title="Held - its schedule has ended", style="yellow")

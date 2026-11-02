@@ -94,3 +94,8 @@ class TestOneReceiptPerFile:
         (receipts / "old.json").write_text('{"received_at": "2026-02-01T01:00:00+00:00", "sequence": 1}')
         with pytest.raises(delivery.ReceiptOrderError, match="regenerate"):
             delivery.read_delivery("old", deliveries, receipts)
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

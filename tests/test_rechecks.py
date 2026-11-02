@@ -207,3 +207,8 @@ class TestABulkRecheck:
         kinds = {(i.kind, i.dataset_id) for i in outstanding.survey().items}
         assert (outstanding.RECHECKED_WORSE, "cp-notifications") in kinds, kinds
         assert (outstanding.AWAITING_DECISION, "cp-clients") in kinds, kinds
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

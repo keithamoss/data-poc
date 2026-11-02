@@ -121,6 +121,7 @@ class TestTheRunIdSaysWhatArrivedAndWhen:
 
 class TestBothCollectionsMove:
 
+    @pytest.mark.asset("daily")
     def test_birth_registrations_too(self, bdm_delivery_dirs):
         """One table, so its deliveries were already one file each -
         but the IDENTITY still changes, and a scheme that only applied
@@ -129,3 +130,8 @@ class TestBothCollectionsMove:
         dataset_id = next(iter(a.files_by_dataset))
         table = hierarchy.dataset(dataset_id).table
         assert a.run_id == f"{table}__{asset_time.arrival_key(a.received_at)}"
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

@@ -133,3 +133,8 @@ def test_a_real_scan_leaves_the_environment_alone(supply_dsn):
         "a real Soda scan changed this process's environment"
     assert supply_db.supply_db_dsn() == supply_dsn, \
         "a real Soda scan repointed the warehouse away from this worker's database"
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

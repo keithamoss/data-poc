@@ -286,3 +286,8 @@ class TestAnOpenPairLeadsTheQueue:
         monkeypatch.setattr(filing_queue, "waiting_behind", lambda conn, states, u: [])
         assert [s.state for s in filing_queue.awaiting(None, "child-protection")] == [
             slot_state.TWO_FILES, slot_state.AWAITING_DECISION]
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

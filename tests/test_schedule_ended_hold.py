@@ -89,7 +89,10 @@ class TestTheHoldSaysWhatToEdit:
     def test_it_names_the_file_and_the_command(self, conn):
         """Criterion 3."""
         said = self._held(conn).describe()
-        assert "contract/calendar.yaml" in said  # since REQ-PIPE-110
+        from qa_tools.common import assets
+
+        # The asset's own calendar by repository path (REQ-PIPE-110; the asset split).
+        assert f"{assets.folder_rel()}/calendar.yaml" in said
         assert "mothman schedule candidate-dates" in said
         assert "2028-Q1" in said
         assert "next period's claim window" not in said
@@ -417,3 +420,8 @@ class TestATruncatedSlotListIsNotAnEndedSchedule:
         decided = assignment.assign("cp-carers", "cp-carers@z", AFTER, SLOTS, frozenset(),
                                     final_period=None)
         assert decided.is_held and not decided.schedule_ended
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

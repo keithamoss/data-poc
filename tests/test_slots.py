@@ -7,6 +7,7 @@ is that sentence in a different form.
 """
 from __future__ import annotations
 
+import asset_folders
 from datetime import date, datetime, timedelta, timezone
 
 import pytest
@@ -43,10 +44,14 @@ class TestSlotsAreDerivedNotAuthored:
         import yaml
         from pathlib import Path
 
-        doc = yaml.safe_load(Path("contract/data-asset.yaml").read_text())
-        for agency in doc["hierarchy"]["agencies"]:
-            for collection in agency["collections"]:
-                assert "slots" not in collection
+        # Every asset's hierarchy (the asset split).
+        paths = sorted(Path(__file__).resolve().parent.parent.glob("assets/*/data-asset.yaml"))
+        assert paths
+        for path in paths:
+            doc = yaml.safe_load(path.read_text())
+            for agency in doc["hierarchy"]["agencies"]:
+                for collection in agency["collections"]:
+                    assert "slots" not in collection
                 for dataset in collection["datasets"]:
                     assert "slots" not in dataset, \
                         f"{dataset['id']} authors slots - they are derived from participation"
@@ -94,15 +99,22 @@ class TestEachSlotCarriesItsOwnTiming:
             assert slot.due_at.tzinfo is not None
             assert slot.claim_opens_at.tzinfo is not None
 
+    @pytest.mark.asset("daily")  # Birth Registrations is the daily asset's
     def test_a_daily_dataset_gets_its_own_different_time_of_day(self):
         """Birth Registrations is due at 14:00 and Child Protection at
-        09:00 - different contracts, different answers, same code."""
+        09:00 - different contracts, different answers, same code (each now
+        on its own asset: the Child Protection half is the next test)."""
         bdm = slots.slots_for_dataset("birth-registrations", until=BDM_UNTIL)[-1]
         assert bdm.due_at.hour == 14
+
+    def test_a_quarterly_dataset_gets_its_own_time_of_day(self):
         assert _cp_slots("cp-clients")[-1].due_at.hour == 9
 
     def test_grace_comes_from_the_datasets_own_contract(self):
         assert _cp_slots("cp-clients")[0].grace == timedelta(hours=8)
+
+    @pytest.mark.asset("daily")  # Birth Registrations is the daily asset's
+    def test_grace_comes_from_the_daily_datasets_own_contract(self):
         assert slots.slots_for_dataset("birth-registrations", until=BDM_UNTIL)[0].grace == timedelta(hours=1)
 
     def test_late_after_is_derived_from_due_and_grace_not_stored(self):
@@ -121,6 +133,7 @@ class TestTheClaimWindowOpensEarlyAndClosesWithTheNextPeriod:
         slot = _cp_slots("cp-clients")[0]
         assert slot.claim_opens_at == slot.due_at - timedelta(days=14)
 
+    @pytest.mark.asset("daily")
     def test_a_daily_feed_gets_its_calendars_own_much_shorter_window(self):
         slot = slots.slots_for_dataset("birth-registrations", until=BDM_UNTIL)[-1]
         assert slot.claim_opens_at == slot.due_at - timedelta(hours=4)
@@ -131,6 +144,7 @@ class TestTheClaimWindowOpensEarlyAndClosesWithTheNextPeriod:
         for here, there in zip(sequence, sequence[1:]):
             assert here.closes_at == there.claim_opens_at, here.name
 
+    @pytest.mark.asset("daily")
     def test_a_daily_slot_closes_when_tomorrows_window_opens(self):
         sequence = slots.slots_for_dataset("birth-registrations", until=BDM_UNTIL)
         for here, there in zip(sequence, sequence[1:]):
@@ -202,7 +216,7 @@ class TestNotExpectedMeansNoSlot:
         # not the other leaves the tree looking for contracts that are
         # not beside it.
         contract_dir = tmp_path / "contract"
-        shutil.copytree("contract", contract_dir)
+        shutil.copytree(asset_folders.real_folder(), contract_dir)
         doc = agreement_split.merged_view(contract_dir)
         for agency in doc["hierarchy"]["agencies"]:
             for collection in agency["collections"]:
@@ -305,7 +319,7 @@ class TestTheClaimWindowIsEffectiveDated:
         import shutil
 
         contract_dir = tmp_path / "contract"
-        shutil.copytree("contract", contract_dir)
+        shutil.copytree(asset_folders.real_folder(), contract_dir)
         # The participation is a stand-in - 09:00, no grace, no override -
         # because the timing that matters here comes from the calendar.
         agreement_split.repoint(monkeypatch, contract_dir, self._two_windows(),
@@ -336,3 +350,8 @@ class TestTheClaimWindowIsEffectiveDated:
                       base=agreement_split.participation("d", claim_window="2h"))
         for slot in slots.slots_for_dataset("d"):
             assert slot.claim_opens_at == slot.due_at - timedelta(hours=2)
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = [*(pytestmark if isinstance(pytestmark, list) else [pytestmark]), pytest.mark.asset("quarterly")]

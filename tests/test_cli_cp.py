@@ -6,6 +6,8 @@ the Click commands through click.testing.CliRunner, same pattern as
 tests/test_cli_bdm.py."""
 from __future__ import annotations
 
+import pytest
+
 from state_paths import fixed
 from qa_tools.common import hand_filing
 import os
@@ -739,3 +741,8 @@ def test_qa_command_table_s3_key_flag_mode_calls_run_check_s3_single_table(monke
     assert captured["run_by"] == "trial:not-recorded"
     assert captured["run_id"] is None
     assert captured["keep"] is False
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

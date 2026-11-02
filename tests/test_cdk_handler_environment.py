@@ -5,6 +5,8 @@ all). aws_cdk is not installed here and the stack has never been
 synthesised, so this reads the stack's source rather than building it."""
 from __future__ import annotations
 
+import pytest
+
 import ast
 from pathlib import Path
 
@@ -31,3 +33,8 @@ def test_the_environment_names_both_variables_from_required_context():
     assert '"MOTHMAN_SUPPLY_DSN": self._required_context("supply_dsn")' in source
     assert "try_get_context" in source and "raise ValueError" in source, (
         "a missing value is refused, never defaulted")
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

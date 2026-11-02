@@ -6,6 +6,8 @@ terminal routes onto it.
 """
 from __future__ import annotations
 
+import pytest
+
 import re
 
 from click.testing import CliRunner
@@ -79,3 +81,8 @@ def test_door_and_flags_offer_it_with_its_consequences(conn, world, monkeypatch,
     assert got.exit_code == 0, got.output
     (entry,) = entries(conn, world.q4, dl.CARRY_FORWARD)
     assert entry["actor"] == REAL_PERSON
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

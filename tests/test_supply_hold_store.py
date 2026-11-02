@@ -191,3 +191,8 @@ class TestWhichDatasetsAreHeldRightNow:
 
     def test_an_empty_scope_asks_nothing(self, conn):
         assert supply_holds.held_datasets(conn, dataset_ids=[]) == frozenset()
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

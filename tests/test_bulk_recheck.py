@@ -25,8 +25,8 @@ from qa_tools.common import filing_decisions as fd
 from test_supersession import DS, REAL_PERSON, WHEN, _filed
 
 AG, COL = "child-protection-family-support", "child-protection"
-CHECK = "data-asset-1.child-protection-family-support.child-protection.cp-carers.row_count_soda"
-OTHER = ("data-asset-1.child-protection-family-support.child-protection.cp-carers.carer_id."
+CHECK = "quarterly.child-protection-family-support.child-protection.cp-carers.row_count_soda"
+OTHER = ("quarterly.child-protection-family-support.child-protection.cp-carers.carer_id."
          "missing_count_soda")
 STALE = "v1:" + "a" * 64
 
@@ -162,6 +162,7 @@ class TestRefusals:
         p = bulk.plan(conn, CHECK)
         assert "already checked under its current definition" in bulk.nothing_to_cover(p)
 
+    @pytest.mark.asset("daily")  # the asset holding the register's retired check
     def test_a_retired_check_is_refused(self, conn):
         retired = next((c for c in bulk.current_checks().values() if c.retired_as_of), None)
         assert retired is not None, "the tree holds a retired check to try"
@@ -795,3 +796,8 @@ class TestTheFlagRouteInProduction:
         got = _cli("--reason", "x", "--yes", "--acknowledge", key)
         assert got.exit_code == 1
         assert conn.execute(f"SELECT count(*) FROM {bulk.TABLE}").fetchone()[0] == 0
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

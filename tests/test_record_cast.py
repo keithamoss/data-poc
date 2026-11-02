@@ -64,3 +64,8 @@ def test_a_scripted_pause_keeps_recording_rather_than_ending_the_session():
 def test_parse_steps_rejects_a_non_numeric_pause():
     with pytest.raises(ValueError, match="pause needs a number"):
         record_cast.parse_steps(["pause:soon"])
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

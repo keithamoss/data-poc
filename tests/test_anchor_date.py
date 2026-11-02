@@ -12,6 +12,8 @@ each appearing twice under delivery dates one day apart.
 """
 from __future__ import annotations
 
+import pytest
+
 import subprocess
 from datetime import date
 
@@ -57,3 +59,8 @@ def test_honours_the_override_env_var(monkeypatch):
     preserving. It is no longer how the normal path gets its date."""
     monkeypatch.setenv("GENERATOR_ANCHOR_DATE", "2026-03-15")
     assert get_anchor_date() == date(2026, 3, 15)
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

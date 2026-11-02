@@ -41,6 +41,7 @@ from typing import Protocol
 
 from qa_tools.common import slot_state
 from qa_tools.common import config_yaml
+from qa_tools.common import assets as _assets
 
 #: The marker that makes a comment THIS reconciler's own (criterion 11).
 #: An HTML comment, so it is invisible on the rendered ticket and exact
@@ -338,7 +339,7 @@ def service_from_env():
         # connecting (criterion 13) - said again here for a caller that
         # asks for the service without a connection.
         raise environments.EnvironmentError_(
-            f"the {env.id!r} environment turns ticketing on, but contract/data-asset.yaml "
+            f"the {env.id!r} environment turns ticketing on, but {_assets.config_dir()}/data-asset.yaml "
             f"names no ticket_repository")
     owner, repo = slug.split("/", 1)
     return GitHubTickets(owner, repo)

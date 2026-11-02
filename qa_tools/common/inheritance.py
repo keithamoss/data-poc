@@ -43,6 +43,7 @@ from datetime import timedelta
 
 from qa_tools.common import (decision_log, hierarchy, period_schema, qa_store, schedule,
                              supply_db)
+from qa_tools.common import assets as _assets
 
 #: What a rule records as its own name in the decision log.
 RULE_ACTOR = "inheritance rule"
@@ -103,7 +104,7 @@ def _does_not_participate(dataset_id: str, period_name: str) -> tuple[bool, str]
     turn = turned_off.gap_for_period(dataset_id, period_name)
     if turn is not None:
         return True, (f"{dataset_id} is {turned_off.gap_words(turn, dataset_id)} in "
-                      f"contract/calendar.yaml, so nothing is owed for {period_name}")
+                      f"{_assets.config_dir()}/calendar.yaml, so nothing is owed for {period_name}")
     # AND THE OTHER WAY A SCHEDULE SAYS IT (2026-10-02): `delivery_months`
     # subsetting the calendar. Case Workers is delivered in February and
     # August only, and the slot builder has always honoured that - but
@@ -134,7 +135,7 @@ def _does_not_participate(dataset_id: str, period_name: str) -> tuple[bool, str]
         names = [calendar.month_name[m] for m in months]
         said = names[0] if len(names) == 1 else ", ".join(names[:-1]) + " and " + names[-1]
         return True, (f"{dataset_id} supplies only in the {said} rounds "
-                      f"(its participation in contract/calendar.yaml), so nothing is owed for {period_name}")
+                      f"(its participation in {_assets.config_dir()}/calendar.yaml), so nothing is owed for {period_name}")
     return False, ""
 
 

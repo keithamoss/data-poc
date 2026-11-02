@@ -556,6 +556,7 @@ class TestCriticFindingsOn169:
         assert "'2024-02-01' -> None" not in text
         assert "'2024-02-01' -> (nothing)" in text
 
+    @pytest.mark.asset("daily")
     def test_f9_before_the_dataset_began_it_owes_nothing_yet(self):
         f = correction_trial.in_force("birth-registrations", date(2024, 3, 1))
         assert f.owes.startswith("nothing yet")
@@ -583,6 +584,7 @@ class TestKeithsAnswersOnThePreview:
             "k", ("dataset", "birth-registrations"), 1, 2),), slot_moves=tuple(moves))
         return correction_trial.report(t, as_at=as_at, database="d", against="r")
 
+    @pytest.mark.asset("daily")
     def test_j_slots_up_to_today_in_full_later_ones_summarised(self):
         def mv(day):
             at = datetime(2026, 10, day, 14, tzinfo=PERTH)
@@ -601,3 +603,8 @@ class TestKeithsAnswersOnThePreview:
         text = self._report([correction_trial.SlotMove("cp-clients", "2024-Q2", "due", old, new)])
         line = next(x for x in text.splitlines() if "2024-Q2" in x)
         assert "09:00 (AWST)" in line and "09:00 (AEDT)" in line, line
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

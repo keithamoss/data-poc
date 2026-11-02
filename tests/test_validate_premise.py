@@ -186,3 +186,8 @@ class TestTheWalkNeverEntersASkippedDirectory:
         monkeypatch.setattr(os, "scandir", scandir)
         files = vp._files()
         assert [p.relative_to(tmp_path).as_posix() for p in files] == ["plans/a.md"]
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

@@ -136,11 +136,12 @@ def schedule_file() -> str:
     path, never a second literal copy of it (REQ-PIPE-110 criterion 17).
     Resolved at call time (REQ-PIPE-342 criterion 6); it was the import-time
     constant SCHEDULE_FILE."""
-    from qa_tools.common import agreement
+    from qa_tools.common import agreement, assets
 
-    path = agreement.calendar_yaml()
-    root = path.parent.parent
-    return str(path.relative_to(root))
+    # By repository path through the resolver (the asset split: the folder is
+    # assets/<asset>/, no longer a top-level contract/, so the file's
+    # grandparent is not the repository root).
+    return f"{assets.folder_rel()}/{agreement.calendar_yaml().name}"
 
 
 def reason_for(decided: Assignment) -> dict:

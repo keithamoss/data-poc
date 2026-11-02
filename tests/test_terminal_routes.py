@@ -10,9 +10,10 @@ from click.testing import CliRunner
 
 from cli import common
 
-from cli.collection_cli import of as _cli_of
 
-bdm, cp = _cli_of('bdm'), _cli_of('cp')
+from asset_cli import LazyCollectionCli  # noqa: E402
+
+bdm, cp = LazyCollectionCli("bdm"), LazyCollectionCli("cp")
 from qa_tools.common import hand_filing
 
 _runner = CliRunner()
@@ -36,6 +37,7 @@ class TestAReferenceIsATrialsOnly:
     and required only for a trial, and one given for a kept supply is refused
     saying why."""
 
+    @pytest.mark.asset("daily")
     @pytest.mark.parametrize("args, flag", [
         (["--file", "{f}", "--reference-file", "{f}", "--commit"], "--reference-file"),
     ])
@@ -53,6 +55,7 @@ class TestAReferenceIsATrialsOnly:
                                              str(folder), "--commit"])
         assert out.exit_code != 0 and "last promoted supply" in _flat(out.output)
 
+    @pytest.mark.asset("daily")
     def test_a_trial_without_a_reference_is_refused_naming_the_flag(self, tmp_path):
         f = _csv(tmp_path, "birth_registrations_2026-01-01.csv")
         out = _runner.invoke(bdm.qa_command, ["--file", f, "--trial"])
@@ -154,15 +157,17 @@ class TestAFileOfAnotherCollection:
     """Criterion 5, at the terminal: refused naming the collection, before any
     question and with no trial on offer."""
 
-    def test_cp_refuses_a_birth_registrations_file(self, monkeypatch, tmp_path):
+    def test_cp_refuses_an_emergency_department_file(self, monkeypatch, tmp_path):
+        # Another collection of the same asset: since the split, Birth
+        # Registrations is another asset's, which this one does not know.
         folder = tmp_path / "d"
         folder.mkdir()
-        _csv(folder, "birth_registrations_2026-01-01.csv")
+        _csv(folder, "ed_presentations.csv")
         wrote = []
         monkeypatch.setattr(hand_filing, "file_supply", lambda *a, **k: wrote.append(1))
         out = _runner.invoke(cp.qa_command, ["--folder", str(folder), "--commit"])
         assert out.exit_code != 0
-        assert "civil-registration" in _flat(out.output) and not wrote
+        assert "emergency-department" in _flat(out.output) and not wrote
         assert "TRIAL instead" not in out.output
 
 
@@ -213,7 +218,8 @@ class TestARecordedArrivalIsNeverRecordedAgain:
                      "delivery": "e"}]
         choices = cp.picker_choices(manifest)
         assert choices[0].endswith("- recorded") and not choices[1].endswith("- recorded")
-        assert bdm.picker_choices(manifest)[0].endswith("- recorded")
+        # Another one-table collection of the same asset (the asset split).
+        assert LazyCollectionCli("ed").picker_choices(manifest)[0].endswith("- recorded")
 
     def test_an_unrecorded_arrival_may_be_kept(self, monkeypatch):
         monkeypatch.setattr(common, "recorded_runs", lambda ids: set())
@@ -256,3 +262,8 @@ class TestAFallbackTrialAsksForItsReference:
         self._tty(monkeypatch, False)
         with pytest.raises(click.ClickException, match="--reference-file"):
             common.reference_for_fallback_trial(None, "--reference-file", "file")
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

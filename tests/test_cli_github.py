@@ -6,6 +6,8 @@ real verification happens in CI, which has one - see cli/github.py's
 own module docstring)."""
 from __future__ import annotations
 
+import pytest
+
 from click.testing import CliRunner
 
 import cli.github as github_cli
@@ -35,3 +37,8 @@ def test_sync_leaderboard_calls_leaderboard_main(monkeypatch):
 
     assert result.exit_code == 0, result.output
     assert called == [True]
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

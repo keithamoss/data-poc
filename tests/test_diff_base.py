@@ -67,3 +67,8 @@ class TestALocalRunComparesAgainstWhatThePushWillBeJudgedAgainst:
         monkeypatch.delenv(diff_base.ENV_VAR)
         monkeypatch.setenv("PRE_COMMIT", "1")
         assert diff_base.diff_base() == "HEAD"
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

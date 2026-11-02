@@ -9,6 +9,8 @@ owed again - was never seen, and the gap quarter inherited nothing.
 """
 from __future__ import annotations
 
+import pytest
+
 import asset_folders
 
 import yaml
@@ -46,3 +48,8 @@ def test_the_quarters_either_side_are_still_owed(tmp_path, monkeypatch):
     _with_gap(tmp_path, monkeypatch)
     assert not inheritance._does_not_participate(ED, "2024-Q1")[0]
     assert not inheritance._does_not_participate(ED, "2024-Q3")[0]
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

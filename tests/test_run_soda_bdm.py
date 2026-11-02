@@ -6,6 +6,8 @@ against the real contract/bdm-birth-registrations-soda-checks.yml and
 a small, real, session-scoped BDM fixture."""
 from __future__ import annotations
 
+import pytest
+
 import qa_tools.tools.run_soda as run_soda
 
 from fixture_ids import BDM_DIRTY_RUN_ID as _DIRTY_RUN_ID, BDM_REF_RUN_ID as _REF_RUN_ID
@@ -89,3 +91,6 @@ def test_a_check_soda_cannot_evaluate_is_recorded_as_an_error(monkeypatch, bdm_d
     others = [r for r in results if r is not mine[0]]
     assert others and all(r["status"] in ("pass", "warn", "fail") for r in others), \
         "the checks Soda could evaluate keep their own results"
+
+#: Birth Registrations is the daily asset's (the asset split).
+pytestmark = pytest.mark.asset("daily")

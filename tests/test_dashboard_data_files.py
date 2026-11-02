@@ -376,3 +376,6 @@ class TestScriptAttributesAreEscaped:
         split_html, written = data_files.split(inlined, "snap.data")
         assert set(written) == {files[0].entry["name"]}
         assert 'data-mothman-key="collection-a&amp;&quot;b"' in split_html
+
+#: Birth Registrations is the daily asset's (the asset split).
+pytestmark = pytest.mark.asset("daily")

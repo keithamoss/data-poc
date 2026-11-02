@@ -18,6 +18,7 @@ half. The copy reuses this checkout's interpreter, dbt packages and browser.
 
 from __future__ import annotations
 
+import asset_folders
 import json
 import os
 import subprocess
@@ -219,7 +220,7 @@ class TestNothingReachesTheRepository:
     """Criterion 6."""
 
     def test_the_real_hierarchy_never_names_it(self, copy):
-        assert fake_collection.COLLECTION_ID not in (ROOT / "contract" / "data-asset.yaml").read_text()
+        assert fake_collection.COLLECTION_ID not in (asset_folders.real_folder() / "data-asset.yaml").read_text()
         assert copy.tree != ROOT
 
     @pytest.mark.parametrize("name", ["data", "reports"])
@@ -231,3 +232,8 @@ def test_how_long_it_took(copy):
     """The measured time goes in the requirement's evidence (TEST COST NFR)."""
     print(f"\nREQ-TEST-249 step times: {copy.seconds}")
     assert copy.seconds["bootstrap"] > 0
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = [*(pytestmark if isinstance(pytestmark, list) else [pytestmark]), pytest.mark.asset("quarterly")]

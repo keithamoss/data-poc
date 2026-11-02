@@ -16,7 +16,7 @@ import yaml
 from fixture_ids import BDM_DIRTY_RUN_ID, CP_DIRTY_RUN_ID
 from qa_tools.common import asked_for, left_out, qa_results_writer, soda_common, supply_db
 
-P = "data-asset-1.child-protection-family-support.child-protection"
+P = "quarterly.child-protection-family-support.child-protection"
 
 
 def _ids(text: str) -> set[str]:
@@ -59,6 +59,7 @@ class TestTheHandedText:
         left = soda_common.left_out_checks(cp.checks_path("child-protection"), {"cp_carers"}, keep=keep)
         assert left and set(left) <= keep
 
+    @pytest.mark.asset("daily")
     def test_an_unreadable_tables_filtered_section_and_filter_go_too(self):
         """A FILTERED SECTION READS ITS TABLE (post-build-review #239):
         `checks for birth_registrations [recent]` and its `filter` entry were
@@ -77,7 +78,17 @@ class TestTheHandedText:
 
 
 @pytest.fixture
-def _quiet(monkeypatch, cp_duckdb_dir, bdm_duckdb_dir):
+def _quiet(monkeypatch, request):
+    """The staged runs of each collection the selected asset holds (the
+    asset split: one asset's database holds one asset's supplies)."""
+    from qa_tools import collections
+
+    held = {c.id for c in collections.all_collections()}
+    staged = [name for cid, name in (("child-protection", "cp_duckdb_dir"),
+                                     ("civil-registration", "bdm_duckdb_dir")) if cid in held]
+    assert staged, "the selected asset holds neither collection these cases stage"
+    for name in staged:
+        request.getfixturevalue(name)
     import qa_tools.tools.run_soda as shared
 
     monkeypatch.setattr(shared, "write_qa_result", lambda *a, **k: None)
@@ -115,6 +126,7 @@ class TestTheSameVerdicts:
         assert want
         assert {r["check_id"]: r for r in scoped} == want
 
+    @pytest.mark.asset("daily")
     def test_birth_registrations(self, _quiet, monkeypatch):
         import qa_tools.tools.run_soda as bdm
 
@@ -167,3 +179,8 @@ class TestNothingAsked:
         monkeypatch.setattr(cp, "write_qa_result", lambda *a, **k: written.append((a[4], a[5])))
         assert cp.evaluate("child-protection", run_id, "2026-04-01T09:00:00Z") == []
         assert written == [("soda", {"asked": []})]
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

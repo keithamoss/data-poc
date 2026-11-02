@@ -409,3 +409,6 @@ class TestEnsureSchemaIsCheapOnceTheSchemaExists:
             qa_store.ensure_schema(conn)
             assert conn.execute(
                 f"SELECT to_regclass('{qa_store.SCHEMA}.check_result')").fetchall()[0][0]
+
+#: Birth Registrations is the daily asset's (the asset split).
+pytestmark = [*(pytestmark if isinstance(pytestmark, list) else [pytestmark]), pytest.mark.asset("daily")]

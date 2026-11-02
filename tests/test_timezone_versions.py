@@ -26,7 +26,7 @@ ROOT = vs.ROOT
 @pytest.fixture
 def sydney(tmp_path, monkeypatch):
     """The asset's clock in Sydney; everything else the real configuration."""
-    doc = yaml.safe_load((ROOT / "contract" / "data-asset.yaml").read_text())
+    doc = yaml.safe_load((asset_folders.real_folder() / "data-asset.yaml").read_text())
     doc["timezone"] = {"versions": [{
         "effective_from": "1970-01-01", "zone": "Australia/Sydney",
         "changelog": [{"date": "2026-10-11", "author": "pytest", "change": "test"}]}]}
@@ -49,6 +49,7 @@ def _expected_time(monkeypatch, hhmm):
 class TestTheGateRefusesADueTimeDaylightSavingBreaks:
     """Criterion 8 - named by dataset, period and time."""
 
+    @pytest.mark.asset("daily")  # Birth Registrations' daily periods reach the switch days
     def test_a_time_in_the_spring_forward_gap_is_refused(self, sydney, monkeypatch):
         # Birth Registrations is daily from 2026-08-24, so 2026-10-04 -
         # Sydney's spring-forward day - is one of its periods.
@@ -59,6 +60,7 @@ class TestTheGateRefusesADueTimeDaylightSavingBreaks:
         assert "does not exist" in gap[0].problem and "02:30" in gap[0].problem
         assert "birth" in gap[0].scope
 
+    @pytest.mark.asset("daily")  # Birth Registrations' daily periods reach the switch days
     def test_a_time_in_the_fall_back_overlap_is_refused(self, sydney, monkeypatch):
         _expected_time(monkeypatch, "02:30")
         errors = vs._daylight_saving_errors(vs.Source.default())
@@ -76,7 +78,7 @@ class TestSettingsChangelogsAreStructured:
     """Criteria 16 and 17."""
 
     def _doc(self):
-        return yaml.safe_load((ROOT / "contract" / "data-asset.yaml").read_text())
+        return yaml.safe_load((asset_folders.real_folder() / "data-asset.yaml").read_text())
 
     def test_a_plain_string_entry_is_refused(self):
         doc = self._doc()
@@ -120,3 +122,8 @@ class TestSettingsChangelogsAreStructured:
             {"date": "2026-10-11", "author": "pytest", "change": "a note added later"})
         assert amber_setting.past_change_problems(old, new, date(2030, 1, 1),
                                                   synthetic=False) == []
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

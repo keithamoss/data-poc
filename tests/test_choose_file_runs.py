@@ -105,3 +105,6 @@ def test_each_settled_supply_is_checked_on_its_own_file(pair):
         assert done.run_key.startswith(supply_files.run_id_of(DS, which) + "__r")
         assert read == set(own[which]), (which, read, own)
         assert results > 0
+
+#: Birth Registrations is the daily asset's (the asset split).
+pytestmark = pytest.mark.asset("daily")

@@ -86,3 +86,8 @@ class TestAWithheldNoteDoesNotEmptyAFilledSlot:
     def test_the_slot_still_counts_as_filled_for_the_gate(
             self, conn, a_filled_slot_then_withheld):
         assert SLOT in promotion.filled_slots(conn, a_filled_slot_then_withheld)
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

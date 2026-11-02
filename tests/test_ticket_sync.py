@@ -388,3 +388,6 @@ def test_an_unreadable_thread_posts_rather_than_staying_silent(monkeypatch, scop
     monkeypatch.setattr(ticket_sync, "_run_gh", fake)
 
     assert "still failing, commented" in sync_dataset("o", "r", scope, _red_dataset())
+
+#: Birth Registrations is the daily asset's (the asset split).
+pytestmark = pytest.mark.asset("daily")

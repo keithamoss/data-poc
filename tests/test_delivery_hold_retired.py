@@ -11,6 +11,8 @@ rather than two kept in step for ever.
 """
 from __future__ import annotations
 
+import pytest
+
 from datetime import datetime, timezone
 from types import SimpleNamespace
 
@@ -72,3 +74,8 @@ def test_the_contested_list_is_derived_not_stored(private_supply_dsn):
     assert "contested" not in cols
     assert record["contested"] == [
         {"dataset_id": "cp-clients", "files": ["cp_clients (2).csv", "cp_clients.csv"]}]
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

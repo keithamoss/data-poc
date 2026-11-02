@@ -212,3 +212,8 @@ class TestTheReCheckedWorseStateCarriesItsVerdict:
         words = filing_tui.listed_words(SimpleNamespace(state=SimpleNamespace(
             state=filing_queue.RECHECKED_WORSE, verdict="red", reason="x: y", files=())))
         assert words == "in place in the warehouse - promoted, then failing on re-check"
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = [*(pytestmark if isinstance(pytestmark, list) else [pytestmark]), pytest.mark.asset("quarterly")]

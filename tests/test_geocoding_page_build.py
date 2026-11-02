@@ -13,6 +13,8 @@ the geocoding pages, from recorded results and configuration only (NFR 5).
 Configuration only, so it sits in CI's fast half."""
 from __future__ import annotations
 
+import pytest
+
 import shutil
 
 import yaml
@@ -134,3 +136,8 @@ class TestTheYearChecksKeepTheirDeclaredOrder:
                  for k in ("unique", "not_null", "accepted_values")]
         rank_for_headline(cards)
         assert [c["tool_ref"] for c in cards] == ["dbt:unique", "dbt:not_null", "dbt:accepted_values"]
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

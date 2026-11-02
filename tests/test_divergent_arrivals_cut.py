@@ -17,6 +17,8 @@ need no deployment.
 """
 from __future__ import annotations
 
+import pytest
+
 from tests.divergent_arrivals import cut_datasets_short
 
 
@@ -76,3 +78,8 @@ class TestTheCutKeepsWhatTheBuildCounts:
         assert set(card["counted"]) == {"cp-investigations@A"}
         assert card.get("superseded", []) == []
         assert all(h["supply_id"] == "cp-investigations@A" for h in card["history"])
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

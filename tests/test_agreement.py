@@ -12,9 +12,9 @@ contract's slaProperties, which this requirement deletes outright.
 """
 from __future__ import annotations
 
+import asset_folders
 import shutil
 from datetime import date, timedelta
-from pathlib import Path
 
 import pytest
 import yaml
@@ -23,7 +23,12 @@ from qa_tools.common import agreement, schedule, slots
 from qa_tools.common.validate_schedule import Source, validate
 from tests import before_growth
 
-REAL_CONTRACT_DIR = Path(__file__).resolve().parent.parent / "contract"
+
+
+def _real():
+    """The selected asset's real folder - read when a test runs, so a test of
+    either asset reads its own (the asset split)."""
+    return asset_folders.real_folder()
 
 
 # ---- the loader ------------------------------------------------------
@@ -32,6 +37,7 @@ class TestTheDashboardCadenceComesFromTheAgreement:
     """Criterion 17 - the per-dataset delivery-time label the builders
     embed, read from contract/calendar.yaml."""
 
+    @pytest.mark.asset("daily")
     def test_birth_registrations_is_daily_at_two_with_an_hour_of_grace(self):
         assert agreement.cadence("birth-registrations") == {
             "type": "daily", "expected_time": "14:00", "latency_minutes": 60}
@@ -65,6 +71,7 @@ class TestTheDashboardCadenceComesFromTheAgreement:
 class TestOneLoaderOneImmutableValue:
     """Criterion 31."""
 
+    @pytest.mark.asset("daily")
     def test_the_value_cannot_be_changed_in_place(self):
         current = agreement.current()
         with pytest.raises(Exception):
@@ -76,7 +83,7 @@ class TestOneLoaderOneImmutableValue:
         """What REQ-PIPE-111's freeze and REQ-PIPE-169's preview need: the
         agreement before a change and after it, in one process, each
         answering for itself."""
-        doc = yaml.safe_load((REAL_CONTRACT_DIR / "calendar.yaml").read_text())
+        doc = yaml.safe_load((_real() / "calendar.yaml").read_text())
         entry = next(d for d in doc["datasets"] if d["id"] == "cp-clients")
         entry["participation"]["versions"][0] = {
             **entry["participation"]["versions"][0], "claim_window": "2h"}
@@ -126,7 +133,7 @@ class TestParticipation:
     def test_before_the_first_version_nothing_is_owed_yet(self, tmp_path):
         """Criterion 30 - and criterion 27: the first version's
         effective_from IS the date a dataset began owing."""
-        doc = before_growth.calendar(yaml.safe_load((REAL_CONTRACT_DIR / "calendar.yaml").read_text()))
+        doc = before_growth.calendar(yaml.safe_load((_real() / "calendar.yaml").read_text()))
         entry = next(d for d in doc["datasets"] if d["id"] == "cp-clients")
         entry["participation"]["versions"][0] = {
             **entry["participation"]["versions"][0], "effective_from": "2025-01-01"}
@@ -142,7 +149,7 @@ class TestParticipation:
     def test_a_participation_version_decides_the_periods_on_its_own_dates(self, tmp_path):
         """A later version narrowing the months governs only the periods
         on or after its own effective_from."""
-        doc = yaml.safe_load((REAL_CONTRACT_DIR / "calendar.yaml").read_text())
+        doc = yaml.safe_load((_real() / "calendar.yaml").read_text())
         entry = next(d for d in doc["datasets"] if d["id"] == "cp-clients")
         first = entry["participation"]["versions"][0]
         entry["participation"]["versions"] = [first, {
@@ -164,7 +171,7 @@ def broken(tmp_path):
     one change to its calendar.yaml (or, with `asset=True`, its
     data-asset.yaml) and returns the gate's errors."""
     contract_dir = tmp_path / "contract"
-    shutil.copytree(REAL_CONTRACT_DIR, contract_dir)
+    shutil.copytree(_real(), contract_dir)
     src = Source(contract_dir / "data-asset.yaml", contract_dir)
 
     def apply(mutate, asset=False):
@@ -207,8 +214,9 @@ class TestTheGateRefusesTheNewShapeBroken:
     def test_delivery_months_is_refused_naming_participates(self, broken):
         """Criterion 14 - in the asset file, where it used to live."""
         def mutate(doc):
-            doc["hierarchy"]["agencies"][1]["collections"][0]["datasets"][5][
-                "delivery_months"] = ["February", "August"]
+            cp = next(c for a in doc["hierarchy"]["agencies"] for c in a["collections"]
+                      if c["id"] == "child-protection")
+            cp["datasets"][5]["delivery_months"] = ["February", "August"]
         errors = broken(mutate, asset=True)
         assert any("delivery_months" in e.problem and "participates" in e.fix
                    and "calendar.yaml" in e.fix for e in errors), _text(errors)
@@ -245,12 +253,14 @@ class TestTheGateRefusesTheNewShapeBroken:
         assert any("cp-nobody" in (e.scope or "") and "hierarchy" in e.problem
                    for e in errors), _text(errors)
 
+    @pytest.mark.asset("daily")
     def test_a_collection_the_hierarchy_does_not_hold_is_refused(self, broken):
         def mutate(doc):
             doc["collections"].append({"id": "nowhere", "calendar": "daily"})
         errors = broken(mutate)
         assert any("nowhere" in (e.scope or "") for e in errors), _text(errors)
 
+    @pytest.mark.asset("daily")
     def test_a_dataset_on_no_calendar_at_all_is_refused_naming_both_files(self, broken):
         """Criterion 18, the other direction: take the collection's
         calendar away and the dataset is on nothing."""
@@ -268,6 +278,7 @@ class TestTheGateRefusesTheNewShapeBroken:
         errors = broken(mutate)
         assert any("no reason" in e.problem for e in errors), _text(errors)
 
+    @pytest.mark.asset("daily")
     @pytest.mark.parametrize("key", ["expected_time", "grace"])
     def test_a_version_with_no_expected_time_or_grace_is_refused(self, broken, key):
         """Criterion 29."""
@@ -311,13 +322,22 @@ class TestTheGateRefusesTheNewShapeBroken:
 
 class TestTheContractsDetection:
     def test_a_contract_is_recognised_by_its_kind(self):
-        """Criterion 32 - neither real contract states slaProperties any
-        more, and both are still checked as contracts."""
-        for name in ("registry-services/bdm-birth-registrations-contract.yaml",
-                     "child-protection-family-support/child-protection-contract.yaml"):
-            doc = yaml.safe_load((REAL_CONTRACT_DIR / name).read_text())
+        """Criterion 32 - no real contract states slaProperties any more,
+        and each is still checked as a contract: every collection's of the
+        asset the test acts for, from the registry (the asset split - each
+        asset's contracts are its own; the module's other asset runs it too)."""
+        from qa_tools import collections
+
+        names = [c.contract for c in collections.all_collections()]
+        assert names, "the registry names no contract"
+        for name in names:
+            doc = yaml.safe_load((_real() / name).read_text())
             assert doc["kind"] == "DataContract"
             assert "slaProperties" not in doc
+
+    @pytest.mark.asset("daily")
+    def test_a_contract_is_recognised_by_its_kind_on_the_daily_asset(self):
+        self.test_a_contract_is_recognised_by_its_kind()
 
 
 class TestAnAssetWithNoCalendarsAtAll:
@@ -389,13 +409,14 @@ class TestCriticFindingsOn110:
         assert any("2026-Q1" in e.problem and "twice" in e.problem for e in errors), _text(errors)
 
     def test_the_loader_refuses_a_duplicate_dataset_too(self, tmp_path):
-        doc = yaml.safe_load((REAL_CONTRACT_DIR / "calendar.yaml").read_text())
+        doc = yaml.safe_load((_real() / "calendar.yaml").read_text())
         doc["datasets"].append(dict(_entry(doc, "cp-clients")))
         path = tmp_path / "calendar.yaml"
         path.write_text(yaml.safe_dump(doc, sort_keys=False))
         with pytest.raises(schedule.ScheduleConfigError, match="twice"):
             agreement.load(path)
 
+    @pytest.mark.asset("daily")
     def test_months_on_an_older_version_against_a_cadence_rule_are_refused(self, broken):
         """Criterion 7: EACH participation version, against every calendar
         version it overlaps - not the newest alone."""
@@ -467,6 +488,7 @@ class TestCriticFindingsOn110:
         errors = broken(mutate)
         assert any("author" in e.fix for e in errors), _text(errors)
 
+    @pytest.mark.asset("daily")
     def test_a_dataset_on_no_calendar_names_both_files(self, broken):
         """Criterion 18 says both files."""
         def mutate(doc):
@@ -480,7 +502,7 @@ class TestCriticFindingsOn110:
 
     def test_a_datasets_own_calendar_beats_its_collections(self, tmp_path):
         """Criterion 11, which had no test of its own."""
-        doc = yaml.safe_load((REAL_CONTRACT_DIR / "calendar.yaml").read_text())
+        doc = yaml.safe_load((_real() / "calendar.yaml").read_text())
         _entry(doc, "cp-clients")["calendar"] = "daily"
         path = tmp_path / "calendar.yaml"
         path.write_text(yaml.safe_dump(doc, sort_keys=False))
@@ -489,10 +511,11 @@ class TestCriticFindingsOn110:
         assert moved.calendar_name_for("cp-carers") == "quarterly"
 
 
+@pytest.mark.asset("daily")
 def test_the_runtime_refuses_older_months_against_a_cadence_rule_too(tmp_path):
     """Criterion 7 at runtime as well as at the gate: an older version's
     months against the daily rule used to drop those days silently."""
-    doc = yaml.safe_load((REAL_CONTRACT_DIR / "calendar.yaml").read_text())
+    doc = yaml.safe_load((_real() / "calendar.yaml").read_text())
     first = _first(doc, "birth-registrations")
     first.update({"participates": ["August"], "reason": "a test"})
     second = dict(first, effective_from="2026-09-01", participates="all", changelog=[
@@ -521,3 +544,8 @@ class TestACorrectionMustBeComplete:
                 correction]
         errors = broken(mutate)
         assert any(missing in (e.problem + (e.field or "")) for e in errors), _text(errors)
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

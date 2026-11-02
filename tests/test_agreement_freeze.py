@@ -9,9 +9,9 @@ runs. The approvers are the real contract/people.yaml's.
 """
 from __future__ import annotations
 
+import asset_folders
 import copy
 from datetime import datetime, timedelta, timezone
-from pathlib import Path
 
 import pytest
 import yaml
@@ -19,7 +19,7 @@ import yaml
 from qa_tools.common import agreement_freeze as freeze
 from tests import before_growth
 
-CONTRACT = Path(__file__).resolve().parent.parent / "contract"
+CONTRACT = asset_folders.SelectedFolder()
 PERTH = timezone(timedelta(hours=8))
 #: The night this was built.
 NOW = datetime(2026, 10, 11, 3, 0, tzinfo=PERTH)
@@ -30,14 +30,22 @@ def _load(name):
     """A committed contract file as it stood before REQ-GEN-207's growth:
     these cases change "the first version", meaning the 2023 one
     (tests/before_growth.py)."""
-    doc = yaml.safe_load((CONTRACT / name).read_text())
+    doc = yaml.safe_load((asset_folders.real_folder() / name).read_text())
     strip = {"calendar.yaml": before_growth.calendar,
              "data-asset.yaml": before_growth.asset}.get(name)
     return strip(doc) if strip else doc
 
 
+def _rel(name):
+    """`name` in the selected asset's folder, by repository path - through
+    the resolver, never a hard-coded folder (the asset split)."""
+    from qa_tools.common import assets
+
+    return f"{assets.folder_rel()}/{name}"
+
+
 #: The real committed .github/CODEOWNERS, as the base (REQ-GHUB-174).
-CODEOWNERS = (CONTRACT.parent / ".github" / "CODEOWNERS").read_text()
+CODEOWNERS = (CONTRACT.parent.parent / ".github" / "CODEOWNERS").read_text()
 
 
 @pytest.fixture
@@ -211,9 +219,9 @@ class TestTheApprover:
 
     def test_a_manager_who_is_not_a_code_owner_may_not(self, state):
         """REQ-GHUB-174 criterion 2: GitHub could not require their review."""
-        others = "/contract/calendar.yaml @someone-else\n"
+        others = f"/{_rel('calendar.yaml')} @someone-else\n"
         found = self._corrected(state, KEITH, codeowners=others)
-        assert any("not a code owner of contract/calendar.yaml" in f.problem
+        assert any(f"not a code owner of {_rel('calendar.yaml')}" in f.problem
                    for f in found), _text(found)
 
     def test_no_codeowners_at_the_base_refuses_every_correction(self, state):
@@ -223,7 +231,7 @@ class TestTheApprover:
 
     def test_the_last_matching_codeowners_line_wins(self, state):
         """As on GitHub: a later line un-owns the file."""
-        later = CODEOWNERS + "\n/contract/ @someone-else\n"
+        later = CODEOWNERS + f"\n/{_rel('')} @someone-else\n"
         found = self._corrected(state, KEITH, codeowners=later)
         assert any("not a code owner" in f.problem for f in found), _text(found)
 
@@ -350,6 +358,7 @@ class TestVersions:
                              base_codeowners=CODEOWNERS)
         assert found == [], _text(found)
 
+    @pytest.mark.asset("daily")
     def test_a_cadence_rule_versions_rule_applies(self, state):
         """Criterion 17: the daily calendar has no dated entries, and its
         version is frozen like any other."""
@@ -374,6 +383,11 @@ class TestRestatingAnOmittedValueAtItsDefault:
         them stating days_before - the shape the amendment is about."""
         cal, asset, people_doc = state
         cal = copy.deepcopy(cal)
+        if not any(e.get("id") == "birth-registrations" for e in cal.get("datasets") or []):
+            # The quarterly asset's calendar (the asset split): Birth
+            # Registrations is the daily asset's, so there is nothing of it
+            # to take back.
+            return cal, asset, people_doc
         versions = _entry(cal, "birth-registrations")["participation"]["versions"]
         versions[:] = [v for v in versions if str(v["effective_from"]) >= "2026-06-30"]
         for v in versions:
@@ -387,10 +401,12 @@ class TestRestatingAnOmittedValueAtItsDefault:
                 "days_before"] = value
         return mutate
 
+    @pytest.mark.asset("daily")
     def test_restating_days_before_at_its_default_is_free(self, state):
         assert state[1].get("synthetic") is True
         assert _check(state, self._restate(0)) == []
 
+    @pytest.mark.asset("daily")
     def test_not_on_a_real_asset(self, state):
         old_cal, old_asset, people = state
         old_asset = dict(old_asset, synthetic=False)
@@ -399,11 +415,13 @@ class TestRestatingAnOmittedValueAtItsDefault:
         assert any("birth-registrations participation" in (f.scope or "") for f in found), \
             _text(found)
 
+    @pytest.mark.asset("daily")
     def test_not_at_any_other_value(self, state):
         found = _check(state, self._restate(1))
         assert any("birth-registrations participation" in (f.scope or "") for f in found), \
             _text(found)
 
+    @pytest.mark.asset("daily")
     def test_not_alongside_another_change_to_the_version(self, state):
         def mutate(doc):
             self._restate(0)(doc)
@@ -413,6 +431,7 @@ class TestRestatingAnOmittedValueAtItsDefault:
         assert any("birth-registrations participation" in (f.scope or "") for f in found), \
             _text(found)
 
+    @pytest.mark.asset("quarterly")  # Child Protection's collection defaults
     def test_not_where_the_collection_gives_another_value(self, state):
         """Left out, the value came from the collection's defaults, so
         restating the fallback default would change what the version
@@ -436,7 +455,7 @@ class TestTheTimezone:
             asset["timezone"]["versions"][0]["zone"] = "Australia/Sydney"
         found = _check(state, change_asset=mutate)
         assert found and found[0].file == "data-asset.yaml", _text(found)
-        assert "the timezone in contract/data-asset.yaml" in found[0].fix
+        assert f"the timezone in {_rel('data-asset.yaml')}" in found[0].fix
 
 
 class TestConfigurationOnly:
@@ -487,7 +506,7 @@ class TestTheSettingsGuardDatesByTheCommitter:
         monkeypatch.setattr(vs, "_content_at", lambda rel, ref: yaml.safe_dump({
             "amber_setting": {"versions": [{"effective_from": "2026-10-01", "value": "hold",
                                             "changelog": []}]}}))
-        got = vs._version_added_on("contract/data-asset.yaml", "BASE", "2026-10-01")
+        got = vs._version_added_on(_rel("data-asset.yaml"), "BASE", "2026-10-01")
         assert any("--format=%H %cI" in a for a in asked), asked
         assert got == date(2026, 10, 10), got
 
@@ -739,3 +758,8 @@ class TestASyntheticAssetMayLaterDateACalendarVersion:
         found = freeze.check(cal, new_cal, asset, asset, people, instant_of=lambda key: NOW,
                              today=NOW.date(), base_codeowners=CODEOWNERS)
         assert any(PAST in (f.scope or "") for f in found), _text(found)
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

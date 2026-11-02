@@ -51,6 +51,7 @@ def test_the_last_authored_slot_closes_when_the_cadence_rule_begins(calendar, un
     assert q2.closes_at == datetime(2024, 6, 1, 5, 0, tzinfo=PERTH)
 
 
+@pytest.mark.asset("quarterly")
 def test_a_claim_window_change_closes_with_the_next_periods_own_window(calendar):
     calendar([
         {"effective_from": "2023-01-01", "changelog": ["i"], "claim_window": "14d",
@@ -67,3 +68,8 @@ def test_a_datasets_own_dates_close_at_its_next_own_date(calendar):
                         {"period": "own-2", "date": "2024-09-01"}]})
     own1 = slots.slots_for_dataset("d")[0]
     assert own1.closes_at == datetime(2024, 8, 18, 9, 0, tzinfo=PERTH)
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("daily")

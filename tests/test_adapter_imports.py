@@ -37,7 +37,9 @@ class TestTheGate:
     @pytest.mark.parametrize("line", [
         "from qa_tools.collections import child_protection",
         "from qa_tools.collections.child_protection import ADAPTER as _other",
-        "import qa_tools.collections.civil_registration",
+        # A sibling of the same asset (the asset split: Birth Registrations'
+        # adapter is another asset's, at a path that no longer exists).
+        "import qa_tools.collections.linkage_products",
         "from generator.collections import emergency_department as _p",
         "import generator.collections.linkage_products",
         "import mothman_adapter_data_asset_1_child_protection",
@@ -86,3 +88,8 @@ class TestTheGate:
         _imports(adapters, "from qa_tools.collections import child_protection")
         assert any("emergency_department.py" in p and "child_protection" in p
                    for p in gate.config_problems())
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

@@ -6,6 +6,8 @@ copy of it changed the way tests/test_turn_off.py changes one.
 """
 from __future__ import annotations
 
+import pytest
+
 from datetime import date
 
 from pipeline import owed_nothing
@@ -95,6 +97,7 @@ class TestTheDeliveryTimeInForce:
         assert versions and all(v["cadence"]["anchor_months"] == [2, 5, 8, 11]
                                 and v["reason"] is None for v in versions)
 
+    @pytest.mark.asset("daily")
     def test_a_daily_dataset_keeps_its_rule(self):
         versions = owed_nothing.sla_timeline("birth-registrations")["versions"]
         assert versions and all(v["cadence"]["type"] == "daily" for v in versions)
@@ -113,3 +116,8 @@ class TestTheDeliveryTimeInForce:
         newer = got["versions"][1]
         assert newer["cadence"]["anchor_months"] == [2, 5, 8, 11]
         assert newer["cadence"]["days_before"] == 1 and newer["reason"] is None
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

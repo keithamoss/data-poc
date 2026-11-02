@@ -9,10 +9,12 @@ TestAnotherTableCouldNotBeRead.
 """
 from __future__ import annotations
 
+import pytest
+
 from pipeline import cross_table_notices as ctn
 from qa_tools.common import root_cause
 
-CHECK = "data-asset-1.child-protection-family-support.child-protection.cp-notifications"
+CHECK = "quarterly.child-protection-family-support.child-protection.cp-notifications"
 REF_DBT = f"{CHECK}.cp_client_id.relationships_dbt"
 REF_SODA = f"{CHECK}.cp_client_id.relationships_soda"
 N2 = "cp-notifications@202411031000000800"
@@ -133,3 +135,8 @@ class TestTheLines:
         points = _points(cards, _log())
         assert [(p["on"], len(p["lines"])) for p in points] == [("2024-11-03", 1),
                                                                 ("2024-11-07", 0)]
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

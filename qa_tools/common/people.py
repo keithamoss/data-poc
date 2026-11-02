@@ -27,6 +27,7 @@ from contextlib import contextmanager
 from pathlib import Path
 
 from qa_tools.common import config_yaml
+from qa_tools.common import assets as _assets
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 
@@ -159,7 +160,7 @@ def synthetic_actor(config: dict | None = None) -> dict:
     found = [p for p in (config["people"] or {}).values() if is_synthetic(p)]
     if len(found) != 1:
         raise UnknownActor(
-            f"contract/people.yaml must hold exactly one entry marked `synthetic: true` "
+            f"{_assets.config_dir()}/people.yaml must hold exactly one entry marked `synthetic: true` "
             f"for scripted playback; it holds {len(found)}")
     return person_by_email(found[0]["email"], config)
 
@@ -176,7 +177,7 @@ def person_by_email(email: str, config: dict | None = None) -> dict:
     person = (config["people"] or {}).get((email or "").strip())
     if person is None:
         raise UnknownActor(
-            f"{email!r} is not in contract/people.yaml, so a filing decision "
+            f"{email!r} is not in {_assets.config_dir()}/people.yaml, so a filing decision "
             f"raised by them could not be attributed to anybody. Add them "
             f"there first - an unattributable decision is worse than none, "
             f"because saying who is what the log is for.")
@@ -213,11 +214,11 @@ def person_by_github(username: str, config: dict | None = None) -> dict:
         if is_placeholder(person) or is_synthetic(person):
             raise UnknownActor(
                 f"the GitHub account {username!r} belongs to a placeholder or the "
-                f"synthetic actor in contract/people.yaml, which cannot raise a filing "
+                f"synthetic actor in {_assets.config_dir()}/people.yaml, which cannot raise a filing "
                 f"decision from GitHub.")
         return person
     raise UnknownActor(
-        f"no person in contract/people.yaml has the GitHub username "
+        f"no person in {_assets.config_dir()}/people.yaml has the GitHub username "
         f"{username!r}, so a decision raised by that account could not be "
         f"attributed to anybody. Add their username there - being able to "
         f"comment on the repository is not the same as being allowed to file.")
@@ -375,6 +376,6 @@ def require_role(person: dict, role: str, level: str, agency_id: str | None = No
              else f"{LEVEL_WORDS[level]} for {agency_id}")
     raise RoleRefused(
         f"{person.get('email')!r} does not hold the {role} role at {where}, which this "
-        f"decision requires. Assign it in contract/people.yaml under `assignments:` - "
+        f"decision requires. Assign it in {_assets.config_dir()}/people.yaml under `assignments:` - "
         f"{'`data_asset:`' if level == DATA_ASSET else f'`agency: {agency_id}`'}, "
         f"`role: {role}` - if they should.")

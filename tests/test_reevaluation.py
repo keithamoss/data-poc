@@ -18,6 +18,8 @@ arrived", which is the difference between a question and an answer.
 """
 from __future__ import annotations
 
+import pytest
+
 from qa_tools.common import reevaluation
 
 READS = {
@@ -111,3 +113,8 @@ class TestACheckFiledUnderTheArrivingTableCountsTowardWhatItReads:
         assert any(".cp-investigations.notification_id.relationships" in c for c in mine), mine
         assert not any("cp-investigations" in reevaluation.counts_toward(
             c, table="cp_investigations", reads=reads) for c in checks)
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

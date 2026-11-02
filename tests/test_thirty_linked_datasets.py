@@ -24,6 +24,7 @@ are never touched.
 
 from __future__ import annotations
 
+import asset_folders
 import csv
 import json
 import os
@@ -304,11 +305,11 @@ class TestNoProductFileChanged:
 
     def test_after_the_run_only_the_generated_scenario_map_differs(self, copy):
         """The replay itself writes nothing into product code. The one tracked
-        file it rewrites is SCENARIOS.md, which every generation rebuilds from
+        file it rewrites is the asset's SCENARIOS-<asset>.md, which every generation rebuilds from
         the recorded placements (cli/pipeline.generate_collection) - and this
         copy places none of the real scenarios. That is the run's output, not
         a file the fixture had to change."""
-        assert copy.changed_after_run == ["SCENARIOS.md changed (M)"]
+        assert copy.changed_after_run == ["SCENARIOS-quarterly.md changed (M)"]
 
     def test_the_check_would_catch_an_edit_to_product_code(self, tmp_path):
         tree = fx.build(tmp_path / "tree")
@@ -326,7 +327,7 @@ class TestNoProductFileChanged:
         assert _snapshot(ROOT / name) == copy.before[name]
 
     def test_the_real_hierarchy_never_names_them(self, copy):
-        assert fx.PRODUCT["collection"] not in (ROOT / "contract" / "data-asset.yaml").read_text()
+        assert fx.PRODUCT["collection"] not in (asset_folders.real_folder() / "data-asset.yaml").read_text()
         assert copy.tree != ROOT
 
 
@@ -341,3 +342,8 @@ def test_how_long_the_linkage_run_took(copy):
           f"knock-on re-run {runs[readers]}s; {len(runs)} QA runs in a {copy.evidence['stream_seconds']}s "
           f"stream; {copy.wall_seconds}s end to end including generation")
     assert linkage > 0
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = [*(pytestmark if isinstance(pytestmark, list) else [pytestmark]), pytest.mark.asset("quarterly")]

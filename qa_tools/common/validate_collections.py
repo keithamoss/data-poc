@@ -31,6 +31,7 @@ import ast
 import re
 import sys
 from pathlib import Path
+from qa_tools.common import assets as _assets
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 
@@ -181,22 +182,40 @@ def config_problems(package: Path | None = None) -> list[str]:
 
     package = package or assets.selected().adapters
     modules = {p.stem for p in package.glob("*.py") if p.stem not in ("__init__", "base")}
-    problems += adapter_import_problems(package)
+
+    def shown(stem: str) -> str:
+        """An adapter by its own path - the asset's adapter folder since the
+        asset split (it was qa_tools/collections/) - from the repository root,
+        or in full outside it."""
+        path = package / f"{stem}.py"
+        try:
+            return str(path.resolve().relative_to(ROOT))
+        except ValueError:
+            return str(path)
+
+    import_problems = adapter_import_problems(package)
+    problems += import_problems
     wanted = {c.module_name: c for c in declared}
     loaded = {}
     for c in declared:
         if c.module_name not in modules:
-            problems.append(f"collection {c.id!r} has no adapter "
-                            f"(qa_tools/collections/{c.module_name}.py)")
+            problems.append(f"collection {c.id!r} has no adapter ({shown(c.module_name)})")
         else:
             try:
                 adapter = collections.adapter(c)
             except TypeError as exc:
                 problems.append(_pointer_problem(c, exc))
                 continue
+            except ImportError as exc:
+                # REPORTED, NOT RAISED: an adapter whose own import fails - most
+                # often the forbidden import adapter_import_problems() has just
+                # named - is one more finding, never the end of the gate.
+                if not any(p.startswith(f"{c.module_name}.py:") for p in import_problems):
+                    problems.append(f"{shown(c.module_name)} cannot be imported: {exc}")
+                continue
             loaded[c.id] = adapter
             if adapter.collection_id != c.id:
-                problems.append(f"qa_tools/collections/{c.module_name}.py is the adapter of "
+                problems.append(f"{shown(c.module_name)} is the adapter of "
                                 f"{adapter.collection_id!r}, not {c.id!r}")
     # REQ-QAC-242 criterion 5, closed by REQ-QAC-247 criterion 5 and REQ-PIPE-248
     # criterion 6: every legacy flag is retired, so legacy.KNOWN is empty and
@@ -205,11 +224,11 @@ def config_problems(package: Path | None = None) -> list[str]:
     for c in declared:
         if c.id in loaded:
             for flag in sorted(loaded[c.id].legacy - set(legacy.KNOWN)):
-                problems.append(f"qa_tools/collections/{c.module_name}.py declares legacy flag "
+                problems.append(f"{shown(c.module_name)} declares legacy flag "
                                 f"{flag!r}, but every legacy flag is retired (REQ-QAC-247, REQ-PIPE-248) - "
                                 f"remove it, or unify the behaviour it preserved")
     for orphan in sorted(modules - set(wanted)):
-        problems.append(f"qa_tools/collections/{orphan}.py names no declared collection")
+        problems.append(f"{shown(orphan)} names no declared collection")
 
     # REQ-PIPE-248 criterion 7: an agency's short names its collections'
     # report files, so it must be unique and safe in a file name.
@@ -246,7 +265,7 @@ def config_problems(package: Path | None = None) -> list[str]:
                                 f"{len(name.encode())} bytes - over PostgreSQL's "
                                 f"{PG_IDENTIFIER_BYTES}")
         if not (hierarchy.data_asset_yaml().parent / c.contract).is_file():
-            problems.append(f"{c.id!r}'s contract file contract/{c.contract} is missing")
+            problems.append(f"{c.id!r}'s contract file {_assets.config_dir()}/{c.contract} is missing")
 
     for field in ("dataset_id", "table"):
         seen = {}
@@ -262,23 +281,33 @@ def config_problems(package: Path | None = None) -> list[str]:
 
 # ---- REQ-QAC-241 criteria 2, 5 and 9: the check files ----------------------
 
-#: The only files at the top of contract/ - the asset's own, not a
-#: collection's (REQ-QAC-241 criterion 2).
-ASSET_WIDE = ("data-asset.yaml", "calendar.yaml", "people.yaml", "environments.yaml",
-              "file-checks.yaml", "scripted_decisions.yaml", "presentation.yaml",
-              "synthetic_inputs.yaml")
+#: The only files at the top of an asset's folder - the asset's own, not a
+#: collection's (REQ-QAC-241 criterion 2 as amended by A21).
+ASSET_WIDE = ("data-asset.yaml", "calendar.yaml", "people.yaml", "file-checks.yaml",
+              "presentation.yaml")
+#: The asset folder's own parts, each with a gate of its own - its dbt project
+#: (the dbt-folder gate), its QA adapters (the adapters gate) and its
+#: synthetic-only configuration (below) - so never an agency's folder.
+ASSET_PARTS = ("dbt", "collections", "synthetic")
+#: The only files at the top of an asset's synthetic/ folder, beside its
+#: providers in synthetic/collections/ (REQ-GEN-370 criterion 1).
+SYNTHETIC = ("scripted_decisions.yaml", "synthetic_inputs.yaml", "eras.yaml")
 _CHECK_FILE = re.compile(r"(?P<stem>.+)-(?:contract|soda-checks|evidently-checks)(?:-retired)?\.ya?ml")
-#: Shared dbt SQL that belongs to no collection (criterion 4).
-_SHARED_DBT = ("dbt_project/tests/generic/",)
 
 
 def check_file_problems(root: Path | None = None) -> list[str]:
-    """`root` holds contract/ and dbt_project/ - the repository unless a
-    test names another; the hierarchy is read from root/contract."""
+    """`root` holds the asset's configuration folder and dbt project - the
+    repository unless a test names another; the hierarchy is read from the
+    selected asset's folder."""
     from qa_tools import collections
-    from qa_tools.common import assets, hierarchy
+    from qa_tools.common import assets
 
-    root = root or hierarchy.data_asset_yaml().parent.parent
+    # The checkout the asset's paths are relative to (assets.folder_rel): the
+    # repository, wherever the asset folder sits inside it; for a folder
+    # outside it (a test's copy, #55's injected configuration), its parent.
+    if root is None:
+        folder = assets.selected().folder
+        root = assets.ROOT if folder.is_relative_to(assets.ROOT) else folder.parent
     try:
         declared = collections.all_collections()
     except ValueError:
@@ -314,8 +343,16 @@ def check_file_problems(root: Path | None = None) -> list[str]:
         rel = path.relative_to(root).as_posix()
         if path.parent == contract:
             if path.name not in ASSET_WIDE:
-                problems.append(f"{rel} is at the top of contract/, where only the asset-wide "
-                                f"files belong ({', '.join(ASSET_WIDE)})")
+                problems.append(f"{rel} is at the top of the asset's folder, where only the "
+                                f"asset-wide files belong ({', '.join(ASSET_WIDE)})")
+            continue
+        part = path.relative_to(contract).parts[0]
+        if part == "synthetic" and path.parent == contract / "synthetic":
+            if path.name not in SYNTHETIC:
+                problems.append(f"{rel} is at the top of the asset's synthetic/ folder, where "
+                                f"only {', '.join(SYNTHETIC)} belong")
+            continue
+        if part in ASSET_PARTS:
             continue
         m = _CHECK_FILE.fullmatch(path.name)
         c = owner.get(m.group("stem")) if m else None
@@ -369,21 +406,22 @@ def _dbt_layout_problems(root: Path, declared) -> list[str]:
     folders = [c.dbt_models + "/" for c in declared] + [c.dbt_tests + "/" for c in declared]
     folders += [c.dbt_retired_schema.rsplit("/", 1)[0] + "/" for c in declared]
     singular: dict[str, str] = {}
-    for top in ("dbt_project/models", "dbt_project/tests", "dbt_project/retired"):
+    from qa_tools.common import assets
+
+    project = assets.dbt_rel()
+    for top in (f"{project}/models", f"{project}/tests", f"{project}/retired"):
         base = root / top
         for path in sorted(base.rglob("*")) if base.is_dir() else []:
             if not path.is_file() or path.suffix not in (".sql", ".yml", ".yaml"):
                 continue
             rel = path.relative_to(root).as_posix()
-            if rel.startswith(_SHARED_DBT):
-                continue
             home = next((f for f in folders if rel.startswith(f)), None)
             if home is None:
                 problems.append(f"{rel} sits outside every collection's dbt folder "
-                                f"(dbt_project/models/<collection-id>/, "
-                                f"dbt_project/tests/<collection-id>/)")
+                                f"({project}/models/<collection-id>/, "
+                                f"{project}/tests/<collection-id>/)")
                 continue
-            if top == "dbt_project/tests" and path.suffix == ".sql":
+            if top == f"{project}/tests" and path.suffix == ".sql":
                 if path.stem in singular and singular[path.stem] != home:
                     problems.append(f"singular test {path.stem!r} is declared in both "
                                     f"{singular[path.stem]} and {home} - dbt names a singular "
@@ -558,16 +596,24 @@ def logic_lines(path: Path) -> int:
     return len({n.lineno for n in ast.walk(tree) if hasattr(n, "lineno")} - docstrings)
 
 
-def line_report(root: Path = ROOT) -> list[str]:
+def line_report(adapters: Path | None = None, providers: Path | None = None) -> list[str]:
     """Each registered collection's adapter against the budget, and its
     generator provider's lines beside it, outside the budget - a real
-    deployment's collections have no synthetic generator at all."""
-    from qa_tools import collections
+    deployment's collections have no synthetic generator at all.
 
+    Each from the selected asset's own folders (the asset split: adapters in
+    assets/<asset>/collections/, providers in assets/<asset>/synthetic/
+    collections/), unless a test names others."""
+    from qa_tools import collections
+    from qa_tools.common import assets
+
+    asset = assets.selected()
+    adapters = adapters or asset.adapters
+    providers = providers or asset.providers
     out = []
     for coll in collections.all_collections():
-        adapter = root / "qa_tools" / "collections" / f"{coll.module_name}.py"
-        provider = root / "generator" / "collections" / f"{coll.module_name}.py"
+        adapter = adapters / f"{coll.module_name}.py"
+        provider = providers / f"{coll.module_name}.py"
         if not adapter.is_file():
             continue  # config_problems() says so
         n = logic_lines(adapter)

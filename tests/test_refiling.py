@@ -223,3 +223,8 @@ class TestItIsLocalToTheSupplyThatMoved:
             f"{sum(rows_read)} filing rows read for one supply's verdict - the cost "
             f"grows with history, which the non-functional constraint forbids")
         assert resolved == ["2026-Q2"]
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = [*(pytestmark if isinstance(pytestmark, list) else [pytestmark]), pytest.mark.asset("quarterly")]

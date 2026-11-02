@@ -203,3 +203,8 @@ class TestStampedWhereTheHistoryEnds:
         at = _applied_at(conn)
         assert at["CAB-1"] == asset_time.start_of_day(date(2026, 1, 10))
         assert at["CAB-2"] == asset_time.start_of_day(date(2026, 2, 10))
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

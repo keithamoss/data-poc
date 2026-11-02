@@ -103,3 +103,6 @@ class TestEveryOlderSchemaIsRefused:
                 qa_store.ensure_schema(conn)
             assert _version(conn) == older, "it was migrated in place"
         assert "reset-synthetic" in str(caught.value)
+
+#: Birth Registrations is the daily asset's (the asset split).
+pytestmark = pytest.mark.asset("daily")

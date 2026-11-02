@@ -2,6 +2,7 @@
 name (REQ-PIPE-202 criteria 1, 2 and 11)."""
 from __future__ import annotations
 
+import asset_folders
 import pytest
 import yaml
 
@@ -28,7 +29,7 @@ class TestThePattern:
         assert arrival_patterns.dataset_for_filename(name) is None
 
     def test_the_pattern_and_its_comment_in_the_configuration(self):
-        text = (ROOT / "contract" / "data-asset.yaml").read_text()
+        text = (asset_folders.real_folder() / "data-asset.yaml").read_text()
         doc = yaml.safe_load(text)
         found = [ds for agency in doc["hierarchy"]["agencies"]
                  for col in agency["collections"] for ds in col["datasets"]
@@ -39,5 +40,10 @@ class TestThePattern:
         assert "demonstrat" in block.lower() and "contest" in block.lower()
 
     def test_the_odcs_transport_value_is_unchanged(self):
-        text = (ROOT / "contract" / "child-protection-family-support" / "child-protection-contract.yaml").read_text()
+        text = (ROOT / "assets" / "quarterly" / "child-protection-family-support" / "child-protection-contract.yaml").read_text()
         assert "cp_clients(_" not in text
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

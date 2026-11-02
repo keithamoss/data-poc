@@ -332,3 +332,8 @@ class TestAStandInIsDecidedByAName:
             kind=promotion_state.INHERITED, period="2025-Q2", stands_on="2025-Q1",
             supply="cp-case-workers@x").as_record()
         assert record["decidedBy"] is None
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = [*(pytestmark if isinstance(pytestmark, list) else [pytestmark]), pytest.mark.asset("quarterly")]

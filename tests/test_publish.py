@@ -785,3 +785,8 @@ class TestACriticalTestCIcannotRunFailsCollection:
         item._fixtureinfo = SimpleNamespace(
             name2fixturedefs={"plain": [SimpleNamespace(func=plain)]})
         self._refuse(item)
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

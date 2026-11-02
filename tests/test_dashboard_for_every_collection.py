@@ -12,6 +12,8 @@ and their output is proved unchanged by the equivalence capture.
 """
 from __future__ import annotations
 
+from qa_tools.common import assets
+
 import json
 
 import pytest
@@ -41,7 +43,9 @@ def described(third_collection, tmp_path, monkeypatch, supply_dsn):
              "description": "Required."},
         ]}]
     contract.write_text(yaml.safe_dump(doc, sort_keys=False))
-    shown = yaml.safe_load(open(bdd.ROOT + "/contract/presentation.yaml"))
+    import asset_folders
+
+    shown = yaml.safe_load((asset_folders.real_folder() / "presentation.yaml").read_text())
     shown["collections"][FAKE_ID] = {"provider": "The Fake Agency", "delivery_format": "CSV",
                                      "provenance": "Built from fakes. ({table_description})"}
     shown["agencies"][FAKE_AGENCY] = {"blurb": "Makes fake things."}
@@ -153,8 +157,13 @@ class TestTheEmbed:
         with pytest.raises(edd.MissingCollectionData) as refused:
             edd.embed()
         said = str(refused.value)
-        assert "civil-registration" in said and "mothman dashboard build-data" in said
-        assert "civil-registration.json" in said and "No page was written" in said
+        from qa_tools import collections
+
+        # The hierarchy's first collection is the one refused (the asset split:
+        # Child Protection on the quarterly asset, where it was Civil Registration).
+        first = collections.all_collections()[0].id
+        assert first in said and "mothman dashboard build-data" in said
+        assert f"{first}.json" in said and "No page was written" in said
         assert not page.exists()
 
 
@@ -175,11 +184,19 @@ class TestAThirdCollectionIsLinked:
     def test_its_dataset_and_agency_get_links_from_the_registry(self, described):
         from qa_tools.common import github_links
 
-        links = github_links.build_folder_links(sha="abc123", root=hierarchy.data_asset_yaml().parent.parent)
-        assert links["agencies"][FAKE_AGENCY].endswith(f"/tree/abc123/contract/{FAKE_AGENCY}")
+        links = github_links.build_folder_links(sha="abc123", root=assets.ROOT)
+        # The asset's folder through the resolver (the asset split - it was
+        # contract/; this test's copy lies outside the repository).
+        folder = assets.folder_rel()
+        assert links["agencies"][FAKE_AGENCY].endswith(f"/tree/abc123/{folder}/{FAKE_AGENCY}")
         assert links["datasets"][FAKE_DATASET].startswith(
-            f"https://github.com/keithamoss/data-poc/blob/abc123/contract/{FAKE_AGENCY}/")
+            f"https://github.com/keithamoss/data-poc/blob/abc123/{folder}/{FAKE_AGENCY}/")
         assert "#L" in links["datasets"][FAKE_DATASET]
 
     def test_its_agency_blurb_comes_from_presentation(self, described):
         assert presentation.agency_blurbs()[FAKE_AGENCY] == "Makes fake things."
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

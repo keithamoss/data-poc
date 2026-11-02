@@ -143,6 +143,7 @@ class TestOnlyAWaitingOrPromotedSupplyIsRechecked:
         assert f"\n  mothman supply decide --operation un-supersede --dataset {DS} --period " \
                f"{state.period} --supply {older}" in said
 
+    @pytest.mark.asset("daily")  # a Birth Registrations pair
     def test_one_file_of_an_open_pair_is_settled_first(self, conn, minted, quiet):
         state, pair = parity.ex_two_files(conn, minted)
         with pytest.raises(fd.OpenPair) as got:
@@ -618,3 +619,8 @@ class TestCriticFindingsOn192:
         del promotion
         done = recheck.run(got.owed[0], run_by="pytest@example.org")
         assert asked == [1] and not done.stays_promoted
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

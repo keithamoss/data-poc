@@ -13,12 +13,14 @@ import random
 
 import pytest
 
+import asset_params
+
 from qa_tools.common import asked_for, check_id, qa_results_writer, qa_store, supply_db
 from qa_tools.common import validate_check_lifecycle as vcl
 
 CP = "child-protection"
 BDM = "civil-registration"
-P = "data-asset-1.child-protection-family-support.child-protection"
+P = "quarterly.child-protection-family-support.child-protection"
 CLIENTS_UNIQUE = f"{P}.cp-clients.cp_client_id.unique_dbt"
 CARERS_UNIQUE = f"{P}.cp-carers.carer_id.unique_dbt"
 
@@ -35,18 +37,21 @@ def _active(collection: str, tool: str) -> set[str]:
 
 class TestWhatACollectionHolds:
 
-    @pytest.mark.parametrize("collection", [CP, BDM])
+    @pytest.mark.parametrize("collection", asset_params.per_asset([CP, BDM]))
     @pytest.mark.parametrize("tool", asked_for.TOOLS)
     def test_every_active_check_of_that_tool_and_collection(self, collection, tool):
         got = asked_for.collection_checks(collection, tool)
         assert got == sorted(_active(collection, tool))
         assert got, "a collection with no checks for a tool it runs"
 
+    @pytest.mark.asset("daily")  # the asset holding the register's retired check
     def test_a_retired_check_is_never_asked_for(self):
+        from qa_tools import collections
+
         retired = [c.check_id for c in vcl.collect_checks(None) if c.retired_as_of]
         assert retired, "precondition: the register holds a retired check"
-        asked = {c for tool in asked_for.TOOLS for coll in (CP, BDM)
-                 for c in asked_for.collection_checks(coll, tool)}
+        asked = {c for tool in asked_for.TOOLS for coll in collections.all_collections()
+                 for c in asked_for.collection_checks(coll.id, tool)}
         assert asked.isdisjoint(retired)
 
 class TestOneRule:
@@ -66,8 +71,10 @@ class TestOneRule:
         assert asked_for.for_run("cp_clients__x", CP, "evidently") == \
             asked_for.collection_checks(CP, "evidently")
 
-    def test_a_run_naming_no_table_is_asked_for_everything(self, monkeypatch):
-        """Criterion 4: a trial or a fixture's run."""
+    def test_a_run_naming_no_table_is_asked_for_everything(self, monkeypatch, clean_qa_history):
+        """Criterion 4: a trial or a fixture's run. The scope rule reads what
+        the run carries from the QA store, so the store is set up here
+        rather than left to whichever test ran before."""
         monkeypatch.setattr(asked_for, "SCOPED", frozenset(asked_for.TOOLS))
         for tool in asked_for.TOOLS:
             assert asked_for.for_run("run_001", CP, tool) == \
@@ -201,6 +208,7 @@ class TestThroughTheRealOrchestrator:
     """Criteria 6, 8 and 10 end to end: Birth Registrations through all
     four real tools, the same path Child Protection takes."""
 
+    @pytest.mark.asset("daily")
     def test_every_tool_invoked_has_what_it_was_asked_for_on_record(self, bdm_duckdb_dir):
         from qa_tools.tools import orchestrate
 
@@ -211,6 +219,7 @@ class TestThroughTheRealOrchestrator:
         assert _asked(run_id) == {tool: asked_for.collection_checks(BDM, tool)
                                   for tool in asked_for.TOOLS}
 
+    @pytest.mark.asset("daily")
     def test_a_check_gone_missing_refuses_the_run(self, bdm_duckdb_dir, monkeypatch):
         """A tool that comes back without one of its in-scope checks - the
         shape a wrong selection takes - refuses the run before it is
@@ -235,6 +244,7 @@ class TestThroughTheRealOrchestrator:
         assert dropped and dropped[0] in str(caught.value) and "soda" in str(caught.value)
         assert not _completed(run_id)
 
+    @pytest.mark.asset("daily")
     def test_a_run_whose_tools_did_not_run_asks_nothing(self, bdm_duckdb_dir, monkeypatch):
         """Criterion 8 is WHEN a tool is invoked: a run that may not read
         its own table invokes none, and the guard does not demand verdicts
@@ -315,6 +325,7 @@ class TestBirthRegistrationsAskedForNothing:
     """An empty ask invokes no tool and says so, on the Birth Registrations
     path too (critic F5: these three branches were untested)."""
 
+    @pytest.mark.asset("daily")
     @pytest.mark.parametrize("module,evaluate,tool,invoker,lead", [
         ("qa_tools.tools.run_dbt", "evaluate", "dbt", "run_dbt", ("civil-registration",)),
         ("qa_tools.tools.run_soda", "evaluate", "soda", "execute_scan", ("civil-registration",)),
@@ -333,3 +344,8 @@ class TestBirthRegistrationsAskedForNothing:
         monkeypatch.setattr(mod, "write_qa_result", lambda *a, **k: written.append((a[4], a[5])))
         assert getattr(mod, evaluate)(*lead, "birth_registrations__1", "2026-01-01T00:00:00Z") == []
         assert written == [(tool, {"asked": []})]
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

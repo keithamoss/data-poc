@@ -17,9 +17,10 @@ import pytest
 
 from cli import filing_tui
 
-from cli.collection_cli import of as _cli_of
 
-bdm, cp = _cli_of('bdm'), _cli_of('cp')
+from asset_cli import LazyCollectionCli  # noqa: E402
+
+bdm, cp = LazyCollectionCli("bdm"), LazyCollectionCli("cp")
 
 
 @pytest.fixture
@@ -30,7 +31,8 @@ def offers(monkeypatch):
     return calls
 
 
-@pytest.mark.parametrize("module", [bdm, cp], ids=["bdm", "cp"])
+@pytest.mark.parametrize("module", [pytest.param(bdm, marks=pytest.mark.asset("daily"), id="bdm"),
+                                    pytest.param(cp, marks=pytest.mark.asset("quarterly"), id="cp")])
 def test_a_kept_hand_filed_run_offers_the_decision(module, offers, monkeypatch):
     monkeypatch.setattr(module, "report_table", lambda results, run_id: "")
     filed = SimpleNamespace(run_id="handfiled_abc", delivery_name="handfiled-abc")
@@ -40,7 +42,8 @@ def test_a_kept_hand_filed_run_offers_the_decision(module, offers, monkeypatch):
     assert offers == [(module.collection_id, "handfiled_abc")]
 
 
-@pytest.mark.parametrize("module", [bdm, cp], ids=["bdm", "cp"])
+@pytest.mark.parametrize("module", [pytest.param(bdm, marks=pytest.mark.asset("daily"), id="bdm"),
+                                    pytest.param(cp, marks=pytest.mark.asset("quarterly"), id="cp")])
 def test_a_trial_offers_nothing(module, offers, monkeypatch):
     monkeypatch.setattr(module, "report_table", lambda results, run_id: "")
     filed = SimpleNamespace(run_id="trial_abc", delivery_name=None)
@@ -48,3 +51,8 @@ def test_a_trial_offers_nothing(module, offers, monkeypatch):
     module._finish_supply([], filed)
 
     assert offers == []
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("daily")

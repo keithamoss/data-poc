@@ -16,7 +16,7 @@ import pytest
 import filing_support
 from qa_tools.common import assignment, left_out, supply_db
 
-P = "data-asset-1.child-protection-family-support.child-protection"
+P = "quarterly.child-protection-family-support.child-protection"
 REL = f"{P}.cp-placements.carer_id.relationships_dbt"
 SODA = f"{P}.cp-placements.carer_id.reference_soda"
 
@@ -148,3 +148,8 @@ class TestATrialIsReconciledToo:
         from qa_tools.tools import orchestrate
 
         assert not orchestrate._reconciles({"received_at": None}, "run_001")
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

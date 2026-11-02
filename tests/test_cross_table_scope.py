@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import pytest
 
+import asset_params
+
 import rebuild_support
 from qa_tools.common import assets
 from qa_tools.common import qa_results_reader as reader
@@ -149,7 +151,7 @@ class TestTheRebuildPathReadsTheScope:
     def test_an_absent_scope_reads_as_nothing_rather_than_raising(self, clean_qa_history):
         assert reader.read_cross_table_results(AGENCY, COLLECTION) == []
 
-    @pytest.mark.parametrize("module", rebuild_support.REBUILDS)
+    @pytest.mark.parametrize("module", asset_params.per_asset(rebuild_support.REBUILDS))
     def test_both_rebuild_paths_read_the_scope(self, clean_qa_history, tmp_path, monkeypatch,
                                                module):
         """A run recorded with one cross-table result and one ordinary
@@ -296,3 +298,8 @@ class TestPooledChecksKeepSeparateIdentities:
                         f"{ds['id']} / {col['name']}: {ck['key']!r} resolves to "
                         f"both {by_key[ck['key']]} and {check_id}")
                     by_key[ck["key"]] = check_id
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = [*(pytestmark if isinstance(pytestmark, list) else [pytestmark]), pytest.mark.asset("quarterly")]

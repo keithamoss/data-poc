@@ -10,6 +10,8 @@ and scaling are what run for real.
 """
 from __future__ import annotations
 
+import pytest
+
 import json
 
 from click.testing import CliRunner
@@ -114,3 +116,8 @@ def test_the_command_reads_the_api_through_gh_and_reports_the_month(monkeypatch)
     # One runs call, then one jobs call per run.
     assert len(calls) == 1 + len(RUNS)
     assert all(a[0] == "api" for a in calls)
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

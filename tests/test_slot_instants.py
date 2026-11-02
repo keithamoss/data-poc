@@ -9,8 +9,8 @@ untouched.
 """
 from __future__ import annotations
 
+import asset_folders
 from datetime import date, datetime, timedelta
-from pathlib import Path
 
 import pytest
 import yaml
@@ -18,7 +18,10 @@ import yaml
 from qa_tools.common import agreement, asset_time, in_force, period_overlap, schedule, slots
 from tests import before_growth
 
-REAL = Path(__file__).resolve().parent.parent / "contract" / "calendar.yaml"
+def _real():
+    """The selected asset's real calendar - read when a test runs (the asset
+    split), so a test of either asset reads its own."""
+    return asset_folders.real_folder() / "calendar.yaml"
 
 
 def _with(tmp_path, dataset_id="cp-clients", versions=None, first=None):
@@ -27,7 +30,7 @@ def _with(tmp_path, dataset_id="cp-clients", versions=None, first=None):
     `versions` (each merged over the existing one) replaces the list."""
     # As it stood before REQ-GEN-207's growth: "the existing single version"
     # is the 2023 one (tests/before_growth.py).
-    doc = before_growth.calendar(yaml.safe_load(REAL.read_text()))
+    doc = before_growth.calendar(yaml.safe_load(_real().read_text()))
     entry = next(d for d in doc["datasets"] if d["id"] == dataset_id)
     base = entry["participation"]["versions"][0]
     if first is not None:
@@ -45,7 +48,7 @@ def _with(tmp_path, dataset_id="cp-clients", versions=None, first=None):
 def _unchanged():
     """What every `_with` copy is compared against: the real agreement, as it
     stood before REQ-GEN-207's growth."""
-    return agreement.from_doc(before_growth.calendar(yaml.safe_load(REAL.read_text())))
+    return agreement.from_doc(before_growth.calendar(yaml.safe_load(_real().read_text())))
 
 
 def _slot(dataset_id, name, agreement_value):
@@ -168,6 +171,7 @@ class TestEveryHorizonReachesPastTheLargestDaysBefore:
                                                          agreement=ninety)]
         assert "2025-Q4" in found
 
+    @pytest.mark.asset("daily")  # Birth Registrations is the daily asset's
     def test_the_overlap_horizon_adds_it(self, tmp_path, monkeypatch):
         ninety = _with(tmp_path, dataset_id="birth-registrations",
                        first={"days_before": 3})
@@ -238,6 +242,7 @@ class TestCriticFindingsOn113:
                                                          agreement=narrowed)]
         assert "2023-Q4" in names
 
+    @pytest.mark.asset("daily")  # Birth Registrations is the daily asset's
     def test_a_sub_day_window_crossing_midnight_still_reaches_tomorrows_slot(self, tmp_path):
         """01:00 due with a 4-hour window opens at 21:00 the day before; a
         supply arriving that evening must be offered tomorrow's slot."""
@@ -330,3 +335,8 @@ class TestAFollowingPeriodDataset:
         q1 = next(s for s in slots.slots_for_dataset("cp-case-workers", agreement=due_early)
                   if s.name == "2026-Q2")
         assert q1.due_at.month == 12
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

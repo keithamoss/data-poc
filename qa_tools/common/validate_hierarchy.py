@@ -56,6 +56,7 @@ from pathlib import Path
 import yaml
 
 from qa_tools.common import hierarchy, postgres_version, tables_read
+from qa_tools.common import assets as _assets
 
 def contract_dir() -> Path:
     """The selected asset's configuration folder, resolved now (REQ-PIPE-342
@@ -164,7 +165,7 @@ def reserved_name_errors(tree) -> list[str]:
                              ("dataset", dataset_id)):
             if tables_read.is_reserved_scope(value):
                 errors.append(
-                    f"contract/data-asset.yaml: {kind} id {value!r} begins with "
+                    f"{_assets.config_dir()}/data-asset.yaml: {kind} id {value!r} begins with "
                     f"{tables_read.RESERVED_SCOPE_PREFIX!r}, which is reserved for the "
                     f"tool's own scopes under qa_results/ - "
                     f"{tables_read.CROSS_TABLE_SCOPE!r} is one. Rename it.")
@@ -178,7 +179,7 @@ def reserved_table_errors(tables: list[tuple[str, str]]) -> list[str]:
     fail or the manifest would describe the wrong object."""
     from qa_tools.common import period_schema
 
-    return [f"contract/data-asset.yaml: dataset {dataset_id!r} names its table "
+    return [f"{_assets.config_dir()}/data-asset.yaml: dataset {dataset_id!r} names its table "
             f"{table!r}, which every period schema reserves for its _manifest view "
             f"(REQ-PIPE-130). Rename the table."
             for dataset_id, table in tables if table == period_schema.MANIFEST]
@@ -206,7 +207,7 @@ def validate() -> list[str]:
             rel = path.relative_to(folder).as_posix()
             if rel not in known:
                 errors.append(
-                    f"{rel}: no dataset in contract/data-asset.yaml names this "
+                    f"{rel}: no dataset in {_assets.config_dir()}/data-asset.yaml names this "
                     f"contract, so nothing checks it. Point a dataset at it, or remove it.")
     for filename, describes in named:
         path = folder / filename
@@ -228,7 +229,7 @@ def validate() -> list[str]:
             if actual != expected:
                 errors.append(
                     f"{filename}: {field} is {actual!r}, but the hierarchy says {expected!r}. "
-                    f"Fix the contract, or fix contract/data-asset.yaml if the hierarchy is wrong - "
+                    f"Fix the contract, or fix {_assets.config_dir()}/data-asset.yaml if the hierarchy is wrong - "
                     f"not both independently."
                 )
         errors.extend(_arrival_pattern_errors(filename, doc))

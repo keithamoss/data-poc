@@ -37,6 +37,7 @@ from pathlib import Path
 
 
 from qa_tools.common import asset_time, delivery, hierarchy, holds, slots
+from qa_tools.common import assets as _assets
 
 
 @dataclass(frozen=True)
@@ -187,7 +188,7 @@ def recognise(d: delivery.Delivery) -> Recognition:
             f"delivery {d.name!r}: {name!r} matches the arrival pattern of more than "
             f"one dataset ({', '.join(claimants)}), so it has been attributed to none "
             f"of them and is held for a human. Two datasets claiming one filename is a "
-            f"configuration error - see contract/data-asset.yaml.",
+            f"configuration error - see {_assets.config_dir()}/data-asset.yaml.",
             stacklevel=2)
     # AN UNRECOGNISED ARTEFACT IS A WARNING, not informational (Keith,
     # 2026-09-24). His own case is the dangerous one: a catch-up

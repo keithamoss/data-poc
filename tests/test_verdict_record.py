@@ -320,3 +320,8 @@ class TestCriticFindingsOn168:
             verdict.record(clean, v["filing_id"], DATASET, "verdict-s",
                            verdict.Judged("late", None, None), recorded_at=RECEIVED,
                            correction_ref="", correction_changelog="c", supersedes=v["id"])
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = [*(pytestmark if isinstance(pytestmark, list) else [pytestmark]), pytest.mark.asset("quarterly")]

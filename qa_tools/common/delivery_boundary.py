@@ -33,6 +33,7 @@ to it.
 from __future__ import annotations
 
 from qa_tools.common import hierarchy
+from qa_tools.common import assets as _assets
 
 #: One directory under the deliveries root is one delivery. The only
 #: boundary this PoC's transport expresses.
@@ -61,12 +62,12 @@ def boundary_for(collection_id: str) -> str:
                   if d.collection_id == collection_id), None)
     if entry is None:
         raise DeliveryBoundaryError(
-            f"{collection_id!r} is not a collection in contract/data-asset.yaml.")
+            f"{collection_id!r} is not a collection in {_assets.config_dir()}/data-asset.yaml.")
     declared = (entry.delivery_boundary or "").strip()
     if not declared:
         raise DeliveryBoundaryError(
             f"collection {collection_id!r} declares no `delivery_boundary:` in "
-            f"contract/data-asset.yaml, so there is nothing to say what one delivery "
+            f"{_assets.config_dir()}/data-asset.yaml, so there is nothing to say what one delivery "
             f"from this source IS. This will not infer a grouping from filenames, "
             f"timestamps or arrival proximity - those are guesses that look like "
             f"facts, and every arrival fact downstream is derived from the boundary. "

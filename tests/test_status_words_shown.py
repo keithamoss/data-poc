@@ -136,6 +136,7 @@ def test_the_gate_refuses_a_status_it_has_no_word_for():
                                  has_active_checks=True)
 
 
+@pytest.mark.asset("daily")
 @pytest.mark.parametrize("value", VERDICTS)
 def test_the_ticket_wording(value, monkeypatch):
     from qa_tools.common import ticket_sync
@@ -207,3 +208,8 @@ def test_the_scenarios_bands_help_says_warn():
     flat = " ".join(got.output.split())
     assert "whether it can read Warn" in flat and "its warn band is" in flat, flat
     _clean(flat, "mothman scenarios bands --help")
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

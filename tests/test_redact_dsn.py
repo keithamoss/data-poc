@@ -47,3 +47,8 @@ def test_connecting_with_a_bad_keyword_dsn_leaks_nothing():
         supply_db.connect(dsn=f"host=127.0.0.1 port=1 password={SECRET} user",
                           label="test-redact")
     assert SECRET not in str(caught.value)
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

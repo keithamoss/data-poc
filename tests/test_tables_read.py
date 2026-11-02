@@ -380,6 +380,7 @@ class TestTheGateRefusesAReservedDatasetId:
     """The half a test over today's tree cannot cover: the dataset
     somebody adds next year."""
 
+    @pytest.mark.asset("daily")
     def test_the_hierarchy_gate_rejects_a_dataset_id_using_the_prefix(self):
         from qa_tools.common import validate_hierarchy
 
@@ -579,4 +580,9 @@ class TestTheReservedNameIsGuardedBeforeItReachesGit:
         hook = next(h for repo in config["repos"] for h in repo.get("hooks", [])
                      if h["id"] == "mothman-check-hierarchy")
 
-        assert _re.search(hook["files"], "contract/child-protection-family-support/child-protection-contract.yaml")
+        assert _re.search(hook["files"], "assets/quarterly/child-protection-family-support/child-protection-contract.yaml")
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

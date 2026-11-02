@@ -60,17 +60,22 @@ class TestOneFactory:
     def test_it_is_labelled_by_its_one_dataset(self, third_collection):
         assert collection_cli.label(_coll(FAKE_ID)) == "Fake Things"
         assert collection_cli.label(_coll("child-protection")) == "Child Protection"
+
+    @pytest.mark.asset("daily")  # Birth Registrations is the daily asset's
+    def test_birth_registrations_is_labelled_by_its_one_dataset(self):
         assert collection_cli.label(_coll("civil-registration")) == "Birth Registrations"
 
     def test_the_trial_flag_follows_the_providers_one_declaration(self, third_collection):
         """The fake provider declares no target trial, so its group offers
-        no --skip-target-trial; Birth Registrations' declares one (criterion 4)."""
+        no --skip-target-trial; Linkage Products' declares one (criterion 4;
+        on the quarterly asset since the split - Birth Registrations' is the
+        daily asset's)."""
         def offers(cid):
             gen = collection_cli.make_group(_coll(cid)).commands["generate-synthetic-data"]
             return "skip_target_trial" in {p.name for p in gen.params}
 
         assert not offers(FAKE_ID)
-        assert offers("civil-registration")
+        assert offers("linkage-products")
         assert not offers("child-protection")
 
     def test_the_many_table_shape_lists_its_tables_from_the_hierarchy(self):
@@ -111,7 +116,8 @@ class TestTheTUIMenus:
         # Every registered collection by its label, in hierarchy order, the
         # fake one last.
         assert choices == [c.label for c in collections.all_collections()]
-        assert choices[:2] == ["Birth Registrations", "Child Protection"]
+        # The quarterly asset's order (the asset split).
+        assert choices[:2] == ["Child Protection", "ED Presentations"]
         assert choices[-1] == "Fake Things"
         assert ran == [FAKE_ID]
 
@@ -179,7 +185,8 @@ class TestTheSharedCollectionOption:
         every = collections.all_collections()
         assert len(every) <= common.N_LIST, "this case is the listing one, at N_LIST or fewer"
         known = ", ".join(f"{c.short} ({c.id})" for c in every)
-        assert known.startswith("bdm (civil-registration), cp (child-protection), ")
+        # The quarterly asset's collections (the asset split).
+        assert known.startswith("cp (child-protection), ed (emergency-department), ")
         assert known.endswith("fk (fake-collection)")
         assert f"Known: {known}" in flat, flat
         assert "mothman collections" in flat, flat
@@ -218,7 +225,7 @@ class TestABrokenAdapter:
         assert not isinstance(out.exception, Exception) or isinstance(out.exception, SystemExit)
 
     def test_every_other_collection_still_works(self, without_adapter):
-        for cid in ("civil-registration", "child-protection", FAKE_ID):
+        for cid in ("emergency-department", "child-protection", FAKE_ID):
             out = _runner.invoke(collection_cli.make_group(_coll(cid)), ["qa", "--help"])
             assert out.exit_code == 0, (cid, out.output)
 
@@ -252,9 +259,14 @@ class TestHelpImportsNoTool:
     """Criterion 7, in a FRESH interpreter each time - an import made by an
     earlier test in this process would hide one made by `--help`."""
 
-    @pytest.mark.parametrize("argv", [["--help"], ["bdm", "--help"], ["cp", "--help"],
-                                      ["bdm", "qa", "--help"], ["cp", "qa", "--help"]],
-                             ids=" ".join)
+    @pytest.mark.parametrize("argv", [
+        # Each collection's commands on its own asset (the asset split).
+        pytest.param(["--help"], id="--help"),
+        pytest.param(["bdm", "--help"], marks=pytest.mark.asset("daily"), id="bdm --help"),
+        pytest.param(["cp", "--help"], id="cp --help"),
+        pytest.param(["bdm", "qa", "--help"], marks=pytest.mark.asset("daily"),
+                     id="bdm qa --help"),
+        pytest.param(["cp", "qa", "--help"], id="cp qa --help")])
     def test_it_imports_none_of_the_tools(self, argv):
         done = subprocess.run([sys.executable, "-c", _PROBE.format(heavy=HEAVY), *argv],
                               cwd=ROOT, capture_output=True, text=True, timeout=120)
@@ -300,3 +312,8 @@ class TestABrokenCollectionIsRefusedByNameEverywhere:
         out = _runner.invoke(pipeline_cli.pipeline_group, ["run", "--collection", "zzz"])
         assert out.exit_code == 2
         assert "This option also takes `all`" in _flat(out.output), out.output
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

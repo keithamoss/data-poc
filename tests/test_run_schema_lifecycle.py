@@ -99,6 +99,7 @@ def test_a_similarly_named_run_is_not_collateral(db):
     supply_db.drop_run_schemas(db, "lifecycle_99")
 
 
+@pytest.mark.asset("quarterly")
 def test_a_rerun_of_the_same_supply_is_not_collateral(db):
     """REQ-PIPE-140: a re-run's id is its supply's run id plus `__r<N>`,
     so `<base>_` matched it - tidying the first run would have dropped the
@@ -118,6 +119,7 @@ def test_a_rerun_of_the_same_supply_is_not_collateral(db):
     supply_db.drop_run_schemas(db, again)
 
 
+@pytest.mark.asset("quarterly")
 def test_a_rerun_id_round_trips_and_keeps_its_supply(db):
     first = "cp_carers__000000000000000042"
     again = supply_db.rerun_id(first, 3)
@@ -126,6 +128,7 @@ def test_a_rerun_id_round_trips_and_keeps_its_supply(db):
     assert supply_db.split_staged(again)[:2] == ("cp_carers", "000000000000000042")
 
 
+@pytest.mark.asset("daily")
 def test_the_longest_real_run_id_has_room_for_a_rerun(db):
     """dbt's audit schema is the longest name a run makes. Under dbt's
     default `_dbt_test__audit` a Birth Registrations run id (20-digit key)
@@ -148,6 +151,7 @@ def test_dropping_a_run_that_has_no_schemas_is_harmless(db):
     assert supply_db.drop_run_schemas(db, "lifecycle_never_existed") == []
 
 
+@pytest.mark.asset("daily")
 def test_a_finished_run_leaves_no_schema_behind(monkeypatch, tmp_path, bdm_raw_dir, bdm_duckdb_dir):
     """The real thing, through the real single-arrival entry point."""
     import shutil
@@ -198,6 +202,7 @@ def test_a_finished_run_leaves_no_schema_behind(monkeypatch, tmp_path, bdm_raw_d
         f"the run removed schemas that were not its own: {sorted(before - after)}"
 
 
+@pytest.mark.asset("quarterly")
 def test_two_runs_over_the_same_files_do_not_share_a_staged_table(db):
     """Two runs with no receipt are two arrivals, whatever their names
     look like.
@@ -232,6 +237,7 @@ def test_two_runs_over_the_same_files_do_not_share_a_staged_table(db):
         f"table ({a}) - the second load would CASCADE away the first's views")
 
 
+@pytest.mark.asset("quarterly")
 def test_a_real_receipt_instant_still_names_the_table_exactly_as_before(db):
     """The other half, and the reason the fix is where it is: a real
     arrival's physical name must not change, because committed history
@@ -242,6 +248,7 @@ def test_a_real_receipt_instant_still_names_the_table_exactly_as_before(db):
         "cp_clients__202608010100000000"
 
 
+@pytest.mark.asset("daily")
 def test_a_long_run_id_still_fits_a_postgres_identifier(db):
     """Distinct is not enough - it has to fit.
 
@@ -269,6 +276,7 @@ def test_a_long_run_id_still_fits_a_postgres_identifier(db):
     assert name != sibling, "two long run ids collapsed to one staged table"
 
 
+@pytest.mark.asset("daily")
 def test_a_short_run_id_is_left_readable(db):
     """The common case must not pay for the long one - `run_001` is a
     name a person reads in a table listing."""
@@ -278,6 +286,7 @@ def test_a_short_run_id_is_left_readable(db):
         "birth_registrations__run_001"
 
 
+@pytest.mark.asset("daily")
 def test_an_arrival_segment_never_contains_the_separator(db):
     """`__` separates the parts of a staged table name, so a segment
     containing one splits the name in the wrong place.
@@ -355,3 +364,8 @@ class TestARunGivesBackItsDiskSpaceToo:
         # A run that never created one: the ordinary case for a run that
         # failed before dbt, and it must not turn one failure into two.
         orchestrate.discard_run_schemas("leak_probe_never_existed")
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

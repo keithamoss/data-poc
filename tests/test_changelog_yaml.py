@@ -199,3 +199,8 @@ def test_the_same_day_appearing_twice_is_rejected(tmp_path):
 def test_an_empty_feed_is_rejected(tmp_path):
     errors = validate(_raw(_write(tmp_path, "releases: []\n")))
     assert any("releases" in e and "at least 1 item" in e for e in errors), errors
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

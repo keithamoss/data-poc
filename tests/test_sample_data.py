@@ -630,7 +630,10 @@ class TestATableNameIsNotADatasetId:
         _asset_with([AGREED, SAMPLE], tmp_path, monkeypatch)
         assert sample_data.is_sample_table("cp-referrals") is False
 
-    @pytest.mark.parametrize("builder", ["cp", "bdm"])
+    @pytest.mark.parametrize("builder", [
+        # Each builder on the asset its collection is in (the asset split).
+        pytest.param("cp", marks=pytest.mark.asset("quarterly")),
+        pytest.param("bdm", marks=pytest.mark.asset("daily"))])
     def test_both_staging_paths_decide_from_the_table(self, builder, tmp_path, monkeypatch,
                                                       supply_dsn):
         """The unit tests above cannot catch a CALLER passing the wrong one -
@@ -673,3 +676,8 @@ class TestATableNameIsNotADatasetId:
             with supply_db.connect(label="test-sample-landing") as conn:
                 for schema in (supply_db.SAMPLE_SCHEMA, supply_db.STAGING_SCHEMA):
                     conn.execute(f'DROP TABLE IF EXISTS "{schema}"."{physical}" CASCADE')
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = [*(pytestmark if isinstance(pytestmark, list) else [pytestmark]), pytest.mark.asset("daily")]

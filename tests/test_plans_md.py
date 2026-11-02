@@ -269,3 +269,8 @@ def test_a_paragraph_after_a_list_is_not_glued_onto_its_last_bullet():
             "    A paragraph after the list.\n")
     (item,) = _parse_numbered_items(text, "x")
     assert item["text"] == "Title.\n\n- a bullet wrapped onto two lines\n\nA paragraph after the list."
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = [*(pytestmark if isinstance(pytestmark, list) else [pytestmark]), pytest.mark.asset("quarterly")]

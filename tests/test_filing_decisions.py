@@ -723,3 +723,8 @@ class TestRejectingAFailedResupplyOfAFilledPeriod:
                            supply=f"{dataset.dataset_id}@{arrival}"),
                   effective_at="2026-09-30T09:00:00+08:00", conn=conn)
         assert dl.promoted_into(conn, dataset.dataset_id, first) == filled
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = [*(pytestmark if isinstance(pytestmark, list) else [pytestmark]), pytest.mark.asset("quarterly")]

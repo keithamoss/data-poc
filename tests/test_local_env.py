@@ -101,3 +101,8 @@ class TestTheCommittedExample:
         """It holds a password and this repository is public."""
         ignored = (local_env.ROOT / ".gitignore").read_text().splitlines()
         assert ".env" in [line.strip() for line in ignored]
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

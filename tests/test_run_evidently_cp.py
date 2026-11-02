@@ -11,6 +11,8 @@ constant passed as an argument), so this stays as an automatic,
 going-forward regression test per CLAUDE.md's convention."""
 from __future__ import annotations
 
+import pytest
+
 import pandas as pd
 
 from qa_tools.common import hierarchy
@@ -121,9 +123,14 @@ class TestACollectionWithNoEvidentlyCheck:
         from qa_tools.common import check_lifecycle, evidently_common
 
         monkeypatch.setattr(check_lifecycle, "load_evidently_checks", lambda path: {
-            "data-asset-1.department-of-health.linkage-products.linkage-keys.row_drop_evidently":
+            "quarterly.department-of-health.linkage-products.linkage-keys.row_drop_evidently":
                 {"method": "row_drop"}})
         import pytest
 
         with pytest.raises(ValueError, match="at least one psi check"):
             evidently_common.collection_checks("linkage-products")
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

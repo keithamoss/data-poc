@@ -292,6 +292,7 @@ class TestTheSurfacesReadTheTree:
                                                   "run_timestamp": "t", "recordedAt": "t"}]}))
         assert eq.reports(tmp_path) == {"x.json": {"datasets": [{"id": "a"}]}}
 
+    @pytest.mark.asset("daily")
     def test_reports_name_ids_and_noisy_instants_by_what_they_are(self, tmp_path):
         """Normaliser 2: a decision or load id becomes what it names; an
         instant from a clock or a rule decision's running clock becomes its
@@ -519,3 +520,18 @@ class TestAPackageGateApplicationIsComparedByWhatItSays:
                                   "WHERE collection_id = 'c1'").fetchall()
         conn.execute("UPDATE qa.run SET gate_application = ? WHERE run_key = 'c1_r2'", [first])
         assert any(d.startswith("qa.run:") for d in eq.differences(before, self._snap()))
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")
+
+
+def test_a_capture_stage_failure_survives_a_process_boundary():
+    """equivalence.StageFailed had the same defect as arrival_lifecycle's: a
+    required argument, so a pickled one could not be rebuilt (post-build-review,
+    2026-11-02)."""
+    import pickle
+    back = pickle.loads(pickle.dumps(eq.StageFailed("S7", "boom")))
+    assert isinstance(back, eq.StageFailed)
+    assert (back.stage, str(back)) == ("S7", "capture failed at stage 'S7': boom")

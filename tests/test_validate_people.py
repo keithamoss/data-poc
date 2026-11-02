@@ -22,6 +22,8 @@ def _write(tmp_path, body: str):
     states its own, so each test still breaks exactly one thing."""
     import yaml
 
+    from qa_tools.common import hierarchy
+
     doc = yaml.safe_load(textwrap.dedent(body)) or {}
     doc.setdefault("roles", ["qa", "peer_review", "manager"])
     if not any("data_asset" in (a or {}) for a in doc.get("assignments") or []):
@@ -29,7 +31,8 @@ def _write(tmp_path, body: str):
             {"email": "asset.manager@example.com", "name": "Asset Manager",
              "github": "asset-manager-for-tests", "roles": ["manager"]})
         doc.setdefault("assignments", []).append(
-            {"data_asset": "data-asset-1", "person": "asset.manager@example.com",
+            # The selected asset's own id (the asset split: it was data-asset-1).
+            {"data_asset": hierarchy.data_asset_id(), "person": "asset.manager@example.com",
              "role": "manager"})
     path = tmp_path / "people.yaml"
     path.write_text(yaml.safe_dump(doc, sort_keys=False))
@@ -167,3 +170,6 @@ class TestWhoMayRaiseADecision:
         got = people.person_by_email("fpycnkgvmt@privaterelay.appleid.com", config)
         assert people.actor_name(got) == got["email"]
         assert people.actor_name(got) != got["name"]
+
+#: Birth Registrations is the daily asset's (the asset split).
+pytestmark = pytest.mark.asset("daily")

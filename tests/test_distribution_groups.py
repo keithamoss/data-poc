@@ -7,6 +7,8 @@ session - the hook's own output - rather than on the hook's source.
 """
 from __future__ import annotations
 
+import pytest
+
 import conftest
 
 
@@ -44,3 +46,8 @@ def test_under_loadgroup_the_scheduler_sees_the_group(request):
     # asserted either way.
     scheduled = hasattr(request.config, "workerinput") and request.config.getvalue("loadgroup")
     assert suffixed == bool(scheduled), request.node.nodeid
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

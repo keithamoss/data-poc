@@ -165,6 +165,17 @@ class TestARefusalIsSaidOnTheThreadThatRaisedIt:
     say nothing - and the person who raised it would be told, in
     silence, that it had been accepted."""
 
+    @pytest.fixture(autouse=True)
+    def _a_migrated_database(self, supply_dsn):
+        """The handler reads the recorded receipts before it judges the
+        command, so the worker's database holds the qa schema - as any real
+        one does. It used to borrow it from whichever module ran before on
+        the worker, and an asset switch empties the database (the split)."""
+        from qa_tools.common import qa_store, supply_db
+
+        with supply_db.connect(label="test-filing-from-github") as conn:
+            qa_store.ensure_schema(conn)
+
     def _handled(self, body, author=KEITH, service=None):
         said = []
         service = service or _Service(said)
@@ -275,3 +286,8 @@ class TestGitHubIsTheInputChannelAndTheLogIsTheRecord:
             assert reader not in source, (
                 f"{reader} would read filing state out of an issue, which "
                 f"criterion 7 forbids - the decision log is the record")
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

@@ -255,6 +255,11 @@ def where_to_settle(dataset_id: str) -> str:
     from qa_tools import collections
     from qa_tools.common import hierarchy
 
+    # A ONE-COLLECTION ASSET'S MENU SKIPS THE COLLECTION PICKER, so the
+    # pointer drops that step (SETTLED by Keith 2026-11-02, the move critic's
+    # decision 3; the menu is unchanged). REJECTED always showing the picker.
+    if len(collections.all_collections()) == 1:
+        return SETTLE_AT.replace(" > {collection}", "")
     try:
         collection = collections.by_id(hierarchy.dataset(dataset_id).collection_id).label
     except (hierarchy.UnknownDatasetError, KeyError, LookupError):

@@ -51,6 +51,7 @@ class TestTheBoundaryIsADirectory:
         assert path.is_dir()
         assert path.name == "BDM_20260824"
 
+    @pytest.mark.asset("quarterly")
     def test_the_boundary_is_visible_without_opening_any_file(self, dirs):
         """Criterion 1. A real transport gives you one prefix, one
         session, one folder drop - so the boundary has to be legible
@@ -70,11 +71,13 @@ class TestTheBoundaryIsADirectory:
         assert len(list(path.iterdir())) == 6
         assert len(delivery.list_deliveries(*dirs)) == 1
 
+    @pytest.mark.asset("quarterly")
     def test_a_delivery_with_no_files_is_refused(self, dirs):
         d, r = dirs
         with pytest.raises(delivery.DeliveryFormatError, match="ARRIVAL"):
             delivery.write_delivery("empty", {}, WHEN, deliveries_dir=d, receipts_dir=r)
 
+    @pytest.mark.asset("quarterly")
     def test_a_delivery_is_flat_not_a_tree(self, dirs):
         d, r = dirs
         with pytest.raises(delivery.DeliveryFormatError, match="path separator"):
@@ -129,6 +132,7 @@ class TestTheReceiptRecordIsOurs:
         assert record["received_at"].endswith("+08:00")
         assert delivery.read_receipt("BDM_20260824", r) == WHEN
 
+    @pytest.mark.asset("quarterly")
     def test_a_receipts_directory_inside_the_deliveries_directory_is_refused(self, dirs):
         """The boundary, enforced rather than documented: a receipts
         directory a supplier can write into is not ours."""
@@ -209,6 +213,7 @@ class TestTheAwkwardDeliveriesRecognitionMustHandle:
     delivery recognition has to be tested against rather than assumed
     away."""
 
+    @pytest.mark.asset("quarterly")
     def test_two_files_matching_one_datasets_pattern(self, dirs):
         d, r = dirs
         _write(dirs, files={"cp_clients.csv": "a\n1\n", "cp_clients_part2.csv": "a\n2\n"})
@@ -249,11 +254,13 @@ class TestTwoArrivalsCanNeverShareADirectory:
     holding seven files.
     """
 
+    @pytest.mark.asset("quarterly")
     def test_writing_over_an_existing_delivery_is_refused(self, dirs):
         _write(dirs, "2026-08-corrected")
         with pytest.raises(delivery.DeliveryFormatError, match="silently merge"):
             _write(dirs, "2026-08-corrected", {"cp_clients.csv": "a\n1\n"})
 
+    @pytest.mark.asset("quarterly")
     def test_the_refusal_leaves_the_first_delivery_untouched(self, dirs):
         d, r = dirs
         _write(dirs, "shared", {"birth_registrations.csv": "first\n"})
@@ -262,6 +269,7 @@ class TestTwoArrivalsCanNeverShareADirectory:
         got = delivery.read_delivery("shared", d, r)
         assert got.files == ("birth_registrations.csv",)
 
+    @pytest.mark.asset("quarterly")
     def test_existing_names_are_readable_so_a_writer_can_avoid_them(self, dirs):
         """The fix itself: uniqueness is global to the directory, not
         to whatever produced it, so a second writer has to be able to
@@ -366,3 +374,8 @@ class TestWhichClockStampedTheReceipt:
         assert read.received_at.year > 2020, (
             "the receipt followed the file's mtime - a supplier who preserves "
             "timestamps on upload would be setting our own arrival record")
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("daily")

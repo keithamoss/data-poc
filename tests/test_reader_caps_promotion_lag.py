@@ -93,3 +93,8 @@ class TestThePeriodAReceiptClaims:
         from qa_tools.common import slots
 
         assert slots.period_claimed_at("cp-clients", ED_AT) == "2026-Q3"
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

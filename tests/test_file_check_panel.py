@@ -2,12 +2,14 @@
 test outside the e2e build until post-build-review #118."""
 from __future__ import annotations
 
+import pytest
+
 from pipeline import file_check_panel
 from qa_tools.common import qa_results_reader as reader
 
 
 def _row(received, attempt=1):
-    return {"check_id": "data-asset-1.child-protection-family-support.child-protection."
+    return {"check_id": "quarterly.child-protection-family-support.child-protection."
                         "cp-carers.encoding_file",
             "run_id": "r1", "received_at": received, "status": "pass", "finding": "fine",
             "filename": "cp_carers.csv", "delivery": "d", "load_attempt": attempt}
@@ -28,3 +30,8 @@ def test_every_defined_check_is_listed_even_with_no_results(monkeypatch):
     monkeypatch.setattr(reader, "read_file_results", lambda *a, **k: [])
     panel = file_check_panel.for_dataset("cp-carers")
     assert {c["key"] for c in panel["checks"]} >= {"encoding_file", "fields_per_row_file"}
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

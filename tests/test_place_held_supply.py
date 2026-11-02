@@ -597,7 +597,8 @@ class TestTheFilingDecisionsDoorListsHeldSupplies:
         door.held_flow(self._row(schedule_ended=True, why="arrived after the schedule ended"))
         out = capsys.readouterr().out
         assert offered == []
-        assert "contract/calendar.yaml" in out
+        # The selected asset's own calendar since the asset split.
+        assert "assets/quarterly/calendar.yaml" in out
         assert "\nmothman schedule draft-correction\n" in out
         assert "nothing to decide" not in out.lower()
 
@@ -636,6 +637,7 @@ class TestEveryListingSaysPlaced:
             assert f"None -> {target}" not in said
 
 
+@pytest.mark.asset("daily")  # a Birth Registrations pair
 class TestAPairHeldWholeIsPlacedTogether:
     """Criterion 37: both files into the period in one transaction, still
     contested; the second file's move named and confirmed; --wait refused."""
@@ -767,6 +769,7 @@ class TestASettlementsRefileTargetIsChosen:
     """Criterion 42, amending REQ-PIPE-193 criterion 19: the chooser, with
     the next period as its first choice - never a typed period."""
 
+    @pytest.mark.asset("daily")  # a Birth Registrations pair's refile target
     def test_it_opens_on_the_next_period(self, monkeypatch):
         from cli import common, filing_tui, settle_tui
         from pair_support import DS as BR, _at
@@ -849,6 +852,7 @@ class TestCriticFindingsOnPlacement:
         line = next(x for x in said.split(supply)[1:2])
         assert "by the rule" in line and "by a person" not in line
 
+    @pytest.mark.asset("daily")
     def test_d7_a_pair_placed_through_flags_says_where_it_is_settled(self, conn, cli):
         """Criterion 37: the outcome offers settling the pair now."""
         held = TestAPairHeldWholeIsPlacedTogether.held_pair.__wrapped__(None, conn)
@@ -975,3 +979,8 @@ class TestTheHeldScreenSaysWhy:
                             lambda *a, **k: asked.append(a) or None)
         filing_tui.filing_menu()
         assert "people.yaml" in capsys.readouterr().out and not asked
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

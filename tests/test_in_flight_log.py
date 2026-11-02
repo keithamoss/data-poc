@@ -9,6 +9,8 @@ is a record about something that genuinely happened.
 """
 from __future__ import annotations
 
+import pytest
+
 import json
 
 from qa_tools.common import delivery, in_flight_log
@@ -77,3 +79,6 @@ class TestReadingThemBack:
         in_flight_log.record("c", "2026-09-25T10:00:00+08:00", [_entry("d", [])],
                               observations_dir=tmp_path)
         assert len(in_flight_log.observations(tmp_path)) == 1
+
+#: Birth Registrations is the daily asset's (the asset split).
+pytestmark = pytest.mark.asset("daily")

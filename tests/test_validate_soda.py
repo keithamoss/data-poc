@@ -3,6 +3,8 @@
 in CI, before any run, rather than discovered as a red run later."""
 from __future__ import annotations
 
+import pytest
+
 from qa_tools.common import validate_soda
 
 
@@ -130,3 +132,8 @@ def test_the_registry_keys_are_by_collection_and_table():
     assert keys[("linkage-products", "linkage_keys")] == collections.adapter(
         "linkage-products").sample_key["linkage_keys"]
     assert all(isinstance(k, tuple) and len(k) == 2 for k in keys)
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

@@ -25,12 +25,15 @@ def an_asset(tmp_path, monkeypatch) -> Path:
     root = tmp_path / "assets"
     folder = root / "one"
     folder.mkdir(parents=True)
-    for entry in (ROOT / "contract").iterdir():
-        (folder / entry.name).symlink_to(entry)
-    (folder / "collections").symlink_to(ROOT / "qa_tools" / "collections")
-    dbt = folder / "dbt"
+    real = assets.selected()
+    # The real asset's own folder, its adapters (collections/) among it - all
+    # but its dbt project, which is rebuilt below without its packages.
+    for entry in real.folder.iterdir():
+        if entry.name != real.dbt_project.name:
+            (folder / entry.name).symlink_to(entry)
+    dbt = folder / real.dbt_project.name
     dbt.mkdir()
-    for entry in (ROOT / "dbt_project").iterdir():
+    for entry in real.dbt_project.iterdir():
         if entry.name not in ("dbt_packages", "packages.yml", "package-lock.yml", "target", "logs"):
             (dbt / entry.name).symlink_to(entry)
     shared = tmp_path / "shared"
@@ -106,3 +109,8 @@ class TestARunWithoutThemIsRefused:
             run_dbt.test_names_by_check_id("child-protection")
         assert invoked == []
         assert "'one'" in str(exc.value) and "mothman env dbt-deps" in str(exc.value)
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

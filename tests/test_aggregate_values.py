@@ -6,6 +6,8 @@ this module's whole job is the SQL it runs, so a real connection is the
 only way to genuinely exercise it."""
 from __future__ import annotations
 
+import pytest
+
 from datetime import date
 
 import duckdb
@@ -173,3 +175,8 @@ class TestATieIsBrokenTheSameWayEveryTime:
         got = self._values(conn, "t")
         assert got[0] == "TBC"
         assert got[1:4] == ["Freemantle", "Not stated", "Unknown"], got
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

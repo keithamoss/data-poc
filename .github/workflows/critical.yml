@@ -32,6 +32,18 @@ permissions:
 
 jobs:
   critical:
+    # ONCE PER ASSET (the asset split, merged 2026-11-03): each leg acts for one
+    # asset - its own MOTHMAN_ASSET, its own warehouse database supply_<asset>,
+    # its own dbt project under assets/<asset>/dbt - and runs only the critical
+    # tests acting for it (`--only-asset`, REQ-PIPE-343 criterion 5: one process
+    # per asset), the shape test.yml's deployment half and validate-config.yml
+    # took in the move. Each leg has the whole budget below for its own pytest
+    # step. fail-fast off, so one asset's red never hides the other's result.
+    name: critical (${{ matrix.asset }})
+    strategy:
+      fail-fast: false
+      matrix:
+        asset: [quarterly, daily]
     runs-on: ubuntu-latest
     # A backstop for a hang only. The budget below is what fails a slow set.
     timeout-minutes: 20
@@ -50,9 +62,12 @@ jobs:
           --health-retries 10
     env:
       MOTHMAN_TEST_DSN: postgresql://postgres:ci-not-a-secret@localhost:5432/postgres
-      MOTHMAN_SUPPLY_DSN: postgresql://postgres:ci-not-a-secret@localhost:5432/supply
+      # THE SERVER, as test.yml names it; this leg's own warehouse is
+      # ${MOTHMAN_PG}/supply_<asset> (REQ-PIPE-343 criterion 7).
+      MOTHMAN_PG: postgresql://postgres:ci-not-a-secret@localhost:5432
+      MOTHMAN_SUPPLY_DSN: postgresql://postgres:ci-not-a-secret@localhost:5432/supply_${{ matrix.asset }}
       MOTHMAN_ENVIRONMENT: ci
-      MOTHMAN_ASSET: data-asset-1
+      MOTHMAN_ASSET: ${{ matrix.asset }}
       # Criterion 7 and Keith's 2026-11-02 answer: the PYTEST STEP's budget,
       # not the job's (the job is about 6-7 minutes with setup), measured on
       # today's 4-core runner and revisited when the repository goes private.
@@ -66,21 +81,24 @@ jobs:
         uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
       - name: Sync dependencies
         run: uv sync --dev
-      - name: Create the warehouse database
+      - name: Create this asset's warehouse database
         run: |
           PGPASSWORD=ci-not-a-secret psql -h localhost -U postgres \
-            -c 'CREATE DATABASE supply'
+            -c "CREATE DATABASE supply_${MOTHMAN_ASSET}"
           PGPASSWORD=ci-not-a-secret psql -h localhost -U postgres \
             -c "ALTER SYSTEM SET log_min_messages = 'fatal'" \
             -c "ALTER SYSTEM SET log_min_error_statement = 'panic'" \
             -c 'SELECT pg_reload_conf()'
-      - name: Install dbt_utils
-        run: uv run dbt deps --project-dir dbt_project --profiles-dir qa_tools/dbt_profiles
-      - name: Mark the warehouse database as CI's
+      # THIS ASSET'S OWN dbt PROJECT (assets/<asset>/dbt), as test.yml does it.
+      - name: Install this asset's dbt packages
+        run: uv run mothman env dbt-deps
+      - name: Mark this asset's warehouse database as CI's
         run: uv run mothman env mark --confirm ci
       # Moved here from test.yml's fast half (post-build-review): seconds of
       # work, and push CI's only check for a duplicate YAML key.
+      # Repository-wide, so one leg runs it.
       - name: Lint YAML (duplicate keys)
+        if: matrix.asset == 'quarterly'
         run: uv run yamllint --strict .
       # No bootstrap, no Playwright, no coverage (criterion 4). The critical
       # job fails on zero tests selected, on any skip, and over its budget
@@ -90,12 +108,12 @@ jobs:
         run: |
           started=$(date +%s)
           set +e
-          uv run pytest -m "critical and not needs_deployment" -rs \
+          uv run pytest -m "critical and not needs_deployment" --only-asset "$MOTHMAN_ASSET" -rs \
             -p no:cacheprovider --durations=15 --junitxml=critical-junit.xml
           code=$?
           set -e
           took=$(( $(date +%s) - started ))
-          echo "Critical pytest step took ${took}s (budget ${CRITICAL_BUDGET_SECONDS}s)"
+          echo "Critical pytest step for ${MOTHMAN_ASSET} took ${took}s (budget ${CRITICAL_BUDGET_SECONDS}s)"
           uv run python3 - "$took" "$CRITICAL_BUDGET_SECONDS" <<'PY'
           import sys
           import xml.etree.ElementTree as ET

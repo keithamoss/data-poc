@@ -9,12 +9,13 @@ current day when it was meant for the next.
 """
 from __future__ import annotations
 
+import pytest
+
 from datetime import datetime, timedelta, timezone
 
 from qa_tools.common import arrival_classification as classify_mod
 from qa_tools.common.schedule import Period
 from qa_tools.common.slots import Slot
-import pytest
 
 PERTH = timezone(timedelta(hours=8))
 
@@ -159,3 +160,8 @@ class TestARejectedSupplyIsClassifiedToo:
         monkeypatch.setattr(supply_db, "connect", refused)
         for at, filed_to, expected in cases:
             assert classify_mod.classify(at, filed_to) == expected
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = [*(pytestmark if isinstance(pytestmark, list) else [pytestmark]), pytest.mark.asset("quarterly")]

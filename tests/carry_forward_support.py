@@ -25,7 +25,7 @@ CASE_WORKERS = "cp-case-workers"
 NAME = "Case Workers"
 REASON = "Case Workers is delivered in February and August only"
 #: The Notifications check that reads cp_case_workers - a real declared read.
-ASSIGNED_WORKER = ("data-asset-1.child-protection-family-support.child-protection."
+ASSIGNED_WORKER = ("quarterly.child-protection-family-support.child-protection."
                    "cp-notifications.assigned_worker_id.relationships_dbt")
 KEYS = {"agency_id": "child-protection-family-support", "collection_id": "child-protection"}
 

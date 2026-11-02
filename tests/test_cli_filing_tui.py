@@ -626,3 +626,8 @@ class TestProductionTypesItsIdIntoTheRealFlows:
             common._file_or_trial(["x.csv"], "child-protection", "cp_run_", keep=True,
                                   route="terminal", originally=None, storage_times=None)
         assert typed
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

@@ -20,7 +20,7 @@ from qa_tools.common import target_agreement
 from generator import driver
 
 DS = "birth-registrations"
-PREFIX = "data-asset-1.registry-services.civil-registration.birth-registrations."
+PREFIX = "daily.registry-services.civil-registration.birth-registrations."
 
 
 def _r(check: str, status: str, **extra) -> dict:
@@ -71,8 +71,11 @@ class TestComparing:
 # ---- what the generator says it built (generator/targets.py) ----
 
 def _book(tmp_path, bdm, cp=()):
+    """A generator record holding each dataset given entries - one asset's
+    datasets only, as one asset's generator writes it (the asset split)."""
     path = tmp_path / "book.json"
-    path.write_text(json.dumps({"birth-registrations": bdm, "cp-clients": list(cp)}))
+    book = {"birth-registrations": list(bdm), "cp-clients": list(cp)}
+    path.write_text(json.dumps({k: v for k, v in book.items() if v}))
     return path
 
 
@@ -90,13 +93,14 @@ def _entry(period, delivery, at="14:30", severity=None):
 
 class TestWhatWasBuilt:
 
+    @pytest.mark.asset("daily")  # Birth Registrations' record; Child Protection's is the next test
     def test_targets_lead_ins_and_ambers_in_both_collections(self, tmp_path):
         book = _book(tmp_path, [
             _entry("2026-08-20", "amb", severity="amber"),
             _entry("2026-09-03", "lead1"), _entry("2026-09-04", "lead2"),
             _entry("2026-09-05", "ts43", at="14:00"), _entry("2026-09-06", "after"),
             _entry("2026-09-07", "plain"),
-        ], cp=[_entry("2024-Q1", "cpamb", severity="amber"), _entry("2024-Q2", "cpclean")])
+        ])
         placed = tmp_path / "placed.json"
         placed.write_text(json.dumps({"placements": [{
             "scenario_id": "TS-43", "dataset": DS, "lead_in": ["2026-09-03", "2026-09-04"],
@@ -104,15 +108,25 @@ class TestWhatWasBuilt:
                                                    "built_to": "amber",
                                                    "rules": ["place_of_birth_facility.completeness"]}]}]}))
         built = {b.delivery: b for b in targets.written(book, placed)}
-        assert set(built) == {"amb", "lead1", "lead2", "ts43", "after", "cpamb"}
+        assert set(built) == {"amb", "lead1", "lead2", "ts43", "after"}
         assert built["ts43"].target == "amber" and built["ts43"].injected
         assert built["ts43"].reference == "lead2", "the LAST lead-in (REQ-GEN-185 c2)"
         assert built["ts43"].day == "2026-09-05"
         assert built["ts43"].rules == ("place_of_birth_facility.completeness",)
         assert {built[d].target for d in ("lead1", "lead2", "after")} == {"green"}
         assert not built["lead1"].injected
-        assert built["amb"].target == "amber" and built["cpamb"].dataset_id == "cp-clients"
+        assert built["amb"].target == "amber"
 
+    @pytest.mark.asset("quarterly")
+    def test_a_child_protection_amber_is_built_and_a_clean_quarter_is_not(self, tmp_path):
+        """The Child Protection half of the test above, on its own asset."""
+        book = _book(tmp_path, [], cp=[_entry("2024-Q1", "cpamb", severity="amber"),
+                                       _entry("2024-Q2", "cpclean")])
+        built = {b.delivery: b for b in targets.written(book, tmp_path / "absent.json")}
+        assert set(built) == {"cpamb"}
+        assert built["cpamb"].target == "amber" and built["cpamb"].dataset_id == "cp-clients"
+
+    @pytest.mark.asset("daily")  # Birth Registrations' record
     def test_a_green_follow_with_no_target_is_still_compared(self, tmp_path):
         """#172 D1: a placement with no targets (TS-73's green_follow) skipped
         its green following day, so the day read RED on the page and nothing
@@ -127,6 +141,7 @@ class TestWhatWasBuilt:
         assert set(built) == {"after"}
         assert built["after"].target == "green" and not built["after"].injected
 
+    @pytest.mark.asset("daily")  # Birth Registrations' record
     def test_a_record_the_placement_does_not_match_is_refused(self, tmp_path):
         book = _book(tmp_path, [_entry("2026-09-04", "lead2")])
         placed = tmp_path / "placed.json"
@@ -136,6 +151,7 @@ class TestWhatWasBuilt:
         with pytest.raises(ValueError, match="TS-43.*2026-09-05 14:00"):
             targets.written(book, placed)
 
+    @pytest.mark.asset("quarterly")
     def test_every_ordinary_amber_names_its_dataset(self, tmp_path):
         """post-build-review #248: Emergency Department's provider declared no
         amber_dataset, so its ordinary ambers were compared under dataset
@@ -146,6 +162,7 @@ class TestWhatWasBuilt:
         built = targets.written(path, tmp_path / "absent.json")
         assert [b.dataset_id for b in built] == ["ed-presentations"]
 
+    @pytest.mark.asset("quarterly")
     def test_linkage_products_ambers_name_their_dataset(self, tmp_path):
         """The same defect again on the Linkage Products provider, found by
         the lp_boot bootstrap from empty 2026-10-30: it builds a quarter of
@@ -157,6 +174,7 @@ class TestWhatWasBuilt:
         built = targets.written(path, tmp_path / "absent.json")
         assert [b.dataset_id for b in built] == ["linkage-keys"]
 
+    @pytest.mark.asset("quarterly")
     def test_an_amber_from_a_provider_naming_no_dataset_is_refused(self, tmp_path,
                                                                    monkeypatch):
         from generator import collections
@@ -172,6 +190,7 @@ class TestWhatWasBuilt:
         with pytest.raises(ValueError, match="nameless.*amber_dataset"):
             targets.written(path, tmp_path / "absent.json")
 
+    @pytest.mark.asset("quarterly")
     def test_nothing_generated_is_nothing_built(self, tmp_path):
         assert targets.written(tmp_path / "absent.json", tmp_path / "absent2.json") == []
 
@@ -274,6 +293,7 @@ class TestSkippingTheTrial:
         bdm.generate_synthetic_data()
         assert ran == [True]
 
+    @pytest.mark.asset("quarterly")
     def test_the_bootstrap_flag_reaches_both_generators(self, monkeypatch):
         from qa_tools.common import bootstrap as boot
 
@@ -295,7 +315,8 @@ class TestSkippingTheTrial:
 
         # Every registered collection, in hierarchy order, none with a trial.
         assert seen == [(c.id, False) for c in collections.all_collections()]
-        assert [cid for cid, _ in seen[:2]] == ["civil-registration", "child-protection"]
+        # The quarterly asset's order (the asset split).
+        assert [cid for cid, _ in seen[:2]] == ["child-protection", "emergency-department"]
 
 
 # ---- after a replay (criteria 3, 6) ----
@@ -327,8 +348,12 @@ class TestAfterAReplay:
             [found] = target_agreement.after_replay(conn, [missing])
         assert found.verdict is None and "nothing recorded" in found.checks[0]
 
+    # EACH ASSET'S OWN DEPLOYMENT (C11): before the split one deployment
+    # held both collections' targets.
+    @pytest.mark.parametrize("asset", [pytest.param(a, marks=pytest.mark.asset(a), id=a)
+                                       for a in ("daily", "quarterly")])
     def test_every_targeted_supply_in_the_deployment_agrees_and_nothing_changes(
-            self, deployment_history):
+            self, deployment_history, asset):
         """The real corpus: injected targets, lead-ins and following days, and
         every ordinary amber in both collections. Reading changes nothing
         (criterion 6)."""
@@ -348,9 +373,35 @@ class TestAfterAReplay:
         # Every collection's targets, from what its provider declares, so a
         # new collection is covered without editing this (#248).
         from generator import collections
-        declared = {p.amber_dataset for p in collections.providers()} - {None}
+        # ITS AMBER DATASET AND ITS TARGET DATASETS (REQ-GEN-298 criterion 12:
+        # every geocoding supply's planned verdict is a target, compared in its
+        # own dataset - linkage_products' target_datasets names them).
+        declared = set()
+        for p in collections.providers():
+            declared |= {p.amber_dataset, *(getattr(p, "target_datasets", ()) or ())}
+        declared -= {None}
+        assert declared
         assert {b.dataset_id for b in built} == declared
-        assert any(b.injected for b in built) and any(b.target == "green" for b in built)
+        # A SCENARIO'S OWN TARGET IS AMONG THEM. Where this asset places a
+        # target on a dataset whose provider declares target_trial (the daily
+        # asset's Birth Registrations), that is an INJECTED target: `scenario`
+        # alone proves nothing there, because the trial also sets it on every
+        # green lead-in and following day (post-build-review #308 3). Where it
+        # places none (the quarterly asset: Child Protection's targets are not
+        # trialled, and REQ-GEN-298's geocoding scenarios are recorded as
+        # planned, not injected), a planned supply a scenario names counts.
+        import json
+
+        from qa_tools.common import scenario_map
+        raw = json.loads(scenario_map.placements_path().read_text())
+        trialled = {r["dataset"] for r in (raw.get("placements") if isinstance(raw, dict) else raw)
+                    if r.get("targets") and r.get("dataset")
+                    and collections.for_dataset(r["dataset"]).target_trial}
+        if trialled:
+            assert any(b.injected and b.dataset_id in trialled for b in built), trialled
+        else:
+            assert any(b.injected or b.scenario for b in built)
+        assert any(b.target == "green" for b in built)
 
 
 class TestEveryBootstrapCallerFailsOnADisagreement:
@@ -381,6 +432,7 @@ class TestAResumeLeavesTheCallersDatabaseAlone:
     resume promises never to write to. It compares after its own replay,
     so it needs no trial."""
 
+    @pytest.mark.asset("quarterly")
     def test_its_regeneration_runs_no_trial(self, monkeypatch):
         import types
 
@@ -388,7 +440,7 @@ class TestAResumeLeavesTheCallersDatabaseAlone:
         from qa_tools.common import checkpoints, replay_inputs
 
         cp = types.SimpleNamespace(recorded=types.SimpleNamespace(readable=True, arrivals=[]),
-                                   collection_id="civil-registration", before=3, name="ckpt")
+                                   collection_id="child-protection", before=3, name="ckpt")
         monkeypatch.setattr(checkpoints, "require_synthetic", lambda: None)
         monkeypatch.setattr(checkpoints, "find", lambda name: cp)
         monkeypatch.setattr(replay_inputs, "first_affected",
@@ -411,7 +463,8 @@ class TestAResumeLeavesTheCallersDatabaseAlone:
 
         # Every registered collection, in hierarchy order, none with a trial.
         assert seen == [(c.id, False) for c in collections.all_collections()]
-        assert [cid for cid, _ in seen[:2]] == ["civil-registration", "child-protection"]
+        # The quarterly asset's order (the asset split).
+        assert [cid for cid, _ in seen[:2]] == ["child-protection", "emergency-department"]
 
 
 class TestEveryFailureNamesWhatToLookAt:
@@ -488,7 +541,7 @@ class TestARecordThatDoesNotAddUp:
         monkeypatch.setattr(bdm, "try_targets", disagree)
         with pytest.raises(bdm.TargetTrialFailed):
             bdm.generate_synthetic_data()
-        assert wrote == [], "the committed SCENARIOS.md is not rewritten for a history not emitted"
+        assert wrote == [], "the committed scenario map is not rewritten for a history not emitted"
 
 
 class TestAPipelineRunComparesToo:
@@ -515,6 +568,7 @@ class TestAPipelineRunComparesToo:
         monkeypatch.setattr(snapshot_dashboard, "sync_local_snapshots", lambda: [])
         return calls
 
+    @pytest.mark.asset("quarterly")
     def test_a_disagreement_fails_the_run_and_publishes_nothing(self, monkeypatch):
         from cli import pipeline
 
@@ -571,6 +625,7 @@ def _delivery_of(sc, supply):
 
 class TestPackageMateHeldBack:
 
+    @pytest.mark.asset("quarterly")
     def test_green_target_agrees_when_only_a_held_back_partner_made_it_red(self,
                                                                          gate_scenario):
         """A fixture replay of S2 strict as re-cast - Clients built red,
@@ -598,6 +653,7 @@ class TestPackageMateHeldBack:
 
 class TestGateOutcomes:
 
+    @pytest.mark.asset("quarterly")
     def test_a_declared_gate_outcome_that_differs_fails_the_bootstrap(self, gate_scenario,
                                                                        monkeypatch):
         """S1 green declared wrongly - Clients v2 held back, where the gate
@@ -635,6 +691,7 @@ class TestGateOutcomes:
         disagreements = bootstrap.targets_agree(["cp"])
         assert any(d.startswith("TS-S1g: cp-clients") for d in disagreements), disagreements
 
+    @pytest.mark.asset("quarterly")
     def test_a_declaration_on_a_dataset_with_no_targets_is_compared_too(self, gate_scenario,
                                                                         monkeypatch):
         """A declared gate outcome names any table of its package, and Child
@@ -664,3 +721,8 @@ class TestGateOutcomes:
         disagreements = bootstrap.targets_agree(["cp"])
         assert any(d.startswith("TS-S1g: cp-notifications") for d in disagreements), \
             disagreements
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("daily")

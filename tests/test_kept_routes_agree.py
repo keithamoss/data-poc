@@ -146,3 +146,6 @@ class TestOneDeliveryKeptThreeWays:
     def test_the_lambda_route_records_what_the_batch_records(self, routes):
         assert _diff(_project(routes["batch"], {"delivery"}),
                      _project(routes["lambda"], {"delivery"})) == []
+
+#: Birth Registrations is the daily asset's (the asset split).
+pytestmark = pytest.mark.asset("daily")

@@ -33,6 +33,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import date
+from qa_tools.common import assets as _assets
 
 #: Input fields named when they differ, in the order a reader thinks in.
 _FIELDS = ("period_date", "due_date", "expected_time", "days_before", "grace_seconds",
@@ -80,8 +81,8 @@ class Refusal:
     def remedy(self) -> str:
         """Criteria 2 and 8: restore the value or declare the correction - or,
         on a synthetic asset, regenerate its history."""
-        base = ("restore the recorded value in contract/calendar.yaml (or "
-                "contract/data-asset.yaml for the timezone), or declare the change as a "
+        base = (f"restore the recorded value in {_assets.config_dir()}/calendar.yaml (or "
+                f"{_assets.config_dir()}/data-asset.yaml for the timezone), or declare the change as a "
                 "correction (REQ-PIPE-111) - the schedule gate's refusal prints the entry to "
                 "paste")
         if self.synthetic:

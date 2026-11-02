@@ -29,6 +29,7 @@ from pathlib import Path
 from types import MappingProxyType
 
 from qa_tools.common import assets, config_yaml
+from qa_tools.common import assets as _assets
 
 
 def calendar_yaml() -> Path:
@@ -507,7 +508,7 @@ def load(path: Path | None = None) -> Agreement:
     return from_doc(doc, path)
 
 
-def from_doc(doc: dict, path: Path | str = "contract/calendar.yaml") -> Agreement:
+def from_doc(doc: dict, path: Path | str = "assets/<asset>/calendar.yaml") -> Agreement:
     """An `Agreement` from an already-parsed calendar.yaml document - what
     REQ-PIPE-111's freeze gate needs for the file as it stood at an earlier
     commit, which is text from git rather than a path."""
@@ -619,7 +620,7 @@ def cadence(dataset_id: str, agreement: Agreement | None = None) -> dict:
     entry = agreement.dataset(dataset_id)
     if entry is None or not entry.participation:
         raise schedule.ScheduleConfigError(
-            f"dataset {dataset_id!r} has no participation in contract/calendar.yaml, so it has "
+            f"dataset {dataset_id!r} has no participation in {_assets.config_dir()}/calendar.yaml, so it has "
             f"no delivery time to label.")
     # RESOLVED (REQ-PIPE-181): a value the collection states is this
     # dataset's as much as one it states itself.

@@ -42,7 +42,7 @@ AGENCY = "child-protection-family-support"
 COLLECTION = "child-protection"
 WHEN = "2026-09-25T22:00:00+08:00"
 BY = "tests@example.gov.au"
-CHECK = "data-asset-1.child-protection-family-support.child-protection"
+CHECK = "quarterly.child-protection-family-support.child-protection"
 #: Real check ids from this repo's own sources, asserted present below so a
 #: renamed check cannot turn these tests into ones about nothing.
 CLIENT_REF = f"{CHECK}.cp-notifications.cp_client_id.relationships_dbt"
@@ -775,3 +775,8 @@ class TestADiscardedTrialTakesItsAttempts:
         assert len(_attempts(conn, run_id)) == 1
         trial.discard(conn, run_id)
         assert _attempts(conn, run_id) == []
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

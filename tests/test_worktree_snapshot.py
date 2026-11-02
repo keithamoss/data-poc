@@ -141,3 +141,9 @@ def test_it_only_ever_pushes_to_a_wip_snap_ref(repo):
     refs = git(remote, "for-each-ref", "--format=%(refname)").splitlines()
     assert refs, "precondition: something was pushed"
     assert set(refs) == {"refs/heads/wip/work-snap", "refs/heads/wip/feature-snap"}, refs
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset). It names no
+#: collection, so the suite's own asset.
+pytestmark = pytest.mark.asset("quarterly")

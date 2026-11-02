@@ -34,26 +34,30 @@ def _key():
     return "".join(random.choice("0123456789") for _ in range(18))
 
 
-def _filed(conn, period, received, *, staged=True):
-    """A supply of cp-carers filed to `period`, received at `received`,
-    with its table in staging."""
+def _filed(conn, period, received, *, staged=True, dataset=DS):
+    """A supply of cp-carers - or of `dataset`, its table read from the
+    registry - filed to `period`, received at `received`, with its table in
+    staging."""
+    from qa_tools.common import hierarchy
+
+    table = TABLE if dataset == DS else hierarchy.dataset(dataset).table
     key = _key()
-    supply, physical, delivery = f"{DS}@{key}", f"{TABLE}__{key}", f"pytest-sup-{key}"
+    supply, physical, delivery = f"{dataset}@{key}", f"{table}__{key}", f"pytest-sup-{key}"
     conn.execute("INSERT INTO qa.delivery (name, received_at, received_instant) "
                  "VALUES (?, ?, ?)", [delivery, received, received])
     conn.execute("INSERT INTO qa.delivery_file (delivery, filename, dataset_id, received_at, "
                  "received_instant, received_from, receipt_sequence) "
-                 "VALUES (?, 'cp_carers.csv', ?, ?, ?, 'our-clock', 1)",
-                 [delivery, DS, received, received])
+                 "VALUES (?, ?, ?, ?, ?, 'our-clock', 1)",
+                 [delivery, f"{table}.csv", dataset, received, received])
     conn.execute("INSERT INTO qa.filing (dataset_id, supply_id, slot, branch, delivery) "
-                 "VALUES (?, ?, ?, 'pytest', ?)", [DS, supply, period, delivery])
+                 "VALUES (?, ?, ?, 'pytest', ?)", [dataset, supply, period, delivery])
     if staged:
         conn.execute(f'CREATE SCHEMA IF NOT EXISTS "{supply_db.STAGING_SCHEMA}"')
         conn.execute(f'CREATE TABLE "{supply_db.STAGING_SCHEMA}"."{physical}" (id integer)')
         # And checked, as its arrival leaves it (post-build-review #173 fix 2).
         import filing_support
 
-        filing_support.checked(conn, DS, supply)
+        filing_support.checked(conn, dataset, supply)
     return supply, physical
 
 
@@ -290,3 +294,8 @@ def test_mothman_supply_superseded_lists_them(supply_dsn, monkeypatch):
                                                  "--dataset", DS, "--period", period])
     assert result.exit_code == 0, result.output
     assert f"{old}  superseded by {new}" in result.output
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

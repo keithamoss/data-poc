@@ -65,8 +65,10 @@ if [ -n "${CLAUDE_ENV_FILE:-}" ]; then
     # in code, because a build that guesses is a build that can be
     # labelled as somewhere it is not.
     echo 'export MOTHMAN_ENVIRONMENT="sandbox"'
-    # WHICH DATA ASSET, with no default (REQ-PIPE-363 criterion 1).
-    echo 'export MOTHMAN_ASSET="data-asset-1"'
+    # NO MOTHMAN_ASSET: which data asset a command acts for is the
+    # person's choice each time, with no default (REQ-PIPE-363 criterion
+    # 1) - there are two since the asset split. Each asset's database is
+    # supply_<asset>, created and marked below (REQ-PIPE-343 criterion 7).
   } >> "$CLAUDE_ENV_FILE"
 fi
 
@@ -82,13 +84,17 @@ if [ -n "${PG_UP:-}" ]; then
   [ -n "${tidied:-}" ] && [ "$tidied" != "0" ] && say "Dropped ${tidied} leftover test database(s)."
 fi
 
-# --- dbt_utils: without it 8 real dbt tests fail ----------------------
-if [ ! -d dbt_project/dbt_packages ]; then
-  uv run dbt deps --project-dir dbt_project --profiles-dir qa_tools/dbt_profiles \
-    >/dev/null 2>&1 && say "Installed dbt_utils." || say "WARNING: dbt deps failed."
-else
-  say "dbt_utils already installed."
-fi
+# --- dbt packages: without them the real dbt tests fail ---------------
+# Each asset's own dbt project, assets/<asset>/dbt, one process each.
+for asset in $(cd assets && ls -d */ | tr -d /); do
+  if [ ! -d "assets/${asset}/dbt/dbt_packages" ]; then
+    MOTHMAN_ASSET="$asset" uv run mothman env dbt-deps >/dev/null 2>&1 \
+      && say "Installed ${asset}'s dbt packages." \
+      || say "WARNING: dbt deps failed for ${asset}."
+  else
+    say "${asset}'s dbt packages already installed."
+  fi
+done
 
 # --- node_modules: without it `npm test` will not start ---------------
 if [ ! -d node_modules ]; then
@@ -115,15 +121,24 @@ fi
 # with none, so the sandbox marks its own - a no-op once it is. A database
 # marked as something else is reported, never re-marked: that is a person's
 # decision (`mothman env mark` at a terminal).
+# ONE DATABASE PER ASSET, supply_<asset> (REQ-PIPE-343 criteria 4 and 7),
+# each created if missing and marked for its own asset, one process each.
 if [ "${PG_UP:-}" = "1" ]; then
-  if MOTHMAN_ENVIRONMENT=sandbox MOTHMAN_ASSET=data-asset-1 \
-     MOTHMAN_SUPPLY_DSN="postgresql://${PGUSER_NAME}:${PGPASS}@localhost:5432/supply" \
-     uv run mothman env mark --confirm sandbox >/dev/null 2>&1; then
-    say "Warehouse is marked as this sandbox's."
-  else
-    say "WARNING: could not mark the warehouse as 'sandbox' - run"
-    say "'uv run mothman env mark' to see why."
-  fi
+  for asset in $(cd assets && ls -d */ | tr -d /); do
+    if ! sudo -n -u postgres psql -tAc \
+        "SELECT 1 FROM pg_database WHERE datname='supply_${asset}'" 2>/dev/null | grep -q 1; then
+      sudo -n -u postgres psql -q -c \
+        "CREATE DATABASE \"supply_${asset}\" OWNER \"${PGUSER_NAME}\";" >/dev/null 2>&1
+    fi
+    if MOTHMAN_ENVIRONMENT=sandbox MOTHMAN_ASSET="$asset" \
+       MOTHMAN_SUPPLY_DSN="postgresql://${PGUSER_NAME}:${PGPASS}@localhost:5432/supply_${asset}" \
+       uv run mothman env mark --confirm sandbox >/dev/null 2>&1; then
+      say "supply_${asset} is marked as this sandbox's."
+    else
+      say "WARNING: could not mark supply_${asset} as 'sandbox' - run"
+      say "'MOTHMAN_ASSET=${asset} uv run mothman env mark' to see why."
+    fi
+  done
 fi
 
 # --- Is there any data here? ------------------------------------------

@@ -176,3 +176,8 @@ class TestAPeriodNameWrittenForAPerson:
     def test_empty_and_none_are_the_empty_string(self):
         assert display_time.format_periods_in("") == ""
         assert display_time.format_periods_in(None) == ""
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

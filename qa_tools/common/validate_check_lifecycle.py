@@ -90,7 +90,9 @@ def sources_fingerprint() -> str:
     yaml_sources, evidently = _sources(None)
     paths = [ROOT / rel for rel, _parser in yaml_sources]
     paths += [ROOT / rel for rel in evidently]
-    dirs = [*collections.SHARED_DBT_DIRS]
+    # THE ASSET PROJECT'S OWN macros/ too: it forwards the shared package's
+    # tests by name (REQ-QAC-368), so an edit there is an edit to the checks.
+    dirs = [*collections.SHARED_DBT_DIRS, f"{assets.dbt_rel()}/macros"]
     for c in collections.all_collections():
         dirs += [c.dbt_models, c.dbt_tests]
     for rel_dir in dirs:
@@ -117,6 +119,15 @@ def _old_file_content(rel_path: str, ref: str | None) -> str | None:
     if ref is None:
         path = ROOT / rel_path
         return path.read_text() if path.is_file() else None
+    # A PATH THE MOVE CREATED is read at its old path in the push that carries
+    # the move (REQ-TEST-366 criterion 2) - a divided file cut to this asset's
+    # part (criterion 5) - so a moved check file is not brand new.
+    from qa_tools.common import moved_paths
+
+    return moved_paths.read_at(rel_path, ref, ROOT, _git_show)
+
+
+def _git_show(rel_path: str, ref: str) -> str | None:
     result = subprocess.run(["git", "show", f"{ref}:{rel_path}"], cwd=ROOT,
                              capture_output=True, text=True)
     if result.returncode != 0:
@@ -125,11 +136,20 @@ def _old_file_content(rel_path: str, ref: str | None) -> str | None:
 
 
 #: Where the project's own dbt SQL lives (REQ-QAC-223 criterion 2): macros
-#: and custom generic tests, and singular tests - every collection's folder
-#: under tests/. Package macros (dbt_packages/) and models are deliberately
-#: NOT covered.
-_DBT_MACRO_DIRS = ("dbt_project/macros", "dbt_project/tests/generic")
-_DBT_SINGULAR_DIR = "dbt_project/tests"
+#: and custom generic tests - the shared local package, dbt_shared/
+#: (REQ-QAC-368) - and singular tests, every collection's folder under the
+#: selected asset's project's tests/ (`_dbt_singular_dir`, asked at call time).
+#: Package macros (dbt_packages/) and models are deliberately NOT covered.
+def _dbt_macro_dirs() -> tuple[str, ...]:
+    from qa_tools import collections
+
+    return collections.SHARED_DBT_DIRS
+
+
+def _dbt_singular_dir() -> str:
+    return f"{assets.dbt_rel()}/tests"
+
+
 _MACRO_HEAD = re.compile(r"{%-?\s*(macro|test)\s+(\w+)\s*\(")
 
 
@@ -144,7 +164,13 @@ def _files_in(rel_dir: str, ref: str | None) -> list[str]:
     result = subprocess.run(["git", "ls-tree", "-r", "--name-only", f"{ref}:{rel_dir}"], cwd=ROOT,
                             capture_output=True, text=True)
     if result.returncode != 0:
-        return []
+        # A FOLDER THE MOVE CREATED (REQ-TEST-366 criterion 2): its files, by
+        # their NEW paths, wherever their old paths existed at `ref` - each
+        # then read through _old_file_content, which follows the map.
+        from qa_tools.common import moved_paths
+
+        return sorted(new for new, old in moved_paths.old_files_under(rel_dir, ROOT).items()
+                      if new.endswith(".sql") and _git_show(old, ref) is not None)
     return sorted(f"{rel_dir}/{n}" for n in result.stdout.split() if n.endswith(".sql"))
 
 
@@ -159,7 +185,7 @@ def dbt_definitions(ref: str | None) -> "cl.DbtDefinition":
     scan is lexical and errs towards including too much, which can only ask
     for a changelog entry that was not strictly needed."""
     macros: dict[str, tuple[str, str]] = {}
-    for rel_dir in _DBT_MACRO_DIRS:
+    for rel_dir in _dbt_macro_dirs():
         for rel in _files_in(rel_dir, ref):
             text = _old_file_content(rel, ref) or ""
             for kind, name in _MACRO_HEAD.findall(text):
@@ -167,8 +193,9 @@ def dbt_definitions(ref: str | None) -> "cl.DbtDefinition":
                 if kind == "macro" and name.startswith("test_"):
                     macros.setdefault(name[len("test_"):], (rel, text))
 
-    singular = [f for f in _files_in(_DBT_SINGULAR_DIR, ref)
-                if not f.startswith(f"{_DBT_SINGULAR_DIR}/generic/")]
+    singular_dir = _dbt_singular_dir()
+    singular = [f for f in _files_in(singular_dir, ref)
+                if not f.startswith(f"{singular_dir}/generic/")]
 
     def _with_used_macros(files: list[str], texts: list[str]) -> tuple[str, tuple[str, ...]]:
         seen = set(files)
@@ -338,14 +365,14 @@ def _explanation_errors(checks: list[cl.CheckMetadata]) -> list[str]:
     return errors
 
 
-def _by_source_file(errors: list[str], old_checks, new_checks, base) -> list[str]:
+def _by_source_file(errors: list[str], old_checks, new_checks, base, moved=None) -> list[str]:
     """ONE EDITED FILE, ONE FAILURE (REQ-QAC-223 criterion 7). A shared macro
     backs many checks - matches_regex.sql backs 11 - so an edit to it would
     otherwise fail the gate once per check. Where an edited project file
     moved more than one undocumented check, those checks' messages become one
     naming the file and listing them; a file behind a single check keeps that
     check's own message."""
-    undocumented = set(cl.find_undocumented_changes(old_checks, new_checks))
+    undocumented = set(cl.find_undocumented_changes(old_checks, new_checks, moved=moved))
     if not undocumented:
         return errors
     files: dict[str, list[str]] = {}
@@ -443,6 +470,14 @@ def frozen_default_errors(old_table, new_table, old_checks) -> list[str]:
     return errors
 
 
+def _moved_ids() -> tuple[str, str] | None:
+    """REQ-QAC-344's rename, read from the move map where the push carries the
+    move: (former data_asset_id, this asset's data_asset_id), or None."""
+    from qa_tools.common import hierarchy, moved_paths
+
+    return moved_paths.id_rename(ROOT, hierarchy.data_asset_id())
+
+
 def main(require_explanations: bool = False) -> int:
     # Not a literal "HEAD~1" - a push of several commits would then
     # only ever be checked on its last one, and every retroactive edit
@@ -451,7 +486,9 @@ def main(require_explanations: bool = False) -> int:
     base = diff_base(root=ROOT)
     old_checks = collect_checks(base)
     new_checks = collect_checks(None)
-    errors = _by_source_file(cl.validate(old_checks, new_checks), old_checks, new_checks, base)
+    moved = _moved_ids()
+    errors = _by_source_file(cl.validate(old_checks, new_checks, moved=moved),
+                             old_checks, new_checks, base, moved)
     # REQ-QAC-176 criterion 11: the frozen defaults stay frozen.
     errors += frozen_default_errors(frozen_defaults_at(base), frozen_defaults_at(None),
                                     old_checks)

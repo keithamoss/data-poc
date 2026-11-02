@@ -313,3 +313,8 @@ def test_the_record_shape_is_held_by_the_database_too(conn):
                 "VALUES (?, ?, ?, 'carry-forward', 's', 'p', 'rule', 'rule', now(), now())",
                 [KEYS["agency_id"], KEYS["collection_id"], CASE_WORKERS])
     assert qa_store.SCHEMA_VERSION >= 47
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

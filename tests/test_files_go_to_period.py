@@ -12,15 +12,15 @@ worked example).
 """
 from __future__ import annotations
 
+import asset_folders
 from datetime import date, datetime, timedelta
-from pathlib import Path
 
 import pytest
 import yaml
 
 from qa_tools.common import agreement, asset_time, assignment, schedule, slots
 
-REAL = Path(__file__).resolve().parent.parent / "contract" / "calendar.yaml"
+REAL = asset_folders.SelectedFolder("calendar.yaml")
 
 
 #: REQ-TEST-375: in the hand-picked set every push runs in CI.
@@ -195,3 +195,8 @@ class TestATurnedOffGapIsJudgedOnTheRound:
         assert turned_off.gap_for_period("cp-clients", "2024-Q1", agr) is not None
         assert turned_off.gap_for_period("cp-clients", "2024-Q2", agr) is None
         assert turned_off.gap_for_period("cp-clients", "2023-Q4", agr) is None
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = [*(pytestmark if isinstance(pytestmark, list) else [pytestmark]), pytest.mark.asset("quarterly")]

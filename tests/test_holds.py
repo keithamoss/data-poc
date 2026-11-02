@@ -54,6 +54,7 @@ def _recognise(dirs, name):
 
 
 class TestItRefusesToChoose:
+    @pytest.mark.asset("quarterly")
     def test_two_files_for_one_dataset_are_held(self, dirs):
         """REQ-PIPE-202 criterion 9: cp_clients' pattern admits a suffixed
         name, so two files for it in one delivery are the reachable shape -
@@ -66,6 +67,7 @@ class TestItRefusesToChoose:
         assert hold.dataset_id == "cp-clients"
         assert hold.files == ("cp_clients.csv", "cp_clients_2.csv")
 
+    @pytest.mark.asset("quarterly")
     def test_ts39_a_second_part_beside_the_extract_is_contested(self, dirs):
         """TS-39's unit test (REQ-PIPE-202 criterion 9): cp_clients.csv beside
         cp_clients_part2.csv is held as contested, never chosen between."""
@@ -108,6 +110,7 @@ class TestOneHoldDoesNotStopTheRest:
     """Criterion 2, and it is the difference between a handled state
     and an exception."""
 
+    @pytest.mark.asset("quarterly")
     def test_every_other_dataset_in_the_delivery_is_still_attributed(self, dirs):
         _drop(dirs, "mixed", {"cp_clients.csv": "a\n1\n",
                                "cp_carers.csv": "a\n1\n",
@@ -133,6 +136,7 @@ class TestBothFilesAreStagedAndNeitherIsReadable:
     it - which enforces "not QA'd" by the mechanism rather than by
     remembering."""
 
+    @pytest.mark.asset("quarterly")
     def test_two_files_stage_as_two_physical_tables(self):
         # AN ORDINAL, not the supplier's filename: these become SQL
         # identifiers, and DuckDB's parameter binding covers values,
@@ -158,6 +162,7 @@ class TestBothFilesAreStagedAndNeitherIsReadable:
             conn.execute(f'SELECT * FROM "{res.schema}"."birth_registrations"')
         conn.close()
 
+    @pytest.mark.asset("quarterly")
     def test_staging_the_second_file_does_not_overwrite_the_first(self, tmp_path, monkeypatch):
         """The failure the hold exists to prevent, reintroduced one
         layer down: one physical name for both files loses one of them
@@ -215,3 +220,8 @@ class TestALaterDeliveryIsUnaffected:
         assert later.contested == frozenset()
         assert later.path_for("birth-registrations").name \
             == "birth_registrations_2026-09-03.csv"
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("daily")

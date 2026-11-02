@@ -488,3 +488,8 @@ class TestOwedEndsAtTheClearingRun:
         assert [(p["on"], p["reason"]) for p in got[c2]] == [
             ("2099-07-01", None), ("2099-07-02", supply_status.RECHECK_OWED),
             ("2099-07-04", supply_status.NO_CURRENT_RESULT)]
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

@@ -48,6 +48,7 @@ class TestAFilingWithNoDeliveryIsRefused:
 
 class TestAKeptSupplyLinksToItsDelivery:
 
+    @pytest.mark.asset("daily")
     def test_a_hand_filed_supplys_filing_names_its_delivery(self, tmp_path, private_supply_dsn):
         from qa_tools.common import arrivals, hand_filing, schedule
 
@@ -68,6 +69,7 @@ class TestAKeptSupplyLinksToItsDelivery:
 
 class TestATrialWritesNoFiling:
 
+    @pytest.mark.asset("daily")
     def test_a_trial_files_nothing(self, tmp_path, private_supply_dsn, monkeypatch):
         """Criterion 33: a trial never reaches filing, so no delivery
         record and no filing is written for it."""
@@ -88,3 +90,8 @@ class TestATrialWritesNoFiling:
             qa_store.ensure_schema(conn)
             assert delivery_log.records(conn) == []
             assert conn.execute(f"SELECT count(*) FROM {filing.TABLE}").fetchall()[0][0] == 0
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

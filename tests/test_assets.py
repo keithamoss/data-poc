@@ -3,10 +3,9 @@ REQ-PIPE-343 criteria 5 and 6, REQ-PIPE-369 criteria 2 and 4): which data
 asset a process acts for, where its configuration and state live, and the
 adapters and providers loaded from its folder by path.
 
-ON TODAY'S LAYOUT (REQ-TEST-357 criterion 6): contract/ is the one asset,
-named data-asset-1 until REQ-QAC-344 renames it, and every path resolves to
-where it is today. The assets/<asset>/ layout is exercised against a folder
-of the test's own.
+ON THE REAL LAYOUT since the move (REQ-TEST-357 criterion 5): assets/quarterly/
+and assets/daily/, and every path resolves under its asset. A layout of the
+test's own is exercised against a folder it builds.
 
 READS ONLY ITS OWN REPORTS - none at all: it compares the paths the resolver
 names under reports/ and opens nothing there (tests/test_publish.py's marker).
@@ -37,28 +36,49 @@ def _two_assets(tmp_path: Path) -> Path:
     return root
 
 
-class TestTodaysLayout:
-    """contract/ is the one asset, and everything resolves where it is today."""
+class TestTheRealLayout:
+    """assets/<asset>/ in this repository: one folder per asset, each named
+    for the data_asset_id it declares (REQ-PIPE-342 criterion 1, REQ-QAC-344
+    criterion 1), and every path resolving under it."""
 
-    def test_the_one_asset_is_named_as_its_file_declares(self):
-        declared = config_yaml.parse((ROOT / "contract" / "data-asset.yaml").read_text())
-        assert assets.names() == [declared["data_asset_id"]] == ["data-asset-1"]
+    def test_each_folder_is_named_as_its_file_declares(self):
+        for name in assets.names():
+            declared = config_yaml.parse((ROOT / "assets" / name / "data-asset.yaml").read_text())
+            assert declared["data_asset_id"] == name
+        assert assets.names() == ["daily", "quarterly"]
 
-    def test_every_path_is_where_it_is_today(self, monkeypatch):
-        monkeypatch.setenv(assets.ASSET_ENV, "data-asset-1")
+    def test_every_path_is_under_the_assets_own_folder(self, monkeypatch):
+        monkeypatch.setenv(assets.ASSET_ENV, "quarterly")
         a = assets.selected()
-        assert (a.name, a.folder) == ("data-asset-1", ROOT / "contract")
-        assert a.file("data-asset.yaml") == ROOT / "contract" / "data-asset.yaml"
-        assert a.adapters == ROOT / "qa_tools" / "collections"
-        assert a.providers == ROOT / "generator" / "collections"
-        assert a.dbt_project == ROOT / "dbt_project"
-        assert a.dbt_packages == ROOT / "dbt_project" / "dbt_packages"
-        assert assets.data_dir() == ROOT / "data"
-        assert assets.reports_dir() == ROOT / "reports"
-        assert assets.data_path("deliveries") == ROOT / "data" / "deliveries"
-        assert assets.reports_path("x.json") == ROOT / "reports" / "x.json"
-        assert assets.deliveries_dir() == ROOT / "data" / "deliveries"
-        assert assets.receipts_dir() == ROOT / "data" / "receipts"
+        folder = ROOT / "assets" / "quarterly"
+        assert (a.name, a.folder) == ("quarterly", folder)
+        assert a.file("data-asset.yaml") == folder / "data-asset.yaml"
+        assert a.adapters == folder / "collections"
+        assert a.providers == folder / "synthetic" / "collections"
+        assert a.synthetic == folder / "synthetic"
+        assert a.dbt_project == folder / "dbt"
+        assert a.dbt_packages == folder / "dbt" / "dbt_packages"
+        assert assets.data_dir() == ROOT / "data" / "quarterly"
+        assert assets.reports_dir() == ROOT / "reports" / "quarterly"
+        assert assets.data_path("deliveries") == ROOT / "data" / "quarterly" / "deliveries"
+        assert assets.reports_path("x.json") == ROOT / "reports" / "quarterly" / "x.json"
+        assert assets.deliveries_dir() == ROOT / "data" / "quarterly" / "deliveries"
+        assert assets.receipts_dir() == ROOT / "data" / "quarterly" / "receipts"
+
+
+    @pytest.mark.parametrize("name", ["results_x_y.json", "x_y_dashboard.json",
+                                      "open_tickets.json", "ticket_resolutions.json"])
+    def test_each_assets_reports_are_gitignored(self, monkeypatch, name):
+        """State, never configuration (CLAUDE.md): reports/<asset>/ is rebuilt
+        from the database, so git must not offer it for commit. Found after
+        the move, when reports/daily/ showed as untracked."""
+        import subprocess
+
+        for asset in assets.names():
+            monkeypatch.setenv(assets.ASSET_ENV, asset)
+            probe = assets.reports_path(name).relative_to(ROOT)
+            result = subprocess.run(["git", "check-ignore", "-q", str(probe)], cwd=ROOT)
+            assert result.returncode == 0, f"{probe} is not gitignored"
 
 
 class TestSelection:
@@ -70,7 +90,7 @@ class TestSelection:
             assets.selected()
         message = str(exc.value)
         assert "MOTHMAN_ASSET is not set" in message
-        assert "Set it to one of: data-asset-1" in message
+        assert "Set it to one of: daily, quarterly" in message
         assert "deliberately no default" in message
 
     def test_a_name_with_no_folder_is_refused_the_same_way(self, monkeypatch):
@@ -78,11 +98,11 @@ class TestSelection:
         with pytest.raises(assets.AssetNotSelected) as exc:
             assets.selected()
         assert "MOTHMAN_ASSET is 'data-asset-2', which names no asset folder" in str(exc.value)
-        assert "Set it to one of: data-asset-1" in str(exc.value)
+        assert "Set it to one of: daily, quarterly" in str(exc.value)
 
-    def test_the_only_asset_present_is_never_chosen_for_you(self, monkeypatch):
+    def test_no_asset_present_is_ever_chosen_for_you(self, monkeypatch):
         monkeypatch.delenv(assets.ASSET_ENV, raising=False)
-        assert len(assets.names()) == 1
+        assert len(assets.names()) == 2
         assert assets.selected_or_none() is None
 
     def test_resolved_at_call_time_not_import_time(self, monkeypatch, tmp_path):
@@ -94,8 +114,8 @@ class TestSelection:
 
     def test_select_states_it_for_this_process_and_its_children(self, monkeypatch):
         monkeypatch.delenv(assets.ASSET_ENV, raising=False)
-        assert assets.select("data-asset-1").name == "data-asset-1"
-        assert os.environ[assets.ASSET_ENV] == "data-asset-1"
+        assert assets.select("quarterly").name == "quarterly"
+        assert os.environ[assets.ASSET_ENV] == "quarterly"
         with pytest.raises(assets.AssetNotSelected):
             assets.select("nowhere")
 
@@ -130,13 +150,13 @@ class TestTheFixture:
         assert a.folder == folder
         assert a.file("calendar.yaml").read_text() == "calendars: []\n"
         assert a.file("data-asset.yaml").read_text() == \
-            (ROOT / "contract" / "data-asset.yaml").read_text()
+            (ROOT / "assets" / "quarterly" / "data-asset.yaml").read_text()
 
     def test_the_hierarchy_reads_through_it(self, asset_folder):
         from qa_tools.common import hierarchy
 
-        text = (ROOT / "contract" / "data-asset.yaml").read_text()
-        asset_folder({"data-asset.yaml": text.replace("data_asset_id: data-asset-1",
+        text = (ROOT / "assets" / "quarterly" / "data-asset.yaml").read_text()
+        asset_folder({"data-asset.yaml": text.replace("data_asset_id: quarterly",
                                                       "data_asset_id: elsewhere")})
         assert hierarchy.data_asset_id() == "elsewhere"
 
@@ -147,18 +167,18 @@ class TestLoadingByPath:
     def test_an_adapter_is_loaded_from_its_assets_folder(self):
         from qa_tools import collections
 
-        module = collections.adapter_module("civil-registration")
-        assert Path(module.__file__) == ROOT / "qa_tools" / "collections" / "civil_registration.py"
-        assert module.__name__ == "mothman_adapter_data_asset_1_civil_registration"
-        assert module.__name__ not in {"qa_tools.collections.civil_registration"}
-        assert collections.adapter("civil-registration") is module.ADAPTER
+        module = collections.adapter_module("child-protection")
+        assert Path(module.__file__) == ROOT / "assets" / "quarterly" / "collections" / "child_protection.py"
+        assert module.__name__ == "mothman_adapter_quarterly_child_protection"
+        assert module.__name__ not in {"qa_tools.collections.child_protection"}
+        assert collections.adapter("child-protection") is module.ADAPTER
 
     def test_a_provider_is_loaded_from_its_assets_folder(self):
         from generator import collections as providers
 
         module = providers.provider_module("child-protection")
-        assert Path(module.__file__) == ROOT / "generator" / "collections" / "child_protection.py"
-        assert module.__name__ == "mothman_provider_data_asset_1_child_protection"
+        assert Path(module.__file__) == ROOT / "assets" / "quarterly" / "synthetic" / "collections" / "child_protection.py"
+        assert module.__name__ == "mothman_provider_quarterly_child_protection"
         assert providers.provider("child-protection") is module.PROVIDER
 
     def test_no_asset_folder_goes_on_sys_path(self):
@@ -244,9 +264,9 @@ class TestLoadingByPath:
         # unset here, and the child is handed the asset and the id.
         monkeypatch.delenv(assets.ASSET_ENV, raising=False)
         with ProcessPoolExecutor(max_workers=1, mp_context=get_context("spawn"),
-                                 initializer=assets.select, initargs=("data-asset-1",)) as pool:
-            got = pool.submit(assets.adapter_file, "civil-registration").result()
-        assert Path(got) == ROOT / "qa_tools" / "collections" / "civil_registration.py"
+                                 initializer=assets.select, initargs=("quarterly",)) as pool:
+            got = pool.submit(assets.adapter_file, "child-protection").result()
+        assert Path(got) == ROOT / "assets" / "quarterly" / "collections" / "child_protection.py"
 
 
 class TestOneAssetPerProcess:
@@ -274,7 +294,7 @@ class TestOneAssetPerProcess:
         suite's exemption while it spawns."""
         assets.release_claim()
         with ProcessPoolExecutor(max_workers=1, mp_context=get_context("spawn")) as pool:
-            refused, after_release = pool.submit(_claim_two, "data-asset-1",
+            refused, after_release = pool.submit(_claim_two, "quarterly",
                                                  "data-asset-2").result()
         assert (refused, after_release) == (True, True)
 
@@ -316,9 +336,9 @@ class TestTheConnectionGuard:
         from qa_tools.common import supply_db
 
         supply_db.connect(read_only=True, reuse=False).close()
-        assert assets.claimed() == "data-asset-1"
+        assert assets.claimed() == "quarterly"
         assets.use_root(_two_assets(tmp_path))
-        monkeypatch.setenv(assets.ASSET_ENV, "quarterly")
+        monkeypatch.setenv(assets.ASSET_ENV, "daily")
         opened = []
         monkeypatch.setattr(psycopg, "connect", lambda *a, **k: opened.append(a))
         with pytest.raises(assets.OneAssetPerProcess):
@@ -339,9 +359,9 @@ class TestTheBootstrapHandsItsStreamsTheAsset:
         monkeypatch.delenv(assets.ASSET_ENV)
         monkeypatch.setattr(assets, "selected", lambda: here)
         monkeypatch.setattr(bootstrap, "_run_stream", _which_asset_and_adapter)
-        got = bootstrap._run_concurrently(["civil-registration"], sequential=True)
-        assert got == {"civil-registration": (
-            "data-asset-1", str(ROOT / "qa_tools" / "collections" / "civil_registration.py"))}
+        got = bootstrap._run_concurrently(["child-protection"], sequential=True)
+        assert got == {"child-protection": (
+            "quarterly", str(ROOT / "assets" / "quarterly" / "collections" / "child_protection.py"))}
 
 
     def test_a_stream_process_is_handed_the_layout_too(self, monkeypatch, tmp_path):
@@ -372,7 +392,7 @@ class TestTheBootstrapHandsItsStreamsTheAsset:
                             lambda **kw: real(mp_context=get_context("spawn"), **kw))
         got = parallel_orchestrate.run_manifest([{"n": 1}, {"n": 2}], _asset_folder_of,
                                                 max_workers=1)
-        assert got == [("data-asset-1", str(folder))] * 2
+        assert got == [("quarterly", str(folder))] * 2
 
 
 def _which_adapter_file(key: str, sequential: bool):
@@ -414,3 +434,8 @@ class TestLoadingIsSafeAcrossThreads:
         for t in threads:
             t.join()
         assert got == [True, True]
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

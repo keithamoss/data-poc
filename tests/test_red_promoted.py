@@ -2,11 +2,12 @@
 can label a red promoted supply, and give every supply its outcome."""
 from __future__ import annotations
 
+import pytest
+
 import test_supersession as _base
 from pipeline import red_promoted, slot_timeline
 from qa_tools.common import decision_log as dl, promotion, supersession, supply_status
 from test_supersession import DS, REAL_PERSON, WHEN, _filed
-import pytest
 
 conn = _base.conn
 period = _base.period
@@ -135,3 +136,8 @@ class TestACauseCarriesWhatThePageNamesItBy:
 
     def test_an_unrecorded_run_carries_nothing(self, conn):
         assert red_promoted._cause_fields(conn, "no-such-run", {}) == {}
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = [*(pytestmark if isinstance(pytestmark, list) else [pytestmark]), pytest.mark.asset("quarterly")]

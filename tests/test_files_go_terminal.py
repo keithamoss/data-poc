@@ -8,9 +8,9 @@ functions those screens call.
 """
 from __future__ import annotations
 
+import asset_folders
 import shutil
 from datetime import UTC, date, datetime
-from pathlib import Path
 
 import pytest
 import yaml
@@ -19,7 +19,7 @@ from click.testing import CliRunner
 from cli import schedule as schedule_cli
 from qa_tools.common import agreement, files_go
 
-REAL = Path(__file__).resolve().parent.parent / "contract"
+REAL = asset_folders.SelectedFolder()
 
 
 @pytest.fixture(autouse=True)
@@ -106,6 +106,7 @@ class TestAFallsRoundIsMarked:
     def test_no_round_is_marked_without_a_fall(self):
         assert files_go.fall_rounds("cp-clients") == []
 
+    @pytest.mark.asset("daily")
     def test_a_cadence_rule_calendar_has_none_to_mark(self):
         assert files_go.fall_rounds("birth-registrations") == []
 
@@ -208,3 +209,8 @@ class TestAReceiptIsShownOnTheAssetsClock:
         from datetime import timedelta, timezone
         want = display_time.format_instant(datetime(2023, 8, 1, 9, tzinfo=timezone(timedelta(hours=8))))
         assert filing_tui.arrived("cp-clients@202308010900000800") == want
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

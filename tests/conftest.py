@@ -56,15 +56,23 @@ os.environ["PY_COLORS"] = "0"
 # fixture, because test modules import the CLI - which builds the selected
 # asset's command groups - while they are collected, before any fixture runs;
 # the `selected_asset` fixture below then states it again for every test, so
-# a test that selected another cannot leak it into the next. Today's tree is
-# one asset; a tree with more has no default here, so each test must say.
+# a test that selected another cannot leak it into the next.
+#
+# EVERY TEST MODULE NAMES ITS ASSET (C11, Keith 2026-11-02): a module-level
+# `pytestmark = pytest.mark.asset("<asset>")`, and a test acting for another
+# asset carries its own mark. There is no default: a module naming none is
+# refused by name (pytest_collection_modifyitems). Never the ambient variable
+# (REQ-PIPE-363 criterion 9). SUITE_ASSET below is only the asset the SESSION
+# starts under - the CLI's first import and the worker database's first mark -
+# and never stands in for a test's own.
 from qa_tools.common import assets as _assets  # noqa: E402
 
-if len(_assets.names()) != 1:
+SUITE_ASSET = "quarterly"
+if SUITE_ASSET not in _assets.names():
     raise pytest.UsageError(
-        f"{len(_assets.names())} asset folders - choose the asset each test acts for "
-        f"explicitly (REQ-PIPE-363 criterion 9) rather than taking a default")
-TEST_ASSET = _assets.names()[0]
+        f"the suite's asset {SUITE_ASSET!r} is not an asset folder ({', '.join(_assets.names())}) "
+        f"- state the asset the suite acts for in tests/conftest.py")
+TEST_ASSET = SUITE_ASSET
 os.environ[_assets.ASSET_ENV] = TEST_ASSET
 
 import fixture_ids
@@ -178,17 +186,143 @@ def stated_test_environment():
         os.environ[environments.ENVIRONMENT_ENV] = before
 
 
+_MODULE_ASSET = re.compile(r"""^pytestmark\b.*?asset\(["']([a-z0-9-]+)["']\)""", re.M)
+
+
+def pytest_collectstart(collector):
+    """A test module is IMPORTED under the asset its module-level pytestmark
+    names (the suite's otherwise), so its import-time reads - a collection
+    looked up by id, a fixture id built from the hierarchy - are that asset's."""
+    if isinstance(collector, pytest.Module):
+        import asset_cli
+
+        try:
+            text = collector.path.read_text()
+        except OSError:
+            text = ""
+        m = _MODULE_ASSET.search(text)
+        # A module naming no asset is imported under the session's, and then
+        # refused by name before any test runs (C11).
+        asset = m.group(1) if m else TEST_ASSET
+        os.environ[_assets.ASSET_ENV] = asset
+        asset_cli.rebuild_for_selected()
+
+
+def pytest_collection_finish(session):
+    os.environ[_assets.ASSET_ENV] = TEST_ASSET
+
+
+#: The worker's own database and the asset its identity row names - marked for
+#: the suite's asset at session start (supply_dsn), and re-marked for the
+#: asset a test selects whenever that differs, so a test of either asset
+#: passes the identity guard (REQ-PIPE-107) on its own worker's database and
+#: no other. Only the worker's database is ever re-marked.
+_WORKER_DB: dict = {}
+
+
+def _mark_worker_db_for(asset: str) -> None:
+    import psycopg
+
+    from qa_tools.common import db_identity, supply_db
+
+    dsn = _WORKER_DB.get("dsn")
+    if not dsn or _WORKER_DB.get("asset") == asset or os.environ.get(supply_db.SUPPLY_DSN_ENV) != dsn:
+        return
+    with psycopg.connect(dsn, autocommit=True) as conn:
+        # EMPTIED FIRST (the asset split): each asset is a deployment with a
+        # database of its own, so a test of one asset never meets rows
+        # another asset's test left - a Birth Registrations hold read by a
+        # quarterly reader that cannot name the dataset. Every data schema
+        # goes, the identity's own among them, and is marked afresh below;
+        # the database itself stays, so pooled connections live on.
+        found = conn.execute(
+            "SELECT nspname FROM pg_namespace WHERE nspname NOT LIKE 'pg\\_%' "
+            "AND nspname NOT IN ('information_schema', 'public')").fetchall()
+        # PAST THE PERIOD-VIEW GUARD (REQ-PIPE-129), which refuses a cascade
+        # that would drop a period's view: a deliberate wipe of a test
+        # worker's own database, so its event triggers are off for the drop
+        # and back on after, for whichever of them the drop left.
+        triggers = [t for (t,) in conn.execute(
+            "SELECT evtname FROM pg_event_trigger WHERE evtenabled <> 'D'").fetchall()]
+        for t in triggers:
+            conn.execute(f'ALTER EVENT TRIGGER "{t}" DISABLE')
+        try:
+            for (schema,) in found:
+                conn.execute(f'DROP SCHEMA "{schema}" CASCADE')
+        finally:
+            left = {t for (t,) in conn.execute("SELECT evtname FROM pg_event_trigger").fetchall()}
+            for t in triggers:
+                if t in left:
+                    conn.execute(f'ALTER EVENT TRIGGER "{t}" ENABLE')
+        db_identity.mark(conn, db_identity.Identity(asset, "test"))
+    _WORKER_DB["asset"] = asset
+    # Counted, so a fixture that staged rows can tell they are gone and stage
+    # them again (_staged_once below).
+    _WORKER_DB["wipes"] = _WORKER_DB.get("wipes", 0) + 1
+
+
+def asset_of(node) -> str:
+    """The asset a test acts for: its closest `asset` mark - its own, its
+    class's or its module's. Every module names one (C11)."""
+    mark = node.get_closest_marker("asset")
+    if mark is None:
+        raise pytest.UsageError(f"{node.nodeid} names no data asset - give its module a "
+                                f"`pytestmark = pytest.mark.asset(...)` (C11)")
+    return mark.args[0]
+
+
+def _scope_selects_its_asset(request):
+    """Select a module's or class's asset BEFORE its own fixtures of that
+    scope run (post-build-review #307). The per-test switch below empties the
+    worker's database when the asset changes, and it runs after every
+    module- and class-scoped fixture - so a daily module first on a worker
+    that started quarterly lost what its module fixture had built before its
+    first test (tests/test_run_dbt_bdm.py, run alone)."""
+    import asset_cli
+
+    mark = request.node.get_closest_marker("asset")
+    if mark is None:
+        yield
+        return
+    before = os.environ.get(_assets.ASSET_ENV)
+    os.environ[_assets.ASSET_ENV] = mark.args[0]
+    _assets.use_root(None)
+    _assets.release_claim()
+    asset_cli.rebuild_for_selected()
+    _mark_worker_db_for(mark.args[0])
+    yield
+    if before is None:
+        os.environ.pop(_assets.ASSET_ENV, None)
+    else:
+        os.environ[_assets.ASSET_ENV] = before
+
+
+@pytest.fixture(scope="module", autouse=True)
+def module_selects_its_asset(supply_dsn, request):
+    yield from _scope_selects_its_asset(request)
+
+
+@pytest.fixture(scope="class", autouse=True)
+def class_selects_its_asset(supply_dsn, request):
+    yield from _scope_selects_its_asset(request)
+
+
 @pytest.fixture(autouse=True)
-def selected_asset(monkeypatch):
-    """Every test acts for TEST_ASSET unless it selects another, with the
+def selected_asset(monkeypatch, request):
+    """Every test acts for the asset its mark names (C11), with the
     resolver pointed at the real asset folders and no connection claimed
     (REQ-PIPE-343 criterion 6: the suite's exemption from one asset per
     process is that each TEST starts unclaimed - each still opens one asset's
     database, and a process a test spawns starts with no exemption at all)."""
-    monkeypatch.setenv(_assets.ASSET_ENV, TEST_ASSET)
+    import asset_cli
+
+    asset = asset_of(request.node)
+    monkeypatch.setenv(_assets.ASSET_ENV, asset)
     _assets.use_root(None)
     _assets.release_claim()
-    yield TEST_ASSET
+    asset_cli.rebuild_for_selected()
+    _mark_worker_db_for(asset)
+    yield asset
     _assets.use_root(None)
     _assets.release_claim()
 
@@ -368,6 +502,7 @@ def supply_dsn(worker_id, stated_test_environment):
     # empty by design, so building from it produces an empty dashboard.
     globals()["DEPLOYMENT_SUPPLY_DSN"] = before
     os.environ[supply_db.SUPPLY_DSN_ENV] = dsn
+    _WORKER_DB.update(dsn=dsn, asset=TEST_ASSET)
     yield dsn
     if before is None:
         os.environ.pop(supply_db.SUPPLY_DSN_ENV, None)
@@ -634,12 +769,42 @@ def deployment_history(supply_dsn, monkeypatch):
     It needs that database populated, which is
     `mothman pipeline bootstrap` - see CLAUDE.md's setup section.
     """
-    dsn = globals().get("DEPLOYMENT_SUPPLY_DSN")
+    dsn = deployment_dsn_for(os.environ.get(_assets.ASSET_ENV))
     if not dsn:
         pytest.skip("no deployment database configured (MOTHMAN_SUPPLY_DSN)")
     monkeypatch.setenv(supply_db_module().SUPPLY_DSN_ENV, dsn)
     use_deployment_environment(monkeypatch)
     return dsn
+
+
+_DEPLOYMENT_BY_ASSET: dict = {}
+
+
+def deployment_dsn_for(asset: str | None) -> str | None:
+    """The deployment database of `asset`: supply_<asset> on the deployment's
+    own server where it exists (REQ-PIPE-343 criterion 7 - each asset's
+    database by that name, the sandbox's and CI's alike), else the deployment
+    database the session was given (MOTHMAN_SUPPLY_DSN). CI's per-asset runs
+    are handed supply_<asset> directly, so both routes agree there."""
+    import psycopg
+
+    base = globals().get("DEPLOYMENT_SUPPLY_DSN")
+    if not base or not asset:
+        return base
+    if asset not in _DEPLOYMENT_BY_ASSET:
+        info = psycopg.conninfo.conninfo_to_dict(base)
+        named = dict(info, dbname=f"supply_{asset}")
+        found = base
+        try:
+            with psycopg.connect(psycopg.conninfo.make_conninfo(**dict(info, dbname="postgres")),
+                                 autocommit=True, connect_timeout=5) as conn:
+                if conn.execute("SELECT 1 FROM pg_database WHERE datname = %s",
+                                [named["dbname"]]).fetchone():
+                    found = psycopg.conninfo.make_conninfo(**named)
+        except psycopg.Error:
+            pass
+        _DEPLOYMENT_BY_ASSET[asset] = found
+    return _DEPLOYMENT_BY_ASSET[asset]
 
 
 def use_deployment_environment(monkeypatch) -> None:
@@ -741,7 +906,25 @@ def clean_load_log(supply_dsn):
 
 
 @pytest.fixture(scope="module")
-def bdm_duckdb_dir(supply_dsn, bdm_raw_dir):
+def _staged_this_module() -> dict:
+    """What this module's staging fixtures have staged, and since which wipe."""
+    return {}
+
+
+def _staged_once(cache: dict, collection_id: str, stage_it) -> None:
+    """Stage a collection's fixture rows once per module, AND AGAIN after the
+    worker's database was emptied by an asset switch (the asset split): a
+    module of one asset may hold tests of the other, each of which empties
+    the database it switches to, so rows staged at module scope do not
+    outlive the next test of the other asset."""
+    key = (collection_id, _WORKER_DB.get("wipes", 0))
+    if key not in cache:
+        stage_it()
+        cache[key] = True
+
+
+@pytest.fixture
+def bdm_duckdb_dir(supply_dsn, bdm_raw_dir, _staged_this_module, selected_asset):
     """bdm_raw_dir's same two runs, staged into this worker's supply
     database via the real build_all() - the exact loading code path the
     real pipeline uses, not a hand-rolled copy of it.
@@ -767,8 +950,12 @@ def bdm_duckdb_dir(supply_dsn, bdm_raw_dir):
 
     from qa_tools.tools import stage
 
-    stage.build_all("civil-registration", deliveries_dir=Path(bdm_raw_dir) / "deliveries",
-               receipts_dir=Path(bdm_raw_dir) / "receipts")
+    # STAGED UNDER THE TEST'S OWN ASSET, so function-scoped (the asset
+    # split): a module-scoped fixture is built under its MODULE's asset, and
+    # a Birth Registrations test in a quarterly module would stage nothing.
+    _staged_once(_staged_this_module, "civil-registration", lambda: stage.build_all(
+        "civil-registration", deliveries_dir=Path(bdm_raw_dir) / "deliveries",
+        receipts_dir=Path(bdm_raw_dir) / "receipts"))
     return supply_dsn
 
 
@@ -855,8 +1042,8 @@ def cp_delivery_dirs(cp_raw_dir):
     return Path(cp_raw_dir) / "deliveries", Path(cp_raw_dir) / "receipts"
 
 
-@pytest.fixture(scope="module")
-def cp_duckdb_dir(supply_dsn, cp_raw_dir):
+@pytest.fixture
+def cp_duckdb_dir(supply_dsn, cp_raw_dir, _staged_this_module, selected_asset):
     """cp_raw_dir's same two runs, staged into this worker's supply
     database via the real build_all(). Shares one database with the BDM
     fixture above, which is the point rather than a compromise - the
@@ -879,6 +1066,25 @@ def cp_duckdb_dir(supply_dsn, cp_raw_dir):
     # tree (REQ-GEN-043) - a real leak this fixture hit for exactly one
     # run, building 18 real CP warehouses into a pytest tmp dir while
     # the fixture's own two sat unread.
+    def stage_it():
+        stage.build_all(
+            "child-protection", deliveries_dir=Path(cp_raw_dir) / "deliveries",
+            receipts_dir=Path(cp_raw_dir) / "receipts")
+        _file_and_overlay_cp(Path(cp_raw_dir) / "deliveries", Path(cp_raw_dir) / "receipts")
+
+    # Under the test's own asset, as bdm_duckdb_dir above.
+    _staged_once(_staged_this_module, "child-protection", stage_it)
+    return supply_dsn
+
+
+@pytest.fixture(scope="module")
+def cp_duckdb_dir_for_module(supply_dsn, cp_raw_dir, module_selects_its_asset):
+    """cp_duckdb_dir for a module-scoped fixture built on it, in a module
+    whose own asset is the quarterly one (tests/test_carried.py)."""
+    from pathlib import Path
+
+    from qa_tools.tools import stage
+
     stage.build_all(
         "child-protection", deliveries_dir=Path(cp_raw_dir) / "deliveries",
         receipts_dir=Path(cp_raw_dir) / "receipts")
@@ -1028,6 +1234,9 @@ def pytest_addoption(parser):
     parser.addoption("--run-full-capture", action="store_true", default=False,
                      help="also run tests marked full_capture (two full bootstraps; "
                           "only when essential)")
+    parser.addoption("--only-asset", default=None, metavar="ASSET",
+                     help="run only the tests acting for this asset - one process per "
+                          "asset, each pointed at that asset's database (REQ-PIPE-343 c5)")
 
 
 #: Modules whose tests are spread across pytest-xdist workers CLASS BY CLASS
@@ -1096,6 +1305,19 @@ def pytest_collection_modifyitems(config, items):
             items[:] = kept
     _mark_deployment(items)
     _refuse_a_critical_test_ci_cannot_run(items)
+    _refuse_a_module_naming_no_asset(items)
+    only = config.getoption("--only-asset")
+    if only:
+        # DESELECTED, NOT SKIPPED, for the reason above: the other asset's
+        # tests run in a process of their own.
+        if only not in _assets.names():
+            raise pytest.UsageError(f"--only-asset {only!r} names no asset folder "
+                                    f"(known: {', '.join(_assets.names())})")
+        dropped = [i for i in items if asset_of(i) != only]
+        if dropped:
+            config.hook.pytest_deselected(items=dropped)
+            items[:] = [i for i in items if asset_of(i) == only]
+    _group_by_asset(items)
     _group_for_distribution(items)
 
 
@@ -1181,6 +1403,77 @@ def _refuse_a_critical_test_ci_cannot_run(items):
             "these tests are marked critical but push CI has no deployment and no "
             "browser - unmark them, or mark only the classes that need neither:\n  "
             + "\n  ".join(bad))
+
+
+def _refuse_a_module_naming_no_asset(items):
+    """C11 (Keith, 2026-11-02): every test module names its asset at module
+    level. One that does not is refused, by name - never given a default.
+    tests/asset_inference.py says which asset a module's tests name, to help
+    write the mark."""
+    unnamed = set()
+    for item in items:
+        module = getattr(item, "module", None)
+        marks = getattr(module, "pytestmark", [])
+        marks = marks if isinstance(marks, list) else [marks]
+        if not any(getattr(m, "name", None) == "asset" for m in marks):
+            unnamed.add(item.nodeid.split("::", 1)[0])
+    if unnamed:
+        raise pytest.UsageError(
+            "these test modules name no data asset - add a module-level "
+            "`pytestmark = pytest.mark.asset(\"<asset>\")` to each (C11; "
+            "tests/asset_inference.named() says which asset's ids a test names): "
+            + ", ".join(sorted(unnamed)))
+
+
+def _group_by_asset(items):
+    """Each module's tests one asset at a time - the suite's first, then the
+    other - keeping their order otherwise, so the module- and class-scoped
+    fixtures built for one asset are rebuilt at most once for the other
+    (pytest_runtest_protocol below)."""
+    position = {}
+    for i, item in enumerate(items):
+        position.setdefault(item.nodeid.split("::", 1)[0], i)
+    items.sort(key=lambda it: (position[it.nodeid.split("::", 1)[0]],
+                               asset_of(it) != TEST_ASSET))
+
+
+@pytest.hookimpl(tryfirst=True)
+def pytest_runtest_setup(item):
+    """THE TEST'S ASSET BEFORE ANY OF ITS FIXTURES (the asset split): a
+    module-, class- or session-scoped fixture is set up before the autouse
+    `selected_asset` one, so it would otherwise be built under whichever
+    asset the previous test left selected."""
+    import asset_cli
+
+    asset = asset_of(item)
+    os.environ[_assets.ASSET_ENV] = asset
+    asset_cli.rebuild_for_selected()
+    _mark_worker_db_for(asset)
+
+
+@pytest.hookimpl(tryfirst=True)
+def pytest_runtest_protocol(item, nextitem):
+    """WHEN THE NEXT TEST ACTS FOR ANOTHER ASSET, its module- and
+    class-scoped fixtures are torn down after this one, so it gets fixtures
+    built for its own asset rather than ones built for this test's (the asset
+    split). Session fixtures - the worker's database - are kept. Otherwise
+    pytest's own protocol, unchanged."""
+    from _pytest.runner import runtestprotocol
+
+    if nextitem is None or asset_of(nextitem) == asset_of(item):
+        return None
+
+    class _AboveTheModule:
+        """The next test's chain above its module, so only those survive."""
+
+        def listchain(self):
+            return [n for n in nextitem.listchain()
+                    if not isinstance(n, (pytest.Module, pytest.Class, pytest.Function))]
+
+    item.ihook.pytest_runtest_logstart(nodeid=item.nodeid, location=item.location)
+    runtestprotocol(item, nextitem=_AboveTheModule())
+    item.ihook.pytest_runtest_logfinish(nodeid=item.nodeid, location=item.location)
+    return True
 
 
 def _mark_deployment(items):

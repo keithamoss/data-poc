@@ -390,3 +390,8 @@ class TestACheckIsEvaluatedOnce:
             assert forbidden not in source, (
                 f"{path} would re-derive a historical verdict via {forbidden!r} "
                 f"instead of replaying the one that was recorded")
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

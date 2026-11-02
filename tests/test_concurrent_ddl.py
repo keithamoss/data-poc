@@ -5,6 +5,8 @@ died with a UniqueViolation on pg_type - PostgreSQL's IF NOT EXISTS is not
 safe against a concurrent creator)."""
 from __future__ import annotations
 
+import pytest
+
 import threading
 
 from qa_tools.common import supply_db
@@ -58,3 +60,8 @@ def test_concurrent_creates_inside_transactions_do_not_collide(supply_dsn):
         with supply_db.connect(label="test-ddl-race") as conn:
             conn.execute(f'DROP SCHEMA IF EXISTS "{name}"')
         assert not errors, f"attempt {attempt}: {errors[0]!r}"
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

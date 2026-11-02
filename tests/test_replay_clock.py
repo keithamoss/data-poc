@@ -135,3 +135,6 @@ class TestAReplayStampsItsOwnTime:
         for action, effective, recorded in got["decisions"]:
             assert effective <= recorded < effective + timedelta(minutes=5), \
                 (action, effective, recorded)
+
+#: Birth Registrations is the daily asset's (the asset split).
+pytestmark = pytest.mark.asset("daily")

@@ -8,6 +8,8 @@ each refusal is paired with a case that must NOT be held.
 """
 from __future__ import annotations
 
+import pytest
+
 from datetime import datetime, timedelta, timezone
 
 from qa_tools.common import assignment, supply_holds
@@ -169,3 +171,8 @@ class TestHoldingChangesNothingElse:
         other = assignment.assign("other", "s", _at(2, 22), _daily(1, 2, 3), frozenset({"01"}))
         assert held.branch == assignment.HELD
         assert other.branch == assignment.OPEN_UNFILLED and other.slot == "02"
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

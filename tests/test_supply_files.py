@@ -205,3 +205,8 @@ class TestNothingElseSplitsASupplyId:
                 if any(re.search(p, line) for p in self.PATTERNS):
                     found.append(f"{rel}:{n}: {line.strip()}")
         assert not found, "split a supply id through supply_files instead:\n" + "\n".join(found)
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

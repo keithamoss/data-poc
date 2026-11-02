@@ -19,6 +19,8 @@ supply that really arrived and exactly wrong for one nobody accepted.
 """
 from __future__ import annotations
 
+import pytest
+
 import attempt_support
 from qa_tools.common import supply_db, trial
 from staging_support import stage_bdm
@@ -68,6 +70,7 @@ class TestATrialIsNamedForWhatItIs:
         run_id = trial.trial_run_id()
         assert supply_db.run_schema(run_id) == supply_db.RUN_SCHEMA_PREFIX + run_id
 
+    @pytest.mark.asset("daily")
     def test_a_trial_staged_table_fits_an_identifier(self):
         name = supply_db.staged_table("birth_registrations", trial.trial_run_id())
         assert len(name.encode()) <= 63, f"{name} is {len(name.encode())} bytes"
@@ -183,6 +186,7 @@ class TestATrialLeavesNothingBehind:
             supply_db.ensure_schemas(conn)
             trial.discard(conn, trial.trial_run_id())
 
+    @pytest.mark.asset("daily")
     def test_discarding_a_trial_leaves_a_real_supply_alone(self, supply_dsn):
         """The property shared staging made impossible to guarantee."""
         with supply_db.connect(label="test-trial") as conn:
@@ -212,6 +216,7 @@ class TestATrialLeavesNothingBehind:
             assert not trial.orphan_schemas(conn)
 
 
+@pytest.mark.asset("daily")  # every case stages a Birth Registrations delivery
 class TestARealTrialStagesAndVanishes:
     """The property the classes above assert about names, asserted
     instead about a trial that really loaded real rows through the real
@@ -338,6 +343,7 @@ class TestARealTrialStagesAndVanishes:
                 [run_id]).fetchall()
             assert run_id not in qa_store.incomplete_runs(conn)
 
+    @pytest.mark.asset("daily")
     def test_a_completed_trials_own_results_go_with_it(self, supply_dsn, invented_check_ids):
         """REQ-PIPE-103 criterion 6 - Keith, 2026-10-06 (post-build-review
         #120 Q6): discard KEPT a trial's own recorded checks on purpose, so a
@@ -389,6 +395,7 @@ class TestATrialIsNeverSilentlyCheckedAgainstPromotedData:
     reintroduce the bug.
     """
 
+    @pytest.mark.asset("quarterly")
     def test_the_overlay_reads_a_trials_own_staging_schema(self, supply_dsn):
         from qa_tools.common import period_schema
 
@@ -439,6 +446,7 @@ class TestASingleTableRunRecordsAllSixTablesItRead:
     years later by an audit, so under-reporting it is not cosmetic.
     """
 
+    @pytest.mark.asset("quarterly")
     def test_borrowing_a_table_records_that_the_run_read_it(self, supply_dsn):
         earlier = "cp_run_900"
         later = trial.trial_run_id()
@@ -485,3 +493,7 @@ class TestASingleTableRunRecordsAllSixTablesItRead:
                 f'DELETE FROM "{supply_db.STAGING_SCHEMA}"._resolutions '
                 f"WHERE run_id = '{earlier}'")
 
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

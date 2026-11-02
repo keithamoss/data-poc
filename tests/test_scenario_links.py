@@ -318,13 +318,22 @@ class TestTheGeneratedPeriodsAreEachGenerators:
     """post-build-review #169 finding 5, and the real routing every CLI
     test above monkeypatches."""
 
+    @pytest.mark.asset("quarterly")
     def test_each_collection_gets_its_own_generators_periods(self):
+        """Two collections of one asset (the asset split: Birth Registrations,
+        which this compared Child Protection with, is the next test's)."""
         cp_provider = collection_modules.provider_module("child-protection")
-        generate_runs = collection_modules.provider_module("civil-registration")
+        ed_provider = collection_modules.provider_module("emergency-department")
 
         assert si.generated_periods("cp-carers") == cp_provider.generated_periods()
+        assert si.generated_periods("ed-presentations") == ed_provider.generated_periods()
+        assert si.generated_periods("cp-carers") != si.generated_periods("ed-presentations")
+
+    @pytest.mark.asset("daily")
+    def test_birth_registrations_gets_its_own_generators_periods(self):
+        generate_runs = collection_modules.provider_module("civil-registration")
+
         assert si.generated_periods("birth-registrations") == generate_runs.generated_periods()
-        assert si.generated_periods("cp-carers") != si.generated_periods("birth-registrations")
 
     def test_a_dataset_no_generator_writes_is_refused(self):
         with pytest.raises(si.CannotPlace, match="no generator"):
@@ -433,3 +442,8 @@ class TestALinkCanStandOnTheHistorysLastDay:
         assert sorted(found) == ["TS-57b", "TS-58b", "TS-59b", "TS-60b", "TS-61b"]
         last = si._history_last_day()
         assert all(v == (last, None) for v in found.values()), found
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

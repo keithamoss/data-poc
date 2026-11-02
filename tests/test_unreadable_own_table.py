@@ -67,6 +67,7 @@ class TestAChildProtectionRunWhoseOwnTableIsUnreadable:
 class TestAnyOtherReasonIsAFailedRun:
     """Criterion 9: missing, and not held, contested or refused at load."""
 
+    @pytest.mark.asset("daily")
     def test_a_birth_registrations_run_with_its_table_simply_absent_raises(
             self, bdm_duckdb_dir):
         from conftest import clone_run_views
@@ -357,3 +358,8 @@ class TestAHeldSiblingDoesNotTakeAnyToolDown:
         assert named == [("fail", "cp_clients")]
         assert about_held == []
         assert results, "the run returned its results"
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

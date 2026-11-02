@@ -53,6 +53,7 @@ import yaml
 from qa_tools.common import asset_time, assets, period_schema, schedule
 from qa_tools.common.diff_base import diff_base
 from qa_tools.common.schemas import DataAsset
+from qa_tools.common import assets as _assets
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 
@@ -248,9 +249,9 @@ def _duration_error(value, what: str) -> str | None:
 #: (REQ-PIPE-110 criteria 14, 16 and 28). Named rather than left to the
 #: schema's generic "not a key", so the refusal says where the fact lives now.
 RETIRED_KEYS = {
-    "delivery_months": "participates, on the dataset's participation in contract/calendar.yaml",
+    "delivery_months": "participates, on the dataset's participation in assets/<asset>/calendar.yaml",
     "owes_from": "the effective_from of the dataset's first participation version in "
-                 "contract/calendar.yaml",
+                 "assets/<asset>/calendar.yaml",
 }
 
 
@@ -756,7 +757,7 @@ def _contract_errors(raw: dict, src: Source) -> list[ConfigError]:
                 src.name, scope,
                 f"sits in collection {collection_id!r}, whose contract {filename!r} does "
                 f"not exist.",
-                f"Add contract/{filename}, or correct the name."))
+                f"Add {_assets.config_dir()}/{filename}, or correct the name."))
 
     # Each collection's contract sits in its agency's folder (REQ-QAC-241), so
     # every YAML under contract/ is looked at, named relative to it - which is
@@ -800,7 +801,7 @@ def _sla_properties_errors(src: Source) -> list[ConfigError]:
                 path.relative_to(src.contract_dir).as_posix(), None,
                 "states slaProperties, which no longer exist.",
                 "Delete the block. A dataset's cadence, expected time and grace live on its "
-                "participation in contract/calendar.yaml, and nothing reads them from a "
+                f"participation in {_assets.config_dir()}/calendar.yaml, and nothing reads them from a "
                 "contract any more."))
     return out
 
@@ -818,7 +819,18 @@ def _content_at(rel_path: str, ref: str) -> str | None:
     estimate based on a DEEP CLONE and a full history walk, which this
     is not, and reopened on 2026-09-23 once the cheap version was found
     to be already running in this repo.
+
+    A PATH THE MOVE CREATED is read at its old path in the push that carries
+    the move, a divided file cut to its asset's part (REQ-TEST-366 criteria 2
+    and 5) - the amber, replacement and list-setting freeze, the agreement
+    freeze, the people file and correction_trial's base reads all come here.
     """
+    from qa_tools.common import moved_paths
+
+    return moved_paths.read_at(rel_path, ref, ROOT, _git_show)
+
+
+def _git_show(rel_path: str, ref: str) -> str | None:
     result = subprocess.run(["git", "show", f"{ref}:{rel_path}"], cwd=ROOT,
                              capture_output=True, text=True)
     return result.stdout if result.returncode == 0 else None
@@ -841,8 +853,14 @@ def _version_added_on(rel_path: str, ref: str, start: str) -> date | None:
     from qa_tools.common import agreement_freeze
 
     base_at = agreement_freeze.committer_instant(ref, root=ROOT)
+    # THE WALK FOLLOWS THE MOVE (REQ-TEST-366 criterion 6): in the push that
+    # carries it, the commits before the move touched the file at its old path,
+    # and _content_at reads each of them there.
+    from qa_tools.common import moved_paths
+
+    paths = [rel_path, *filter(None, [moved_paths.old_path(rel_path, ROOT)])]
     result = subprocess.run(["git", "log", "--reverse", "--format=%H %cI", f"{ref}..HEAD",
-                             "--", rel_path], cwd=ROOT, capture_output=True, text=True)
+                             "--", *paths], cwd=ROOT, capture_output=True, text=True)
     if result.returncode != 0:
         return None
     for line in result.stdout.splitlines():

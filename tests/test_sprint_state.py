@@ -491,3 +491,8 @@ class TestAnOwnsLineThatWraps:
             """))
         assert ss.parse_sprints(path)[0][2] == ["REQ-X-001", "REQ-X-002", "REQ-X-003",
                                                 "REQ-X-004"]
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

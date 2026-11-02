@@ -10,10 +10,10 @@ collection, which is the change REQ-PIPE-181 exists to make one edit.
 """
 from __future__ import annotations
 
+import asset_folders
 import copy
 import shutil
 from datetime import date, timedelta
-from pathlib import Path
 
 import pytest
 import yaml
@@ -22,7 +22,17 @@ from qa_tools.common import agreement, schedule, slots
 from qa_tools.common.validate_schedule import Source, validate
 from tests import before_growth
 
-REAL_CONTRACT_DIR = Path(__file__).resolve().parent.parent / "contract"
+
+
+def _real():
+    """The selected asset's real folder - read when a test runs (the asset
+    split), so a test of either asset reads its own."""
+    return asset_folders.real_folder()
+
+
+#: The same folder for a module importing it by name (tests/test_turn_off.py),
+#: resolved when used rather than at import.
+REAL_CONTRACT_DIR = asset_folders.SelectedFolder()
 LOG = [{"date": "2023-01-01", "author": "a test", "change": "a test"}]
 
 
@@ -54,8 +64,12 @@ def _per_dataset(doc: dict) -> dict:
                 {**v, "expected_time": v.get("expected_time", due),
                  "grace": v.get("grace", grace)}
                 for v in entry["participation"]["versions"]]
-    assert any(e["id"].startswith("cp-") for e in doc["datasets"]), \
-        "no Child Protection dataset in the calendar - these cases would prove nothing"
+    assert doc["datasets"], "no dataset in the calendar - these cases would prove nothing"
+    # Child Protection's premise wherever the asset holds it (the asset split:
+    # the daily asset's cases are civil-registration's).
+    if any(c.id == "child-protection" for c in collections.all_collections()):
+        assert any(e["id"].startswith("cp-") for e in doc["datasets"]), \
+            "no Child Protection dataset in the calendar - these cases would prove nothing"
     return doc
 
 
@@ -63,7 +77,7 @@ def _doc() -> dict:
     # AS IT STOOD BEFORE REQ-GEN-207's GROWTH: these cases edit the first
     # version, meaning the 2023 one (tests/before_growth.py).
     return _per_dataset(before_growth.calendar(copy.deepcopy(
-        yaml.safe_load((REAL_CONTRACT_DIR / "calendar.yaml").read_text()))))
+        yaml.safe_load((_real() / "calendar.yaml").read_text()))))
 
 
 def _entry(doc, dataset_id):
@@ -197,7 +211,7 @@ class TestInherit:
 @pytest.fixture
 def broken(tmp_path):
     contract_dir = tmp_path / "contract"
-    shutil.copytree(REAL_CONTRACT_DIR, contract_dir)
+    shutil.copytree(_real(), contract_dir)
     src = Source(contract_dir / "data-asset.yaml", contract_dir)
 
     def apply(mutate):
@@ -352,6 +366,12 @@ class TestAnotherCalendarStatesItsOwn:
 
     def test_a_dataset_on_its_own_calendar_taking_a_collection_value_is_refused(self, broken):
         def mutate(doc):
+            # A second calendar in the asset for the dataset to sit on: the
+            # daily one, as the daily asset defines it (the asset split - the
+            # quarterly asset defines only its own, and one asset may define
+            # several).
+            daily = yaml.safe_load((asset_folders.real_folder_of("daily") / "calendar.yaml").read_text())
+            doc["calendars"].append(next(c for c in daily["calendars"] if c["name"] == "daily"))
             _lift(doc, "cp-carers", keys=("grace",))
             _entry(doc, "cp-carers")["calendar"] = "daily"
             _defaults(doc, {"effective_from": "2023-01-01", "grace": "8h", "changelog": LOG})
@@ -388,6 +408,7 @@ class TestMonthsAgainstACadenceRule:
     """Criterion 17: REQ-PIPE-110 criterion 7 applies to months a collection
     gives."""
 
+    @pytest.mark.asset("daily")  # civil-registration is the daily asset's
     def test_a_collection_on_a_daily_calendar_naming_months_is_refused(self, broken):
         def mutate(doc):
             _defaults(doc, {"effective_from": "2023-01-01", "participates": ["February"],
@@ -411,11 +432,11 @@ class TestACollectionsDefaultsFreeze:
         old_cal = _unshare(_doc())
         _defaults(old_cal, {"effective_from": "2023-01-01", "claim_window": "21d",
                             "changelog": LOG})
-        asset = yaml.safe_load((REAL_CONTRACT_DIR / "data-asset.yaml").read_text())
-        people = yaml.safe_load((REAL_CONTRACT_DIR / "people.yaml").read_text())
+        asset = yaml.safe_load((_real() / "data-asset.yaml").read_text())
+        people = yaml.safe_load((_real() / "people.yaml").read_text())
         new_cal = copy.deepcopy(old_cal)
         change(new_cal)
-        codeowners = (REAL_CONTRACT_DIR.parent / ".github" / "CODEOWNERS").read_text()
+        codeowners = (_real().parent.parent / ".github" / "CODEOWNERS").read_text()
         return freeze.check(old_cal, new_cal, asset, copy.deepcopy(asset), people,
                             instant_of=lambda key: at, today=at.date(),
                             base_codeowners=codeowners)
@@ -724,3 +745,8 @@ class TestTheRealContractStatesChildProtectionOnce:
         due = slots.slot_instants("cp-clients", date(2024, 2, 1), agreement=agr)
         assert due.due_at.isoformat() == "2024-02-01T09:00:00+08:00"
         assert due.grace == timedelta(hours=8)
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

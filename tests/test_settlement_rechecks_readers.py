@@ -393,3 +393,8 @@ class TestTheFlagFormExits3WhenItsOwnRunsAreLeftOwed:
                                     env=PIPED)
         assert "not checked yet - owed" in _flat(result.output), result.output
         assert result.exit_code == filing_tui.CHECKS_STILL_OWED_EXIT, result.output
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

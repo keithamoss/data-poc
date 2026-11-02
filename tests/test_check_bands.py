@@ -19,9 +19,17 @@ BDM = "birth-registrations"
 FACILITY = (BDM, "place_of_birth_facility", "completeness")
 
 
-@pytest.fixture(scope="module")
-def catalogue():
-    return cb.catalogue()
+#: Each asset's catalogue, built once (the asset split: this module holds
+#: tests of both assets, and a module-scoped fixture is built under the
+#: module's own).
+_CATALOGUES: dict = {}
+
+
+@pytest.fixture
+def catalogue(selected_asset):
+    if selected_asset not in _CATALOGUES:
+        _CATALOGUES[selected_asset] = cb.catalogue()
+    return _CATALOGUES[selected_asset]
 
 
 class TestTheRealDefinitions:
@@ -38,20 +46,24 @@ class TestTheRealDefinitions:
         assert rule.amber(2000) == []
         assert any(c.endswith("sex.invalidValues_datacontract") for c in rule.closed_by(2000))
 
+    @pytest.mark.asset("quarterly")
     def test_client_postcodes_are_amber_from_one_to_fifteen_in_527(self, catalogue):
         """REQ-QAC-187's own arithmetic, now read off the definitions."""
         assert catalogue.rule("cp-clients", "postcode", "conformity").amber(527) == [(1, 15)]
 
+    @pytest.mark.asset("daily")  # a Birth Registrations check, named by its column
     def test_a_sql_check_is_single_tier(self, catalogue):
         [c] = [c for c in catalogue.checks
                if c.check_id.endswith("is_multiple_birth.sibling_match_soda")]
         assert c.single_tier and c.reads_columns
 
+    @pytest.mark.asset("daily")  # a Birth Registrations check, named by its column
     def test_a_dbt_test_with_no_warn_if_is_single_tier(self, catalogue):
         [c] = [c for c in catalogue.checks
                if c.check_id.endswith("registration_number.unique_dbt")]
         assert c.single_tier
 
+    @pytest.mark.asset("quarterly")
     def test_a_warning_only_contract_rule_never_fails(self, catalogue):
         [c] = [c for c in catalogue.checks if c.tool == "datacontract"
                and c.dataset_id == "cp-clients" and c.metric == "rowCount"]
@@ -68,11 +80,15 @@ class TestTheRealDefinitions:
         assert [b.value for b in psi.warn] == [entry["warn_threshold"]]
         assert [b.value for b in psi.fail] == [entry["fail_threshold"]]
 
-    def test_every_dataset_is_catalogued(self, catalogue):
+    # EACH ASSET'S EVERY DATASET (the asset split): the catalogue is one
+    # asset's, so the check is made once per asset.
+    @pytest.mark.parametrize("asset", [pytest.param("daily", marks=pytest.mark.asset("daily")),
+                                       pytest.param("quarterly", marks=pytest.mark.asset("quarterly"))])
+    def test_every_dataset_is_catalogued(self, catalogue, asset):
         from qa_tools.common import hierarchy
 
-        expected = {d.dataset_id for c in ("civil-registration", "child-protection")
-                    for d in hierarchy.datasets_in_collection(c)}
+        expected = {d.dataset_id for d in hierarchy.all_datasets()}
+        assert expected
         assert {c.dataset_id for c in catalogue.checks} >= expected
 
     def test_it_never_opens_a_database(self, monkeypatch):
@@ -94,13 +110,14 @@ class TestUnparseable:
               - missing_count(sex):
                   warn: when somewhat high
                   attributes:
-                    check_id: data-asset-1.registry-services.civil-registration.birth-registrations.sex.x_soda
+                    check_id: daily.registry-services.civil-registration.birth-registrations.sex.x_soda
                     category: completeness
             """))
         with pytest.raises(cb.CatalogueError, match=r"sex\.x_soda.*soda\.yml|soda\.yml.*sex\.x_soda"):
             cb.soda_bounds(path)
 
 
+@pytest.mark.asset("daily")  # the one retired check is a Birth Registrations check
 class TestRetired:
     def test_a_retired_check_is_left_out(self, catalogue):
         """Criterion 5."""
@@ -132,10 +149,12 @@ class TestGroupingByName:
     """Keith, 2026-10-11: checks sharing an authored name are one rule across
     tools; otherwise dataset, column, category and measure."""
 
+    @pytest.mark.asset("quarterly")
     def test_escalation_completeness_is_its_own_rule_in_three_tools(self, catalogue):
         rule = catalogue.named("cp-notifications", "Escalation completeness")
         assert {c.tool for c in rule.checks} == {"dbt", "soda", "datacontract"}
 
+    @pytest.mark.asset("quarterly")
     def test_notification_id_nulls_no_longer_carry_the_escalation_checks(self, catalogue):
         rule = catalogue.rule("cp-notifications", "notification_id", "completeness")
         assert not [c for c in rule.checks if "escalation" in c.check_id]
@@ -144,6 +163,7 @@ class TestGroupingByName:
         rule = catalogue.named(BDM, "Registered on or after birth")
         assert {c.tool for c in rule.checks} == {"dbt", "soda", "datacontract"}
 
+    @pytest.mark.asset("quarterly")
     def test_carer_reference_and_approval_compliance_are_two_rules(self, catalogue):
         ref = catalogue.named("cp-placements", "Carer reference")
         assert not [c for c in ref.checks if "approval" in c.check_id]
@@ -181,6 +201,7 @@ class TestEachToolsOwnArithmetic:
             if any(u == cb.DUP_ROWS for _t, u in tools_units):
                 assert all(u == cb.DUP_ROWS for _t, u in tools_units), rule
 
+    @pytest.mark.asset("quarterly")
     def test_a_size_band_nothing_fails_above_is_open_ended(self, catalogue):
         """Finding 6: never an invented upper edge."""
         [rule] = [r for r in catalogue.rules() if r.dataset_id == "cp-investigations"
@@ -189,6 +210,7 @@ class TestEachToolsOwnArithmetic:
 
 
 class TestReaders:
+    @pytest.mark.asset("quarterly")
     def test_soda_reference_checks_read_the_parent_column(self, catalogue):
         """Finding 8."""
         readers = catalogue.single_tier_readers("cp-clients")["cp_client_id"]
@@ -231,9 +253,11 @@ class TestNoSilentDefaults:
         with pytest.raises(cb.CatalogueError, match="n_datacontract.*info"):
             cb.contract_bounds(path)
 
+    @pytest.mark.asset("quarterly")
     def test_default_rows_reads_the_contract(self, catalogue):
         assert cb.default_rows("cp-clients", catalogue) > 0
 
+    @pytest.mark.asset("quarterly")
     def test_default_rows_with_nothing_to_read_refuses(self):
         with pytest.raises(cb.CatalogueError, match="--rows"):
             cb.default_rows("cp-clients", cb.Catalogue([]))
@@ -249,12 +273,14 @@ class TestTheListing:
         assert got.exit_code == 0, got.output
         return got.output
 
+    @pytest.mark.asset("quarterly")
     def test_a_tolerant_single_tier_check_prints_its_bound(self):
         """Finding 2: the contract fails at 3% or more, not on any."""
         out = self._out("--dataset", "cp-clients", "--rows", "527")
         line = next(ln for ln in out.splitlines() if "datacontract" in ln and ">= 3%" in ln)
         assert "fails on any" not in line
 
+    @pytest.mark.asset("quarterly")
     def test_every_line_fits_eighty_columns_and_continues_indented(self):
         """Finding 9."""
         lines = self._out("--dataset", "cp-notifications", "--rows", "1000").splitlines()
@@ -262,6 +288,7 @@ class TestTheListing:
         body = [ln for ln in lines if ln.strip()][1:]
         assert all(ln.startswith("  ") for ln in body)
 
+    @pytest.mark.asset("quarterly")
     def test_a_reader_from_another_dataset_is_named_with_it(self):
         out = " ".join(self._out("--dataset", "cp-clients", "--rows", "527").split())
         assert "cp-notifications.cp_client_id.relationships_dbt" in out
@@ -288,14 +315,15 @@ class TestAUserDefinedMetricsBandIsRead:
     the unit its attributes state - found when the catalogue refused the
     collection's check file outright."""
 
+    @pytest.mark.asset("quarterly")
     def test_large_key_groups(self):
         from pathlib import Path
 
         from qa_tools.common import check_bands
 
-        path = (Path(__file__).resolve().parent.parent / "contract" / "department-of-health"
+        path = (Path(__file__).resolve().parent.parent / "assets" / "quarterly" / "department-of-health"
                 / "linkage-products-soda-checks.yml")
-        cid = ("data-asset-1.department-of-health.linkage-products.linkage-keys."
+        cid = ("quarterly.department-of-health.linkage-products.linkage-keys."
                "linkage_key.large_key_groups_soda")
         metric, warn, fail = check_bands.soda_bounds(path)[cid]
         assert metric == "large_key_group_percent"
@@ -323,3 +351,8 @@ class TestAUserDefinedMetricsBandIsRead:
         assert metric == "src2_d1_coverage_percent"
         assert [(b.op, b.value, b.unit) for b in warn] == [("<", 90.0, check_bands.PERCENT)]
         assert [(b.op, b.value, b.unit) for b in fail] == [("<", 85.0, check_bands.PERCENT)]
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("daily")

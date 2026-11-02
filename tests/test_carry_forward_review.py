@@ -302,6 +302,7 @@ class TestADecisionThatDoesNotStandOpensNothing:
             place_support._place(conn, supply, target)
         assert not period_schema.opened(conn, target)
 
+    @pytest.mark.asset("daily")
     def test_a_settlement_opens_the_period_it_files_into(self, conn, actor):
         from datetime import date, timedelta
 
@@ -316,6 +317,7 @@ class TestADecisionThatDoesNotStandOpensNothing:
         p.settle(conn, actor, (one, "supply"), (two, "refile", nxt.isoformat()))
         assert period_schema.opened(conn, nxt.isoformat())
 
+    @pytest.mark.asset("daily")
     def test_a_failed_settlement_opens_nothing(self, conn, actor, monkeypatch):
         from datetime import date, timedelta
 
@@ -902,3 +904,7 @@ class TestASharedCalendar:
                                  [made["id"]]).fetchone()
         assert caused == supply
 
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

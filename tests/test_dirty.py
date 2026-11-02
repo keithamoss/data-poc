@@ -376,6 +376,7 @@ def _clean_bdm_df(n: int = 4000) -> pd.DataFrame:
     return df
 
 
+@pytest.mark.asset("daily")
 def test_birth_registrations_preset_red_is_worse_than_amber():
     df = _clean_bdm_df()
     amber = dirty.apply_birth_registrations_presets(df, severity="amber", seed=1)
@@ -390,6 +391,7 @@ def test_birth_registrations_preset_red_is_worse_than_amber():
     assert red_invalid_sex > amber_invalid_sex
 
 
+@pytest.mark.asset("daily")
 def test_birth_registrations_preset_truncates_to_exact_band_target():
     # No multi-birth pairs here (unlike _clean_bdm_df) - isolates
     # truncation as the ONLY row-count-changing step in the preset.
@@ -607,3 +609,8 @@ def test_inject_dangling_foreign_key_never_mutates_its_input():
     dirty.inject_dangling_foreign_key(df, "carer_id", seed=1, rate=0.3, id_format="CARER-{:06d}",
                                        existing_ids=existing, id_max=1_000_000)
     pd.testing.assert_frame_equal(df, original)
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

@@ -242,3 +242,8 @@ class TestTheCriticsSmallerFindings:
         out = " ".join(capsys.readouterr().out.split())
         assert "ran 1 owed item(s)" in out
         assert "1 owed item(s) and 1 arrival(s) wait on a refused dataset" in out
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

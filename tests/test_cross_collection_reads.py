@@ -12,6 +12,8 @@ from types import SimpleNamespace
 
 import pytest
 
+import asset_params
+
 from qa_tools.common import run_reads
 
 #: Linkage Products' own tables: the linkage release and, since REQ-QAC-294,
@@ -25,11 +27,12 @@ class TestTheOneResolver:
         assert reads.own == LP_OWN
         assert reads.foreign == ("cp_clients", "ed_presentations")
 
-    def test_a_collection_reading_only_its_own_tables_has_no_foreign(self):
-        for coll in ("child-protection", "emergency-department", "civil-registration"):
-            reads = run_reads.reads_for(coll)
-            assert reads.own, coll
-            assert reads.foreign == (), coll
+    @pytest.mark.parametrize("coll", asset_params.per_asset(
+        ["child-protection", "emergency-department", "civil-registration"]))
+    def test_a_collection_reading_only_its_own_tables_has_no_foreign(self, coll):
+        reads = run_reads.reads_for(coll)
+        assert reads.own, coll
+        assert reads.foreign == (), coll
 
     def test_foreign_readers_of_a_linked_table(self):
         assert run_reads.foreign_readers("cp_clients") == ["linkage-products"]
@@ -147,7 +150,7 @@ def test_recheck_execute_asks_the_resolver(coll, monkeypatch):
     assert seen["foreign"] == ("cp_clients", "ed_presentations")
 
 
-LP = "data-asset-1.department-of-health.linkage-products.linkage-keys.cp-clients.referential_soda"
+LP = "quarterly.department-of-health.linkage-products.linkage-keys.cp-clients.referential_soda"
 
 
 class TestADeclaredReadAcrossCollectionsIsGated:
@@ -160,9 +163,24 @@ class TestADeclaredReadAcrossCollectionsIsGated:
         [p] = run_reads.declaration_problems({LP: ["no_such_table"]})
         assert LP in p and "no_such_table" in p and "no dataset" in p
 
-    def test_a_dataset_on_another_calendar(self):
-        [p] = run_reads.declaration_problems({LP: ["birth_registrations"]})
-        assert LP in p and "birth_registrations" in p and "daily" in p and "quarterly" in p
+    def test_a_dataset_on_another_calendar(self, monkeypatch):
+        """Within one asset (the asset split: Birth Registrations, the daily
+        dataset this read, is another asset's): the Client Register put on
+        another calendar, as test_a_dataset_with_no_calendar puts it on none."""
+        import types
+
+        from qa_tools.common import schedule
+
+        real = schedule.calendar_for_dataset
+
+        def _daily(dataset_id, agreement=None):
+            if dataset_id == "cp-clients":
+                return types.SimpleNamespace(name="daily")
+            return real(dataset_id, agreement)
+
+        monkeypatch.setattr(schedule, "calendar_for_dataset", _daily)
+        [p] = run_reads.declaration_problems({LP: ["cp_clients"]})
+        assert LP in p and "cp_clients" in p and "daily" in p and "quarterly" in p
 
     def test_a_dataset_with_no_calendar(self, monkeypatch):
         from qa_tools.common import schedule
@@ -179,7 +197,7 @@ class TestADeclaredReadAcrossCollectionsIsGated:
         assert "names no calendar" in p and "cp-clients" in p
 
     def test_a_read_within_the_collection_is_not_this_gates(self):
-        own = "data-asset-1.department-of-health.linkage-products.linkage-keys.x.y_soda"
+        own = "quarterly.department-of-health.linkage-products.linkage-keys.x.y_soda"
         assert run_reads.declaration_problems({own: ["linkage_keys"]}) == []
 
 
@@ -261,8 +279,10 @@ class TestDbtReadsAnotherCollectionThroughSource:
         from pathlib import Path
 
         repo = Path(__file__).resolve().parent.parent
-        shutil.copytree(repo / "dbt_project" / "models", tmp_path / "dbt_project" / "models")
-        shutil.copytree(repo / "dbt_project" / "tests", tmp_path / "dbt_project" / "tests")
+        from qa_tools.common import assets
+
+        for part in ("models", "tests"):
+            shutil.copytree(repo / assets.dbt_rel() / part, tmp_path / assets.dbt_rel() / part)
         return tmp_path
 
     def test_the_real_tree_passes(self):
@@ -279,7 +299,7 @@ class TestDbtReadsAnotherCollectionThroughSource:
         from qa_tools.common import validate_collections as vc
 
         root = self._tree(tmp_path)
-        bad = root / "dbt_project" / "tests" / "linkage-products" / "bad_ref.sql"
+        bad = root / "assets" / "quarterly" / "dbt" / "tests" / "linkage-products" / "bad_ref.sql"
         bad.parent.mkdir(parents=True, exist_ok=True)
         bad.write_text("select * from {{ ref('stg_cp_clients') }} where 1 = 0\n")
         [p] = vc.dbt_cross_collection_ref_problems(root, collections.all_collections())
@@ -290,7 +310,7 @@ class TestDbtReadsAnotherCollectionThroughSource:
         from qa_tools.common import validate_collections as vc
 
         root = self._tree(tmp_path)
-        ok = root / "dbt_project" / "tests" / "linkage-products" / "ok.sql"
+        ok = root / "assets" / "quarterly" / "dbt" / "tests" / "linkage-products" / "ok.sql"
         ok.parent.mkdir(parents=True, exist_ok=True)
         ok.write_text("select * from {{ source('raw', 'cp_clients') }} where 1 = 0\n")
         assert vc.dbt_cross_collection_ref_problems(root, collections.all_collections()) == []
@@ -321,3 +341,8 @@ class TestACollectionWithNoDriftChecksRuns:
         monkeypatch.setattr(run_evidently.left_out, "note", lambda *a, **k: None)
         assert run_evidently.evaluate("linkage-products", "linkage_keys__x", "t") == []
         assert recorded == [[]]
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

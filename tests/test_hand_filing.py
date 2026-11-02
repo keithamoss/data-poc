@@ -106,6 +106,7 @@ class TestFilingGivesARealArrival:
         # typed - the check must read the file the record describes.
         assert filed.paths == (str(deliveries / filed.delivery_name / path.name),)
 
+    @pytest.mark.asset("quarterly")
     def test_a_folder_of_files_is_ONE_delivery(self, tmp_path, tree):
         """They arrived together, and a delivery is the transport unit.
         One delivery per file would invent DELIVERIES that never
@@ -177,6 +178,7 @@ class TestAnUnplaceableFileIsRefused:
         assert not deliveries.exists() or not list(deliveries.iterdir())
         assert not receipts.exists() or not list(receipts.iterdir())
 
+    @pytest.mark.asset("quarterly")
     def test_one_bad_name_refuses_the_whole_delivery(self, tmp_path, tree):
         """They arrived together, so filing the half we can read would
         record a delivery that is missing a file nobody would know to
@@ -221,14 +223,18 @@ class TestAFileOfAnotherCollectionIsRefusedFirst:
     written, naming the collection it belongs to - and not offered as a
     trial, since it is the wrong command rather than an unplaceable file."""
 
+    @pytest.mark.asset("quarterly")
     def test_it_is_refused_naming_its_collection_and_writes_nothing(self, tmp_path, tree):
+        """Another collection OF THE SAME ASSET's file (the asset split:
+        Birth Registrations, which this used, is another asset's now -
+        Emergency Department is Child Protection's sibling)."""
         deliveries, receipts = tree
-        path = _csv(tmp_path, "birth_registrations_2026-09-20.csv")
+        path = _csv(tmp_path, "ed_presentations.csv")
         with pytest.raises(hand_filing.WrongCollection) as exc:
             hand_filing.file_supply([path], "child-protection", "cp_run_",
                                     deliveries_dir=deliveries, receipts_dir=receipts, **KEPT)
-        assert "civil-registration" in str(exc.value)
-        assert "birth_registrations_2026-09-20.csv" in str(exc.value)
+        assert "emergency-department" in str(exc.value)
+        assert "ed_presentations.csv" in str(exc.value)
         assert not deliveries.exists() or not list(deliveries.iterdir())
         assert not receipts.exists() or not list(receipts.iterdir())
 
@@ -238,3 +244,8 @@ class TestAFileOfAnotherCollectionIsRefusedFirst:
             [_csv(tmp_path, "birth_registrations_2026-09-20.csv")], "civil-registration",
             "run_", deliveries_dir=deliveries, receipts_dir=receipts, **KEPT)
         assert filed.delivery_name
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("daily")

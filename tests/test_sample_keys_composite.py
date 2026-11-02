@@ -35,9 +35,14 @@ def test_every_adapter_declares_each_tables_key_as_a_list():
                 (a.collection_id, table, cols)
 
 
-def test_the_existing_one_column_keys_are_unchanged():
+@pytest.mark.asset("daily")  # civil-registration is the daily asset's
+def test_the_existing_one_column_key_of_birth_registrations_is_unchanged():
     keys = {c.id: collections.adapter(c).sample_key for c in collections.all_collections()}
     assert keys["civil-registration"] == {"birth_registrations": ["registration_number"]}
+
+
+def test_the_existing_one_column_keys_are_unchanged():
+    keys = {c.id: collections.adapter(c).sample_key for c in collections.all_collections()}
     assert keys["emergency-department"] == {"ed_presentations": ["presentation_id"]}
     assert keys["child-protection"]["cp_clients"] == ["cp_client_id"]
 
@@ -359,6 +364,7 @@ def _singular(meta):
             "config": {"meta": meta}}
 
 
+@pytest.mark.asset("daily")
 def test_dbt_records_nothing_for_a_test_declaring_it_names_no_row():
     from qa_tools.tools import run_dbt
 
@@ -369,6 +375,7 @@ def test_dbt_records_nothing_for_a_test_declaring_it_names_no_row():
     assert got == []
 
 
+@pytest.mark.asset("daily")
 def test_dbt_samples_a_singular_test_without_the_declaration():
     from qa_tools.tools import run_dbt
 
@@ -378,13 +385,14 @@ def test_dbt_samples_a_singular_test_without_the_declaration():
                                      "birth_registrations", _singular({}), "fail", frozenset())
 
 
+@pytest.mark.asset("daily")
 def test_birth_registrations_recency_test_declares_it_names_no_row():
     """The one declaration, not an adapter list (singular_unsampled is gone)."""
     import yaml
 
     from qa_tools.collections.base import DbtSpec
 
-    doc = yaml.safe_load(open("dbt_project/models/civil-registration/schema.yml"))
+    doc = yaml.safe_load(open("assets/daily/dbt/models/civil-registration/schema.yml"))
     [recency] = [t for t in doc.get("data_tests") or doc.get("tests") or []
                  if t.get("name") == "recency"]
     assert recency["config"]["meta"]["names_no_row"] is True
@@ -435,3 +443,7 @@ def test_datacontract_samples_the_declared_key_where_the_contract_marks_none(tmp
     [c] = [c for c in run.checks if getattr(c, "failedSamples", None)]
     assert "site_code" not in c.failedSamples[0]
 
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

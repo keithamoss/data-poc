@@ -1393,7 +1393,7 @@ function zoneVersions(){
   if(_ZONE_VERSIONS) return _ZONE_VERSIONS;
   const list = ASSET_TIMEZONES;
   if(!Array.isArray(list) || !list.length){
-    throw new Error("no asset timezone is embedded (contract/data-asset.yaml -> "
+    throw new Error(`no asset timezone is embedded (${assetFile("data-asset.yaml")} -> `
       + "timezone), so no instant can be placed on the asset's clock");
   }
   _ZONE_VERSIONS = list.map(v=>{
@@ -2713,6 +2713,13 @@ const SNAPSHOT_MANIFEST = [];
 // periods for ever and cannot run out, so warning about one would be
 // warning about something that cannot happen.
 const SCHEDULE_RUNWAY = null;
+// A file in the asset's configuration folder, as the page names it to a
+// reader (the asset split: the folder is assets/<asset>, embedded as
+// SCHEDULE_RUNWAY.configDir; the generic form when nothing is embedded).
+function assetFile(name){
+  const dir = (SCHEDULE_RUNWAY && SCHEDULE_RUNWAY.configDir) || "assets/<asset>";
+  return `${dir}/${name}`;
+}
 // PERIOD_SEQUENCES - REQ-DASH-054. Every named calendar's period sequence
 // and which calendar each dataset follows, embedded from configuration at
 // build time.
@@ -2752,7 +2759,7 @@ const SLOT_DUE_DATES = {};
 // and is itself a real one - criterion 13 asks the page to SAY nothing
 // is waiting rather than render an empty box.
 // SCENARIO_MAP - REQ-DASH-046: the committed scenario map
-// (SCENARIOS.md), embedded as structured entries by
+// (SCENARIOS-<asset>.md), embedded as structured entries by
 // dashboard/embed_dashboard_data.py from the machine-readable block
 // inside that same markdown file. One committed file for both readers,
 // so there is no sidecar to drift from it.
@@ -4894,11 +4901,23 @@ function computeReportGaps(history, datasetRuns){
   }
   return gaps;
 }
-function computeChangeMarkers(history, changelog){
+function computeChangeMarkers(history, changelog, onShow){
   const markers = {};
+  // AN ENTRY AFTER THE LAST RUN AND THE DATE ON SHOW HAS NOT HAPPENED YET
+  // (post-build-review #307): a change declared ahead of its date
+  // (REQ-QAC-300's census-year widenings) draws nothing, rather than the
+  // fallback below breaking the line between two runs on one definition.
+  const shown = onShow || (typeof CURRENT_IN_PLACE_ON !== "undefined" ? CURRENT_IN_PLACE_ON : null);
   (changelog||[]).forEach(entry=>{
     let idx = history.findIndex(h=>h.date>=entry.date);
-    if(idx===-1) idx = history.length-1; // entry postdates the last known run
+    if(idx===-1){
+      // entry postdates the last known run - unless it postdates the date
+      // on show too, when it has not happened yet and draws nothing
+      const at = entry.date && typeof entry.date.getTime === "function" && !isNaN(entry.date.getTime())
+        ? entry.date.toISOString().slice(0, 10) : null;
+      if(shown && at && at > shown) return;
+      idx = history.length-1;
+    }
     if(idx<=0) return; // no earlier point in view to split away from
     if(!markers[idx] || entry.date>markers[idx].date) markers[idx] = entry;
   });
@@ -5173,8 +5192,8 @@ function agreementNotice(data){
     <ul style="margin:6px 0 0; padding-left:18px; font-size:13px;">${which}</ul>
     <div style="color:var(--ink-muted); font-size:13px;">
       This is a configuration problem on our side, not a problem with anyone's data: recorded
-      verdicts no longer match <code>contract/calendar.yaml</code> (or, for the timezone,
-      <code>contract/data-asset.yaml</code>). Restore the recorded value, or
+      verdicts no longer match <code>${escHtml(assetFile("calendar.yaml"))}</code> (or, for the timezone,
+      <code>${escHtml(assetFile("data-asset.yaml"))}</code>). Restore the recorded value, or
       declare the change as a correction${synthetic ? " - or, on this synthetic asset, regenerate its history" : ""}.
       <code>mothman schedule check-agreement</code> names each change. New supplies are held until then.
     </div>
@@ -5778,7 +5797,7 @@ function assignmentBadge(kind, id){
     const label = r.nickname || r.name || r.github || "someone";
     return r.role ? `${label} (${r.role})` : label;
   }).join(", ");
-  return `<span class="pill tag sm" title="Real people assigned via contract/people.yaml"><span class="ico"></span>Owned by ${names}</span>`;
+  return `<span class="pill tag sm" title="Real people assigned via ${escHtml(assetFile("people.yaml"))}"><span class="ico"></span>Owned by ${names}</span>`;
 }
 
 // EVERYTHING THAT NAVIGATES IS A REAL LINK (post-build-review #10,
@@ -7496,7 +7515,7 @@ function exhaustedNotice(runwayState, onDateStr){
     return `<li><b style="display:inline">${escHtml(name(id))}</b> - its last delivery date is for
       ${escHtml(String(e.lastPeriod || "?"))} (${escHtml(String(e.calendar))} calendar)</li>`;
   }).join("");
-  const file = (SCHEDULE_RUNWAY && SCHEDULE_RUNWAY.configFile) || "contract/calendar.yaml";
+  const file = (SCHEDULE_RUNWAY && SCHEDULE_RUNWAY.configFile) || assetFile("calendar.yaml");
   // "CANNOT BE FILED", NOT "PROCESSED" (#131 D10): an arriving supply is
   // still received and its files checked (REQ-PIPE-154 criterion 5); it is
   // filing it to a period that waits for dates.
@@ -7532,7 +7551,7 @@ function exhaustedNotice(runwayState, onDateStr){
 function lowRunwayNotice(runway){
   const source = runway === undefined ? (DATA && DATA.scheduleRunway) : runway;
   if(!source || !(source.low||[]).length || source.exhaustedCount) return "";
-  const file = (SCHEDULE_RUNWAY && SCHEDULE_RUNWAY.configFile) || "contract/calendar.yaml";
+  const file = (SCHEDULE_RUNWAY && SCHEDULE_RUNWAY.configFile) || assetFile("calendar.yaml");
   const lines = source.low.map(cal=>{
     const n = cal.datasetCount;
     const who = cal.drivingDataset && cal.drivingTurnsOffAfter
@@ -8622,7 +8641,7 @@ function renderExec(view){
           <h2>No data embedded</h2>
           <div class="view-sub">This is the dashboard TEMPLATE, opened directly. It carries no
             agencies, datasets or QA results of its own — they are embedded at build time from
-            <code>contract/data-asset.yaml</code>, <code>contract/calendar.yaml</code> and the
+            <code>assets/&lt;asset&gt;/data-asset.yaml</code>, <code>assets/&lt;asset&gt;/calendar.yaml</code> and the
             recorded QA history. Run <code>mothman pipeline run</code> (or <code>mothman dashboard
             embed</code>) and open the built file instead.</div>
         </div>
@@ -10111,7 +10130,7 @@ function renderDataset(view, agencyId, collectionId, datasetId){
   let exhaustedBanner = "";
   if(ds.scheduleExhausted){
     const ended = ds.scheduleExhausted;
-    const file = (SCHEDULE_RUNWAY && SCHEDULE_RUNWAY.configFile) || "contract/calendar.yaml";
+    const file = (SCHEDULE_RUNWAY && SCHEDULE_RUNWAY.configFile) || assetFile("calendar.yaml");
     exhaustedBanner = `
       <div class="notice-exhausted" role="status">
         <b>This dataset's delivery schedule has ended.</b>
@@ -12119,7 +12138,7 @@ function renderScenariosPanel(body){
   if(!SCENARIO_MAP.length){
     body.innerHTML = `<div style="font-size:13px; color:var(--ink-muted);">
       No scenario map embedded — this page renders the repo's own committed
-      <code>SCENARIOS.md</code>, rebuilt with the synthetic history itself.
+      <code>SCENARIOS-&lt;asset&gt;.md</code>, rebuilt with the synthetic history itself.
     </div>`;
     return;
   }
@@ -12186,7 +12205,7 @@ function renderLeaderboardPanel(){
     body.innerHTML = `<div style="font-size:13px; color:var(--ink-muted);">
       No streaks yet — this celebrates a real person's own current run of
       GitHub QA tickets closed in a row without being reopened. Add real
-      people to <code>contract/people.yaml</code> (matched by GitHub
+      people to <code>${escHtml(assetFile("people.yaml"))}</code> (matched by GitHub
       username) to see this fill in.
     </div>`;
     return;

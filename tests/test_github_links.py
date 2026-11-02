@@ -6,9 +6,11 @@ check_ids to REAL lines in REAL files, so a fixture-based test would
 only prove the algorithm works on data written to match it."""
 from __future__ import annotations
 
+import pytest
+
 import subprocess
 
-from qa_tools.common import github_links
+from qa_tools.common import assets, github_links
 
 
 def _git(repo, *args):
@@ -43,17 +45,17 @@ def test_build_check_source_links_covers_every_real_check_id():
 
 def test_a_real_known_check_id_resolves_to_its_real_source_line():
     """registration_number's matches_regex dbt check - a real, stable
-    check_id (dbt_project/models/civil-registration/schema.yml) - verified against
+    check_id (assets/daily/dbt/models/civil-registration/schema.yml) - verified against
     the file's own real content at the URL's own #L<n> anchor, not a
     hardcoded line number (which would make this test fragile against
     unrelated edits to that file)."""
-    check_id = "data-asset-1.registry-services.civil-registration.birth-registrations.registration_number.matches_regex_dbt"
+    check_id = "daily.registry-services.civil-registration.birth-registrations.registration_number.matches_regex_dbt"
     links = github_links.build_check_source_links(sha="abc123")
     url = links[check_id]
-    assert url.startswith("https://github.com/keithamoss/data-poc/blob/abc123/dbt_project/models/civil-registration/schema.yml#L")
+    assert url.startswith("https://github.com/keithamoss/data-poc/blob/abc123/assets/daily/dbt/models/civil-registration/schema.yml#L")
 
     line_no = int(url.rsplit("#L", 1)[1])
-    lines = (github_links.ROOT / "dbt_project/models/civil-registration/schema.yml").read_text().splitlines()
+    lines = (github_links.ROOT / "assets/daily/dbt/models/civil-registration/schema.yml").read_text().splitlines()
     assert check_id in lines[line_no - 1]
 
 
@@ -62,26 +64,26 @@ def test_a_real_contract_check_id_resolves_to_its_real_source_line():
     check_id / value: <id>) is a genuinely different YAML layout from
     dbt/soda's inline `check_id: <value>` - covers that the same plain
     text-scan approach still finds the right line for it."""
-    check_id = "data-asset-1.registry-services.civil-registration.birth-registrations.registration_number.nullValues_datacontract"
+    check_id = "daily.registry-services.civil-registration.birth-registrations.registration_number.nullValues_datacontract"
     links = github_links.build_check_source_links(sha="abc123")
     url = links[check_id]
-    assert "contract/registry-services/bdm-birth-registrations-contract.yaml#L" in url
+    assert "assets/daily/registry-services/bdm-birth-registrations-contract.yaml#L" in url
 
     line_no = int(url.rsplit("#L", 1)[1])
-    lines = (github_links.ROOT / "contract/registry-services/bdm-birth-registrations-contract.yaml").read_text().splitlines()
+    lines = (github_links.ROOT / "assets/daily/registry-services/bdm-birth-registrations-contract.yaml").read_text().splitlines()
     assert check_id in lines[line_no - 1]
 
 
 def test_a_real_evidently_check_id_resolves_to_its_real_source_line():
     """Evidently's own shape (a `- check_id:` list entry in its check
     file, REQ-QAC-241) - a third real format the line-scan needs to handle."""
-    check_id = "data-asset-1.registry-services.civil-registration.birth-registrations.sex.drift_psi_evidently"
+    check_id = "daily.registry-services.civil-registration.birth-registrations.sex.drift_psi_evidently"
     links = github_links.build_check_source_links(sha="abc123")
     url = links[check_id]
-    assert "contract/registry-services/bdm-birth-registrations-evidently-checks.yml#L" in url
+    assert "assets/daily/registry-services/bdm-birth-registrations-evidently-checks.yml#L" in url
 
     line_no = int(url.rsplit("#L", 1)[1])
-    lines = (github_links.ROOT / "contract/registry-services/bdm-birth-registrations-evidently-checks.yml").read_text().splitlines()
+    lines = (github_links.ROOT / "assets/daily/registry-services/bdm-birth-registrations-evidently-checks.yml").read_text().splitlines()
     assert check_id in lines[line_no - 1]
 
 
@@ -94,9 +96,11 @@ def test_a_dataset_opens_its_contract_at_its_own_entry_and_an_agency_its_folder(
     every = collections.all_collections()
     assert every, "the registry must hold collections for this test to mean anything"
     for coll in every:
+        # The asset's own folder through the resolver (the asset split).
+        folder = f"{assets.folder_rel()}/{coll.agency_id}"
         assert folders["agencies"][coll.agency_id] == (
-            f"https://github.com/keithamoss/data-poc/tree/abc123/contract/{coll.agency_id}")
-        assert f"contract/{coll.agency_id}/" in folders["titles"]["agencies"][coll.agency_id]
+            f"https://github.com/keithamoss/data-poc/tree/abc123/{folder}")
+        assert f"{folder}/" in folders["titles"]["agencies"][coll.agency_id]
         contract = coll.check_file("contract")
         lines = (github_links.ROOT / contract).read_text().splitlines()
         for d in coll.datasets:
@@ -104,3 +108,6 @@ def test_a_dataset_opens_its_contract_at_its_own_entry_and_an_agency_its_folder(
             assert url.startswith(f"https://github.com/keithamoss/data-poc/blob/abc123/{contract}#L")
             assert lines[int(url.rsplit("#L", 1)[1]) - 1].strip() == f"- name: {d.table}"
             assert contract in folders["titles"]["datasets"][d.dataset_id]
+
+#: Birth Registrations is the daily asset's (the asset split).
+pytestmark = pytest.mark.asset("daily")

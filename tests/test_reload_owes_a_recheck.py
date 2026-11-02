@@ -4,6 +4,8 @@ load record, and run by the next processing pass through REQ-PIPE-140's
 re-check, the reload recorded as its cause."""
 from __future__ import annotations
 
+import pytest
+
 import uuid
 
 from qa_tools.common import load_log, qa_store, recheck, supply_db
@@ -63,3 +65,8 @@ class TestAReloadAfterAFailureOwesARecheck:
                 pass
         assert _owed_for(supply) == []
         assert load_log.latest_for(physical).outcome == load_log.FAILED
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

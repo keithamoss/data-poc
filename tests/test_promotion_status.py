@@ -186,3 +186,8 @@ class TestAGapRedWarnsButDoesNotBlock:
                                    reads={}) == "green"
         # On its own it is not evidence of health either.
         assert promotion.status_of("cp-carers", [rec], reads={}) != "green"
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

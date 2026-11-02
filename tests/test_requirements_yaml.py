@@ -184,3 +184,8 @@ def test_empty_requirements_list(tmp_path):
 def test_missing_requirements_key_returns_empty_list(tmp_path):
     path = _write(tmp_path, "# nothing here yet\n")
     assert parse_requirements(path) == []
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = [*(pytestmark if isinstance(pytestmark, list) else [pytestmark]), pytest.mark.asset("quarterly")]

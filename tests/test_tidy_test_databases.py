@@ -135,3 +135,8 @@ def test_a_test_server_that_cannot_be_listed_is_an_error(monkeypatch):
     assert result.exit_code != 0
     assert "could not list the test databases" in result.output
     assert "does not exist" in result.output
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

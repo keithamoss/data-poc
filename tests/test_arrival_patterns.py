@@ -35,7 +35,9 @@ class TestTheRealDeclaredPatterns:
     thing worth knowing is whether TODAY's files attribute correctly."""
 
     @pytest.mark.parametrize("filename,expected", [
-        ("birth_registrations_2026-09-07.csv", "birth-registrations"),
+        # Each file on the asset its dataset is in (the asset split).
+        pytest.param("birth_registrations_2026-09-07.csv", "birth-registrations",
+                     marks=pytest.mark.asset("daily")),
         ("cp_clients.csv", "cp-clients"),
         ("cp_case_workers.csv", "cp-case-workers"),
         ("cp_notifications.csv", "cp-notifications"),
@@ -270,6 +272,7 @@ class TestTheConfigurationGate:
 
 
 class TestTheTransportMatcherIsADifferentThing:
+    @pytest.mark.asset("daily")
     def test_the_contract_keypattern_is_not_what_attributes_a_file(self):
         """The contract still declares `bdm/birth_registrations_{date}.csv`
         for the transport, and a file named after that whole key must
@@ -314,3 +317,8 @@ class TestAContestedFileIsHeldRatherThanFiled:
         assert found.by_dataset == {} and found.unmatched == ()
         assert found.contested == {"shared.csv": ("alpha", "beta")}
         assert found.is_unplaceable
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

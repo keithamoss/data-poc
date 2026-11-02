@@ -24,6 +24,8 @@ available to the person reading it.
 """
 from __future__ import annotations
 
+import pytest
+
 
 from qa_tools.common import period_schema as ps
 
@@ -127,3 +129,8 @@ class TestTheOldBehaviourIsUnchangedWhereNoStateIsKnown:
 
     def test_a_table_that_IS_resolved_still_runs(self):
         assert ps.check_readiness(["cp_carers"], a_resolution(["cp_carers"])) is None
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

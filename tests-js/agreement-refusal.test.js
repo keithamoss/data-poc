@@ -2,7 +2,8 @@
 // blocked banner, worded as our configuration problem; one asset-level
 // notice names every refused dataset as a link; cards count it once by kind.
 import { describe, it, expect } from "vitest";
-import { loadDashboard } from "./support/loadDashboard.js";
+import { readFileSync } from "node:fs";
+import { loadDashboard, TEMPLATE_PATH } from "./support/loadDashboard.js";
 
 const REFUSAL = {datasetId: "cp-clients", remedy: "restore the recorded value ... or declare the change",
   drifts: [{datasetId: "cp-clients", slot: "2023-Q3", supplies: 1,
@@ -68,7 +69,18 @@ describe("one asset-level notice (criterion 7)", () => {
 describe("the wording (delivery-critic on 173, #10)", () => {
   it("names data-asset.yaml as well as calendar.yaml", () => {
     const w = withRefusal({"cp-clients": REFUSAL});
-    expect(w.agreementNotice(DATA_)).toContain("contract/data-asset.yaml");
+    expect(w.agreementNotice(DATA_)).toContain("assets/&lt;asset&gt;/data-asset.yaml");
+  });
+
+  it("names the files in the embedded asset's own folder (the asset split)", () => {
+    const html = readFileSync(TEMPLATE_PATH, "utf-8").replace("const SCHEDULE_RUNWAY = null;",
+      'const SCHEDULE_RUNWAY = {configFile: "assets/quarterly/calendar.yaml", configDir: "assets/quarterly", calendars: []};');
+    const w = loadDashboard({html}).window;
+    w.rawRealDatasetById = id => ({agreementRefusal: id === "cp-clients" ? REFUSAL : null});
+    const notice = w.agreementNotice(DATA_);
+    expect(notice).toContain("assets/quarterly/calendar.yaml");
+    expect(notice).toContain("assets/quarterly/data-asset.yaml");
+    expect(notice).not.toContain("contract/");
   });
 });
 

@@ -52,6 +52,7 @@ def _stage(conn, table: str, run_id: str, rows: int = 1) -> str:
 class TestOneNameResolvesToOneTable:
     """Criteria 1 and 4."""
 
+    @pytest.mark.asset("daily")
     def test_a_single_candidate_becomes_a_readable_view(self, db):
         _stage(db, "birth_registrations", "run_001", rows=3)
         res = supply_db.create_run_views(
@@ -62,6 +63,7 @@ class TestOneNameResolvesToOneTable:
             f'SELECT count(*) FROM "{res.schema}"."birth_registrations"').fetchone()[0]
         assert got == 3
 
+    @pytest.mark.asset("quarterly")
     def test_a_name_with_no_candidate_is_absent_not_empty(self, db):
         res = supply_db.create_run_views(
             db, "run_001", supply_db.candidates_in(
@@ -78,6 +80,7 @@ class TestOneNameResolvesToOneTable:
 class TestAmbiguityIsAbsenceRatherThanAChoice:
     """Criterion 3, and REQ-PIPE-059 depends on it."""
 
+    @pytest.mark.asset("quarterly")
     def test_two_candidates_produce_no_view_at_all(self, db):
         _stage(db, "cp_clients", "run_007")
         # A second physical table claiming the same logical name, which
@@ -95,6 +98,7 @@ class TestAmbiguityIsAbsenceRatherThanAChoice:
         with pytest.raises(psycopg.errors.UndefinedTable):
             db.execute(f'SELECT * FROM "{res.schema}"."cp_clients"')
 
+    @pytest.mark.asset("quarterly")
     def test_it_never_picks_the_first_one(self, db):
         """The failure this prevents is silent: a view over whichever
         candidate happened to sort first reads as a healthy table."""
@@ -108,6 +112,7 @@ class TestAmbiguityIsAbsenceRatherThanAChoice:
         assert res.resolved == {}
         assert len(res.ambiguous["cp_carers"]) == 3
 
+    @pytest.mark.asset("quarterly")
     def test_ambiguous_and_absent_are_reported_apart(self, db):
         """They are the same thing to a check and completely different
         things to whoever has to fix it."""
@@ -135,6 +140,7 @@ class TestCandidatesAreScopedToTheRun:
     table, which reads nothing like a scoping mistake.
     """
 
+    @pytest.mark.asset("daily")
     def test_a_run_sees_its_own_arrival_and_not_every_other_one(self, db):
         for run_id in ("run_001", "run_002", "run_042"):
             _stage(db, "birth_registrations", run_id)
@@ -143,6 +149,7 @@ class TestCandidatesAreScopedToTheRun:
         assert res.resolved == {"birth_registrations": "birth_registrations__run_042"}
         assert res.ambiguous == {}
 
+    @pytest.mark.asset("daily")
     def test_unscoped_is_what_went_wrong(self, db):
         """The old call, kept as a test so the failure mode stays
         visible rather than becoming a thing nobody remembers."""
@@ -154,6 +161,7 @@ class TestCandidatesAreScopedToTheRun:
         res = supply_db.create_run_views(db, "run_001", unscoped)
         assert res.resolved == {}, "this is the bug: every run after the first resolves nothing"
 
+    @pytest.mark.asset("daily")
     def test_a_run_id_is_matched_whole_not_by_prefix(self, db):
         """`run_001` and `run_0011` are different runs, and a prefix
         test says the second belongs to the first."""
@@ -163,6 +171,7 @@ class TestCandidatesAreScopedToTheRun:
             db, supply_db.STAGING_SCHEMA, ["birth_registrations"], arrival=supply_db.arrival_segment("run_001"))
         assert found["birth_registrations"] == ["birth_registrations__run_001"]
 
+    @pytest.mark.asset("quarterly")
     def test_two_files_for_one_dataset_in_one_run_are_still_ambiguous(self, db):
         """The ambiguity this is actually for (REQ-PIPE-059) survives
         the scoping - it is within one run, not across runs."""
@@ -180,6 +189,7 @@ class TestCandidatesAreScopedToTheRun:
 
 
 class TestACandidateMustActuallyClaimTheName:
+    @pytest.mark.asset("quarterly")
     def test_a_longer_name_is_not_a_candidate_for_a_shorter_one(self, db):
         """`cp_case_workers__x` is not a version of `cp_case`. A prefix
         test says it is, which is why this is matched on the separator."""
@@ -189,6 +199,7 @@ class TestACandidateMustActuallyClaimTheName:
         assert found["cp_case"] == []
         assert found["cp_case_workers"] == ["cp_case_workers__run_001"]
 
+    @pytest.mark.asset("quarterly")
     def test_a_table_in_another_schema_is_not_a_candidate(self, db):
         db.execute('CREATE SCHEMA IF NOT EXISTS "somewhere_else"')
         db.execute('CREATE TABLE "somewhere_else"."cp_clients__run_001" AS SELECT 1 AS id')
@@ -200,6 +211,7 @@ class TestACandidateMustActuallyClaimTheName:
 class TestTheRunSchemaIsDisposable:
     """Criteria 1 and 6."""
 
+    @pytest.mark.asset("daily")
     def test_dropping_the_view_schema_leaves_the_data_alone(self, db):
         _stage(db, "birth_registrations", "run_001", rows=5)
         supply_db.create_run_views(db, "run_001", supply_db.candidates_in(
@@ -235,6 +247,7 @@ class TestOneDatabase:
             "SELECT schema_name FROM information_schema.schemata").fetchall()}
         assert {supply_db.STAGING_SCHEMA, supply_db.REJECTED_SCHEMA} <= schemas
 
+    @pytest.mark.asset("daily")
     def test_two_runs_share_one_database_and_do_not_collide(self, db):
         _stage(db, "birth_registrations", "run_001", rows=1)
         _stage(db, "birth_registrations", "run_002", rows=2)
@@ -246,6 +259,7 @@ class TestOneDatabase:
         assert db.execute(f'SELECT count(*) FROM "{a.schema}"."birth_registrations"').fetchone()[0] == 1
         assert db.execute(f'SELECT count(*) FROM "{b.schema}"."birth_registrations"').fetchone()[0] == 2
 
+    @pytest.mark.asset("quarterly")
     def test_a_resupply_is_a_new_table_rather_than_an_overwrite(self, db):
         """The cheapest implementation is the wrong one: CREATE OR
         REPLACE keeps exactly one version and destroys the history the
@@ -352,6 +366,7 @@ class TestAWriterDoesNotExcludeReaders:
     exists.
     """
 
+    @pytest.mark.asset("daily")
     def test_a_reader_sees_committed_rows_while_another_connection_holds_one_open(self, db):
         _stage(db, "birth_registrations", "run_001", rows=3)
         writer = supply_db.connect()
@@ -389,6 +404,7 @@ class TestWhatARunReadIsRecorded:
     that started failing.
     """
 
+    @pytest.mark.asset("daily")
     def test_a_resolution_survives_the_schema_it_describes(self, db):
         _stage(db, "birth_registrations", "run_001")
         res = supply_db.create_run_views(db, "run_001", supply_db.candidates_in(
@@ -399,6 +415,7 @@ class TestWhatARunReadIsRecorded:
         back = supply_db.resolution_for(db, "run_001")
         assert back.resolved == {"birth_registrations": "birth_registrations__run_001"}
 
+    @pytest.mark.asset("quarterly")
     def test_it_records_why_a_name_was_not_readable(self, db):
         """Ambiguous and absent are different answers to "why is this
         table missing", and both are worth keeping."""
@@ -414,6 +431,7 @@ class TestWhatARunReadIsRecorded:
         assert back.ambiguous == {"cp_carers": ["cp_carers__r__1", "cp_carers__r__2"]}
         assert back.absent == ["cp_placements"]
 
+    @pytest.mark.asset("daily")
     def test_restaging_replaces_the_record_rather_than_adding_to_it(self, db):
         _stage(db, "birth_registrations", "run_001")
         args = (db, "run_001", supply_db.candidates_in(
@@ -430,6 +448,7 @@ class TestWhatARunReadIsRecorded:
         recorded" is more use than a traceback."""
         assert supply_db.resolution_for(db, "run_never").resolved == {}
 
+    @pytest.mark.asset("daily")
     def test_the_record_names_the_run_and_the_schema_it_describes(self, db):
         _stage(db, "birth_registrations", "run_009")
         res = supply_db.create_run_views(db, "run_009", supply_db.candidates_in(
@@ -438,3 +457,8 @@ class TestWhatARunReadIsRecorded:
         assert record["run_id"] == "run_009"
         assert record["schema"] == supply_db.run_schema("run_009")
         assert record["resolved"] == {"birth_registrations": "birth_registrations__run_009"}
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

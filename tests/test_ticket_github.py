@@ -260,3 +260,8 @@ class TestReadingBackWhatGhSaid:
 
     def test_a_ticket_with_no_comments_is_an_empty_list(self, svc, calls):
         assert svc.comments(tg.Ticket(key="k", number=1)) == []
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

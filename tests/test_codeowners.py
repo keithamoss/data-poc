@@ -3,6 +3,7 @@
 TestTheApprover; this is the committed file and its parser."""
 from __future__ import annotations
 
+import asset_folders
 from pathlib import Path
 
 import pytest
@@ -15,21 +16,36 @@ CODEOWNERS = (ROOT / ".github" / "CODEOWNERS").read_text()
 
 
 class TestTheCommittedFile:
-    @pytest.mark.parametrize("path", ["contract/calendar.yaml", "contract/data-asset.yaml",
-                                      "contract/people.yaml", ".github/CODEOWNERS"])
-    def test_it_owns_the_four_files(self, path):
-        """Criterion 1."""
+    @pytest.mark.parametrize("name", ["calendar.yaml", "data-asset.yaml", "people.yaml",
+                                      None])
+    def test_it_owns_the_four_files(self, name):
+        """Criterion 1 - each asset's own three, by repository path through the
+        resolver (the asset split: they were contract/'s), and CODEOWNERS."""
+        from qa_tools.common import assets
+
+        path = f"{assets.folder_rel()}/{name}" if name else ".github/CODEOWNERS"
         assert freeze.code_owners(CODEOWNERS, path)
 
     def test_every_owner_of_the_agreement_is_an_approver_in_people_yaml(self):
         """Criterion 2's match goes through people.yaml's github field, so a
         code owner nobody can name as approver is a file out of step."""
-        people = yaml.safe_load((ROOT / "contract" / "people.yaml").read_text())
+        people = yaml.safe_load((asset_folders.real_folder() / "people.yaml").read_text())
         handles = {str(p.get("github", "")).lower() for p in freeze.approvers(people)}
-        assert freeze.code_owners(CODEOWNERS, "contract/calendar.yaml") <= handles
+        from qa_tools.common import assets
+
+        owners = freeze.code_owners(CODEOWNERS, f"{assets.folder_rel()}/calendar.yaml")
+        assert owners, "nobody owns the asset's calendar - this would prove nothing"
+        assert owners <= handles
 
     def test_it_owns_nothing_else(self):
-        assert freeze.code_owners(CODEOWNERS, "contract/bdm-birth-registrations.yaml") == set()
+        """A real contract file of the asset's - one that exists, so the case
+        is not trivially unowned (the asset split moved the old path)."""
+        from qa_tools import collections
+        from qa_tools.common import assets
+
+        contract = f"{assets.folder_rel()}/{collections.all_collections()[0].contract}"
+        assert (ROOT / contract).is_file(), contract
+        assert freeze.code_owners(CODEOWNERS, contract) == set()
 
     def test_the_documentation_says_review_is_off_and_how_to_turn_it_on(self):
         """Criteria 3 and 4."""
@@ -81,15 +97,18 @@ class TestCriticFindingsOn174:
     def test_M4_a_bare_at_is_not_an_owner(self):
         assert freeze.code_owners("/contract/calendar.yaml @", "contract/calendar.yaml") == set()
 
+    @pytest.mark.asset("quarterly")  # the quarterly calendar's dates
     def test_L1_may_approve_names_only_who_the_gate_accepts(self):
         """The paste-ready block's "May approve" must not name a manager the
         gate then refuses as not a code owner."""
         import copy
         from datetime import date, datetime, timedelta, timezone
 
-        cal = yaml.safe_load((ROOT / "contract" / "calendar.yaml").read_text())
-        asset = yaml.safe_load((ROOT / "contract" / "data-asset.yaml").read_text())
-        people_doc = yaml.safe_load((ROOT / "contract" / "people.yaml").read_text())
+        from qa_tools.common import assets
+
+        cal = yaml.safe_load((asset_folders.real_folder() / "calendar.yaml").read_text())
+        asset = yaml.safe_load((asset_folders.real_folder() / "data-asset.yaml").read_text())
+        people_doc = yaml.safe_load((asset_folders.real_folder() / "people.yaml").read_text())
         new = copy.deepcopy(cal)
         quarterly = next(c for c in new["calendars"] if c["name"] == "quarterly")
         for d in quarterly["versions"][-1]["dates"]:
@@ -98,6 +117,9 @@ class TestCriticFindingsOn174:
         at = datetime(2026, 10, 11, 3, tzinfo=timezone(timedelta(hours=8)))
         found = freeze.check(cal, new, asset, asset, people_doc, instant_of=lambda k: at,
                              today=date(2026, 10, 11),
-                             base_codeowners="/contract/calendar.yaml @someone-else\n")
+                             base_codeowners=f"/{assets.folder_rel()}/calendar.yaml @someone-else\n")
         text = "\n".join(f.fix for f in found)
         assert "May approve: nobody" in text, text
+
+#: Birth Registrations is the daily asset's (the asset split).
+pytestmark = pytest.mark.asset("daily")

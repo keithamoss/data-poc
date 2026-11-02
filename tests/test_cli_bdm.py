@@ -5,6 +5,8 @@ generator output, not hand-crafted rows), and drives the Click commands
 through click.testing.CliRunner, same as that file."""
 from __future__ import annotations
 
+import pytest
+
 from state_paths import fixed
 from qa_tools.common import hand_filing
 import os
@@ -597,3 +599,6 @@ def test_qa_command_s3_key_flag_mode_downloads_and_runs_real_checks(monkeypatch)
     assert captured["run_id"] is None
     assert captured["keep"] is False
     assert "nothing was filed and nothing was recorded" in _flat(result.output)
+
+#: Birth Registrations is the daily asset's (the asset split).
+pytestmark = pytest.mark.asset("daily")

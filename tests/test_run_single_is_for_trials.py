@@ -32,6 +32,7 @@ def ensured(supply_dsn):
 
 class TestARealIdentityIsRefused:
 
+    @pytest.mark.asset("daily")
     def test_bdm_refuses_and_records_nothing(self, ensured, tmp_path):
         csv = tmp_path / "birth_registrations.csv"
         csv.write_text("not,read\n")
@@ -42,6 +43,7 @@ class TestARealIdentityIsRefused:
                                         reference_run_id=None, run_by="t@example.com")
         assert _counts() == before
 
+    @pytest.mark.asset("quarterly")
     def test_cp_refuses_and_records_nothing(self, ensured):
         before = _counts()
         with pytest.raises(trial.NotATrial, match="cp_run_042"):
@@ -57,3 +59,8 @@ class TestARealIdentityIsRefused:
 
     def test_a_trial_identity_passes(self):
         trial.require_trial(trial.trial_run_id(), "orchestrate.run_single_file")
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

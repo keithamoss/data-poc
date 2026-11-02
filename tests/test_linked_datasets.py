@@ -4,6 +4,9 @@ contract folder, changes one thing, and asks the gate - the collections gate
 calls the same function. The real files are untouched."""
 from __future__ import annotations
 
+from qa_tools.common import assets
+
+import asset_folders
 import shutil
 from pathlib import Path
 
@@ -17,12 +20,12 @@ REAL = Path(__file__).resolve().parent.parent
 
 @pytest.fixture
 def repo(tmp_path):
-    shutil.copytree(REAL / "contract", tmp_path / "contract")
+    shutil.copytree(asset_folders.real_folder(), tmp_path / assets.folder_rel())
     return tmp_path
 
 
 def _asset(repo):
-    return repo / "contract" / "data-asset.yaml"
+    return repo / assets.folder_rel() / "data-asset.yaml"
 
 
 def _linked(doc):
@@ -61,9 +64,19 @@ class TestCriterionSix:
         assert "cp-nope" in text and "not in the hierarchy" in text
 
     def test_a_dataset_on_no_shared_calendar(self, repo):
-        text = _edit(repo, lambda ls: ls.append(
-            {"dataset": "birth-registrations", "code": "BR", "id_columns": ["registration_number"]}))
-        assert "birth-registrations" in text and "calendar" in text
+        """Within one asset (the asset split: Birth Registrations, the daily
+        dataset this linked, is another asset's): the Client Register put on
+        a calendar of its own, as test_a_dataset_naming_no_calendar puts it
+        on none."""
+        cal_path = repo / assets.folder_rel() / "calendar.yaml"
+        cal = yaml.safe_load(cal_path.read_text())
+        entry = next(d for d in cal["datasets"] if d["id"] == "cp-clients")
+        entry.pop("no_calendar", None)
+        entry["calendar"] = "monthly"
+        cal_path.write_text(yaml.safe_dump(cal, sort_keys=False))
+        text = "\n".join(linked_datasets.problems(repo))
+        assert ("linkage-keys links 'cp-clients', which is never on linkage-keys's calendar "
+                "'quarterly' (it is on 'monthly')") in text, text
 
     def test_a_source_column_its_contract_does_not_declare(self, repo):
         def change(ls):
@@ -84,7 +97,7 @@ class TestCriterionSix:
                 "contract's id_1 to id_2.") in text.splitlines(), text
 
     def test_a_dataset_naming_no_calendar(self, repo):
-        cal_path = repo / "contract" / "calendar.yaml"
+        cal_path = repo / assets.folder_rel() / "calendar.yaml"
         cal = yaml.safe_load(cal_path.read_text())
         entry = next(d for d in cal["datasets"] if d["id"] == "cp-clients")
         entry["no_calendar"] = True
@@ -104,7 +117,7 @@ class TestTheHandWrittenChecksAgreeWithTheMapping:
     """REQ-QAC-333 criteria 3 and 8."""
 
     def _soda(self, repo):
-        return repo / "contract" / "department-of-health" / "linkage-products-soda-checks.yml"
+        return repo / "assets" / "quarterly" / "department-of-health" / "linkage-products-soda-checks.yml"
 
     def test_a_check_stating_another_code_is_refused_naming_both(self, repo):
         path = self._soda(repo)
@@ -143,7 +156,7 @@ class TestTheQueriesThemselvesAgreeWithTheMapping:
     naming the check, the dataset and both values."""
 
     def _soda(self, repo):
-        return repo / "contract" / "department-of-health" / "linkage-products-soda-checks.yml"
+        return repo / "assets" / "quarterly" / "department-of-health" / "linkage-products-soda-checks.yml"
 
     def _replace(self, repo, old, new):
         path = self._soda(repo)
@@ -180,3 +193,8 @@ class TestTheQueriesThemselvesAgreeWithTheMapping:
         text = self._replace(repo, "WHERE (dataset = 'DOC_CLIENTS' AND id_2 IS NOT NULL",
                              "WHERE (dataset = 'DOC_CLIENT' AND id_2 IS NOT NULL")
         assert "no_surplus_ids_soda" in text and "DOC_CLIENT'" in text, text
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

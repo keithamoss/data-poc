@@ -503,3 +503,8 @@ class TestCriticFindingsOn161:
             filing.refile(conn, DATASET, supply, EARLY_SLOT, decision_id=decided)
         assert excuse.in_force(conn, DATASET, supply, as_at="2026-10-11T06:00:00+08:00")
         assert excuse.in_force(conn, DATASET, supply) is None
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

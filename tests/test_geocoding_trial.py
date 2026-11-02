@@ -172,8 +172,8 @@ def _record(check_id, **kw):
     return {"check_id": check_id, "status": kw.pop("status", "pass"), **kw}
 
 
-CHECK = "data-asset-1.department-of-health.linkage-products.geo-cp-clients.cp-clients.coverage_soda"
-ORPHAN = ("data-asset-1.department-of-health.linkage-products.geo-cp-clients.cp-clients."
+CHECK = "quarterly.department-of-health.linkage-products.geo-cp-clients.cp-clients.coverage_soda"
+ORPHAN = ("quarterly.department-of-health.linkage-products.geo-cp-clients.cp-clients."
           "referential_soda")
 READS = {CHECK: ["cp_clients"], ORPHAN: ["cp_clients", "geo_cp_clients"]}
 
@@ -219,7 +219,7 @@ class TestTheTrialsOwnRule:
         missing-year check."""
         from qa_tools.common import target_agreement
 
-        base = "data-asset-1.department-of-health.linkage-products.geo-cp-clients."
+        base = "quarterly.department-of-health.linkage-products.geo-cp-clients."
         aimed = ["census_year.missing_set_members_dbt"]
         results = [_record(base + "census_year.missing_set_members_dbt", status="fail",
                            dataset_id="geo-cp-clients"),
@@ -444,7 +444,7 @@ class TestATrialSpeaksOnlyForItsOwnCollectionsChecks:
         decides, not its tables."""
         from qa_tools.common import unrunnable
 
-        cp = "data-asset-1.child-protection-family-support.child-protection"
+        cp = "quarterly.child-protection-family-support.child-protection"
         cp_check = f"{cp}.cp-clients.cp_client_id.not_null_dbt"
         res = supply_db.Resolution(run_id="trial_x", schema="qa_trial_x",
                                    resolved={"geo_cp_clients": "geo_cp_clients__1"},
@@ -477,9 +477,14 @@ class TestAnEmptySupplysDriftIsNotEvaluated:
         monkeypatch.setattr(run_evidently, "_reference_frame",
                             lambda c, ref, table, column: pd.DataFrame(
                                 {column: ["postcode", "suburb"] * 50}))
-        check = ("data-asset-1.department-of-health.linkage-products.geo-cp-clients."
+        check = ("quarterly.department-of-health.linkage-products.geo-cp-clients."
                  "match_level.drift_psi_evidently")
         out = run_evidently._psi_result(coll, entry, check, "geo_cp_clients", "trial_x", "t",
                                         "trial_ref_x")
         assert out["status"] == "nodata" and out["metric_value"] is None
         assert "no rows" in (out.get("not_evaluated_reason") or "")
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = [*(pytestmark if isinstance(pytestmark, list) else [pytestmark]), pytest.mark.asset("quarterly")]

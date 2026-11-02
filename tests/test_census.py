@@ -4,6 +4,8 @@ periods and scopes its census to them, since other tests leave periods
 behind on the same worker."""
 from __future__ import annotations
 
+import pytest
+
 import test_supersession as _base
 from qa_tools.common import census, decision_log as dl, period_schema, promotion, qa_store
 from test_supersession import DS, TABLE, WHEN, _filed
@@ -160,3 +162,8 @@ class TestTheCensusIsOneSnapshot:
 
         census_id = census.take(Between(conn), trigger="test", periods=[period])
         assert _findings(conn, census_id) == []
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

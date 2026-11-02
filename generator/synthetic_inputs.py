@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import yaml
+from qa_tools.common import assets as _assets
 
 REPO = Path(__file__).resolve().parent.parent
 NAME = "synthetic_inputs.yaml"
@@ -25,7 +26,7 @@ def _path(root: Path) -> Path:
     import-time constant PATH)."""
     from qa_tools.common.linked_datasets import _asset_folder
 
-    return _asset_folder(root) / NAME
+    return _asset_folder(root) / "synthetic" / NAME
 
 
 @dataclass(frozen=True)
@@ -90,9 +91,9 @@ def problems(root: Path = REPO) -> list[str]:
     where = {ds.get("id"): (coll, ds) for _a, coll, ds in _walk(asset)}
     out = []
     for p in placings(root).values():
-        head = f"{assets.folder_rel()}/{NAME}: {p.dataset}"
+        head = f"{assets.folder_rel()}/synthetic/{NAME}: {p.dataset}"
         if p.dataset not in where:
-            out.append(f"{head} is not in the hierarchy (contract/data-asset.yaml).")
+            out.append(f"{head} is not in the hierarchy ({_assets.config_dir()}/data-asset.yaml).")
             continue
         coll, ds = where[p.dataset]
         linked = ds.get("linked_datasets") or []

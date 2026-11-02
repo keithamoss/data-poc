@@ -36,6 +36,7 @@ from datetime import date, datetime, timedelta
 
 from qa_tools.common import asset_time, schedule
 from qa_tools.common.schedule import Period
+from qa_tools.common import assets as _assets
 
 
 @dataclass(frozen=True)
@@ -124,7 +125,7 @@ def _participation_for(dataset_id: str, period_date: date, agreement):
     entry = agreement.dataset(dataset_id)
     if entry is None or not entry.participation:
         raise schedule.ScheduleConfigError(
-            f"dataset {dataset_id!r} has no participation version in contract/calendar.yaml, "
+            f"dataset {dataset_id!r} has no participation version in {_assets.config_dir()}/calendar.yaml, "
             f"so none of its slots has a due instant.")
     # RESOLVED, value by value, from the dataset or its collection
     # (REQ-PIPE-181, amending REQ-PIPE-113 criterion 2).

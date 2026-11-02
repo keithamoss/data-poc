@@ -13,6 +13,7 @@ gets tested against a shape nobody uses.
 """
 from __future__ import annotations
 
+import asset_folders
 import copy
 from datetime import date
 import shutil
@@ -25,7 +26,7 @@ from qa_tools.common import validate_schedule
 import agreement_split
 from qa_tools.common.validate_schedule import Source, validate
 
-REAL_CONTRACT_DIR = Path(__file__).resolve().parent.parent / "contract"
+REAL_CONTRACT_DIR = asset_folders.SelectedFolder()
 
 
 @pytest.fixture
@@ -167,6 +168,7 @@ class TestAMistypedKeyFailsToo:
 
 
 class TestCalendarIntegrity:
+    @pytest.mark.asset("daily")
     def test_duplicate_calendar_names_are_rejected(self):
         def mutate(doc):
             doc["calendars"].append(copy.deepcopy(_calendar(doc, "daily")))
@@ -261,6 +263,7 @@ class TestSubsettingAndOverridingAreDifferentActs:
         errors = _run(mutate)
         assert any("BOTH" in e.problem for e in errors), _messages(errors)
 
+    @pytest.mark.asset("daily")
     def test_delivery_months_against_a_cadence_rule_calendar_is_rejected(self):
         def mutate(doc):
             _dataset(doc, "birth-registrations")["delivery_months"] = ["February"]
@@ -332,7 +335,7 @@ class TestHowItReports:
         def mutate(doc):
             _dataset(doc, "cp-case-workers")["delivery_months"] = ["Febuary"]
             _dataset(doc, "cp-clients")["calendar"] = "nope"
-            _calendar(doc, "daily")["versions"][0]["claim_window"] = "4"
+            _calendar(doc, "quarterly")["versions"][0]["claim_window"] = "4"
         errors = _run(mutate)
         assert errors
         for error in errors:
@@ -493,6 +496,15 @@ class TestOneTypoReadsAsOneTypo:
         for calendar in doc["calendars"]:
             if calendar["name"] == "quarterly":
                 calendar["name"] = "quarterley"
+        # ANOTHER CALENDAR IN USE, as the one-asset layout had in `daily`
+        # (the asset split): with none in use the fix line deliberately lists
+        # every calendar defined, so the case needs one a dataset still names.
+        daily = yaml.safe_load((asset_folders.real_folder_of("daily") / "calendar.yaml").read_text())
+        doc["calendars"].append(next(c for c in daily["calendars"] if c["name"] == "daily"))
+        ed = next(c for a in doc["hierarchy"]["agencies"] for c in a["collections"]
+                  if c["id"] == "emergency-department")
+        ed["datasets"].append({"id": "probe-on-daily", "name": "Probe on daily",
+                               "table": "probe_on_daily", "calendar": "daily"})
         agreement_split.write(contract_dir, doc)
         return Source(path, contract_dir)
 
@@ -836,7 +848,7 @@ class TestTheDiffBase:
 
         monkeypatch.setenv("MOTHMAN_DIFF_BASE", "HEAD")
         monkeypatch.setattr(mod, "_content_at", spy)
-        src = Source(mod.ROOT / "contract" / "data-asset.yaml", REAL_CONTRACT_DIR)
+        src = Source(asset_folders.real_folder() / "data-asset.yaml", REAL_CONTRACT_DIR)
         mod._freeze_errors({}, {}, src)
         assert seen and set(seen) == {"HEAD"}, (
             f"the past-date guard compared against {seen} - a push of several "
@@ -857,3 +869,8 @@ class TestTheDiffBase:
         mod.main()
         assert seen[0] == "HEAD", (
             f"the check-lifecycle gate compared against {seen[0]!r}")
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

@@ -354,9 +354,9 @@ requirements:
     - qa_tools/tools/run_soda.py::evaluate
     - qa_tools/tools/run_datacontract.py::evaluate
     - qa_tools/tools/run_evidently.py::evaluate
-    - dbt_project/models/civil-registration/schema.yml
-    - contract/registry-services/bdm-birth-registrations-contract.yaml
-    - contract/registry-services/bdm-birth-registrations-soda-checks.yml
+    - assets/daily/dbt/models/civil-registration/schema.yml
+    - assets/daily/registry-services/bdm-birth-registrations-contract.yaml
+    - assets/daily/registry-services/bdm-birth-registrations-soda-checks.yml
     - qa_tools/common/soda_common.py::unreported_checks
     - qa_tools/common/validate_soda.py::problems
   - id: REQ-QAC-002
@@ -420,8 +420,8 @@ requirements:
     - qa_tools/tools/run_soda.py::evaluate
     - qa_tools/tools/run_datacontract.py::evaluate
     - qa_tools/tools/run_evidently.py::evaluate
-    - contract/child-protection-family-support/child-protection-contract.yaml
-    - contract/child-protection-family-support/child-protection-soda-checks.yml
+    - assets/quarterly/child-protection-family-support/child-protection-contract.yaml
+    - assets/quarterly/child-protection-family-support/child-protection-soda-checks.yml
     - qa_tools/common/soda_common.py::unreported_checks
     - qa_tools/common/validate_soda.py::problems
   - id: REQ-DASH-003
@@ -668,7 +668,8 @@ requirements:
       - qa_tools/common/agreement.py::cadence
       - qa_tools/common/schedule.py::periods_for_calendar
       - pipeline/recorded_arrival.py::for_run
-      - contract/data-asset.yaml
+      - assets/daily/data-asset.yaml
+      - assets/quarterly/data-asset.yaml
 
   - id: REQ-QAC-008
     title: Resupply chains derived from real, observable signals
@@ -1948,8 +1949,8 @@ requirements:
       - qa_tools/common/check_lifecycle.py::name_by_check_id
       - qa_tools/common/validate_check_lifecycle.py::_check_id_errors
       - qa_tools/tools/run_datacontract.py::evaluate
-      - contract/child-protection-family-support/child-protection-contract.yaml
-      - contract/registry-services/bdm-birth-registrations-contract.yaml
+      - assets/quarterly/child-protection-family-support/child-protection-contract.yaml
+      - assets/daily/registry-services/bdm-birth-registrations-contract.yaml
     evidence:
       - >
         2026-09-20: all 258 check config_hashes byte-identical before and
@@ -4902,7 +4903,8 @@ requirements:
       - qa_tools/common/check_id.py::validate_tail_uniqueness
       - qa_tools/common/check_lifecycle.py::migrate_pre_039_check_id
       - qa_tools/collections/__init__.py::by_id
-      - contract/data-asset.yaml
+      - assets/daily/data-asset.yaml
+      - assets/quarterly/data-asset.yaml
       - dashboard/qa-reporting-dashboard.template.html
       - cli/dashboard.py::_validate_hierarchy
     evidence:
@@ -5328,9 +5330,9 @@ requirements:
     implemented_by:
       - generator/resupply.py::run_slot_chain
       - generator/resupply.py::DatasetProvider
-      - generator/collections/child_protection.py::ChildProtectionProvider
-      - generator/collections/child_protection.py::_pick_dirty_tables
-      - generator/collections/civil_registration.py::BirthRegistrationsProvider
+      - assets/quarterly/synthetic/collections/child_protection.py::ChildProtectionProvider
+      - assets/quarterly/synthetic/collections/child_protection.py::_pick_dirty_tables
+      - assets/daily/synthetic/collections/civil_registration.py::BirthRegistrationsProvider
     evidence:
       - >
         2026-09-23: the generator emits all three delivery shapes, shown
@@ -6018,10 +6020,10 @@ requirements:
       - generator/resupply.py::Delivery
       - generator/resupply.py::run_slot_chain
       - generator/anchor_date.py::get_anchor_date
-      - generator/collections/civil_registration.py::_manifest_entries_for_slot
-      - generator/collections/civil_registration.py::_received_at
-      - generator/collections/child_protection.py::_cp_manifest_entries_for_slot
-      - generator/collections/child_protection.py::_cp_received_at
+      - assets/daily/synthetic/collections/civil_registration.py::_manifest_entries_for_slot
+      - assets/daily/synthetic/collections/civil_registration.py::_received_at
+      - assets/quarterly/synthetic/collections/child_protection.py::_cp_manifest_entries_for_slot
+      - assets/quarterly/synthetic/collections/child_protection.py::_cp_received_at
       - qa_tools/common/asset_time.py::local_date
       - pipeline/build_dashboard_data.py::_run_date
       - pipeline/build_dashboard_data.py::_run_date
@@ -7539,7 +7541,8 @@ requirements:
       - qa_tools/common/asset_time.py::wall_clock
       - qa_tools/common/asset_time.py::end_of_day
       - qa_tools/common/arrival_classification.py::classify
-      - contract/data-asset.yaml
+      - assets/daily/data-asset.yaml
+      - assets/quarterly/data-asset.yaml
       - dashboard/qa-reporting-dashboard.template.html
     evidence:
       - >
@@ -7767,8 +7770,9 @@ requirements:
       - qa_tools/common/agreement.py::load
       - cli/schedule.py::show_command
       - cli/schedule.py::candidate_dates_command
-      - contract/data-asset.yaml
-      - contract/child-protection-family-support/child-protection-contract.yaml
+      - assets/daily/data-asset.yaml
+      - assets/quarterly/data-asset.yaml
+      - assets/quarterly/child-protection-family-support/child-protection-contract.yaml
     evidence:
       - >
         2026-09-23: two named calendars in contract/data-asset.yaml -
@@ -19183,7 +19187,7 @@ requirements:
       - dashboard/embed_dashboard_data.py::embed
       - dashboard/qa-reporting-dashboard.template.html::renderBuildStamp
       - .github/workflows/validate-config.yml
-      - contract/environments.yaml
+      - assets/environments.yaml
       - qa_tools/common/environments.py::all_environments
       - qa_tools/common/environments.py::get
       - qa_tools/common/environments.py::current
@@ -19619,8 +19623,9 @@ requirements:
     - qa_tools/common/ticket_reconciler.py::service_from_env
     - cli/common.py::confirm_change
     - cli/filing_tui.py::apply_decision
-    - contract/environments.yaml
-    - contract/data-asset.yaml
+    - assets/environments.yaml
+    - assets/daily/data-asset.yaml
+    - assets/quarterly/data-asset.yaml
     - .devcontainer/devcontainer.json
     - tests/conftest.py::stated_test_environment
     - cli/common.py::decide_keep
@@ -20188,7 +20193,8 @@ requirements:
     - qa_tools/common/file_checks.py::screen
     - qa_tools/common/file_checks.py::record
     - qa_tools/common/file_checks.py::check_id_for
-    - contract/file-checks.yaml
+    - assets/daily/file-checks.yaml
+    - assets/quarterly/file-checks.yaml
     - qa_tools/common/check_id.py::parse
     - qa_tools/common/check_lifecycle.py::parse_file_check_metadata
     - qa_tools/common/qa_store.py::record_file_results
@@ -26157,7 +26163,8 @@ requirements:
     - qa_tools/common/schemas.py::ConfigChangelogEntry
     - qa_tools/common/hand_filing.py::resolve_original
     - dashboard/embed_dashboard_data.py::embed
-    - contract/data-asset.yaml
+    - assets/daily/data-asset.yaml
+    - assets/quarterly/data-asset.yaml
     linked_tests:
     - tests/test_asset_time.py
     - tests/test_timezone_versions.py
@@ -29300,7 +29307,8 @@ requirements:
     - pipeline/slot_timeline.py::supply_states
     - qa_tools/common/promotion.py::Judged
     - qa_tools/common/gate.py::_record_holdback
-    - contract/data-asset.yaml
+    - assets/daily/data-asset.yaml
+    - assets/quarterly/data-asset.yaml
     linked_tests:
     - tests/test_replacement_setting.py
     - tests-js/supply-outcome.test.js
@@ -30339,7 +30347,8 @@ requirements:
     - qa_tools/common/validate_people.py::problems
     - qa_tools/common/arrival_lifecycle.py::process_all
     - cli/scenarios.py::validate_command
-    - contract/scripted_decisions.yaml
+    - assets/daily/synthetic/scripted_decisions.yaml
+    - assets/quarterly/synthetic/scripted_decisions.yaml
     linked_tests:
     - tests/test_scripted_decisions.py
     source: 'Keith, 2026-10-04, ''SCRIPTED HUMAN DECISIONS WILL BE BUILT'' (plans/road-testing.md #16 - ''the generator produces files only today, so synthetic history gains a way to play back seeded decisions''). Scoped by delivery-scoper 2026-10-04.'
@@ -30447,8 +30456,9 @@ requirements:
     implemented_by:
     - generator/scenario_injection.py::INJECTIONS
     - generator/scenario_injection.py::resolve
-    - generator/collections/civil_registration.py::_days_to_avoid
-    - contract/data-asset.yaml
+    - assets/daily/synthetic/collections/civil_registration.py::_days_to_avoid
+    - assets/daily/data-asset.yaml
+    - assets/quarterly/data-asset.yaml
     - plans/supply-model.md
     linked_tests:
     - tests/test_scenario_injection.py
@@ -30525,7 +30535,8 @@ requirements:
       covers the playback itself.'
     - '2026-10-11, criterion 4 (REQ-GEN-184, 185): TS-45 planted beside TS-44 in the promote-and-acknowledge era and read back from a regenerate from empty - its supply warns on parent 2 nulls alone, is promoted owing an acknowledgement, and a scripted person acknowledges it five hours after it arrived.'
     implemented_by:
-    - contract/scripted_decisions.yaml
+    - assets/daily/synthetic/scripted_decisions.yaml
+    - assets/quarterly/synthetic/scripted_decisions.yaml
     - generator/scenario_injection.py::INJECTIONS
     - qa_tools/common/scripted_decisions.py::Player
     linked_tests:
@@ -30570,7 +30581,8 @@ requirements:
       it; TS-5 already carried one. SCENARIOS.md regenerated in the same change.'
     implemented_by:
     - plans/supply-model.md
-    - SCENARIOS.md
+    - SCENARIOS-quarterly.md
+    - SCENARIOS-daily.md
     linked_tests:
     - tests/test_scenario_map.py
     source: "Found by delivery-scoper 2026-10-04 while drafting the batch's scenarios: several register entries in plans/supply-model.md assert the filing rule that REQ-PIPE-131 replaces. Scoped by delivery-scoper 2026-10-04."
@@ -31321,7 +31333,8 @@ requirements:
     - qa_tools/common/supply_db.py::connect
     - qa_tools/common/validate_hierarchy.py::validate
     - qa_tools/common/schemas.py::DataAsset
-    - contract/data-asset.yaml
+    - assets/daily/data-asset.yaml
+    - assets/quarterly/data-asset.yaml
     linked_tests:
     - tests/test_postgres_version.py::TestTheDeclaration
     - tests/test_postgres_version.py::TestTheServerIsAsserted
@@ -32954,8 +32967,8 @@ requirements:
     - generator/targeting.py::bdm_amber
     - generator/targeting.py::cp_amber
     - generator/targeting.py::outside_hold
-    - generator/collections/civil_registration.py::_ordinary_severities
-    - generator/collections/child_protection.py::_ordinary_severities
+    - assets/daily/synthetic/collections/civil_registration.py::_ordinary_severities
+    - assets/quarterly/synthetic/collections/child_protection.py::_ordinary_severities
     - generator/scenario_injection.py::ExtraArrival
     - qa_tools/common/scenario_map.py::_target_text
     - generator/resupply.py::run_slot_chain
@@ -33040,15 +33053,16 @@ requirements:
     - generator/scenario_injection.py::Injection
     - generator/scenario_injection.py::resolve
     - generator/scenario_injection.py::no_two_scenarios_share_a_period
-    - generator/collections/civil_registration.py::_built_green
-    - generator/collections/civil_registration.py::_reds_clear_of_scenarios
-    - generator/collections/civil_registration.py::_away_from_suppressed
-    - generator/collections/civil_registration.py::_plan_injections
-    - generator/collections/child_protection.py::_ordinary_severities
+    - assets/daily/synthetic/collections/civil_registration.py::_built_green
+    - assets/daily/synthetic/collections/civil_registration.py::_reds_clear_of_scenarios
+    - assets/daily/synthetic/collections/civil_registration.py::_away_from_suppressed
+    - assets/daily/synthetic/collections/civil_registration.py::_plan_injections
+    - assets/quarterly/synthetic/collections/child_protection.py::_ordinary_severities
     - qa_tools/common/promotion.py::effective_at_for
     - qa_tools/tools/orchestrate.py::_claim_window
     - qa_tools/tools/orchestrate.py::_claim_window
-    - contract/scripted_decisions.yaml
+    - assets/daily/synthetic/scripted_decisions.yaml
+    - assets/quarterly/synthetic/scripted_decisions.yaml
     evidence:
     - '2026-10-11: tests/test_generate_to_target.py''s lead-in tests - a targeted anchor claims two lead-in periods by default and the period after (c1, c3), configurable per injection (c1), none for an untargeted one; a lead-in before the history refuses; another scenario''s anchor or a suppressed day on a lead-in or the period after fails naming both (c5). Through the real generator: each lead-in and the period after is one green supply, received inside its due time and grace (tests/test_generate_runs.py, failing before #156''s fix), with every twin matched and no other period''s arrival on it (c1); the targeted supply and its churned green resend are exactly the last lead-in''s size, and so is the period after (c2, c3, c4). tests/test_promotion_waits_for_next_receipt.py: a replayed decision lands within the claim window, both orchestrators passing it. All decided from the placement and configuration alone - nothing reads the decision log or the database to place anything (c6, by construction).'
     - '2026-10-11, regenerated from empty and read back: TS-43 (09-05) warns on facility nulls alone after two green lead-ins; the rule records promotion-withheld under hold, the scripted person promotes it at 10:00 on 09-06 - recorded at that instant - before 09-06''s 14:30 supply, which reads green with no gap red, and at in-place-on 2026-09-05 the page shows TS-43 waiting for a decision (c7, c8; re-read after post-build-review #156). TS-44, TS-45 and TS-46 as on REQ-GEN-136 and 137. Birth Registrations before and after: 42 supplies became 51 (the history is 40 days, Keith''s call), gate verdicts amber 14 / green 13 / red 15 became 18 / 21 / 12, page 10 / 7 / 25 became 16 / 16 / 19, gap reds 28 became 21 (results the gap rule turned red; 26 carry a gap note, 5 of which measured red anyway - the critic''s 26 and this 21 count different things), promotions 21 became 33, periods with more than one supply 10 became 9; Child Protection unchanged. Bootstrap 8m44s became 9m09s, and 9m25s after #156''s fixes, which moved no count above. Every lead-in and following supply arrives on time, at 14:30; the arrival golden moved by exactly those four (39 / 6 / 6 on time / early / late became 43 / 4 / 4 for Birth Registrations), Child Protection identical. The rule''s 32 replayed Birth Registrations promotions take effect at 31 different lags, rather than 25 of 33 at exactly four hours. The arrival-semantics golden re-captured: Birth Registrations 42 arrivals became 51, every Child Protection dataset identical.'
@@ -33180,7 +33194,7 @@ requirements:
     linked_tests:
     - tests/test_postcode_tolerance.py
     implemented_by:
-    - contract/child-protection-family-support/child-protection-contract.yaml
+    - assets/quarterly/child-protection-family-support/child-protection-contract.yaml
     evidence:
     - '2026-10-11: tests/test_postcode_tolerance.py 3 passed against the real datacontract-cli and Soda Core over this worker''s staged fixture delivery - with 1% of client postcodes unrecognised the contract''s rule passes and Soda''s warns (c6), at 5% the contract''s fails (c7), and the recorded fail threshold is 3, not 0 (c8). The first and third failed before the change. `mothman dashboard validate-check-lifecycle` OK over 307 checks with the breaking changelog entry (c3); check_id, validValues and dimension unchanged (c2); the Soda and dbt checks and the postcode null rule untouched (c5); the description rewritten to the tolerance form docs/check-authoring-rules.md asks for, the same words the Soda copy already uses (c4).'
   - id: REQ-PIPE-188
@@ -33702,7 +33716,8 @@ requirements:
     - tests/test_scenario_injection.py::TestTheEarlyEmergencyDepartmentSupplies
     implemented_by:
     - generator/scenario_injection.py::INJECTIONS
-    - contract/scripted_decisions.yaml
+    - assets/daily/synthetic/scripted_decisions.yaml
+    - assets/quarterly/synthetic/scripted_decisions.yaml
     evidence:
     - '2026-10-12: reset and bootstrapped from empty (3m51s) with the scripted re-files in place. TS-9 filed 2024-Q2 early, TS-65 2025-Q3 early, TS-66 2025-Q4 early. TS-67 was filed by the rule to 2023-Q3 as a late resupply, its promotion there refused, then re-filed by the synthetic person to 2023-Q4 at 02:00 UTC on 21 October and judged early, for five datasets; cp-case-workers rejected by the same person. Arrival golden re-captured: exactly 24 run ids swapped and five verdicts late -> early, nothing else moved. tests/test_scenario_injection.py TestTheEarlyChildProtectionSupplies 9 passed.'
     decisions:
@@ -33805,13 +33820,15 @@ requirements:
     implemented_by:
     - generator/scenario_injection.py::INJECTIONS
     - generator/scenario_injection.py::PairFile
-    - generator/collections/civil_registration.py::_pair_delivery
-    - generator/collections/civil_registration.py::_ordinary_severities
+    - assets/daily/synthetic/collections/civil_registration.py::_pair_delivery
+    - assets/daily/synthetic/collections/civil_registration.py::_ordinary_severities
     - generator/targets.py::written
     - qa_tools/common/target_agreement.py::after_replay
     - qa_tools/common/scripted_decisions.py::answers_for
-    - contract/scripted_decisions.yaml
-    - contract/calendar.yaml
+    - assets/daily/synthetic/scripted_decisions.yaml
+    - assets/quarterly/synthetic/scripted_decisions.yaml
+    - assets/daily/calendar.yaml
+    - assets/quarterly/calendar.yaml
     evidence:
     - '2026-10-13: reset and bootstrapped from empty in 6m29s (Birth Registrations 330s, Child Protection 261s). 80 Birth Registrations slots, 10 reds and 16 ambers as drawn; every targeted supply read as built once replayed (the first bootstrap''s 13 disagreements were the payload defect above). Filings: TS-68 08-05 #1 and #2; TS-69 #2 re-filed to 08-09; TS-70 #1 re-filed to 08-11 late from its 16:30 receipt; TS-73 08-20 and TS-74 08-24 with no supply; TS-74 #1 re-filed to 08-25; no mark-not-supplied for either. tests/test_scripted_decisions.py + tests/test_scenario_map.py + TestThePlantedPairsOnTheBuiltDashboard: 77 passed, 6 failed - the e2e class counted earlier settled pairs as open rows - then the class alone 7 passed once its selector excluded settled rows; tests/test_generate_runs.py + tests/test_generate_to_target.py 97 passed.'
     - '2026-10-13, after post-build-review #172 (pairs spaced out, 85 days): reset and bootstrapped from empty in 6m43s (Birth Registrations 334s, Child Protection 265s); every built-green, targeted and ordinary-amber supply read as built once replayed (the comparison now includes untargeted green days, which caught TS-73''s red follow day on the earlier history); the longest resend lag 8 days (was 27); no two ordinary reds on neighbouring days; arrival golden re-captured - Child Protection identical, the 27 Birth Registrations arrivals in both captures unchanged.'
@@ -33998,11 +34015,13 @@ requirements:
     - generator/scenario_injection.py::carries
     - generator/scenario_injection.py::filed_early_into
     - generator/scenario_injection.py::inheritance_placements
-    - generator/collections/civil_registration.py::_covered
-    - generator/collections/child_protection.py::_injected_chain
-    - generator/collections/child_protection.py::_ordinary_severities
-    - contract/scripted_decisions.yaml
-    - contract/data-asset.yaml
+    - assets/daily/synthetic/collections/civil_registration.py::_covered
+    - assets/quarterly/synthetic/collections/child_protection.py::_injected_chain
+    - assets/quarterly/synthetic/collections/child_protection.py::_ordinary_severities
+    - assets/daily/synthetic/scripted_decisions.yaml
+    - assets/quarterly/synthetic/scripted_decisions.yaml
+    - assets/daily/data-asset.yaml
+    - assets/quarterly/data-asset.yaml
     - plans/supply-model.md
     linked_tests:
     - tests/test_as_at_scenarios.py
@@ -34372,14 +34391,17 @@ requirements:
       - tests/test_dashboard_e2e.py::TestTheAsAtScenarioChips
       - tests/test_scripted_decisions.py::TestAnOrdinaryChainIsSettledByPeriod
     implemented_by:
-      - generator/collections/child_protection.py::grown_run_plan
-      - generator/collections/child_protection.py::grown_periods
-      - generator/collections/child_protection.py::original_periods
-      - generator/collections/child_protection.py::_grown_severities
+      - assets/quarterly/synthetic/collections/child_protection.py::grown_run_plan
+      - assets/quarterly/synthetic/collections/child_protection.py::grown_periods
+      - assets/quarterly/synthetic/collections/child_protection.py::original_periods
+      - assets/quarterly/synthetic/collections/child_protection.py::_grown_severities
       - generator/scenario_injection.py::stood_on
-      - contract/calendar.yaml
-      - contract/data-asset.yaml
-      - contract/scripted_decisions.yaml
+      - assets/daily/calendar.yaml
+      - assets/quarterly/calendar.yaml
+      - assets/daily/data-asset.yaml
+      - assets/quarterly/data-asset.yaml
+      - assets/daily/synthetic/scripted_decisions.yaml
+      - assets/quarterly/synthetic/scripted_decisions.yaml
       - qa_tools/common/scripted_decisions.py::_timed_chain
     evidence:
       - '2026-10-16: CRITERION 12 - bootstrap from empty on adfe559''s configuration (29m28s, Birth Registrations 593s, Child
@@ -34629,7 +34651,8 @@ requirements:
     - tests/test_holds.py
     - tests/test_asset_time_semantics.py
     implemented_by:
-    - contract/data-asset.yaml
+    - assets/daily/data-asset.yaml
+    - assets/quarterly/data-asset.yaml
     - cli/many_tables.py::ManyTablesCLI::_all_by_pattern
     - cli/many_tables.py::ManyTablesCLI::_borrow_the_rest
     - cli/many_tables.py::ManyTablesCLI::_load_delivery_from_folder
@@ -34780,12 +34803,13 @@ requirements:
       - "tests/test_cp_pair.py"
       - "tests/test_scenario_links.py"
     implemented_by:
-      - "generator/collections/child_protection.py::_pair_files"
-      - "generator/collections/child_protection.py::_injected_chain"
-      - "generator/collections/child_protection.py::_grown_severities"
-      - "generator/collections/child_protection.py::ChildProtection::files"
+      - "assets/quarterly/synthetic/collections/child_protection.py::_pair_files"
+      - "assets/quarterly/synthetic/collections/child_protection.py::_injected_chain"
+      - "assets/quarterly/synthetic/collections/child_protection.py::_grown_severities"
+      - "assets/quarterly/synthetic/collections/child_protection.py::ChildProtection::files"
       - "generator/scenario_injection.py::INJECTIONS"
-      - "contract/scripted_decisions.yaml"
+      - "assets/daily/synthetic/scripted_decisions.yaml"
+      - "assets/quarterly/synthetic/scripted_decisions.yaml"
     evidence:
       - "2026-10-19: TS-42a, TS-42b and TS-80's Expect lines written in plans/supply-model.md from the bootstrap of that day, and REQ-GEN-136's unmet entry for criterion 3 cleared naming TS-42 (criterion 9)."
       - "Selected suites: tests/test_emergency_department.py, test_collections_registry.py, test_generator_providers.py, test_correction_claims.py, test_scripted_corrections.py, test_participation_gap.py, test_scenario_links.py, test_scenario_injection.py, test_generate_cp_runs.py, test_turn_off.py, test_agreement_freeze.py, test_bootstrap.py, test_correction_replay.py, test_correction_apply.py, test_evidently_reads_its_entry.py, test_hierarchy.py, test_validate_schedule.py, test_inheritance.py and test_generate_to_target.py: '4 failed, 714 passed, 316 warnings in 145.32s' with -m 'not needs_deployment', on branch ed-build at 7da8773 plus an uncommitted SCENARIOS.md and plans/morning-reports.md, 2026-10-19 (Perth). The four failures: test_scenario_injection.py::TestTheInjectedSetItself::test_every_injection_names_a_scenario_the_register_marks_for_injection (TS-57a is not in the register), test_generator_providers.py::TestOneDriverForEveryCollection::test_a_third_collections_history_is_written_by_the_shared_driver and ::test_a_regeneration_overwrites_rather_than_accumulates (correction_claims.check_written raises ScheduleConfigError on the fake collection's calendar-less dataset), and test_bootstrap.py::TestItDoesNotRebuildWhatIsAlreadyThere::test_force_rebuilds_anyway (the real scripted keep of TS-59a refused over an empty history). tests/test_cp_pair.py, test_runway.py, test_target_agreement.py, test_calendar_move_pin.py, test_census.py, test_delivery_boundary.py, test_collection_defaults.py, test_cli_pipeline.py, test_collection_cli.py, test_cli_at_thirty_collections.py, test_common_helpers.py, test_cli_dashboard.py, test_run_evidently_cp_real.py, test_bootstrap_equivalence.py, test_publish.py, test_embed_dashboard_data.py, test_build_dashboard_data.py, test_check_lifecycle.py and test_validate_requirements.py: '409 passed, 393 warnings in 121.21s' with -m 'not needs_deployment', the same tree, 2026-10-19 (Perth). TestTheContestedClientRegisterPairs, TestAScenarioInAGrownQuarter, TestRefusals156 and tests/test_cp_pair.py passed."
@@ -35823,12 +35847,14 @@ requirements:
       - "generator/correction_claims.py::check_version_after"
       - "generator/correction_claims.py::added_versions"
       - "generator/correction_claims.py::last_req_gen_199_link_day"
-      - "generator/collections/civil_registration.py::end_periods"
+      - "assets/daily/synthetic/collections/civil_registration.py::end_periods"
       - "generator/scenario_injection.py::correction_event"
       - "generator/scenario_injection.py::INJECTIONS"
       - "cli/scenarios.py::validate_command"
-      - "contract/calendar.yaml"
-      - "contract/scripted_decisions.yaml"
+      - "assets/daily/calendar.yaml"
+      - "assets/quarterly/calendar.yaml"
+      - "assets/daily/synthetic/scripted_decisions.yaml"
+      - "assets/quarterly/synthetic/scripted_decisions.yaml"
     evidence:
       - "2026-10-19: TS-57a to TS-62's register entries in plans/supply-model.md rewritten to the quarterly and daily calendars' real values and to what the page shows (criteria 13 to 15), the 'a' entries per Keith's ruling that the page never shows a past correction as awaiting; REQ-PIPE-170's unmet entry for criterion 23 cleared naming this requirement (criterion 17)."
       - "Selected suites: tests/test_emergency_department.py, test_collections_registry.py, test_generator_providers.py, test_correction_claims.py, test_scripted_corrections.py, test_participation_gap.py, test_scenario_links.py, test_scenario_injection.py, test_generate_cp_runs.py, test_turn_off.py, test_agreement_freeze.py, test_bootstrap.py, test_correction_replay.py, test_correction_apply.py, test_evidently_reads_its_entry.py, test_hierarchy.py, test_validate_schedule.py, test_inheritance.py and test_generate_to_target.py: '4 failed, 714 passed, 316 warnings in 145.32s' with -m 'not needs_deployment', on branch ed-build at 7da8773 plus an uncommitted SCENARIOS.md and plans/morning-reports.md, 2026-10-19 (Perth). The four failures: test_scenario_injection.py::TestTheInjectedSetItself::test_every_injection_names_a_scenario_the_register_marks_for_injection (TS-57a is not in the register), test_generator_providers.py::TestOneDriverForEveryCollection::test_a_third_collections_history_is_written_by_the_shared_driver and ::test_a_regeneration_overwrites_rather_than_accumulates (correction_claims.check_written raises ScheduleConfigError on the fake collection's calendar-less dataset), and test_bootstrap.py::TestItDoesNotRebuildWhatIsAlreadyThere::test_force_rebuilds_anyway (the real scripted keep of TS-59a refused over an empty history). Two of the four failures are this requirement's: the register test (TS-57a to TS-61a not in plans/supply-model.md - see the unmet entry for criteria 13 to 15) and test_force_rebuilds_anyway."
@@ -36030,7 +36056,8 @@ requirements:
       - "tests/test_turn_off.py"
       - "tests/test_scenario_links.py::TestALinkMayBeBoundedByACorrectionAndTheHistorysEnd::test_a_link_between_its_arrival_and_its_correction"
     implemented_by:
-      - "contract/calendar.yaml"
+      - "assets/daily/calendar.yaml"
+      - "assets/quarterly/calendar.yaml"
       - "generator/scenario_injection.py::INJECTIONS"
       - "generator/correction_claims.py::check_written"
     evidence:
@@ -36477,8 +36504,21 @@ requirements:
     - "THE REVIEWER IS NEVER NAMED (Keith, 2026-10-14, Q7, option A). No name, role, agency or verbatim quote anywhere; cards say 'you'. REJECTED: a first name with their agreement."
     - "#3 IS A CURRENT ENTRY, NOT A RESTORED ONE. It was deleted on 2026-10-12 (03cb93e) as fixed by REQ-PIPE-167 and reopened by Keith the same evening (35edcab) as a different concept, so it gets an ordinary card in place. Its card names REQ-PIPE-167 only if the card says plainly that REQ-PIPE-167 is the half that was built - otherwise its derived status would read Built for something still unscoped."
     - 'BUILT 2026-10-14. The approved intro paragraph and CLAUDE.md exception went in word for word (Keith, 2026-10-14). #1 and #2, deleted at road-testing sprint 1''s close after this requirement was signed, came back as card-only entries under their own numbers (Keith, 2026-10-14) - 21 cards, as NFR 7 expected. The two old #14s'' first lines were settled with Keith: ''Arrived at'' is We noticed, ''Client reference'' is You told us. #3 carries no evidence, per the decision that it names REQ-PIPE-167 only if the card says that is the half built, which would derive Built for something still unscoped. Building the parser found that plans_md joined a paragraph after a list onto the list''s last bullet (post-build-review #185), fixed first. road_testing_sprints() lives in plans_md so the build and the gate read the sprint list the same way.'
+    - "A LINK TO AN AGENCY THE ASSET DOES NOT HOLD WAITS FOR REQ-PIPE-354 (SETTLED by Keith 2026-11-02, the move critic's decision 1): plans/road-testing.md is repository-wide while each asset's feedback pass reads only its own hierarchy (REQ-PIPE-342 criterion 8), so route_problem passes over a link naming an agency the selected asset does not hold, leaving it to the other asset's pass - and a mistyped agency is no longer caught. Collection and dataset checks under a held agency are unchanged. The test that pinned the refusal (an unknown agency fails) was removed from tests/test_validate_feedback.py with a note; it comes back with REQ-PIPE-354's moved notice, which decides cross-asset links. REJECTED reading every asset's hierarchy now."
     open_questions:
     - "If a second person road-tests the PoC, do their cards share this file and tab (which would need a 'who' grouping without naming anyone)? Out of scope for this draft and not asked now; recorded so it is asked rather than assumed."
+    unmet_criteria:
+    - criterion: >-
+        Criterion 10, in part - a dashboard link naming an agency that no asset's
+        hierarchy holds (a mistyped agency) no longer fails the validator.
+      why: >-
+        SETTLED by Keith 2026-11-02 (the move critic's decision 1): since the asset
+        split each asset's pass reads only its own hierarchy (REQ-PIPE-342 criterion 8),
+        so an agency this asset does not hold may be the other asset's and is left to
+        that pass. Telling the two apart waits for REQ-PIPE-354's moved notice.
+      owner: REQ-PIPE-354, which decides how a link crosses assets
+      blocked_by:
+        requirements: [REQ-PIPE-354]
     linked_tests:
     - 'tests/test_validate_feedback.py'
     - 'tests/test_plans_md.py::test_a_paragraph_after_a_list_is_not_glued_onto_its_last_bullet'
@@ -37254,8 +37294,8 @@ requirements:
       - qa_tools/collections/__init__.py::resolve
       - qa_tools/collections/__init__.py::adapter
       - qa_tools/collections/base.py::CollectionAdapter
-      - qa_tools/collections/civil_registration.py::ADAPTER
-      - qa_tools/collections/child_protection.py::ADAPTER
+      - assets/daily/collections/civil_registration.py::ADAPTER
+      - assets/quarterly/collections/child_protection.py::ADAPTER
       - qa_tools/common/validate_collections.py::config_problems
       - qa_tools/common/validate_collections.py::literal_problems
       - qa_tools/common/validate_collections.py::ALLOWLIST
@@ -37265,7 +37305,8 @@ requirements:
       - qa_tools/common/bootstrap.py::bootstrap
       - qa_tools/common/ticket_sync.py::_load_scopes
       - qa_tools/common/schemas.py::CollectionConfig
-      - contract/data-asset.yaml
+      - assets/daily/data-asset.yaml
+      - assets/quarterly/data-asset.yaml
     evidence:
       - "2026-10-16, CRITERION 12 (REQ-TEST-239): `mothman debug equivalence compare self-check-a after-240` - self-check-a a full capture of 66efd5d, the commit before this change, after-240 a full capture of 0e5bacf, this change, 3 commits apart: S1 recorded-results same, S4 generated-files same, S5 reports same, S7 help-and-menus same, exit 0."
       - "2026-10-16, BOOTSTRAP TIME: after-240 1964s (Birth Registrations 641s, Child Protection 1841s). Against self-check-a (1756s) +208s, just over the self-check's +179s noise; against self-check-b (1935s), the other capture of the same unchanged commit, +29s. The two captures of one commit spanned 1756s to 1935s and after-240 sits 29s above that range, so this is read as noise rather than a per-run cost - the registry is read once per process and cached."
@@ -37362,8 +37403,8 @@ requirements:
       - qa_tools/common/soda_common.py::soda_check_files
       - qa_tools/common/check_bands.py::evidently_bounds
       - qa_tools/collections/__init__.py::Collection
-      - contract/registry-services/bdm-birth-registrations-evidently-checks.yml
-      - contract/child-protection-family-support/child-protection-evidently-checks.yml
+      - assets/daily/registry-services/bdm-birth-registrations-evidently-checks.yml
+      - assets/quarterly/child-protection-family-support/child-protection-evidently-checks.yml
     evidence:
       - "2026-10-16, CRITERION 13 (REQ-TEST-239): `mothman debug equivalence compare after-240 after-241` - after-240 a full capture of 0e5bacf, after-241 of ca6747b, this change, 5 commits apart: S1 recorded-results same, S4 generated-files same, S5 reports same, S7 help-and-menus same. Nothing differed, so there are no dbt file-path differences to list. Bootstrap 1972s against 1964s, +9s."
       - "2026-10-16, CRITERION 6: collect_checks('da3644f') against the working tree - 307 checks on both sides (datacontract 89, soda 86, dbt 81, file 42, evidently 9), none added, removed, retired or with a changed config_hash or lifecycle field; check_lifecycle.validate() returned no errors."
@@ -37759,7 +37800,8 @@ requirements:
       - dashboard/qa-reporting-dashboard.template.html::buildCollectionDatasets
       - dashboard/qa-reporting-dashboard.template.html::realDatasetIndex
       - dashboard/qa-reporting-dashboard.template.html::githubFolderLink
-      - contract/presentation.yaml
+      - assets/daily/presentation.yaml
+      - assets/quarterly/presentation.yaml
     open_questions: []
 
   - id: REQ-TEST-245
@@ -37986,6 +38028,7 @@ requirements:
       - "NO PLANS PROSE DELETED IN THIS CHANGE, deliberately: plans/publishing-and-history.md item 6 feeds every requirement of this series up to REQ-PIPE-248, and CLAUDE.md's batch rule 4 deletes a thread whole once its last dependent requirement is built."
       - "SEEDS ARE MEASURED AS WELL AS DECLARED (Keith, 2026-10-18, after the delivery-critic on this requirement): the gate keeps checking each provider's declared seed_schedule(), and a test now records every seed the generator's own code draws during a real generation of each collection and fails on one no declared window holds - criterion 2's 'any seed a provider derives' made a check, not a promise."
       - "THIRD-COLLECTION HARDENING AS GATE CHECKS (Keith, 2026-10-18: 'fix now'): the providers gate refuses a provider filed under another collection, a dataset or amber dataset its collection does not own, a target trial on a multi-table collection, a lever set generator/targeting.py does not know or one two collections share, and a provider module naming no collection; a trial asked of a multi-table collection is refused before anything is written (post-build-review #232)."
+      - "A SCENARIO NAMING A DATASET IN NEITHER ASSET WAITS FOR REQ-PIPE-354, AND IS NAMED, NOT SILENT (SETTLED by Keith 2026-11-02, the move critic's decision 2): since the asset split the scenario table is still one repository-wide list, so each asset's generation walks only the injections naming a dataset it declares (scenario_injection.this_assets_injections) and criterion 8's refusal now sees only those. An injection whose dataset no asset declares cannot be told from another asset's without reading that asset, which REQ-PIPE-342 criterion 8 forbids, so it is passed over - with a UserWarning naming each scenario dropped, once per asset per process. REJECTED reading both assets now, and waiting silently."
     evidence:
       - "2026-10-18, CRITERION 4 (REQ-TEST-239): `mothman debug equivalence compare after-243 after-246` - after-243 a full capture of 2e3e76e (REQ-PIPE-243's after, this change's before), after-246 of 86fdc05, 12 commits apart: S1 recorded-results same, S4 generated-files same, S5 reports same. S7 help-and-menus differs only by `mothman github ci-usage`, which REQ-TEST-260 added between the two captures. Bootstrap 1245s against 1298s, +53s (Birth Registrations 457s against 429s, Child Protection 1165s against 1213s)."
       - "2026-10-18, TESTS on the tree of b3f9f4f plus the register edit: tests/test_generator_providers.py, test_scenario_map.py, test_scenario_injection.py, test_generate_runs.py, test_generate_cp_runs.py, test_generate_to_target.py, test_scenario_links.py, test_scenario_subjects.py, test_bootstrap.py and test_collections_registry.py - 367 passed. The full gate runs once after REQ-PIPE-248 (Keith, 2026-10-18)."
@@ -37993,6 +38036,7 @@ requirements:
     linked_tests:
       - tests/test_generator_providers.py
       - tests/test_scenario_map.py::TestItIsRebuiltWithTheHistory
+      - tests/test_scenario_injection.py::TestAnInjectionNamingNoAssetsDataset
       - tests/test_bootstrap.py
       - tests/test_generate_runs.py
       - tests/test_generate_cp_runs.py
@@ -38002,8 +38046,8 @@ requirements:
       - generator/collections/__init__.py::provider
       - generator/collections/__init__.py::seed_range_problems
       - generator/collections/base.py::Provider
-      - generator/collections/civil_registration.py::CivilRegistration
-      - generator/collections/child_protection.py::ChildProtection
+      - assets/daily/synthetic/collections/civil_registration.py::CivilRegistration
+      - assets/quarterly/synthetic/collections/child_protection.py::ChildProtection
       - generator/validate_providers.py::problems
       - generator/scenario_injection.py::generated_periods
       - generator/scenario_injection.py::unprovided_scenarios
@@ -38012,6 +38056,19 @@ requirements:
       - generator/targets.py::_trialled
       - cli/pipeline.py::generate_collection
       - cli/pipeline.py::target_datasets
+    unmet_criteria:
+      - criterion: >-
+          Criterion 8, in part - a scenario naming a dataset that NO asset declares (a
+          typo'd dataset id) is no longer refused at generation: each asset passes it
+          over as possibly another asset's, with a warning naming it.
+        why: >-
+          SETTLED by Keith 2026-11-02 (the move critic's decision 2): telling another
+          asset's scenario from a typo means reading the other asset, which REQ-PIPE-342
+          criterion 8 forbids until REQ-PIPE-354 decides cross-asset references. A
+          dataset an asset declares but no provider makes is still refused.
+        owner: REQ-PIPE-354, with the per-asset scenario check of REQ-PIPE-352 criterion 3
+        blocked_by:
+          requirements: [REQ-PIPE-354]
     open_questions: []
 
   - id: REQ-QAC-247
@@ -38125,7 +38182,7 @@ requirements:
       - qa_tools/collections/__init__.py::Collection
       - qa_tools/common/validate_collections.py::config_problems
       - qa_tools/common/equivalence.py::compare
-      - dbt_project/models/civil-registration/stg_birth_registrations.sql
+      - assets/daily/dbt/models/civil-registration/stg_birth_registrations.sql
     evidence:
       - "2026-10-18, CRITERION 5: `mothman debug equivalence compare after-247b after-248 --renamed-by REQ-PIPE-248` (7c2913a against 578b2d5, 20 commits; bootstraps 1371s and 1465s). S4 generated files the same. S1: 111 recorded results differ, every one Birth Registrations' row-count-growth check and every one in `column_name` alone (registration_number -> (table)) - status, value and reference identical, so the per-table count read from the record equals the count the old path made; and all 482 dataset_stats records differ in shape only (row_count -> row_counts by table, aggregates keyed table.column, no arrival/earliest_extract). S5, with the four files mapped to their new names: Child Protection's dashboard file identical; its results file loses each record's `arrival`; Birth Registrations' results file gains the collection header and the stats shape above; Birth Registrations' dashboard file moves under `datasets`, where its one dataset equals the old document except that the volume check sits in Supply-level checks rather than registration_number and the Table-level and Supply-level pseudo-columns take Child Protection's order. S7: one line, `mothman debug equivalence compare`'s help gaining --renamed-by, which criterion 8 adds. Every difference is one this requirement or REQ-QAC-247's two moved calls names."
       - "2026-10-18, CRITERIA 1-4, 6-8: built in 80b6027 (agency shorts), a5a7ace (rename map), dbb3c6c (registry file names), 96b12d4 and b56c671 (dashboard and results shapes), 5ac0906 (run entry), 3ce13c7 (stats shape), d7ba899 (volume per table; criterion 3's snapshot, read by nothing), baaf401 (earliest_extract), 3bc9f00 (view-only scoping), c0503e6 (stamping, the last legacy flag; legacy.KNOWN empty so the collections gate fails any declared flag), 7ef2684 (the legacy Evidently reader and the allowlist's last entry). The full `mothman check` result on the pushed tree is in that push's commit message."
@@ -39034,18 +39091,21 @@ requirements:
       - "tests/test_validate_schedule.py"
       - "tests/test_check_lifecycle.py"
     implemented_by:
-      - "contract/data-asset.yaml"
-      - "contract/calendar.yaml"
-      - "contract/presentation.yaml"
-      - "contract/department-of-health/emergency-department-contract.yaml"
-      - "contract/department-of-health/emergency-department-contract-retired.yaml"
-      - "contract/department-of-health/emergency-department-soda-checks.yml"
-      - "contract/department-of-health/emergency-department-soda-checks-retired.yml"
-      - "contract/department-of-health/emergency-department-evidently-checks.yml"
-      - "contract/department-of-health/emergency-department-evidently-checks-retired.yml"
-      - "dbt_project/models/emergency-department/schema.yml"
-      - "dbt_project/models/emergency-department/sources.yml"
-      - "dbt_project/models/emergency-department/stg_ed_presentations.sql"
+      - "assets/daily/data-asset.yaml"
+      - "assets/quarterly/data-asset.yaml"
+      - "assets/daily/calendar.yaml"
+      - "assets/quarterly/calendar.yaml"
+      - "assets/daily/presentation.yaml"
+      - "assets/quarterly/presentation.yaml"
+      - "assets/quarterly/department-of-health/emergency-department-contract.yaml"
+      - "assets/quarterly/department-of-health/emergency-department-contract-retired.yaml"
+      - "assets/quarterly/department-of-health/emergency-department-soda-checks.yml"
+      - "assets/quarterly/department-of-health/emergency-department-soda-checks-retired.yml"
+      - "assets/quarterly/department-of-health/emergency-department-evidently-checks.yml"
+      - "assets/quarterly/department-of-health/emergency-department-evidently-checks-retired.yml"
+      - "assets/quarterly/dbt/models/emergency-department/schema.yml"
+      - "assets/quarterly/dbt/models/emergency-department/sources.yml"
+      - "assets/quarterly/dbt/models/emergency-department/stg_ed_presentations.sql"
       - "qa_tools/common/evidently_common.py::collection_checks"
       - "qa_tools/tools/run_evidently.py::evaluate"
       - "qa_tools/common/agreement_freeze.py::check"
@@ -39109,10 +39169,10 @@ requirements:
       - "tests/test_generator_providers.py::TestImportingAProviderCostsNoToolImport::test_every_provider_module_imports_without_pandas_or_numpy"
       - "tests/test_correction_claims.py::test_the_driver_refuses_before_it_writes"
     implemented_by:
-      - "generator/collections/emergency_department.py::EmergencyDepartment"
-      - "generator/collections/emergency_department.py::Rows"
-      - "generator/collections/emergency_department.py::run_plan"
-      - "generator/collections/emergency_department.py::generated_periods"
+      - "assets/quarterly/synthetic/collections/emergency_department.py::EmergencyDepartment"
+      - "assets/quarterly/synthetic/collections/emergency_department.py::Rows"
+      - "assets/quarterly/synthetic/collections/emergency_department.py::run_plan"
+      - "assets/quarterly/synthetic/collections/emergency_department.py::generated_periods"
       - "generator/collections/base.py::Provider"
       - "generator/driver.py::generate"
     evidence:
@@ -39168,7 +39228,7 @@ requirements:
       - "tests/test_collection_cli.py"
       - "tests/test_cli_at_thirty_collections.py"
     implemented_by:
-      - "qa_tools/collections/emergency_department.py::ADAPTER"
+      - "assets/quarterly/collections/emergency_department.py::ADAPTER"
       - "qa_tools/common/bootstrap.py::bootstrap"
       - "qa_tools/common/bootstrap.py::_confirm_corrections"
     evidence:
@@ -39225,7 +39285,8 @@ requirements:
       - "tests/test_embed_dashboard_data.py"
     implemented_by:
       - "dashboard/qa-reporting-dashboard.template.html"
-      - "contract/presentation.yaml"
+      - "assets/daily/presentation.yaml"
+      - "assets/quarterly/presentation.yaml"
     evidence:
       - "Selected suites: tests/test_cp_pair.py, test_runway.py, test_target_agreement.py, test_calendar_move_pin.py, test_census.py, test_delivery_boundary.py, test_collection_defaults.py, test_cli_pipeline.py, test_collection_cli.py, test_cli_at_thirty_collections.py, test_common_helpers.py, test_cli_dashboard.py, test_run_evidently_cp_real.py, test_bootstrap_equivalence.py, test_publish.py, test_embed_dashboard_data.py, test_build_dashboard_data.py, test_check_lifecycle.py and test_validate_requirements.py: '409 passed, 393 warnings in 121.21s' with -m 'not needs_deployment', the same tree, 2026-10-19 (Perth). npm test on the same tree, 2026-10-19 (Perth): 'Test Files 61 passed (61)', 'Tests 835 passed (835)'."
       - "2026-10-19 bootstrap from empty (scratch database, 1464s): the dashboard built from it carries three agency cards (registry-services, child-protection-family-support, department-of-health) and ED's dataset page; tests/test_dashboard_e2e.py's 37 tests that had failed on the grown history (exhausted schedule, per-dataset arrivals, file checks, scenario jumps and as-at chips) passed against the first 2026-10-19 bootstrap (37 passed in 479s); the full module runs in the main session's final gate."
@@ -39274,7 +39335,8 @@ requirements:
       - "tests/test_scripted_decisions.py"
     implemented_by:
       - "generator/scenario_injection.py::INJECTIONS"
-      - "contract/scripted_decisions.yaml"
+      - "assets/daily/synthetic/scripted_decisions.yaml"
+      - "assets/quarterly/synthetic/scripted_decisions.yaml"
       - "plans/supply-model.md"
     evidence:
       - "2026-10-28: BOOTSTRAP FROM EMPTY on 9777ce3's code (l4_probe, the one Keith approved for #276's option b): rc 0 in 1886s. On Emergency Department TS-9 filed 2024-Q2 early, TS-65 2025-Q3 early, TS-66 2025-Q4 early; TS-67 filed by the rule as a resupply of 2023-Q3, its promotion refused, then re-filed by the scripted person to 2023-Q4 (one decision, actor person) and judged early - tests/test_scenario_injection.py::TestTheEarlyEmergencyDepartmentSupplies, both deployment tests included, 15 passed with the #276 and target-agreement tests. Target agreement passed. REQ-PIPE-262 criterion 12's four pins held. Every Birth Registrations delivery and receipt byte-identical by a generation into scratch before and after (242 files)."
@@ -39319,7 +39381,7 @@ requirements:
     implemented_by:
       - "generator/scenario_injection.py::INJECTIONS"
       - "generator/scenario_injection.py::resolve"
-      - "generator/collections/emergency_department.py::EmergencyDepartment"
+      - "assets/quarterly/synthetic/collections/emergency_department.py::EmergencyDepartment"
       - "plans/supply-model.md"
     evidence:
       - "Selected suites: tests/test_emergency_department.py, test_collections_registry.py, test_generator_providers.py, test_correction_claims.py, test_scripted_corrections.py, test_participation_gap.py, test_scenario_links.py, test_scenario_injection.py, test_generate_cp_runs.py, test_turn_off.py, test_agreement_freeze.py, test_bootstrap.py, test_correction_replay.py, test_correction_apply.py, test_evidently_reads_its_entry.py, test_hierarchy.py, test_validate_schedule.py, test_inheritance.py and test_generate_to_target.py: '4 failed, 714 passed, 316 warnings in 145.32s' with -m 'not needs_deployment', on branch ed-build at 7da8773 plus an uncommitted SCENARIOS.md and plans/morning-reports.md, 2026-10-19 (Perth). The four failures: test_scenario_injection.py::TestTheInjectedSetItself::test_every_injection_names_a_scenario_the_register_marks_for_injection (TS-57a is not in the register), test_generator_providers.py::TestOneDriverForEveryCollection::test_a_third_collections_history_is_written_by_the_shared_driver and ::test_a_regeneration_overwrites_rather_than_accumulates (correction_claims.check_written raises ScheduleConfigError on the fake collection's calendar-less dataset), and test_bootstrap.py::TestItDoesNotRebuildWhatIsAlreadyThere::test_force_rebuilds_anyway (the real scripted keep of TS-59a refused over an empty history). The three TS-3a/TS-3b tests passed in it."
@@ -39361,7 +39423,8 @@ requirements:
       - "tests/test_participation_gap.py::test_the_quarters_either_side_are_still_owed"
       - "tests/test_inheritance.py"
     implemented_by:
-      - "contract/calendar.yaml"
+      - "assets/daily/calendar.yaml"
+      - "assets/quarterly/calendar.yaml"
       - "qa_tools/common/inheritance.py::_does_not_participate"
     evidence:
       - "Selected suites: tests/test_emergency_department.py, test_collections_registry.py, test_generator_providers.py, test_correction_claims.py, test_scripted_corrections.py, test_participation_gap.py, test_scenario_links.py, test_scenario_injection.py, test_generate_cp_runs.py, test_turn_off.py, test_agreement_freeze.py, test_bootstrap.py, test_correction_replay.py, test_correction_apply.py, test_evidently_reads_its_entry.py, test_hierarchy.py, test_validate_schedule.py, test_inheritance.py and test_generate_to_target.py: '4 failed, 714 passed, 316 warnings in 145.32s' with -m 'not needs_deployment', on branch ed-build at 7da8773 plus an uncommitted SCENARIOS.md and plans/morning-reports.md, 2026-10-19 (Perth). The four failures: test_scenario_injection.py::TestTheInjectedSetItself::test_every_injection_names_a_scenario_the_register_marks_for_injection (TS-57a is not in the register), test_generator_providers.py::TestOneDriverForEveryCollection::test_a_third_collections_history_is_written_by_the_shared_driver and ::test_a_regeneration_overwrites_rather_than_accumulates (correction_claims.check_written raises ScheduleConfigError on the fake collection's calendar-less dataset), and test_bootstrap.py::TestItDoesNotRebuildWhatIsAlreadyThere::test_force_rebuilds_anyway (the real scripted keep of TS-59a refused over an empty history). tests/test_participation_gap.py (2) and tests/test_inheritance.py passed in it."
@@ -39434,8 +39497,8 @@ requirements:
       - "generator/correction_claims.py::foreign_altered"
       - "generator/correction_claims.py::check_written"
       - "generator/correction_claims.py::re_judges"
-      - "generator/collections/child_protection.py::_foreign_altered"
-      - "generator/collections/child_protection.py::ChildProtection::slot"
+      - "assets/quarterly/synthetic/collections/child_protection.py::_foreign_altered"
+      - "assets/quarterly/synthetic/collections/child_protection.py::ChildProtection::slot"
       - "generator/collections/base.py::Provider"
       - "generator/scenario_injection.py::INJECTIONS"
     evidence:
@@ -39498,11 +39561,13 @@ requirements:
       - "tests/test_collection_defaults.py"
       - "tests/test_agreement.py"
     implemented_by:
-      - "generator/collections/child_protection.py::drawn_grown_periods"
-      - "generator/collections/child_protection.py::generated_periods"
-      - "generator/collections/child_protection.py::_grown_severities"
-      - "contract/calendar.yaml"
-      - "contract/scripted_decisions.yaml"
+      - "assets/quarterly/synthetic/collections/child_protection.py::drawn_grown_periods"
+      - "assets/quarterly/synthetic/collections/child_protection.py::generated_periods"
+      - "assets/quarterly/synthetic/collections/child_protection.py::_grown_severities"
+      - "assets/daily/calendar.yaml"
+      - "assets/quarterly/calendar.yaml"
+      - "assets/daily/synthetic/scripted_decisions.yaml"
+      - "assets/quarterly/synthetic/scripted_decisions.yaml"
       - "tests/before_growth.py::calendar"
       - "qa_tools/common/agreement_freeze.py::_redated_versions"
     evidence:
@@ -42562,7 +42627,7 @@ requirements:
     - generator/scenario_injection.py::GateOutcome
     - generator/scenario_injection.py::Placement
     - generator/scenario_injection.py::apply_file_shape
-    - generator/collections/child_protection.py::_plan_injections
+    - assets/quarterly/synthetic/collections/child_protection.py::_plan_injections
     - plans/supply-model.md
     evidence:
     - "2026-10-25: tests/test_target_agreement.py::TestPackageMateHeldBack and TestGateOutcomes pass on this change; written with target_agreement's own-results split and the gate-outcome comparison. A failing-first run against base 80023b7 was not kept: the fixture replay needs schema 48."
@@ -44549,7 +44614,7 @@ requirements:
     - tests/test_dashboard_e2e.py::TestTheBuildIsTheWorkersOwn::test_every_browser_test_is_grouped_by_its_class
     - tests/test_dashboard_e2e.py::TestTheBuildIsTheWorkersOwn::test_the_self_hosted_fonts_load_from_beside_the_page
     - tests/test_dashboard_e2e.py::TestDemoTab::test_opening_it_renders_the_real_player_with_zero_console_errors
-    - tests/test_dashboard_e2e.py::TestTicketBadge::test_an_open_ticket_shows_a_linked_badge_at_tier2_and_tier3
+    - tests/test_dashboard_e2e.py::TestTicketBadgeOnTheDailyAsset::test_an_open_ticket_shows_a_linked_badge_at_tier2_and_tier3
     - tests/test_dashboard_e2e.py::TestAPayloadPastTheBudgetIsWrittenInParts::test_the_page_reassembles_the_unsplit_payload
     - tests/test_embed_dashboard_data.py::TestABuildUnderAnOutDir::test_the_page_its_files_and_its_assets_land_in_the_out_dir
     - tests/test_embed_dashboard_data.py::TestABuildUnderAnOutDir::test_every_reports_path_of_the_chain_is_the_out_dirs
@@ -45024,7 +45089,8 @@ requirements:
     - qa_tools/common/agreement.py::Agreement::files_go_to_period_for
     - qa_tools/common/agreement.py::_offset_versions
     - qa_tools/common/validate_schedule.py::_files_go_to_period_errors
-    - contract/calendar.yaml
+    - assets/daily/calendar.yaml
+    - assets/quarterly/calendar.yaml
     linked_tests:
     - tests/test_files_go_to_period_gate.py::TestANegativeValueIsRefused::test_a_fraction_is_refused_naming_the_collection_and_the_version
     - tests/test_files_go_to_period_gate.py::TestTwoVersionsOnOneDateAreRefused::test_refused_naming_the_date
@@ -45381,7 +45447,7 @@ requirements:
     - LINKAGE PRODUCTS DOES NOT MOVE. It is at 0 (REQ-PIPE-320 criterion 10), so its geocoding of the Child Protection supply filed to a period arrives on that period's own round, one round after the supply it reads - the period, not the round, joins them.
     open_questions: []
     implemented_by:
-    - generator/collections/child_protection.py::generated_periods
+    - assets/quarterly/synthetic/collections/child_protection.py::generated_periods
     - qa_tools/common/schedule.py::round_of
     linked_tests:
     - tests/test_scripted_decisions.py::TestThePeriodsDueInstantIsTheCalendars::test_due_at_is_the_slots_due_instant_not_its_claim_opening
@@ -45578,8 +45644,8 @@ requirements:
     - "qa_tools/common/schemas.py::LinkedDataset"
     - "qa_tools/common/hierarchy.py::Dataset"
     - "qa_tools/common/validate_collections.py::main"
-    - "qa_tools/collections/linkage_products.py::ADAPTER"
-    - "contract/department-of-health/linkage-products-contract.yaml"
+    - "assets/quarterly/collections/linkage_products.py::ADAPTER"
+    - "assets/quarterly/department-of-health/linkage-products-contract.yaml"
     linked_tests:
     - "tests/test_linked_datasets.py::test_the_real_configuration_passes"
     - "tests/test_linked_datasets.py::test_the_linked_list_is_the_hierarchys"
@@ -45816,7 +45882,7 @@ requirements:
       by: Keith
       date: '2026-10-30'
     implemented_by:
-    - "contract/department-of-health/linkage-products-soda-checks.yml"
+    - "assets/quarterly/department-of-health/linkage-products-soda-checks.yml"
     - "qa_tools/common/distribution.py::measure"
     - "qa_tools/common/distribution.py::bins"
     - "qa_tools/common/distribution.py::declared"
@@ -45917,7 +45983,7 @@ requirements:
       by: Keith
       date: '2026-10-30'
     implemented_by:
-    - "generator/collections/linkage_products.py::LinkageProducts"
+    - "assets/quarterly/synthetic/collections/linkage_products.py::LinkageProducts"
     - "generator/collections/base.py::generated_supplies"
     - "qa_tools/common/promotion.py::_readers_next_receipts"
     - "qa_tools/common/slots.py::period_claimed_at"
@@ -45990,9 +46056,10 @@ requirements:
       by: Keith
       date: '2026-10-30'
     implemented_by:
-    - "generator/collections/linkage_products.py::LinkageProducts"
+    - "assets/quarterly/synthetic/collections/linkage_products.py::LinkageProducts"
     - "generator/scenario_injection.py::ExtraArrival"
-    - "contract/scripted_decisions.yaml"
+    - "assets/daily/synthetic/scripted_decisions.yaml"
+    - "assets/quarterly/synthetic/scripted_decisions.yaml"
     linked_tests:
     - "tests/test_linkage_scenarios.py::test_an_empty_key"
     - "tests/test_linkage_scenarios.py::test_an_undeclared_code_stands_for_a_missing_dataset"
@@ -46064,7 +46131,7 @@ requirements:
       by: Keith
       date: '2026-10-30'
     implemented_by:
-    - "qa_tools/collections/linkage_products.py::ADAPTER"
+    - "assets/quarterly/collections/linkage_products.py::ADAPTER"
     - "qa_tools/common/bootstrap.py::with_what_it_reads"
     - "qa_tools/common/bootstrap.py::reads_others"
     - "qa_tools/common/evidently_common.py::collection_checks"
@@ -46295,11 +46362,14 @@ requirements:
     - 'THE PLACING GATE IS THE PROVIDERS GATE''S (build): contract/synthetic_inputs.yaml is generator-only configuration, so generator/synthetic_inputs.py holds its reader and its gate and generator/validate_providers.py calls it, as the collections gate calls linked_datasets''.'
     - AMENDMENT A8 APPLIED 2026-11-01 to REQ-QAC-241 criterion 2 as signed (presentation.yaml and synthetic_inputs.yaml in the asset-wide list).
     implemented_by:
-    - contract/data-asset.yaml
-    - contract/calendar.yaml
-    - contract/synthetic_inputs.yaml
-    - contract/department-of-health/linkage-products-contract.yaml
-    - contract/presentation.yaml
+    - assets/daily/data-asset.yaml
+    - assets/quarterly/data-asset.yaml
+    - assets/daily/calendar.yaml
+    - assets/quarterly/calendar.yaml
+    - assets/quarterly/synthetic/synthetic_inputs.yaml
+    - assets/quarterly/department-of-health/linkage-products-contract.yaml
+    - assets/daily/presentation.yaml
+    - assets/quarterly/presentation.yaml
     - qa_tools/common/schemas.py::LinkedDataset
     - qa_tools/common/hierarchy.py::Dataset
     - qa_tools/common/linked_datasets.py::problems
@@ -46403,18 +46473,19 @@ requirements:
     - generator/driver.py::generate
     - generator/driver.py::provider_delivery_names
     - generator/driver.py::no_instant_shared_with_another_collection
-    - generator/collections/linkage_products.py::LinkageProducts
-    - generator/collections/linkage_products.py::geocoded
-    - generator/collections/linkage_products.py::geocode_rows
-    - generator/collections/linkage_products.py::area_codes
-    - generator/collections/linkage_products.py::planned_verdict
-    - generator/collections/linkage_products.py::members_in_force
-    - generator/collections/linkage_products.py::_refuse_geocoding_unschedulable
+    - assets/quarterly/synthetic/collections/linkage_products.py::LinkageProducts
+    - assets/quarterly/synthetic/collections/linkage_products.py::geocoded
+    - assets/quarterly/synthetic/collections/linkage_products.py::geocode_rows
+    - assets/quarterly/synthetic/collections/linkage_products.py::area_codes
+    - assets/quarterly/synthetic/collections/linkage_products.py::planned_verdict
+    - assets/quarterly/synthetic/collections/linkage_products.py::members_in_force
+    - assets/quarterly/synthetic/collections/linkage_products.py::_refuse_geocoding_unschedulable
     - generator/targets.py::written
     - generator/scenario_injection.py::CORRECTION_RIDERS
     - generator/correction_claims.py::check_all
     - cli/collection_cli.py::CollectionCLI::try_targets
-    - contract/scripted_decisions.yaml
+    - assets/daily/synthetic/scripted_decisions.yaml
+    - assets/quarterly/synthetic/scripted_decisions.yaml
     linked_tests:
     - tests/test_geocoding_generator.py::TestTheStreams
     - tests/test_geocoding_generator.py::TestWhenAndFromWhat
@@ -46493,12 +46564,12 @@ requirements:
     - 'DRIFT CHECKS ON SEVERAL DATASETS OF ONE COLLECTION (build, 2026-11-01): evidently_common.collection_checks refused psi checks on two datasets because they would need a reference each; the reference has been resolved per run''s own dataset since REQ-PIPE-105, so the refusal is removed and run_evidently evaluates each run''s own table''s drift checks. drift_dataset answers None where a collection''s are on several.'
     - 'A SHARED COLUMN''S VALUE COUNTS ARE THE RUN''S OWN TABLE''S (build, test first): value_counts stays keyed by column, the shape every reader reads, and the run''s own table is counted last.'
     implemented_by:
-    - qa_tools/collections/linkage_products.py::ADAPTER
+    - assets/quarterly/collections/linkage_products.py::ADAPTER
     - qa_tools/collections/base.py::DbtSpec
-    - dbt_project/models/linkage-products/sources.yml
-    - dbt_project/models/linkage-products/schema.yml
-    - dbt_project/models/linkage-products/stg_geo_cp_clients.sql
-    - dbt_project/models/linkage-products/stg_geo_ed_presentations.sql
+    - assets/quarterly/dbt/models/linkage-products/sources.yml
+    - assets/quarterly/dbt/models/linkage-products/schema.yml
+    - assets/quarterly/dbt/models/linkage-products/stg_geo_cp_clients.sql
+    - assets/quarterly/dbt/models/linkage-products/stg_geo_ed_presentations.sql
     - qa_tools/tools/dataset_stats.py::compute_dataset_stats
     - cli/collection_cli.py::_cached
     linked_tests:
@@ -46608,10 +46679,10 @@ requirements:
     - 'THE IDENTIFIER, LEVEL AND FORMAT CHECKS ARE FAILED-ROWS QUERIES SELECTING THE KEY (build): id_1 and census_year, so every sample names a record and a year; match_level''s allowed values as a failed-rows query because an empty value is a violation, which invalid_count does not count.'
     - 'GENERIC KIND PHRASES IN MEASURES (build): dbt:missing_set_members, dbt:duplicated_set_members, dbt:unexpected_set_members and soda:value_share, worded for any set and any value, so tests/test_check_measures.py holds until REQ-DASH-299 declares the geocoding words on the checks.'
     implemented_by:
-    - dbt_project/macros/set_member_violations.sql
-    - dbt_project/tests/generic/missing_set_members.sql
-    - dbt_project/tests/generic/duplicated_set_members.sql
-    - dbt_project/tests/generic/unexpected_set_members.sql
+    - dbt_shared/macros/set_member_violations.sql
+    - dbt_shared/tests/generic/missing_set_members.sql
+    - dbt_shared/tests/generic/duplicated_set_members.sql
+    - dbt_shared/tests/generic/unexpected_set_members.sql
     - qa_tools/collections/base.py::DbtSpec
     - qa_tools/tools/run_dbt.py::_counted
     - qa_tools/tools/run_dbt.py::_reads_declared_set
@@ -46623,9 +46694,9 @@ requirements:
     - qa_tools/tools/run_evidently.py::_excluding
     - qa_tools/common/evidently_common.py::collection_checks
     - pipeline/dashboard_check_labels.py::MEASURES
-    - contract/department-of-health/linkage-products-soda-checks.yml
-    - contract/department-of-health/linkage-products-evidently-checks.yml
-    - qa_tools/collections/linkage_products.py::ADAPTER
+    - assets/quarterly/department-of-health/linkage-products-soda-checks.yml
+    - assets/quarterly/department-of-health/linkage-products-evidently-checks.yml
+    - assets/quarterly/collections/linkage_products.py::ADAPTER
     linked_tests:
     - tests/test_geocoding_checks.py::TestTheSetReachesDbtWithThePeriodsViews
     - tests/test_geocoding_checks.py::TestEachYearCheckCountsItsOwnViolation
@@ -46739,18 +46810,18 @@ requirements:
     - 'DEFECT FOUND RUNNING THE TRIAL, FIXED TEST-FIRST (qa_tools/tools/run_evidently.py _psi_result): Evidently raises on an empty current frame, so TS-110''s empty file left the whole run incomplete and its coverage Fail (REQ-QAC-340 criterion 4) unrecorded; drift over no rows is now recorded not evaluated with a reason, never a pass.'
     - 'DEFECT FOUND RUNNING THE TRIAL, FIXED FOR GEOCODING ONLY (GeneratedSupply.carried, ChildProtection.carries_table): the row interface (REQ-GEN-334 criterion 6) offered a Child Protection supply whose file a scenario''s file shape leaves out - five, among them TS-104''s 2016-Q2 source - so geocoding was built from a supply that never arrives. The geocoding stream now reads only supplies whose file arrives; the linkage stream is unchanged, so its built deliveries stay byte-identical, and the linkage half is written up for Keith as plans/qa-pipeline.md #89.'
     implemented_by:
-    - generator/collections/linkage_products.py::GEO_ROW_FAULTS
-    - generator/collections/linkage_products.py::GEO_FAULT_AIMS
-    - generator/collections/linkage_products.py::apply_geo_faults
-    - generator/collections/linkage_products.py::in_warehouse
-    - generator/collections/linkage_products.py::LinkageProducts
-    - generator/collections/linkage_products.py::geo_named_placements
-    - generator/collections/linkage_products.py::_refuse_geocoding_scenario_quarters
-    - generator/collections/linkage_products.py::_named_held_sources
+    - assets/quarterly/synthetic/collections/linkage_products.py::GEO_ROW_FAULTS
+    - assets/quarterly/synthetic/collections/linkage_products.py::GEO_FAULT_AIMS
+    - assets/quarterly/synthetic/collections/linkage_products.py::apply_geo_faults
+    - assets/quarterly/synthetic/collections/linkage_products.py::in_warehouse
+    - assets/quarterly/synthetic/collections/linkage_products.py::LinkageProducts
+    - assets/quarterly/synthetic/collections/linkage_products.py::geo_named_placements
+    - assets/quarterly/synthetic/collections/linkage_products.py::_refuse_geocoding_scenario_quarters
+    - assets/quarterly/synthetic/collections/linkage_products.py::_named_held_sources
     - generator/collections/base.py::GeneratedSupply
     - generator/collections/base.py::generated_supplies
     - generator/collections/base.py::Plan
-    - generator/collections/child_protection.py::ChildProtection::carries_table
+    - assets/quarterly/synthetic/collections/child_protection.py::ChildProtection::carries_table
     - generator/driver.py::generate
     - generator/scenario_injection.py::INJECTIONS
     - generator/targets.py::Built
@@ -46768,7 +46839,7 @@ requirements:
     - qa_tools/common/target_agreement.py::unaimed
     - qa_tools/common/unrunnable.py::results_for_trial
     - qa_tools/tools/run_evidently.py::_psi_result
-    - generator/collections/linkage_products.py::_addresses_gapped
+    - assets/quarterly/synthetic/collections/linkage_products.py::_addresses_gapped
     - plans/supply-model.md
     linked_tests:
     - tests/test_geocoding_faults.py::TestTheFaultsByConstruction
@@ -46959,9 +47030,10 @@ requirements:
     - "dashboard/qa-reporting-dashboard.template.html::listSettingTilesHtml"
     - "dashboard/qa-reporting-dashboard.template.html::linkedSourceTileHtml"
     - "status-cases.json"
-    - "contract/presentation.yaml"
-    - "contract/department-of-health/linkage-products-soda-checks.yml"
-    - "dbt_project/models/linkage-products/schema.yml"
+    - "assets/daily/presentation.yaml"
+    - "assets/quarterly/presentation.yaml"
+    - "assets/quarterly/department-of-health/linkage-products-soda-checks.yml"
+    - "assets/quarterly/dbt/models/linkage-products/schema.yml"
     linked_tests:
     - "tests/test_geocoding_page_build.py::TestTheYearChecksKeepTheirDeclaredOrder"
     - "tests/test_notchecked_refused.py::test_a_result_recorded_notchecked_is_refused_and_nothing_lands"
@@ -47076,8 +47148,9 @@ requirements:
     - qa_tools/common/list_setting_members.py::_breaking_entry_problems
     - qa_tools/common/list_setting_members.py::InForce
     - qa_tools/tools/run_dbt.py::_set_judged_against
-    - contract/data-asset.yaml
-    - dbt_project/models/linkage-products/schema.yml
+    - assets/daily/data-asset.yaml
+    - assets/quarterly/data-asset.yaml
+    - assets/quarterly/dbt/models/linkage-products/schema.yml
     linked_tests:
     - tests/test_list_settings.py::TestCriterionTwelveSeenFailingFirst
     - tests/test_list_settings.py::TestThePathAndTheTypedValue
@@ -47155,10 +47228,10 @@ requirements:
     - 'THE PAIR''S PHRASES ARE REQ-DASH-299''s (build, 2026-11-01): the generic rewording of soda:referential and soda:coverage to ''Rows matching no source record'' and ''Source records matched'' is REQ-DASH-299 criterion 2''s and is not made here; the orphan check is named ''Rows matching no source record'' in its file.'
     - 'THE ORPHAN CHECK''S SAMPLE IS id_1 AND census_year (build): the geocoding table''s key, so an orphan names its record and each year it was released for.'
     implemented_by:
-    - contract/department-of-health/linkage-products-soda-checks.yml
+    - assets/quarterly/department-of-health/linkage-products-soda-checks.yml
     - qa_tools/common/linked_datasets.py::_check_problems
     - qa_tools/common/linked_datasets.py::_query_problems
-    - qa_tools/collections/linkage_products.py::ADAPTER
+    - assets/quarterly/collections/linkage_products.py::ADAPTER
     linked_tests:
     - tests/test_geocoding_checks.py::TestTheShareAndThePairOnRealSoda
     - tests/test_geocoding_declarations.py::TestCriterionFiveEachRuleReadsItsOwnBlock
@@ -47257,7 +47330,7 @@ requirements:
     - qa_tools/collections/base.py::CollectionAdapter
     - pipeline/build_dashboard_data.py::build_one_table
     - dashboard/qa-reporting-dashboard.template.html
-    - contract/department-of-health/linkage-products-soda-checks.yml
+    - assets/quarterly/department-of-health/linkage-products-soda-checks.yml
     linked_tests:
     - tests/test_sample_keys_composite.py::test_every_adapter_declares_each_tables_key_as_a_list
     - tests/test_sample_keys_composite.py::test_the_existing_one_column_keys_are_unchanged
@@ -47650,10 +47723,11 @@ requirements:
     - 'tests/test_dashboard_e2e.py::_GUARD_SKIPPED_MARKS'
     evidence:
     - '2026-11-01, tree f22855b: criterion 5''s tests/test_status_words_shown.py passes 53 of 53 (status_words in every form for every status, the outcome, root-cause, queue-state, re-checked-worse, bulk re-check, gate refusal, ticket and scenario-map wordings with NO_COLOR set, and the replacement setting''s words). The browser guard and its two self-tests are written in tests/test_dashboard_e2e.py and not run (unmet_criteria).'
+    - '2026-11-02, bmove tree 07a43526: tests/test_dashboard_e2e.py whole, 434 passed and 4 failed against each asset''s bootstrapped deployment database. Every REQ-TEST-361 guard class passed - TestNoColourWordIsReadAsAStatus (quarterly, 4 tests), TestNoColourWordIsReadAsAStatusOnTheDailyAsset (daily, 4 tests: scenario pages, tiers with the Scenarios tab and dataset page, a column panel with its trend tooltips, and the needs-action queue) and TestTheColourWordGuardCanFail (2) - and test_the_two_assets_show_every_surface failed naming the two criterion-1 surfaces in unmet_criteria. The other three failures are post-build-review #307 5(a), 5(c) and the load budget, none of this requirement''s. Each asset''s scenario scan now walks every scenario page and asserts the surfaces shown are exactly that asset''s _GUARD_SURFACES_BY_ASSET entry (post-build-review #306 2).'
     unmet_criteria:
-    - criterion: 'Criteria 1 to 4 and 6 - the real-browser guard and its two self-tests run against the built dashboard.'
-      why: 'Written in tests/test_dashboard_e2e.py and not run: they need a dashboard built from a bootstrapped history, and this build ran with an empty warehouse (Keith''s run terms, 2026-11-01).'
-      owner: 'the end-of-run bootstrap (2026-11-01 build run)'
+    - criterion: 'Criterion 1''s re-checked-worse supply and ''Re-checked <t>: became <X>'' row.'
+      why: 'Criteria 1 to 4 and 6 have run against dashboards built from each asset''s bootstrapped history (2026-11-02, bmove, evidence above) and the guard finds no colour word on any surface it scans, on either asset. Criterion 1 is still unmet on two of the six surfaces it names: no scenario page of either asset shows a re-checked-worse supply or a ''Re-checked <t>: became <X>'' row, so test_the_two_assets_show_every_surface fails naming them (post-build-review #305 5(b) and #306 4).'
+      owner: 'Keith - a scenario that produces each surface, or an amended criterion (post-build-review #307 5(b))'
       blocked_by:
         unowned: true
   - id: REQ-DOCS-362
@@ -47739,7 +47813,8 @@ requirements:
     - 'docs/supplier-guidance.md'
     - 'README.md'
     - 'plans/supply-model.md'
-    - 'SCENARIOS.md'
+    - 'SCENARIOS-quarterly.md'
+    - 'SCENARIOS-daily.md'
     evidence:
     - '2026-11-02 Perth, CLEARED BY REQ-DASH-299''s build (worktree b299): the tag REQ-DASH-299 criterion 15 (9) names is amberPromotedTag''s - [data-amber-promoted], its pill ''Promoted, warning'' and [data-amber-promoted-why] - checked against the template and asserted by tests/test_dashboard_e2e.py::TestTheGeocodingPages::test_9_the_g1_route_tags_the_older_client_register_supply (written; run by the end-of-run bootstrap).'
     - '2026-11-01: A1-A39 (41 criteria) and B1 applied by a script that stopped on any CURRENT not matching the live criterion verbatim (none did) and read each back with yaml.safe_load: 0 mismatches, 42 criteria changed, every requirement''s criterion count unchanged, no other requirement''s text changed.'
@@ -47797,6 +47872,8 @@ requirements:
     - 'THE STATE-PATH SWEEP''S SHAPE (state-path sweep, 2026-11-01): each module-level state-path constant became a call-time function in the module that had it - delivery.default_deliveries_dir()/default_receipts_dir()/bookkeeping_path(), the generator driver''s own deliveries_dir()/receipts_dir()/bookkeeping_path(), scenario_map''s and scenario_injection''s placements_path(), and the reports lookups in build_dashboard_data, results_history, ticket_sync and embed_dashboard_data - each answering through qa_tools/common/assets.py. The driver''s three stay separate from delivery''s, as the constants were, so redirecting the generator''s output (generator/output.py''s redirect) still leaves the default readers alone; a test redirects one by replacing its function (tests/state_paths.py''s fixed()). REJECTED: one resolver-level override for every state path, which would have redirected readers the old constants left alone and changed what existing tests assert; and module __getattr__ keeping the constant names, which monkeypatch''s undo would freeze back into a constant.'
     - 'A GUARD FOR CALL TIME (state-path sweep, 2026-11-01): tests/test_state_paths_at_call_time.py fails on any product module that builds a contract/, data/ or reports/ path itself (a string starting with one, or the bare word as a path component) or calls a resolver lookup at import time (module or class body, default argument, decorator), so the geocoding merge and later code cannot reintroduce one. Its allowlist is shrink-only - an entry nothing matches fails too - and holds only messages naming a file for a person, the cache key''s repository-wide input globs, environments.yaml, and an --out-dir build''s own reports/.'
     - 'PROVISIONAL (state-path sweep, 2026-11-01): a reader that names the asset''s files by repository path - the lifecycle gate, the agreement freeze''s git-ref reads - asks assets.folder_rel(), which gives ''contract'' today and, for an asset folder outside the repository (a test''s copy, #55''s injected configuration), the folder''s ABSOLUTE path, so joining it to the repository root still finds it; only a read at a git ref has no meaning there. Question for Keith: is an absolute path the right answer for an asset outside the repository, or should such a reader refuse it?'
+    - 'WHAT LANDED (2026-11-02): the move commit de009e91 - contract/ is assets/, one folder per asset (quarterly: Child Protection, Emergency Department, Linkage Products; daily: Civil Registration), environments.yaml at the top of assets/, the resolver switched to assets/ and CODEOWNERS'' paths updated in the same commit (criterion 9). Follow-ons: the collections gate takes the repository as its root and knows an asset folder''s parts - dbt/, collections/ and synthetic/ each with a gate of its own - listing the asset-wide files (data-asset, calendar, people, file-checks, presentation) and the synthetic ones (120fa04f); the caches gate scans assets/ with allowlist keys `assets/*/...`, naming no asset. `mothman check --no-pytest` passes every gate on that tree with MOTHMAN_DIFF_BASE=f123a582, each asset-reading gate once per asset.'
+    - 'CROSS-ASSET FEEDBACK LINKS WAIT FOR REQ-PIPE-354 (SETTLED by Keith 2026-11-02, the move critic''s decision 1; was PROVISIONAL): the feedback gate leaves a road-testing link naming an agency the selected asset does not hold to the other asset''s pass, since plans/road-testing.md is repository-wide and reading the other asset would break criterion 8 - so a mistyped agency in a link is not caught until REQ-PIPE-354''s moved notice decides cross-asset links. Recorded as REQ-DOCS-219''s unmet criterion 10. REJECTED reading every asset''s hierarchy now.'
     open_questions: []
   - id: REQ-PIPE-363
     title: A command is told which asset it acts for by MOTHMAN_ASSET, with no default; only that asset's commands exist, the terminal names the asset, and check and --help work with none set
@@ -47843,6 +47920,7 @@ requirements:
     - 'PROVISIONAL (groundwork builder, 2026-11-01): the asset is also named in a confirmation''s prefix, ''[Claude Code sandbox (not production) · Asset: data-asset-1] Record promote?'', reading criterion 8''s ''wherever REQ-TEST-114 names the environment'' as including its criterion 4. Question for Keith: keep it there, or the toolbar and the stderr line only?'
     - 'PROVISIONAL (groundwork builder, 2026-11-01): bare `mothman` checks the asset before the terminal check, so a non-TTY session meets the missing variable rather than the ''needs a terminal'' refusal. Question for Keith: is that order right?'
     - 'PROVISIONAL (state-path sweep, after the groundwork critic, 2026-11-01): `mothman env tidy-test-databases` still connects with MOTHMAN_ASSET unset, reading criterion 6''s ''opens a connection'' as a connection to an asset''s database - the suite''s test databases belong to no asset (each test selects its own) and it reads MOTHMAN_TEST_DSN, never the supply database. `mothman pipeline checkpoint list` is refused, since a checkpoint is a copy of one asset''s supply database. Question for Keith: keep tidy-test-databases exempt, or refuse it too and have the suite''s own tidying set an asset?'
+    - 'SETTLED by Keith 2026-11-01: every module names its asset. Each test module carries a module-level pytestmark = pytest.mark.asset("<asset>"), a test or class acting for the other asset carries its own, tests/conftest.py refuses a test with no mark by name, and there is no suite default. The CLI''s collection groups are rebuilt in place for the selected asset by a test helper (tests/asset_cli.py), since mothman builds them once at import. Stated in the suite, never ambient, per criterion 9.'
     open_questions: []
   - id: REQ-PIPE-364
     title: mothman check runs every configuration gate once per asset folder, needing no asset and no database, keeps identifiers unique within each asset, and compares nothing across assets
@@ -47944,6 +48022,9 @@ requirements:
     - '`mothman env dbt-deps` IN THE env GROUP (CLI UX v3 SHOULD 4): beside reset-synthetic and mark; idempotent. REJECTED leaving a bare `dbt deps` per asset in each setup script, which every new setup would have to learn the paths of.'
     - 'PROJECT NAMED FOR THE ASSET (delivery-scoper, v3; SETTLED by Keith 2026-11-01 with v4): mothman_<asset>, so dbt''s own logs and artefacts say which asset they came from.'
     - 'PROVISIONAL (groundwork builder, 2026-11-01): ''already installed'' is decided by a stamp, dbt_packages/.mothman-packages.sha1, holding the digest of the packages.yml the packages were installed for; a dbt_packages/ installed by a bare `dbt deps` has no stamp, so the first `mothman env dbt-deps` installs once more. The stamp also lists the package directories the install produced, and one missing or empty since installs again (added after the groundwork critic found a deleted dbt_packages/dbt_utils still read as installed). Question for Keith: acceptable, or compare against dbt''s own package-lock.yml instead?'
+    - 'WHAT LANDED (2026-11-02): each asset''s dbt project under assets/<asset>/dbt/ (the move commit de009e91), and the shared macro and generic tests in the local package dbt_shared/ (28fce20d), pulled in by each project''s packages.yml as `local: ../../../dbt_shared`. The registry, the lifecycle gate and the dbt-folder gate name the selected asset''s project through assets.dbt_rel() at call time. .gitignore and .yamllint-ignore name assets/*/dbt/{dbt_packages,target,logs}/ (0605a9e0); nothing under them was ever committed.'
+    - 'PROVISIONAL (the move build, 2026-11-02): dbt resolves an UNQUALIFIED generic test only in the root project and dbt''s own namespace, never in an installed package - found by real dbt: with the macros moved into the package, `- matches_regex:` and the set-member tests failed to compile (''test_matches_regex'' is undefined). Each asset''s project therefore carries macros/dbt_shared_tests.sql, forwarding each shared test and set_member_violations by name to dbt_shared.<name> with whitespace control, so the compiled SQL is byte-identical (7 compiled tests compared) and no schema file or definition hash changes. REJECTED qualifying the schema files (`- dbt_shared.matches_regex:`), which changes every such check''s definition. Question for Keith: keep the forwarding file per project, or point each project''s macro-paths and test-paths at ../../../dbt_shared instead (also byte-identical, tested), which drops packages.yml''s local entry and so departs from criterion 2''s wording?'
+    - 'PROVISIONAL (the move build, 2026-11-02): the project is still named birth_registrations in both assets - the move changes no content, and dbt''s unique_ids carry the project name (test.birth_registrations....), so renaming to mothman_<asset> (criterion 1) changes every recorded unique_id and is a content change for a later commit. Question for Keith: rename in the follow-on push, accepting that any raw dbt output recorded with unique_ids differs from the pre-split history?'
     open_questions: []
   - id: REQ-PIPE-369
     title: Each asset's QA adapters live under assets/<asset>/collections/ and are loaded by file path, never as a package, and a spawned process is handed the asset and the collection id
@@ -48017,6 +48098,8 @@ requirements:
     - 'THE POPULATION GENERATOR APPLIES ONLY THE SELECTED ASSET''S PRESETS (Keith, 2026-11-01, on architect v3 BLOCKING 4): `mothman population` takes MOTHMAN_ASSET. REJECTED the architect''s recommendation of dropping its preset step, and REJECTED one process reading both assets'' providers, which breaks REQ-PIPE-342 criterion 8.'
     - 'THE GATES AND THE SETTING RESOLVER ARE ALLOWED READERS (architect v3 SHOULD 1): validate_collections reads scripted_decisions.yaml and synthetic_inputs.yaml today, and REQ-GEN-371 makes the setting resolver and validate_schedule read eras.yaml; v3''s criterion would have failed working code.'
     - 'SEED RANGES UNIQUE WITHIN AN ASSET (delivery-scoper, v3): providers of two assets never run in one generator process.'
+    - 'WHAT LANDED (2026-11-02): providers under assets/<asset>/synthetic/collections/ and scripted_decisions.yaml and synthetic_inputs.yaml under assets/<asset>/synthetic/ (the move commit de009e91), read there through Asset.synthetic (fe2a8fd3). NOT YET DONE: criterion 4''s fold of daily_batch.py and the apply_*_presets into their providers, and criterion 6''s per-asset `mothman population` - synthetic_data_generator/agency_datasets.py also imports daily_batch, so the fold needs population to load the daily provider by path while it builds both assets'' tables, a design question for this requirement''s own build.'
+    - 'ONE SCENARIO TABLE UNTIL EACH ASSET HOLDS ITS OWN (SETTLED by Keith 2026-11-02, the move critic''s decision 2; was PROVISIONAL): generator/scenario_injection.py INJECTIONS stays one repository-wide list, so generation, correction claims and `mothman scenarios validate` walk only the injections naming a dataset the selected asset declares (scenario_injection.this_assets_injections); another asset''s are passed over, and one naming a dataset in no asset is no longer refused - it WAITS for REQ-PIPE-354, and meanwhile a warning names each scenario dropped. Recorded as REQ-GEN-246''s unmet criterion 8. REJECTED reading both assets now, and dropping silently.'
     open_questions: []
   - id: REQ-GEN-371
     title: Each asset's synthetic-era setting versions - back-dated, or named a synthetic era in their changelog - move from data-asset.yaml to synthetic/eras.yaml, and the merged timeline is unchanged
@@ -48116,6 +48199,9 @@ requirements:
     - 'A NARROW, SELF-EXPIRING TRANSFORM (architect BLOCKING 3): find_disappeared_check_ids excuses only REQ-QAC-039''s transform today, so once the base-commit reads follow the move (REQ-TEST-366) every renamed id would fail as disappeared. REJECTED waiving the gate for the move commit, which would also let a real deletion through.'
     - 'THE DASHBOARD URL STILL CARRIES NO ASSET SEGMENT (REQ-QAC-039 criterion 6, kept): each asset has its own site (REQ-PIPE-354).'
     - 'DELETED IN THE NEXT PUSH, WITH THE MAP IT READS (architect v3 BLOCKING 2, following Keith''s move-map answer of 2026-10-31): v3 called the transform ''inert'' once no base predated the move, but it reads its former id from a map deleted in the next push. REJECTED leaving it in the code inert. Its one-off confirmation is REQ-TEST-366 criterion 4''s, not a kept test.'
+    - 'WHAT LANDED (the move commit de009e91, 2026-11-02): data_asset_id quarterly and daily in the two data-asset.yaml files, people.yaml''s data_asset assignment in each, and every check id''s first segment in each asset''s contracts, Soda, Evidently, retired and dbt files - including each ODCS quality rule''s own id, the colon form of its check id (check_lifecycle.odcs_quality_id). The transform migrate_moved_check_id sits beside migrate_pre_039_check_id (9bdf10dc) and is applied in find_disappeared_check_ids and, so a renamed check''s config_hash is still compared, in find_undocumented_changes; it reads its former id from the move map only (moved_paths.id_rename). tests/test_moved_paths.py TestTheRenameIsExcusedAndNothingElse covers criterion 7.'
+    - 'MEASURED (criterion 3, 2026-11-02): all 378 checks'' config_hash before (f123a582, as data-asset-1) and after (each asset) compared under the renamed ids - 378 before, 378 after (87 daily, 291 quarterly), 0 missing, 0 extra, 0 hash changed.'
+    - 'NOT YET DONE: criterion 6 (the transform deleted with the map in the next push) and criterion 8 (the exception recorded as approved by Keith in the change that applies it) - the second needs Keith''s own approval statement, so the move commit carries none. Two comments still say data-asset-1 (data-asset.yaml''s header and people.yaml''s example), left for the docs stream since the move commit changes no comment.'
     open_questions: []
   - id: REQ-TEST-366
     title: One committed move map, from each old path to its new one, is followed by every read of a base commit in the push that carries the move, and is deleted with its readers in the next push
@@ -48149,6 +48235,10 @@ requirements:
     - 'FIRES ONLY FOR THE PUSH CARRYING THE MOVE (architect v3 BLOCKING 1): v3''s ''for any push whose base predates the move, however many commits later'' and ''removable once no open branch predates the move'' contradicted the deletion and are REMOVED.'
     - 'A ONE-OFF CHECK, NOT A KEPT ABSENCE TEST (architect v3 NIT; CLAUDE.md test rule 2): criterion 4 confirms the deletion once, in the push that makes it. A post-move base is recognised by assets/ existing at diff_base().'
     - A BRANCH CUT BEFORE THE MOVE MUST BE REBASED BEFORE IT IS PUSHED - AN ACCEPTED RISK (Keith, 2026-11-01). The scoper noted that nothing refuses such a push mechanically and recommended leaving it so; Keith signed v4 on that basis. REJECTED keeping the map so long-lived branches stay covered, which is the inert map he declined.
+    - 'WHAT LANDED (the move build, 2026-11-02, branch bmove): the map assets/moved-paths.yaml (commit 4ff1be88, before the move commit and generated from the same plan that performs the move, so the two cannot disagree), read by qa_tools/common/moved_paths.py (9bdf10dc) only where it is in the working tree and the push''s diff base holds no assets/ folder. Every base-commit reader goes through one helper, moved_paths.read_at: validate_check_lifecycle._old_file_content and _files_in (so _sources(ref) and the dbt definitions), validate_schedule._content_at (the amber, replacement and list-setting freezes, the agreement freeze, people at the base and correction_trial''s base reads), _version_added_on''s base..HEAD walk (old path added to its pathspec) and the base CODEOWNERS match. tests/test_moved_paths.py: 13 of its 19 tests seen failing with the readers stashed, all 19 passing with them. Criteria 3 and 4 (the deletion and its one-off check) belong to the next push and are not built.'
+    - 'MEASURED through the map (2026-11-02, MOTHMAN_DIFF_BASE=f123a582): `mothman dashboard validate-check-lifecycle --require-explanations` passes for both assets, reading 87 checks (daily) and 291 (quarterly) at the base through the map; with the map moved aside the same gate reads 0 checks at the base and passes silently - the bypass this requirement exists to close.'
+    - 'PROVISIONAL (the move build, 2026-11-02): a divided file is cut to an asset''s part by member ids the map declares per asset (agencies, collections, datasets, calendars and declared corrections'' change_references): a list item or mapping key identifying another asset''s member is dropped, and a whole value equal to the former data_asset_id reads as the asset''s own; everything else is both assets''. The move''s own division was checked against that cut for all ten divided files (0 differences). Question for Keith: is a member list in the map the right way to name the parts, or should each divided file list its parts explicitly?'
+    - 'PROVISIONAL (the move build, 2026-11-02): the shared dbt package''s five files moved from dbt_project/ to dbt_shared/ in a commit before the move commit, in the same push, and the map lists them too, so the lifecycle gate reads their text at the base and no check''s definition hash appears to change. Question for Keith: acceptable that the map covers moves made earlier in the push, not only those in the move commit itself?'
     open_questions: []
   - id: REQ-PIPE-345
     title: Each data asset declares one baseline calendar; no collection or dataset names a calendar or dates of its own, and a gate refuses anything faster than the baseline
@@ -48401,6 +48491,8 @@ requirements:
     - TWO DATABASES, TWO BOOTSTRAPS (Keith, 2026-10-31, implied by 'each built only from its own asset's database').
     - 'ONE STREAM PER ASSET (delivery-scoper): REQ-PIPE-262 grouped collections by shared calendar; under one baseline that grouping is every calendared collection of the asset. plans/running-thoughts.md #111 is unchanged by this.'
     - 'A SCENARIO MAP PER ASSET, ONE REGISTER (delivery-scoper; SETTLED by Keith 2026-11-01 with v4): SCENARIOS.md is generated with the history (REQ-GEN-045 criterion 3), and each asset has its own history.'
+    - 'CRITERION 3 BUILT INSIDE THE MOVE (Keith, 2026-11-02, option (a) on the move''s scenario-map gap): scenario_map.map_path() answers SCENARIOS-<asset>.md for the selected asset, written by write_map() and checked by `mothman scenarios map --check` (the scenario map gate, once per asset), and SCENARIOS.md is deleted. The mixed-asset refusal is scenario_injection.mixed_asset_problems(), run by `mothman scenarios validate` (the scenarios gate, once per asset): a scenario NAMES a dataset when an injection for it (its own id, or one listing it in also_demonstrates) names that dataset, read against the selected asset''s hierarchy alone. Tests first: tests/test_scenario_map.py::TestEachAssetHasItsOwnMap, nine tests, all seen failing before the change. The requirement stays not_started: criteria 1, 2 and 4 to 6 are the bootstrap stream''s.'
+    - 'PROVISIONAL (the move, 2026-11-02; restated 2026-11-02, post-build-review #308 6): WHICH SCENARIOS a map lists comes only from generator/scenario_injection.py''s INJECTIONS table (other_assets_scenarios), never from the asset''s own placements: a scenario leaves an asset''s map only when it has injections and every one names a dataset the asset does not hold. So every scenario NOT in INJECTIONS lands in BOTH maps - a unit test, one marked for injection and not yet placed, and also six the quarterly asset HAS placed (TS-79a, TS-79b, TS-93c, TS-95, TS-100c and TS-101b), each of which SCENARIOS-daily.md lists as not injected. That is why 53 scenarios are in both maps (76 scenario headings in SCENARIOS-daily.md, 116 in SCENARIOS-quarterly.md). Question for Keith: should membership come from each asset''s own placements, so that an unplaced scenario is in neither map, or in both?'
     - 'THE 12-MINUTE TARGET APPLIES TO EACH ASSET ON ITS OWN (Keith, 2026-10-31, draft Q5 (a)): criterion 5. REJECTED (b), measure and report only, and (c), a ceiling on each bootstrap beyond REQ-PIPE-250''s.'
     - 'THE SCENARIO-REGISTER CHECK IS PER ASSET (delivery-scoper, v4): v2''s ''a scenario naming datasets of two assets'' needed a gate that knew both hierarchies, which Q4''s closure rules out; criterion 3 asks each asset''s pass whether a scenario names one of its datasets and one it does not hold.'
     open_questions: []
@@ -48729,6 +48821,16 @@ requirements:
     - v1's FREEZE-GATE CRITERION MOVED TO REQ-TEST-366 and widened to every base-commit read (architect BLOCKING 2).
     - 'GROUNDWORK FIRST, ONE MOVE COMMIT, THEN FOUR STREAMS (Keith, 2026-11-01): the groundwork is built in parallel with geocoding against a resolver that still points at contract/; the move follows once geocoding and the groundwork merge, proven by this requirement''s compare; then four post-move streams run in parallel - the dashboard (two sites, the period control, ''For day'', the moved notice, the snapshot deletion), the Cancer and Mental Health collections, CI and publishing (the cache key, dbt deps per asset, the daily publish hold), and docs with the amendments.'
     - 'ORDER ACROSS BATCHES (Keith, 2026-10-31 and 2026-11-01): Pass / Warn / Fail first, then geocoding, then this split.'
+    - 'THE MOVE COMMIT (2026-11-02): de009e91 on branch bmove, on base f123a582 with three preparatory commits that change nothing observable (9bdf10dc the map reader, 28fce20d dbt_shared/ and the asset''s dbt paths at call time, 4ff1be88 the map). It holds only the moves (git mv, 69 renames), the divided files (10 new parts, every comment kept), REQ-QAC-344''s renames and the switch (assets._DEFAULT to assets/, environments.yaml read there, CODEOWNERS'' three paths). Checked on that tree: every divided part equals the old file cut to its asset, every file moved whole equals the old file with only the rename (84 targets, 0 differences).'
+    - 'BYTE IDENTITY, MEASURED (2026-11-02): a whole-history generation into scratch at f123a582 (one asset, 432s) and after the move and its generator follow-on fe2a8fd3 (daily and quarterly, 469s for quarterly), every delivery and receipt compared. All 614 delivery files are byte-identical. All 121 daily receipts are identical. In quarterly, TWO DELIVERY DIRECTORIES ARE NAMED DIFFERENTLY - Child Protection''s BDM_20260801 becomes 2026-08-corrected and Emergency Department''s upload-4402 becomes BDM_20260801, their files identical - and every receipt''s sequence is renumbered within its own asset''s tree, receipt order kept (493 of 493), every other receipt field identical. Both follow from REQ-PIPE-365 criterion 1''s per-asset delivery tree: a delivery name is unique only among names already on disk, and a sequence counts within one receipts tree. STOPPED, NOT DECIDED: this is recorded data that changes, so criterion 3''s compare cannot report no difference as signed unless the delivery name and receipt sequence are normalised or the generator names deliveries as before - a decision for Keith.'
+    - 'CRITERION 2 BUILT, NOT RUN (bd9e004c): equivalence.capture bootstraps a tree holding asset folders once per asset, each into its own scratch database with that asset selected, keeping each under per_asset and their union under surfaces; compare normalises only each side''s asset ids (the check-id segment, dotted or colon, and a whole value) and the identity row where either side holds more than one asset. A file both assets hold, or a --help both print, is kept once per asset so the difference shows. tests/test_equivalence_assets.py (9 tests) drives it on hand-built baselines. Criteria 1 and 3 need the end-of-run bootstrap (2026-11-01 build run); they are recorded here rather than as unmet_criteria because the validator allows unmet_criteria only on a built requirement and this one is not.'
+    - 'DEVIATION FROM CRITERION 5''S BASE CLAUSE (the move build, 2026-11-02, the coordinator''s instruction): the move commit de009e91 was made on f123a582, which held geocoding''s contract changes except REQ-DASH-299''s; work then moved to 712eb10a with 299 branched from f123a582. 299''s three configuration edits (presentation.yaml''s word blocks, two soda measures lines, six dbt measures lines) land after the move, in the merge 84d0d9cf, carried by git''s rename detection to assets/quarterly/ - a later content commit, which criterion 5 allows. The move commit stays as it is.'
+    - 'EXISTING TESTS AFTER THE MOVE, MEASURED (2026-11-02): every module but tests/test_dashboard_e2e.py, in four batches, at f123a582 (6974 passed, 43 failed) and at 89b11345 (6426 passed, 459 failed, 193 errors). 610 tests passing at the base fail after; 1 failing at the base passes. By first error: 326 name Birth Registrations while running under the suite''s quarterly asset, 31 name a quarterly collection under daily, 31 look up an item the selected asset lacks (StopIteration), 80 assert pre-split expectations (four collections in one hierarchy, Birth Registrations first), 43 still name contract/ or dbt_project/, 41 miss other files, 5 meet the identity guard on the real supply database still marked data-asset-1 (needs criterion 1''s regenerated history), and the rest are scattered. NOT MET: criterion 6''s ''every existing test unchanged in outcome'' does not hold after the move, and this batch''s follow-on commits fixed the shared causes (per-test asset selection, the worker database''s mark, the real folder in test helpers) but not the per-test rework the rest needs. Two later commits (7036979f, 2a94f73f) were re-run by module only: tests/test_collections_registry.py 67 passed, 8 failed; tests/test_cli_at_thirty_collections.py 19 passed, 3 failed.'
+    - 'EVERY TEST MODULE NAMES ITS ASSET (C11, Keith 2026-11-02): a module-level pytestmark = pytest.mark.asset(...) in each, a test or case of the other asset marked on its own, and no quarterly default - tests/conftest.py refuses an unmarked module by name before any test runs. tests/asset_inference.py stays as a helper that reads which asset''s registry ids a test names; it no longer decides anything at collection. A case list holding both assets'' values marks each with its own asset (tests/asset_params.per_asset, read from each asset''s data-asset.yaml). A test naming both assets or neither keeps the quarterly asset it ran under before C11, marked explicitly.'
+    - 'A WORKER''S DATABASE IS EMPTIED WHEN ITS TESTS CHANGE ASSET (tests/conftest.py, 2026-11-02): one worker database served both assets'' tests, so a daily test''s Birth Registrations hold was read by a quarterly reader that cannot name the dataset - test_not_supplied and test_supersession_critic failed only beside other modules. On a switch every data schema is dropped, past the period-view guard (REQ-PIPE-129) with event triggers off for the drop, and the identity re-marked, as a separate deployment''s database would be. Rejected: a database per asset per worker, because supply_dsn is a session value many tests use as a string and could not follow the switch.'
+    - 'PRODUCT DEFECTS FROM THE MOVE, FIXED TEST-FIRST (2026-11-02): the freeze gate''s, the calendar refusal''s and the schedule-ended notice''s messages named contract/ files that no longer exist (agreement_freeze, schedule, supply_holds.schedule_file); the adapter line report read the old adapter and provider folders and reported nothing; the provider orphan gate scanned generator/collections/, which holds only the shared base; the two mothman pre-commit hooks watched ^contract/ and so never ran on an asset''s files; the collections gate crashed on an adapter it could not import instead of reporting it, and named adapters by the old folder. 66 user-facing strings elsewhere still name contract/ paths: a follow-on wording sweep, not done here.'
+    - 'EXISTING TESTS AFTER C11, MEASURED (2026-11-02): every module but tests/test_dashboard_e2e.py, in four batches, at 5cddb454: 7067 passed, 53 failed, 17 skipped, against f123a582''s 6974 passed, 43 failed, 16 skipped. Of the 43 base failures 41 still fail and 2 pass. 12 tests passing at the base fail after, each classified: 2 need a product decision (validate_feedback''s agency check, PROVISIONAL since phase 1; the settle pointer on the one-collection daily asset), 4 cannot run within one asset (three sibling-on-another-calendar cases and Birth Registrations'' cross-table rebuild, which borrowed a Child Protection check), 5 need a regenerated deployment database (status_parity, cross_table_scope, evidently_recorded_reference), 1 waits on the cache key (test_replay_inputs: replay_inputs.INPUTS still lists contract/**). After that sweep tests/test_generator_providers.py changed alone and was re-run whole on the final tree.'
+    - 'A CASE LIST BUILT AT IMPORT HOLDS ONE ASSET (2026-11-02): test_a_real_generation_draws_only_declared_seeds took its cases from the registry when its quarterly module was imported, so Birth Registrations'' case stopped running, and its probe counted only draws made in generator/ files while providers draw in assets/<asset>/synthetic/collections/. Its cases now come from every asset''s providers folder, each under its own asset, and draws in the selected asset''s providers count. Every other base test id absent after the move has a renamed successor carrying its assertion, except test_status_parity''s words test, removed on work and merged in.'
     open_questions: []
   - id: REQ-DOCS-358
     title: 'Signed requirements, CLAUDE.md and the README are restated for two assets in the change that makes the split: path-only edits under one blanket rule, every meaning change quoted and signed'

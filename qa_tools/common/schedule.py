@@ -360,6 +360,14 @@ def _load(agreement=None) -> dict[str, Calendar]:
     return calendars
 
 
+def _calendar_file_rel() -> str:
+    """The selected asset's calendar file by repository path, for a refusal
+    to point at (the asset split: it was contract/calendar.yaml)."""
+    from qa_tools.common import assets
+
+    return f"{assets.folder_rel()}/calendar.yaml"
+
+
 def calendars(agreement=None) -> list[Calendar]:
     return list(_load(agreement).values())
 
@@ -369,7 +377,7 @@ def calendar(name: str, agreement=None) -> Calendar:
         return _load(agreement)[name]
     except KeyError:
         raise UnknownCalendarError(
-            f"{name!r} is not a calendar in contract/calendar.yaml. "
+            f"{name!r} is not a calendar in {_calendar_file_rel()}. "
             f"Known: {', '.join(sorted(_load(agreement)))}") from None
 
 

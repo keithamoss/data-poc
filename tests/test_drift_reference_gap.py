@@ -197,3 +197,8 @@ def test_a_long_gap_names_the_five_most_recent_and_counts_the_rest():
                                    gap=tuple(f"2026-08-{d:02d}" for d in range(1, 21)))
     assert a.reason.endswith("2026-08-16, 2026-08-17, 2026-08-18, 2026-08-19, 2026-08-20 "
                              "and 15 earlier owed one")
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

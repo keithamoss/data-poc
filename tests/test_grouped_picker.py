@@ -70,3 +70,8 @@ class TestNothingMatches:
         for keys in ("\r", "\x1b[B\r", "\x1b[B\x1b[B\r", "\x1b[B\x1b[B\x1b[B\r"):
             got = _pick(keys)
             assert got not in {h for h, _ in GROUPS}, (keys, got)
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

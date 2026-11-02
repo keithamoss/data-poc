@@ -36,6 +36,7 @@ AN ALLOWLIST ENTRY IS A DELIBERATE, REVIEWED ACT, with its reason beside it.
 from __future__ import annotations
 
 import ast
+import fnmatch
 import sys
 from pathlib import Path
 
@@ -44,7 +45,9 @@ ROOT = Path(__file__).resolve().parent.parent.parent
 #: Where the gate looks, relative to the repository root. generator/ joined
 #: 2026-10-29 (post-build-review #282 (7), Keith's option a):
 #: emergency_department.run_plan held the calendar for the process.
-SCANNED = ("qa_tools", "pipeline", "generator")
+#: assets/ too: each asset's QA adapters and generator providers are code
+#: (REQ-PIPE-369, REQ-GEN-370), keyed below by `assets/*/...` so no asset is named.
+SCANNED = ("qa_tools", "pipeline", "generator", "assets")
 
 #: THE MODULES WHOSE CALLS READ CONFIGURATION, by the name a file binds them
 #: to: a call into one at import builds a value from the file as it stood
@@ -74,15 +77,15 @@ ALLOWLIST: dict[tuple[str, str], str] = {
         "once per run (settled by REQ-TEST-253)",
     # generator/, scanned from 2026-10-29: each built from module constants
     # and a fixed seed alone, reading no file, so nothing can go stale.
-    ("generator/collections/child_protection.py", "_cp_delay"):
+    ("assets/*/synthetic/collections/child_protection.py", "_cp_delay"):
         "a fixed resupply-delay curve from numpy constants; reads no file",
-    ("generator/collections/child_protection.py", "run_plan"):
+    ("assets/*/synthetic/collections/child_protection.py", "run_plan"):
         "drawn from N_QUARTERS and a fixed seed; reads no file",
-    ("generator/collections/child_protection.py", "grown_run_plan"):
+    ("assets/*/synthetic/collections/child_protection.py", "grown_run_plan"):
         "drawn from GROWN_QUARTERS and a fixed seed; reads no file",
-    ("generator/collections/civil_registration.py", "run_plan"):
+    ("assets/*/synthetic/collections/civil_registration.py", "run_plan"):
         "drawn from N_DELIVERIES and a fixed seed; reads no file",
-    ("generator/collections/emergency_department.py", "_postcodes"):
+    ("assets/*/synthetic/collections/emergency_department.py", "_postcodes"):
         "the postcodes of generator/names_au.py's SUBURBS constant; reads no file",
 }
 
@@ -223,6 +226,12 @@ def scan(root: Path = ROOT) -> list[tuple[str, str, int]]:
     return out
 
 
+def _allowed(rel: str, name: str, allowlist) -> bool:
+    """An entry names a file exactly, or - for an asset's module - as
+    `assets/*/...`, matching it in whichever asset holds it."""
+    return any(n == name and fnmatch.fnmatchcase(rel, pattern) for pattern, n in allowlist)
+
+
 def problems(root: Path = ROOT, allowlist: dict | None = None) -> list[str]:
     allowlist = ALLOWLIST if allowlist is None else allowlist
     found = scan(root)
@@ -231,16 +240,16 @@ def problems(root: Path = ROOT, allowlist: dict | None = None) -> list[str]:
            f"process answers an edited or swapped file for what it used to say - key it on "
            f"the file's content with config_yaml.Built (REQ-PIPE-254), or allowlist it with "
            f"the reason it is safe."
-           for rel, name, line in found if (rel, name) not in allowlist]
+           for rel, name, line in found if not _allowed(rel, name, allowlist)]
     out += [f"{rel}:{line}: builds a value from configuration at import, which holds it "
             f"for the process as a cache would - an edited or swapped file is answered for "
             f"what it said when the module was first imported. Read it when it is asked for "
             f"(post-build-review #282 (7))."
             for rel, line in scan_import_time(root)]
-    present = {(rel, name) for rel, name, _ in found}
     out += [f"{rel}: the ALLOWLIST excuses {name}(), which carries no lru_cache or cache - "
             f"remove the entry, so the list cannot outlive what it excuses."
-            for rel, name in allowlist if (rel, name) not in present]
+            for rel, name in allowlist
+            if not any(fnmatch.fnmatchcase(f, rel) and n == name for f, n, _ in found)]
     return out
 
 

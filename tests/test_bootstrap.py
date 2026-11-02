@@ -33,7 +33,9 @@ STREAMS = [boot.STREAM_JOIN.join(g) for g in boot.streams(SHORTS)]
 
 def _key(collection_ids) -> str:
     return boot.STREAM_JOIN.join(_SHORT[c] for c in collection_ids)
-assert SHORTS[:2] == ["bdm", "cp"], SHORTS
+#: The first collection of the asset the suite acts for (the asset split: it was
+#: Birth Registrations, whose asset is now the daily one).
+FIRST = SHORTS[0]
 
 
 @pytest.fixture(autouse=True)
@@ -150,8 +152,11 @@ class TestWhatItRuns:
         assert spy == [*(f"gen-{s}" for s in SHORTS), "concurrently", *STREAMS, "record"]
 
     def test_the_real_configuration_makes_more_than_one_stream_of_several(self):
-        """Otherwise the tests here would not exercise a merged stream."""
-        assert len(STREAMS) > 1 and any(boot.STREAM_JOIN in k for k in STREAMS), STREAMS
+        """Otherwise the tests here would not exercise a merged stream. One
+        stream per asset since the split (the quarterly asset's collections
+        share a calendar; Birth Registrations is the daily asset's alone), so
+        what stays is that the stream is merged."""
+        assert any(boot.STREAM_JOIN in k for k in STREAMS), STREAMS
 
     def test_sequential_runs_one_stream_after_another(self, spy):
         """REQ-TEST-116 criterion 5's reference, as REQ-PIPE-262 criterion 7
@@ -161,8 +166,8 @@ class TestWhatItRuns:
         assert spy == [*(f"gen-{s}" for s in SHORTS), *STREAMS, "record"]
 
     def test_one_collection_leaves_the_other_alone(self, spy):
-        boot.bootstrap(collection="bdm")
-        assert spy == ["gen-bdm", "bdm"]
+        boot.bootstrap(collection=FIRST)
+        assert spy == [f"gen-{FIRST}", FIRST]
 
     def test_it_generates_before_checking(self, spy):
         """Order matters and is easy to get backwards: checks over data
@@ -175,12 +180,12 @@ class TestWhatItRuns:
         """A command that takes minutes and prints nothing reads as
         hung, and the first thing a newcomer does is kill it."""
         steps = []
-        boot.bootstrap(collection="bdm", on_step=steps.append)
+        boot.bootstrap(collection=FIRST, on_step=steps.append)
         assert len(steps) >= 3
         assert any("Generating" in s for s in steps)
 
     def test_it_works_with_no_progress_callback(self, spy):
-        boot.bootstrap(collection="bdm")
+        boot.bootstrap(collection=FIRST)
 
 
 def _in_process(monkeypatch, called=None):
@@ -242,7 +247,7 @@ class TestCollectionsRunSideBySide:
         called, _ = spy
         monkeypatch.setattr(correction_replay, "confirm_due",
                             lambda **k: called.append("confirm") or [])
-        boot.bootstrap(collection="bdm")
+        boot.bootstrap(collection=FIRST)
         assert "confirm" not in called
 
     def test_every_stream_is_dispatched_together(self, spy):
@@ -334,3 +339,8 @@ class TestTheBudgetLine:
         app._bootstrap_menu()
         assert ("Generating synthetic data...", "dim") in said
         assert (line, style) in said, said
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

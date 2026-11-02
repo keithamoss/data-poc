@@ -175,3 +175,8 @@ class TestNamesAndLeaks:
         proc.wait()
         run_dbt.evaluate("child-protection", CP_DIRTY_RUN_ID, "2026-04-01T09:00:00Z")
         assert not os.path.exists(pp_dir), "the dead worker's parse directory leaked"
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

@@ -26,6 +26,8 @@ raw.<table>` did.
 """
 from __future__ import annotations
 
+import pytest
+
 import functools
 
 from qa_tools.common import supply_db
@@ -57,6 +59,7 @@ def test_bdm_build_all_restages_an_arrival_it_has_already_seen(
         "re-staging the same arrivals must not leave a second copy of any of them"
 
 
+@pytest.mark.asset("quarterly")
 def test_cp_build_all_restages_an_arrival_it_has_already_seen(
         cp_duckdb_dir, cp_raw_dir, cp_delivery_dirs):
     deliveries, receipts = cp_delivery_dirs
@@ -68,3 +71,8 @@ def test_cp_build_all_restages_an_arrival_it_has_already_seen(
 
     assert second == first
     assert _staged(cp_duckdb_dir, "cp_clients") == before
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("daily")

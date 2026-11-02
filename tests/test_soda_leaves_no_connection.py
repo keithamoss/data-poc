@@ -119,3 +119,8 @@ def test_closing_twice_is_harmless(dsn):
 def test_closing_a_scan_that_never_ran_is_harmless(dsn):
     """An exception before execute() still reaches the finally."""
     assert close_scan_connections(_scan(supply_db.STAGING_SCHEMA)) == 0
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

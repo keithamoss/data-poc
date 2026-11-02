@@ -545,7 +545,11 @@ def embed() -> None:
     # The file a person edits to add dates - supply_holds' one constant,
     # contract/calendar.yaml since REQ-PIPE-110, never a second copy.
     from qa_tools.common import supply_holds
+    from qa_tools.common import assets as _assets
     schedule_runway = {"configFile": supply_holds.schedule_file(),
+                        # The asset's configuration folder, for every other
+                        # file the page names (critic finding 7, the split).
+                        "configDir": _assets.config_dir(),
                         "defaultThreshold": runway.DEFAULT_WARNING_SLOTS,
                         "calendars": []}
     for cal in schedule.calendars():
@@ -692,7 +696,8 @@ def embed() -> None:
     # purpose: this is asset-level and spans both collections, and
     # computing it per-collection is how it would have become two
     # queues - which is the thing the requirement exists to prevent.
-    # SCENARIO_MAP - REQ-DASH-046. Read from the COMMITTED SCENARIOS.md
+    # SCENARIO_MAP - REQ-DASH-046. Read from the asset's COMMITTED
+    # SCENARIOS-<asset>.md (REQ-PIPE-352 criterion 3)
     # and nothing else: the coordinates were written there by the
     # generator, which is the only thing that knows where a scenario
     # landed, and this build may open nothing under data/.

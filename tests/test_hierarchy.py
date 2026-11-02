@@ -62,6 +62,7 @@ class TestAgainstTheRealConfig:
             "cp_placements", "cp_carers", "cp_case_workers",
         ]
 
+    @pytest.mark.asset("daily")  # Birth Registrations is the daily asset's
     def test_birth_registrations_has_a_collection_like_child_protection_does(self):
         # Criterion: "model a collection for Birth Registrations by the
         # same mechanism Child Protection uses, rather than skipping the
@@ -74,6 +75,7 @@ class TestAgainstTheRealConfig:
 
 
 class TestFailsLoudly:
+    @pytest.mark.asset("daily")
     def test_an_unknown_dataset_id_names_the_ones_that_exist(self):
         with pytest.raises(hierarchy.UnknownDatasetError) as exc:
             hierarchy.dataset("birth_registrations")  # underscores, not hyphens
@@ -121,3 +123,8 @@ class TestFailsLoudly:
         self._write(tmp_path, monkeypatch, {"data_asset_id": "a", "hierarchy": {"agencies": []}})
         with pytest.raises(ValueError, match="no datasets"):
             hierarchy.all_datasets()
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

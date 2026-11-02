@@ -71,6 +71,7 @@ def test_run_dbt_bdm_looks_up_nothing_and_calls_evaluate_dbt_bdm(monkeypatch):
     assert seen["run_id"] == "run_001"
 
 
+@pytest.mark.asset("quarterly")
 def test_run_dbt_cp_calls_evaluate_dbt_cp(monkeypatch):
     import qa_tools.tools.run_dbt as run_dbt
 
@@ -116,6 +117,7 @@ def test_run_datacontract_bdm_unknown_run_id_fails_clearly(monkeypatch):
     assert "does_not_exist" in result.output
 
 
+@pytest.mark.asset("quarterly")
 def test_run_datacontract_cp_does_not_need_a_csv_filename(monkeypatch):
     import qa_tools.tools.run_datacontract as run_datacontract
 
@@ -172,6 +174,7 @@ def test_run_evidently_bdm_honours_an_explicit_reference_run_id(monkeypatch):
     assert "reference_csv" not in seen, "the reference is a run id now, not a file"
 
 
+@pytest.mark.asset("quarterly")
 def test_run_evidently_cp_defaults_reference_to_manifests_first_run_id(monkeypatch):
     _patch_cp_manifest(monkeypatch)
     import qa_tools.tools.run_evidently as run_evidently
@@ -189,8 +192,10 @@ def test_run_evidently_cp_defaults_reference_to_manifests_first_run_id(monkeypat
     assert seen == {"run_id": "cp_run_02", "reference_run_id": "cp_run_01"}
 
 
-@pytest.mark.parametrize("short,collection_id", [("bdm", "civil-registration"),
-                                                   ("cp", "child-protection")])
+@pytest.mark.parametrize("short,collection_id", [
+    # Each collection on its own asset (the asset split).
+    pytest.param("bdm", "civil-registration", marks=pytest.mark.asset("daily")),
+    pytest.param("cp", "child-protection", marks=pytest.mark.asset("quarterly"))])
 def test_build_warehouses_stages_that_collection(monkeypatch, short, collection_id):
     from qa_tools.tools import stage
 
@@ -215,3 +220,8 @@ def test_changelog_prints_real_build_changelog_output_as_json(monkeypatch):
     assert result.exit_code == 0, result.output
     assert '"agency": "registry-services"' in result.output
     assert '"dataset": "birth-registrations"' in result.output
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("daily")

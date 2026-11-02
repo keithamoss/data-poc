@@ -8,6 +8,10 @@ tests.
 """
 from __future__ import annotations
 
+import pytest
+
+import asset_params
+
 from types import SimpleNamespace
 
 from qa_tools.tools import orchestrate
@@ -69,6 +73,7 @@ class TestBothCollectionsSupplyTheirHalf:
         for coll in collections.all_collections():
             assert isinstance(orchestrate.steps(coll.id), arrival_lifecycle.Steps), coll.id
 
+    @pytest.mark.asset("daily")
     def test_a_contested_birth_registrations_file_is_checked_not_refused(self):
         """One of the drifts the extraction removed: the hand-filed path
         called path_for() and so refused a contested file the batch would
@@ -88,6 +93,7 @@ class TestBothCollectionsSupplyTheirHalf:
 
 
 class TestTheCollectionsHalvesForwardWhatTheyAreGiven:
+    @pytest.mark.asset("quarterly")
     def test_child_protection_files_with_the_whole_pass_as_among(self, monkeypatch):
         """A zip is filed whole (REQ-PIPE-105 criterion 5) only while CP's
         half passes `among` through - nothing else would notice if it
@@ -98,14 +104,40 @@ class TestTheCollectionsHalvesForwardWhatTheyAreGiven:
         orchestrate.steps("child-protection").file_and_overlay(A, [A, B])
         assert seen["among"] == [A, B]
 
-    def test_each_collections_steps_carry_its_own_id(self, monkeypatch):
-        for collection_id in ("civil-registration", "child-protection"):
-            calls = []
-            monkeypatch.setattr(orchestrate, "run_one",
-                                lambda cid, *a, **k: calls.append(("run", cid)) or [])
-            monkeypatch.setattr(orchestrate, "promote_after",
-                                lambda cid, *a, **k: calls.append(("gate", cid)))
-            steps = orchestrate.steps(collection_id)
-            steps.run_one({"run_id": "r"}, "T", "x", on_step=None)
-            steps.promote_after(A, [], "x")
-            assert calls == [("run", collection_id), ("gate", collection_id)], collection_id
+    @pytest.mark.parametrize("collection_id", asset_params.per_asset(
+        ["civil-registration", "child-protection"]))
+    def test_each_collections_steps_carry_its_own_id(self, monkeypatch, collection_id):
+        calls = []
+        monkeypatch.setattr(orchestrate, "run_one",
+                            lambda cid, *a, **k: calls.append(("run", cid)) or [])
+        monkeypatch.setattr(orchestrate, "promote_after",
+                            lambda cid, *a, **k: calls.append(("gate", cid)))
+        steps = orchestrate.steps(collection_id)
+        steps.run_one({"run_id": "r"}, "T", "x", on_step=None)
+        steps.promote_after(A, [], "x")
+        assert calls == [("run", collection_id), ("gate", collection_id)], collection_id
+
+
+class TestAStageFailureSurvivesAProcessBoundary:
+    """A bootstrap runs arrivals in a process pool, which hands a worker's
+    exception back by pickling it. StageFailed's required arguments meant it
+    could not be rebuilt on the other side, so every stage failure there read
+    "StageFailed.__init__() missing 3 required positional arguments" and the
+    real error was lost (post-build-review, 2026-11-02)."""
+
+    def test_it_unpickles_with_its_stage_and_cause(self):
+        import pickle
+        cause = ValueError("column registration_number does not exist")
+        exc = arrival_lifecycle.StageFailed("bdm_run_001", "qa", ("filing",), cause,
+                                            arrival={"run_id": "bdm_run_001"})
+        back = pickle.loads(pickle.dumps(exc))
+        assert isinstance(back, arrival_lifecycle.StageFailed)
+        assert str(back) == str(exc)
+        assert (back.run_id, back.stage, back.completed) == ("bdm_run_001", "qa", ("filing",))
+        assert repr(back.cause) == repr(cause)
+        assert back.arrival == {"run_id": "bdm_run_001"}
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

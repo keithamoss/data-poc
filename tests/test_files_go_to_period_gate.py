@@ -6,15 +6,15 @@ in one way and requires the gate to name it. The real file is untouched.
 """
 from __future__ import annotations
 
+import asset_folders
 import shutil
-from pathlib import Path
 
 import pytest
 import yaml
 
 from qa_tools.common.validate_schedule import Source, validate
 
-REAL = Path(__file__).resolve().parent.parent / "contract"
+REAL = asset_folders.SelectedFolder()
 
 
 def _v(effective_from, value):
@@ -134,6 +134,7 @@ class TestEveryCollectionOnACalendarStatesIt:
 class TestACadenceRuleCalendarKeepsDaysBefore:
     """Criterion 7, with REQ-PIPE-324 criterion 4's pointer."""
 
+    @pytest.mark.asset("daily")  # civil-registration is the daily asset's
     def test_a_non_zero_value_on_the_daily_calendar_is_refused(self, gate):
         def mutate(doc):
             _collection(doc, "civil-registration")["files_go_to_period"] = {
@@ -223,7 +224,7 @@ class TestAdoptingTheKeyOnFrozenHistory:
         old_asset["synthetic"] = new_asset["synthetic"] = synthetic
         return freeze.check(old_cal, new_cal, old_asset, new_asset, people,
                             instant_of=lambda key: self.AT, today=self.AT.date(),
-                            base_codeowners=(REAL.parent / ".github" / "CODEOWNERS").read_text())
+                            base_codeowners=(REAL.parent.parent / ".github" / "CODEOWNERS").read_text())
 
     def _with(self, cal, values, eff="2000-01-01"):
         new = self._copy.deepcopy(cal)
@@ -261,3 +262,8 @@ class TestAdoptingTheKeyOnFrozenHistory:
         new = self._with(cal, {"child-protection": 1})
         found = self._check(old, new, asset, people, synthetic=False)
         assert any("files_go_to_period" in f.scope for f in found)
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

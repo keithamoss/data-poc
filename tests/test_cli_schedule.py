@@ -10,6 +10,8 @@ testing is that it IS discoverable where a human would look.
 """
 from __future__ import annotations
 
+import pytest
+
 from click.testing import CliRunner
 
 from cli import schedule as schedule_cli
@@ -31,11 +33,15 @@ class TestItIsWhereAHumanWouldLookForIt:
 
 
 class TestShow:
-    def test_it_prints_both_real_calendars_and_who_uses_them(self):
+    @pytest.mark.parametrize("calendar, user", [
+        # Each real calendar on the asset that defines it (the asset split).
+        pytest.param("quarterly", "cp-clients", marks=pytest.mark.asset("quarterly")),
+        pytest.param("daily", "birth-registrations", marks=pytest.mark.asset("daily"))])
+    def test_it_prints_both_real_calendars_and_who_uses_them(self, calendar, user):
         result = _runner.invoke(schedule_cli.schedule_group, ["show"])
         assert result.exit_code == 0, result.output
-        assert "quarterly" in result.output and "daily" in result.output
-        assert "birth-registrations" in result.output
+        assert calendar in result.output
+        assert user in result.output
 
     def test_one_dataset_shows_its_own_participation(self):
         """`--all` since 2026-09-25: the default is now a window around
@@ -49,6 +55,7 @@ class TestShow:
         assert "February" in result.output and "August" in result.output
         assert "2023-Q2" in result.output
 
+    @pytest.mark.asset("daily")
     def test_a_daily_dataset_no_longer_needs_an_until(self):
         """REPLACES "a daily dataset needs an --until", which asserted
         the behaviour post-build-review #29 exists to remove.
@@ -67,6 +74,7 @@ class TestShow:
         # A handful of rows, not three years of them.
         assert result.output.count("+0800") < 40
 
+    @pytest.mark.asset("daily")
     def test_all_is_a_real_escape_hatch_and_still_prints_everything(self):
         """The window trims by default; `--all` must genuinely not.
         Otherwise the default becomes a cap with no way past it, which
@@ -110,6 +118,7 @@ class TestShow:
                                  ["show", "--dataset", "cp-case-workers"])
         assert "->" in result.output
 
+    @pytest.mark.asset("daily")
     def test_a_daily_dataset_with_until_lists_its_periods(self):
         """`--until` is asked for a date the calendar actually covers,
         derived from the calendar rather than written here. It used to
@@ -168,6 +177,7 @@ class TestCandidateDates:
         assert "Note" in result.output
         assert "Day" in result.output
 
+    @pytest.mark.asset("daily")
     def test_extending_a_cadence_rule_calendar_fails_with_a_reason(self):
         result = _runner.invoke(schedule_cli.schedule_group,
                                  ["candidate-dates", "--calendar", "daily", "--year", "2029"])
@@ -271,6 +281,7 @@ class TestTheCliSpeaksOneLanguage:
     the single most obvious invocation for this repo's flagship dataset.
     """
 
+    @pytest.mark.asset("daily")
     def test_the_flagship_datasets_most_obvious_invocation_does_not_crash(self):
         """`schedule show --dataset birth-registrations` is a daily
         cadence rule with no end, so it needs a stop date. The message
@@ -459,3 +470,8 @@ class TestTheNextDueMarkerFollowsTheDueDate:
         today_index = next(i for i, p in enumerate(many)
                            if due[p.name].due_at.date() >= date(2026, 1, 1))
         assert many[today_index] in shown and shown.index(many[today_index]) > 0
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

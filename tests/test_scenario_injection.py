@@ -238,6 +238,7 @@ class TestTheRunIdsComeFromRecognition:
 class TestTheRecordTheScenarioMapReads:
     """Criterion 7, against the reader rather than against this module."""
 
+    @pytest.mark.asset("daily")
     def test_it_round_trips_through_the_scenario_map(self, tmp_path):
         from qa_tools.common import scenario_map
 
@@ -253,6 +254,7 @@ class TestTheRecordTheScenarioMapReads:
         assert back["TS-1"].supplies == ("run_028",)
         assert back["TS-1"].is_complete
 
+    @pytest.mark.asset("daily")
     def test_a_shared_placement_is_recorded_under_both_scenarios(self, tmp_path):
         """TS-1's third file IS TS-4's arrival into a filled slot.
         Recording one placement under both is honest; generating a
@@ -399,9 +401,11 @@ class TestTheChildProtectionScenariosAreReallyThere:
 
     @staticmethod
     def _tree():
-        from pathlib import Path
-
-        root = Path(__file__).resolve().parent.parent / "data" / "deliveries"
+        # The selected asset's own tree, data/<asset>/deliveries, through the
+        # resolver: the repository-root data/deliveries this used to name has
+        # not existed since the move, so the class skipped every time
+        # (post-build-review #308 1).
+        root = assets.deliveries_dir()
         if not root.is_dir():
             pytest.skip("no generated delivery tree - run `mothman cp generate-synthetic-data`")
         return root
@@ -526,6 +530,7 @@ class TestQuietDays:
         placed = si.resolve(si.Injection("TS-x", "d", -5, "cfg", quiet=(0, 1)), periods)
         assert placed.quiet == (periods[-5].name, periods[-4].name)
 
+    @pytest.mark.asset("daily")
     def test_a_period_keeps_its_own_supply_on_a_quiet_day(self):
         gr = collection_modules.provider_module("civil-registration")
 
@@ -533,6 +538,7 @@ class TestQuietDays:
                                   quiet={"2026-09-07", "2026-09-08"})
         assert avoid == {"2026-09-01", "2026-09-07"}
 
+    @pytest.mark.asset("daily")
     def test_another_period_s_resend_is_moved_off_a_quiet_day(self):
         gr = collection_modules.provider_module("civil-registration")
         from generator.resupply import Delivery
@@ -716,15 +722,18 @@ class TestTheEarlyEmergencyDepartmentSupplies:
         assert not [r for r in rows if r[1] == "reject"], rows
 
 
-def test_a_pair_targets_only_the_files_its_script_makes_supplies():
+@pytest.mark.parametrize("asset", [pytest.param("daily", marks=pytest.mark.asset("daily")),
+                                   pytest.param("quarterly", marks=pytest.mark.asset("quarterly"))])
+def test_a_pair_targets_only_the_files_its_script_makes_supplies(asset):
     """REQ-GEN-196 criterion 19: a file the script settles as rejected or
     kept but superseded is not targeted - nobody checks it, so it has no
-    verdict to compare - and a file it makes a supply is."""
+    verdict to compare - and a file it makes a supply is. Each asset's pairs
+    against its own scripted decisions (the asset split)."""
     from generator import scenario_injection as si
     from qa_tools.common import scripted_decisions as sd
 
     scripts = {s.scenario: s for s in sd.load() if s.operation == sd.CHOOSE_FILE}
-    pairs = [i for i in si.INJECTIONS if any(a.files for a in i.arrivals)]
+    pairs = [i for i in si.this_assets_injections() if any(a.files for a in i.arrivals)]
     assert pairs
     # A PAIR NO PERSON SETTLES (REQ-GEN-203, TS-42) is superseded by a later
     # file, so neither of its files is a supply - and neither is targeted.
@@ -931,3 +940,30 @@ class TestTheGateOutcomeScenarios:
             arrivals=(si.ExtraArrival(0, "09:00"),))))
         with pytest.raises(si.CannotPlace, match="TS-x"):
             cp._plan_injections(periods)
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")
+
+
+class TestAnInjectionNamingNoAssetsDataset:
+    """SETTLED by Keith 2026-11-02 (REQ-GEN-246 c8, the move critic's decision
+    2): an injection whose dataset the selected asset does not declare is
+    passed over - telling another asset's from a typo waits for REQ-PIPE-354 -
+    but never SILENTLY: a warning names each scenario dropped."""
+
+    @pytest.mark.parametrize("asset", ["quarterly", "daily"])
+    def test_it_is_dropped_and_the_warning_names_it(self, monkeypatch, asset):
+        import dataclasses
+
+        monkeypatch.setenv(assets.ASSET_ENV, asset)
+        real = si.this_assets_injections()
+        assert real, f"{asset} places no injection - the comparison would prove nothing"
+        stray = dataclasses.replace(real[0], scenario_id="TS-STRAY", dataset_id="no-such-dataset")
+        monkeypatch.setattr(si, "INJECTIONS", si.INJECTIONS + (stray,))
+        monkeypatch.setattr(si, "_WARNED_DROPS", set(), raising=False)
+        with pytest.warns(UserWarning, match=r"TS-STRAY \(no-such-dataset\)"):
+            got = si.this_assets_injections()
+        assert stray not in got
+        assert set(got) == set(real)

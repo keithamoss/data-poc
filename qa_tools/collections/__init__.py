@@ -106,14 +106,15 @@ class Collection:
                   "evidently": "evidently-checks{r}.yml"}[kind]
         return f"{self.folder}/{self.stem}-" + suffix.format(r="-retired" if retired else "")
 
-    #: The collection's own dbt folders (REQ-QAC-241 criterion 4).
+    #: The collection's own dbt folders (REQ-QAC-241 criterion 4), in the
+    #: selected asset's dbt project, asked at call time (REQ-QAC-368).
     @property
     def dbt_models(self) -> str:
-        return f"dbt_project/models/{self.id}"
+        return f"{assets.dbt_rel()}/models/{self.id}"
 
     @property
     def dbt_tests(self) -> str:
-        return f"dbt_project/tests/{self.id}"
+        return f"{assets.dbt_rel()}/tests/{self.id}"
 
     @property
     def dbt_schema(self) -> str:
@@ -122,7 +123,7 @@ class Collection:
     #: Outside model-paths, so dbt never runs a retired check.
     @property
     def dbt_retired_schema(self) -> str:
-        return f"dbt_project/retired/{self.id}/schema-retired.yml"
+        return f"{assets.dbt_rel()}/retired/{self.id}/schema-retired.yml"
 
     def check_sources(self) -> list[tuple[str, str]]:
         """Every file this collection's checks are defined in, as
@@ -134,9 +135,10 @@ class Collection:
         return out + [(self.dbt_schema, "dbt"), (self.dbt_retired_schema, "dbt")]
 
 
-#: The checks no collection owns: shared dbt SQL, and the file checks
-#: derived once for every dataset (REQ-QAC-241 criterion 8).
-SHARED_DBT_DIRS = ("dbt_project/macros", "dbt_project/tests/generic")
+#: The checks no collection owns: shared dbt SQL - the shared local package,
+#: dbt_shared/ (REQ-QAC-368 criterion 2) - and the file checks derived once
+#: for every dataset (REQ-QAC-241 criterion 8).
+SHARED_DBT_DIRS = (f"{assets.DBT_SHARED}/macros", f"{assets.DBT_SHARED}/tests/generic")
 
 
 def file_checks() -> str:

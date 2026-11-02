@@ -13,15 +13,15 @@ import pytest
 from qa_tools.common import check_id as ci
 from qa_tools.common import validate_check_lifecycle as vcl
 
-_REAL = ("data-asset-1.registry-services.civil-registration.birth-registrations"
+_REAL = ("daily.registry-services.civil-registration.birth-registrations"
          ".registration_number.unique_dbt")
-_TABLE_LEVEL = ("data-asset-1.child-protection-family-support.child-protection.cp-carers"
+_TABLE_LEVEL = ("quarterly.child-protection-family-support.child-protection.cp-carers"
                 ".rowCount_datacontract")
 
 
 def test_parses_a_real_check_id_into_named_segments():
     c = ci.parse(_REAL)
-    assert c.data_asset == "data-asset-1"
+    assert c.data_asset == "daily"  # REQ-QAC-344: an id names its asset
     assert c.agency == "registry-services"
     assert c.collection == "civil-registration"
     assert c.dataset == "birth-registrations"
@@ -41,6 +41,7 @@ def test_the_grammar_is_exactly_these_segments_in_this_order():
         "data_asset", "agency", "collection", "dataset", "column", "check_name", "tool")
 
 
+@pytest.mark.asset("quarterly")
 def test_a_table_level_check_has_no_column_rather_than_a_guessed_one():
     """The optional segment is what makes 5- and 6-segment ids ambiguous
     by dot-counting alone. Anchoring the tail on a known tool suffix is
@@ -66,12 +67,20 @@ def test_a_malformed_check_id_raises_and_names_itself(bad):
     assert repr(bad) in str(e.value), "the error must name the offending id"
 
 
-def test_every_real_check_id_in_this_repo_matches_the_grammar():
+#: Each asset, with a floor below which its register is suspiciously small (the
+#: asset split: 378 checks in one asset became 291 quarterly and 87 daily).
+_EACH_ASSET = [pytest.param(200, marks=pytest.mark.asset("quarterly"), id="quarterly"),
+               pytest.param(50, marks=pytest.mark.asset("daily"), id="daily")]
+
+
+@pytest.mark.parametrize("floor", _EACH_ASSET)
+def test_every_real_check_id_in_this_repo_matches_the_grammar(floor):
     """The grammar is only worth having if it describes what is actually
     authored. This asserts against every real check definition across all
-    four tools and both datasets, not a fixture."""
+    four tools and both datasets, not a fixture - each asset's register on
+    its own asset."""
     ids = [c.check_id for c in vcl.collect_checks(None)]
-    assert len(ids) > 200, "collect_checks() returned suspiciously few checks"
+    assert len(ids) > floor, "collect_checks() returned suspiciously few checks"
     assert ci.validate_grammar(ids) == []
 
 
@@ -122,6 +131,7 @@ def test_a_column_segment_disagreeing_with_its_attachment_is_an_error():
     assert "registration_number" in errors[0] and "some_other_column" in errors[0]
 
 
+@pytest.mark.asset("quarterly")
 def test_a_table_level_rule_is_not_reported_as_a_column_mismatch():
     assert ci.validate_column_matches([(_TABLE_LEVEL, None)]) == []
 
@@ -132,8 +142,8 @@ def test_every_real_contract_rule_sits_under_the_column_its_id_names():
     intended - the id and the attachment were free to disagree before,
     and nothing would have said so."""
     from qa_tools.common.check_lifecycle import contract_rule_attachments
-    for path in ("contract/registry-services/bdm-birth-registrations-contract.yaml",
-                 "contract/child-protection-family-support/child-protection-contract.yaml"):
+    for path in ("assets/daily/registry-services/bdm-birth-registrations-contract.yaml",
+                 "assets/quarterly/child-protection-family-support/child-protection-contract.yaml"):
         assert ci.validate_column_matches(contract_rule_attachments(path)) == [], path
 
 
@@ -155,27 +165,31 @@ class TestHierarchyAgreement:
     to nothing is worse than one that fails, because it looks resolved.
     """
 
-    def test_every_real_check_id_agrees_with_the_hierarchy(self):
+    @pytest.mark.parametrize("floor", _EACH_ASSET)
+    def test_every_real_check_id_agrees_with_the_hierarchy(self, floor):
         ids = [c.check_id for c in vcl.collect_checks(None)]
-        assert len(ids) > 200, "collect_checks() returned suspiciously few checks"
+        assert len(ids) > floor, "collect_checks() returned suspiciously few checks"
         assert ci.validate_hierarchy_agreement(ids) == []
 
     def test_a_collection_the_dataset_does_not_sit_under_is_an_error(self):
         errors = ci.validate_hierarchy_agreement([
-            "data-asset-1.registry-services.child-protection.birth-registrations.c.unique_dbt"])
+            "daily.registry-services.child-protection.birth-registrations.c.unique_dbt"])
         assert len(errors) == 1
         assert "civil-registration" in errors[0]
 
     def test_an_agency_the_dataset_does_not_sit_under_is_an_error(self):
         errors = ci.validate_hierarchy_agreement([
-            "data-asset-1.child-protection-family-support.civil-registration"
+            # Only the agency wrong: the dataset is the daily asset's, so
+            # the id names that asset (REQ-QAC-344's rename read the
+            # agency and gave this deliberately wrong id the other one).
+            "daily.child-protection-family-support.civil-registration"
             ".birth-registrations.c.unique_dbt"])
         assert len(errors) == 1
         assert "registry-services" in errors[0]
 
     def test_a_dataset_the_hierarchy_does_not_define_is_named(self):
         errors = ci.validate_hierarchy_agreement([
-            "data-asset-1.registry-services.civil-registration.birth_registrations.c.unique_dbt"])
+            "daily.registry-services.civil-registration.birth_registrations.c.unique_dbt"])
         assert len(errors) == 1
         assert "birth_registrations" in errors[0]
 
@@ -193,3 +207,8 @@ class TestHierarchyAgreement:
         """Reporting the same id twice, once per rule, makes a fixing
         session read two lists to find one problem."""
         assert ci.validate_hierarchy_agreement(["not-a-check-id"]) == []
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("daily")

@@ -173,3 +173,8 @@ def test_152_6_a_keep_while_parked_names_its_correction_exactly(
                                  reason="it stays", effective_at=T.AT)
     [kept] = corrections.for_dataset(T.DATASET, conn, declared={})["kept"]["p6"]
     assert (kept["reference"], kept["reason"]) == ("CHG 12", "it stays")
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

@@ -8,7 +8,7 @@ import pytest
 
 from qa_tools.common import period_schema, supply_db, unrunnable
 
-P = "data-asset-1.child-protection-family-support.child-protection"
+P = "quarterly.child-protection-family-support.child-protection"
 PLACEMENTS_READS_CLIENTS = f"{P}.cp-placements.cp_client_id.relationships_dbt"
 PLACEMENTS_READS_CARERS = f"{P}.cp-placements.carer_id.relationships_dbt"
 NOTIFICATIONS_READS_CLIENTS = f"{P}.cp-notifications.cp_client_id.relationships_dbt"
@@ -233,3 +233,8 @@ class TestAHeldTableIsOneRecordPerCheckToo:
         assert [r["check_id"] for r in out] == [PLACEMENTS_READS_BOTH]
         assert out[0]["held_tables"] == ["cp_carers", "cp_clients"]
         assert "cp_carers" in out[0]["held_reason"] and "cp_clients" in out[0]["held_reason"]
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

@@ -199,8 +199,10 @@ class TestAKeptSyntheticArrivalIsReportedToo:
     it printed the check table and "Recorded N results" and nothing the
     lifecycle decided."""
 
-    @pytest.mark.parametrize("module, collection", [("bdm", "civil-registration"),
-                                                    ("cp", "child-protection")])
+    @pytest.mark.parametrize("module, collection", [
+        # Each collection on its own asset (the asset split).
+        pytest.param("bdm", "civil-registration", marks=pytest.mark.asset("daily")),
+        pytest.param("cp", "child-protection", marks=pytest.mark.asset("quarterly"))])
     @pytest.mark.parametrize("interactive", [False, True])
     def test_it_ends_on_the_lifecycle_summary(self, monkeypatch, module, collection,
                                               interactive):
@@ -221,6 +223,7 @@ class TestAKeptSyntheticArrivalIsReportedToo:
         mod._report_synthetic([], mine.run_id, True, interactive=interactive)
         assert shown == [[mine.run_id]]
 
+    @pytest.mark.asset("daily")
     def test_a_trial_has_no_lifecycle_to_report(self, monkeypatch):
         from cli.collection_cli import of as _cli_of
         bdm = _cli_of('bdm')
@@ -234,6 +237,7 @@ class TestAKeptRunIdNothingRecognisesIsRefusedPlainly:
     """#120 D13: `next()` over the recognised arrivals raised a bare
     StopIteration when the run id named none of them."""
 
+    @pytest.mark.asset("daily")
     def test_the_keep_branch_names_the_run(self, monkeypatch):
         from qa_tools.common import arrivals
 
@@ -244,21 +248,21 @@ class TestAKeptRunIdNothingRecognisesIsRefusedPlainly:
 
 class TestTheCheckColumnSaysWhichCheck:
     """Keith, 2026-10-06 (post-build-review #124): at normal widths the
-    Check column showed only the shared "data-asset-1.registry-services.
+    Check column showed only the shared "daily.registry-services.
     civil-..." prefix. It shows `column.check` now; the tool has its own
     column."""
 
     def test_a_column_check(self):
         from cli import common
 
-        r = {"check_id": "data-asset-1.child-protection-family-support.child-protection."
+        r = {"check_id": "quarterly.child-protection-family-support.child-protection."
                          "cp-placements.cp_client_id.relationships_dbt"}
         assert common.check_label(r) == "cp_client_id.relationships"
 
     def test_a_dataset_level_check_has_no_column(self):
         from cli import common
 
-        r = {"check_id": "data-asset-1.child-protection-family-support.child-protection."
+        r = {"check_id": "quarterly.child-protection-family-support.child-protection."
                          "cp-placements.row_count_soda"}
         assert common.check_label(r) == "row_count"
 
@@ -267,3 +271,8 @@ class TestTheCheckColumnSaysWhichCheck:
 
         assert common.check_label({"check_id": "odd"}) == "odd"
         assert common.check_label({"name": "n"}) == "n"
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

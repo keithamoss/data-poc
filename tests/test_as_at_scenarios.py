@@ -123,6 +123,7 @@ class TestOnePlacementCoversSeveralDays:
     """TS-78: D, D+1 and D+2 are one placement, because D+1 is both D's
     following day and D+2's lead-in."""
 
+    @pytest.mark.asset("daily")
     def test_the_covered_days_are_claimed_and_the_green_day_follows_them(self):
         placement = si.resolve(_injection("TS-78a"), _bdm_periods())
         assert placement.period == "2026-08-30"
@@ -130,6 +131,7 @@ class TestOnePlacementCoversSeveralDays:
         assert placement.lead_in == ("2026-08-28", "2026-08-29")
         assert placement.follow == ("2026-09-02",)
 
+    @pytest.mark.asset("daily")
     def test_another_scenario_on_a_covered_day_is_refused(self):
         periods = _bdm_periods()
         # 31 AUGUST, counted from the history's end rather than written as a
@@ -140,6 +142,7 @@ class TestOnePlacementCoversSeveralDays:
             si.no_two_scenarios_share_a_period([_injection("TS-78a"), other],
                                                {"birth-registrations": periods})
 
+    @pytest.mark.asset("daily")
     def test_the_generator_writes_no_ordinary_supply_on_a_covered_day(self):
         generate_runs = collection_modules.provider_module("civil-registration")
 
@@ -153,9 +156,11 @@ class TestTheHoldEraIsNotLeft:
     """Criterion 15: outside the era, refused naming the scenario - never
     shifted."""
 
+    @pytest.mark.asset("daily")
     def test_today_the_era_covers_d_to_d_plus_2(self):
         si.resolve(_injection("TS-78a"), _bdm_periods())  # no refusal
 
+    @pytest.mark.asset("daily")
     def test_an_anchor_outside_the_era_is_refused_naming_it(self):
         moved = dataclasses.replace(_injection("TS-78a"), anchor=-30)
         with pytest.raises(si.CannotPlace, match="TS-78a.*outside a hold"):
@@ -265,23 +270,33 @@ class TestTs79IsWrittenAfterGeneration:
 class TestTheLinksResolveBetweenTheirEvents:
     """Criterion 23: each link's date between its two events."""
 
-    def test_every_link_of_the_new_scenarios_stands(self):
-        new = [i for i in si.INJECTIONS
-               if i.scenario_id in ("TS-75a", "TS-76", "TS-77a", "TS-78a")]
-        assert len(new) == 4
+    # Each asset's own scenarios (the asset split): TS-75a, TS-76 and TS-77a
+    # are Child Protection's, TS-78a Birth Registrations'.
+    @pytest.mark.parametrize("ids", [
+        pytest.param(("TS-75a", "TS-76", "TS-77a"), marks=pytest.mark.asset("quarterly"),
+                     id="quarterly"),
+        pytest.param(("TS-78a",), marks=pytest.mark.asset("daily"), id="daily")])
+    def test_every_link_of_the_new_scenarios_stands(self, ids):
+        new = [i for i in si.this_assets_injections() if i.scenario_id in ids]
+        assert len(new) == len(ids)
         assert si.link_problems(new) == []
 
+    @pytest.mark.asset("quarterly")
     def test_the_dates(self):
         got = {}
-        for sid, periods in (("TS-75a", _cp_periods()), ("TS-76", _cp_periods()),
-                             ("TS-77a", _cp_periods()), ("TS-78a", _bdm_periods())):
-            got.update(dict(si.resolve(_injection(sid), periods).in_place_on))
+        for sid in ("TS-75a", "TS-76", "TS-77a"):
+            got.update(dict(si.resolve(_injection(sid), _cp_periods()).in_place_on))
         assert got == {"TS-75a": "2024-02-08", "TS-75b": "2024-02-25",
                        "TS-76": "2025-02-17", "TS-77a": "2023-05-17",
                        # TS-54 rides TS-76's placement and date (REQ-GEN-044).
                        "TS-54": "2025-02-17",
-                       "TS-77b": "2023-06-08", "TS-78a": "2026-08-31",
-                       "TS-78b": "2026-09-01"}
+                       "TS-77b": "2023-06-08"}
+
+    @pytest.mark.asset("daily")
+    def test_the_birth_registrations_dates(self):
+        """The other half of the test above, on the daily asset."""
+        got = dict(si.resolve(_injection("TS-78a"), _bdm_periods()).in_place_on)
+        assert got == {"TS-78a": "2026-08-31", "TS-78b": "2026-09-01"}
 
 
 def test_a_targeted_amber_is_never_named_with_a_severity():
@@ -291,6 +306,7 @@ def test_a_targeted_amber_is_never_named_with_a_severity():
         si.ExtraArrival(0, "09:00", None, severity_tables=("cp_clients",))
 
 
+@pytest.mark.asset("daily")  # TS-43 and TS-78 are Birth Registrations', the daily asset's
 class TestOnlyThePlantedAmbersWaitUnderHold:
     """Criterion 16, on the bootstrapped history: every supply the rule held
     under the hold amber setting is TS-43's or TS-78's - the guard that the
@@ -326,3 +342,8 @@ class TestOnlyThePlantedAmbersWaitUnderHold:
     def test_nothing_else_is_held(self, deployment_history):
         held, planted = self._held_and_planted()
         assert held - planted == set(), sorted(held - planted)
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

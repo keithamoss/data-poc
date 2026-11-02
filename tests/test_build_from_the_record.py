@@ -30,7 +30,7 @@ from qa_tools.tools import results_history
 
 CP = "child-protection"
 AGENCY = "child-protection-family-support"
-CHECK = f"data-asset-1.{AGENCY}.{CP}"
+CHECK = f"quarterly.{AGENCY}.{CP}"
 CLIENT_REF = f"{CHECK}.cp-notifications.cp_client_id.relationships_dbt"
 WORKER_REF = f"{CHECK}.cp-notifications.assigned_worker_id.relationships_dbt"
 WHEN = "2026-09-26T10:00:00+08:00"
@@ -410,7 +410,9 @@ class TestTheSameHistoryBuildsTheSameBytes:
     run_seq and nothing the build emits."""
 
     def _build(self, history, interleave: bool, keys: dict) -> str:
-        coll = collections.by_id("civil-registration")
+        # Another collection OF THE SAME ASSET (the asset split: Civil
+        # Registration is another asset's, with a database of its own).
+        coll = collections.by_id("emergency-department")
         if interleave:
             _run(f"pytest_bdm_{uuid.uuid4().hex[:8]}", dataset_id=None, supply=None,
                  collection=coll.id, agency=coll.agency_id)
@@ -444,8 +446,8 @@ def test_hierarchy_knows_the_tables_these_use():
 LP_AGENCY, LP = "department-of-health", "linkage-products"
 #: A check declared in ANOTHER collection that reads the Client Register - by
 #: the checks file's own declaration, so the writer files it cross-table.
-FOREIGN_REF = f"data-asset-1.{LP_AGENCY}.{LP}.linkage-keys.cp-clients.referential_soda"
-FOREIGN_COVERAGE = f"data-asset-1.{LP_AGENCY}.{LP}.linkage-keys.cp-clients.coverage_soda"
+FOREIGN_REF = f"quarterly.{LP_AGENCY}.{LP}.linkage-keys.cp-clients.referential_soda"
+FOREIGN_COVERAGE = f"quarterly.{LP_AGENCY}.{LP}.linkage-keys.cp-clients.coverage_soda"
 
 
 class TestAResultRecordedUnderAnotherCollectionReachesTheTableItRead:
@@ -502,7 +504,9 @@ class TestAResultRecordedUnderAnotherCollectionReachesTheTableItRead:
     def test_a_collection_none_of_whose_tables_it_read_carries_nothing(self, history):
         self._foreign_run(f"cp-clients@{_key()}",
                           results=[_record(FOREIGN_REF, "linkage-keys", "fail")])
-        assert history.rebuild("civil-registration")["read_by_others"] == []
+        # A sibling none of whose tables the check read (the asset split: it
+        # was Civil Registration, another asset's now).
+        assert history.rebuild("emergency-department")["read_by_others"] == []
 
 
 class TestARecordedDistributionAndBandReachTheCard:
@@ -551,3 +555,8 @@ class TestASeveralColumnSampleReachesThePageUnchanged:
         assert several["failing_sample_key_columns"] == cols
         one = by_samples[json.dumps(["C-9"])]
         assert "failing_sample_key_columns" not in one
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

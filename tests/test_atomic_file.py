@@ -16,6 +16,8 @@ import json
 
 import pytest
 
+import asset_params
+
 import rebuild_support
 
 
@@ -35,7 +37,7 @@ def test_an_interrupted_write_leaves_the_previous_file_whole(tmp_path):
     assert [p.name for p in tmp_path.iterdir()] == ["results.json"], "no temp file left"
 
 
-@pytest.mark.parametrize("module", rebuild_support.REBUILDS)
+@pytest.mark.parametrize("module", asset_params.per_asset(rebuild_support.REBUILDS))
 def test_an_interrupted_rebuild_leaves_the_previous_results_whole(
         module, clean_qa_history, tmp_path, monkeypatch):
     """Both results writers, driven for real and interrupted part-way
@@ -86,3 +88,6 @@ def test_an_interrupted_dashboard_build_leaves_the_previous_file_whole(tmp_path,
 
     assert json.loads(out.read_text()) == previous
     assert [p.name for p in out.parent.iterdir()] == ["a_dashboard.json"], "no temp file left"
+
+#: Birth Registrations is the daily asset's (the asset split).
+pytestmark = pytest.mark.asset("daily")

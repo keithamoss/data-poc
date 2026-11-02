@@ -21,6 +21,8 @@ the cheapest way for this to regress is somebody editing one.
 """
 from __future__ import annotations
 
+import pytest
+
 import ast
 import inspect
 
@@ -191,3 +193,8 @@ class TestSimultaneousArrivalsAreFiledTogether:
     def test_with_nothing_to_compare_against_it_files_itself(self, monkeypatch):
         arrivals = self._arrivals()
         assert self._filed_by(monkeypatch, arrivals[1], None) == ["cp_clients__a"]
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

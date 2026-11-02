@@ -297,3 +297,8 @@ class TestARealTrialLeavesNothing:
         assert after[2] == before[2], "a staging, period or rejected table changed"
         if promoted:
             assert tried.prediction.startswith("it would stay promoted")
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

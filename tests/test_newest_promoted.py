@@ -118,3 +118,8 @@ class TestItOnlyEverConsidersPromotedSupplies:
         # Newer by arrival, but nobody promoted it.
         a_staged_table(conn, "a20260209000000")
         assert promotion.newest_promoted(conn, dataset, period) == promoted
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

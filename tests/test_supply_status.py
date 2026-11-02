@@ -3,12 +3,13 @@ NEWEST BY EVALUATION ORDER (REQ-PIPE-279 criterion 9), which replaced
 "newest cause wins" (REQ-PIPE-121 criterion 10)."""
 from __future__ import annotations
 
+import pytest
+
 import attempt_support
 import test_supersession as _base
 from qa_tools.common import decision_log as dl, qa_store, supply_status
 from test_supersession import DS, _filed
 from attempt_support import ANY_CHECK
-import pytest
 
 conn = _base.conn
 period = _base.period
@@ -59,3 +60,8 @@ class TestTheLaterOpenedRunIsNewer:
         assert [r["run_id"] for r in _shown(conn, DS, a)] == [
             a_table, a_table + "__r1"]
         assert [r["status"] for r in supply_status.latest_results(conn, DS, a)] == ["fail"]
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = [*(pytestmark if isinstance(pytestmark, list) else [pytestmark]), pytest.mark.asset("quarterly")]

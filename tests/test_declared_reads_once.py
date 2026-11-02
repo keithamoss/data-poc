@@ -10,6 +10,7 @@ never seen again in that process.
 """
 from __future__ import annotations
 
+import asset_folders
 import shutil
 
 import pytest
@@ -71,14 +72,14 @@ class TestAnEditedCheckIsSeen:
             if src.exists():
                 (tmp_path / rel).parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy(src, tmp_path / rel)
-        shutil.copytree(vcl.ROOT / "contract", tmp_path / "contract", dirs_exist_ok=True)
+        shutil.copytree(asset_folders.real_folder(), tmp_path / "contract", dirs_exist_ok=True)
         monkeypatch.setattr(vcl, "ROOT", tmp_path)
         before = tables_read.declared_reads()
         calls = _counting(monkeypatch)
         tables_read.declared_reads()
         assert calls == [], "worked out again with nothing changed"
 
-        contract = tmp_path / "contract" / "child-protection-family-support" / "child-protection-contract.yaml"
+        contract = tmp_path / "assets" / "quarterly" / "child-protection-family-support" / "child-protection-contract.yaml"
         text = contract.read_text()
         assert "cp_carers" in text
         edited = text.replace("cp_carers", "cp_carerz", 1)
@@ -167,3 +168,8 @@ class TestTheBusiestParsersAskOnce:
         before = environments._load(path)
         path.write_text(path.read_text().replace(before[0].id, before[0].id + "x", 1))
         assert environments._load(path)[0].id == before[0].id + "x"
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

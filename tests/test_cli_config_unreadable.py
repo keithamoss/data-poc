@@ -7,6 +7,8 @@ could say anything: the file is read while the command modules import.
 """
 from __future__ import annotations
 
+import pytest
+
 import asset_folders
 
 import subprocess
@@ -30,7 +32,7 @@ runpy.run_module("cli.app", run_name="__main__")
 
 
 def _broken_copy(tmp_path: Path) -> Path:
-    text = (ROOT / "contract" / "data-asset.yaml").read_text()
+    text = (asset_folders.real_folder() / "data-asset.yaml").read_text()
     lines = text.split("\n")
     i = next(n for n, line in enumerate(lines) if line.startswith("timezone:"))
     lines[i] = "   " + lines[i]
@@ -53,3 +55,8 @@ def test_a_slip_is_one_line_naming_the_file_and_line(tmp_path):
     assert "Traceback" not in out, out
     assert "data-asset.yaml" in out and f"line {line}" in out, out
     assert len(out.splitlines()) == 1, out
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

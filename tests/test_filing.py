@@ -207,6 +207,7 @@ class TestFilingRealArrivals:
         assert filing.file_arrivals(found) == [], (
             "criterion 10 - a supply already filed is left alone on every later run")
 
+    @pytest.mark.asset("daily")
     def test_a_red_supply_is_filed_on_the_same_terms(self, filings, tmp_path):
         """Criterion 11. A supply never promoted still carries where it
         was filed - "arrived three weeks late AND was bad" is what
@@ -465,3 +466,8 @@ class TestAReceiptKeepsItsOwnOffset:
         assert got == received
         assert supply_db.arrival_segment(got) == key, (
             f"{got.isoformat()} gives {supply_db.arrival_segment(got)}, not {key}")
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = [*(pytestmark if isinstance(pytestmark, list) else [pytestmark]), pytest.mark.asset("quarterly")]

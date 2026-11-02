@@ -28,6 +28,9 @@ PERTH = timezone(timedelta(hours=8))
 WHEN = datetime(2026, 8, 24, 14, 36, 3, tzinfo=PERTH)
 
 _BDM_FILE = "birth_registrations_2026-08-24.csv"
+#: Another collection of Child Protection's asset, for the tests about
+#: attribution BETWEEN collections - within one asset since the split.
+_ED_FILE = "ed_presentations.csv"
 _CP_FILES = ("cp_clients.csv", "cp_notifications.csv", "cp_investigations.csv",
              "cp_placements.csv", "cp_carers.csv", "cp_case_workers.csv")
 
@@ -97,6 +100,7 @@ class TestADeliveryIsRecognisedNotLabelled:
         found = _for(dirs)
         assert [a.files_by_dataset for a in found] == [{"birth-registrations": (_BDM_FILE,)}]
 
+    @pytest.mark.asset("quarterly")
     def test_the_collection_is_worked_out_from_the_files_not_declared(self, dirs):
         _cp(dirs, "2026-Q3")
         # SIX ARRIVALS SINCE REQ-PIPE-105, one per file - the
@@ -104,18 +108,20 @@ class TestADeliveryIsRecognisedNotLabelled:
         assert {a.collection_id for a in _for(dirs, "child-protection", "cp_run_")} \
             == {"child-protection"}
         # And the same delivery is NOT claimed by the other collection.
-        assert _for(dirs) == []
+        assert _for(dirs, "emergency-department", "ed_run_") == []
 
+    @pytest.mark.asset("quarterly")
     def test_a_delivery_nothing_can_place_is_reported_not_guessed_at(self, dirs):
         _write(dirs, "mystery-drop", {"covering_note.pdf": "%PDF-1.4\n"})
         d, r = dirs
         assert [x.name for x in arrivals.unplaceable(d, r)] == ["mystery-drop"]
         # Reported, and the run does not fail (criterion 13).
         with pytest.warns(UserWarning, match="covering_note.pdf"):
-            assert _for(dirs) == []
+            assert _for(dirs, "emergency-department", "ed_run_") == []
         with pytest.warns(UserWarning):
             assert _for(dirs, "child-protection", "cp_run_") == []
 
+    @pytest.mark.asset("quarterly")
     def test_a_delivery_spanning_two_collections_is_attributed_not_held(self, dirs):
         """REVERSED 2026-09-24 (Keith), and this test's old name said
         the opposite: a spanning delivery used to RAISE, which took the
@@ -128,26 +134,27 @@ class TestADeliveryIsRecognisedNotLabelled:
         One delivery, two runs: the DELIVERY is the transport unit and
         the RUN is the per-collection QA unit, and they were only ever
         the same thing by coincidence of this PoC's generated data."""
-        _write(dirs, "mixed", {_BDM_FILE: "registration_number\n1\n", "cp_clients.csv": "a\n1\n"})
+        _write(dirs, "mixed", {_ED_FILE: "presentation_id\n1\n", "cp_clients.csv": "a\n1\n"})
 
-        bdm = _for(dirs)
+        ed = _for(dirs, "emergency-department", "ed_run_")
         cp = _for(dirs, "child-protection", "cp_run_")
 
-        assert [a.delivery_name for a in bdm] == ["mixed"]
+        assert [a.delivery_name for a in ed] == ["mixed"]
         assert [a.delivery_name for a in cp] == ["mixed"]
-        assert bdm[0].run_id.startswith("birth_registrations__")
+        assert ed[0].run_id.startswith("ed_presentations__")
         assert cp[0].run_id.startswith("cp_clients__")
         # Each side sees only its OWN files - attribution is per file,
         # on its own dataset's terms.
-        assert bdm[0].files_by_dataset == {"birth-registrations": (_BDM_FILE,)}
+        assert ed[0].files_by_dataset == {"ed-presentations": (_ED_FILE,)}
         assert cp[0].files_by_dataset == {"cp-clients": ("cp_clients.csv",)}
 
+    @pytest.mark.asset("quarterly")
     def test_a_spanning_delivery_names_both_collections(self, dirs):
-        _write(dirs, "mixed", {_BDM_FILE: "registration_number\n1\n", "cp_clients.csv": "a\n1\n"})
+        _write(dirs, "mixed", {_ED_FILE: "presentation_id\n1\n", "cp_clients.csv": "a\n1\n"})
         d, r = dirs
         [one] = delivery.list_deliveries(d, r)
         assert arrivals.recognise(one).collections == (
-            "child-protection", "civil-registration")
+            "child-protection", "emergency-department")
 
 
 @pytest.mark.critical
@@ -209,6 +216,7 @@ class TestRunIdsComeFromWhatArrivedAndWhen:
         got = _for(dirs)[0]
         assert got.run_id.endswith(asset_time.arrival_key(got.received_at))
 
+    @pytest.mark.asset("quarterly")
     def test_the_prefix_no_longer_decides_anything(self, dirs):
         """`run_id_prefix` is kept in the signature - every call site
         passes it and it still says which collection is meant - but it
@@ -286,6 +294,7 @@ class TestWhatAnArrivalHandsToThePipeline:
         assert found.unmatched == ("covering_note.pdf",)
         assert found.files_by_dataset == {"birth-registrations": (_BDM_FILE,)}
 
+    @pytest.mark.asset("quarterly")
     def test_files_for_several_datasets_are_one_arrival_EACH(self, dirs):
         """REVERSED BY REQ-PIPE-105 criterion 1, and the old assertion
         is worth stating because it was the whole model until
@@ -357,6 +366,7 @@ class TestTheGeneratorsBookkeepingIsWalledOff:
                     out.add(id(first.value))
         return out
 
+    @pytest.mark.asset("quarterly")
     def test_no_pipeline_module_names_the_bookkeeping_artefact(self):
         offenders = []
         for path in self._modules():
@@ -394,6 +404,7 @@ class TestTheGeneratorsBookkeepingIsWalledOff:
     SANCTIONED_TARGET_READERS = {"qa_tools/common/bootstrap.py", "cli/pipeline.py",
                                  "cli/collection_cli.py", "cli/target_trial.py"}
 
+    @pytest.mark.asset("quarterly")
     def test_only_the_sanctioned_modules_reach_what_the_generator_built(self):
         reached = []
         for path in self._modules():
@@ -413,6 +424,7 @@ class TestTheGeneratorsBookkeepingIsWalledOff:
             "a sanctioned reader no longer reaches it - narrow the set rather than leave "
             f"an exception nobody uses: {sorted(set(reached))}")
 
+    @pytest.mark.asset("quarterly")
     def test_the_bookkeeping_rule_is_checked_against_real_code(self):
         """The test above passes trivially if _modules() finds nothing,
         and a walled package getting renamed is exactly how that would
@@ -420,6 +432,7 @@ class TestTheGeneratorsBookkeepingIsWalledOff:
         found = list(self._modules())
         assert len(found) > 50, f"only {len(found)} modules walked - the walled packages have moved"
 
+    @pytest.mark.asset("quarterly")
     def test_no_pipeline_module_imports_the_generator_package(self):
         offenders = []
         for path in self._modules():
@@ -451,6 +464,7 @@ class TestNoRecordedResultCarriesBookkeeping:
                  "n_rows_generated", "manifest_entry", "attempt_number", "is_resupply",
                  "supersedes_run_id")
 
+    @pytest.mark.asset("quarterly")
     def test_every_recorded_dataset_stats_payload_is_clean(self, deployment_history):
         from qa_tools.common import qa_store, supply_db
 
@@ -463,3 +477,8 @@ class TestNoRecordedResultCarriesBookkeeping:
                  for key in self.FORBIDDEN if f'"{key}"' in raw]
         assert found == [], (
             "recorded QA history carries the generator's own bookkeeping:\n  " + "\n  ".join(found))
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("daily")

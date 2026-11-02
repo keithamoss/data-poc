@@ -12,6 +12,8 @@ hard failure scoped to one dataset.
 """
 from __future__ import annotations
 
+import asset_folders
+
 from datetime import date
 
 import pytest
@@ -50,7 +52,7 @@ def q1_2028_authored(tmp_path, monkeypatch):
     import shutil
 
     contract_dir = tmp_path / "contract"
-    shutil.copytree("contract", contract_dir)
+    shutil.copytree(asset_folders.real_folder(), contract_dir)
     doc = agreement_split.merged_view(contract_dir)
     quarterly = next(c for c in doc["calendars"] if c["name"] == "quarterly")
     quarterly["versions"][-1]["dates"].append({"period": "2028-Q1", "date": "2028-02-01"})
@@ -100,10 +102,12 @@ class TestACadenceRuleNeverWarns:
     would be warning about something that cannot happen - and a warning
     that can never be acted on teaches a reader to skip the class."""
 
+    @pytest.mark.asset("daily")
     def test_the_daily_calendar_is_never_low(self):
         for as_of in (BEFORE_ANY_RUNOUT, date(2026, 9, 23), AFTER_EVERYTHING, date(2199, 1, 1)):
             assert "daily" not in [r.calendar_name for r in runway.low_runway(as_of)]
 
+    @pytest.mark.asset("daily")
     def test_a_daily_dataset_is_never_exhausted(self):
         for as_of in (date(2026, 9, 23), AFTER_EVERYTHING, date(2199, 1, 1)):
             assert "birth-registrations" not in runway.exhausted_datasets(as_of)
@@ -128,8 +132,11 @@ class TestTheWarningNeverFailsAnything:
             assert "not failing the build" in line
 
     def test_a_warning_names_the_file_a_person_must_edit(self):
-        for line in runway.warning_lines(date(2026, 9, 23)):
-            assert "contract/calendar.yaml" in line
+        lines = runway.warning_lines(date(2026, 9, 23))
+        assert lines, "no warning - the check would prove nothing"
+        for line in lines:
+            # The selected asset's own calendar since the asset split.
+            assert "assets/quarterly/calendar.yaml" in line
             assert "candidate-dates" in line, "and how to get the dates proposed"
 
 
@@ -164,7 +171,7 @@ class TestItWarnsOncePerCalendarNotOncePerDataset:
 
 
         contract_dir = tmp_path / "contract"
-        shutil.copytree("contract", contract_dir)
+        shutil.copytree(asset_folders.real_folder(), contract_dir)
         doc = agreement_split.merged_view(contract_dir)
         # A second authored calendar, also nearly out, with one dataset
         # on it. NEARLY out rather than fully out, and the dates below
@@ -196,6 +203,7 @@ class TestAnExhaustedScheduleIsScopedToItsOwnDatasets:
         assert set(exhausted) == _quarterly()
         assert set(exhausted.values()) == {"quarterly"}
 
+    @pytest.mark.asset("daily")
     def test_the_daily_dataset_carries_on(self):
         """Criterion: the failure is scoped to the affected dataset and
         must not stop any other. At thirty datasets, a check that stops
@@ -227,7 +235,7 @@ class TestTheThresholdIsConfigurable:
 
 
         contract_dir = tmp_path / "contract"
-        shutil.copytree("contract", contract_dir)
+        shutil.copytree(asset_folders.real_folder(), contract_dir)
         doc = agreement_split.merged_view(contract_dir)
         next(c for c in doc["calendars"] if c["name"] == "quarterly")["runway_warning_slots"] = 1
         agreement_split.repoint(monkeypatch, contract_dir, doc)
@@ -241,7 +249,7 @@ class TestTheThresholdIsConfigurable:
 
 
         contract_dir = tmp_path / "contract"
-        shutil.copytree("contract", contract_dir)
+        shutil.copytree(asset_folders.real_folder(), contract_dir)
         doc = agreement_split.merged_view(contract_dir)
         next(c for c in doc["calendars"] if c["name"] == "quarterly")["runway_warning_slots"] = 0
         agreement_split.repoint(monkeypatch, contract_dir, doc)
@@ -380,3 +388,8 @@ class TestTheNumberCanBeCheckedAgainstTheFile:
         assert r.driving_last_date == date(2027, 8, 1)
         assert "its own last is 2027-Q4, due on the 1 August 2027 round" in self._line()
         assert "2027-11-01" not in self._line()
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

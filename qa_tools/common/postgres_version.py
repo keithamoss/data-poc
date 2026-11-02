@@ -22,6 +22,7 @@ import re
 from pathlib import Path
 
 from qa_tools.common import config_yaml
+from qa_tools.common import assets as _assets
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 COMPOSE = ROOT / ".devcontainer" / "docker-compose.yml"
@@ -55,11 +56,11 @@ def declaration_errors(path=None) -> list[str]:
     """Criterion 6: missing, or not a whole-number major, is a gate failure."""
     value = _declared_value(path)
     if value is _MISSING:
-        return [f"contract/data-asset.yaml: `{KEY}` is missing - declare the PostgreSQL "
+        return [f"{_assets.config_dir()}/data-asset.yaml: `{KEY}` is missing - declare the PostgreSQL "
                 f"major this data asset targets (REQ-PIPE-146)"]
     # bool is an int in Python, and `true` is not a version.
     if isinstance(value, bool) or not isinstance(value, int) or value < 1:
-        return [f"contract/data-asset.yaml: `{KEY}` is {value!r}, which is not a whole-number "
+        return [f"{_assets.config_dir()}/data-asset.yaml: `{KEY}` is {value!r}, which is not a whole-number "
                 f"major such as 16"]
     return []
 
@@ -90,7 +91,7 @@ def check_number(num, declared: int | None = None) -> None:
     if got != want:
         raise VersionMismatch(
             f"this server runs PostgreSQL {got} (server_version_num {num}), but "
-            f"contract/data-asset.yaml declares postgres_major {want} - refusing rather than "
+            f"{_assets.config_dir()}/data-asset.yaml declares postgres_major {want} - refusing rather than "
             f"letting a version nobody targeted behave differently from production")
 
 
@@ -149,7 +150,7 @@ def image_tag_errors(declared: int | None = None, compose=None, workflow=None) -
             continue
         head = match.group("tag").split("-")[0].split(".")[0]
         if head != str(want):
-            errors.append(f"{where} runs {image}, but contract/data-asset.yaml declares "
+            errors.append(f"{where} runs {image}, but {_assets.config_dir()}/data-asset.yaml declares "
                           f"postgres_major {want}")
     return errors
 

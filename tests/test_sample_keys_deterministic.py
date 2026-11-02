@@ -6,6 +6,8 @@ only in order - and past five failing rows, WHICH rows were sampled could
 differ too."""
 from __future__ import annotations
 
+import pytest
+
 from types import SimpleNamespace
 
 from qa_tools.common import datacontract_common, dbt_common, soda_common, supply_db
@@ -103,3 +105,8 @@ def test_the_dashboards_fine_print_states_the_real_limits():
                              page, re.M))
     assert int(stated["SODA_SAMPLES_ASKED"]) == soda_common.SODA_SAMPLES_LIMIT
     assert int(stated["DATACONTRACT_SAMPLES_RETURNED"]) == ibis_check_execute._FAILED_SAMPLE_LIMIT
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

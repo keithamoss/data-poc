@@ -9,6 +9,8 @@ evidently.Report + DataDriftPreset/RowCount classes against a small,
 real, session-scoped BDM CSV fixture."""
 from __future__ import annotations
 
+import pytest
+
 from state_paths import fixed
 import qa_tools.tools.run_evidently as run_evidently
 from qa_tools.common.evidently_common import collection_checks
@@ -160,3 +162,6 @@ def test_evaluate_evidently_bdm_forwards_the_given_reference_not_the_module_defa
     )
     psi = next(r for r in results if r["check_name"] == "drift:PSI")
     assert psi["reference_run_id"] == _REF_RUN_ID
+
+#: Birth Registrations is the daily asset's (the asset split).
+pytestmark = pytest.mark.asset("daily")

@@ -136,11 +136,16 @@ class TestANameIsValidatedBeforeAnythingIsOpened:
 
 
 class TestWhichFilenamesEachDatasetClaims:
-    def test_it_shows_the_real_declared_patterns(self):
+    @pytest.mark.parametrize("dataset, pattern", [
+        # Each asset's own declared patterns (the asset split).
+        pytest.param("cp-clients", "cp_clients", marks=pytest.mark.asset("quarterly")),
+        pytest.param("birth-registrations", "birth_registrations",
+                     marks=pytest.mark.asset("daily"))])
+    def test_it_shows_the_real_declared_patterns(self, dataset, pattern):
         result = _run(["datasets"])
         assert result.exit_code == 0
-        assert "birth-registrations" in result.output
-        assert "cp_clients" in result.output
+        assert dataset in result.output
+        assert pattern in result.output
 
 
 class TestWhatWasActuallyLoaded:
@@ -217,16 +222,21 @@ def _timeline(conn, tmp_path, drops):
     and putting all seven in one delivery - which an earlier version
     of this fixture did - quietly made it six.
     """
-    from qa_tools.common import arrivals, delivery as delivery_mod, delivery_log
+    from qa_tools.common import arrivals, delivery as delivery_mod, delivery_log, hierarchy
 
+    # THE SELECTED ASSET'S FAMILIES ONLY (the asset split): each asset
+    # recognises its own datasets' files, Birth Registrations' on the daily
+    # asset and Child Protection's on the quarterly.
+    held = {d.dataset_id for d in hierarchy.all_datasets()}
     deliveries, receipts = tmp_path / "hist-deliveries", tmp_path / "hist-receipts"
     cp_files = ("cp_clients.csv", "cp_carers.csv", "cp_case_workers.csv",
                 "cp_investigations.csv", "cp_notifications.csv", "cp_placements.csv")
     for n in range(1, drops + 1):
         day = f"2026-03-{n:02d}"
-        for name, files in (
-                (f"bdm-{n:02d}", {f"birth_registrations_{day}.csv": "a\n1\n"}),
-                (f"cp-{n:02d}", {f: "a\n1\n" for f in cp_files})):
+        families = [(f"bdm-{n:02d}", {f"birth_registrations_{day}.csv": "a\n1\n"},
+                     "birth-registrations"),
+                    (f"cp-{n:02d}", {f: "a\n1\n" for f in cp_files}, "cp-clients")]
+        for name, files, _ in [f for f in families if f[2] in held]:
             delivery_mod.write_delivery(
                 name, files, f"{day}T09:00:00+08:00", deliveries, receipts)
             d = delivery_mod.read_delivery(name, deliveries, receipts)
@@ -245,6 +255,7 @@ class TestOneDatasetsOwnTimeline:
         result = _run(["history", "--dataset", "not-a-dataset"])
         assert result.exit_code != 0
 
+    @pytest.mark.asset("daily")  # Birth Registrations' own timeline
     def test_it_says_promoted_is_not_tracked_rather_than_leaving_it_blank(
             self, clean_delivery_log, tmp_path):
         """Silence would read as "same as the latest arrival", which is
@@ -387,8 +398,11 @@ class TestACollectionIsNamedOrRefusedInWords:
     def test_the_short_names_pipeline_run_takes_are_taken_here(self):
         to_id = common.CollectionParam("id")
         assert to_id.convert("cp", None, None) == "child-protection"
-        assert to_id.convert("bdm", None, None) == "civil-registration"
         assert to_id.convert(None, None, None) is None
+
+    @pytest.mark.asset("daily")  # bdm is the daily asset's short
+    def test_the_birth_registrations_short_is_taken_here(self):
+        assert common.CollectionParam("id").convert("bdm", None, None) == "civil-registration"
 
 
 def test_discard_sample_names_an_unknown_dataset_without_a_repr():
@@ -405,6 +419,7 @@ class TestLoadStagesTheCollectionItIsGiven:
     "unknown collection 'civil-registration'" - the option hands the command
     an id, which the command then looked up among the shorts."""
 
+    @pytest.mark.asset("daily")
     @pytest.mark.parametrize("value", ["bdm", "civil-registration"])
     def test_by_short_or_id(self, monkeypatch, value):
         from qa_tools.common import load_log
@@ -418,3 +433,8 @@ class TestLoadStagesTheCollectionItIsGiven:
         result = CliRunner().invoke(supply_group, ["load", "--collection", value])
         assert result.exit_code == 0, result.output
         assert staged == ["civil-registration"]
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

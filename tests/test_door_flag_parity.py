@@ -169,10 +169,12 @@ def _state(conn, mint_now, slot, *, filed=None, ever=True):
                                ever_delivered=ever)
 
 
-def _promote(conn, supply, table, period, *, amber=None):
-    from qa_tools.common import promotion
+def _promote(conn, supply, table, period, *, amber=None, dataset=DS):
+    from qa_tools.common import hierarchy, promotion
 
-    promotion.promote(conn, agency_id=AG, collection_id=COL, dataset_id=DS, supply=supply,
+    entry = hierarchy.dataset(dataset)
+    promotion.promote(conn, agency_id=entry.agency_id, collection_id=entry.collection_id,
+                      dataset_id=dataset, supply=supply,
                       period=period, physical_tables=[table], actor=promotion.RULE_ACTOR,
                       actor_kind=dl.RULE, effective_at=_iso(_now()), amber=amber,
                       reason=promotion.AUTOMATIC_REASON)
@@ -402,6 +404,13 @@ def ex_superseded(conn, mint):
 
 #: Every slot state the door can show (criterion 5): slot_state's own, plus
 #: the two the queue adds - each needs an example below.
+def _examples_on_their_asset():
+    """Each example under the asset its builder files into (the asset split:
+    ex_two_files builds a Birth Registrations pair)."""
+    return [pytest.param(n, marks=pytest.mark.asset("daily")) if n == "two-files" else n
+            for n in sorted(EXAMPLES)]
+
+
 EXAMPLES = {
     slot_state.NOT_YET_DUE: ex_not_yet_due,
     slot_state.OVERDUE: ex_overdue,
@@ -617,9 +626,12 @@ def _request_for(op, state, supply, mint, conn):
     if op == fd.PLACE:
         kw["period"] = None
     if op == fd.SUBSTITUTE:
+        # An earlier supply OF THE SLOT'S OWN DATASET (the asset split: the
+        # two-files slot is Birth Registrations', on the daily asset).
         earlier = mint("closed")
-        held, table = _filed(conn, earlier.name, _received_late(earlier))
-        _promote(conn, held, table, earlier.name)
+        held, table = _filed(conn, earlier.name, _received_late(earlier),
+                             dataset=state.dataset_id)
+        _promote(conn, held, table, earlier.name, dataset=state.dataset_id)
         kw.update(stands_on=earlier.name, supply=held)
     if op == fd.UN_SUPERSEDE:
         from qa_tools.common import supersession
@@ -675,7 +687,7 @@ class TestEveryStateHasAnExample:
         missing = [s for s in _every_state() if s not in EXAMPLES]
         assert not missing, f"no parity example for: {missing}"
 
-    @pytest.mark.parametrize("name", sorted(EXAMPLES))
+    @pytest.mark.parametrize("name", _examples_on_their_asset())
     def test_each_example_shows_its_state(self, conn, minted, name):
         state, _ = EXAMPLES[name](conn, minted)
         want = slot_state.OVERDUE if name == "closed-unfilled" else name
@@ -684,7 +696,7 @@ class TestEveryStateHasAnExample:
             assert state.closed
 
 
-@pytest.mark.parametrize("name", sorted(EXAMPLES))
+@pytest.mark.parametrize("name", _examples_on_their_asset())
 def test_the_door_offers_what_the_flags_would_record(conn, minted, quiet, name):
     """Criteria 2, 3 and 4: every operation, from filing_decisions.OPERATIONS."""
     hidden_here = []
@@ -904,3 +916,8 @@ class TestCriticFindingsOn189:
             fd.apply(request, effective_at=_iso(_now()), conn=conn)
         assert "None" not in str(refused.value) and "--supply" in str(refused.value)
         assert len(dl.decisions_for(conn, DS)) == before, "nothing was recorded"
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

@@ -596,3 +596,6 @@ class TestTheEveningBeforeEra:
         era = {p.name for p in generate_runs.grown_periods()}
         assert placement.period in era, placement.period
         assert set(placement.suppressed) <= era
+
+#: Birth Registrations is the daily asset's (the asset split).
+pytestmark = pytest.mark.asset("daily")

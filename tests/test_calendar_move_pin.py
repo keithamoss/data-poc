@@ -6,23 +6,47 @@ existed. Arrival verdicts are pinned separately, by the arrival-semantics
 golden after a rebuild (tests/test_asset_time_semantics.py)."""
 from __future__ import annotations
 
+import pytest
+
 import json
 
 from calendar_move_pin import PIN, UNTIL, capture
 
 
-def test_every_dataset_computes_what_it_did_before_the_move():
+@pytest.mark.parametrize("asset", [pytest.param("quarterly", marks=pytest.mark.asset("quarterly")),
+                                   pytest.param("daily", marks=pytest.mark.asset("daily"))])
+def test_every_dataset_computes_what_it_did_before_the_move(asset):
     """ROUND BY ROUND (REQ-PIPE-321 criterion 14): a collection at
     files_go_to_period N fills the period N after each round, so each
     period and slot is named by the round it is due on - the name the pin
     recorded at 0 - and every instant must be what was pinned. The pin is
     never re-captured."""
+    import yaml
+
+    import asset_folders
+    from qa_tools.common import assets, hierarchy
+
     pinned = json.loads(PIN.read_text())
+    assert pinned, "the pin holds no dataset - the comparison would prove nothing"
+    # EVERY PINNED DATASET IS SOME ASSET'S (the asset split), read from every
+    # asset's own data-asset.yaml - so a dataset lost from both assets fails
+    # here even though each asset's run below sees only its own. Not from
+    # assets/moved-paths.yaml, which REQ-TEST-366 criterion 3 deletes.
+    declared = set()
+    for name in assets.names():
+        doc = yaml.safe_load((asset_folders.real_folder_of(name) / "data-asset.yaml").read_text())
+        declared |= {d["id"] for a in doc["hierarchy"]["agencies"] for c in a["collections"]
+                     for d in c["datasets"]}
+    assert declared, "no asset declares a dataset"
+    assert set(pinned) <= declared, "the datasets themselves changed"
+    # This asset's pinned datasets, each computing what it did.
+    mine = {d.dataset_id for d in hierarchy.all_datasets()}
+    pinned = {k: v for k, v in pinned.items() if k in mine}
+    assert pinned, "the pin holds none of this asset's datasets - this would prove nothing"
     now = capture(by_round=True)
     # A DATASET ADDED SINCE (Emergency Department's, REQ-QAC-231) has no
     # pinned past to keep, so the pin speaks for the datasets it holds: none
     # of them may be lost or renamed, and each computes what it did.
-    assert pinned, "the pin holds no dataset - the comparison would prove nothing"
     assert set(pinned) <= set(now), "the datasets themselves changed"
     for dataset_id, before in pinned.items():
         after = (_from_the_pinned_start(now[dataset_id], before)
@@ -124,3 +148,8 @@ def _without_rounds_filling_nothing(dataset_id: str, pinned, now):
             f"{dataset_id}: the pinned round {entry[0]} is gone, and it is not a round whose "
             f"period {n} ahead is past the calendar's end")
     return [e for e in pinned if e[0] in have]
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

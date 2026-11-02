@@ -37,9 +37,14 @@ class TestAnOverlapIsFound:
         assert first.later_claim_opens <= first.on_time_until
         assert first.by > timedelta(0)
 
-    def test_it_reports_every_dataset(self, wide_window):
+    @pytest.mark.parametrize("expected", [
+        # Each asset's own datasets (the asset split).
+        pytest.param({"cp-clients", "cp-carers"}, marks=pytest.mark.asset("quarterly"),
+                     id="quarterly"),
+        pytest.param({"birth-registrations"}, marks=pytest.mark.asset("daily"), id="daily")])
+    def test_it_reports_every_dataset(self, wide_window, expected):
         datasets = {o.dataset_id for o in period_overlap.overlaps()}
-        assert {"cp-clients", "cp-carers", "birth-registrations"} <= datasets
+        assert expected <= datasets
 
     def test_the_gate_names_the_dataset_both_periods_and_the_size(self, wide_window):
         errors = validate_schedule.validate()
@@ -47,6 +52,7 @@ class TestAnOverlapIsFound:
         e = next(e for e in errors if e.scope == "cp-clients")
         assert "overlap by" in e.problem and "claim window opens" in e.problem
 
+    @pytest.mark.asset("daily")
     def test_touching_is_still_an_overlap(self, monkeypatch):
         """'Strictly after': a window opening at the very instant the
         earlier period stops being on time leaves one instant in both."""
@@ -82,3 +88,8 @@ class TestEveryCalendarPeriodCounts:
                             widest + timedelta(days=1))
         pairs = {(o.earlier, o.later) for o in period_overlap.overlaps_for("cp-case-workers")}
         assert len(pairs) == len(all_periods) - 1
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

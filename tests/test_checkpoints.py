@@ -230,12 +230,14 @@ class TestARefusalChangesNothing:
     @pytest.fixture
     def no_generating(self, monkeypatch):
         from cli.collection_cli import of as _cli_of
-        bdm, cp = _cli_of('bdm'), _cli_of('cp')
+        from qa_tools import collections
 
-        def refuse():
+        def refuse(**_):
             raise AssertionError("the synthetic data was regenerated before the refusal")
-        monkeypatch.setattr(bdm, "generate_synthetic_data", refuse)
-        monkeypatch.setattr(cp, "generate_synthetic_data", refuse)
+        # Every collection the asset holds (the asset split: Birth
+        # Registrations is another asset's).
+        for c in collections.all_collections():
+            monkeypatch.setattr(_cli_of(c.short), "generate_synthetic_data", refuse)
 
     @pytest.mark.parametrize("before", [0, 1, 999])
     def test_an_impossible_arrival_is_refused_before_data_is_generated(
@@ -355,3 +357,8 @@ class TestAResumeRecordsWhatAFullReplayDoes:
         assert sum(equiv_support.summary(full_snap).values()) > 0
         diffs = equiv_support.differences(full_snap, resumed_snap)
         assert not diffs, "a resume differs from the full replay:\n" + "\n".join(diffs)
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

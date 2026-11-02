@@ -49,6 +49,12 @@ class TestWhatACorrectionAlters:
         got = cc.altered("CAB-1", ["cp-clients"], docs=docs)
         assert got == {"cp-clients": {"2023-Q3", "2023-Q4"}}
 
+    def test_a_moved_date_is_not_a_version_level_change(self, docs):
+        # The other half of TestAVersionLevelChangeClaimsOnlyTheFilingsItChanges'
+        # own version-level test: a moved quarter date is the quarterly
+        # asset's, and the widened window the daily asset's (the asset split).
+        assert not cc.is_version_level("CAB-1", docs=docs)
+
     def test_its_claim_adds_the_period_before_and_after(self, docs):
         got = cc.claimed("CAB-1", {"cp-clients": _quarters()}, docs=docs)
         assert got == {"cp-clients": ["2023-Q2", "2023-Q3", "2023-Q4", "2024-Q1"]}
@@ -155,6 +161,7 @@ def _widen_daily(cal, asset):
                                              "change": "wider"}]})
 
 
+@pytest.mark.asset("daily")  # a change to the daily calendar's window
 class TestAVersionLevelChangeClaimsOnlyTheFilingsItChanges:
     """REQ-GEN-205 criterion 10's narrowing for a version-level change
     (TS-62's): only the days whose filing it would change, by the impact
@@ -177,9 +184,8 @@ class TestAVersionLevelChangeClaimsOnlyTheFilingsItChanges:
         at = asset_time.wall_clock(date(2026, 9, 20), "12:00")
         assert cc.filing_changes("CAB-W", "birth-registrations", [at], docs=widened) == set()
 
-    def test_it_is_a_version_level_change(self, widened, docs):
+    def test_it_is_a_version_level_change(self, widened):
         assert cc.is_version_level("CAB-W", docs=widened)
-        assert not cc.is_version_level("CAB-1", docs=docs)
 
 
 def _widen_daily_from(day):
@@ -192,6 +198,7 @@ def _widen_daily_from(day):
     return widen
 
 
+@pytest.mark.asset("daily")  # TS-62 and TS-47 are the daily asset's
 class TestTS62sVersionStandsAfterTheHistoryREQGEN199Quotes:
     """REQ-GEN-205 criterion 25: TS-62's version takes effect after
     2026-09-08, TS-47's following day, and after the last day any REQ-GEN-199
@@ -257,7 +264,7 @@ class TestAWrittenArrivalIsAskedOnlyWhatAConfirmationCouldMove:
         ridden by one scenario, as a version-level correction would be."""
         import dataclasses
 
-        rider = dataclasses.replace(si.INJECTIONS[0], correction="CAB-W")
+        rider = dataclasses.replace(si.this_assets_injections()[0], correction="CAB-W")
         monkeypatch.setattr(si, "INJECTIONS", [rider])
         return _declare(_docs(), _widen_daily, "CAB-W", "2026-09-25")
 
@@ -265,11 +272,13 @@ class TestAWrittenArrivalIsAskedOnlyWhatAConfirmationCouldMove:
         return {"run_id": "run_x", "period": "2026-09-20", "received_at": at,
                 "row_counts": {"birth_registrations": 10}}
 
+    @pytest.mark.asset("daily")
     def test_an_arrival_before_the_correction_it_would_refile_is_refused(self, backdated):
         with pytest.raises(si.CannotPlace, match="run_x"):
             cc.check_written(["birth-registrations"], [self._br("2026-09-20T09:00:00+08:00")],
                              docs=backdated)
 
+    @pytest.mark.asset("daily")
     def test_the_same_arrival_after_the_correction_is_not(self, backdated, monkeypatch):
         later = _declare(_docs(), _widen_daily, "CAB-W", "2026-09-19")
         cc.check_written(["birth-registrations"], [self._br("2026-09-20T09:00:00+08:00")],
@@ -289,7 +298,8 @@ class TestADateLevelCorrectionIsAskedToo:
         import dataclasses
 
         monkeypatch.setattr(si, "INJECTIONS",
-                            [dataclasses.replace(si.INJECTIONS[0], correction="CAB-1")])
+                            [dataclasses.replace(si.this_assets_injections()[0],
+                                                 correction="CAB-1")])
 
     def _docs(self, to):
         return _declare(_docs(), lambda cal, asset: _move_q3(cal, asset, to), "CAB-1",
@@ -333,7 +343,13 @@ def test_the_req_gen_199_link_day_plans_only_injections_carrying_its_links(monke
 
     monkeypatch.setattr(si, "generated_periods", recording)
     cc.last_req_gen_199_link_day()
-    carrying = {i.dataset_id for i in si.INJECTIONS
+    # The selected asset's own injections, which generation walks (the split).
+    carrying = {i.dataset_id for i in si.this_assets_injections()
                 if any(cc._REQ_GEN_199.match(link.scenario_id) for link in i.links)}
     assert carrying, "no REQ-GEN-199 link to resolve"
     assert set(asked) == carrying, f"asked {sorted(set(asked))}, carrying {sorted(carrying)}"
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

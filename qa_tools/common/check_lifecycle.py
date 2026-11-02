@@ -426,7 +426,7 @@ def parse_dbt_check_metadata(schema_yml_path: Path | str, *,
     # no check_id anywhere and was silently invisible here - not failing
     # check_lifecycle.validate(), just never seen by it. See
     # plans/qa-pipeline.md's own entry for the full account.
-    for entry in doc.get("tests", []) or []:
+    for entry in (doc.get("data_tests") or doc.get("tests") or []):
         try:
             out.extend(_parse_dbt_singular_test(entry, source, definition))
         except (MissingCheckIdError, MissingCategoryError, InvalidCategoryError) as e:
@@ -499,7 +499,7 @@ def dbt_check_id_lookup(schema_yml_path: Path | str, *,
             for test in col.get("tests", []) or []:
                 _record(test, model_name, col["name"])
 
-    for entry in doc.get("tests", []) or []:
+    for entry in (doc.get("data_tests") or doc.get("tests") or []):
         name = entry.get("name")
         meta = (entry.get("config") or {}).get("meta") or {}
         check_id = meta.get("check_id")
@@ -928,7 +928,33 @@ def migrate_pre_039_check_id(check_id: str) -> str:
             f".{m.group('dataset')}{m.group('rest')}")
 
 
-def find_disappeared_check_ids(old_checks: list[CheckMetadata], new_checks: list[CheckMetadata]) -> list[str]:
+# ---- REQ-QAC-344's one-time asset rename ------------------------------
+#
+# The asset split's narrow, signed exception to the rule that a check id never
+# changes (Keith, 2026-11-01): every check id of an asset's collections takes
+# that asset's data_asset_id - quarterly or daily - as its first segment, in
+# place of data-asset-1. Like REQ-QAC-039's transform above, a RULE rather than
+# a list of pairs, and narrower still: it reads its former id from the move map
+# (REQ-TEST-366), which only the push carrying the move has, so `moved` is None
+# for every other push and this changes nothing. An old id it maps excuses a
+# disappearance only where the result is present in the new files, and its
+# config_hash is then compared under the new id - so a rename that also changed
+# what the check does still fails. Deleted, with the map, in the next push
+# (REQ-QAC-344 criterion 6).
+
+def migrate_moved_check_id(check_id: str, moved: tuple[str, str] | None) -> str:
+    """`check_id` with its first segment renamed, where `moved` is (the former
+    data_asset_id, the data_asset_id of the asset folder its file moved to)
+    and the id begins with the former one; otherwise unchanged."""
+    if moved is None:
+        return check_id
+    former, asset = moved
+    head, dot, rest = check_id.partition(".")
+    return f"{asset}.{rest}" if dot and head == former else check_id
+
+
+def find_disappeared_check_ids(old_checks: list[CheckMetadata], new_checks: list[CheckMetadata],
+                               moved: tuple[str, str] | None = None) -> list[str]:
     """Returns check_ids present in `old_checks` but entirely missing
     from `new_checks` - a check_id, once introduced, must never be
     changed or deleted, even once retired (Keith's call, 2026-09-16).
@@ -946,21 +972,31 @@ def find_disappeared_check_ids(old_checks: list[CheckMetadata], new_checks: list
 
     The one exception is REQ-QAC-039's grammar migration - see
     `migrate_pre_039_check_id()` above for what it covers and why it is
-    spent rather than standing."""
+    spent rather than standing - and REQ-QAC-344's asset rename, read through
+    `moved` (see `migrate_moved_check_id()`)."""
     new_ids = {c.check_id for c in new_checks}
     return sorted(c.check_id for c in old_checks
                   if c.check_id not in new_ids
-                  and migrate_pre_039_check_id(c.check_id) not in new_ids)
+                  and migrate_pre_039_check_id(c.check_id) not in new_ids
+                  and migrate_moved_check_id(c.check_id, moved) not in new_ids)
 
 
-def find_undocumented_changes(old_checks: list[CheckMetadata], new_checks: list[CheckMetadata]) -> list[str]:
+def find_undocumented_changes(old_checks: list[CheckMetadata], new_checks: list[CheckMetadata],
+                              moved: tuple[str, str] | None = None) -> list[str]:
     """Returns check_ids whose config_hash changed between `old_checks`
     and `new_checks` without a new changelog entry to explain it (the
     new changelog must be strictly longer than the old one - simple,
     robust, doesn't need precise date/time reasoning about which entry
     is "the new one"). A check present only in `new_checks` (newly
     check_id'd) is never flagged - there's nothing to have changed FROM."""
+    new_ids = {c.check_id for c in new_checks}
     old_by_id = {c.check_id: c for c in old_checks}
+    # A RENAMED ID IS COMPARED UNDER ITS NEW NAME (REQ-QAC-344 criterion 7),
+    # so the rename cannot carry a config change through as a brand-new check.
+    for c in old_checks:
+        renamed = migrate_moved_check_id(c.check_id, moved)
+        if renamed != c.check_id and renamed in new_ids and renamed not in old_by_id:
+            old_by_id[renamed] = c
     undocumented = []
     for new in new_checks:
         old = old_by_id.get(new.check_id)
@@ -971,15 +1007,16 @@ def find_undocumented_changes(old_checks: list[CheckMetadata], new_checks: list[
     return sorted(undocumented)
 
 
-def validate(old_checks: list[CheckMetadata], new_checks: list[CheckMetadata]) -> list[str]:
+def validate(old_checks: list[CheckMetadata], new_checks: list[CheckMetadata],
+             moved: tuple[str, str] | None = None) -> list[str]:
     """The single entry point the CI gate calls (Phase 3). Returns a list
     of human-readable error strings - empty means valid."""
     errors = []
     for check_id in find_duplicate_check_ids(new_checks):
         errors.append(f"Duplicate check_id: {check_id!r}")
-    for check_id in find_undocumented_changes(old_checks, new_checks):
+    for check_id in find_undocumented_changes(old_checks, new_checks, moved):
         errors.append(f"Check config changed without a new changelog entry: {check_id!r}")
-    for check_id in find_disappeared_check_ids(old_checks, new_checks):
+    for check_id in find_disappeared_check_ids(old_checks, new_checks, moved):
         errors.append(
             f"check_id disappeared entirely - a check_id must never be deleted or renamed, "
             f"only retired (moved to its own tool's -retired sibling file): {check_id!r}"

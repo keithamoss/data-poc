@@ -5,8 +5,9 @@ checkStatus(). Fixture-based dataset dicts, matching the real shape
 pipeline/build_dashboard_data.py produces."""
 from __future__ import annotations
 
-from qa_tools.common.dataset_status import dataset_status, status_by_run, status_for_value
 import pytest
+
+from qa_tools.common.dataset_status import dataset_status, status_by_run, status_for_value
 
 
 #: REQ-TEST-375: in the hand-picked set every push runs in CI.
@@ -141,3 +142,8 @@ def test_status_by_run_prefers_each_history_entrys_real_verdict():
 def test_status_by_run_does_not_crash_on_a_null_threshold():
     ck = _history_check(None, None, ("run_01", 1939))
     assert status_by_run({"columns": [{"checks": [ck]}]}) == {}
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = [*(pytestmark if isinstance(pytestmark, list) else [pytestmark]), pytest.mark.asset("quarterly")]

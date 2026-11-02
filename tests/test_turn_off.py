@@ -586,8 +586,8 @@ class TestHeldWhileTurnedOff:
         assert held.describe() == (
             "Received while Client Register is turned off (supplier paused, set for Client "
             "Register). Place it into a period it still owes, reject it, or change "
-            "effective_to/effective_from in contract/calendar.yaml if this period should be "
-            "owed.")
+            f"effective_to/effective_from in {supply_holds.schedule_file()} if this period "
+            "should be owed.")
         place, reject, change = held.responses
         assert "mothman supply decide --operation place" in place
         assert reject == "reject the supply" and "effective_to/effective_from" in change
@@ -1234,3 +1234,8 @@ class TestCriticFindingsOn190:
         got = _text(errors)
         assert "2023-01-01" in got
         assert "\n      turns_off: true" in got
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

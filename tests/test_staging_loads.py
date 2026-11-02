@@ -252,3 +252,6 @@ class TestNothingIsWrittenIntoTheDelivery:
         assert stage_bdm("run_001", str(drop / "missing.csv"),
                               received_at=_RECEIPT) is None
         assert sorted(p.name for p in drop.iterdir()) == before
+
+#: Birth Registrations is the daily asset's (the asset split).
+pytestmark = pytest.mark.asset("daily")

@@ -51,7 +51,15 @@ def route_problem(path: str, tree: dict) -> str | None:
         return f"route '#{path}' is not one the dashboard has"
     agency = parts[1]
     if agency not in tree:
-        return f"route '#{path}' names agency {agency!r}, which the hierarchy does not hold"
+        # ANOTHER ASSET'S ROUTE (SETTLED by Keith 2026-11-02, REQ-DOCS-219's
+        # unmet criterion 10; REJECTED reading every asset's hierarchy now): the
+        # feedback file is repository-wide while each pass reads one asset's
+        # hierarchy, so a link to an agency this asset does not hold is left to
+        # the pass of the asset that does - reading the other asset to tell it
+        # from a typo would break REQ-PIPE-342 criterion 8. Until the moved
+        # notice (REQ-PIPE-354) decides cross-asset links, a mistyped agency is
+        # no longer caught here.
+        return None
     if len(parts) == 2:
         return None
     if len(parts) < 6 or parts[2] != "collection" or parts[4] != "dataset":

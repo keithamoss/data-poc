@@ -10,6 +10,7 @@ from __future__ import annotations
 import rich_click as click
 from rich.console import Console
 from rich.table import Table
+from qa_tools.common import assets as _assets
 
 console = Console()
 
@@ -25,7 +26,7 @@ def list_command() -> None:
     from qa_tools.common import environments
 
     here = environments.current_or_none()
-    table = Table(title="Declared environments (contract/environments.yaml)")
+    table = Table(title="Declared environments (assets/environments.yaml)")
     table.add_column(""), table.add_column("id"), table.add_column("Label")
     table.add_column("Publishes"), table.add_column("What it is")
     for env in environments.all_environments():
@@ -99,7 +100,7 @@ def reset_synthetic_command() -> None:
 
     Deliveries, delivery files, filings, holds, decisions, runs and results,
     and every schema holding supply rows - rebuild-from-empty made explicit
-    (REQ-PIPE-144). Refused unless contract/data-asset.yaml declares the asset
+    (REQ-PIPE-144). Refused unless assets/<asset>/data-asset.yaml declares the asset
     synthetic, and only after you type a phrase naming what goes. Follow it
     with `mothman pipeline bootstrap`.
     """
@@ -111,7 +112,7 @@ def reset_synthetic_command() -> None:
     if not synthetic_reset.is_synthetic():
         raise click.ClickException(
             f"{synthetic_reset.asset_id()} is not declared synthetic in "
-            f"contract/data-asset.yaml - its history is treated as real, and "
+            f"{_assets.config_dir()}/data-asset.yaml - its history is treated as real, and "
             f"nothing was deleted.")
     with supply_db.connect(label="mothman:reset-synthetic") as conn:
         counts = synthetic_reset.what_it_deletes(conn)
@@ -152,7 +153,7 @@ def mark_command(typed: str | None) -> None:
     Every other command refuses a database whose recorded identity is missing
     or differs from this checkout's (REQ-PIPE-107), and none of them ever
     writes it - this is the only way it gets there. The identity written is
-    this checkout's: the data asset in contract/data-asset.yaml and the
+    this checkout's: the data asset in assets/<asset>/data-asset.yaml and the
     environment stated in MOTHMAN_ENVIRONMENT, which you type to confirm.
     """
     from cli import common

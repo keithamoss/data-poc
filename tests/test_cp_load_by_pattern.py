@@ -174,3 +174,8 @@ class TestTheRefusalSaysWhatToDo:
         said = got.value.message
         assert "settle the pair in Filing decisions" in said
         assert "remove all but one file" not in said
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

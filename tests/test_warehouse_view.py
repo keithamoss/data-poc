@@ -654,3 +654,8 @@ class TestASupplyInSeveralPeriods:
         reads = promotion._declared_reads()
         assert filing_queue._verdict(conn, "cp-clients", c1, reads, period=q1) == "green"
         assert filing_queue._verdict(conn, "cp-clients", c1, reads, period=q2) == "red"
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

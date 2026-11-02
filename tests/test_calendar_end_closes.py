@@ -3,6 +3,8 @@ an authored calendar's last slot closes, so a file arriving after the
 calendar runs out is held rather than filed years backward."""
 from __future__ import annotations
 
+import pytest
+
 from datetime import date, datetime, timezone
 
 from qa_tools.common import slots
@@ -27,3 +29,8 @@ def test_a_2030_file_finds_no_open_slot():
     at = datetime(2030, 6, 1, 1, tzinfo=timezone.utc)
     assert not any(slots.is_open(s, at)
                    for s in slots.slots_for_dataset("cp-clients", until=date(2031, 1, 1)))
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

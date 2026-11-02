@@ -48,7 +48,7 @@ def _reading_clients_from_notifications() -> set[str]:
 
 
 @pytest.fixture(scope="module")
-def two_runs(cp_duckdb_dir, cp_raw_dir):
+def two_runs(cp_duckdb_dir_for_module, cp_raw_dir):
     """The Client Register's run, then the Notifications run, of one zip -
     each filed with its siblings and overlaid, then through the real run
     step, as the lifecycle does (REQ-PIPE-105 criterion 5: a zip is filed
@@ -135,3 +135,8 @@ class TestWhatIsNeverCarried:
         assert carried.not_evaluated_reason({"unrunnable_reason": "not yet due"})
         assert carried.not_evaluated_reason({"held_reason": "held"})
         assert carried.not_evaluated_reason({"status": "fail"}) is None
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

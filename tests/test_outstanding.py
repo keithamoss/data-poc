@@ -478,3 +478,8 @@ class TestSuppliesAwaitingADecisionAreWaitingForAPerson:
         assert "2 supplies" in by_dataset["cp-carers"].headline
         assert "1 supply" in by_dataset["cp-clients"].headline
         assert all(i.collection_id == "child-protection" for i in items)
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

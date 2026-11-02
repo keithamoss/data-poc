@@ -11,6 +11,7 @@ itself.
 """
 from __future__ import annotations
 
+import asset_folders
 import importlib.util
 import os
 import re
@@ -35,8 +36,8 @@ HEAVY = ("pandas", "numpy", "duckdb", "soda", "dbt", "datacontract", "evidently"
 @pytest.fixture(scope="module")
 def thirty(tmp_path_factory) -> Path:
     tree = thirty_collections.build(tmp_path_factory.mktemp("thirty") / "tree")
-    assert (tree / "contract" / "data-asset.yaml").is_file()
-    people = tree / "contract" / "people.yaml"
+    assert (tree / "assets" / "quarterly" / "data-asset.yaml").is_file()
+    people = tree / "assets" / "quarterly" / "people.yaml"
     doc = yaml.safe_load(people.read_text())
     doc["people"].append({"email": DECIDER, "name": "Thirty Collections", "github": "thirty-collections"})
     people.write_text(yaml.safe_dump(doc, sort_keys=False))
@@ -81,7 +82,7 @@ class TestTheFixture:
         assert len({c["agency_id"] for c in thirty_collections.added()}) >= 5
 
     def test_it_writes_nothing_to_the_repository(self, thirty):
-        real = (ROOT / "contract" / "data-asset.yaml").read_text()
+        real = (asset_folders.real_folder() / "data-asset.yaml").read_text()
         added = thirty_collections.added()
         assert added and not [c["id"] for c in added if c["id"] in real]
         for c in thirty_collections.added():
@@ -114,7 +115,9 @@ class TestHelpAtThirty:
         assert "collections" in {row.split()[0] for row in tools_panel if row}
 
     @pytest.mark.parametrize("argv", [["--help"], ["edp", "--help"], ["edw", "qa", "--help"],
-                                      ["bdm", "qa", "--help"]], ids=" ".join)
+                                      # A real collection of the tree's asset
+                                      # (the quarterly one since the split).
+                                      ["cp", "qa", "--help"]], ids=" ".join)
     def test_help_imports_no_tool(self, thirty, argv):
         probe = ("import json, sys\nfrom cli.app import cli\n"
                  "try:\n    cli.main(sys.argv[1:], prog_name='mothman', standalone_mode=False)\n"
@@ -170,9 +173,14 @@ class TestTheThresholdAtTwo:
     def test_two_is_not_many(self):
         assert common.N_LIST == 9 and not common.many_collections()
 
-    def test_the_refusal_still_lists_every_collection(self):
-        said = common.unknown_collection_message("bmd")
-        assert "Closest: bdm" in said and "Known: bdm (civil-registration), cp (child-protection)" in said
+    @pytest.mark.parametrize("typo, closest, known", [
+        # Each asset's own collections (the asset split).
+        pytest.param("cq", "cp", "cp (child-protection), ed (emergency-department), "
+                     "lp (linkage-products)", marks=pytest.mark.asset("quarterly")),
+        pytest.param("bmd", "bdm", "bdm (civil-registration)", marks=pytest.mark.asset("daily"))])
+    def test_the_refusal_still_lists_every_collection(self, typo, closest, known):
+        said = common.unknown_collection_message(typo)
+        assert f"Closest: {closest}" in said and f"Known: {known}" in said
         assert "mothman collections" in said
 
     def test_the_grouped_picker_is_todays_select_at_two(self, monkeypatch):
@@ -307,5 +315,11 @@ class TestTheFilingMenuAtTwo:
         # offers, by its QA-menu label, in hierarchy order.
         filed = set(filing_tui._collections())
         expected = [c.label for c in collections.all_collections() if c.id in filed]
-        assert expected[:2] == ["Birth Registrations", "Child Protection"]
+        # The quarterly asset's hierarchy order (the asset split).
+        assert expected == ["Child Protection", "ED Presentations", "Linkage Products"]
         assert asked["groups"] == [("", expected)]
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")
