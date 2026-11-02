@@ -597,7 +597,8 @@ class TestTheFilingDecisionsDoorListsHeldSupplies:
         door.held_flow(self._row(schedule_ended=True, why="arrived after the schedule ended"))
         out = capsys.readouterr().out
         assert offered == []
-        assert "contract/calendar.yaml" in out
+        # The selected asset's own calendar since the asset split.
+        assert "assets/quarterly/calendar.yaml" in out
         assert "\nmothman schedule draft-correction\n" in out
         assert "nothing to decide" not in out.lower()
 

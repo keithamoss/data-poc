@@ -26,9 +26,17 @@ from generator import driver
 BDM_ID = "birth-registrations"
 
 
-@pytest.fixture(scope="module")
-def cat():
-    return check_bands.catalogue()
+#: Each asset's catalogue, built once (the asset split: Birth Registrations'
+#: tests and Child Protection's share this module, each under its own asset,
+#: and a module-scoped fixture is built under the module's).
+_CATALOGUES: dict = {}
+
+
+@pytest.fixture
+def cat(selected_asset):
+    if selected_asset not in _CATALOGUES:
+        _CATALOGUES[selected_asset] = check_bands.catalogue()
+    return _CATALOGUES[selected_asset]
 
 
 @pytest.fixture(scope="module")
