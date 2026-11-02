@@ -14167,3 +14167,18 @@ twice. It deliberately did not re-find the `TypeError`.
           Refuse only for the injected-root (#55) layout and keep (b) for
           the suite's folder copies - which ties product behaviour to how a
           test points the resolver. Until he answers, (b) stands.
+     - **Runs (tree 1e1fde37, before this bullet was added)**: the touched
+       modules plus the three the held-back M2 broke (test_equivalence_assets,
+       test_assets, test_github_links, test_validate_premise,
+       test_replay_inputs, test_changelog_yaml, test_no_calendar,
+       test_turn_off, test_collection_defaults) on dedc85e1: 301 passed, 2
+       failed - test_collection_defaults.py::TestWhereEachValueCameFrom::test_the_calendar_entry_uses_the_same_renderer
+       (cli NotInteractive) and test_turn_off.py::TestCriticFindingsOn190::test_the_gate_says_no_more_dates_are_needed_once_authored
+       (ValueError unpacking an empty list), both failing identically on the
+       base 994be5fb in a clean worktree, so not this change's; not
+       investigated here. Critical set: quarterly 789 passed, 0 skipped, 74s;
+       daily 106 passed, 0 skipped, 45s. `uv run ruff check .` clean.
+       `mothman check --no-pytest` (MOTHMAN_ASSET unset,
+       MOTHMAN_DIFF_BASE=f123a582) passed with warnings from schedule,
+       sprints and scenario map; npm test 1138 passed. `mothman check
+       --docs` passed with warnings from sprints and scenario map.
