@@ -810,11 +810,18 @@ class TestTheInPlaceOnPanelSaysWhichPeriod:
         _goto(clean_page, built_dashboard_html)
         self._open_panel(clean_page)
         text = clean_page.locator("#in-place-on-periods").inner_text()
-        # This asset has two named calendars, and the same chosen date is a
-        # different period on each - which is the whole reason a reader
-        # needs telling rather than inferring it from the date.
-        assert "quarterly calendar" in text
-        assert "daily calendar" in text
+        # EVERY NAMED CALENDAR OF THIS ASSET (the asset split: one each
+        # today, two on the one asset before it), each saying its period -
+        # the same chosen date is a different period on each calendar.
+        import yaml
+
+        from qa_tools.common import agreement
+
+        names = [c["name"] for c in yaml.safe_load(
+            agreement.calendar_yaml().read_text())["calendars"]]
+        assert names, "the asset names no calendar - the check would prove nothing"
+        for name in names:
+            assert f"{name} calendar" in text, (name, text)
 
     def test_the_named_period_follows_the_date_the_reader_picks(self, clean_page, built_dashboard_html):
         _goto(clean_page, built_dashboard_html)
@@ -875,6 +882,12 @@ class TestTheInPlaceOnPanelSaysWhichPeriod:
     def test_a_date_inside_the_range_draws_no_notice_at_all(self, clean_page, built_dashboard_html):
         _goto(clean_page, built_dashboard_html)
         assert clean_page.locator("#in-place-on-range-notice").is_hidden()
+
+
+@pytest.mark.shared_page
+@pytest.mark.asset("daily")
+class TestTheInPlaceOnPanelSaysWhichPeriodOnTheDailyAsset(TestTheInPlaceOnPanelSaysWhichPeriod):
+    """The same panel on the daily asset's page (C11): its daily calendar."""
 
 
 @pytest.mark.asset("daily")  # Birth Registrations' page, so the class's page fixtures build it
@@ -4140,34 +4153,6 @@ class TestScenariosTab:
             "no entry says it has nothing behind it, and most still have nothing")
 
 
-    def test_a_jump_says_so_and_back_undoes_it(self, clean_page, built_dashboard_html):
-        """Keith, 2026-10-06 (post-build-review #123 B4): a scenario jump
-        silently moved the whole dashboard to a past date, and Back did not
-        put it back. It now shows a bar naming the scenario and the date,
-        with a way back to today, and Back restores the date it left."""
-        from qa_tools.common import scenario_map
-
-        placement = scenario_map.read_placements().get("TS-47")
-        if placement is None or not placement.is_complete:
-            pytest.skip("TS-47 is not placed in this history")
-        _goto(clean_page, built_dashboard_html)
-        before = clean_page.evaluate("CURRENT_IN_PLACE_ON")
-        clean_page.locator("#scenarios-btn").click()
-        clean_page.wait_for_timeout(400)
-        index = clean_page.evaluate("SCENARIO_MAP.findIndex(e => e.id === 'TS-47')")
-        clean_page.locator(f'a[data-scenario="{index}"]').click()
-        clean_page.wait_for_timeout(600)
-        bar = clean_page.locator("[data-testid=scenario-jump-bar]")
-        assert bar.count() == 1
-        assert "TS-47" in bar.inner_text()
-        assert clean_page.evaluate("CURRENT_IN_PLACE_ON") == placement.in_place_on
-
-        clean_page.go_back()
-        clean_page.wait_for_timeout(600)
-        assert "/scenarios" in clean_page.url
-        assert clean_page.evaluate("CURRENT_IN_PLACE_ON") == before
-        assert f"in-place-on={placement.in_place_on}" not in clean_page.url
-
     def test_the_committed_map_carries_no_url_for_the_page_to_follow(
             self, clean_page, built_dashboard_html):
         """Criterion 3. The page constructs the link; a URL written into
@@ -4218,6 +4203,34 @@ class TestScenariosTabOnTheDailyAsset:
         clean_page.wait_for_timeout(600)
         assert f"in-place-on={placement.in_place_on}" in clean_page.url
         assert "/dataset/birth-registrations" in clean_page.url
+
+    def test_a_jump_says_so_and_back_undoes_it(self, clean_page, built_dashboard_html):
+        """Keith, 2026-10-06 (post-build-review #123 B4): a scenario jump
+        silently moved the whole dashboard to a past date, and Back did not
+        put it back. It now shows a bar naming the scenario and the date,
+        with a way back to today, and Back restores the date it left."""
+        from qa_tools.common import scenario_map
+
+        placement = scenario_map.read_placements().get("TS-47")
+        if placement is None or not placement.is_complete:
+            pytest.skip("TS-47 is not placed in this history")
+        _goto(clean_page, built_dashboard_html)
+        before = clean_page.evaluate("CURRENT_IN_PLACE_ON")
+        clean_page.locator("#scenarios-btn").click()
+        clean_page.wait_for_timeout(400)
+        index = clean_page.evaluate("SCENARIO_MAP.findIndex(e => e.id === 'TS-47')")
+        clean_page.locator(f'a[data-scenario="{index}"]').click()
+        clean_page.wait_for_timeout(600)
+        bar = clean_page.locator("[data-testid=scenario-jump-bar]")
+        assert bar.count() == 1
+        assert "TS-47" in bar.inner_text()
+        assert clean_page.evaluate("CURRENT_IN_PLACE_ON") == placement.in_place_on
+
+        clean_page.go_back()
+        clean_page.wait_for_timeout(600)
+        assert "/scenarios" in clean_page.url
+        assert clean_page.evaluate("CURRENT_IN_PLACE_ON") == before
+        assert f"in-place-on={placement.in_place_on}" not in clean_page.url
 
 
 @pytest.mark.shared_page
@@ -5066,6 +5079,14 @@ class TestClosedWithNoSupply:
         assert got["accepted"] is None, "not marked yet on this date"
         assert [g["periods"] for g in got["noSupply"]] == [["2024-Q4"]], \
             "and Q2/Q3 had not closed yet"
+
+
+@pytest.mark.asset("daily")  # Birth Registrations' page, so the class's page fixtures build it
+class TestClosedWithNoSupplyOnTheDailyAsset:
+    """TestClosedWithNoSupply's Birth Registrations tests, on the daily asset's
+    page (C11)."""
+
+    _slot = TestClosedWithNoSupply._slot
 
     def test_a_daily_feed_awaiting_todays_file_keeps_its_row(self, page, tmp_path,
                                                             built_dashboard_html):
@@ -6029,18 +6050,6 @@ class TestThePlantedPairsOnTheBuiltDashboard:
             toggle.click()
         return " ".join(page.locator("#view").inner_text().split()), date.fromisoformat(placed.period)
 
-    def test_ts70_reads_late_from_the_corrected_files_receipt(self, page, built_dashboard_html):
-        """Criterion 14: D's supply is the 16:30 re-export, so D is late."""
-        text, _day = self._text_on(page, built_dashboard_html, "TS-70", 1)
-        assert "Late 4:30pm" in text, text[:2000]
-
-
-    def test_ts73_says_both_files_were_rejected(self, page, built_dashboard_html):
-        """Criterion 17: D is left owed, and the page says two files came and
-        were both rejected - not 'a supply'."""
-        text, _day = self._text_on(page, built_dashboard_html, "TS-73", 2)
-        assert "2 files arrived and were rejected" in text, text[:2000]
-
 
 @pytest.mark.asset("daily")
 class TestThePlantedPairsOnTheBuiltDashboardOnTheDailyAsset:
@@ -6093,6 +6102,17 @@ class TestThePlantedPairsOnTheBuiltDashboardOnTheDailyAsset:
         assert f"birth_registrations_{day}-test.csv" in text
         assert "never loaded" in text, text[:2000]
 
+    def test_ts70_reads_late_from_the_corrected_files_receipt(self, page, built_dashboard_html):
+        """Criterion 14: D's supply is the 16:30 re-export, so D is late."""
+        text, _day = self._text_on(page, built_dashboard_html, "TS-70", 1)
+        assert "Late 4:30pm" in text, text[:2000]
+
+    def test_ts73_says_both_files_were_rejected(self, page, built_dashboard_html):
+        """Criterion 17: D is left owed, and the page says two files came and
+        were both rejected - not 'a supply'."""
+        text, _day = self._text_on(page, built_dashboard_html, "TS-73", 2)
+        assert "2 files arrived and were rejected" in text, text[:2000]
+
 
 #: REQ-GEN-199 criteria 32-34: each chip, the element holding the text its
 #: register Expect quotes, and that text - from plans/supply-model.md. Child
@@ -6139,6 +6159,7 @@ _VISIBLE_TEXT = """() => {
 _IN_PLACE_ALONE = re.compile(r"\bin place\b(?! in the warehouse)(?! of\b)", re.IGNORECASE)
 
 
+@pytest.mark.asset("daily")  # TS-78b is Birth Registrations', so the class's page fixtures build it
 class TestInPlaceInTheWarehouse:
     """REQ-DASH-277 criterion 7: no visible text on a DATASET or COLLECTION
     view says 'in place' without saying where - walked as every visible text
@@ -6189,6 +6210,10 @@ class TestInPlaceInTheWarehouse:
         self._check(collection, "the collection view")
 
 
+#: The chips above that are Birth Registrations' scenarios (the daily asset's).
+_DAILY_CHIPS = ("TS-78a", "TS-78b")
+
+
 class TestTheAsAtScenarioChips:
     """REQ-GEN-199 criteria 32-37 as amended by REQ-DASH-208 (Keith, 2026-10-14):
     each of this requirement's chips opens on a date where the text its
@@ -6198,8 +6223,11 @@ class TestTheAsAtScenarioChips:
     (clean_page). Post-build-review #174's below-the-fold findings are fixed
     by the jump, so none is carried as an expected failure any more."""
 
+    # TS-78a and TS-78b are Birth Registrations', the daily asset's: the class
+    # below (C11).
     @pytest.mark.parametrize("sid,where,text", [
-        pytest.param(sid, where, text, id=f"{sid}-{where}") for sid, where, text in _AS_AT_CHIPS])
+        pytest.param(sid, where, text, id=f"{sid}-{where}") for sid, where, text in _AS_AT_CHIPS
+        if sid not in _DAILY_CHIPS])
     def test_the_quoted_text_is_on_screen_and_survives_a_cold_reload(
             self, clean_page, built_dashboard_html, sid, where, text):
         from qa_tools.common import scenario_map
@@ -6240,6 +6268,20 @@ class TestTheAsAtScenarioChips:
             "() => Number(document.documentElement.dataset.renderCount || 0) > 0")
         clean_page.wait_for_selector("[data-scenario-label]", timeout=10000)
         on_screen()
+
+
+@pytest.mark.asset("daily")  # Birth Registrations' page, so the class's page fixtures build it
+class TestTheAsAtScenarioChipsOnTheDailyAsset:
+    """TestTheAsAtScenarioChips' Birth Registrations chips, on the daily
+    asset's page (C11)."""
+
+    @pytest.mark.parametrize("sid,where,text", [
+        pytest.param(sid, where, text, id=f"{sid}-{where}") for sid, where, text in _AS_AT_CHIPS
+        if sid in _DAILY_CHIPS])
+    def test_the_quoted_text_is_on_screen_and_survives_a_cold_reload(
+            self, clean_page, built_dashboard_html, sid, where, text):
+        TestTheAsAtScenarioChips().test_the_quoted_text_is_on_screen_and_survives_a_cold_reload(
+            clean_page, built_dashboard_html, sid, where, text)
 
 
 def _scenario_chip(page, html, sid):
