@@ -395,3 +395,12 @@ the rebuild needs no question asked twice. Drafts and builders read this file.
 - NEXT (Keith 2026-11-03): with all four split decisions made, #134 goes back
   to delivery-scoper for a v4 carrying them, then to the architect and the
   CLI and dashboard UX reviewers before sign-off.
+- SPLIT RISK 5 (geocoding check files) SETTLED by Keith 2026-11-03: KEEP
+  HAND-WRITTEN - each geocoded source's Soda, dbt and contract sections stay
+  their own hand-reviewed artefact, although only three facts differ between
+  sources. REJECTED a template from the three facts, and waiting for a third
+  source.
+- SPLIT RISK 6 (status copies inside the dashboard page) SETTLED by Keith
+  2026-11-03: LEAVE THEM - RECHECK_RANK, xtStatusCounts' order list and
+  XT_WORD ('No result') stay as they are. REJECTED reading STATUS_ORDER from
+  both repeats, and one wording everywhere.

@@ -6132,6 +6132,11 @@ could never have computed it), and it belongs with batch 5's check work.
        questions, every amendment wording signed).
      - **SCOPED 2026-11-02 (delivery-scoper, draft separation-v1: REQ-PIPE-380, REQ-GEN-381, REQ-PIPE-382, REQ-PIPE-383, REQ-TEST-384, REQ-PIPE-385, REQ-GEN-386).** A fresh scan of the moved tree: 86 generator imports from qa_tools in 13 files naming 21 modules (asset_time, hierarchy, schedule and slots are 75 of 122 names; the generator also calls assignment.open_slot, arrival_classification.classify and check_bands.catalogue); the bootstrap and replay machinery is ten qa_tools/common modules, 3,514 lines; 17 real pipeline modules read replay_clock; orchestrate._begin() sets a scripted-decision player by default; and knock_on imports bootstrap, arrival_lifecycle imports correction_replay, the dashboard build imports scenario_map, and bootstrap reaches into cli.pipeline.
      - **KEITH'S ANSWERS, 2026-11-02 (all SETTLED):** Q1 the generator imports the DOMAIN MODEL ONLY, the pure pipeline functions it calls moving into it (rejected: a permanent allowlist; everything passed as data). Q2 top-level `domain/` and `bootstrap/` packages. Q3 ONE `mothman`, the synthetic commands present only when the components are installed and the asset has a synthetic/ folder (rejected: a second entry point; always listed and refused). Q4 a SMALL SHARED synthetic-config package owns the scripted_decisions.yaml reader and the scenario vocabulary (rejected: the generator or the bootstrap owning it). Q5 the bootstrap is SYNTHETIC-ONLY and only it plays scripted decisions; `pipeline run` never does. Q6 the simulated-clock refusal on a real asset lives IN THE DOMAIN CLOCK. Q7 MOTHMAN_PINNED_NOW goes through the SAME clock seam. Q8 "not importable" is proven by an import-BLOCKING TEST ONLY (rejected: a recorded deleted-copy run, offered at ~5-10 minutes once). NFR: the bootstrap at most 5% slower. The bootstrap requirement is coded GEN. Next: a v2 draft with these applied, then sign-off; built after the asset split. **v2's three open questions, SETTLED by Keith 2026-11-02:** the shared package is `scenarios/` (rejected: synthetic_config/); REQ-PIPE-382 moves EVERY anchor() into a clock hook and ACCEPTS the new recorded instants, the compare listing each moved one (rejected: reporting unmovable calls for a decision); on an asset with no scenarios the dashboard's scenario features are HIDDEN ENTIRELY (rejected: as they render today). **NEXT, Keith 2026-11-02:** he reviews a high-level module map, a dependency diagram and a DRY analysis of the code after both the split and this separation, makes further decisions, and then where it lands goes back to delivery-scoper or on to delivery-architect and the UX reviewers before sign-off. v3 is at docs/drafts/separation-v3.yaml once committed (drafted in the session scratchpad).
+     **SCOPED v4 2026-11-03 (delivery-scoper, docs/drafts/separation-v4.yaml)**:
+     v3 re-drafted with `asset_model/` (SPLIT D1) and the decisions D1b, D2, D3
+     and D4 as REQ-PIPE-379, REQ-QAC-387, REQ-TEST-388, REQ-QAC-389,
+     REQ-PIPE-390, REQ-GEN-391 and REQ-GEN-392; re-scanned at 04fa7955. Eleven
+     open questions are with Keith; then the architect and UX reviewers.
 135. **[done, 2026-11-01]** **[Docs & process]** **[Testing & dev tooling]** **A replaced container lost a day of unpushed work; every checkpoint is now pushed to a `wip/` branch.**
      2026-11-01, afternoon Perth: under Keith's "no push until the very end"
      the whole build run (REQ-PIPE-341, REQ-TEST-374, Pass / Warn / Fail,
@@ -6222,6 +6227,11 @@ could never have computed it), and it belongs with batch 5's check work.
      built before Keith signs what the scoper drafts. The duplicate-table
      sighting goes with them to be confirmed or dismissed.
 
+     **Groups B-D DRAFTED 2026-11-03** as REQ-PIPE-376 (B), REQ-PIPE-377 (C)
+     and REQ-PIPE-378 (D, five open questions) in
+     docs/drafts/separation-v4.yaml; the readers of `synthetic: true` fold into
+     REQ-PIPE-382. The duplicate-table sighting is CONFIRMED and goes into
+     REQ-PIPE-376.
 138. **[todo, 2026-11-03]** **[Data generation]** **A rolling anchor date
      for the synthetic data.** Keith, 2026-11-03, answering morning report 12
      question 4: the demo data is generated up to a fixed ANCHOR_DATE
