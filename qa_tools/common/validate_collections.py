@@ -181,22 +181,40 @@ def config_problems(package: Path | None = None) -> list[str]:
 
     package = package or assets.selected().adapters
     modules = {p.stem for p in package.glob("*.py") if p.stem not in ("__init__", "base")}
-    problems += adapter_import_problems(package)
+
+    def shown(stem: str) -> str:
+        """An adapter by its own path - the asset's adapter folder since the
+        asset split (it was qa_tools/collections/) - from the repository root,
+        or in full outside it."""
+        path = package / f"{stem}.py"
+        try:
+            return str(path.resolve().relative_to(ROOT))
+        except ValueError:
+            return str(path)
+
+    import_problems = adapter_import_problems(package)
+    problems += import_problems
     wanted = {c.module_name: c for c in declared}
     loaded = {}
     for c in declared:
         if c.module_name not in modules:
-            problems.append(f"collection {c.id!r} has no adapter "
-                            f"(qa_tools/collections/{c.module_name}.py)")
+            problems.append(f"collection {c.id!r} has no adapter ({shown(c.module_name)})")
         else:
             try:
                 adapter = collections.adapter(c)
             except TypeError as exc:
                 problems.append(_pointer_problem(c, exc))
                 continue
+            except ImportError as exc:
+                # REPORTED, NOT RAISED: an adapter whose own import fails - most
+                # often the forbidden import adapter_import_problems() has just
+                # named - is one more finding, never the end of the gate.
+                if not any(p.startswith(f"{c.module_name}.py:") for p in import_problems):
+                    problems.append(f"{shown(c.module_name)} cannot be imported: {exc}")
+                continue
             loaded[c.id] = adapter
             if adapter.collection_id != c.id:
-                problems.append(f"qa_tools/collections/{c.module_name}.py is the adapter of "
+                problems.append(f"{shown(c.module_name)} is the adapter of "
                                 f"{adapter.collection_id!r}, not {c.id!r}")
     # REQ-QAC-242 criterion 5, closed by REQ-QAC-247 criterion 5 and REQ-PIPE-248
     # criterion 6: every legacy flag is retired, so legacy.KNOWN is empty and
@@ -205,11 +223,11 @@ def config_problems(package: Path | None = None) -> list[str]:
     for c in declared:
         if c.id in loaded:
             for flag in sorted(loaded[c.id].legacy - set(legacy.KNOWN)):
-                problems.append(f"qa_tools/collections/{c.module_name}.py declares legacy flag "
+                problems.append(f"{shown(c.module_name)} declares legacy flag "
                                 f"{flag!r}, but every legacy flag is retired (REQ-QAC-247, REQ-PIPE-248) - "
                                 f"remove it, or unify the behaviour it preserved")
     for orphan in sorted(modules - set(wanted)):
-        problems.append(f"qa_tools/collections/{orphan}.py names no declared collection")
+        problems.append(f"{shown(orphan)} names no declared collection")
 
     # REQ-PIPE-248 criterion 7: an agency's short names its collections'
     # report files, so it must be unique and safe in a file name.

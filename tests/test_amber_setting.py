@@ -33,7 +33,9 @@ def _doc(asset=("2023-01-01", "promote"), collection=None, dataset=None):
     doc["amber_setting"] = {"versions": [_version(*asset)]} if asset else None
     if doc["amber_setting"] is None:
         del doc["amber_setting"]
-    col = doc["hierarchy"]["agencies"][1]["collections"][0]
+    # Child Protection by its id, not by position (the asset split moved it).
+    col = next(c for a in doc["hierarchy"]["agencies"] for c in a["collections"]
+               if c["id"] == "child-protection")
     if collection:
         col["amber_setting"] = {"versions": [_version(*v) for v in collection]}
     if dataset:

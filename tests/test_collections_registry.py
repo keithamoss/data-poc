@@ -346,14 +346,18 @@ class TestTheConfigurationGate:
         assert gate.config_problems(_package(tmp_path, *self.REAL, "fake_collection")) == []
 
     def test_a_collection_with_no_adapter_fails(self, third_collection, tmp_path):
-        got = gate.config_problems(_package(tmp_path, *self.REAL))
+        package = _package(tmp_path, *self.REAL)
+        got = gate.config_problems(package)
+        # Named by the adapter folder the gate read (the asset split: it was
+        # always qa_tools/collections/).
         assert got == [f"collection {FAKE_ID!r} has no adapter "
-                       "(qa_tools/collections/fake_collection.py)"]
+                       f"({package / 'fake_collection.py'})"]
 
     def test_an_adapter_naming_no_collection_fails(self, tmp_path):
         assert "no_such_collection" not in self.REAL
-        got = gate.config_problems(_package(tmp_path, *self.REAL, "no_such_collection"))
-        assert got == ["qa_tools/collections/no_such_collection.py names no declared "
+        package = _package(tmp_path, *self.REAL, "no_such_collection")
+        got = gate.config_problems(package)
+        assert got == [f"{package / 'no_such_collection.py'} names no declared "
                        "collection"]
 
     @pytest.mark.parametrize("edit,expected", [
@@ -876,9 +880,9 @@ class TestTheSharedToolModules:
 
         adapter = collection_modules.installed("adapter", "fake_collection")
         adapter.ADAPTER = dataclasses.replace(adapter.ADAPTER, legacy=frozenset({"no.such.flag"}))
-        got = gate.config_problems(_package(tmp_path, *TestTheConfigurationGate.REAL,
-                                            "fake_collection"))
-        assert got == ["qa_tools/collections/fake_collection.py declares legacy flag "
+        package = _package(tmp_path, *TestTheConfigurationGate.REAL, "fake_collection")
+        got = gate.config_problems(package)
+        assert got == [f"{package / 'fake_collection.py'} declares legacy flag "
                        "'no.such.flag', but every legacy flag is retired (REQ-QAC-247, REQ-PIPE-248) - "
                        "remove it, or unify the behaviour it preserved"]
 
