@@ -4405,11 +4405,11 @@ class TestArrivedVersusPromoted:
 
     def test_the_panel_agrees_with_the_data_about_whether_to_show_at_all(
             self, clean_page, built_dashboard_html):
-        agency, collection, dataset_id = self.DATASET
         """Criteria 1 and 3 together, and asserting them as ONE claim is
         deliberate: "show both" and "stay quiet" are the same rule read
         from its two sides, and a test for either alone passes on a page
         that always does that one thing."""
+        agency, collection, dataset_id = self.DATASET
         self._open(clean_page, built_dashboard_html, agency, collection, dataset_id)
         differs = clean_page.evaluate(
             """(id) => {
@@ -4447,11 +4447,11 @@ class TestArrivedVersusPromoted:
 
     def test_it_shows_no_raw_period_code(
             self, clean_page, built_dashboard_html):
-        agency, collection, dataset_id = self.DATASET
         """A DAILY calendar names its periods by the day, so the period
         name is a bare ISO date - the one thing REQ-DASH-071 says a
         reader never sees. The panel is the newest place one could leak
         in."""
+        agency, collection, dataset_id = self.DATASET
         self._open_where_it_shows(clean_page, built_dashboard_html, agency, collection,
                                   dataset_id)
         panel = clean_page.locator('[data-testid="promotion-split"]')
@@ -9437,9 +9437,12 @@ _GUARD_SURFACES_BY_ASSET = {
 
 
 def _scan_scenario_surfaces(page, html: Path, asset: str, until: str | None = None) -> list[str]:
-    """Scan every scenario page that shows a surface not yet seen, and
-    assert the asset's scenario pages show every surface its
-    _GUARD_SURFACES_BY_ASSET entry names; the colour words found."""
+    """Visit EVERY scenario page of the asset, scan each one that shows a
+    surface not yet seen (and `until`'s), and assert the surfaces the pages
+    show are EXACTLY the asset's _GUARD_SURFACES_BY_ASSET entry - so that
+    entry is what the pages show, both ways, and
+    test_the_two_assets_show_every_surface's union is read from the pages
+    rather than trusted (post-build-review #306 2); the colour words found."""
     hits: list[str] = []
     seen: set[str] = set()
     want = _GUARD_SURFACES_BY_ASSET[asset]
@@ -9451,10 +9454,10 @@ def _scan_scenario_surfaces(page, html: Path, asset: str, until: str | None = No
             continue
         seen |= found
         hits += _colour_words(page, f"{entry['id']} on {on}")
-        if want <= seen and (until is None or entry["id"] == until):
-            break
-    missing = want - seen
+    missing, unlisted = want - seen, seen - want
     assert not missing, f"no {asset} scenario page shows {sorted(missing)}"
+    assert not unlisted, (f"{asset} scenario pages show {sorted(unlisted)}, which "
+                          f"_GUARD_SURFACES_BY_ASSET[{asset!r}] does not list - add it there")
     return hits
 
 
@@ -9495,6 +9498,84 @@ class TestASeveralColumnSampleOnTheRealPageOnTheDailyAsset:
         assert "New since the compared run" not in got["text"]
 
 
+_COLOUR = re.compile(r"\b(green|amber|red)\b", re.I)
+
+
+def _scan_tiers_and_dataset_pages(page, html: Path) -> list[str]:
+    """Every tier, the Scenarios tab, and one dataset page per collection of
+    the selected asset, with each dataset page's unit-trend tooltip; the
+    colour words found (REQ-TEST-361 criteria 1 to 3)."""
+    hx = _hierarchy_index()
+    hits: list[str] = []
+    _goto(page, html)
+    hits += _colour_words(page, "Executive tier")
+    agencies = sorted(set(hx["ds_agency"].values()))
+    assert agencies, "precondition: the hierarchy names an agency"
+    for agency in agencies:
+        _goto(page, html, state={"tier": "agency", "agencyId": agency})
+        _open_groups(page)
+        hits += _colour_words(page, f"Agencies tier, {agency}")
+    _goto(page, html, state={"tier": "scenarios"})
+    hits += _colour_words(page, "Scenarios tab", pills=False)
+    for collection in hx["order"]:
+        dataset = next(d for d, c in hx["ds_col"].items() if c == collection)
+        # On a day its trends have a verdict to draw (_generated_on).
+        _goto(page, html, state=_dataset_state(hx, dataset), in_place_on=_generated_on())
+        _open_groups(page)
+        hits += _colour_words(page, f"dataset page, {dataset}")
+        for tip in _hover_trends(page, ["unit trend"]):
+            if _COLOUR.search(tip):
+                hits.append(f"dataset page, {dataset}: chart tooltip {tip!r}")
+    return hits
+
+
+def _scan_column_panel_and_trends(page, html: Path, dataset: str, *,
+                                  cross_table: bool) -> list[str]:
+    """`dataset`'s page: its cross-table grid where `cross_table`, a column
+    panel and its unit-trend tooltip, a check panel and its trend tooltip, and
+    the agency tier's sparkline points; the colour words found. Each surface
+    is asserted present first (REQ-TEST-361 criterion 4)."""
+    hx = _hierarchy_index()
+    _goto(page, html, state=_dataset_state(hx, dataset), in_place_on=_generated_on())
+    _open_groups(page)
+    hits: list[str] = []
+    if cross_table:
+        assert page.locator(".xt-row").count(), "precondition: a cross-table grid row"
+        hits += _colour_words(page, "cross-table grid")
+    tile = page.locator(".col-tile").first
+    assert tile.count(), "precondition: a column tile"
+    tile.click()
+    page.locator("#drawer[aria-hidden='false']").wait_for()
+    hits += _colour_words(page, "column panel")
+    for tip in _hover_trends(page, ["unit trend"]):
+        if _COLOUR.search(tip):
+            hits.append(f"column panel: chart tooltip {tip!r}")
+    # A CHECK'S OWN TREND, from its card in the panel.
+    card = page.locator("#drawer .check-card").first
+    assert card.count(), "precondition: the column panel lists a check"
+    card.click()
+    # The card opens the CHECK panel beside the drawer, and the trend is
+    # drawn there.
+    page.locator("#check-panel svg .hitrect").first.wait_for()
+    hits += _colour_words(page, "check panel")
+    for tip in _hover_trends(page, ["check trend"]):
+        if _COLOUR.search(tip):
+            hits.append(f"check panel: chart tooltip {tip!r}")
+    # AND A SPARKLINE'S POINT TITLES, on the agency tier's dataset rows.
+    _goto(page, html, state={"tier": "agency", "agencyId": hx["ds_agency"][dataset]})
+    for tip in _hover_trends(page, ["sparkline"]):
+        if _COLOUR.search(tip):
+            hits.append(f"agency tier: sparkline point {tip!r}")
+    return hits
+
+
+def _scan_needs_action_queue(page, html: Path) -> list[str]:
+    _goto(page, html)
+    assert page.locator("[data-outstanding], .outstanding-marker, .queue-head").count(), (
+        "precondition: the needs-action queue or a marker is on the page")
+    return _colour_words(page, "needs-action queue")
+
+
 @pytest.mark.needs_deployment
 class TestNoColourWordIsReadAsAStatus:
     """REQ-TEST-361 criteria 1 to 4 and 6: the built dashboard, driven in a
@@ -9504,63 +9585,13 @@ class TestNoColourWordIsReadAsAStatus:
 
     def test_every_tier_the_scenarios_tab_and_one_dataset_page_per_collection(
             self, clean_page, built_dashboard_html):
-        hx = _hierarchy_index()
-        hits: list[str] = []
-        _goto(clean_page, built_dashboard_html)
-        hits += _colour_words(clean_page, "Executive tier")
-        agencies = sorted(set(hx["ds_agency"].values()))
-        assert agencies, "precondition: the hierarchy names an agency"
-        for agency in agencies:
-            _goto(clean_page, built_dashboard_html, state={"tier": "agency", "agencyId": agency})
-            _open_groups(clean_page)
-            hits += _colour_words(clean_page, f"Agencies tier, {agency}")
-        _goto(clean_page, built_dashboard_html, state={"tier": "scenarios"})
-        hits += _colour_words(clean_page, "Scenarios tab", pills=False)
-        for collection in hx["order"]:
-            dataset = next(d for d, c in hx["ds_col"].items() if c == collection)
-            # On a day its trends have a verdict to draw (_generated_on).
-            _goto(clean_page, built_dashboard_html, state=_dataset_state(hx, dataset),
-                  in_place_on=_generated_on())
-            _open_groups(clean_page)
-            hits += _colour_words(clean_page, f"dataset page, {dataset}")
-            for tip in _hover_trends(clean_page, ["unit trend"]):
-                if re.search(r"\b(green|amber|red)\b", tip, re.I):
-                    hits.append(f"dataset page, {dataset}: chart tooltip {tip!r}")
+        hits = _scan_tiers_and_dataset_pages(clean_page, built_dashboard_html)
         assert not hits, "\n".join(hits)
 
     def test_a_column_panel_its_trend_tooltip_and_the_cross_table_grid(
             self, clean_page, built_dashboard_html):
-        hx = _hierarchy_index()
-        _goto(clean_page, built_dashboard_html, state=_dataset_state(hx, _LINKAGE_DATASET),
-              in_place_on=_generated_on())
-        _open_groups(clean_page)
-        assert clean_page.locator(".xt-row").count(), "precondition: a cross-table grid row"
-        hits = _colour_words(clean_page, "cross-table grid")
-        tile = clean_page.locator(".col-tile").first
-        assert tile.count(), "precondition: a column tile"
-        tile.click()
-        clean_page.locator("#drawer[aria-hidden='false']").wait_for()
-        hits += _colour_words(clean_page, "column panel")
-        for tip in _hover_trends(clean_page, ["unit trend"]):
-            if re.search(r"\b(green|amber|red)\b", tip, re.I):
-                hits.append(f"column panel: chart tooltip {tip!r}")
-        # A CHECK'S OWN TREND, from its card in the panel.
-        card = clean_page.locator("#drawer .check-card").first
-        assert card.count(), "precondition: the column panel lists a check"
-        card.click()
-        # The card opens the CHECK panel beside the drawer, and the trend is
-        # drawn there.
-        clean_page.locator("#check-panel svg .hitrect").first.wait_for()
-        hits += _colour_words(clean_page, "check panel")
-        for tip in _hover_trends(clean_page, ["check trend"]):
-            if re.search(r"\b(green|amber|red)\b", tip, re.I):
-                hits.append(f"check panel: chart tooltip {tip!r}")
-        # AND A SPARKLINE'S POINT TITLES, on the agency tier's dataset rows.
-        _goto(clean_page, built_dashboard_html,
-              state={"tier": "agency", "agencyId": hx["ds_agency"][_LINKAGE_DATASET]})
-        for tip in _hover_trends(clean_page, ["sparkline"]):
-            if re.search(r"\b(green|amber|red)\b", tip, re.I):
-                hits.append(f"agency tier: sparkline point {tip!r}")
+        hits = _scan_column_panel_and_trends(clean_page, built_dashboard_html, _LINKAGE_DATASET,
+                                             cross_table=True)
         assert not hits, "\n".join(hits)
 
     def test_the_scenario_pages_every_named_surface_and_scenario_j(
@@ -9582,31 +9613,61 @@ class TestNoColourWordIsReadAsAStatus:
         assert not hits, "\n".join(hits)
 
     def test_the_needs_action_queue_and_its_markers(self, clean_page, built_dashboard_html):
-        _goto(clean_page, built_dashboard_html)
-        assert clean_page.locator("[data-outstanding], .outstanding-marker, .queue-head").count(), (
-            "precondition: the needs-action queue or a marker is on the page")
-        hits = _colour_words(clean_page, "needs-action queue")
+        hits = _scan_needs_action_queue(clean_page, built_dashboard_html)
         assert not hits, "\n".join(hits)
 
 
 @pytest.mark.shared_page
 @pytest.mark.asset("daily")
 class TestNoColourWordIsReadAsAStatusOnTheDailyAsset:
-    """TestNoColourWordIsReadAsAStatus's scenario-page scan on the daily
-    asset's page (C11): Birth Registrations' scenarios carry the
-    acknowledgement-owed surface."""
+    """TestNoColourWordIsReadAsAStatus on the daily asset's page (C11): its
+    scenario pages (Birth Registrations' carry the acknowledgement-owed
+    surface), its tiers, Scenarios tab and dataset page, a column panel with
+    its trends, and the needs-action queue (post-build-review #306 2)."""
 
     @pytest.mark.asset("daily")
     def test_the_scenario_pages_every_named_surface(self, clean_page, built_dashboard_html):
         hits = _scan_scenario_surfaces(clean_page, built_dashboard_html, "daily")
         assert not hits, "\n".join(hits)
 
+    def test_every_tier_the_scenarios_tab_and_one_dataset_page_per_collection(
+            self, clean_page, built_dashboard_html):
+        hits = _scan_tiers_and_dataset_pages(clean_page, built_dashboard_html)
+        assert not hits, "\n".join(hits)
+
+    def test_a_column_panel_and_its_trend_tooltips(self, clean_page, built_dashboard_html):
+        """Birth Registrations' page. THE DAILY ASSET HAS NO CROSS-TABLE GRID:
+        no check of its one collection is scoped cross-table, which is asserted
+        from the build rather than assumed, so a cross-table check added to it
+        later fails here until the grid is scanned too."""
+        hx = _hierarchy_index()
+        dataset = next(d for d, c in hx["ds_col"].items() if c == hx["order"][0])
+        built = _built_datasets(built_dashboard_html)
+        assert dataset in built, f"precondition: the daily build holds {dataset}"
+        assert not any(_cross_table_checks(ds) for ds in built.values()), (
+            "the daily asset now has a cross-table check - scan its grid here too")
+        hits = _scan_column_panel_and_trends(clean_page, built_dashboard_html, dataset,
+                                             cross_table=False)
+        assert not hits, "\n".join(hits)
+
+    def test_the_needs_action_queue_and_its_markers(self, clean_page, built_dashboard_html):
+        hits = _scan_needs_action_queue(clean_page, built_dashboard_html)
+        assert not hits, "\n".join(hits)
+
+    # SCENARIO (j) IS NOT THE DAILY ASSET'S: TS-95 marks a linked dataset not
+    # supplied in Linkage Products, a quarterly collection, and the daily
+    # scenario map lists it as not injected (SCENARIOS-daily.md).
+
 
 def test_the_two_assets_show_every_surface():
     """REQ-TEST-361 criterion 1 names six surfaces; split across the two
-    assets (C11), the two together must still show all six. FAILS TODAY: no
-    page of either asset's synthetic history shows a re-checked-worse supply or
-    a 'Re-checked <t>: became <X>' row (2026-11-02, every dataset page probed
+    assets (C11), the two together must still show all six. The dictionary
+    this reads is PINNED TO THE PAGES: each asset's scenario-page scan walks
+    every one of its scenario pages and fails unless what they show is
+    exactly that asset's entry (_scan_scenario_surfaces), so a surface a page
+    starts or stops showing fails there first. FAILS TODAY: no page of either
+    asset's synthetic history shows a re-checked-worse supply or a
+    'Re-checked <t>: became <X>' row (2026-11-02, every dataset page probed
     at the anchor date) - held for Keith, post-build-review #305."""
     shown = set().union(*_GUARD_SURFACES_BY_ASSET.values())
     assert shown == set(_GUARD_SURFACES), (

@@ -117,9 +117,9 @@ class TestReadingTheRealCommittedHistory:
         assert (ec.recorded_row_counts(self.AGENCY, self.COLLECTION, run_id) or {}).get("birth_registrations") > 0
 
     def test_the_recorded_count_and_distribution_agree(self, deployment_history):
-        run_id = self._first_measured_run()
         """If these ever disagree, one of them is being computed from
         something other than the rows that landed."""
+        run_id = self._first_measured_run()
         counts = ec.reference_value_counts(self.AGENCY, self.COLLECTION, run_id, "sex")
         assert sum(c for _, c in counts) == \
             (ec.recorded_row_counts(self.AGENCY, self.COLLECTION, run_id) or {}).get("birth_registrations")

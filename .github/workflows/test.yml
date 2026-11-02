@@ -172,22 +172,23 @@ jobs:
           --health-timeout 5s
           --health-retries 10
     env:
-      # TWO DSNs, AND THEY POINT AT DIFFERENT DATABASES ON PURPOSE - the
-      # same shape CLAUDE.md documents for a dev container.
+      # THE ADMIN DSN HERE, AND THE WAREHOUSE DSN PER STEP - the two point at
+      # different databases on purpose, the same shape CLAUDE.md documents
+      # for a dev container.
       #
       # MOTHMAN_TEST_DSN is the ADMIN connection the suite uses to create
       # and drop a database per xdist worker, so it has to name a database
       # that is never one of those - `postgres`.
       #
-      # MOTHMAN_SUPPLY_DSN is the warehouse anything outside the suite
-      # uses, which here is the bootstrap and dashboard-build steps below.
-      # Added 2026-09-28 after those steps had been failing on every push
-      # since REQ-PIPE-089 phase 6 introduced them: only the test DSN was
-      # set, so `mothman pipeline bootstrap` died on "MOTHMAN_SUPPLY_DSN is
-      # not set" before a single test ran. Green locally the whole time,
-      # because a developer's shell has both - which is the exact shape
-      # CLAUDE.md's own "local passing is necessary, never sufficient"
-      # rule is about.
+      # MOTHMAN_SUPPLY_DSN, the warehouse the bootstrap and dashboard-build
+      # steps use, is NOT set at job level since the asset split: each such
+      # step sets it to its own asset's ${MOTHMAN_PG}/supply_<asset> (below).
+      # It was a job-level variable from 2026-09-28, after those steps had
+      # failed on every push since REQ-PIPE-089 phase 6 with only the test
+      # DSN set - green locally because a developer's shell has both, the
+      # shape CLAUDE.md's "local passing is necessary, never sufficient"
+      # rule is about. tests/test_publish.py still checks this workflow
+      # names every variable the pipeline refuses to run without.
       MOTHMAN_TEST_DSN: postgresql://postgres:ci-not-a-secret@localhost:5432/postgres
       # THE SERVER, not one database: each asset's is ${MOTHMAN_PG}/supply_<asset>,
       # and a step acting for one asset names it beside MOTHMAN_ASSET (REQ-PIPE-343
