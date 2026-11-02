@@ -235,7 +235,10 @@ class TestTheBuildIsTheWorkersOwn:
 
     def test_the_page_is_built_into_a_directory_named_for_this_worker(self, built_dashboard_html,
                                                                        worker_id):
-        assert built_dashboard_html.parent.name == f"dashboard-build-{worker_id}"
+        from qa_tools.common import assets
+
+        asset = os.environ.get(assets.ASSET_ENV)
+        assert built_dashboard_html.parent.name == f"dashboard-build-{worker_id}-{asset}"
         assert ROOT not in built_dashboard_html.parents
         reports = _reports_of(built_dashboard_html)
         for c in _registry.all_collections():
@@ -631,6 +634,7 @@ def test_raw_template_renders_with_zero_console_errors(clean_page):
     assert "0 agencies" not in view_text
 
 
+@pytest.mark.asset("daily")  # Birth Registrations' page, so the class's page fixtures build it
 class TestInPlaceOnDatePicking:
     @pytest.mark.asset("daily")  # Birth Registrations' page
     def test_a_date_before_any_real_history_shows_no_data(self, clean_page, built_dashboard_html):
@@ -873,6 +877,7 @@ class TestTheInPlaceOnPanelSaysWhichPeriod:
         assert clean_page.locator("#in-place-on-range-notice").is_hidden()
 
 
+@pytest.mark.asset("daily")  # Birth Registrations' page, so the class's page fixtures build it
 class TestSupplyHistoryDrillDown:
     @pytest.mark.asset("daily")  # Birth Registrations' page
     def test_clicking_a_supply_history_entry_sets_the_in_place_on_date_to_that_run(self, clean_page, built_dashboard_html):
@@ -1384,6 +1389,21 @@ def dashboard_html_with_ticket(built_dashboard_html, tmp_path_factory) -> Path:
 
 @pytest.mark.shared_page
 class TestTicketBadge:
+
+    def test_a_dataset_with_no_open_ticket_shows_no_badge(self, clean_page, dashboard_html_with_ticket):
+        _goto(
+            clean_page, dashboard_html_with_ticket,
+            state={"tier": "dataset", "agencyId": "registry-services", "collectionId": "civil-registration", "datasetId": "cp-clients"},
+        )
+        assert clean_page.locator("a.pill.tag[href*='github.com'][href*='issues']").count() == 0
+
+
+@pytest.mark.shared_page
+@pytest.mark.asset("daily")
+class TestTicketBadgeOnTheDailyAsset:
+    """TestTicketBadge's Birth Registrations tests, in a class of their own so the
+    class's page fixtures build the daily asset's page (C11)."""
+
     @pytest.mark.asset("daily")  # Birth Registrations' page
     def test_an_open_ticket_shows_a_linked_badge_at_tier2_and_tier3(self, clean_page, dashboard_html_with_ticket):
         badge_selector = "a.pill.tag[href='https://github.com/keithamoss/data-poc/issues/999']"
@@ -1399,13 +1419,6 @@ class TestTicketBadge:
         )
         tier3_badge = clean_page.locator(badge_selector)
         assert tier3_badge.count() > 0, "no ticket badge rendered on the Tier 3 dataset page"
-
-    def test_a_dataset_with_no_open_ticket_shows_no_badge(self, clean_page, dashboard_html_with_ticket):
-        _goto(
-            clean_page, dashboard_html_with_ticket,
-            state={"tier": "dataset", "agencyId": "registry-services", "collectionId": "civil-registration", "datasetId": "cp-clients"},
-        )
-        assert clean_page.locator("a.pill.tag[href*='github.com'][href*='issues']").count() == 0
 
 
 class TestOwedNothingPeriods:
@@ -2071,6 +2084,7 @@ def _rewrite_checks(page, fields: dict):
     page.wait_for_timeout(300)
 
 
+@pytest.mark.asset("daily")  # Birth Registrations' page, so the class's page fixtures build it
 @pytest.mark.shared_page
 class TestCheckCardReadsAsPlainEnglish:
     @pytest.mark.asset("daily")  # Birth Registrations' page
@@ -2118,6 +2132,7 @@ class TestCheckCardReadsAsPlainEnglish:
             assert card.get_attribute("href").endswith(f"/check/{terse}_{tool}")
 
 
+@pytest.mark.asset("daily")  # Birth Registrations' page, so the class's page fixtures build it
 @pytest.mark.shared_page
 class TestCheckCardIsARealLink:
     @pytest.mark.asset("daily")  # Birth Registrations' page
@@ -2171,6 +2186,7 @@ class TestCheckCardIsARealLink:
         assert clean_page.locator("#check-panel-title").inner_text() == headline
 
 
+@pytest.mark.asset("daily")  # Birth Registrations' page, so the class's page fixtures build it
 class TestLongDescriptionsAreClampedOnTheCardOnly:
     _LONG = "long " * 62  # 310 chars; the longest real description is 156
 
@@ -2220,6 +2236,7 @@ class TestLongDescriptionsAreClampedOnTheCardOnly:
         assert len(set(offsets)) == 1, offsets
 
 
+@pytest.mark.asset("daily")  # Birth Registrations' page, so the class's page fixtures build it
 class TestAuthoredProseCannotAlterTheCard:
     """No real check contains a quote or an angle bracket today - 6 of
     257 contain an apostrophe and that is all. This is latent rather
@@ -2261,6 +2278,7 @@ class TestAuthoredProseCannotAlterTheCard:
         assert label.startswith(self._HOSTILE["name"])
 
 
+@pytest.mark.asset("daily")  # Birth Registrations' page, so the class's page fixtures build it
 @pytest.mark.shared_page
 class TestAuthoredProseCannotAlterTheDetailPanel:
     """The card's own version of this is above. The panel has six more
@@ -2933,6 +2951,7 @@ def _open_a_drawer(page):
     page.wait_for_timeout(300)
 
 
+@pytest.mark.asset("daily")  # Birth Registrations' page, so the class's page fixtures build it
 @pytest.mark.shared_page
 class TestTheKeyboardCanReachTheData:
     """The accessibility cluster: post-build-review #8, #9, #10 and #55,
@@ -3138,6 +3157,7 @@ class TestEveryDatasetPageSurvivesItsOwnDrillDown:
         assert not missing, f"checks with no key, so no deep link and no Back: {missing}"
 
 
+@pytest.mark.asset("daily")  # Birth Registrations' page, so the class's page fixtures build it
 @pytest.mark.shared_page
 class TestAStaleDeepLinkSaysSo:
     """post-build-review #11, and the half tests-js cannot cover.
@@ -3375,13 +3395,6 @@ class TestNavigationUsesRealLinks:
         clean_page.wait_for_timeout(400)
         assert "/dataset/" in clean_page.url
 
-    @pytest.mark.asset("daily")  # Birth Registrations' page
-    def test_the_breadcrumbs_are_links(self, clean_page, built_dashboard_html):
-        _goto(clean_page, built_dashboard_html,
-              state={"tier": "agency", "agencyId": "registry-services"})
-        crumbs = clean_page.locator("#rail a.crumb")
-        assert crumbs.count() > 1
-        assert crumbs.first.get_attribute("href") == "#/"
 
     def test_a_control_that_acts_rather_than_navigates_is_still_a_button(
             self, clean_page, built_dashboard_html):
@@ -3391,6 +3404,21 @@ class TestNavigationUsesRealLinks:
             tag = clean_page.evaluate(
                 f"() => (document.getElementById({control_id!r})||{{}}).tagName")
             assert tag in (None, "BUTTON"), f"{control_id} is a {tag}"
+
+
+@pytest.mark.shared_page
+@pytest.mark.asset("daily")
+class TestNavigationUsesRealLinksOnTheDailyAsset:
+    """TestNavigationUsesRealLinks's Birth Registrations tests, in a class of their own so the
+    class's page fixtures build the daily asset's page (C11)."""
+
+    @pytest.mark.asset("daily")  # Birth Registrations' page
+    def test_the_breadcrumbs_are_links(self, clean_page, built_dashboard_html):
+        _goto(clean_page, built_dashboard_html,
+              state={"tier": "agency", "agencyId": "registry-services"})
+        crumbs = clean_page.locator("#rail a.crumb")
+        assert crumbs.count() > 1
+        assert crumbs.first.get_attribute("href") == "#/"
 
 
 @pytest.mark.shared_page
@@ -3869,6 +3897,14 @@ class TestOutstandingDecisions:
             assert label != "On time", status
             assert "pill green" not in pill, status
 
+
+
+@pytest.mark.shared_page
+@pytest.mark.asset("daily")
+class TestOutstandingDecisionsOnTheDailyAsset:
+    """TestOutstandingDecisions's Birth Registrations tests, in a class of their own so the
+    class's page fixtures build the daily asset's page (C11)."""
+
     @pytest.mark.asset("daily")  # Birth Registrations' page
     def test_an_arrival_verdict_says_it_follows_the_supplys_current_filing(
             self, clean_page, built_dashboard_html):
@@ -4074,26 +4110,6 @@ class TestScenariosTab:
         assert "no data behind it" in panel.inner_text(), (
             "no entry says it has nothing behind it, and most still have nothing")
 
-    @pytest.mark.asset("daily")  # Birth Registrations' page
-    def test_a_coordinate_lands_on_the_right_page_and_date(
-            self, clean_page, built_dashboard_html):
-        """REQ-DASH-139 NFR 2 (sprint 11 critic: it was only done by hand).
-        TS-47 is planted, so its entry leads somewhere: the Birth
-        Registrations page, at the in-place-on date its placement records."""
-        from qa_tools.common import scenario_map
-
-        placement = scenario_map.read_placements().get("TS-47")
-        if placement is None or not placement.is_complete:
-            pytest.skip("TS-47 is not placed in this history")
-        _goto(clean_page, built_dashboard_html)
-        clean_page.locator("#scenarios-btn").click()
-        clean_page.wait_for_timeout(400)
-        index = clean_page.evaluate("SCENARIO_MAP.findIndex(e => e.id === 'TS-47')")
-        assert index >= 0, "TS-47 is not in the embedded map"
-        clean_page.locator(f'a[data-scenario="{index}"]').click()
-        clean_page.wait_for_timeout(600)
-        assert f"in-place-on={placement.in_place_on}" in clean_page.url
-        assert "/dataset/birth-registrations" in clean_page.url
 
     def test_a_jump_says_so_and_back_undoes_it(self, clean_page, built_dashboard_html):
         """Keith, 2026-10-06 (post-build-review #123 B4): a scenario jump
@@ -4145,6 +4161,34 @@ class TestScenariosTab:
         clean_page.go_back()
         clean_page.wait_for_timeout(400)
         assert "/scenarios" not in clean_page.url
+
+
+@pytest.mark.shared_page
+@pytest.mark.asset("daily")
+class TestScenariosTabOnTheDailyAsset:
+    """TestScenariosTab's Birth Registrations tests, in a class of their own so the
+    class's page fixtures build the daily asset's page (C11)."""
+
+    @pytest.mark.asset("daily")  # Birth Registrations' page
+    def test_a_coordinate_lands_on_the_right_page_and_date(
+            self, clean_page, built_dashboard_html):
+        """REQ-DASH-139 NFR 2 (sprint 11 critic: it was only done by hand).
+        TS-47 is planted, so its entry leads somewhere: the Birth
+        Registrations page, at the in-place-on date its placement records."""
+        from qa_tools.common import scenario_map
+
+        placement = scenario_map.read_placements().get("TS-47")
+        if placement is None or not placement.is_complete:
+            pytest.skip("TS-47 is not placed in this history")
+        _goto(clean_page, built_dashboard_html)
+        clean_page.locator("#scenarios-btn").click()
+        clean_page.wait_for_timeout(400)
+        index = clean_page.evaluate("SCENARIO_MAP.findIndex(e => e.id === 'TS-47')")
+        assert index >= 0, "TS-47 is not in the embedded map"
+        clean_page.locator(f'a[data-scenario="{index}"]').click()
+        clean_page.wait_for_timeout(600)
+        assert f"in-place-on={placement.in_place_on}" in clean_page.url
+        assert "/dataset/birth-registrations" in clean_page.url
 
 
 @pytest.mark.shared_page
@@ -5067,6 +5111,7 @@ class TestFileChecksOnThePage:
         assert ds["status"] == own
 
 
+@pytest.mark.asset("daily")  # Birth Registrations' page, so the class's page fixtures build it
 class TestSampleFinePrint:
     """post-build-review #129 (Keith 2026-10-07): the example failing rows
     say which rows they are, in the real panel."""
@@ -5093,6 +5138,7 @@ class TestSampleFinePrint:
         assert text and "Soda returns up to 100 of the failing rows" in text
 
 
+@pytest.mark.asset("daily")  # Birth Registrations' page, so the class's page fixtures build it
 class TestAChecksChartNamesWhatItMeasures:
     """REQ-DASH-228: a check's trend chart says what quantity it plots and
     in what unit, above the plot and as the table's column header - one
@@ -5130,6 +5176,7 @@ class TestAChecksChartNamesWhatItMeasures:
         assert header.inner_text().strip() == expected
 
 
+@pytest.mark.asset("daily")  # Birth Registrations' page, so the class's page fixtures build it
 @pytest.mark.shared_page
 class TestAStaleDatasetsSectionsSayNoData:
     """post-build-review #183: on a date a dataset has nothing in its current
@@ -5527,6 +5574,27 @@ class TestClosingAPanelReachedByItsUrl:
         return page.evaluate("() => [STATE.tier, STATE.columnName || null, STATE.checkKey || null,"
                              " document.getElementById('check-panel').getAttribute('aria-hidden')]")
 
+
+    def test_in_a_fresh_tab_it_closes_and_stays_on_the_dashboard(self, clean_page,
+                                                                 built_dashboard_html):
+        _goto(clean_page, built_dashboard_html, self._CHECK)
+        clean_page.locator("#check-panel-close").click()
+        clean_page.wait_for_timeout(500)
+        assert clean_page.url.startswith("file://") and "qa-reporting-dashboard" in clean_page.url
+        assert self._state(clean_page) == ["dataset", "registration_number", None, "true"]
+
+
+
+
+@pytest.mark.shared_page
+@pytest.mark.asset("daily")
+class TestClosingAPanelReachedByItsUrlOnTheDailyAsset:
+    """TestClosingAPanelReachedByItsUrl's Birth Registrations tests, in a class of their own so the
+    class's page fixtures build the daily asset's page (C11)."""
+
+    _CHECK = TestClosingAPanelReachedByItsUrl._CHECK
+    _state = TestClosingAPanelReachedByItsUrl._state
+
     @pytest.mark.asset("daily")  # Birth Registrations' page
     def test_reached_from_the_agency_view_it_closes_to_its_column(self, clean_page,
                                                                   built_dashboard_html):
@@ -5536,14 +5604,6 @@ class TestClosingAPanelReachedByItsUrl:
         assert self._state(clean_page)[2] == "not_null_dbt"
         clean_page.locator("#check-panel-close").click()
         clean_page.wait_for_function("() => !STATE.checkKey")
-        assert self._state(clean_page) == ["dataset", "registration_number", None, "true"]
-
-    def test_in_a_fresh_tab_it_closes_and_stays_on_the_dashboard(self, clean_page,
-                                                                 built_dashboard_html):
-        _goto(clean_page, built_dashboard_html, self._CHECK)
-        clean_page.locator("#check-panel-close").click()
-        clean_page.wait_for_timeout(500)
-        assert clean_page.url.startswith("file://") and "qa-reporting-dashboard" in clean_page.url
         assert self._state(clean_page) == ["dataset", "registration_number", None, "true"]
 
     @pytest.mark.asset("daily")  # Birth Registrations' page
@@ -5846,6 +5906,7 @@ def dashboard_html_with_a_settled_pair(built_dashboard_html, supply_dsn, tmp_pat
     return out, day, (one, two), DS
 
 
+@pytest.mark.asset("daily")  # Birth Registrations' page, so the class's page fixtures build it
 class TestASettledPairOnThePage:
     """REQ-PIPE-194 criteria 10, 11 and 12, in a real browser."""
 
@@ -5917,8 +5978,44 @@ class TestThePlantedPairsOnTheBuiltDashboard:
 
     PAIRS = ("TS-68", "TS-69", "TS-70", "TS-71", "TS-72", "TS-73", "TS-74")
 
+
+    def _text_on(self, page, html, sid, days_after):
+        from datetime import date, timedelta
+
+        from qa_tools.common import scenario_map
+
+        placed = scenario_map.read_placements()[sid]
+        on = date.fromisoformat(placed.period) + timedelta(days=days_after)
+        _goto(page, html, state=TestASettledPairOnThePage()._where(placed.dataset),
+              in_place_on=str(on))
+        # THE PAIR'S OWN DAY IS AN OLDER CYCLE by then, behind the toggle.
+        toggle = page.locator("#supply-history-toggle")
+        if toggle.count():
+            toggle.click()
+        return " ".join(page.locator("#view").inner_text().split()), date.fromisoformat(placed.period)
+
+    def test_ts70_reads_late_from_the_corrected_files_receipt(self, page, built_dashboard_html):
+        """Criterion 14: D's supply is the 16:30 re-export, so D is late."""
+        text, _day = self._text_on(page, built_dashboard_html, "TS-70", 1)
+        assert "Late 4:30pm" in text, text[:2000]
+
+
+    def test_ts73_says_both_files_were_rejected(self, page, built_dashboard_html):
+        """Criterion 17: D is left owed, and the page says two files came and
+        were both rejected - not 'a supply'."""
+        text, _day = self._text_on(page, built_dashboard_html, "TS-73", 2)
+        assert "2 files arrived and were rejected" in text, text[:2000]
+
+
+@pytest.mark.asset("daily")
+class TestThePlantedPairsOnTheBuiltDashboardOnTheDailyAsset:
+    """TestThePlantedPairsOnTheBuiltDashboard's Birth Registrations tests, in a class of their own so the
+    class's page fixtures build the daily asset's page (C11)."""
+
+    _text_on = TestThePlantedPairsOnTheBuiltDashboard._text_on
+
     @pytest.mark.asset("daily")  # Birth Registrations' page
-    @pytest.mark.parametrize("sid", PAIRS)
+    @pytest.mark.parametrize("sid", TestThePlantedPairsOnTheBuiltDashboard.PAIRS)
     def test_contested_on_its_arrival_day_and_settled_the_next(self, page, built_dashboard_html,
                                                                 sid):
         from datetime import date, timedelta
@@ -5954,38 +6051,12 @@ class TestThePlantedPairsOnTheBuiltDashboard:
                 if f"birth_registrations_{day}" in t]
         assert len(mine) == 1 and "Settled" in mine[0], mine
 
-    def _text_on(self, page, html, sid, days_after):
-        from datetime import date, timedelta
-
-        from qa_tools.common import scenario_map
-
-        placed = scenario_map.read_placements()[sid]
-        on = date.fromisoformat(placed.period) + timedelta(days=days_after)
-        _goto(page, html, state=TestASettledPairOnThePage()._where(placed.dataset),
-              in_place_on=str(on))
-        # THE PAIR'S OWN DAY IS AN OLDER CYCLE by then, behind the toggle.
-        toggle = page.locator("#supply-history-toggle")
-        if toggle.count():
-            toggle.click()
-        return " ".join(page.locator("#view").inner_text().split()), date.fromisoformat(placed.period)
-
-    def test_ts70_reads_late_from_the_corrected_files_receipt(self, page, built_dashboard_html):
-        """Criterion 14: D's supply is the 16:30 re-export, so D is late."""
-        text, _day = self._text_on(page, built_dashboard_html, "TS-70", 1)
-        assert "Late 4:30pm" in text, text[:2000]
-
     @pytest.mark.asset("daily")  # Birth Registrations' page
     def test_ts72_marks_the_refused_file_never_loaded(self, page, built_dashboard_html):
         """Criterion 16 (#172 D2): the settled row says which file never loaded."""
         text, day = self._text_on(page, built_dashboard_html, "TS-72", 1)
         assert f"birth_registrations_{day}-test.csv" in text
         assert "never loaded" in text, text[:2000]
-
-    def test_ts73_says_both_files_were_rejected(self, page, built_dashboard_html):
-        """Criterion 17: D is left owed, and the page says two files came and
-        were both rejected - not 'a supply'."""
-        text, _day = self._text_on(page, built_dashboard_html, "TS-73", 2)
-        assert "2 files arrived and were rejected" in text, text[:2000]
 
 
 #: REQ-GEN-199 criteria 32-34: each chip, the element holding the text its
@@ -6495,6 +6566,7 @@ class TestTheGitHubLinks:
             assert f"contract/{agency_id}/" in title, (agency_id, title)
 
 
+@pytest.mark.asset("daily")  # Birth Registrations' page, so the class's page fixtures build it
 @pytest.mark.shared_page
 class TestAPendingCorrectionIsANeedsActionItem:
     """REQ-DASH-263 criterion 5, on the bootstrapped history: Birth
@@ -9567,21 +9639,6 @@ class TestTheGeocodingPages:
             assert not re.search(r"\b\d{9}\b", text), (sid, text[:500])
             assert not any(c in text for c in codes), sid
 
-    @pytest.mark.asset("daily")  # Birth Registrations' page
-    def test_8_another_collections_check_is_headed_by_its_phrase(
-            self, clean_page, built_dashboard_html):
-        ds = _built_datasets(built_dashboard_html)["birth-registrations"]
-        found = [(c, ck) for c in ds["columns"] for ck in c.get("checks") or []
-                 if ck.get("measures") and any(h.get("failing_sample_keys") for h in ck.get("history") or [])]
-        assert found, "precondition: a Birth Registrations check records examples"
-        col, ck = found[0]
-        on = [h for h in ck["history"] if h.get("failing_sample_keys")][-1]["run_date"][:10]
-        hx = _hierarchy_index()
-        _goto(clean_page, built_dashboard_html, state=_dataset_state(
-            hx, "birth-registrations", columnName=col["name"], checkKey=ck["key"]), in_place_on=on)
-        heading = clean_page.locator("#check-panel .sample-heading")
-        assert heading.count() == 1
-        assert heading.inner_text().startswith(f"Examples: {ck['measures']} (key only)")
 
     def test_9_the_g1_route_tags_the_older_client_register_supply(
             self, clean_page, built_dashboard_html):
@@ -9647,6 +9704,39 @@ class TestTheGeocodingPages:
         assert across.count() >= 1, "no 'Across collections' sub-heading on the agency page"
         assert across.first.locator("h4").inner_text().strip().lower() == "across collections"
         assert "Child Protection's Client Register" in across.first.inner_text()
+
+
+@pytest.mark.shared_page
+@pytest.mark.asset("daily")
+class TestTheGeocodingPagesOnTheDailyAsset:
+    """TestTheGeocodingPages's Birth Registrations tests, in a class of their own so the
+    class's page fixtures build the daily asset's page (C11)."""
+
+    @pytest.mark.asset("daily")  # Birth Registrations' page
+    def test_8_another_collections_check_is_headed_by_its_phrase(
+            self, clean_page, built_dashboard_html):
+        ds = _built_datasets(built_dashboard_html)["birth-registrations"]
+        # A DAY THE PAGE SHOWS A RUN WITH EXAMPLES ON: the page shows a day's
+        # LAST run, and a day can hold several (a re-check, a resupply), so
+        # the newest day whose last run recorded examples - not the day of
+        # the newest run that did, which a later passing run may hide.
+        def example_days(ck):
+            last = {}
+            for h in ck.get("history") or []:
+                last[(h.get("run_date") or "")[:10]] = h
+            return sorted(day for day, h in last.items() if h.get("failing_sample_keys"))
+
+        found = [(c, ck) for c in ds["columns"] for ck in c.get("checks") or []
+                 if ck.get("measures") and example_days(ck)]
+        assert found, "precondition: a Birth Registrations check shows examples on some day"
+        col, ck = found[0]
+        on = example_days(ck)[-1]
+        hx = _hierarchy_index()
+        _goto(clean_page, built_dashboard_html, state=_dataset_state(
+            hx, "birth-registrations", columnName=col["name"], checkKey=ck["key"]), in_place_on=on)
+        heading = clean_page.locator("#check-panel .sample-heading")
+        assert heading.count() == 1
+        assert heading.inner_text().startswith(f"Examples: {ck['measures']} (key only)")
 
 
 #: The data asset this module's tests act for, unless a test says otherwise
