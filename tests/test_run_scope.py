@@ -90,9 +90,13 @@ def test_a_run_that_names_no_table_is_not_scoped(scoped, run_id):
 
 def test_the_owner_is_read_off_the_run_id():
     assert writer.run_owner(RUN) == ("cp-clients", "cp_clients")
+    assert writer.run_owner("trial_20261002t010203") is None
+
+
+@pytest.mark.asset("daily")  # Birth Registrations' run, on its own asset
+def test_the_owner_of_a_birth_registrations_run_is_read_off_its_id():
     assert writer.run_owner("birth_registrations__202601010600000000") == (
         "birth-registrations", "birth_registrations")
-    assert writer.run_owner("trial_20261002t010203") is None
 
 
 def test_a_sibling_check_kept_for_reading_this_table_names_this_arrival(scoped):

@@ -49,6 +49,7 @@ def _expected_time(monkeypatch, hhmm):
 class TestTheGateRefusesADueTimeDaylightSavingBreaks:
     """Criterion 8 - named by dataset, period and time."""
 
+    @pytest.mark.asset("daily")  # Birth Registrations' daily periods reach the switch days
     def test_a_time_in_the_spring_forward_gap_is_refused(self, sydney, monkeypatch):
         # Birth Registrations is daily from 2026-08-24, so 2026-10-04 -
         # Sydney's spring-forward day - is one of its periods.
@@ -59,6 +60,7 @@ class TestTheGateRefusesADueTimeDaylightSavingBreaks:
         assert "does not exist" in gap[0].problem and "02:30" in gap[0].problem
         assert "birth" in gap[0].scope
 
+    @pytest.mark.asset("daily")  # Birth Registrations' daily periods reach the switch days
     def test_a_time_in_the_fall_back_overlap_is_refused(self, sydney, monkeypatch):
         _expected_time(monkeypatch, "02:30")
         errors = vs._daylight_saving_errors(vs.Source.default())

@@ -278,6 +278,7 @@ class TestWhatTheTicketSays:
         # REQ-PIPE-194 criteria 4 and 15: the one phrase for what to do.
         assert "say what each file is" in body
 
+    @pytest.mark.asset("daily")  # a Birth Registrations pair
     def test_two_files_say_the_decision_is_made_in_the_terminal(self):
         """REQ-PIPE-194 criterion 2: several choices, made in the terminal,
         both files as code, where in the TUI - and no GitHub command."""

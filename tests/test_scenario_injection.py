@@ -720,15 +720,18 @@ class TestTheEarlyEmergencyDepartmentSupplies:
         assert not [r for r in rows if r[1] == "reject"], rows
 
 
-def test_a_pair_targets_only_the_files_its_script_makes_supplies():
+@pytest.mark.parametrize("asset", [pytest.param("daily", marks=pytest.mark.asset("daily")),
+                                   pytest.param("quarterly", marks=pytest.mark.asset("quarterly"))])
+def test_a_pair_targets_only_the_files_its_script_makes_supplies(asset):
     """REQ-GEN-196 criterion 19: a file the script settles as rejected or
     kept but superseded is not targeted - nobody checks it, so it has no
-    verdict to compare - and a file it makes a supply is."""
+    verdict to compare - and a file it makes a supply is. Each asset's pairs
+    against its own scripted decisions (the asset split)."""
     from generator import scenario_injection as si
     from qa_tools.common import scripted_decisions as sd
 
     scripts = {s.scenario: s for s in sd.load() if s.operation == sd.CHOOSE_FILE}
-    pairs = [i for i in si.INJECTIONS if any(a.files for a in i.arrivals)]
+    pairs = [i for i in si.this_assets_injections() if any(a.files for a in i.arrivals)]
     assert pairs
     # A PAIR NO PERSON SETTLES (REQ-GEN-203, TS-42) is superseded by a later
     # file, so neither of its files is a supply - and neither is targeted.

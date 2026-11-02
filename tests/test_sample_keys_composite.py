@@ -35,9 +35,14 @@ def test_every_adapter_declares_each_tables_key_as_a_list():
                 (a.collection_id, table, cols)
 
 
-def test_the_existing_one_column_keys_are_unchanged():
+@pytest.mark.asset("daily")  # civil-registration is the daily asset's
+def test_the_existing_one_column_key_of_birth_registrations_is_unchanged():
     keys = {c.id: collections.adapter(c).sample_key for c in collections.all_collections()}
     assert keys["civil-registration"] == {"birth_registrations": ["registration_number"]}
+
+
+def test_the_existing_one_column_keys_are_unchanged():
+    keys = {c.id: collections.adapter(c).sample_key for c in collections.all_collections()}
     assert keys["emergency-department"] == {"ed_presentations": ["presentation_id"]}
     assert keys["child-protection"]["cp_clients"] == ["cp_client_id"]
 

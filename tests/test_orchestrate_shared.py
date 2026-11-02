@@ -106,9 +106,6 @@ class TestAThirdCollectionsStatsAndClaimWindowForReal:
         cp_only = SimpleNamespace(received_at=received, files_by_dataset={"cp-clients": "x"})
         assert orchestrate._claim_window("child-protection", cp_only) == \
             schedule.claim_window("cp-clients", on=on)
-        bdm = SimpleNamespace(received_at=received, files_by_dataset={"birth-registrations": "x"})
-        assert orchestrate._claim_window("civil-registration", bdm) == \
-            schedule.claim_window("birth-registrations", on=on)
         # The adapter's dataset stands in only when the arrival names none.
         none_named = SimpleNamespace(received_at=received, files_by_dataset={})
         assert orchestrate._claim_window("child-protection", none_named) == \
@@ -117,6 +114,16 @@ class TestAThirdCollectionsStatsAndClaimWindowForReal:
                               files_by_dataset={"cp-clients": "x", "cp-case-workers": "y"})
         windows = [schedule.claim_window(d, on=on) for d in ("cp-clients", "cp-case-workers")]
         assert orchestrate._claim_window("child-protection", two) == min(windows)
+
+    @pytest.mark.asset("daily")  # Birth Registrations' own claim window, on its asset
+    def test_the_claim_window_of_a_birth_registrations_arrival_is_its_datasets(self):
+        from qa_tools.common import schedule
+
+        on = date(2026, 1, 1)
+        bdm = SimpleNamespace(received_at="2026-01-01T01:00:00+08:00",
+                              files_by_dataset={"birth-registrations": "x"})
+        assert orchestrate._claim_window("civil-registration", bdm) == \
+            schedule.claim_window("birth-registrations", on=on)
 
 
 #: The data asset this module's tests act for, unless a test says otherwise

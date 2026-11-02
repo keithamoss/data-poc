@@ -37,9 +37,14 @@ class TestAnOverlapIsFound:
         assert first.later_claim_opens <= first.on_time_until
         assert first.by > timedelta(0)
 
-    def test_it_reports_every_dataset(self, wide_window):
+    @pytest.mark.parametrize("expected", [
+        # Each asset's own datasets (the asset split).
+        pytest.param({"cp-clients", "cp-carers"}, marks=pytest.mark.asset("quarterly"),
+                     id="quarterly"),
+        pytest.param({"birth-registrations"}, marks=pytest.mark.asset("daily"), id="daily")])
+    def test_it_reports_every_dataset(self, wide_window, expected):
         datasets = {o.dataset_id for o in period_overlap.overlaps()}
-        assert {"cp-clients", "cp-carers", "birth-registrations"} <= datasets
+        assert expected <= datasets
 
     def test_the_gate_names_the_dataset_both_periods_and_the_size(self, wide_window):
         errors = validate_schedule.validate()
