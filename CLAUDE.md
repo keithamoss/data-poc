@@ -463,9 +463,10 @@ Rough layout:
   (used repeatedly to verify refactors are behaviour-preserving).
 - Dependencies are managed with `uv` (`pyproject.toml` + `uv.lock`) -
   `uv sync --dev` installs everything including dev tooling. A real dbt
-  test dependency too, not covered by `uv`: `uv run dbt deps
-  --project-dir dbt_project --profiles-dir qa_tools/dbt_profiles`
-  (one-time, only re-run if `dbt_project/packages.yml` changes) installs
+  test dependency too, not covered by `uv`: `for asset in quarterly
+  daily; do MOTHMAN_ASSET=$asset uv run mothman env dbt-deps; done`
+  (one-time per asset, only re-run if `assets/<asset>/dbt/packages.yml`
+  changes - it reads dbt's own package-lock.yml to tell) installs
   `dbt_utils` - several real dbt checks (`dbt_utils.accepted_range`/
   `expression_is_true`/`recency`, added in the 2026-09-15 dbt_utils
   switch - see `plans/qa-pipeline.md`) use macros that package ships,
@@ -1365,9 +1366,9 @@ Rough layout:
     had just written. Regenerable, so the cost was time rather than
     data - and the same script against `MOTHMAN_TEST_DSN` would have
     cost nothing.
-  - `uv run dbt deps --project-dir dbt_project --profiles-dir
-    qa_tools/dbt_profiles` (installs `dbt_utils`, whose macros several
-    real dbt checks need - without it 8 real tests fail)
+  - `for asset in quarterly daily; do MOTHMAN_ASSET=$asset uv run
+    mothman env dbt-deps; done` (installs each asset's `dbt_utils`, whose
+    macros several real dbt checks need - without it 8 real tests fail)
   - `npm ci` (without it `npm test` won't start at all)
   - `uv run playwright install chromium`, or in this sandbox
     `export PLAYWRIGHT_CHROMIUM_PATH=/opt/pw-browsers/chromium` (the
