@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import os
 import sys
+from datetime import date
 from concurrent.futures import ProcessPoolExecutor
 from multiprocessing import get_context
 from pathlib import Path
@@ -173,6 +174,52 @@ class TestARepositoryPathForAFolderOutsideIt:
         monkeypatch.setenv(assets.ASSET_ENV, "daily")
         with pytest.raises(assets.OutsideTheRepository):
             vcl.collect_checks("HEAD")
+
+    @staticmethod
+    def _guard(src, name):
+        from qa_tools.common import validate_schedule as vs
+
+        raw, today = {"data_asset_id": "daily"}, date(2026, 11, 2)
+        return {"freeze": lambda: vs._freeze_errors(raw, {}, src, ref="HEAD"),
+                "amber": lambda: vs._amber_setting_errors(raw, src, today, ref="HEAD"),
+                "replacement": lambda: vs._replacement_setting_errors(raw, src, today, ref="HEAD"),
+                "list": lambda: vs._list_setting_errors(raw, src, today, ref="HEAD")}[name]
+
+    @pytest.mark.parametrize("guard", ["freeze", "amber", "replacement", "list"])
+    def test_the_schedule_gates_reads_at_a_git_ref_are_refused_for_an_injected_root(
+            self, monkeypatch, tmp_path, guard):
+        """Keith, 2026-11-03 (morning report 12 Q13): where a deployment has
+        deliberately injected its asset root (REQ-PIPE-342's injection, #55),
+        never read as 'no previous state', which passed any edit to a past
+        agreement item or setting version unseen (post-build-review #313 M2)."""
+        from qa_tools.common import validate_schedule as vs
+
+        assets.use_root(_two_assets(tmp_path))
+        monkeypatch.setenv(assets.ASSET_ENV, "daily")
+        assert assets.root_injected()
+        src = vs.Source.default()
+        src.agreement_path.write_text("calendars: {}\n")
+        with pytest.raises(assets.OutsideTheRepository):
+            self._guard(src, guard)()
+
+    @pytest.mark.parametrize("guard", ["freeze", "amber", "replacement", "list"])
+    def test_any_other_outside_folder_still_reads_as_no_previous_state(
+            self, monkeypatch, tmp_path, guard):
+        """Keith, 2026-11-03 (Q13): an outside folder NOT reached by injecting
+        the root - one asset's folder pointed elsewhere, as the suite's fixture
+        does - keeps reading as 'no previous state'. REJECTED refusing every
+        outside folder, and never refusing."""
+        from qa_tools.common import validate_schedule as vs
+
+        monkeypatch.setenv(assets.ASSET_ENV, "daily")
+        folder = tmp_path / "daily"
+        folder.mkdir()
+        (folder / "data-asset.yaml").write_text("data_asset_id: daily\n")
+        assets.use_folder(folder)
+        assert not assets.root_injected()
+        src = vs.Source.default()
+        src.agreement_path.write_text("calendars: {}\n")
+        self._guard(src, guard)()
 
     def test_a_reader_that_only_opens_files_still_finds_them(self, monkeypatch, tmp_path):
         """folder_on_disk() is a path to open, not a repository path."""

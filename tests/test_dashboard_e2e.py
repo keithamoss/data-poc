@@ -9659,19 +9659,27 @@ class TestNoColourWordIsReadAsAStatusOnTheDailyAsset:
     # scenario map lists it as not injected (SCENARIOS-daily.md).
 
 
+#: CRITERION 1'S TWO SURFACES NO GENERATED PAGE SHOWS, covered by a Vitest
+#: test against mock data instead (Keith, 2026-11-03, morning report 12 Q3,
+#: against the recommendation; REJECTED planting a scenario for each, and
+#: dropping them from criterion 1): tests-js/colour-words-recheck-surfaces.test.js
+#: renders each and holds it to this guard's rule. The real-page guard scans
+#: what the data shows.
+_GUARD_SURFACES_IN_MOCK = {"re-checked worse", "Re-checked <t>: became <X>"}
+
+
 def test_the_two_assets_show_every_surface():
     """REQ-TEST-361 criterion 1 names six surfaces; split across the two
-    assets (C11), the two together must still show all six. The dictionary
-    this reads is PINNED TO THE PAGES: each asset's scenario-page scan walks
-    every one of its scenario pages and fails unless what they show is
-    exactly that asset's entry (_scan_scenario_surfaces), so a surface a page
-    starts or stops showing fails there first. FAILS TODAY: no page of either
-    asset's synthetic history shows a re-checked-worse supply or a
-    'Re-checked <t>: became <X>' row (2026-11-02, every dataset page probed
-    at the anchor date) - held for Keith, post-build-review #307."""
+    assets (C11), the two together must still show all six but the two the
+    mock test covers (_GUARD_SURFACES_IN_MOCK). The dictionary this reads is
+    PINNED TO THE PAGES: each asset's scenario-page scan walks every one of
+    its scenario pages and fails unless what they show is exactly that
+    asset's entry (_scan_scenario_surfaces), so a surface a page starts or
+    stops showing fails there first."""
+    assert _GUARD_SURFACES_IN_MOCK < set(_GUARD_SURFACES), "the mock's surfaces are criterion 1's"
     shown = set().union(*_GUARD_SURFACES_BY_ASSET.values())
-    assert shown == set(_GUARD_SURFACES), (
-        f"no scenario page of either asset shows {sorted(set(_GUARD_SURFACES) - shown)}")
+    owed = set(_GUARD_SURFACES) - _GUARD_SURFACES_IN_MOCK
+    assert owed <= shown, f"no scenario page of either asset shows {sorted(owed - shown)}"
 
 
 @pytest.mark.needs_deployment

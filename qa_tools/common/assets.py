@@ -187,6 +187,18 @@ def use_root(root: Path | None):
     return before
 
 
+def root_injected() -> bool:
+    """Whether a deployment has DELIBERATELY injected its assets/ root
+    elsewhere (use_root; REQ-PIPE-342's injection, #55) - as opposed to one
+    asset's folder pointed elsewhere (use_folder), which is what the suite's
+    fixture does. Keith, 2026-11-03 (morning report 12 Q13): the schedule
+    gate's git-ref guards refuse an outside folder only in the first case."""
+    layout = _layout
+    while isinstance(layout, _Folder):
+        layout = layout.base
+    return isinstance(layout, _Assets) and Path(layout.root) != Path(_DEFAULT.root)
+
+
 class _Folder:
     """Another layout with one asset's configuration folder pointed
     elsewhere - every other path of it, and every other asset, unchanged."""
@@ -268,6 +280,14 @@ def names() -> list[str]:
     """The asset folder names found - the one thing read with no asset
     selected (REQ-PIPE-363 NFR: reading the names is not reading an asset)."""
     return _layout.names()
+
+
+def every() -> list[Asset]:
+    """Every asset folder found, as the resolver lays it out now - for the
+    configuration-only reads that must tell another asset's name from a typo
+    (qa_tools/common/every_asset.py; Keith, 2026-11-03, morning report 12 Q6
+    and Q8). Selects nothing, and opens no database."""
+    return [_layout.asset(n) for n in names()]
 
 
 def _refusal(stated: str | None, found: list[str]) -> str:

@@ -9,8 +9,8 @@ this adds what only committed configuration can answer: that a cited
 requirement exists and is not retired, that a cited sprint is on the list,
 and that a dashboard link names a route and a dataset the page has.
 
-It reads plans/road-testing.md, requirements.yaml and contract/data-asset.yaml
-and nothing else - no database, no data/, no reports/ (NFR 2). What it cannot
+It reads plans/road-testing.md, requirements.yaml, the selected asset's
+data-asset.yaml and every asset's agency ids (every_asset) and nothing else - no database, no data/, no reports/ (NFR 2). What it cannot
 check is the authoring rule that matters most on a public page: a card never
 names or describes the reviewer (criterion 18). Review holds that.
 
@@ -42,8 +42,9 @@ def _hierarchy(path: Path) -> dict:
     return tree
 
 
-def route_problem(path: str, tree: dict) -> str | None:
-    """Why a link's #/... route is not one the dashboard has, or None."""
+def route_problem(path: str, tree: dict, every_agency=None) -> str | None:
+    """Why a link's #/... route is not one the dashboard has, or None.
+    `every_agency`: the agency ids every asset declares (every_asset)."""
     parts = [unquote(p) for p in path.split("/") if p]
     if not parts or (len(parts) == 1 and parts[0] in _TOP_ROUTES):
         return None
@@ -51,14 +52,13 @@ def route_problem(path: str, tree: dict) -> str | None:
         return f"route '#{path}' is not one the dashboard has"
     agency = parts[1]
     if agency not in tree:
-        # ANOTHER ASSET'S ROUTE (SETTLED by Keith 2026-11-02, REQ-DOCS-219's
-        # unmet criterion 10; REJECTED reading every asset's hierarchy now): the
-        # feedback file is repository-wide while each pass reads one asset's
-        # hierarchy, so a link to an agency this asset does not hold is left to
-        # the pass of the asset that does - reading the other asset to tell it
-        # from a typo would break REQ-PIPE-342 criterion 8. Until the moved
-        # notice (REQ-PIPE-354) decides cross-asset links, a mistyped agency is
-        # no longer caught here.
+        # ANOTHER ASSET'S ROUTE IS LEFT TO ITS OWN PASS; A MISTYPED AGENCY IS
+        # NOT (Keith, 2026-11-03, morning report 12 Q8, reversing 2026-11-02's
+        # wait for REQ-PIPE-354): the feedback file is repository-wide while
+        # each pass reads one asset's hierarchy, so the two are told apart by
+        # every asset's configuration (every_asset) - never its database.
+        if every_agency is not None and agency not in every_agency:
+            return f"route '#{path}' names agency {agency!r}, which no asset's hierarchy holds"
         return None
     if len(parts) == 2:
         return None
@@ -88,6 +88,9 @@ def problems(plans_dir: Path = PLANS_DIR, requirements: Path = REQUIREMENTS,
     reqs = {r["id"]: r for r in (yaml.safe_load(Path(requirements).read_text()) or {}).get("requirements", [])}
     sprints = road_testing_sprints(path.read_text())
     tree = _hierarchy(Path(data_asset))
+    from qa_tools.common import every_asset
+
+    every_agency = every_asset.declared().agencies
     for card in cards:
         where = f"entry #{card['number']}"
         for item in card["evidence"]:
@@ -102,7 +105,7 @@ def problems(plans_dir: Path = PLANS_DIR, requirements: Path = REQUIREMENTS,
                 if item["n"] not in sprints:
                     errors.append(f"{where}: sprint {item['n']} is not in the introduction's list of proposed sprints")
             elif item["kind"] == "link" and item["path"]:
-                why = route_problem(item["path"], tree)
+                why = route_problem(item["path"], tree, every_agency)
                 if why:
                     errors.append(f"{where}: link {item['label']!r}: {why}")
     return cards, errors

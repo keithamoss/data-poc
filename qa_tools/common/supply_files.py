@@ -247,6 +247,28 @@ def arrival_run_id_of(dataset_id: str, supply_id: str) -> str:
 SETTLE_AT = "mothman > Filing decisions > {collection} > Supplies waiting on a decision"
 
 
+def collection_step_asked(n_collections: int, *asset_wide) -> bool:
+    """Whether the filing menu (cli/filing_tui.filing_menu) asks which
+    collection - its one condition, shared with where_to_settle so the two
+    cannot disagree: always for an asset of several collections, and for a
+    one-collection asset only while something asset-wide is pending -
+    `asset_wide` is its pending corrections, parked moves and nudges."""
+    return n_collections != 1 or any(asset_wide)
+
+
+def _asset_wide_waiting() -> tuple[list, list, list]:
+    """The pending corrections, parked moves and nudges the filing menu
+    reads - none where they cannot be read, as the menu treats them."""
+    from qa_tools.common import bulk_recheck, correction_apply, supply_db
+
+    try:
+        with supply_db.connect(read_only=True, label="mothman:settle-pointer") as conn:
+            return (correction_apply.pending(conn), correction_apply.parked(conn),
+                    bulk_recheck.nudges(conn))
+    except Exception:  # noqa: BLE001 - as the menu: it works without them
+        return [], [], []
+
+
 def where_to_settle(dataset_id: str) -> str:
     """SETTLE_AT for this dataset's collection, BY THE LABEL THE FILING MENU
     LISTS IT UNDER (Keith, 2026-10-18: one rule for a collection's label in
@@ -255,10 +277,14 @@ def where_to_settle(dataset_id: str) -> str:
     from qa_tools import collections
     from qa_tools.common import hierarchy
 
-    # A ONE-COLLECTION ASSET'S MENU SKIPS THE COLLECTION PICKER, so the
-    # pointer drops that step (SETTLED by Keith 2026-11-02, the move critic's
-    # decision 3; the menu is unchanged). REJECTED always showing the picker.
-    if len(collections.all_collections()) == 1:
+    # THE STEP IS NAMED WHENEVER THE MENU WILL ASK IT, by the menu's own
+    # condition (collection_step_asked): a one-collection asset's menu skips
+    # the collection picker (SETTLED by Keith 2026-11-02, the move critic's
+    # decision 3) unless corrections, parked moves or nudges are pending
+    # (Keith, 2026-11-03, morning report 12 Q7). REJECTED accepting the gap,
+    # and changing the menu.
+    n = len(collections.all_collections())
+    if n == 1 and not collection_step_asked(n, *_asset_wide_waiting()):
         return SETTLE_AT.replace(" > {collection}", "")
     try:
         collection = collections.by_id(hierarchy.dataset(dataset_id).collection_id).label

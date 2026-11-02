@@ -1017,26 +1017,37 @@ def this_assets_injections() -> tuple["Injection", ...]:
     ANOTHER ASSET'S SCENARIO IS NOT THIS ONE'S TO PLACE: the table below is
     still one repository-wide list until each asset holds its own, so an
     injection naming a dataset the selected asset does not declare is passed
-    over, and placed by its own asset's generation. Telling the other asset's
-    from a typo would mean reading the other asset, which waits for
-    REQ-PIPE-354 - but the drop is NEVER SILENT (SETTLED by Keith 2026-11-02,
-    REQ-GEN-246 criterion 8): a warning names each scenario passed over, once
-    per asset per process."""
+    over, and placed by its own asset's generation. QUIETLY for another
+    asset's, told apart by reading both assets' hierarchies - configuration
+    only (every_asset) - and NAMED by a warning, once per asset per process,
+    for one whose dataset NO asset declares: a typo, which generation then
+    refuses (unprovided_scenarios; REQ-GEN-246 criterion 8). SETTLED by Keith
+    2026-11-03 (morning report 12 Q6 and Q8), narrowing 2026-11-02's warning
+    on every drop; REJECTED a one-line summary, and the full list on every
+    run."""
     import warnings
 
     from qa_tools.common import assets, hierarchy
 
     mine = {d.dataset_id for d in hierarchy.all_datasets()}
-    dropped = [i for i in INJECTIONS if i.dataset_id not in mine]
+    unknown = _naming_no_assets_dataset()
     asset = assets.selected().name
-    if dropped and asset not in _WARNED_DROPS:
+    if unknown and asset not in _WARNED_DROPS:
         _WARNED_DROPS.add(asset)
-        named = ", ".join(f"{i.scenario_id} ({i.dataset_id})" for i in dropped)
+        named = ", ".join(f"{i.scenario_id} ({i.dataset_id})" for i in unknown)
         warnings.warn(
-            f"asset {asset!r} passes over {len(dropped)} scenario(s) naming a dataset it does "
-            f"not declare - another asset's, or a dataset no asset declares (telling them "
-            f"apart waits for REQ-PIPE-354): {named}", UserWarning, stacklevel=2)
+            f"asset {asset!r} passes over {len(unknown)} scenario(s) naming a dataset no "
+            f"asset declares - a mistyped dataset id, which generation refuses: {named}",
+            UserWarning, stacklevel=2)
     return tuple(i for i in INJECTIONS if i.dataset_id in mine)
+
+
+def _naming_no_assets_dataset() -> list["Injection"]:
+    """The injections whose dataset no asset declares (every_asset)."""
+    from qa_tools.common import every_asset
+
+    everyone = every_asset.declared().datasets
+    return [i for i in INJECTIONS if i.dataset_id not in everyone]
 
 
 def _datasets_named() -> dict[str, set]:
@@ -1049,14 +1060,15 @@ def _datasets_named() -> dict[str, set]:
     return out
 
 
-def other_assets_scenarios() -> set[str]:
-    """The scenarios whose injections name no dataset the selected asset
-    declares - another asset's, left out of this asset's map (REQ-PIPE-352
-    criterion 3). Read from this asset's own hierarchy alone."""
+def this_assets_scenarios() -> set[str]:
+    """The scenarios whose injections name a dataset the selected asset
+    declares - one half of its map's membership (REQ-PIPE-352 criterion 3);
+    the other half is what its own asset placed (scenario_map). Read from
+    this asset's own hierarchy alone."""
     from qa_tools.common import hierarchy
 
     mine = {d.dataset_id for d in hierarchy.all_datasets()}
-    return {sid for sid, named in _datasets_named().items() if not named & mine}
+    return {sid for sid, named in _datasets_named().items() if named & mine}
 
 
 def mixed_asset_problems() -> list[str]:
@@ -1088,6 +1100,12 @@ def unprovided_scenarios() -> list[str]:
             collections.for_dataset(injection.dataset_id)
         except collections.NoProviderError as exc:
             out.append(f"{injection.scenario_id} names {injection.dataset_id}: {exc}")
+    # A DATASET NO ASSET DECLARES IS REFUSED TOO (Keith, 2026-11-03, morning
+    # report 12 Q8; reversing 2026-11-02's wait for REQ-PIPE-354): told from
+    # another asset's by both assets' configuration (every_asset).
+    for injection in _naming_no_assets_dataset():
+        out.append(f"{injection.scenario_id} names {injection.dataset_id}, which no asset's "
+                   f"hierarchy declares - a mistyped dataset id?")
     return out
 
 

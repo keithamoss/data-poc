@@ -948,10 +948,38 @@ pytestmark = pytest.mark.asset("quarterly")
 
 
 class TestAnInjectionNamingNoAssetsDataset:
-    """SETTLED by Keith 2026-11-02 (REQ-GEN-246 c8, the move critic's decision
-    2): an injection whose dataset the selected asset does not declare is
-    passed over - telling another asset's from a typo waits for REQ-PIPE-354 -
-    but never SILENTLY: a warning names each scenario dropped."""
+    """An injection whose dataset the selected asset does not declare is
+    passed over. SETTLED by Keith 2026-11-03 (morning report 12 Q6 and Q8),
+    narrowing 2026-11-02's: another asset's is passed over QUIETLY - both
+    assets' hierarchies are read, configuration only, to tell the two apart -
+    and one naming a dataset NEITHER asset declares is named by the warning
+    and refused at generation (REQ-GEN-246 criterion 8)."""
+
+    @pytest.mark.parametrize("asset,other", [("quarterly", "daily"), ("daily", "quarterly")])
+    def test_another_assets_injection_is_passed_over_quietly(self, monkeypatch, asset, other):
+        import warnings
+
+        monkeypatch.setenv(assets.ASSET_ENV, other)
+        theirs = si.this_assets_injections()
+        assert theirs, f"precondition: {other} places an injection"
+        monkeypatch.setenv(assets.ASSET_ENV, asset)
+        monkeypatch.setattr(si, "_WARNED_DROPS", set(), raising=False)
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            got = si.this_assets_injections()
+        assert not set(theirs) & set(got)
+        assert not [u for u in si.unprovided_scenarios() if theirs[0].scenario_id in u]
+
+    def test_one_naming_a_dataset_no_asset_declares_is_refused_before_writing(self, monkeypatch):
+        import dataclasses
+
+        real = si.this_assets_injections()
+        stray = dataclasses.replace(real[0], scenario_id="TS-STRAY", dataset_id="no-such-dataset")
+        monkeypatch.setattr(si, "INJECTIONS", si.INJECTIONS + (stray,))
+        monkeypatch.setattr(si, "_WARNED_DROPS", set(), raising=False)
+        with pytest.warns(UserWarning):
+            said = si.unprovided_scenarios()
+        assert [u for u in said if u.startswith("TS-STRAY names no-such-dataset")], said
 
     @pytest.mark.parametrize("asset", ["quarterly", "daily"])
     def test_it_is_dropped_and_the_warning_names_it(self, monkeypatch, asset):

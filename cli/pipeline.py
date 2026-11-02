@@ -357,7 +357,7 @@ def generate_collection(collection_id: str, *, trial: bool) -> None:
                       style="yellow")
     from generator import scenario_injection
 
-    scenario_map.write_map(leave_out=scenario_injection.other_assets_scenarios())
+    scenario_map.write_map(naming_mine=scenario_injection.this_assets_scenarios())
 
 
 def provider_collection(collection_id: str):

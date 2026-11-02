@@ -126,11 +126,9 @@ def test_the_shared_parser_itself_refuses_a_non_relative_target(tmp_path):
     ("REQ-DASH-999", "not in requirements.yaml"),
     ("REQ-DASH-002", "retired - cite REQ-DASH-001"),
     ("sprint 9", "not in the introduction's list"),
-    # NO CASE FOR AN UNKNOWN AGENCY (SETTLED by Keith 2026-11-02, the move
-    # critic's decision 1): each asset's pass reads only its own hierarchy, so
-    # an agency it does not hold is left to the other asset's pass. The case
-    # `[x](#/agency/nope)` comes back with REQ-PIPE-354, which decides cross-asset
-    # links - REQ-DOCS-219's unmet criterion 10 records the gap.
+    # A MISTYPED AGENCY IS CAUGHT AGAIN (Keith, 2026-11-03, morning report 12
+    # Q8): no asset's hierarchy holds it, read from configuration alone.
+    ("[x](#/agency/nope)", "agency 'nope'"),
     ("[x](#/agency/ag/collection/col/dataset/zzz)", "dataset 'zzz'"),
     ("[x](#/nowhere)", "not one the dashboard has"),
 ])
@@ -138,6 +136,18 @@ def test_evidence_is_checked_against_configuration(repo, item, needle):
     card = f"- **You told us:** a\n- **What we heard:** b\n- **Evidence:** {item}"
     _, errors = repo(_entry(card=card))
     _only(errors, needle)
+
+
+def test_a_link_to_another_assets_agency_is_left_to_that_assets_pass(repo):
+    """Keith, 2026-11-03 (morning report 12 Q8): an agency the other asset
+    declares is not a typo - its pass checks the rest of the route."""
+    from qa_tools.common import every_asset
+
+    theirs = sorted(every_asset.declared().agencies - {"ag"})
+    assert theirs, "precondition: the assets declare agencies"
+    card = f"- **You told us:** a\n- **What we heard:** b\n- **Evidence:** [x](#/agency/{theirs[0]}/collection/c/dataset/d)"
+    _, errors = repo(_entry(card=card))
+    assert errors == []
 
 
 @pytest.mark.parametrize("card,needle", [

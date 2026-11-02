@@ -2366,9 +2366,14 @@ def filing_menu() -> None:
             return
         collection_id = by_name.get(picked)
     else:
-        picked = (collections[0] if len(collections) == 1 else
-                  common.grouped_select("Which collection?", grouped, flag_hint=_FLAG_HINT,
-                                        many=common.many_collections(), terms=terms))
+        # ONE CONDITION FOR WHETHER THIS ASKS, shared with the settle pointer
+        # (supply_files.collection_step_asked; Keith, 2026-11-03, Q7).
+        from qa_tools.common import supply_files
+
+        asks = supply_files.collection_step_asked(len(collections), waiting, parked, nudges)
+        picked = (common.grouped_select("Which collection?", grouped, flag_hint=_FLAG_HINT,
+                                        many=common.many_collections(), terms=terms)
+                  if asks else collections[0])
         collection_id = by_name.get(picked)
     if collection_id is None:
         return

@@ -408,8 +408,13 @@ class TestThePointerMatchesTheMenus:
         def select(message, choices, **k):
             asked.append(list(choices))
             return None
-        monkeypatch.setattr(filing_tui, "_pending_corrections", lambda: [])
-        monkeypatch.setattr(filing_tui, "_parked_moves", lambda: [])
+        # NOTHING ASSET-WIDE PENDING, at the source the menu and the pointer
+        # both read (Keith, 2026-11-03, Q7: one condition for the two).
+        from qa_tools.common import bulk_recheck, correction_apply
+
+        monkeypatch.setattr(correction_apply, "pending", lambda conn: [])
+        monkeypatch.setattr(correction_apply, "parked", lambda conn: [])
+        monkeypatch.setattr(bulk_recheck, "nudges", lambda conn: [])
         monkeypatch.setattr(common, "select", select)
         # A LISTED PERSON: the door asks who is deciding on the way in (#188).
         from qa_tools.common import people
@@ -423,6 +428,40 @@ class TestThePointerMatchesTheMenus:
         # pointer drops that step and walks straight to the action menu.
         assert pointer == ["mothman", "Filing decisions", filing_tui._MENU_QUEUE]
         assert pointer[2] in asked[0]
+
+    @pytest.mark.parametrize("waiting", ["corrections", "parked", "nudges"])
+    def test_a_one_collection_asset_names_the_step_when_the_menu_will_ask_it(
+            self, monkeypatch, waiting):
+        """Keith, 2026-11-03 (morning report 12 Q7): where corrections,
+        parked moves or nudges are pending the menu asks which collection - or
+        the corrections - even of a one-collection asset, so the pointer names
+        that step then, by the one condition the menu asks by."""
+        from types import SimpleNamespace
+
+        from cli import bulk_recheck_tui, filing_tui
+        from qa_tools import collections
+        from qa_tools.common import bulk_recheck, correction_apply, people, supply_files
+
+        assert len(collections.all_collections()) == 1, "precondition: one collection"
+        item = SimpleNamespace(reference="CAB-1", total=1, check_id="c", changed="d", headline="h")
+        for name, module, attr in (("corrections", correction_apply, "pending"),
+                                   ("parked", correction_apply, "parked"),
+                                   ("nudges", bulk_recheck, "nudges")):
+            monkeypatch.setattr(module, attr, (lambda conn, _i=item: [_i]) if name == waiting
+                                else (lambda conn: []))
+        monkeypatch.setattr(bulk_recheck_tui, "menu_label", lambda n: "Bulk re-checks (1)")
+        monkeypatch.setattr(filing_tui, "actor_at_the_keyboard",
+                            lambda: people.person_by_email(REAL_PERSON))
+        asked = []
+        monkeypatch.setattr(common, "grouped_select",
+                            lambda message, grouped, **k: asked.append(grouped) or None)
+        monkeypatch.setattr(common, "select", lambda *a, **k: None)
+        filing_tui.filing_menu()
+        assert asked, "precondition: the menu asked which collection"
+        label = collections.by_id(_DS.collection_id).label
+        pointer = supply_files.where_to_settle(DS).split(" > ")
+        assert pointer == ["mothman", "Filing decisions", label, "Supplies waiting on a decision"]
+        assert label in [x for _, labels in asked[0] for x in labels]
 
     @pytest.mark.asset("quarterly")
     def test_an_asset_of_several_collections_keeps_the_collection_step(self):
