@@ -253,3 +253,16 @@ the rebuild needs no question asked twice. Drafts and builders read this file.
   is SETTLED by Keith 2026-11-02: kept, with its pinning tests made critical.
   REJECTED moving the push out of cli/, and removing the command. It had been
   added by the coordinator without sign-off; the REQ-TEST-375 critic caught it.
+- THE MOVE CRITIC'S THREE DECISIONS, SETTLED by Keith 2026-11-02 afternoon:
+  1. Feedback links' mistyped-agency check (REQ-PIPE-342 c8), dropped by the
+     move because each asset knows only its own agencies: WAITS for
+     REQ-PIPE-354. REJECTED reading every asset's hierarchy now.
+  2. A scenario naming a dataset in neither asset (REQ-GEN-246 c8), now
+     silently dropped by `scenario_injection.this_assets_injections`: WAITS
+     for REQ-PIPE-354, and meanwhile the drop is made VISIBLE (a warning
+     naming each dropped scenario), not silent. REJECTED reading both assets
+     now, and waiting silently.
+  3. The settle pointer on a one-collection asset (`supply_files.where_to_settle`
+     names a collection step the menu skips): the POINTER DROPS the collection
+     step when the asset has one collection; the menu is unchanged. REJECTED
+     always showing the collection picker.
