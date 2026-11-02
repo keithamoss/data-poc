@@ -298,64 +298,6 @@ class TestTheAddedOnWalkFollowsTheMove:
 # ---- correction_trial's base reads (lines 623 and 651-653 then) ----------
 
 class TestCorrectionTrialReadsTheBaseThroughTheMove:
-    def test_the_real_agreement_divides_into_readable_parts(self, tmp_path, monkeypatch):
-        """The real contract/ calendar and data-asset files at a base, read for
-        each asset of a map dividing them as the split does: each part is a
-        readable agreement and holds its own asset's collections only."""
-        repo = tmp_path / "real"
-        repo.mkdir()
-        _git(repo, "init", "-q")
-        src = REAL / "contract" if (REAL / "contract").is_dir() else None
-        if src is None:
-            pytest.skip("the tree is already moved; the base read is covered above")
-        _write(repo, {"contract/calendar.yaml": (src / "calendar.yaml").read_text(),
-                      "contract/data-asset.yaml": (src / "data-asset.yaml").read_text()})
-        _git(repo, "add", "-A")
-        _git(repo, "commit", "-qm", "base")
-        monkeypatch.setenv("MOTHMAN_DIFF_BASE", _git(repo, "rev-parse", "HEAD"))
-        monkeypatch.setattr(validate_schedule, "ROOT", repo)
-        validate_schedule._content_at.cache_clear()
-        _write(repo, {"assets/moved-paths.yaml": textwrap.dedent("""\
-            former_data_asset_id: data-asset-1
-            assets:
-              daily:
-                agencies: [registry-services]
-                collections: [civil-registration]
-                datasets: [birth-registrations]
-                calendars: [daily]
-                change_references: [REQ-GEN-205-WINDOW]
-              quarterly:
-                agencies: [child-protection-family-support, department-of-health]
-                collections: [child-protection, emergency-department, linkage-products]
-                datasets: [cp-clients, cp-notifications, cp-investigations, cp-placements,
-                           cp-carers, cp-case-workers, ed-presentations, linkage-keys,
-                           geo-cp-clients, geo-ed-presentations]
-                calendars: [quarterly]
-                change_references: [REQ-GEN-205, REQ-PIPE-181, REQ-GEN-218]
-            moves:
-              - from: contract/calendar.yaml
-                to: [assets/quarterly/calendar.yaml, assets/daily/calendar.yaml]
-              - from: contract/data-asset.yaml
-                to: [assets/quarterly/data-asset.yaml, assets/daily/data-asset.yaml]
-            """)})
-        for asset, colls in (("daily", {"civil-registration"}),
-                             ("quarterly", {"child-protection", "emergency-department",
-                                            "linkage-products"})):
-            from qa_tools.common import agreement_freeze
-
-            monkeypatch.setattr(agreement_freeze, "calendar_rel",
-                                lambda a=asset: f"assets/{a}/calendar.yaml")
-            monkeypatch.setattr(agreement_freeze, "asset_rel",
-                                lambda a=asset: f"assets/{a}/data-asset.yaml")
-            cal, doc = correction_trial.at_ref(os.environ["MOTHMAN_DIFF_BASE"])
-            assert {c["id"] for c in cal["collections"]} == colls
-            assert {c["id"] for a in doc["hierarchy"]["agencies"]
-                    for c in a["collections"]} == colls
-            assert doc["data_asset_id"] == asset
-            assert {d["id"] for d in cal["datasets"]} == {
-                d["id"] for a in doc["hierarchy"]["agencies"] for c in a["collections"]
-                for d in c["datasets"]}
-
     def test_without_the_map_the_base_cannot_be_read(self, moved, monkeypatch):
         moved(with_map=False)
         from qa_tools.common import agreement_freeze

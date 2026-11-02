@@ -58,8 +58,11 @@ _BUILD_STEPS = ["rebuild-results", "build-data", "embed"]
 
 
 def _deployment_dsn():
+    """The deployment database of the asset this test acts for (the asset
+    split: each asset's own, supply_<asset> - conftest.deployment_dsn_for)."""
     import conftest
-    return getattr(conftest, "DEPLOYMENT_SUPPLY_DSN", None)
+    from qa_tools.common import assets
+    return conftest.deployment_dsn_for(os.environ.get(assets.ASSET_ENV))
 
 
 def _deployment_environment():
@@ -114,9 +117,26 @@ def real_tree_before_the_build() -> dict:
     return _stat_of(_real_build_outputs())
 
 
-@pytest.fixture(scope="session")
+#: Each asset's built page, once per worker (the asset split: each asset is a
+#: deployment with a dashboard of its own).
+_BUILT: dict = {}
+
+
+@pytest.fixture(scope="class")
 def built_dashboard_html(supply_dsn, worker_id, tmp_path_factory,
                          real_tree_before_the_build) -> Path:
+    """The selected asset's page, built once per worker per asset (below).
+    CLASS-SCOPED rather than session-scoped so a class of the other asset
+    gets its own asset's page; the build itself still happens once."""
+    from qa_tools.common import assets
+
+    asset = os.environ.get(assets.ASSET_ENV)
+    if asset not in _BUILT:
+        _BUILT[asset] = _build_dashboard(worker_id, tmp_path_factory, asset)
+    return _BUILT[asset]
+
+
+def _build_dashboard(worker_id, tmp_path_factory, asset) -> Path:
     """The real dashboard, built by the real chain, ONCE PER WORKER, into a
     directory named for that worker (REQ-TEST-281 criterion 3).
 
@@ -152,7 +172,7 @@ def built_dashboard_html(supply_dsn, worker_id, tmp_path_factory,
             "database rather than a committed tree, so a checkout alone is no "
             "longer enough.")
 
-    out = tmp_path_factory.mktemp(f"dashboard-build-{worker_id}", numbered=False)
+    out = tmp_path_factory.mktemp(f"dashboard-build-{worker_id}-{asset}", numbered=False)
     env = {**os.environ, "MOTHMAN_SUPPLY_DSN": dsn}
     env.pop("MOTHMAN_DASHBOARD_OUT", None)
     # The environment the deployment's database is marked for (REQ-PIPE-107).
@@ -612,6 +632,7 @@ def test_raw_template_renders_with_zero_console_errors(clean_page):
 
 
 class TestInPlaceOnDatePicking:
+    @pytest.mark.asset("daily")  # Birth Registrations' page
     def test_a_date_before_any_real_history_shows_no_data(self, clean_page, built_dashboard_html):
         run_ids = list_run_ids("registry-services", "civil-registration")
         assert run_ids, "no real committed BDM history to test against"
@@ -853,6 +874,7 @@ class TestTheInPlaceOnPanelSaysWhichPeriod:
 
 
 class TestSupplyHistoryDrillDown:
+    @pytest.mark.asset("daily")  # Birth Registrations' page
     def test_clicking_a_supply_history_entry_sets_the_in_place_on_date_to_that_run(self, clean_page, built_dashboard_html):
         _goto(
             clean_page, built_dashboard_html,
@@ -1362,6 +1384,7 @@ def dashboard_html_with_ticket(built_dashboard_html, tmp_path_factory) -> Path:
 
 @pytest.mark.shared_page
 class TestTicketBadge:
+    @pytest.mark.asset("daily")  # Birth Registrations' page
     def test_an_open_ticket_shows_a_linked_badge_at_tier2_and_tier3(self, clean_page, dashboard_html_with_ticket):
         badge_selector = "a.pill.tag[href='https://github.com/keithamoss/data-poc/issues/999']"
 
@@ -2050,6 +2073,7 @@ def _rewrite_checks(page, fields: dict):
 
 @pytest.mark.shared_page
 class TestCheckCardReadsAsPlainEnglish:
+    @pytest.mark.asset("daily")  # Birth Registrations' page
     def test_the_headline_is_the_authored_name_with_description_and_tool_beneath(
             self, clean_page, built_dashboard_html):
         _goto(clean_page, built_dashboard_html, _BDM)
@@ -2069,6 +2093,7 @@ class TestCheckCardReadsAsPlainEnglish:
         # ...and the tool trace is one line below, not a click away.
         assert re.match(r"^(dbt|soda|datacontract|evidently):\S+$", tool_ref), tool_ref
 
+    @pytest.mark.asset("daily")  # Birth Registrations' page
     def test_the_card_does_not_render_the_shared_category_label(
             self, clean_page, built_dashboard_html):
         _goto(clean_page, built_dashboard_html, _BDM)
@@ -2077,6 +2102,7 @@ class TestCheckCardReadsAsPlainEnglish:
 
         assert clean_page.locator(".check-card .dim-tag").count() == 0
 
+    @pytest.mark.asset("daily")  # Birth Registrations' page
     def test_the_tool_line_and_the_url_segment_are_the_same_string(
             self, clean_page, built_dashboard_html):
         """The reason for deriving the line from the check_id rather than
@@ -2094,6 +2120,7 @@ class TestCheckCardReadsAsPlainEnglish:
 
 @pytest.mark.shared_page
 class TestCheckCardIsARealLink:
+    @pytest.mark.asset("daily")  # Birth Registrations' page
     def test_it_is_an_anchor_carrying_the_checks_own_deep_link(
             self, clean_page, built_dashboard_html):
         _goto(clean_page, built_dashboard_html, _BDM)
@@ -2105,6 +2132,7 @@ class TestCheckCardIsARealLink:
         href = card.get_attribute("href")
         assert f"/column/{column}/check/" in href
 
+    @pytest.mark.asset("daily")  # Birth Registrations' page
     def test_a_plain_click_is_ours_but_a_modifier_click_is_the_browsers(
             self, clean_page, built_dashboard_html):
         """The whole point of the card being a link. If we swallowed
@@ -2129,6 +2157,7 @@ class TestCheckCardIsARealLink:
 
         assert prevented == {"plain": True, "meta": False, "ctrl": False, "shift": False}
 
+    @pytest.mark.asset("daily")  # Birth Registrations' page
     def test_a_plain_click_opens_that_exact_check(self, clean_page, built_dashboard_html):
         _goto(clean_page, built_dashboard_html, _BDM)
         _open_first_column(clean_page)
@@ -2153,6 +2182,7 @@ class TestLongDescriptionsAreClampedOnTheCardOnly:
                   chars: e.textContent.length};
         }""")
 
+    @pytest.mark.asset("daily")  # Birth Registrations' page
     def test_the_card_clamps_to_two_lines_and_the_panel_does_not(
             self, clean_page, built_dashboard_html):
         _goto(clean_page, built_dashboard_html, _BDM)
@@ -2173,6 +2203,7 @@ class TestLongDescriptionsAreClampedOnTheCardOnly:
         assert panel["lines"] > 2
         assert panel["clipped"] is False
 
+    @pytest.mark.asset("daily")  # Birth Registrations' page
     def test_the_status_pill_holds_its_position_whatever_the_description(
             self, clean_page, built_dashboard_html):
         """Criterion's own wording. The clamp is what makes this true:
@@ -2201,6 +2232,7 @@ class TestAuthoredProseCannotAlterTheCard:
         "description": '</a><script>window.__pwned=1</script> & <img src=x onerror="window.__pwned=2">',
     }
 
+    @pytest.mark.asset("daily")  # Birth Registrations' page
     def test_markup_in_authored_fields_renders_as_text(
             self, clean_page, built_dashboard_html):
         _goto(clean_page, built_dashboard_html, _BDM)
@@ -2215,6 +2247,7 @@ class TestAuthoredProseCannotAlterTheCard:
         assert card.locator("img").count() == 0
         assert clean_page.evaluate("() => window.__pwned ?? null") is None
 
+    @pytest.mark.asset("daily")  # Birth Registrations' page
     def test_a_double_quote_in_a_name_does_not_break_out_of_the_aria_label(
             self, clean_page, built_dashboard_html):
         """The specific escape the requirement's NFR named. The label is
@@ -2266,6 +2299,7 @@ class TestAuthoredProseCannotAlterTheDetailPanel:
         }""", [self._SCRIPTY, self._QUOTED])
         page.wait_for_timeout(600)
 
+    @pytest.mark.asset("daily")  # Birth Registrations' page
     def test_nothing_authored_can_inject_an_element_into_the_panel(
             self, clean_page, built_dashboard_html):
         _goto(clean_page, built_dashboard_html, _BDM)
@@ -2281,6 +2315,7 @@ class TestAuthoredProseCannotAlterTheDetailPanel:
         }""")
         assert counts == {"img": 0, "bold": 0, "script": 0, "pwned": None}
 
+    @pytest.mark.asset("daily")  # Birth Registrations' page
     def test_the_authored_sections_still_show_their_real_text(
             self, clean_page, built_dashboard_html):
         """Rendering nothing would also pass the test above. The point is
@@ -2305,6 +2340,7 @@ class TestAuthoredProseCannotAlterTheDetailPanel:
         assert shown["changelog_desc"] == self._SCRIPTY
         assert shown["changelog_author"].endswith(self._QUOTED)
 
+    @pytest.mark.asset("daily")  # Birth Registrations' page
     def test_the_charts_own_annotations_hold_the_text_literally(
             self, clean_page, built_dashboard_html):
         """The one that was missed by reading the code. Both the breaking
@@ -2917,6 +2953,7 @@ class TestTheKeyboardCanReachTheData:
     # because of it.
     AGENCY = {"tier": "agency", "agencyId": "registry-services"}
 
+    @pytest.mark.asset("daily")  # Birth Registrations' page
     def test_every_dataset_row_is_in_the_tab_order(self, clean_page, built_dashboard_html):
         _goto(clean_page, built_dashboard_html, state=self.AGENCY)
         tabindexes = clean_page.evaluate(
@@ -2925,6 +2962,7 @@ class TestTheKeyboardCanReachTheData:
         assert all(t >= 0 for t in tabindexes), (
             f"dataset rows are unreachable by keyboard: tabIndex values {tabindexes}")
 
+    @pytest.mark.asset("daily")  # Birth Registrations' page
     def test_a_dataset_row_navigates_on_enter(self, clean_page, built_dashboard_html):
         """The property that matters is operability, not the attribute."""
         _goto(clean_page, built_dashboard_html, state=self.AGENCY)
@@ -2934,6 +2972,7 @@ class TestTheKeyboardCanReachTheData:
         assert "/dataset/" in clean_page.url, (
             f"Enter on a focused dataset row did not drill in: {clean_page.url}")
 
+    @pytest.mark.asset("daily")  # Birth Registrations' page
     def test_nothing_inside_a_closed_drawer_can_take_focus(self, clean_page, built_dashboard_html):
         """Focusable content inside `aria-hidden` is a WCAG 4.1.2
         violation, and to a keyboard user it simply reads as "Tab
@@ -2952,6 +2991,7 @@ class TestTheKeyboardCanReachTheData:
         }""")
         assert not stuck, f"closed drawers still hold focusable controls: {stuck}"
 
+    @pytest.mark.asset("daily")  # Birth Registrations' page
     def test_an_open_drawer_can_still_be_used(self, clean_page, built_dashboard_html):
         """Whatever hides the closed ones must not hide the open one."""
         _goto(clean_page, built_dashboard_html)
@@ -2969,6 +3009,7 @@ class TestTheKeyboardCanReachTheData:
         }""")
         assert reachable, "an OPEN drawer's own controls cannot take focus"
 
+    @pytest.mark.asset("daily")  # Birth Registrations' page
     @pytest.mark.parametrize("selector", [
         ".crumb", ".col-tile", ".snapshots-btn", ".drawer-close",
     ])
@@ -3002,6 +3043,7 @@ class TestTheKeyboardCanReachTheData:
         assert found["style"] == "solid" and found["width"] != "0px", (
             f"{selector} falls back to the browser's default focus ring: {found}")
 
+    @pytest.mark.asset("daily")  # Birth Registrations' page
     def test_the_page_title_says_which_view_you_are_on(self, clean_page, built_dashboard_html):
         _goto(clean_page, built_dashboard_html)
         exec_title = clean_page.title()
@@ -3011,6 +3053,7 @@ class TestTheKeyboardCanReachTheData:
             f"the title never changes - both views are titled {exec_title!r}")
         assert "Registry Services" in agency_title
 
+    @pytest.mark.asset("daily")  # Birth Registrations' page
     def test_a_route_change_is_announced_and_moves_focus(self, clean_page, built_dashboard_html):
         """Without either, a screen-reader user who activates a row is
         told nothing and left where they were."""
@@ -3122,6 +3165,7 @@ class TestAStaleDeepLinkSaysSo:
             return columnKey(ds.columns[0]);
         }""")
 
+    @pytest.mark.asset("daily")  # Birth Registrations' page
     def test_a_real_column_link_still_opens_its_drawer(self, clean_page, built_dashboard_html):
         """The must-not-change half. Repairing a broken deep link is
         worth nothing if it broke the working ones."""
@@ -3133,6 +3177,7 @@ class TestAStaleDeepLinkSaysSo:
             "a column that exists no longer opens its drawer")
         assert key in clean_page.url
 
+    @pytest.mark.asset("daily")  # Birth Registrations' page
     def test_a_dropped_column_is_named_rather_than_ignored(self, clean_page,
                                                             built_dashboard_html):
         _goto(clean_page, built_dashboard_html,
@@ -3142,6 +3187,7 @@ class TestAStaleDeepLinkSaysSo:
         assert notice.count() == 1, "no notice - the stale link failed silently"
         assert "a_column_that_was_dropped" in notice.inner_text()
 
+    @pytest.mark.asset("daily")  # Birth Registrations' page
     def test_the_dead_segment_is_taken_out_of_the_url(self, clean_page,
                                                        built_dashboard_html):
         _goto(clean_page, built_dashboard_html,
@@ -3149,6 +3195,7 @@ class TestAStaleDeepLinkSaysSo:
         clean_page.wait_for_timeout(400)
         assert "a_column_that_was_dropped" not in clean_page.url
 
+    @pytest.mark.asset("daily")  # Birth Registrations' page
     def test_the_rest_of_the_dataset_page_still_renders(self, clean_page,
                                                          built_dashboard_html):
         """Deliberately NOT a full-page not-found: everything the reader
@@ -3326,6 +3373,7 @@ class TestNavigationUsesRealLinks:
         clean_page.wait_for_timeout(400)
         assert "/dataset/" in clean_page.url
 
+    @pytest.mark.asset("daily")  # Birth Registrations' page
     def test_the_breadcrumbs_are_links(self, clean_page, built_dashboard_html):
         _goto(clean_page, built_dashboard_html,
               state={"tier": "agency", "agencyId": "registry-services"})
@@ -3819,6 +3867,7 @@ class TestOutstandingDecisions:
             assert label != "On time", status
             assert "pill green" not in pill, status
 
+    @pytest.mark.asset("daily")  # Birth Registrations' page
     def test_an_arrival_verdict_says_it_follows_the_supplys_current_filing(
             self, clean_page, built_dashboard_html):
         """Criterion 11. A punctuality verdict is measured against the
@@ -4023,6 +4072,7 @@ class TestScenariosTab:
         assert "no data behind it" in panel.inner_text(), (
             "no entry says it has nothing behind it, and most still have nothing")
 
+    @pytest.mark.asset("daily")  # Birth Registrations' page
     def test_a_coordinate_lands_on_the_right_page_and_date(
             self, clean_page, built_dashboard_html):
         """REQ-DASH-139 NFR 2 (sprint 11 critic: it was only done by hand).
@@ -5019,6 +5069,7 @@ class TestSampleFinePrint:
     """post-build-review #129 (Keith 2026-10-07): the example failing rows
     say which rows they are, in the real panel."""
 
+    @pytest.mark.asset("daily")  # Birth Registrations' page
     def test_a_soda_check_past_its_limit_says_soda_chose_them(
             self, clean_page, built_dashboard_html):
         _goto(clean_page, built_dashboard_html, _BDM)
@@ -5045,6 +5096,7 @@ class TestAChecksChartNamesWhatItMeasures:
     in what unit, above the plot and as the table's column header - one
     check of each unit, count, % and PSI, on the real built dashboard."""
 
+    @pytest.mark.asset("daily")  # Birth Registrations' page
     @pytest.mark.parametrize("kind,expected", [
         ("dbt:not_null", "Rows with no value (count)"),
         ("soda:invalid_percent", "Invalid values (%)"),
@@ -5084,6 +5136,7 @@ class TestAStaleDatasetsSectionsSayNoData:
     claim about a period nothing was checked for. Found building REQ-DASH-225,
     whose row count is checked against exactly these pills."""
 
+    @pytest.mark.asset("daily")  # Birth Registrations' page
     def test_section_heads_go_quiet_with_the_tiles(self, clean_page, built_dashboard_html):
         _goto(clean_page, built_dashboard_html, _BDM)
         seen = clean_page.evaluate("""() => ({
@@ -5095,6 +5148,7 @@ class TestAStaleDatasetsSectionsSayNoData:
         assert seen["heads"], "precondition: it has a check section"
         assert all("nodata" in c for c in seen["heads"]), seen["heads"]
 
+    @pytest.mark.asset("daily")  # Birth Registrations' page
     def test_no_tile_lines_key_when_no_tile_draws_lines(self, clean_page, built_dashboard_html):
         """post-build-review #184 (D3): the line explaining the tiles' two
         lines showed above thirteen 'No data' tiles that draw none."""
@@ -5471,6 +5525,7 @@ class TestClosingAPanelReachedByItsUrl:
         return page.evaluate("() => [STATE.tier, STATE.columnName || null, STATE.checkKey || null,"
                              " document.getElementById('check-panel').getAttribute('aria-hidden')]")
 
+    @pytest.mark.asset("daily")  # Birth Registrations' page
     def test_reached_from_the_agency_view_it_closes_to_its_column(self, clean_page,
                                                                   built_dashboard_html):
         _goto(clean_page, built_dashboard_html, {"tier": "agency",
@@ -5489,6 +5544,7 @@ class TestClosingAPanelReachedByItsUrl:
         assert clean_page.url.startswith("file://") and "qa-reporting-dashboard" in clean_page.url
         assert self._state(clean_page) == ["dataset", "registration_number", None, "true"]
 
+    @pytest.mark.asset("daily")  # Birth Registrations' page
     def test_a_column_drawer_reached_by_its_url_closes_to_its_dataset(self, clean_page,
                                                                     built_dashboard_html):
         _goto(clean_page, built_dashboard_html, {"tier": "agency",
@@ -5498,6 +5554,7 @@ class TestClosingAPanelReachedByItsUrl:
         clean_page.wait_for_function("() => !STATE.columnName")
         assert clean_page.evaluate("() => STATE.tier") == "dataset"
 
+    @pytest.mark.asset("daily")  # Birth Registrations' page
     def test_opened_in_the_app_close_is_still_one_step_back(self, clean_page,
                                                           built_dashboard_html):
         _goto(clean_page, built_dashboard_html, _BDM)
@@ -5805,6 +5862,7 @@ class TestASettledPairOnThePage:
             return "missing";
         }}""")
 
+    @pytest.mark.asset("daily")  # Birth Registrations' page
     def test_it_reads_contested_until_the_settlement_then_settled(
             self, page, dashboard_html_with_a_settled_pair):
         from datetime import timedelta
@@ -5832,6 +5890,7 @@ class TestASettledPairOnThePage:
         assert "Settled" in text and one in text and two in text
         assert "this period's supply (" in text and "re-filed to" in text
 
+    @pytest.mark.asset("daily")  # Birth Registrations' page
     def test_the_refiled_files_link_cold_loads_framed_as_a_refile(
             self, page, dashboard_html_with_a_settled_pair):
         from datetime import timedelta
@@ -5856,6 +5915,7 @@ class TestThePlantedPairsOnTheBuiltDashboard:
 
     PAIRS = ("TS-68", "TS-69", "TS-70", "TS-71", "TS-72", "TS-73", "TS-74")
 
+    @pytest.mark.asset("daily")  # Birth Registrations' page
     @pytest.mark.parametrize("sid", PAIRS)
     def test_contested_on_its_arrival_day_and_settled_the_next(self, page, built_dashboard_html,
                                                                 sid):
@@ -5912,6 +5972,7 @@ class TestThePlantedPairsOnTheBuiltDashboard:
         text, _day = self._text_on(page, built_dashboard_html, "TS-70", 1)
         assert "Late 4:30pm" in text, text[:2000]
 
+    @pytest.mark.asset("daily")  # Birth Registrations' page
     def test_ts72_marks_the_refused_file_never_loaded(self, page, built_dashboard_html):
         """Criterion 16 (#172 D2): the settled row says which file never loaded."""
         text, day = self._text_on(page, built_dashboard_html, "TS-72", 1)
@@ -6447,11 +6508,13 @@ class TestAPendingCorrectionIsANeedsActionItem:
         return [t for t in page.locator(".notice-queue .queue-item").all_inner_texts()
                 if self.REF in t]
 
+    @pytest.mark.asset("daily")  # Birth Registrations' page
     def test_listed_from_its_date(self, clean_page, built_dashboard_html):
         [item] = self._items(clean_page, built_dashboard_html, "2026-09-25")
         assert "Calendar correction to confirm" in item
         assert f"mothman supply corrections --reference {self.REF}" in item
 
+    @pytest.mark.asset("daily")  # Birth Registrations' page
     def test_not_listed_before_it(self, clean_page, built_dashboard_html):
         assert self._items(clean_page, built_dashboard_html, "2026-09-23") == []
 
@@ -9502,6 +9565,7 @@ class TestTheGeocodingPages:
             assert not re.search(r"\b\d{9}\b", text), (sid, text[:500])
             assert not any(c in text for c in codes), sid
 
+    @pytest.mark.asset("daily")  # Birth Registrations' page
     def test_8_another_collections_check_is_headed_by_its_phrase(
             self, clean_page, built_dashboard_html):
         ds = _built_datasets(built_dashboard_html)["birth-registrations"]

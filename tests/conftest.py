@@ -729,12 +729,42 @@ def deployment_history(supply_dsn, monkeypatch):
     It needs that database populated, which is
     `mothman pipeline bootstrap` - see CLAUDE.md's setup section.
     """
-    dsn = globals().get("DEPLOYMENT_SUPPLY_DSN")
+    dsn = deployment_dsn_for(os.environ.get(_assets.ASSET_ENV))
     if not dsn:
         pytest.skip("no deployment database configured (MOTHMAN_SUPPLY_DSN)")
     monkeypatch.setenv(supply_db_module().SUPPLY_DSN_ENV, dsn)
     use_deployment_environment(monkeypatch)
     return dsn
+
+
+_DEPLOYMENT_BY_ASSET: dict = {}
+
+
+def deployment_dsn_for(asset: str | None) -> str | None:
+    """The deployment database of `asset`: supply_<asset> on the deployment's
+    own server where it exists (REQ-PIPE-343 criterion 7 - each asset's
+    database by that name, the sandbox's and CI's alike), else the deployment
+    database the session was given (MOTHMAN_SUPPLY_DSN). CI's per-asset runs
+    are handed supply_<asset> directly, so both routes agree there."""
+    import psycopg
+
+    base = globals().get("DEPLOYMENT_SUPPLY_DSN")
+    if not base or not asset:
+        return base
+    if asset not in _DEPLOYMENT_BY_ASSET:
+        info = psycopg.conninfo.conninfo_to_dict(base)
+        named = dict(info, dbname=f"supply_{asset}")
+        found = base
+        try:
+            with psycopg.connect(psycopg.conninfo.make_conninfo(**dict(info, dbname="postgres")),
+                                 autocommit=True, connect_timeout=5) as conn:
+                if conn.execute("SELECT 1 FROM pg_database WHERE datname = %s",
+                                [named["dbname"]]).fetchone():
+                    found = psycopg.conninfo.make_conninfo(**named)
+        except psycopg.Error:
+            pass
+        _DEPLOYMENT_BY_ASSET[asset] = found
+    return _DEPLOYMENT_BY_ASSET[asset]
 
 
 def use_deployment_environment(monkeypatch) -> None:

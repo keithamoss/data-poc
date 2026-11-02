@@ -163,9 +163,24 @@ class TestADeclaredReadAcrossCollectionsIsGated:
         [p] = run_reads.declaration_problems({LP: ["no_such_table"]})
         assert LP in p and "no_such_table" in p and "no dataset" in p
 
-    def test_a_dataset_on_another_calendar(self):
-        [p] = run_reads.declaration_problems({LP: ["birth_registrations"]})
-        assert LP in p and "birth_registrations" in p and "daily" in p and "quarterly" in p
+    def test_a_dataset_on_another_calendar(self, monkeypatch):
+        """Within one asset (the asset split: Birth Registrations, the daily
+        dataset this read, is another asset's): the Client Register put on
+        another calendar, as test_a_dataset_with_no_calendar puts it on none."""
+        import types
+
+        from qa_tools.common import schedule
+
+        real = schedule.calendar_for_dataset
+
+        def _daily(dataset_id, agreement=None):
+            if dataset_id == "cp-clients":
+                return types.SimpleNamespace(name="daily")
+            return real(dataset_id, agreement)
+
+        monkeypatch.setattr(schedule, "calendar_for_dataset", _daily)
+        [p] = run_reads.declaration_problems({LP: ["cp_clients"]})
+        assert LP in p and "cp_clients" in p and "daily" in p and "quarterly" in p
 
     def test_a_dataset_with_no_calendar(self, monkeypatch):
         from qa_tools.common import schedule

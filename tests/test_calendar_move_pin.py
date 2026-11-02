@@ -21,18 +21,24 @@ def test_every_dataset_computes_what_it_did_before_the_move(asset):
     period and slot is named by the round it is due on - the name the pin
     recorded at 0 - and every instant must be what was pinned. The pin is
     never re-captured."""
-    from pathlib import Path
+    import yaml
 
-    from qa_tools.common import hierarchy, moved_paths
+    import asset_folders
+    from qa_tools.common import assets, hierarchy
 
     pinned = json.loads(PIN.read_text())
     assert pinned, "the pin holds no dataset - the comparison would prove nothing"
-    # EVERY PINNED DATASET IS SOME ASSET'S (the asset split), by the move map's
-    # repository-wide record of what went where - so a dataset lost from both
-    # assets fails here even though each asset's run below sees only its own.
-    root = Path(__file__).resolve().parent.parent
-    members = moved_paths.parse((root / moved_paths.MAP_REL).read_text()).members
-    assert set(pinned) <= set().union(*members.values()), "the datasets themselves changed"
+    # EVERY PINNED DATASET IS SOME ASSET'S (the asset split), read from every
+    # asset's own data-asset.yaml - so a dataset lost from both assets fails
+    # here even though each asset's run below sees only its own. Not from
+    # assets/moved-paths.yaml, which REQ-TEST-366 criterion 3 deletes.
+    declared = set()
+    for name in assets.names():
+        doc = yaml.safe_load((asset_folders.real_folder_of(name) / "data-asset.yaml").read_text())
+        declared |= {d["id"] for a in doc["hierarchy"]["agencies"] for c in a["collections"]
+                     for d in c["datasets"]}
+    assert declared, "no asset declares a dataset"
+    assert set(pinned) <= declared, "the datasets themselves changed"
     # This asset's pinned datasets, each computing what it did.
     mine = {d.dataset_id for d in hierarchy.all_datasets()}
     pinned = {k: v for k, v in pinned.items() if k in mine}

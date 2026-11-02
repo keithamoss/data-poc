@@ -16,14 +16,14 @@ environments.current() refuses for the environment, listing the folder names
 found - the only thing read before an asset is selected. Never the only asset
 present, never a last-used value.
 
-TWO LAYOUTS, AND THE SWITCH BETWEEN THEM IS THE MOVE (REQ-TEST-357 criteria 5
-and 6). Until the move, `_PreMove` maps today's tree as one asset: contract/
-is its folder, qa_tools/collections/ and generator/collections/ hold its
-adapters and providers, dbt_project/ is its dbt project, and data/ and
-reports/ are its state. Until REQ-QAC-344 renames it, that one asset is named
-data-asset-1, as its data-asset.yaml declares (decided 2026-11-01). The move
-commit points `_DEFAULT` at `_Assets(ROOT / "assets")`, where each asset
-folder is found from assets/ itself (criterion 5) and no code names an asset.
+ONE LAYOUT SINCE THE MOVE (REQ-TEST-357 criteria 5 and 6): `_DEFAULT` is
+`_Assets(ROOT / "assets")`, and each asset folder is found from assets/ itself
+(criterion 5) - assets/<asset>/ its configuration, its collections/ the QA
+adapters, its synthetic/collections/ the generator providers, its dbt/ the dbt
+project, and data/<asset>/ and reports/<asset>/ its state. No code names an
+asset. The one-asset layout before the move (contract/, qa_tools/collections/,
+generator/collections/, dbt_project/) is gone, and with it the class that
+mapped it.
 
 ADAPTERS AND PROVIDERS ARE LOADED BY PATH (REQ-PIPE-369 criterion 2,
 REQ-GEN-370 criterion 2), through importlib's file-location loader, under a
@@ -129,25 +129,6 @@ class Asset:
         """The asset's name as part of a module name - hyphens as
         underscores, as a collection id becomes its module's name."""
         return self.name.replace("-", "_")
-
-
-class _PreMove:
-    """Today's tree as one asset (REQ-TEST-357 criterion 6)."""
-
-    #: The one asset's name until REQ-QAC-344, as its data-asset.yaml says.
-    NAME = "data-asset-1"
-
-    folder = ROOT / "contract"
-
-    def names(self) -> list[str]:
-        return [self.NAME]
-
-    def asset(self, name: str) -> Asset:
-        return Asset(name=name, folder=self.folder,
-                     adapters=ROOT / "qa_tools" / "collections",
-                     providers=ROOT / "generator" / "collections",
-                     dbt_project=ROOT / "dbt_project",
-                     data=ROOT / "data", reports=ROOT / "reports")
 
 
 class _Assets:
@@ -336,7 +317,7 @@ def select(name: str) -> Asset:
 
 def folder_rel() -> str:
     """The selected asset's configuration folder relative to the repository
-    root, POSIX-style - `contract` today - for a reader that names its files
+    root, POSIX-style - `assets/<asset>` - for a reader that names its files
     by repository path, as the lifecycle gate and a read at a git ref do
     (REQ-PIPE-342 criterion 6). A folder outside the repository (a test's
     copy, #55's injected configuration) is given ABSOLUTE, so joining it to
@@ -351,7 +332,7 @@ def folder_rel() -> str:
 
 def dbt_rel() -> str:
     """The selected asset's dbt project relative to the repository root,
-    POSIX-style - `dbt_project` today - for the readers that name its files
+    POSIX-style - `assets/<asset>/dbt` - for the readers that name its files
     by repository path, as `folder_rel` does for the configuration folder
     (REQ-QAC-368 criterion 1); absolute outside the repository."""
     project = selected().dbt_project
