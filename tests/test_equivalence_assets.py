@@ -107,6 +107,101 @@ class TestComparingAcrossTheSplit:
         assert eq.compare(plain, renamed, ["S1"])["S1"]
 
 
+def _receipt(name, file, seq, **extra):
+    return {"delivery": name, "file": file, "sequence": seq, "received_at": "t", **extra}
+
+
+def _side(per_asset_s4, s1_files=None):
+    """A baseline from {asset: {delivery: [(file, sha, sequence)]}}, with
+    each delivery's files, its receipts and (optionally) qa.delivery_file."""
+    per = {}
+    for asset, deliveries in per_asset_s4.items():
+        s4, rows = {}, []
+        for name, files in deliveries.items():
+            for file, sha, seq in files:
+                s4[f"data/deliveries/{name}/{file}"] = sha
+                s4[f"data/receipts/{name}/{file}.json"] = _receipt(name, file, seq)
+                rows.append([[f'"{name}"', f'"{file}"', str(seq)], 1])
+        # A report naming each delivery, in its key and its value.
+        surfaces = {"S4": s4, "S5": {f"{n}.json": {"delivery": n} for n in deliveries}}
+        if s1_files is not False:
+            surfaces["S1"] = {"qa.delivery_file": {
+                "columns": ["delivery", "filename", "receipt_sequence"], "rows": sorted(rows)}}
+        per[asset] = surfaces
+    names = sorted(per)
+    if len(names) == 1:
+        return _base(names, per[names[0]])
+    b = _base(names, eq.union(per))
+    b["per_asset"] = per
+    return b
+
+
+#: Before the split: one tree, one receipt sequence, and two deliveries named
+#: by what was on disk then (the move's measured case, REQ-TEST-357 d7).
+SPLIT_BEFORE = _side({"data-asset-1": {
+    "BDM_20260801": [("cp.csv", "h-cp", 2)],
+    "upload-4402": [("ed.csv", "h-ed", 3)],
+    "BR_1": [("br.csv", "h-br", 1)],
+    "BR_2": [("br.csv", "h-br2", 4)],
+}})
+
+
+def _split_after(**change):
+    """After: the same files, Child Protection's delivery renamed and
+    Emergency Department's given the freed name, each asset counting its own
+    receipts from 1."""
+    quarterly = {"2026-08-corrected": [("cp.csv", "h-cp", 1)],
+                 "BDM_20260801": [("ed.csv", "h-ed", 2)]}
+    daily = {"BR_1": [("br.csv", "h-br", 1)], "BR_2": [("br.csv", "h-br2", 2)]}
+    quarterly.update(change.get("quarterly", {}))
+    daily.update(change.get("daily", {}))
+    return _side({"quarterly": quarterly, "daily": daily})
+
+
+class TestDeliveriesAcrossTheSplit:
+    """A1 (Keith, 2026-11-02; REQ-TEST-357 criterion 3 as amended): across the
+    split, the compare normalises each asset's receipt sequence numbers and
+    its delivery folders' names, comparing each delivery by its CONTENTS and
+    the receipts by their ORDER within the asset."""
+
+    def test_renamed_folders_and_renumbered_receipts_report_no_difference(self):
+        assert eq.compare(SPLIT_BEFORE, _split_after(), ["S1", "S4", "S5"]) == \
+            {"S1": [], "S4": [], "S5": []}
+
+    def test_a_changed_file_in_a_renamed_delivery_is_still_a_difference(self):
+        after = _split_after(quarterly={"2026-08-corrected": [("cp.csv", "CHANGED", 1)]})
+        assert eq.compare(SPLIT_BEFORE, after, ["S4"])["S4"]
+
+    def test_receipts_out_of_their_old_order_are_a_difference(self):
+        after = _split_after(quarterly={"2026-08-corrected": [("cp.csv", "h-cp", 2)],
+                                        "BDM_20260801": [("ed.csv", "h-ed", 1)]})
+        found = eq.compare(SPLIT_BEFORE, after, ["S1", "S4"])
+        assert found["S1"] and found["S4"]
+
+    def test_a_receipt_field_other_than_the_two_is_still_compared(self):
+        after = _split_after()
+        key = "data/receipts/BR_1/br.csv.json"
+        after["per_asset"]["daily"]["S4"][key] = _receipt("BR_1", "br.csv", 1, received_at="other")
+        after["surfaces"] = eq.union(after["per_asset"])
+        assert eq.compare(SPLIT_BEFORE, after, ["S4"])["S4"]
+
+    def test_within_one_layout_names_and_sequences_are_compared_raw(self):
+        renamed = _side({"data-asset-1": {
+            "BDM_20260801": [("cp.csv", "h-cp", 2)], "elsewhere": [("ed.csv", "h-ed", 3)],
+            "BR_1": [("br.csv", "h-br", 1)], "BR_2": [("br.csv", "h-br2", 4)]}})
+        assert eq.compare(SPLIT_BEFORE, renamed, ["S4"])["S4"]
+
+    @pytest.mark.asset("daily")
+    def test_a_capture_records_each_receipt_as_its_record(self, tmp_path):
+        (tmp_path / "assets" / "daily").mkdir(parents=True)
+        (tmp_path / "assets" / "daily" / "data-asset.yaml").write_text("data_asset_id: daily\n")
+        receipt = tmp_path / "data" / "daily" / "receipts" / "a" / "f.csv.json"
+        receipt.parent.mkdir(parents=True)
+        receipt.write_text('{"delivery": "a", "file": "f.csv", "sequence": 7}')
+        assert eq.generated_files(tmp_path, "daily") == {
+            "data/receipts/a/f.csv.json": {"delivery": "a", "file": "f.csv", "sequence": 7}}
+
+
 #: The data asset this module's tests act for, unless a test says otherwise
 #: (C11, Keith 2026-11-02: every test module names its asset).
 pytestmark = pytest.mark.asset("quarterly")

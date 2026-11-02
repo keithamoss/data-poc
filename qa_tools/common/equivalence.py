@@ -52,13 +52,17 @@ ROOT = Path(__file__).resolve().parent.parent.parent
 #: Bumped when what a capture records changes; `compare` refuses two
 #: baselines that disagree (criterion 2), because their differences would
 #: be the harness's rather than the code's.
-HARNESS_VERSION = 2
+HARNESS_VERSION = 3
+#: 3 (2026-11-02, A1): S4 records each receipt as its parsed record rather
+#: than its digest, so its sequence and delivery name can be normalised.
 #: Bumped when a normalising rule below changes, for the same reason.
 #: 2 (2026-10-16): the rules the first self-check proved missing - decision
 #: references, rule-made decision times, S5's ids and clock instants.
 #: 3 (2026-10-24): REQ-PIPE-279's records - an attempt's clock, a read by
 #: the result it belongs to, opening order within each collection.
-NORMALISER_VERSION = 3
+#: 4 (2026-11-02, A1): across the split, delivery folders by their contents
+#: and receipt sequences by their order within each asset.
+NORMALISER_VERSION = 4
 
 #: THE INSTANT EVERY CAPTURE'S BOOTSTRAP AND BUILD TAKE AS "NOW" (criterion
 #: 17, Keith 2026-10-16). A build works out from now which slots have closed
@@ -486,7 +490,13 @@ def _tree_state(tree: Path, asset: str, kind: str) -> Path:
         else tree / kind
 
 
-def generated_files(tree: Path, asset: str | None = None) -> dict[str, str]:
+#: S4's folders under data/ whose NAMES the split changes (A1): a delivery is
+#: named uniquely only among the names already in its own asset's tree, and a
+#: receipt's sequence counts within its own asset's receipts.
+DELIVERIES, RECEIPTS = "deliveries", "receipts"
+
+
+def generated_files(tree: Path, asset: str | None = None) -> dict:
     """S4: every file the bootstrap left under `tree`'s data/ - every
     delivery, every receipt, and the generators' own records - except
     dbt's scratch. Named by WHERE it is rather than file by file, so this
@@ -502,7 +512,16 @@ def generated_files(tree: Path, asset: str | None = None) -> dict[str, str]:
         if f.is_file() and rel.parts[0] not in NOT_GENERATED:
             # Named under data/ whatever the layout, so a split tree's
             # data/<asset>/ and an older tree's data/ name a file alike.
-            out[f"{kind}/{rel.as_posix()}"] = hashlib.sha256(f.read_bytes()).hexdigest()
+            value = hashlib.sha256(f.read_bytes()).hexdigest()
+            if rel.parts[0] == RECEIPTS and f.suffix == ".json":
+                # A RECEIPT AS ITS RECORD (A1): its delivery's name and its
+                # sequence are normalised across the split, every other
+                # field compared as written.
+                try:
+                    value = json.loads(f.read_text())
+                except ValueError:
+                    pass
+            out[f"{kind}/{rel.as_posix()}"] = value
     return out
 
 
@@ -997,6 +1016,164 @@ def normalise_assets(surfaces: dict, asset_ids: list[str]) -> dict:
     return out
 
 
+# ---- deliveries and receipts across the split (A1) ---------------------
+
+def _s4_part(key: str, folder: str) -> tuple[str, str] | None:
+    """(delivery name, the rest) for an S4 key under `folder`, else None."""
+    parts = key.split("/")
+    if len(parts) >= 4 and parts[1] == folder:
+        return parts[2], "/".join(parts[3:])
+    return None
+
+
+def _content_id(files) -> str:
+    return hashlib.sha256(json.dumps(sorted(files), default=str).encode()).hexdigest()[:12]
+
+
+def _per_asset(baseline: dict) -> dict[str, dict]:
+    """Each asset's own surfaces: a several-asset baseline's `per_asset` (a
+    capture keeps each under `surfaces`), or a one-asset baseline whole."""
+    per = baseline.get("per_asset")
+    if per:
+        return {a: (v.get("surfaces", v) if isinstance(v, dict) else v) for a, v in per.items()}
+    ids = _asset_ids(baseline)
+    return {ids[0] if ids else "": baseline["surfaces"]}
+
+
+def _delivery_order(per: dict[str, dict]) -> dict[str, dict]:
+    """{asset: {name: (content id, [(sequence, file)])}} from S4."""
+    out: dict[str, dict] = {}
+    for asset, surfaces in per.items():
+        files: dict[str, list] = {}
+        seqs: dict[str, list] = {}
+        for key, value in (surfaces.get("S4") or {}).items():
+            if (hit := _s4_part(key, DELIVERIES)):
+                files.setdefault(hit[0], []).append((hit[1], value))
+            elif (hit := _s4_part(key, RECEIPTS)) and isinstance(value, dict):
+                seqs.setdefault(hit[0], []).append((value.get("sequence"), value.get("file", hit[1])))
+        out[asset] = {n: (_content_id(files.get(n, [])), sorted(seqs.get(n, []), key=str))
+                      for n in set(files) | set(seqs)}
+    return out
+
+
+def _renamings(per: dict[str, dict], buckets) -> tuple[dict, dict]:
+    """Each asset's {delivery name: token} and {(name, file): rank}: a token
+    names a delivery by its contents (and its place among identical ones),
+    and a rank is the receipt's place in receipt order within its bucket -
+    the asset it belongs to, which is the same on both sides of a compare."""
+    order = _delivery_order(per)
+    receipts = []  # (bucket, sequence, asset, name, file)
+    first: dict[tuple[str, str], tuple] = {}
+    for asset, deliveries in order.items():
+        for name, (_cid, seqs) in deliveries.items():
+            bucket = buckets(asset, _cid)
+            for seq, file in seqs:
+                receipts.append((bucket, seq if isinstance(seq, int) else -1, asset, name, file))
+            first[(asset, name)] = (bucket, min((s for s, _f in seqs if isinstance(s, int)),
+                                                default=-1), name)
+    ranks: dict[tuple[str, str, str], int] = {}
+    counter: Counter = Counter()
+    for bucket, _seq, asset, name, file in sorted(receipts, key=lambda r: (str(r[0]), r[1], r[3], r[4])):
+        counter[bucket] += 1
+        ranks[(asset, name, file)] = counter[bucket]
+    tokens: dict[str, dict[str, str]] = {a: {} for a in order}
+    seen: Counter = Counter()
+    for (asset, name), _key in sorted(first.items(), key=lambda kv: (str(kv[1][0]), kv[1][1], kv[1][2])):
+        cid = order[asset][name][0]
+        seen[cid] += 1
+        tokens[asset][name] = f"<delivery {cid}>" + (f"#{seen[cid]}" if seen[cid] > 1 else "")
+    return tokens, ranks
+
+
+def _rename(surfaces: dict, asset: str, tokens: dict[str, str], ranks: dict) -> dict:
+    """One asset's surfaces with its delivery names as tokens and its receipt
+    sequences as ranks - S4's paths and receipt records, qa.delivery_file's
+    receipt_sequence by its row's own delivery and file, and the names
+    wherever else S1 and S5 hold them."""
+    if not tokens:
+        return surfaces
+    pattern = re.compile("(?<![A-Za-z0-9_-])(?:" + "|".join(
+        re.escape(n) for n in sorted(tokens, key=len, reverse=True)) + ")(?![A-Za-z0-9_-])")
+
+    def sub(value):
+        if isinstance(value, str):
+            return pattern.sub(lambda m: tokens[m.group(0)], value)
+        if isinstance(value, list):
+            return [sub(v) for v in value]
+        if isinstance(value, dict):
+            return {sub(k): sub(v) for k, v in value.items()}
+        return value
+
+    out = dict(surfaces)
+    if "S4" in surfaces:
+        s4 = {}
+        for key, value in surfaces["S4"].items():
+            hit = _s4_part(key, DELIVERIES) or _s4_part(key, RECEIPTS)
+            if hit and hit[0] in tokens:
+                head = key.split("/")[:2]
+                if isinstance(value, dict) and _s4_part(key, RECEIPTS):
+                    file = value.get("file", hit[1])
+                    value = {**value, "delivery": tokens.get(value.get("delivery"), value.get("delivery")),
+                             "sequence": ranks.get((asset, hit[0], file), value.get("sequence"))}
+                key = "/".join([*head, tokens[hit[0]], hit[1]])
+            s4[key] = value
+        out["S4"] = s4
+    if "S1" in surfaces:
+        s1 = {}
+        for table, body in surfaces["S1"].items():
+            cols = body["columns"]
+            rows = body["rows"]
+            if table == "qa.delivery_file" and {"delivery", "filename", "receipt_sequence"} <= set(cols):
+                d, f, q = (cols.index(c) for c in ("delivery", "filename", "receipt_sequence"))
+                fixed = []
+                for r, n in rows:
+                    r = list(r)
+                    rank = ranks.get((asset, json.loads(r[d]), json.loads(r[f])))
+                    if rank is not None:
+                        r[q] = _canon(rank)
+                    fixed.append([r, n])
+                rows = fixed
+            s1[table] = {"columns": cols, "rows": sorted([sub(list(r)), n] for r, n in rows)}
+        out["S1"] = s1
+    if "S5" in surfaces:
+        out["S5"] = sub(surfaces["S5"])
+    return out
+
+
+def normalise_deliveries(a: dict, b: dict) -> tuple[dict, dict]:
+    """Both baselines' surfaces with each delivery folder named by its
+    CONTENTS and each receipt sequence by its ORDER within its asset (A1,
+    Keith 2026-11-02; REQ-TEST-357 criterion 3). A delivery's name is unique
+    only among the names already in its own asset's tree and a sequence
+    counts within one asset's receipts, so both legitimately change at the
+    split while the files and their order do not. A one-asset side's
+    deliveries are grouped by the asset the other side files the same
+    contents under, so its order is compared within each asset too."""
+    pa, pb = _per_asset(a), _per_asset(b)
+
+    def owner(per):
+        found: dict[str, str | None] = {}
+        for asset, deliveries in _delivery_order(per).items():
+            for _name, (cid, _seqs) in deliveries.items():
+                found[cid] = asset if found.get(cid, asset) == asset else None
+        return found
+
+    def renamed(baseline, per, other_per):
+        theirs = owner(other_per) if len(per) == 1 and len(other_per) > 1 else {}
+
+        def bucket(asset, cid):
+            return theirs.get(cid) or asset
+
+        tokens, ranks = _renamings(per, bucket)
+        done = {asset: _rename(surfaces, asset, tokens.get(asset, {}), ranks)
+                for asset, surfaces in per.items()}
+        if len(done) == 1:
+            return next(iter(done.values()))
+        return {**baseline["surfaces"], **union(done)}
+
+    return renamed(a, pa, pb), renamed(b, pb, pa)
+
+
 # ---- compare -----------------------------------------------------------
 
 def load(path_or_label: str) -> dict:
@@ -1108,12 +1285,14 @@ def compare(a: dict, b: dict, surfaces: list[str], *, limit: int = 5,
             raise Refused(f"the two baselines were taken by different {key} versions "
                           f"({a.get('label')}: {a.get(key)}, {b.get('label')}: "
                           f"{b.get(key)}) - recapture one so they compare like with like")
-    # ACROSS THE SPLIT (REQ-TEST-357 criterion 2): where either side was
+    # ACROSS THE SPLIT (REQ-TEST-357 criteria 2 and 3): where either side was
     # captured as more than one asset, or the two name different assets, each
-    # side's asset ids and its identity row are normalised - nothing else.
+    # side's asset ids and its identity row are normalised, and its delivery
+    # folders' names and receipt sequences (A1) - nothing else.
     sa_all, sb_all = a["surfaces"], b["surfaces"]
     if len(_asset_ids(a)) > 1 or len(_asset_ids(b)) > 1 or (
             _asset_ids(a) and _asset_ids(b) and _asset_ids(a) != _asset_ids(b)):
+        sa_all, sb_all = normalise_deliveries(a, b)
         sa_all = normalise_assets(sa_all, _asset_ids(a))
         sb_all = normalise_assets(sb_all, _asset_ids(b))
     out = {}
