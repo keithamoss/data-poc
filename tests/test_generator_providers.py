@@ -487,6 +487,24 @@ class TestATrialIsRefusedBeforeAnythingIsWritten:
         assert written == []
 
 
+def _every_assets_providers():
+    """Every asset's provider modules, each case under its own asset (the
+    asset split): listed from each asset's providers folder through the
+    resolver's layout, since this module is imported under one asset and its
+    registry would name only that asset's collections."""
+    from qa_tools.common import assets
+
+    out = []
+    for name in assets.names():
+        folder = assets._DEFAULT.asset(name).providers
+        for module in sorted(folder.glob("*.py")):
+            if module.stem not in ("__init__", "base"):
+                cid = module.stem.replace("_", "-")
+                out.append(pytest.param(cid, marks=pytest.mark.asset(name), id=cid))
+    assert out, "no asset declares a provider - nothing would be probed"
+    return out
+
+
 class TestEverySeedDrawnIsOneItsProviderDeclares:
     """REQ-GEN-246 criterion 2, measured as well as declared (Keith,
     2026-10-18, after the critic found the seed check reads each provider's
@@ -498,7 +516,7 @@ class TestEverySeedDrawnIsOneItsProviderDeclares:
     delivery_names.py is left out: it seeds from the delivery's name, not
     from the collection's seeds, and a collision there is refused at write."""
 
-    @pytest.mark.parametrize("collection_id", [p.collection_id for p in providers.providers()])
+    @pytest.mark.parametrize("collection_id", _every_assets_providers())
     def test_a_real_generation_draws_only_declared_seeds(self, collection_id, tmp_path,
                                                          monkeypatch, capsys):
         """Every provider, not the first two (2026-10-30: Emergency Department
@@ -512,12 +530,19 @@ class TestEverySeedDrawnIsOneItsProviderDeclares:
 
         monkeypatch.setattr(correction_claims, "check_all", lambda *a, **k: None)
 
+        from qa_tools.common import assets
+
         real_rng = np.random.default_rng
         drawn: set[int] = set()
+        own_providers = str(assets.selected().providers.resolve()) + "/"
 
         def recording(seed=None, *args, **kwargs):
             where = sys._getframe(1).f_code.co_filename
-            if ("/generator/" in where and not where.endswith("delivery_names.py")
+            # The shared generator's files AND the asset's own providers, which
+            # live in assets/<asset>/synthetic/collections/ since the split - a
+            # draw there is a provider's own and must be declared too.
+            if (("/generator/" in where or where.startswith(own_providers))
+                    and not where.endswith("delivery_names.py")
                     and isinstance(seed, (int, np.integer))):
                 drawn.add(int(seed))
             return real_rng(seed, *args, **kwargs)
