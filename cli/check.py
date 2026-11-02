@@ -307,11 +307,19 @@ def _pytest_argv(argv: list[str], reports: Path) -> list[str]:
 def _tree_state() -> str:
     """The exact tree the gate ran on: HEAD's when clean, else the tree a
     commit of everything now in the working tree would have - written through
-    a scratch index, so the real index is never touched."""
+    a scratch index, so the real index is never touched. A tree git cannot
+    read is said, never guessed, and never stops the gate."""
+    try:
+        return _read_tree_state()
+    except (OSError, subprocess.SubprocessError) as exc:
+        return f"tree unknown ({type(exc).__name__})"
+
+
+def _read_tree_state() -> str:
     import tempfile
 
     head = subprocess.check_output(["git", "rev-parse", "--short", "HEAD"], cwd=ROOT,
-                                   text=True).strip()
+                                   text=True, stderr=subprocess.DEVNULL).strip()
     changed = _changed_paths()
     if not changed:
         return f"HEAD {head} (clean)"

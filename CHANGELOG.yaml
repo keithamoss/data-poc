@@ -109,6 +109,22 @@ intro: >
   all three.
 
 releases:
+  - date: "2026-11-02"
+    summary: >
+      Each push now runs a hand-picked set of the most important tests in a
+      few minutes, and the full suite runs on your own machine first.
+    changes:
+      - category: Improved
+        items:
+          - headline: A fast critical test set on every push
+            components: ["Testing & dev tooling"]
+            description: >
+              Each push now runs only the tests guarding the project's standing
+              rules and its core supply logic, plus the dashboard's own tests,
+              in a few minutes rather than over an hour. The full suite and its
+              coverage floor run in your local check, which ends with a line to
+              paste into the commit message, and the full CI run is started by
+              hand before a merge.
   - date: "2026-11-01"
     summary: >
       Every status now reads Pass, Warn or Fail with the colours unchanged,

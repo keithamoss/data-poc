@@ -44,6 +44,8 @@ def record(monkeypatch):
 
     monkeypatch.setattr(check_cli.subprocess, "run", fake_run)
     monkeypatch.setattr(check_cli.shutil, "which", lambda name: f"/usr/bin/{name}")
+    # The tree is read with git; a gate run here records gates, not git.
+    monkeypatch.setattr(check_cli, "_tree_state", lambda: "HEAD abc1234 (clean)")
     return calls, codes
 
 
@@ -111,6 +113,7 @@ def test_a_missing_toolchain_is_reported_as_not_run_rather_than_passed(monkeypat
                         lambda argv, cwd=None, env=None: _Result(0))
     monkeypatch.setattr(check_cli.shutil, "which",
                         lambda name: None if name == "npm" else f"/usr/bin/{name}")
+    monkeypatch.setattr(check_cli, "_tree_state", lambda: "HEAD abc1234 (clean)")
     result = _runner.invoke(check_cli.check_command, [])
     assert "not installed" in result.output
     # Rich wraps at the terminal width, so match on a short fragment
@@ -369,3 +372,35 @@ class TestTheFullGateIsTheWholeSuitesRecord:
         assert "FAILED: pytest" in line and "not run (no toolchain): npm test" in line
         assert "pytest wrote no report" in line and "coverage not measured" in line
         assert "TREE CHANGED DURING THE RUN" in line
+
+    def test_the_tree_it_names_is_the_one_a_commit_would_have(self, tmp_path, monkeypatch):
+        """Through a scratch index, in a real repository: clean names HEAD,
+        dirty names the tree id a commit of everything would have, and the
+        real index is left alone."""
+        import subprocess
+
+        def git(*args, strip=True):
+            out = subprocess.check_output(["git", *args], cwd=tmp_path, text=True)
+            return out.strip() if strip else out
+
+        git("init", "-q")
+        git("config", "user.email", "t@example.invalid")
+        git("config", "user.name", "t")
+        (tmp_path / "a.txt").write_text("a\n")
+        git("add", "a.txt")
+        git("commit", "-qm", "one")
+        monkeypatch.setattr(check_cli, "ROOT", tmp_path)
+        assert check_cli._tree_state() == f"HEAD {git('rev-parse', '--short', 'HEAD')} (clean)"
+        (tmp_path / "a.txt").write_text("changed\n")
+        (tmp_path / "b.txt").write_text("new\n")
+        state = check_cli._tree_state()
+        assert git("status", "--porcelain", strip=False) == " M a.txt\n?? b.txt\n", \
+            "the real index was touched"
+        git("add", "-A")
+        assert state.startswith(f"tree {git('write-tree')[:10]} (HEAD ")
+        assert "+ 2 uncommitted paths" in state
+
+    def test_a_tree_git_cannot_read_is_said_rather_than_crashing_the_gate(self, tmp_path,
+                                                                          monkeypatch):
+        monkeypatch.setattr(check_cli, "ROOT", tmp_path)  # not a repository
+        assert check_cli._tree_state().startswith("tree unknown")
