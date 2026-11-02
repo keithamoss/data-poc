@@ -46813,7 +46813,7 @@ requirements:
     - qa_tools/common/target_agreement.py::unaimed
     - qa_tools/common/unrunnable.py::results_for_trial
     - qa_tools/tools/run_evidently.py::_psi_result
-    - assets/quarterly/synthetic/collections/linkage_products.py::_addresses_gapped
+    - 'assets/quarterly/synthetic/collections/linkage_products.py::drift_verdict'
     - plans/supply-model.md
     linked_tests:
     - tests/test_geocoding_faults.py::TestTheFaultsByConstruction
@@ -46830,7 +46830,7 @@ requirements:
     - tests/test_generator_providers.py::TestATrialIsRefusedBeforeAnythingIsWritten
     - tests/test_geocoding_trial.py::TestATrialSpeaksOnlyForItsOwnCollectionsChecks
     - tests/test_geocoding_trial.py::TestAnEmptySupplysDriftIsNotEvaluated
-    - tests/test_geocoding_faults.py::TestADirtiedSourcesDriftIsPlanned
+    - 'tests/test_geocoding_faults.py::TestDriftIsPlannedFromWhatTheDriftCheckReads'
     evidence:
     - '2026-11-01/02 Perth overnight, worktree bgeo from 39393c3, no bootstrap and no full gate (Keith''s build-run terms).'
     - 'BYTE-IDENTITY, by generating every collection''s whole history into private scratch folders at 39393c3 and at this tree (generator.output.generated_into): all 514 non-geocoding delivery files and their 514 receipts byte-identical; the birth-registrations, cp-clients, ed-presentations and linkage-keys bookkeeping equal; all 79 existing scenario placements equal. Differences are geocoding only: 38 geocoding files changed, 4 new geocoding resupply deliveries, 74 geocoding receipts (their contents or their sequence numbers, shifted by the resupplies), the two geocoding bookkeeping keys (43 -> 45 and 53 -> 55 entries) and 13 new placements (TS-102 to TS-111, TS-93c, TS-100c, TS-101b). 379s to generate at base, 424s after, on a shared 4-core sandbox.'
