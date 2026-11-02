@@ -3213,6 +3213,49 @@ one or more component tags, and a date.
       C6/C7/C12/C13/A1 work, then the end-of-run bootstrap per asset, full
       gate, one push and the critical CI check. In parallel: the split
       overview's four decisions, then #134 v3 to the reviewers.
+    - **NIGHT OF 2026-11-02 TO 03 (update, ~05:50 Perth)**: the asset split
+      is MERGED into `work`, with Keith's morning answers and the settled
+      follow-ons (C6, C7, C12, C13, A1), at 113d9f35, pushed to
+      wip/build-2026-11-01 only. Two critics on the move and one on the
+      follow-ons; every finding written up (post-build-review #306-#313) and
+      fixed test-first or put to Keith. REQ-PIPE-352 c3 (per-asset
+      SCENARIOS-<asset>.md) built inside the move at Keith's call. Fast CI now
+      runs per asset (quarterly 789 tests ~74s, daily 106 ~45s on this
+      sandbox). The browser module stands at 434 passed, 4 failed - the 4 wait
+      on Keith (questions 1-3 below, plus a load-only budget test). Safe
+      tidying (#137 group A) is being built. NOT DONE: the end-of-run
+      bootstrap per asset, full gate and push - the full gate would be red on
+      those 4, so it waits on Keith's answers.
+      QUESTIONS FOR KEITH (each with its write-up):
+      1. A list row says "No column has a verdict" where its page shows Warn
+         and Pass, on a day with no supply yet (REQ-DASH-225 c18; pre-move) -
+         which is right? (#307 5a)
+      2. The nine-digit check matches allowed client ids like CPS-053812655 -
+         amend REQ-DASH-299 c15(7)'s regex? (#307 5b)
+      3. REQ-TEST-361 c1 names two surfaces no page shows (re-checked-worse,
+         "Re-checked <t>: became <X>") - add scenarios or amend? (#307 5c)
+      4. The demo data has aged past a quarterly round (ANCHOR_DATE
+         2026-09-25) - bump and regenerate? (REQ-GEN-042)
+      5. Each asset's scenario map lists from the shared INJECTIONS table, so
+         6 quarterly-placed scenarios read "not injected" in the daily map -
+         build membership from each asset's own placements? (REQ-PIPE-352)
+      6. The dropped-scenario warning names 20/52 legitimate scenarios every
+         run - narrow it?
+      7. The settle pointer omits the collection step while a correction is
+         pending, when the menu asks for it - acceptable?
+      8. REQ-GEN-246 c8 and REQ-DOCS-219 c10 wait on REQ-PIPE-354, which has
+         no criterion that restores either - give them an owner?
+      9. An asset folder outside the repository: should the dashboard build
+         omit GitHub links, or refuse (today it refuses)? (#313)
+      10. Should a stale dbt package lock also block a run (REQ-QAC-368 c6)?
+      11. Wording: REQ-TEST-357 c2 vs amended c3; REQ-QAC-368's title. (#313)
+      12. A regression test for the post-create.sh wiring fix? (#312)
+      13. C7 in the schedule gate (M2): refuse an outside folder as C7 says
+          (and move nine tests' fixture copies inside the repository), keep
+          "no previous state", or refuse only for an injected root? (#313)
+      14. The C7 line itself: only true repository-path reads refuse;
+          file-only readers accept an outside folder (REQ-PIPE-342 d20) -
+          stricter?
     - **OVERNIGHT (Keith, ~22:20 Perth: "Keep going overnight as far as you
       can")**: the same terms. A question a builder could not settle from the
       decisions file took the recommended option, marked PROVISIONAL and
