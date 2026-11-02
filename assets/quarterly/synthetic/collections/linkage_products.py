@@ -350,6 +350,61 @@ def worst(*verdicts: str) -> str:
     return max(verdicts, key=lambda v: _RANK[v]) if verdicts else "green"
 
 
+def known_values(dataset_id: str, column: str) -> list:
+    """The values the collection's recorded stats count `column` by for the
+    dataset's table (its adapter's stats spec), in declared order."""
+    from qa_tools import collections
+    from qa_tools.common import hierarchy
+
+    spec = collections.adapter(collections.by_id(COLLECTION_ID)).stats
+    return list(spec.value_counts.get((hierarchy.dataset(dataset_id).table, column)) or [])
+
+
+def value_counts(rows, column: str, dataset_id: str) -> list[list]:
+    """A column's `[[value, count], ...]` exactly as dataset_stats records it
+    and the real drift check rebuilds its reference from: every known value,
+    zeros included, anything else folded into '(invalid code)'
+    (evidently_common.fold_value_counts, shared)."""
+    from qa_tools.common import evidently_common
+
+    pairs = ([] if rows is None or not len(rows) or column not in rows.columns
+             else [[v, int(n)] for v, n in rows[column].astype(str).value_counts().items()])
+    return evidently_common.fold_value_counts(pairs, known_values(dataset_id, column))
+
+
+def _drift_entry(dataset_id: str) -> dict | None:
+    """The geocoding dataset's drift check, as its Evidently check file
+    declares it - its column, excluded values and thresholds - or None where
+    it declares none."""
+    from qa_tools.common import evidently_common
+
+    found = [m for i, m in evidently_common.collection_checks(COLLECTION_ID).checks.items()
+             if m.get("method") == "psi" and i.split(".")[3] == dataset_id]
+    if len(found) > 1:
+        raise CannotGenerate(f"{dataset_id} declares {len(found)} drift checks - one is needed "
+                             f"to plan its supplies' drift; nothing was written")
+    return found[0] if found else None
+
+
+def drift_verdict(dataset_id: str, rows, reference_rows) -> str:
+    """The verdict a geocoding file is planned to on its drift check
+    (REQ-GEN-295 criterion 7 as AMENDED 2026-11-02, Keith, morning report
+    A2): computed from the inputs the real check reads - the file's value
+    counts and its reference's - by the check's own PSI, exclusions and
+    thresholds (evidently_common.psi_of_counts), so it predicts the check
+    from what the check reads. green where there is no reference, or nothing
+    placed to compare."""
+    from qa_tools.common import evidently_common
+
+    entry = _drift_entry(dataset_id)
+    if entry is None or reference_rows is None:
+        return "green"
+    _psi, status = evidently_common.psi_of_counts(
+        value_counts(rows, entry["column"], dataset_id),
+        value_counts(reference_rows, entry["column"], dataset_id), entry)
+    return {"fail": "red", "warn": "amber"}.get(status, "green")
+
+
 def parse_geo_fault(fault: str, where: str, dataset_id: str) -> str:
     """A geocoding row fault's name, refused naming the scenario where the
     name is unknown or it names a dataset other than the one it is applied
@@ -1048,25 +1103,29 @@ class LinkageProducts(Provider):
                                                            sources[src])
         named = _named_held_sources(plan.resolved, jobs, base, warehouse)
 
-        # A DIRTIED SOURCE'S PLACED MIX DRIFTS (PROVISIONAL, REQ-GEN-298's
-        # decisions): a record's match level follows its quarter's address
-        # columns (REQ-GEN-295 criterion 5 as amended, GA2 a), so a file built
-        # from a source supply its own provider built red with gaps in the
-        # address columns it is placed by - TS-93a's and TS-100a's Client
-        # Registers - is built to the drift check's Warn, not only to its
-        # share's band. A red source dirtied elsewhere (2017-Q3's) is not.
-        # Found by the trial, which confirms it.
-        dirty_built = set()
-        for job in jobs:
-            if base[job.slot_id] is None:
-                continue
-            at, files = base[job.slot_id]
-            for table, (d, rows, verdict) in list(files.items()):
-                src = hierarchy.dataset(d).linked[0][0]
-                used = _before(sources[src], src, job.period.name, at)
-                if used and used[-1].severity == "red" and _addresses_gapped(d, used[-1].rows):
-                    dirty_built.add((job.slot_id, d))
-                    files[table] = (d, rows, worst(verdict, "amber"))
+        # A FILE'S DRIFT, FROM WHAT THE DRIFT CHECK READS (REQ-GEN-295
+        # criterion 7 as AMENDED 2026-11-02, Keith, morning report A2): its
+        # placed mix against its reference's, by the check's own PSI and
+        # thresholds. Here over the files as their sources make them, each
+        # against the last earlier one the plan holds then, so a file that
+        # already drifts is kept off the draw below like any file planned
+        # worse than green from its source's own rows. Its verdict is planned
+        # below, against the reference the replay resolves, once every fault
+        # is placed.
+        drifts_as_built = set()
+        for d, src, _cols in geo:
+            t = tables[d]
+            earlier: list = []
+            for job in jobs:
+                if base[job.slot_id] is None or t not in base[job.slot_id][1]:
+                    continue
+                at, files = base[job.slot_id]
+                _dd, rows, verdict = files[t]
+                ref = next((e for e in reversed(earlier) if e[2] != "red"
+                            and in_warehouse(src, e[0], at, sources[src]) is not None), None)
+                if drift_verdict(d, rows, ref[3] if ref is not None else None) != "green":
+                    drifts_as_built.add((job.slot_id, d))
+                earlier.append((job.period.name, at, verdict, rows))
 
         # THE ORDINARY SEVERITIES, FROM THE STREAM'S OWN SEED (REQ-GEN-295
         # criterion 13): the collections' mix per geocoding dataset, kept off
@@ -1085,7 +1144,8 @@ class LinkageProducts(Provider):
                 if job.period.name in ridden or job.period.name in injected
                 or (d, job.period.name) in named or job.period.name in claims[src]
                 or warehouse[(job.slot_id, d)] is None
-                or base[job.slot_id][1][tables[d]][2] != "green")
+                or base[job.slot_id][1][tables[d]][2] != "green"
+                or (job.slot_id, d) in drifts_as_built)
             drawn = targeting.outside_hold(
                 _draw(len(mine), draw), [job.period.round_date for job in mine], d,
                 keep_clean=frozenset({0}), unavailable=blocked)
@@ -1159,13 +1219,15 @@ class LinkageProducts(Provider):
                     files2[tables[d]] = (d, rows, planned_verdict(d, rows, catalogue))
                 resupply[job.slot_id] = (again, files2)
                 meta[(job.slot_id, 2)] = _meta([], files2, {}, job.slot_id)
-        # EACH FILE'S DRIFT REFERENCE, AS THE REPLAY WILL RESOLVE IT
-        # (REQ-QAC-108; PROVISIONAL): the dataset's last earlier delivery the
-        # plan promotes before this one's receipt - a red one is held, and so
-        # is one whose source the warehouse still does not hold then (TS-93c)
-        # - its green resupply where it has one. A file measured against a
-        # dirtied file drifts too, so it is built to Warn and tried.
-        drift_planned = set(dirty_built)
+        # EACH FILE'S DRIFT, AGAINST ITS REFERENCE AS THE REPLAY WILL RESOLVE
+        # IT (REQ-QAC-108; REQ-GEN-295 criterion 7 as amended): the dataset's
+        # last earlier delivery the plan promotes before this one's receipt -
+        # a red one is held, and so is one whose source the warehouse still
+        # does not hold then (TS-93c) - its green resupply where it has one.
+        # Every arrival, resupplies included, is planned at least its drift
+        # check's band, computed by drift_verdict from the two files' value
+        # counts; one not green is tried.
+        drift_planned, bands = set(), {}
         for d, src, _cols in geo:
             t = tables[d]
             earlier: list = []
@@ -1179,20 +1241,24 @@ class LinkageProducts(Provider):
                     ref = next((e for e in reversed(earlier)
                                 if e[3] != "red" and in_warehouse(src, e[1], at, sources[src])
                                 is not None), None)
-                    if ref is not None and (ref[0], d) in dirty_built and n == 1:
+                    dd, rows, verdict = files[t]
+                    band = drift_verdict(d, rows, ref[4] if ref is not None else None)
+                    bands[(job.slot_id, d, n)] = band
+                    if band != "green":
                         drift_planned.add((job.slot_id, d))
-                        dd, rows, verdict = files[t]
-                        files[t] = (dd, rows, worst(verdict, "amber"))
+                        files[t] = (dd, rows, worst(verdict, band))
                         m = meta.setdefault((job.slot_id, n), {})
                         if d not in m.get("tried", ()):
-                            fresh = _meta(sorted(set(m.get("tried", ())) | {d}), files,
-                                          warehouse, job.slot_id)
-                            m.update(fresh)
+                            held = (warehouse if n == 1 else
+                                    {(job.slot_id, d): in_warehouse(src, job.period.name, at,
+                                                                    sources[src])})
+                            m.update(_meta(sorted(set(m.get("tried", ())) | {d}), files,
+                                           held, job.slot_id))
                     m = meta.get((job.slot_id, n)) or {}
                     if d in m.get("tried", ()):
                         m.setdefault("references", {})[d] = (
                             asset_time.isoformat(ref[2]) if ref is not None else None)
-                    earlier.append((job.slot_id, job.period.name, at, files[t][2]))
+                    earlier.append((job.slot_id, job.period.name, at, files[t][2], rows))
         plan.jobs.extend(jobs)
         plan.state["geocoding"] = state
         plan.state["geo_resupply"] = resupply
@@ -1201,9 +1267,10 @@ class LinkageProducts(Provider):
         # WHICH FAULTS EACH FILE CARRIES, by (slot, dataset) - what a reader
         # of the plan needs to tell a fault from the rows' own shape.
         plan.state["geo_faults"] = applied
-        # THE FILES PLANNED TO DRIFT, by (slot, dataset): built from a dirtied
-        # source, or measured against such a file (PROVISIONAL).
+        # THE FILES PLANNED TO DRIFT, by (slot, dataset), and each arrival's
+        # computed drift band, by (slot, dataset, arrival number).
         plan.state["geo_drift"] = drift_planned
+        plan.state["geo_drift_bands"] = bands
         plan.resolved.extend(resolved)
         plan.injected_by_stream[GEO_STREAM] = injected
 
@@ -1218,15 +1285,15 @@ class LinkageProducts(Provider):
     def _rows(self, plan: Plan, job: Job, n: int):
         import numpy as np
 
-        from qa_tools.common import asset_time
-
         at, faults, _sev = plan.state["arrivals"][job.slot_id][n]
         # THE LAST SUPPLY FILED TO THE QUARTER AND RECEIVED BEFORE THIS
-        # DELIVERY (criterion 5): a release cannot describe a later file.
+        # DELIVERY (criterion 5): a release cannot describe a later file -
+        # NOR ONE WHOSE FILE NEVER ARRIVED (criterion 5 as amended 2026-11-02,
+        # Keith, morning report D1; it was plans/qa-pipeline.md #89): only a carried
+        # supply, by the rule the geocoding stream reads by (_before).
         described = {}
         for did, _code, _cols in linked():
-            before = [s for s in plan.state["sources"][did] if s.period == job.period.name
-                      and asset_time.parse_instant(s.received_at, did) < at]
+            before = _before(plan.state["sources"][did], did, job.period.name, at)
             if before:
                 described[did] = before[-1].rows
         injected = plan.injected_by_period.get(job.period.name)
@@ -1375,8 +1442,10 @@ NAMED_HELD_SOURCE = (("TS-93c", "geo-cp-clients", "TS-93b"),
 def _before(supplies, dataset_id: str, period: str, at) -> list:
     """The source's supplies filed to `period` and received before `at`,
     oldest first - only those whose file arrives (GeneratedSupply.carried):
-    the geocoding stream geocodes what the geocoder could have been sent.
-    The linkage stream does not ask, so its releases are unchanged."""
+    the geocoding stream geocodes what the geocoder could have been sent,
+    and a linkage release describes only what could have been linked
+    (REQ-GEN-334 criterion 5 as amended 2026-11-02, Keith, morning report
+    D1)."""
     from qa_tools.common import asset_time
 
     return [s for s in supplies if s.period == period and s.carried
@@ -1447,19 +1516,6 @@ def in_warehouse(dataset_id: str, period: str, at, supplies):
         elif what == "reject" and held is supply:
             held = None
     return held
-
-
-def _addresses_gapped(dataset_id: str, rows) -> bool:
-    """Whether any address column a record of `dataset_id` is placed by holds
-    a blank or null in these source rows."""
-    from generator import synthetic_inputs
-
-    for column, _value in synthetic_inputs.placings()[dataset_id].place_by:
-        if column in rows.columns:
-            values = rows[column]
-            if values.isna().any() or (values.astype(str).str.strip() == "").any():
-                return True
-    return False
 
 
 def _draw(n: int, rng) -> list:

@@ -5480,23 +5480,3 @@ urgent.
     and only a guarded `mothman env reset-synthetic` clears them. Built
     straight after REQ-PIPE-131. Delete this entry when REQ-PIPE-144 is
     built.
-
-89. **[todo, 2026-11-01]** **[Data generation]** **A linkage release can
-    describe a Client Register supply that never arrived.** Found building
-    REQ-GEN-298 (2026-11-01, overnight), when the geocoding trial could not
-    find TS-104's source file: the generator's row interface
-    (`generator/collections/base.py::generated_supplies`, REQ-GEN-334
-    criterion 6) reported every arrival as a supply of every table its
-    payload holds, but a Child Protection scenario's file shape can leave a
-    table's file out, rename it so nothing claims it, or make it unreadable
-    - so the 2016-02-29 10:00 delivery has no `cp_clients.csv` and the row
-    interface still offered its rows as a Client Register supply (also
-    2023-06-08 10:00). FIXED FOR GEOCODING in REQ-GEN-298: the supply now
-    says whether its file arrives (`GeneratedSupply.carried`, the Child
-    Protection provider's `carries_table`), and the geocoding stream reads
-    only those. NOT FIXED FOR LINKAGE, deliberately: the linkage stream
-    still reads every reported supply, because reading only carried ones
-    changes built linkage deliveries, which this build was told to keep
-    byte-identical. Which linkage releases are affected, and whether to fix
-    them, is Keith's call - a defect in a built requirement's output
-    (REQ-GEN-334), so it needs his sign-off before it changes.

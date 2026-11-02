@@ -48,7 +48,7 @@ def _source(plan, job, did, n=0):
     """The ids of the linked dataset's supply the release describes."""
     at = plan.state["arrivals"][job.slot_id][n][0]
     before = [s for s in plan.state["sources"][did] if s.period == job.period.name
-              and asset_time.parse_instant(s.received_at, did) < at]
+              and s.carried and asset_time.parse_instant(s.received_at, did) < at]
     assert before, f"no {did} supply before {job.period.name}'s release"
     return lp._ids(before[-1].rows, COLUMN[did])
 
@@ -220,6 +220,62 @@ def test_the_named_scenario_rides_a_marked_quarter(plan):
     marked = lp.marked_quarters([j.period for j in plan.jobs])
     assert marked and marked[0] == ("cp-clients", "2015-Q2")
     assert "2015-Q2" not in plan.injected_by_period
+
+
+class TestAReleaseDescribesOnlyASupplyThatArrived:
+    """REQ-GEN-334 criterion 5 as amended 2026-11-02 (Keith, morning report D1;
+    it was plans/qa-pipeline.md #89, now deleted):
+    a release describes its quarter's last source supply received before it
+    WHOSE FILE ARRIVED (GeneratedSupply.carried) - the rule the geocoding
+    stream reads by - never one a scenario's file shape left out
+    (REQ-GEN-334 criterion 5 as amended)."""
+
+    def _supply(self, did, at, ids, carried=True):
+        import pandas as pd
+
+        from generator.collections.base import GeneratedSupply
+
+        return GeneratedSupply(period="2016-Q1", received_at=at,
+                               rows=pd.DataFrame({COLUMN[did]: ids}), carried=carried)
+
+    def test_a_supply_whose_file_never_arrived_is_not_described(self):
+        from datetime import date
+
+        from generator.collections.base import Job, Plan
+
+        period = type("P", (), {"name": "2016-Q1", "round_date": date(2016, 3, 31)})()
+        job = Job("lp_slot_test", lp.BASE_SEED + 1, None, period, stream=lp.LINKAGE_STREAM)
+        at = asset_time.wall_clock(date(2016, 3, 31), "17:30")
+        sources = {
+            "cp-clients": [
+                self._supply("cp-clients", "2016-02-01T10:00:00+08:00",
+                             [f"A{i}" for i in range(200)]),
+                self._supply("cp-clients", "2016-02-29T10:00:00+08:00",
+                             [f"B{i}" for i in range(200)], carried=False)],
+            "ed-presentations": [
+                self._supply("ed-presentations", "2016-03-31T09:00:00+08:00",
+                             [f"E{i}" for i in range(200)])]}
+        plan = Plan(jobs=[job], resolved=[], injected_by_period={},
+                    state={"sources": sources, "arrivals": {job.slot_id: [(at, (), None)]}})
+        rows = lp.PROVIDER._rows(plan, job, 0)
+        cp = set(rows.loc[rows["dataset"] == CODES["cp-clients"], "id_1"])
+        assert cp, "the release describes a Client Register supply"
+        assert all(i.startswith("A") for i in cp), sorted(cp)[:5]
+
+    def test_the_real_history_holds_such_a_supply(self, plan):
+        """So the rule has work to do: a Child Protection scenario's file shape
+        leaves a Client Register out before some release reads its quarter."""
+        found = []
+        for job in plan.jobs:
+            if job.stream != lp.LINKAGE_STREAM:
+                continue
+            for at, _f, _s in plan.state["arrivals"][job.slot_id]:
+                before = [s for s in plan.state["sources"]["cp-clients"]
+                          if s.period == job.period.name
+                          and asset_time.parse_instant(s.received_at, "cp-clients") < at]
+                if before and not before[-1].carried:
+                    found.append(job.period.name)
+        assert found, "no release reads a quarter whose newest Client Register never arrived"
 
 
 def test_an_unknown_fault_is_refused_naming_the_scenario():

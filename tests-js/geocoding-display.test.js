@@ -124,9 +124,38 @@ describe("a several-column key on the page (criterion 8)", () => {
     expect(text(w, w.samplePill(["CP", "C-1", ""], "transparent"))).toBe("CP / C-1");
   });
 
-  it("keeps a null middle part as '(no value)', as REQ-PIPE-341 built it", () => {
+  // REQ-DASH-299 decision 36 as CHANGED by Keith 2026-11-02 (morning report
+  // B11): a NULL part followed by a present one reads '—', as an empty one
+  // does - criterion 8's letter. Only a whole null key reads '(no value)'.
+  it("shows a null middle part as '—', the same as an empty one", () => {
     const w = load();
-    expect(text(w, w.samplePill(["CP", null, "x"], "transparent"))).toBe("CP / (no value) / x");
+    expect(text(w, w.samplePill(["CP", null, "x"], "transparent"))).toBe("CP / — / x");
+    expect(text(w, w.samplePill([null, "C-1"], "transparent"))).toBe("— / C-1");
+    expect(text(w, w.samplePill(["CP", null, "", "x"], "transparent"))).toBe("CP / — / — / x");
+  });
+
+  it("still reads a whole null key, or a key of nothing, as '(no value)'", () => {
+    const w = load();
+    expect(text(w, w.samplePill(null, "transparent"))).toBe("(no value)");
+    expect(text(w, w.samplePill([null], "transparent"))).toBe("(no value)");
+    expect(text(w, w.samplePill([null, null], "transparent"))).toBe("(no value)");
+  });
+
+  it("reads a key whose parts are all null or empty as '(no value)', whatever the order", () => {
+    const w = load();
+    expect(text(w, w.samplePill([null, ""], "transparent"))).toBe("(no value)");
+    expect(text(w, w.samplePill(["", null], "transparent"))).toBe("(no value)");
+    expect(text(w, w.samplePill(["", "", ""], "transparent"))).toBe("(no value)");
+  });
+
+  it("reads a null middle part of a set-member line's record as '—'", () => {
+    const w = load();
+    const check = { tool_ref: "dbt:missing_set_members",
+      check_id: "q.a.c.geo-cp-clients.census_year.missing_set_members_dbt" };
+    const line = w.setMemberSampleLine(check,
+      { failing_sample_key_columns: ["id_1", "id_2", "id_3", "census_year"] },
+      ["C-1", null, "x", "2016"], null);
+    expect(line).toContain("C-1 / — / x · 2016");
   });
 
   it("compares across a change of recorded key columns by saying it cannot", () => {

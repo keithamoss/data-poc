@@ -330,6 +330,72 @@ class TestASettledPairsRunReadsItsOwnFile:
             f"cp_clients__{key}__1", f"cp_clients__{key}__2"}
 
 
+class TestAFolderTrialReadsTheRestAsARealArrivalDoes:
+    """REQ-PIPE-202 decision 17 as CHANGED by Keith 2026-11-02 (morning
+    report B1): a folder trial reads each table it did not carry as a real
+    arrival's overlay reads a sibling - the one supply staged for the period
+    and not yet decided where exactly one is, else the period's promoted
+    version - never only what is promoted."""
+
+    @pytest.fixture
+    def trial_run(self, conn):
+        from qa_tools.common import trial
+
+        run_id = trial.trial_run_id()
+        # What staging the trial's own file gave it: its own scope and views.
+        conn.execute(f'CREATE SCHEMA IF NOT EXISTS "{supply_db.staging_schema_for(run_id)}"')
+        conn.execute(f'CREATE SCHEMA IF NOT EXISTS "{supply_db.run_schema(run_id)}"')
+        yield run_id
+        trial.discard(conn, run_id)
+
+    def _read(self, conn, run_id, table):
+        return conn.execute(
+            f'SELECT v FROM "{supply_db.run_schema(run_id)}"."{table}"').fetchone()[0]
+
+    def test_a_staged_undecided_supply_is_read_over_the_promoted_one(self, conn, world,
+                                                                     trial_run):
+        world.promote(world.stage("cp_clients", _key(), value=1))
+        k = _key()
+        world.stage("cp_clients", k, value=9)
+        assert period_schema.borrow_from_period(conn, trial_run, world.period,
+                                                ["cp_clients"], loaded=None) == ["cp_clients"]
+        assert self._read(conn, trial_run, "cp_clients") == 9
+        res = supply_db.resolution_for(conn, trial_run)
+        assert res.source["cp_clients"] == period_schema.FROM_STAGING
+        assert res.supply_of["cp_clients"] == f"cp-clients@{k}"
+
+    def test_with_nothing_staged_the_promoted_version_answers(self, conn, world, trial_run):
+        world.promote(world.stage("cp_clients", _key(), value=5))
+        period_schema.borrow_from_period(conn, trial_run, world.period, ["cp_clients"],
+                                         loaded=None)
+        assert self._read(conn, trial_run, "cp_clients") == 5
+        res = supply_db.resolution_for(conn, trial_run)
+        assert res.source["cp_clients"] == period_schema.FROM_PERIOD
+
+    def test_two_staged_supplies_are_contested_and_the_period_answers(self, conn, world,
+                                                                      trial_run):
+        world.promote(world.stage("cp_clients", _key(), value=1))
+        world.stage("cp_clients", _key(), value=2)
+        world.stage("cp_clients", _key(), value=3)
+        period_schema.borrow_from_period(conn, trial_run, world.period, ["cp_clients"],
+                                         loaded=None)
+        assert self._read(conn, trial_run, "cp_clients") == 1
+
+    def test_a_supply_staged_for_another_period_is_not_read(self, conn, world, trial_run):
+        world.stage("cp_clients", _key(), value=4, period_to="1999-q9-elsewhere")
+        assert period_schema.borrow_from_period(conn, trial_run, world.period,
+                                                ["cp_clients"], loaded=None) == []
+
+    def test_behind_the_real_load_record_gate_an_unloaded_supply_is_not_read(
+            self, conn, world, trial_run):
+        """As a real arrival's run: a staged table no load record says
+        loaded is not read, and the period answers (REQ-PIPE-060 c7)."""
+        world.promote(world.stage("cp_clients", _key(), value=1))
+        world.stage("cp_clients", _key(), value=9)
+        period_schema.borrow_from_period(conn, trial_run, world.period, ["cp_clients"])
+        assert self._read(conn, trial_run, "cp_clients") == 1
+
+
 class TestTheResolutionCarriesTheSupplyOfEveryTableItReads:
     """REQ-PIPE-279 criterion 2: a STAGED table's supply is carried too, from
     the filing records the overlay already walks, and where each table was

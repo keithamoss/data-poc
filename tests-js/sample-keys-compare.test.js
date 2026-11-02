@@ -68,9 +68,11 @@ describe("a failing-row sample pill", () => {
     expect(w.samplePill(["CP", null], "transparent")).not.toContain("null");
   });
 
-  it("shows a null key, or a null part, as (no value)", () => {
+  // A null PART followed by a present one reads '—' since REQ-DASH-299
+  // decision 36 was changed by Keith 2026-11-02 (morning report B11).
+  it("shows a null key as (no value), and a null middle part as '—'", () => {
     const w = load();
     expect(w.samplePill(null, "transparent")).toContain(">(no value)</span>");
-    expect(w.samplePill(["CP", null, "x"], "transparent")).toContain("CP / (no value) / x");
+    expect(w.samplePill(["CP", null, "x"], "transparent")).toContain("CP / — / x");
   });
 });

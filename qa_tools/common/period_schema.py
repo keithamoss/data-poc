@@ -409,6 +409,30 @@ class PeriodResolution:
         return record
 
 
+def choose_version(staged: Sequence[str] | None, promoted: Sequence[str] | None
+                   ) -> tuple[str | None, str | None, list[str]]:
+    """THE ONE RULE FOR WHICH VERSION OF A TABLE A RUN READS IN ITS PERIOD
+    (REQ-PIPE-105 criterion 8, REQ-PIPE-079 criteria 11-13): the one staged
+    candidate where exactly one is; where several are, none of them -
+    contested, and returned so the caller records it - and the period's one
+    promoted version, as where none is staged. Returns (physical, origin,
+    contested), physical None where neither answers. A real arrival's overlay
+    (create_overlay_views) and a folder trial's borrowed tables
+    (borrow_from_period, REQ-PIPE-202 decision 17) both ask it."""
+    candidates = sorted(staged or ())
+    contested = candidates if len(candidates) > 1 else []
+    if len(candidates) == 1:
+        return candidates[0], FROM_STAGING, contested
+    versions = promoted or ()
+    # AN INHERITED TABLE IS A VIEW NAMED JUST `logical` (REQ-PIPE-098),
+    # standing on an earlier period's supply - so it carries no arrival key
+    # and newest() rightly will not order it. It is the period's one answer
+    # for that table, and is read as such; missing it left every check
+    # reading a non-participating dataset red as "missing" (2026-10-02).
+    # ONE OBJECT, never ranked (REQ-PIPE-128 criterion 11).
+    return (versions[0] if versions else None), FROM_PERIOD, contested
+
+
 def create_overlay_views(conn, run_id: str, period_name: str,
                           staged: Mapping[str, Sequence[str]],
                           promoted: Mapping[str, Sequence[str]] | None = None
@@ -463,30 +487,18 @@ def create_overlay_views(conn, run_id: str, period_name: str,
     out = PeriodResolution(period=period_name, resolution=res)
 
     for logical in sorted(set(staged) | set(promoted)):
-        candidates = sorted(staged.get(logical) or ())
-        if len(candidates) > 1:
-            # Recorded, then treated as though staging brought nothing:
-            # the fall-through below is the whole of criterion 12, and
-            # the record is the whole of criterion 13.
-            res.ambiguous[logical] = candidates
-            candidates = []
-        if candidates:
-            physical, source_schema, origin = (
-                candidates[0], supply_db.staging_schema_for(run_id), FROM_STAGING)
-        else:
-            versions = promoted.get(logical) or ()
-            # AN INHERITED TABLE IS A VIEW NAMED JUST `logical` (REQ-PIPE-098),
-            # standing on an earlier period's supply - so it carries no
-            # arrival key and newest() rightly will not order it. It is
-            # the period's one answer for that table, and is read as such;
-            # missing it left every check reading a non-participating
-            # dataset red as "missing" (2026-10-02).
-            # ONE OBJECT, never ranked (REQ-PIPE-128 criterion 11).
-            physical = versions[0] if versions else None
-            source_schema, origin = period, FROM_PERIOD
-            if physical is None:
-                res.absent.append(logical)
-                continue
+        # Recorded, then treated as though staging brought nothing: the
+        # fall-through is the whole of criterion 12, and the record is the
+        # whole of criterion 13.
+        physical, origin, contested = choose_version(staged.get(logical),
+                                                     promoted.get(logical))
+        if contested:
+            res.ambiguous[logical] = contested
+        if physical is None:
+            res.absent.append(logical)
+            continue
+        source_schema = (supply_db.staging_schema_for(run_id) if origin == FROM_STAGING
+                         else period)
         conn.execute(
             f'CREATE VIEW "{schema}"."{logical}" AS '
             f'SELECT * FROM "{source_schema}"."{physical}"')
@@ -736,30 +748,54 @@ def contested_own_checks(contested: Iterable[str],
         if check_id_mod.parse(cid).dataset in datasets)
 
 
-def borrow_from_period(conn, run_id: str, period_name: str, tables) -> list[str]:
-    """Let a TRIAL read what is in place in a period for the tables its folder
-    did not carry (REQ-PIPE-202 criterion 8 as amended 2026-11-01, Keith): a
-    view onto each table's one promoted version in the period's schema, its
-    resolution recorded as read from the period - what a real arrival reads
-    for a table nothing staged for its period. Returns the logical names it
-    could borrow; a table the period holds none of stays absent, and a trial
-    records it no data."""
-    found = promoted_in(conn, period_name, list(tables))
+#: borrow_from_period's default: the real load log, as a real arrival's run reads.
+_REAL_LOAD_LOG = object()
+
+
+def borrow_from_period(conn, run_id: str, period_name: str, tables, *,
+                       loaded=_REAL_LOAD_LOG) -> list[str]:
+    """Let a TRIAL read the tables its folder did not carry (REQ-PIPE-202
+    criterion 8 as amended 2026-11-01, Keith) AS A REAL ARRIVAL'S OVERLAY
+    READS A SIBLING (decision 17 as CHANGED by Keith 2026-11-02, morning
+    report B1): the one supply filed to the period and still staged -
+    undecided - where exactly one is (period_overlay.staged_for_period,
+    behind the real load-record gate); where several are, contested and
+    recorded so, the period's promoted version, as where none is. Returns
+    the logical names it could borrow; a table neither holds stays absent,
+    and a trial records it no data. `loaded` is the load-record gate, the
+    real load log unless given (None skips it, as the overlay's own tests
+    do)."""
+    from qa_tools.common import load_log, period_overlay
+
+    wanted = sorted(set(tables))
+    if loaded is _REAL_LOAD_LOG:
+        loaded = load_log.loaded_tables(None, conn)
+    staged = period_overlay.staged_for_period(conn, period_name, wanted,
+                                              staging=supply_db.STAGING_SCHEMA, loaded=loaded)
+    supply_of_staged = period_overlay.filed_tables(conn, period_name, set(wanted))
+    found = promoted_in(conn, period_name, wanted)
     schema = supply_db.run_schema(run_id)
-    source = period_schema(period_name)
     mine = supply_db.resolution_for(conn, run_id)
     borrowed = []
-    for logical, physicals in sorted(found.items()):
-        if len(physicals) != 1:
+    for logical in wanted:
+        physical, origin, contested = choose_version(staged.get(logical), found.get(logical))
+        if contested:
+            mine.ambiguous[logical] = contested
+        if physical is None:
             continue
+        if not contested:
+            mine.ambiguous.pop(logical, None)
+        source_schema = (supply_db.STAGING_SCHEMA if origin == FROM_STAGING
+                         else period_schema(period_name))
         conn.execute(f'CREATE OR REPLACE VIEW "{schema}"."{logical}" AS '
-                     f'SELECT * FROM "{source}"."{physicals[0]}"')
-        mine.resolved[logical] = physicals[0]
-        mine.source[logical] = FROM_PERIOD
-        mine.ambiguous.pop(logical, None)
+                     f'SELECT * FROM "{source_schema}"."{physical}"')
+        mine.resolved[logical] = physical
+        mine.source[logical] = origin
+        if origin == FROM_STAGING and supply_of_staged.get(physical):
+            mine.supply_of[logical] = supply_of_staged[physical]
         if logical in mine.absent:
             mine.absent.remove(logical)
         borrowed.append(logical)
-    if borrowed:
+    if borrowed or mine.ambiguous:
         supply_db.record_resolution(conn, mine)
     return borrowed
