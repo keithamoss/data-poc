@@ -44,11 +44,11 @@ def map_command(out_path: str | None, check: bool) -> None:
     if check:
         _check_map()
         return
-    path = scenario_map.write_map(map_path=out_path)
     from generator import scenario_injection
 
     # THIS ASSET'S SCENARIOS, as its map carries them (REQ-PIPE-352 criterion 3).
     leave_out = scenario_injection.other_assets_scenarios()
+    path = scenario_map.write_map(leave_out=leave_out, map_path=out_path)
     entries = [s for s in scenarios.parse_register() if s.id not in leave_out]
     placements = scenario_map.read_placements()
     injected = [s for s in entries if s.is_injected]
@@ -258,7 +258,10 @@ def _check_map() -> None:
             raise SystemExit(int(os.environ["MOTHMAN_GATE_WARNING_EXIT"]))
         return
     path = scenario_map.map_path()
-    if not path.is_file() or path.read_text() != scenario_map.build_for_selected():
+    from generator import scenario_injection
+
+    built = scenario_map.build_for_selected(leave_out=scenario_injection.other_assets_scenarios())
+    if not path.is_file() or path.read_text() != built:
         console.print(f"{path.name} is stale - run `mothman scenarios map`.", style="red")
         raise SystemExit(1)
     console.print(f"{path.name} is current.", style="green")

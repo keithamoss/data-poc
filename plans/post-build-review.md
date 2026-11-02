@@ -13942,3 +13942,78 @@ twice. It deliberately did not re-find the `TypeError`.
        evidently_common.fold_value_counts is now the one copy, used by
        dataset_stats and by the generator (with the adapter's known values),
        guarded by a test against the shared function.
+
+311. **[done, 2026-11-03]** **[Pipeline & publishing]** **[Testing & dev tooling]** **Merging bmove (#306-#308) and bans (#309-#310) into `work`: one silent merge breakage and one defect the critical set surfaced, both fixed; what is still open, in one place.**
+     Not a critic's pass: what the two merges turned up, each checked against
+     the code.
+     - **Renumbering**: `work` already had #305 (REQ-TEST-375's critic), so
+       bmove's #304, #305 and #306 are now #306, #307 and #308, and bans'
+       #304 and #306 are #309 and #310. Every reference was repointed (the
+       register, the dashboard template, tables_read.py, conftest.py, five
+       test modules, one Vitest file); `work`'s own #305 references are
+       unchanged. Code that bmove had cited as "#307" now points at the right
+       entry by coincidence of the renumbering (#307 item 2 says so).
+     - **1. The critical mark dropped in 33 modules (merge breakage, fixed
+       inside the merge commit)**: `work` added `pytestmark =
+       pytest.mark.critical` near the top of 33 modules and bmove added
+       `pytestmark = pytest.mark.asset(...)` at the bottom; git merged both
+       without a conflict, and the second assignment replaced the first, so
+       every one of those modules silently left the push set. Each asset
+       mark now appends, as bmove's own pre-existing cases already did. The
+       critical set's test ids before the merge (work 00957c40, 879) are all
+       present after it (881: the same 879 plus two bmove added to
+       test_slots.py). Seven duplicate `import pytest` lines from both sides
+       went the same way. Not guarded by a test; a guard that fails on any
+       module rebinding `pytestmark` without carrying the earlier value is
+       the cheap one, if wanted.
+     - **2. The scenario map imported the generator (defect, fixed; the
+       guard test failed first)**: REQ-PIPE-352 criterion 3's build (bmove
+       10a061b6) had qa_tools/common/scenario_map.py call
+       generator.scenario_injection.other_assets_scenarios(), which REQ-GEN-043
+       criterion 7's wall forbids.
+       tests/test_arrivals.py::TestTheGeneratorsBookkeepingIsWalledOff::test_no_pipeline_module_imports_the_generator_package
+       failed on bmove alone (run in /home/user/bmove-wt) and in the merged
+       critical set, because `work` made that module critical.
+       build_for_selected and write_map now take `leave_out` as a required
+       keyword, passed by their callers in cli/; behaviour unchanged. Five
+       test stubs of write_map take keywords now. Recorded on REQ-PIPE-352.
+     - **3. critical.yml acts once per asset (#306 item 2's merge duty)**: a
+       matrix over quarterly and daily, each leg with its own MOTHMAN_ASSET,
+       supply_<asset> database, `mothman env dbt-deps` and `--only-asset`,
+       each with the full 300-second pytest budget; REQ-TEST-375's zero-test
+       and any-skip rules unchanged; yamllint in the quarterly leg only (it
+       reads the whole repository).
+     - **STILL OPEN, carried from #307 and #308 (why both stay in-progress)**:
+       the four browser-test failures - #307 5(a) TestColumnsNotGreenMatchesTheDatasetPage
+       at the default date, 5(b) test_the_two_assets_show_every_surface
+       (REQ-TEST-361 criterion 1's two surfaces), 5(c) REQ-DASH-299
+       criterion 15 (7)'s regex hitting a Client Register id - each waiting
+       on Keith, and the first-view load-budget test, which passes alone and
+       fails beside three other workers; plus #308's list left for Keith
+       (scenario-map membership, the dropped-scenario warning's length, the
+       settle pointer while a correction is pending, REQ-GEN-246 c8 and
+       REQ-DOCS-219 c10 naming REQ-PIPE-354 as an owner). Not re-run at the
+       merge: this checkout has no bootstrapped deployment.
+     - **Also still to build, from Keith's morning answers**: C6 (dbt's own
+       package-lock.yml decides "installed", not a stamp - REQ-QAC-368), C7
+       (a repo-relative path request for an asset folder outside the
+       repository refuses - REQ-PIPE-342) and C12 (no forwarding macros file;
+       each asset's dbt project points macro-paths and test-paths at
+       dbt_shared - REQ-QAC-368). Neither branch built them: the tree still
+       has assets/<asset>/dbt/macros/dbt_shared_tests.sql and the stamp.
+     - **A register note for Keith**: REQ-GEN-370's scenario-table decision
+       now carries both of his answers - morning report C14 ("accepted until
+       REQ-PIPE-352 criterion 3") and the move critic's decision 2 ("waits for
+       REQ-PIPE-354") - and criterion 3 is built while the refusal is not
+       restored, so the later answer is the one in force.
+     - **Runs (this tree, before the commit carrying this entry)**: `uv run
+       ruff check .` clean; `mothman check --no-pytest` (MOTHMAN_DIFF_BASE=
+       f123a582, MOTHMAN_ASSET unset) passed with warnings from schedule,
+       sprints and scenario map (no placements on this machine), npm test
+       1138 passed; the critical set as critical.yml runs it - quarterly 780
+       passed, 0 skipped, pytest step 49s; daily 106 passed, 0 skipped, 24s;
+       the 47 test modules either branch and this merge touched, `-m "not
+       needs_deployment"`: 1234 passed in 536s; their needs_deployment tests:
+       7 passed, 5 skipped, 7 failed, every failure and skip a missing
+       generated history (this checkout has no bootstrap) - the two map tests
+       pass (9 passed) with bmove's own placements copied in, then removed.

@@ -235,7 +235,7 @@ class TestAThirdCollectionAtEverySite:
         monkeypatch.setattr(scenario_injection, "placements_path", fixed(scratch / "placements.json"))
         real = driver.generate
         monkeypatch.setattr(driver, "generate", lambda cid: real(cid) if cid == FAKE_ID else [])
-        monkeypatch.setattr("qa_tools.common.scenario_map.write_map", lambda: None)
+        monkeypatch.setattr("qa_tools.common.scenario_map.write_map", lambda **_: None)
         # Every real collection whose provider declares a target trial - read
         # from the provider, never named (the asset split: Birth Registrations
         # on the daily asset, Linkage Products on the quarterly).
