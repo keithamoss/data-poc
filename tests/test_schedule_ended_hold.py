@@ -89,7 +89,10 @@ class TestTheHoldSaysWhatToEdit:
     def test_it_names_the_file_and_the_command(self, conn):
         """Criterion 3."""
         said = self._held(conn).describe()
-        assert "contract/calendar.yaml" in said  # since REQ-PIPE-110
+        from qa_tools.common import assets
+
+        # The asset's own calendar by repository path (REQ-PIPE-110; the asset split).
+        assert f"{assets.folder_rel()}/calendar.yaml" in said
         assert "mothman schedule candidate-dates" in said
         assert "2028-Q1" in said
         assert "next period's claim window" not in said

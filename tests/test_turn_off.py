@@ -586,8 +586,8 @@ class TestHeldWhileTurnedOff:
         assert held.describe() == (
             "Received while Client Register is turned off (supplier paused, set for Client "
             "Register). Place it into a period it still owes, reject it, or change "
-            "effective_to/effective_from in contract/calendar.yaml if this period should be "
-            "owed.")
+            f"effective_to/effective_from in {supply_holds.schedule_file()} if this period "
+            "should be owed.")
         place, reject, change = held.responses
         assert "mothman supply decide --operation place" in place
         assert reject == "reject the supply" and "effective_to/effective_from" in change

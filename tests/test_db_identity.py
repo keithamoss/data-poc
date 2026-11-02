@@ -149,11 +149,14 @@ class TestMarking:
 
         assert _mark("--confirm", "sandbox", env="sandbox").exit_code == 0
         monkeypatch.setattr(common, "require_tty", lambda hint: None)
-        answers = iter(["data-asset-1/local"])
+        from qa_tools.common import hierarchy
+
+        asset_id = hierarchy.data_asset_id()  # the asset's own id (the asset split)
+        answers = iter([f"{asset_id}/local"])
         monkeypatch.setattr(common, "_ask_text", lambda m: next(answers))
         wrong = _mark("--confirm", "test")
         assert wrong.exit_code != 0 and _recorded(unmarked_dsn).environment == "sandbox"
-        answers = iter(["data-asset-1/sandbox"])
+        answers = iter([f"{asset_id}/sandbox"])
         ok = _mark("--confirm", "test")
         assert ok.exit_code == 0, ok.output
         assert _recorded(unmarked_dsn).environment == "test"

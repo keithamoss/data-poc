@@ -28,6 +28,11 @@ def _real():
     """The selected asset's real folder - read when a test runs (the asset
     split), so a test of either asset reads its own."""
     return asset_folders.real_folder()
+
+
+#: The same folder for a module importing it by name (tests/test_turn_off.py),
+#: resolved when used rather than at import.
+REAL_CONTRACT_DIR = asset_folders.SelectedFolder()
 LOG = [{"date": "2023-01-01", "author": "a test", "change": "a test"}]
 
 

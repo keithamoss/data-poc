@@ -199,8 +199,10 @@ class TestAKeptSyntheticArrivalIsReportedToo:
     it printed the check table and "Recorded N results" and nothing the
     lifecycle decided."""
 
-    @pytest.mark.parametrize("module, collection", [("bdm", "civil-registration"),
-                                                    ("cp", "child-protection")])
+    @pytest.mark.parametrize("module, collection", [
+        # Each collection on its own asset (the asset split).
+        pytest.param("bdm", "civil-registration", marks=pytest.mark.asset("daily")),
+        pytest.param("cp", "child-protection", marks=pytest.mark.asset("quarterly"))])
     @pytest.mark.parametrize("interactive", [False, True])
     def test_it_ends_on_the_lifecycle_summary(self, monkeypatch, module, collection,
                                               interactive):

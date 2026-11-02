@@ -28,12 +28,16 @@ def _sources(monkeypatch, mapping: dict[str, str]):
 
 
 class TestTheRealConfiguration:
-    def test_every_source_states_what_a_delivery_is(self):
+    @pytest.mark.parametrize("held", [
+        # Each asset's own collections (the asset split).
+        pytest.param("child-protection", marks=pytest.mark.asset("quarterly")),
+        pytest.param("civil-registration", marks=pytest.mark.asset("daily"))])
+    def test_every_source_states_what_a_delivery_is(self, held):
         found = delivery_boundary.check_all()
         from qa_tools import collections
 
         declared = {c.id for c in collections.all_collections()}
-        assert {"child-protection", "civil-registration"} <= declared
+        assert held in declared
         assert set(found) == declared
         assert set(found.values()) == {delivery_boundary.DIRECTORY}
 

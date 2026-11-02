@@ -170,7 +170,9 @@ class TestArrivalPatternsNameRealDatasets:
     @pytest.mark.asset("daily")  # its contract describes Birth Registrations
     def test_every_offending_pattern_is_reported_not_just_the_first(self, tmp_path, monkeypatch):
         _contract(tmp_path, monkeypatch, "c.yaml",
-                   self._doc(["nope-one", "nope-two", "cp-clients"]), "birth-registrations")
+                   # The one real dataset is the daily asset's own (the asset split).
+                   self._doc(["nope-one", "nope-two", "birth-registrations"]),
+                   "birth-registrations")
         assert len(validate_hierarchy.validate()) == 2
 
     def test_a_contract_with_no_arrival_pattern_is_fine(self, tmp_path, monkeypatch):
