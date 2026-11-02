@@ -34659,6 +34659,7 @@ requirements:
     - cli/many_tables.py::ManyTablesCLI::load_manifest
     - cli/many_tables.py::ManyTablesCLI::picker_choices
     - 'qa_tools/common/period_schema.py::borrow_from_period'
+    - 'qa_tools/common/period_schema.py::choose_version'
     evidence:
     - 'tests/test_cp_pair.py drives the real Child Protection orchestrator over a seven-file delivery: one contested arrival of cp-clients, the outstanding item naming both files, each reader''s cp_clients check recorded once as contested, file checks under each filename (criteria 3-5); settled as supply plus spare copy and as supply plus re-file, each run''s own supply id and period, readers re-evaluated (criterion 7); a later file supersedes the pair and the knock-on re-evaluates the readers (criterion 6).'
     - 'tests/test_cp_load_by_pattern.py: every folder route attributes by pattern, refuses a missing or contested table naming the files and where it is settled (criterion 8); the picker marks and refuses a pair (criterion 13). tests/test_cp_clients_pattern.py: the pattern, TS-38''s names unrecognised, every other pattern unchanged, the comment, the ODCS keyPattern unchanged (criteria 1, 2, 11). tests/test_holds.py: the reachable shape and TS-39 (criterion 9). tests/test_asset_time_semantics.py reproduces the characterization pin unchanged (criterion 10).'
@@ -46465,6 +46466,7 @@ requirements:
     - assets/quarterly/synthetic/scripted_decisions.yaml
     - 'qa_tools/common/evidently_common.py::psi_of_counts'
     - 'assets/quarterly/synthetic/collections/linkage_products.py::drift_verdict'
+    - 'qa_tools/common/evidently_common.py::fold_value_counts'
     linked_tests:
     - tests/test_geocoding_generator.py::TestTheStreams
     - tests/test_geocoding_generator.py::TestWhenAndFromWhat
