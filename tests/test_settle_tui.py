@@ -418,8 +418,21 @@ class TestThePointerMatchesTheMenus:
                             lambda: people.person_by_email(REAL_PERSON))
         filing_tui.filing_menu()
         pointer = supply_files.where_to_settle(DS).split(" > ")
+        # A ONE-COLLECTION ASSET (SETTLED by Keith 2026-11-02, the move
+        # critic's decision 3): the menu skips the collection picker, so the
+        # pointer drops that step and walks straight to the action menu.
+        assert pointer == ["mothman", "Filing decisions", filing_tui._MENU_QUEUE]
         assert pointer[2] in asked[0]
-        assert pointer[3] == filing_tui._MENU_QUEUE
+
+    @pytest.mark.asset("quarterly")
+    def test_an_asset_of_several_collections_keeps_the_collection_step(self):
+        from qa_tools import collections
+        from qa_tools.common import supply_files
+
+        assert len(collections.all_collections()) > 1, "quarterly holds several collections"
+        pointer = supply_files.where_to_settle("cp-clients").split(" > ")
+        assert pointer[2] == collections.by_id("child-protection").label
+        assert pointer[3] == "Supplies waiting on a decision"
 
 #: Birth Registrations is the daily asset's (the asset split).
 pytestmark = pytest.mark.asset("daily")

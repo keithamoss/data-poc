@@ -946,14 +946,13 @@ pytestmark = pytest.mark.asset("quarterly")
 
 
 class TestAnInjectionNamingNoAssetsDataset:
-    """PROVISIONAL (the asset split, critic finding 4, waiting on Keith): an
-    injection whose dataset neither asset declares - a typo'd id - is passed
-    over by both assets' generation rather than refused, because telling it
-    from the other asset's would mean reading the other asset (REQ-PIPE-342
-    criterion 8). This pins today's behaviour so a change to it is deliberate."""
+    """SETTLED by Keith 2026-11-02 (REQ-GEN-246 c8, the move critic's decision
+    2): an injection whose dataset the selected asset does not declare is
+    passed over - telling another asset's from a typo waits for REQ-PIPE-354 -
+    but never SILENTLY: a warning names each scenario dropped."""
 
     @pytest.mark.parametrize("asset", ["quarterly", "daily"])
-    def test_it_is_silently_dropped_by_each_asset(self, monkeypatch, asset):
+    def test_it_is_dropped_and_the_warning_names_it(self, monkeypatch, asset):
         import dataclasses
 
         monkeypatch.setenv(assets.ASSET_ENV, asset)
@@ -961,6 +960,8 @@ class TestAnInjectionNamingNoAssetsDataset:
         assert real, f"{asset} places no injection - the comparison would prove nothing"
         stray = dataclasses.replace(real[0], scenario_id="TS-STRAY", dataset_id="no-such-dataset")
         monkeypatch.setattr(si, "INJECTIONS", si.INJECTIONS + (stray,))
-        got = si.this_assets_injections()
+        monkeypatch.setattr(si, "_WARNED_DROPS", set(), raising=False)
+        with pytest.warns(UserWarning, match=r"TS-STRAY \(no-such-dataset\)"):
+            got = si.this_assets_injections()
         assert stray not in got
         assert set(got) == set(real)

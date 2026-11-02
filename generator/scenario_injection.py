@@ -1006,19 +1006,36 @@ def generated_periods(dataset_id: str) -> list:
     return provider.generated_periods_for(dataset_id)
 
 
+#: The assets whose dropped scenarios this process has already named, so the
+#: warning below is said once per asset, not on every call.
+_WARNED_DROPS: set = set()
+
+
 def this_assets_injections() -> tuple["Injection", ...]:
     """The injections naming a dataset the selected asset declares.
 
-    ANOTHER ASSET'S SCENARIO IS NOT THIS ONE'S TO PLACE (PROVISIONAL, the
-    asset split, 2026-11-02): the table below is still one repository-wide
-    list until each asset holds its own, so an injection naming a dataset the
-    selected asset does not declare is the other asset's - passed over rather
-    than refused, and placed by its own asset's generation. Telling it from a
-    typo would mean reading the other asset, which REQ-PIPE-342 criterion 8
-    forbids, so a typo'd dataset id is no longer refused here."""
-    from qa_tools.common import hierarchy
+    ANOTHER ASSET'S SCENARIO IS NOT THIS ONE'S TO PLACE: the table below is
+    still one repository-wide list until each asset holds its own, so an
+    injection naming a dataset the selected asset does not declare is passed
+    over, and placed by its own asset's generation. Telling the other asset's
+    from a typo would mean reading the other asset, which waits for
+    REQ-PIPE-354 - but the drop is NEVER SILENT (SETTLED by Keith 2026-11-02,
+    REQ-GEN-246 criterion 8): a warning names each scenario passed over, once
+    per asset per process."""
+    import warnings
+
+    from qa_tools.common import assets, hierarchy
 
     mine = {d.dataset_id for d in hierarchy.all_datasets()}
+    dropped = [i for i in INJECTIONS if i.dataset_id not in mine]
+    asset = assets.selected().name
+    if dropped and asset not in _WARNED_DROPS:
+        _WARNED_DROPS.add(asset)
+        named = ", ".join(f"{i.scenario_id} ({i.dataset_id})" for i in dropped)
+        warnings.warn(
+            f"asset {asset!r} passes over {len(dropped)} scenario(s) naming a dataset it does "
+            f"not declare - another asset's, or a dataset no asset declares (telling them "
+            f"apart waits for REQ-PIPE-354): {named}", UserWarning, stacklevel=2)
     return tuple(i for i in INJECTIONS if i.dataset_id in mine)
 
 
