@@ -525,3 +525,13 @@ class TestAPackageGateApplicationIsComparedByWhatItSays:
 #: The data asset this module's tests act for, unless a test says otherwise
 #: (C11, Keith 2026-11-02: every test module names its asset).
 pytestmark = pytest.mark.asset("quarterly")
+
+
+def test_a_capture_stage_failure_survives_a_process_boundary():
+    """equivalence.StageFailed had the same defect as arrival_lifecycle's: a
+    required argument, so a pickled one could not be rebuilt (post-build-review,
+    2026-11-02)."""
+    import pickle
+    back = pickle.loads(pickle.dumps(eq.StageFailed("S7", "boom")))
+    assert isinstance(back, eq.StageFailed)
+    assert (back.stage, str(back)) == ("S7", "capture failed at stage 'S7': boom")

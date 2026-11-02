@@ -6612,7 +6612,8 @@ class TestTheGitHubLinks:
     """REQ-DASH-244 criteria 12, 13 and 15, in a real browser: a dataset's
     'View on GitHub' opens its collection's ODCS contract at that dataset's
     own entry, an agency's opens its contract/<agency-id>/ folder, and each
-    one's tooltip names the target - for every registered collection."""
+    one's tooltip names the target - for every registered collection. The
+    agency folder is assets/<asset>/<agency-id>/ since the asset split."""
 
     def test_every_dataset_opens_its_contract_at_its_entry(self, clean_page, built_dashboard_html):
         from qa_tools import collections
@@ -6635,12 +6636,16 @@ class TestTheGitHubLinks:
     def test_every_agency_opens_its_folder(self, clean_page, built_dashboard_html):
         from qa_tools import collections
 
+        # The selected asset's own folder, assets/<asset>/ since the split
+        # (it was contract/ before it).
+        folder = asset_folders.real_folder().resolve().relative_to(
+            Path(__file__).resolve().parent.parent).as_posix()
         for agency_id in dict.fromkeys(c.agency_id for c in collections.all_collections()):
             _goto(clean_page, built_dashboard_html, state={"tier": "agency", "agencyId": agency_id})
             link = clean_page.locator("a", has_text="View on GitHub").first
             href, title = link.get_attribute("href"), link.get_attribute("title")
-            assert href.endswith(f"/contract/{agency_id}"), (agency_id, href)
-            assert f"contract/{agency_id}/" in title, (agency_id, title)
+            assert href.endswith(f"/{folder}/{agency_id}"), (agency_id, href)
+            assert f"{folder}/{agency_id}/" in title, (agency_id, title)
 
 
 @pytest.mark.asset("daily")  # Birth Registrations' page, so the class's page fixtures build it
@@ -6717,8 +6722,9 @@ class TestACrossTableCheckOnTS80:
                          .locator("xpath=ancestor::aside[1]").inner_text().split())
         # The labels are upper-cased by CSS, and inner_text keeps that.
         assert "latest result" in panel.lower() and "current run" not in panel.lower(), panel[:400]
-        # Criterion 9: the chart's last date is when the result was recorded.
-        assert panel.rstrip().endswith("Sunday, 8 November 2020 View as table"), panel[-200:]
+        # Criterion 9: the chart's last date is when the result was recorded -
+        # in the trend axis's short form since #289 D8d (REQ-DASH-359 c18).
+        assert panel.rstrip().endswith(" 8 Nov 2020 View as table"), panel[-200:]
         assert ("Re-checked 7:35am Sunday, 8 November 2020, when the Client Register was "
                 "re-checked.") in panel
 
@@ -7734,7 +7740,7 @@ class TestWarehouseAndStagingViews:
 
     def test_s1_green_the_clause_the_caption_and_s4(self, clean_page, cp_pages):
         """S1 green: Notifications' page reads 'Awaiting a decision' for v2 and
-        says the supply in the warehouse is v1 and Green, with its pill; the
+        says the supply in the warehouse is v1 and passing, with its pill; the
         grid is captioned as the waiting supply's results. S4: the Client
         Register's page, its v2 promoted after Notifications v2's hold-back,
         reads Green with one result column and no result from Notifications
@@ -7747,8 +7753,10 @@ class TestWarehouseAndStagingViews:
         _goto(clean_page, page, state=self.N, in_place_on="2024-08-05")
         (verdict,) = _shown(clean_page, ".verdict-of")
         assert verdict["text"].startswith("Awaiting a decision"), verdict
+        # The warehouse clause reads the verb ('..., and is passing'): the
+        # Pass / Warn / Fail wording, SETTLED by Keith 2026-11-01.
         assert ("The supply in place in the warehouse is the one received 10:00am Thursday, 25 "
-                "July 2024, and is Green.") in verdict["text"], verdict
+                "July 2024, and is passing.") in verdict["text"], verdict
         (clause,) = _shown(clean_page, ".verdict-of [data-wh-clause]")
         assert clause["attrs"]["data-wh-clause"] == "green"
         assert clean_page.locator(".verdict-of [data-wh-clause] .pill.green .ico").count() == 1, \
@@ -8509,7 +8517,7 @@ class TestAGateThatDidNotFinishIsSaidSo:
         (verdict,) = _shown(clean_page, ".verdict-of")
         assert verdict["attrs"].get("data-gating") == "waiting", verdict
         assert verdict["text"] == (
-            "Amber Checked, waiting for the rest of its delivery (received 9:00am Friday, "
+            "Warn Checked, waiting for the rest of its delivery (received 9:00am Friday, "
             "1 November 2024): 1 of 2 files checked. Nothing needs deciding yet."), verdict
         assert "Awaiting a decision" not in verdict["text"]
         assert clean_page.locator(".verdict-of .pill.amber").count() == 1, "its pill is amber"
@@ -8539,6 +8547,16 @@ class TestAGateThatDidNotFinishIsSaidSo:
 # (criterion 5).
 
 _STATUS_WORST_FIRST = ("red", "amber", "green", "nodata", "inactive")
+
+
+def _count_word(status: str) -> str:
+    """A status in the count form ('failing', 'warning', 'passing', ...), from
+    status-cases.json's vocabulary - the words the page is held to."""
+    import json
+
+    labels = json.loads((Path(__file__).resolve().parent.parent / "status-cases.json")
+                        .read_text())["vocabulary"]["labels"]
+    return labels[status]["count"]
 
 
 def _hierarchy_index() -> dict:
@@ -8674,10 +8692,10 @@ class TestChecksThatReadAnotherCollection:
             assert worst == next(s for s in _STATUS_WORST_FIRST if s in statuses), (
                 f"{cid}: heading says {worst}, its checks are {statuses}")
             n = len(statuses)
+            # In the count form, from status-cases.json (REQ-DASH-359
+            # criterion 3: '1 warning, 1 passing', never '1 amber, 1 green').
             counts = ", ".join(
-                f"{statuses.count(s)} {label}" for s, label in
-                (("red", "red"), ("amber", "amber"), ("green", "green"),
-                 ("nodata", "no data"), ("inactive", "no rule defined"))
+                f"{statuses.count(s)} {_count_word(s)}" for s in _STATUS_WORST_FIRST
                 if statuses.count(s))
             assert f"{n} {'check' if n == 1 else 'checks'}: {counts}" in head, (
                 f"{cid}'s heading {head!r} does not count its {statuses}")
@@ -8692,9 +8710,14 @@ class TestChecksThatReadAnotherCollection:
         hx = _hierarchy_index()
         built = _built_datasets(built_dashboard_html)
         linkage_col = hx["ds_col"][_LINKAGE_DATASET]
-        readers = [ck for ck in _cross_table_checks(built[_LINKAGE_DATASET])
+        # EVERY Linkage Products dataset whose checks read the Client Register
+        # - Linkage Keys, and since REQ-QAC-294 the Client Register Geocodes
+        # release too - sits in the one Linkage Products group.
+        reader_ds = [d for d, c in hx["ds_col"].items() if c == linkage_col]
+        readers = [ck for d in reader_ds for ck in _cross_table_checks(built[d])
                    if "cp-clients" in ck["between"]["reads"]]
-        assert readers, "precondition: Linkage Keys has checks that read the Client Register"
+        assert any(ck["between"]["declared_on"] == _LINKAGE_DATASET for ck in readers), (
+            "precondition: Linkage Keys has checks that read the Client Register")
         shared = {ck["check_id"] for ck in _cross_table_checks(built["cp-clients"])}
         assert {ck["check_id"] for ck in readers} <= shared, (
             "the Client Register's build does not carry the linkage checks that read it")
@@ -8711,7 +8734,7 @@ class TestChecksThatReadAnotherCollection:
         assert rows.count() == len(readers), (
             f"{rows.count()} rows in the group for {len(readers)} linkage checks")
         for r in rows.all():
-            assert hx["ds_name"][_LINKAGE_DATASET] in r.inner_text()
+            assert any(hx["ds_name"][d] in r.inner_text() for d in reader_ds), r.inner_text()
         # NEVER A LINK INSIDE A ROW'S BUTTON (REQ-DASH-272 criterion 15).
         assert rows.locator("a").count() == 0
 
@@ -8834,15 +8857,23 @@ class TestChecksThatReadAnotherCollection:
         hx = _hierarchy_index()
         coords = _scenario(clean_page, built_dashboard_html, _AMBER_COVERAGE)
         period, release_on = coords["period"], coords["inPlaceOn"]
-        case = clean_page.evaluate("""([period, before]) => {
+        # Each Linkage Products dataset reading the Client Register names
+        # ITSELF and its own due time - Linkage Keys, and since REQ-QAC-294 the
+        # Client Register Geocodes release, due an hour later.
+        readers = [d for d, c in hx["ds_col"].items() if c == hx["ds_col"][_LINKAGE_DATASET]]
+        case = clean_page.evaluate("""([period, before, readers]) => {
             const ds = rawRealDatasetById("cp-clients");
             const r = (ds.runs || []).find(r => ((ds.arrivalByRun || {})[r.run_id] || {}).slot === period
                                             && r.run_date < before);
-            const slot = (slotsOf("linkage-keys") || []).find(s => s.period === period);
-            return {on: r ? r.run_date : null, due: slot && slot.due ? fmtInstant(slot.due) : null};
-        }""", [period, release_on])
+            const due = {};
+            for(const id of readers){
+              const slot = (slotsOf(id) || []).find(s => s.period === period);
+              due[id] = slot && slot.due ? fmtInstant(slot.due) : null;
+            }
+            return {on: r ? r.run_date : null, due};
+        }""", [period, release_on, readers])
         assert case["on"], f"precondition: a Client Register supply for {period} before {release_on}"
-        assert case["due"], f"precondition: Linkage Keys has a slot for {period}"
+        assert case["due"][_LINKAGE_DATASET], f"precondition: Linkage Keys has a slot for {period}"
         _goto(clean_page, built_dashboard_html, state=_dataset_state(hx, "cp-clients"),
               in_place_on=case["on"])
         group = clean_page.locator(f'.xt-group[data-xt-group="{hx["ds_col"][_LINKAGE_DATASET]}"]')
@@ -8850,8 +8881,12 @@ class TestChecksThatReadAnotherCollection:
         group.locator(".xt-group-toggle").click()
         notes = [n.inner_text() for n in group.locator("[data-not-yet-checked]").all()]
         assert notes, "no not-yet-checked note on the Client Register's linkage checks"
-        want = f"Not yet checked by {hx['ds_name'][_LINKAGE_DATASET]} - due {case['due']}"
-        assert all(want in n for n in notes), f"{notes} do not read {want!r}"
+        wants = {f"Not yet checked by {hx['ds_name'][d]} - due {due}"
+                 for d, due in case["due"].items() if due}
+        assert all(any(w in n for w in wants) for n in notes), f"{notes} do not read one of {wants}"
+        linkage_keys = f"Not yet checked by {hx['ds_name'][_LINKAGE_DATASET]} - due " \
+                       f"{case['due'][_LINKAGE_DATASET]}"
+        assert any(linkage_keys in n for n in notes), f"{notes} carry no {linkage_keys!r}"
 
     def test_the_not_supplied_quarter_reads_not_supplied_by_decision(
             self, clean_page, built_dashboard_html):
@@ -9326,6 +9361,23 @@ def _hover_trends(page, kinds) -> list[str]:
             got = page.locator(f"#{svg_id}-tip").text_content() or ""
             assert got.strip(), "hovering the check trend filled no tooltip"
             said.append(got)
+        elif kind == "unit trend":
+            # A UNIT TREND HAS NO PER-POINT TOOLTIP: what it says is its chart's
+            # aria-label (unitTrendBlock), so that is what is collected after
+            # hovering the chart. Its first svg is the legend key, not the
+            # chart; and with a drawer open, the chart is the drawer's own -
+            # the page's charts sit under the backdrop.
+            scope = "#drawer[aria-hidden='false'] " if page.locator(
+                "#drawer[aria-hidden='false']").count() else ""
+            chart = page.locator(f"{scope}.unit-trend svg[role='img']")
+            assert chart.count(), f"precondition: {scope or 'the page '}draws a {kind} chart"
+            chart.first.hover()
+            got = chart.evaluate_all("els => els.map(e => e.getAttribute('aria-label') || '')")
+            got += page.evaluate(
+                "(sel) => [...document.querySelectorAll(sel + ' title')].map(t => t.textContent)",
+                f"{scope}.unit-trend svg")
+            assert any(t.strip() for t in got), f"no {kind} chart says anything"
+            said += got
         else:
             page.locator(sel).first.hover()
             got = page.evaluate(
@@ -9787,7 +9839,13 @@ class TestTheGeocodingPages:
         hx = _hierarchy_index()
         lp = hx["ds_col"][_GEO]
         _goto(clean_page, built_dashboard_html, state={"tier": "agency", "agencyId": hx["ds_agency"][_GEO]})
-        across = clean_page.locator(f'[data-collection="{lp}"] [data-across-collections], [data-across-collections]')
+        # LINKAGE PRODUCTS' OWN block: the agency page lists Emergency
+        # Department's across-collections checks first, so the first such
+        # sub-heading on the page is not this collection's.
+        block = clean_page.locator(".collection-block",
+                                   has=clean_page.locator(f'[data-collection="{lp}"]'))
+        assert block.count() == 1, f"no {lp} block on the agency page"
+        across = block.locator("[data-across-collections]")
         assert across.count() >= 1, "no 'Across collections' sub-heading on the agency page"
         assert across.first.locator("h4").inner_text().strip().lower() == "across collections"
         assert "Child Protection's Client Register" in across.first.inner_text()
