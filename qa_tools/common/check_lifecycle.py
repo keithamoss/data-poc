@@ -426,7 +426,7 @@ def parse_dbt_check_metadata(schema_yml_path: Path | str, *,
     # no check_id anywhere and was silently invisible here - not failing
     # check_lifecycle.validate(), just never seen by it. See
     # plans/qa-pipeline.md's own entry for the full account.
-    for entry in doc.get("tests", []) or []:
+    for entry in (doc.get("data_tests") or doc.get("tests") or []):
         try:
             out.extend(_parse_dbt_singular_test(entry, source, definition))
         except (MissingCheckIdError, MissingCategoryError, InvalidCategoryError) as e:
@@ -499,7 +499,7 @@ def dbt_check_id_lookup(schema_yml_path: Path | str, *,
             for test in col.get("tests", []) or []:
                 _record(test, model_name, col["name"])
 
-    for entry in doc.get("tests", []) or []:
+    for entry in (doc.get("data_tests") or doc.get("tests") or []):
         name = entry.get("name")
         meta = (entry.get("config") or {}).get("meta") or {}
         check_id = meta.get("check_id")

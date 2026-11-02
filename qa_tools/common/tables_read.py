@@ -326,7 +326,7 @@ def _dbt_singular_cross_table_checks(path: Path) -> list[tuple[str, str]]:
     """
     tests_dir = path.parents[2] / "tests"
     found = []
-    for entry in (_yaml(path).get("tests") or []):
+    for entry in (_singular_entries(_yaml(path))):
         if not isinstance(entry, dict):
             continue
         name = entry.get("name", "")
@@ -484,3 +484,9 @@ def real_sources() -> tuple[list[Path], list[Path], list[Path]]:
             [ROOT / f for f in collections.check_files("soda")],
             [ROOT / f for f in collections.check_files("contract")])
 
+
+def _singular_entries(doc: dict) -> list:
+    """A schema file's singular-test entries: `data_tests:`, the key dbt 1.12
+    applies (post-build-review #307), or the older `tests:` a retired file
+    still uses."""
+    return doc.get("data_tests") or doc.get("tests") or []

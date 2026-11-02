@@ -338,7 +338,7 @@ def _dbt_one(metric: str, cfg: dict, meta: dict, path) -> tuple[str, tuple]:
 def dbt_bounds(path: Path) -> dict[str, tuple]:
     doc = config_yaml.parse(Path(path).read_text()) or {}
     out = {}
-    for entry in doc.get("tests") or []:
+    for entry in (doc.get("data_tests") or doc.get("tests") or []):
         conf = entry.get("config") or {}
         cid, val = _dbt_one(str(entry.get("name")), conf, conf.get("meta") or {}, path)
         out[cid] = val

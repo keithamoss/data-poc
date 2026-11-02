@@ -267,6 +267,42 @@ def asset_of(node) -> str:
     return mark.args[0]
 
 
+def _scope_selects_its_asset(request):
+    """Select a module's or class's asset BEFORE its own fixtures of that
+    scope run (post-build-review #307). The per-test switch below empties the
+    worker's database when the asset changes, and it runs after every
+    module- and class-scoped fixture - so a daily module first on a worker
+    that started quarterly lost what its module fixture had built before its
+    first test (tests/test_run_dbt_bdm.py, run alone)."""
+    import asset_cli
+
+    mark = request.node.get_closest_marker("asset")
+    if mark is None:
+        yield
+        return
+    before = os.environ.get(_assets.ASSET_ENV)
+    os.environ[_assets.ASSET_ENV] = mark.args[0]
+    _assets.use_root(None)
+    _assets.release_claim()
+    asset_cli.rebuild_for_selected()
+    _mark_worker_db_for(mark.args[0])
+    yield
+    if before is None:
+        os.environ.pop(_assets.ASSET_ENV, None)
+    else:
+        os.environ[_assets.ASSET_ENV] = before
+
+
+@pytest.fixture(scope="module", autouse=True)
+def module_selects_its_asset(supply_dsn, request):
+    yield from _scope_selects_its_asset(request)
+
+
+@pytest.fixture(scope="class", autouse=True)
+def class_selects_its_asset(supply_dsn, request):
+    yield from _scope_selects_its_asset(request)
+
+
 @pytest.fixture(autouse=True)
 def selected_asset(monkeypatch, request):
     """Every test acts for the asset its mark names (C11), with the
