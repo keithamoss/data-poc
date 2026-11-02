@@ -54,19 +54,13 @@ def _aggregate(conn, table: str, column: str, spec: dict) -> dict:
 
 def _value_counts(conn, table: str, column: str, known: list[str]) -> list[list]:
     """Every known value's count, ZEROS INCLUDED (REQ-QAC-247): a category
-    that falls to zero shows as a 0 rather than vanishing from the chart."""
-    counts = {k: 0 for k in known}
-    other = 0
-    for value, n in conn.execute(
-            f"SELECT {column}, COUNT(*) FROM {table} GROUP BY {column}").fetchall():
-        if value in counts:
-            counts[value] += n
-        else:
-            other += n
-    out = [[k, v] for k, v in counts.items()]
-    if other:
-        out.append(["(invalid code)", other])
-    return out
+    that falls to zero shows as a 0 rather than vanishing from the chart -
+    folded by evidently_common.fold_value_counts, which the generator's
+    drift planning shares."""
+    from qa_tools.common.evidently_common import fold_value_counts
+
+    return fold_value_counts(conn.execute(
+        f"SELECT {column}, COUNT(*) FROM {table} GROUP BY {column}").fetchall(), known)
 
 
 def _count(conn, table: str) -> int:

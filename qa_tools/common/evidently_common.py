@@ -101,6 +101,31 @@ def status_for(value: float, entry: dict) -> str:
     return "pass"
 
 
+#: What every value a column does not declare is counted under.
+INVALID_CODE = "(invalid code)"
+
+
+def fold_value_counts(pairs, known) -> list[list]:
+    """`[[value, count], ...]` as dataset_stats records it, from any
+    `(value, count)` pairs: every KNOWN value's count, zeros included
+    (REQ-QAC-247), in declared order, then every other value folded into one
+    '(invalid code)' count where there is any. The one copy - the recorded
+    stats and the generator's drift planning (REQ-GEN-295 criterion 7 as
+    amended) both fold through it, so a planned reference has the recorded
+    one's shape."""
+    counts = {k: 0 for k in known}
+    other = 0
+    for value, n in pairs:
+        if value in counts:
+            counts[value] += n
+        else:
+            other += n
+    out = [[k, v] for k, v in counts.items()]
+    if other:
+        out.append([INVALID_CODE, other])
+    return out
+
+
 def excluding(frame, entry: dict):
     """A drift frame without the values the check declares excluded, from
     reference and current alike (REQ-QAC-297 criterion 11) - so a value

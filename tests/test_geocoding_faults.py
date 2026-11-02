@@ -444,8 +444,8 @@ class TestDriftIsPlannedFromWhatTheDriftCheckReads:
         for n_postcode in (100, 160, 250, 380):
             current = _rows(_mixed(400 - n_postcode, n_postcode, start=900))
             psi, status = evidently_common.psi_of_counts(
-                lp.value_counts(current, entry["column"]),
-                lp.value_counts(reference, entry["column"]), entry)
+                lp.value_counts(current, entry["column"], CP),
+                lp.value_counts(reference, entry["column"], CP), entry)
             want = {"pass": "green", "warn": "amber", "fail": "red"}[status]
             assert lp.drift_verdict(CP, current, reference) == want, (n_postcode, psi)
             seen.add(want)
@@ -473,6 +473,22 @@ class TestDriftIsPlannedFromWhatTheDriftCheckReads:
         reference = _rows(_mixed(300, 100))
         gapped = _mixed(300, 100, start=900)
         assert lp.drift_verdict(CP, _rows(gapped), reference) == "green"
+
+    def test_value_counts_fold_as_the_recorded_stats_do(self):
+        """The generator's counts are the drift reference's shape exactly:
+        every known value, zeros included, and anything else folded into
+        '(invalid code)' - dataset_stats' own folding, shared."""
+        from qa_tools.common import evidently_common
+
+        rows = _rows(_mixed(300, 100))
+        rows.loc[rows.index[:5], "match_level"] = "rooftop"
+        got = lp.value_counts(rows, "match_level", CP)
+        pairs = [[v, int(n)] for v, n in rows["match_level"].value_counts().items()]
+        known = lp.known_values(CP, "match_level")
+        assert known and "rooftop" not in known
+        assert got == evidently_common.fold_value_counts(pairs, known)
+        assert got[-1] == ["(invalid code)", 5]
+        assert [k for k, _n in got[:-1]] == list(known), "every known value, zeros included"
 
     def test_the_plans_drift_set_is_exactly_the_computed_drift(self, plan):
         """Every geocoding arrival, resupplies included, planned at least its

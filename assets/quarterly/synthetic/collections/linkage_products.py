@@ -350,14 +350,26 @@ def worst(*verdicts: str) -> str:
     return max(verdicts, key=lambda v: _RANK[v]) if verdicts else "green"
 
 
-def value_counts(rows, column: str) -> list[list]:
-    """A column's `[[value, count], ...]`, in value order - the shape
-    dataset_stats records and the real drift check rebuilds its reference
-    from (qa_tools/common/evidently_common.py)."""
-    if rows is None or not len(rows) or column not in rows.columns:
-        return []
-    counts = rows[column].astype(str).value_counts()
-    return [[v, int(counts[v])] for v in sorted(counts.index)]
+def known_values(dataset_id: str, column: str) -> list:
+    """The values the collection's recorded stats count `column` by for the
+    dataset's table (its adapter's stats spec), in declared order."""
+    from qa_tools import collections
+    from qa_tools.common import hierarchy
+
+    spec = collections.adapter(collections.by_id(COLLECTION_ID)).stats
+    return list(spec.value_counts.get((hierarchy.dataset(dataset_id).table, column)) or [])
+
+
+def value_counts(rows, column: str, dataset_id: str) -> list[list]:
+    """A column's `[[value, count], ...]` exactly as dataset_stats records it
+    and the real drift check rebuilds its reference from: every known value,
+    zeros included, anything else folded into '(invalid code)'
+    (evidently_common.fold_value_counts, shared)."""
+    from qa_tools.common import evidently_common
+
+    pairs = ([] if rows is None or not len(rows) or column not in rows.columns
+             else [[v, int(n)] for v, n in rows[column].astype(str).value_counts().items()])
+    return evidently_common.fold_value_counts(pairs, known_values(dataset_id, column))
 
 
 def _drift_entry(dataset_id: str) -> dict | None:
@@ -388,8 +400,8 @@ def drift_verdict(dataset_id: str, rows, reference_rows) -> str:
     if entry is None or reference_rows is None:
         return "green"
     _psi, status = evidently_common.psi_of_counts(
-        value_counts(rows, entry["column"]), value_counts(reference_rows, entry["column"]),
-        entry)
+        value_counts(rows, entry["column"], dataset_id),
+        value_counts(reference_rows, entry["column"], dataset_id), entry)
     return {"fail": "red", "warn": "amber"}.get(status, "green")
 
 
