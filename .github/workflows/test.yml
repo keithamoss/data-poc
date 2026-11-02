@@ -11,7 +11,8 @@ name: Run test suite
 # affects the PUBLISHED DASHBOARD changes; this workflow needs to catch
 # a regression anywhere in the codebase, including generator/ changes
 # that never touch a committed dashboard artifact at all - so no path
-# filter, runs on every push to the working branch.
+# filter. (It ran on every push to the working branch until REQ-TEST-375,
+# 2026-11-02; it is started by hand now - see the trigger below.)
 #
 # `uv run pytest` is what's gated here - `uv run ruff check .` stays a
 # local/pre-commit concern (pre-commit already wires it into every
@@ -297,8 +298,8 @@ jobs:
           include-hidden-files: true
           retention-days: 1
 
-  # THE TESTS MARKED on_demand, ON EVERY PUSH (post-build-review #128, Keith
-  # 2026-10-06). They are deselected from a plain `uv run pytest` because
+  # THE TESTS MARKED on_demand, WHENEVER THIS WORKFLOW RUNS - by hand since
+  # REQ-TEST-375 (post-build-review #128, Keith 2026-10-06). They are deselected from a plain `uv run pytest` because
   # they are slow, which keeps a person's local run quick - and the
   # bootstrap-equivalence one then failed on every run for two days with
   # nothing running it. A test nobody runs is not a check. They build their

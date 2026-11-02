@@ -19587,6 +19587,7 @@ requirements:
         diff` over QA history, which Keith has said he will give up,
         and the public dashboard, which production probably does not
         want.
+      - 'THE ONE NAMED NON-PUBLISHING PUSHER, SETTLED by Keith 2026-11-02 (post-build-review #305): criterion 9''s guard, tests/test_publish.py::TestThereIsExactlyOnePublishPath::test_only_one_function_in_the_cli_pushes_anything, allows exactly one push besides dashboard.py::_publish - worktree_snapshot.py::snapshot_one, behind `mothman debug snapshot-worktrees`, which pushes uncommitted worktree work to a wip/<branch>-snap ref and builds, uploads and deploys nothing. The exception was first added by the coordinator without sign-off; Keith signed it 2026-11-02. REJECTED: moving the push out of cli/ (it would hide a pusher from the guard rather than name it), and removing the command. Kept honest by tests/test_worktree_snapshot.py''s test_it_only_ever_pushes_to_a_wip_snap_ref and test_the_worktree_is_left_exactly_as_it_was, both in REQ-TEST-375''s critical set so every push proves them.'
   - id: REQ-PIPE-093
     title: Every connection needs a stated environment, there is no default, and production asks before a person changes anything
     date_written: '2026-09-26'
@@ -48844,6 +48845,8 @@ requirements:
     - 'Cost: target a push at roughly 5-10 billable minutes (critical job plus JS job) against today''s ~80-145; a hand-started full run still costs the old figure and should be checked against `mothman github ci-usage` first.'
     dependencies: []
     linked_tests:
+    - 'tests/test_worktree_snapshot.py::test_it_only_ever_pushes_to_a_wip_snap_ref'
+    - 'tests/test_worktree_snapshot.py::test_the_worktree_is_left_exactly_as_it_was'
     - 'tests/test_publish.py::TestNeitherHalfOfCIQuietlyStopsCovering'
     - 'tests/test_publish.py::TestACriticalTestCIcannotRunFailsCollection'
     - 'tests/test_publish.py::TestTheWorkflowCarriesEveryVariableThePipelineNeeds'
@@ -48883,6 +48886,9 @@ requirements:
     - 'ON-DEMAND TESTS NOW RUN WHEN THE FULL WORKFLOW IS STARTED (post-build-review #128''s ''on every push'' superseded by this signed requirement): tests/test_ci_on_demand.py asserts a dispatch trigger and no schedule rather than a push trigger.'
     - 'THE RESULT LINE names the exact tree: HEAD when clean, else the tree id a commit of the working tree would have, written through a scratch index so the real index is untouched; computed before and after the run, and a tree that changed mid-run is said to be no claim. Counts come from pytest''s JUnit report and coverage from its JSON report, never from parsing streamed output.'
     - 'test.yml''s change is the trigger block only, to keep the merge with the asset-split branch (bmove, which also edits test.yml) easy.'
+    - 'GUARD TESTS ADDED TO THE APPROVED LIST (post-build-review #305, the coordinator for Keith, 2026-11-02): tests/test_publish.py::TestTheWorkflowCarriesEveryVariableThePipelineNeeds (now read over test.yml AND critical.yml) and ::TestNeitherHalfOfCIQuietlyStopsCovering::test_the_push_job_carries_the_full_jobs_environment, which keep the push job''s environment honest; and tests/test_worktree_snapshot.py::test_it_only_ever_pushes_to_a_wip_snap_ref and ::test_the_worktree_is_left_exactly_as_it_was (Keith, 2026-11-02), which pin on every push that REQ-PIPE-092''s one named non-publishing pusher writes only wip/*-snap refs and never touches a worktree.'
+    - 'YAMLLINT MOVED INTO PUSH CI (post-build-review #305): `yamllint --strict .` only ever ran in test.yml''s fast half, so dispatch-only test.yml left a duplicate YAML key unchecked on push; critical.yml runs it as its own step, pinned by TestNeitherHalfOfCIQuietlyStopsCovering::test_the_push_job_lints_the_yaml.'
+    - 'BROWSER DETECTION, WIDENED AND ITS LIMIT ACCEPTED (post-build-review #305): conftest also reads the FUNCTION of every fixture in a test''s closure for Playwright (not the fixture''s module - conftest.py names playwright for fixtures that launch nothing). A browser reached through a PRODUCT HELPER is accepted as undetected. REJECTED: scanning the repository modules a test imports, which refused eleven approved test_publish.py tests, because cli.dashboard imports the render check while those tests stub it. Such a test cannot pass quietly on the push runner: no browser is installed, so it fails, and a skip fails the zero-skip check.'
     unmet_criteria:
     - criterion: 'Criteria 4 to 7 and the Performance NFR, on GitHub''s runner - the critical job and the JS job run on a push, and the pytest step is seen under 300s with zero skips in the Actions log.'
       why: 'critical.yml cannot run from this sandbox; its checker is exercised locally against JUnit reports of each shape, and the set''s wall time measured here (evidence).'

@@ -78,6 +78,10 @@ jobs:
         run: uv run dbt deps --project-dir dbt_project --profiles-dir qa_tools/dbt_profiles
       - name: Mark the warehouse database as CI's
         run: uv run mothman env mark --confirm ci
+      # Moved here from test.yml's fast half (post-build-review): seconds of
+      # work, and push CI's only check for a duplicate YAML key.
+      - name: Lint YAML (duplicate keys)
+        run: uv run yamllint --strict .
       # No bootstrap, no Playwright, no coverage (criterion 4). The critical
       # job fails on zero tests selected, on any skip, and over its budget
       # (criteria 6 and 7) - a skip here is a test in the wrong set, and a

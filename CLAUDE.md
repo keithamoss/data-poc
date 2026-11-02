@@ -586,10 +586,11 @@ Rough layout:
   `reports/` or built page. A local dashboard is `mothman dashboard
   rebuild` now, not a side effect of a test run. One cost: under xdist a
   node id carries its group as an `@...` suffix in the report; drop it
-  to re-run that test by id. CI
-  (`.github/workflows/
-  test.yml`) runs the full suite with `pytest-cov` on every push and
-  enforces `pyproject.toml`'s `[tool.coverage.report] fail_under` - a
+  to re-run that test by id. `mothman check`'s full gate runs the full
+  suite with `pytest-cov` and enforces `pyproject.toml`'s
+  `[tool.coverage.report] fail_under`, and so does a hand-started
+  `.github/workflows/test.yml`; push CI does NOT since REQ-TEST-375
+  (2026-11-02), it runs only the `critical` set - a
   real, measured threshold (not a guessed one - see
   `plans/publishing-and-history.md`'s Phase 6 "Build progress" note for
   how it was set), so real coverage can't silently regress. Run
@@ -1396,9 +1397,11 @@ Rough layout:
   temporary and run the test there.
 
   Two things worth knowing so this doesn't get mis-diagnosed next time:
-  **CI is not affected** - `.github/workflows/test.yml` runs all three
-  as real steps, so a red local suite with a green CI almost certainly
-  means local setup, not a regression. And a failure in any of those
+  **CI is not affected** - `.github/workflows/test.yml` (started by hand
+  since REQ-TEST-375) runs all three as real steps, and push CI's
+  `critical.yml` needs only `dbt deps` and `npm ci`, which it also runs;
+  so a red local suite with a green CI run of the same tests almost
+  certainly means local setup, not a regression. And a failure in any of those
   areas is not evidence of a code fault until setup has actually been
   done. Automating this properly (a `.claude/settings.json` SessionStart
   hook) is scoped as `plans/tooling.md` #11 - until it exists, this
