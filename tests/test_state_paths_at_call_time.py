@@ -54,30 +54,9 @@ LOOKUPS = frozenset({
 
 #: (file, the string's start) -> why it may stay. SHRINK-ONLY.
 ALLOWED = {
-    # MESSAGES - a file named for a person, not a path anything opens.
-    ("qa_tools/common/leaderboard.py", "contract/data-asset.yaml names no"):
-        "an error message naming the file to edit",
-    ("qa_tools/common/ticket_sync.py", "contract/data-asset.yaml names no"):
-        "an error message naming the file to edit",
-    ("qa_tools/common/people.py", "contract/people.yaml must hold"):
-        "an error message naming the file to edit",
-    ("qa_tools/common/postgres_version.py", "contract/data-asset.yaml: `"):
-        "an error message naming the file to edit",
-    ("qa_tools/common/presentation.py", "contract/presentation.yaml is missing"):
-        "an error message naming the file to edit",
-    ("qa_tools/common/scripted_corrections.py", "contract/scripted_decisions.yaml correction"):
-        "an error message naming the file to edit",
-    ("qa_tools/common/scripted_decisions.py", "contract/scripted_decisions.yaml decision"):
-        "an error message naming the file to edit",
-    ("qa_tools/common/validate_hierarchy.py", "contract/data-asset.yaml: "):
-        "a gate's finding naming the file to edit",
-    ("qa_tools/common/agreement.py", "contract/calendar.yaml"):
-        "the default LABEL a parsed document's messages carry - never opened",
-    ("qa_tools/common/asset_time.py", "contract/data-asset.yaml"):
-        "the default LABEL a parsed document's messages carry - never opened",
-    # REPOSITORY-WIDE - not one asset's, so not the resolver's to answer.
-    ("qa_tools/common/replay_inputs.py", "contract/**"):
-        "the cache key's repository-wide input globs; the move rewrites them",
+    # The messages that named contract/ files, the default labels of parsed
+    # documents and the cache key's contract/** glob all went with the move
+    # and its wording sweep (they name the selected asset's folder now).
     ("qa_tools/common/build_output.py", "reports"):
         "an --out-dir build's own layout, DIR/reports/, not an asset's state tree",
 }

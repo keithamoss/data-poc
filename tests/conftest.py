@@ -255,6 +255,9 @@ def _mark_worker_db_for(asset: str) -> None:
                     conn.execute(f'ALTER EVENT TRIGGER "{t}" ENABLE')
         db_identity.mark(conn, db_identity.Identity(asset, "test"))
     _WORKER_DB["asset"] = asset
+    # Counted, so a fixture that staged rows can tell they are gone and stage
+    # them again (_staged_once below).
+    _WORKER_DB["wipes"] = _WORKER_DB.get("wipes", 0) + 1
 
 
 def asset_of(node) -> str:
@@ -902,7 +905,25 @@ def clean_load_log(supply_dsn):
 
 
 @pytest.fixture(scope="module")
-def bdm_duckdb_dir(supply_dsn, bdm_raw_dir):
+def _staged_this_module() -> dict:
+    """What this module's staging fixtures have staged, and since which wipe."""
+    return {}
+
+
+def _staged_once(cache: dict, collection_id: str, stage_it) -> None:
+    """Stage a collection's fixture rows once per module, AND AGAIN after the
+    worker's database was emptied by an asset switch (the asset split): a
+    module of one asset may hold tests of the other, each of which empties
+    the database it switches to, so rows staged at module scope do not
+    outlive the next test of the other asset."""
+    key = (collection_id, _WORKER_DB.get("wipes", 0))
+    if key not in cache:
+        stage_it()
+        cache[key] = True
+
+
+@pytest.fixture
+def bdm_duckdb_dir(supply_dsn, bdm_raw_dir, _staged_this_module, selected_asset):
     """bdm_raw_dir's same two runs, staged into this worker's supply
     database via the real build_all() - the exact loading code path the
     real pipeline uses, not a hand-rolled copy of it.
@@ -928,8 +949,12 @@ def bdm_duckdb_dir(supply_dsn, bdm_raw_dir):
 
     from qa_tools.tools import stage
 
-    stage.build_all("civil-registration", deliveries_dir=Path(bdm_raw_dir) / "deliveries",
-               receipts_dir=Path(bdm_raw_dir) / "receipts")
+    # STAGED UNDER THE TEST'S OWN ASSET, so function-scoped (the asset
+    # split): a module-scoped fixture is built under its MODULE's asset, and
+    # a Birth Registrations test in a quarterly module would stage nothing.
+    _staged_once(_staged_this_module, "civil-registration", lambda: stage.build_all(
+        "civil-registration", deliveries_dir=Path(bdm_raw_dir) / "deliveries",
+        receipts_dir=Path(bdm_raw_dir) / "receipts"))
     return supply_dsn
 
 
@@ -1016,8 +1041,8 @@ def cp_delivery_dirs(cp_raw_dir):
     return Path(cp_raw_dir) / "deliveries", Path(cp_raw_dir) / "receipts"
 
 
-@pytest.fixture(scope="module")
-def cp_duckdb_dir(supply_dsn, cp_raw_dir):
+@pytest.fixture
+def cp_duckdb_dir(supply_dsn, cp_raw_dir, _staged_this_module, selected_asset):
     """cp_raw_dir's same two runs, staged into this worker's supply
     database via the real build_all(). Shares one database with the BDM
     fixture above, which is the point rather than a compromise - the
@@ -1040,6 +1065,25 @@ def cp_duckdb_dir(supply_dsn, cp_raw_dir):
     # tree (REQ-GEN-043) - a real leak this fixture hit for exactly one
     # run, building 18 real CP warehouses into a pytest tmp dir while
     # the fixture's own two sat unread.
+    def stage_it():
+        stage.build_all(
+            "child-protection", deliveries_dir=Path(cp_raw_dir) / "deliveries",
+            receipts_dir=Path(cp_raw_dir) / "receipts")
+        _file_and_overlay_cp(Path(cp_raw_dir) / "deliveries", Path(cp_raw_dir) / "receipts")
+
+    # Under the test's own asset, as bdm_duckdb_dir above.
+    _staged_once(_staged_this_module, "child-protection", stage_it)
+    return supply_dsn
+
+
+@pytest.fixture(scope="module")
+def cp_duckdb_dir_for_module(supply_dsn, cp_raw_dir, module_selects_its_asset):
+    """cp_duckdb_dir for a module-scoped fixture built on it, in a module
+    whose own asset is the quarterly one (tests/test_carried.py)."""
+    from pathlib import Path
+
+    from qa_tools.tools import stage
+
     stage.build_all(
         "child-protection", deliveries_dir=Path(cp_raw_dir) / "deliveries",
         receipts_dir=Path(cp_raw_dir) / "receipts")

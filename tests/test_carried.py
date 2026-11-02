@@ -48,7 +48,7 @@ def _reading_clients_from_notifications() -> set[str]:
 
 
 @pytest.fixture(scope="module")
-def two_runs(cp_duckdb_dir, cp_raw_dir):
+def two_runs(cp_duckdb_dir_for_module, cp_raw_dir):
     """The Client Register's run, then the Notifications run, of one zip -
     each filed with its siblings and overlaid, then through the real run
     step, as the lifecycle does (REQ-PIPE-105 criterion 5: a zip is filed

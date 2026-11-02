@@ -19,9 +19,17 @@ BDM = "birth-registrations"
 FACILITY = (BDM, "place_of_birth_facility", "completeness")
 
 
-@pytest.fixture(scope="module")
-def catalogue():
-    return cb.catalogue()
+#: Each asset's catalogue, built once (the asset split: this module holds
+#: tests of both assets, and a module-scoped fixture is built under the
+#: module's own).
+_CATALOGUES: dict = {}
+
+
+@pytest.fixture
+def catalogue(selected_asset):
+    if selected_asset not in _CATALOGUES:
+        _CATALOGUES[selected_asset] = cb.catalogue()
+    return _CATALOGUES[selected_asset]
 
 
 class TestTheRealDefinitions:
