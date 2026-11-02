@@ -52,7 +52,7 @@ class TestABirthRegistrationsAmber:
         [(lo, hi)] = rule.amber(len(out))
         assert lo < int(out[column].isna().sum()) < hi
 
-    @pytest.mark.asset("quarterly")
+    @pytest.mark.asset("daily")
     def test_no_row_count_and_no_twin_is_touched(self, batch, cat):
         """Criteria 5 and 6."""
         out = targeting.bdm_amber(batch, seed=3, catalogue=cat)
@@ -60,13 +60,13 @@ class TestABirthRegistrationsAmber:
         twins = batch["is_multiple_birth"].astype(bool)
         pd.testing.assert_frame_equal(out[twins], batch[twins])
 
-    @pytest.mark.asset("quarterly")
+    @pytest.mark.asset("daily")
     def test_the_same_seed_gives_the_same_rows(self, batch, cat):
         """Criterion 13."""
         pd.testing.assert_frame_equal(targeting.bdm_amber(batch, seed=9, catalogue=cat),
                                       targeting.bdm_amber(batch, seed=9, catalogue=cat))
 
-    @pytest.mark.asset("quarterly")
+    @pytest.mark.asset("daily")
     def test_no_room_in_any_band_is_refused_loudly(self, batch, cat):
         """Criterion 11."""
         full = batch.copy()
@@ -165,7 +165,7 @@ class TestTheGeneratedHistory:
         assert not [p.name for p, s in zip(periods, sevs) if s == "amber"
                     and p.name in by_period and not by_period[p.name][0].keeps_drawn_severity]
 
-    @pytest.mark.asset("quarterly")
+    @pytest.mark.asset("daily")
     def test_reds_are_where_they_were_drawn_and_only_ambers_moved(self):
         """Criterion 10."""
         g, periods, by_period, suppressed, sevs = self._bdm()
@@ -192,9 +192,8 @@ class TestTheGeneratedHistory:
         g.BirthRegistrationsProvider(amber_dates=frozenset({day})).generate(
             day, seed=1, n_rows=50, id_offset=0)
 
-    @pytest.mark.asset("quarterly")
+    @pytest.mark.asset("daily")
     def test_the_providers_never_reach_the_amber_preset(self, monkeypatch, batch, cat):
-        cp = collection_modules.provider_module("child-protection")
         g = collection_modules.provider_module("civil-registration")
 
         from generator import dirty
@@ -202,6 +201,12 @@ class TestTheGeneratedHistory:
         monkeypatch.setattr(dirty, "apply_birth_registrations_presets",
                             lambda *a, **k: (_ for _ in ()).throw(AssertionError("preset")))
         g.BirthRegistrationsProvider().dirty(batch, "amber", seed=1, previous_row_count=None)
+
+    @pytest.mark.asset("quarterly")
+    def test_the_child_protection_provider_never_reaches_the_amber_preset(self, monkeypatch):
+        """The other half of the test above, on the asset holding Child
+        Protection's provider (the asset split)."""
+        cp = collection_modules.provider_module("child-protection")
         from generator import dirty as dirty_mod
 
         monkeypatch.setattr(dirty_mod, "apply_cp_clients_presets",
@@ -254,14 +259,14 @@ class TestAnUnreachableAmberNamesItsPeriod:
 class TestTheCriticsSmallerGaps:
     """post-build-review #154."""
 
-    @pytest.mark.asset("quarterly")
+    @pytest.mark.asset("daily")
     def test_an_amber_is_trimmed_to_the_size_asked_keeping_every_twin(self, batch, cat):
         out = targeting.bdm_amber(batch, seed=2, catalogue=cat, rows=len(batch) - 40)
         assert len(out) == len(batch) - 40
         twins = batch["is_multiple_birth"].astype(bool)
         assert set(batch.index[twins]) <= set(out.index)
 
-    @pytest.mark.asset("quarterly")
+    @pytest.mark.asset("daily")
     def test_too_few_single_births_to_blank_is_refused(self, batch, cat):
         few = batch[batch["is_multiple_birth"].astype(bool) | (batch.index < 5)]
         with pytest.raises(targeting.TargetError, match="single-birth rows"):
@@ -306,7 +311,7 @@ class TestATarget:
 
 
 class TestBirthRegistrationsTargets:
-    @pytest.mark.asset("quarterly")
+    @pytest.mark.asset("daily")
     def test_green_brings_every_lever_clear_of_its_first_warning(self, batch, cat):
         """Criterion 4, and the natural parent_2 warning a clean batch carries."""
         out, moved = targeting.bdm_target(batch, targeting.Target("green"), seed=1, catalogue=cat)
@@ -317,7 +322,7 @@ class TestBirthRegistrationsTargets:
                 rule.column
         assert any(m["rule"] == "registering_parent_2_name.completeness" for m in moved)
 
-    @pytest.mark.asset("quarterly")
+    @pytest.mark.asset("daily")
     def test_amber_on_a_named_rule_lands_in_its_band_and_nothing_else_trips(self, batch, cat):
         key = "place_of_birth_facility.completeness"
         out, moved = targeting.bdm_target(batch, targeting.Target("amber", (key,)), seed=2,
@@ -332,7 +337,7 @@ class TestBirthRegistrationsTargets:
                 assert not any(c.warns(x, n) or c.fails(x, n) for c in rule.checks)
         assert [m for m in moved if m["rule"] == key][0]["to"] == "amber"
 
-    @pytest.mark.asset("quarterly")
+    @pytest.mark.asset("daily")
     def test_red_on_a_named_rule_fails_it(self, batch, cat):
         key = "registering_parent_1_name.completeness"
         out, _ = targeting.bdm_target(batch, targeting.Target("red", (key,)), seed=3,
@@ -340,7 +345,7 @@ class TestBirthRegistrationsTargets:
         [rule] = [r for r in targeting._levers(cat, out)[0] if targeting.rule_key(r) == key]
         assert any(c.fails(_nulls(out, rule.column), len(out)) for c in rule.checks)
 
-    @pytest.mark.asset("quarterly")
+    @pytest.mark.asset("daily")
     def test_twins_are_never_touched_and_the_size_is_as_asked(self, batch, cat):
         """Criteria 4 and 5."""
         out, _ = targeting.bdm_target(batch, targeting.Target("amber"), seed=4, catalogue=cat,
@@ -349,7 +354,7 @@ class TestBirthRegistrationsTargets:
         twins = batch["is_multiple_birth"].astype(bool)
         pd.testing.assert_frame_equal(out.loc[batch.index[twins]], batch[twins])
 
-    @pytest.mark.asset("quarterly")
+    @pytest.mark.asset("daily")
     def test_a_rule_with_no_amber_band_is_refused_naming_what_closes_it(self, batch, cat):
         """Criterion 11."""
         with pytest.raises(targeting.TargetError, match="sex.*cannot be built"):
@@ -370,7 +375,7 @@ class TestBirthRegistrationsTargets:
             targeting.bdm_target(batch, targeting.Target(
                 "amber", ("place_of_birth_facility.completeness",)), seed=1, catalogue=poisoned)
 
-    @pytest.mark.asset("quarterly")
+    @pytest.mark.asset("daily")
     def test_the_same_seed_gives_the_same_rows(self, batch, cat):
         """Criterion 13."""
         t = targeting.Target("amber")
@@ -378,7 +383,7 @@ class TestBirthRegistrationsTargets:
         b, _ = targeting.bdm_target(batch, t, seed=5, catalogue=cat)
         pd.testing.assert_frame_equal(a, b)
 
-    @pytest.mark.asset("quarterly")
+    @pytest.mark.asset("daily")
     def test_what_was_moved_carries_no_row_data(self, batch, cat):
         """REQ-GEN-045 NFR 1: a rule and a count, never a value."""
         _out, moved = targeting.bdm_target(batch, targeting.Target("amber"), seed=6,
@@ -415,13 +420,13 @@ class TestTargetsAgainstTheRealTools:
         return bdm.run_check_local_file(str(csv), str(ref_csv), "trial:not-recorded",
                                         keep=False)[0]
 
-    @pytest.mark.asset("quarterly")
+    @pytest.mark.asset("daily")
     def test_a_green_target_passes_everything(self, tmp_path, batch, cat):
         out, _ = targeting.bdm_target(batch, targeting.Target("green"), seed=7, catalogue=cat)
         results = self._run(tmp_path, out)
         assert [r["check_id"] for r in results if r["status"] != "pass"] == []
 
-    @pytest.mark.asset("quarterly")
+    @pytest.mark.asset("daily")
     def test_an_amber_target_warns_on_its_rule_alone(self, tmp_path, batch, cat):
         key = "registering_parent_1_name.completeness"
         out, _ = targeting.bdm_target(batch, targeting.Target("amber", (key,)), seed=8,
@@ -645,7 +650,7 @@ class TestFindings155:
             targeting.bdm_target(batch, targeting.Target(
                 "amber", ("place_of_birth_facility.completeness",)), seed=1, catalogue=poisoned)
 
-    @pytest.mark.asset("quarterly")
+    @pytest.mark.asset("daily")
     def test_green_leaves_every_lever_a_margin(self, batch, cat):
         """Finding 6: 550 nulls against dbt's > 550 passed with none."""
         edge = batch.copy()
@@ -658,7 +663,7 @@ class TestFindings155:
             if trip:
                 assert _nulls(out, rule.column) <= (trip - 1) * 9 // 10, rule.column
 
-    @pytest.mark.asset("quarterly")
+    @pytest.mark.asset("daily")
     def test_the_record_says_built_to_and_was_is_the_original_count(self, batch, cat):
         """Finding 7: never a key called `verdict`."""
         t = targeting.Target("amber", ("registering_parent_2_name.completeness",))

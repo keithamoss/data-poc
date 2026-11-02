@@ -225,13 +225,16 @@ class TestAFileOfAnotherCollectionIsRefusedFirst:
 
     @pytest.mark.asset("quarterly")
     def test_it_is_refused_naming_its_collection_and_writes_nothing(self, tmp_path, tree):
+        """Another collection OF THE SAME ASSET's file (the asset split:
+        Birth Registrations, which this used, is another asset's now -
+        Emergency Department is Child Protection's sibling)."""
         deliveries, receipts = tree
-        path = _csv(tmp_path, "birth_registrations_2026-09-20.csv")
+        path = _csv(tmp_path, "ed_presentations.csv")
         with pytest.raises(hand_filing.WrongCollection) as exc:
             hand_filing.file_supply([path], "child-protection", "cp_run_",
                                     deliveries_dir=deliveries, receipts_dir=receipts, **KEPT)
-        assert "civil-registration" in str(exc.value)
-        assert "birth_registrations_2026-09-20.csv" in str(exc.value)
+        assert "emergency-department" in str(exc.value)
+        assert "ed_presentations.csv" in str(exc.value)
         assert not deliveries.exists() or not list(deliveries.iterdir())
         assert not receipts.exists() or not list(receipts.iterdir())
 

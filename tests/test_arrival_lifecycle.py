@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import pytest
 
+import asset_params
+
 from types import SimpleNamespace
 
 from qa_tools.tools import orchestrate
@@ -102,17 +104,18 @@ class TestTheCollectionsHalvesForwardWhatTheyAreGiven:
         orchestrate.steps("child-protection").file_and_overlay(A, [A, B])
         assert seen["among"] == [A, B]
 
-    def test_each_collections_steps_carry_its_own_id(self, monkeypatch):
-        for collection_id in ("civil-registration", "child-protection"):
-            calls = []
-            monkeypatch.setattr(orchestrate, "run_one",
-                                lambda cid, *a, **k: calls.append(("run", cid)) or [])
-            monkeypatch.setattr(orchestrate, "promote_after",
-                                lambda cid, *a, **k: calls.append(("gate", cid)))
-            steps = orchestrate.steps(collection_id)
-            steps.run_one({"run_id": "r"}, "T", "x", on_step=None)
-            steps.promote_after(A, [], "x")
-            assert calls == [("run", collection_id), ("gate", collection_id)], collection_id
+    @pytest.mark.parametrize("collection_id", asset_params.per_asset(
+        ["civil-registration", "child-protection"]))
+    def test_each_collections_steps_carry_its_own_id(self, monkeypatch, collection_id):
+        calls = []
+        monkeypatch.setattr(orchestrate, "run_one",
+                            lambda cid, *a, **k: calls.append(("run", cid)) or [])
+        monkeypatch.setattr(orchestrate, "promote_after",
+                            lambda cid, *a, **k: calls.append(("gate", cid)))
+        steps = orchestrate.steps(collection_id)
+        steps.run_one({"run_id": "r"}, "T", "x", on_step=None)
+        steps.promote_after(A, [], "x")
+        assert calls == [("run", collection_id), ("gate", collection_id)], collection_id
 
 
 #: The data asset this module's tests act for, unless a test says otherwise

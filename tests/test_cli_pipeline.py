@@ -21,7 +21,20 @@ from qa_tools.tools import orchestrate
 _runner = CliRunner()
 #: Every collection the hierarchy declares, by id - a run over the whole
 #: asset generates and runs each of them, not only the first two.
-_SHORT = {c.id: c.short for c in collections.all_collections()}
+class _Shorts:
+    """Collection id -> short, for the asset the test runs under (read when
+    asked, so a test of either asset gets its own - the asset split)."""
+
+    def __getitem__(self, collection_id):
+        return {c.id: c.short for c in collections.all_collections()}[collection_id]
+
+
+_SHORT = _Shorts()
+
+
+def _others(short):
+    """Every other collection the selected asset holds, by short."""
+    return [c.short for c in collections.all_collections() if c.short != short]
 
 
 def _stub_generation(monkeypatch, record=None):
@@ -30,7 +43,7 @@ def _stub_generation(monkeypatch, record=None):
     from cli.collection_cli import of as _cli_of
 
     shorts = [c.short for c in collections.all_collections()]
-    assert shorts[:2] == ["bdm", "cp"], shorts
+    assert shorts, "the asset holds no collection - nothing to stub"
     for short in shorts:
         monkeypatch.setattr(_cli_of(short), "generate_synthetic_data",
                             lambda _s=short, **_: record and record(_s))
@@ -82,7 +95,9 @@ class TestCorrectionsAfterAFullRun:
 
     def test_after_both(self, monkeypatch):
         calls = self._run(monkeypatch)
-        assert calls.index("confirm") > max(calls.index("bdm"), calls.index("cp"))
+        shorts = [c.short for c in collections.all_collections()]
+        assert len(shorts) > 1, shorts
+        assert calls.index("confirm") > max(calls.index(s) for s in shorts)
         assert calls.index("confirm") < calls.index("build-data")
 
     @pytest.mark.asset("daily")
@@ -145,9 +160,12 @@ def test_run_default_dataset_runs_both_bdm_and_cp(monkeypatch):
     assert calls == [*expected, "build-data", "embed", "sync"]
 
 
+@pytest.mark.asset("daily")
 def test_run_dataset_bdm_only_never_touches_cp(monkeypatch):
+    """--collection bdm runs Birth Registrations and nothing else its asset
+    holds (the asset split: Child Protection is another asset's now)."""
     from cli.collection_cli import of as _cli_of
-    bdm, cp = _cli_of('bdm'), _cli_of('cp')
+    bdm = _cli_of('bdm')
 
     calls = []
     monkeypatch.setattr(bdm, "generate_synthetic_data", lambda **_: calls.append("bdm-generate"))
@@ -155,9 +173,10 @@ def test_run_dataset_bdm_only_never_touches_cp(monkeypatch):
                         lambda collection_id, sequential=False:
                         calls.append(f"{_SHORT[collection_id]}-run"))
 
-    def _fail_if_called():
-        raise AssertionError("--dataset bdm must not touch Child Protection")
-    monkeypatch.setattr(cp, "generate_synthetic_data", _fail_if_called)
+    def _fail_if_called(**_):
+        raise AssertionError("--collection bdm must touch no other collection")
+    for other in _others("bdm"):
+        monkeypatch.setattr(_cli_of(other), "generate_synthetic_data", _fail_if_called)
     _patch_dashboard_build_embed(monkeypatch, calls)
     _patch_snapshot(monkeypatch, calls)
 
@@ -168,14 +187,19 @@ def test_run_dataset_bdm_only_never_touches_cp(monkeypatch):
 
 
 def test_run_dataset_cp_only_never_touches_bdm(monkeypatch):
+    """--collection cp runs Child Protection and nothing else its asset holds
+    (the asset split: its siblings are Emergency Department and Linkage
+    Products; Birth Registrations is another asset's)."""
     from cli.collection_cli import of as _cli_of
-    bdm, cp = _cli_of('bdm'), _cli_of('cp')
+    cp = _cli_of('cp')
 
     calls = []
 
-    def _fail_if_called():
-        raise AssertionError("--dataset cp must not touch Birth Registrations")
-    monkeypatch.setattr(bdm, "generate_synthetic_data", _fail_if_called)
+    def _fail_if_called(**_):
+        raise AssertionError("--collection cp must touch no other collection")
+    assert _others("cp"), "no sibling collection - this would prove nothing"
+    for other in _others("cp"):
+        monkeypatch.setattr(_cli_of(other), "generate_synthetic_data", _fail_if_called)
 
     monkeypatch.setattr(cp, "generate_synthetic_data", lambda **_: calls.append("cp-generate"))
     monkeypatch.setattr(orchestrate, "run_pipeline",

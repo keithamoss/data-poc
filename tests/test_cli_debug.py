@@ -192,9 +192,10 @@ def test_run_evidently_cp_defaults_reference_to_manifests_first_run_id(monkeypat
     assert seen == {"run_id": "cp_run_02", "reference_run_id": "cp_run_01"}
 
 
-@pytest.mark.asset("quarterly")
-@pytest.mark.parametrize("short,collection_id", [("bdm", "civil-registration"),
-                                                   ("cp", "child-protection")])
+@pytest.mark.parametrize("short,collection_id", [
+    # Each collection on its own asset (the asset split).
+    pytest.param("bdm", "civil-registration", marks=pytest.mark.asset("daily")),
+    pytest.param("cp", "child-protection", marks=pytest.mark.asset("quarterly"))])
 def test_build_warehouses_stages_that_collection(monkeypatch, short, collection_id):
     from qa_tools.tools import stage
 

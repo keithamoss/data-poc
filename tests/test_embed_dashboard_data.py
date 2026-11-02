@@ -469,8 +469,12 @@ def test_the_schedule_ended_notice_names_the_file_dates_are_authored_in(monkeypa
     edd.embed()
     match = re.search(r"const SCHEDULE_RUNWAY = (.*?);\n", out_html.read_text())
     assert match, "SCHEDULE_RUNWAY const not found in built output"
-    assert json.loads(match.group(1))["configFile"] == "contract/calendar.yaml"
-    assert supply_holds.schedule_file() == "contract/calendar.yaml"
+    from qa_tools.common import assets
+
+    # The selected asset's calendar, by repository path (the asset split).
+    expected = f"{assets.folder_rel()}/calendar.yaml"
+    assert json.loads(match.group(1))["configFile"] == expected
+    assert supply_holds.schedule_file() == expected
 
 
 @pytest.mark.asset("daily")
@@ -503,7 +507,22 @@ def test_slot_due_dates_are_only_for_a_cadence_rule_calendar():
             self.due_at = datetime.fromisoformat(due).replace(tzinfo=timezone.utc)
 
     got = edd._slot_due_dates({
-        "cp-clients": [Slot("2026-05-01", "2026-02-01T01:00:00")],
+        "cp-clients": [Slot("2026-05-01", "2026-02-01T01:00:00")]})
+    assert got == {}
+
+
+@pytest.mark.asset("daily")  # Birth Registrations is the daily asset's
+def test_slot_due_dates_travel_for_the_daily_cadence_rule():
+    """The other half of the test above, on the asset the cadence-rule
+    calendar is defined in (the asset split)."""
+
+    class Slot:
+        def __init__(self, period_date, due):
+            from datetime import date, datetime, timezone
+            self.date = date.fromisoformat(period_date)
+            self.due_at = datetime.fromisoformat(due).replace(tzinfo=timezone.utc)
+
+    got = edd._slot_due_dates({
         "birth-registrations": [Slot("2026-06-18", "2026-06-17T06:00:00"),
                                 Slot("2026-06-30", "2026-06-30T06:00:00")]})
     assert got == {"birth-registrations": {"2026-06-18": "2026-06-17"}}

@@ -167,7 +167,7 @@ class TestArrivalPatternsNameRealDatasets:
                    self._doc(["child-protection-casework"]), "birth-registrations")
         assert any("child-protection-casework" in e for e in validate_hierarchy.validate())
 
-    @pytest.mark.asset("quarterly")
+    @pytest.mark.asset("daily")  # its contract describes Birth Registrations
     def test_every_offending_pattern_is_reported_not_just_the_first(self, tmp_path, monkeypatch):
         _contract(tmp_path, monkeypatch, "c.yaml",
                    self._doc(["nope-one", "nope-two", "cp-clients"]), "birth-registrations")
