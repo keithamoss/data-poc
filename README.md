@@ -123,9 +123,9 @@ nothing here is a hand-rolled stand-in:
 
 | Tool | What's real | What runs it |
 |---|---|---|
-| **datacontract-cli** | `contract/registry-services/bdm-birth-registrations-contract.yaml` is a genuine ODCS v3.2.0 contract — `datacontract lint` passes on it. | `qa_tools/tools/run_datacontract.py` runs the actual `datacontract-cli` Python API (`DataContract.test()`) against each run's own view schema in the warehouse. |
-| **Soda Core** | `contract/registry-services/bdm-birth-registrations-soda-checks.yml` is genuine SodaCL. | `qa_tools/tools/run_soda.py` runs the real `soda-core` `Scan` API against each run's own view schema. |
-| **dbt-core** | `dbt_project/` is a real dbt project — `dbt_project.yml`, a staging model, `schema.yml` with real generic tests and severity config. | `qa_tools/tools/run_dbt.py` shells out to the real `dbt` CLI (`dbt build`) against each run's own view schema. |
+| **datacontract-cli** | `assets/daily/registry-services/bdm-birth-registrations-contract.yaml` is a genuine ODCS v3.2.0 contract — `datacontract lint` passes on it. | `qa_tools/tools/run_datacontract.py` runs the actual `datacontract-cli` Python API (`DataContract.test()`) against each run's own view schema in the warehouse. |
+| **Soda Core** | `assets/daily/registry-services/bdm-birth-registrations-soda-checks.yml` is genuine SodaCL. | `qa_tools/tools/run_soda.py` runs the real `soda-core` `Scan` API against each run's own view schema. |
+| **dbt-core** | Each asset's `assets/<asset>/dbt/` is a real dbt project — `dbt_project.yml`, a staging model, `schema.yml` with real generic tests and severity config. | `qa_tools/tools/run_dbt.py` shells out to the real `dbt` CLI (`dbt build`) against each run's own view schema. |
 | **Evidently AI** | Population Stability Index (PSI) on the `sex` column vs. a reference run. | `qa_tools/tools/run_evidently.py` runs the real `evidently.Report` + `DataDriftPreset` (the current 0.7.x API). |
 
 `pyproject.toml` lists the exact package set verified to install and run
@@ -161,7 +161,10 @@ Git history holds the actual code if it's ever needed again as a reference.
 ## Layout
 
 ```
-contract/                    the two real YAML files, copied verbatim from this project's docs
+assets/<asset>/              one data asset's configuration (quarterly, daily): its hierarchy and
+                               calendar, each agency's contracts and check files, its people,
+                               presentation words and its own dbt project (assets/<asset>/dbt/)
+dbt_shared/                  the dbt macros and generic tests both assets' dbt projects use
 generator/                   a real package (generator/__init__.py) - invoked via `mothman bdm/cp
                                generate-synthetic-data` (`cli/`, never a bare `python3 -m generator.<module>`)
   daily_batch.py               generates ONE day's birth-registration batch (an event-flow model,
@@ -183,18 +186,16 @@ generator/                   a real package (generator/__init__.py) - invoked vi
   names_au.py, presentation.py, dirty.py   the canonical copies - synthetic_data_generator/
                                imports these from here rather than keeping its own duplicates
                                (see "Relationship to the synthetic_data_generator package" below)
-dbt_project/                 a real (if minimal) dbt project — dbt_project.yml, a staging model,
-                               schema.yml with genuine two-tier severity config
 qa_tools/                    runs the actual dbt/soda/datacontract-cli/evidently tools - a proper Python
                                package now (qa_tools/__init__.py etc.), one subpackage per dataset plus
                                a common/ of tool-generic code shared between them (see "Code layout" below)
   collections/                 the collection registry (REQ-PIPE-240): every collection the hierarchy in
-                               contract/data-asset.yaml declares, each run through a small adapter module
+                               the asset's data-asset.yaml declares, each run through a small adapter module
                                named by its id - civil_registration.py, child_protection.py. A new collection
                                is picked up everywhere through it, or refused by name; `mothman check`'s
                                collections gate fails on one without an adapter
   dbt_profiles/profiles.yml     dbt-duckdb connection profile (no secrets - just a path) - shared by both
-                               datasets, since there's one dbt_project/
+                               assets' dbt projects
   common/
     parallel_orchestrate.py       runs one run's four tools beside each other, for the orchestrator in
                                  tools/ - see "Speed" below
@@ -217,7 +218,7 @@ pipeline/                    a real package (pipeline/__init__.py) - invoked via
                                run`/`mothman dashboard build-data` (`cli/`, never bare `python3 -m pipeline.<module>`)
   build_dashboard_data.py       reshapes every collection's results file into the dashboard's data
                                shape - one builder for every collection, each column's type and
-                               description from its contract, the rest from contract/presentation.yaml
+                               description from its contract, the rest from the asset's presentation.yaml
 dashboard/
   qa-reporting-dashboard.template.html   the 3-tier QA dashboard's hand-authored UI source (HTML/CSS/JS) -
                                edit this file, not the built .html below
@@ -370,7 +371,7 @@ export MOTHMAN_RAW_BUCKET_NAME=your-real-raw-data-bucket-name
 globally-unique bucket name at deploy time (no fixed `bucket_name=`
 passed). The `bdm/`/`cp/` prefixes and per-dataset default local root
 (`data/raw`/`data/cp_raw`) come from each dataset's own real ODCS
-contract (`contract/*.yaml`'s `s3Source`/`localSource`
+contract (each contract's `s3Source`/`localSource`
 `customProperties`, verified 2026-09-19 against real datacontract-cli
 parsing before landing there) — a Child Protection "delivery" here is a
 prefix holding all 6 real table CSVs together
