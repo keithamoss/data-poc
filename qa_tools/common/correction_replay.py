@@ -34,6 +34,7 @@ import contextlib
 from datetime import date, datetime
 
 from qa_tools.common import asset_time, correction_apply, correction_trial, decision_log
+from qa_tools.common import assets as _assets
 
 
 def merge_instant(p: correction_apply.Pending) -> datetime:
@@ -156,7 +157,7 @@ def confirm_due(conn=None, *, until: datetime | None = None, effective_at: str |
                     f"The scripted confirmation of {p.reference} (keeping {scenarios_named}) "
                     f"was refused: {e} Its proposed moves: "
                     f"{'; '.join(moves) or 'none'}. Put the script right in "
-                    f"contract/scripted_decisions.yaml.") from e
+                    f"{_assets.config_dir()}/synthetic/scripted_decisions.yaml.") from e
             done.append(p.reference)
             say(f"Confirmed correction {p.reference} as the data asset's manager: "
                 f"{len(applied.moved)} moved, {len(applied.placed)} placed, "

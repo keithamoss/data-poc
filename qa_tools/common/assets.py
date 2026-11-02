@@ -330,6 +330,17 @@ def folder_rel() -> str:
         return folder.as_posix()
 
 
+def config_dir() -> str:
+    """The selected asset's configuration folder for a MESSAGE to name -
+    `folder_rel()` when an asset is selected, else the generic
+    `assets/<asset>`, so a refusal or warning naming a file never itself
+    fails for want of an asset (critic finding 7, the asset split)."""
+    try:
+        return folder_rel()
+    except AssetNotSelected:
+        return "assets/<asset>"
+
+
 def dbt_rel() -> str:
     """The selected asset's dbt project relative to the repository root,
     POSIX-style - `assets/<asset>/dbt` - for the readers that name its files

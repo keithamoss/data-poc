@@ -35,6 +35,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from qa_tools.common import config_yaml
+from qa_tools.common import assets as _assets
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 ENVIRONMENTS_PATH = ROOT / "assets" / "environments.yaml"
@@ -188,8 +189,8 @@ def for_connection(path: Path | str | None = None) -> Environment:
     env = current(path)
     if env.ticketing and "/" not in (ticket_repository() or "").strip("/"):
         raise EnvironmentError_(
-            f"the {env.id!r} environment turns ticketing on, but contract/data-asset.yaml "
+            f"the {env.id!r} environment turns ticketing on, but {_assets.config_dir()}/data-asset.yaml "
             f"names no ticket_repository to open tickets in. Name it (owner/repo) or turn "
-            f"ticketing off for {env.id!r} in contract/environments.yaml.")
+            f"ticketing off for {env.id!r} in assets/environments.yaml.")
     return env
 

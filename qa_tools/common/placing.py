@@ -36,6 +36,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from qa_tools.common import decision_log, supply_holds
+from qa_tools.common import assets as _assets
 
 #: The words every route uses for a placement (criterion 41).
 VERB = "placed into"
@@ -97,7 +98,7 @@ def plan(conn, *, dataset_id: str, supply: str, to_period: str) -> Plan:
         # Criterion 22: it files itself once dates cover it (REQ-PIPE-154).
         raise dl.DecisionRefused(
             f"{supply} is held because {dataset_id}'s schedule has ended, so it is not "
-            f"placed by hand: add the next delivery dates to contract/calendar.yaml and it "
+            f"placed by hand: add the next delivery dates to {_assets.config_dir()}/calendar.yaml and it "
             f"files itself. Where a declared correction is needed:\n"
             f"  mothman schedule draft-correction")
     if held.doubly_fed and to_period != held.doubly_fed["period"]:

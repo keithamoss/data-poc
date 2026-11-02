@@ -31,6 +31,7 @@ import ast
 import re
 import sys
 from pathlib import Path
+from qa_tools.common import assets as _assets
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 
@@ -264,7 +265,7 @@ def config_problems(package: Path | None = None) -> list[str]:
                                 f"{len(name.encode())} bytes - over PostgreSQL's "
                                 f"{PG_IDENTIFIER_BYTES}")
         if not (hierarchy.data_asset_yaml().parent / c.contract).is_file():
-            problems.append(f"{c.id!r}'s contract file contract/{c.contract} is missing")
+            problems.append(f"{c.id!r}'s contract file {_assets.config_dir()}/{c.contract} is missing")
 
     for field in ("dataset_id", "table"):
         seen = {}

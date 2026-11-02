@@ -545,7 +545,11 @@ def embed() -> None:
     # The file a person edits to add dates - supply_holds' one constant,
     # contract/calendar.yaml since REQ-PIPE-110, never a second copy.
     from qa_tools.common import supply_holds
+    from qa_tools.common import assets as _assets
     schedule_runway = {"configFile": supply_holds.schedule_file(),
+                        # The asset's configuration folder, for every other
+                        # file the page names (critic finding 7, the split).
+                        "configDir": _assets.config_dir(),
                         "defaultThreshold": runway.DEFAULT_WARNING_SLOTS,
                         "calendars": []}
     for cal in schedule.calendars():

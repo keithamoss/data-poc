@@ -205,7 +205,7 @@ def deliveries_command(wanted: str | None) -> None:
 
 def _filed_by_text(d) -> str:
     """Whether a person filed it, by which route and who (REQ-PIPE-147
-    criterion 7) - the person resolved through contract/people.yaml."""
+    criterion 7) - the person resolved through assets/<asset>/people.yaml."""
     from qa_tools.common import people
 
     filed_by = getattr(d, "filed_by", None) or {}
@@ -1086,7 +1086,7 @@ def amber_setting_command(collection_id: str | None) -> None:
     """The warn setting in force for each dataset - what happens to a supply
     whose checks come back warning - and where it was set (REQ-PIPE-122 NFR
     1; REQ-DASH-359 criterion 12), so a value nobody remembers setting can be
-    found. Configured as amber_setting in contract/data-asset.yaml.
+    found. Configured as amber_setting in assets/<asset>/data-asset.yaml.
 
     Plain lines, one per dataset, so the list can be read or grepped.
     """
@@ -1225,7 +1225,7 @@ def decide_command(operation: str, dataset_id: str, period: str | None,
     \f
     THE FLAG FORM OF THE WIZARD, calling the same implementation the
     GitHub route calls. The actor is whoever `git config user.email`
-    says, checked against contract/people.yaml - there is no way to
+    says, checked against assets/<asset>/people.yaml - there is no way to
     state one, on either route.
 
     IT WRITES THE DECISION LOG AND CALLS NO GITHUB (criterion 30). The
@@ -1448,8 +1448,8 @@ def corrections_command(reference: str | None) -> None:
       mothman supply corrections
       mothman supply corrections --reference CAB-123
 
-    A correction declared in contract/calendar.yaml (or the timezone's in
-    contract/data-asset.yaml) is pending until the asset manager confirms
+    A correction declared in assets/<asset>/calendar.yaml (or the timezone's in
+    assets/<asset>/data-asset.yaml) is pending until the asset manager confirms
     it. With --reference, its moves and verdict changes are worked out NOW,
     from what is filed today - by the same computation as the impact preview
     the change board saw - summary by dataset first. Anyone allowlisted may

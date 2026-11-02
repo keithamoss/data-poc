@@ -13,6 +13,7 @@ import re
 from pathlib import Path
 
 import yaml
+from qa_tools.common import assets as _assets
 
 REPO = Path(__file__).resolve().parent.parent.parent
 
@@ -205,7 +206,7 @@ def problems(root: Path = REPO) -> list[str]:
             if code is not None:
                 by_code.setdefault(code, did)
             if did not in where:
-                out.append(f"{head}, which is not in the hierarchy (contract/data-asset.yaml).")
+                out.append(f"{head}, which is not in the hierarchy ({_assets.config_dir()}/data-asset.yaml).")
                 continue
             mapping[did] = (code, cols)
             _a, l_coll, l_ds = where[did]

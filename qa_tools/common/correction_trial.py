@@ -34,6 +34,7 @@ from __future__ import annotations
 import contextlib
 from dataclasses import dataclass, field, replace
 from datetime import date, datetime, timedelta
+from qa_tools.common import assets as _assets
 
 #: The instants of a slot a correction can move, in the order a reader
 #: thinks in, with the dashboard's words for them (NFR 1).
@@ -564,8 +565,8 @@ def working() -> tuple[dict, dict]:
     except Exception as exc:  # noqa: BLE001 - a YAML slip, or a missing file
         raise Unreadable(f"the working copy cannot be read, so nothing was compared: "
                          f"{exc}") from exc
-    return _readable(docs, "the working copy of contract/calendar.yaml or "
-                           "contract/data-asset.yaml")
+    return _readable(docs, f"the working copy of {_assets.config_dir()}/calendar.yaml or "
+                           f"{_assets.config_dir()}/data-asset.yaml")
 
 
 def at_ref(ref: str) -> tuple[dict, dict]:

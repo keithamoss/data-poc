@@ -20,6 +20,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from qa_tools.common import config_yaml
+from qa_tools.common import assets as _assets
 
 #: Fields a confirmation must not carry: it is timed by the replay, not by
 #: an offset from a supply (criterion 5).
@@ -90,10 +91,10 @@ def problems(confirmations: list[Confirmation], *, declared: set[str],
     out: list[str] = []
     seen: dict[str, int] = {}
     for i, c in enumerate(confirmations, 1):
-        where = f"contract/scripted_decisions.yaml correction {i} ({c.change_reference or '?'})"
+        where = f"{_assets.config_dir()}/synthetic/scripted_decisions.yaml correction {i} ({c.change_reference or '?'})"
         if c.change_reference not in declared:
             out.append(f"{where}: {c.change_reference!r} is not a declared correction - "
-                       f"declare it in contract/calendar.yaml (or contract/data-asset.yaml) "
+                       f"declare it in {_assets.config_dir()}/calendar.yaml (or {_assets.config_dir()}/data-asset.yaml) "
                        f"first")
         first = seen.setdefault(c.change_reference, i)
         if first != i:

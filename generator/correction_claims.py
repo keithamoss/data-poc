@@ -21,6 +21,7 @@ from datetime import date, timedelta
 from typing import Mapping, Sequence
 
 from generator.scenario_injection import CannotPlace
+from qa_tools.common import assets as _assets
 
 
 def _docs_either_side(reference: str, docs):
@@ -63,7 +64,7 @@ def altered(reference: str, datasets: Sequence[str], *, docs=None,
     p, before, after = _docs_either_side(reference, docs)
     if p is None:
         raise CannotPlace(f"{reference!r} is not a declared correction - declare it in "
-                          f"contract/calendar.yaml first")
+                          f"{_assets.config_dir()}/calendar.yaml first")
     out: dict[str, set[str]] = {}
     for dataset_id in datasets:
         old, new = _slots(dataset_id, before[0], until), _slots(dataset_id, after[0], until)
@@ -123,7 +124,7 @@ def check(injections: Sequence, generated: Mapping[str, Sequence], *, docs=None,
         names = ", ".join(i.scenario_id for i in riding)
         if p is None:
             raise CannotPlace(f"{names} ride {reference!r}, which is not a declared "
-                              f"correction - declare it in contract/calendar.yaml first")
+                              f"correction - declare it in {_assets.config_dir()}/calendar.yaml first")
         if date.fromisoformat(p.date[:10]) > history_end:
             raise CannotPlace(f"{names}: correction {reference} is dated {p.date}, after the "
                               f"generated history ends ({history_end}) - move its date "

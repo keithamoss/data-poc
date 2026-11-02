@@ -11,6 +11,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from qa_tools.common import config_yaml
+from qa_tools.common import assets as _assets
 
 #: What every collection's entry must carry.
 COLLECTION_KEYS = ("provider", "delivery_format", "provenance")
@@ -47,7 +48,7 @@ def for_collection(collection_id: str, path: Path | None = None) -> dict:
     entry = (load(path).get("collections") or {}).get(collection_id)
     if not isinstance(entry, dict):
         raise ValueError(f"collection {collection_id!r} has no entry under `collections:` in "
-                         f"contract/presentation.yaml")
+                         f"{_assets.config_dir()}/presentation.yaml")
     return entry
 
 
@@ -90,18 +91,18 @@ def problems(path: Path | None = None) -> list[str]:
 
     path = Path(path or _default())
     if not path.is_file():
-        return ["contract/presentation.yaml is missing, so the dashboard cannot be built"]
+        return [f"{_assets.config_dir()}/presentation.yaml is missing, so the dashboard cannot be built"]
     found = load(path).get("collections") or {}
     out = []
     for coll in collections.all_collections():
         entry = found.get(coll.id)
         if not isinstance(entry, dict):
             out.append(f"collection {coll.id!r} has no entry under `collections:` in "
-                       f"contract/presentation.yaml, so the dashboard cannot be built for it")
+                       f"{_assets.config_dir()}/presentation.yaml, so the dashboard cannot be built for it")
             continue
         for key in COLLECTION_KEYS:
             if not isinstance(entry.get(key), str):
-                out.append(f"collection {coll.id!r}'s entry in contract/presentation.yaml has "
+                out.append(f"collection {coll.id!r}'s entry in {_assets.config_dir()}/presentation.yaml has "
                            f"no `{key}`")
     out += _tile_word_problems(path)
     return out
@@ -118,10 +119,10 @@ def _tile_word_problems(path: Path) -> list[str]:
     for _container, name in amber_setting.list_setting_keys(doc):
         if not list_setting_label(name, path):
             out.append(f"list setting {name!r} has no `label` under `list_settings:` in "
-                       f"contract/presentation.yaml, so its tile on the dataset page has no name")
+                       f"{_assets.config_dir()}/presentation.yaml, so its tile on the dataset page has no name")
     for ds in hierarchy.all_datasets():
         if _single_codeless_source(ds) is not None and not relation_word(ds.dataset_id, path):
             out.append(f"dataset {ds.dataset_id!r} links one source with no code but has no "
-                       f"`relation` under `datasets:` in contract/presentation.yaml, so its tile "
+                       f"`relation` under `datasets:` in {_assets.config_dir()}/presentation.yaml, so its tile "
                        f"on the dataset page has no name")
     return out

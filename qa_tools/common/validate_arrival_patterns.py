@@ -41,6 +41,7 @@ from pathlib import Path
 
 from qa_tools.common import (
     arrival_patterns, delivery_log, hierarchy, slots, supply_db)
+from qa_tools.common import assets as _assets
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 
@@ -127,7 +128,7 @@ def validate(conn=None) -> str:
     for dataset_id in missing_patterns():
         problems.append(
             f"dataset {dataset_id!r} is expected to receive supplies and declares no "
-            f"`arrival_pattern:` in contract/data-asset.yaml, so nothing it is sent can "
+            f"`arrival_pattern:` in {_assets.config_dir()}/data-asset.yaml, so nothing it is sent can "
             f"ever be recognised as its own.")
 
     filenames = committed_filenames(conn)

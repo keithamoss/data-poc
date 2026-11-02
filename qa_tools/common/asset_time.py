@@ -84,7 +84,7 @@ class ZoneVersion:
         return datetime.combine(self.effective_from, time.min, tzinfo=self.zone)
 
 
-def parse_timezone_versions(doc: dict, where: str = "contract/data-asset.yaml") -> tuple[ZoneVersion, ...]:
+def parse_timezone_versions(doc: dict, where: str = "assets/<asset>/data-asset.yaml") -> tuple[ZoneVersion, ...]:
     """The asset's timezone versions from a parsed data-asset.yaml, oldest
     first. Refuses the old bare `timezone: <name>` form and a fixed UTC
     offset (criterion 1) rather than reading either."""

@@ -943,3 +943,24 @@ class TestTheGateOutcomeScenarios:
 #: The data asset this module's tests act for, unless a test says otherwise
 #: (C11, Keith 2026-11-02: every test module names its asset).
 pytestmark = pytest.mark.asset("quarterly")
+
+
+class TestAnInjectionNamingNoAssetsDataset:
+    """PROVISIONAL (the asset split, critic finding 4, waiting on Keith): an
+    injection whose dataset neither asset declares - a typo'd id - is passed
+    over by both assets' generation rather than refused, because telling it
+    from the other asset's would mean reading the other asset (REQ-PIPE-342
+    criterion 8). This pins today's behaviour so a change to it is deliberate."""
+
+    @pytest.mark.parametrize("asset", ["quarterly", "daily"])
+    def test_it_is_silently_dropped_by_each_asset(self, monkeypatch, asset):
+        import dataclasses
+
+        monkeypatch.setenv(assets.ASSET_ENV, asset)
+        real = si.this_assets_injections()
+        assert real, f"{asset} places no injection - the comparison would prove nothing"
+        stray = dataclasses.replace(real[0], scenario_id="TS-STRAY", dataset_id="no-such-dataset")
+        monkeypatch.setattr(si, "INJECTIONS", si.INJECTIONS + (stray,))
+        got = si.this_assets_injections()
+        assert stray not in got
+        assert set(got) == set(real)

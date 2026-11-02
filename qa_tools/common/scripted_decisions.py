@@ -52,6 +52,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 from qa_tools.common import config_yaml
+from qa_tools.common import assets as _assets
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 
@@ -249,7 +250,7 @@ def problems(scripts: list[Script], *, registered: set[str],
 
     out = []
     for i, s in enumerate(scripts, 1):
-        where = f"contract/scripted_decisions.yaml decision {i} ({label(s) if s.scenario or s.period else '?'})"
+        where = f"{_assets.config_dir()}/synthetic/scripted_decisions.yaml decision {i} ({label(s) if s.scenario or s.period else '?'})"
         if s.period is not None:
             out += _chain_problems(s, where)
         elif s.scenario not in registered:
@@ -264,7 +265,7 @@ def problems(scripts: list[Script], *, registered: set[str],
         try:
             hierarchy.dataset(s.dataset_id)
         except hierarchy.UnknownDatasetError:
-            out.append(f"{where}: no dataset {s.dataset_id!r} in contract/data-asset.yaml")
+            out.append(f"{where}: no dataset {s.dataset_id!r} in {_assets.config_dir()}/data-asset.yaml")
         if s.period is None:
             out += _scope_problems(s, where)
             out += _settlement_problems(s, where)
@@ -286,7 +287,7 @@ def problems(scripts: list[Script], *, registered: set[str],
             other = scripts[first - 1].scenario
             scope = (f"({s.scenario})" if other == s.scenario
                      else f"({other} and {s.scenario}, which share a placement)")
-            out.append(f"contract/scripted_decisions.yaml decisions {first} and {i} "
+            out.append(f"{_assets.config_dir()}/synthetic/scripted_decisions.yaml decisions {first} and {i} "
                        f"{scope} are both named {s.name!r} - a name is unique within the "
                        f"scenarios sharing a placement; rename one")
     return out

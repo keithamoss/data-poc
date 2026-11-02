@@ -44,6 +44,7 @@ from dataclasses import dataclass
 from datetime import date
 
 from qa_tools.common import hierarchy, schedule
+from qa_tools.common import assets as _assets
 
 # How few future slots left before we say so. A year of quarterly
 # supplies, which is the smallest window in which "ask the agency for
@@ -324,7 +325,7 @@ def warning_lines(as_of: date) -> list[str]:
                 f"EXHAUSTED (not failing the build, yet): calendar {runway.calendar_name!r} has NO "
                 f"future dates left - its last is {runway.last_period} on {runway.last_date}, "
                 f"and {datasets}. Author the next year's dates in "
-                f"contract/calendar.yaml; `mothman schedule candidate-dates` proposes them. "
+                f"{_assets.config_dir()}/calendar.yaml; `mothman schedule candidate-dates` proposes them. "
                 f"Until then those datasets cannot be processed.")
         else:
             # THE NUMBER AND THE PERIOD BELONG TO ONE DATASET, and the
@@ -357,7 +358,7 @@ def warning_lines(as_of: date) -> list[str]:
                 f"future supply slot(s) left - its own last is {runway.driving_last_period}, due on "
                 f"the {runway.driving_last_date.day} {runway.driving_last_date.strftime('%B %Y')} "
                 f"round. {datasets[0].upper()}{datasets[1:]}."
-                f"{horizon} Author the next year's dates in contract/calendar.yaml; "
+                f"{horizon} Author the next year's dates in {_assets.config_dir()}/calendar.yaml; "
                 f"`mothman schedule candidate-dates` proposes them.")
     return lines
 

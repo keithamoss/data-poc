@@ -43,6 +43,7 @@ from typing import Sequence
 
 from generator.targeting import Target
 from qa_tools.common import assets, scenario_map
+from qa_tools.common import assets as _assets
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -868,7 +869,7 @@ def _refuse_outside_hold(injection: Injection, anchor_day: date) -> None:
         raise CannotPlace(
             f"{injection.scenario_id}: {', '.join(d.isoformat() for d in outside)} "
             f"fall(s) outside a hold amber-setting era, and the scenario's held supplies "
-            f"need it - move the anchor back inside the era (contract/data-asset.yaml's "
+            f"need it - move the anchor back inside the era ({_assets.config_dir()}/data-asset.yaml's "
             f"amber_setting), or add a version; it is not shifted for you")
 
 
@@ -920,13 +921,13 @@ def link_dates(injection: Injection, placement: Placement,
             return ref, (None if on is None else asset_time.start_of_day(on)), (
                 None if on is not None else
                 f"{reference!r} is not a declared correction - declare it in "
-                f"contract/calendar.yaml, or fix the link")
+                f"{_assets.config_dir()}/calendar.yaml, or fix the link")
         label = f"decision {ref!r}"
         named = [s for s in mine if s.name == ref]
         if not named:
             return label, None, (f"no scripted decision of {', '.join(ours)} is named "
                                  f"{ref!r} - give that decision `name: {ref}` in "
-                                 f"contract/scripted_decisions.yaml, or fix the link")
+                                 f"{_assets.config_dir()}/synthetic/scripted_decisions.yaml, or fix the link")
         if len(named) > 1:
             return label, None, (f"{len(named)} scripted decisions of {', '.join(ours)} "
                                  f"are named {ref!r}, so it names none of them - rename one")
@@ -1234,7 +1235,7 @@ def inheritance_placements(periods: Sequence) -> list[Placement]:
     inherited = [i for i, p in enumerate(periods[:-1]) if p.name not in delivered and i > 0]
     if not inherited:
         raise CannotPlace(f"TS-79: {INHERITING_DATASET} inherits in no generated quarter - "
-                          f"its participation in contract/calendar.yaml now covers every "
+                          f"its participation in {_assets.config_dir()}/calendar.yaml now covers every "
                           f"one, so there is no inheritance to link")
     out = []
     for sid, i, why in (("TS-79a", inherited[-1], "the newest quarter it inherits in "
@@ -1252,7 +1253,7 @@ def inheritance_placements(periods: Sequence) -> list[Placement]:
             scenario_id=sid, dataset=INHERITING_DATASET, period=p.name,
             period_date=p.round_date,
             config=(f"quarterly; {INHERITING_DATASET} is delivered only in the quarters "
-                    f"contract/calendar.yaml's participation names, so {p.name} - {why} - "
+                    f"{_assets.config_dir()}/calendar.yaml's participation names, so {p.name} - {why} - "
                     f"inherits {source}'s supply. Nothing generated for it."),
             in_place_on=((sid, middle.isoformat()),),
             subjects=((sid, scenario_map.STANDING_IN_PILL),)))

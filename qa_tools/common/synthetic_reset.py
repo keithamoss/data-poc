@@ -29,6 +29,7 @@ from __future__ import annotations
 from qa_tools.common import config_yaml
 
 from qa_tools.common import qa_store, supply_db
+from qa_tools.common import assets as _assets
 
 
 class NotSynthetic(Exception):
@@ -174,7 +175,7 @@ def reset(conn: supply_db.SupplyConnection, typed: str,
     """
     if not is_synthetic():
         raise NotSynthetic(
-            f"{asset_id()} is not declared synthetic in contract/data-asset.yaml, so "
+            f"{asset_id()} is not declared synthetic in {_assets.config_dir()}/data-asset.yaml, so "
             f"its history is treated as real and nothing was deleted.")
     if in_production():
         raise NotSynthetic("this checkout is acting as `production` (MOTHMAN_ENVIRONMENT), "

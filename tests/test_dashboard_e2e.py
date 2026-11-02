@@ -2681,7 +2681,8 @@ class TestAnExhaustedScheduleIsLoud:
     def test_the_notice_names_the_file_to_edit(self, page, dashboard_html_without_blockers):
         _goto(page, dashboard_html_without_blockers, in_place_on=self.ONE_EXHAUSTED)
         text = " ".join(page.locator(".notice-exhausted").inner_text().split())
-        assert "contract/calendar.yaml" in text
+        from qa_tools.common import assets
+        assert f"{assets.folder_rel()}/calendar.yaml" in text
         assert "candidate-dates" in text, "and how to get the next dates proposed"
 
     def test_the_notice_cannot_be_dismissed(self, page, dashboard_html_without_blockers):
@@ -2714,7 +2715,8 @@ class TestAnExhaustedScheduleIsLoud:
         _goto(page, dashboard_html_without_blockers, state=self.DS, in_place_on=self.ONE_EXHAUSTED)
         text = " ".join(page.locator("#view").inner_text().split())
         assert "delivery schedule has ended" in text.lower()
-        assert "contract/calendar.yaml" in text
+        from qa_tools.common import assets
+        assert f"{assets.folder_rel()}/calendar.yaml" in text
 
     def test_it_names_the_datasets_own_last_period(self, page, dashboard_html_without_blockers):
         """cp-case-workers' last owed period is 2027-Q4, which its 1 August

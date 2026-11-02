@@ -51,7 +51,7 @@ class _KnownChoice(click.ParamType):
     (post-build-review #30).
 
     RESOLVED LAZILY rather than at import: the values come from
-    `contract/data-asset.yaml` and `contract/calendar.yaml`, and reading it while the module is
+    `assets/<asset>/data-asset.yaml` and `assets/<asset>/calendar.yaml`, and reading it while the module is
     being imported would make every `mothman --help` - including the
     ones that never touch a schedule - depend on that file parsing.
     A gate exists to tell you it does not; the help should not be the
@@ -125,6 +125,9 @@ def show_command(dataset: str | None, until, show_all: bool, on) -> None:
       mothman schedule show --dataset cp-case-workers
       mothman schedule show --dataset birth-registrations --until 2026-12-31
       mothman schedule show --dataset cp-clients --on 2024-06-01
+
+    A --dataset is one of the selected asset's own: birth-registrations is
+    the daily asset's, the cp- datasets the quarterly asset's.
 
     By default a single dataset shows a WINDOW around today - the last
     few periods and the next few - because at daily cadence the full
@@ -276,7 +279,7 @@ def _show_dataset(dataset: str, until: date | None, show_all: bool,
             marker = "->" if p.name == _next_owed(shown, by_period, today) else ""
         # THE PERIOD'S DATE IS A CONFIG ECHO and keeps its written form
         # (criterion 8) - a reader comparing this table against
-        # contract/calendar.yaml is comparing those two columns. The
+        # assets/<asset>/calendar.yaml is comparing those two columns. The
         # DUE and CLAIMABLE instants are not in any file: this computes
         # them, so they are written the way everything else a person
         # reads is written (REQ-DASH-071).
@@ -390,7 +393,7 @@ def candidate_dates_command(calendar_name: str, year: int, as_yaml: bool) -> Non
     These are CANDIDATES and nothing evaluates against them. The dates
     in the calendar ARE the supplier agreement; this only saves somebody
     typing out four dates and working out which ones fall on a weekend.
-    Copy what you want into contract/calendar.yaml, as a NEW version
+    Copy what you want into assets/<asset>/calendar.yaml, as a NEW version
     with its own effective_from and changelog entry.
     """
     from qa_tools.common import schedule
@@ -434,7 +437,7 @@ def candidate_dates_command(calendar_name: str, year: int, as_yaml: bool) -> Non
 
     if as_yaml:
         # THE THING THE HELP TELLS YOU TO COPY. It said "copy what you
-        # want into contract/calendar.yaml" and printed a Rich table
+        # want into assets/<asset>/calendar.yaml" and printed a Rich table
         # (post-build-review #28). Printed bare, so it can be piped.
         import yaml as _yaml
         body = {"effective_from": f"{year}-01-01",
@@ -574,8 +577,8 @@ def preview_correction_command(ref: str | None, output: str | None) -> None:
       mothman schedule preview-correction
       mothman schedule preview-correction --against origin/main --output impact.md
 
-    READS THE DATABASE. Compares the working copy of contract/calendar.yaml
-    and contract/data-asset.yaml with the same files at a git ref, and lists
+    READS THE DATABASE. Compares the working copy of assets/<asset>/calendar.yaml
+    and assets/<asset>/data-asset.yaml with the same files at a git ref, and lists
     each slot whose times move, each period that gains or loses an
     obligation, each recorded verdict that would change and each supply the
     filing rule would file elsewhere or hold - marking any a later period
@@ -620,7 +623,7 @@ def _preview(ref) -> str:
 @click.option("--reference", default=None, help="The change reference, e.g. CAB-123.")
 @click.option("--reason", default=None, help="Why the agreement was wrong.")
 @click.option("--approver", default=None,
-              help="Who approves it - a person contract/people.yaml allows to.")
+              help="Who approves it - a person assets/<asset>/people.yaml allows to.")
 @click.option("--author", default=None, help="You.")
 def draft_correction_command(ref, reference, reason, approver, author) -> None:
     """Print the correction entry to declare for each change you made.

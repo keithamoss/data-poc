@@ -53,6 +53,7 @@ import yaml
 from qa_tools.common import asset_time, assets, period_schema, schedule
 from qa_tools.common.diff_base import diff_base
 from qa_tools.common.schemas import DataAsset
+from qa_tools.common import assets as _assets
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 
@@ -248,9 +249,9 @@ def _duration_error(value, what: str) -> str | None:
 #: (REQ-PIPE-110 criteria 14, 16 and 28). Named rather than left to the
 #: schema's generic "not a key", so the refusal says where the fact lives now.
 RETIRED_KEYS = {
-    "delivery_months": "participates, on the dataset's participation in contract/calendar.yaml",
+    "delivery_months": "participates, on the dataset's participation in assets/<asset>/calendar.yaml",
     "owes_from": "the effective_from of the dataset's first participation version in "
-                 "contract/calendar.yaml",
+                 "assets/<asset>/calendar.yaml",
 }
 
 
@@ -756,7 +757,7 @@ def _contract_errors(raw: dict, src: Source) -> list[ConfigError]:
                 src.name, scope,
                 f"sits in collection {collection_id!r}, whose contract {filename!r} does "
                 f"not exist.",
-                f"Add contract/{filename}, or correct the name."))
+                f"Add {_assets.config_dir()}/{filename}, or correct the name."))
 
     # Each collection's contract sits in its agency's folder (REQ-QAC-241), so
     # every YAML under contract/ is looked at, named relative to it - which is
@@ -800,7 +801,7 @@ def _sla_properties_errors(src: Source) -> list[ConfigError]:
                 path.relative_to(src.contract_dir).as_posix(), None,
                 "states slaProperties, which no longer exist.",
                 "Delete the block. A dataset's cadence, expected time and grace live on its "
-                "participation in contract/calendar.yaml, and nothing reads them from a "
+                f"participation in {_assets.config_dir()}/calendar.yaml, and nothing reads them from a "
                 "contract any more."))
     return out
 

@@ -71,6 +71,7 @@ import subprocess
 
 from qa_tools.common.ticket_sync import TICKET_LABEL
 from qa_tools.common.people import assignees_for
+from qa_tools.common import assets as _assets
 
 
 def list_ticket_numbers(owner: str, repo: str) -> list[int]:
@@ -291,7 +292,7 @@ def main() -> None:
 
     slug = environments.ticket_repository()
     if not slug or "/" not in slug:
-        raise SystemExit("contract/data-asset.yaml names no ticket_repository (owner/repo)")
+        raise SystemExit(f"{_assets.config_dir()}/data-asset.yaml names no ticket_repository (owner/repo)")
     owner, repo = slug.split("/", 1)
     print(json.dumps(fetch_all_ticket_resolutions(owner, repo)))
 
