@@ -228,6 +228,17 @@ def _mark_worker_db_for(asset: str) -> None:
     if not dsn or _WORKER_DB.get("asset") == asset or os.environ.get(supply_db.SUPPLY_DSN_ENV) != dsn:
         return
     with psycopg.connect(dsn, autocommit=True) as conn:
+        # EMPTIED FIRST (the asset split): each asset is a deployment with a
+        # database of its own, so a test of one asset never meets rows
+        # another asset's test left - a Birth Registrations hold read by a
+        # quarterly reader that cannot name the dataset. Every data schema
+        # goes, the identity's own among them, and is marked afresh below;
+        # the database itself stays, so pooled connections live on.
+        found = conn.execute(
+            "SELECT nspname FROM pg_namespace WHERE nspname NOT LIKE 'pg\\_%' "
+            "AND nspname NOT IN ('information_schema', 'public')").fetchall()
+        for (schema,) in found:
+            conn.execute(f'DROP SCHEMA "{schema}" CASCADE')
         db_identity.mark(conn, db_identity.Identity(asset, "test"))
     _WORKER_DB["asset"] = asset
 

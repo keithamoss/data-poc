@@ -216,6 +216,7 @@ class TestATrialLeavesNothingBehind:
             assert not trial.orphan_schemas(conn)
 
 
+@pytest.mark.asset("daily")  # every case stages a Birth Registrations delivery
 class TestARealTrialStagesAndVanishes:
     """The property the classes above assert about names, asserted
     instead about a trial that really loaded real rows through the real
@@ -228,7 +229,6 @@ class TestARealTrialStagesAndVanishes:
         deliveries, _ = bdm_delivery_dirs
         return str(deliveries / "REF_20260101" / "birth_registrations_2026-01-01.csv")
 
-    @pytest.mark.asset("daily")
     def test_a_real_trial_stages_into_its_own_schema_and_leaves_no_trace(
             self, supply_dsn, bdm_delivery_dirs, tmp_path):
 
