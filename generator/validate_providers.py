@@ -19,7 +19,6 @@ import sys
 
 from pathlib import Path
 
-PACKAGE = Path(__file__).resolve().parent / "collections"
 
 
 def declaration_problems() -> list[str]:
@@ -71,13 +70,28 @@ def declaration_problems() -> list[str]:
     return out
 
 
-def orphan_problems(package: Path = PACKAGE) -> list[str]:
+def orphan_problems(package: Path | None = None) -> list[str]:
     """A provider module naming no declared collection - a misspelt one would
-    otherwise leave its collection silently ungenerated."""
+    otherwise leave its collection silently ungenerated.
+
+    In the selected asset's own providers folder unless told another (the
+    asset split: providers live in assets/<asset>/synthetic/collections/;
+    generator/collections/ holds only the shared base), each named by its
+    path from the repository root - or in full, outside it."""
     from qa_tools import collections as registry
+    from qa_tools.common import assets
+
+    package = Path(package) if package is not None else assets.selected().providers
+    root = Path(__file__).resolve().parent.parent
+
+    def shown(path: Path) -> str:
+        try:
+            return str(path.resolve().relative_to(root))
+        except ValueError:
+            return str(path)
 
     declared = {c.module_name for c in registry.all_collections()}
-    return [f"generator/collections/{p.stem}.py names no declared collection"
+    return [f"{shown(p)} names no declared collection"
             for p in sorted(package.glob("*.py"))
             if p.stem not in ("__init__", "base") and p.stem not in declared]
 

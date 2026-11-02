@@ -6,7 +6,6 @@ package, so installing it needs no network.
 """
 from __future__ import annotations
 
-import asset_folders
 import subprocess
 from pathlib import Path
 
@@ -26,12 +25,15 @@ def an_asset(tmp_path, monkeypatch) -> Path:
     root = tmp_path / "assets"
     folder = root / "one"
     folder.mkdir(parents=True)
-    for entry in (asset_folders.real_folder()).iterdir():
-        (folder / entry.name).symlink_to(entry)
-    (folder / "collections").symlink_to(ROOT / "qa_tools" / "collections")
-    dbt = folder / "dbt"
+    real = assets.selected()
+    # The real asset's own folder, its adapters (collections/) among it - all
+    # but its dbt project, which is rebuilt below without its packages.
+    for entry in real.folder.iterdir():
+        if entry.name != real.dbt_project.name:
+            (folder / entry.name).symlink_to(entry)
+    dbt = folder / real.dbt_project.name
     dbt.mkdir()
-    for entry in (ROOT / "dbt_project").iterdir():
+    for entry in real.dbt_project.iterdir():
         if entry.name not in ("dbt_packages", "packages.yml", "package-lock.yml", "target", "logs"):
             (dbt / entry.name).symlink_to(entry)
     shared = tmp_path / "shared"

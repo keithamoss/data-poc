@@ -4,7 +4,6 @@ test copies the real configuration, changes one thing and asks the gate; the
 real files are untouched."""
 from __future__ import annotations
 
-import asset_folders
 import shutil
 from pathlib import Path
 
@@ -14,17 +13,29 @@ import yaml
 from qa_tools.common import list_setting_members, supply_db
 
 REAL = Path(__file__).resolve().parent.parent
-SCHEMA = Path("assets/quarterly/dbt/models/linkage-products/schema.yml")
+
+
+def _schema() -> Path:
+    """Linkage Products' dbt schema, by repository path through the resolver."""
+    from qa_tools.common import assets
+
+    return Path(assets.dbt_rel()) / "models" / "linkage-products" / "schema.yml"
 
 
 @pytest.fixture
 def repo(tmp_path):
-    shutil.copytree(asset_folders.real_folder(), tmp_path / "contract")
-    (tmp_path / SCHEMA).parent.mkdir(parents=True)
-    shutil.copy(REAL / SCHEMA, tmp_path / SCHEMA)
-    # The asset's own collections' models, in its own dbt project (the split).
     from qa_tools import collections
     from qa_tools.common import assets
+
+    # The asset's configuration where the gate reads it, by the resolver's
+    # repository path (the asset split - it was contract/); its dbt project
+    # is copied below, model by model.
+    real = assets.selected()
+    shutil.copytree(real.folder, tmp_path / assets.folder_rel(),
+                    ignore=lambda d, names: [real.dbt_project.name] if Path(d) == real.folder else [])
+    (tmp_path / _schema()).parent.mkdir(parents=True)
+    shutil.copy(REAL / _schema(), tmp_path / _schema())
+    # The asset's own collections' models, in its own dbt project (the split).
 
     for c in collections.all_collections():
         if c.id == "linkage-products":
@@ -35,11 +46,11 @@ def repo(tmp_path):
 
 
 def _schema_doc(repo):
-    return yaml.safe_load((repo / SCHEMA).read_text())
+    return yaml.safe_load((repo / _schema()).read_text())
 
 
 def _write(repo, doc):
-    (repo / SCHEMA).write_text(yaml.safe_dump(doc, sort_keys=False))
+    (repo / _schema()).write_text(yaml.safe_dump(doc, sort_keys=False))
 
 
 def _tests(doc, model):
@@ -73,7 +84,9 @@ class TestCriterionThirteenThePresenceGate:
         assert "names the member_setting 'census_yrs', which is no declared list setting" in text
 
     def test_a_geocoding_dataset_lacking_its_share_check(self, repo):
-        path = repo / "assets" / "quarterly" / "department-of-health" / "linkage-products-soda-checks.yml"
+        from qa_tools.common import assets
+
+        path = repo / assets.folder_rel() / "department-of-health" / "linkage-products-soda-checks.yml"
         doc = yaml.safe_load(path.read_text())
         block = doc["checks for geo_cp_clients"]
         block[:] = [c for c in block if "geo_cp_clients_not_geocoded_percent" not in c]
@@ -85,7 +98,9 @@ class TestCriterionThirteenThePresenceGate:
 
 class TestCriterionFiveOfRequirement300Coverage:
     def test_a_period_no_version_covers_is_refused_naming_dataset_and_period(self, repo):
-        path = repo / "contract" / "data-asset.yaml"
+        from qa_tools.common import assets
+
+        path = repo / assets.folder_rel() / "data-asset.yaml"
         text = path.read_text()
         assert '- effective_from: "2013-01-01"\n                  value: [2011]' in text
         path.write_text(text.replace('- effective_from: "2013-01-01"\n                  value: [2011]',

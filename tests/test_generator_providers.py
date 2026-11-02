@@ -169,11 +169,15 @@ class TestTheSeedSchedule:
 
         fake = sys.modules[PROVIDER_MODULE].PROVIDER
         assert validate_providers.problems() == []
-        monkeypatch.setattr(fake, "seed_ranges", ((1500, 1600),))
-        monkeypatch.setattr(fake, "seed_schedule", lambda: [("fk", 1550, 1550)])
+        # Inside Child Protection's own first range (the asset split: it was
+        # Birth Registrations', which is another asset's now).
+        low, high = providers.provider("child-protection").seed_ranges[0]
+        inside = (low + high) // 2
+        monkeypatch.setattr(fake, "seed_ranges", ((inside, inside + 100),))
+        monkeypatch.setattr(fake, "seed_schedule", lambda: [("fk", inside + 50, inside + 50)])
         problems = validate_providers.problems()
         assert len(problems) == 1
-        assert "civil-registration" in problems[0] and FAKE_ID in problems[0]
+        assert "child-protection" in problems[0] and FAKE_ID in problems[0]
         assert validate_providers.main() == 1
 
 
@@ -216,14 +220,16 @@ class TestTheTargetTrialIsTheProvidersToDeclare:
     def test_the_cli_and_the_bootstrap_read_the_providers_declaration(self, third_collection):
         from cli import pipeline
 
-        assert pipeline.has_target_trial("civil-registration") is True
+        # The quarterly asset's: Linkage Products declares a trial and Child
+        # Protection none (the asset split - Birth Registrations' is the daily's).
+        assert pipeline.has_target_trial("linkage-products") is True
         assert pipeline.has_target_trial("child-protection") is False
         assert pipeline.has_target_trial(FAKE_ID) is False
         assert pipeline.target_datasets(FAKE_ID) == (FAKE_DATASET,)
         # Every collection the hierarchy declares, in its order, the fake last.
         assert pipeline.generated_collections() == [
             c.id for c in registry.all_collections()]
-        assert pipeline.generated_collections()[:2] == ["civil-registration", "child-protection"]
+        assert pipeline.generated_collections()[:2] == ["child-protection", "emergency-department"]
         assert pipeline.generated_collections()[-1] == FAKE_ID
 
     def test_every_provider_naming_where_its_ambers_land_has_them_compared(self):
@@ -312,7 +318,7 @@ class TestTheRegistryRoutesTheRest:
         with generated_into(tmp_path):
             pass
         expected = [c.id for c in registry.all_collections()]
-        assert expected[:2] == ["civil-registration", "child-protection"]
+        assert expected[:2] == ["child-protection", "emergency-department"]
         assert expected[-1] == FAKE_ID
         assert [cid for cid, _ in ran] == expected
         assert all(where == str(tmp_path / "deliveries") for _, where in ran)
@@ -385,7 +391,9 @@ class TestTheProvidersGateKnowsWhatAProviderMayDeclare:
         ("collection_id", "child-protection", "names collection 'child-protection'"),
         ("dataset_id", "cp-clients", "dataset 'cp-clients' is not one of fake-collection's"),
         ("target_levers", "nonsense", "lever set 'nonsense'"),
-        ("target_levers", "null-rate", "lever set 'null-rate' is declared by both"),
+        # One another provider of the same asset declares (the asset split:
+        # null-rate is Birth Registrations', on the daily asset).
+        ("target_levers", "client-postcodes", "lever set 'client-postcodes' is declared by both"),
     ])
     def test_a_bad_declaration_fails_naming_it(self, third_collection, monkeypatch, attr, value,
                                                expected):
@@ -415,13 +423,46 @@ class TestTheProvidersGateKnowsWhatAProviderMayDeclare:
         assert validate_providers.problems() == []
 
     def test_a_provider_module_naming_no_collection_fails(self, tmp_path):
+        from qa_tools import collections as registry
         from generator import validate_providers
 
-        for name in ("civil_registration", "child_protection", "emergency_departmnet"):
+        # The selected asset's own providers, and one misspelt (the asset split).
+        real = [c.module_name for c in registry.all_collections()]
+        assert real, "the asset declares no collection"
+        for name in [*real, "emergency_departmnet"]:
             (tmp_path / f"{name}.py").write_text("")
         problems = validate_providers.orphan_problems(tmp_path)
-        assert problems == ["generator/collections/emergency_departmnet.py names no declared "
+        assert problems == [f"{tmp_path / 'emergency_departmnet.py'} names no declared "
                             "collection"]
+
+    def test_the_gate_looks_in_the_selected_assets_own_providers_folder(self, tmp_path):
+        """The asset split: providers moved to assets/<asset>/synthetic/
+        collections/, so a scan of generator/collections/ - which holds only
+        the shared base now - would pass a misspelt provider in silence."""
+        from qa_tools.common import assets
+        from generator import validate_providers
+
+        real = assets.selected()
+        # An assets/ root whose selected asset is the real one, linked entry by
+        # entry, down to its providers folder, which gains one misspelt module.
+        root = tmp_path / "assets"
+        here, there = root / real.name, real.folder
+        for part in real.providers.relative_to(real.folder).parts:
+            here.mkdir(parents=True, exist_ok=True)
+            for entry in there.iterdir():
+                if entry.name != part:
+                    (here / entry.name).symlink_to(entry)
+            here, there = here / part, there / part
+        here.mkdir(parents=True)
+        for entry in there.iterdir():
+            (here / entry.name).symlink_to(entry)
+        (here / "emergency_departmnet.py").write_text("")
+        assets.use_root(root)
+        providers = assets.selected().providers
+        assert providers == here
+        problems = validate_providers.orphan_problems()
+        assert [p for p in problems if "emergency_departmnet.py" in p] == [
+            f"{providers / 'emergency_departmnet.py'} names no declared collection"], problems
 
     def test_the_real_providers_pass(self):
         from generator import validate_providers

@@ -230,6 +230,7 @@ class TestRejectedAndSupersededSayWhoAndWhat:
 class TestAnOpenPairIsOneEntry:
     """Criterion 9."""
 
+    @pytest.mark.asset("daily")  # parity.ex_two_files is a Birth Registrations pair
     def test_the_pair_is_one_entry_offering_only_settle(self, conn, minted):
         slot, pair = parity.ex_two_files(conn, minted)
         got = filing_queue.supplies_in(conn, slot)
@@ -282,6 +283,7 @@ class TestThePromotedSupplyIsInPlaceWhateverElseHappened:
         assert fd.DEMOTE in filing_queue.operations_for(got[a])[0]
         assert got[b].state == filing_queue.ANOTHER_VERSION_WAITING
 
+    @pytest.mark.asset("daily")  # a Birth Registrations pair
     def test_an_open_pair_over_a_promoted_supply(self, conn, minted):
         from datetime import date
 
@@ -436,4 +438,4 @@ class TestTheDoorsOtherBranches:
         assert shown and not any("earlier version" in c for c in shown)
 
 #: Birth Registrations is the daily asset's (the asset split).
-pytestmark = pytest.mark.asset("daily")
+pytestmark = pytest.mark.asset("quarterly")
