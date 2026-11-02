@@ -401,9 +401,11 @@ class TestTheChildProtectionScenariosAreReallyThere:
 
     @staticmethod
     def _tree():
-        from pathlib import Path
-
-        root = Path(__file__).resolve().parent.parent / "data" / "deliveries"
+        # The selected asset's own tree, data/<asset>/deliveries, through the
+        # resolver: the repository-root data/deliveries this used to name has
+        # not existed since the move, so the class skipped every time
+        # (post-build-review #306 1).
+        root = assets.deliveries_dir()
         if not root.is_dir():
             pytest.skip("no generated delivery tree - run `mothman cp generate-synthetic-data`")
         return root

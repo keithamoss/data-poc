@@ -382,10 +382,25 @@ class TestAfterAReplay:
         declared -= {None}
         assert declared
         assert {b.dataset_id for b in built} == declared
-        # A SCENARIO'S OWN TARGET IS AMONG THEM: an injected arrival's, or a
-        # planned supply a scenario names (REQ-GEN-298's geocoding scenarios,
-        # the quarterly asset's - recorded as planned, not injected).
-        assert any(b.injected or b.scenario for b in built)
+        # A SCENARIO'S OWN TARGET IS AMONG THEM. Where this asset places a
+        # target on a dataset whose provider declares target_trial (the daily
+        # asset's Birth Registrations), that is an INJECTED target: `scenario`
+        # alone proves nothing there, because the trial also sets it on every
+        # green lead-in and following day (post-build-review #306 3). Where it
+        # places none (the quarterly asset: Child Protection's targets are not
+        # trialled, and REQ-GEN-298's geocoding scenarios are recorded as
+        # planned, not injected), a planned supply a scenario names counts.
+        import json
+
+        from qa_tools.common import scenario_map
+        raw = json.loads(scenario_map.placements_path().read_text())
+        trialled = {r["dataset"] for r in (raw.get("placements") if isinstance(raw, dict) else raw)
+                    if r.get("targets") and r.get("dataset")
+                    and collections.for_dataset(r["dataset"]).target_trial}
+        if trialled:
+            assert any(b.injected and b.dataset_id in trialled for b in built), trialled
+        else:
+            assert any(b.injected or b.scenario for b in built)
         assert any(b.target == "green" for b in built)
 
 
