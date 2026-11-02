@@ -6172,5 +6172,44 @@ could never have computed it), and it belongs with batch 5's check work.
      participation, and refusals that name the bad line of config. Seen in
      passing: two functions both called `claim_window` (one in each
      module), and `slots.fall_hold`, which is a hold rule rather than a slot
-     rule. Nobody has reviewed these modules for simplification. Keith to
-     say whether to do that before #134 moves them into domain/.
+     rule. Keith to say whether to do that before #134 moves them into
+     domain/ - he asked for the review, 2026-11-02 ~19:25 Perth.
+
+     **REVIEWED 2026-11-02 (read-only agent; report in this session).** The
+     size is mostly justified: of schedule.py's and slots.py's 674 code lines,
+     ~88 are refusal text, ~130 exist only for files filling a later period
+     (REQ-PIPE-320 to 322) and ~25 bound how far ahead slots are made; the
+     rest is versioning, the two calendar shapes, own-dates, no-calendar
+     kinds, slot closing and candidate dates. Realistic after every
+     cleanup: code 943 -> ~845 lines, prose ~1,095 -> ~750-800, ~2,305 ->
+     ~1,800 total. Its groups:
+     - A, SAFE (no behaviour or register change): ~150-180 lines of history
+       already in `decisions:`; dead `Dataset.qa_results_scope` and
+       `hierarchy.contract_path` (verified: no product callers); redundant
+       local imports; a no-op year arithmetic; two copies of a filter loop,
+       of the ISO parse, of the zone lookup and of three HH:MM parsers; the
+       agreement file re-read per call and per round where `None` is passed.
+     - B, MECHANICAL BUT A REGISTER CLAIM EDIT (Keith's): `schedule.schema_name`
+       is a second, unused copy of `period_schema.period_schema` that
+       REQ-PIPE-051 names as its implementation; `will_graduate` dead but
+       named by REQ-PIPE-106 (both verified: no product callers); private
+       names used as public API (`_calendar_periods` 18 call sites); two
+       pairs of same-named functions meaning different things
+       (`claim_window`, `_calendar_periods`); `fall_hold` belongs with its
+       one caller in assignment.py. Renames ride the #134 move.
+     - C, REAL DUPLICATION (scope with Keith): which participation version
+       gives a slot its inputs is resolved three times per slot (two copies
+       plus verdict.py); the round-to-period step is written in six places
+       (one in the Child Protection provider with no bounds check); "does
+       this dataset supply in round R" in three, one narrower than the
+       others (possible disagreement, not verified reachable).
+     - D, WOULD CHANGE BEHAVIOUR (Keith's): two "in force" policies for one
+       calendar (raise before the first version vs fall back); a cadence
+       check done twice; six different lookahead horizons, with
+       `relative_period` unable to see a period `slot_named` can; swallowed
+       config errors in two slot helpers; a nullable field never null; three
+       readers of `synthetic: true` (already folded by REQ-PIPE-382).
+     - SIGHTING, not verified exhaustively: `hierarchy._build` keeps the
+       first dataset when two share a `table:`, and nothing found refuses
+       it (a duplicate dataset id IS refused). `dataset_for_table` claims a
+       real inverse.
