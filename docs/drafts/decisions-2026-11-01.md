@@ -248,3 +248,8 @@ the rebuild needs no question asked twice. Drafts and builders read this file.
   CONFIRMED by Keith: the split-overview page's four decisions and #134
   v3, then the architect and UX reviewers). Notify Keith only when there is something to
   look at or an input is needed.
+- The one-publish-path guard's named exception for `mothman debug
+  snapshot-worktrees` (it pushes wip/<branch>-snap refs only, never publishes)
+  is SETTLED by Keith 2026-11-02: kept, with its pinning tests made critical.
+  REJECTED moving the push out of cli/, and removing the command. It had been
+  added by the coordinator without sign-off; the REQ-TEST-375 critic caught it.
