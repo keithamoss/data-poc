@@ -118,6 +118,26 @@ class TestTheCollectionsHalvesForwardWhatTheyAreGiven:
         assert calls == [("run", collection_id), ("gate", collection_id)], collection_id
 
 
+class TestAStageFailureSurvivesAProcessBoundary:
+    """A bootstrap runs arrivals in a process pool, which hands a worker's
+    exception back by pickling it. StageFailed's required arguments meant it
+    could not be rebuilt on the other side, so every stage failure there read
+    "StageFailed.__init__() missing 3 required positional arguments" and the
+    real error was lost (post-build-review, 2026-11-02)."""
+
+    def test_it_unpickles_with_its_stage_and_cause(self):
+        import pickle
+        cause = ValueError("column registration_number does not exist")
+        exc = arrival_lifecycle.StageFailed("bdm_run_001", "qa", ("filing",), cause,
+                                            arrival={"run_id": "bdm_run_001"})
+        back = pickle.loads(pickle.dumps(exc))
+        assert isinstance(back, arrival_lifecycle.StageFailed)
+        assert str(back) == str(exc)
+        assert (back.run_id, back.stage, back.completed) == ("bdm_run_001", "qa", ("filing",))
+        assert repr(back.cause) == repr(cause)
+        assert back.arrival == {"run_id": "bdm_run_001"}
+
+
 #: The data asset this module's tests act for, unless a test says otherwise
 #: (C11, Keith 2026-11-02: every test module names its asset).
 pytestmark = pytest.mark.asset("quarterly")

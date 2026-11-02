@@ -93,7 +93,11 @@ class Refused(RuntimeError):
 class StageFailed(RuntimeError):
     def __init__(self, stage: str, detail: str):
         super().__init__(f"capture failed at stage '{stage}': {detail}")
-        self.stage = stage
+        self.stage, self.detail = stage, detail
+
+    def __reduce__(self):
+        # Rebuildable from a pickle, as arrival_lifecycle.StageFailed is.
+        return (type(self), (self.stage, self.detail))
 
 
 def surface_codes(given: tuple[str, ...] | list[str] | None) -> list[str]:

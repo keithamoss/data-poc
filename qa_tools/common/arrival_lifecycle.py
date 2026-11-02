@@ -99,6 +99,14 @@ class StageFailed(RuntimeError):
         #: criterion 17).
         self.arrival = arrival
 
+    def __reduce__(self):
+        # A process pool hands a worker's exception back by pickling it, and
+        # the default rebuild calls __init__ with the message alone - so
+        # without this every stage failure in a pool worker surfaced as a
+        # TypeError about missing arguments, hiding the real error.
+        return (type(self), (self.run_id, self.stage, self.completed, self.cause),
+                {"arrival": self.arrival})
+
 
 class ArrivalBusy(RuntimeError):
     """Another process has this arrival, or has already finished it."""
