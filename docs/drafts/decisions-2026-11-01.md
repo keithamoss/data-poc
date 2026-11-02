@@ -245,6 +245,6 @@ the rebuild needs no question asked twice. Drafts and builders read this file.
 - PLAN, Keith 2026-11-02 morning: once the in-flight builds finish (the move,
   the morning answers, the fast CI set), tonight returns to finishing the
   scoping of the rest of the split, "starting with the ..." (message cut off;
-  most likely the split-overview page's four decisions and #134 v3, then the
-  architect and UX reviewers). Notify Keith only when there is something to
+  CONFIRMED by Keith: the split-overview page's four decisions and #134
+  v3, then the architect and UX reviewers). Notify Keith only when there is something to
   look at or an input is needed.
