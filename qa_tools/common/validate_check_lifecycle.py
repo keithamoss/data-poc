@@ -55,6 +55,12 @@ def _sources(ref: str | None) -> tuple[list[tuple[str, object]], list[str]]:
     from qa_tools import collections
     from qa_tools.common import config_yaml, hierarchy
 
+    if ref is not None:
+        # A READ AT A GIT REF names the files by repository path, which a
+        # folder outside the repository has none of: refused, never read as
+        # "no checks" (C7, REQ-PIPE-342 decision 18).
+        assets.folder_rel()
+        assets.dbt_rel()
     asset = hierarchy.data_asset_yaml()
     rel_asset = asset.relative_to(ROOT).as_posix() if asset.is_relative_to(ROOT) else None
     text = asset.read_text() if ref is None or rel_asset is None else _old_file_content(rel_asset, ref)
@@ -90,15 +96,13 @@ def sources_fingerprint() -> str:
     yaml_sources, evidently = _sources(None)
     paths = [ROOT / rel for rel, _parser in yaml_sources]
     paths += [ROOT / rel for rel in evidently]
-    # THE ASSET PROJECT'S OWN macros/ too: it forwards the shared package's
-    # tests by name (REQ-QAC-368), so an edit there is an edit to the checks.
-    dirs = [*collections.SHARED_DBT_DIRS, f"{assets.dbt_rel()}/macros"]
+    dirs = list(collections.SHARED_DBT_DIRS)
     for c in collections.all_collections():
         dirs += [c.dbt_models, c.dbt_tests]
     for rel_dir in dirs:
         if (ROOT / rel_dir).is_dir():
             paths += sorted(p for p in (ROOT / rel_dir).rglob("*") if p.is_file())
-    contract = ROOT / assets.folder_rel()
+    contract = ROOT / assets.folder_on_disk()
     if contract.is_dir():
         paths += sorted(contract.rglob("*.y*ml"))
     for path in dict.fromkeys(paths):
@@ -136,7 +140,7 @@ def _git_show(rel_path: str, ref: str) -> str | None:
 
 
 #: Where the project's own dbt SQL lives (REQ-QAC-223 criterion 2): macros
-#: and custom generic tests - the shared local package, dbt_shared/
+#: and custom generic tests - dbt_shared/, read by every asset's project
 #: (REQ-QAC-368) - and singular tests, every collection's folder under the
 #: selected asset's project's tests/ (`_dbt_singular_dir`, asked at call time).
 #: Package macros (dbt_packages/) and models are deliberately NOT covered.
@@ -146,8 +150,9 @@ def _dbt_macro_dirs() -> tuple[str, ...]:
     return collections.SHARED_DBT_DIRS
 
 
-def _dbt_singular_dir() -> str:
-    return f"{assets.dbt_rel()}/tests"
+def _dbt_singular_dir(ref: str | None = None) -> str:
+    # At a git ref, a repository path - refused outside it (C7).
+    return f"{assets.dbt_on_disk() if ref is None else assets.dbt_rel()}/tests"
 
 
 _MACRO_HEAD = re.compile(r"{%-?\s*(macro|test)\s+(\w+)\s*\(")
@@ -193,7 +198,7 @@ def dbt_definitions(ref: str | None) -> "cl.DbtDefinition":
                 if kind == "macro" and name.startswith("test_"):
                     macros.setdefault(name[len("test_"):], (rel, text))
 
-    singular_dir = _dbt_singular_dir()
+    singular_dir = _dbt_singular_dir(ref)
     singular = [f for f in _files_in(singular_dir, ref)
                 if not f.startswith(f"{singular_dir}/generic/")]
 

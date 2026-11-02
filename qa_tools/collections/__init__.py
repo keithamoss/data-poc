@@ -89,11 +89,13 @@ class Collection:
     # Every collection's contract, Soda, Evidently and retired-check files sit
     # in its agency's folder, contract/<agency-id>/, named from one stem - its
     # contract's file name less `-contract.yaml`. Paths are relative to the
-    # repository root, as the lifecycle gate reads them at any git ref.
+    # repository root where it holds the asset's folder - as the lifecycle
+    # gate reads them at any git ref, after asking assets.folder_rel(), which
+    # refuses a folder outside it (C7) - and the folder itself otherwise.
 
     @property
     def folder(self) -> str:
-        return f"{assets.folder_rel()}/{self.agency_id}"
+        return f"{assets.folder_on_disk()}/{self.agency_id}"
 
     @property
     def stem(self) -> str:
@@ -110,11 +112,11 @@ class Collection:
     #: selected asset's dbt project, asked at call time (REQ-QAC-368).
     @property
     def dbt_models(self) -> str:
-        return f"{assets.dbt_rel()}/models/{self.id}"
+        return f"{assets.dbt_on_disk()}/models/{self.id}"
 
     @property
     def dbt_tests(self) -> str:
-        return f"{assets.dbt_rel()}/tests/{self.id}"
+        return f"{assets.dbt_on_disk()}/tests/{self.id}"
 
     @property
     def dbt_schema(self) -> str:
@@ -123,7 +125,7 @@ class Collection:
     #: Outside model-paths, so dbt never runs a retired check.
     @property
     def dbt_retired_schema(self) -> str:
-        return f"{assets.dbt_rel()}/retired/{self.id}/schema-retired.yml"
+        return f"{assets.dbt_on_disk()}/retired/{self.id}/schema-retired.yml"
 
     def check_sources(self) -> list[tuple[str, str]]:
         """Every file this collection's checks are defined in, as
@@ -135,16 +137,17 @@ class Collection:
         return out + [(self.dbt_schema, "dbt"), (self.dbt_retired_schema, "dbt")]
 
 
-#: The checks no collection owns: shared dbt SQL - the shared local package,
+#: The checks no collection owns: shared dbt SQL - every asset project's macro-paths,
 #: dbt_shared/ (REQ-QAC-368 criterion 2) - and the file checks derived once
 #: for every dataset (REQ-QAC-241 criterion 8).
 SHARED_DBT_DIRS = (f"{assets.DBT_SHARED}/macros", f"{assets.DBT_SHARED}/tests/generic")
 
 
 def file_checks() -> str:
-    """The selected asset's file checks, by repository path, asked at call
-    time (REQ-PIPE-342 criterion 6) - it was the FILE_CHECKS constant."""
-    return f"{assets.folder_rel()}/file-checks.yaml"
+    """The selected asset's file checks, by repository path where the
+    repository holds them, asked at call time (REQ-PIPE-342 criterion 6) -
+    it was the FILE_CHECKS constant."""
+    return f"{assets.folder_on_disk()}/file-checks.yaml"
 
 
 def collections_in(doc: dict) -> list[Collection]:

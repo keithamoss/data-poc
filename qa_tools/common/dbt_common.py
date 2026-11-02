@@ -174,8 +174,13 @@ _PARSED_SKIP = {"target", "dbt_packages", "logs"}
 
 
 def _project_fingerprint(project_dir: str) -> str:
-    """A digest of every file dbt reads from the project, by content."""
+    """A digest of every file dbt reads from the project, by content - its
+    own folder, and each macro-path and test-path it names OUTSIDE that
+    folder (dbt_shared/ since C12), which an edit there would otherwise leave
+    the cached parse blind to."""
     import hashlib
+
+    import yaml
 
     digest = hashlib.sha256()
     root = Path(project_dir)
@@ -184,6 +189,16 @@ def _project_fingerprint(project_dir: str) -> str:
         if rel.parts[0] in _PARSED_SKIP or not path.is_file():
             continue
         digest.update(str(rel).encode() + b"\0" + path.read_bytes() + b"\0")
+    try:
+        config = yaml.safe_load((root / "dbt_project.yml").read_text()) or {}
+    except (OSError, yaml.YAMLError):
+        config = {}
+    outside = sorted({(root / p).resolve() for key in ("macro-paths", "test-paths")
+                      for p in config.get(key) or [] if not (root / p).resolve().is_relative_to(root.resolve())})
+    for folder in outside:
+        for path in sorted(folder.rglob("*")) if folder.is_dir() else []:
+            if path.is_file():
+                digest.update(str(path).encode() + b"\0" + path.read_bytes() + b"\0")
     return digest.hexdigest()
 
 

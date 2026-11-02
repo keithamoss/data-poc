@@ -85,7 +85,7 @@ class CollectionCLI:
         self.datasets = list(coll.datasets)
         self.tables = [d.table for d in coll.datasets]
         self.label = label(coll)
-        self.contract_path = os.path.join(ROOT, assets.folder_rel(), coll.contract)
+        self.contract_path = os.path.join(ROOT, assets.folder_on_disk(), coll.contract)
 
     # ---- its commands ----------------------------------------------------------
 

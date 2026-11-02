@@ -480,8 +480,8 @@ def _corrections_by_owner(cal_doc: dict, asset_doc: dict) -> dict[tuple, list]:
 
 def _owner_label(owner: tuple) -> str:
     if owner[0] == "timezone":
-        return f"the timezone in {assets.folder_rel()}/data-asset.yaml"
-    return f"{owner[0]} {owner[1]!r} in {assets.folder_rel()}/calendar.yaml"
+        return f"the timezone in {assets.config_dir()}/data-asset.yaml"
+    return f"{owner[0]} {owner[1]!r} in {assets.config_dir()}/calendar.yaml"
 
 
 def approvers(people_doc: dict) -> list[dict]:
@@ -830,7 +830,7 @@ def check(old_cal: dict | None, new_cal: dict, old_asset: dict | None, new_asset
                 out.append(Finding(
                     file, where,
                     f"a correction names approver {approver!r}, who is not a person allowed to "
-                    f"approve in {assets.folder_rel()}/people.yaml as it stood before this change. Nothing "
+                    f"approve in {assets.config_dir()}/people.yaml as it stood before this change. Nothing "
                     f"was committed.",
                     "Name one of: " + (", ".join(p.get("email") for p in eligible) or "nobody") +
                     ". An approver added in the same change does not count."))

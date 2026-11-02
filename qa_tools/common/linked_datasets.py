@@ -23,7 +23,7 @@ def _asset_folder(root: Path) -> Path:
     asked of the resolver at call time (REQ-PIPE-342 criterion 6)."""
     from qa_tools.common import assets
 
-    return root / assets.folder_rel()
+    return root / assets.folder_on_disk()
 _ID = re.compile(r"^id_(\d+)$")
 
 

@@ -101,18 +101,24 @@ def build_folder_links(repo: str = DEFAULT_REPO, sha: str | None = None,
     at its own schema entry: the contract is what the dataset is held to.
     AN AGENCY OPENS ITS FOLDER, contract/<agency-id>/, which holds every one of
     its collections' contracts and check files (REQ-QAC-241).
+
+    A LINK IS A REPOSITORY PATH: the asset's folder relative to the checkout
+    at `root`, refused when the folder lies outside it (C7, REQ-PIPE-342
+    decision 18) rather than linking to a path GitHub has never seen.
     """
     from qa_tools import collections
+    from qa_tools.common import assets
 
     sha = sha or current_commit_sha(root)
     root = Path(root)
+    base = assets.folder_rel(root)
     out: dict[str, dict[str, str]] = {"agencies": {}, "datasets": {}, "titles": {"agencies": {},
                                                                               "datasets": {}}}
     for coll in collections.all_collections():
-        folder = coll.folder
+        folder = f"{base}/{coll.agency_id}"
         out["agencies"][coll.agency_id] = f"https://github.com/{repo}/tree/{sha}/{folder}"
         out["titles"]["agencies"][coll.agency_id] = f"View {folder}/ on GitHub"
-        rel = coll.check_file("contract")
+        rel = f"{folder}/{coll.check_file('contract').rsplit('/', 1)[-1]}"
         path = root / rel
         text = path.read_text() if path.is_file() else ""
         for d in coll.datasets:

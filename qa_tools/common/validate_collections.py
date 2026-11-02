@@ -335,7 +335,7 @@ def check_file_problems(root: Path | None = None) -> list[str]:
                                 f"{shown(c.check_file(kind))}")
         owner[c.stem] = c
 
-    contract = root / assets.folder_rel()
+    contract = root / assets.folder_on_disk()
     agencies = {c.agency_id for c in declared}
     for path in sorted(contract.rglob("*")) if contract.is_dir() else []:
         if not path.is_file():
@@ -408,7 +408,7 @@ def _dbt_layout_problems(root: Path, declared) -> list[str]:
     singular: dict[str, str] = {}
     from qa_tools.common import assets
 
-    project = assets.dbt_rel()
+    project = assets.dbt_on_disk()
     for top in (f"{project}/models", f"{project}/tests", f"{project}/retired"):
         base = root / top
         for path in sorted(base.rglob("*")) if base.is_dir() else []:

@@ -140,6 +140,57 @@ class TestTheAssetsLayout:
         assert assets.reports_dir() == ROOT / "reports" / "daily"
 
 
+class TestARepositoryPathForAFolderOutsideIt:
+    """C7 (Keith, 2026-11-02, REQ-PIPE-342 decision 18): a reader asking for
+    the asset's folder or dbt project BY REPOSITORY PATH is refused when the
+    folder lies outside the repository - never handed an absolute path that
+    a git-ref read or a CODEOWNERS match would quietly mis-read."""
+
+    def test_inside_the_repository_it_is_relative(self, monkeypatch):
+        monkeypatch.setenv(assets.ASSET_ENV, "daily")
+        assert assets.folder_rel() == "assets/daily"
+        assert assets.dbt_rel() == "assets/daily/dbt"
+
+    def test_outside_it_the_folder_is_refused(self, monkeypatch, tmp_path):
+        assets.use_root(_two_assets(tmp_path))
+        monkeypatch.setenv(assets.ASSET_ENV, "daily")
+        with pytest.raises(assets.OutsideTheRepository) as exc:
+            assets.folder_rel()
+        assert str(tmp_path / "assets" / "daily") in str(exc.value)
+
+    def test_outside_it_the_dbt_project_is_refused(self, monkeypatch, tmp_path):
+        assets.use_root(_two_assets(tmp_path))
+        monkeypatch.setenv(assets.ASSET_ENV, "daily")
+        with pytest.raises(assets.OutsideTheRepository):
+            assets.dbt_rel()
+
+    def test_the_lifecycle_gates_read_at_a_git_ref_is_refused(self, monkeypatch, tmp_path):
+        """Never read as 'no checks at that ref', which a path git has never
+        seen would have given."""
+        from qa_tools.common import validate_check_lifecycle as vcl
+
+        assets.use_root(_two_assets(tmp_path))
+        monkeypatch.setenv(assets.ASSET_ENV, "daily")
+        with pytest.raises(assets.OutsideTheRepository):
+            vcl.collect_checks("HEAD")
+
+    def test_a_reader_that_only_opens_files_still_finds_them(self, monkeypatch, tmp_path):
+        """folder_on_disk() is a path to open, not a repository path."""
+        root = _two_assets(tmp_path)
+        assets.use_root(root)
+        monkeypatch.setenv(assets.ASSET_ENV, "daily")
+        assert (ROOT / assets.folder_on_disk() / "data-asset.yaml").read_text() == \
+            "data_asset_id: daily\n"
+
+    def test_a_message_still_names_the_folder(self, monkeypatch, tmp_path):
+        """config_dir() names a file for a PERSON, not a repository path, so
+        it gives the folder as it is rather than refusing mid-message."""
+        root = _two_assets(tmp_path)
+        assets.use_root(root)
+        monkeypatch.setenv(assets.ASSET_ENV, "daily")
+        assert assets.config_dir() == (root / "daily").as_posix()
+
+
 class TestTheFixture:
     """One fixture points the resolver at an asset folder (REQ-PIPE-342
     criterion 7) - a copy of the selected one with the files a test names."""

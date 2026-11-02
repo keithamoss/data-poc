@@ -91,7 +91,7 @@ def problems(root: Path = REPO) -> list[str]:
     where = {ds.get("id"): (coll, ds) for _a, coll, ds in _walk(asset)}
     out = []
     for p in placings(root).values():
-        head = f"{assets.folder_rel()}/synthetic/{NAME}: {p.dataset}"
+        head = f"{assets.config_dir()}/synthetic/{NAME}: {p.dataset}"
         if p.dataset not in where:
             out.append(f"{head} is not in the hierarchy ({_assets.config_dir()}/data-asset.yaml).")
             continue

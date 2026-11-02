@@ -6,6 +6,7 @@ package, so installing it needs no network.
 """
 from __future__ import annotations
 
+import os
 import subprocess
 from pathlib import Path
 
@@ -173,6 +174,104 @@ class TestARunWithoutThemIsRefused:
             run_dbt.test_names_by_check_id("child-protection")
         assert invoked == []
         assert "'one'" in str(exc.value) and "mothman env dbt-deps" in str(exc.value)
+
+
+REAL_ASSETS = sorted(p.parent.parent.name for p in (ROOT / "assets").glob("*/dbt/dbt_project.yml"))
+
+
+def _compiled(asset: str, tmp_path) -> dict:
+    """dbt's own manifest of the real asset's project, compiled into a
+    target of the test's own - every test's SQL rendered from the macros it
+    names. Against the suite's own test database's server; nothing is built."""
+    import json
+    import sys
+
+    from psycopg.conninfo import conninfo_to_dict
+
+    info = conninfo_to_dict(os.environ["MOTHMAN_TEST_DSN"])
+    env = {**os.environ, "DBT_PG_HOST": info.get("host") or "localhost",
+           "DBT_PG_PORT": str(info.get("port") or 5432), "DBT_PG_USER": info.get("user") or "",
+           "DBT_PG_PASSWORD": info.get("password") or "", "DBT_PG_DBNAME": info.get("dbname") or "postgres",
+           "DBT_PG_SCHEMA": "bfol_never_built", "DBT_RUN_SCHEMA": "bfol_never_built",
+           "DBT_SEND_ANONYMOUS_USAGE_STATS": "False"}
+    project = ROOT / "assets" / asset / "dbt"
+    if not assets_installed(project):
+        pytest.fail(f"{asset}'s dbt packages are not installed - run `mothman env dbt-deps`")
+    dbt = Path(sys.executable).parent / "dbt"
+    done = subprocess.run([str(dbt), "compile", "--project-dir", str(project), "--profiles-dir",
+                           str(ROOT / "qa_tools" / "dbt_profiles"), "--target-path", str(tmp_path),
+                           "--select", "resource_type:test", "--quiet"],
+                          capture_output=True, text=True, env=env)
+    assert done.returncode == 0, done.stdout + done.stderr
+    return json.loads((tmp_path / "manifest.json").read_text())
+
+
+def assets_installed(project) -> bool:
+    from qa_tools.common import dbt_common
+
+    return dbt_common.packages_installed(project)
+
+
+@pytest.mark.parametrize("asset", REAL_ASSETS)
+class TestEachAssetsProject:
+    """Each real asset's dbt project (REQ-QAC-368 criteria 1, 2 and 10):
+    named mothman_<asset> (C13, Keith 2026-11-02), and reading the shared
+    macros and generic tests straight from dbt_shared/ through its own
+    macro-paths and test-paths, with no forwarding file (C12)."""
+
+    def test_there_are_two_real_assets(self, asset):
+        assert len(REAL_ASSETS) >= 2, REAL_ASSETS
+
+    def test_every_node_is_named_for_its_asset(self, asset, tmp_path):
+        manifest = _compiled(asset, tmp_path)
+        assert manifest["metadata"]["project_name"] == f"mothman_{asset}"
+        ours = [uid for uid, n in manifest["nodes"].items() if n["package_name"] != "dbt_utils"]
+        assert ours, "the project compiled no nodes of its own"
+        assert all(uid.split(".")[1] == f"mothman_{asset}" for uid in ours), ours[:5]
+
+    def test_a_check_using_a_shared_test_compiles_from_dbt_shared(self, asset, tmp_path):
+        import re
+
+        names = {m for f in (ROOT / "dbt_shared").rglob("*.sql")
+                 for m in re.findall(r"{%-?\s*test\s+(\w+)\s*\(", f.read_text())}
+        assert names, "dbt_shared/ defines no generic test"
+        manifest = _compiled(asset, tmp_path)
+        shared = [n for n in manifest["nodes"].values()
+                  if (n.get("test_metadata") or {}).get("name") in names]
+        assert shared, f"no check in {asset} uses one of dbt_shared's tests {sorted(names)}"
+        for node in shared:
+            uid = f"macro.mothman_{asset}.test_{node['test_metadata']['name']}"
+            assert uid in node["depends_on"]["macros"], node["depends_on"]["macros"]
+            assert Path(manifest["macros"][uid]["original_file_path"]).parts[3] == "dbt_shared"
+            assert node["compiled_code"].strip()
+
+    def test_no_forwarding_file_and_no_package_entry_for_dbt_shared(self, asset):
+        import yaml
+
+        project = ROOT / "assets" / asset / "dbt"
+        assert not (project / "macros").exists()
+        packages = yaml.safe_load((project / "packages.yml").read_text())["packages"]
+        assert not [p for p in packages if "local" in p], packages
+
+
+class TestTheParseCacheSeesTheSharedFolder:
+    """The parsed-project cache is keyed on every file dbt reads
+    (REQ-PIPE-189), and since C12 that includes dbt_shared/, outside the
+    project, through its macro-paths and test-paths."""
+
+    def test_an_edit_in_a_shared_path_outside_the_project_changes_the_key(self, tmp_path):
+        from qa_tools.common import dbt_common
+
+        project, shared = tmp_path / "proj", tmp_path / "shared"
+        (project / "models").mkdir(parents=True)
+        (shared / "macros").mkdir(parents=True)
+        (project / "dbt_project.yml").write_text(
+            "name: p\nmacro-paths: ['../shared/macros']\ntest-paths: ['tests', '../shared/tests']\n")
+        macro = shared / "macros" / "m.sql"
+        macro.write_text("{% macro m() %}1{% endmacro %}\n")
+        before = dbt_common._project_fingerprint(str(project))
+        macro.write_text("{% macro m() %}2{% endmacro %}\n")
+        assert dbt_common._project_fingerprint(str(project)) != before
 
 
 #: The data asset this module's tests act for, unless a test says otherwise

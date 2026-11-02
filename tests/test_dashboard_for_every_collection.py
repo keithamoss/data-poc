@@ -184,14 +184,22 @@ class TestAThirdCollectionIsLinked:
     def test_its_dataset_and_agency_get_links_from_the_registry(self, described):
         from qa_tools.common import github_links
 
-        links = github_links.build_folder_links(sha="abc123", root=assets.ROOT)
-        # The asset's folder through the resolver (the asset split - it was
-        # contract/; this test's copy lies outside the repository).
-        folder = assets.folder_rel()
+        # This test's copy of the asset's folder lies outside the repository,
+        # so its links are built for the checkout that holds it (C7: a link
+        # is a repository path, never an absolute one).
+        checkout = assets.selected().folder.parent
+        links = github_links.build_folder_links(sha="abc123", root=checkout)
+        folder = assets.folder_rel(checkout)
         assert links["agencies"][FAKE_AGENCY].endswith(f"/tree/abc123/{folder}/{FAKE_AGENCY}")
         assert links["datasets"][FAKE_DATASET].startswith(
             f"https://github.com/keithamoss/data-poc/blob/abc123/{folder}/{FAKE_AGENCY}/")
         assert "#L" in links["datasets"][FAKE_DATASET]
+
+    def test_outside_the_repository_it_is_refused_not_linked(self, described):
+        from qa_tools.common import github_links
+
+        with pytest.raises(assets.OutsideTheRepository):
+            github_links.build_folder_links(sha="abc123", root=assets.ROOT)
 
     def test_its_agency_blurb_comes_from_presentation(self, described):
         assert presentation.agency_blurbs()[FAKE_AGENCY] == "Makes fake things."

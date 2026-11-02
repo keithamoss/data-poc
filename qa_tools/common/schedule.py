@@ -365,7 +365,7 @@ def _calendar_file_rel() -> str:
     to point at (the asset split: it was contract/calendar.yaml)."""
     from qa_tools.common import assets
 
-    return f"{assets.folder_rel()}/calendar.yaml"
+    return f"{assets.config_dir()}/calendar.yaml"
 
 
 def calendars(agreement=None) -> list[Calendar]:

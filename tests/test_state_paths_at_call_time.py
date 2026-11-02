@@ -47,7 +47,8 @@ _PREFIX = re.compile(r"^(data|reports|contract)/")
 #: The resolver's lookups, and the call-time wrappers built on them.
 LOOKUPS = frozenset({
     "selected", "data_dir", "reports_dir", "data_path", "reports_path", "deliveries_dir",
-    "receipts_dir", "folder_rel", "dbt_project_ready", "module_file",
+    "receipts_dir", "folder_rel", "folder_on_disk", "dbt_rel", "dbt_on_disk",
+    "dbt_project_ready", "module_file",
     "default_deliveries_dir", "default_receipts_dir", "bookkeeping_path", "placements_path",
     "reports_root", "open_tickets_json", "ticket_resolutions_json",
 })

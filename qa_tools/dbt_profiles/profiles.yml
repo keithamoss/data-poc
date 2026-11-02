@@ -25,11 +25,13 @@
 # sitting in `public` beside real supply schemas is exactly the
 # ambiguity the four-kinds-of-schema design removes.
 #
-# This one profile is shared by both datasets (one dbt_project/), even
-# though its name ("birth_registrations") predates Child Protection.
+# This one profile is shared by every asset's dbt project
+# (assets/<asset>/dbt/, each named mothman_<asset>), so it is named for none
+# of them (C13, 2026-11-02; it was birth_registrations, which predated Child
+# Protection).
 #
-# Usage: dbt run --profiles-dir qa_tools/dbt_profiles --project-dir dbt_project
-birth_registrations:
+# Usage: dbt run --profiles-dir qa_tools/dbt_profiles --project-dir assets/<asset>/dbt
+mothman:
   target: dev
   outputs:
     dev:

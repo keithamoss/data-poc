@@ -141,7 +141,7 @@ def schedule_file() -> str:
     # By repository path through the resolver (the asset split: the folder is
     # assets/<asset>/, no longer a top-level contract/, so the file's
     # grandparent is not the repository root).
-    return f"{assets.folder_rel()}/{agreement.calendar_yaml().name}"
+    return f"{assets.config_dir()}/{agreement.calendar_yaml().name}"
 
 
 def reason_for(decided: Assignment) -> dict:

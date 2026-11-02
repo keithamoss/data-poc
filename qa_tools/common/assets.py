@@ -82,6 +82,11 @@ class BadAssetName(AssetNotSelected):
     path separator (post-build-review, the groundwork critic)."""
 
 
+class OutsideTheRepository(AssetError):
+    """A repository path was asked for an asset folder the repository does
+    not hold (REQ-PIPE-342 decision 18)."""
+
+
 class ModuleNameClash(AssetError):
     """Two different asset modules would register one module name."""
 
@@ -315,45 +320,85 @@ def select(name: str) -> Asset:
     return selected()
 
 
-def folder_rel() -> str:
+def _repo_rel(path: Path, what: str, root: Path | None = None) -> str:
+    """`path` relative to the repository root (or the checkout at `root`),
+    POSIX-style - REFUSED for a path outside it (Keith, 2026-11-02, C7;
+    REQ-PIPE-342 decision 18). A repository path is what a read at a git
+    ref, CODEOWNERS and a link into the repository mean, and none of them
+    has a meaning for a folder the repository does not hold, so an absolute
+    path standing in for one would be mis-read rather than fail."""
+    root = Path(root) if root is not None else ROOT
+    try:
+        return path.relative_to(root).as_posix()
+    except ValueError:
+        raise OutsideTheRepository(
+            f"asset {selected().name!r}'s {what} is {path}, outside the repository "
+            f"({root}), so it has no repository path - a reader that names its files "
+            f"by repository path cannot read it there.") from None
+
+
+def _on_disk(path: Path) -> str:
+    try:
+        return path.relative_to(ROOT).as_posix()
+    except ValueError:
+        return path.as_posix()
+
+
+def folder_rel(root: Path | None = None) -> str:
     """The selected asset's configuration folder relative to the repository
-    root, POSIX-style - `assets/<asset>` - for a reader that names its files
-    by repository path, as the lifecycle gate and a read at a git ref do
-    (REQ-PIPE-342 criterion 6). A folder outside the repository (a test's
-    copy, #55's injected configuration) is given ABSOLUTE, so joining it to
-    the repository root still names it; only a git-ref read has no meaning
-    there."""
-    folder = selected().folder
+    root (or the checkout at `root`), POSIX-style - `assets/<asset>` - for a
+    reader that names its files by REPOSITORY PATH: a read at a git ref,
+    CODEOWNERS, a link into the repository (REQ-PIPE-342 criterion 6).
+    Refused for a folder outside it (a test's copy, #55's injected
+    configuration): OutsideTheRepository. A reader that only OPENS the
+    asset's files asks folder_on_disk()."""
+    return _repo_rel(selected().folder, "configuration folder", root)
+
+
+def folder_on_disk() -> str:
+    """The selected asset's configuration folder AS A PATH TO OPEN in the
+    working tree: by repository path where the repository holds it, so what
+    a reader records or names reads as before, and as the folder itself
+    where it does not (#55's injected configuration, a test's copy) - joined
+    to the repository root, either finds it. Never a repository path: a
+    git-ref read, CODEOWNERS or a link asks folder_rel(), which refuses
+    (C7)."""
+    return _on_disk(selected().folder)
+
+
+def config_dir() -> str:
+    """The selected asset's configuration folder for a MESSAGE to name -
+    its repository path, or the folder as it is when the repository does not
+    hold it (a message names a file for a person, so it is never refused
+    mid-sentence); the generic `assets/<asset>` when no asset is selected,
+    so a refusal or warning naming a file never itself fails for want of an
+    asset (critic finding 7, the asset split)."""
+    try:
+        folder = selected().folder
+    except AssetNotSelected:
+        return "assets/<asset>"
     try:
         return folder.relative_to(ROOT).as_posix()
     except ValueError:
         return folder.as_posix()
 
 
-def config_dir() -> str:
-    """The selected asset's configuration folder for a MESSAGE to name -
-    `folder_rel()` when an asset is selected, else the generic
-    `assets/<asset>`, so a refusal or warning naming a file never itself
-    fails for want of an asset (critic finding 7, the asset split)."""
-    try:
-        return folder_rel()
-    except AssetNotSelected:
-        return "assets/<asset>"
-
-
-def dbt_rel() -> str:
+def dbt_rel(root: Path | None = None) -> str:
     """The selected asset's dbt project relative to the repository root,
     POSIX-style - `assets/<asset>/dbt` - for the readers that name its files
     by repository path, as `folder_rel` does for the configuration folder
-    (REQ-QAC-368 criterion 1); absolute outside the repository."""
-    project = selected().dbt_project
-    try:
-        return project.relative_to(ROOT).as_posix()
-    except ValueError:
-        return project.as_posix()
+    (REQ-QAC-368 criterion 1); refused outside the repository, as there."""
+    return _repo_rel(selected().dbt_project, "dbt project", root)
 
 
-#: The shared local dbt package every asset's project pulls in (REQ-QAC-368
+def dbt_on_disk() -> str:
+    """The selected asset's dbt project as a path to open, as
+    folder_on_disk() is for its configuration folder."""
+    return _on_disk(selected().dbt_project)
+
+
+#: The shared dbt macros and generic tests every asset's project reads through its
+#: macro-paths and test-paths (REQ-QAC-368
 #: criterion 2): the shared macros and generic tests, and nothing a
 #: collection owns. Repository-wide, so a constant.
 DBT_SHARED = "dbt_shared"
