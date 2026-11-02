@@ -12,8 +12,10 @@ echo "==> Python dependencies"
 pip install --no-cache-dir uv
 uv sync --dev
 
-echo "==> dbt_utils (several real dbt checks use macros this package ships)"
-uv run dbt deps --project-dir dbt_project --profiles-dir qa_tools/dbt_profiles
+echo "==> dbt packages, once per asset (REQ-QAC-368 criterion 4)"
+for asset in $(cd assets && ls -d */ | tr -d /); do
+  MOTHMAN_ASSET="$asset" uv run mothman env dbt-deps
+done
 
 echo "==> Node dependencies (the dashboard template's own JS suite)"
 npm ci

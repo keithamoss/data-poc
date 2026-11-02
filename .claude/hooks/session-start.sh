@@ -86,13 +86,16 @@ fi
 
 # --- dbt packages: without them the real dbt tests fail ---------------
 # Each asset's own dbt project, assets/<asset>/dbt, one process each.
+# `mothman env dbt-deps` decides whether they are installed, from dbt's own
+# package-lock.yml (REQ-QAC-368 decision 5) - never a folder merely existing.
 for asset in $(cd assets && ls -d */ | tr -d /); do
-  if [ ! -d "assets/${asset}/dbt/dbt_packages" ]; then
-    MOTHMAN_ASSET="$asset" uv run mothman env dbt-deps >/dev/null 2>&1 \
-      && say "Installed ${asset}'s dbt packages." \
-      || say "WARNING: dbt deps failed for ${asset}."
+  if out=$(MOTHMAN_ASSET="$asset" uv run mothman env dbt-deps 2>&1); then
+    case "$out" in
+      *"already installed"*) say "${asset}'s dbt packages already installed." ;;
+      *) say "Installed ${asset}'s dbt packages." ;;
+    esac
   else
-    say "${asset}'s dbt packages already installed."
+    say "WARNING: dbt deps failed for ${asset}."
   fi
 done
 

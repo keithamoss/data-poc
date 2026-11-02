@@ -89,12 +89,76 @@ class TestInstalling:
         assert "already installed" not in result.output
         assert installed.exists()
 
-    def test_an_edited_packages_file_installs_again(self, an_asset):
+    def test_an_edited_packages_file_installs_again(self, an_asset, tmp_path):
+        """A package added to packages.yml: dbt's own lock no longer matches
+        it, so the packages install again (REQ-QAC-368 d5, C6)."""
         assert _dbt_deps().exit_code == 0
-        (an_asset / "packages.yml").write_text((an_asset / "packages.yml").read_text() + "\n")
+        _another_package(tmp_path, an_asset)
         result = _dbt_deps()
         assert result.exit_code == 0, result.output
         assert "already installed" not in result.output
+        assert (an_asset / "dbt_packages" / "second_probe").exists()
+
+
+class TestInstalledIsDecidedByDbtsOwnLock:
+    """C6 (Keith, 2026-11-02, REQ-QAC-368 d5): whether the packages count
+    as installed is decided by dbt's own package-lock.yml - the hash dbt
+    itself writes of packages.yml, and the packages that lock names being in
+    dbt_packages/ - never by a stamp file of ours."""
+
+    def test_packages_a_bare_dbt_deps_installed_count_as_installed(self, an_asset, monkeypatch):
+        """No stamp of ours: a bare `dbt deps` wrote the lock and the
+        packages, and that is enough."""
+        import sys
+
+        dbt = Path(sys.executable).parent / "dbt"
+        done = subprocess.run([str(dbt), "deps", "--project-dir", str(an_asset),
+                               "--profiles-dir", str(ROOT / "qa_tools" / "dbt_profiles")],
+                              capture_output=True, text=True)
+        assert done.returncode == 0, done.stdout + done.stderr
+        ran = []
+        real = subprocess.run
+        monkeypatch.setattr(subprocess, "run", lambda *a, **k: ran.append(a) or real(*a, **k))
+        result = _dbt_deps()
+        assert result.exit_code == 0, result.output
+        assert "already installed" in result.output
+        assert ran == []
+
+    def test_no_file_of_ours_is_written_beside_the_packages(self, an_asset):
+        assert _dbt_deps().exit_code == 0
+        installed = {p.name for p in (an_asset / "dbt_packages").iterdir()}
+        assert installed == {"shared_probe"}
+
+    def test_a_change_dbt_does_not_count_is_still_installed(self, an_asset, monkeypatch):
+        """A comment in packages.yml leaves dbt's own hash where it was, so
+        dbt would not re-lock it, and nor does this."""
+        assert _dbt_deps().exit_code == 0
+        (an_asset / "packages.yml").write_text("# a comment\n" + (an_asset / "packages.yml").read_text())
+        ran = []
+        real = subprocess.run
+        monkeypatch.setattr(subprocess, "run", lambda *a, **k: ran.append(a) or real(*a, **k))
+        result = _dbt_deps()
+        assert result.exit_code == 0, result.output
+        assert "already installed" in result.output
+        assert ran == []
+
+    def test_a_missing_lock_installs_again(self, an_asset):
+        assert _dbt_deps().exit_code == 0
+        (an_asset / "package-lock.yml").unlink()
+        result = _dbt_deps()
+        assert result.exit_code == 0, result.output
+        assert "already installed" not in result.output
+        assert (an_asset / "package-lock.yml").is_file()
+
+
+def _another_package(tmp_path, project):
+    second = tmp_path / "second"
+    (second / "macros").mkdir(parents=True)
+    (second / "dbt_project.yml").write_text('name: second_probe\nversion: "1.0"\n'
+                                            'config-version: 2\nmacro-paths: ["macros"]\n')
+    (second / "macros" / "probe2.sql").write_text("{% macro probe2() %}2{% endmacro %}\n")
+    with open(project / "packages.yml", "a") as f:
+        f.write(f"  - local: {second}\n")
 
 
 class TestARunWithoutThemIsRefused:

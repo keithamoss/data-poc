@@ -439,35 +439,51 @@ def _table_of_model(model: str) -> str:
     return model[len(MODEL_PREFIX):] if model.startswith(MODEL_PREFIX) else model
 
 
-#: Written into an asset's dbt_packages/ once its packages install, holding
-#: the digest of the packages.yml they were installed for (REQ-QAC-368
-#: criterion 5) - so a second run can tell 'already installed' from 'the
-#: packages changed' - then, a line each, the package directories that
-#: install produced, so a package deleted since is not read as installed
-#: (post-build-review, the groundwork critic).
-PACKAGES_STAMP = ".mothman-packages.sha1"
+#: dbt's own record of what `dbt deps` installed, beside packages.yml.
+PACKAGE_LOCK = "package-lock.yml"
+
+
+def packages_installed(project_dir) -> bool:
+    """Whether one dbt project's packages count as installed - decided by
+    dbt's OWN package-lock.yml, never by a file of ours (Keith, 2026-11-02,
+    C6; REQ-QAC-368 decision 5). Installed when the lock exists, its
+    `sha1_hash` is the hash dbt itself computes of packages.yml as it reads
+    now (so a change dbt would re-lock for is one, and a comment is not),
+    and every package the lock names is a non-empty folder in dbt_packages/
+    (so a package deleted since is not read as installed)."""
+    from pathlib import Path
+
+    import yaml
+    from dbt.config.renderer import PackageRenderer
+    from dbt.config.project import package_config_from_data
+    from dbt.task.deps import _create_sha1_hash
+
+    project = Path(project_dir)
+    lock_path, packages = project / PACKAGE_LOCK, project / "dbt_packages"
+    if not lock_path.is_file():
+        return False
+    lock = yaml.safe_load(lock_path.read_text()) or {}
+    wanted = yaml.safe_load((project / "packages.yml").read_text()) or {}
+    # dbt's own hashing of its own rendering of packages.yml (dbt.task.deps),
+    # so this agrees with `dbt deps` about what counts as a change.
+    specs = package_config_from_data(PackageRenderer({}).render_data(wanted), wanted).packages
+    if lock.get("sha1_hash") != _create_sha1_hash(specs):
+        return False
+    names = [p.get("name") for p in lock.get("packages") or []]
+    return all(n and (packages / n).is_dir() and any((packages / n).iterdir()) for n in names)
 
 
 def install_packages(project_dir, profiles_dir) -> bool:
     """Install one dbt project's packages into its own dbt_packages/ with
-    `dbt deps`; False, changing nothing, when they are already installed for
-    the packages.yml as it reads now (REQ-QAC-368 criterion 5)."""
-    import hashlib
+    `dbt deps`; False, changing nothing, when they are already installed
+    (REQ-QAC-368 criterion 5) as dbt's own lock says (packages_installed)."""
     import subprocess
     import sys
     from pathlib import Path
 
     project = Path(project_dir)
-    wanted = hashlib.sha1((project / "packages.yml").read_bytes()).hexdigest()
-    packages = project / "dbt_packages"
-    stamp = packages / PACKAGES_STAMP
-    if stamp.is_file():
-        digest, *dirs = stamp.read_text().split()
-        present = all((packages / d).is_dir() and any((packages / d).iterdir()) for d in dirs)
-        # A stamp naming no directory (written before they were recorded)
-        # cannot vouch for any, so it installs once more.
-        if digest == wanted and dirs and present:
-            return False
+    if packages_installed(project):
+        return False
     dbt = Path(sys.executable).parent / "dbt"
     done = subprocess.run([str(dbt), "deps", "--project-dir", str(project),
                            "--profiles-dir", str(profiles_dir)],
@@ -477,7 +493,4 @@ def install_packages(project_dir, profiles_dir) -> bool:
     if done.returncode != 0:
         said = "\n".join(p.strip() for p in (done.stdout, done.stderr) if p and p.strip())
         raise DbtRunFailed(f"dbt deps failed for {project}. dbt said:\n{said}")
-    stamp.parent.mkdir(exist_ok=True)
-    dirs = sorted(d.name for d in packages.iterdir() if d.is_dir())
-    stamp.write_text("\n".join([wanted, *dirs]) + "\n")
     return True
