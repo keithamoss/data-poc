@@ -24,8 +24,10 @@ class TestTheSameArrivalsAsTheTree:
     """Pinned over the whole deployment: every field disk recognition
     gives, in the same order, for both collections."""
 
-    @pytest.mark.parametrize("collection_id,prefix", [("civil-registration", "run_"),
-                                                      ("child-protection", "cp_run_")])
+    # EACH UNDER ITS OWN ASSET (C11): each is a deployment of its own.
+    @pytest.mark.parametrize("collection_id,prefix", [
+        pytest.param("civil-registration", "run_", marks=pytest.mark.asset("daily")),
+        pytest.param("child-protection", "cp_run_", marks=pytest.mark.asset("quarterly"))])
     def test_identical(self, deployment_history, collection_id, prefix):
         from_tree = arrivals.arrivals_for(collection_id, prefix)
         from_rows = arrivals.arrivals_from_records(collection_id)

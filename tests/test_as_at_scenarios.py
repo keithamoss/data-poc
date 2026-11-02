@@ -306,6 +306,7 @@ def test_a_targeted_amber_is_never_named_with_a_severity():
         si.ExtraArrival(0, "09:00", None, severity_tables=("cp_clients",))
 
 
+@pytest.mark.asset("daily")  # TS-43 and TS-78 are Birth Registrations', the daily asset's
 class TestOnlyThePlantedAmbersWaitUnderHold:
     """Criterion 16, on the bootstrapped history: every supply the rule held
     under the hold amber setting is TS-43's or TS-78's - the guard that the
