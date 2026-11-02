@@ -242,3 +242,9 @@ the rebuild needs no question asked twice. Drafts and builders read this file.
   REQ-TEST next free above 374) to be signed and built, so the push runs the
   fast set, not the full test.yml (~145 billable minutes on a cache miss, with
   the month near its allowance). SETTLED by Keith 2026-11-02.
+- PLAN, Keith 2026-11-02 morning: once the in-flight builds finish (the move,
+  the morning answers, the fast CI set), tonight returns to finishing the
+  scoping of the rest of the split, "starting with the ..." (message cut off;
+  most likely the split-overview page's four decisions and #134 v3, then the
+  architect and UX reviewers). Notify Keith only when there is something to
+  look at or an input is needed.
