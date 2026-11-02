@@ -928,6 +928,14 @@ class TestCriticFindings:
         monkeypatch.setattr(gate, "touched",
                             lambda conn, s: gate.Touched(held_back=[("cp-clients", "x")]))
         assert of("cp").exit_status([{"status": "pass"}], [object()]) == 1
+
+    @pytest.mark.asset("daily")  # Birth Registrations' command, on its own asset
+    def test_birth_registrations_qa_exits_1_on_a_failed_check(self, private_supply_dsn):
+        from cli.collection_cli import of
+        from qa_tools.common import qa_store, supply_db
+
+        with supply_db.connect(label="pytest") as conn:
+            qa_store.ensure_schema(conn)
         assert of("bdm").exit_status([{"status": "fail"}], []) == 1
 
     def test_next_step_says_the_recheck_is_owed_once_the_cause_is_promoted(self, sc):

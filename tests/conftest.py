@@ -237,8 +237,22 @@ def _mark_worker_db_for(asset: str) -> None:
         found = conn.execute(
             "SELECT nspname FROM pg_namespace WHERE nspname NOT LIKE 'pg\\_%' "
             "AND nspname NOT IN ('information_schema', 'public')").fetchall()
-        for (schema,) in found:
-            conn.execute(f'DROP SCHEMA "{schema}" CASCADE')
+        # PAST THE PERIOD-VIEW GUARD (REQ-PIPE-129), which refuses a cascade
+        # that would drop a period's view: a deliberate wipe of a test
+        # worker's own database, so its event triggers are off for the drop
+        # and back on after, for whichever of them the drop left.
+        triggers = [t for (t,) in conn.execute(
+            "SELECT evtname FROM pg_event_trigger WHERE evtenabled <> 'D'").fetchall()]
+        for t in triggers:
+            conn.execute(f'ALTER EVENT TRIGGER "{t}" DISABLE')
+        try:
+            for (schema,) in found:
+                conn.execute(f'DROP SCHEMA "{schema}" CASCADE')
+        finally:
+            left = {t for (t,) in conn.execute("SELECT evtname FROM pg_event_trigger").fetchall()}
+            for t in triggers:
+                if t in left:
+                    conn.execute(f'ALTER EVENT TRIGGER "{t}" ENABLE')
         db_identity.mark(conn, db_identity.Identity(asset, "test"))
     _WORKER_DB["asset"] = asset
 
