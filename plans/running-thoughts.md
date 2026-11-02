@@ -6213,3 +6213,11 @@ could never have computed it), and it belongs with batch 5's check work.
        first dataset when two share a `table:`, and nothing found refuses
        it (a duplicate dataset id IS refused). `dataset_for_table` claims a
        real inverse.
+
+     **DECIDED (Keith, 2026-11-02 ~21:05 Perth): "Happy to do safe tidying
+     after the move and to send the other three groups to the scoper."** So
+     group A is built as its own small change once the move has merged into
+     `work` (its two dead-code removals touch no requirement claim); groups
+     B, C and D go to delivery-scoper with #134, and nothing from them is
+     built before Keith signs what the scoper drafts. The duplicate-table
+     sighting goes with them to be confirmed or dismissed.
