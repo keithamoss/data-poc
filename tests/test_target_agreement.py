@@ -274,7 +274,7 @@ class TestSkippingTheTrial:
         from qa_tools.common import scenario_map
 
         monkeypatch.setattr(driver, "generate", lambda collection_id: [])
-        monkeypatch.setattr(scenario_map, "write_map", lambda: None)
+        monkeypatch.setattr(scenario_map, "write_map", lambda **_: None)
         monkeypatch.setattr(bdm, "manifest_exists", lambda: False)
         monkeypatch.setattr(bdm, "try_targets", lambda **k: pytest.fail("the trial ran"))
         out = CliRunner().invoke(bdm.generate_synthetic_data_command, ["--skip-target-trial"])
@@ -288,7 +288,7 @@ class TestSkippingTheTrial:
 
         ran = []
         monkeypatch.setattr(driver, "generate", lambda collection_id: [])
-        monkeypatch.setattr(scenario_map, "write_map", lambda: None)
+        monkeypatch.setattr(scenario_map, "write_map", lambda **_: None)
         monkeypatch.setattr(bdm, "try_targets", lambda **k: ran.append(True))
         bdm.generate_synthetic_data()
         assert ran == [True]
@@ -534,7 +534,7 @@ class TestARecordThatDoesNotAddUp:
 
         wrote = []
         monkeypatch.setattr(driver, "generate", lambda collection_id: [])
-        monkeypatch.setattr(scenario_map, "write_map", lambda: wrote.append(True))
+        monkeypatch.setattr(scenario_map, "write_map", lambda **_: wrote.append(True))
 
         def disagree(**k):
             raise bdm.TargetTrialFailed("TS-43 did not read as built")

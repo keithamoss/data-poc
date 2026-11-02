@@ -225,7 +225,7 @@ class TestItIsRebuiltWithTheHistory:
 
         done = []
         monkeypatch.setattr(driver, "generate", lambda cid: done.append(("generate", cid)))
-        monkeypatch.setattr(sm, "write_map", lambda: done.append(("map", None)))
+        monkeypatch.setattr(sm, "write_map", lambda **_: done.append(("map", None)))
         collections = pipeline.generated_collections()
         assert collections
         for cid in collections:
@@ -279,7 +279,10 @@ class TestEachAssetHasItsOwnMap:
     @pytest.mark.needs_deployment
     @pytest.mark.parametrize("asset", _EACH_ASSET)
     def test_each_committed_map_is_current_for_its_own_history(self, asset):
-        assert sm.map_path().read_text() == sm.build_for_selected(), (
+        from generator import scenario_injection
+
+        built = sm.build_for_selected(leave_out=scenario_injection.other_assets_scenarios())
+        assert sm.map_path().read_text() == built, (
             f"SCENARIOS-{asset}.md is stale - run `mothman scenarios map`")
 
     @pytest.mark.parametrize("asset,mine,theirs", [
@@ -288,7 +291,10 @@ class TestEachAssetHasItsOwnMap:
                      id="quarterly")])
     def test_a_map_carries_its_own_scenarios_and_not_the_others(self, asset, mine, theirs):
         """TS-78a is Birth Registrations', TS-80 the Client Register's."""
-        text = sm.build_for_selected(placements_path="/nonexistent/placements.json")
+        from generator import scenario_injection
+
+        text = sm.build_for_selected(leave_out=scenario_injection.other_assets_scenarios(),
+                                     placements_path="/nonexistent/placements.json")
         assert f"### {mine} " in text, f"{asset}'s map leaves out its own {mine}"
         assert f"### {theirs} " not in text, f"{asset}'s map carries {theirs}"
 

@@ -370,23 +370,31 @@ def build_map(scenarios: Iterable[scenarios_mod.Scenario],
     return "\n".join(lines).rstrip() + "\n"
 
 
-def build_for_selected(register_path: Path | str | None = None,
+def build_for_selected(*, leave_out: set[str] | frozenset[str],
+                       register_path: Path | str | None = None,
                        placements_path: Path | str | None = None) -> str:
     """The selected asset's map: the one register, less every scenario whose
     injections name only datasets another asset holds, with this asset's own
     placements (REQ-PIPE-352 criterion 3). A scenario with no injection - a
-    unit test, or one not yet placed - names no asset and is in every map."""
-    from generator import scenario_injection
+    unit test, or one not yet placed - names no asset and is in every map.
 
-    leave_out = scenario_injection.other_assets_scenarios()
+    `leave_out` is those other assets' scenarios, which only the generator's
+    injection table knows (generator.scenario_injection.other_assets_scenarios).
+    The CALLER passes it, because this module may not import the generator
+    (REQ-GEN-043 criterion 7's wall, tests/test_arrivals.py's
+    TestTheGeneratorsBookkeepingIsWalledOff); `cli/` may.
+    Required, so no caller gets every asset's scenarios by forgetting it."""
     entries = [s for s in scenarios_mod.parse_register(register_path) if s.id not in leave_out]
     return build_map(entries, read_placements(placements_path))
 
 
-def write_map(map_path: Path | str | None = None,
-               register_path: Path | str | None = None,
-               placements_path: Path | str | None = None) -> Path:
-    """Rebuild the selected asset's committed map. Returns the path written."""
+def write_map(*, leave_out: set[str] | frozenset[str],
+              map_path: Path | str | None = None,
+              register_path: Path | str | None = None,
+              placements_path: Path | str | None = None) -> Path:
+    """Rebuild the selected asset's committed map. Returns the path written.
+    `leave_out` as build_for_selected takes it."""
     out = Path(map_path or globals()["map_path"]())
-    out.write_text(build_for_selected(register_path, placements_path))
+    out.write_text(build_for_selected(leave_out=leave_out, register_path=register_path,
+                                      placements_path=placements_path))
     return out

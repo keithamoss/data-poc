@@ -355,7 +355,9 @@ def generate_collection(collection_id: str, *, trial: bool) -> None:
         console.print("Target trial skipped: no injected target was tried against the "
                       "real tools. The comparison after a replay still runs.",
                       style="yellow")
-    scenario_map.write_map()
+    from generator import scenario_injection
+
+    scenario_map.write_map(leave_out=scenario_injection.other_assets_scenarios())
 
 
 def provider_collection(collection_id: str):
