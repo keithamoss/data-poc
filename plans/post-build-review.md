@@ -13604,7 +13604,7 @@ twice. It deliberately did not re-find the `TypeError`.
        names the tool by display name; each remaining PROVISIONAL question
        carries a recommendation.
 
-304. **[in-progress, 2026-11-02]** **[Pipeline & publishing]** **[Data generation]** **[Testing & dev tooling]** **Post-build critic on the asset split's move (bmove, f6bc05bf): three high findings, three for Keith, seven minor; fixed in 4f65fb07..HEAD on bmove.**
+304. **[done, 2026-11-02]** **[Pipeline & publishing]** **[Data generation]** **[Testing & dev tooling]** **Post-build critic on the asset split's move (bmove, f6bc05bf): three high findings, three for Keith, seven minor; fixed in 4f65fb07..HEAD on bmove.**
      Each was checked against the code before it went here; the defect fixes
      are test-first and were seen failing first.
      - **1. The replay and cache inputs missed every asset file (high, fixed
@@ -13664,4 +13664,106 @@ twice. It deliberately did not re-find the `TypeError`.
        placements by every bootstrap, so the last asset bootstrapped wins (a
        daily bootstrap wrote "23 of 102"). The committed map is the union of
        both assets' placements and was restored; the per-asset
-       SCENARIOS-<asset>.md is criterion 3's, not built.
+       SCENARIOS-<asset>.md is criterion 3's - BUILT since, in 10a061b6
+       (SCENARIOS-quarterly.md and SCENARIOS-daily.md), and the register's
+       two implemented_by entries that still named SCENARIOS.md were
+       repointed at both while finishing.
+
+305. **[in-progress, 2026-11-02]** **[Pipeline & publishing]** **[QA pipeline]** **[Dashboard UI]** **[Testing & dev tooling]** **Finishing the asset split's move (bmove): three latent defects found on the way, all fixed; the browser module's twenty failures triaged; five things held for Keith.**
+     Each was checked against the code before it went here; the defect fixes
+     are test-first and were seen failing first.
+     - **1. A stage failure in a bootstrap pool worker hid its real error
+       (minor defect, fixed)**: `arrival_lifecycle.StageFailed` (and
+       `equivalence.StageFailed`) took required arguments, so the pickle a
+       process pool hands back could not be rebuilt, and every stage failure
+       there read "TypeError: StageFailed.__init__() missing 3 required
+       positional arguments" instead of what failed - which is how the base
+       bootstrap's first attempt (f123a582) failed with no usable message.
+       Both now define `__reduce__`; tests/test_arrival_lifecycle.py's
+       TestAStageFailureSurvivesAProcessBoundary and
+       tests/test_equivalence.py's test_a_capture_stage_failure_survives_a_process_boundary
+       pickle and unpickle one (seen failing on that TypeError first). The move
+       tree had it too; it is not a move regression.
+     - **2. A singular dbt test's meta never reached dbt, so a stale Birth
+       Registrations supply stopped the run (defect, fixed in 0d9a8b61)**:
+       each collection's singular tests were described under the schema
+       file's old `tests:` key, which dbt 1.12 does not apply to a singular
+       test, so `names_no_row: true` never reached the manifest node
+       run_dbt reads; a FAILING recency check was then sampled as rows, its
+       sample query asked for `registration_number` of a test relation that
+       has no such column, and the run stopped with SampleNotRecordable. It
+       is on `work` today (f123a582's `--sequential` base bootstrap stopped on
+       exactly this, at birth_registrations__20260707060444326097, as did
+       bmove's first two daily bootstraps), and it only fires on a run where
+       recency fails, which is why nothing caught it sooner. Fixed on bmove by
+       moving the entries under `data_tests:`, and
+       tests/test_dbt_singular_test_meta.py parses each asset's real project
+       with dbt and compares the manifest against the YAML. The same commit
+       made a module's or class's asset mark select its asset BEFORE that
+       scope's own fixtures run (tests/conftest.py's
+       `_scope_selects_its_asset`), after a daily module first on a quarterly
+       worker lost what its module fixture had built. Both were cited in the
+       code as "#307", an entry that was never written; they are this one.
+     - **3. A changelog entry dated after the date on show drew a break
+       (minor defect, fixed)**: REQ-QAC-300 declares the 2026 census's
+       widening ahead of time (2027-08-01), and computeChangeMarkers' "entry
+       postdates the last known run" fallback put it on the newest point,
+       so Client Register Geocodes' year checks showed a third break between
+       two runs on one definition. An entry after the date on show now draws
+       nothing (tests-js/change-markers.test.js, seen failing).
+     - **4. The browser module's twenty failures (cd7004d5's tree, 20 failed,
+       413 passed)**, each read against the code. NONE was caused by the move's
+       product code. Fixed:
+       - Left behind by the move (C11): the agency 'View on GitHub' link now
+         names `assets/<asset>/<agency>`; the fresh-tab Close test used Birth
+         Registrations and moved to the daily class; the scenario-surface scan
+         is split per asset (`_GUARD_SURFACES_BY_ASSET`), with a daily class
+         of its own.
+       - Left behind by Pass / Warn / Fail: a group heading's count form
+         ('1 warning, 1 passing', read from status-cases.json), the warehouse
+         clause's 'and is passing', the stopped pass's 'Warn' pill, and the
+         trend axis's short last date ('8 Nov 2020', #289 D8d).
+       - Left behind by the geocoding batch (its browser proofs were written
+         against an empty warehouse and never run): the Client Register's
+         Linkage Products group holds the Client Register Geocodes checks too,
+         each saying 'Not yet checked by <its own dataset> - due <its own
+         time>'; the agency page's Across collections block is found in
+         Linkage Products' own block, not the first on the page; a linkage
+         sample's null key part is null by REQ-PIPE-341's amendment, so the
+         test asserts no 'None' text and at least one named identifier; the
+         check trend opens in the check panel, not the drawer; a unit trend
+         has no per-point tooltip, so its chart's aria-label is what is read;
+         and the first census-years version is read on 2016-06-30, a date the
+         history holds (its source starts in 2015-Q4).
+       - Date-sensitive (the demo data has aged past a round): ANCHOR_DATE is
+         2026-09-25, so from 2026-11-01 19:00 the quarterly asset's 2026-Q4
+         round is due with nothing generated, and tests reading the current
+         cycle at the default date went quiet. Four now take their date from
+         the generated history (`_generated_on()`), as CLAUDE.md asks.
+       - Load: the first-view budget test passes alone (trends 4.7-4.8s of a
+         6s budget; about 3s when written) and fails only beside three other
+         workers.
+     - **5. FOR KEITH**:
+       - (a) **A list row hides a warning its page shows, on an overdue day**
+         (left failing: TestColumnsNotGreenMatchesTheDatasetPage at the
+         default date). On 2026-11-02 the agency rows for ED Presentations and
+         Linkage Keys read 'No column has a verdict on this date' while their
+         pages' cross-table sections show Warn (Client Register and ED
+         Presentations Geocodes: Pass). The period on show has no supply yet,
+         the cross-table verdict is the warehouse's. Pre-existing; which one is
+         right is a product question (REQ-DASH-225 criterion 18).
+       - (b) **REQ-TEST-361 criterion 1 names two surfaces no page shows**:
+         'a re-checked-worse supply' and 'a Re-checked <t>: became <X> row'
+         appear on no dataset page of either asset at the anchor date (every
+         page probed). test_the_two_assets_show_every_surface fails naming
+         them. A scenario for each, or an amended criterion.
+       - (c) **REQ-DASH-299 criterion 15 (7)'s own regex hits an identifier**:
+         /\b\d{9}\b/ matches 'CPS-053812655', a Client Register id, which
+         criterion 13 allows on the page. Left failing; the regex wants
+         amending (an id is an identifier value), not the page.
+       - (d) **The demo data's age**: bumping ANCHOR_DATE and regenerating is
+         Keith's deliberate act (REQ-GEN-042); until then any new test of the
+         current cycle should take `_generated_on()`.
+       - (e) **The move cannot be compared against its base**: f123a582's
+         bootstrap stops on defect 2 above, so the e2e comparison against base
+         was not possible; the failures were triaged on their merits instead.

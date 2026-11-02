@@ -1,4 +1,4 @@
-"""A singular dbt test's meta reaches dbt (post-build-review #307, finding 13).
+"""A singular dbt test's meta reaches dbt (post-build-review #305, item 2).
 
 Every collection's singular tests (tests/<collection>/*.sql) are described
 in its models/ schema.yml - check_id, names_no_row and the rest. dbt 1.12

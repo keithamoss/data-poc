@@ -272,7 +272,7 @@ def asset_of(node) -> str:
 
 def _scope_selects_its_asset(request):
     """Select a module's or class's asset BEFORE its own fixtures of that
-    scope run (post-build-review #307). The per-test switch below empties the
+    scope run (post-build-review #305). The per-test switch below empties the
     worker's database when the asset changes, and it runs after every
     module- and class-scoped fixture - so a daily module first on a worker
     that started quarterly lost what its module fixture had built before its

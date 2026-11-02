@@ -487,6 +487,6 @@ def real_sources() -> tuple[list[Path], list[Path], list[Path]]:
 
 def _singular_entries(doc: dict) -> list:
     """A schema file's singular-test entries: `data_tests:`, the key dbt 1.12
-    applies (post-build-review #307), or the older `tests:` a retired file
+    applies (post-build-review #305), or the older `tests:` a retired file
     still uses."""
     return doc.get("data_tests") or doc.get("tests") or []

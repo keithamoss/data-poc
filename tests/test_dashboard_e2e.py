@@ -9381,7 +9381,10 @@ def _hover_trends(page, kinds) -> list[str]:
             hit = page.locator(sel).first
             box = hit.bounding_box()
             assert box, "precondition: the check trend's hit area is on screen"
-            page.mouse.move(box["x"] + box["width"] * 0.9, box["y"] + box["height"] / 2)
+            # hover() waits for the hit area to be STABLE, which a raw mouse
+            # move does not: a check panel opened from a column drawer is
+            # still sliding in, partly off screen, when it first appears.
+            hit.hover(position={"x": box["width"] * 0.9, "y": box["height"] / 2})
             svg_id = hit.evaluate("el => el.closest('svg').id")
             got = page.locator(f"#{svg_id}-tip").text_content() or ""
             assert got.strip(), "hovering the check trend filled no tooltip"
@@ -9772,10 +9775,20 @@ class TestTheGeocodingPages:
             self, clean_page, built_dashboard_html):
         """Exactly two breaking markers, each between the last point before a
         widening and the first on or after it - located, not only counted."""
+        from datetime import datetime
+
         hx = _hierarchy_index()
         (ck,) = [c for c in self._year_checks(built_dashboard_html)
                  if c["tool_ref"] == "dbt:missing_set_members"]
-        dates = [h["run_date"][:10] for h in ck["history"]]
+        _goto(clean_page, built_dashboard_html, state=self._geo_state(
+            hx, columnName="census_year", checkKey=ck["key"]))
+        # THE POINTS THE CHART DRAWS, read from its own table (newest first):
+        # the page plots one point per day shown, which is not one per
+        # recorded result - a re-supply's results share their quarter.
+        shown = clean_page.locator("#check-panel .trend-table tbody tr").evaluate_all(
+            "trs => trs.map(tr => tr.cells[0].firstChild.textContent)")
+        dates = [datetime.strptime(re.search(r"\d{1,2} \w+ \d{4}", t).group(0), "%d %B %Y")
+                 .date().isoformat() for t in reversed(shown)]
         n = len(dates)
         assert n > 2, dates
         xs = [42 + i * (480 - 42 - 16) / (n - 1) for i in range(n)]  # trendChart's own geometry
@@ -9784,8 +9797,6 @@ class TestTheGeocodingPages:
             after = next((i for i, d in enumerate(dates) if d >= cut), None)
             assert after not in (None, 0), (cut, dates[:3], dates[-3:])
             mids.append((xs[after - 1] + xs[after]) / 2)
-        _goto(clean_page, built_dashboard_html, state=self._geo_state(
-            hx, columnName="census_year", checkKey=ck["key"]))
         got = clean_page.locator("#check-panel .break-glyph").evaluate_all(
             "els => els.map(e => Number(/translate\\(([\\d.]+)/.exec(e.getAttribute('transform'))[1]))")
         assert len(got) == 2, got
