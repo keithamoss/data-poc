@@ -24,19 +24,17 @@ sweep sets - see is_overdue() for why that matters. Same for
 whether a slot is open or closed.
 
 A dataset's expected time of day, grace allowance and claim window come
-from its participation in contract/calendar.yaml, read through the one
-loader (qa_tools/common/agreement.py, REQ-PIPE-110). They used to live in
-each ODCS contract's slaProperties, parsed by pipeline/cadence.py, which
-this module had to reach into from qa_tools/common/.
+from its participation in the asset's calendar.yaml, read through the one
+loader (qa_tools/common/agreement.py, REQ-PIPE-110).
 """
 from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 
-from qa_tools.common import asset_time, schedule
-from qa_tools.common.schedule import Period
+from qa_tools.common import asset_time, hierarchy, schedule
 from qa_tools.common import assets as _assets
+from qa_tools.common.schedule import Period
 
 
 @dataclass(frozen=True)
@@ -57,13 +55,10 @@ class Slot:
     it opened as the period before it stayed open (REQ-PIPE-131
     criterion 16).
 
-    This REVERSES the open-ended window this docstring used to defend
-    ("NEVER CLOSES, because late is always allowed" - plans/supply-
-    model.md Thread E). Lateness is still allowed WITHIN a period's open
-    interval; it is no longer allowed across the next period's opening,
-    which is what let a late file be filed backward into an older,
-    unfilled period. Claiming FORWARD stays impossible: a slot whose
-    window has not opened cannot be claimed at all.
+    Lateness is allowed WITHIN a period's open interval and never across
+    the next period's opening, so a late file is not filed backward into
+    an older, unfilled period. Claiming FORWARD is impossible: a slot
+    whose window has not opened cannot be claimed at all.
     """
 
     dataset_id: str
@@ -199,21 +194,6 @@ def claimable_until(dataset_id: str, at: date, agreement=None) -> date:
     supply arrive BEFORE its slot's due instant and still be recognised
     as that period's.
 
-    THE BUG THIS CLOSES, with its worked example, because the old
-    behaviour looks reasonable. Child Protection's 2023-Q3 is due
-    2023-08-01 and its window opens 2023-07-18. A supply arriving on
-    the 25th - a week early, exactly as the calendar allows - was
-    offered only Q1 and Q2, so it was filed against Q2, as a late
-    resupply, and read about twelve weeks LATE. The honest answer is
-    EARLY for Q3. Nothing was wrong with the classifier; it was handed
-    the wrong slot before it was asked.
-
-    ONE FEED HAD IT AND THE OTHER DID NOT, which is why it survived.
-    The fault bites only where the window reaches back ACROSS a period
-    boundary: four hours never leaves its own day, so Birth
-    Registrations was immune, while fourteen days reaches a fortnight
-    into the previous quarter - 14 days of every 91 exposed.
-
     WIDENING THE LIST IS NOT WIDENING WHAT MAY BE CLAIMED.
     `assignment.open_slot()` still filters on `claim_opens_at`, so a
     slot whose window has not opened is offered and not chosen - the behaviour the daily feed has always had for
@@ -226,26 +206,25 @@ def claimable_until(dataset_id: str, at: date, agreement=None) -> date:
     # floor(window - expected time + one day, less an instant) whole days:
     # a 4h window at 14:00 reaches no further than today, at 01:00 it
     # reaches tomorrow (it opens at 21:00 tonight), and the quarterly 14d at
-    # 09:00 reaches fourteen days. A date plus a sub-day window is the same
-    # date, which dropped the 01:00 case (delivery-critic on 113, #3); a
-    # blunt round-up added a day the daily feed can never claim. The
-    # EARLIEST expected time any version has is the conservative one.
+    # 09:00 reaches fourteen days. A date plus a sub-day window would drop
+    # the 01:00 case; a blunt round-up would add a day the daily feed can
+    # never claim. The EARLIEST expected time any version has is the
+    # conservative one.
+    agreement = schedule._agreement(agreement)
+    versions = agreement.resolved_versions(dataset_id)
     window = claim_window(dataset_id, agreement)
-    times = [v.expected_time for v in schedule._agreement(agreement).resolved_versions(dataset_id)
-             if v.expected_time]
-    earliest = min((timedelta(hours=int(t[:2]), minutes=int(t[3:5])) for t in times),
+    earliest = min((timedelta(hours=h, minutes=m) for h, m in
+                    (asset_time.parse_hhmm(v.expected_time) for v in versions if v.expected_time)),
                    default=timedelta(0))
     reach = (window - earliest + timedelta(days=1) - timedelta(microseconds=1)) \
         // timedelta(days=1)
-    # ONLY THE VERSIONS IN FORCE ACROSS THE HORIZON (2026-10-16): the largest
-    # days_before EVER stated widened every later day's horizon too, so
-    # Birth Registrations' twelve evening-before days in June offered
-    # September supplies the next day's slot (test_claim_window_lookahead).
-    # A period is governed by the version in force on its date, so only a
-    # version whose span meets [at, at + reach + the largest ever] counts.
+    # ONLY THE VERSIONS IN FORCE ACROSS THE HORIZON: a period is governed by
+    # the version in force on its date, so only a version whose span meets
+    # [at, at + reach + the largest ever] counts - the largest days_before
+    # ever stated would otherwise widen every later day's horizon
+    # (test_claim_window_lookahead).
     reach = max(reach, 0)
-    versions = schedule._agreement(agreement).resolved_versions(dataset_id)
-    widest = at + timedelta(days=reach + max_days_before(dataset_id, agreement))
+    widest = at + timedelta(days=reach + max((v.days_before for v in versions), default=0))
     spans = zip(versions, [v.effective_from for v in versions[1:]] + [None])
     days = max((v.days_before for v, until in spans
                 if v.effective_from <= widest and (until is None or until > at)), default=0)
@@ -287,12 +266,10 @@ def slots_for_dataset(dataset_id: str, until: date | None = None,
     agreement = schedule._agreement(agreement)
 
     def claim_opens(period_date: date) -> datetime:
-        # Resolved PER PERIOD, on that period's own date. Hoisting this
-        # out of the loop is what made a new calendar version move every
-        # historical slot's claim_opens_at - the same retroactivity
-        # _effect_windows() already prevents for the dates themselves
-        # (post-build-review #42), and since REQ-PIPE-113 the expected
-        # time, days before and grace resolve the same way. A zero window
+        # Resolved PER PERIOD, on that period's own date, so a new calendar
+        # version never moves a historical slot's claim_opens_at (REQ-PIPE-110,
+        # REQ-PIPE-113: the expected time, days before and grace resolve the
+        # same way). A zero window
         # opens at the due instant, which is REQ-PIPE-131 criterion 3 for
         # free. The NEXT period's opening uses the next period's own
         # inputs (REQ-PIPE-113 criterion 4).
@@ -313,12 +290,10 @@ def slots_for_dataset(dataset_id: str, until: date | None = None,
         if nxt is not None:
             return claim_opens(nxt)
         # AN AUTHORED CALENDAR'S LAST PERIOD CLOSES TOO (REQ-PIPE-131
-        # criterion 16, Keith 2026-10-05; post-build-review #93): it used
-        # to stay open for ever, so a 2030 file was filed to 2027-Q4. It
-        # stays open as long as the period before it did - the PROVISIONAL
-        # measure, there being no claim-window end to use - and a file
-        # after that finds no open slot and is held (criterion 10). A
-        # calendar of one date has nothing to measure by and stays open.
+        # criterion 16): it stays open as long as the period before it did -
+        # the PROVISIONAL measure, there being no claim-window end to use -
+        # and a file after that finds no open slot and is held (criterion
+        # 10). A calendar of one date has nothing to measure by and stays open.
         prev = preceding.get(period.name)
         return opens + (opens - claim_opens(prev)) if prev is not None else None
 
@@ -348,8 +323,6 @@ def lookup_horizon(on: date | None = None) -> date:
     """SLOT_LOOKUP_YEARS after `on` (default today on the asset's clock),
     the furthest any look-up from now reaches. 29 February moves to 1 March,
     where date.replace(year=) would raise."""
-    from qa_tools.common import asset_time
-
     on = on or asset_time.local_date(asset_time.now())
     try:
         return on.replace(year=on.year + SLOT_LOOKUP_YEARS)
@@ -378,11 +351,7 @@ def relative_period(dataset_id: str, period: str, offset: int,
     for cp-case-workers, delivered in February and August only, the period
     before 2024-Q3 is 2024-Q1, never the 2024-Q2 it owes nothing for.
     """
-    from datetime import timedelta
-
-    from qa_tools.common import schedule as schedule_mod
-
-    on = schedule_mod.date_of(period, dataset_id)
+    on = schedule.date_of(period, dataset_id)
     if on is None:
         return None
     reach = timedelta(days=366 * max(1, offset)) if offset > 0 else timedelta(0)
@@ -414,9 +383,8 @@ def _calendar_periods(dataset_id: str, until: date | None, agreement=None) -> li
     # FAR ENOUGH TO REACH THE NEXT PERIOD: a day for a cadence rule, or -
     # where `until` sits in an authored stretch - the start of the next
     # calendar version, which is where a following cadence rule's first
-    # period is (delivery-critic, overnight sprint 3b: generated with
-    # `until` just before such a switch, the last authored slot had no
-    # closing instant at all).
+    # period is (without it, generated with `until` just before such a
+    # switch, the last authored slot would have no closing instant).
     # Tried with a day FIRST, so a daily calendar with a far-future version
     # never generates the years in between.
     periods = schedule.periods_for_calendar(cal.name, until=until + timedelta(days=1),
@@ -489,8 +457,6 @@ def is_owed_supplies(dataset_id: str) -> bool:
     a dataset that is owed supplies and declares no arrival pattern
     (REQ-PIPE-058 criterion 7).
     """
-    from qa_tools.common import schedule
-
     try:
         calendar = schedule.calendar_for_dataset(dataset_id)
     except schedule.NoCalendarAgreed:
@@ -514,8 +480,6 @@ def fall_hold(dataset_id: str, at: datetime, agreement=None) -> dict | None:
     that round's period (REQ-PIPE-322 criterion 3): the agreement change -
     collection, version, round and the period it would be a second supply
     for - or None. Cheap for a collection that never changes its value."""
-    from qa_tools.common import asset_time, hierarchy
-
     agr = schedule._agreement(agreement)
     try:
         cid = hierarchy.dataset(dataset_id).collection_id
@@ -562,14 +526,11 @@ def fall_hold(dataset_id: str, at: datetime, agreement=None) -> dict | None:
             "period": target.name, "filled_by": filler.isoformat()}
 
 
-
 def period_claimed_at(dataset_id: str, at: datetime, agreement=None) -> str | None:
     """The period of this dataset's slot whose claim window holds `at` -
     opened by then, not yet closed - from configuration alone, or None
     where none does (REQ-GEN-334 criterion 12: which period a reader's
     delivery is for, before anything has filed it)."""
-    from qa_tools.common import asset_time
-
     try:
         found = slots_for_dataset(
             dataset_id, until=claimable_until(dataset_id, asset_time.local_date(at), agreement),
@@ -578,6 +539,6 @@ def period_claimed_at(dataset_id: str, at: datetime, agreement=None) -> str | No
         return None
     hit = None
     for slot in found:
-        if slot.claim_opens_at <= at and (slot.closes_at is None or at < slot.closes_at):
+        if is_open(slot, at):
             hit = slot.period.name
     return hit

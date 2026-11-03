@@ -565,11 +565,13 @@ class TestTheFileCheckShapes:
                "C3,Cy,Lee,foster,pending,2026-01-01T00:00:00\n")
 
     def _evaluate(self, tmp_path, content, table):
+        from qa_tools import collections
         from qa_tools.common import file_checks, hierarchy
 
         path = tmp_path / f"{table}.csv"
         path.write_text(content)
-        contract = hierarchy.contract_path("child-protection")
+        contract = (hierarchy.data_asset_yaml().parent
+                    / collections.by_id("child-protection").contract)
         return {f.check: f for f in file_checks.evaluate(
             path, file_checks.expected_columns(contract, table))}
 

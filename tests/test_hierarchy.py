@@ -47,14 +47,6 @@ class TestAgainstTheRealConfig:
         for entry in hierarchy.all_datasets():
             assert hierarchy.dataset_for_table(entry.table) is entry
 
-    def test_qa_results_scope_is_agency_and_collection_for_every_dataset(self):
-        # The asymmetry REQ-QAC-039 removes: CP wrote under its
-        # collection, BDM under its dataset id. Both are the collection
-        # now, so a scope built from this never depends on which
-        # dataset it came from.
-        for entry in hierarchy.all_datasets():
-            assert entry.qa_results_scope == (entry.agency_id, entry.collection_id)
-
     def test_child_protection_holds_its_six_real_datasets(self):
         found = hierarchy.datasets_in_collection("child-protection")
         assert [d.table for d in found] == [

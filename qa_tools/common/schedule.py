@@ -9,14 +9,6 @@ in this module are the CANDIDATES `mothman schedule candidate-dates`
 prints for a human to review, edit and commit. Nothing evaluates
 against those.
 
-Rejected on the way here, and worth knowing because it sounds
-reasonable: derive the date from a holiday library at runtime, or
-derive it once and freeze the result. Neither loses on library quality -
-holiday packages are year-keyed, so a later gazette amendment does not
-silently rewrite a settled past date. They lose because freezing leaves
-nowhere to record a date that differs from what the rule would generate,
-which is exactly the case that matters: a supplier asked for the 3rd.
-
 TWO SHAPES, AND THAT IS NOT A COMPROMISE. A quarterly calendar
 enumerates four authored dates a year, known well in advance, where the
 real agreement is "the closest business day to the 1st" - which no
@@ -41,12 +33,9 @@ something is DUE would be asking the calendar to know a dataset's
 expected time, which is deliberately not here (see `carries no time of
 day` below).
 
-A CALENDAR DATE CARRIES NO TIME OF DAY. This supersedes Thread H's own
-chaos-pass item 5, which said the schedule carries a time alongside the
-dates - that predates Thread C's correction moving the deadline onto
-the slot, and the two cannot both hold. A time on the calendar date is
-a per-period deadline, which is precisely what was ruled out, because
-thirty datasets sharing one period do not share one deadline.
+A CALENDAR DATE CARRIES NO TIME OF DAY. A time on the calendar date
+would be a per-period deadline, which is ruled out because thirty
+datasets sharing one period do not share one deadline.
 
 EVERY CALENDAR IS VERSIONED AND EFFECTIVE-DATED, in the same shape
 check lifecycle already uses. A supply is judged against the calendar in
@@ -60,9 +49,7 @@ import re
 from dataclasses import dataclass
 from datetime import date, timedelta
 
-
-
-from qa_tools.common import hierarchy
+from qa_tools.common import asset_time, hierarchy, in_force
 
 
 # Full month names, lower-cased for comparison. Full names ONLY: an
@@ -189,8 +176,6 @@ class Calendar:
         dating. Editing next year's dates must never retroactively move
         a date a past supply was already judged against.
         """
-        from qa_tools.common import in_force
-
         version = in_force.version_on(self.versions, on)
         if version is None:
             raise ScheduleConfigError(
@@ -221,22 +206,14 @@ def parse_duration(value, where: str) -> timedelta:
 
 def format_duration(value: timedelta) -> str:
     """A timedelta back in the form the config authors it in - `14d`,
-    `4h`.
+    `4h` - the inverse of `parse_duration`.
 
-    The inverse of `parse_duration`, and it exists because the one
-    surface that displayed a claim window printed `str(timedelta)`:
-    `14 days, 0:00:00` and `4:00:00`. REQ-PIPE-050 rejects every form
-    but one on purpose - "four ways to write one duration is four ways
-    for thirty datasets' config to read differently" - so a display
-    inventing a fifth is the same problem from the other end. `4:00:00`
-    additionally reads as a time of day, in a table whose neighbouring
-    columns are times (post-build-review #27).
-
-    Whole days where it divides, whole hours otherwise, and minutes
-    only if some future config ever needs them - a duration this cannot
-    express has no authored form either, so falling back to the
-    timedelta's own repr would be showing something nobody could type
-    back in.
+    ONE FORM, THE AUTHORED ONE (post-build-review #27): REQ-PIPE-050
+    accepts one way to write a duration, so a display inventing another -
+    `str(timedelta)`'s `4:00:00`, which also reads as a time of day - is
+    the same problem from the other end. Whole days where it divides,
+    whole hours otherwise; a duration with no authored form raises rather
+    than showing something nobody could type back in.
     """
     seconds = int(value.total_seconds())
     if seconds and seconds % 86400 == 0:
@@ -373,12 +350,13 @@ def calendars(agreement=None) -> list[Calendar]:
 
 
 def calendar(name: str, agreement=None) -> Calendar:
+    loaded = _load(agreement)
     try:
-        return _load(agreement)[name]
+        return loaded[name]
     except KeyError:
         raise UnknownCalendarError(
             f"{name!r} is not a calendar in {_calendar_file_rel()}. "
-            f"Known: {', '.join(sorted(_load(agreement)))}") from None
+            f"Known: {', '.join(sorted(loaded))}") from None
 
 
 #: The key a dataset uses to say it has NO calendar, DELIBERATELY
@@ -439,7 +417,13 @@ def no_calendar(dataset_id: str, agreement=None) -> str | None:
     by accident - which would be the quiet direction.
     """
     hierarchy.dataset(dataset_id)
-    entry = _agreement(agreement).dataset(dataset_id)
+    return _no_calendar(dataset_id, _agreement(agreement))
+
+
+def _no_calendar(dataset_id: str, agreement) -> str | None:
+    """`no_calendar` for a dataset already known to the hierarchy, against
+    an agreement already resolved."""
+    entry = agreement.dataset(dataset_id)
     declared = entry.no_calendar if entry else None
     if declared is None:
         return None
@@ -508,10 +492,11 @@ def calendar_for_dataset(dataset_id: str, agreement=None) -> Calendar:
     somebody got it wrong.
     """
     hierarchy.dataset(dataset_id)  # raises UnknownDatasetError, naming the known ids
-    declared = no_calendar(dataset_id, agreement)
+    agreement = _agreement(agreement)
+    declared = _no_calendar(dataset_id, agreement)
     if declared is not None:
         raise NoCalendarAgreed(dataset_id, declared)
-    name = _agreement(agreement).calendar_name_for(dataset_id)
+    name = agreement.calendar_name_for(dataset_id)
     if not name:
         raise ScheduleConfigError(
             f"dataset {dataset_id!r} names no `calendar:` and does not declare "
@@ -534,12 +519,13 @@ def delivery_months(dataset_id: str, on: date | None = None,
     participation version in force on `on` - the period's own date - or of
     the newest version where `on` is not given.
     """
-    entry = _agreement(agreement).dataset(dataset_id)
+    agreement = _agreement(agreement)
+    entry = agreement.dataset(dataset_id)
     if entry is None or not entry.participation:
         return None
     if on is None:
-        return _agreement(agreement).resolved_versions(dataset_id)[-1].participates
-    version = _agreement(agreement).participation_on(dataset_id, on)
+        return agreement.resolved_versions(dataset_id)[-1].participates
+    version = agreement.participation_on(dataset_id, on)
     return version.participates if version else None
 
 
@@ -566,12 +552,12 @@ def dataset_dates_override(dataset_id: str, agreement=None) -> tuple[Period, ...
     VERSIONED LIKE A CALENDAR (REQ-PIPE-110 criterion 25): each version
     contributes only the periods inside its own period of effect.
     """
-    entry = _agreement(agreement).dataset(dataset_id)
+    agreement = _agreement(agreement)
+    entry = agreement.dataset(dataset_id)
     own = entry.own_dates if entry else None
     if own is None:
         return None
-    if any(v.participates is not None
-           for v in _agreement(agreement).resolved_versions(dataset_id)):
+    if any(v.participates is not None for v in agreement.resolved_versions(dataset_id)):
         raise ScheduleConfigError(
             f"dataset {dataset_id!r} dates: a dataset states EITHER its own `dates:` "
             f"(overriding its calendar) OR a `participates:` list of months (subsetting it), "
@@ -614,37 +600,23 @@ def periods_for_calendar(calendar_name: str, until: date | None = None,
     authored today cannot reach back and change - or delete - a period
     that a past supply was already filed against.
 
-    This replaced reading `calendar.current` for the entire sequence,
-    which was a real bug rather than a simplification. Adding a version
-    effective 2027 did not merely move the earlier periods; it replaced
-    them, so four years of history CEASED TO EXIST and every supply
-    filed against 2023-Q1 had no period at all. Latent only because no
-    second version has ever been authored - see
-    tests/test_schedule.py's own account.
-
     A cadence-rule version generates one period per day across its own
     window, named by its date, so a calendar can legitimately change
     from a rule to authored dates or back.
     """
     cal = calendar(calendar_name, agreement)
-    out: list[Period] = []
+    out = _calendar_periods(cal)
     for version, start, end in _effect_windows(cal):
-        stop = end - timedelta(days=1) if end is not None else until
-        if version.is_cadence_rule:
-            if stop is None:
-                raise ScheduleConfigError(
-                    f"calendar {calendar_name!r} is a cadence rule with no end - pass `until` "
-                    f"to say where to stop.")
-            out.extend(Period(name=(start + timedelta(days=i)).isoformat(),
-                               date=start + timedelta(days=i))
-                        for i in range((stop - start).days + 1))
+        if not version.is_cadence_rule:
             continue
-        for period in version.periods:
-            if period.date < start:
-                continue
-            if end is not None and period.date >= end:
-                continue
-            out.append(period)
+        stop = end - timedelta(days=1) if end is not None else until
+        if stop is None:
+            raise ScheduleConfigError(
+                f"calendar {calendar_name!r} is a cadence rule with no end - pass `until` "
+                f"to say where to stop.")
+        out.extend(Period(name=(start + timedelta(days=i)).isoformat(),
+                           date=start + timedelta(days=i))
+                    for i in range((stop - start).days + 1))
     out.sort(key=lambda p: p.date)
     if until is not None:
         out = [p for p in out if p.date <= until]
@@ -693,6 +665,7 @@ def periods_for_dataset(dataset_id: str, until: date | None = None,
     from qa_tools.common.agreement import TURNED_OFF
 
     cal = calendar_for_dataset(dataset_id, agreement)
+    agreement = _agreement(agreement)
     months = delivery_months(dataset_id, agreement=agreement)
     version = cal.current
     skipped = not_expected_periods(dataset_id, agreement)
@@ -712,7 +685,7 @@ def periods_for_dataset(dataset_id: str, until: date | None = None,
             return False
         # TURNED OFF ON THE ROUND'S DATE (REQ-PIPE-179 criteria 4, 8 and 13):
         # owes nothing, so no period and no slot.
-        if _agreement(agreement).standing_on(dataset_id, r.date).state == TURNED_OFF:
+        if agreement.standing_on(dataset_id, r.date).state == TURNED_OFF:
             return False
         on = delivery_months(dataset_id, r.date, agreement)
         if on is not None and _version_in_force(cal, r.date).is_cadence_rule:
@@ -740,7 +713,7 @@ def periods_for_dataset(dataset_id: str, until: date | None = None,
         for r in rounds:
             if not _participates(r):
                 continue
-            n = _agreement(agreement).files_go_to_period_for(dataset_id, r.date) or 0
+            n = agreement.files_go_to_period_for(dataset_id, r.date) or 0
             j = index[r.name] + n
             if j >= len(sequence):
                 continue
@@ -792,71 +765,38 @@ def claim_window(dataset_id: str, contract_value: str | None = None,
     today", which is what a `mothman schedule show` line wants and what
     no slot derivation should ever want (post-build-review #42).
 
-    BEFORE, and the first line of this docstring used to say "after",
-    which was wrong in the one way that matters (found building
-    REQ-PIPE-052). A window measured forwards from the period's date
-    describes something that CLOSES - a deadline for claiming - and the
-    settled rule is the opposite: the window opens a configured
-    interval BEFORE the due instant, and the slot then stays open until
-    the NEXT calendar period's window opens (REQ-PIPE-131, which replaced
-    Thread E's "never closes").
+    BEFORE, never after: the window opens a configured interval before
+    the due instant, and the slot then stays open until the NEXT calendar
+    period's window opens (REQ-PIPE-131). What it prevents is claiming
+    FORWARD into a slot that is not yet claimable; read as a closing
+    deadline it would instead make a late supply unfileable, from the
+    same number. qa_tools/common/slots.py is what applies it.
 
-    The difference is not pedantry. What the window prevents is
-    claiming FORWARD into a slot that is not yet claimable, which is
-    what makes the forward cascade structurally impossible. Read as a
-    closing deadline it would instead make a late supply unfileable -
-    the exact opposite behaviour, from the same number.
-
-    qa_tools/common/slots.py is what applies it.
-
-    The CALENDAR carries the default and a dataset's participation
-    version may override it in contract/calendar.yaml - say nothing, get
-    the default (REQ-PIPE-110; it used to be a `claimWindow` slaProperty
-    in the dataset's own contract).
-
-    WHY THE DEFAULT SITS ON THE CALENDAR rather than on the asset root,
-    which is where an earlier answer put it: a quarterly calendar's
-    sensible window is measured in days and a daily calendar's in hours,
-    so a single asset-root default would be wrong for one of them on day
-    one, in this repo. An asset-root default would hand Birth
-    Registrations a 14-day claim window on a daily feed. Putting it on
-    the calendar makes the default track the thing that sets its scale
-    (Keith, 2026-09-22, shown all three shapes side by side).
-
-    Per-dataset-only was rejected twice for the same reason the calendar
-    is asset-level at all: thirty near-identical values on one asset,
-    which nobody maintains and which drift.
-
-    NOT called earlyWindow, deliberately. Nothing measures how early a
-    supply is in order to assign it - earliness is a reported
-    consequence of assignment, so earlyWindow would name the wrong half
-    of what this does.
-
-    BOTH ARE VERSIONED NOW. The override used to be declared in the
-    dataset's own ODCS contract, which had no effective_from, so it
-    could not be; since REQ-PIPE-110 it sits on the dataset's
-    participation versions and resolves, like the calendar's default, on
-    the period's own date. `contract_value` survives only as an explicit
-    value a caller passes.
+    The CALENDAR carries the default - a quarterly window is measured in
+    days and a daily one in hours - and a dataset's participation version
+    may override it: say nothing, get the default (REQ-PIPE-049,
+    REQ-PIPE-110). Both resolve on the period's own date. `contract_value`
+    is only an explicit value a caller passes.
     """
     if contract_value is not None:
         return parse_duration(contract_value, f"dataset {dataset_id!r} claimWindow")
     # A PARTICIPATION VERSION MAY OVERRIDE IT (REQ-PIPE-110 criterion 4).
-    entry = _agreement(agreement).dataset(dataset_id)
+    agreement = _agreement(agreement)
+    entry = agreement.dataset(dataset_id)
     if on is not None:
         # A period before the first version takes that first version's
         # inputs - all of them, this override included (REQ-PIPE-113's
         # PROVISIONAL rule, as slots._participation_for applies it).
-        standing = _agreement(agreement).standing_on(dataset_id, on)
+        standing = agreement.standing_on(dataset_id, on)
         # INSIDE A TURNED-OFF GAP, as if every effective_to were absent
         # (REQ-PIPE-179 criterion 14) - the window this period would have had.
-        version = ((_agreement(agreement).timing_on(dataset_id, on)
+        version = ((agreement.timing_on(dataset_id, on)
                     if standing.turned_off is not None else standing.values)
-                   or (_agreement(agreement).participation_on(
+                   or (agreement.participation_on(
                        dataset_id, entry.participation[0].effective_from)
                        if entry and entry.participation else None))
     else:
-        resolved = _agreement(agreement).resolved_versions(dataset_id)
+        resolved = agreement.resolved_versions(dataset_id)
         version = resolved[-1] if resolved else None
     if version is not None and version.claim_window is not None:
         return version.claim_window
@@ -875,8 +815,6 @@ def _version_in_force(cal: Calendar, on: date) -> CalendarVersion:
     answer that does not turn "this calendar was authored later than
     its own earliest data" into an error nobody can act on.
     """
-    from qa_tools.common import in_force
-
     return in_force.version_on(cal.versions, on) or cal.versions[0]
 
 
@@ -917,7 +855,7 @@ def candidate_dates(calendar_name: str, year: int) -> list[tuple[Period, str]]:
     for month in months:
         when = date(year, month, min(day, _calendar.monthrange(year, month)[1]))
         template = by_month_position.get(month, "")
-        name = _renamed_for_year(template, when, year)
+        name = _renamed_for_year(template, year)
         note = ""
         if when.weekday() >= 5:
             note = f"{when.strftime('%A')} - check what was actually agreed"
@@ -928,7 +866,7 @@ def candidate_dates(calendar_name: str, year: int) -> list[tuple[Period, str]]:
     return out
 
 
-def _renamed_for_year(template: str, when: date, year: int) -> str:
+def _renamed_for_year(template: str, year: int) -> str:
     """An existing period name with its year advanced, or "" if the name
     does not carry one recognisably.
 
@@ -940,8 +878,7 @@ def _renamed_for_year(template: str, when: date, year: int) -> str:
     m = re.search(r"(19|20)\d{2}", template)
     if not m:
         return ""
-    offset = year - int(m.group(0))
-    return template[:m.start()] + str(int(m.group(0)) + offset) + template[m.end():]
+    return template[:m.start()] + str(year) + template[m.end():]
 
 
 def date_of(period_name: str, dataset_id: str) -> date | None:
@@ -963,8 +900,6 @@ def date_of(period_name: str, dataset_id: str) -> date | None:
     answer rather than an error: a period from another calendar, or one
     whose name changed, is simply not this dataset's.
     """
-    from qa_tools.common import asset_time
-
     horizon = asset_time.now().date() + timedelta(days=365)
     for period in periods_for_calendar(calendar_for_dataset(dataset_id).name,
                                         until=horizon):
@@ -986,8 +921,6 @@ def round_of(period_name: str, dataset_id: str, agreement=None) -> date | None:
     round fills the period - a period a rise skips (REQ-PIPE-322), or one
     the calendar does not name.
     """
-    from qa_tools.common import asset_time
-
     agr = _agreement(agreement)
     horizon = asset_time.now().date() + timedelta(days=365)
     sequence = periods_for_calendar(calendar_for_dataset(dataset_id, agr).name,

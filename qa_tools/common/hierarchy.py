@@ -1,29 +1,12 @@
 """The agency/collection/dataset hierarchy, resolved from one place
 (REQ-QAC-039).
 
-WHAT THIS REPLACES. Until 2026-09-23 the tree was literals in twelve
-Python files: `AGENCY_ID`/`COLLECTION_ID`/`DATASET_ID` copy-pasted
-across the four BDM tool scripts, a hand-maintained
-`TABLE_DATASET_ID`/`TABLE_DATASET_NAME` pair in `cp_common.py`, plus
-`ticket_sync.py`'s `DATASET_SCOPE`, `acceptance_sync.py`'s
-`QA_RESULTS_SCOPE_FOR_DATASET`, `github_links.py`'s folder constants,
-both orchestrators and both dashboard build scripts. `ticket_sync.py`'s
-own comment had already recorded that it was the FOURTH copy and that
-four was the trigger for consolidating - then deferred it.
+ONE STATEMENT OF THE TREE, so a check's id, its dashboard URL and its
+stored results cannot each carry a different half of the truth.
 
-The cost of that shape was not duplication for its own sake. It was
-that a check's id, its dashboard URL and its stored results each
-carried a different half of the truth, and nothing could tell you they
-disagreed, because no single statement of the tree existed to disagree
-WITH.
-
-WHY IT READS CONFIG RATHER THAN DECLARING THE TREE ITSELF. The
-hierarchy is data-asset-level configuration, so it lives in
-`contract/data-asset.yaml` alongside the other asset-level config - and
-alongside REQ-PIPE-049's named delivery calendars, which land in the
-same file. A dataset naming a calendar and a dataset naming its
-collection then resolve through one file rather than two mechanisms.
-Keith's call, 2026-09-23.
+IT READS CONFIG RATHER THAN DECLARING THE TREE ITSELF: the hierarchy is
+data-asset-level configuration, so it lives in the asset's
+data-asset.yaml beside the other asset-level config.
 
 KEYED ON THE FILE'S CONTENT (REQ-PIPE-254). The file is read on every
 call and the tree is built again only when its text has changed, so an
@@ -52,8 +35,7 @@ from qa_tools.common import assets, config_yaml
 
 def data_asset_yaml() -> Path:
     """The selected asset's data-asset.yaml, resolved now (REQ-PIPE-342
-    criterion 6) - it was the import-time constant DATA_ASSET_YAML, which
-    captured one folder for the life of the process."""
+    criterion 6), never captured once for the life of the process."""
     return assets.selected().data_asset_yaml
 
 
@@ -79,7 +61,7 @@ class Dataset:
 
     Carries its ancestors rather than pointing at them: every consumer
     that has a dataset wants the agency and collection ids in the same
-    breath - to build a check_id, a qa_results path or a dashboard URL -
+    breath - to build a check_id, a results key or a dashboard URL -
     and a reference to walk up would just be re-derived at each call
     site, which is the shape this module exists to remove.
     """
@@ -110,27 +92,6 @@ class Dataset:
     #: criterion 5's one place. Empty for a dataset that links nothing. The
     #: code is None for a code-less entry (REQ-QAC-294 criterion 2).
     linked: tuple = ()
-
-    @property
-    def qa_results_scope(self) -> tuple[str, str]:
-        """(agency, collection) - the scope this dataset's recorded QA
-        results are keyed under.
-
-        IT NAMED A DIRECTORY UNTIL REQ-PIPE-089 (`qa_results/<agency>/
-        <collection>/...`) and names a pair of COLUMNS now
-        (`qa.check_result.agency_id`, `.collection_id`). The pair is the
-        same pair; only the store moved.
-
-        Deliberately the COLLECTION, not the dataset. Child Protection
-        already wrote under its collection while Birth Registrations
-        wrote under its dataset id, which is the asymmetry
-        REQ-QAC-039's "model a collection for Birth Registrations by
-        the same mechanism Child Protection uses" removes. Moving BDM
-        onto this changes its committed directory tree, which is why
-        that change rides the one combined regeneration rather than
-        happening on its own (Keith, 2026-09-23).
-        """
-        return (self.agency_id, self.collection_id)
 
 
 def _require(node: dict, key: str, where: str):
@@ -258,9 +219,9 @@ def by_table() -> "MappingProxyType[str, Dataset]":
 def dataset_for_table(table: str, tables: "MappingProxyType[str, Dataset] | None" = None) -> Dataset:
     """The dataset a physical table belongs to.
 
-    Replaces `cp_common.TABLE_DATASET_ID`. A dataset maps to exactly one
-    logical table by construction under the supply model (Thread F), so
-    this is a real inverse rather than a lookup that might miss.
+    A dataset maps to exactly one logical table by construction under the
+    supply model (Thread F), so this is a real inverse rather than a
+    lookup that might miss.
 
     `tables` is a `by_table()` the caller already holds; without one the
     file is read now.
@@ -275,23 +236,8 @@ def dataset_for_table(table: str, tables: "MappingProxyType[str, Dataset] | None
         ) from None
 
 
-def contract_path(collection_id: str) -> Path:
-    """The ODCS contract file covering one collection.
-
-    Stated in the hierarchy rather than in a map beside each consumer,
-    for the reason REQ-QAC-039 exists: a second copy is a copy that
-    drifts, and this one is how a file's own dataset gets resolved from
-    its name (REQ-GEN-043).
-    """
-    return data_asset_yaml().parent / datasets_in_collection(collection_id)[0].contract
-
-
 def datasets_in_collection(collection_id: str) -> list[Dataset]:
-    """Every dataset under one collection, declaration order.
-
-    Replaces `cp_common.TABLES`, which was a hand-kept list of the same
-    six names in a different file from the map that gave them ids.
-    """
+    """Every dataset under one collection, declaration order."""
     found = [d for d in all_datasets() if d.collection_id == collection_id]
     if not found:
         raise UnknownDatasetError(

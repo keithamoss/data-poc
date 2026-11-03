@@ -211,8 +211,8 @@ class TestNotExpectedMeansNoSlot:
 
 
         # A whole copy of the contract directory, not just the asset
-        # file: hierarchy.contract_path() resolves a collection's
-        # contract relative to the asset file, so repointing one and
+        # file: a collection's contract is resolved relative to the
+        # asset file, so repointing one and
         # not the other leaves the tree looking for contracts that are
         # not beside it.
         contract_dir = tmp_path / "contract"
