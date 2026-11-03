@@ -14369,3 +14369,27 @@ twice. It deliberately did not re-find the `TypeError`.
        SCENARIOS-daily.md and SCENARIOS-quarterly.md are stale under Q5's
        rule because this sandbox has no placements file (#314). The
        end-of-run bootstrap regenerates both.
+     - **Runs (code at 79f737d7; the index at 4ef2cff0; this bullet after)**:
+       the five new tests failed first, as above, and passed after the
+       fixes. Touched and neighbouring modules (22: test_every_asset,
+       test_settle_tui, test_dataset_blockers, test_scenario_injection,
+       test_validate_feedback, test_assets, test_cli_at_thirty_collections,
+       test_choose_file, test_correction_trial, test_filing_decisions,
+       test_refile_decision, test_supply_files, test_hierarchy,
+       test_validate_schedule, test_outstanding, test_collections_registry,
+       test_bulk_recheck, test_correction_apply, test_refiling,
+       test_ticket_reconciler, test_place_held_supply,
+       test_correction_claims): 884 passed, 8 failed, 3 skipped. The 8 are
+       the 5 TestTheEarlyEmergencyDepartmentSupplies "TS-<n> is not placed"
+       failures and 3 test_correction_trial calendar-entry NotInteractive
+       failures, and all 8 fail the same way at 6707fd63 in a clean
+       worktree (#314 recorded the same). The 3 skips are scenario tests
+       that need a generated delivery tree or a built dashboard file.
+       Critical set: quarterly 788 passed, 1 failed (the stale
+       plans/INDEX.md this entry made; `mothman dashboard plans-index` was
+       then run and tests/test_plans_index.py passed, 11 tests), 0 skipped;
+       daily 106 passed, 0 skipped. `uv run ruff check .` clean. npm test
+       1146 passed. `mothman check --no-pytest` (MOTHMAN_DIFF_BASE=f123a582)
+       on 4ef2cff0 passed, with warnings from schedule, sprints and scenario
+       map. No CHANGELOG.yaml entry: these are minor critic fixes to #314's
+       build, which has its own entry.

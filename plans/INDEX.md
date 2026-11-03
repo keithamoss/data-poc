@@ -1070,7 +1070,7 @@ one when this line suggests it matters.
 - **#314** `done` 2026-11-03 - Keith's answers to morning report 12's questions, built (bq14): Q1-Q3, Q5-Q11 and Q13; Q4, Q12 and Q14 not built, as he...
   - *touches:* `tests/test_dashboard_e2e.py`
 - **#315** `done` 2026-11-03 - The critic's pass over Keith's morning-report-12 answers (#314; 6707fd63): one high finding settled by Keith with no...
-  - *touches:* `qa_tools/common/every_asset.py`, `tests/test_every_asset.py`, `tests/test_cli_at_thirty_collections.py`, `tests/test_settle_tui.py`, `tests/test_dataset_blockers.py`, `tests/test_assets.py` +2 more
+  - *touches:* `qa_tools/common/every_asset.py`, `tests/test_every_asset.py`, `tests/test_cli_at_thirty_collections.py`, `tests/test_settle_tui.py`, `tests/test_dataset_blockers.py`, `tests/test_assets.py` +3 more
 
 ## plans/road-testing.md
 
