@@ -404,3 +404,14 @@ the rebuild needs no question asked twice. Drafts and builders read this file.
   2026-11-03: LEAVE THEM - RECHECK_RANK, xtStatusCounts' order list and
   XT_WORD ('No result') stay as they are. REJECTED reading STATUS_ORDER from
   both repeats, and one wording everywhere.
+- Q6/Q8 FOLLOW-UP (answers critic H1) SETTLED by Keith 2026-11-03: no change.
+  Scenarios exist only for SYNTHETIC assets, and both synthetic assets are
+  always present together for demo and test, so the both-hierarchies read
+  always finds both; a single-asset injected deployment is a real one, which
+  carries no scenarios. Recorded as the premise of the read. REJECTED staying
+  quiet when the other folder is absent, and deferring to REQ-PIPE-354.
+- REQ-PIPE-342 c8 AMENDED, wording approved by Keith 2026-11-03 as written:
+  append "except that the generator's scenario check and the feedback
+  validator may read every asset's data-asset.yaml, configuration only, to
+  tell another asset's dataset or agency from a mistyped one (Keith,
+  2026-11-03)."
