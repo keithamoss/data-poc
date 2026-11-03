@@ -3296,6 +3296,15 @@ one or more component tags, and a date.
         they are requirement claims, so I would rather walk them with you.
         The push waits on one more full suite on the final tree (tests and
         the golden changed after e998729f, product code did not).
+      - **THAT RUN, on 5ff97f93 (~02:10 Perth on the 4th)**: 7,722 tests,
+        2 failed, coverage 94%. One was the first-view budget again, which
+        passes alone. The other was a test snapshotting the gitignored dbt
+        log inside `assets/quarterly/`, fixed along with a test that had
+        been skipping silently since the split (#320). The disk filled
+        mid-run on old pytest session folders (running-thoughts #139),
+        which cost one browser-chunk re-run. Pushed to
+        `claude/qac-024-explanations-qx8hx8` with those two test fixes,
+        their modules re-run.
 
     **THE BATCHES**
     - **REQ-PIPE-341, multi-column sample keys** (ad2a266, fixes 2929723,

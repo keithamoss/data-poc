@@ -14513,3 +14513,11 @@ twice. It deliberately did not re-find the `TypeError`.
        report 12), and the quarterly data has grown with geocoding. Run
        ALONE on the same tree it passed: 4.6, 4.4 and 4.7 seconds. Not
        loosened.
+     - **The push-gate run on 5ff97f93 found two more, both test-side**:
+       `test_correction_trial`'s "the view edits no configuration" snapshotted
+       every file under `assets/quarterly/`, which now includes the dbt
+       project's gitignored `dbt/logs/dbt.log` that other workers write - it
+       compares the git-tracked files only; and `test_history_rekey`'s
+       unique-key test looked in the bare `reports/` folder, so it SKIPPED on
+       every run since the split - it reads the asset's own reports now, and
+       runs.

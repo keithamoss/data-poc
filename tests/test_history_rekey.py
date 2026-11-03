@@ -311,12 +311,15 @@ class TestOneAgreedOrdering:
         silently goes back to depending on input order."""
         import json as _json
         from collections import Counter
-        from pathlib import Path as _Path
 
         from qa_tools import collections
+        from qa_tools.common import assets as _assets
 
         for c in collections.all_collections():
-            name, built = c.id, _Path("reports") / c.results_file
+            # The asset's own reports/ folder since the split (post-build-review
+            # #320) - the bare reports/ path no longer held them, so this
+            # skipped on every run and proved nothing.
+            name, built = c.id, _assets.reports_path(c.results_file)
             if not built.is_file():
                 pytest.skip("the results have not been built in this checkout")
             results = _json.loads(built.read_text())["results"]

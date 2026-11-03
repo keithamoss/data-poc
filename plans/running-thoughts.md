@@ -6263,3 +6263,17 @@ could never have computed it), and it belongs with batch 5's check work.
      anchor reproduces the same bytes) or a rounding rule (e.g. the start of
      the current week) so it moves rarely. Also: what a test should use as
      "today", and how CI's cache behaves when the anchor rolls.
+
+139. **[todo, 2026-11-03]** **[Testing & dev tooling]** **Pytest's session
+     temp folders filled the sandbox disk.** Found 2026-11-03 when the browser
+     tests began failing en masse with no code change: `/tmp/pytest-of-root`
+     held dozens of old `pytest-NNN` session folders, 2-7GB each (the
+     deployment-history fixtures copy whole delivery trees), and the
+     per-session disk allowance ran out. pytest's default retention (the last
+     three) evidently is not holding - xdist workers and chunked runs each
+     start a session. Freed ~20GB by deleting the old ones by hand. To look
+     at: `tmp_path_retention_policy = "failed"` (or "none") in pyproject, or
+     the fixtures cleaning their own copies; the session-start hook could
+     also report /tmp's size. Thousands of small `/tmp/tmp*` and
+     `/tmp/mothman-*` leftovers remain (a wider sweep was refused, rightly,
+     without Keith's say-so).

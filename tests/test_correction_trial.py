@@ -8,6 +8,7 @@ configuration is a changed copy.
 from __future__ import annotations
 
 import copy
+import subprocess
 from datetime import UTC, date, datetime, timedelta, timezone
 
 import pytest
@@ -374,7 +375,14 @@ class TestTheCalendarEntry:
         from cli import schedule as schedule_cli
 
         contract = agreement.calendar_yaml().parent
-        before = {p: p.read_bytes() for p in sorted(contract.rglob("*")) if p.is_file()}
+        # CONFIGURATION IS WHAT GIT TRACKS: since the asset split the folder
+        # also holds the dbt project, whose gitignored logs another worker's
+        # dbt run writes while this test runs (post-build-review #320).
+        tracked = set(subprocess.run(["git", "ls-files", "-z", str(contract)], cwd=contract,
+                                     capture_output=True, check=True).stdout.split(b"\0"))
+        configuration = [p for p in sorted(contract.rglob("*"))
+                         if p.is_file() and bytes(p.relative_to(contract)) in tracked]
+        before = {p: p.read_bytes() for p in configuration}
         assert agreement.calendar_yaml() in before, "test precondition - the calendar is read"
 
         datasets, steps = iter([DATASET, None]), iter(
@@ -395,8 +403,9 @@ class TestTheCalendarEntry:
         schedule_cli.calendar_menu()
         assert next(steps, "walked") == "walked", "test precondition - every branch was taken"
 
-        after = {p: p.read_bytes() for p in sorted(contract.rglob("*")) if p.is_file()}
+        after = {p: p.read_bytes() for p in configuration}
         assert after == before, "the Calendar entry changed configuration"
+        assert set(contract.rglob("*")) >= set(configuration), "a configuration file went"
 
 
 def test_a_declared_correction_reads_applied_once_a_verdict_names_it(conn):
