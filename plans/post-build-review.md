@@ -14276,3 +14276,96 @@ twice. It deliberately did not re-find the `TypeError`.
        skipped. `uv run ruff check .` clean. npm test 1146 passed.
        `mothman check --no-pytest` (MOTHMAN_DIFF_BASE=f123a582) passed with
        warnings from schedule, sprints and scenario map (no placements file).
+
+315. **[done, 2026-11-03]** **[Data generation]** **[QA pipeline]** **[Testing & dev tooling]** **The critic's pass over Keith's morning-report-12 answers (#314; 6707fd63): one high finding settled by Keith with no code change, one criterion amended in his words, one defect and five minor findings fixed test-first.**
+     Each finding checked against the code before it was written up here.
+     - **H1. Under an injected single-asset root, the both-hierarchies read
+       treats the other asset's scenarios as mistyped (SETTLED by Keith
+       2026-11-03, no code change).** `every_asset.declared()` reads the
+       assets the resolver finds, so a #55 root holding one asset would make
+       the other asset's scenarios name "a dataset no asset declares". Keith:
+       scenarios exist only for synthetic assets, and both synthetic assets
+       are always present together for demo and test, so the read always
+       finds both; a single-asset injected deployment is a real one, which
+       carries no scenarios. Recorded as the read's premise in
+       qa_tools/common/every_asset.py's docstring and in decisions on
+       REQ-GEN-246 and REQ-DOCS-219. REJECTED staying quiet when the other
+       asset's folder is absent, and deferring to REQ-PIPE-354.
+       tests/test_every_asset.py::TestBothAssetsHierarchies::test_an_injected_root_is_read_rather_than_the_repositorys
+       is left as it is.
+     - **M1. REQ-PIPE-342 criterion 8 contradicted the two readers (amended,
+       Keith's wording).** The criterion said no reader running for a
+       selected asset opens another asset's folder, and the scenario check
+       and the feedback validator do. Keith's approved wording is appended
+       as written: the criterion now ends "folder, except that the
+       generator's scenario check and the feedback validator may read every
+       asset's data-asset.yaml, configuration only, to tell another asset's
+       dataset or agency from a mistyped one (Keith, 2026-11-03)." The
+       original full stop after "folder" became the comma before it. Read
+       back from the file with yaml.safe_load after the edit. A decision on
+       REQ-PIPE-342 records it.
+     - **M2. A folder under assets/ with no data-asset.yaml crashed both
+       readers (defect, fixed).** `every_asset.declared()` read every
+       folder's data-asset.yaml unconditionally, so a stray or half-made
+       folder raised FileNotFoundError out of generation and the feedback
+       validator. It now passes over a folder with no such file. Seen
+       failing first (FileNotFoundError):
+       tests/test_every_asset.py::TestBothAssetsHierarchies::test_a_folder_with_no_data_asset_yaml_is_passed_over.
+     - **L1. The menu and the pointer counted collections differently
+       (fixed).** The filing menu counted the collections it lists (those
+       registered with a dataset filed under them in the hierarchy);
+       `where_to_settle` counted every registered collection. One count now,
+       `supply_files.filing_collections()`, and `collection_step_asked`
+       counts by it itself, so neither caller passes a number. The menu's
+       meaning was kept, since a collection with no datasets has nothing to
+       decide. `cli/filing_tui._collections()` was left used only by a test,
+       so it was removed and that test
+       (tests/test_cli_at_thirty_collections.py) works out its expected list
+       from the hierarchy itself. Seen failing first, with two collections
+       registered and one filed (the pointer named a step the menu skipped):
+       tests/test_settle_tui.py::TestThePointerMatchesTheMenus::test_the_menu_and_the_pointer_count_collections_the_same_way.
+     - **L2. The pointer's asset-wide read was silent and opened its own
+       connections (fixed).** `where_to_settle(dataset_id, conn=None)` now
+       reads the pending corrections, parked moves and nudges on a
+       connection the caller holds. The contested blockers pass theirs, and
+       each blocker works out the pointer once and keeps it (a new
+       `Blocker.settle_at`) for its reason and its record; before, it
+       opened a new connection twice per blocker on a one-collection
+       asset. A failed read still counts as nothing pending, as the menu
+       treats it, but it now raises a UserWarning naming the error's first
+       line, where the menu shows a dim note (a library module has no
+       console). Seen failing first:
+       tests/test_settle_tui.py::TestThePointerMatchesTheMenus::test_the_pointer_reads_on_the_connection_it_is_given
+       (TypeError, no `conn`),
+       ::test_a_pointer_that_cannot_read_what_is_pending_says_so (did not
+       warn), and
+       tests/test_dataset_blockers.py::TestATableTwoFilesClaimRaisesOneDatasetItem::test_its_settle_pointer_is_read_on_the_blockers_own_connection
+       (connections opened under the `mothman:settle-pointer` label).
+       **Worth knowing**: on a passed connection the read runs inside that
+       connection's own state. The project's connections are autocommit, so
+       a failed read does not poison the caller's later queries, but a
+       caller inside an explicit transaction would see that transaction
+       aborted. No caller does that today.
+     - **L3. Two indirections (tidied).** `validate_schedule._repo_path` now
+       raises OutsideTheRepository itself, naming the file and the folder,
+       instead of calling `assets.folder_rel()` only for its exception. The
+       existing four-guard test
+       (tests/test_assets.py::TestARepositoryPathForAFolderOutsideIt) covers
+       it. `every_asset` no longer calls the private
+       `hierarchy._from_text`: the new public
+       `hierarchy.datasets_declared_in(path)` reads one data-asset.yaml
+       through the same content-keyed build. The collection registry still
+       calls `_from_text` inside its own package, which is that function's
+       stated purpose.
+     - **L4. Two tests tightened.**
+       tests/test_scenario_injection.py's
+       `test_another_assets_injection_is_passed_over_quietly` compares the
+       whole scenario id at the head of each refusal line, for every one of
+       the other asset's injections, rather than a substring of one.
+       tests/test_validate_feedback.py's other-asset agency test injects its
+       own two-asset root, so it no longer depends on what the repository's
+       assets declare.
+     - **L5. The committed scenario maps are stale (left, as Keith said).**
+       SCENARIOS-daily.md and SCENARIOS-quarterly.md are stale under Q5's
+       rule because this sandbox has no placements file (#314). The
+       end-of-run bootstrap regenerates both.
