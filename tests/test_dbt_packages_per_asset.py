@@ -143,6 +143,31 @@ class TestInstalledIsDecidedByDbtsOwnLock:
         assert "already installed" in result.output
         assert ran == []
 
+    def test_a_package_no_longer_named_is_not_installed_and_goes(self, an_asset):
+        """A package left in dbt_packages/ that packages.yml no longer names -
+        the old `dbt_shared` local package C12 removed, still linked there -
+        makes dbt refuse to parse (UninstalledPackagesFoundError: it expects
+        1 package and finds 2), so it must not read as installed, and
+        installing again must clear it out."""
+        assert _dbt_deps().exit_code == 0
+        leftover = an_asset / "dbt_packages" / "dbt_shared"
+        leftover.symlink_to(an_asset)
+        result = _dbt_deps()
+        assert result.exit_code == 0, result.output
+        assert "already installed" not in result.output
+        assert not leftover.exists() and not leftover.is_symlink()
+        assert (an_asset / "dbt_packages" / "shared_probe").exists()
+
+    def test_a_stray_file_beside_the_packages_is_not_a_package(self, an_asset):
+        """A plain file in dbt_packages/ (the old .mothman-packages.sha1
+        stamp) is not a package dbt counts, so it does not stop the packages
+        reading as installed."""
+        assert _dbt_deps().exit_code == 0
+        (an_asset / "dbt_packages" / ".mothman-packages.sha1").write_text("old\n")
+        result = _dbt_deps()
+        assert result.exit_code == 0, result.output
+        assert "already installed" in result.output
+
     def test_a_missing_lock_installs_again(self, an_asset):
         assert _dbt_deps().exit_code == 0
         (an_asset / "package-lock.yml").unlink()

@@ -465,7 +465,11 @@ def packages_installed(project_dir) -> bool:
     `sha1_hash` is the hash dbt itself computes of packages.yml as it reads
     now (so a change dbt would re-lock for is one, and a comment is not),
     and every package the lock names is a non-empty folder in dbt_packages/
-    (so a package deleted since is not read as installed)."""
+    (so a package deleted since is not read as installed), and dbt_packages/
+    holds no OTHER package - a folder or link packages.yml no longer names,
+    such as the `dbt_shared` local package C12 removed, makes dbt refuse to
+    parse (UninstalledPackagesFoundError), so it is not installed either. A
+    plain file there (the old stamp) is not a package and does not count."""
     from pathlib import Path
 
     import yaml
@@ -485,7 +489,10 @@ def packages_installed(project_dir) -> bool:
     if lock.get("sha1_hash") != _create_sha1_hash(specs):
         return False
     names = [p.get("name") for p in lock.get("packages") or []]
-    return all(n and (packages / n).is_dir() and any((packages / n).iterdir()) for n in names)
+    if not all(n and (packages / n).is_dir() and any((packages / n).iterdir()) for n in names):
+        return False
+    present = {e.name for e in packages.iterdir() if e.is_dir() or e.is_symlink()}
+    return present <= set(names)
 
 
 def install_packages(project_dir, profiles_dir) -> bool:
@@ -499,6 +506,12 @@ def install_packages(project_dir, profiles_dir) -> bool:
     project = Path(project_dir)
     if packages_installed(project):
         return False
+    # dbt deps adds and updates packages but never removes one packages.yml
+    # stopped naming, and dbt then refuses to parse; so an install starts
+    # from an empty dbt_packages/ (a link inside is removed, never followed).
+    import shutil
+
+    shutil.rmtree(project / "dbt_packages", ignore_errors=True)
     dbt = Path(sys.executable).parent / "dbt"
     done = subprocess.run([str(dbt), "deps", "--project-dir", str(project),
                            "--profiles-dir", str(profiles_dir)],

@@ -14393,3 +14393,30 @@ twice. It deliberately did not re-find the `TypeError`.
        on 4ef2cff0 passed, with warnings from schedule, sprints and scenario
        map. No CHANGELOG.yaml entry: these are minor critic fixes to #314's
        build, which has its own entry.
+
+316. **[done, 2026-11-03]** **[QA pipeline]** **[Testing & dev tooling]**
+     **A package left in dbt_packages/ read as installed, and dbt refused to
+     parse.** Found by the end-of-run bootstrap, not a critic: both assets'
+     bootstraps stopped within minutes on dbt's own
+     `UninstalledPackagesFoundError(2, 1)` - packages.yml names one package
+     (dbt_utils) and dbt_packages/ held two, the second the `dbt_shared` local
+     package link C12 removed from packages.yml (#312). C6's lock-file rule
+     (`dbt_common.packages_installed`) checked only that every package the
+     lock names is present, never that nothing else is, so `mothman env
+     dbt-deps` said "already installed" and left the link; and `dbt deps`
+     itself never removes a package packages.yml stopped naming. The old
+     `.mothman-packages.sha1` stamp was also still there (harmless: a file,
+     not a package).
+     - **Fixed test-first** (`tests/test_dbt_packages_per_asset.py`):
+       `test_a_package_no_longer_named_is_not_installed_and_goes` failed
+       against the code before the fix; `test_a_stray_file_beside_the_packages
+       _is_not_a_package` guards the other side (a plain file does not count).
+       `packages_installed` now also requires dbt_packages/ to hold no folder
+       or link beyond the lock's packages, and `install_packages` starts from
+       an empty dbt_packages/ (links inside removed, never followed). Both
+       assets reinstalled: each dbt_packages/ now holds dbt_utils only.
+     - **Runs**: the module, 22 passed, after reinstalling both assets (the
+       four compile tests read the real installs, which correctly read as
+       not installed until then).
+     - Minor bug under the polish rule; REQ-QAC-368 d5's meaning of
+       "installed" is unchanged, only made complete.
