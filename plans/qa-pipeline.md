@@ -1128,7 +1128,7 @@ relative, not a schedule — this is weeks of work, not months.
     including resupplies) and Child Protection (10 straightforward
     weekly runs, no resupply concept) the same way.
 
-25. **[todo, 2026-09-18]** **[QA checks & contract]** Layperson-friendly, human-readable English explanations of
+25. **[todo, 2026-09-18]** **[QA checks & contract]** **[Dashboard UI]** **[GitHub workflow & people]** Layperson-friendly, human-readable English explanations of
     what each check actually does - recorded on the check (or the
     contract) and surfaced in the dashboard/reporting, not just in
     code/config comments - near-term work Keith flagged, not scoped yet.
@@ -1156,6 +1156,186 @@ relative, not a schedule — this is weeks of work, not months.
     across three separately-authored check files; and where in the
     dashboard it surfaces - the check card, the check-detail panel, or
     both.
+
+    **Scoped 2026-09-19 (delivery-scoper / delivery-architect /
+    delivery-dashboard-ux), then walked through fork by fork with Keith
+    2026-09-20. Every question is now answered; five requirements are in
+    `requirements.yaml` as REQ-QAC-023/024/025, REQ-DASH-026 and
+    REQ-GHUB-027.** This was also this project's first real end-to-end
+    run of the `delivery-*` pipeline - see `plans/tooling.md` #15/#16 for
+    what that exercise itself turned up.
+
+    **Three of this item's own findings above are now stale - corrected
+    here rather than edited out, so the drift stays visible.** Soda
+    checks are no longer description-free (26 check_ids/29 descriptions
+    in BDM's file, 59/59 in Child Protection's); a real lifecycle
+    `description` field has existed on every check across all 4 tools
+    since Thread D Phase 1 and is parsed by `check_lifecycle.py`; and it
+    has surfaced in the dashboard since Phase 5c (2026-09-17) as the
+    check-detail panel's "What this check does" section. What this item
+    was written against - no field, nowhere surfaced - was already
+    half-built by the time it was logged.
+
+    **What the gap actually was:** inconsistent voice (~5 checks still
+    read technically, e.g. "Population Stability Index on sex's value
+    distribution"), no coverage enforcement (`description` is optional
+    where `check_id`/`category` are hard errors), reach (detail panel
+    only - cards showed a technical string), and unguarded cross-engine
+    wording drift.
+
+    **Keith's decisions, all of them:**
+    - *Field shape*: three named text fields. `description` becomes by
+      definition the plain-English **what it verifies**; a new field
+      carries **what a failure indicates**; a third carries contributor
+      rationale. Nothing is deleted - superseded technical wording moves
+      rather than disappears.
+    - *Content*: what + why, purely descriptive. Remediation advice is
+      explicitly out and stays with the ticket, so the two can't drift.
+    - *Column and table names ARE allowed* in the plain-English text
+      where they are the clearest way to say it (his own correction, and
+      a real narrowing of the drafted criterion - the ban is on tool
+      vocabulary and unfollowable cross-references, not on domain
+      identifiers).
+    - *The "why" is conditional*: required where a failure has a
+      non-obvious cause, not where it would only restate the what. The
+      mechanism is that **the field is never absent** - it holds either a
+      real statement or an explicit self-evident declaration, so there is
+      no missing state for CI to tolerate or an author to drift into, and
+      the honest "there isn't one here" costs a token rather than
+      inviting invention. Two findings decided it: only **9 of 172**
+      existing descriptions say anything about what a failure implies,
+      and those 9 share a voice that is about what happened *upstream*
+      ("catches a doubled or truncated extract file"), which is the
+      framing that is almost never tautological.
+    - *Per-engine wording is permission, not obligation.* Where two tools
+      genuinely check the same thing their sentences may be identical -
+      "this is about testing different tools and ultimately we will
+      reduce it to one tool doing that particular check."
+    - *Surfacing*: the **what** replaces the technical headline; the
+      panel carries the **why** under "What it means if this fails", same
+      position and styling green or red (colouring static definition text
+      would imply a live finding - item 74's own class of bug).
+    - *No shared category label on the card.* Decided with the
+      counter-evidence in view: 85 of 105 (column, label) groups are
+      checked by 2+ engines, so a column can show three same-question
+      cards distinguished only by engine. Accepted, because the tools are
+      being compared deliberately and will be reduced later.
+    - *No authoring standard, and no audit trail* when wording changes.
+    - *No sensitivity limit* on what a failure's consequence may say,
+      taken with the consequence named explicitly (public repo, public
+      issues). **If this is ever pointed at real production data that is
+      a decision to revisit deliberately, not an unexamined default.**
+    - *Retired checks* take the same rule, no carve-out - they render in
+      the dashboard, so an exempt one would be a visible card with
+      nothing explaining it.
+    - *Card links*: `plans/dashboard.md` #15's card-as-real-link half is
+      folded in, since the card is being rewritten and the URL key
+      defined in the same change. The rest of #15 stays its own item.
+
+    **Three things were drafted and consciously NOT taken - don't
+    re-propose them:** cross-engine consistency enforcement (per-engine
+    differences are information); explanations in `mothman`'s own run
+    output (tickets only, and now parked); and a CI veto refusing the
+    self-evident declaration on `consistency`/`timeliness` checks
+    (inspection of all 41 suggested the veto would be correct today,
+    Keith declined the extra rule - the author decides).
+
+    **REQ-QAC-023 is BUILT (2026-09-20) and its scoping prose has been
+    deleted from this item** - the fragility it fixed, the three shapes
+    the fix went through, the check_id grammar decision, the declined
+    builder and the `(table)`-versus-check_id inconsistency all now live
+    as `decisions:` on the requirement itself, which is the permanent
+    record. First application of `CLAUDE.md`'s own new rule that build
+    work deletes the plans text its requirements now cover. What remains
+    below belongs to REQ-QAC-024/025 and REQ-DASH-026/GHUB-027, which are
+    still open.
+
+    **The contributor-rationale field was challenged and survived, with
+    its boundary now written into the requirement** (Keith, 2026-09-20 -
+    "I do wonder if it's duplication with... the field we have that has
+    the changelog"). A fair challenge, and testing it against the real
+    text rather than arguing it split the contributor-voiced
+    descriptions three ways:
+
+    1. **Genuinely changelog material** - e.g. `freshness_datacontract`'s
+       "Phase 5f (plans/qa-pipeline.md #61, 2026-09-17), previously
+       compared against...". Dated, attributable, describes a change.
+       Keith's call, same day - **redirect this into the changelog as
+       part of the migration**, rather than carrying dated history into
+       a new field and baking the existing confusion into the new
+       structure. That it currently sits in a description is a small
+       pre-existing bug.
+    2. **Standing cross-references** - "Same format rule as
+       child_given_names, see that property's description" (x3). Nothing
+       happened; it is a permanent fact about how one check relates to
+       another.
+    3. **Behaviour-by-construction notes** - e.g.
+       `approval_compliance_datacontract`'s "Passes 0/0 on every clean
+       run, child_protection.py only ever assigns an Approved carer to a
+       placement, so this holds by construction". Explains why a check
+       looks like it does nothing. A contributor needs it; a data
+       engineer must never see it.
+
+    **The argument that decided it:** a `changelog` entry carries a
+    date, an author and a `breaking` flag. Buckets 2 and 3 have none of
+    those - no date because nothing happened, no author because it is
+    not a decision - so forcing them into the changelog means inventing
+    both, corrupting the one field whose whole job is who changed what
+    when. The field is sparse (roughly 8 distinct texts across 258
+    checks), which is why it stays optional with CI never requiring it,
+    and the requirement now states what it is NOT for as well as what it
+    is.
+
+    **Field names settled** the same morning - `description` (existing,
+    repurposed as the plain-English *what*), `failure_indicates` (new),
+    `technical_note` (new). Two new fields, not three.
+
+**Two real code findings from the scoping runs, verified at source
+    and not covered by any of the five requirements' own text.**
+
+    First, and it is a live defect rather than a design gap:
+    `check_lifecycle.py`'s contract parser ends
+    `description=meta.get("description") or native_description`, so an
+    ODCS rule's own native `description:` silently becomes the
+    reader-facing text when no `customProperties` one exists. Three
+    checks currently show a data engineer *"Same format rule as
+    child_given_names - see that property's description."* - a
+    cross-reference the dashboard cannot resolve, presented as the
+    explanation. A fourth shows a paragraph about RE2 lacking lookahead
+    support. REQ-QAC-024's rewrite would fix the text; nothing currently
+    names the fallback that lets contributor notes reach a viewer at
+    all, so fixing the wording alone would leave the mechanism in place
+    for the next one.
+
+    Second: there is no HTML-escaping helper anywhere in the template -
+    a grep for `escapeHtml`/`function esc` returns nothing - and check
+    text reaches the page through both `innerHTML` interpolation and an
+    unescaped `aria-label` attribute. Repo-authored text, so not an
+    attacker path, but an apostrophe-heavy plain-English sentence
+    containing a double quote breaks out of that attribute, and a `<`
+    silently mangles the panel. Carried as an NFR on REQ-DASH-026;
+    recorded here too because it is a property of the template rather
+    than of that one requirement.
+
+        **`label` becomes dead data.** Its only consumer was
+    `display_name(check_name, engine_short, label)` - the card headline
+    the plain-English sentence now replaces. Nothing else reads it. Two
+    of the three description-parsing sites existed purely to compute it
+    and die for free; removing the field itself across all 8 `run_*.py`
+    modules is a real cleanup that belongs with `plans/tooling.md` #12's
+    DRY pass, not smuggled in here.
+
+    **Two more verified traps for whoever builds REQ-QAC-024/025:**
+    `validate_check_lifecycle.py` parses both the working tree and
+    `HEAD~1`, so making the new fields mandatory *at parse time* would
+    make the previous commit's files unparseable and break the gate on
+    the very push that introduces it - enforcement belongs in
+    `validate()`, over new checks only, which also removes the only real
+    argument for a warn-first phase. And Evidently's parser excludes
+    config-hash fields by an **explicit name list**
+    (`check_lifecycle.py:415-417`), not the wholesale metadata-block
+    exclusion dbt and Soda get, so new fields added there change every
+    affected check's `config_hash` and fail CI as an undocumented change.
 
 26. **[todo, 2026-09-15]** **[QA checks & contract]** A real bug found
     while auditing every check for item 23's "duplicated-logic drift
@@ -3974,7 +4154,7 @@ relative, not a schedule — this is weeks of work, not months.
     day, rather than the old bug of two unrelated things merging purely
     by calendar coincidence).
 
-74. **[todo, 2026-09-18]** **[QA checks & contract]** Item 73's new
+74. **[done, 2026-09-19]** **[QA checks & contract]** Item 73's new
     per-run aggregate status made a pre-existing, previously-easy-to-
     miss calibration problem impossible to ignore: `birth-registrations`
     currently shows ONE never-closing resupply chain covering its entire
@@ -4041,6 +4221,253 @@ relative, not a schedule — this is weeks of work, not months.
     today's real (bug-affected) data - the never-closing chain is an
     accurate computation given that input, not a bug in the new
     derivation logic itself.
+
+    **Picked up and fixed, 2026-09-19** (Keith's own pick from the open-
+    items sweep at the start of the `claude/delivery-subagents-plans-
+    717lrx` session, chosen specifically because it blocks something
+    already built - see the ticketing note at the end). Investigating it
+    properly first turned up three things this entry had wrong or
+    didn't know:
+
+    **1. Bug B was already fixed, and this item went stale.**
+    `qa_tools/common/datacontract_common.py`'s
+    `fail_threshold_from_quality_definition()` already parses the real
+    `mustBe`/`mustBeLessThan`/`mustBeLessOrEqualTo` out of each ODCS
+    rule, and its own comment block names "Item 74 ... Bug B" directly.
+    It landed in `8ed69a9` and nothing ever came back to update this
+    entry. Both of Bug B's named examples are gone too - and
+    `registering_parent_1_name`'s Soda rule (Bug A's own named example)
+    has since gained a real `fail: when > 15%` with a changelog entry
+    citing this item. So the only thing still live was Bug A's root
+    cause in the builders.
+
+    **2. The real impact was bigger and differently shaped than the
+    "warn-only check" framing here suggested.** Measured against this
+    repo's own committed history by comparing every result's own tool
+    verdict against what the dashboard computed from thresholds: **1,829
+    disagreements** (1,648 BDM / 181 CP, ~6% of all results). Every
+    single one in the same direction - the tool said `pass`, the
+    dashboard rendered amber or red. Zero cases of the reverse, so this
+    bug only ever manufactured false alarms and never once hid a real
+    failure. They cluster into exactly three kinds:
+    - `rowCount_datacontract` + `row_count_soda` - **884 false reds.**
+      The real rule is `mustBeBetween: [500, 20000]`, a genuine
+      TWO-SIDED range, so both thresholds are correctly None; the
+      0-substitution turned a real row count of 1939 into `1939 > 0`.
+      Red on 352/352 BDM runs and 18/18 CP runs - one per dataset, which
+      is precisely the "all 7 datasets read red" this project had been
+      attributing to a vaguer threshold-encoding problem.
+    - `nullValues_datacontract` - 944 false ambers, the warn side of the
+      same substitution.
+    - `range_check_soda` - 1, an edge case.
+
+    **3. The obvious fix would have been a regression.** ~63 checks
+    (`not_null`/`unique`/`relationships`/`matches_regex`/
+    `accepted_range`) have a null `fail_threshold` AND currently agree
+    with their tool exactly, because for a violation COUNT "any
+    violation is a failure" genuinely is the rule - `fail=0` is the
+    correct encoding, not a bug. Simply passing None through and reading
+    it as "unbounded" would have turned real failures green, converting
+    a false-alarm bug into a missed-failure one. Worth naming plainly:
+    the naive reading of this item as originally written would have done
+    exactly that.
+
+    **The actual root cause, deeper than thresholds**: every result
+    already carries its own tool's real verdict, and
+    `build_dashboard_data.py` was **throwing it away** when building
+    each check's `history[]`, leaving the dashboard to re-derive a
+    status from a warn/fail pair that cannot express every real rule.
+
+    **Fix (Keith's own call via `AskUserQuestion`, picked over a
+    surgical range-check special-case and over adding a two-sided
+    threshold model): trust the tool's own verdict.** New
+    `dashboard_status()` in `pipeline/dashboard_check_labels.py` (the
+    module both builders already share, so the two can't drift) maps a
+    real `pass`/`warn`/`fail`/`error` onto green/amber/red, returning
+    None for anything unrecognised so callers fall back rather than
+    reading an unknown verdict as healthy. Both builders now carry
+    `status` onto every history entry and `current_status` onto each
+    check, and - the other half - **stop substituting 0 for a None
+    threshold**, since None means "no bound of this kind exists", not
+    "zero tolerance". Template side: `checkStatus()` prefers
+    `current_status`, a new `historyStatus(h, check)` prefers a history
+    entry's own `status`, and `statusForValue()` is now the explicit
+    fallback with null treated as absent rather than zero.
+
+    Null thresholds then had to become real, renderable values rather
+    than crashes - a concrete gap this entry's own "needs his call"
+    paragraph had flagged only in the abstract, now answered with real
+    findings: the trend chart turned out **safe** (`null * 1.15`
+    coerces to 0, so the y-axis still scales off the data), but
+    `fmtMetric(null, "%")` calls `null.toFixed(2)` and **hard-crashes
+    the whole check-detail panel** - so `fmtMetric()` now renders an
+    absent bound as an em dash, the chart omits guide lines/y-ticks for
+    a bound that doesn't exist, and the detail panel's threshold line
+    states "no single-sided threshold - status is this tool's own
+    verdict" instead of the previous, outright false "warn > 0 ·
+    fail > 0".
+
+    **Verified against real committed history, not fixtures**: the
+    dashboard now matches the tools' own verdict on **352/352 BDM runs**
+    and **108/108 CP (dataset, run) pairs** - every one of the 1,829
+    disagreements gone, with no status invented anywhere. The real
+    distribution underneath is BDM 198 red / 52 amber / 102 green and CP
+    19 red / 89 green - BDM genuinely does have a lot of red, because
+    the generator deliberately injects red deliveries and resupply
+    chains, but **102 BDM runs are now green that previously could not
+    be**, since the rowCount false-red hit literally every run. That is
+    what unblocks item 73's "ONE never-closing resupply chain covering
+    the entire 176-run history": chains can actually close now.
+
+    Tests, per this project's standing "reproduce it failing first"
+    convention (a logic bug, so the automatic rule applied, no need to
+    ask): 3 new Python tests in `tests/test_build_dashboard_data.py`
+    (the real rowCount shape; null thresholds surviving as null; and an
+    explicit regression guard that a violation-count check's real `fail`
+    verdict still reads red) - all 3 confirmed failing against the
+    pre-fix code first. 11 new JS tests
+    (`tests-js/tool-verdict-status.test.js`) - confirmed by stashing the
+    template and re-running that 8 of the 11 genuinely fail pre-fix,
+    with the other 3 passing by design as unchanged-behaviour guards.
+
+    **Two real knock-on changes the fix surfaced, both genuine rather
+    than test-wrangling:**
+    - `tests/test_dashboard_e2e.py`'s `TestAmberDecisionBadge` fixture
+      broke, correctly. It targeted 3 runs (2026-05-22/23/24) that its
+      own docstring recorded as "REAL, currently-amber ... found by
+      actually computing this dataset's own per-run status, not
+      assumed" - true when written, but they were only amber BECAUSE of
+      this bug. `run_001_2026-05-22` is BDM's very first run and is
+      genuinely clean; it now reads green, so the badge's own
+      `status==="amber"` gate correctly stopped firing. Re-derived 3
+      genuinely-amber, window-owning runs the same way the original
+      docstring describes (`run_044_2026-07-05` accept,
+      `run_062_2026-07-23` reject, `run_066_2026-07-27` neither). Worth
+      being explicit: the fixture's PREMISE expired, the mechanism it
+      tests did not - and it expiring is itself evidence the fix landed.
+    - Doing that re-derivation turned up a real, latent addressing
+      problem: the supply-history row identified itself only by
+      `data-run-date`, which is **not unique** - the exact "352 real BDM
+      runs across only 123 distinct dates" fact `plans/conceptual-
+      design.md` Thread A already found the hard way. Not one amber
+      window-owning run has a unique `run_date`. Added `data-run-id`
+      alongside it (`e.run_id` was already in scope on that row -
+      `amberDecisionBadge()` next to it already used it), so anything
+      needing exactly one row can address one. Small, but it removes a
+      real footgun rather than working around it in a selector.
+
+    **Two real consumers of these thresholds were missed on the first
+    pass, both found the same evening - worth recording honestly,
+    because the way each was found says something.**
+    - `qa_tools/common/dataset_status.py` is the PYTHON MIRROR of the
+      dashboard's own client-side status logic (it exists because the
+      ticketing Action has no JS runtime). The fix changed the JS and
+      `pipeline/dashboard_check_labels.py` but not this third copy, so
+      `status_for_value()` still did a bare `value > fail` and died with
+      a real `TypeError: '>' not supported between instances of 'int'
+      and 'NoneType'`. **Found by CI** - specifically by the very first
+      run of `ticket-sync.yml` after its own dead branch pin was fixed
+      (`plans/publishing-and-history.md` #7), within seconds of that
+      workflow running for the first time ever. The cleanest possible
+      argument for fixing that pin.
+    - `buildRealDataset()` in the dashboard template rebuilds every
+      check and history entry into a NEW object, and copied neither
+      `current_status` nor the per-entry `status`. This one was worse:
+      dropping the verdict doesn't fail loudly, it falls back to
+      threshold math, and with null bounds now preserved a real dbt
+      `not_null` check with 14 violations and no configured fail
+      threshold would have rendered **GREEN** - the false-green
+      direction this item's own write-up above specifically identifies
+      as the danger, reintroduced by the fix meant to avoid it. Found by
+      auditing every remaining consumer after CI caught the sibling
+      miss, not by any test.
+
+    **Why the original verification missed both, since that matters more
+    than the misses themselves**: the 352/352 and 108/108 agreement
+    figures above were computed by reading `reports/*_dashboard.json`
+    and applying the status-preference rule in a throwaway script. That
+    genuinely verified the DATA layer - and nothing else. It never
+    exercised `buildRealDataset()`, and never touched the Python mirror
+    at all. A green data layer says nothing about the render layer when
+    the render layer has its own transform. Both now have real tests at
+    the layer that was actually wrong: 5 new Python tests
+    (`tests/test_dataset_status.py`) and 3 new JS tests
+    (`tests-js/tool-verdict-status.test.js`'s own `buildRealDataset`
+    block), each confirmed failing against the pre-fix code - and
+    notably, only 2 of those 3 JS tests fail without the fix, because
+    the passing-rowCount case gets the right answer from the fallback by
+    luck. That asymmetry is exactly why the bug was invisible.
+
+    **Keith's own follow-up, same evening: "why do we have two tools
+    doing the same thing", and "what can we do to make that more
+    robust".** Investigating turned up more than the two known
+    implementations:
+    - **Four status implementations existed, not two**: the template's
+      JS, `qa_tools/common/dataset_status.py`, `pipeline/
+      dashboard_check_labels.py`'s own `status_rank`, and - the
+      telling one - a `worst` column rollup in `build_dashboard_data.py`
+      that was **dead code**. It rolled up from each real engine's own
+      `status` field, which is exactly the right idea, and then nothing
+      ever read it; `columns_out.append()` never carried it. Ruff
+      couldn't flag it either, since `worst` is read inside its own
+      accumulating loop so `F841` never fires. BDM-only; CP never had it.
+    - **The duplication that remains is genuinely unavoidable** - the
+      dashboard is static, so the browser must re-roll status for any
+      as-of date a viewer picks, and the ticketing Action has no JS
+      runtime. The useful contrast is `pipeline/cadence.py`, which has
+      the SAME kind of split and hasn't drifted, because its own
+      docstring says why: both sides are tested against the same real
+      configs and dates. `dataset_status.py` had no such cross-check,
+      which is precisely how it drifted.
+    - **Item 74 had already made most of it vestigial** - measured, not
+      assumed: after the fix, only 198 results in the whole app still
+      reached the threshold fallback, every one of them the builders'
+      own synthetic "No automated quality rule defined" placeholder, and
+      zero real tool results.
+
+    **Built (Keith picked all three options offered):**
+    1. The placeholder now states its own status explicitly, so the
+       threshold fallback has **no live callers at all** - a fallback
+       with one synthetic caller is a trap, not a safety net.
+       `dashboard_status()`/`dashboard_status_of()`/`status_for_value()`
+       now live in one canonical Python module, with
+       `dashboard_check_labels.status_rank()` delegating rather than
+       carrying its own copy; the dead `worst` block is deleted. Two
+       implementations remain, one per language, which is the real floor.
+    2. `buildRealDataset()` inverted from a hand-maintained allowlist of
+       ~11 copied fields to **spread-then-override**. The old shape had
+       exactly one failure mode - add a field upstream, forget it here,
+       lose it silently - which is what shipped. Now a new field flows
+       through by default and you only write code to CHANGE something.
+       Verified safe first: nothing anywhere iterates a check's own keys,
+       so the raw twins left beside their transformed versions are inert.
+       Guarded by a real test that fails, naming the field, if anything
+       is dropped - confirmed by reverting to an allowlist and watching
+       it fail on `dimension`.
+    3. **The test that would have caught both**:
+       `tests/test_dashboard_e2e.py::TestStatusMatchesEachToolsOwnVerdict`
+       drives the real built dashboard in a real browser and uses the
+       PAGE's own `buildRealDataset()`/`checkStatus()`/`historyStatus()`
+       to compare ~30,000 rendered statuses against the verdict each real
+       tool recorded. Runs in ~8s. Proven rather than assumed: the real
+       bug was reintroduced and it failed with a genuinely diagnostic
+       message (`not_null_dbt`, tool `red`, rendered `green`, value 1,
+       both bounds null). A second test asserts no REAL check ever lacks
+       a verdict, so a future silent drop fails loudly.
+
+    The standing lesson landed as its own `CLAUDE.md` convention:
+    enumerate consumers mechanically on a shape change, and verify at
+    the LAST transform before the user rather than the first one after
+    the source.
+
+    **Still open, deliberately not done here**: flipping
+    `ticket-sync.yml`'s automatic push trigger on.
+    `plans/running-thoughts.md` #1 records that the ticketing MVP
+    shipped `workflow_dispatch`-only precisely because all 7 datasets
+    read red and would have generated pure noise - that blocker is now
+    gone, but actually turning the trigger on is Keith's call, not a
+    side effect of this fix, and wants a real look at how much genuine
+    ticket volume BDM's 198 real red runs would produce first.
 
 75. **[done, 2026-09-18]** **[Docs & process]** A live requirements register - Keith's own
     request, one of the ideas parked in `plans/running-thoughts.md`
@@ -4784,6 +5211,37 @@ relative, not a schedule — this is weeks of work, not months.
     2026-09-18 split - a QA-checks-and-contract concern, not a
     whole-of-project one.)
 
+    **Picked up again, widened, 2026-09-19 - see `plans/tooling.md` #12**
+    (Keith's own pointer, tying that item back to this one). This item
+    stays `done`: what it actually did - diff the BDM/CP tool-runner
+    pairs in full, sort the result into genuinely-shared vs
+    genuinely-dataset-specific, extract only the confirmed-shared part -
+    was completed and verified. What #12 takes from it is the METHOD,
+    which is the closest thing this project has to a proven approach for
+    this kind of work, plus two findings worth carrying forward: that
+    actually diffing candidates side by side surfaced shared code nobody
+    predicted, and that the honest answer here was "not a false-DRY
+    situation, but not nothing either" rather than a clean verdict
+    either way.
+
+    Two things about this item are worth reading as OF ITS TIME rather
+    than as standing rulings, since #12 will re-measure both. It
+    measured **2 datasets** against a stated target of ~30; and its own
+    closing cost - "every new dataset currently means copy-pasting a
+    whole file and manually picking apart which parts to keep" - was
+    accepted as tolerable at that scale, reopened by
+    `plans/publishing-and-history.md` #6, and then, 2026-09-19,
+    explicitly REJECTED as tolerable by Keith quoting this very
+    sentence back: "that is not tolerable in the short term as we add
+    more data sets, so that will need to be addressed as a priority."
+    #6 is now `todo` and HIGH priority on the strength of it. So this
+    item's own closing line has outlived the judgement attached to it -
+    the cost it names is real and still there, what changed is that
+    paying it is no longer acceptable. Nothing about the FINDING is
+    being second-guessed; the codebase it was measured against has
+    simply grown a lot since (`plans/qa-pipeline.md` item 74 alone
+    turned up four separate status implementations, one of them dead).
+
 85. **[investigate, 2026-09-18]** **[QA checks & contract]** A real, currently-unused
     way to make the ODCS contract the actual single source of truth for
     dbt's and Soda's own check files too - not just something the
@@ -4881,6 +5339,95 @@ relative, not a schedule — this is weeks of work, not months.
     already covered against real committed history by this project's
     existing `TestRunWindowsAgainstRealCommittedHistory` tests).
 
+87. **[done, 2026-09-27]** **[QA checks & contract]** Evidently reads the RECORDED reference distribution rather than hunting for a past run's rows - and it was never blocked.
+
+    **This entry previously said "blocked" and that was wrong.** Keith
+    pushed back ("dig into that, do research online, how we resolve
+    that - that's critical") and the premise did not survive ten
+    minutes of looking. Recorded as a correction rather than quietly
+    rewritten, because the wrong version was a reasoned argument and
+    the reasoning is the instructive part.
+
+    **What I claimed.** Evidently needs rows from three runs - the
+    current one, the fixed PSI reference, and the previous run for the
+    row-count-growth check. A run's view schema is dropped when its run
+    ends, so a past run's rows must be found by their staged table; and
+    once promotion exists those rows live in a period schema instead.
+    Therefore Evidently needs a "where are run X's rows now" lookup
+    that only the promotion sprints can provide.
+
+    **Why it is wrong.** Every one of those three needs is ALREADY
+    RECORDED, per run, by `dataset_stats` - which exists for exactly
+    this reason, computed at the one point in the pipeline with a
+    legitimate live connection (Phase 3, plans/publishing-and-history.md):
+
+    - `value_counts["sex"]` - the full categorical distribution of the
+      column the PSI check runs on.
+    - `row_count` - measured from the warehouse, not from bookkeeping.
+
+    So the reference does not need to be FOUND, because it was written
+    down when it was cheap to write down. Only the CURRENT run needs
+    rows, and its own view schema is open while it is being checked.
+
+    **PSI from a reconstructed reference is EXACT, not an
+    approximation**, and this is the part worth verifying rather than
+    assuming. For a categorical column PSI depends only on the category
+    proportions, so expanding recorded counts back into rows reproduces
+    the reference distribution exactly. Measured against real Evidently
+    0.7.23: PSI from real reference rows and PSI from a reference
+    rebuilt out of `value_counts` came back bit-identical
+    (`0.03422418388845692` both ways).
+
+    Dividing every count by their GCD is also exact, for the same
+    reason - 492,000 reference rows reduced to 41 gave the identical
+    float. Worth knowing for the 30-dataset target, though not a
+    general escape: arbitrary counts usually have a GCD of 1, and a
+    full expansion of a million-row reference is a few megabytes, which
+    is fine.
+
+    **The one real limit, and it should fail loudly rather than
+    silently approximate.** This is exact for CATEGORICAL drift. A
+    numeric column's drift needs binned histograms, and a value-count
+    distribution is not one - so if a numeric drift check is ever added,
+    `dataset_stats` must record fixed-bin histograms for it, and the
+    code must refuse a numeric column rather than quietly doing
+    something defensible-looking.
+
+    **Why this is better than what it replaces, and better than the fix
+    I proposed.** Today Evidently reads the supplier's CSV - the last
+    tool not checking what landed (REQ-QAC-088 criteria 2 and 3).
+    Reading recorded statistics instead is immune to promotion,
+    retention and deletion of old supplies; it needs no lookup from the
+    promotion sprints, so it unblocks now; and it obeys CLAUDE.md's own
+    rule for anything historical - recorded QA results, never actual
+    data. Real Evidently still runs; nothing here hand-rolls PSI.
+
+    **BUILT the same day.** `evidently_common.py` grew
+    `reference_value_counts()`, `recorded_row_count()` and
+    `frame_from_value_counts()`; both evaluators now read the current
+    run from its own view schema and the reference from what was
+    recorded. The CSV path survives only as a FALLBACK for the ad-hoc
+    local-file mode, where a supply has been checked without ever being
+    staged and so has no recorded stats - that is a real case, not
+    defensive coding.
+
+    The row-count-growth check moved the same way and is a small
+    improvement in its own right: the previous run's count is now the
+    one `dataset_stats` measured from the warehouse when that run was
+    checked, rather than a number re-derived by re-reading its CSV.
+
+    `tests/test_evidently_recorded_reference.py` covers it, and its
+    shape is deliberate - the EXISTING Evidently tests pass whether the
+    reference comes from a CSV, the warehouse or a recording, because
+    they assert on the verdict and all three agree. They could not have
+    caught this change and cannot catch it regressing. The new ones
+    assert exactness (bit-identical PSI, not `approx` - an approx here
+    would hide the very drift this is about), the scale-invariance that
+    makes it safe at a million rows, loud refusal of a malformed
+    recording, and that this repo's own committed history really does
+    carry the recording in the shape the code expects.
+
+
 ## Held over from the original (equivalent-only) build
 
 Lower priority — these were already documented as deliberate, honest
@@ -4888,15 +5435,48 @@ simplifications before any real tool ran, and nothing since has changed
 that assessment. Listed here so they don't get lost, not because they're
 urgent.
 
-7. **[open, low]** ODCS severity is single-tier (pass/fail or pass/warn,
+7. **[superseded, 2026-09-18]** **[QA checks & contract]** ODCS severity is single-tier (pass/fail or pass/warn,
    never a three-way band). `contract_engine.py` encodes that into the
    dashboard's two-threshold shape as warn==fail (error severity) or an
    unreachable fail ceiling (warning/info severity). Real, not a bug —
    revisit only if the dashboard's shape itself changes.
 
-8. **[open, low]** Soda's `row_count` check is a genuine two-sided range
+   **Marked superseded 2026-09-20**, during the retrofit of the 10 items
+   left carrying the pre-2026-09-18 tag shape. Two independent reasons,
+   either of which would do it. `contract_engine.py` no longer exists —
+   the whole `engines/` directory of hand-written stand-ins was removed
+   once real tool access arrived (item 83), so this describes code that
+   is gone. And the substance was resolved separately by item 74's fix:
+   the dashboard now carries each tool's OWN verdict rather than
+   re-deriving status from a warn/fail pair, which is precisely the
+   squeeze this item was describing.
+
+8. **[superseded, 2026-09-18]** **[QA checks & contract]** Soda's `row_count` check is a genuine two-sided range
    (too few *or* too many rows); `soda_engine.py`'s `_numeric_threshold()`
    reduces it to the upper bound only for display — the one place a piece
    of real information (the lower bound) is dropped for a single scalar.
    Would need a dashboard/schema change (a second threshold field) to fix
    properly, not just an engine change.
+
+   **Marked superseded 2026-09-20**, same retrofit and the same two
+   reasons as #7 — `soda_engine.py` is gone with the rest of `engines/`,
+   and item 74's fix addressed the substance. The specific remedy this
+   item asked for is now visible in the rendered card: a check with no
+   single-sided threshold shows *"status is this tool's own verdict"*
+   rather than a fabricated scalar. The lower bound is still not
+   displayed as a number, so if that specific gap matters it wants a new
+   item against the real Soda path rather than reviving this one.
+
+88. **[todo, 2026-10-04]** **[Pipeline & publishing]** The qa metadata
+    schema states each fact once - `REQ-PIPE-144`, signed 2026-10-04.
+    Keith's ask after auditing the live schema. Three copies go:
+    `filing.record` (a JSON copy of the row's own columns plus retired
+    rule fields; "slots considered" survives as its own ordered column),
+    `filing.received_at` (the FILE's own receipt, so it moves onto
+    `qa.delivery_file` and every reader asks one receipt view; a
+    contested pair claims no single receipt until a person picks a
+    file), and `delivery.contested` (becomes a view). Delivery records
+    become permanent history: `mothman pipeline run` stops pruning them
+    and only a guarded `mothman env reset-synthetic` clears them. Built
+    straight after REQ-PIPE-131. Delete this entry when REQ-PIPE-144 is
+    built.

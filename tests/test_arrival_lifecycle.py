@@ -1,0 +1,143 @@
+"""The one per-arrival lifecycle (REQ-PIPE-086 criterion 2).
+
+The batch and the terminal's hand-filed routes both go through
+arrival_lifecycle.process(); these pin what that function promises,
+without the real tools, so the contract is checked in milliseconds and
+the real-tool behaviour is left to the orchestrator and equivalence
+tests.
+"""
+from __future__ import annotations
+
+import pytest
+
+import asset_params
+
+from types import SimpleNamespace
+
+from qa_tools.tools import orchestrate
+from qa_tools.common import arrival_lifecycle
+
+
+def _recording_steps(log):
+    return arrival_lifecycle.Steps(
+        file_and_overlay=lambda a, among: log.append(("file", a.run_id, len(among))),
+        entry_for=lambda a: {"run_id": a.run_id},
+        run_one=lambda entry, ts, run_by, on_step=None: (
+            log.append(("run", entry["run_id"], ts)) or [{"run_id": entry["run_id"]}]),
+        promote_after=lambda a, got, run_by: log.append(("gate", a.run_id, len(got))))
+
+
+A = SimpleNamespace(run_id="r1")
+B = SimpleNamespace(run_id="r2")
+
+
+class TestOneArrivalAtATime:
+    def test_each_arrival_is_filed_checked_and_gated_before_the_next(self):
+        log = []
+        arrival_lifecycle.process_all([A, B], steps=_recording_steps(log),
+                                      run_by="x", run_timestamp="T")
+        assert [step[:2] for step in log] == [
+            ("file", "r1"), ("run", "r1"), ("gate", "r1"),
+            ("file", "r2"), ("run", "r2"), ("gate", "r2")]
+
+    def test_every_arrival_sees_the_whole_pass_as_among(self):
+        """A zip is filed whole (REQ-PIPE-105 criterion 5): file_and_overlay
+        needs every arrival the caller knows of, not just the one in hand."""
+        log = []
+        arrival_lifecycle.process_all([A, B], steps=_recording_steps(log), run_by="x")
+        assert [s[2] for s in log if s[0] == "file"] == [2, 2]
+
+    def test_results_come_back_in_arrival_order(self):
+        got = arrival_lifecycle.process_all([A, B], steps=_recording_steps([]), run_by="x")
+        assert [r["run_id"] for r in got] == ["r1", "r2"]
+
+
+class TestTimestamps:
+    def test_the_batch_stamps_one_instant_for_the_pass(self):
+        log = []
+        arrival_lifecycle.process_all([A, B], steps=_recording_steps(log),
+                                      run_by="x", run_timestamp="T")
+        assert {s[2] for s in log if s[0] == "run"} == {"T"}
+
+    def test_a_hand_filed_run_stamps_each_arrival_as_it_starts(self):
+        log = []
+        arrival_lifecycle.process_all([A], steps=_recording_steps(log), run_by="x")
+        stamp = [s[2] for s in log if s[0] == "run"][0]
+        assert stamp and stamp != "T"
+
+
+class TestBothCollectionsSupplyTheirHalf:
+    def test_the_shared_orchestrator_gives_every_collection_its_steps(self):
+        from qa_tools import collections
+
+        for coll in collections.all_collections():
+            assert isinstance(orchestrate.steps(coll.id), arrival_lifecycle.Steps), coll.id
+
+    @pytest.mark.asset("daily")
+    def test_a_contested_birth_registrations_file_is_checked_not_refused(self):
+        """One of the drifts the extraction removed: the hand-filed path
+        called path_for() and so refused a contested file the batch would
+        check (REQ-PIPE-105 criterion 6). Both now use entry_for()."""
+        class Contested:
+            run_id = "run_x"
+            contested = {"birth-registrations"}
+            path = "/deliveries/run_x"
+
+            def path_for(self, dataset_id):
+                raise AssertionError("path_for refuses to choose between two files")
+
+            def as_entry(self):
+                return {"run_id": self.run_id}
+
+        assert orchestrate.entry_for("civil-registration", Contested()) == {"run_id": "run_x"}
+
+
+class TestTheCollectionsHalvesForwardWhatTheyAreGiven:
+    @pytest.mark.asset("quarterly")
+    def test_child_protection_files_with_the_whole_pass_as_among(self, monkeypatch):
+        """A zip is filed whole (REQ-PIPE-105 criterion 5) only while CP's
+        half passes `among` through - nothing else would notice if it
+        stopped (delivery-critic, sprint 1)."""
+        seen = {}
+        monkeypatch.setattr(orchestrate, "file_and_overlay",
+                            lambda collection_id, arrival, among=None: seen.update(among=among))
+        orchestrate.steps("child-protection").file_and_overlay(A, [A, B])
+        assert seen["among"] == [A, B]
+
+    @pytest.mark.parametrize("collection_id", asset_params.per_asset(
+        ["civil-registration", "child-protection"]))
+    def test_each_collections_steps_carry_its_own_id(self, monkeypatch, collection_id):
+        calls = []
+        monkeypatch.setattr(orchestrate, "run_one",
+                            lambda cid, *a, **k: calls.append(("run", cid)) or [])
+        monkeypatch.setattr(orchestrate, "promote_after",
+                            lambda cid, *a, **k: calls.append(("gate", cid)))
+        steps = orchestrate.steps(collection_id)
+        steps.run_one({"run_id": "r"}, "T", "x", on_step=None)
+        steps.promote_after(A, [], "x")
+        assert calls == [("run", collection_id), ("gate", collection_id)], collection_id
+
+
+class TestAStageFailureSurvivesAProcessBoundary:
+    """A bootstrap runs arrivals in a process pool, which hands a worker's
+    exception back by pickling it. StageFailed's required arguments meant it
+    could not be rebuilt on the other side, so every stage failure there read
+    "StageFailed.__init__() missing 3 required positional arguments" and the
+    real error was lost (post-build-review, 2026-11-02)."""
+
+    def test_it_unpickles_with_its_stage_and_cause(self):
+        import pickle
+        cause = ValueError("column registration_number does not exist")
+        exc = arrival_lifecycle.StageFailed("bdm_run_001", "qa", ("filing",), cause,
+                                            arrival={"run_id": "bdm_run_001"})
+        back = pickle.loads(pickle.dumps(exc))
+        assert isinstance(back, arrival_lifecycle.StageFailed)
+        assert str(back) == str(exc)
+        assert (back.run_id, back.stage, back.completed) == ("bdm_run_001", "qa", ("filing",))
+        assert repr(back.cause) == repr(cause)
+        assert back.arrival == {"run_id": "bdm_run_001"}
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

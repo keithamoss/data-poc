@@ -7,6 +7,8 @@ bug found via place_of_birth_facility's own mustBeLessThan: 35 rule
 reading red on almost every run despite genuinely passing."""
 from __future__ import annotations
 
+import pytest
+
 import yaml
 
 from qa_tools.common.datacontract_common import fail_threshold_from_quality_definition
@@ -59,3 +61,6 @@ def test_unrecognised_threshold_shape_falls_back_to_the_old_zero_default():
     unexpected future shape doesn't crash a real pipeline run."""
     qd = _quality_definition(mustBeGreaterThan=5)
     assert fail_threshold_from_quality_definition(qd, "error") == 0
+
+#: Birth Registrations is the daily asset's (the asset split).
+pytestmark = pytest.mark.asset("daily")

@@ -1,0 +1,540 @@
+"""mothman check - every gate this repo has, in one command (Tier 3).
+
+Keith's ask, 2026-09-20: make `npm test` something that gets run by
+default rather than something to remember. The obvious-looking fix is a
+rule - "run the JS suite when you touch the dashboard template" - and he
+ruled it out in the same breath: "I don't want to maintain file lists
+and so forth. That's messy." A list like that is wrong the moment
+someone adds a file, and nothing tells you it has gone stale.
+
+So the mechanism is not a trigger, it is a single command that runs
+everything. There is nothing to decide and nothing to keep up to date:
+if a gate exists, this runs it, and the report at the end says which
+ones passed. The JS suite stops being a separate thing to remember
+because it is no longer separate.
+
+Deliberately runs EVERY gate rather than stopping at the first failure.
+Fixing four things you were told about at once is one pass; finding them
+one command at a time is four, and the last three are invisible while
+the first is unfixed.
+
+Order is cheapest-first, so the fast gates report while the slow ones
+are still ahead of you - and the Python suite, far and away the longest,
+goes last. Use `--no-pytest` when selective tests have already been run
+locally (CLAUDE.md's own "run selective tests for smaller changes"
+convention), which leaves everything else - including the JS suite -
+still running in a couple of seconds.
+
+Since REQ-TEST-375 (Keith, 2026-11-02) this full gate is the ONLY place the
+whole suite and its coverage floor run on every push: push CI runs just the
+`critical` mark (critical.yml) and test.yml is started by hand. So the full
+gate enforces `fail_under` itself and ends with one result line to paste into
+the commit message - the record of what ran, on which tree.
+"""
+from __future__ import annotations
+
+import re
+
+import os
+import shutil
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+import rich_click as click
+from rich.console import Console
+from rich.table import Table
+
+console = Console()
+
+ROOT = Path(__file__).resolve().parent.parent
+
+#: A gate that PASSED but has something worth knowing exits with this
+#: instead of 0. See _GATES below for why it is opt-in and env-gated
+#: rather than something any gate may emit whenever it likes.
+WARNING_EXIT = 78
+WARNING_EXIT_VAR = "MOTHMAN_GATE_WARNING_EXIT"
+
+# (label, argv, why-it-is-here, can-warn). Node's suite is in here
+# alongside the Python ones rather than left to a separate habit - see
+# this module's own docstring.
+#
+# THE FOURTH FIELD IS THE WARNING OPT-IN, and it is per gate rather
+# than global for one reason: a real failure that happened to exit 78
+# would otherwise be re-read as a warning, turning red into yellow.
+# That is the false-green direction, so only a gate that actually has a
+# warning state gets its sentinel interpreted (post-build-review #23).
+_GATES: tuple[tuple[str, list[str], str, bool], ...] = (
+    ("ruff", ["uv", "run", "ruff", "check", "."],
+     "real bugs in Python, not style", False),
+    ("yamllint", ["uv", "run", "yamllint", "--strict", "."],
+     "duplicate mapping keys, which PyYAML swallows silently", False),
+    # Not coverable by check-yaml/yamllint: these are *.md files, so
+    # neither hook ever globs them - see the module's own docstring for
+    # the incident that produced this gate.
+    ("agents", ["uv", "run", "python3", "-m", "qa_tools.common.validate_agents"],
+     ".claude/agents/*.md frontmatter actually parses", False),
+    ("hierarchy", ["uv", "run", "mothman", "dashboard", "validate-hierarchy"],
+     "every contract agrees with the one agency/collection/dataset tree", False),
+    # REQ-PIPE-240 criteria 7 to 10: one registry, and no product file that
+    # names a collection outside it unless the file waits, by name, on the
+    # requirement that rewires it.
+    ("collections", ["uv", "run", "python3", "-m", "qa_tools.common.validate_collections"],
+     "every collection has an adapter and nothing else names one", False),
+    # REQ-GEN-246 criterion 3: two generator providers drawing the same seeds
+    # would draw the same rows.
+    ("providers", ["uv", "run", "python3", "-m", "generator.validate_providers"],
+     "every generator provider's seeds are disjoint from every other's", False),
+    # REQ-PIPE-254 criteria 16 to 18: a value held for the whole process
+    # answers an edited or swapped configuration file stale, so a new
+    # lru_cache or cache needs a reviewed reason.
+    ("caches", ["uv", "run", "python3", "-m", "qa_tools.common.validate_caches"],
+     "no unreviewed functools cache under qa_tools/ or pipeline/", False),
+    # The one gate with a warning state today: REQ-PIPE-053's low
+    # runway, which must be visible without failing the build.
+    ("schedule", ["uv", "run", "mothman", "schedule", "validate"],
+     "a config typo can never leave a dataset expecting nothing", True),
+    # REQ-PIPE-058 criterion 13. Half of a PAIR: this catches a careless
+    # pattern edit at the moment it is cheapest to fix, and the runtime
+    # hold in qa_tools/common/arrivals.py catches every collision that
+    # actually occurs. Neither alone is enough at thirty datasets.
+    ("patterns", ["uv", "run", "python3", "-m", "qa_tools.common.validate_arrival_patterns"],
+     "one filename can only ever belong to one dataset", False),
+    # The road-testing sweep's #7 (Keith, 2026-10-06): a SodaCL check this
+    # project cannot run is refused here, before a run reports it red.
+    ("soda", ["uv", "run", "mothman", "dashboard", "validate-soda"],
+     "every Soda check parses and can run without Soda Cloud", False),
+    # REQ-GEN-183 criterion 9: the synthetic generator reads these lists to
+    # avoid breaking a check, so a SQL check that names none is refused here.
+    ("columns", ["uv", "run", "mothman", "dashboard", "validate-reads-columns"],
+     "every SQL-bodied check names the columns it reads", False),
+    # running-thoughts #81: commit rule B re-runs only this cheap gate after
+    # a plans edit, and a stale index is what a plans edit most often
+    # breaks - the 2026-09-23 incident was exactly that, caught only by CI.
+    ("plans", ["uv", "run", "mothman", "dashboard", "plans-index", "--check"],
+     "plans/INDEX.md matches plans/*.md", False),
+    ("requirements", ["uv", "run", "mothman", "dashboard", "validate-requirements"],
+     "every linked test and implemented_by symbol still exists", False),
+    # REQ-DOCS-072. The delivery plan and the register are two records
+    # of the same thing, so they can drift - and did, on 11 of 25
+    # sprints, one of them stale for three days and repeated twice in
+    # conversation as fact before anyone checked.
+    # REQ-DOCS-073 gave this gate a warning state: a deferral whose
+    # blocker has since shipped is worth re-testing, and is not a
+    # failure - see sprint_state.main() for why it must not be one.
+    ("sprints", ["uv", "run", "mothman", "plans", "sprints"],
+     "a sprint's written status matches what its criteria say", True),
+    # REQ-TEST-374 (Keith, 2026-11-01, post-build-review #292): a builder's
+    # provisional choice is a question waiting on him, so a new one in BUILT
+    # work WARNS - never fails - against a shrink-only baseline.
+    ("provisional", ["uv", "run", "mothman", "dashboard", "validate-provisional"],
+     "every unanswered PROVISIONAL choice in built work is named", True),
+    ("changelog", ["uv", "run", "mothman", "dashboard", "validate-changelog"],
+     "CHANGELOG.yaml's schema and component tags", False),
+    # REQ-DOCS-219. Every road-testing entry carries a card the Feedback
+    # tab shows; a missing or malformed one fails here rather than vanishing.
+    ("feedback", ["uv", "run", "mothman", "dashboard", "validate-feedback"],
+     "every road-testing entry carries a well-formed feedback card", False),
+    ("scenarios", ["uv", "run", "mothman", "scenarios", "validate"],
+     "every scripted decision names a registered scenario and a real decision", True),
+    # REQ-TEST-253: a plans/supply-model.md edit can make an asset's
+    # SCENARIOS-<asset>.md stale, and until this gate only pytest noticed
+    # (2026-10-15). One map per asset (REQ-PIPE-352 criterion 3).
+    ("scenario map", ["uv", "run", "mothman", "scenarios", "map", "--check"],
+     "SCENARIOS-<asset>.md matches the register and the asset's recorded placements", True),
+    # REQ-GHUB-082 criterion 29. A person without a `github:` is shown
+    # on the dashboard, assigned nothing, and discovers they cannot
+    # raise a filing decision at the moment they try to raise one -
+    # which will be the moment something is wrong.
+    ("people", ["uv", "run", "python3", "-m", "qa_tools.common.validate_people"],
+     "everybody who is not a placeholder can actually act", False),
+    # REQ-DOCS-101 criterion 7. A sweep fixed fifteen signed requirements
+    # and three documents that still said the dashboard is built from
+    # committed files; what a sweep cannot do is stay fixed, because the
+    # next requirement drafted from a stale paragraph reintroduces the
+    # contradiction and the register then reads as though it agrees with
+    # itself. That requirement's own first NFR names a half-done sweep as
+    # the real risk rather than the effort.
+    ("premise", ["uv", "run", "python3", "-m", "qa_tools.common.validate_premise"],
+     "nothing still says CI builds the dashboard from committed files", False),
+    # REQ-PIPE-129 criterion 18. A WARNING: where the platform refuses the
+    # event triggers, the decision log and the move code path still guard
+    # a period table, and the gap is said rather than failed on.
+    ("guard", ["uv", "run", "python3", "-m", "qa_tools.common.period_tables"],
+     "whether the database guard on period tables is installed", True),
+    ("npm test", ["npm", "test", "--silent"],
+     "the dashboard template's own inline JS", False),
+    ("pytest", ["uv", "run", "pytest"],
+     "the Python suite", False),
+)
+
+
+#: THE DOCS GATE (REQ-TEST-253, Keith, 2026-10-16): the gates a change to
+#: these paths can affect, and the paths that may change for it to apply.
+#: A change anywhere else refuses `--docs` rather than skipping what it
+#: would need - a narrow gate that silently passed a code change is the
+#: false green this command exists to prevent.
+_DOCS_GATES = frozenset({"yamllint", "plans", "requirements", "sprints", "changelog",
+                         "feedback", "scenarios", "scenario map", "premise",
+                         "provisional"})
+_DOCS_PATHS = ("plans/", "docs/", "requirements.yaml", "CHANGELOG.yaml", "CLAUDE.md",
+               "README.md", "provisional-baseline.yaml")
+#: Each asset's committed scenario map (REQ-PIPE-352 criterion 3).
+_DOCS_FILE_PATTERN = re.compile(r"SCENARIOS-[a-z0-9-]+\.md")
+
+
+#: Gates that read no asset's configuration: run once, whatever
+#: MOTHMAN_ASSET says. pytest selects each test's asset itself (REQ-PIPE-363
+#: criterion 9).
+_REPOSITORY_WIDE = frozenset({"ruff", "yamllint", "agents", "npm test", "pytest"})
+
+
+def _asset_passes(label: str) -> list[dict]:
+    """The environment additions for each run of one gate. WITH NO ASSET
+    SELECTED - a fresh clone (REQ-PIPE-363 criterion 5, NFR PORTABILITY) - a
+    gate that reads an asset's configuration runs once for each asset folder
+    found, each run told its asset; with one selected, once, for it.
+    REQ-PIPE-364 builds its per-asset passes on this."""
+    from qa_tools.common import assets
+
+    if label in _REPOSITORY_WIDE or os.environ.get(assets.ASSET_ENV):
+        return [{}]
+    return [{assets.ASSET_ENV: name} for name in assets.names()] or [{}]
+
+
+def _worst(codes: list[int]) -> int:
+    """One gate's result over its passes: the first failure, else a warning,
+    else passed."""
+    failed = [c for c in codes if c not in (0, WARNING_EXIT, 127)]
+    if failed:
+        return failed[0]
+    return next((c for c in codes if c != 0), 0)
+
+
+def _changed_paths() -> list[str]:
+    """Every path the working tree changes against HEAD - staged,
+    unstaged and untracked - as git names it."""
+    out = subprocess.check_output(["git", "status", "--porcelain=v1", "-z",
+                                   "--untracked-files=all"], cwd=ROOT, text=True)
+    entries = [e for e in out.split("\0") if e]
+    paths, skip = [], False
+    for e in entries:
+        if skip:          # the source of a rename, after its target
+            skip = False
+            continue
+        status, path = e[:2], e[3:]
+        paths.append(path)
+        skip = "R" in status or "C" in status
+    return paths
+
+
+def _outside_docs(paths: list[str]) -> list[str]:
+    return [p for p in paths
+            if not any(p == d or (d.endswith("/") and p.startswith(d)) for d in _DOCS_PATHS)
+            and not _DOCS_FILE_PATTERN.fullmatch(p)]
+
+
+def _run_captured(label: str, argv: list[str], can_warn: bool) -> tuple[int, str]:
+    """One gate, captured, over each of its asset passes."""
+    codes, outputs = [], []
+    for extra in _asset_passes(label):
+        code, output = _run_captured_once(label, argv, can_warn, extra)
+        codes.append(code)
+        outputs.append(output)
+    return _worst(codes), "".join(outputs)
+
+
+def _run_captured_once(label: str, argv: list[str], can_warn: bool,
+                       extra: dict) -> tuple[int, str]:
+    """One gate with its output captured rather than streamed - for
+    `--docs`, whose gates run side by side (REQ-TEST-253 criterion 3):
+    nine one-to-eight-second checks one after another were 33 seconds,
+    and in parallel they cost the slowest of them."""
+    if shutil.which(argv[0]) is None:
+        return 127, (f"{argv[0]!r} is not installed - skipping {label}. "
+                     f"See CLAUDE.md's environment-setup bullet.\n")
+    env = {**os.environ, **extra} if (extra or can_warn) else None
+    if can_warn:
+        env[WARNING_EXIT_VAR] = str(WARNING_EXIT)
+    done = subprocess.run(argv, cwd=ROOT, env=env, capture_output=True, text=True)
+    return done.returncode, (done.stdout or "") + (done.stderr or "")
+
+
+def _run(label: str, argv: list[str], can_warn: bool = False) -> int:
+    """Streams the gate's own output rather than capturing it.
+
+    A summary table telling you `pytest` failed and nothing else would
+    be worse than no command at all - the failure itself is what you
+    need, and it needs to appear while it happens, not after every other
+    gate has finished.
+
+    Streaming is also why the warning channel is an exit code and not a
+    marker line in the output: reading the output would mean piping it,
+    and a gate whose stdout is a pipe stops colouring it.
+
+    `can_warn` opts the gate in through the environment rather than
+    letting it decide for itself. CI runs these same commands directly
+    as their own workflow steps, where any non-zero exit is a failed
+    step - so a gate must return 0 there, and only say more when
+    something asked it to.
+    """
+    console.rule(f"[bold]{label}", style="dim")
+    if shutil.which(argv[0]) is None:
+        console.print(
+            f"{argv[0]!r} is not installed - skipping {label}. "
+            f"See CLAUDE.md's environment-setup bullet.", style="yellow")
+        return 127
+    codes = []
+    for extra in _asset_passes(label):
+        # NOTHING TO ADD, NOTHING PASSED: the gate inherits this environment.
+        env = {**os.environ, **extra} if (extra or can_warn) else None
+        if can_warn:
+            env[WARNING_EXIT_VAR] = str(WARNING_EXIT)
+        codes.append(subprocess.run(argv, cwd=ROOT, env=env).returncode)
+    return _worst(codes)
+
+
+#: What the full gate measures coverage over - the same four packages test.yml
+#: measures, so the floor means the same thing here as in a hand-started run.
+#: `fail_under` itself is read from pyproject.toml by pytest-cov (REQ-TEST-375
+#: criterion 9: enforced in this gate, never in push CI).
+COVERAGE_PACKAGES = ("qa_tools", "pipeline", "generator", "dashboard")
+
+
+def _pytest_argv(argv: list[str], reports: Path) -> list[str]:
+    """The pytest gate with coverage enforced, and the two reports the
+    result line is read from."""
+    return [*argv, *(f"--cov={p}" for p in COVERAGE_PACKAGES),
+            f"--cov-report=json:{reports / 'coverage.json'}",
+            f"--junitxml={reports / 'junit.xml'}"]
+
+
+def _tree_state() -> str:
+    """The exact tree the gate ran on: HEAD's when clean, else the tree a
+    commit of everything now in the working tree would have - written through
+    a scratch index, so the real index is never touched. A tree git cannot
+    read is said, never guessed, and never stops the gate."""
+    try:
+        return _read_tree_state()
+    except (OSError, subprocess.SubprocessError) as exc:
+        return f"tree unknown ({type(exc).__name__})"
+
+
+def _read_tree_state() -> str:
+    import tempfile
+
+    head = subprocess.check_output(["git", "rev-parse", "--short", "HEAD"], cwd=ROOT,
+                                   text=True, stderr=subprocess.DEVNULL).strip()
+    changed = _changed_paths()
+    if not changed:
+        return f"HEAD {head} (clean)"
+    with tempfile.TemporaryDirectory() as scratch:
+        index = Path(scratch) / "index"
+        real = subprocess.check_output(["git", "rev-parse", "--git-path", "index"], cwd=ROOT,
+                                       text=True).strip()
+        real_path = Path(real) if Path(real).is_absolute() else ROOT / real
+        if real_path.exists():
+            shutil.copy(real_path, index)
+        env = {**os.environ, "GIT_INDEX_FILE": str(index)}
+        subprocess.check_call(["git", "add", "-A"], cwd=ROOT, env=env)
+        tree = subprocess.check_output(["git", "write-tree"], cwd=ROOT, env=env,
+                                       text=True).strip()
+    return f"tree {tree[:10]} (HEAD {head} + {len(changed)} uncommitted paths)"
+
+
+def _pytest_counts(junit: Path) -> tuple[int, int, int] | None:
+    """(passed, failed, skipped) from pytest's JUnit report; errors count as
+    failed. None when pytest wrote no report."""
+    import xml.etree.ElementTree as ET
+
+    try:
+        root = ET.parse(junit).getroot()
+    except (OSError, ET.ParseError):
+        return None
+    suites = [root] if root.tag == "testsuite" else list(root)
+    total = sum(int(s.get("tests", 0)) for s in suites)
+    failed = sum(int(s.get("failures", 0)) + int(s.get("errors", 0)) for s in suites)
+    skipped = sum(int(s.get("skipped", 0)) for s in suites)
+    return total - failed - skipped, failed, skipped
+
+
+def _coverage_percent(report: Path) -> float | None:
+    import json
+
+    try:
+        return float(json.loads(report.read_text())["totals"]["percent_covered"])
+    except (OSError, ValueError, KeyError):
+        return None
+
+
+def _fail_under() -> float | None:
+    import tomllib
+
+    config = tomllib.loads((ROOT / "pyproject.toml").read_text())
+    return config.get("tool", {}).get("coverage", {}).get("report", {}).get("fail_under")
+
+
+def result_line(*, tree: str, tree_after: str, counts, coverage, floor, elapsed: float,
+                failed_gates: list[str], not_run: list[str] = ()) -> str:
+    """REQ-TEST-375 criterion 10: the full gate's result, on one line, fit to
+    paste into a commit message. It never claims more than ran: a missing
+    report says so, and a tree that changed mid-run is not a claim about
+    either tree."""
+    minutes, seconds = divmod(round(elapsed), 60)
+    tests = ("pytest wrote no report" if counts is None
+             else f"{counts[0]} passed, {counts[1]} failed, {counts[2]} skipped")
+    cov = "coverage not measured" if coverage is None else f"coverage {coverage:.2f}%"
+    if coverage is not None and floor is not None:
+        cov += f" (floor {floor:g}%)"
+    gates = "; ".join(filter(None, [
+        f"FAILED: {', '.join(failed_gates)}" if failed_gates else "",
+        f"not run (no toolchain): {', '.join(not_run)}" if not_run else ""])) \
+        or "every gate passed"
+    where = (tree if tree == tree_after
+             else f"TREE CHANGED DURING THE RUN ({tree} -> {tree_after}), so this is no claim")
+    return f"Full gate (mothman check): {gates}; {tests}; {cov}; {minutes}m{seconds:02d}s; {where}"
+
+
+@click.command("check")
+@click.option("--no-pytest", is_flag=True,
+              help="Skip the Python suite (the slow one). Everything else still runs.")
+@click.option("--docs", is_flag=True,
+              help="Only the gates a documentation change can affect - plans, requirements, "
+                   "changelog, scenarios, YAML. Refuses if anything else changed.")
+@click.option("--only", "only", metavar="GATE",
+              help="Run just one gate, by its name in the summary table. For a "
+                   "pre-commit hook or a targeted re-run, where the point is "
+                   "one fast check rather than the whole sweep.")
+def check_command(no_pytest: bool, docs: bool, only: str | None) -> None:
+    """Run every gate - lint, YAML, the validators, the JS suite, the Python suite."""
+    gates = _GATES
+    if docs:
+        if only is not None or no_pytest:
+            raise click.ClickException("--docs is its own set of gates - give it alone.")
+        outside = _outside_docs(_changed_paths())
+        if outside:
+            raise click.ClickException(
+                "--docs covers documentation only, and this change also touches: "
+                + ", ".join(outside) + ". Use `mothman check --no-pytest` (or the full gate).")
+        gates = tuple(g for g in _GATES if g[0] in _DOCS_GATES)
+    if only is not None:
+        gates = tuple(g for g in _GATES if g[0] == only)
+        if not gates:
+            # Naming the real options beats "invalid value": the labels
+            # are not guessable from the command name.
+            raise click.ClickException(
+                f"no gate called {only!r}. Available: "
+                f"{', '.join(label for label, _, _, _ in _GATES)}.")
+
+    results: list[tuple[str, int, str, bool, float]] = []
+    if docs:
+        # SIDE BY SIDE, PRINTED IN ORDER: each gate's own output, whole,
+        # under its own heading - a failure is still shown in full, only
+        # after rather than while it happens.
+        from concurrent.futures import ThreadPoolExecutor
+
+        def timed(gate):
+            label, argv, why, can_warn = gate
+            started = time.monotonic()
+            code, output = _run_captured(label, argv, can_warn)
+            return label, code, why, can_warn, time.monotonic() - started, output
+
+        with ThreadPoolExecutor(max_workers=len(gates)) as pool:
+            ran = list(pool.map(timed, gates))
+        for label, code, why, can_warn, took, output in ran:
+            console.rule(f"[bold]{label}", style="dim")
+            if output:
+                console.out(output.rstrip("\n"), highlight=False)
+            results.append((label, code, why, can_warn, took))
+    full = not (docs or no_pytest or only is not None)
+    gate_started = time.monotonic()
+    tree = _tree_state() if full else ""
+    import tempfile
+
+    reports = Path(tempfile.mkdtemp(prefix="mothman-check-"))
+    for label, argv, why, can_warn in (() if docs else gates):
+        if no_pytest and label == "pytest":
+            continue
+        if label == "pytest":
+            argv = _pytest_argv(argv, reports)
+        started = time.monotonic()
+        code = _run(label, argv, can_warn)
+        results.append((label, code, why, can_warn, time.monotonic() - started))
+
+    console.print()
+    table = Table(title="mothman check", title_style="bold", header_style="dim")
+    table.add_column("Gate")
+    table.add_column("Result")
+    table.add_column("Time", justify="right")
+    table.add_column("What it covers", style="dim")
+    for label, code, why, can_warn, took in results:
+        if code == 0:
+            outcome = "[green]passed[/green]"
+        elif code == 127:
+            outcome = "[yellow]not installed[/yellow]"
+        elif can_warn and code == WARNING_EXIT:
+            outcome = "[yellow]passed, with a warning[/yellow]"
+        else:
+            outcome = f"[red]FAILED ({code})[/red]"
+        table.add_row(label, outcome, f"{took:.1f}s", why)
+    console.print(table)
+
+    def _warned(code: int, can_warn: bool) -> bool:
+        return can_warn and code == WARNING_EXIT
+
+    failed = [label for label, code, _, can_warn, _t in results
+              if code not in (0, 127) and not _warned(code, can_warn)]
+    skipped = [label for label, code, _, _, _t in results if code == 127]
+    warned = [label for label, code, _, can_warn, _t in results if _warned(code, can_warn)]
+    if full:
+        line = result_line(tree=tree, tree_after=_tree_state(),
+                           counts=_pytest_counts(reports / "junit.xml"),
+                           coverage=_coverage_percent(reports / "coverage.json"),
+                           floor=_fail_under(), elapsed=time.monotonic() - gate_started,
+                           failed_gates=failed, not_run=skipped)
+        console.print("Paste into the commit message:", style="bold")
+        console.out(line, highlight=False)
+    shutil.rmtree(reports, ignore_errors=True)
+    if failed:
+        raise click.ClickException(f"{len(failed)} gate(s) failed: {', '.join(failed)}")
+
+    # Never "every gate passed" when one of them did not run. A summary
+    # that overstates its own coverage is worse than no summary - the
+    # whole reason this command exists is that a suite nobody remembered
+    # to run looked exactly like a suite that passed.
+    # A warning is reported BEFORE the closing line and never instead
+    # of it: the gate passed, and the command's exit code says so. What
+    # this fixes is the summary saying "Every gate passed" while a real
+    # warning sat eight gates and two minutes further up the scrollback
+    # (post-build-review #23).
+    if warned:
+        console.print(
+            f"Passed, with a warning from: {', '.join(warned)}. "
+            f"Scroll up for what it said - it is not failing the build.",
+            style="yellow")
+
+    if skipped:
+        console.print(f"Incomplete - no toolchain for: {', '.join(skipped)}. "
+                      f"Everything that ran, passed. See CLAUDE.md's "
+                      f"environment-setup bullet.", style="yellow")
+    elif warned:
+        pass  # already said above; "Every gate passed" would talk over it
+    elif only is not None:
+        # Same reasoning as the skipped-toolchain branch above: never
+        # let a summary overstate what actually ran.
+        console.print(f"The {only!r} gate passed. Other gates were not run.",
+                      style="green")
+    elif docs:
+        console.print("Every documentation gate passed. Code, contracts, the JS suite and "
+                      "the Python suite were not run - this change touches none of them.",
+                      style="green")
+    elif no_pytest:
+        console.print("Every gate passed except the Python suite, which was skipped.",
+                      style="green")
+    else:
+        console.print("Every gate passed.", style="green")
+
+
+def main() -> None:
+    sys.exit(check_command.main(standalone_mode=False) or 0)

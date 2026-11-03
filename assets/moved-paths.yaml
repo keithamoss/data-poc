@@ -1,0 +1,174 @@
+# THE MOVE MAP (REQ-TEST-366): every file the asset split moves or divides,
+# from its old path to its new path or paths, and the former data_asset_id
+# (REQ-QAC-344). Read by qa_tools/common/moved_paths.py, and only for the push
+# that carries the move - one whose diff base holds no assets/ folder. The
+# next push deletes this file, every line of code that reads it and the check
+# id transform (REQ-TEST-366 criterion 3).
+#
+# A divided file has one `to` per asset; read at the base for one asset it is
+# cut to that asset's part, by the member ids listed under `assets` - an
+# agency, collection, dataset, calendar or declared correction of another
+# asset is that asset's, everything else is both assets'.
+former_data_asset_id: data-asset-1
+assets:
+  daily:
+    agencies: [registry-services]
+    collections: [civil-registration]
+    datasets: [birth-registrations]
+    calendars: [daily]
+    change_references: [REQ-GEN-205-WINDOW]
+  quarterly:
+    agencies: [child-protection-family-support, department-of-health]
+    collections: [child-protection, emergency-department, linkage-products]
+    datasets: [cp-clients, cp-notifications, cp-investigations, cp-placements, cp-carers, cp-case-workers, ed-presentations, linkage-keys, geo-cp-clients, geo-ed-presentations]
+    calendars: [quarterly]
+    change_references: [REQ-GEN-205, REQ-PIPE-181, REQ-GEN-218]
+moves:
+  - from: contract/data-asset.yaml
+    to: [assets/daily/data-asset.yaml, assets/quarterly/data-asset.yaml]
+  - from: contract/calendar.yaml
+    to: [assets/daily/calendar.yaml, assets/quarterly/calendar.yaml]
+  - from: contract/people.yaml
+    to: [assets/daily/people.yaml, assets/quarterly/people.yaml]
+  - from: contract/presentation.yaml
+    to: [assets/daily/presentation.yaml, assets/quarterly/presentation.yaml]
+  - from: contract/file-checks.yaml
+    to: [assets/daily/file-checks.yaml, assets/quarterly/file-checks.yaml]
+  - from: contract/scripted_decisions.yaml
+    to: [assets/daily/synthetic/scripted_decisions.yaml, assets/quarterly/synthetic/scripted_decisions.yaml]
+  - from: dbt_project/dbt_project.yml
+    to: [assets/daily/dbt/dbt_project.yml, assets/quarterly/dbt/dbt_project.yml]
+  - from: dbt_project/packages.yml
+    to: [assets/daily/dbt/packages.yml, assets/quarterly/dbt/packages.yml]
+  - from: dbt_project/package-lock.yml
+    to: [assets/daily/dbt/package-lock.yml, assets/quarterly/dbt/package-lock.yml]
+  - from: dbt_project/macros/dbt_shared_tests.sql
+    to: [assets/daily/dbt/macros/dbt_shared_tests.sql, assets/quarterly/dbt/macros/dbt_shared_tests.sql]
+  - from: dbt_project/macros/matches_regex.sql
+    to: dbt_shared/macros/matches_regex.sql
+  - from: dbt_project/macros/set_member_violations.sql
+    to: dbt_shared/macros/set_member_violations.sql
+  - from: dbt_project/tests/generic/duplicated_set_members.sql
+    to: dbt_shared/tests/generic/duplicated_set_members.sql
+  - from: dbt_project/tests/generic/missing_set_members.sql
+    to: dbt_shared/tests/generic/missing_set_members.sql
+  - from: dbt_project/tests/generic/unexpected_set_members.sql
+    to: dbt_shared/tests/generic/unexpected_set_members.sql
+  - from: contract/child-protection-family-support/child-protection-contract-retired.yaml
+    to: assets/quarterly/child-protection-family-support/child-protection-contract-retired.yaml
+  - from: contract/child-protection-family-support/child-protection-contract.yaml
+    to: assets/quarterly/child-protection-family-support/child-protection-contract.yaml
+  - from: contract/child-protection-family-support/child-protection-evidently-checks-retired.yml
+    to: assets/quarterly/child-protection-family-support/child-protection-evidently-checks-retired.yml
+  - from: contract/child-protection-family-support/child-protection-evidently-checks.yml
+    to: assets/quarterly/child-protection-family-support/child-protection-evidently-checks.yml
+  - from: contract/child-protection-family-support/child-protection-soda-checks-retired.yml
+    to: assets/quarterly/child-protection-family-support/child-protection-soda-checks-retired.yml
+  - from: contract/child-protection-family-support/child-protection-soda-checks.yml
+    to: assets/quarterly/child-protection-family-support/child-protection-soda-checks.yml
+  - from: contract/department-of-health/emergency-department-contract-retired.yaml
+    to: assets/quarterly/department-of-health/emergency-department-contract-retired.yaml
+  - from: contract/department-of-health/emergency-department-contract.yaml
+    to: assets/quarterly/department-of-health/emergency-department-contract.yaml
+  - from: contract/department-of-health/emergency-department-evidently-checks-retired.yml
+    to: assets/quarterly/department-of-health/emergency-department-evidently-checks-retired.yml
+  - from: contract/department-of-health/emergency-department-evidently-checks.yml
+    to: assets/quarterly/department-of-health/emergency-department-evidently-checks.yml
+  - from: contract/department-of-health/emergency-department-soda-checks-retired.yml
+    to: assets/quarterly/department-of-health/emergency-department-soda-checks-retired.yml
+  - from: contract/department-of-health/emergency-department-soda-checks.yml
+    to: assets/quarterly/department-of-health/emergency-department-soda-checks.yml
+  - from: contract/department-of-health/linkage-products-contract-retired.yaml
+    to: assets/quarterly/department-of-health/linkage-products-contract-retired.yaml
+  - from: contract/department-of-health/linkage-products-contract.yaml
+    to: assets/quarterly/department-of-health/linkage-products-contract.yaml
+  - from: contract/department-of-health/linkage-products-evidently-checks-retired.yml
+    to: assets/quarterly/department-of-health/linkage-products-evidently-checks-retired.yml
+  - from: contract/department-of-health/linkage-products-evidently-checks.yml
+    to: assets/quarterly/department-of-health/linkage-products-evidently-checks.yml
+  - from: contract/department-of-health/linkage-products-soda-checks-retired.yml
+    to: assets/quarterly/department-of-health/linkage-products-soda-checks-retired.yml
+  - from: contract/department-of-health/linkage-products-soda-checks.yml
+    to: assets/quarterly/department-of-health/linkage-products-soda-checks.yml
+  - from: contract/registry-services/bdm-birth-registrations-contract-retired.yaml
+    to: assets/daily/registry-services/bdm-birth-registrations-contract-retired.yaml
+  - from: contract/registry-services/bdm-birth-registrations-contract.yaml
+    to: assets/daily/registry-services/bdm-birth-registrations-contract.yaml
+  - from: contract/registry-services/bdm-birth-registrations-evidently-checks-retired.yml
+    to: assets/daily/registry-services/bdm-birth-registrations-evidently-checks-retired.yml
+  - from: contract/registry-services/bdm-birth-registrations-evidently-checks.yml
+    to: assets/daily/registry-services/bdm-birth-registrations-evidently-checks.yml
+  - from: contract/registry-services/bdm-birth-registrations-soda-checks-retired.yml
+    to: assets/daily/registry-services/bdm-birth-registrations-soda-checks-retired.yml
+  - from: contract/registry-services/bdm-birth-registrations-soda-checks.yml
+    to: assets/daily/registry-services/bdm-birth-registrations-soda-checks.yml
+  - from: contract/environments.yaml
+    to: assets/environments.yaml
+  - from: contract/synthetic_inputs.yaml
+    to: assets/quarterly/synthetic/synthetic_inputs.yaml
+  - from: dbt_project/models/child-protection/schema.yml
+    to: assets/quarterly/dbt/models/child-protection/schema.yml
+  - from: dbt_project/models/child-protection/sources.yml
+    to: assets/quarterly/dbt/models/child-protection/sources.yml
+  - from: dbt_project/models/child-protection/stg_cp_carers.sql
+    to: assets/quarterly/dbt/models/child-protection/stg_cp_carers.sql
+  - from: dbt_project/models/child-protection/stg_cp_case_workers.sql
+    to: assets/quarterly/dbt/models/child-protection/stg_cp_case_workers.sql
+  - from: dbt_project/models/child-protection/stg_cp_clients.sql
+    to: assets/quarterly/dbt/models/child-protection/stg_cp_clients.sql
+  - from: dbt_project/models/child-protection/stg_cp_investigations.sql
+    to: assets/quarterly/dbt/models/child-protection/stg_cp_investigations.sql
+  - from: dbt_project/models/child-protection/stg_cp_notifications.sql
+    to: assets/quarterly/dbt/models/child-protection/stg_cp_notifications.sql
+  - from: dbt_project/models/child-protection/stg_cp_placements.sql
+    to: assets/quarterly/dbt/models/child-protection/stg_cp_placements.sql
+  - from: dbt_project/models/civil-registration/schema.yml
+    to: assets/daily/dbt/models/civil-registration/schema.yml
+  - from: dbt_project/models/civil-registration/sources.yml
+    to: assets/daily/dbt/models/civil-registration/sources.yml
+  - from: dbt_project/models/civil-registration/stg_birth_registrations.sql
+    to: assets/daily/dbt/models/civil-registration/stg_birth_registrations.sql
+  - from: dbt_project/models/emergency-department/schema.yml
+    to: assets/quarterly/dbt/models/emergency-department/schema.yml
+  - from: dbt_project/models/emergency-department/sources.yml
+    to: assets/quarterly/dbt/models/emergency-department/sources.yml
+  - from: dbt_project/models/emergency-department/stg_ed_presentations.sql
+    to: assets/quarterly/dbt/models/emergency-department/stg_ed_presentations.sql
+  - from: dbt_project/models/linkage-products/schema.yml
+    to: assets/quarterly/dbt/models/linkage-products/schema.yml
+  - from: dbt_project/models/linkage-products/sources.yml
+    to: assets/quarterly/dbt/models/linkage-products/sources.yml
+  - from: dbt_project/models/linkage-products/stg_geo_cp_clients.sql
+    to: assets/quarterly/dbt/models/linkage-products/stg_geo_cp_clients.sql
+  - from: dbt_project/models/linkage-products/stg_geo_ed_presentations.sql
+    to: assets/quarterly/dbt/models/linkage-products/stg_geo_ed_presentations.sql
+  - from: dbt_project/models/linkage-products/stg_linkage_keys.sql
+    to: assets/quarterly/dbt/models/linkage-products/stg_linkage_keys.sql
+  - from: dbt_project/tests/child-protection/closed_case_investigation_hygiene.sql
+    to: assets/quarterly/dbt/tests/child-protection/closed_case_investigation_hygiene.sql
+  - from: dbt_project/tests/child-protection/escalation_completeness.sql
+    to: assets/quarterly/dbt/tests/child-protection/escalation_completeness.sql
+  - from: dbt_project/tests/child-protection/placement_carer_approval.sql
+    to: assets/quarterly/dbt/tests/child-protection/placement_carer_approval.sql
+  - from: dbt_project/tests/civil-registration/multiple_birth_sibling.sql
+    to: assets/daily/dbt/tests/civil-registration/multiple_birth_sibling.sql
+  - from: dbt_project/tests/civil-registration/recency.sql
+    to: assets/daily/dbt/tests/civil-registration/recency.sql
+  - from: dbt_project/retired/civil-registration/schema-retired.yml
+    to: assets/daily/dbt/retired/civil-registration/schema-retired.yml
+  - from: qa_tools/collections/child_protection.py
+    to: assets/quarterly/collections/child_protection.py
+  - from: qa_tools/collections/civil_registration.py
+    to: assets/daily/collections/civil_registration.py
+  - from: qa_tools/collections/emergency_department.py
+    to: assets/quarterly/collections/emergency_department.py
+  - from: qa_tools/collections/linkage_products.py
+    to: assets/quarterly/collections/linkage_products.py
+  - from: generator/collections/child_protection.py
+    to: assets/quarterly/synthetic/collections/child_protection.py
+  - from: generator/collections/civil_registration.py
+    to: assets/daily/synthetic/collections/civil_registration.py
+  - from: generator/collections/emergency_department.py
+    to: assets/quarterly/synthetic/collections/emergency_department.py
+  - from: generator/collections/linkage_products.py
+    to: assets/quarterly/synthetic/collections/linkage_products.py

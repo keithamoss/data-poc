@@ -1,0 +1,114 @@
+# DRAFT - three small items for Keith's morning sign-off, drafted by
+# delivery-scoper 2026-10-23 (Perth). A PROPOSAL: nothing here is in
+# requirements.yaml and nothing is signed. summary.md beside this file is the
+# sign-off brief, and carries item 3 (REQ-TEST-239's retirement wording),
+# which is an amendment to an existing requirement rather than a new one.
+# Ids used: REQ-TEST-281, REQ-TEST-282, REQ-TEST-283 (279 and 280 taken; the
+# period-clarity draft written in parallel takes its own).
+requirements:
+- id: REQ-TEST-281
+  title: "The browser-test module runs across every test worker, each worker building its own dashboard into its own output path"
+  date_written: "2026-10-23"
+  story: "As whoever runs the full gate, I want tests/test_dashboard_e2e.py spread across all the test workers rather than pinned to one, with each worker building the dashboard into a place of its own, so that the gate's wall clock is no longer set by one 41-minute module running alone while the other workers sit idle."
+  moscow: should
+  status: not_started
+  source: "Keith, plans/running-thoughts.md #88 (2026-10-12: \"full gate takes 10 minutes now, it's a long time\") and plans/tooling.md #24 fix 3 (2026-09-26, still open); approved as option A of two ('A and B') for overnight 2026-10-23 drafting, with \"dig into what the 56 minutes of PyTest is about\". Drafted by delivery-scoper 2026-10-23 from the timed full gate of 2026-10-21/22 on this sandbox. A PROPOSAL, not signed."
+  acceptance_criteria:
+  - "THE SYSTEM SHALL distribute the tests of tests/test_dashboard_e2e.py across every pytest-xdist worker of a run, with no test class split across two workers."
+  - "THE SYSTEM SHALL keep every other test module on one worker per file, exactly as `--dist loadfile` does today."
+  - "WHEN a worker first needs the built dashboard, THE SYSTEM SHALL build it once for that worker, by the same build chain as today (rebuild-results, build_dashboard_data, embed), into an output location named for that worker, and SHALL reuse that build for every later test on the same worker."
+  - "WHILE the browser-test module runs, THE SYSTEM SHALL NOT write to the real tree's reports/ files or to dashboard/qa-reporting-dashboard.html."
+  - "THE SYSTEM SHALL resolve the built page's fonts/ and vendor/ assets from each worker's output location, so a per-worker build renders the self-hosted fonts and the Demo tab's player exactly as the shared build does."
+  - "WHEN a class-scoped variant fixture (dashboard_html_with_ticket and its siblings) re-embeds a dashboard, THE SYSTEM SHALL read its worker's own built reports, never the real tree's."
+  - "WHEN the browser-test module is run three times in a row under the default worker count, THE SYSTEM SHALL pass every test each time with no new skips, and this SHALL be this requirement's evidence alongside the timed full gate."
+  - "WHEN the change lands, THE SYSTEM SHALL record in CLAUDE.md's test-suite runtime log the timed full-gate pytest wall clock and the per-module durations it was measured from."
+  non_functional_requirements:
+  - "THE RACE THAT MADE --dist loadfile NECESSARY STAYS CLOSED BY CONSTRUCTION (plans/tooling.md #10, race 2): several workers each ran the session-scoped build and rewrote the same real reports/ files and built HTML. A per-worker output location means no two builds share a file, rather than a lock or an ordering that could be lost later. pyproject.toml's loadfile comment and CLAUDE.md's \"--dist loadfile is load-bearing\" note are rewritten in the same change to say what now prevents it."
+  - "NO WEAKER SUITE: the same tests run and pass, the fast half's skip count stays zero (CLAUDE.md, CI halves), and no assertion is loosened to make a parallel run pass."
+  - "THE BUILD STILL READS RECORDED QA RESULTS ONLY (CLAUDE.md: a build may read recorded QA results, never actual data): a per-worker build reads the same deployment database as today, and nothing here gives a build a new reach."
+  - "ONLY THROUGH mothman, AND NO NEW DEPENDENCY: whatever output-location option the build gains is reachable through the existing mothman dashboard commands; pytest-xdist's own grouping is already installed."
+  - "COST PER WORKER IS MEASURED, NOT ASSUMED: each extra worker pays one dashboard build (12.9s when last measured, 2026-09-27, on a far smaller history); the evidence names the measured build time per worker on today's history."
+  - "CI WALL CLOCK: the deployment half runs this module too, so its time is reported alongside the sandbox figure; no CI workflow is changed beyond what the new distribution needs."
+  dependencies: []
+  open_questions:
+  - "THE MEASURABLE TARGET (changes what counts as done). Scenario: the timed gate of 2026-10-21/22 had the e2e module at 2,441s on one worker, ~41 minutes of wall clock, out of 4,730s of test time; the next slowest modules were test_checkpoints 293s, test_door_flag_parity 206s, test_replay_inputs 135s, test_dbt_worker 120s, test_generate_to_target 111s. Spread evenly over four workers, 4,730s is ~20 minutes, plus one build per worker. RECOMMENDATION: an NFR that the full local `uv run pytest` wall clock on this sandbox is at most 25 minutes with A alone (and at most 20 with A and REQ-TEST-282 together), measured by the same timed gate - a finding for Keith if missed, not a CI gate, matching his 2026-09-18 call that runtime is watched rather than enforced. Alternative: no number, just 'measurably faster', which cannot fail."
+  - "THE GROUPING MECHANISM (changes what gets built in pyproject.toml and conftest). Scenario: `--dist loadgroup` spreads ungrouped tests one by one, which would silently undo loadfile for every other module. RECOMMENDATION: switch to loadgroup and have tests/conftest.py give every test an xdist_group - its file for every module, its file and class for this one - so the other modules keep exactly today's behaviour. Alternative: split the e2e module into several files by theme and keep loadfile; simpler config, but four to six files to keep balanced by hand as tests are added, and every file still pays its own build."
+  decisions:
+  - "PER-WORKER BUILD OUTPUT, NOT A SHARED BUILD UNDER A LOCK (Keith approved A as 'a per-worker build output path', 2026-10-23). REJECTED building once under a file lock and having every worker read it: it reintroduces exactly the shared-file read that plans/tooling.md #10 race 1 was, and it couples every worker to the first one's success. A per-worker build costs one build per worker and shares nothing."
+  - "THE REAL TREE IS NO LONGER WRITTEN BY THE SUITE (criterion 4). Today the e2e fixture rewrites the real reports/ and built HTML as a side effect, which is also a live hazard to the other needs_deployment modules that read reports/ while it runs. A side effect any developer was relying on (a test run refreshing the local dashboard) goes with it; `mothman dashboard rebuild` is the way to get one."
+  - "NO TEST CLASS SPLIT ACROSS WORKERS (criterion 1): the class-scoped variant fixtures (2026-09-27) and REQ-TEST-282's class-scoped page both assume a class runs on one worker; per-test spreading would multiply their cost per worker."
+  - "THE MASTHEAD TEST'S 15s AND THE PER-WORKER BUILD ARE A FLOOR PARALLELISM CANNOT REMOVE (plans/tooling.md #24): the realistic gain is below the arithmetic, and the target in open_questions allows for it."
+  - "REJECTED moving the e2e tests to Playwright's own JS runner (plans/tooling.md #24, 2026-09-26): the pytest plugin is the supported Python path and recommends xdist, and a split would lose the fixtures that build from recorded history."
+- id: REQ-TEST-282
+  title: "A browser-test class loads the dashboard once and its tests share that page, except the tests that need a fresh load"
+  date_written: "2026-10-23"
+  story: "As whoever runs the full gate, I want the tests of one browser-test class to share one loaded dashboard page rather than each opening and parsing the multi-megabyte page again, so that the module's time goes on what the tests check rather than on reloading the same page hundreds of times."
+  moscow: should
+  status: not_started
+  source: "Keith, plans/running-thoughts.md #88 and the 'dig into the 56 minutes' ask; approved as option B of two ('A and B') for overnight 2026-10-23 drafting. Drafted by delivery-scoper 2026-10-23. A PROPOSAL, not signed."
+  acceptance_criteria:
+  - "WHERE a browser-test class opts in to a shared page, THE SYSTEM SHALL open one browser context and page for that class, load the dashboard document in it at most once, and give every test in the class that page."
+  - "WHEN a test in a shared-page class starts, THE SYSTEM SHALL return the page to a known state - the class's starting route reached by a same-document navigation, local and session storage cleared, any open panel or drawer closed - before the test's own steps run."
+  - "THE SYSTEM SHALL let a test mark itself as needing a fresh document load, and WHEN a marked test runs in a shared-page class, THE SYSTEM SHALL reload the page for it."
+  - "THE SYSTEM SHALL mark as needing a fresh load every test that asserts on a reload, on persistence across a load, on the first render, on the clock ticking or not ticking, or that rewrites the page's embedded data or DOM in place (_rewrite_checks, _rewrite_const and their like)."
+  - "THE SYSTEM SHALL still fail each test on any console error or uncaught page exception raised during that test, attributing it to the test during which it was raised, as clean_page does today."
+  - "IF a shared page's document has been replaced by something other than a marked test's own reload, THEN THE SYSTEM SHALL fail the test that replaced it, naming it, rather than let later tests run on a page they did not expect."
+  - "WHEN the change lands, THE SYSTEM SHALL report in its evidence the number of document loads the module makes before and after, and the module's duration before and after, measured on the same history."
+  non_functional_requirements:
+  - "NO TEST BECOMES ORDER-DEPENDENT: each test in a shared-page class SHALL pass when run alone (`-k`) and when the class runs in reverse order (pytest's own ordering options, or a one-off reversed run recorded as evidence)."
+  - "NO WEAKER ASSERTION: the per-test console-error bar (Keith's own confirmed design for this suite) is kept per test, not relaxed to per class."
+  - "NO NEW DEPENDENCY: built on pytest-playwright's own session-scoped browser fixture; no plugin added for ordering or state."
+  - "ROLLOUT IS ALLOWED TO BE PARTIAL: classes opt in, so a class that turns out to be state-heavy stays on a fresh page per test; the evidence names which classes opted in and which did not."
+  dependencies: []
+  open_questions:
+  - "THE TARGET is shared with REQ-TEST-281's first open question (one number for A and B together is recommended: at most 20 minutes local pytest wall clock on this sandbox)."
+  decisions:
+  - "OPT-IN PER CLASS, NOT A MODULE-WIDE SWITCH: the 2026-09-27 class-scoped variant fixtures proved the class is the natural unit of reuse here, and a class whose tests mutate shared state can stay as it is rather than be rewritten."
+  - "RESET BY SAME-DOCUMENT NAVIGATION, NOT A RELOAD: a reload is exactly the cost being removed. _goto already tells a hash change from a reload with window.__e2eMark and the data-render-count counter (plans/tooling.md #24, fix 1), so a reset can wait on a real render rather than a sleep."
+  - "A DOCUMENT REPLACED UNEXPECTEDLY IS A FAILURE, NOT A SILENT RECOVERY (criterion 6): silently reloading would hide the very order-dependence this change risks."
+  - "INDEPENDENT OF REQ-TEST-281 BUT COMPATIBLE: it assumes only that a class runs on one worker, which loadfile gives today and REQ-TEST-281 criterion 1 keeps."
+- id: REQ-TEST-283
+  title: "`mothman env tidy-test-databases` drops the test suite's own leftover databases, never anything else, and the session-start hook runs it"
+  date_written: "2026-10-23"
+  story: "As whoever runs the test suite on a shared PostgreSQL server, I want the databases earlier test sessions left behind dropped automatically once they are old and unused, so that tagged sessions' databases stop accumulating (about 130 in one sandbox) without any risk to the supply database, another server user's databases, or a session still running."
+  moscow: should
+  status: not_started
+  source: "Keith, 2026-10-20: \"Feel free to setup something to automatically tidy up old leftover test databases.\" BUILT before any requirement existed (commit 8e6f745, 2026-10-22 Perth, a checkpoint with no test claims); drafted afterwards by delivery-scoper 2026-10-23 to describe what is built, so the register catches up with the code. A PROPOSAL, not signed; the main session flips it to built after sign-off."
+  acceptance_criteria:
+  - "THE SYSTEM SHALL offer `mothman env tidy-test-databases` with `--older-than-hours` (default 12), `--dry-run` and `--prefix`, reading the server from MOTHMAN_TEST_DSN."
+  - "IF MOTHMAN_TEST_DSN is not set, THEN THE SYSTEM SHALL refuse, saying there is no test server to tidy, and drop nothing."
+  - "THE SYSTEM SHALL consider only databases whose names match ^mothman_(test|solo)_[A-Za-z0-9_]+$ - the names tests/conftest.py gives a worker's database, its tagged form, its _scratch sibling and a solo test's database - and SHALL never drop any other database on the server."
+  - "THE SYSTEM SHALL drop a matching database only when nobody is connected to it and it was created at least --older-than-hours ago, taking its creation time from the modification time of its PG_VERSION file."
+  - "WHERE --prefix is given, THE SYSTEM SHALL further restrict the candidates to names beginning with that prefix."
+  - "WHEN --dry-run is given, THE SYSTEM SHALL list each database it would drop and their count, and drop nothing."
+  - "THE SYSTEM SHALL drop each candidate with a plain DROP DATABASE, never WITH (FORCE), and IF a drop fails because somebody connected since the listing, THEN THE SYSTEM SHALL keep that database, say so by name, and carry on with the rest."
+  - "IF the test server cannot be listed, THEN THE SYSTEM SHALL exit non-zero naming the database error."
+  - "WHEN a session starts and PostgreSQL is up, THE SYSTEM SHALL run the command from .claude/hooks/session-start.sh with its defaults, and report the number dropped only when it is more than zero, without failing the session start if the command fails."
+  non_functional_requirements:
+  - "NEVER THE REAL DATABASE (CLAUDE.md, the 2026-09-27 TRUNCATE incident): the name pattern is the only selector, it cannot match the supply database, and criterion 3's test proves a database not named by the suite is never touched."
+  - "TESTS NARROW EVERY DROP TO THEIR OWN NAMES with --prefix, because with a zero threshold the command would otherwise drop any idle suite database on the server, including a concurrent session's."
+  - "PRIVILEGE: pg_stat_file needs a superuser or the pg_read_server_files role. The sandbox role is a superuser; on a least-privilege role the listing fails loudly (criterion 8) and the hook stays quiet, so the tidy simply does not happen there rather than doing something wrong."
+  - "OUT OF REACH OF A REAL DEPLOYMENT: it reads MOTHMAN_TEST_DSN only and touches only test-suite names, so it has nothing to act on in an environment with no test server."
+  dependencies: []
+  # ON THE FLIP TO built (main session, after sign-off): uncomment these two
+  # fields as they stand - the validator refuses them on a not_started
+  # requirement - and add signed_off and evidence from a fresh run.
+  # linked_tests:
+  # - tests/test_tidy_test_databases.py::test_an_old_unused_test_database_is_dropped
+  # - tests/test_tidy_test_databases.py::test_a_young_test_database_is_kept
+  # - tests/test_tidy_test_databases.py::test_a_database_somebody_is_connected_to_is_kept
+  # - tests/test_tidy_test_databases.py::test_a_database_not_named_by_the_suite_is_never_touched
+  # - tests/test_tidy_test_databases.py::test_dry_run_drops_nothing
+  # implemented_by:
+  # - cli/env.py::leftover_test_databases
+  # - cli/env.py::tidy_test_databases_command
+  # - .claude/hooks/session-start.sh
+  open_questions:
+  - "COVERAGE GAPS AGAINST THESE CRITERIA (changes what the flip claims, not the code). Scenario: the five tests cover criteria 3, 4 (age and connection), 6 and the drop itself; nothing tests criterion 2 (no MOTHMAN_TEST_DSN), criterion 5 (--prefix as a filter in its own right, though every test uses it), criterion 7's kept-on-a-late-connection path, criterion 8, or the hook (criterion 9). RECOMMENDATION: add tests for criteria 2, 7 and 8 before the flip (small, under the minor-fix rule), and record criterion 9 as verified by reading the hook rather than a test, since the hook is a shell script run at session start. Alternative: flip with those criteria listed in unmet_criteria."
+  decisions:
+  - "PLAIN DROP DATABASE, NEVER WITH (FORCE): a connection that arrived after the listing means somebody is using that database after all, and the drop should fail rather than kill their session. This is the opposite of tests/conftest.py's own session-start drop, which FORCEs because it is dropping its OWN worker's database, and was the cause of the 2026-10-05 incident where a critic's run and the builder's gate killed each other's databases."
+  - "SKIP ANY DATABASE WITH A CONNECTION, WHATEVER ITS AGE: a long-running session or a person inspecting a leftover database after a failed run is exactly what the suite leaves them for; age alone cannot tell that from abandonment."
+  - "AGE FROM THE PG_VERSION FILE, NOT FROM A CATALOGUE COLUMN: PostgreSQL records no creation time for a database, and PG_VERSION is written once when the database is created and never again. A test session recreates its databases when it starts, so a live session's are always younger than any sensible threshold. REJECTED the age of the newest activity, which a database left idle for inspection does not have."
+  - "THE NAME PATTERN IS THE WHOLE SELECTOR, ANCHORED AND CHARACTER-CLASSED: it also makes the double-quoted name in the DROP statement safe, since nothing outside [A-Za-z0-9_] can reach it."
+  - "RUN FROM THE SESSION-START HOOK, QUIET UNLESS IT DID SOMETHING: Keith asked for it to happen automatically; a failure there must not stop a session starting, so it is reported only by its absence."
+  - "TWELVE HOURS BY DEFAULT: longer than any gate run measured on this sandbox (the longest, ~56 minutes) by a wide margin, short enough that a day's leftovers go by the next morning."

@@ -1,0 +1,6 @@
+# Geocoding dashboard UX review (2026-10-29)
+Q1: v1 nothing on Client Register page; name one word from theirs; sample panel says 'Example failing rows (primary key only)' / 'Rows flagged' (template ~9917/9959/9947) - wrong for absent pairs; share check must not be labelled 'Invalid values' (dashboard_check_labels MEASURES:246); attribution (geocoder vs source).
+Q2: census note - 'Census years' .sla-tile in .sla-strip, sub-line only after a change, follows asof; unexpected-year sample adds '(in force from 2026-Q3)'.
+Q3: match_level - existing column value bars via StatsSpec.value_counts (needed by drift anyway), not histogram; share check on match_level column.
+Criteria: DASH-299 c1 (attach to census_year, dimensions/order, own MEASURES labels; share 'Rows not geocoded'), c2 (sample heading from measure phrase, escHtml composite keys), new c2a, c6 tile, new c9 source-dataset link tile, c10 value bars, c11 e2e; QAC-297 c7 unit/direction, c9 value_counts, c12 failure_indicates causes; QAC-300 c6 changelog reassure; QAC-340 OQ.
+KEITH Qs: G1 geocoding coverage counts against source supply (a no, info line / b yes like linkage); G2 v1 quiet link on Client Register page to its Geocodes (a yes / b wait for 340); G3 match_level distribution (a value bars REC / b histogram / c both); G4 census years tile (a always-present tile REC / b panels only).

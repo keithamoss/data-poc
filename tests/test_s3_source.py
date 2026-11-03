@@ -3,6 +3,8 @@ why this is mocked-boto3-client only (no real AWS access in this
 sandbox), same pattern tests/test_results_s3_sink.py already
 established."""
 from __future__ import annotations
+
+import pytest
 from unittest.mock import MagicMock
 
 from qa_tools.common.s3_source import (
@@ -90,3 +92,8 @@ def test_functions_build_a_real_boto3_client_when_none_is_passed(tmp_path, monke
 
     assert list_keys("my-bucket", "bdm/") == []
     fake_boto3.client.assert_called_once_with("s3")
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

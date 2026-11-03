@@ -1,0 +1,851 @@
+# DRAFT v2 - the asset split, one baseline calendar per asset, the global
+# period control and two test datasets (plans/running-thoughts.md #131, #55,
+# #109). delivery-scoper, 2026-10-31 (Perth). A PROPOSAL for sign-off, not a
+# settled requirement. Nothing here is built until Keith has signed it.
+#
+# WHAT v2 IS: v1 (docs/drafts/asset-split-v1.yaml) with Keith's answers of
+# 2026-10-31 (docs/drafts/asset-split-answers.md), the architect review's four
+# BLOCKING findings and every SHOULD and NIT, and the dashboard UX review's
+# MUST 1-4 and every SHOULD and NIT folded in. UX MUST 5 (the landing page's
+# old-link redirect) is dropped with the landing page itself.
+#
+# SEQUENCING (Keith, 2026-10-31): geocoding's contract changes land FIRST
+# (architect Q4 (a)); then the split's move commit, which carries them with
+# everything else; then the test datasets; then the period control
+# (REQ-DASH-355, 356, 367).
+#
+# IDS: REQ-*-342 to REQ-*-358 as in v1, plus 363 to 367 for v1's REQ-PIPE-342
+# split (architect NIT) and two new pieces of work (the base-commit move map,
+# the composition table folded into the agency page). 359-362 are the
+# Pass/Warn/Fail draft's (docs/drafts/pass-warn-fail-v1.yaml).
+#
+# STATUS WORDS: every new displayed status word here is in that draft's
+# vocabulary - 'Pass', 'Warn', 'Fail' as labels, 'passing', 'warning',
+# 'failing' in prose (REQ-DASH-359 criterion 3) - and the dashboard
+# requirements below depend on it. Stored values (green, amber, red) are
+# unchanged by that draft.
+#
+# CHANGES TO SIGNED TEXT are listed in full, CURRENT and PROPOSED, on
+# REQ-DOCS-358's decisions (A1 to A36), each signed on its own (Keith Q4 (a)).
+# Path-only edits go under one blanket rule signed once, applied by one sweep.
+requirements:
+  - id: REQ-PIPE-342
+    title: "One repository holds a configuration folder per data asset, and one call-time resolver is the only way any reader finds an asset's configuration"
+    date_written: "2026-10-31"
+    story: "As whoever maintains the pipeline, I want each data asset's configuration in a folder of its own inside this one repository, found by one resolver every reader goes through, so that the quarterly and daily assets can be configured separately - as two teams in two environments will - without a second copy of the code."
+    moscow: must
+    status: not_started
+    source: "Keith, plans/running-thoughts.md #131 (2026-10-31 morning: the split, repository shape (a)) and #55. Drafted by delivery-scoper 2026-10-31; v2 the same day, split after the architect review (with REQ-PIPE-363, REQ-PIPE-364, REQ-PIPE-365). A PROPOSAL, not signed."
+    acceptance_criteria:
+      - "THE SYSTEM SHALL hold each data asset's configuration in a folder named for its data_asset_id - contract/quarterly/ and contract/daily/ (PROPOSED) - each holding that asset's data-asset.yaml, calendar.yaml, presentation.yaml, people.yaml, scripted_decisions.yaml and file-checks.yaml, and its agencies' folders below it as REQ-QAC-241 lays them out today."
+      - "THE SYSTEM SHALL keep at the top of contract/ only configuration that is the same for every asset - environments.yaml and the move map of REQ-TEST-366 (PROPOSED)."
+      - "THE SYSTEM SHALL place Child Protection and Family Support's Child Protection collection and Department of Health's Emergency Department and Linkage Products collections (geocoding's datasets included) in the quarterly asset, and Registry Services' Civil Registration collection in the daily asset, moving each file without changing its content except where another criterion of this batch says so."
+      - "THE SYSTEM SHALL let one agency appear in both assets, each asset holding its own folder for it, as Department of Health will once REQ-QAC-350 adds Mental Health to the daily asset."
+      - "THE SYSTEM SHALL discover the asset folders from contract/ itself, and SHALL NOT hold a list of assets, or name an asset, anywhere in code."
+      - "THE SYSTEM SHALL find every asset-wide file through one resolver, grown from qa_tools/common/hierarchy.py's DATA_ASSET_YAML and validate_schedule.Source, which SHALL resolve the selected asset's folder at CALL TIME, replacing every module-level path constant that names an asset-wide file today (about 12, among them hierarchy.DATA_ASSET_YAML, validate_schedule.DATA_ASSET_YAML and asset_time.DATA_ASSET_YAML)."
+      - "THE SYSTEM SHALL let a test point the resolver at an asset folder through one fixture, and SHALL remove the monkeypatching of the retired path constants (about 27 test files today) in the same change."
+      - "THE SYSTEM SHALL NOT let any reader that runs for a selected asset open another asset's folder."
+      - "WHEN the move is made, THE SYSTEM SHALL update .github/CODEOWNERS's paths (lines 12-14 today) in the same commit."
+    non_functional_requirements:
+      - "CONFIGURATION, NOT STATE: an asset folder holds only authored configuration."
+      - "NOTHING CODED FOR ONE ASSET: as nothing is coded for one collection (CLAUDE.md), no code names 'quarterly' or 'daily'; a third asset folder - project extractions, later - is picked up by discovery or refused by a gate, never silently ignored."
+      - "MAINTAINABILITY: about 137 Python files (tests included) name an asset-wide file today; one call-time resolver means the next change of layout - #55's (b) or (c) - is one function rather than another sweep, and no import-time default can capture the wrong asset before a test selects one."
+      - "SCALE: nothing assumes two assets or a fixed number of collections in either."
+    dependencies:
+      - REQ-PIPE-240
+      - REQ-QAC-241
+      - REQ-QAC-294
+    decisions:
+      - "ONE REPOSITORY, A CONFIGURATION FOLDER PER ASSET, FOR THE PoC (Keith, 2026-10-31, #55 option (a)). FLAGGED AS A FUTURE DECISION POINT, in his words 'once this needs to migrate out of PoC stage': (b) a repository per asset, or (c) shared code and checks with each asset's configuration injected at deploy time. Sample datasets, project extractions and ad hoc QA are not part of this decision."
+      - "SPLIT THE PoC INTO TWO FAKE ASSETS, quarterly and daily (Keith, 2026-10-31): 'the thing we've been putting off for a while ... splitting this to have two different fake data assets'. It is what CLAUDE.md's scale target already describes - two assets, each with its own team, environment, deployment and dashboard."
+      - "THE FOLDER IS NAMED FOR THE data_asset_id (delivery-scoper, following Keith's Q2 (b), meaningful ids): one name per asset, not a folder name and a separate id."
+      - "ONE AGENCY MAY BE IN BOTH ASSETS (Keith's Q3 answer puts Mental Health under Department of Health on the daily asset): the first agency spanning two assets, as a real agency supplying both would. Each asset holds its own department-of-health folder; REQ-PIPE-364 criterion 4 keeps the two agreeing."
+      - "GEOCODING'S CONTRACT CHANGES LAND BEFORE THE MOVE (Keith, 2026-10-31, architect Q4 (a)): the move commit carries them with everything else. REJECTED holding contract/ while the move is in flight."
+      - "environments.yaml STAYS SHARED (delivery-scoper): its production entry already says 'a second asset is a second deployment of this same configuration, not another entry here'. people.yaml GOES PER ASSET: a team's people are a fact about that team, and a correction's approver must be one of the asset's own people."
+      - "THE dbt PROJECT STAYS ONE PROJECT, FOLDERS BY COLLECTION (delivery-scoper): dbt_project/models/<collection-id>/ already separates collections and an asset's runs select only its own. REJECTED a dbt project per asset, which duplicates macros, tests/generic and profiles for no isolation a selector does not already give. It is the one piece of check configuration not in the asset's folder."
+      - "CALL-TIME RESOLUTION (architect SHOULD): several path constants are import-time defaults, so a module imported before a test selects its asset would keep the wrong folder. REJECTED keeping the constants and pointing them per asset, which is the same capture with more steps."
+      - "v1's CRITERIA 5-13 MOVED: selecting the asset and the CLI to REQ-PIPE-363, the gates to REQ-PIPE-364, per-asset state to REQ-PIPE-365 (architect NIT: v1's REQ-PIPE-342 was extra-large)."
+    open_questions: []
+
+  - id: REQ-PIPE-363
+    title: "A command is told which asset it acts for by MOTHMAN_ASSET, with no default; only that asset's commands exist, and check and --help work with none set"
+    date_written: "2026-10-31"
+    story: "As whoever runs either asset, I want every command told which asset it is for, and to see only that asset's commands, so that a command can never quietly act for the other team's asset."
+    moscow: must
+    status: not_started
+    source: "Keith, plans/running-thoughts.md #131 and #55; architect review BLOCKING 4; Keith's answer to architect Q3 (b), 2026-10-31. Split out of v1's REQ-PIPE-342 by delivery-scoper, 2026-10-31. A PROPOSAL, not signed."
+    acceptance_criteria:
+      - "THE SYSTEM SHALL take the asset a command acts for from MOTHMAN_ASSET, naming an asset folder, beside MOTHMAN_ENVIRONMENT and MOTHMAN_SUPPLY_DSN (PROPOSED, on REQ-PIPE-091's precedent)."
+      - "WHEN mothman starts, THE SYSTEM SHALL build the command groups of the selected asset's collections only, and SHALL build none and read no asset configuration WHILE MOTHMAN_ASSET is unset."
+      - "IF a command names a collection the selected asset does not hold - `mothman bdm ...` under the quarterly asset, for example - THEN THE SYSTEM SHALL answer as for any unknown command, 'No such command', and SHALL list the selected asset's own collection commands beneath it, reading nothing of any other asset."
+      - "WHILE MOTHMAN_ASSET is unset, THE SYSTEM SHALL run `mothman check`, `mothman --help` and every command that reads no asset configuration and opens no connection, and `mothman --help` SHALL say in one line that collection commands appear once MOTHMAN_ASSET names one of the asset folders, listing the folder names found."
+      - "IF a command that reads asset configuration or opens a connection runs WHILE MOTHMAN_ASSET is unset or names no asset folder, THEN THE SYSTEM SHALL refuse before reading any asset configuration or opening any connection, naming the variable and every asset folder found, and SHALL NOT fall back to a default, a last-used value or the only asset present."
+      - "THE SYSTEM SHALL let each test select its asset explicitly through REQ-PIPE-342 criterion 7's fixture, and SHALL NOT let a test's outcome depend on an ambient MOTHMAN_ASSET."
+      - "THE SYSTEM SHALL have tests, seen failing first, of `mothman --help` and `mothman check` with MOTHMAN_ASSET unset, of `mothman bdm` under the quarterly asset answering 'No such command', and of an asset-reading command refused with the variable unset and with it naming no folder."
+    non_functional_requirements:
+      - "SECURITY: a command that does not exist cannot be run against the wrong asset; nothing reads another asset's configuration, not even its ids (Keith, architect Q3)."
+      - "PORTABILITY: a fresh clone with MOTHMAN_ASSET unset can still run `mothman check` in full (REQ-PIPE-092 criterion 9)."
+      - "USABILITY: 'No such command' is followed by what the reader CAN run, so the plain answer still points somewhere."
+    dependencies:
+      - REQ-PIPE-342
+      - REQ-PIPE-091
+      - REQ-PIPE-093
+    decisions:
+      - "THE ASSET IS NAMED BY AN ENVIRONMENT VARIABLE, AS THE ENVIRONMENT IS (delivery-scoper, following REQ-PIPE-091's decision for MOTHMAN_ENVIRONMENT, Keith 2026-10-04 option A). REJECTED a mandatory --asset flag, for the reason REQ-PIPE-091 rejected --env: a flag cannot move the DSN. REJECTED one DSN variable per asset, as REQ-PIPE-091 rejected one per environment; a machine working both assets switches two variables together, and REQ-PIPE-343's guard catches a mismatched pair."
+      - "THE WRONG ASSET'S COMMANDS SIMPLY DO NOT EXIST (Keith, 2026-10-31, architect Q3 (b)): 'mothman bdm' under the quarterly asset gets 'No such command'. REJECTED (a), a repository-wide identifiers-only read so the refusal could name the right asset. This removes v1's criterion naming the other asset."
+      - "GROUPS BUILT ONLY FOR THE SELECTED ASSET (architect BLOCKING 4): cli/app.py builds every collection's group at import by reading the hierarchy, which clashed with refusing before any read and with check and --help needing no asset."
+    open_questions: []
+
+  - id: REQ-PIPE-364
+    title: "mothman check runs every configuration gate once per asset folder, needing no asset and no database, and refuses an identifier two assets' shared code would collide on"
+    date_written: "2026-10-31"
+    story: "As whoever maintains both assets' configuration, I want one `mothman check` to validate every asset folder, each on its own terms, so that a change to either asset is checked before it is pushed without anyone having to select an asset first."
+    moscow: must
+    status: not_started
+    source: "Keith, plans/running-thoughts.md #131; architect review SHOULD (reuse check_id.py's asset segment). Split out of v1's REQ-PIPE-342 by delivery-scoper, 2026-10-31. A PROPOSAL, not signed."
+    acceptance_criteria:
+      - "WHEN `mothman check` runs, THE SYSTEM SHALL run every configuration gate - registry, collections, hierarchy, schedule, check-source, check-id, dbt-folder, patterns, check-lifecycle, agreement-freeze, people and presentation - once for each asset folder, each pass reading that folder alone, needing no MOTHMAN_ASSET and no database, and SHALL name the asset in every failure it reports."
+      - "THE SYSTEM SHALL enforce each check id's asset segment through qa_tools/common/check_id.py's existing check, run for each asset folder against that asset's data_asset_id, and SHALL NOT add a second one."
+      - "THE SYSTEM SHALL keep collection ids, collection shorts, run prefixes, dataset ids and table names unique across the whole repository, because adapters, providers, dbt folders and command groups are shared code keyed by them; and `mothman check` SHALL fail on a duplicate, naming both assets (PROVISIONAL on open question Q4)."
+      - "WHERE an agency appears in more than one asset, `mothman check` SHALL fail unless every asset gives it the same id, name and short (PROVISIONAL on open question Q4)."
+      - "IF a check's reads_tables, or a dataset's linked_datasets, names a table or dataset its own asset's hierarchy does not hold, THEN `mothman check` SHALL fail, naming the declaring dataset, the item and the asset folder checked, and SHALL NOT look the item up in another asset."
+      - "IF a file other than environments.yaml or REQ-TEST-366's move map sits at the top of contract/, THEN `mothman check` SHALL fail, naming it."
+      - "THE SYSTEM SHALL have tests, seen failing first, of each refusal above, each against a fixture repository holding two asset folders."
+    non_functional_requirements:
+      - "SCALE: the gates loop over asset folders and over collections within each; nothing assumes two of either."
+      - "PERFORMANCE: about twice today's configuration-gate time with two folders, inside `mothman check --no-pytest`'s ~45s budget."
+      - "PORTABILITY: no database and no asset needed (REQ-PIPE-092 criterion 9)."
+    dependencies:
+      - REQ-PIPE-342
+      - REQ-PIPE-363
+      - REQ-QAC-344
+    decisions:
+      - "IDENTIFIERS UNIQUE ACROSS THE REPOSITORY, NOT PER ASSET (delivery-scoper): two assets reusing a collection id would collide in shared code even though their databases never meet. Under #55's (b) or (c) this may relax; it is part of that future decision. Agency ids are exempt, because one agency in two assets is the same agency (criterion 4)."
+      - "THE REPOSITORY GATE IS THE ONE THING THAT OPENS EVERY FOLDER (delivery-scoper, PROPOSED; Q4): it runs with no asset selected and ships nothing; every command run FOR an asset still reads only that asset (REQ-PIPE-342 criterion 8). Criteria 3 and 4 compare ids across folders; nothing else does."
+      - "A CROSS-ASSET READ IS A CONFIGURATION ERROR, AND ITS REFUSAL DOES NOT NAME THE OTHER ASSET (Keith, architect Q3): criterion 5. Today Birth Registrations is kept out of linkage by the calendar rule (REQ-QAC-330 criterion 6); after the split, by the asset boundary, which is the honest reason."
+    open_questions:
+      - "Q4 (Keith to confirm; recommendation (a)) - YOUR ANSWER TO ARCHITECT Q3 SAID NOTHING READS ANOTHER ASSET'S CONFIGURATION, 'NOT EVEN ITS IDS'. Criteria 3 and 4 need the repository gate to compare ids across folders. (a) RECOMMENDED: the gate does so - it is the repository's own check, run with no asset, shipping nothing - and every command run for an asset stays strict. (b) No comparison at all: shared code is namespaced by asset (qa_tools/collections/<asset>/<id>.py, generator/collections/<asset>/, dbt_project/models/<asset>/<id>/) so a repeated id cannot collide - a larger move touching every adapter, provider and dbt folder, and Department of Health's two folders could disagree unseen."
+
+  - id: REQ-PIPE-365
+    title: "Each asset's generated state - deliveries, receipts, bookkeeping, scenario placements, results files, checkpoints and the replay cache key - lives under that asset's own name"
+    date_written: "2026-10-31"
+    story: "As whoever runs both assets on one machine, I want each asset's generated files kept apart, so that bootstrapping or resetting one never reads, overwrites or replays the other's."
+    moscow: must
+    status: not_started
+    source: "Keith, plans/running-thoughts.md #131; architect review SHOULD (scenario_placements.json, checkpoints, cache_key, rebuild-results/build-data). Split out of v1's REQ-PIPE-342 by delivery-scoper, 2026-10-31. A PROPOSAL, not signed."
+    acceptance_criteria:
+      - "THE SYSTEM SHALL keep each asset's deliveries, receipts, generator bookkeeping and scenario placements under data/<asset>/ (deliveries/, receipts/, generator_bookkeeping.json, scenario_placements.json) and its results and dashboard data files under reports/<asset>/, all gitignored."
+      - "THE SYSTEM SHALL keep `mothman env reset-synthetic`, checkpoints and resume per asset, each reading and writing the selected asset's checkpoints only, and each refusing an asset not declared synthetic."
+      - "THE SYSTEM SHALL key qa_tools/common/replay_inputs.py's cache_key() and `mothman pipeline cache-key` on the selected asset: the shared inputs, that asset's folder and the repository-wide files of REQ-PIPE-342 criterion 2, never the other asset's folder."
+      - "THE SYSTEM SHALL run `mothman dashboard rebuild-results` and `mothman dashboard build-data` for the selected asset only, reading its database and writing under reports/<asset>/."
+      - "THE SYSTEM SHALL NOT let a command run for one asset read or write anything under the other asset's data/ or reports/ folder, shown by a test that runs each command above for one asset beside a populated folder of the other and compares that folder byte for byte before and after."
+    non_functional_requirements:
+      - "CONFIGURATION, NOT STATE: everything here stays gitignored state (CLAUDE.md)."
+      - "RELIABILITY: one asset's reset or failed bootstrap leaves the other's files untouched (criterion 5)."
+      - "PORTABILITY: the test asserts on folders whether or not they exist beforehand (CLAUDE.md: a fresh clone has no data/)."
+    dependencies:
+      - REQ-PIPE-342
+      - REQ-PIPE-363
+      - REQ-TEST-117
+    decisions:
+      - "STATE FOLLOWS THE ASSET (delivery-scoper): the four data/ paths test.yml caches (lines 410-414 today) and every reports/ file become per asset; scenario_placements.json was missing from v1 (architect SHOULD)."
+    open_questions: []
+
+  - id: REQ-PIPE-343
+    title: "Each asset's database carries that asset's own identity, and a checkout refuses a database belonging to the other asset on every route"
+    date_written: "2026-10-31"
+    story: "As whoever runs either asset, I want a command configured for one asset to refuse the other asset's database before it does anything, so that two teams sharing one repository can never write to each other's history by a mistyped variable."
+    moscow: must
+    status: not_started
+    source: "Keith, plans/running-thoughts.md #131 and #55 (REQ-PIPE-107 named as load-bearing for shared configuration); Keith's answer to architect Q2 (a), 2026-10-31. Drafted by delivery-scoper 2026-10-31, v2 the same day. A PROPOSAL, not signed."
+    acceptance_criteria:
+      - "THE SYSTEM SHALL record in each asset's database the selected asset's data_asset_id, through REQ-PIPE-107's one marking command, which SHALL require the person to type both the asset's data_asset_id and the environment id."
+      - "WHEN a connection is opened, THE SYSTEM SHALL compare the database's recorded data_asset_id with the selected asset's, as REQ-PIPE-107 criterion 5 does today, so that a quarterly checkout pointed at the daily database is refused before any statement runs."
+      - "IF the two differ, THEN THE SYSTEM SHALL refuse, naming the data_asset_id the database carries and the one expected, as REQ-PIPE-107 criterion 6 does, and SHALL NOT include any part of the connection string."
+      - "THE SYSTEM SHALL mark, in the same change, each asset's sandbox database in the session-start hook, each asset's CI database in test.yml, each asset's dev-container database in .devcontainer/post-create.sh, and each test worker's database for the asset its fixture selects."
+      - "THE SYSTEM SHALL NOT open connections to two assets' databases from one process, in anything that ships; a step that needs both - CI's two bootstraps - SHALL run as one process per asset, each with its own MOTHMAN_ASSET and MOTHMAN_SUPPLY_DSN."
+      - "WHERE the process is the test suite, THE SYSTEM SHALL exempt it from criterion 5, and SHALL have each individual test open only one asset's database."
+      - "THE SYSTEM SHALL name each asset's database on the sandbox's, CI's and the dev container's one local server supply_<data_asset_id> (PROPOSED), so that the deployment fixture finds each asset's database by that name; nothing that ships SHALL rely on the name."
+      - "THE SYSTEM SHALL have a test, seen failing first, that points a checkout configured for each asset at the other asset's marked database and asserts the refusal on every route REQ-PIPE-107 criterion 10 names - mothman, a test worker's database, and the connection details handed to dbt, Soda Core and datacontract-cli - with the database left exactly as it was found."
+    non_functional_requirements:
+      - "SECURITY: the guard is what makes one shared repository safe for two separately managed assets (#55); it must hold on every route, so criterion 8 tests each."
+      - "SECURITY: no credential and no connection-string fragment in any refusal (REQ-PIPE-093 criterion 3)."
+      - "PRIVACY AT REAL SCALE: in a real deployment the two databases sit in separately managed cloud environments, and a refusal is the last line behind network separation, not the only one."
+      - "TODAY'S DATABASE IS REFUSED BY BOTH: it carries data-asset-1, which neither asset declares, so it cannot be used by accident after the split; REQ-TEST-357 regenerates rather than migrates."
+    dependencies:
+      - REQ-PIPE-342
+      - REQ-PIPE-363
+      - REQ-PIPE-107
+      - REQ-QAC-344
+    decisions:
+      - "TWO ASSETS NEED TWO data_asset_ids FOR THE GUARD TO WORK AT ALL (delivery-scoper, from qa_tools/common/db_identity.py): REQ-PIPE-107 compares data_asset_id and environment."
+      - "ONE PROCESS PER ASSET FOR EVERYTHING THAT SHIPS; PYTEST EXEMPT, EACH TEST ONE ASSET (Keith, 2026-10-31, architect Q2 (a)). CI keeps one deployment job. REJECTED (b), the deployment half run once per asset. REJECTED one bootstrap process holding both DSNs, which puts both assets' credentials in one process."
+      - "THE REFUSAL NAMES IDS FROM THE DATABASE, NOT ANOTHER FOLDER (Keith, architect Q3): v1's criterion naming the other asset's folder needed a cross-asset read; REQ-PIPE-107's existing found-and-expected message needs none."
+      - "ONE NAMING CONVENTION FOR LOCAL DATABASES (delivery-scoper, PROPOSED): criterion 7 lets one pytest session reach both assets' databases without a second DSN variable or a variable named for an asset."
+    open_questions: []
+
+  - id: REQ-QAC-344
+    title: "Both assets' check ids carry their own meaningful data_asset_id - quarterly and daily - renamed once under a narrow, signed, self-expiring exception"
+    date_written: "2026-10-31"
+    story: "As whoever maintains the checks, I want every check id to name the asset it belongs to by a meaningful name, so that two assets sharing one repository never have two checks with one id, and an id says which asset it is from at a glance."
+    moscow: must
+    status: not_started
+    source: "Keith, plans/running-thoughts.md #131; Keith's answer to draft Q2 (b), 2026-10-31; architect review BLOCKING 3. Drafted by delivery-scoper 2026-10-31, v2 the same day. A PROPOSAL, not signed."
+    acceptance_criteria:
+      - "THE SYSTEM SHALL declare data_asset_id 'quarterly' in the quarterly asset's data-asset.yaml and 'daily' in the daily asset's (PROPOSED exact ids, for confirmation at sign-off), replacing data-asset-1."
+      - "THE SYSTEM SHALL write every check id of an asset's collections - in its contracts, Soda, Evidently and retired-check files and in dbt_project's models and retired files for its collections - with that asset's data_asset_id as the first segment."
+      - "WHERE a check id is renamed by criterion 2, THE SYSTEM SHALL change nothing else about the check: its config_hash SHALL be unchanged, shown by comparing every renamed check's hash before and after, as REQ-QAC-039's rename was measured."
+      - "THE SYSTEM SHALL excuse the rename in find_disappeared_check_ids through one narrow transform beside migrate_pre_039_check_id: an id whose first segment is the former data_asset_id REQ-TEST-366's move map declares SHALL be read with that segment replaced by the data_asset_id of the asset folder its file moved to, and SHALL be excused only where the result is present in the new files."
+      - "THE SYSTEM SHALL take the former data_asset_id from the move map, and SHALL NOT write it in code."
+      - "THE SYSTEM SHALL let the transform apply only to a base commit that predates the move, so that it is inert once no base does: the asset-segment check (REQ-PIPE-364 criterion 2) refuses the former id in any current file."
+      - "THE SYSTEM SHALL have tests, seen failing first, that the move's renamed ids pass the check-lifecycle gate against a pre-move base, that an id renamed in any other way still fails as disappeared, and that a renamed id whose config_hash also changed fails."
+      - "THE SYSTEM SHALL record the rename as one narrow exception to the rule that a check id never changes, approved by Keith in the change that applies it and licensing this rename only, as REQ-QAC-039's decisions record the 2026-09-22 one."
+    non_functional_requirements:
+      - "AUDITABILITY: history is regenerated rather than migrated (REQ-TEST-357), so no recorded result carries an id that no longer exists; the exception is recorded here."
+      - "MAINTAINABILITY: about 390 ids and up to 86 test files change once; the transform is the only code the rename leaves behind, and it is inert after the move."
+    dependencies:
+      - REQ-PIPE-342
+      - REQ-QAC-039
+      - REQ-TEST-366
+    decisions:
+      - "MEANINGFUL IDS FOR BOTH ASSETS (Keith, 2026-10-31, draft Q2 (b)): every check id in both assets changes. REJECTED (a), keeping data-asset-1 for the quarterly asset and renaming only Birth Registrations to data-asset-2. Keeping data-asset-1 for both was never offered: the guard (REQ-PIPE-343) could not tell the databases apart."
+      - "THE SEGMENT STAYS (delivery-scoper, from check_id.py and Keith 2026-09-22): this is exactly the case it was kept for - 'the cost of that only appears when a second asset arrives'."
+      - "A NARROW, SELF-EXPIRING TRANSFORM (architect BLOCKING 3): find_disappeared_check_ids excuses only REQ-QAC-039's transform today, so once the base-commit reads follow the move (REQ-TEST-366) every renamed id would fail as disappeared. REJECTED waiving the gate for the move commit, which would also let a real deletion through."
+      - "THE DASHBOARD URL STILL CARRIES NO ASSET SEGMENT (REQ-QAC-039 criterion 6, kept): each asset has its own site (REQ-PIPE-354)."
+    open_questions: []
+
+  - id: REQ-TEST-366
+    title: "One committed move map, from each old path to its new one, is followed by every read of a base commit, for any push whose base predates the move"
+    date_written: "2026-10-31"
+    story: "As Keith, I want the freeze and lifecycle gates to see a moved file as the same file, so that the move commit cannot carry a frozen or check change through unseen just because the file has a new path."
+    moscow: must
+    status: not_started
+    source: "Architect review BLOCKING 2, 2026-10-31, widening v1's REQ-TEST-357 criterion 5. Drafted by delivery-scoper 2026-10-31. A PROPOSAL, not signed."
+    acceptance_criteria:
+      - "THE SYSTEM SHALL commit, at the top of contract/, one move map (PROPOSED: contract/asset-split-move.yaml) listing every configuration file the split moves or divides, from its old path to its new path or paths, and the former data_asset_id."
+      - "WHEN a gate reads a file at a base commit and the file's current path does not exist there, THE SYSTEM SHALL read the old path the move map gives for it, in every reader of a base commit: validate_check_lifecycle._sources(ref), the amber-setting and replacement-setting freeze in validate_schedule (lines 993-996 today), the people file read at the base (PEOPLE_REL), _version_added_on, and correction_trial's base reads (lines 623 and 651-653 today)."
+      - "WHERE a file was divided between assets, THE SYSTEM SHALL compare each part with the matching part of the old file, so that a frozen item or a check's config changed in the move fails as it would have in place."
+      - "THE SYSTEM SHALL have _version_added_on follow the move map when walking history, so that a check's first version is still found before the move."
+      - "THE SYSTEM SHALL hold for any push whose base predates the move, however many commits later, and SHALL be inert for a base that already has the new paths."
+      - "THE SYSTEM SHALL have a test, seen failing first, for each reader in criterion 2: against a temporary repository whose base has the old layout and whose head has the new, a frozen item or a check's config changed in the move fails, and the same move with no change passes."
+    non_functional_requirements:
+      - "RELIABILITY: the freeze gates exempt a file brand new at its path (validate_check_lifecycle.py's docstring; validate_schedule._content_at returns None for a missing path), so without this the move commit bypasses the freeze silently - including any past-date change made in the same commit."
+      - "MAINTAINABILITY: one map, read by one helper every reader calls; inert after the move, like migrate_pre_039_check_id, and removable once no open branch predates the move."
+      - "CONFIGURATION, NOT STATE: the map is authored and reviewed with the move."
+    dependencies:
+      - REQ-PIPE-342
+    decisions:
+      - "ONE MAP FOR EVERY BASE-COMMIT READ (architect BLOCKING 2): v1 fixed only the agreement-freeze and check-lifecycle gates; six readers lose the old file after the move. REJECTED a per-reader fix, which is six chances to miss one."
+      - "INERT RATHER THAN DATED (delivery-scoper, PROPOSED): the map is consulted only when the current path is absent at the base, so it expires by itself and needs no date. REJECTED an expiry date, which a long-lived branch could outlive."
+    open_questions: []
+
+  - id: REQ-PIPE-345
+    title: "Each data asset declares one baseline calendar; no collection or dataset names a calendar or dates of its own, and a gate refuses anything faster than the baseline"
+    date_written: "2026-10-31"
+    story: "As whoever maintains the delivery agreement, I want each asset to nominate one baseline calendar that every dataset fits around, owing all or some of its periods, so that a period means one thing within an asset and nothing can quietly run on a faster cadence than the asset's releases."
+    moscow: must
+    status: not_started
+    source: "Keith, plans/running-thoughts.md #131 (2026-10-31 morning: one baseline calendar per asset; #109 settled). Drafted by delivery-scoper 2026-10-31, v2 the same day. A PROPOSAL, not signed."
+    acceptance_criteria:
+      - "THE SYSTEM SHALL let an asset's calendar.yaml declare at most one calendar, its baseline - effective-dated and versioned as calendars are today - and SHALL accept none only WHERE every dataset of the asset declares no calendar (REQ-PIPE-110 criterion 36)."
+      - "THE SYSTEM SHALL put every dataset of the asset that does not declare no calendar (REQ-PIPE-106) on the asset's baseline calendar, and SHALL NOT read a calendar named on a collection or a dataset."
+      - "IF an asset's calendar.yaml declares a second calendar, a collection or dataset names a calendar, or a dataset states authored dates of its own, THEN `mothman check` SHALL fail, naming the asset, the item and the file, and saying: a dataset may not be faster than its asset's baseline; a slower one owes a subset of the baseline's periods, stated under participates; to go faster, change the asset's baseline."
+      - "THE SYSTEM SHALL express a dataset slower than the baseline only as participation in a subset of the baseline's periods, under participates in its asset's calendar.yaml, with the reason a list of some periods already needs (REQ-PIPE-110 criterion 8)."
+      - "THE SYSTEM SHALL hold one period schema per baseline period in an asset's database, and SHALL never create a schema for a period not on its asset's baseline calendar."
+      - "THE SYSTEM SHALL NOT name a calendar in shared code: where code needs a dataset's periods it SHALL ask for the asset's baseline, and where it needs to know whether the baseline is a cadence rule or authored dates it SHALL ask the baseline's kind - replacing generator/scenario_injection.py's test that a calendar is named 'daily' (line 1315 today) and generator/collections/child_protection.py's request for the calendar named 'quarterly' (line 736 today)."
+      - "THE SYSTEM SHALL have a gate test, seen failing first, that feeds the schedule validator an asset configuration with a monthly calendar beside a quarterly baseline, a collection naming it, and a dataset with its own authored dates, and asserts each is refused with the message of criterion 3 - proving the refusal by a test, not by a dataset."
+      - "WHEN the configuration is moved into the two asset folders, THE SYSTEM SHALL produce for every dataset exactly the rounds, slots, instants and periods it produces today, compared against tests/fixtures/calendar_move_pin.json round by round and not re-captured."
+    non_functional_requirements:
+      - "SCALE: at about 30 quarterly datasets, roughly 70 percent owing every quarter and the rest once or twice a year, one baseline plus participation is the shape that stays legible; thirty calendars would drift."
+      - "MAINTAINABILITY: removes branches rather than adding one - collection and dataset calendar resolution and per-dataset authored dates go, with their tests (CLAUDE.md test rule 2)."
+      - "PRIVACY AT REAL SCALE: a period schema never again holds Birth Registrations beside Child Protection records - period_schema.py's own docstring calls that co-location the most sensitive artefact the design creates."
+    dependencies:
+      - REQ-PIPE-342
+      - REQ-PIPE-049
+      - REQ-PIPE-110
+      - REQ-PIPE-181
+    decisions:
+      - "ONE BASELINE CALENDAR PER ASSET (Keith, 2026-10-31): 'each data asset needs to have a single baseline calendar'. It makes the period control unambiguous, since a period means one thing within an asset."
+      - "WHAT A PERIOD SCHEMA IS, SETTLED (Keith, 2026-10-31, answering #109; none of the three options put): 'a data asset has to nominate a baseline calendar, whether that's quarterly or monthly or daily. And then everything else has to fit around that.' A period schema is one baseline period, which is one release. REJECTED per-cadence schemas, with or without a release layer on top."
+      - "NOTHING FASTER THAN THE BASELINE (Keith, 2026-10-31): a quarterly asset cannot hold a monthly dataset. SLOWER IS PARTICIPATION IN A SUBSET OF BASELINE PERIODS: owed in two quarters a year, or annually, meaning one quarter a year. TO GO FASTER, CHANGE THE ASSET: change the baseline to monthly and re-express every quarterly dataset as owed only in certain months. Changing an asset's baseline is NOT built here; it is a future requirement."
+      - "THE REFUSAL IS PROVEN BY A GATE TEST, NOT BY A DATASET (Keith, 2026-10-31): criterion 7."
+      - "PER-DATASET AUTHORED DATES ARE RETIRED (delivery-scoper, following Keith's rule): REQ-PIPE-049 criterion 7 and REQ-PIPE-110 criterion 25 let a dataset replace its calendar's dates, a second calendar by another name. No dataset uses it today. REJECTED keeping it constrained to a subset of baseline dates, which is participation stated twice."
+      - "THE PER-COLLECTION CALENDAR CHOICE GOES (Keith, 2026-10-31): REQ-PIPE-110 criteria 10 and 11 and REQ-PIPE-181 criterion 9 have nothing left to choose between. files_go_to_period stays on the collection (REQ-PIPE-320): an offset is not a cadence."
+      - "AN ASSET WITH NO CALENDAR STAYS POSSIBLE (delivery-scoper, from CLAUDE.md's project-extraction shape): 'at most one', with REQ-PIPE-110 criterion 36's empty list kept."
+      - "THE calendar_differs RULE BECOMES UNREACHABLE (delivery-scoper): with every calendared dataset of an asset on one baseline, REQ-PIPE-331 criterion 2's not-applicable branch and REQ-QAC-330 criterion 6's calendar clause can never fire. Amendments A13 and A14 retire them and their tests."
+      - "SHARED CODE NAMING A CALENDAR (architect SHOULD): criterion 6. After the split the calendar names happen to match the asset ids, which is exactly why a name test in shared code must go - it would read as working."
+    open_questions: []
+
+  - id: REQ-PIPE-346
+    title: "A dataset owes a subset of its baseline's periods, named in the baseline's own terms - delivery months on an authored calendar, weekdays on a daily one"
+    date_written: "2026-10-31"
+    story: "As whoever maintains the delivery agreement, I want participates to name which of the baseline's periods a dataset owes in whatever terms that baseline has - months for a quarterly asset, weekdays for a daily one - so that a weekly dataset on the daily asset is stated as plainly as a twice-yearly one on the quarterly asset."
+    moscow: must
+    status: not_started
+    source: "Keith, plans/running-thoughts.md #131 (2026-10-31 morning: a weekly dataset in the daily asset needs NEW participation by weekday). Drafted by delivery-scoper 2026-10-31. A PROPOSAL, not signed."
+    acceptance_criteria:
+      - "THE SYSTEM SHALL read participates as a subset of the baseline calendar's rounds, named in the vocabulary of the baseline calendar version in force on each round's date - the month of the round's calendar date for an authored calendar, and the weekday of the round's calendar date, on the asset's clock, for a daily cadence rule - or as the keyword all."
+      - "THE SYSTEM SHALL accept weekday names in full, case-insensitively, and SHALL NOT accept an abbreviation, a number or a positional index, as month names are accepted today (REQ-PIPE-049 criterion 6)."
+      - "IF participates names months for a round whose calendar version is a daily rule, or weekdays for a round whose calendar version is authored, THEN THE SYSTEM SHALL reject the configuration, naming the dataset, the version and the vocabulary that version takes, checking each participation version against every calendar version it overlaps."
+      - "THE SYSTEM SHALL apply every existing participation rule to weekdays exactly as to months - the reason a list of some needs, the restate rule, inherit and participation_defaults value by value (REQ-PIPE-181), the newly-owed refusal, which SHALL name the rounds newly owed in the version's own vocabulary, and days_before, naming the weekday of the round's calendar date whatever days_before says."
+      - "THE SYSTEM SHALL treat a period a dataset owes nothing in by weekday exactly as one it owes nothing in by month - inherited when the period is born (REQ-PIPE-098), and an arrival in it classified as for any round the dataset does not supply in - with no rule of its own."
+      - "THE SYSTEM SHALL show, in the terminal's Calendar entry and `mothman schedule show --dataset <id> --on <date>` (REQ-PIPE-181 criterion 13, REQ-PIPE-327), the weekdays a dataset supplies on, in the form months are shown."
+      - "THE SYSTEM SHALL have tests, seen failing first, of a weekday list resolved on a daily calendar, each refusal of criterion 3, an abbreviation refused, and a weekly dataset's non-owed days inheriting its newest supply."
+    non_functional_requirements:
+      - "GENERIC, NOT A WEEKLY FEATURE (Keith's no-special-case rule): a subset of the baseline's periods in the baseline's own terms, so a later vocabulary - days of the month on a daily baseline, say - is one more entry in one place, not a new key."
+      - "SCALE ON A DAILY ASSET: a weekly dataset owes nothing on six days of seven, each inherited by a view created when the day's schema is born - about six inheritance views a week per weekly dataset, measured by REQ-PIPE-352's bootstrap figures."
+      - "CONFIGURATION ONLY: resolving participation reads no database (REQ-PIPE-110 criterion 23)."
+    dependencies:
+      - REQ-PIPE-345
+      - REQ-PIPE-110
+      - REQ-PIPE-181
+      - REQ-PIPE-098
+    decisions:
+      - "WEEKDAY PARTICIPATION IS NEW AND NEEDED (Keith, 2026-10-31): participates names months only today, and REQ-PIPE-110 criterion 7 refuses months on a cadence-rule calendar."
+      - "ONE KEY, ITS VOCABULARY SET BY THE BASELINE (delivery-scoper): criterion 1. REJECTED a second key (participates_weekdays), which every reader would have to learn and which two versions could both state."
+      - "THE WEEKDAY OF THE ROUND'S CALENDAR DATE, NOT OF THE DUE INSTANT (delivery-scoper, following REQ-PIPE-110 criterion 5's month rule): with days_before 1, a Monday supply due 22:00 on Sunday is still a Monday round."
+    open_questions: []
+
+  - id: REQ-DASH-347
+    title: "The dashboard words a dataset's participation in its baseline's own terms - 'Weekly (Monday)', 'Weekdays', 'Not owed — it supplies only on Mondays' - wherever it words months today"
+    date_written: "2026-10-31"
+    story: "As a data team leader glancing at the daily asset, I want a weekly dataset's tile and its quiet days to say 'Weekly' and which day, so that six quiet days a week read as expected rather than as something missing."
+    moscow: should
+    status: not_started
+    source: "Keith, plans/running-thoughts.md #131 (2026-10-31 morning: a weekly dataset in the daily asset); dashboard UX review NIT ('Weekdays'). Drafted by delivery-scoper 2026-10-31, v2 the same day. A PROPOSAL, not signed."
+    acceptance_criteria:
+      - "WHERE a dataset participates by weekday, THE SYSTEM SHALL label its cycle on its SLA tile 'Weekly (<weekday>)' for one weekday, 'Weekdays' for Monday to Friday exactly, '<N> days a week (<weekdays>)' for any other two to six, and 'Daily' for all seven, with its delivery time as REQ-DASH-182 criteria 7 and 11 word it (PROPOSED wording)."
+      - "THE SYSTEM SHALL word a participation row for a day a dataset owes nothing in as 'Not owed — it supplies only on <weekdays>', from REQ-DASH-182 criterion 14's one label function, and SHALL show consecutive such days as one run, in days, as REQ-DASH-182 criterion 13 does."
+      - "THE SYSTEM SHALL show the authored reason once, on the SLA tile, as for month participation (REQ-DASH-182 criterion 11)."
+      - "THE SYSTEM SHALL have a tests-js test of each label form of criterion 1, and a real-browser test that first asserts the weekly test dataset is on the page and the day on show is one it owes nothing in, then asserts its row reads neither failing, stale nor 'No data' (REQ-DASH-182 criterion 15's guard, applied to it)."
+    non_functional_requirements:
+      - "SCALE: at about thirty daily-asset datasets, a weekly one's quiet days collapse into runs (criterion 2), so its history stays readable."
+      - "COMPUTED FROM CONFIGURATION AND RECORDED RESULTS ONLY (REQ-DASH-182 criterion 5)."
+      - "ONE VOCABULARY: any status word this requirement shows follows REQ-DASH-359 (Pass / Warn / Fail)."
+    dependencies:
+      - REQ-PIPE-346
+      - REQ-DASH-182
+      - REQ-DASH-359
+    decisions:
+      - "WORDING FOLLOWS REQ-DASH-182 CRITERION 8'S FREQUENCY WORDS (delivery-scoper, PROPOSED), with 'Weekdays' for Monday to Friday (UX NIT) rather than '5 days a week'."
+      - "THE PERIOD VIEW AND THIS ROW AGREE (UX SHOULD, the 356/347 clash): on a not-owed day the composition table's kind is 'Inherited from <Monday>' and its sub-line is this requirement's 'Not owed — it supplies only on Mondays' (REQ-DASH-356 criterion 8). One sentence, two places."
+    open_questions: []
+
+  - id: REQ-QAC-348
+    title: "The quarterly asset gains Department of Health's Cancer collection, one annual dataset owed in the August round through participates as built, with its contract and checks"
+    date_written: "2026-10-31"
+    story: "As Keith designing the period control, I want a real dataset on the quarterly asset that is owed only once a year, so that the period view is designed and seen working against an off-baseline cadence from the start, not retrofitted to one."
+    moscow: should
+    status: not_started
+    source: "Keith, plans/running-thoughts.md #131 (2026-10-31 morning: #109's test datasets replaced, (a)); Keith's answer to draft Q3, 2026-10-31, naming it 'Cancer'. Drafted by delivery-scoper 2026-10-31, v2 the same day. A PROPOSAL, not signed."
+    acceptance_criteria:
+      - "THE SYSTEM SHALL declare in the quarterly asset's hierarchy, under Department of Health, a new collection holding one dataset (PROPOSED for confirmation at sign-off: collection cancer 'Cancer', short can, run prefix can_run_; dataset cancer-notifications 'Cancer Notifications', table cancer_notifications, one file cancer_notifications.csv), with its delivery boundary and an exact arrival pattern."
+      - "THE SYSTEM SHALL declare its participation in the quarterly asset's calendar.yaml as participates [August] with a reason, at files_go_to_period 0, with its expected time and grace on its collection's participation_defaults, owed from the first quarter of Child Protection's synthetic history."
+      - "THE SYSTEM SHALL declare its ODCS contract and its checks in Department of Health's folder (REQ-QAC-241), with at least one active check in each of the four tools on its own rows, each check's description, failure_indicates and technical_note written to docs/check-authoring-rules.md."
+      - "THE SYSTEM SHALL say in its contract's description that it is synthetic, a test dataset made to exercise annual participation, and stands in for no real supply."
+      - "THE SYSTEM SHALL add the collection's QA adapter (qa_tools/collections/cancer.py) as a short adapter on Emergency Department's pattern, naming no other collection."
+      - "WHEN `mothman check` runs, THE SYSTEM SHALL pass every configuration gate with the collection present, with no exemption added for it."
+    non_functional_requirements:
+      - "SYNTHETIC ONLY: no real cancer, patient or diagnosis data; at real scale cancer registrations are among the most sensitive health data an asset could hold, which this stand-in assumes nothing about."
+      - "NOTHING CODED FOR ONE COLLECTION: the registry, adapter, provider and dashboard pick it up by configuration."
+      - "BOOTSTRAP COST: about one supply a year across the quarterly history (about 14, plus resupplies) on the quarterly stream, the critical path; measured by REQ-PIPE-352."
+    dependencies:
+      - REQ-PIPE-342
+      - REQ-PIPE-345
+      - REQ-QAC-241
+      - REQ-PIPE-240
+    decisions:
+      - "AN ANNUAL DATASET IN THE QUARTERLY ASSET, USING participates AS BUILT (Keith, 2026-10-31, (a)). REJECTED #109's monthly dataset, now refused by design (REQ-PIPE-345). Annual rather than twice-yearly because cp-case-workers already participates [February, August]."
+      - "ITS OWN ONE-DATASET COLLECTION WITH ITS OWN PROVIDER, NAMED 'Cancer' (Keith, 2026-10-31, draft Q3 (a)): no existing collection's generated bytes change. REPLACES v1's School Census. REJECTED (b), a new dataset inside an existing collection."
+      - "UNDER DEPARTMENT OF HEALTH, OWED IN AUGUST (PROPOSED for Keith's sign-off, 2026-10-31)."
+    open_questions: []
+
+  - id: REQ-GEN-349
+    title: "The Cancer collection's provider writes one supply a year in its August round, the ordinary severity mix, and scenarios for an arrival in a quarter not owed and an inherited quarter"
+    date_written: "2026-10-31"
+    story: "As Keith planting scenarios, I want the annual dataset's synthetic history to hold ordinary supplies and the awkward cases an annual cadence invites, so that the period view can be seen on a quarter it is owed in and on the three it is not."
+    moscow: should
+    status: not_started
+    source: "Keith, plans/running-thoughts.md #131 (2026-10-31 morning: the replacement test datasets); draft Q3 answer. Drafted by delivery-scoper 2026-10-31, v2 the same day. A PROPOSAL, not signed."
+    acceptance_criteria:
+      - "THE SYSTEM SHALL add a provider for the Cancer collection (generator/collections/cancer.py), importable without pandas or numpy, declaring a seed range disjoint from every other provider's (REQ-GEN-246's gate; PROPOSED [73000, 74000))."
+      - "THE SYSTEM SHALL write one delivery for each round the dataset owes across the quarterly history, received inside its claim window and before its due time, never sharing a receipt instant with another delivery (REQ-GEN-334 criterion 13's refusal applied)."
+      - "THE SYSTEM SHALL draw the ordinary severities from its own seed with the collections' mix - about a quarter warning, at least one failing with a passing resupply five to twenty days later, the oldest supply passing - and SHALL have the real tools confirm every planned verdict (REQ-GEN-186)."
+      - "THE SYSTEM SHALL plant, each as a named scenario in plans/supply-model.md's register: a supply received in a round the dataset owes nothing in; and a quarter it owes nothing in standing on the previous August's supply, to be seen with the period control set to that quarter."
+      - "WHEN its generator runs twice with the same seed and configuration, THE SYSTEM SHALL write byte-identical deliveries and receipts both times, and adding the provider SHALL change no byte any other collection writes (REQ-TEST-239's compare)."
+    non_functional_requirements:
+      - "SYNTHETIC ONLY: names and values from a synthetic pool."
+      - "BOOTSTRAP COST: measured by REQ-PIPE-352."
+    dependencies:
+      - REQ-QAC-348
+      - REQ-GEN-246
+      - REQ-GEN-186
+      - REQ-TEST-239
+    decisions:
+      - "SCENARIOS AS NEEDED, NOT A CATALOGUE (brief): two, each one a period-control reader needs to see."
+    open_questions: []
+
+  - id: REQ-QAC-350
+    title: "The daily asset gains Department of Health's Mental Health collection, one weekly dataset owed on Mondays through weekday participation, with its contract and checks"
+    date_written: "2026-10-31"
+    story: "As Keith designing the period control, I want a real dataset on the daily asset that is owed once a week, so that choosing a day on the daily dashboard shows a dataset that is quiet by agreement on most days."
+    moscow: should
+    status: not_started
+    source: "Keith, plans/running-thoughts.md #131 (2026-10-31 morning: #109's test datasets replaced, (a)); Keith's answer to draft Q3, 2026-10-31, naming it 'Mental Health'. Drafted by delivery-scoper 2026-10-31, v2 the same day. A PROPOSAL, not signed."
+    acceptance_criteria:
+      - "THE SYSTEM SHALL declare in the daily asset's hierarchy, under its own Department of Health folder (REQ-PIPE-342 criterion 4), a new collection holding one dataset (PROPOSED for confirmation at sign-off: collection mental-health 'Mental Health', short mh, run prefix mh_run_; dataset mental-health-contacts 'Service Contacts', table mental_health_contacts, one file mental_health_contacts.csv), with its delivery boundary and an exact arrival pattern."
+      - "THE SYSTEM SHALL declare its participation in the daily asset's calendar.yaml as participates [Monday] with a reason (REQ-PIPE-346), at files_go_to_period 0, with its expected time and grace on its collection's participation_defaults, owed from the first day of Birth Registrations' synthetic history."
+      - "THE SYSTEM SHALL declare its ODCS contract and its checks in the daily asset's Department of Health folder, with at least one active check in each of the four tools on its own rows, each check's prose fields written to docs/check-authoring-rules.md."
+      - "THE SYSTEM SHALL say in its contract's description that it is synthetic, a test dataset made to exercise weekly participation on a daily asset, and stands in for no real supply."
+      - "THE SYSTEM SHALL add the collection's short QA adapter (qa_tools/collections/mental_health.py), naming no other collection."
+      - "WHEN `mothman check` runs, THE SYSTEM SHALL pass every configuration gate with the collection present, with no exemption added for it."
+    non_functional_requirements:
+      - "SYNTHETIC ONLY: no real mental-health or patient data; real mental-health service data is among the most sensitive an asset could hold."
+      - "BOOTSTRAP COST: about 14 supplies and about 83 inherited days over the 97-day daily history; measured by REQ-PIPE-352."
+    dependencies:
+      - REQ-PIPE-342
+      - REQ-PIPE-346
+      - REQ-QAC-241
+      - REQ-PIPE-364
+    decisions:
+      - "A WEEKLY DATASET IN THE DAILY ASSET (Keith, 2026-10-31, (a)), needing new participation by weekday (REQ-PIPE-346)."
+      - "ITS OWN COLLECTION, NAMED 'Mental Health', UNDER DEPARTMENT OF HEALTH (Keith, 2026-10-31, draft Q3 (a); the agency PROPOSED for sign-off). REPLACES v1's Celebrant Register under Registry Services. It puts Department of Health in both assets, the first agency to span two (REQ-PIPE-342 decision 4)."
+    open_questions: []
+
+  - id: REQ-GEN-351
+    title: "The Mental Health collection's provider writes one supply each Monday, the ordinary severity mix, and scenarios for a missed Monday and a supply on a day not owed"
+    date_written: "2026-10-31"
+    story: "As Keith planting scenarios, I want the weekly dataset's history to hold an ordinary run of Mondays and the cases a weekly cadence invites, so that the daily dashboard's period view can be seen on an owed day, a quiet day and a missed one."
+    moscow: should
+    status: not_started
+    source: "Keith, plans/running-thoughts.md #131 (2026-10-31 morning: the replacement test datasets); draft Q3 answer. Drafted by delivery-scoper 2026-10-31, v2 the same day. A PROPOSAL, not signed."
+    acceptance_criteria:
+      - "THE SYSTEM SHALL add a provider for the Mental Health collection (generator/collections/mental_health.py), importable without pandas or numpy, declaring a seed range disjoint from every other provider's (PROPOSED [74000, 75000))."
+      - "THE SYSTEM SHALL write one delivery for each Monday the dataset owes across the daily history, received inside its claim window and before its due time, never sharing a receipt instant with another delivery."
+      - "THE SYSTEM SHALL draw the ordinary severities from its own seed with the collections' mix, and SHALL have the real tools confirm every planned verdict (REQ-GEN-186)."
+      - "THE SYSTEM SHALL plant, each as a named scenario in the register: a Monday with no supply, reading 'No supply' that day until a person decides; and a supply received on a Tuesday, a day it owes nothing."
+      - "WHEN its generator runs twice with the same seed and configuration, THE SYSTEM SHALL write byte-identical deliveries and receipts both times, and adding the provider SHALL change no byte any other collection writes."
+    non_functional_requirements:
+      - "SYNTHETIC ONLY."
+      - "NO FLICKERING FAILURES (plans/running-thoughts.md #113): the missed Monday is one a notified person would need to act on, not one that clears by itself minutes later."
+    dependencies:
+      - REQ-QAC-350
+      - REQ-GEN-246
+      - REQ-GEN-186
+    decisions:
+      - "SCENARIOS AS NEEDED (brief): a missed owed day and a supply on a day not owed, the two a weekly cadence invites."
+    open_questions: []
+
+  - id: REQ-PIPE-352
+    title: "Each asset is bootstrapped into its own database from its own configuration, within 12 minutes each, and the two bootstraps' cost is measured against today's single one"
+    date_written: "2026-10-31"
+    story: "As whoever runs the pipeline, I want each asset bootstrapped into its own database, separately, so that each holds only its own asset's history and a change to one asset never costs a rebuild of the other."
+    moscow: must
+    status: not_started
+    source: "Keith, plans/running-thoughts.md #131 (2026-10-31 morning: two dashboards, each built only from its own asset's database); Keith's answer to draft Q5 (a), 2026-10-31. Drafted by delivery-scoper 2026-10-31, v2 the same day. A PROPOSAL, not signed."
+    acceptance_criteria:
+      - "WHEN `mothman pipeline bootstrap` runs, THE SYSTEM SHALL generate, stage, check and promote only the selected asset's collections, into the selected asset's database, and SHALL refuse where the database's identity is another asset's (REQ-PIPE-343)."
+      - "THE SYSTEM SHALL replay every calendared collection of an asset as one receipt-ordered stream, since one baseline puts them all on one calendar (REQ-PIPE-262 criterion 1 as amended by A12), and each no-calendar collection as a stream of its own."
+      - "THE SYSTEM SHALL generate each asset's scenario map from that asset's own history, at SCENARIOS-<asset>.md in the repository root where SCENARIOS.md is today (PROPOSED), the test scenario register in plans/supply-model.md staying one register; and IF a registered scenario names datasets of two assets, THEN `mothman check` SHALL fail, naming it."
+      - "THE SYSTEM SHALL have the session-start hook start one database per asset, mark each (REQ-PIPE-343) and report each one's staged-table count, naming the asset."
+      - "WHEN each asset's bootstrap runs from empty on this sandbox, THE SYSTEM SHALL finish within 12 minutes of wall clock (REQ-PIPE-250 criterion 2 as amended by A22)."
+      - "WHEN this requirement is built, THE SYSTEM SHALL record in evidence, from empty on this sandbox, each asset's bootstrap wall clock alone and both run side by side, beside today's single bootstrap and its per-stream figures on the same commit (REQ-PIPE-336 evidence: Birth Registrations 814s, the quarterly stream 2507s, 3509s in all), with and without the two test collections."
+    non_functional_requirements:
+      - "PERFORMANCE: the split adds no work - today's bootstrap already runs Birth Registrations and the quarterly stream as separate processes (REQ-PIPE-262 criterion 6) - so side by side it should cost about what today's does, plus the two test collections. Today's 3509s exceeds the larger stream's 2507s by about Birth Registrations' 814s, which suggests the streams are not fully overlapping now; criterion 6's figures will say."
+      - "PERFORMANCE, RISK: the quarterly stream alone took 2507s (about 42 minutes) on REQ-PIPE-336's commit, so criterion 5's 12 minutes rests on REQ-PIPE-250's speed-up work landing; the split does not make it faster."
+      - "RELIABILITY: one asset's bootstrap failing leaves the other's database untouched, since no process holds both (REQ-PIPE-343 criterion 5)."
+      - "PRIVACY: each database holds one asset's supply rows only."
+    dependencies:
+      - REQ-PIPE-342
+      - REQ-PIPE-343
+      - REQ-PIPE-345
+      - REQ-PIPE-365
+      - REQ-PIPE-262
+      - REQ-PIPE-250
+      - REQ-GEN-045
+    decisions:
+      - "TWO DATABASES, TWO BOOTSTRAPS (Keith, 2026-10-31, implied by 'each built only from its own asset's database')."
+      - "ONE STREAM PER ASSET (delivery-scoper): REQ-PIPE-262 grouped collections by shared calendar; under one baseline that grouping is every calendared collection of the asset. plans/running-thoughts.md #111 is unchanged by this."
+      - "A SCENARIO MAP PER ASSET, ONE REGISTER (delivery-scoper, PROPOSED): SCENARIOS.md is generated with the history (REQ-GEN-045 criterion 3), and each asset has its own history."
+      - "THE 12-MINUTE TARGET APPLIES TO EACH ASSET ON ITS OWN (Keith, 2026-10-31, draft Q5 (a)): criterion 5. REJECTED (b), measure and report only, and (c), a ceiling on each bootstrap beyond REQ-PIPE-250's."
+    open_questions: []
+
+  - id: REQ-TEST-353
+    title: "CI checks both assets on every push within 10 percent of today's billed minutes on a cache hit, each asset's bootstrapped database cached on its own key, and records the cache-miss cost"
+    date_written: "2026-10-31"
+    story: "As Keith paying for CI from a 2,000-minute monthly allowance, I want both assets checked on every push at about the cost of checking today's one combined asset, so that the split does not cut how often finished work can be pushed."
+    moscow: must
+    status: not_started
+    source: "Keith, plans/running-thoughts.md #131; CLAUDE.md's CI minutes budget (REQ-TEST-260); Keith's answers to draft Q5 (a) and architect Q2 (a), 2026-10-31. Drafted by delivery-scoper 2026-10-31, v2 the same day. A PROPOSAL, not signed."
+    acceptance_criteria:
+      - "THE SYSTEM SHALL key each asset's cached bootstrap with REQ-PIPE-365 criterion 3's cache key, and SHALL cache that asset's data/<asset>/ paths beside its dump, so that a change to one asset's configuration restores the other asset's cache."
+      - "THE SYSTEM SHALL bootstrap or restore both assets' databases in the one test-deployment job, side by side, each as its own process with its own MOTHMAN_ASSET and DSN, and SHALL NOT add a second deployment job."
+      - "THE SYSTEM SHALL run `mothman dashboard rebuild-results` and `mothman dashboard build-data` once per asset in that job (test.yml lines 508-511 today), each with its own MOTHMAN_ASSET."
+      - "THE SYSTEM SHALL run the deployment half's tests in one pytest session against both assets' databases, each test opening only its own asset's (REQ-PIPE-343 criterion 6), and the fast half's configuration tests against every asset folder."
+      - "THE SYSTEM SHALL say in the job log, per asset, whether its database was restored or rebuilt and from which key (REQ-TEST-117 criterion 4)."
+      - "THE SYSTEM SHALL keep the fast half's skip count at zero with both assets present."
+      - "WHEN this requirement is built, THE SYSTEM SHALL record in evidence, from `mothman github ci-usage`, the billable minutes of a cache-hit run and of a cache-miss run before and after the split, and SHALL record the requirement as not met where the cache-hit run after bills more than 10 percent above the cache-hit run before (about 39 minutes today)."
+    non_functional_requirements:
+      - "COST: one runner, two databases, both bootstraps in parallel - billed about as today's single job, which already runs both streams. A second job would bill a second runner's setup and every install step again on every push."
+      - "COST: per-asset cache keys mean a daily-only edit rebuilds only the daily bootstrap (814s on this sandbox) rather than the quarterly one. A shared-code edit misses both caches, which is why the cache-miss figure is recorded, without a ceiling of its own."
+      - "RELIABILITY: a cache restore of one asset never restores into the other's database; each dump is named for its asset and checked by the guard after restore."
+      - "NO LIVE DATA IN CI: both databases hold synthetic data generated on the runner (REQ-TEST-117 criterion 5)."
+    dependencies:
+      - REQ-PIPE-352
+      - REQ-PIPE-365
+      - REQ-TEST-117
+      - REQ-TEST-260
+    decisions:
+      - "A CEILING ON CACHE-HIT CI MINUTES, AND THE CACHE-MISS FIGURE RECORDED (Keith, 2026-10-31, draft Q5 (a), with the architect's addition). REJECTED (b), measure and report only, and (c), a ceiling on both CI and each bootstrap."
+      - "ONE DEPLOYMENT JOB, NOT TWO (Keith, 2026-10-31, architect Q2 (a)): criterion 2. REJECTED a job per asset, which would report a daily failure sooner but bill a second runner on every push."
+    open_questions: []
+
+  - id: REQ-PIPE-354
+    title: "Each asset has its own Cloudflare Pages project and Access allow-list, built and published only from its own asset's database; today's project becomes the quarterly asset's, and an old Birth Registrations link says where it went"
+    date_written: "2026-10-31"
+    story: "As someone given access to one team's register, I want that asset's dashboard on a site of its own, behind its own sign-in, showing only its own asset, so that the two teams' registers are as separate as their data, and a link I saved before the split still tells me where to go."
+    moscow: must
+    status: not_started
+    source: "Keith, plans/running-thoughts.md #131; Keith's answers of 2026-10-31 to architect Q1 (a), one Cloudflare project per asset, and on the old address (a). Rewritten by delivery-scoper 2026-10-31 from v1's two dashboards on one site. A PROPOSAL, not signed."
+    acceptance_criteria:
+      - "WHEN the dashboard is built, THE SYSTEM SHALL build it for the selected asset only, from that asset's recorded QA results and configuration, and SHALL embed no collection, calendar, person or result of another asset."
+      - "THE SYSTEM SHALL name the asset in the built dashboard's masthead and title, from a name declared in its data-asset.yaml (PROPOSED: 'Quarterly data asset', 'Daily data asset'), as well as the environment and commit (REQ-PIPE-092 criteria 7 and 17)."
+      - "THE SYSTEM SHALL publish each asset to the Cloudflare Pages project, production branch, address and Access sign-in domain its own data-asset.yaml declares (REQ-PIPE-255 criterion 8 and REQ-PIPE-257 criterion 8 as amended by A24 and A25), each project with its own Access applications and its own allow-list."
+      - "THE SYSTEM SHALL configure for the quarterly asset the Pages project REQ-PIPE-255 sets up for today's asset, and for the daily asset a new project, and SHALL publish nothing at today's address for the daily asset."
+      - "WHEN a publish runs, THE SYSTEM SHALL pass wrangler only the selected asset's project, shown by a test with REQ-PIPE-255 criterion 30's stub wrangler that publishes under each asset and asserts the project named."
+      - "WHERE an asset's data-asset.yaml declares collections that moved to another asset (PROPOSED key: moved_to, each entry an agency, collection or dataset id, the name of the asset it moved to and that asset's dashboard address), WHEN the dashboard is opened at a route naming one of them, THE SYSTEM SHALL show in place of the not-found page one line - 'Birth Registrations has moved to the Daily data asset's dashboard' (PROPOSED wording) - with the address as a real link carrying the same route and query, and SHALL NOT redirect."
+      - "THE SYSTEM SHALL declare in the quarterly asset's data-asset.yaml a moved_to entry for Registry Services, Civil Registration and Birth Registrations, and SHALL have a real-browser test that opens a pre-split Birth Registrations dataset route on the quarterly dashboard, asserts the line and the link's address, and asserts the page did not navigate."
+      - "THE SYSTEM SHALL archive each publish's snapshot under dashboard/snapshots/<asset>/, and SHALL leave the archive already committed at dashboard/snapshots/ unchanged, published with the quarterly asset's site only (PROVISIONAL on open question Q3)."
+      - "THE SYSTEM SHALL keep each built dashboard a single file openable from file:// with no live external dependency, with the fonts and vendor assets copied into each asset's site tree (REQ-PIPE-092 criterion 3)."
+      - "THE SYSTEM SHALL keep the repository-wide tabs - Plans, Release Notes, Demo and Feedback - in each asset's dashboard, and the Scenarios tab showing that asset's own scenario map (REQ-PIPE-352 criterion 3)."
+    non_functional_requirements:
+      - "PRIVACY: a build may read recorded QA results, never actual data, and never anything else (Keith, 2026-09-27) - and now never another asset's results either. Each publish runs where its own asset's database is (REQ-PIPE-092)."
+      - "SECURITY: one project per asset means one asset's publish cannot touch the other's site, and each team's allow-list admits only its own people (REQ-PIPE-257 criterion 3, per project)."
+      - "NOTHING READS ANOTHER ASSET: the moved_to entry is the quarterly asset's own declaration about its own past, not a read of the daily asset's configuration; if the daily address changes, that entry changes with it by hand."
+      - "PERFORMANCE: each dashboard embeds one asset, so each page is smaller than today's combined one; both sizes measured and reported beside today's."
+      - "COMPATIBILITY: self-hosted fonts and vendor assets in each site, nothing from a CDN (government networks)."
+      - "COST: a second Cloudflare Pages project and Access application on the free tier; no CI minutes, since publishing runs where the database is."
+    dependencies:
+      - REQ-PIPE-342
+      - REQ-PIPE-352
+      - REQ-PIPE-092
+      - REQ-PIPE-255
+      - REQ-PIPE-257
+      - REQ-GHUB-258
+    decisions:
+      - "ONE CLOUDFLARE PROJECT PER ASSET, EACH WITH ITS OWN ACCESS ALLOW-LIST (Keith, 2026-10-31, architect Q1 (a)): matches the two-team target and removes per-path publishing. It SUPERSEDES v1's 'two dashboards on one site, /quarterly/ and /daily/' (Keith's earlier (a), which predated knowing REQ-PIPE-255 uploads a whole tree). REJECTED (b), one combined project rebuilt from both databases on every publish."
+      - "TODAY'S PROJECT BECOMES THE QUARTERLY ASSET'S; THE DAILY ASSET GETS A NEW ONE; NO LANDING PAGE AND NO REDIRECT SCRIPT; AN OLD BIRTH REGISTRATIONS LINK SHOWS A ONE-LINE NOTICE (Keith, 2026-10-31, old address (a)). REJECTED (b), new projects for both with a linking page at today's address. This drops v1's landing page and old-link redirect, and with them UX MUST 5 and UX Q2."
+      - "THE NOTICE IS CONFIGURATION, NOT A READ OF THE OTHER ASSET (delivery-scoper, PROPOSED): criterion 6's moved_to key, so the rule that nothing reads another asset's configuration holds. It links rather than redirects, keeping the route so the reader lands where they meant to."
+      - "THE PRE-SPLIT SNAPSHOT ARCHIVE IS NOT REWRITTEN (CLAUDE.md: dashboard/snapshots/*.html.gz accumulate and are never deleted as generated cruft); where it is served is Q3."
+      - "HOSTING AMENDMENTS (architect BLOCKING 1): REQ-PIPE-255, REQ-PIPE-257, REQ-GHUB-258 and REQ-DOCS-259 are amended for two projects (A24 to A27). They are signed but not built, so the amended text holds whichever lands first; Q2 says which order is recommended."
+    open_questions:
+      - "Q2 (Keith to decide; recommendation (a)) - ORDER OF THE CLOUDFLARE HOSTING AND THE SPLIT. REQ-PIPE-255, 257 and 258 are signed and not started. (a) RECOMMENDED: build them first, for today's one asset, so the split only adds a second project; the daily asset cannot publish until this requirement is built, because its data-asset.yaml has no project until then and REQ-PIPE-255 refuses a missing key. (b) The split first, then REQ-PIPE-255 built per asset from the start: no second pass over the hosting code, but between the move and REQ-PIPE-255 both assets would push to the one gh-pages branch and one would overwrite the other, so the daily asset's publish would have to be refused in the meantime."
+      - "Q3 (Keith to decide; recommendation (a)) - WHERE THE PRE-SPLIT SNAPSHOT ARCHIVE IS SERVED. Every committed snapshot holds Birth Registrations beside Child Protection. (a) RECOMMENDED: with the quarterly site only - it is today's project's history, and the archive is synthetic. (b) With both sites: each team sees the combined past, and each sees the other's. (c) Neither, kept in the repository only. At real scale (a) would show the quarterly team daily-asset results; that is the trade to accept or reject."
+
+  - id: REQ-DASH-355
+    title: "A global period control sits beside the date control, is carried in the URL and across navigation, and with no period chosen every page renders as it did before the change"
+    date_written: "2026-10-31"
+    story: "As Keith during a quarterly refresh and release, I want to choose a period - 2026-Q2 - once in the header and have every page show what we know about that period as at the date on show, so that I can see a period's whole picture, including what arrived about it later, without losing my place."
+    moscow: should
+    status: not_started
+    source: "Keith, plans/running-thoughts.md #131 (2026-10-31 morning: a period view alongside as-at; a global period control beside the global as-at control); dashboard UX review MUST 1-3 and SHOULDs; Keith's answer to UX Q4 (a), 2026-10-31. Drafted by delivery-scoper 2026-10-31, v2 the same day. A PROPOSAL, not signed."
+    acceptance_criteria:
+      - "THE SYSTEM SHALL show in the dashboard header, beside the date control, a period control reading 'For period: <period name>' when a period is chosen and 'Period: all current' when none is - 'For day: <date>' and 'Day: all current' WHERE the asset's baseline is daily (PROPOSED wording) - opening a labelled panel to choose or clear one."
+      - "THE SYSTEM SHALL offer as choices the periods of the asset's baseline in the embedded PERIOD_SEQUENCES, from the first any dataset owes to the newest any slot has opened (REQ-DASH-054 criterion 3), newest first and grouped under year headings; and WHERE the baseline is daily, THE SYSTEM SHALL offer a date input bounded to that range in place of a list."
+      - "THE SYSTEM SHALL carry the chosen period in a query parameter, period=<period name>, beside in-place-on, keep it across every navigation and in every link the page builds, as in-place-on is kept, and drop it only when the reader clears it."
+      - "WHEN the period is chosen or cleared with the control, THE SYSTEM SHALL replace the current history entry rather than add one, as the date control does, so that Back and Forward do not step through period choices."
+      - "THE SYSTEM SHALL keep the date on show when the period changes, and the period when the date on show changes."
+      - "WHILE a period is chosen, THE SYSTEM SHALL show one statement in #in-place-on-past-notice, styled .in-place-on-range-notice, in place of the past-date notice - 'Showing <P> — results recorded by the end of <date> · Clear period' (PROPOSED wording), 'Clear period' a button that clears it - and SHALL label the date control 'Results recorded by: <date>' in place of 'In the warehouse on' (PROPOSED)."
+      - "WHILE a period is chosen, THE SYSTEM SHALL add ' · <P>' to document.title, and SHALL announce 'Showing <P>' through #route-announcer when it is chosen and 'Showing all current' when it is cleared."
+      - "IF the period parameter names no period of the asset's baseline, THEN THE SYSTEM SHALL say so in a notice naming the value, as the stale-link notice does, remove the parameter with replaceState, and show the page with no period chosen."
+      - "WHILE a period is chosen and the date on show is before that period opened for a collection, THE SYSTEM SHALL show '<period> had not opened by <date>' in that collection's own panel on the agencies list and agency page, in place of that collection's content, leaving every other collection as it is."
+      - "WHILE no period is chosen, THE SYSTEM SHALL render the agencies list, an agency page and a dataset page on two dates exactly as before this change, held by a real-browser test comparing each page's rendered text with a capture taken from the build of the commit before this change against the same recorded history, asserting first that each capture is non-empty and holds the page's heading."
+      - "THE SYSTEM SHALL keep the in-place-on selection a calendar date in its own parameter (REQ-DASH-054 criterion 7, unchanged)."
+    non_functional_requirements:
+      - "PERFORMANCE: choosing a period re-renders from data already embedded, as changing the date does - no fetch, no rebuild - and should feel as immediate as the date control does today."
+      - "SCALE: about 55 quarterly periods today, grouped by year so the list stays scannable; one per day on the daily asset, where the date input keeps it from becoming hundreds of items."
+      - "COMPATIBILITY: a plain file:// open works; shared links keep both parameters (docs/spa-best-practices.md)."
+      - "ACCESSIBILITY: the control is a real button with a labelled panel, keyboard-reachable, as the date control is; the period is in the title and announced (criterion 7)."
+      - "ONE VOCABULARY: any status word the period view shows follows REQ-DASH-359."
+    dependencies:
+      - REQ-PIPE-345
+      - REQ-PIPE-354
+      - REQ-DASH-054
+      - REQ-DASH-359
+    decisions:
+      - "A PERIOD VIEW, ALONGSIDE AS-AT (Keith, 2026-10-31, rejecting all three options put for the geocoding batch's J1/G1 surfacing question - accept, a quiet notice, or move the timing): 'what we need here is a new way to view the dashboard ... almost by period'. Supersedes the geocoding batch's J1 question."
+      - "A GLOBAL PERIOD CONTROL, BESIDE THE GLOBAL AS-AT CONTROL (Keith, 2026-10-31): 'something like another global as at control ... that's what I want'. In the header, in the URL, kept across navigation like as-at; every page reads it; with no period chosen every page behaves as today. REJECTED growing only the existing period page (REQ-DASH-209) into the view."
+      - "THIS REOPENS A RECORDED DECISION, AND KEITH WAS TOLD SO (2026-10-31): REQ-DASH-054 decision 14 (2026-09-23) rejected a period picker beside the date because a period name is ambiguous once several calendars exist. One baseline per asset (REQ-PIPE-345) removes that ambiguity. REQ-DASH-054 criterion 7 - the date stays a date - still holds."
+      - "MOSTLY FOR THE QUARTERLY ASSET, APPLIED TO EVERY CADENCE (Keith, 2026-10-31); ON THE DAILY ASSET THE CONTROL STAYS, LABELLED 'For day' (Keith, 2026-10-31, UX Q4 (a)). REJECTED (b), hiding it on the daily asset."
+      - "WRITTEN AGAINST THE POST-SPLIT SHAPE (Keith, 2026-10-31, sequencing (c)). REJECTED (b), a period control on today's combined asset with an interim rule for Birth Registrations."
+      - "GLOBAL, NOT ONE DATASET (Keith, 2026-10-30 ~23:55): 'I'd also want this fix to apply globally, not just to one dataset.'"
+      - "THE LIST ENDS AT THE NEWEST OPENED PERIOD, NOT AT TODAY'S (UX MUST 1): at files_go_to_period 1 collections are already filling the next quarter, so bounding by the build's date would hide a period with real supplies. REQ-DASH-054 decision 2's no-future rule is kept in its REQ-DASH-326 form: nothing no slot has opened."
+      - "WHAT THE DATE MEANS WHILE A PERIOD IS SET (UX MUST 3): 'In the warehouse on' is false when the supply on show has since been replaced, and a period's results read as today's is a mode error. Criterion 6 says one true thing instead."
+      - "BACK AND FORWARD DO NOT STEP THROUGH PERIODS (Keith's period-page answer, which made UX MUST 4 and UX Q3 moot): the period is set only by the control, which replaces the history entry as the date does (criterion 4)."
+      - "'Period: all current' WHEN NONE IS CHOSEN (UX SHOULD), rather than v1's 'For period: none', which reads as an empty result."
+      - "THE ARRIVAL-CONTEXT DRILL KEEPS SETTING THE DATE, NOT THE PERIOD (UX review, on Q1): REQ-DASH-085, 100 and 198 unchanged. A SCENARIO JUMP NEITHER SETS NOR CLEARS THE PERIOD (delivery-scoper): REQ-DASH-208 unchanged."
+      - "A PERIOD MODE ON THE AS-AT SWITCHER WAS FLOATED AND DROPPED (Keith, about midnight 2026-10-30, then 'Hmm maybe it's OK as it is'): superseded by the separate control; recorded so it is not re-proposed."
+      - "THE NO-PERIOD GUARD CAN FAIL (UX, proofs that cannot fail): v1's 'passing on today's page' compared the page with itself; criterion 10 compares against a capture of the build before the change."
+    open_questions: []
+
+  - id: REQ-DASH-356
+    title: "With a period chosen, the agencies list, agency pages and dataset pages show that period's supplies and every result recorded about them as at the date on show, later linkage and geocoding verdicts included, source supplies and derived releases in separately named sections"
+    date_written: "2026-10-31"
+    story: "As Keith during a quarterly release, I want 2026-Q2 to show both what arrived for Q2 from the source agencies and what the linkage and geocoding releases for Q2 found about those supplies, kept apart, so that a verdict recorded hours after a supply was replaced as current is still seen on that supply's own page."
+    moscow: should
+    status: not_started
+    source: "Keith, plans/running-thoughts.md #131 (2026-10-30 ~23:50, 'How can we view the results for a whole period?'; 2026-10-31 morning: two distinct views, keyed by period); plans/post-build-review.md #289 J1; Keith's answer to UX Q1 (c), config-driven, 2026-10-31; dashboard UX review SHOULDs and proofs. Drafted by delivery-scoper 2026-10-31, v2 the same day. A PROPOSAL, not signed."
+    acceptance_criteria:
+      - "WHILE a period P is chosen, THE SYSTEM SHALL show on each dataset page the supply P holds for that dataset at the end of the date on show - Promoted, Inherited from <period>, Substituted from <period>, Not supplied or Not owed - found by the same lookup REQ-DASH-209 uses (promotionStateOn over the embedded slot timeline), headed 'For <P> · results recorded by <date>' (PROPOSED)."
+      - "WHILE a period P is chosen, THE SYSTEM SHALL show on that dataset page its own checks' results about that supply recorded by the end of the date on show, and every result of another collection's check that read that supply (the reads the build embeds from qa.check_read) recorded by then, whenever it was recorded, grouped by the reading collection as REQ-DASH-337 groups them, each saying when it was recorded."
+      - "WHILE a period P is chosen, THE SYSTEM SHALL compute each dataset's status for P from those results, counting another collection's verdict toward it as REQ-PIPE-332 counts it, and roll it up to its collection and agency by the page's existing rollup rule."
+      - "WHILE a period P is chosen, THE SYSTEM SHALL show the agencies list and each agency page in two sections: 'Source supplies for <P>', holding every collection none of whose datasets declares linked_datasets, and a second section holding every collection whose datasets declare linked_datasets, headed '<the configured names of those collections> for <P>' - today 'Linkage Products for <P>' (PROPOSED; open question Q1) - each name taken from the asset's data-asset.yaml and never written in code, and each section's status rolled up on its own."
+      - "WHERE an agency has collections in both sections, THE SYSTEM SHALL show it in each, each card rolling up only that section's collections; and WHERE a section would hold no collection, THE SYSTEM SHALL show neither it nor its heading."
+      - "IF a collection holds both a dataset that declares linked_datasets and one that does not, THEN `mothman check` SHALL fail, naming the collection and both datasets (PROPOSED), so that a section heading never misdescribes a collection."
+      - "THE SYSTEM SHALL take everything it shows under a chosen period from the timelines, results, reads and PERIOD_SEQUENCES the build already embeds; before adding anything to the build, THE SYSTEM SHALL record in evidence each fact the view needs, whether the build already embeds it (pipeline/build_dashboard_data.py and pipeline/slot_timeline.py, among them) and, where it does not, what is added; and SHALL NOT read supply rows, a period schema or its _manifest."
+      - "THE SYSTEM SHALL have a real-browser test that, on the daily dashboard, first asserts the day chosen is not a Monday and that the Mental Health dataset is on the page, then asserts its row reads 'Inherited from <the previous Monday>' with the sub-line 'Not owed — it supplies only on Mondays' (REQ-DASH-347 criterion 2), and neither failing nor 'No data'."
+      - "THE SYSTEM SHALL have a real-browser test, written first and seen to fail, against a dashboard built from the quarterly history: with a Child Protection period chosen, at a date after that period's linkage release, the Client Register page shows the linkage verdict about the supply filed to that period, which the same page with no period chosen does not show (post-build-review #289 J1); asserting first that the verdict exists in the recorded results."
+      - "THE SYSTEM SHALL measure each built dashboard's size before and after this change and report both in evidence, with no size budget (REQ-DASH-209 criterion 11's precedent)."
+    non_functional_requirements:
+      - "PRIVACY: computed from recorded QA metadata only; people shown by display name, never email address (REQ-DASH-209 decision 21)."
+      - "SCALE: at about thirty quarterly collections, the two-section split is derived from linked_datasets, so it holds as linkage and geocoding products grow, with no list to maintain; the second heading names collections, which stay few, rather than datasets, which grow."
+      - "PERFORMANCE: a period choice is a lookup over embedded timelines, as the date is; page weight measured (criterion 10)."
+      - "OBSERVABILITY: each result says when it was recorded, so a verdict that arrived after the supply was replaced as current is legible as such."
+      - "ONE VOCABULARY: status words follow REQ-DASH-359."
+    dependencies:
+      - REQ-DASH-355
+      - REQ-DASH-367
+      - REQ-DASH-337
+      - REQ-PIPE-331
+      - REQ-PIPE-332
+      - REQ-DASH-347
+      - REQ-QAC-348
+      - REQ-QAC-350
+      - REQ-DASH-359
+    decisions:
+      - "KEYED BY PERIOD, NOT BY ROUND (Keith, 2026-10-31, (a)): a view of 2026-Q2 shows the source supplies filed to Q2, which arrived in an earlier round, and the linkage and geocoding releases for Q2, which arrive in a later round, in two sections, one per workstream, with the as-at time picked within it. REJECTED (b), a view by round or refresh, and (c), both views."
+      - "TWO DISTINCT VIEWS FOR A QUARTERLY REFRESH (Keith, 2026-10-31): what we know about the source data arriving for its period, and what we know about the linkage products and geocoding for the current period - 'distinct, separate releases, almost separate work streams'."
+      - "ONE GENERIC RULE (Keith, 2026-10-30): any result recorded about a period's supply, whenever it arrived and whichever collection's check recorded it."
+      - "SECTION NAMES ARE CONFIG-DRIVEN (Keith, 2026-10-31, UX Q1 (c) as he amended it): 'Source supplies for <P>' and a second heading from the configured names of what derives from other collections' supplies, taken from data-asset.yaml's names and linked_datasets declarations. REJECTED (a) 'Derived releases' and (b) v1's 'Releases about other collections' supplies'."
+      - "THE SECOND HEADING NAMES COLLECTIONS, NOT DATASETS (delivery-scoper, PROPOSED; Q1): Linkage Products holds Linkage Keys and several geocoding datasets, and the dataset list grows with each geocoding product while the collection name does not."
+      - "THE WORKSTREAM IS DERIVED FROM linked_datasets (delivery-scoper): REJECTED a 'workstream:' key, which could disagree with what a collection reads; REJECTED files_go_to_period, which describes timing. Geocoding (REQ-QAC-294) declares linked_datasets too."
+      - "A MIXED COLLECTION IS REFUSED (delivery-scoper, PROPOSED, answering the UX SHOULD): criterion 6. REJECTED placing it by any one dataset, which would put a source dataset under a derived heading; no collection is mixed today."
+      - "REUSE WHAT THE BUILD ALREADY EMBEDS FIRST (architect NIT): much of it is (build_dashboard_data.py 247-252, 627, 942; slot_timeline.py 284), so criterion 7 records the gap before adding to it."
+      - "THE OPTIONS BEFORE THE CONTROL WAS CHOSEN (2026-10-30, not taken): (a) results on the period page, (b) the dataset page opening by period, (c) both."
+    open_questions:
+      - "Q1 (Keith, at sign-off as he asked; recommendation (a)) - WHAT THE SECOND SECTION'S HEADING NAMES. (a) RECOMMENDED: the derived collections' names - 'Linkage Products for 2026-Q2' - short, and stable as geocoding products are added. (b) Their datasets' names - 'Linkage Keys and geocoding for 2026-Q2', using a configured group name for the geocoding datasets - closer to how you described it, but it grows with every dataset and needs a group name the configuration does not hold today."
+
+  - id: REQ-DASH-367
+    title: "With a period chosen, the agency page shows each collection's composition table for that period; the period page's route is retired and its old links open the agency page with the period set"
+    date_written: "2026-10-31"
+    story: "As Keith during a quarterly release, I want what each dataset holds in the chosen period, and how it got there, shown on the agency page itself, so that there is one 'period on show', set in one place, and a link I saved to an old period page still lands on the same answer."
+    moscow: should
+    status: not_started
+    source: "Keith's answer to draft Q1 (b), 2026-10-31: fold the period page's table into the agency page and retire the route; dashboard UX review SHOULD (path against ?period=). Drafted by delivery-scoper 2026-10-31. A PROPOSAL, not signed."
+    acceptance_criteria:
+      - "WHILE a period P is chosen, THE SYSTEM SHALL show in each collection's panel on the agency page REQ-DASH-209's composition table for that collection and P - its rows, columns, count line, grouping and links (REQ-DASH-209 criteria 1 to 5 and 9 as amended by A28 to A32) - with a caption reading '<collection> · <P> — what each dataset held at the end of <date on show>'."
+      - "THE SYSTEM SHALL show above the agency page's sections a link to the previous period and one to the next, reading 'Previous period: <P>' and 'Next period: <P>' - 'Previous day: <date>' and 'Next day: <date>' on a daily baseline - each setting the period control by replacing the history entry, and SHALL leave a link out, rather than disable it, where there is no earlier period or the next had not opened by the date on show."
+      - "WHEN the dashboard is opened at a retired period route, /agency/<agency>/collection/<collection>/period/<period>, THE SYSTEM SHALL replace the history entry with the agency page and period=<period>, keeping in-place-on and every other parameter, and SHALL bring that collection's panel into view and move focus to its table caption."
+      - "IF a retired period route's period and a period parameter disagree, THEN THE SYSTEM SHALL take the route's period and rewrite the parameter."
+      - "IF a retired period route names an agency or collection the dashboard does not hold, THEN THE SYSTEM SHALL show the existing not-found page (renderNotFound) - or, where the asset declares it moved (REQ-PIPE-354 criterion 6), the moved notice - and IF it names a period the baseline does not hold, THEN THE SYSTEM SHALL open the agency page with REQ-DASH-355 criterion 8's notice."
+      - "THE SYSTEM SHALL have every link the page built to a period's composition view - a period label in supply history, a gap or owed-nothing row, the standing-in pill's drill-down and TS-55's chip - go to the agency page with that period set and that collection's panel in view."
+      - "THE SYSTEM SHALL have a real-browser test that opens a real retired period URL, asserts the final location's path and query, that history length did not grow, that the collection's table is in view and holds rows, and that Back leaves the dashboard rather than returning to the retired route; and SHALL re-point REQ-DASH-209 criterion 10's test at the agency page's table."
+    non_functional_requirements:
+      - "COMPATIBILITY: old period links keep working (criterion 3); routing stays as docs/spa-best-practices.md section A describes."
+      - "ACCESSIBILITY: focus moves to the table caption on arrival from an old link (criterion 3), replacing REQ-DASH-209 criterion 12's h2 focus."
+      - "SCALE: at about thirty collections an agency page with a period set holds one table per collection; the agency-page panels already group them, and each table keeps REQ-DASH-209's every-row-shown rule."
+      - "PRIVACY: unchanged from REQ-DASH-209 - display names, never email addresses."
+    dependencies:
+      - REQ-DASH-355
+      - REQ-DASH-209
+      - REQ-DASH-208
+    decisions:
+      - "FOLD THE TABLE INTO THE AGENCY PAGE AND RETIRE THE ROUTE (Keith, 2026-10-31, draft Q1 (b)): old period links redirect to the agency page with that period set, and REQ-DASH-209's criteria are rewritten as amendments signed one by one (A28 to A36). REJECTED (a), keeping the page joined to the control, and (c), keeping it independent. This made UX MUST 4 and UX Q3 moot."
+      - "THE ROUTE'S PERIOD WINS OVER THE PARAMETER (UX SHOULD): criterion 4, because a link to a period page always meant that period."
+      - "A REDIRECT INSIDE THE DASHBOARD, NOT A SCRIPT ON ANOTHER PAGE (delivery-scoper): the retired route is this dashboard's own, so the page that opens it replaces the entry itself; unlike v1's landing-page redirect, which is gone."
+    open_questions: []
+
+  - id: REQ-TEST-357
+    title: "The move to two assets changes nothing a collection records, generates, builds or offers - proven by the equivalence harness and the existing pins, never by re-capturing them"
+    date_written: "2026-10-31"
+    story: "As Keith, I want proof that splitting the configuration moved files and nothing else, so that the split can be trusted as a refactor before the new datasets and the period control are built on it."
+    moscow: must
+    status: not_started
+    source: "Keith, plans/running-thoughts.md #131 (2026-10-31 morning: build the split first); Keith's answer to architect Q4 (a). Drafted by delivery-scoper 2026-10-31, v2 the same day. A PROPOSAL, not signed."
+    acceptance_criteria:
+      - "THE SYSTEM SHALL regenerate each asset's history from empty after the split rather than migrate today's single database, which `mothman env reset-synthetic` then clears (REQ-PIPE-089 criterion 25's precedent)."
+      - "THE SYSTEM SHALL extend `mothman debug equivalence capture` so that a commit with asset folders is captured as one baseline per asset, and `compare` SHALL compare the union of a post-split commit's baselines with a pre-split commit's single baseline, collection by collection, normalising only the data_asset_id segment REQ-QAC-344 renames and the database identity row."
+      - "WHEN the split's move lands, before the test collections, THE SYSTEM SHALL show that compare reporting no difference on any surface, and SHALL record both commits and the result in evidence."
+      - "THE SYSTEM SHALL keep tests/fixtures/arrival_semantics_golden.json and tests/fixtures/calendar_move_pin.json as captured, each test reading each pinned dataset's agreement from its own asset, and SHALL NOT re-capture either."
+      - "THE SYSTEM SHALL make the move in a commit that changes no configuration content beyond the moves and the renames REQ-QAC-344 makes, on a base that already holds geocoding's contract changes, with every content change of this batch in later commits; and the agreement-freeze and check-lifecycle gates SHALL pass on it through REQ-TEST-366's move map."
+    non_functional_requirements:
+      - "AUDITABILITY: the equivalence result goes in evidence, so 'the split changed nothing' is a recorded run of a named tree, never a claim."
+      - "COST: two from-empty bootstraps per capture; captures are on demand, not on every push."
+    dependencies:
+      - REQ-PIPE-342
+      - REQ-QAC-344
+      - REQ-PIPE-352
+      - REQ-TEST-366
+      - REQ-TEST-239
+      - REQ-PIPE-111
+    decisions:
+      - "REGENERATE, NOT MIGRATE (delivery-scoper, following Keith's REQ-PIPE-089 choice): the history is synthetic and seeded."
+      - "THE PINS ARE NOT RE-CAPTURED (REQ-PIPE-110 criterion 20's rule): a pin captured from the post-split tree would prove only that the tree agrees with itself."
+      - "v1's FREEZE-GATE CRITERION MOVED TO REQ-TEST-366 and widened to every base-commit read (architect BLOCKING 2)."
+    open_questions: []
+
+  - id: REQ-DOCS-358
+    title: "Signed requirements, CLAUDE.md and the README are restated for two assets in the change that makes the split: path-only edits under one blanket rule, every meaning change quoted and signed"
+    date_written: "2026-10-31"
+    story: "As whoever reads the register next, I want every signed requirement that assumes one asset, one hierarchy file, several calendars, one site or a period page restated for the new shape, so that the register and the system agree the day the split lands."
+    moscow: must
+    status: not_started
+    source: "Keith, plans/running-thoughts.md #131 (2026-10-31 morning); Keith's answer to draft Q4 (a), 2026-10-31, widened by the architect. Drafted by delivery-scoper 2026-10-31, v2 the same day. A PROPOSAL, not signed."
+    acceptance_criteria:
+      - "THE SYSTEM SHALL apply amendments A1 to A36 recorded in this requirement's decisions, each in the change that builds the requirement it serves, marked 'AMENDED <date applied> by <requirement>', once Keith has signed its wording."
+      - "THE SYSTEM SHALL apply one blanket rule, signed once, by one mechanical sweep in the move's change: a signed criterion naming an asset-wide file under contract/, an agency file under contract/<agency>/, a file under reports/ or data/, SCENARIOS.md, or a new archive under dashboard/snapshots/ reads as that file in the asset's own place - contract/<asset>/, reports/<asset>/, data/<asset>/, SCENARIOS-<asset>.md, dashboard/snapshots/<asset>/ - each touched criterion marked AMENDED, with a count before and after."
+      - "THE SYSTEM SHALL amend CLAUDE.md's layout table, its scale paragraph, its PostgreSQL setup block (one database per asset, MOTHMAN_ASSET), its bootstrap figures and its hosting notes, and README's running instructions, in the change that lands the split."
+      - "THE SYSTEM SHALL take plans/running-thoughts.md #131's split, baseline and period-control decisions, #55's decision and #109 out of the plans files once the last requirement of this batch they feed is built, each decision having been carried into a requirement first (CLAUDE.md's carry-over rule)."
+    non_functional_requirements:
+      - "AUDITABILITY: a signed criterion changes only by a quoted, signed amendment (criterion 1) or by the one signed blanket rule (criterion 2)."
+      - "MAINTAINABILITY: a half-done sweep is worse than none (REQ-DOCS-101's NFR 1); criterion 2's sweep is one change, with a count before and after."
+    dependencies:
+      - REQ-PIPE-342
+      - REQ-PIPE-345
+      - REQ-PIPE-346
+      - REQ-PIPE-352
+      - REQ-PIPE-354
+      - REQ-DASH-367
+    decisions:
+      - "A1 - REQ-PIPE-049 criterion 1 (serves REQ-PIPE-345). CURRENT: 'THE SYSTEM SHALL hold one or more NAMED delivery calendars per data asset, and each dataset SHALL name exactly one of them.' PROPOSED: 'THE SYSTEM SHALL hold at most one NAMED delivery calendar per data asset, its baseline, and SHALL put every dataset that does not declare no calendar on it (REQ-PIPE-345).'"
+      - "A2 - REQ-PIPE-049 criterion 5 (serves REQ-PIPE-346). CURRENT: 'IF a dataset naming a cadence-rule calendar also names delivery months, THEN THE SYSTEM SHALL reject the configuration rather than ignoring the months.' PROPOSED: 'IF a dataset's participation names periods in a vocabulary its baseline calendar version does not take - months on a daily rule, weekdays on an authored calendar - THEN THE SYSTEM SHALL reject the configuration rather than ignoring them (REQ-PIPE-346).'"
+      - "A3 - REQ-PIPE-049 criterion 7 (serves REQ-PIPE-345). CURRENT: 'THE SYSTEM SHALL let a dataset override its calendar with its own authored dates instead of subsetting it.' PROPOSED: 'THE SYSTEM SHALL NOT let a dataset state authored dates of its own; a dataset slower than its baseline owes a subset of the baseline's periods (REQ-PIPE-345).'"
+      - "A4 - REQ-PIPE-110 criterion 1 (serves REQ-PIPE-342 and 345). CURRENT: 'THE SYSTEM SHALL hold every delivery agreement belonging to a data asset in one file, contract/calendar.yaml - its named calendars, which calendar each collection and dataset is on, and each dataset's participation.' PROPOSED: 'THE SYSTEM SHALL hold every delivery agreement belonging to a data asset in one file, its asset folder's calendar.yaml - its baseline calendar, each collection's files_go_to_period and participation defaults, and each dataset's participation.'"
+      - "A5 - REQ-PIPE-110 criterion 5 (serves REQ-PIPE-346). CURRENT, in part: '... either as the keyword all or by naming delivery months in full and case-insensitively, naming the month of each round's CALENDAR DATE even where days before is set ...'. PROPOSED: the same sentence, with 'by naming delivery months in full and case-insensitively, naming the month of each round's CALENDAR DATE' replaced by 'by naming, in full and case-insensitively, the month - or, on a daily baseline, the weekday - of each round's CALENDAR DATE (REQ-PIPE-346)'."
+      - "A6 - REQ-PIPE-110 criterion 7 (serves REQ-PIPE-346). CURRENT: 'IF participates resolves to delivery months for a dataset whose calendar version in force on any of its periods' dates is a cadence rule, THEN THE SYSTEM SHALL reject the configuration, checking each participation version against every calendar version it overlaps.' PROPOSED: 'IF participates resolves to months where the baseline calendar version in force on any of a dataset's periods' dates is a daily rule, or to weekdays where it is authored, THEN THE SYSTEM SHALL reject the configuration, checking each participation version against every calendar version it overlaps.'"
+      - "A7 - REQ-PIPE-110 criteria 10 and 11 (serves REQ-PIPE-345). CURRENT: 'THE SYSTEM SHALL let a collection name a calendar, and SHALL apply that calendar to every dataset in the collection that names none of its own.' and 'WHERE a dataset names its own calendar, THE SYSTEM SHALL use it in preference to the one its collection names.' PROPOSED: both RETIRED, replaced by REQ-PIPE-345 criteria 2 and 3, their tests removed in the same change."
+      - "A8 - REQ-PIPE-110 criteria 25 and 35 (serves REQ-PIPE-345). CURRENT: criterion 25, 'WHERE a dataset states its own authored dates in place of its calendar's, THE SYSTEM SHALL hold them as effective-dated versions ...'; criterion 35, 'IF a dataset's own authored dates use a period name that any calendar in the file also uses, THEN THE SYSTEM SHALL reject the configuration.' PROPOSED: both RETIRED, replaced by REQ-PIPE-345 criterion 3's refusal."
+      - "A9 - REQ-PIPE-110 criterion 18 (serves REQ-PIPE-345). CURRENT: 'IF a dataset in the asset's hierarchy has neither a calendar nor a deliberate no-calendar declaration, or contract/calendar.yaml names a dataset or collection the hierarchy does not hold, THEN THE SYSTEM SHALL reject the configuration naming both files.' PROPOSED: 'IF the asset declares no baseline calendar while a dataset of its hierarchy has no deliberate no-calendar declaration, or the asset's calendar.yaml names a dataset or collection its hierarchy does not hold, THEN THE SYSTEM SHALL reject the configuration naming both files and the asset.'"
+      - "A10 - REQ-PIPE-181 criterion 9 (serves REQ-PIPE-345). CURRENT: 'IF a dataset names a calendar other than its collection's and would take any participation value from its collection's participation_defaults, THEN THE SYSTEM SHALL reject the configuration unless the dataset states that value itself, naming the dataset, both calendars and each value.' PROPOSED: RETIRED - no dataset or collection names a calendar (REQ-PIPE-345); its tests removed."
+      - "A11 - REQ-PIPE-181 criterion 8 (serves REQ-PIPE-346). CURRENT, in part: '... naming the item, each dataset affected, the months newly owed and the periods those rounds fill ...'. PROPOSED: 'the months newly owed' becomes 'the rounds newly owed, named as participates names them (REQ-PIPE-346)'; the rest unchanged."
+      - "A12 - REQ-PIPE-262 criteria 1, 6 and 12 (serves REQ-PIPE-352). CURRENT 1: 'THE SYSTEM SHALL group a bootstrap's collections into streams derived from configuration alone, two collections falling in one stream whenever any dataset of one resolves (schedule.calendar_for_dataset) to a calendar any dataset of the other resolves to, transitively, and SHALL hold no list of collections or calendars of its own.' PROPOSED 1: 'THE SYSTEM SHALL replay every calendared collection of the selected asset as one stream, and each collection none of whose datasets names a calendar as a stream of its own, and SHALL hold no list of collections of its own.' CURRENT 6: 'WHEN a bootstrap of every collection runs without --sequential, THE SYSTEM SHALL run its streams side by side, each in a process of its own, so that a collection on a calendar no other collection uses (Birth Registrations, daily) still runs beside the quarterly stream.' PROPOSED 6: 'WHEN a bootstrap of every collection of the asset runs without --sequential, THE SYSTEM SHALL run its streams side by side, each in a process of its own, so that a no-calendar collection's stream runs beside the asset's calendared stream; the daily and quarterly assets are bootstrapped separately (REQ-PIPE-352).' Criterion 12's 'with all three collections' becomes 'the quarterly asset bootstrapped from empty'."
+      - "A13 - REQ-PIPE-331 criterion 2 (serves REQ-PIPE-345 and 364). CURRENT: 'IF a check declares a read of a table no dataset in the hierarchy owns, or of a dataset that is never on the same calendar as the declaring dataset in any period, or that names no calendar at all, THEN `mothman check` SHALL fail, naming the check, the table and the reason; and WHERE the two datasets are on different calendars for a given period, THE SYSTEM SHALL record the check NOT APPLICABLE for that period - in left_out with the reason code calendar_differs (REQ-PIPE-332 criterion 10), counting toward nothing - and SHALL record neither red nor a result for it.' PROPOSED: 'IF a check declares a read of a table no dataset in its asset's hierarchy owns, or of a dataset that declares no calendar, THEN `mothman check` SHALL fail, naming the check, the table and the reason.' The calendar_differs code, its branch and its tests are RETIRED, and REQ-PIPE-332 criterion 10 is amended to drop that code."
+      - "A14 - REQ-QAC-330 criterion 6 and REQ-QAC-294 criterion 4 (serves REQ-PIPE-345 and 364). CURRENT 330, in part: 'IF a linked dataset is not in the hierarchy, is never on the same calendar as linkage-keys in any period, or names no calendar at all, names a source column its contract does not declare ...'. PROPOSED 330: 'IF a linked dataset is not in its asset's hierarchy, or declares no calendar, names a source column its contract does not declare ...', the rest unchanged. CURRENT 294, in part: 'IF a dataset's linked_datasets entry names a source not in the hierarchy, one naming no calendar, or one never on the same calendar as the declaring dataset in any period (REQ-QAC-330 decision 15's period-by-period rule), or names a source column ...'. PROPOSED 294: 'IF a dataset's linked_datasets entry names a source not in its asset's hierarchy, or one naming no calendar, or names a source column ...', the rest unchanged. Geocoding lands first (Keith, architect Q4), so the split's change amends both."
+      - "A15 - REQ-PIPE-107 criteria 1 and 12 (serves REQ-PIPE-343). CURRENT 1: 'THE SYSTEM SHALL record, in the database itself, the data asset id (contract/data-asset.yaml's data_asset_id) and the environment id that database belongs to.' PROPOSED 1: '... the data asset id (the selected asset's data_asset_id, REQ-PIPE-343) and the environment id that database belongs to.' CURRENT 12: 'THE SYSTEM SHALL mark the sandbox's database in the session-start hook, CI's database in its workflow, the dev container's database as local in .devcontainer/post-create.sh, and each test worker's database as test in its fixture, in the same change that adds the check.' PROPOSED 12: 'THE SYSTEM SHALL mark each asset's sandbox database in the session-start hook, each asset's CI database in its workflow, each asset's dev-container database as local in .devcontainer/post-create.sh, and each test worker's database as test, for the asset its fixture selects.'"
+      - "A16 - REQ-PIPE-092 criterion 7 (serves REQ-PIPE-354). CURRENT: 'THE SYSTEM SHALL name, in the artifact itself, the environment it was built from.' PROPOSED: 'THE SYSTEM SHALL name, in the artifact itself, the data asset and the environment it was built from.' (v1's amendment to criterion 12, a path on the gh-pages branch, is WITHDRAWN: REQ-PIPE-255 criteria 2 and 31 replace that push.)"
+      - "A17 - REQ-DASH-182 criteria 2 and 8 (serves REQ-DASH-347). CURRENT 8, in part: '... label its cycle in words - Yearly for one delivery month a year, Twice a year for two, Quarterly for four, Monthly for twelve, otherwise <N> times a year ...'. PROPOSED 8: the same, adding 'and, where a dataset participates by weekday, as REQ-DASH-347 criterion 1 words it'. Criterion 2's example 'it supplies only in the February and August rounds' gains the weekday form 'it supplies only on Mondays' by the same reference."
+      - "A18 - REQ-PIPE-240 criteria 1 and 2 (serves REQ-PIPE-342 and 363). CURRENT 1: 'THE SYSTEM SHALL declare on each collection in contract/data-asset.yaml's hierarchy a short and a run_prefix ...'. PROPOSED 1: '... on each collection in its asset's data-asset.yaml hierarchy ...'. CURRENT 2: 'THE SYSTEM SHALL provide one registry module that lists collections only from the hierarchy, in hierarchy order, and resolves a collection by id, by short or by run_prefix ...'. PROPOSED 2: '... that lists collections only from the selected asset's hierarchy, in hierarchy order, and resolves a collection of that asset by id, by short or by run_prefix ...'. (v1's 'resolves one of another asset only to refuse it by name' is WITHDRAWN: Keith, architect Q3 (b).)"
+      - "A19 - REQ-TEST-117 criteria 1 and 5 (serves REQ-TEST-353). CURRENT 1, in part: 'CI SHALL cache a dump of the bootstrapped database, keyed on a hash of every input that shapes it - generator/, synthetic_data_generator/, pipeline/, qa_tools/, contract/, dbt_project/, cli/pipeline.py, pyproject.toml, uv.lock and the workflow file itself.' PROPOSED 1: 'CI SHALL cache a dump of each asset's bootstrapped database, with that asset's data/<asset>/ paths, keyed on a hash of every input that shapes it - the same list, with contract/ replaced by that asset's folder and the repository-wide configuration (REQ-PIPE-365 criterion 3).' Criterion 5 is unchanged in meaning."
+      - "A20 - REQ-TEST-239 criterion 1 (serves REQ-TEST-357). CURRENT, in part: '... runs that commit's own `mothman pipeline bootstrap` from empty into a scratch database named for the label, and writes one baseline file describing surfaces S1, S4, S5 and S7 ...'. PROPOSED: '... runs that commit's own bootstrap from empty for each asset it declares - or once, where it declares none - each into a scratch database named for the label and the asset, and writes one baseline file per asset describing surfaces S1, S4, S5 and S7 ...'."
+      - "A21 - REQ-QAC-241 criterion 2 (serves REQ-PIPE-342). CURRENT: 'THE SYSTEM SHALL keep each agency's contract, Soda, Evidently and retired-check files under contract/<agency-id>/, and only the asset-wide files (data-asset.yaml, calendar.yaml, people.yaml, environments.yaml, file-checks.yaml, scripted_decisions.yaml) at the top of contract/; WHEN `mothman check` runs, IF a collection's file sits outside its agency's folder, THEN THE SYSTEM SHALL fail naming it.' PROPOSED: 'THE SYSTEM SHALL keep each agency's contract, Soda, Evidently and retired-check files under contract/<asset>/<agency-id>/, each asset's asset-wide files (data-asset.yaml, calendar.yaml, people.yaml, file-checks.yaml, scripted_decisions.yaml, presentation.yaml) at the top of contract/<asset>/, and only repository-wide files (environments.yaml and the split's move map, REQ-TEST-366) at the top of contract/; WHEN `mothman check` runs, IF a collection's file sits outside its agency's folder, THEN THE SYSTEM SHALL fail naming it.'"
+      - "A22 - REQ-PIPE-250 criteria 2 and 5 (in progress, not built; serves REQ-PIPE-352 and REQ-TEST-353). CURRENT 2: 'WHEN `mothman pipeline bootstrap` runs from empty on this sandbox with all three collections, THE SYSTEM SHALL finish within 12 minutes of wall clock, in each of three consecutive runs recorded in evidence.' PROPOSED 2: 'WHEN each asset's `mothman pipeline bootstrap` runs from empty on this sandbox, THE SYSTEM SHALL finish within 12 minutes of wall clock, in each of three consecutive runs recorded in evidence.' CURRENT 5: 'THE SYSTEM SHALL record the CI deployment half's cache-miss bootstrap time alongside, without a budget of its own.' PROPOSED 5: 'THE SYSTEM SHALL record each asset's cache-miss bootstrap time in the CI deployment half alongside, without a budget of its own' (Keith, draft Q5 (a))."
+      - "A23 - REQ-PIPE-248 criterion 7 (serves REQ-PIPE-364 and 365). CURRENT, in part: 'THE SYSTEM SHALL declare a `short` on each agency in contract/data-asset.yaml's hierarchy, unique across the asset (REQ-PIPE-240's gate extended to it), and SHALL write every collection's results as reports/results_<agency short>_<collection_id>.json ...'. PROPOSED: 'THE SYSTEM SHALL declare a `short` on each agency in its asset's data-asset.yaml hierarchy, unique across the asset and the same in every asset the agency appears in (REQ-PIPE-364 criterion 4), and SHALL write every collection's results as reports/<asset>/results_<agency short>_<collection_id>.json ...', the rest unchanged."
+      - "A24 - REQ-PIPE-255 criteria 1, 8, 24 and 30 (signed, not built; serves REQ-PIPE-354). CURRENT 8: 'THE SYSTEM SHALL take the Pages project name, its production branch name, the dashboard's address and the expected Access sign-in domain from contract/data-asset.yaml, one site per data-asset deployment, and SHALL NOT hardcode any of them in code.' PROPOSED 8: '... from the selected asset's data-asset.yaml, one Cloudflare Pages project per asset (REQ-PIPE-354), and SHALL NOT hardcode any of them in code.' Criterion 1's 'snapshots/ with every snapshot' becomes 'snapshots/ with every snapshot in the selected asset's archive (REQ-PIPE-354 criterion 8)'. Criterion 24's 'the newest archived snapshot in dashboard/snapshots/' becomes 'the newest archived snapshot in the selected asset's archive'. Criterion 30's test SHALL publish under each asset."
+      - "A25 - REQ-PIPE-257 criteria 1, 3, 6, 8, 12 and 14 (signed, not built; serves REQ-PIPE-354). CURRENT 1: 'THE SYSTEM SHALL require Cloudflare Access sign-in for the Pages project's production hostname, <project>.pages.dev, and for every deployment and branch-alias hostname under *.<project>.pages.dev.' PROPOSED 1: 'THE SYSTEM SHALL require Cloudflare Access sign-in for each asset's Pages project's production hostname ... under its own Access applications and policy.' CURRENT 3: 'THE SYSTEM SHALL admit only email addresses listed one by one in the Access policy ...'. PROPOSED 3: '... listed one by one in each asset's own Access policy ...', the rest unchanged. Criterion 6's runbook gives every step once per asset project. Criterion 8's 'from contract/data-asset.yaml' becomes 'from the selected asset's data-asset.yaml'. Criterion 12's verify-access checks the selected asset's project. Criterion 14 is verified for each asset's project."
+      - "A26 - REQ-GHUB-258 criterion 1 (signed, not built; serves REQ-PIPE-354). CURRENT: 'THE SYSTEM SHALL take the published dashboard's address from contract/data-asset.yaml, beside the Pages project name, and SHALL NOT hardcode a dashboard address in product code.' PROPOSED: 'THE SYSTEM SHALL take each asset's published dashboard address from that asset's data-asset.yaml, beside its Pages project name, and SHALL NOT hardcode a dashboard address in product code.'"
+      - "A27 - REQ-DOCS-259 criteria 2, 5 and 7 (signed, not built; serves REQ-PIPE-354). CURRENT 2, in part: '... a real publish is serving the current dashboard and every snapshot from the private host, and an allow-listed person other than Keith has signed in to it.' PROPOSED 2: '... a real publish is serving each asset's current dashboard and its snapshots from its own private project, and an allow-listed person other than Keith has signed in to each.' Criterion 5's '`mothman dashboard verify-access` passing' becomes '... passing for each asset'. Criterion 7's 'where the dashboard is hosted' becomes 'where each asset's dashboard is hosted'."
+      - "A28 - REQ-DASH-209 criterion 1 (serves REQ-DASH-367). CURRENT, in part: 'THE SYSTEM SHALL offer, for each period of every collection - daily collections included, one view per day - a period-composition view with one row per dataset of that collection ...'. PROPOSED: 'WHILE a period is chosen (REQ-DASH-355), THE SYSTEM SHALL show in each collection's panel on the agency page - daily collections included, one per day - a composition table with one row per dataset of that collection ...', the rest unchanged."
+      - "A29 - REQ-DASH-209 criterion 5 (serves REQ-DASH-367). CURRENT: '... each dataset's name a real link (<a href>) to that dataset's page at the same date on show, and each from <period> a real link to that period's composition view.' PROPOSED: '... to that dataset's page at the same date on show and period, and each from <period> a real link to the agency page with that period set (REQ-DASH-367 criterion 6).'"
+      - "A30 - REQ-DASH-209 criterion 6 (serves REQ-DASH-367). CURRENT, in part: 'THE SYSTEM SHALL give the view its own address in the dashboard's existing routing - #/agency/<agency>/collection/<collection>/period/<period> ...'. PROPOSED: RETIRED, replaced by REQ-DASH-367 criteria 3 and 6: the route is retired, old links open the agency page with the period set, and every link to the view goes there."
+      - "A31 - REQ-DASH-209 criterion 7 and REQ-DASH-208 criterion 2 (serve REQ-DASH-367). CURRENT 209/7, in part: 'THE SYSTEM SHALL let TS-55's chip in the test-scenarios panel open its period's composition view ...'. PROPOSED: '... open the agency page with its period set and its collection's composition table in view ...', the rest unchanged. CURRENT 208/2, in part: '... or the period-composition view's table once REQ-DASH-209 adds it ...'. PROPOSED: '... or a collection's composition table on the agency page (REQ-DASH-367) ...'."
+      - "A32 - REQ-DASH-209 criterion 8 (serves REQ-DASH-355 and 367). CURRENT: 'WHERE no dataset of the collection holds anything in the period on the date on show, THE SYSTEM SHALL say so in one line above the rows; and WHERE the date on show is before the period opened, THE SYSTEM SHALL show <period> had not opened by <date> in place of the rows.' PROPOSED: the same, 'in place of the rows' reading 'in that collection's panel, in place of its table (REQ-DASH-355 criterion 9)'."
+      - "A33 - REQ-DASH-209 criterion 12 (serves REQ-DASH-367). CURRENT, in part: 'THE SYSTEM SHALL head the view with an h2 reading <collection> · <period name> over a sub-line ... SHALL show the rail as Agencies › <agency> › <collection> › <period name>, SHALL give the table a caption saying the same, and SHALL move focus to the h2 on arrival.' PROPOSED: 'THE SYSTEM SHALL caption each composition table <collection> · <period name> — what each dataset held at the end of <date on show>, SHALL leave the rail as the agency page's, and SHALL move focus to the caption on arrival from a retired period link (REQ-DASH-367 criterion 3).'"
+      - "A34 - REQ-DASH-209 criterion 13 (serves REQ-DASH-367). CURRENT: 'IF the address names an agency, collection or period the dashboard does not hold, THEN THE SYSTEM SHALL show the existing not-found page (renderNotFound) naming what was not found, and SHALL NOT show an empty view.' PROPOSED: RETIRED, replaced by REQ-DASH-367 criterion 5."
+      - "A35 - REQ-DASH-209 criterion 14 (serves REQ-DASH-367). CURRENT, in part: 'THE SYSTEM SHALL show beside the view's h2 a link to the previous period's composition view and one to the next period's ...'. PROPOSED: RETIRED, replaced by REQ-DASH-367 criterion 2, the links moving the global period control."
+      - "A36 - REQ-DASH-209 criteria 2, 3, 4, 9, 10 and 11 are UNCHANGED IN MEANING, listed so the rewrite is seen whole: criterion 3's contract/people.yaml follows the blanket rule; criterion 10's test is re-pointed at the agency page's table by REQ-DASH-367 criterion 7; criterion 11 is history."
+      - "REQ-DASH-054 DECISION 14 IS SUPERSEDED, NOT EDITED (delivery-scoper): decisions are history, and REQ-DASH-355's decisions say why it is reopened. REQ-DASH-054 criteria 1 and 6 ('each of the asset's named calendars') stay true of an asset with one."
+      - "SIGNING (Keith, 2026-10-31, draft Q4 (a)): the blanket rule signed once, the 36 amendments one by one. REJECTED (b), every path-only edit quoted and signed, and (c), leaving path-only criteria naming files that no longer exist. The rule widened (architect) to reports/, SCENARIOS.md and snapshot paths; data/ added by the scoper on the same reasoning, for Keith's confirmation with the rule."
+      - "THE BLANKET SWEEP, counted by script on 2026-10-31 at commit 7e9bf6e over signed or built requirements, to be re-counted when applying. Asset-wide contract files, 99 criteria in 57 requirements: REQ-DASH-054 2; REQ-DASH-209 3; REQ-DASH-220 13; REQ-DASH-299 9, 10; REQ-DOCS-219 10; REQ-GEN-135 9; REQ-GEN-183 1; REQ-GEN-184 9; REQ-GEN-185 7; REQ-GEN-199 13, 29, 38; REQ-GEN-200 10; REQ-GEN-201 3; REQ-GEN-205 1, 4; REQ-GEN-218 1, 2; REQ-GEN-235 2; REQ-GEN-251 1; REQ-GEN-295 12; REQ-GEN-325 4; REQ-GEN-334 4; REQ-GHUB-082 14, 29; REQ-GHUB-171 5; REQ-GHUB-174 1, 2; REQ-PIPE-048 1; REQ-PIPE-049 4, 8, 9; REQ-PIPE-093 12, 13; REQ-PIPE-103 16; REQ-PIPE-110 12, 13, 14, 16, 17, 19, 23, 26; REQ-PIPE-111 1, 22; REQ-PIPE-112 1, 17; REQ-PIPE-122 1, 13, 24; REQ-PIPE-132 4; REQ-PIPE-134 2; REQ-PIPE-146 1, 6; REQ-PIPE-147 7; REQ-PIPE-156 1; REQ-PIPE-161 1; REQ-PIPE-163 22; REQ-PIPE-166 1; REQ-PIPE-169 13, 14; REQ-PIPE-179 4, 20, 28, 34, 37, 40; REQ-PIPE-202 1, 11; REQ-PIPE-254 1, 6; REQ-PIPE-320 1, 3; REQ-PIPE-322 9; REQ-QAC-176 22; REQ-QAC-231 1, 2, 8; REQ-QAC-241 8; REQ-QAC-294 1, 11, 12; REQ-QAC-300 1, 10; REQ-QAC-330 1, 2, 8; REQ-TEST-249 3, 6, 10. reports/: REQ-TEST-239 8, 12; REQ-TEST-252 15; REQ-TEST-249 6; REQ-TEST-281 4. SCENARIOS.md: REQ-PIPE-131 15; REQ-DASH-139 2; REQ-TEST-253 1, 2; REQ-GEN-201 10; REQ-GEN-325 4 (REQ-GEN-045 names 'a map', not the file). Snapshots: REQ-PIPE-089 10; REQ-PIPE-255 22, 32; REQ-DASH-292 3, 4. data/: REQ-PIPE-102 3; REQ-GEN-201 5; REQ-GEN-334 6; REQ-GEN-295 3. (REQ-PIPE-107 1, REQ-PIPE-110 1 and 18, REQ-PIPE-240 1, REQ-PIPE-248 7, REQ-PIPE-255 1, 8 and 24, REQ-PIPE-257 8 and REQ-GHUB-258 1 also name a path and are covered by A15, A4, A9, A18, A23, A24, A25 and A26 instead.)"
+    open_questions: []
+
+# ---------------------------------------------------------------------------
+# CARRY-OVER CHECK (CLAUDE.md's batch-scoping rule 3), v2, 2026-10-31, against
+# v1, Keith's answers (docs/drafts/asset-split-answers.md), the architect
+# review and the UX review, on top of v1's check against #131, #55 and #109
+# (every v1 line still holds, re-pointed where requirements moved).
+#
+# KEITH'S ANSWERS, 2026-10-31
+#  - Architect Q1 (a) one Cloudflare project per asset; rejected (b) ......... REQ-PIPE-354 decision 1, criteria 3-5
+#  - REQ-PIPE-255/257, REQ-GHUB-258, REQ-DOCS-259 amended for two projects .... REQ-DOCS-358 A24-A27; REQ-PIPE-354 decision 5
+#  - landing page at most optional ............................................ dropped by the old-address answer; REQ-PIPE-354 decision 2
+#  - Draft Q2 (b) meaningful ids, both; rejected (a); exact ids at sign-off ... REQ-QAC-344 criterion 1, decision 1
+#  - narrow signed exception + self-expiring transform, both assets ........... REQ-QAC-344 criteria 4-8
+#  - Draft Q3 (a) Cancer (annual, quarterly), Mental Health (weekly, daily);
+#    replaces School Census / Celebrant Register; DoH, names, August, Monday .. REQ-QAC-348 criteria 1-2, decisions 2-3; REQ-QAC-350 criteria 1-2, decision 2
+#  - Draft Q4 (a) blanket rule + sweep, widened; meaning changes one by one ... REQ-DOCS-358 criteria 1-2, decision SIGNING
+#  - Draft Q5 (a) 10% cache-hit ceiling; 12 min per asset; cache-miss recorded  REQ-TEST-353 criterion 7, decision 1; REQ-PIPE-352 criterion 5; A22
+#  - Architect Q2 (a) pytest exempt, each test one db; one deployment job ..... REQ-PIPE-343 criteria 5-6, decision 2; REQ-TEST-353 criteria 2, 4
+#  - Architect Q3 (b) no such command; nothing reads another asset ............ REQ-PIPE-363 criteria 2-3, decision 2; REQ-PIPE-343 decision 3; A18 (the repository gate's id comparison goes back to Keith as Q4, REQ-PIPE-364)
+#  - Architect Q4 (a) geocoding's contract changes first ...................... REQ-PIPE-342 decision 5; REQ-TEST-357 criterion 5; A14
+#  - Draft Q1 (b) fold the table into the agency page, retire the route,
+#    redirect; 209 rewritten as amendments; UX Q3 moot ......................... REQ-DASH-367, decision 1; A28-A36; REQ-DASH-355 decision 9
+#  - UX Q1 (c) config-driven section names; collection or datasets at sign-off  REQ-DASH-356 criterion 4, decisions 4-5, Q1
+#  - UX Q4 (a) keep the control, 'For day' .................................... REQ-DASH-355 criterion 1, decision 4
+#  - Old address (a): today's project -> quarterly; daily new; one-line BR
+#    notice; no redirect script; drops landing page, UX MUST 5, UX Q2 ......... REQ-PIPE-354 criteria 4, 6-7, decision 2
+#
+# ARCHITECT REVIEW
+#  - BLOCKING 1 hosting contradiction ......................................... REQ-PIPE-354 rewrite; A24-A27; A16's criterion-12 part withdrawn
+#  - BLOCKING 2 one move map, every base-commit read, self-expiring; CODEOWNERS  REQ-TEST-366; REQ-PIPE-342 criterion 9
+#  - BLOCKING 3 narrow self-expiring id transform ............................. REQ-QAC-344 criteria 4-7, decision 3
+#  - BLOCKING 4 CLI groups at import; check/--help with no asset .............. REQ-PIPE-363 criteria 2-5, decision 3
+#  - SHOULD reuse check_id.py's asset segment ................................. REQ-PIPE-364 criterion 2
+#  - SHOULD resolver from DATA_ASSET_YAML / validate_schedule.Source, ~12
+#    constants, call time, 27 monkeypatching test files ........................ REQ-PIPE-342 criteria 6-7, decision 8
+#  - SHOULD scenario_injection.py:1315, child_protection.py:736 ............... REQ-PIPE-345 criterion 6, decision 9
+#  - SHOULD 343 c5 vs 353 c3 ................................................... resolved by Keith's answer: REQ-PIPE-343 criteria 5-7
+#  - SHOULD cache_key per asset ............................................... REQ-PIPE-365 criterion 3; REQ-TEST-353 criterion 1; A19
+#  - SHOULD rebuild-results / build-data per asset ............................ REQ-PIPE-365 criterion 4; REQ-TEST-353 criterion 3
+#  - SHOULD data/scenario_placements.json ..................................... REQ-PIPE-365 criterion 1, decision 1
+#  - SHOULD checkpoints per asset ............................................. REQ-PIPE-365 criterion 2
+#  - SHOULD missing amendment REQ-PIPE-248 .................................... A23
+#  - SHOULD SCENARIOS.md in GEN-045, PIPE-131, DASH-139, GEN-201 .............. blanket sweep (path only); GEN-045 names no file
+#  - SHOULD REQ-TEST-117's cache path list .................................... A19
+#  - SHOULD the four hosting requirements ..................................... A24-A27
+#  - NIT 354 c4 landing names vs agency map ................................... not needed - no landing page
+#  - NIT 356 c5 reuse what is embedded; PERIOD_SEQUENCES ...................... REQ-DASH-356 criterion 7, decision 8; REQ-DASH-355 criterion 2
+#  - NIT split REQ-PIPE-342 into three ........................................ REQ-PIPE-342 / 363 / 364 / 365; REQ-PIPE-342 decision 9
+#  - Geocoding in parallel: seeds and ids do not clash ........................ not needed - Cancer and Mental Health take [73000, 75000), clear of geocoding's [71000, 72000)
+#
+# UX REVIEW
+#  - MUST 1 bound by newest opened period ..................................... REQ-DASH-355 criterion 2, decision 7
+#  - MUST 2 'had not opened' per collection panel ............................. REQ-DASH-355 criterion 9; A32
+#  - MUST 3 one statement in #in-place-on-past-notice; mode error ............. REQ-DASH-355 criterion 6, decision 8
+#  - MUST 4 Back/forward, replaceState ........................................ REQ-DASH-355 criterion 4, decision 9 (from/to pattern moot under Q1 (b))
+#  - MUST 5 landing-page redirect ............................................. not needed - dropped with the landing page (Keith, old address (a))
+#  - SHOULD path vs ?period= .................................................. REQ-DASH-367 criterion 4, decision 2
+#  - SHOULD 'For day' ......................................................... REQ-DASH-355 criterion 1
+#  - SHOULD 'Period: all current' ............................................. REQ-DASH-355 criterion 1, decision 10
+#  - SHOULD title and announcer ............................................... REQ-DASH-355 criterion 7
+#  - SHOULD section names, hide an empty one, mixed collection ................ REQ-DASH-356 criteria 4-6, decisions 4, 7
+#  - SHOULD 356 c7 / 347 c2 clash ............................................. REQ-DASH-347 decision 2; REQ-DASH-356 criterion 8
+#  - NIT 'Weekdays' ........................................................... REQ-DASH-347 criterion 1
+#  - NIT group 55 quarters by year ............................................ REQ-DASH-355 criterion 2
+#  - NIT one-line description per asset on the landing page ................... not needed - no landing page
+#  - Proofs: 355 c7 before/after captures, non-empty .......................... REQ-DASH-355 criterion 10, decision 13
+#  - Proofs: 356 c7 assert not Monday, dataset present ........................ REQ-DASH-356 criterion 8; REQ-DASH-347 criterion 4
+#  - On Q1: arrival-context drill keeps setting the date ...................... REQ-DASH-355 decision 11
+#
+# #132 (Pass / Warn / Fail)
+#  - new displayed status words in that vocabulary; dependency ................ file header; REQ-DASH-347/355/356 NFRs and dependencies on REQ-DASH-359; GEN-349/351 prose
+#
+# v1 ITEMS DROPPED OR CHANGED, so nothing is lost silently
+#  - v1 342 c8 (refuse naming the other asset) ................................ dropped by Keith's architect Q3 (b); REQ-PIPE-363 decision 2
+#  - v1 342 c11 naming the other asset ........................................ REQ-PIPE-364 criterion 5 names only the folder checked
+#  - v1 342 c9 agency shorts unique across the repository ..................... relaxed: one agency may be in both assets (REQ-PIPE-364 criterion 4, decision 1)
+#  - v1 343 c3 naming the other folder ........................................ REQ-PIPE-343 criterion 3, decision 3
+#  - v1 344 'quarterly keeps data-asset-1' and its scale NFR .................. superseded by Q2 (b); REQ-QAC-344 decision 1
+#  - v1 354 one site, landing page, redirect by agency, per-path publish ...... superseded; REQ-PIPE-354 decisions 1-2
+#  - v1 355 c9 period page joined to the control (Q1 (a)) ..................... superseded by REQ-DASH-367
+#  - v1 356 'period page is not grown into the view' .......................... still true: every page reads the control; the table moved, it did not grow
+#  - v1 357 c5 freeze-gate fix ................................................ REQ-TEST-366; REQ-TEST-357 decision 3
+#  - v1 A16 criterion 12, A18 'refuse by name' ................................ withdrawn, recorded in A16 and A18
+#
+# NFR ANGLES (delivery-scoper): performance, scale, reliability, security,
+# privacy, compatibility, maintainability, auditability and cost each judged
+# and carried above; compliance and retention judged not to apply beyond the
+# per-asset separation already required. No new NFR question for Keith -
+# the cost and isolation forks were his Q5 and architect Q1-Q3.
+#
+# Nothing left uncarried.
+# ---------------------------------------------------------------------------

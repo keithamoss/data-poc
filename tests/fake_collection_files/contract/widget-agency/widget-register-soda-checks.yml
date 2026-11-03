@@ -1,0 +1,27 @@
+# REQ-TEST-249: the fake collection's Soda checks.
+checks for widgets:
+  - row_count:
+      fail: when < 50
+      attributes:
+        check_id: data-asset-1.widget-agency.widget-register.widgets.row_count_soda
+        category: completeness
+        introduced_date: "2026-10-18"
+        description: >
+          The number of rows in the supply must fall inside the expected band.
+        failure_indicates: >
+          self-evident
+        changelog: []
+
+  - missing_count(colour):
+      warn: when > 0
+      fail: when > 3
+      samples limit: 100
+      attributes:
+        check_id: data-asset-1.widget-agency.widget-register.widgets.colour.missing_count_soda
+        category: completeness
+        introduced_date: "2026-10-18"
+        description: >
+          A few empty values are tolerated; a sustained rise fails.
+        failure_indicates: >
+          self-evident
+        changelog: []

@@ -13,16 +13,12 @@ Keith's explicit requirement, 2026-09-16 (the same day the template/
 build-output split landed): opening the raw template (before
 embed_dashboard_data.py has ever run - a real path a contributor can
 hit, not just a hypothetical) must not crash just because its
-REAL_BIRTH_REG_DATA/REAL_CP_DATA/SNAPSHOT_MANIFEST consts are still
-placeholders (null/null/[]). See buildBirthRegistrations()'s/
-buildChildProtectionDatasets()'s own comment in the template for the
-fallback mechanism (genDataset(), the same illustrative-mock generator
-the other 14 non-real datasets already use) this check verifies.
+COLLECTION_DATA/SNAPSHOT_MANIFEST consts are still placeholders
+(null/[]).
 
 Doesn't build anything itself - run this after the full rebuild
-(qa_tools.bdm/cp.build_results_from_history, pipeline.
-build_dashboard_data/build_cp_dashboard_data, dashboard.
-embed_dashboard_data) has already produced the file. Needs Playwright's
+(qa_tools.tools.results_history, pipeline.build_dashboard_data,
+dashboard.embed_dashboard_data) has already produced the file. Needs Playwright's
 Chromium already available (see pyproject.toml's dev dependency group).
 
 Run as `python3 -m dashboard.check_dashboard_renders`.
@@ -30,15 +26,12 @@ Run as `python3 -m dashboard.check_dashboard_renders`.
 from __future__ import annotations
 
 import asyncio
-import json
 import os
-import re
 import sys
 from pathlib import Path
 
 from playwright.async_api import async_playwright
 
-from dashboard.embed_dashboard_data import TARGETS
 
 ROOT = Path(__file__).resolve().parent.parent
 DASHBOARD_PATH = ROOT / "dashboard" / "qa-reporting-dashboard.html"
@@ -79,24 +72,27 @@ def _resolve_chromium_path() -> str | None:
 _CHROMIUM_PATH = _resolve_chromium_path()
 
 
-def _check_embedded_json() -> list[str]:
-    """Each `const <NAME> = {...};` block actually parses as JSON - the
-    exact same single-line regex embed_dashboard_data.py itself uses to
-    find and replace these lines, reused here rather than re-derived, so
-    the two never drift apart on what "the embedded data line" means."""
-    html = DASHBOARD_PATH.read_text()
-    errors = []
-    for const_name, _data_path in TARGETS:
-        pattern = re.compile(rf"const {const_name} = (.*?);\n")
-        match = pattern.search(html)
-        if not match:
-            errors.append(f"{const_name}: no embedded const found in the built HTML")
-            continue
-        try:
-            json.loads(match.group(1))
-        except json.JSONDecodeError as e:
-            errors.append(f"{const_name}: embedded data isn't valid JSON - {e}")
-    return errors
+def _check_embedded_json(page: Path | None = None) -> list[str]:
+    """The built page's COLLECTION_DATA is all there and is what its list
+    says - read through dashboard/data_files.py's one reader
+    (REQ-DASH-291 criteria 13 and 14), which takes the page's data from its
+    sibling files, its inline blocks or, for a page built before the split,
+    the const itself. So the gate and the build cannot disagree on what "the
+    page's data" is, and a missing file, or one whose SHA-256 differs from
+    the page's list, fails here before any browser is started."""
+    from dashboard import data_files
+    from qa_tools import collections
+
+    page = page or DASHBOARD_PATH
+    found = data_files.read_page(page.read_text(), page.parent)
+    if found.problems:
+        return [f"COLLECTION_DATA: {p}" if not p.startswith("COLLECTION_DATA") else p
+                for p in found.problems]
+    data = found.collections
+    # EVERY REGISTERED COLLECTION IS IN IT (REQ-DASH-244 criterion 9) -
+    # the list from the registry, never a second one here.
+    return [f"COLLECTION_DATA: no entry for collection {c.id!r}"
+            for c in collections.all_collections() if c.id not in (data or {})]
 
 
 async def _check_render(html_path: Path, label: str) -> list[str]:
@@ -116,22 +112,117 @@ async def _check_render(html_path: Path, label: str) -> list[str]:
         view_html = await page.locator("#view").inner_html()
         if not view_html.strip():
             console_errors.append("#view is empty after load - the dashboard app never rendered")
+        # A page that rendered its missing-file error rendered no tier at all
+        # (REQ-DASH-291 criterion 14), whatever the console says.
+        if await page.locator('[data-testid="data-file-error"]').count():
+            console_errors.append("the page shows its data-file error: "
+                                  + (await page.locator('[data-testid="data-file-error"]').inner_text()))
+
+        # EVERY DATASET, not just the landing page
+        # (plans/post-build-review.md #43). This gate is cited as "what
+        # would catch a throw reaching a viewer", and for a long time it
+        # could not: it loaded the front door and stopped, while three
+        # of seven dataset pages threw an uncaught TypeError on
+        # drill-down. Proven blind before this was written - the bug was
+        # reintroduced into a built copy and the gate still reported
+        # zero console errors.
+        #
+        # Routes come from the page's own DATA and its own
+        # stateToHash(), so a dataset added later is covered without
+        # anybody remembering to add it here, and the gate can never
+        # visit a route the app would not build.
+        routes = await page.evaluate("""() => {
+            // `typeof DATA`, not `window.DATA`: a top-level `const`
+            // creates a global BINDING but not a window property, so
+            // window.DATA is undefined while DATA itself is fine. The
+            // first version tested window.DATA, got nothing, and
+            // enumerated zero routes - the second no-op in a row while
+            // extending this gate.
+            if(typeof DATA === "undefined" || !DATA || !DATA.agencies) return [];
+            const out = [];
+            DATA.agencies.forEach(ag => {
+                out.push(stateToHash({tier:"agency", agencyId:ag.id}));
+                ag.collections.forEach(col => col.datasets.forEach(ds =>
+                    out.push(stateToHash({tier:"dataset", agencyId:ag.id,
+                                           collectionId:col.id, datasetId:ds.id}))));
+            });
+            return out;
+        }""")
+        # A REAL LOAD PER ROUTE, not an assignment to location.hash.
+        # The first version of this did the latter and was a no-op: the
+        # app listens for `popstate`, which a programmatic hash
+        # assignment does not fire, so the gate "visited" nine routes
+        # without re-rendering once and still reported zero errors.
+        # Caught by re-proving it against the reintroduced bug rather
+        # than trusting the change - which is the same
+        # a-check-that-never-runs-looks-like-success shape this gate was
+        # being extended to close.
+        #
+        # A full load is also what a person opening a shared deep link
+        # actually does, so it exercises the initial-state resolution
+        # path as well as the render.
+        for route in routes:
+            await page.goto(f"file://{html_path.resolve()}{route}")
+            await page.wait_for_timeout(400)
+            body = await page.locator("#view").inner_html()
+            if not body.strip():
+                console_errors.append(f"#view is empty at {route}")
 
         await browser.close()
     return [f"{label} render check: {e}" for e in console_errors]
 
 
+def render_errors(path: Path, label: str) -> list[str]:
+    """The real-browser render check of one page, run to completion.
+
+    IN A THREAD OF ITS OWN WHEN THE CALLER ALREADY HAS A RUNNING EVENT LOOP
+    (post-build-review #271), because asyncio.run() refuses to start inside
+    one. A terminal never has one; a test process does once a sync
+    Playwright session is open in it, as pytest-playwright's is for the rest
+    of a test worker's session."""
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:  # no loop running - the ordinary case
+        return asyncio.run(_check_render(path, label))
+    import threading
+
+    out: dict = {}
+
+    def _in_thread():
+        try:
+            out["errors"] = asyncio.run(_check_render(path, label))
+        except BaseException as exc:  # handed back to the caller below
+            out["raised"] = exc
+
+    thread = threading.Thread(target=_in_thread)
+    thread.start()
+    thread.join()
+    if "raised" in out:
+        raise out["raised"]
+    return out["errors"]
+
+
+def built_page() -> Path:
+    """The page to check: the real build's, or under `--out-dir` that build's
+    own (REQ-TEST-281)."""
+    from qa_tools.common import build_output
+
+    out = build_output.out_dir()
+    return Path(out) / build_output.PAGE_NAME if out else DASHBOARD_PATH
+
+
 def main() -> int:
-    if not DASHBOARD_PATH.exists():
-        print(f"FAILED: {DASHBOARD_PATH} doesn't exist - run the build pipeline first.", file=sys.stderr)
+    page = built_page()
+    if not page.exists():
+        print(f"FAILED: {page} doesn't exist - run the build pipeline first.", file=sys.stderr)
         return 1
     if not TEMPLATE_PATH.exists():
         print(f"FAILED: {TEMPLATE_PATH} doesn't exist.", file=sys.stderr)
         return 1
 
-    errors = _check_embedded_json()
-    errors += asyncio.run(_check_render(DASHBOARD_PATH, "built output"))
-    errors += asyncio.run(_check_render(TEMPLATE_PATH, "template"))
+    errors = _check_embedded_json(page)
+    errors += render_errors(page, "built output")
+    errors += render_errors(TEMPLATE_PATH, "template")
 
     if errors:
         print(f"dashboard render check FAILED ({len(errors)} error(s)):", file=sys.stderr)
