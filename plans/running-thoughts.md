@@ -6159,7 +6159,7 @@ could never have computed it), and it belongs with batch 5's check work.
     Keith, 2026-11-02 morning, after the CI cost re-measure (CLAUDE.md, commit-cadence rule: ~80 billable minutes a push on a cache hit, ~145 on a miss, both pytest halves several times what they were on 2026-10-24): "I think we can do something about these tests taking so long. I'd like to do another test audit and really dig into it at some point." In the meantime he asked whether a set of the most critical tests could run in CI in under five minutes, accepting the cost of running the full gate locally instead. **The interim fast set is BUILT as REQ-TEST-375** (signed 2026-11-02; its decisions carry the scoping answers below and the open-question answers, so this item's remaining work is the audit alone). **Still todo, NOT SCOPED: the test-time audit itself** - why the suites take so long, and what would make the full run cheap again.
     **Scoping answers, Keith 2026-11-02:** the fast CI set is a HAND-PICKED `critical` mark (rejected: a measured 'slow' mark, and whole module kinds); I propose the list against stated criteria with timings and Keith signs it off before it reaches CI. Coverage's `fail_under` is enforced in the LOCAL full gate, not CI (rejected: a lower CI floor). The deployment half and the full `test.yml` become a workflow started BY HAND (rejected: nightly, over the allowance; dropping it from CI entirely). The JS tests run ALONGSIDE as their own job, so the Python critical set has the whole five minutes. The full gate runs locally before every push, its result in the commit message.
 
-137. **[todo, 2026-11-02]** **[QA pipeline]** **Is the schedule code bigger
+137. **[in-progress, 2026-11-02]** **[QA pipeline]** **Is the schedule code bigger
      than it needs to be?** Keith, 2026-11-02, reading the split overview:
      "how do we have 1,020 lines in schedule.py and 582 in slots.py? ...
      that's not complex logic." Measured the same day: the four modules
@@ -6221,3 +6221,22 @@ could never have computed it), and it belongs with batch 5's check work.
      B, C and D go to delivery-scoper with #134, and nothing from them is
      built before Keith signs what the scoper drafts. The duplicate-table
      sighting goes with them to be confirmed or dismissed.
+
+     **GROUP A BUILT 2026-11-02 (branch `btidy`, off `work` at 113d9f35,
+     before the #134 move had merged, so the four files were still in
+     qa_tools/common/).** No behaviour change and no register edit: history
+     prose deleted only where `decisions:` already carries it
+     (REQ-PIPE-049, 051, 052, 110, 113, 131, 048, QAC-039), the rest
+     compressed to the current rule and its why; `Dataset.qa_results_scope`
+     and `hierarchy.contract_path` removed (no product callers; one test
+     removed, one repointed at `collections.by_id(...).contract`); local
+     re-imports hoisted with no cycle; `_renamed_for_year`'s no-op
+     arithmetic and unused parameter gone; one authored-period filter loop,
+     one ISO parse (`_parse_iso`), one zone lookup (`_zone_in_force`), one
+     `parse_hhmm()`; `period_claimed_at` calls `is_open`; the agreement
+     resolved once per call. Lines, code / prose (docstrings and comments)
+     / total, before -> after: schedule.py 449/463/1028 -> 445/404/961,
+     slots.py 229/296/583 -> 223/270/544, asset_time.py 157/195/410 ->
+     148/177/387, hierarchy.py 112/143/293 -> 107/97/239; all four
+     947/1097/2314 -> 923/948/2131. Groups B, C and D and the
+     duplicate-table sighting are untouched, waiting on the scoper.
