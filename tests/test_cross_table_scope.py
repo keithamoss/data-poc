@@ -151,7 +151,7 @@ class TestTheRebuildPathReadsTheScope:
     def test_an_absent_scope_reads_as_nothing_rather_than_raising(self, clean_qa_history):
         assert reader.read_cross_table_results(AGENCY, COLLECTION) == []
 
-    @pytest.mark.parametrize("module", asset_params.per_asset(rebuild_support.REBUILDS))
+    @pytest.mark.parametrize("module", asset_params.per_asset((COLLECTION,)))
     def test_both_rebuild_paths_read_the_scope(self, clean_qa_history, tmp_path, monkeypatch,
                                                module):
         """A run recorded with one cross-table result and one ordinary
@@ -159,9 +159,12 @@ class TestTheRebuildPathReadsTheScope:
         omitted the scope looks entirely healthy - it just publishes
         fewer checks than the run actually produced.
 
-        Birth Registrations has no cross-table check of its own, so a
-        Child Protection one stands in: what is under test is that its
-        rebuild reads the scope at all."""
+        ONLY FOR A COLLECTION WHOSE ASSET DECLARES A CROSS-TABLE CHECK. Birth
+        Registrations used to borrow a Child Protection one; since the asset
+        split it is the daily asset's, which cannot see the quarterly asset's
+        checks, so no result can reach its cross-table scope through real
+        configuration. The rebuild is one shared builder (REQ-DASH-244), so
+        the quarterly case proves the path reads the scope."""
         tr.forget_declared_reads()
         spanning = _a_real_cross_table_check_id()
         ordinary = rebuild_support.check(module, "row_count", "dbt")

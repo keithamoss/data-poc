@@ -169,6 +169,24 @@ class SetMemberCheck:
     changelog: tuple
 
 
+#: A dbt schema file's (path, mtime_ns, size) -> its parsed document.
+_SCHEMAS: dict = {}
+
+
+def _schema(path: Path) -> dict:
+    """A dbt schema file, parsed once per version of it. declared() is asked
+    for every geocoding file the generator writes (through
+    member_setting_of), and re-parsing every schema file each time was 84% of
+    a Linkage Products generation (post-build-review #318). Keyed by the
+    file's stat, so an edited file - or a test's copy - is read afresh. Read,
+    never mutated, by declared()."""
+    stat = path.stat()
+    key = (str(path), stat.st_mtime_ns, stat.st_size)
+    if key not in _SCHEMAS:
+        _SCHEMAS[key] = yaml.safe_load(path.read_text()) or {}
+    return _SCHEMAS[key]
+
+
 def declared(root: Path = REPO) -> list[SetMemberCheck]:
     """Every set-member check the collections' dbt schema files declare."""
     from qa_tools import collections
@@ -178,7 +196,7 @@ def declared(root: Path = REPO) -> list[SetMemberCheck]:
         path = root / coll.dbt_schema
         if not path.is_file():
             continue
-        doc = yaml.safe_load(path.read_text()) or {}
+        doc = _schema(path)
         tables = {d.table: d.dataset_id for d in coll.datasets}
         for model in doc.get("models") or []:
             table = str(model.get("name", "")).removeprefix("stg_")

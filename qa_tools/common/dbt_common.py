@@ -458,6 +458,41 @@ def _table_of_model(model: str) -> str:
 PACKAGE_LOCK = "package-lock.yml"
 
 
+#: packages.yml's (path, mtime_ns, size) -> the hash dbt computes of it.
+_HASHES: dict = {}
+
+#: dbt's own hashing of its own rendering of packages.yml (dbt.task.deps), so
+#: the answer agrees with `dbt deps` about what counts as a change.
+_HASH_SCRIPT = """
+import sys, yaml
+from dbt.config.project import package_config_from_data
+from dbt.config.renderer import PackageRenderer
+from dbt.task.deps import _create_sha1_hash
+wanted = yaml.safe_load(open(sys.argv[1]).read()) or {}
+specs = package_config_from_data(PackageRenderer({}).render_data(wanted), wanted).packages
+print(_create_sha1_hash(specs))
+"""
+
+
+def _packages_hash(packages_yml) -> str:
+    """The sha1_hash `dbt deps` writes to package-lock.yml for this
+    packages.yml - computed by dbt's own code IN A CHILD PROCESS, never this
+    one: importing dbt.task pulls in dbt's CLI, and dbt never runs in the
+    interpreter beside Soda Core, datacontract-cli or Evidently (REQ-PIPE-157
+    criterion 5; post-build-review #317 - C6 had imported it here). Cached by
+    the file's path, mtime and size, so one process asks once per version."""
+    import subprocess
+    import sys
+
+    stat = packages_yml.stat()
+    key = (str(packages_yml), stat.st_mtime_ns, stat.st_size)
+    if key not in _HASHES:
+        _HASHES[key] = subprocess.run(
+            [sys.executable, "-c", _HASH_SCRIPT, str(packages_yml)],
+            check=True, capture_output=True, text=True).stdout.strip()
+    return _HASHES[key]
+
+
 def packages_installed(project_dir) -> bool:
     """Whether one dbt project's packages count as installed - decided by
     dbt's OWN package-lock.yml, never by a file of ours (Keith, 2026-11-02,
@@ -473,20 +508,13 @@ def packages_installed(project_dir) -> bool:
     from pathlib import Path
 
     import yaml
-    from dbt.config.renderer import PackageRenderer
-    from dbt.config.project import package_config_from_data
-    from dbt.task.deps import _create_sha1_hash
 
     project = Path(project_dir)
     lock_path, packages = project / PACKAGE_LOCK, project / "dbt_packages"
     if not lock_path.is_file():
         return False
     lock = yaml.safe_load(lock_path.read_text()) or {}
-    wanted = yaml.safe_load((project / "packages.yml").read_text()) or {}
-    # dbt's own hashing of its own rendering of packages.yml (dbt.task.deps),
-    # so this agrees with `dbt deps` about what counts as a change.
-    specs = package_config_from_data(PackageRenderer({}).render_data(wanted), wanted).packages
-    if lock.get("sha1_hash") != _create_sha1_hash(specs):
+    if lock.get("sha1_hash") != _packages_hash(project / "packages.yml"):
         return False
     names = [p.get("name") for p in lock.get("packages") or []]
     if not all(n and (packages / n).is_dir() and any((packages / n).iterdir()) for n in names):

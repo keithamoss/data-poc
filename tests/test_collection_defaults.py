@@ -541,7 +541,13 @@ class TestWhereEachValueCameFrom:
         shown = []
         monkeypatch.setattr(schedule_cli, "_show_values", shown.append)
         answers = iter(["cp-clients", None])
+        # THE DATASET PICKER, whichever form it takes: the quarterly asset
+        # holds more datasets than common.N_LIST since the asset split, so the
+        # menu asks through the grouped, filtered picker (REQ-TEST-252) rather
+        # than a plain select - stubbing select alone left it asking for a
+        # terminal. What is under test is the renderer, not the picker.
         monkeypatch.setattr(common, "select", lambda *a, **k: next(answers))
+        monkeypatch.setattr(common, "grouped_select", lambda *a, **k: next(answers))
         monkeypatch.setattr(common, "text_prompt", lambda *a, **k: "2024-06-01")
         schedule_cli.calendar_menu()
         assert shown and shown[0].dataset_id == "cp-clients" and shown[0].on == date(2024, 6, 1)
