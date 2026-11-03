@@ -3308,7 +3308,9 @@ one or more component tags, and a date.
         both assets (run 41692776303); configuration validation RED (run
         41692776232) - the workflow ran its gates with no asset selected,
         missed in the move; fixed as #321 and pushed. One question for you
-        there (a regression test for a workflow's environment?).
+        there (a regression test for a workflow's environment?). CI on
+        741a1d87: BOTH GREEN - critical tests (run 41696483015) and
+        configuration validation per asset (run 41696483079).
 
     **THE BATCHES**
     - **REQ-PIPE-341, multi-column sample keys** (ad2a266, fixes 2929723,
