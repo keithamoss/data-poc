@@ -31,15 +31,9 @@ A scenario marked **not injected** has no generated data behind it.
 Either it is a pure unit test with nothing to look at, or it is meant
 for injection and has not been placed yet.
 
-**69 of 79 scenarios marked for injection have data behind them today.** 116 scenarios are registered in all; the rest are unit tests with nothing to look at.
+**69 of 69 scenarios marked for injection have data behind them today.** 69 scenarios are registered in all; the rest are unit tests with nothing to look at.
 
 ## Slot assignment
-
-### TS-3 - Arrival just OUTSIDE the claim window - four sub-tests
-
-Reframed from daily during Keith's review: the original example (22:00 due, 21:57 arrival) does not work at all, because the claim window opens BEFORE due_at, so 21:57 sits comfortably inside it and files to Tuesday correctly. The scenario only bites where the gap genuinely exceeds the window.
-
-**not injected - nothing to look at yet**
 
 ### TS-3a - Quarterly, prior slot FILLED
 
@@ -69,48 +63,6 @@ Reframed from daily during Keith's review: the original example (22:00 due, 21:5
 | Period | 2026-Q2 |
 | Set "in the warehouse on" to | 2026-05-01 |
 
-### TS-5 - A missed slot must not absorb a later resupply
-
-**What it demonstrates.** Tuesday is **closed** - it closed when Wednesday's claim window opened (REQ-PIPE-131, which replaced REQ-PIPE-063's monotonic filling: closing by time, not by a later slot filling). That is the whole point of the test.
-
-**What it would look like if the rule were wrong.** Files as Tuesday - recording a missed delivery as MET, using another day's data. Worse than a cascade, because it manufactures a delivery that never happened.
-
-*Config: MUST be stated per variant - Keith's correction.*
-
-*unit test - no generated data, nothing to navigate to*
-
-### TS-6a - Genuine lateness still fills its own slot
-
-**What it demonstrates.** Fills **Monday, late**. Monday is still the open period: lateness is allowed WITHIN a period's open interval (REQ-PIPE-131).
-
-*unit test - no generated data, nothing to navigate to*
-
-### TS-6b - A rolling lag stays correctly recorded
-
-**What it demonstrates.** Each fills its own slot, each classified late - each arrives before the next day's window opens, so its own day is still open. Nothing is left permanently unfilled - the feed is running behind, and says so. **A feed running MORE than one window behind** is the deliberate reversal (REQ-PIPE-131, reversing REQ-PIPE-063 criterion 3): it fills the open period, and the days it skipped close unfilled.
-
-*unit test - no generated data, nothing to navigate to*
-
-### TS-6c - A skipped day becomes missed, and a later backfill cannot be placed
-
-**What it demonstrates.** Wednesday's fills **Wednesday**, the open period. Tuesday closed unfilled when Wednesday's window opened -> overdue, and a human marks it not supplied (REQ-PIPE-132). If Tuesday's supply then turns up afterwards it is filed to whichever period is OPEN when it arrives - as a resupply where that period is filled - and a person re-files it into Tuesday (REQ-PIPE-131). It is never filed backward automatically, and never held merely for being late.
-
-*unit test - no generated data, nothing to navigate to*
-
-### TS-7 - No period open - hold, do not guess
-
-**What it demonstrates.** **held for a human**, never defaulted forward or backward. Defaulting forward is the forward cascade again. *Used to expect* a hold whenever the oldest claimable slot was ambiguous - REQ-PIPE-131 holds only when no period is open.
-
-*unit test - no generated data, nothing to navigate to*
-
-### TS-8 - Assignment must be order-independent
-
-**What it demonstrates.** **identical assignments both ways**, because replay is in arrival-timestamp order rather than discovery order. Identical timestamps resolve by a defined tiebreak.
-
-**What it would look like if the rule were wrong.** The answer depends on whichever file the loop happened to pick up first - non-determinism nothing would ever flag.
-
-*unit test - no generated data, nothing to navigate to*
-
 ## Arrival classification
 
 ### TS-9 - A genuinely early quarterly supply
@@ -125,12 +77,6 @@ Reframed from daily during Keith's review: the original example (22:00 due, 21:5
 | Supplies | `ed_presentations__202404221000000800` |
 | Period | 2024-Q2 |
 | Set "in the warehouse on" to | 2024-05-01 |
-
-### TS-11 - A re-filed supply reclassifies
-
-**What it demonstrates.** The verdict **recomputes** - it now reads on time. A supply reported late only because it was misfiled was never actually late. The re-filed supply returns to staging under a NEW filing (the old one kept), is checked again as a run of its own, and the gate decides (REQ-PIPE-140, REQ-PIPE-141). *Used to expect* the supply to move between slots and stay promoted - REQ-PIPE-141 made a re-file never fill its target directly.
-
-*unit test - no generated data, nothing to navigate to*
 
 ### TS-65 - Early, at the edge of the window
 
@@ -190,14 +136,6 @@ Reframed from daily during Keith's review: the original example (22:00 due, 21:5
 | Period | 2025-Q3 |
 | Set "in the warehouse on" to | 2025-05-02 |
 
-### TS-13 - Six tables landing seconds apart
-
-**What it demonstrates.** **one QA run over the delivery**, with no intermediate state in which cross-table checks read Fail. The test asserts the ABSENCE of flicker.
-
-**What it would look like if the rule were wrong.** Per-table triggering evaluates "Client reference" at 09:00:00 when notifications has not arrived, so it reads Fail, then Pass four seconds later. Transiently true and practically useless - and at 30 datasets, a Fail appearing on every healthy delivery is how people learn to ignore a Fail.
-
-**not injected - nothing to look at yet**
-
 ### TS-14 - A later single-table resupply
 
 **What it demonstrates.** It arrives as **its own delivery** and triggers QA. Its slot is clients' own August slot - per-table slot sequences mean there is no "resupply of table X within delivery Y" concept to implement; it is just clients' August supply, arriving late. The previously blocked cross-table check now runs. If it passes, clients promotes and August's slot fills. The recorded QA history keeps **both** runs - the period's current state is the latest, its history is all of them. Clients arriving also re-evaluates the waiting placements' reading checks and re-gates them (REQ-PIPE-121). *Used to say* `qa_results/` kept both runs - REQ-PIPE-089 moved the history into the database. *In the data since 2026-10-15 (REQ-GEN-044 criterion 1)*, riding TS-12's placement: TS-12's cp_clients is refused in 2025-Q2, and the corrected cp_clients arrives alone 28 days later, 10:00 on 2025-05-29, filed to 2025-Q2's still-empty slot. TS-12's link sits between the two; TS-14's lands on the correction's day.
@@ -209,171 +147,7 @@ Reframed from daily during Keith's review: the original example (22:00 due, 21:5
 | Period | 2025-Q3 |
 | Set "in the warehouse on" to | 2025-05-29 |
 
-### TS-15a - An UNEXPECTED TABLE - recognised, but not owed
-
-**What it demonstrates.** It does **not** break the delivery or block readiness, which are defined over EXPECTED tables. Not QA'd, not promoted (no slot).
-
-*unit test - no generated data, nothing to navigate to*
-
-### TS-15b - An UNRECOGNISED ARTEFACT - matches nothing
-
-**What it demonstrates.** Still does not break the delivery, still not QA'd, still not promoted. **WARNING, not informational** (Keith, 2026-09-24) - because this is indistinguishable at runtime from a supply we FAILED TO CLAIM, which is the TS-38 shape below, and a near-miss that reports quietly produces a false-complete.
-
-*unit test - no generated data, nothing to navigate to*
-
-### TS-16 - Per-table classification
-
-**What it demonstrates.** Each table gets its **own** early/on-time/late verdict. One late table does not make five punctual ones late - more honest than a single per-delivery verdict taking the worst.
-
-*unit test - no generated data, nothing to navigate to*
-
-### TS-17 - The transport cannot express a delivery boundary
-
-**What it demonstrates.** An **explicit configuration failure**, never a silent guess at grouping. The delivery boundary is load-bearing and comes from the transport, so a feed that cannot express one needs a boundary arranged as a plumbing step.
-
-*unit test - no generated data, nothing to navigate to*
-
-## Status and rollup - the false-pass family
-
-### TS-18 - Cross-table check passing, candidate rejected for a different reason
-
-**What it demonstrates.** "Client reference" does **not** keep its passing verdict for August. It reverts to **cannot-run, Fail**, because clients never entered the warehouse. The passing result stays attached to the rejected SUPPLY as evidence of what was evaluated.
-
-*unit test - no generated data, nothing to navigate to*
-
-### TS-19 - Partial nodata must not roll up to Pass
-
-**What it demonstrates.** The collection reads **Fail**.
-
-**What it would look like if the rule were wrong.** `worstOf()` is seeded at a pass and `STATUS_ORDER.nodata` is -1, so a nodata can never win a reduce - five passes plus one nodata returns a pass. Fail-for-unrun makes this structurally impossible; the test guards the old path.
-
-*unit test - no generated data, nothing to navigate to*
-
-### TS-20 - The two status implementations must agree
-
-**What it demonstrates.** Python and JS return the same status for every input, including ones the Python side does not currently know. Item 74's exact failure mode, in the module whose own docstring says it drifted from its JS counterpart once already.
-
-*unit test - no generated data, nothing to navigate to*
-
-### TS-21 - A table with no checks defined
-
-Nothing failed to run, because there was nothing to run. `worstOf()` over an empty list is seeded at a pass, so such a table reads Pass by vacuum and would auto-promote with no quality signal behind it at all. Every other false pass found was a real signal being swallowed; this is the ABSENCE of any signal reading as a good one.
-
-*unit test - no generated data, nothing to navigate to*
-
-### TS-22 - Freshness caps the headline
-
-**What it demonstrates.** The headline is **worst of (quality, freshness)**. All-passing checks on a dataset whose expected period is unfilled must not read Pass. **Keith, 2026-09-22**: the tables read **Fail, with a "no data" qualifier** - the same status-plus-chip vocabulary as a check that could not run.
-
-*unit test - no generated data, nothing to navigate to*
-
-## Schedule and config
-
-### TS-23 - Exhausted schedule
-
-**What it demonstrates.** The pipeline **hard-fails for that dataset only**; sibling datasets are unaffected; supplies pile up in staging (safe, because staging preserves arrival facts and the backlog drains correctly once dates are added); and the dashboard **still shows the banner**, computed from config, even though no new results were produced. A dashboard that stopped updating otherwise looks identical to one where nothing changed.
-
-*unit test - no generated data, nothing to navigate to*
-
-### TS-24 - Low runway
-
-**What it demonstrates.** A warning when fewer than N expected supplies remain, measured in **slots** not months - three months of quarterly runway is one slot, which is already too late. Non- fatal, so it cannot fail an otherwise-fine build, which is how gates get disabled.
-
-*unit test - no generated data, nothing to navigate to*
-
-### TS-25 - Config typo yielding zero slots
-
-**What it demonstrates.** `mothman check` **fails**. A dataset must never silently reach zero slots - that is the exhausted-schedule state, reached by accident, on a dataset nobody is watching.
-
-*unit test - no generated data, nothing to navigate to*
-
-### TS-26 - Schedule version change
-
-**What it demonstrates.** Each period is evaluated against the version **in force at its own due date**. Periods that were met stay met; history does not move when a supplier changes.
-
-*unit test - no generated data, nothing to navigate to*
-
-### TS-27 - `not_expected` versus marked not supplied
-
-**What it demonstrates.** `not_expected` yields **no slot** - nothing owed, nothing overdue, nothing failing. A closed slot a person marks **not supplied** (REQ-PIPE-132) **keeps its slot**, unfilled, reading "not supplied (accepted)", counted as an obligation NOT MET, with a reason. The distinction protects supplier reliability from becoming whatever people were willing to excuse after the fact. *Used to say* "marked missed" - REQ-PIPE-132 introduced mark as not supplied, which records the decision.
-
-*unit test - no generated data, nothing to navigate to*
-
-## Composition and as-at
-
-### TS-28 - Rejected Monday, promoted Friday
-
-**What it demonstrates.** The supply is **absent** from the in-place-on-Wednesday view: it was rejected on Monday, so it was withdrawn on every day before Friday (REQ-PIPE-081 criteria 1, 2 and 8 as amended 2026-10-05). *Used to expect* it absent because "filtering is on **promotion**, not arrival" (Keith, 2026-09-22) - the amended criteria show the newest supply promoted OR awaiting, and a supply leaves the view only when withdrawn, so the answer stands for a different reason.
-
-*unit test - no generated data, nothing to navigate to*
-
-### TS-29 - Drift with a missing reference period
-
-**What it demonstrates.** **Fail** - identical to a missing table dependency, the dependency simply being temporal rather than lateral.
-
-*unit test - no generated data, nothing to navigate to*
-
-### TS-30 - Drift on a brand-new dataset
-
-**What it demonstrates.** **`nodata`, not a Fail.** The owed-versus-not-owed boundary. Without it, every new dataset starts life failing on all its drift checks, which is how people learn to ignore a signal.
-
-*unit test - no generated data, nothing to navigate to*
-
 ## Timestamps
-
-### TS-31 - Naive timestamp
-
-**What it demonstrates.** Never silently interpreted. `pipeline/cadence.py` treats naive values as UTC, so a naive AWST value is eight hours out - enough on a daily feed to flip on-time to late or move a supply into the wrong slot. Stored values carry their offset.
-
-*unit test - no generated data, nothing to navigate to*
-
-### TS-32 - Supplier-provided timestamp
-
-**What it demonstrates.** **ignored** in favour of our own receipt time. A file's metadata reflects the supplier's clock, timezone and bugs; staging's whole justification is that it asserts only facts we can vouch for.
-
-*unit test - no generated data, nothing to navigate to*
-
-### TS-34 - One delivery, two files for each of two datasets
-
-**What it demonstrates.** `cp_clients` and `cp_placements` are HELD, each reported as needing action naming every file that matched. No view is built for either, so they are unqueryable for that run. The other four datasets are staged, assigned, classified and QA'd normally. Every cross-table check reading a held table reads as a Fail naming it - which is three real checks against `cp_clients` alone (`cp_notifications`, `cp_investigations`, `cp_placements` each carry a referential check on `cp_client_id`). Neither held dataset's slot is filled, so both go overdue in the ordinary way.
-
-**not injected - nothing to look at yet**
-
-### TS-35 - A held supply is never chosen between, even when one file is obviously newer
-
-**What it demonstrates.** Still held. No rule consults size, mtime, lexical order or directory position. This asserts that a KNOWN-TEMPTING heuristic stays unimplemented rather than that the system computes something - label it as such, the same family as TS-3, so a later session does not "fix" it by adding the obvious tie-break. `REQ-PIPE-059` records why each such rule was rejected: every one is a guess dressed as a policy, and the dropped file is exactly the one a supplier will later say they sent.
-
-*unit test - no generated data, nothing to navigate to*
-
-### TS-36 - One delivery, two collections
-
-**What it demonstrates.** The delivery is processed NORMALLY. Each file is attributed to its own dataset and handled on that dataset's terms; nothing is held, rejected or failed for spanning collections (Keith, 2026-09-24). This CHANGES BUILT BEHAVIOUR twice - `qa_tools/common/arrivals.py`'s `classify()` raises today (and because recognition walks the whole tree, one such drop takes the run down for all 60 deliveries, reproduced before deciding), and it also returns a SINGLE `collection_id` that `arrivals_for()` filters on, so single-collection is structural rather than just a guard.
-
-*unit test - no generated data, nothing to navigate to*
-
-### TS-36b - A mixed-collection delivery must not be held
-
-The negative case, and it exists for the same reason TS-33b does: the rejected design (hold it for a human) is the one already written down in git history, so an implementation that reinstates it looks defensible in review. Assert explicitly that no hold, no anomaly and no warning is raised for the spanning itself - an unrecognised artefact inside such a delivery still warns on its own terms, which is a different thing.
-
-*unit test - no generated data, nothing to navigate to*
-
-### TS-36c - One file, two datasets' patterns - the runtime hold
-
-**What it demonstrates.** That file is HELD, attributed to NEITHER dataset, reported at no lower than WARNING, and the delivery and run both continue (Keith, 2026-09-24, `REQ-PIPE-058` criterion 9).
-
-*unit test - no generated data, nothing to navigate to*
-
-### TS-36d - The same collision, caught by the configuration gate
-
-**What it demonstrates.** `mothman check` FAILS, naming both datasets and the example filename. **And the negative half matters as much**: with that filename ABSENT from history the gate PASSES, which is the known, accepted limit of the corpus approach - real regex intersection was rejected on cost (`REQ-PIPE-058`). A test asserting the gate catches an unwitnessed collision is asserting the rejected design.
-
-*unit test - no generated data, nothing to navigate to*
-
-### TS-37 - A delivery directory with no receipt record
-
-**What it demonstrates.** Skipped as in-flight, reported **on every run** as an informational observation, and every other delivery processed normally. NOT a hard error - reproduced 2026-09-24 that one such directory makes `list_deliveries()` raise, taking all 60 with it. NO configured interval, NO file modification time, NO state counting runs: persistence shows through repetition. The reason this is the normal case rather than an edge - under a real transport a delivery has no receipt until our own BOUNDARY RULE says it is complete, and in S3 events fire per object with no delivery-is-finished signal, so "files present, no receipt" is the state of every delivery until the boundary closes.
-
-*unit test - no generated data, nothing to navigate to*
 
 ### TS-38 - A resupply whose filename no longer matches
 
@@ -385,32 +159,6 @@ The negative case, and it exists for the same reason TS-33b does: the rejected d
 | Supplies | `cp_clients__202602010900000800` |
 | Period | 2026-Q2 |
 | Set "in the warehouse on" to | 2026-02-01 |
-
-### TS-39 - A split extract, once patterns are regexes
-
-**What it demonstrates.** A duplicate match, so the dataset is HELD (TS-34's machinery), not a silent choice between them. Verified 2026-09-24 that under today's `keyPattern` reuse this is NOT reachable for Child Protection - `cp/{delivery_id}/cp_clients.csv` reduces to `^cp_clients\.csv$`, so `part2` matches nothing and falls out as unrecognised instead, which is the TS-38 shape. Reachable for Birth Registrations only because its pattern carries a `{date}` placeholder. This scenario is what proves the regex change (`REQ-PIPE-058`, 2026-09-24) actually closed the gap. NOW REACHABLE for `cp_clients` (REQ-PIPE-202, 2026-10-15): its pattern is `cp_clients(_[^/]+)?\.csv`, so `cp_clients_part2.csv` matches and the pair is held as contested - `tests/test_holds.py::test_ts39_a_second_part_beside_the_extract_is_contested`. Every other Child Protection pattern is still an exact filename.
-
-*unit test - no generated data, nothing to navigate to*
-
-### TS-40 - A run dies mid-load, and the next run must not trust what it finds
-
-**What it demonstrates.** Every table without a committed load record is treated as unloaded and replaced, whatever is sitting in the staging schema. The delivery is not considered processed until every attributed file has a record.
-
-*unit test - no generated data, nothing to navigate to*
-
-## An arrival with no open period
-
-### TS-33a - A supply arriving in a period its dataset does not deliver in
-
-**What it demonstrates.** A June arrival of it is **held for a person** (REQ-PIPE-064) - filed neither backward into February nor forward into August.
-
-*unit test - no generated data, nothing to navigate to*
-
-### TS-33b - Its siblings must NOT be held with it
-
-**What it demonstrates.** Each is filed to its own open period and promoted on the ordinary passing-or-warning rule. The hold is on one supply only.
-
-*unit test - no generated data, nothing to navigate to*
 
 ## The option A and period-closing batch, planted (REQ-GEN-136, REQ-GEN-137)
 
@@ -446,42 +194,6 @@ TS-42a's placement; this link opens on the later file's asset day. *Config: as T
 | Set "in the warehouse on" to | 2019-11-29 |
 | Built to | Pass, the 2019-11-29 10:00 arrival |
 
-### TS-48 - A correction arriving before its partner is promoted
-
-NOT IN THE DATA YET. A single-table correction that starts failing on a cross-table check and is promoted when its partner's promotion re-checks it (REQ-PIPE-121) needs the Child Protection generator to place a partner's promotion between two arrivals of one quarter, which its delivery shapes do not yet express.
-
-**not injected - nothing to look at yet**
-
-### TS-49 - A correction still failing after its partner's promotion
-
-NOT IN THE DATA YET, for TS-48's reason. Would produce the decision log's still-failing record (REQ-PIPE-121 criterion 12).
-
-**not injected - nothing to look at yet**
-
-### TS-50 - A reader re-checked against the newer version
-
-NOT IN THE DATA YET, for TS-48's reason (REQ-PIPE-118, REQ-PIPE-123 with a cross-table reader).
-
-**not injected - nothing to look at yet**
-
-### TS-51 - A promoted supply turned to Fail by a later sibling
-
-NOT IN THE DATA YET. Needs a Child Protection file shape that breaks a promoted sibling's referential check (REQ-DASH-126).
-
-**not injected - nothing to look at yet**
-
-### TS-52 - Case Workers arriving in a period it does not deliver in
-
-NOT INJECTED: the ordinary history already produces it - Case Workers files arrive in every delivery and are held in the quarters it does not take part in (TS-33a, REQ-PIPE-131). An injection would record a placement for what is already there; it waits on the Child Protection injection supporting a placement with no extra arrival.
-
-**not injected - nothing to look at yet**
-
-### TS-53 - Keith's worked un-supersede case
-
-NOT IN THE DATA - FOR KEITH. A good file superseded by a bad later one, the bad one rejected and the good one un-superseded, re-checked and promoted by the gate (REQ-PIPE-120). Under the rules as built a good file is superseded only while WAITING, and a passing one waits only behind a filled slot or a hold - in either case the gate does not promote it after the un-supersede without a further decision. What should the planted shape be?
-
-**not injected - nothing to look at yet**
-
 ### TS-54 - A period substituted onto an earlier promoted supply
 
 In the data since 2026-10-15 (REQ-GEN-044 criterion 1; Keith, 2026-10-14, Q13): demonstrated by TS-76's placement - cp-placements' 2025-Q1 substituted by a scripted person onto 2024-Q4, whose cp-placements supply was promoted passing - with its own link while the substitution stands. CORRECTED 2026-10-16 (post-build-review #207 D1): REQ-GEN-207 moved the ordinary Warn drawn for 2026-Q3 to 2024-Q4 and this entry then said "promoted warning", but that Warn dirties only cp_carers and cp_clients, so cp-placements' 2024-Q4 supply is still passing and promoted. Whether it should be a Warn is with Keith. The script's `stands_on` field (REQ-GEN-200) answered the old blocker.
@@ -492,12 +204,6 @@ In the data since 2026-10-15 (REQ-GEN-044 criterion 1; Keith, 2026-10-14, Q13): 
 | Supplies | — |
 | Period | 2025-Q2 |
 | Set "in the warehouse on" to | 2025-02-17 |
-
-### TS-55 - A period whose _manifest lists all three kinds
-
-NOT IN THE DATA YET: needs TS-54's substitution beside an inheritance in one period (REQ-PIPE-130, REQ-GEN-137 criterion 6).
-
-**not injected - nothing to look at yet**
 
 ### TS-56 - A supply whose columns arrive in another order
 
@@ -786,14 +492,6 @@ TS-63a's placement; this link opens on 2021-Q4's delivery and runs to the end of
 | Supplies | `cp_carers__202201051000000800`, `cp_carers__202203151000000800` |
 | Period | 2022-Q1 |
 | Set "in the warehouse on" to | 2022-03-20 |
-
-### TS-64 - An undeclared change to a frozen date
-
-**What it demonstrates.** The draft-correction command prints a correction entry for it; committing without one is refused by the pre-commit hook with the same entry, and CI refuses it if the hook was skipped (REQ-PIPE-111, REQ-PIPE-169).
-
-**What it would look like if the rule were wrong.** Committed; or the hook's entry and the command's entry differ.
-
-*unit test - no generated data, nothing to navigate to*
 
 ### TS-75a - A supply rejected after it waited - while it waited
 
@@ -1362,17 +1060,6 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
 {
  "scenarios": [
   {
-   "id": "TS-3",
-   "mode": "INJECT",
-   "title": "Arrival just OUTSIDE the claim window - four sub-tests",
-   "section": "Slot assignment",
-   "demonstrates": "Reframed from daily during Keith's review: the original example (22:00 due, 21:57 arrival) does not work at all, because the claim window opens BEFORE due_at, so 21:57 sits comfortably inside it and files to Tuesday correctly. The scenario only bites where the gap genuinely exceeds the window.",
-   "breaksAs": null,
-   "config": null,
-   "requirements": [],
-   "coordinates": null
-  },
-  {
    "id": "TS-3a",
    "mode": "INJECT",
    "title": "Quarterly, prior slot FILLED",
@@ -1414,85 +1101,6 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    }
   },
   {
-   "id": "TS-5",
-   "mode": "unit",
-   "title": "A missed slot must not absorb a later resupply",
-   "section": "Slot assignment",
-   "demonstrates": "Tuesday is **closed** - it closed when Wednesday's claim window opened (REQ-PIPE-131, which replaced REQ-PIPE-063's monotonic filling: closing by time, not by a later slot filling). That is the whole point of the test.",
-   "breaksAs": "Files as Tuesday - recording a missed delivery as MET, using another day's data. Worse than a cascade, because it manufactures a delivery that never happened.",
-   "config": "Config: MUST be stated per variant - Keith's correction.",
-   "requirements": [
-    "REQ-PIPE-131",
-    "REQ-PIPE-063"
-   ],
-   "coordinates": null
-  },
-  {
-   "id": "TS-6a",
-   "mode": "unit",
-   "title": "Genuine lateness still fills its own slot",
-   "section": "Slot assignment",
-   "demonstrates": "Fills **Monday, late**. Monday is still the open period: lateness is allowed WITHIN a period's open interval (REQ-PIPE-131).",
-   "breaksAs": null,
-   "config": null,
-   "requirements": [
-    "REQ-PIPE-131"
-   ],
-   "coordinates": null
-  },
-  {
-   "id": "TS-6b",
-   "mode": "unit",
-   "title": "A rolling lag stays correctly recorded",
-   "section": "Slot assignment",
-   "demonstrates": "Each fills its own slot, each classified late - each arrives before the next day's window opens, so its own day is still open. Nothing is left permanently unfilled - the feed is running behind, and says so. **A feed running MORE than one window behind** is the deliberate reversal (REQ-PIPE-131, reversing REQ-PIPE-063 criterion 3): it fills the open period, and the days it skipped close unfilled.",
-   "breaksAs": null,
-   "config": null,
-   "requirements": [
-    "REQ-PIPE-131",
-    "REQ-PIPE-063"
-   ],
-   "coordinates": null
-  },
-  {
-   "id": "TS-6c",
-   "mode": "unit",
-   "title": "A skipped day becomes missed, and a later backfill cannot be placed",
-   "section": "Slot assignment",
-   "demonstrates": "Wednesday's fills **Wednesday**, the open period. Tuesday closed unfilled when Wednesday's window opened -> overdue, and a human marks it not supplied (REQ-PIPE-132). If Tuesday's supply then turns up afterwards it is filed to whichever period is OPEN when it arrives - as a resupply where that period is filled - and a person re-files it into Tuesday (REQ-PIPE-131). It is never filed backward automatically, and never held merely for being late.",
-   "breaksAs": null,
-   "config": null,
-   "requirements": [
-    "REQ-PIPE-132",
-    "REQ-PIPE-131"
-   ],
-   "coordinates": null
-  },
-  {
-   "id": "TS-7",
-   "mode": "unit",
-   "title": "No period open - hold, do not guess",
-   "section": "Slot assignment",
-   "demonstrates": "**held for a human**, never defaulted forward or backward. Defaulting forward is the forward cascade again. *Used to expect* a hold whenever the oldest claimable slot was ambiguous - REQ-PIPE-131 holds only when no period is open.",
-   "breaksAs": null,
-   "config": null,
-   "requirements": [
-    "REQ-PIPE-131"
-   ],
-   "coordinates": null
-  },
-  {
-   "id": "TS-8",
-   "mode": "unit",
-   "title": "Assignment must be order-independent",
-   "section": "Slot assignment",
-   "demonstrates": "**identical assignments both ways**, because replay is in arrival-timestamp order rather than discovery order. Identical timestamps resolve by a defined tiebreak.",
-   "breaksAs": "The answer depends on whichever file the loop happened to pick up first - non-determinism nothing would ever flag.",
-   "config": null,
-   "requirements": [],
-   "coordinates": null
-  },
-  {
    "id": "TS-9",
    "mode": "INJECT",
    "title": "A genuinely early quarterly supply",
@@ -1514,20 +1122,6 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
     "inPlaceOn": "2024-05-01",
     "subject": "supply-history-row"
    }
-  },
-  {
-   "id": "TS-11",
-   "mode": "unit",
-   "title": "A re-filed supply reclassifies",
-   "section": "Arrival classification",
-   "demonstrates": "The verdict **recomputes** - it now reads on time. A supply reported late only because it was misfiled was never actually late. The re-filed supply returns to staging under a NEW filing (the old one kept), is checked again as a run of its own, and the gate decides (REQ-PIPE-140, REQ-PIPE-141). *Used to expect* the supply to move between slots and stay promoted - REQ-PIPE-141 made a re-file never fill its target directly.",
-   "breaksAs": null,
-   "config": null,
-   "requirements": [
-    "REQ-PIPE-140",
-    "REQ-PIPE-141"
-   ],
-   "coordinates": null
   },
   {
    "id": "TS-12",
@@ -1555,17 +1149,6 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    }
   },
   {
-   "id": "TS-13",
-   "mode": "INJECT",
-   "title": "Six tables landing seconds apart",
-   "section": "Delivery and multi-table",
-   "demonstrates": "**one QA run over the delivery**, with no intermediate state in which cross-table checks read Fail. The test asserts the ABSENCE of flicker.",
-   "breaksAs": "Per-table triggering evaluates \"Client reference\" at 09:00:00 when notifications has not arrived, so it reads Fail, then Pass four seconds later. Transiently true and practically useless - and at 30 datasets, a Fail appearing on every healthy delivery is how people learn to ignore a Fail.",
-   "config": null,
-   "requirements": [],
-   "coordinates": null
-  },
-  {
    "id": "TS-14",
    "mode": "INJECT",
    "title": "A later single-table resupply",
@@ -1590,328 +1173,6 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    }
   },
   {
-   "id": "TS-15a",
-   "mode": "unit",
-   "title": "An UNEXPECTED TABLE - recognised, but not owed",
-   "section": "Delivery and multi-table",
-   "demonstrates": "It does **not** break the delivery or block readiness, which are defined over EXPECTED tables. Not QA'd, not promoted (no slot).",
-   "breaksAs": null,
-   "config": null,
-   "requirements": [],
-   "coordinates": null
-  },
-  {
-   "id": "TS-15b",
-   "mode": "unit",
-   "title": "An UNRECOGNISED ARTEFACT - matches nothing",
-   "section": "Delivery and multi-table",
-   "demonstrates": "Still does not break the delivery, still not QA'd, still not promoted. **WARNING, not informational** (Keith, 2026-09-24) - because this is indistinguishable at runtime from a supply we FAILED TO CLAIM, which is the TS-38 shape below, and a near-miss that reports quietly produces a false-complete.",
-   "breaksAs": null,
-   "config": null,
-   "requirements": [],
-   "coordinates": null
-  },
-  {
-   "id": "TS-16",
-   "mode": "unit",
-   "title": "Per-table classification",
-   "section": "Delivery and multi-table",
-   "demonstrates": "Each table gets its **own** early/on-time/late verdict. One late table does not make five punctual ones late - more honest than a single per-delivery verdict taking the worst.",
-   "breaksAs": null,
-   "config": null,
-   "requirements": [],
-   "coordinates": null
-  },
-  {
-   "id": "TS-17",
-   "mode": "unit",
-   "title": "The transport cannot express a delivery boundary",
-   "section": "Delivery and multi-table",
-   "demonstrates": "An **explicit configuration failure**, never a silent guess at grouping. The delivery boundary is load-bearing and comes from the transport, so a feed that cannot express one needs a boundary arranged as a plumbing step.",
-   "breaksAs": null,
-   "config": null,
-   "requirements": [],
-   "coordinates": null
-  },
-  {
-   "id": "TS-18",
-   "mode": "both",
-   "title": "Cross-table check passing, candidate rejected for a different reason",
-   "section": "Status and rollup - the false-pass family",
-   "demonstrates": "\"Client reference\" does **not** keep its passing verdict for August. It reverts to **cannot-run, Fail**, because clients never entered the warehouse. The passing result stays attached to the rejected SUPPLY as evidence of what was evaluated.",
-   "breaksAs": null,
-   "config": null,
-   "requirements": [],
-   "coordinates": null
-  },
-  {
-   "id": "TS-19",
-   "mode": "unit",
-   "title": "Partial nodata must not roll up to Pass",
-   "section": "Status and rollup - the false-pass family",
-   "demonstrates": "The collection reads **Fail**.",
-   "breaksAs": "`worstOf()` is seeded at a pass and `STATUS_ORDER.nodata` is -1, so a nodata can never win a reduce - five passes plus one nodata returns a pass. Fail-for-unrun makes this structurally impossible; the test guards the old path.",
-   "config": null,
-   "requirements": [],
-   "coordinates": null
-  },
-  {
-   "id": "TS-20",
-   "mode": "unit",
-   "title": "The two status implementations must agree",
-   "section": "Status and rollup - the false-pass family",
-   "demonstrates": "Python and JS return the same status for every input, including ones the Python side does not currently know. Item 74's exact failure mode, in the module whose own docstring says it drifted from its JS counterpart once already.",
-   "breaksAs": null,
-   "config": null,
-   "requirements": [],
-   "coordinates": null
-  },
-  {
-   "id": "TS-21",
-   "mode": "unit",
-   "title": "A table with no checks defined",
-   "section": "Status and rollup - the false-pass family",
-   "demonstrates": "Nothing failed to run, because there was nothing to run. `worstOf()` over an empty list is seeded at a pass, so such a table reads Pass by vacuum and would auto-promote with no quality signal behind it at all. Every other false pass found was a real signal being swallowed; this is the ABSENCE of any signal reading as a good one.",
-   "breaksAs": null,
-   "config": null,
-   "requirements": [],
-   "coordinates": null
-  },
-  {
-   "id": "TS-22",
-   "mode": "both",
-   "title": "Freshness caps the headline",
-   "section": "Status and rollup - the false-pass family",
-   "demonstrates": "The headline is **worst of (quality, freshness)**. All-passing checks on a dataset whose expected period is unfilled must not read Pass. **Keith, 2026-09-22**: the tables read **Fail, with a \"no data\" qualifier** - the same status-plus-chip vocabulary as a check that could not run.",
-   "breaksAs": null,
-   "config": null,
-   "requirements": [],
-   "coordinates": null
-  },
-  {
-   "id": "TS-23",
-   "mode": "unit",
-   "title": "Exhausted schedule",
-   "section": "Schedule and config",
-   "demonstrates": "The pipeline **hard-fails for that dataset only**; sibling datasets are unaffected; supplies pile up in staging (safe, because staging preserves arrival facts and the backlog drains correctly once dates are added); and the dashboard **still shows the banner**, computed from config, even though no new results were produced. A dashboard that stopped updating otherwise looks identical to one where nothing changed.",
-   "breaksAs": null,
-   "config": null,
-   "requirements": [],
-   "coordinates": null
-  },
-  {
-   "id": "TS-24",
-   "mode": "unit",
-   "title": "Low runway",
-   "section": "Schedule and config",
-   "demonstrates": "A warning when fewer than N expected supplies remain, measured in **slots** not months - three months of quarterly runway is one slot, which is already too late. Non- fatal, so it cannot fail an otherwise-fine build, which is how gates get disabled.",
-   "breaksAs": null,
-   "config": null,
-   "requirements": [],
-   "coordinates": null
-  },
-  {
-   "id": "TS-25",
-   "mode": "unit",
-   "title": "Config typo yielding zero slots",
-   "section": "Schedule and config",
-   "demonstrates": "`mothman check` **fails**. A dataset must never silently reach zero slots - that is the exhausted-schedule state, reached by accident, on a dataset nobody is watching.",
-   "breaksAs": null,
-   "config": null,
-   "requirements": [],
-   "coordinates": null
-  },
-  {
-   "id": "TS-26",
-   "mode": "unit",
-   "title": "Schedule version change",
-   "section": "Schedule and config",
-   "demonstrates": "Each period is evaluated against the version **in force at its own due date**. Periods that were met stay met; history does not move when a supplier changes.",
-   "breaksAs": null,
-   "config": null,
-   "requirements": [],
-   "coordinates": null
-  },
-  {
-   "id": "TS-27",
-   "mode": "unit",
-   "title": "`not_expected` versus marked not supplied",
-   "section": "Schedule and config",
-   "demonstrates": "`not_expected` yields **no slot** - nothing owed, nothing overdue, nothing failing. A closed slot a person marks **not supplied** (REQ-PIPE-132) **keeps its slot**, unfilled, reading \"not supplied (accepted)\", counted as an obligation NOT MET, with a reason. The distinction protects supplier reliability from becoming whatever people were willing to excuse after the fact. *Used to say* \"marked missed\" - REQ-PIPE-132 introduced mark as not supplied, which records the decision.",
-   "breaksAs": null,
-   "config": null,
-   "requirements": [
-    "REQ-PIPE-132"
-   ],
-   "coordinates": null
-  },
-  {
-   "id": "TS-28",
-   "mode": "both",
-   "title": "Rejected Monday, promoted Friday",
-   "section": "Composition and as-at",
-   "demonstrates": "The supply is **absent** from the in-place-on-Wednesday view: it was rejected on Monday, so it was withdrawn on every day before Friday (REQ-PIPE-081 criteria 1, 2 and 8 as amended 2026-10-05). *Used to expect* it absent because \"filtering is on **promotion**, not arrival\" (Keith, 2026-09-22) - the amended criteria show the newest supply promoted OR awaiting, and a supply leaves the view only when withdrawn, so the answer stands for a different reason.",
-   "breaksAs": null,
-   "config": null,
-   "requirements": [
-    "REQ-PIPE-081"
-   ],
-   "coordinates": null
-  },
-  {
-   "id": "TS-29",
-   "mode": "unit",
-   "title": "Drift with a missing reference period",
-   "section": "Composition and as-at",
-   "demonstrates": "**Fail** - identical to a missing table dependency, the dependency simply being temporal rather than lateral.",
-   "breaksAs": null,
-   "config": null,
-   "requirements": [],
-   "coordinates": null
-  },
-  {
-   "id": "TS-30",
-   "mode": "unit",
-   "title": "Drift on a brand-new dataset",
-   "section": "Composition and as-at",
-   "demonstrates": "**`nodata`, not a Fail.** The owed-versus-not-owed boundary. Without it, every new dataset starts life failing on all its drift checks, which is how people learn to ignore a signal.",
-   "breaksAs": null,
-   "config": null,
-   "requirements": [],
-   "coordinates": null
-  },
-  {
-   "id": "TS-31",
-   "mode": "unit",
-   "title": "Naive timestamp",
-   "section": "Timestamps",
-   "demonstrates": "Never silently interpreted. `pipeline/cadence.py` treats naive values as UTC, so a naive AWST value is eight hours out - enough on a daily feed to flip on-time to late or move a supply into the wrong slot. Stored values carry their offset.",
-   "breaksAs": null,
-   "config": null,
-   "requirements": [],
-   "coordinates": null
-  },
-  {
-   "id": "TS-32",
-   "mode": "unit",
-   "title": "Supplier-provided timestamp",
-   "section": "Timestamps",
-   "demonstrates": "**ignored** in favour of our own receipt time. A file's metadata reflects the supplier's clock, timezone and bugs; staging's whole justification is that it asserts only facts we can vouch for.",
-   "breaksAs": null,
-   "config": null,
-   "requirements": [],
-   "coordinates": null
-  },
-  {
-   "id": "TS-33a",
-   "mode": "unit",
-   "title": "A supply arriving in a period its dataset does not deliver in",
-   "section": "An arrival with no open period",
-   "demonstrates": "A June arrival of it is **held for a person** (REQ-PIPE-064) - filed neither backward into February nor forward into August.",
-   "breaksAs": null,
-   "config": null,
-   "requirements": [
-    "REQ-PIPE-064"
-   ],
-   "coordinates": null
-  },
-  {
-   "id": "TS-33b",
-   "mode": "unit",
-   "title": "Its siblings must NOT be held with it",
-   "section": "An arrival with no open period",
-   "demonstrates": "Each is filed to its own open period and promoted on the ordinary passing-or-warning rule. The hold is on one supply only.",
-   "breaksAs": null,
-   "config": null,
-   "requirements": [],
-   "coordinates": null
-  },
-  {
-   "id": "TS-34",
-   "mode": "INJECT",
-   "title": "One delivery, two files for each of two datasets",
-   "section": "Timestamps",
-   "demonstrates": "`cp_clients` and `cp_placements` are HELD, each reported as needing action naming every file that matched. No view is built for either, so they are unqueryable for that run. The other four datasets are staged, assigned, classified and QA'd normally. Every cross-table check reading a held table reads as a Fail naming it - which is three real checks against `cp_clients` alone (`cp_notifications`, `cp_investigations`, `cp_placements` each carry a referential check on `cp_client_id`). Neither held dataset's slot is filled, so both go overdue in the ordinary way.",
-   "breaksAs": null,
-   "config": null,
-   "requirements": [
-    "REQ-PIPE-202"
-   ],
-   "coordinates": null
-  },
-  {
-   "id": "TS-35",
-   "mode": "unit",
-   "title": "A held supply is never chosen between, even when one file is obviously newer",
-   "section": "Timestamps",
-   "demonstrates": "Still held. No rule consults size, mtime, lexical order or directory position. This asserts that a KNOWN-TEMPTING heuristic stays unimplemented rather than that the system computes something - label it as such, the same family as TS-3, so a later session does not \"fix\" it by adding the obvious tie-break. `REQ-PIPE-059` records why each such rule was rejected: every one is a guess dressed as a policy, and the dropped file is exactly the one a supplier will later say they sent.",
-   "breaksAs": null,
-   "config": null,
-   "requirements": [
-    "REQ-PIPE-059"
-   ],
-   "coordinates": null
-  },
-  {
-   "id": "TS-36",
-   "mode": "unit",
-   "title": "One delivery, two collections",
-   "section": "Timestamps",
-   "demonstrates": "The delivery is processed NORMALLY. Each file is attributed to its own dataset and handled on that dataset's terms; nothing is held, rejected or failed for spanning collections (Keith, 2026-09-24). This CHANGES BUILT BEHAVIOUR twice - `qa_tools/common/arrivals.py`'s `classify()` raises today (and because recognition walks the whole tree, one such drop takes the run down for all 60 deliveries, reproduced before deciding), and it also returns a SINGLE `collection_id` that `arrivals_for()` filters on, so single-collection is structural rather than just a guard.",
-   "breaksAs": null,
-   "config": null,
-   "requirements": [],
-   "coordinates": null
-  },
-  {
-   "id": "TS-36b",
-   "mode": "unit",
-   "title": "A mixed-collection delivery must not be held",
-   "section": "Timestamps",
-   "demonstrates": "The negative case, and it exists for the same reason TS-33b does: the rejected design (hold it for a human) is the one already written down in git history, so an implementation that reinstates it looks defensible in review. Assert explicitly that no hold, no anomaly and no warning is raised for the spanning itself - an unrecognised artefact inside such a delivery still warns on its own terms, which is a different thing.",
-   "breaksAs": null,
-   "config": null,
-   "requirements": [],
-   "coordinates": null
-  },
-  {
-   "id": "TS-36c",
-   "mode": "unit",
-   "title": "One file, two datasets' patterns - the runtime hold",
-   "section": "Timestamps",
-   "demonstrates": "That file is HELD, attributed to NEITHER dataset, reported at no lower than WARNING, and the delivery and run both continue (Keith, 2026-09-24, `REQ-PIPE-058` criterion 9).",
-   "breaksAs": null,
-   "config": null,
-   "requirements": [
-    "REQ-PIPE-058"
-   ],
-   "coordinates": null
-  },
-  {
-   "id": "TS-36d",
-   "mode": "unit",
-   "title": "The same collision, caught by the configuration gate",
-   "section": "Timestamps",
-   "demonstrates": "`mothman check` FAILS, naming both datasets and the example filename. **And the negative half matters as much**: with that filename ABSENT from history the gate PASSES, which is the known, accepted limit of the corpus approach - real regex intersection was rejected on cost (`REQ-PIPE-058`). A test asserting the gate catches an unwitnessed collision is asserting the rejected design.",
-   "breaksAs": null,
-   "config": null,
-   "requirements": [
-    "REQ-PIPE-058"
-   ],
-   "coordinates": null
-  },
-  {
-   "id": "TS-37",
-   "mode": "unit",
-   "title": "A delivery directory with no receipt record",
-   "section": "Timestamps",
-   "demonstrates": "Skipped as in-flight, reported **on every run** as an informational observation, and every other delivery processed normally. NOT a hard error - reproduced 2026-09-24 that one such directory makes `list_deliveries()` raise, taking all 60 with it. NO configured interval, NO file modification time, NO state counting runs: persistence shows through repetition. The reason this is the normal case rather than an edge - under a real transport a delivery has no receipt until our own BOUNDARY RULE says it is complete, and in S3 events fire per object with no delivery-is-finished signal, so \"files present, no receipt\" is the state of every delivery until the boundary closes.",
-   "breaksAs": null,
-   "config": null,
-   "requirements": [],
-   "coordinates": null
-  },
-  {
    "id": "TS-38",
    "mode": "INJECT",
    "title": "A resupply whose filename no longer matches",
@@ -1929,31 +1190,6 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
     "inPlaceOn": "2026-02-01",
     "subject": "supply-history-row"
    }
-  },
-  {
-   "id": "TS-39",
-   "mode": "unit",
-   "title": "A split extract, once patterns are regexes",
-   "section": "Timestamps",
-   "demonstrates": "A duplicate match, so the dataset is HELD (TS-34's machinery), not a silent choice between them. Verified 2026-09-24 that under today's `keyPattern` reuse this is NOT reachable for Child Protection - `cp/{delivery_id}/cp_clients.csv` reduces to `^cp_clients\\.csv$`, so `part2` matches nothing and falls out as unrecognised instead, which is the TS-38 shape. Reachable for Birth Registrations only because its pattern carries a `{date}` placeholder. This scenario is what proves the regex change (`REQ-PIPE-058`, 2026-09-24) actually closed the gap. NOW REACHABLE for `cp_clients` (REQ-PIPE-202, 2026-10-15): its pattern is `cp_clients(_[^/]+)?\\.csv`, so `cp_clients_part2.csv` matches and the pair is held as contested - `tests/test_holds.py::test_ts39_a_second_part_beside_the_extract_is_contested`. Every other Child Protection pattern is still an exact filename.",
-   "breaksAs": null,
-   "config": null,
-   "requirements": [
-    "REQ-PIPE-058",
-    "REQ-PIPE-202"
-   ],
-   "coordinates": null
-  },
-  {
-   "id": "TS-40",
-   "mode": "unit",
-   "title": "A run dies mid-load, and the next run must not trust what it finds",
-   "section": "Timestamps",
-   "demonstrates": "Every table without a committed load record is treated as unloaded and replaced, whatever is sitting in the staging schema. The delivery is not considered processed until every attributed file has a record.",
-   "breaksAs": null,
-   "config": null,
-   "requirements": [],
-   "coordinates": null
   },
   {
    "id": "TS-42a",
@@ -2022,85 +1258,6 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    }
   },
   {
-   "id": "TS-48",
-   "mode": "INJECT",
-   "title": "A correction arriving before its partner is promoted",
-   "section": "The option A and period-closing batch, planted (REQ-GEN-136, REQ-GEN-137)",
-   "demonstrates": "NOT IN THE DATA YET. A single-table correction that starts failing on a cross-table check and is promoted when its partner's promotion re-checks it (REQ-PIPE-121) needs the Child Protection generator to place a partner's promotion between two arrivals of one quarter, which its delivery shapes do not yet express.",
-   "breaksAs": null,
-   "config": null,
-   "requirements": [
-    "REQ-PIPE-121"
-   ],
-   "coordinates": null
-  },
-  {
-   "id": "TS-49",
-   "mode": "INJECT",
-   "title": "A correction still failing after its partner's promotion",
-   "section": "The option A and period-closing batch, planted (REQ-GEN-136, REQ-GEN-137)",
-   "demonstrates": "NOT IN THE DATA YET, for TS-48's reason. Would produce the decision log's still-failing record (REQ-PIPE-121 criterion 12).",
-   "breaksAs": null,
-   "config": null,
-   "requirements": [
-    "REQ-PIPE-121"
-   ],
-   "coordinates": null
-  },
-  {
-   "id": "TS-50",
-   "mode": "INJECT",
-   "title": "A reader re-checked against the newer version",
-   "section": "The option A and period-closing batch, planted (REQ-GEN-136, REQ-GEN-137)",
-   "demonstrates": "NOT IN THE DATA YET, for TS-48's reason (REQ-PIPE-118, REQ-PIPE-123 with a cross-table reader).",
-   "breaksAs": null,
-   "config": null,
-   "requirements": [
-    "REQ-PIPE-118",
-    "REQ-PIPE-123"
-   ],
-   "coordinates": null
-  },
-  {
-   "id": "TS-51",
-   "mode": "INJECT",
-   "title": "A promoted supply turned to Fail by a later sibling",
-   "section": "The option A and period-closing batch, planted (REQ-GEN-136, REQ-GEN-137)",
-   "demonstrates": "NOT IN THE DATA YET. Needs a Child Protection file shape that breaks a promoted sibling's referential check (REQ-DASH-126).",
-   "breaksAs": null,
-   "config": null,
-   "requirements": [
-    "REQ-DASH-126"
-   ],
-   "coordinates": null
-  },
-  {
-   "id": "TS-52",
-   "mode": "INJECT",
-   "title": "Case Workers arriving in a period it does not deliver in",
-   "section": "The option A and period-closing batch, planted (REQ-GEN-136, REQ-GEN-137)",
-   "demonstrates": "NOT INJECTED: the ordinary history already produces it - Case Workers files arrive in every delivery and are held in the quarters it does not take part in (TS-33a, REQ-PIPE-131). An injection would record a placement for what is already there; it waits on the Child Protection injection supporting a placement with no extra arrival.",
-   "breaksAs": null,
-   "config": null,
-   "requirements": [
-    "REQ-PIPE-131"
-   ],
-   "coordinates": null
-  },
-  {
-   "id": "TS-53",
-   "mode": "INJECT",
-   "title": "Keith's worked un-supersede case",
-   "section": "The option A and period-closing batch, planted (REQ-GEN-136, REQ-GEN-137)",
-   "demonstrates": "NOT IN THE DATA - FOR KEITH. A good file superseded by a bad later one, the bad one rejected and the good one un-superseded, re-checked and promoted by the gate (REQ-PIPE-120). Under the rules as built a good file is superseded only while WAITING, and a passing one waits only behind a filled slot or a hold - in either case the gate does not promote it after the un-supersede without a further decision. What should the planted shape be?",
-   "breaksAs": null,
-   "config": null,
-   "requirements": [
-    "REQ-PIPE-120"
-   ],
-   "coordinates": null
-  },
-  {
    "id": "TS-54",
    "mode": "INJECT",
    "title": "A period substituted onto an earlier promoted supply",
@@ -2120,20 +1277,6 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
     "inPlaceOn": "2025-02-17",
     "subject": "substitution-drill-down"
    }
-  },
-  {
-   "id": "TS-55",
-   "mode": "INJECT",
-   "title": "A period whose _manifest lists all three kinds",
-   "section": "The option A and period-closing batch, planted (REQ-GEN-136, REQ-GEN-137)",
-   "demonstrates": "NOT IN THE DATA YET: needs TS-54's substitution beside an inheritance in one period (REQ-PIPE-130, REQ-GEN-137 criterion 6).",
-   "breaksAs": null,
-   "config": null,
-   "requirements": [
-    "REQ-PIPE-130",
-    "REQ-GEN-137"
-   ],
-   "coordinates": null
   },
   {
    "id": "TS-56",
@@ -2415,20 +1558,6 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
     "inPlaceOn": "2022-03-20",
     "subject": "supply-history-row"
    }
-  },
-  {
-   "id": "TS-64",
-   "mode": "unit",
-   "title": "An undeclared change to a frozen date",
-   "section": "Calendar corrections",
-   "demonstrates": "The draft-correction command prints a correction entry for it; committing without one is refused by the pre-commit hook with the same entry, and CI refuses it if the hook was skipped (REQ-PIPE-111, REQ-PIPE-169).",
-   "breaksAs": "Committed; or the hook's entry and the command's entry differ.",
-   "config": null,
-   "requirements": [
-    "REQ-PIPE-111",
-    "REQ-PIPE-169"
-   ],
-   "coordinates": null
   },
   {
    "id": "TS-65",
