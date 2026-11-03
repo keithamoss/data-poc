@@ -47,7 +47,7 @@ def test_it_says_one_zip_on_both_paths_and_why():
     text = _text().lower()
     assert "one zip" in text
     assert "delivery directory" in text and "cloud upload path" in text
-    assert "checked as they arrive" in text and "reads **red**" in text
+    assert "checked as they arrive" in text and "reads **fail**" in text
 
 
 def test_it_says_the_red_clears_by_itself_and_a_zip_avoids_it():

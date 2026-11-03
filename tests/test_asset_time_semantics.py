@@ -99,7 +99,8 @@ def _reports():
     from qa_tools import collections
 
     names = [c.dashboard_file for c in collections.all_collections()]
-    assert len(names) > 1
+    # Not empty - the daily asset holds one collection since the split.
+    assert names, "test precondition - the asset registers a collection"
     return names
 
 
@@ -118,6 +119,21 @@ def _built_datasets():
         for ds in doc["datasets"]:
             out[ds["id"]] = ds
     return out
+
+
+def _golden_for_this_asset() -> dict:
+    """The golden's entries for the datasets the selected asset holds. ONE
+    golden for both assets (the pin predates the split, and its history
+    reads as one); each asset's built reports are compared with its own
+    part of it, and TestEveryDailyArrivalKeepsItsVerdict runs the same
+    comparison for the daily asset (post-build-review #320)."""
+    from qa_tools.common import hierarchy
+
+    mine = {d.dataset_id for d in hierarchy.all_datasets()}
+    golden = json.loads(GOLDEN.read_text())
+    part = {ds: runs for ds, runs in golden.items() if ds in mine}
+    assert part, "test precondition - the golden holds this asset's datasets"
+    return part
 
 
 class TestEveryCommittedArrivalKeepsItsVerdict:
@@ -290,7 +306,7 @@ class TestEveryCommittedArrivalKeepsItsVerdict:
     def test_the_golden_covers_every_dataset_and_run_that_exists_now(self):
         """A pin that silently stops covering things is worse than none -
         it goes green by measuring less. Guards both directions."""
-        golden = json.loads(GOLDEN.read_text())
+        golden = _golden_for_this_asset()
         built = _built_datasets()
         assert set(golden) == set(built), "the golden and the built reports disagree about which datasets exist"
         for ds_id, runs in golden.items():
@@ -298,7 +314,7 @@ class TestEveryCommittedArrivalKeepsItsVerdict:
             assert set(runs) == on_page, f"{ds_id}: the golden and the built history disagree about run ids"
 
     def test_no_arrival_changed_its_verdict(self):
-        golden = json.loads(GOLDEN.read_text())
+        golden = _golden_for_this_asset()
         built = _built_datasets()
         moved = []
         for ds_id, runs in golden.items():
@@ -324,7 +340,7 @@ class TestEveryCommittedArrivalKeepsItsVerdict:
         the rule that was in force when they were written - which is the
         one place in this repo that rule still applies, and only because
         it is being used to prove it was preserved."""
-        golden = json.loads(GOLDEN.read_text())
+        golden = _golden_for_this_asset()
         built = _built_datasets()
         moved = []
         for ds_id, runs in golden.items():
@@ -536,8 +552,21 @@ class TestEveryCommittedArrivalKeepsItsVerdict:
         # the evening its Client Register does, ahead of its own due day) and
         # 2 late (7 November 2023 and 6 February 2026, after their due days). Every other arrival matched by instant has the
         # same verdict; ten Child Protection run ids renamed, nothing moved.
-        assert counts == {"on_time": 345, "early": 98, "late": 48, "unfiled": 13}
-        assert sum(counts.values()) == 504
+        # 345 / 194 / 52 / 13 over 604 FOR THE GEOCODING DATASETS (2026-11-03,
+        # post-build-review #320): geo-cp-clients' 45 (43 early, 2 late) and
+        # geo-ed-presentations' 55 (53 early, 2 late) join from a bootstrap
+        # from empty; each geocoding release lands hours before its 19:00 due
+        # time. The 504 already pinned were compared one by one first: every
+        # one of them the same verdict, none missing, none new.
+        assert counts == {"on_time": 345, "early": 194, "late": 52, "unfiled": 13}
+        assert sum(counts.values()) == 604
+
+
+@pytest.mark.asset("daily")
+class TestEveryDailyArrivalKeepsItsVerdict(TestEveryCommittedArrivalKeepsItsVerdict):
+    """The same pin for the daily asset's datasets - Birth Registrations,
+    which moved there in the asset split - against the daily asset's own
+    built reports (post-build-review #320)."""
 
 
 class TestTheClassificationBoundaries:

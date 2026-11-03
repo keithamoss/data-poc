@@ -14489,3 +14489,26 @@ twice. It deliberately did not re-find the `TypeError`.
      Protection cross-table check that the daily asset can no longer see; it
      runs for the quarterly collection only, since the rebuild is one shared
      builder (REQ-DASH-244). Test fixes, no product change.
+     - **The final suite run on e998729f found eight more of the same kind**,
+       all fixed as test changes: (3) `test_correction_trial`'s three
+       calendar-menu tests, the same grouped picker; (4) `test_turn_off`'s
+       runway-gate test turned off each other dataset's FIRST version, and
+       geo-ed-presentations (REQ-QAC-294) owes through later ones, so it drove
+       the minimum and no line was written - it now turns off the version in
+       force; (5) `test_supplier_guidance` still expected "reads **red**",
+       which REQ-DASH-359 made "reads **Fail**"; (6) the Scenarios tab test
+       asserted "most still have nothing", false since every scenario in an
+       asset's map is placed (Q5) - it now counts the entries with nothing
+       behind them against the page's own map; (7) THE ARRIVAL GOLDEN
+       (`tests/fixtures/arrival_semantics_golden.json`) spanned both assets
+       and lacked the two geocoding datasets. Compared entry by entry first:
+       all 504 pinned arrivals (389 quarterly, 115 daily) the same verdict,
+       none missing, none new. The comparison now takes the selected asset's
+       part, a daily subclass runs it for Birth Registrations, and the
+       geocoding datasets' 100 arrivals (96 early, 4 late) were added - an
+       addition only, no existing entry touched.
+     - **Left for Keith**: `TestTheDataFilesLoadFromDisk`'s first-view budget
+       (post-build-review #268 L1) read 6.4, 5.9 and 7.6 seconds for the
+       quarterly trends against 6 - a known load-sensitive guard (morning
+       report 12), and the quarterly data has grown with geocoding. Not
+       loosened.

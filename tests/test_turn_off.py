@@ -1136,8 +1136,12 @@ class TestCriticFindingsOn190:
                   if not e["id"].startswith("cp-") and e.get("participation")
                   and _collection(doc, collections.collection_of(e["id"]).id).get("calendar")
                   == cp_calendar]
+        # THE VERSION IN FORCE - the last - not the first: a dataset with
+        # later versions (geo-ed-presentations mirrors its source's 2015-Q4
+        # gap, REQ-QAC-294) still owes through them, and would drive the
+        # minimum (post-build-review #320).
         for ds in others:
-            _turn_off(_versions(doc, ds)[0], to="2027-03-31", log=log)
+            _turn_off(_versions(doc, ds)[-1], to="2027-03-31", log=log)
         using(doc)
         before = runway.warning_lines(date(2026, 8, 1))
         assert before and "candidate-dates" in before[0]

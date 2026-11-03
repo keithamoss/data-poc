@@ -4167,8 +4167,15 @@ class TestScenariosTab:
         assert controls <= len(placed), (
             f"the panel offers {controls} control(s) for {len(placed)} placed "
             f"scenario(s) - one of them leads nowhere")
-        assert "no data behind it" in panel.inner_text(), (
-            "no entry says it has nothing behind it, and most still have nothing")
+        # EVERY ENTRY WITH NOTHING BEHIND IT SAYS SO, counted against the
+        # page's own map: since each asset's map lists only its own
+        # placements (morning report 12 Q5) an asset's map can hold none, and
+        # "most still have nothing" stopped being true by the work succeeding.
+        unplaced = clean_page.evaluate(
+            "SCENARIO_MAP.filter(e => !scenarioTarget(e)).length")
+        assert panel.inner_text().count("no data behind it") == unplaced, (
+            f"{unplaced} entr(ies) have nothing behind them, and the panel does not "
+            f"say so for each")
 
 
     def test_the_committed_map_carries_no_url_for_the_page_to_follow(

@@ -350,7 +350,10 @@ class TestTheCalendarEntry:
         from cli import schedule as schedule_cli
 
         answers = iter([DATASET, None])
+        # The dataset picker is grouped above common.N_LIST datasets, as the
+        # quarterly asset's are since the split (post-build-review #320).
         monkeypatch.setattr(common, "select", lambda *a, **k: next(answers))
+        monkeypatch.setattr(common, "grouped_select", lambda *a, **k: next(answers))
         monkeypatch.setattr(common, "text_prompt", lambda *a, **k: "2023-07-01")
         schedule_cli.calendar_menu()
         out = capsys.readouterr().out
@@ -385,6 +388,8 @@ class TestTheCalendarEntry:
             return choices[-1]
 
         monkeypatch.setattr(common, "select", select)
+        monkeypatch.setattr(common, "grouped_select", lambda message, groups, **_k: select(
+            message, [c for _name, cs in groups for c in cs]))
         monkeypatch.setattr(common, "text_prompt", lambda *a, **k: "2023-07-01")
         monkeypatch.setattr(common, "path_prompt", lambda *a, **k: "")
         schedule_cli.calendar_menu()
@@ -526,7 +531,10 @@ class TestCriticFindingsOn169:
         _clients(broken)["participation"]["versions"][0]["grace"] = "not a duration"
         monkeypatch.setattr(correction_trial, "_working_docs", lambda: (broken, asset))
         answers = iter([DATASET, None])
+        # The dataset picker is grouped above common.N_LIST datasets, as the
+        # quarterly asset's are since the split (post-build-review #320).
         monkeypatch.setattr(common, "select", lambda *a, **k: next(answers))
+        monkeypatch.setattr(common, "grouped_select", lambda *a, **k: next(answers))
         monkeypatch.setattr(common, "text_prompt", lambda *a, **k: None)
         schedule_cli.calendar_menu()
         assert "working copy" in capsys.readouterr().out
