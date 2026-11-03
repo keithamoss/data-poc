@@ -62,14 +62,23 @@ permissions:
 
 jobs:
   validate:
+    # ONCE PER ASSET, as critical.yml (post-build-review #321). The steps below
+    # are the individual gate commands, not `mothman check`, so nothing sets
+    # the asset for them: the gates that read an asset's configuration refuse
+    # with MOTHMAN_ASSET unset, which is what turned the first push after the
+    # split red. The repository-wide gates (requirements, changelog,
+    # feedback, the plans index) run in both legs; they are seconds each.
+    name: validate (${{ matrix.asset }})
+    strategy:
+      fail-fast: false
+      matrix:
+        asset: [quarterly, daily]
     runs-on: ubuntu-latest
     env:
       # Empty on workflow_dispatch, where qa_tools/common/diff_base.py
       # falls back to HEAD~1.
       MOTHMAN_DIFF_BASE: ${{ github.event.before }}
-      # NO MOTHMAN_ASSET: `mothman check` runs every gate that reads an
-      # asset's configuration once per folder under assets/, setting the asset
-      # itself (cli/check.py), so a job-wide one would only override it.
+      MOTHMAN_ASSET: ${{ matrix.asset }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4

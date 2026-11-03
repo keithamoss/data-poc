@@ -14521,3 +14521,26 @@ twice. It deliberately did not re-find the `TypeError`.
        unique-key test looked in the bare `reports/` folder, so it SKIPPED on
        every run since the split - it reads the asset's own reports now, and
        runs.
+
+321. **[done, 2026-11-04]** **[Testing & dev tooling]** **CI's
+     configuration validation ran every gate with no asset selected, and
+     went red on the first push after the split.** Found by run 41692776232
+     on 7c04843a: `.github/workflows/validate-config.yml` calls the individual
+     gate commands, not `mothman check`, yet its comment said `mothman check`
+     would set the asset - so nothing did, and the first gate refused with
+     "MOTHMAN_ASSET is not set". `critical.yml`'s own comment says this
+     workflow "took the per-asset shape in the move"; it had not. The
+     critical tests on the same push were green (run 41692776303).
+     - **Fixed**: the job runs once per asset (`matrix.asset: [quarterly,
+       daily]`, fail-fast off), each leg with its own MOTHMAN_ASSET, as
+       `critical.yml` does. Reproduced first: `validate-hierarchy` with the
+       asset unset exits 1 with CI's message; every one of the workflow's ten
+       steps then exits 0 for each asset, run as CI runs them (no
+       MOTHMAN_ENVIRONMENT, no DSN). tests/test_validate_provisional.py,
+       test_publish.py and test_ci_usage.py, which read this workflow, pass.
+     - **No regression test written - a question for Keith**: this is a
+       wiring bug (a workflow's environment), the class CLAUDE.md says to ask
+       about before writing one. The candidate is the shape
+       `TestTheWorkflowCarriesEveryVariableThePipelineNeeds` already has for
+       test.yml: assert every workflow that runs an asset-reading gate sets
+       MOTHMAN_ASSET or a matrix over the assets.

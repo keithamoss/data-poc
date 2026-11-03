@@ -3304,7 +3304,11 @@ one or more component tags, and a date.
         mid-run on old pytest session folders (running-thoughts #139),
         which cost one browser-chunk re-run. Pushed to
         `claude/qac-024-explanations-qx8hx8` with those two test fixes,
-        their modules re-run.
+        their modules re-run. CI on 7c04843a: the critical tests GREEN for
+        both assets (run 41692776303); configuration validation RED (run
+        41692776232) - the workflow ran its gates with no asset selected,
+        missed in the move; fixed as #321 and pushed. One question for you
+        there (a regression test for a workflow's environment?).
 
     **THE BATCHES**
     - **REQ-PIPE-341, multi-column sample keys** (ad2a266, fixes 2929723,
