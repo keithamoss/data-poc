@@ -14510,5 +14510,6 @@ twice. It deliberately did not re-find the `TypeError`.
      - **Left for Keith**: `TestTheDataFilesLoadFromDisk`'s first-view budget
        (post-build-review #268 L1) read 6.4, 5.9 and 7.6 seconds for the
        quarterly trends against 6 - a known load-sensitive guard (morning
-       report 12), and the quarterly data has grown with geocoding. Not
+       report 12), and the quarterly data has grown with geocoding. Run
+       ALONE on the same tree it passed: 4.6, 4.4 and 4.7 seconds. Not
        loosened.

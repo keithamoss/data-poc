@@ -3261,6 +3261,41 @@ one or more component tags, and a date.
       decisions file took the recommended option, marked PROVISIONAL and
       listed below (REQ-TEST-374 c5). Anything significant was stopped, not
       decided.
+    - **3 NOVEMBER, DAY AND EVENING (update, ~22:25 Perth)**: your 14
+      answers are recorded and built where they asked for building, as are
+      the split decisions (D1-D4, risks 5-6). #134 v4 is drafted
+      (docs/drafts/separation-v4.yaml) and waits on your answers to its 11
+      open questions, in three batches. The end-of-run work so far:
+      - **Bootstraps from empty, one per asset**: daily 11m24s, quarterly
+        111m09s against its 12-minute budget (#318 below). Both maps
+        regenerated: each lists only its own placements (Q5) - 69 quarterly,
+        23 daily, every one with data behind it.
+      - **One more defect before the bootstrap could run** (#316): a
+        leftover `dbt_shared` link in dbt_packages/ read as installed and dbt
+        refused to parse. Fixed test-first.
+      - **The full suite, in 21 chunks** - a single run outlived the 2-hour
+        background limit, and a detached one was reclaimed by the container
+        every ~10 minutes. On e998729f: 7,718 tests, 10 failed, coverage 94%
+        (floor 92). All 10 were tests, not product: written up as #317-#320
+        and fixed in c5d01de5. The first full run (stopped part-way) found
+        three more, fixed in e998729f.
+      - **Two real findings**: #317, C6's package check imported dbt into
+        the main process (REQ-PIPE-157 c5) - fixed, the hash now in a child
+        process; #318, generation had become very slow - the asset resolver
+        re-listed assets/ ~3 million times per generation, and schema files
+        were re-parsed per geocoding file. Two caches halve it (906s ->
+        457s profiled). The rest is a design question for you (#318): how a
+        generation pins its configuration.
+      - **The arrival golden holds**: all 504 pinned arrivals compared entry
+        by entry, the same verdict and instant, none missing. It now compares
+        per asset, and the geocoding datasets' 100 arrivals were added.
+      - **The first-view budget (#268 L1)** missed under the suite's load
+        (6.4/5.9/7.6s against 6) and passed alone (4.4-4.7s). Not loosened.
+      - **NOT DONE YET**: the unmet_criteria the bootstrap proves are NOT
+        cleared - each needs its evidence written against a specific run, and
+        they are requirement claims, so I would rather walk them with you.
+        The push waits on one more full suite on the final tree (tests and
+        the golden changed after e998729f, product code did not).
 
     **THE BATCHES**
     - **REQ-PIPE-341, multi-column sample keys** (ad2a266, fixes 2929723,
