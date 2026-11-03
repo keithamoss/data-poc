@@ -54,6 +54,18 @@ def _dbt_deps():
     return CliRunner().invoke(env_group, ["dbt-deps"])
 
 
+def _spy_on_dbt_deps(ran: list, real):
+    """subprocess.run, recording each `dbt deps` it is asked to run. Only
+    those: the lock-hash child process (dbt_common._packages_hash, which
+    keeps dbt out of this interpreter) is not an install."""
+    def run(*a, **k):
+        argv = a[0] if a else k.get("args") or []
+        if "deps" in [str(x) for x in argv]:
+            ran.append(a)
+        return real(*a, **k)
+    return run
+
+
 class TestInstalling:
 
     def test_it_installs_the_selected_assets_packages(self, an_asset):
@@ -67,7 +79,7 @@ class TestInstalling:
         before = sorted(p.name for p in (an_asset / "dbt_packages").iterdir())
         ran = []
         real = subprocess.run
-        monkeypatch.setattr(subprocess, "run", lambda *a, **k: ran.append(a) or real(*a, **k))
+        monkeypatch.setattr(subprocess, "run", _spy_on_dbt_deps(ran, real))
         result = _dbt_deps()
         assert result.exit_code == 0, result.output
         assert "already installed" in result.output
@@ -119,7 +131,7 @@ class TestInstalledIsDecidedByDbtsOwnLock:
         assert done.returncode == 0, done.stdout + done.stderr
         ran = []
         real = subprocess.run
-        monkeypatch.setattr(subprocess, "run", lambda *a, **k: ran.append(a) or real(*a, **k))
+        monkeypatch.setattr(subprocess, "run", _spy_on_dbt_deps(ran, real))
         result = _dbt_deps()
         assert result.exit_code == 0, result.output
         assert "already installed" in result.output
@@ -137,7 +149,7 @@ class TestInstalledIsDecidedByDbtsOwnLock:
         (an_asset / "packages.yml").write_text("# a comment\n" + (an_asset / "packages.yml").read_text())
         ran = []
         real = subprocess.run
-        monkeypatch.setattr(subprocess, "run", lambda *a, **k: ran.append(a) or real(*a, **k))
+        monkeypatch.setattr(subprocess, "run", _spy_on_dbt_deps(ran, real))
         result = _dbt_deps()
         assert result.exit_code == 0, result.output
         assert "already installed" in result.output

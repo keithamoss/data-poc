@@ -31,7 +31,7 @@ A scenario marked **not injected** has no generated data behind it.
 Either it is a pure unit test with nothing to look at, or it is meant
 for injection and has not been placed yet.
 
-**69 of 69 scenarios marked for injection have data behind them today.** 69 scenarios are registered in all; the rest are unit tests with nothing to look at.
+**69 of 69 scenarios marked for injection have data behind them today.** 69 scenarios are registered in all.
 
 ## Slot assignment
 

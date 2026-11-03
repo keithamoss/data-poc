@@ -177,6 +177,16 @@ class TestTheMapItself:
         injected = len(sc.injected())
         assert f"0 of {injected} scenarios marked for injection" in text
 
+    def test_a_map_with_no_unit_scenarios_does_not_mention_a_rest(self):
+        """Since each asset's map lists only its own placements (morning
+        report 12 Q5), a map can hold injected scenarios only - and then
+        "the rest are unit tests" names a rest that is not there."""
+        injected = [s for s in sc.parse_register() if s.is_injected]
+        assert injected, "test precondition - the register has injected scenarios"
+        text = sm.build_map(injected, {})
+        assert "the rest are unit tests" not in text
+        assert f"{len(injected)} scenarios are registered" in text
+
     def test_every_scenario_appears(self):
         text = self._map()
         for scenario in sc.parse_register():

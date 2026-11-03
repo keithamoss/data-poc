@@ -354,8 +354,9 @@ def build_map(scenarios: Iterable[scenarios_mod.Scenario],
     lines = [
         _INTRO.strip(), "",
         f"**{len(placed)} of {len(injected)} scenarios marked for injection have data "
-        f"behind them today.** {len(scenarios)} scenarios are registered in all; the "
-        f"rest are unit tests with nothing to look at.", "",
+        f"behind them today.** {len(scenarios)} scenarios are registered in all"
+        + ("; the rest are unit tests with nothing to look at." if len(scenarios) > len(injected)
+           else "."), "",
     ]
 
     by_section: dict[str, list] = {}

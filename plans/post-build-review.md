@@ -14420,3 +14420,72 @@ twice. It deliberately did not re-find the `TypeError`.
        not installed until then).
      - Minor bug under the polish rule; REQ-QAC-368 d5's meaning of
        "installed" is unchanged, only made complete.
+
+317. **[done, 2026-11-03]** **[QA pipeline]** **[Testing & dev tooling]**
+     **C6's package check imported dbt into the main process.** Found by the
+     end-of-run full suite, not a critic: `tests/test_dbt_worker.py`'s
+     "dbt never runs in this interpreter" (REQ-PIPE-157 criterion 5) failed,
+     alone and in the suite. A trace showed `dbt_common.packages_installed`
+     (C6, #315/#316) importing `dbt.task.deps` for dbt's own lock hash, which
+     pulls in dbt's CLI beside Soda Core, datacontract-cli and Evidently.
+     - **Fixed against the existing test, which failed first**: the hash is
+       computed by the same dbt code in a short child process
+       (`dbt_common._packages_hash`), remembered per packages.yml path, mtime
+       and size, so C6's "dbt's own hashing" decision stands and dbt stays out
+       of this interpreter. Three tests in `tests/test_dbt_packages_per_asset.py`
+       spied on EVERY `subprocess.run` to prove `dbt deps` did not run again;
+       they now record only `dbt deps` calls, which is what they meant.
+     - **Runs**: `tests/test_dbt_worker.py` and `tests/test_dbt_packages_per_asset.py`
+       pass (12 and 22).
+     - Defect in a built feature, fixed under the polish rule because the
+       requirement's own criterion was already the test; nothing about what
+       "installed" means changed.
+
+318. **[in-progress, 2026-11-03]** **[Data generation]** **[QA pipeline]**
+     **Generating the quarterly asset's synthetic data had become very
+     slow, and the suite and the bootstrap with it.** Measured: the
+     quarterly end-of-run bootstrap took 111 minutes against its 12-minute
+     budget (Child Protection, Emergency Department and Linkage Products
+     6242s), and a full local suite run went past the 2-hour background
+     limit. `checkpoints.arrivals_of`'s docstring says "about five seconds";
+     one call took 906 profiled seconds. `tests/test_checkpoints.py` pays it
+     once per test.
+     - **Two causes found by profiling and fixed (polish rule - no behaviour
+       changes):** (1) `assets.selected()` was asked about 3 million times in
+       one generation and LISTED `assets/` each time (a listdir and an is_dir
+       per entry, then six new Paths) - over half the time. The listing is now
+       remembered by the folder's own stat (mtime and inode, so an added,
+       removed or renamed asset is seen at once) and each Asset's paths per
+       name. (2) `list_setting_members.declared()`, asked once per geocoding
+       file, re-parsed every dbt schema file each time; parses are now
+       remembered per file stat. Together: 906s -> 457s profiled.
+     - **Left, and FOR KEITH because it is design rather than polish**: the
+       rest is spread across `hierarchy._load` (2.7 million calls, each
+       re-reading data-asset.yaml - deliberate, REQ-PIPE-254 criterion 15),
+       `agreement.standing_on` (1.5 million) and the slot and period
+       arithmetic the generator recomputes inside its loops
+       (`slots_for_dataset`, `periods_for_dataset`, `correction_claims`). A
+       real fix memoizes per generation, which needs a decision on how a
+       generation pins its configuration. Logged, not built.
+     - **Runs**: the affected modules (test_assets, test_asset_switch_keeps_module_fixtures,
+       test_cli_asset_selection, test_every_asset, test_list_settings) pass.
+
+319. **[done, 2026-11-03]** **[Data generation]** **The scenario map's
+     summary named a "rest" that was not there.** Since each asset's map
+     lists only its own placements (morning report 12 Q5), both maps hold
+     injected scenarios only, and the line read "23 scenarios are registered
+     in all; the rest are unit tests with nothing to look at". Fixed
+     test-first (`test_a_map_with_no_unit_scenarios_does_not_mention_a_rest`
+     failed before the fix): the clause appears only when there is a rest.
+     Both maps regenerated. Wording, polish rule.
+
+320. **[done, 2026-11-03]** **[Testing & dev tooling]** **Two tests broken
+     by the asset split, found by the end-of-run suite.** (1)
+     `test_collection_defaults`'s calendar-menu test stubbed only `select`,
+     but the quarterly asset now holds more than `common.N_LIST` datasets, so
+     the menu asks through `grouped_select` and refused for want of a
+     terminal; it stubs both now. (2) `test_cross_table_scope`'s rebuild test
+     was parametrised over Birth Registrations too, borrowing a Child
+     Protection cross-table check that the daily asset can no longer see; it
+     runs for the quarterly collection only, since the rebuild is one shared
+     builder (REQ-DASH-244). Test fixes, no product change.
