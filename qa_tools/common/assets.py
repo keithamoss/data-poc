@@ -46,6 +46,7 @@ from __future__ import annotations
 import importlib.util
 import os
 import re
+import stat
 import sys
 import threading
 from dataclasses import dataclass
@@ -143,10 +144,24 @@ class _Assets:
 
     def __init__(self, root: Path):
         self.root = root
+        # REMEMBERED BY THE FOLDER'S OWN STAT, so still "as it is now": a
+        # folder added, removed or renamed under assets/ changes the
+        # directory's mtime, and the next call lists it afresh. selected() is
+        # asked millions of times in one generation, and listing the folder
+        # each time was over half of it (post-build-review #318).
+        self._listed: tuple | None = None
+        self._assets: dict[str, Asset] = {}
 
     def names(self) -> list[str]:
-        if not self.root.is_dir():
+        try:
+            st = os.stat(self.root)
+        except OSError:
             return []
+        if not stat.S_ISDIR(st.st_mode):
+            return []
+        stamp = (st.st_mtime_ns, st.st_ino)
+        if self._listed is not None and self._listed[0] == stamp:
+            return list(self._listed[1])
         found = sorted(p.name for p in self.root.iterdir()
                        if p.is_dir() and not p.name.startswith((".", "_")))
         bad = [n for n in found if not NAME_PATTERN.fullmatch(n)]
@@ -156,14 +171,21 @@ class _Assets:
                 f"lowercase letters, digits and single hyphens - rename them. An asset's "
                 f"name becomes part of its modules' names, so 'a-b' and 'a_b' would be "
                 f"one module and a dot would be a module path.")
+        self._listed = (stamp, tuple(found))
         return found
 
     def asset(self, name: str) -> Asset:
-        folder = self.root / name
-        return Asset(name=name, folder=folder, adapters=folder / "collections",
-                     providers=folder / "synthetic" / "collections",
-                     dbt_project=folder / "dbt",
-                     data=ROOT / "data" / name, reports=ROOT / "reports" / name)
+        """Its paths - which depend on nothing but the root and the name, so
+        built once per name (an Asset is frozen)."""
+        found = self._assets.get(name)
+        if found is None:
+            folder = self.root / name
+            found = self._assets[name] = Asset(
+                name=name, folder=folder, adapters=folder / "collections",
+                providers=folder / "synthetic" / "collections",
+                dbt_project=folder / "dbt",
+                data=ROOT / "data" / name, reports=ROOT / "reports" / name)
+        return found
 
 
 #: AN ASSET'S NAME: lowercase letters and digits, words joined by single
