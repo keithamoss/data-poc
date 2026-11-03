@@ -126,11 +126,9 @@ def test_the_shared_parser_itself_refuses_a_non_relative_target(tmp_path):
     ("REQ-DASH-999", "not in requirements.yaml"),
     ("REQ-DASH-002", "retired - cite REQ-DASH-001"),
     ("sprint 9", "not in the introduction's list"),
-    # NO CASE FOR AN UNKNOWN AGENCY (SETTLED by Keith 2026-11-02, the move
-    # critic's decision 1): each asset's pass reads only its own hierarchy, so
-    # an agency it does not hold is left to the other asset's pass. The case
-    # `[x](#/agency/nope)` comes back with REQ-PIPE-354, which decides cross-asset
-    # links - REQ-DOCS-219's unmet criterion 10 records the gap.
+    # A MISTYPED AGENCY IS CAUGHT AGAIN (Keith, 2026-11-03, morning report 12
+    # Q8): no asset's hierarchy holds it, read from configuration alone.
+    ("[x](#/agency/nope)", "agency 'nope'"),
     ("[x](#/agency/ag/collection/col/dataset/zzz)", "dataset 'zzz'"),
     ("[x](#/nowhere)", "not one the dashboard has"),
 ])
@@ -138,6 +136,34 @@ def test_evidence_is_checked_against_configuration(repo, item, needle):
     card = f"- **You told us:** a\n- **What we heard:** b\n- **Evidence:** {item}"
     _, errors = repo(_entry(card=card))
     _only(errors, needle)
+
+
+def test_a_link_to_another_assets_agency_is_left_to_that_assets_pass(repo, tmp_path,
+                                                                     monkeypatch):
+    """Keith, 2026-11-03 (morning report 12 Q8): an agency the other asset
+    declares is not a typo - its pass checks the rest of the route.
+    HERMETIC (#315 L4): the assets it reads are this test's own, injected,
+    so it holds whatever the repository's assets declare."""
+    from qa_tools.common import assets, every_asset
+
+    root = tmp_path / "assets"
+    for name, ag in (("ours", "ag"), ("theirs", "ag-theirs")):
+        (root / name).mkdir(parents=True)
+        (root / name / "data-asset.yaml").write_text(
+            f"data_asset_id: {name}\nhierarchy:\n  agencies:\n    - id: {ag}\n      name: A\n"
+            f"      collections:\n        - id: col\n          name: C\n"
+            f"          contract: c.yaml\n          datasets:\n            - id: ds-{name}\n"
+            f"              name: D\n              table: t_{name}\n")
+    before = assets.use_root(root)
+    try:
+        monkeypatch.setenv(assets.ASSET_ENV, "ours")
+        assert every_asset.declared().agencies == {"ag", "ag-theirs"}, "precondition"
+        card = ("- **You told us:** a\n- **What we heard:** b\n- **Evidence:** "
+                "[x](#/agency/ag-theirs/collection/c/dataset/d)")
+        _, errors = repo(_entry(card=card))
+    finally:
+        assets.restore(before)
+    assert errors == []
 
 
 @pytest.mark.parametrize("card,needle", [

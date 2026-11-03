@@ -315,6 +315,28 @@ def _build_changelog_feed() -> list[dict]:
     return feed
 
 
+#: What GITHUB_LINKS holds when it holds nothing - the template's own default.
+_NO_GITHUB_LINKS = {"checks": {}, "agencies": {}, "datasets": {}, "titles": {"agencies": {}, "datasets": {}}}
+
+
+def github_links_or_none(sha: str) -> tuple[dict, str | None]:
+    """(GITHUB_LINKS, None), or - where the selected asset's configuration
+    lies outside this repository - (no links, a quiet note saying so). Keith,
+    2026-11-03 (morning report 12 Q9): the dashboard BUILDS for such an asset,
+    leaving its GitHub links out, since a link is a repository path GitHub has
+    never seen (C7, REQ-PIPE-342 decision 18). REJECTED refusing the build.
+    The page already draws no 'View on GitHub' where it has no link."""
+    from qa_tools.common import assets
+
+    try:
+        return {"checks": build_check_source_links(sha=sha), **build_folder_links(sha=sha)}, None
+    except assets.OutsideTheRepository:
+        asset = assets.selected()
+        return (json.loads(json.dumps(_NO_GITHUB_LINKS)),
+                f"GITHUB_LINKS left out: asset {asset.name!r}'s configuration ({asset.folder}) "
+                f"is not in this repository, so it has no GitHub links.")
+
+
 def _replace_const(html: str, const_name: str, value_json: str) -> str:
     # "</" written as "<\/" (post-build-review #187): json.dumps leaves a
     # literal "</script>" alone, and inside a <script> that ends the element.
@@ -742,9 +764,9 @@ def embed() -> None:
           + ("" if os.path.exists(open_tickets_json) else " (no reports/open_tickets.json - local build, embedding empty)"))
 
     sha = current_commit_sha()
-    github_links = {"checks": build_check_source_links(sha=sha), **build_folder_links(sha=sha)}
+    github_links, outside = github_links_or_none(sha=sha)
     html = _replace_const(html, "GITHUB_LINKS", json.dumps(github_links, separators=(",", ":")))
-    print(f"Re-embedded GITHUB_LINKS = {len(github_links['checks'])} check link(s) at commit {sha[:12]}")
+    print(outside or f"Re-embedded GITHUB_LINKS = {len(github_links['checks'])} check link(s) at commit {sha[:12]}")
 
     def _public(record: dict) -> dict:
         return {k: v for k, v in record.items() if k != "email"}

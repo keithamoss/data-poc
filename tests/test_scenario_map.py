@@ -281,7 +281,7 @@ class TestEachAssetHasItsOwnMap:
     def test_each_committed_map_is_current_for_its_own_history(self, asset):
         from generator import scenario_injection
 
-        built = sm.build_for_selected(leave_out=scenario_injection.other_assets_scenarios())
+        built = sm.build_for_selected(naming_mine=scenario_injection.this_assets_scenarios())
         assert sm.map_path().read_text() == built, (
             f"SCENARIOS-{asset}.md is stale - run `mothman scenarios map`")
 
@@ -293,10 +293,36 @@ class TestEachAssetHasItsOwnMap:
         """TS-78a is Birth Registrations', TS-80 the Client Register's."""
         from generator import scenario_injection
 
-        text = sm.build_for_selected(leave_out=scenario_injection.other_assets_scenarios(),
+        text = sm.build_for_selected(naming_mine=scenario_injection.this_assets_scenarios(),
                                      placements_path="/nonexistent/placements.json")
         assert f"### {mine} " in text, f"{asset}'s map leaves out its own {mine}"
         assert f"### {theirs} " not in text, f"{asset}'s map carries {theirs}"
+
+    @pytest.mark.parametrize("asset", _EACH_ASSET)
+    def test_a_map_lists_its_own_placements_and_those_naming_its_datasets(self, asset, tmp_path):
+        """SETTLED by Keith 2026-11-03 (morning report 12 Q5), replacing
+        REQ-PIPE-352's PROVISIONAL membership: a map lists the scenarios its
+        OWN asset placed, plus those whose injections name one of its
+        datasets; an unplaced scenario naming no dataset is in neither map."""
+        from generator import scenario_injection as si
+        from qa_tools.common import scenarios
+
+        register = scenarios.parse_register()
+        named = {sid for i in si.INJECTIONS for sid in (i.scenario_id, *i.also_demonstrates)}
+        nowhere = [s.id for s in register if s.id not in named]
+        assert len(nowhere) >= 2, "precondition: two scenarios name no dataset"
+        placed, unplaced = nowhere[0], nowhere[1]
+        mine = si.this_assets_scenarios()
+        assert mine, f"precondition: some scenario names a dataset of {asset}'s"
+        path = tmp_path / "placements.json"
+        path.write_text(json.dumps({"placements": [{
+            "scenario_id": placed, "dataset": "d", "supplies": ["s"], "period": "p",
+            "in_place_on": "2026-01-01"}]}))
+        text = sm.build_for_selected(naming_mine=mine, placements_path=path)
+        assert f"### {placed} " in text, f"{asset}'s map leaves out {placed}, which it placed"
+        assert f"### {unplaced} " not in text, f"{asset}'s map carries {unplaced}, placed by no one"
+        missing = [sid for sid in mine if sid in {s.id for s in register} and f"### {sid} " not in text]
+        assert not missing, missing
 
     @pytest.mark.parametrize("asset", _EACH_ASSET)
     def test_the_real_register_names_no_scenario_across_assets(self, asset):

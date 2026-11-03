@@ -121,5 +121,34 @@ def test_check_links_for_a_folder_outside_the_repository_are_refused(tmp_path):
         github_links.build_check_source_links(sha="abc123")
 
 
+def _injected_root(tmp_path):
+    """REQ-PIPE-342's injection (#55): an assets/ root outside the repository,
+    each asset folder in it a link to the real one."""
+    root = tmp_path / "assets"
+    root.mkdir()
+    for entry in (assets.ROOT / "assets").iterdir():
+        (root / entry.name).symlink_to(entry)
+    assets.use_root(root)
+    return root
+
+
+def test_the_build_leaves_the_links_out_for_a_folder_outside_the_repository(tmp_path, capsys):
+    """Keith, 2026-11-03 (morning report 12 Q9): the dashboard BUILDS for an
+    asset folder outside the repository, leaving that asset's GitHub links
+    out with a quiet note that its configuration is not in this repository.
+    REJECTED refusing the build."""
+    from dashboard import embed_dashboard_data as embed
+
+    inside, note = embed.github_links_or_none(sha="abc123")
+    assert inside["checks"] and inside["agencies"] and note is None, "precondition: links inside"
+    _injected_root(tmp_path)
+    with pytest.raises(assets.OutsideTheRepository):
+        github_links.build_folder_links(sha="abc123")
+    links, note = embed.github_links_or_none(sha="abc123")
+    assert links == {"checks": {}, "agencies": {}, "datasets": {},
+                     "titles": {"agencies": {}, "datasets": {}}}
+    assert "not in this repository" in note and "'daily'" in note
+
+
 #: Birth Registrations is the daily asset's (the asset split).
 pytestmark = pytest.mark.asset("daily")

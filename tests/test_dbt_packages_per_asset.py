@@ -175,6 +175,37 @@ class TestARunWithoutThemIsRefused:
         assert invoked == []
         assert "'one'" in str(exc.value) and "mothman env dbt-deps" in str(exc.value)
 
+    # ONE MEANING OF "INSTALLED" EVERYWHERE (Keith, 2026-11-03, morning report
+    # 12 Q10; REQ-QAC-368 criterion 6 as amended): the run guard uses the
+    # package-lock rule `mothman env dbt-deps` uses, so packages installed
+    # once and then outdated by an edit to packages.yml are refused too.
+    def test_a_stale_lock_is_refused_as_dbt_deps_would_reinstall(self, an_asset, tmp_path, monkeypatch):
+        from qa_tools.common import dbt_worker
+        from qa_tools.tools import run_dbt
+
+        assert _dbt_deps().exit_code == 0
+        assert assets.dbt_project_ready() == an_asset, "precondition: installed and current"
+        _another_package(tmp_path, an_asset)
+        invoked = []
+        monkeypatch.setattr(dbt_worker, "invoke", lambda *a, **k: invoked.append(a))
+        with pytest.raises(assets.DbtPackagesMissing) as exc:
+            run_dbt.test_names_by_check_id("child-protection")
+        assert invoked == []
+        assert "'one'" in str(exc.value) and "mothman env dbt-deps" in str(exc.value)
+
+    def test_a_package_deleted_since_is_refused(self, an_asset):
+        import shutil
+
+        assert _dbt_deps().exit_code == 0
+        installed = [p for p in (an_asset / "dbt_packages").iterdir() if p.is_dir()]
+        assert installed, "precondition: a package is installed"
+        # A local package is installed as a link to its folder.
+        installed[0].unlink() if installed[0].is_symlink() else shutil.rmtree(installed[0])
+        (an_asset / "dbt_packages" / "leftover").mkdir()
+        (an_asset / "dbt_packages" / "leftover" / "x").write_text("")
+        with pytest.raises(assets.DbtPackagesMissing):
+            assets.dbt_project_ready()
+
 
 REAL_ASSETS = sorted(p.parent.parent.name for p in (ROOT / "assets").glob("*/dbt/dbt_project.yml"))
 

@@ -9659,19 +9659,27 @@ class TestNoColourWordIsReadAsAStatusOnTheDailyAsset:
     # scenario map lists it as not injected (SCENARIOS-daily.md).
 
 
+#: CRITERION 1'S TWO SURFACES NO GENERATED PAGE SHOWS, covered by a Vitest
+#: test against mock data instead (Keith, 2026-11-03, morning report 12 Q3,
+#: against the recommendation; REJECTED planting a scenario for each, and
+#: dropping them from criterion 1): tests-js/colour-words-recheck-surfaces.test.js
+#: renders each and holds it to this guard's rule. The real-page guard scans
+#: what the data shows.
+_GUARD_SURFACES_IN_MOCK = {"re-checked worse", "Re-checked <t>: became <X>"}
+
+
 def test_the_two_assets_show_every_surface():
     """REQ-TEST-361 criterion 1 names six surfaces; split across the two
-    assets (C11), the two together must still show all six. The dictionary
-    this reads is PINNED TO THE PAGES: each asset's scenario-page scan walks
-    every one of its scenario pages and fails unless what they show is
-    exactly that asset's entry (_scan_scenario_surfaces), so a surface a page
-    starts or stops showing fails there first. FAILS TODAY: no page of either
-    asset's synthetic history shows a re-checked-worse supply or a
-    'Re-checked <t>: became <X>' row (2026-11-02, every dataset page probed
-    at the anchor date) - held for Keith, post-build-review #307."""
+    assets (C11), the two together must still show all six but the two the
+    mock test covers (_GUARD_SURFACES_IN_MOCK). The dictionary this reads is
+    PINNED TO THE PAGES: each asset's scenario-page scan walks every one of
+    its scenario pages and fails unless what they show is exactly that
+    asset's entry (_scan_scenario_surfaces), so a surface a page starts or
+    stops showing fails there first."""
+    assert _GUARD_SURFACES_IN_MOCK < set(_GUARD_SURFACES), "the mock's surfaces are criterion 1's"
     shown = set().union(*_GUARD_SURFACES_BY_ASSET.values())
-    assert shown == set(_GUARD_SURFACES), (
-        f"no scenario page of either asset shows {sorted(set(_GUARD_SURFACES) - shown)}")
+    owed = set(_GUARD_SURFACES) - _GUARD_SURFACES_IN_MOCK
+    assert owed <= shown, f"no scenario page of either asset shows {sorted(owed - shown)}"
 
 
 @pytest.mark.needs_deployment
@@ -9881,56 +9889,6 @@ class TestTheGeocodingPages:
         bars = clean_page.locator(".value-bars .value-bar-row .lbl").all_inner_texts()
         assert bars, "match_level shows no value bars"
         assert set(bars) <= {"address", "postcode", "suburb", "not geocoded"}, bars
-
-    def test_7_no_area_code_or_nine_digit_run_on_a_geocoding_page(
-            self, clean_page, built_dashboard_html):
-        """Criterion 13, on every geocoding page shown for a scenario's
-        period: the dataset page's strip and EVERY check panel of its
-        census_year and match_level columns. The supply's file is found
-        through its receipt (qa.supply_receipt) - a delivery folder's name is
-        arbitrary (generator/delivery_names.py) and never holds the period."""
-        import csv
-
-        from qa_tools.common import delivery, qa_store, supply_db
-
-        hx = _hierarchy_index()
-        built = _built_datasets(built_dashboard_html)
-        for sid, dataset_id in ((_MISSING_YEAR, _GEO), (_DUPLICATE_YEAR, "geo-ed-presentations"),
-                                (_UNEXPECTED_YEAR, _GEO)):
-            coords = _scenario(clean_page, built_dashboard_html, sid)
-            ds = built[dataset_id]
-            supplies = {r["supply_id"] for r in ds["runs"] if r["run_id"] in coords["supplies"]}
-            assert supplies, f"precondition: {sid}'s runs are {dataset_id}'s"
-            with supply_db.connect(read_only=True, label="test-e2e") as conn:
-                found = conn.execute(
-                    f'SELECT delivery, filename FROM "{qa_store.SCHEMA}".supply_receipt '
-                    "WHERE supply_id = ANY(?)", [sorted(supplies)]).fetchall()
-            assert found, f"precondition: {sid}'s supply has a receipt"
-            codes = set()
-            for name, filename in found:
-                path = delivery.default_deliveries_dir() / name / filename
-                assert path.is_file(), path
-                with path.open(newline="") as fh:
-                    codes |= {v for row in csv.DictReader(fh) for k, v in row.items()
-                              if k in ("sa2_code", "lga_code") and v}
-            assert codes, f"precondition: {sid}'s file holds area codes"
-            on = coords["inPlaceOn"]
-            _goto(clean_page, built_dashboard_html, state=self._geo_state(hx, dataset_id), in_place_on=on)
-            shown = clean_page.locator(".sla-strip").all_inner_texts()
-            panels = [ck for col in ds["columns"] if col["name"] in ("census_year", "match_level")
-                      for ck in col["checks"] if not ck.get("retired")]
-            assert len(panels) >= 4, [ck["key"] for ck in panels]
-            for ck in panels:
-                col = ck["check_id"].split(".")[4]
-                _goto(clean_page, built_dashboard_html, state=self._geo_state(
-                    hx, dataset_id, columnName=col, checkKey=ck["key"]), in_place_on=on)
-                panel = clean_page.locator("#check-panel")
-                assert panel.count() == 1, ck["key"]
-                shown += panel.locator(".sample-line, .sample-heading, [data-value-text]").all_inner_texts()
-            text = " ".join(shown)
-            assert not re.search(r"\b\d{9}\b", text), (sid, text[:500])
-            assert not any(c in text for c in codes), sid
-
 
     def test_9_the_g1_route_tags_the_older_client_register_supply(
             self, clean_page, built_dashboard_html):

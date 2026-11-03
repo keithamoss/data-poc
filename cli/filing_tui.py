@@ -208,10 +208,6 @@ _LISTED_AS = {
 }
 
 
-def _collections() -> list[str]:
-    return sorted({d.collection_id for d in hierarchy.all_datasets()})
-
-
 def _collection_name(collection_id: str) -> str:
     for d in hierarchy.all_datasets():
         if d.collection_id == collection_id:
@@ -2322,8 +2318,10 @@ def filing_menu() -> None:
     # their own names, sorted by id, until then.
     from qa_tools import collections as registry
 
-    filed = set(_collections())
-    every = [c for c in registry.all_collections() if c.id in filed]
+    # THE POINTER'S COUNT TOO (supply_files.filing_collections; #315 L1).
+    from qa_tools.common import supply_files
+
+    every = supply_files.filing_collections()
     by_name = {c.label: c.id for c in every}
     collections = list(by_name)
     terms = {c.label: common.collection_terms(c) for c in every}
@@ -2366,9 +2364,13 @@ def filing_menu() -> None:
             return
         collection_id = by_name.get(picked)
     else:
-        picked = (collections[0] if len(collections) == 1 else
-                  common.grouped_select("Which collection?", grouped, flag_hint=_FLAG_HINT,
-                                        many=common.many_collections(), terms=terms))
+        # ONE CONDITION FOR WHETHER THIS ASKS, shared with the settle pointer
+        # (supply_files.collection_step_asked; Keith, 2026-11-03, Q7), which
+        # counts the collections the one way both use (#315 L1).
+        asks = supply_files.collection_step_asked(waiting, parked, nudges)
+        picked = (common.grouped_select("Which collection?", grouped, flag_hint=_FLAG_HINT,
+                                        many=common.many_collections(), terms=terms)
+                  if asks else collections[0])
         collection_id = by_name.get(picked)
     if collection_id is None:
         return

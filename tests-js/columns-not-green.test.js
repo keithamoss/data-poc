@@ -82,6 +82,37 @@ describe("the Columns not green cell", () => {
     expect(label).not.toMatch(/latest \d+ failing/);
   });
 
+  // Morning report 12 Q1 (Keith, 2026-11-03): THE PAGE IS THE REFERENCE
+  // (criterion 18). On a date with nothing in the current period the page's
+  // tiles go quiet but its cross-table section still reads the warehouse's
+  // verdict, so the row counts that section as the page does - read through
+  // the page's own crossTableSectionHead, for any dataset.
+  it("on a quiet date, counts the cross-table section's verdict as the page does", () => {
+    const w = load();
+    const ctx = { col: { id: "c" }, ds: { id: "d", name: "D", columns: [] } };
+    w.crossTableSectionHead = (col, ds) => (col === ctx.col && ds === ctx.ds
+      ? { head: "amber", name: "Cross-table checks" } : null);
+    const html = w.columnsNotGreenCell([unit("a", { r1: "red", r2: "amber" })], undefined, true, ctx);
+    const t = text(w, html);
+    expect(t).toContain("1 of 1");
+    expect(t).toContain("0 failing, 1 warning · incl. Cross-table checks");
+    expect(t).not.toContain("No column has a verdict");
+    const label = html.match(/<svg[^>]*aria-label="([^"]+)"/)[1];
+    expect(label).toMatch(/latest 0 failing and 1 warning of 1$/);
+    // The history stays neutral: nothing in the current period was checked.
+    expect(html).not.toContain("var(--warn)");
+  });
+
+  it("on a quiet date, a cross-table section with no verdict still reads no verdict", () => {
+    const w = load();
+    const ctx = { col: { id: "c" }, ds: { id: "d", name: "D", columns: [] } };
+    w.crossTableSectionHead = () => ({ head: "nodata", name: "Cross-table checks" });
+    const html = w.columnsNotGreenCell([unit("a", { r1: "red", r2: "amber" })], undefined, true, ctx);
+    // (each point's tooltip follows the cell's text)
+    expect(text(w, html)).toMatch(/^No column has a verdict on this date/);
+    expect(text(w, html)).not.toMatch(/\d+ of \d+/);
+  });
+
   it("says when no column has a verdict, and when there is one run so far", () => {
     const w = load();
     expect(text(w, w.columnsNotGreenCell([unit("a", { r1: "inactive" })])))
