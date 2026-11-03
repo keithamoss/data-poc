@@ -60,6 +60,29 @@ class TestBothAssetsHierarchies:
         assert got.collections == {"col-one", "col-two"}
         assert got.datasets == {"ds-one", "ds-two"}
 
+    def test_a_folder_with_no_data_asset_yaml_is_passed_over(self, monkeypatch, tmp_path):
+        """Post-build-review #315 M2: a folder under assets/ holding no
+        data-asset.yaml - a half-made asset, a stray directory - declares
+        nothing, so it is skipped rather than raising FileNotFoundError out of
+        generation and the feedback validator."""
+        root = tmp_path / "assets"
+        (root / "one").mkdir(parents=True)
+        (root / "one" / "data-asset.yaml").write_text(
+            "data_asset_id: one\nhierarchy:\n  agencies:\n    - id: ag-one\n      name: A\n"
+            "      collections:\n        - id: col-one\n          name: C\n"
+            "          contract: c.yaml\n          datasets:\n            - id: ds-one\n"
+            "              name: D\n              table: t_one\n")
+        (root / "empty").mkdir()
+        before = assets.use_root(root)
+        try:
+            monkeypatch.setenv(assets.ASSET_ENV, "one")
+            assert "empty" in assets.names(), "precondition: the bare folder is found"
+            got = every_asset.declared()
+        finally:
+            assets.restore(before)
+        assert got.agencies == {"ag-one"}
+        assert got.datasets == {"ds-one"}
+
     def test_it_reads_no_database(self, monkeypatch):
         from qa_tools.common import supply_db
 

@@ -86,6 +86,10 @@ class Blocker:
     #: PROVISIONAL 2026-10-23): what a reader's contested read names, so the
     #: page keys a cross-table row on the pair rather than on a time.
     tables: tuple[str, ...] = ()
+    #: Where a contested pair is settled (supply_files.where_to_settle),
+    #: read once on the connection the blocker was built from - never a
+    #: connection of its own per record (post-build-review #315 L2).
+    settle_at: str | None = None
 
     @property
     def is_open(self) -> bool:
@@ -113,14 +117,14 @@ class Blocker:
                 "ended": self.ended,
                 # WHERE IT IS SETTLED, for the page's own wording on any date
                 # (REQ-PIPE-194 criteria 1 and 14, #171).
-                "settleAt": _settle_at(self.dataset_id) if self.kind == CONTESTED else None,
+                "settleAt": self.settle_at if self.kind == CONTESTED else None,
                 "tables": list(self.tables)}
 
 
-def _settle_at(dataset_id: str) -> str:
+def _settle_at(dataset_id: str, conn=None) -> str:
     from qa_tools.common import supply_files
 
-    return supply_files.where_to_settle(dataset_id)
+    return supply_files.where_to_settle(dataset_id, conn=conn)
 
 
 def _iso(value) -> str | None:
@@ -306,9 +310,10 @@ def _contested(db) -> list[Blocker]:
             f"{name} (received {display_time.format_instant(received[name])})"
             if received.get(name) else name
             for name in (list(received) or list(files)))
+        settle_at = _settle_at(dataset_id, db)
         reason = (f"Two files claim this dataset's table in delivery {delivery!r}: "
                   f"{listed}. Nothing is checked until a person says what each file is, "
-                  f"at '{_settle_at(dataset_id)}'.")
+                  f"at '{settle_at}'.")
         if refused:
             reason += " " + " ".join(f"{name} could not be loaded ({why})."
                                      for name, why in refused)
@@ -320,7 +325,7 @@ def _contested(db) -> list[Blocker]:
             opened_at=received_at, resolved_at=ended["at"] if ended else None,
             reason=reason, files=files, load_failures=tuple(refused), delivery=delivery,
             settlement=settlement, superseded_by=superseded_by,
-            tables=_pair_tables(dataset_id, received_at, len(files))))
+            tables=_pair_tables(dataset_id, received_at, len(files)), settle_at=settle_at))
     return out
 
 

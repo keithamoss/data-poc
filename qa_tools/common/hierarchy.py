@@ -223,6 +223,14 @@ def all_datasets() -> list[Dataset]:
     return list(_load()[1].values())
 
 
+def datasets_declared_in(path: Path) -> list[Dataset]:
+    """Every dataset ONE data-asset.yaml declares, in its order - for a
+    configuration-only read of an asset that need not be the selected one
+    (qa_tools/common/every_asset.py; post-build-review #315 L3). The same
+    build, keyed on the file's content, as the selected asset's tree."""
+    return list(_from_text(path, config_yaml.read(path))[1].values())
+
+
 def dataset(dataset_id: str) -> Dataset:
     """One dataset by id, or `UnknownDatasetError` naming what is known.
 

@@ -138,15 +138,31 @@ def test_evidence_is_checked_against_configuration(repo, item, needle):
     _only(errors, needle)
 
 
-def test_a_link_to_another_assets_agency_is_left_to_that_assets_pass(repo):
+def test_a_link_to_another_assets_agency_is_left_to_that_assets_pass(repo, tmp_path,
+                                                                     monkeypatch):
     """Keith, 2026-11-03 (morning report 12 Q8): an agency the other asset
-    declares is not a typo - its pass checks the rest of the route."""
-    from qa_tools.common import every_asset
+    declares is not a typo - its pass checks the rest of the route.
+    HERMETIC (#315 L4): the assets it reads are this test's own, injected,
+    so it holds whatever the repository's assets declare."""
+    from qa_tools.common import assets, every_asset
 
-    theirs = sorted(every_asset.declared().agencies - {"ag"})
-    assert theirs, "precondition: the assets declare agencies"
-    card = f"- **You told us:** a\n- **What we heard:** b\n- **Evidence:** [x](#/agency/{theirs[0]}/collection/c/dataset/d)"
-    _, errors = repo(_entry(card=card))
+    root = tmp_path / "assets"
+    for name, ag in (("ours", "ag"), ("theirs", "ag-theirs")):
+        (root / name).mkdir(parents=True)
+        (root / name / "data-asset.yaml").write_text(
+            f"data_asset_id: {name}\nhierarchy:\n  agencies:\n    - id: {ag}\n      name: A\n"
+            f"      collections:\n        - id: col\n          name: C\n"
+            f"          contract: c.yaml\n          datasets:\n            - id: ds-{name}\n"
+            f"              name: D\n              table: t_{name}\n")
+    before = assets.use_root(root)
+    try:
+        monkeypatch.setenv(assets.ASSET_ENV, "ours")
+        assert every_asset.declared().agencies == {"ag", "ag-theirs"}, "precondition"
+        card = ("- **You told us:** a\n- **What we heard:** b\n- **Evidence:** "
+                "[x](#/agency/ag-theirs/collection/c/dataset/d)")
+        _, errors = repo(_entry(card=card))
+    finally:
+        assets.restore(before)
     assert errors == []
 
 

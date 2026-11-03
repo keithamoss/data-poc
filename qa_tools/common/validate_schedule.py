@@ -848,7 +848,11 @@ def _repo_path(path: Path) -> str | None:
         return str(path.relative_to(ROOT))
     asset = assets.selected_or_none()
     if asset is not None and assets.root_injected() and path.is_relative_to(asset.folder):
-        assets.folder_rel()
+        raise assets.OutsideTheRepository(
+            f"asset {asset.name!r}'s configuration folder is {asset.folder}, outside the "
+            f"repository ({ROOT}), so {path.name} has no repository path - the schedule "
+            f"gate cannot read its previous state at a git ref, and will not read it as "
+            f"having none.")
     return None
 
 

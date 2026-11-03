@@ -313,7 +313,9 @@ class TestTheFilingMenuAtTwo:
 
         # At N_LIST or fewer, one ungrouped list: every collection the menu
         # offers, by its QA-menu label, in hierarchy order.
-        filed = set(filing_tui._collections())
+        from qa_tools.common import hierarchy
+
+        filed = {d.collection_id for d in hierarchy.all_datasets()}
         expected = [c.label for c in collections.all_collections() if c.id in filed]
         # The quarterly asset's hierarchy order (the asset split).
         assert expected == ["Child Protection", "ED Presentations", "Linkage Products"]

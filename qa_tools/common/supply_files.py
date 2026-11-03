@@ -247,33 +247,63 @@ def arrival_run_id_of(dataset_id: str, supply_id: str) -> str:
 SETTLE_AT = "mothman > Filing decisions > {collection} > Supplies waiting on a decision"
 
 
-def collection_step_asked(n_collections: int, *asset_wide) -> bool:
+def filing_collections() -> list:
+    """The collections the filing menu (cli/filing_tui.filing_menu) lists:
+    every registered collection with a dataset filed under it in the
+    hierarchy, in hierarchy order. THE ONE COUNT the menu and where_to_settle
+    both ask by (post-build-review #315 L1) - the pointer counted every
+    registered collection, so a registered collection with no datasets yet
+    made it name a step the menu never asks."""
+    from qa_tools import collections
+    from qa_tools.common import hierarchy
+
+    filed = {d.collection_id for d in hierarchy.all_datasets()}
+    return [c for c in collections.all_collections() if c.id in filed]
+
+
+def collection_step_asked(*asset_wide) -> bool:
     """Whether the filing menu (cli/filing_tui.filing_menu) asks which
     collection - its one condition, shared with where_to_settle so the two
-    cannot disagree: always for an asset of several collections, and for a
-    one-collection asset only while something asset-wide is pending -
-    `asset_wide` is its pending corrections, parked moves and nudges."""
-    return n_collections != 1 or any(asset_wide)
+    cannot disagree: always for an asset of several collections (counted by
+    filing_collections), and for a one-collection asset only while something
+    asset-wide is pending - `asset_wide` is its pending corrections, parked
+    moves and nudges."""
+    return len(filing_collections()) != 1 or any(asset_wide)
 
 
-def _asset_wide_waiting() -> tuple[list, list, list]:
+def _asset_wide_waiting(conn=None) -> tuple[list, list, list]:
     """The pending corrections, parked moves and nudges the filing menu
-    reads - none where they cannot be read, as the menu treats them."""
+    reads - on `conn` where the caller holds one (the dashboard build's
+    blockers), else on a read-only connection of its own. None where they
+    cannot be read, as the menu treats them - and SAID, as a warning, as the
+    menu says it in a dim note (post-build-review #315 L2): read as nothing
+    pending, the pointer drops the collection step, and a silent drop would
+    hide why."""
+    import warnings
+    from contextlib import nullcontext
+
     from qa_tools.common import bulk_recheck, correction_apply, supply_db
 
     try:
-        with supply_db.connect(read_only=True, label="mothman:settle-pointer") as conn:
-            return (correction_apply.pending(conn), correction_apply.parked(conn),
-                    bulk_recheck.nudges(conn))
-    except Exception:  # noqa: BLE001 - as the menu: it works without them
+        opened = (nullcontext(conn) if conn is not None
+                  else supply_db.connect(read_only=True, label="mothman:settle-pointer"))
+        with opened as db:
+            return (correction_apply.pending(db), correction_apply.parked(db),
+                    bulk_recheck.nudges(db))
+    except Exception as exc:  # noqa: BLE001 - as the menu: it works without them
+        first = (str(exc).splitlines() or [type(exc).__name__])[0]
+        warnings.warn(f"The settle pointer could not read the pending calendar corrections, "
+                      f"parked moves or re-checks ({first}), so it reads none pending.",
+                      stacklevel=3)
         return [], [], []
 
 
-def where_to_settle(dataset_id: str) -> str:
+def where_to_settle(dataset_id: str, conn=None) -> str:
     """SETTLE_AT for this dataset's collection, BY THE LABEL THE FILING MENU
     LISTS IT UNDER (Keith, 2026-10-18: one rule for a collection's label in
     every picker) - a one-table collection by its dataset's name. It named
-    the collection's own name, which that menu no longer shows."""
+    the collection's own name, which that menu no longer shows. `conn`: a
+    connection the caller already holds, read on rather than opening one."""
     from qa_tools import collections
     from qa_tools.common import hierarchy
 
@@ -282,9 +312,9 @@ def where_to_settle(dataset_id: str) -> str:
     # the collection picker (SETTLED by Keith 2026-11-02, the move critic's
     # decision 3) unless corrections, parked moves or nudges are pending
     # (Keith, 2026-11-03, morning report 12 Q7). REJECTED accepting the gap,
-    # and changing the menu.
-    n = len(collections.all_collections())
-    if n == 1 and not collection_step_asked(n, *_asset_wide_waiting()):
+    # and changing the menu. The asset-wide reads are made only where they
+    # can change the answer - an asset of one collection.
+    if len(filing_collections()) == 1 and not collection_step_asked(*_asset_wide_waiting(conn)):
         return SETTLE_AT.replace(" > {collection}", "")
     try:
         collection = collections.by_id(hierarchy.dataset(dataset_id).collection_id).label

@@ -968,7 +968,10 @@ class TestAnInjectionNamingNoAssetsDataset:
             warnings.simplefilter("error")
             got = si.this_assets_injections()
         assert not set(theirs) & set(got)
-        assert not [u for u in si.unprovided_scenarios() if theirs[0].scenario_id in u]
+        # THE WHOLE ID, never a substring of the line (#315 L4): TS-1 is in
+        # "TS-12 names ...", so a substring match could see another scenario.
+        ids = {t.scenario_id for t in theirs}
+        assert not [u for u in si.unprovided_scenarios() if u.split(" ", 1)[0] in ids]
 
     def test_one_naming_a_dataset_no_asset_declares_is_refused_before_writing(self, monkeypatch):
         import dataclasses

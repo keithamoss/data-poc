@@ -90,6 +90,30 @@ class TestATableTwoFilesClaimRaisesOneDatasetItem:
         assert display_time.format_instant(RECEIVED) in b.reason
         assert supply_files.where_to_settle(DATASET) in b.reason
 
+    def test_its_settle_pointer_is_read_on_the_blockers_own_connection(self, clean,
+                                                                        monkeypatch):
+        """Post-build-review #315 L2: on a one-collection asset the pointer
+        reads what is pending asset-wide; in the dashboard build's path it
+        opened a connection of its own for each blocker - twice, for the
+        reason and the record - ignoring the one it was given."""
+        from qa_tools import collections
+
+        _pair()
+        mine = collections.by_id("child-protection")
+        monkeypatch.setattr(collections, "all_collections", lambda: [mine])
+        opened = []
+        real = supply_db.connect
+
+        def counting(*a, **k):
+            opened.append(k.get("label"))
+            return real(*a, **k)
+        monkeypatch.setattr(supply_db, "connect", counting)
+        records = [b.as_record() for b in dataset_blockers.all_blockers(clean)
+                   if b.dataset_id == DATASET and b.kind == "contested"]
+        assert records, "precondition: the pair is a contested blocker"
+        assert records[0]["settleAt"].startswith("mothman > Filing decisions")
+        assert opened == []
+
     def test_its_record_names_the_pairs_own_staged_tables(self, clean):
         """REQ-PIPE-279 criterion 15's contested half (PROVISIONAL, 2026-10-23):
         a reader's contested read names the files it found as staged tables,
