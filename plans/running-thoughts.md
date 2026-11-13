@@ -6277,3 +6277,24 @@ could never have computed it), and it belongs with batch 5's check work.
      also report /tmp's size. Thousands of small `/tmp/tmp*` and
      `/tmp/mothman-*` leftovers remain (a wider sweep was refused, rightly,
      without Keith's say-so).
+
+140. **[investigate, 2026-11-13]** **[QA checks & contract]** **Type-driven
+     drift detection on every column, and ad hoc drift within a period.**
+     Keith, 2026-11-13 (dictated). Two uses of ONE generic framework:
+     - **In the pipeline**: drift between a supply and the previous promoted
+       supply (the previous period), as today - but over all (or nearly all)
+       columns, table-level measures too (row counts and the like), with the
+       method chosen from each column's kind (numeric, categorical, date,
+       free text, code, identifier), so enabling it is a small piece of
+       configuration per dataset rather than a hand-written check per column.
+     - **Ad hoc, from time to time**: drift between supplies WITHIN one
+       period slot - not yet known whether against the previous supply in
+       the period (resupply 2 against 1, 5 against 4) or against the period's
+       first supply. Probably not in the pipeline at all: a person reruns a
+       QA report by hand on their laptop and reads a local HTML report. Keep
+       the pipeline simple; ad hoc things are humans running commands.
+     - **First step he asked for**: check whether drift on all columns is
+       easy today with small configuration. Played back 2026-11-13: it is
+       NOT - six hand-authored PSI checks, categorical only, one column each,
+       and column kinds are not declared anywhere a framework could read
+       them (the contracts say only date/string). Questions put to him.
