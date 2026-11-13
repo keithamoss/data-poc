@@ -1,0 +1,12 @@
+# REQ-TEST-249: the fake collection's Evidently checks.
+checks:
+  - check_id: data-asset-1.widget-agency.widget-register.widgets.colour.drift_psi_evidently
+    category: consistency
+    introduced_date: "2026-10-18"
+    description: The spread of values must stay close to the reference supply.
+    failure_indicates: self-evident
+    column: colour
+    method: psi
+    warn_threshold: 0.10
+    fail_threshold: 0.25
+    changelog: []

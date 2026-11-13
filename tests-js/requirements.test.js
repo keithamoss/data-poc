@@ -45,11 +45,30 @@ describe("moscowLabel / moscowPill", () => {
     expect(w.moscowLabel("urgent")).toBe("urgent");
   });
 
-  it("renders a real pill with the right label and status class", () => {
+  it("renders a real pill whose class is NOT a data-status class", () => {
+    // Changed 2026-09-25 (post-build-review #56). This asserted
+    // `pill red` for `must` - which was the defect, not the contract:
+    // a requirement's PRIORITY was drawn in exactly the pill a failing
+    // dataset uses, so one viewport carried red "Red" agency pills on
+    // the left and red "Must" requirement pills on the right. Same
+    // palette, two unrelated meanings, and REQ-QAC-047 owns the status
+    // vocabulary.
     const w = load();
     const html = w.moscowPill("must");
     expect(html).toContain("Must");
-    expect(html).toContain("pill red");
+    for (const status of ["red", "amber", "green", "nodata", "exhausted", "inactive"]) {
+      expect(html).not.toContain(`pill ${status}`);
+    }
+  });
+
+  it("gives each priority its own distinct class", () => {
+    const w = load();
+    const classes = ["must", "should", "could", "wont"].map((m) => {
+      const match = w.moscowPill(m).match(/class="pill ([^ "]+)/);
+      return match && match[1];
+    });
+    expect(new Set(classes).size).toBe(4);
+    expect(classes.every(Boolean)).toBe(true);
   });
 });
 
@@ -77,5 +96,21 @@ describe("renderRequirementsPanel (raw template, illustrative-fallback state)", 
     w.renderRequirementsPanel();
     const body = w.document.getElementById("requirements-panel-body");
     expect(body.innerHTML).toContain("No requirements yet");
+  });
+});
+
+describe("a retired requirement (REQ-DOCS-143)", () => {
+  it("is labelled Retired in the retired check's muted pill", () => {
+    const w = load();
+    expect(w.requirementStatusLabel("retired")).toBe("Retired");
+    expect(w.requirementStatusPill("retired")).toContain("pill retired");
+  });
+
+  it("says when, who and what replaced it", () => {
+    const w = load();
+    const note = w.retirementNote({ date: "2026-10-04", by: "Keith", replaced_by: ["REQ-PIPE-131"] });
+    expect(note).toContain("2026-10-04");
+    expect(note).toContain("Keith");
+    expect(note).toContain("REQ-PIPE-131");
   });
 });

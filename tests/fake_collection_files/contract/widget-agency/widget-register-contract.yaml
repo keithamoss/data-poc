@@ -1,0 +1,88 @@
+# REQ-TEST-249: a fake collection's ODCS contract, for a test that adds a
+# collection to a COPY of the repository - never registered in the real one.
+apiVersion: v3.2.0
+kind: DataContract
+id: widget-register
+status: draft
+version: 1.0.0
+name: Widget Register
+domain: widget-agency
+description:
+  purpose: >
+    A fictional register of widgets, one row per widget, supplied quarterly.
+    It exists so a test can add a collection the way the next real one will
+    be added and follow it to the page.
+servers:
+  - server: production
+    type: s3
+    location: s3://gov-data-exchange/widget-register/
+    format: csv
+    delimiter: comma
+    description: A quarterly extract of the register, dropped into this bucket.
+schema:
+  - name: widgets
+    physicalType: table
+    description: "One row per widget on the register, per quarterly extract."
+    properties:
+      - name: widget_id
+        logicalType: integer
+        physicalType: integer
+        required: true
+        unique: true
+        description: "The register's own widget number - primary key of this table."
+        quality:
+          - id: data-asset-1:widget-agency:widget-register:widgets:widget_id:nullValues_datacontract
+            metric: nullValues
+            dimension: completeness
+            mustBe: 0
+            severity: error
+            customProperties:
+              - property: check_id
+                value: data-asset-1.widget-agency.widget-register.widgets.widget_id.nullValues_datacontract
+              - property: introduced_date
+                value: "2026-10-18"
+              - property: description
+                value: >
+                  This value must never be empty.
+              - property: changelog
+                value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
+      - name: colour
+        logicalType: string
+        physicalType: varchar(10)
+        required: true
+        description: "The widget's colour, one of red, green or blue."
+        quality:
+          - id: data-asset-1:widget-agency:widget-register:widgets:colour:nullValues_datacontract
+            metric: nullValues
+            dimension: completeness
+            mustBe: 0
+            severity: error
+            customProperties:
+              - property: check_id
+                value: data-asset-1.widget-agency.widget-register.widgets.colour.nullValues_datacontract
+              - property: introduced_date
+                value: "2026-10-18"
+              - property: description
+                value: >
+                  This value must never be empty.
+              - property: changelog
+                value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
+      - name: made_on
+        logicalType: date
+        physicalType: date
+        required: true
+        description: "The day the widget was made."
+      - name: extract_timestamp
+        logicalType: timestamp
+        physicalType: timestamp
+        required: true
+        description: "When the supplier took the extract."
+customProperties:
+  - property: currentDeliveryFormat
+    value: csv

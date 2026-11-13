@@ -1,0 +1,12 @@
+  # REQ-TEST-249: the fake Widget Register, added to a copy only.
+  - id: widget-register
+    calendar: quarterly
+    participation_defaults:
+      versions:
+        - effective_from: "2024-01-01"
+          expected_time: "09:00"
+          grace: 8h
+          changelog:
+            - date: "2026-10-18"
+              author: REQ-TEST-249
+              change: The fake Widget Register owes a supply every quarter, due at 09:00 with 8 hours' grace.

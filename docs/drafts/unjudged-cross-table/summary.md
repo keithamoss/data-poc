@@ -1,0 +1,703 @@
+# Unjudged cross-table checks (#95): draft for sign-off
+
+Drafted by delivery-scoper on 2026-10-14 from `plans/running-thoughts.md` #95,
+including Keith's input for the scoper. This is a **proposal**. Nothing in it
+is in `requirements.yaml`, and anything marked PROVISIONAL depends on one of
+the questions at the end. The requirements are in `requirements-draft.yaml`
+next to this file, numbered REQ-QAC-212 to REQ-PIPE-217 (after the close-out
+draft's REQ-PIPE-211).
+
+## What is wrong today
+
+I checked this in the code and in the bootstrapped database on 2026-10-14.
+
+A cross-table check that cannot read one of its tables is recorded once, in
+the reader's run. The dependency's state is read once, at that run, and never
+looked at again:
+
+- **Not yet due.** The check is recorded `nodata`. `nodata` sits below green
+  and loses every rollup, so a reader whose other checks pass reads **green**
+  and promotes itself. A real example: `cp-investigations@202408010100000000`
+  was promoted by rule on 2024-08-01 (decision 103) with 15 results recorded
+  `nodata` for cp_clients, cp_case_workers and cp_notifications. It was only
+  checked again because those three tables happened to be promoted later. If
+  any of them had never arrived, it would have stayed green and promoted.
+- **Overdue, awaiting a decision, contested, could not be loaded, held, or
+  the catch-all.** The check is recorded `fail`, which rolls up, so a reader
+  with nothing failing in its own data reads **red**. A real example: the
+  2023-Q4 re-file re-checks recorded 30 catch-all fails across four datasets,
+  and the knock-on wrote a "still failing, a person decides" record for
+  cp-notifications (decision 70).
+
+## The central fork, and what I recommend
+
+**How the shout should look.** I recommend **a new status, INCOMPLETE**
+(working name). It is neither green nor red. It ranks above amber and below
+red: a reader with a red check of its own still reads red, and one that would
+otherwise read green or amber reads INCOMPLETE. It has one trigger: a
+cross-table check could not run against every table it reads. The cause is
+never part of the status. The reader's page says the period has no readable
+`<table>` and links to it, and that table's own page says whether it is late,
+overdue, held or anything else. That is Keith's own framing.
+
+**What follows from that:**
+
+- **Gate.** An INCOMPLETE supply does not promote itself, but a person can
+  promote it.
+- **Re-check.** A reader is checked again when something moves:
+  - the missing table is promoted, substituted or inherited into the period
+    (the knock-on already does this, once round 4's blocker B1 is fixed in
+    general rather than only for contests);
+  - a staged table the reader had read is rejected or superseded (new).
+
+  Nothing is re-checked on the clock. Once "not yet due" already shouts,
+  "now overdue" only changes the reason, and the reason belongs on the
+  dependency's page. The dashboard never shows the recorded reason as the
+  table's current state.
+- **The R2 shout.** No "still failing" record is written for a reader that
+  is only INCOMPLETE. So a dependency that never arrived and a pair where
+  both files were rejected give exactly the same shout, which answers Keith's
+  R2 question directly.
+
+Why not the alternatives:
+
+- **The verdict plus an "Incomplete" label** (the red-promoted pattern): a
+  green pill is still read as green at a glance.
+- **Red for everything:** this is the red-for-nothing-wrong that REQ-PIPE-079
+  criterion 14 forbids. On Child Protection, every early arrival in a quarter
+  would read red.
+- **A status shown beside the rollup rather than in it:** it cannot express
+  both "red beats it" and "it beats green".
+
+**Deadlock: checked, there isn't one.** Every arrival is checked against
+every other table staged for its period, so the last of a period's tables to
+arrive is checked against all of them. When it promotes, the knock-on
+re-checks the earlier readers and promotes them in turn.
+
+## Requirements drafted
+
+| Id | MoSCoW | What it covers |
+|---|---|---|
+| REQ-QAC-212 | must | The INCOMPLETE status: what it means, its place in the ordering, Python/JS parity through status-cases.json, and that drift checks and trials do not use it. |
+| REQ-PIPE-213 | must | Every not-evaluated cross-table record reads INCOMPLETE, whatever the reason. It counts toward the participants that could be read, never toward the missing table's own dataset. Amends six signed requirements. |
+| REQ-PIPE-214 | must | The gate does not promote an INCOMPLETE supply; a person can. Amends REQ-PIPE-075 criterion 3. |
+| REQ-PIPE-215 | must | When a reader is checked again: something moves, never the clock. Includes the general fix for B1. Amends REQ-PIPE-121 criterion 1 and NFR 4. |
+| REQ-DASH-216 | must | INCOMPLETE on every status surface, the missing table described only as "no readable supply" for the date on show, an "Incomplete promoted" label, and real-browser tests. |
+| REQ-PIPE-217 | should | No "still failing" record for an INCOMPLETE-only reader, and how tickets handle it. Amends REQ-PIPE-121 criterion 12. |
+
+## Every case, today and under the draft
+
+Keith asked for this table (2026-10-14, binding on the draft). Every test
+named below goes in `tests/test_incomplete_cross_table.py` unless another
+file is given. Each is written first, seen to fail by reproducing today's
+reading, and then made to pass.
+
+| # | Case | Reads today | Reads under the draft | Fixed by |
+|---|---|---|---|---|
+| 1 | Dependency not yet due when the reader runs | **Green**, promoted by rule (decision 103) | INCOMPLETE, not promoted | 213 c7; 214 c6; 216 c7 (in the browser) |
+| 2 | ...and the dependency then goes overdue | Still green and promoted, never checked again | Still INCOMPLETE, with no re-run needed | 215 c3, c5 |
+| 3 | ...and the dependency never arrives (period closes) | Green and promoted for good | INCOMPLETE and staged until the table arrives or a person acts | 214 c7, c8 |
+| 4 | Dependency overdue when the reader runs, no failure of its own | **Red**, plus a "still failing, a person decides" record after a knock-on | INCOMPLETE, with no such record | 213 c8; 217 c5; 216 c7 |
+| 5 | Dependency staged but unreadable, awaiting a decision | Red | INCOMPLETE | 213 c9 |
+| 6 | Dependency contested | Red | INCOMPLETE | 213 c10 |
+| 7 | Dependency could not be loaded (live: cp_investigations__202505010900000800) | Red | INCOMPLETE | 213 c11 |
+| 8 | Dependency held with no period | Red (held_blast_radius) | INCOMPLETE | 213 c12 |
+| 9 | Dependency arrives after the reader, is red, never promoted | Whatever the reader's first run recorded, never checked again | INCOMPLETE | 215 c6 |
+| 10 | Reader checked against the dependency's **staged** supply, which is then rejected | The verdict on rejected data stands; nothing re-checks it | Re-checked, reads INCOMPLETE ("Incomplete promoted" if already promoted) | 215 c2, c7; 216 c5 |
+| 11 | Dependency promoted later, including after a pair where both files were rejected | Re-run in most cases, but only re-gated where the period held nothing before or after (round 4 B1) | Re-run against the promoted table, then re-gated | 215 c1, c8 |
+| 12 | Siblings re-filed into one period at the same instant (2023-Q4 `__r1` runs) | Red (catch-all), plus a "still failing" record | INCOMPLETE, with no such record | 213 c13; 217 c5 |
+| 13 | The staged dependency the reader read is superseded by a later file | Not re-checked | Re-checked against the later file | 215 c2, c9 |
+| 14 | The other side: a check filed under the missing table, recorded in the arriving table's run (cp_carers__202305010900000800) | Green (nodata is dropped) | INCOMPLETE (PROVISIONAL, Q8) | 213 c14 |
+| 15 | The missing table's own dataset | The reader's not-evaluated record is shared onto its page by the build | Not counted there; it shows its own state | 213 c15; 216 c8 |
+| - | Pair where both files were rejected, compared with a dependency that never arrived (R2) | Different: one gets a log record, the other gets nothing | The same status, and no record in either case | 217 c6 |
+
+## Effect on REQ-DASH-204, REQ-PIPE-210 and REQ-PIPE-211
+
+If the recommendation is accepted, the close-out batch needs these changes:
+
+**REQ-DASH-204** (the line at the top of the reader's page). It stays the
+owner of the line, and the line explains INCOMPLETE rather than red.
+
+- Title and story become "Incomplete because another table...".
+- c1: drop "SHALL NOT show a line for a table that is merely not yet due".
+  Keith wants a shout even when the table simply hasn't arrived with the
+  reader. The red notice style becomes the INCOMPLETE style.
+- c3: "explains the red" becomes "explains the INCOMPLETE status".
+- c15: I recommend replacing the five per-cause wordings with one: **"No
+  promoted `<dataset>` for `<period>`"**, linked, with the cause read on
+  that dataset's page. Keith is agnostic about the detail, and the recorded
+  cause can be out of date. If the per-cause wordings are kept, they must
+  come from the dependency's state on the date shown, never from the
+  recorded code.
+- c7 gets simpler: where the period now holds the table but the reader has
+  not been re-run, say "`<dataset>` was promoted on `<date>`; these checks
+  have not run against it yet".
+- c10 (codes per table) is only needed if the per-cause wording is kept.
+  `held_tables` and `unrunnable_tables` are still needed either way.
+- c16 stays: nothing needs deciding on this supply.
+- c18 stays: one line per missing table on the card.
+- c13 and c14 tests: reword them for INCOMPLETE.
+
+**REQ-PIPE-210** (the terminal queue).
+
+- c1: "every red check is another table's" becomes "its status is
+  INCOMPLETE". c4 (a reader with a red of its own) is unchanged.
+- The F6 counting rule stands. Its open question 1 (a reader with nothing
+  to sit beneath) is answered "not counted", for F6's own reason.
+- If Keith picks Q2 option B (INCOMPLETE promotes), these readers leave the
+  queue altogether and 210 shrinks to its c4.
+
+**REQ-PIPE-211** (re-checking after a pair is settled). Under the draft,
+most of its reason goes away:
+
+- After "reject both", the readers read INCOMPLETE. That is correct, not
+  "red for good", and they are re-run when cp_clients is promoted
+  (REQ-PIPE-215 c1).
+- Re-running them right after the settlement re-records the same
+  INCOMPLETE status with a fresher reason.
+- What is still worth keeping:
+  - c8: the terminal shows the readers' state after settling;
+  - possibly the trigger, so the stored reason stops saying "contested".
+- B1 moves into REQ-PIPE-215 c1. If 211 is kept, it depends on 215.
+
+I recommend demoting 211 to **should**, reduced to c1, c5 and c8. That is
+question Q9, since Keith made it a must.
+
+## Signed requirements this amends (wording for Keith's approval)
+
+- **REQ-PIPE-079 c4, c15, c16:** "report it red" becomes "record it not
+  evaluated, reading INCOMPLETE (REQ-PIPE-213)", still naming the table and
+  the reason. **c14:** "SHALL NOT report the check red" becomes "SHALL
+  record it not evaluated, reading INCOMPLETE, and say the table has not
+  been supplied for this period yet".
+- **REQ-PIPE-105 c13:** "...make plain that the check reads INCOMPLETE for
+  want of a readable table rather than because of anything in the data".
+- **REQ-PIPE-115 c14:** "not evaluated, red" becomes "not evaluated,
+  INCOMPLETE". **c20:** the expected codes stay, but every case reads
+  INCOMPLETE.
+- **REQ-PIPE-078 c10:** "report that check as red" becomes "record it not
+  evaluated, reading INCOMPLETE".
+- **REQ-QAC-037 c7:** "...whether that check failed or could not run - a
+  check that could not run reads INCOMPLETE for the participants it could
+  read and is not counted toward the participant it could not read
+  (REQ-PIPE-213) - and SHALL NOT leave a participating dataset reading green
+  while a check that reads it reads red or INCOMPLETE."
+- **REQ-PIPE-075 c3:** "red or INCOMPLETE" (REQ-PIPE-214 c5).
+- **REQ-PIPE-121:**
+  - c1 gains the staged-rejected or superseded trigger. Amend it once,
+    together with REQ-PIPE-211's contest-end trigger, if 211 survives.
+  - c12 excludes an INCOMPLETE-only supply.
+  - NFR 4 says a not-evaluated reading result always means a re-run.
+- **REQ-PIPE-083:** no amendment if Q7 option A is chosen. c6 already
+  covers "every state".
+- **REQ-DASH-126:** no amendment. REQ-DASH-216 c5 extends its pattern.
+- **REQ-QAC-108:** unchanged. Gaps in the drift reference period keep their
+  own rules.
+
+## Non-functional angles
+
+- **Answered from the codebase:**
+  - Scale: aggregate, one line per table.
+  - Reliability: owed in the same transaction, finished by the processing
+    pass.
+  - Performance: computed at build time.
+  - The build rule.
+  - Auditability: re-runs name their cause.
+  - Maintainability: one status value in two vocabularies held equal by a
+    parity test.
+  - Compatibility: no new assets.
+- **Put to Keith:**
+  - Throughput: early arrivals now wait for their partners (Q2).
+  - Ticket noise (Q7).
+- **Ruled out as not applying:**
+  - Security: no new capability, and a person's promotion keeps its
+    allowlist.
+  - Privacy: only table names and periods are recorded, never rows.
+  - Cost: there is no clock-driven sweep. Re-checks are cross-table only,
+    one per decision.
+  - Compliance and retention: no new stored data class.
+
+## Questions for Keith (recommended option first)
+
+### Set 1: the shape
+
+- **Q1. What does the reader read when a cross-table check couldn't run?**
+  - **A.** A new status, INCOMPLETE, ranked above amber and below red.
+    (Recommended.) Own red still wins; otherwise it shouts.
+  - **B.** The verdict of the checks that did run, plus a loud "Incomplete"
+    label beside the pill (the red-promoted pattern). Keeps more detail, but
+    still shows a green pill.
+  - **C.** Red for every case, including not yet due. Simplest, but red for
+    nothing wrong.
+  - **D.** A distinct status shown beside the rollup rather than in it. It
+    can't be ordered against red or green.
+- **Q2. Does an INCOMPLETE supply promote itself?**
+  - **A.** No. It waits for the table or for a person. (Recommended; this is
+    what #95 proposed.) Early Child Protection arrivals wait for their
+    partners.
+  - **B.** Yes, shown as "Incomplete promoted" and re-checked when the table
+    arrives. Data keeps flowing, but a reader that later turns red can't be
+    demoted.
+- **Q3. When is an INCOMPLETE reader checked again?**
+  - **A.** Only when something moves: the table is promoted, substituted or
+    inherited, or a staged table it read is rejected or superseded. Never on
+    the clock. (Recommended.)
+  - **B.** Also on the clock, when the table goes overdue or the period
+    closes. This refreshes the stored reason, at the cost of a scheduled
+    sweep that grows with history.
+- **Q4. A reader checked against a dependency's *staged*, not-yet-promoted
+  supply: does that count as checked?**
+  - **A.** Yes, as today. If that staged supply is later rejected or
+    superseded, the reader is re-checked. (Recommended.)
+  - **B.** No. It stays INCOMPLETE until the dependency is promoted (your
+    literal "red and not promoted, notifications shouts"). The gate would
+    then have to promote a period's waiting supplies together, which is a
+    much bigger change.
+
+### Set 2: the edges
+
+- **Q5. The dependency's slot is accepted as "not supplied". What happens to
+  its readers?**
+  - **A.** They stay INCOMPLETE, and a person promotes them if wanted.
+    (Recommended.)
+  - **B.** The acceptance releases them to their own verdict and they are
+    re-gated automatically.
+- **Q6. The "still failing, a person decides" record, for a reader that is
+  only INCOMPLETE:**
+  - **A.** Not written. The status is the shout, the same whether the table
+    never came or both files were rejected. (Recommended; this answers R2.)
+  - **B.** Written at normal prominence, naming what it waits on.
+- **Q7. Tickets under the needs-action policy:**
+  - **A.** No ticket for INCOMPLETE alone. The missing table's own ticket
+    carries it, and the reader's existing ticket shows the state.
+    (Recommended.)
+  - **B.** Each INCOMPLETE reader gets a ticket.
+- **Q8. The other side of a check: the first table to arrive in a quarter,
+  whose partner's check couldn't run.**
+  - **A.** It reads INCOMPLETE too, under one rule, per REQ-QAC-037 c7.
+    (Recommended.)
+  - **B.** Only the dataset the check is filed under reads INCOMPLETE.
+
+### Set 3: the close-out batch
+
+- **Q9. REQ-PIPE-211, given that "reject both" would read INCOMPLETE rather
+  than red for good:**
+  - **A.** Demote it to should, keeping only the trigger, the "owed if
+    interrupted" rule and the terminal's after-settlement display.
+    (Recommended.)
+  - **B.** Keep it as a must, as drafted.
+  - **C.** Drop it.
+- **Q10. REQ-DASH-204's line:**
+  - **A.** One wording, "No promoted `<dataset>` for `<period>`", linked,
+    with the cause read on that page. (Recommended.)
+  - **B.** Keep the five per-cause wordings, taken from the dependency's
+    state on the date shown.
+
+### Not relay questions
+
+- The word on the pill (QAC-212, open question 1) is for the dashboard UX
+  review to propose and Keith to approve.
+- Whether pre-change records must also read INCOMPLETE (PIPE-213, open
+  question 1) is for the architect.
+
+## A sighting for the architect, outside this scope
+
+The 2023-Q4 re-file batch's re-check runs saw siblings re-filed at the same
+instant as *missing* (the catch-all), rather than reading each other as
+staged. REQ-PIPE-105 c5's same-instant rule is worded for arrivals. Is the
+same thing true of re-files?
+
+## Draft entry for plans/running-thoughts.md (replaces #95's status line; for a human to apply)
+
+> 95. **[in-progress, 2026-10-14]** **[Pipeline & publishing]** **[QA checks & contract]** **[Dashboard UI]** ...(existing text kept)... **SCOPED 2026-10-14** into `docs/drafts/unjudged-cross-table/` as REQ-QAC-212 to REQ-PIPE-217 (unsigned): a new INCOMPLETE status that the gate does not promote on, re-checked only when something moves, with no "still failing" record. Ten questions are with Keith. REQ-DASH-204, REQ-PIPE-210 and REQ-PIPE-211 are re-folded once he has answered.
+
+## Validation
+
+- I merged `requirements.yaml`, the close-out draft's nine new requirements
+  and these six into `scratchpad/merged95.yaml`. `uv run mothman dashboard
+  validate-requirements --draft` reported: **"requirements validation OK -
+  212 requirements, zero errors."**
+- Run on its own, this draft reports only the expected errors for
+  requirements it depends on but does not contain.
+- I read the file back. All six requirements parse, and every prose item is
+  a string.
+
+## Keith's answers so far (2026-10-14, ~midday)
+
+- Shape (Q1): "Red with nuance and pills?" - not yet settled. Followed up:
+  a red-looking status with an "Incomplete: no promoted <table>" pill that
+  still promotes itself, vs a truly red one the gate holds, vs red in the data
+  with a flag. PARKED by Keith: "Let's come back to this later today."
+- Promote itself (Q2): YES - option B, "because a person can unpromote": an
+  incomplete supply promotes itself as "Incomplete promoted" and is re-checked
+  when the missing table arrives. NOTE: with self-promotion the architect's B1
+  deadlock largely disappears (early arrivals promote, the period opens,
+  inheritance runs, and the existing knock-on re-checks them when the table is
+  promoted) - but it conflicts with a TRULY red status, which never promotes
+  itself; that is the parked shape question.
+- A staged dependency counts as checked (Q4 / architect A2): YES (A).
+- Re-gate on a staged arrival - amend REQ-PIPE-121's "a file landing in
+  staging stays outside this mechanism" (architect A1): reminded of the
+  decision's wording; PARKED with the shape question ("see previous").
+
+## Shape question re-asked, 2026-10-14 13:06 - PARKED again ("Come back to this"; REQ-PIPE-121: "See previous")
+
+Reframed for next time. Q2 = B (an incomplete supply promotes itself) rules out
+a TRULY red status, which never promotes itself, and largely dissolves the
+architect's B1 (the deadlock: early arrivals promote, the period opens, the
+existing knock-on re-checks them when the missing table is promoted) and B2
+(nothing sits in AWAITING_DECISION). Three shapes remain:
+
+1. **Its own "Incomplete" status** (recommended): between amber and red in
+   every rollup - own red wins, it beats green and amber - pill "Incomplete:
+   no promoted <table>" linking to the table, whose page gives the cause;
+   promotes as "Incomplete promoted"; re-checked when the table is promoted,
+   substituted or inherited.
+2. **Red-looking with a pill**, but promoting itself unlike every other red:
+   loudest, but red would mean two things and early Child Protection arrivals
+   read red every quarter.
+3. **The real verdict plus a flag** (the red-promoted pattern): least change,
+   but a green pill still reads green at a glance.
+
+REQ-PIPE-121: with self-promotion the case for amending "a file landing in
+staging stays outside this mechanism" (architect A1) mostly falls away.
+Recommended: keep it, and have the architect confirm no deadlock remains once
+self-promotion is in.
+
+## Keith's answer on the shape, 2026-10-20
+
+- **Q1: shape 1, its own Incomplete status** ("Go with 1, its own Incomplete
+  status"). Between amber and red in every rollup - its own red wins, it beats
+  green and amber; the pill reads "Incomplete: no promoted <table>" and links to
+  the table, whose page gives the cause; it promotes itself as "Incomplete
+  promoted" (Q2 = B, 2026-10-14); re-checked when the table is promoted,
+  substituted or inherited. Settles REQ-QAC-212 criterion 2 (PROVISIONAL until
+  now). Put to him in the context of REQ-DASH-264's Q1 answer the same morning:
+  a could-not-run cross-table row now reads red with "Could not be checked ...";
+  once this lands its pill reads Incomplete and the sentence stays.
+- **The remaining questions, 2026-10-20** ("A on all but Q9, which is B"),
+  put to him reworded for self-promotion:
+  - **Q3 = A**: re-checked only when something moves (the missing table is
+    promoted, substituted or inherited, or a staged table it read is rejected
+    or superseded), never on the clock.
+  - **Q5 = A**: when the missing table's slot is accepted as "not supplied",
+    the reader stays Incomplete for that period; a person can still act.
+  - **Q6 = A**: no "still failing, a person decides" record for a reader that
+    is only Incomplete - the status is the shout (answers close-out R2).
+  - **Q7 = A**: no ticket for Incomplete alone; the missing table's own ticket
+    carries it.
+  - **Q8 = A**: the other side of a check reads Incomplete too, one rule
+    (REQ-QAC-037 criterion 7).
+  - **Q9 = B**: REQ-PIPE-211 stays a must, as drafted.
+  - **Q10 = A**: REQ-DASH-204's line has one wording, "No promoted <dataset>
+    for <period>", linked, the cause read on that dataset's page.
+  Every question in this draft is now answered; next is folding the answers
+  into the six requirements (and REQ-DASH-204, REQ-PIPE-210, REQ-PIPE-211)
+  and the architect confirming no deadlock remains with self-promotion.
+
+## Shape REOPENED, 2026-10-20 ~11:30
+
+Keith was asked Q11 (Incomplete under amber "hold") and answered: "Hmm I'm
+rethinking adding this new 'incomplete' status... red 'feels' right
+somehow". Asked to choose between keeping Incomplete, red that promotes
+itself, and red that holds, he chose "talk it through more". The v2 draft and
+its three reviews stand, but the shape (Q1, 2026-10-20 morning) is open
+again. Hold the remaining questions until it settles.
+
+## Talking it through, 2026-10-20 late morning
+
+Keith's position so far: no new status vocabulary, and no red that follows
+different rules from other reds. His goal: "the promoted view reflects what's
+actually in the warehouse across rechecks". Re-checks of OTHER tables should
+still be triggered by promotion, not by an arrival.
+
+**Facts established, from the code (asked by Keith):**
+- Each cross-table check asks ONE question, in ONE direction, and is declared
+  on one dataset. Notifications' "Client reference" asks whether every
+  notification's client exists in Clients. Clients declares no cross-table
+  check at all. Notifications <-> Investigations is two DIFFERENT one-way
+  questions: Notifications' "Escalation completeness" and Investigations'
+  "Notification reference".
+- A check is evaluated in the run of EITHER table it reads: the declaring
+  table's own checks, plus the readers' checks that read the arriving table
+  (`qa_results_writer.base_scope_of_run`, `check in readers`). It reads
+  staged over promoted, and its verdict counts against every table it reads
+  (REQ-QAC-037). So the arriving table's own run already tells the truth
+  about the shared question, for that table's own gate.
+- LIVE ISSUE, from before #95: `supply_status.runs_about` /
+  `latest_results` count, toward a PROMOTED supply's status, any run that
+  read that supply - including an arrival run of a partner that was then
+  HELD. Keith's scenario: Notifications promoted green; a new Clients file
+  arrives, red for its own reasons, and is held. Notifications' in-place
+  status and page then show the cross-table verdict against the unpromoted
+  Clients, not against what is in the warehouse.
+- Correction to the earlier explanation: in the simple staggered case there
+  is NO deadlock under red that holds. Clients' run evaluates the shared
+  check against staged Notifications; if Clients promotes, the knock-on
+  re-checks Notifications. What remains is (a) a waiting reader is not
+  re-gated when its partner is staged but held, which Keith says is right,
+  and (b) owe-nothing quarters, where inheritance waits for a first
+  promotion that every reader is waiting on. (b) is a real deadlock.
+
+**Keith on (b), 2026-10-20:** inherit when the quarter is filed, not when it is
+first promoted. "That would align with the idea we have of having a command to
+open a quarter that's separate to any checks." That command is REQ-PIPE-098
+criterion 4, unmet and unowned ("Leave until needed", 2026-10-19). This now
+needs it, or at least needs the period to open on filing. To go to the scoper,
+architect and reviewers with the rest of the model once the other open point
+is settled.
+
+## Shape settled in principle, 2026-10-20 evening to 2026-10-21 morning (Keith)
+
+- Red only: no Incomplete, and no red that follows different rules.
+- **Two principles.** (1) No half-and-half view: a result is either the
+  warehouse view (the table and its dependencies as they are in the
+  warehouse) or the staging view (the file, read against what is staged for
+  its dependencies, or the warehouse version where nothing is staged). Never
+  mixed. (2) No flickering reds (running-thoughts #113), because red will
+  drive notifications.
+- **A package of files** is gated together, after every file in it has been
+  checked. A zip stands in for "package" (running-thoughts #114). When a file
+  in the package is held, the others' cross-table checks re-run against the
+  warehouse partner before any of them can promote. The worked example is the
+  Clients v2 / Notifications v2 zip over v1 + v1.
+- Other tables are re-checked only on promotion.
+- A warehouse view counts a cross-table verdict only when every supply it read
+  is the one in place, judged by supply.
+- Inherit on filing.
+- **Staggered files minutes apart flicker, accepted:** "I guess that's just
+  going to have to flicker at that point. And we need to say, if you want to
+  avoid a flicker, make sure you send us a package of files... I don't think
+  we can really design around that." This needs supplier guidance, not a
+  design.
+- **Open (Keith raising it):** with a staged v2 awaiting a decision, the page
+  and its pill show the v2 (staging) verdict. That is today's REQ-PIPE-081 c1
+  ("the results below are the newest supply ... not in place yet"). How does
+  someone see that the warehouse is still green? Keith's guess: supply history.
+- **Keith, 2026-10-21 morning:**
+  - Rejecting the staged reds puts the page back on the warehouse supply's
+    verdict. That is today's behaviour: `clipDatasetToInPlaceOn` drops a
+    withdrawn (turned-down) run.
+  - Warehouse view: option 2. The awaiting line gains a clause giving the
+    in-place supply's status ("The supply in place is the one received
+    <date>, and is green").
+  - Re-checks cascade within a package until nothing changes.
+  - First-time zip with a held partner: the re-check of Clients against "no
+    Notifications" is a could-not-run, which is red, so Clients is held too.
+    Promoting the partner clears it through the knock-on. No special display
+    case remains, apart from a person promoting by hand, which shows as red
+    promoted.
+- **Keith, 2026-10-21: STRICT, not relaxed.** An absent partner stays
+  could-not-run, which is red; "not supplied = empty" was considered and
+  rejected. In his words: "things that depend on each other don't promote
+  until they're all happy... A human can always overrule that using the
+  terminal... It's the strictest rule. It's probably the easiest to sort of
+  think about and understand." REQ-PIPE-265 stands, with the rule that a
+  carried verdict stops counting once a file it read is held. To the scoper,
+  then the architect, 2026-10-21 morning. Keith wants their view on any other
+  tensions, gaps or deadlocks.
+
+## Keith's answers on v3, 2026-10-22 (Perth)
+
+- **N1 (architect): a transitive group gate.** A gate application is the
+  arrival plus every waiting supply in the period connected to it through
+  recorded cross-table verdicts, settled by REQ-PIPE-267's fixed point and
+  never running a check for a waiting supply. This applies at every gate
+  entry. Put to Keith as a clarification of his "things that depend on each
+  other don't promote until they're all good"; no objection. It folds
+  REQ-PIPE-268 and 267 c14 into one rule, and with them the scoper's Q1 and
+  Q2 (both become A).
+- **Q13 = B.** A check that could not run counts only against the table
+  asking the question (the declaring table). Where the declaring table
+  (e.g. Placements) is absent or held back, its record counts toward
+  nothing. Where the referenced table (e.g. Clients) is absent, it counts
+  toward the declaring table only. One bad or late Placements file no
+  longer holds back the whole quarter. This reverses v2's Q8 (given for
+  Incomplete). Strict red still holds for the table that asks.
+- **Q9 = A, "B later".** Packages are zip-only for now. On the cloud (S3)
+  path every file stands alone and gets the accepted flicker; this is
+  recorded as a known limitation, and REQ-DOCS-274's guidance says to upload
+  a zip. A cloud package boundary (a manifest or an end marker) comes later,
+  as transport-layer work: running-thoughts #114, plans/supply-thoughts.md.
+- **Q3 = A.** A crash keeps the package waiting (it is checked, waiting for
+  its package, owed and not a failure); the next pass re-runs the crashed
+  file and gates the package together. A refusal by the agreement backstop
+  counts as held back, so the siblings are re-checked against the warehouse
+  partner and go ahead if green. That matches the backstop's own "holding
+  back nothing else".
+- **Q4 = B, plus a warning.** "Carry forward once" stands for both cases; no
+  automatic retry and no automatic re-pointing. Keith: "B, but include the
+  warning on the dashboard et cetera when it goes stale." So when an earlier
+  supply is promoted after a quarter opened, the quarter shows a warning on
+  the dashboard and in the terminal (the queue and the door) saying a newer
+  supply could be carried forward, and a person re-points it by hand
+  (REQ-PIPE-099's un_inherit / inherit_one). Taken to cover the refused case
+  too (the architect's S9, where the readers are red with nothing carried
+  forward), so S9 is cleared by a person acting on the warning, not by a
+  retry. To confirm with Keith at sign-off.
+  **Confirmed by Keith, 2026-10-22:** "Happy with the wording you used and
+  your interpretation." The warning covers both the stale and the refused
+  case.
+- **Q5 = A.** While an owed re-check hasn't run, the supply reads red,
+  worded "Not yet re-checked against the <dataset> promoted <instant>; the
+  re-check runs on the next processing pass." No notification is sent for
+  that red unless the re-check itself fails (running-thoughts #113, no
+  flickering reds). Option B, showing the old verdict against the previous
+  partner, was rejected as a half-and-half view.
+- **Q7 = A, "with a few scenario that explicitly exercise B".** A target
+  describes the file itself: it is compared against the file's own checks,
+  leaving out could-not-run results and re-checks a package-mate caused.
+  Separately, a FEW scripted scenarios declare the expected GATE outcome
+  (held back because of a package-mate, a re-check against the warehouse
+  partner, both branches of S1) and are checked against it, so the package
+  gate itself is pinned by the test history. REQ-GEN-273 gains a criterion
+  for these; which scenarios is for the scoper (suggested: S1 green, S1 red,
+  S2, the S10 three-file chain, and Q13's Placements case).
+- **Q8 = A (the scoper's draft, not the CLI reviewer's A').** A supply held
+  back only because of a package-mate is listed beneath that package-mate in
+  the queue, is not counted, and reads that nothing needs deciding on it. It
+  is not offered as a pickable decision from the queue line; a hand override
+  is still available by naming it (`mothman supply decide --dataset
+  cp-clients ...`). Once the package-mate is rejected, it becomes its own
+  counted row. (A' was offered and not taken; Keith told he can switch.)
+- **Agreed batch, "All four as recommended", 2026-10-22:**
+  - Q10 = A: a rejected sibling is not re-run; the other file's reason is
+    reworded from the decision log ("The <dataset> file received with it was
+    turned down; this supply now needs its own decision"), and no surface
+    keeps a stale "waiting for".
+  - Q6 = A: one ticket and one "still failing" record per root cause, naming
+    everything it holds back.
+  - A decision on a supply whose package is still being checked or gated is
+    refused: "The delivery received <instant> is still being checked (n of m
+    files checked); decide once it is gated." `promote()` re-confirms the
+    read holders under the slot locks (architect).
+  - The supply-history row shows the joint promotion: "Promoted <time> with
+    the <dataset> supply received <instant>, by the rule" (this replaces the
+    S5 "cleared minutes later" note, Q-F).
+- **Q11 = A.** The collection, agency and exec cards follow each dataset's
+  newest supply (the staging view while it awaits a decision), plus one card
+  line per held-back delivery: "[Red] Held back together: <names> (one
+  delivery, received <instant>)", with the first two names then "and n more"
+  past three. Red keeps meaning "a person is needed".
+- **Q12 = A** (confirmed after the mechanism was explained). Every
+  cross-table row, on both views, says what it read: "Read against the
+  <dataset> in place, received <instant>", "...supply received <instant>,
+  not in place yet", or "Read against: no <dataset> in place for <period>".
+  Two kinds of row are excepted because their own sentence already names the
+  partner: a package re-check against the warehouse, and could-not-be-checked
+  for want of a partner. Decided in the Python build from structured fields
+  (qa.tables_read, the run's from_warehouse marker, the structured reason
+  code), never from text. "In place" is judged as at the date on show, using
+  the as-at promotion timeline.
+- **S1-red top line = A.** A notice at the top of the page, in the existing
+  `.notice-exhausted role=status` structure: "**Held back with the
+  Notifications received with it.** That file (received <instant>) was held
+  back, so this supply was re-checked against the Notifications in place in
+  the warehouse, and <n> cross-table check(s) fail against it. It is checked
+  again by itself once a Notifications supply is promoted." It has no "not a
+  fault" clause.
+- **S2 wording = yes** (REQ-DASH-204 c2): "**No promoted Notifications for
+  2024-Q3.** The Notifications received with this supply (<instant>) was held
+  back, so <n> of this supply's checks could not run. That is not a fault in
+  this supply's own data. They run again by themselves once a 2024-Q3
+  Notifications supply is promoted." This amends Keith's single wording from
+  Q10 = A (2026-10-14).
+- **General wording change (Keith, 2026-10-22): "in place" becomes "in place
+  in the warehouse"** wherever the phrase is shown to a person, here and
+  everywhere else it is already exposed (about 33 uses in the dashboard
+  template and 12 in the CLI). This is a change to built, signed wording, so
+  it needs its own small requirement, outside #95's batch but landing with it.
+  Open for sign-off: the date picker's label "In place on" (REQ-PIPE-081
+  c6), where "In place in the warehouse on" is long. Candidate: "In the
+  warehouse on".
+- **S6 row display = A** ("definitely option A", after seeing a mock-up on
+  the real page: mockup-s6-top.png and mockup-s6-cross-table.png in this
+  folder). A cross-table row whose staging verdict and warehouse re-check
+  differ shows both: the staging result (read against the staged partner) as
+  the main line, and the re-check against the warehouse partner as a second
+  line saying it is why the supply is held back. The row's status is the
+  gate's. In S6 that means Escalation completeness: Pass against
+  Investigations v2, Fail against Investigations v1.
+  **Keith's concern, for the dashboard UX reviewer:** the density. "I think
+  we could do something better here than just layering in lots of text, but
+  I think having the longer descriptions there is useful to explain it to a
+  sort of wider audience of engineers." The mock-up shows the dual lines
+  repeated per tool (x3) and long "Read against..." labels wrapping. The
+  reviewer is to propose a presentation that keeps the full explanation
+  available without stacking text.
+- **S6 root naming (A or B) is NOT yet answered.** It was interrupted by the
+  row question and is to be asked next.
+- **S6 root naming = A.** Every name in these sentences is a real link (built
+  via `navHref`/`affectsLinks`, keeping in-place-on). Where the chain is
+  longer than one step, the held-back line names the root as well: "Held back
+  with its delivery: the Investigations file was held back, and the
+  Notifications with it." The root's page lists every supply its hold is
+  holding back, directly or through the chain.
+- **Row density = Option C, "with stacked results on phone"** (Keith,
+  2026-10-22, after seeing mock-ups of B and C on the real page:
+  mockup-density-option-b.png, -option-c.png, -option-c-phone.png). The
+  cross-table section is a grid with one row per check (not per tool),
+  columns "Against what's staged" and "Against what's in the warehouse".
+  Each cell shows the verdict, the tools as marks (dbt, Soda,
+  datacontract-cli) and which supply was read ("Investigations received 2
+  Oct"); a dash where that view has no result. The dual case shows both
+  cells, the warehouse one ending "why it is held back". The row's status pill
+  is the gate's. A key line explains the marks. Selecting a check opens each
+  tool's full result, where the full sentences live (the long "Read against
+  ..." and re-check sentences, with "in place in the warehouse"); the
+  accessible name carries them too. At phone width each check's two results
+  stack under its name, with the status pill kept visible. (Keith's earlier
+  "A" was for N1 only; Option A was not chosen.) Amends REQ-DASH-264 c2, c7,
+  M4 and NFR 2, and REQ-DASH-272 c4-c6.
+- **N1 (a partner not due yet) = A.** The partner's page shows a muted line in
+  `noSupplyNote()`'s `.late-open-note` shape: "Not due until <instant> — the
+  <reader> is waiting on it", with the reader names built by `affectsLinks`.
+  The reader's red is unchanged. For #113 (notifications on red): a red that
+  lasts days because a partner isn't due yet is legitimate, but should not
+  page anyone.
+
+## How Keith will sign v4 off (2026-10-22)
+
+Sequence: the scoper writes v4, then the architect, then both UX reviewers
+(dashboard and CLI), then the whole package goes to Keith. His terms: "I don't
+feel I need to sign off on exact wording, but as long as what I've decided
+hasn't changed or there's been no new questions, I'm happy to take these as
+kind of as read. But yeah, do one last check-in with me." That last check-in is
+a walk-through of the original scenario (S1: Clients v1 and Notifications v1
+in the warehouse, a zip brings v2 of both) as it now works end to end, given
+only once everything has settled and any new questions from the scoper,
+architect or reviewers have been answered. Sign-off is recorded only after
+that walk-through, and only if no decision moved; anything that did move is put
+to him first.
+Keith added (2026-10-22): the final check-in also walks through an alternate
+version beside S1, the staggered arrival. The same v1/v2 files arrive as
+separate files a few minutes apart, not as a zip, so the accepted flicker and
+the transitive group gate are shown end to end.
+
+## Keith's answers on the v4 reviews, 2026-10-22 (Perth)
+
+**V4-Q1 = A: in a first-time zip, a clean table promotes alone when the only failing table is one that depends on it.** Raised independently by the architect (v4 B1) and the CLI reviewer (v4 B1): Clients declares no cross-table check, so under Q13 = B the Client-reference check (declared on Notifications) counts only toward Notifications; with Notifications v1 red and held back, Clients v1 promotes on its own. This supersedes Keith's 2026-10-21 "Clients is held too" for that case. Rejected: B, a zip promotes all or nothing (a package rule on top of the dependency rule, holding back clean data nothing depends on). The mirror case is unchanged: Clients red holds Notifications back, because its check cannot run with no Clients in the warehouse. So S2 strict is re-cast as that mirror, and S10 is re-ordered (Notifications 08:40, Investigations 09:00, Clients 09:20) with the original order kept as a second test asserting Clients promotes at 09:00 (architect v4 B1).
+
+**Deterministic matching (separate requirement).** Keith: "I don't want ties and guessing, I want deterministic matching - even if it means changing the metadata we capture." Scoped as its own requirement (REQ-PIPE-279 draft, docs/drafts/deterministic-matching/), built before REQ-PIPE-265 is flipped. The per-check record of which supply of every table a check read is the same fact v4's B2 needs; v5 should reference it rather than define its own.
+
+**V4-Q2 = A: one "carry the newer one forward" step.** CLI reviewer v4 B2: REQ-PIPE-271's stale/refused-inheritance warning told the person to un-inherit then inherit, two decisions each with its own knock-on; between them the period holds no Clients, every reader's cross-table check is could-not-run red, promoted readers go red-promoted and waiting readers raise tickets - the self-clearing red Keith ruled out (#113). Keith chose one operation, from the period's door and by flags, that swaps the inherited supply for the newer one as a single decision with a single re-check of the readers (the shape of REQ-PIPE-121 c9's one re-evaluation per gate application), so nothing turns red in between. Widens REQ-PIPE-099 by one operation. Rejected: B, two steps with a warning, an immediate offer of the inherit, and no ticket for the gap - a real red window a script or an interrupted person can leave standing. 271's warning names the one step and its command on a line of its own.
+
+**V4-Q3 = A: a decision refused because its delivery is still being checked exits 75.** CLI reviewer v4 S3(c): on the flag route `apply_decision` returns None and `supply decide` exits 1, the same as a permanent refusal. Keith chose EXIT_LOCKED 75 (EX_TEMPFAIL), the code `mothman pipeline process` already uses for "nothing was changed, try later", documented in the command's exit-code list, so a script can tell "wait and retry" from "no". Rejected: B, exit 1 like every other refusal. Applies to REQ-PIPE-266 c15 and REQ-PIPE-276 c2.
+
+**V5-Q1 = A: while a gate application holds a period, any person's table-moving decision in it is refused with exit 75.** Architect v5 B3: 266 c16's compare-and-swap ran under the promoted supply's own slot locks only, so a person promoting Notifications v2 and an application promoting Clients v2 could both commit, each re-confirmed against the other's v1 - a half-and-half warehouse. Keith chose: every person's decision that moves a table (promote, reject, demote, un-inherit, de-substitute, re-file, carry-forward under REQ-PIPE-280) try-locks the same per-(collection, period) lock the gate holds; on contention it refuses, exit 75, "A gate is running for <period>. Nothing was changed. Try again in a moment." - the same "try later" as V4-Q3. Slot locks then order person against person only. Rejected: B, locking partner slots in one global sorted order (no wait, but changes the lock set on every decision path). The architect's two technical questions are taken as recommended: REQ-DASH-264 c1 amended by 279 then again by 269 quoting 279's text as OLD; runs inside a gate application keyed on the application as their point (amending 279 c8).
+
+**V5-Q2 = A: `supply decide`'s existing lock-timeout refusal (`decision_log.RUN_IN_PROGRESS`, "Something is using these tables right now ... retry in a minute") exits 75 too**, so every "nothing changed, try later" on that command is 75. Changes a signed exit code (REQ-GHUB-082's refusal path) - an amendment with old/new wording in v6, and one test. Rejected: B, leave it at 1 and narrow 276's NFR. (CLI UX v5 Q1.)
+
+## Keith's sign-off walk-through, 2026-10-23 (Perth)
+
+Walked through v6 + REQ-PIPE-279 v4 step by step: walk-through 1 (S1, a zip: filed as one package; Clients checked first; Notifications checked; the gate; 5a green; 5b red; 6 later decisions) and walk-through 2 (staggered: Order A 9:00 Notifications then 9:05 Clients, green and red; Order B 9:00 Clients then 9:05 Notifications, green and red; the accepted flicker). Keith confirmed every step "matches what I expect" - no decision moved. Aside logged during step 1: plans/running-thoughts.md #124 (pipeline observability alongside the AWS build).
+
+**C (T18, REQ-PIPE-271 OQ1) = A: a check whose read table was not part of the agreement for that period, and was never supplied, is out of scope for that period** - neither red nor a result, recorded with its reason (in `left_out`, per the architect's v4 note) so the page can say why it did not run. Rejected: B, keep it red and have a person promote each such period by hand.
+
+**D (REQ-DOCS-274) = A: the supplier guidance is a short new `docs/supplier-guidance.md`**, linked from `docs/delivery-format.md` and the AWS design doc. Rejected: B, a section of `docs/delivery-format.md`; C, wait for the transport layer.
+
+**E (REQ-PIPE-210 F6 follow-ups) = B, against the recommendation: a supply red only because its partner is overdue, with no held-back supply to sit beneath, COUNTS as an ordinary decision waiting on a person.** Rejected: A, not counted with an explanatory line under the count. Read (to confirm with Keith if wrong): the dashboard's cards count it the same way, through the same function, so page and terminal agree (E's second part stands). v6's 210 needs that criterion turned round before sign-off is recorded.
+
+**New terminal wording approved (CLI v5 item 11, REQ-PIPE-271 c7):** "To carry that one forward instead, in one step:" (and "To carry it forward, in one step:" for a refused inheritance), the command on its own line, "or from the <period> door."; the dashboard keeps "A person can carry that one forward instead, in one step:".
+
+**SIGN-OFF, Keith, 2026-10-23 (Perth):** the #95 batch (v6 with C = A, D = A, E = B applied) and REQ-PIPE-279 v4, after the walk-through above. Building starts with REQ-PIPE-279.

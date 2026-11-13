@@ -27,11 +27,11 @@ FACILITY_SUFFIXES = ["Community Hospital", "Birth Centre", "District Hospital", 
 
 # Real-world arrival calibration (Keith, 2026-09-17): "on time about 80%
 # of the time... early for 5%... late 15%" - against BDM's real cadence
-# (contract/bdm-birth-registrations-contract.yaml's slaProperties: -
-# daily, 14:00 AWST expected, 60 min latency grace; see pipeline/
-# cadence.py's classify_arrival()). 14:00 AWST is UTC-8h = 06:00 UTC the
-# SAME day as date_registered's own midnight (that same contract entry's
-# own comment explains why 14:00, not the more obvious-sounding 06:00 -
+# (birth-registrations' participation in contract/calendar.yaml -
+# daily, 14:00 AWST expected, 1h grace; it was the contract's
+# slaProperties until REQ-PIPE-110). 14:00 AWST is UTC-8h = 06:00 UTC the
+# SAME day as date_registered's own midnight (that entry's own changelog
+# explains why 14:00, not the more obvious-sounding 06:00 -
 # AWST hours before 08:00 convert to a UTC moment on the PREVIOUS
 # calendar day, which the real "extract timestamp ordering" check
 # always rejects - 06:00 AWST made "on time" structurally unreachable),
@@ -63,7 +63,7 @@ def generate_daily_batch(run_date: date, seed: int, n_rows: int, id_offset: int 
     """id_offset: added to the per-row counter used to mint registration_number/
     source_system_record_id, so IDs stay globally unique across multiple
     runs generated in the same pipeline (each run passes a different,
-    non-overlapping offset - see generate_runs.py)."""
+    non-overlapping offset - see civil_registration.py)."""
     rng = np.random.default_rng(seed)
     names = build_name_pools()
     suburb_names, postcodes, _, _ = build_geo_pools()
@@ -129,7 +129,7 @@ def generate_daily_batch(run_date: date, seed: int, n_rows: int, id_offset: int 
     # after this point. One CHARACTERISTIC offset per run (not per row -
     # a real batch's extraction genuinely starts at one point in time,
     # not 2000 independent random times; earliest_extract is a MIN()
-    # over the whole run downstream (qa_tools/bdm/dataset_stats.py), so
+    # over the whole run downstream (qa_tools/tools/dataset_stats.py), so
     # per-row-independent offsets across a wide range would make that
     # MIN collapse onto the range's extreme low tail almost every run,
     # regardless of the intended on-time/early/late split above), plus a
@@ -183,7 +183,7 @@ def generate_daily_batch(run_date: date, seed: int, n_rows: int, id_offset: int 
     # freshly drawn name/sex/IDs - real twins aren't identical rows, just
     # rows that share the event they were born into. person_seq for
     # siblings continues straight after the base batch's own range (still
-    # well inside this run's id_offset block - see generate_runs.py's
+    # well inside this run's id_offset block - see civil_registration.py's
     # ID_BLOCK), so registration_number/source_system_record_id stay
     # globally unique.
     n_sib = len(twin_idx)

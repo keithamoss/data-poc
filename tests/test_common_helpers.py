@@ -7,11 +7,17 @@ tool invocation to test since these are plain functions over plain data."""
 from __future__ import annotations
 
 import duckdb
+import pytest
 
 from qa_tools.common.datacontract_common import check_id_from_quality_definition
 from qa_tools.common.dbt_common import failing_sample_keys_direct, failing_sample_keys_via_values
-from qa_tools.common.evidently_common import status_for_psi
+from qa_tools.common.sample_keys import SampleNotRecordable
+from qa_tools.common.evidently_common import status_for
+from qa_tools.common.evidently_common import collection_checks
 from qa_tools.common.soda_common import check_id_from_resource_attributes
+
+_BDM_CHECKS = collection_checks("civil-registration")
+_BDM_EVIDENTLY, _PSI_ID = _BDM_CHECKS.checks, _BDM_CHECKS.psi[0]
 
 
 def test_check_id_from_quality_definition_none_when_no_definition():
@@ -40,29 +46,39 @@ def test_check_id_from_resource_attributes_finds_the_real_attribute():
 
 
 def test_status_for_psi_below_warn_threshold_is_pass():
-    assert status_for_psi(0.01, is_reference=False) == "pass"
+    assert status_for(0.01, _BDM_EVIDENTLY[_PSI_ID]) == "pass"
 
 
-def test_status_for_psi_reference_run_is_always_pass_regardless_of_value():
-    assert status_for_psi(0.9, is_reference=True) == "pass"
+def test_status_for_psi_bands_a_real_value_rather_than_special_casing_a_run():
+    """`is_reference` WAS REMOVED 2026-09-29 (REQ-QAC-108 criterion 4).
+    It returned "pass" when a run was its own reference, which was only
+    reachable while the reference was a fixed run the batch chose once.
+    A run can never be its own reference now, and "there is no reference
+    at all" is answered by NO_REFERENCE before this function is reached."""
+    assert status_for(0.9, _BDM_EVIDENTLY[_PSI_ID]) == "fail"
+    assert status_for(0.15, _BDM_EVIDENTLY[_PSI_ID]) == "warn"
 
 
-def test_failing_sample_keys_direct_returns_empty_on_a_real_query_error():
+def test_failing_sample_keys_direct_fails_loudly_on_a_real_query_error():
+    """REQ-PIPE-341 criterion 8: it returned [] - an empty sample recorded."""
     conn = duckdb.connect(":memory:")
     # relation_name doesn't exist - a real DuckDB error, not a mock
-    assert failing_sample_keys_direct(conn, "no_such_table", "id") == []
+    with pytest.raises(SampleNotRecordable, match="no_such_table"):
+        failing_sample_keys_direct(conn, "no_such_table", ["id"], check="not_null", table="t")
 
 
 def test_failing_sample_keys_direct_returns_real_pk_values():
     conn = duckdb.connect(":memory:")
     conn.execute("CREATE TABLE audit (id INTEGER)")
     conn.execute("INSERT INTO audit VALUES (1), (2), (NULL)")
-    assert failing_sample_keys_direct(conn, "audit", "id") == ["1", "2"]
+    # A null key is kept, last (post-build-review #294 D1) - it was dropped.
+    assert failing_sample_keys_direct(conn, "audit", ["id"]) == ["1", "2", None]
 
 
-def test_failing_sample_keys_via_values_returns_empty_on_a_real_query_error():
+def test_failing_sample_keys_via_values_fails_loudly_on_a_real_query_error():
     conn = duckdb.connect(":memory:")
-    assert failing_sample_keys_via_values(conn, "no_such_table", "v", "no_such_model", "col", "id") == []
+    with pytest.raises(SampleNotRecordable):
+        failing_sample_keys_via_values(conn, "no_such_table", "v", "no_such_model", "col", ["id"])
 
 
 def test_failing_sample_keys_via_values_resolves_real_rows():
@@ -71,4 +87,7 @@ def test_failing_sample_keys_via_values_resolves_real_rows():
     conn.execute("INSERT INTO model VALUES (1, 'X'), (2, 'M')")
     conn.execute("CREATE TABLE audit (sex VARCHAR)")
     conn.execute("INSERT INTO audit VALUES ('X')")
-    assert failing_sample_keys_via_values(conn, "audit", "sex", "model", "sex", "id") == ["1"]
+    assert failing_sample_keys_via_values(conn, "audit", "sex", "model", "sex", ["id"]) == ["1"]
+
+#: Birth Registrations is the daily asset's (the asset split).
+pytestmark = pytest.mark.asset("daily")

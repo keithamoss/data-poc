@@ -22,15 +22,17 @@ def sync_tickets_command() -> None:
     sync_main()
 
 
-@github_group.command("sync-acceptances")
-def sync_acceptances_command() -> None:
-    """Fetch every real qa-ticket issue's own comments (for /accept matching) - prints JSON to stdout."""
-    from qa_tools.common.acceptance_sync import main as sync_main
-    sync_main()
-
-
 @github_group.command("sync-leaderboard")
 def sync_leaderboard_command() -> None:
     """Fetch every real qa-ticket issue's own closed/reopened history (for the leaderboard) - prints JSON to stdout."""
     from qa_tools.common.leaderboard import main as sync_main
     sync_main()
+
+
+@github_group.command("ci-usage")
+@click.option("--days", default=7, show_default=True, type=click.IntRange(min=1),
+              help="How many days back to measure.")
+def ci_usage_command(days: int) -> None:
+    """Billable GitHub Actions minutes - runs, cancelled runs, pushes and job-minutes per workflow, scaled to a month against the private free allowance (REQ-TEST-260)."""
+    from qa_tools.common.ci_usage import main as usage_main
+    usage_main(days)

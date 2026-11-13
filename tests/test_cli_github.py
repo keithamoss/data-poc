@@ -6,6 +6,8 @@ real verification happens in CI, which has one - see cli/github.py's
 own module docstring)."""
 from __future__ import annotations
 
+import pytest
+
 from click.testing import CliRunner
 
 import cli.github as github_cli
@@ -25,18 +27,6 @@ def test_sync_tickets_calls_ticket_sync_main(monkeypatch):
     assert called == [True]
 
 
-def test_sync_acceptances_calls_acceptance_sync_main(monkeypatch):
-    import qa_tools.common.acceptance_sync as acceptance_sync
-
-    called = []
-    monkeypatch.setattr(acceptance_sync, "main", lambda: called.append(True))
-
-    result = _runner.invoke(github_cli.github_group, ["sync-acceptances"])
-
-    assert result.exit_code == 0, result.output
-    assert called == [True]
-
-
 def test_sync_leaderboard_calls_leaderboard_main(monkeypatch):
     import qa_tools.common.leaderboard as leaderboard
 
@@ -47,3 +37,8 @@ def test_sync_leaderboard_calls_leaderboard_main(monkeypatch):
 
     assert result.exit_code == 0, result.output
     assert called == [True]
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

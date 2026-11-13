@@ -1,0 +1,251 @@
+# The delivery agreement for this data asset - REQ-PIPE-110.
+#
+# ONE FILE HOLDS THE WHOLE AGREEMENT: the named calendars, which calendar
+# each collection and dataset is on, and each dataset's participation -
+# which periods it owes, by when on the day, with how much grace. Until
+# 2026-10-11 the calendars lived in contract/data-asset.yaml and each
+# dataset's cadence, expected time and grace lived in its ODCS contract
+# under slaProperties. The two could disagree, nothing checked that they
+# did not, and slaProperties could not be versioned - so changing a due
+# time silently re-judged history. slaProperties is gone from both
+# contracts and is refused if it comes back.
+#
+# The asset's timezone stays in contract/data-asset.yaml (REQ-PIPE-112):
+# it is wider than the agreement - the asset clock, every timestamp.
+#
+# ---------------------------------------------------------------------
+# DELIVERY CALENDARS (REQ-PIPE-049) - what QA judges a supply against.
+#
+# THE DATES ARE THE SUPPLIER AGREEMENT. That is the whole design, in one
+# line (plans/supply-model.md Thread C). A holiday library PREDICTS what
+# was probably agreed; it does not CONSTITUTE it. So the quarterly dates
+# below are AUTHORED, never computed at evaluation time - which is also
+# the only shape with somewhere to record a date that differs from what
+# a rule would have generated, because a supplier asked for it.
+# `mothman schedule candidate-dates` prints next year's suggestions for
+# a human to review, edit and commit; nothing evaluates against its
+# output.
+#
+# SEVERAL NAMED CALENDARS, each dataset naming exactly one. Not
+# generality bought for a hypothetical future: two cadences already
+# share this one asset - Birth Registrations daily, Child Protection
+# quarterly - so one asset-wide calendar could never have worked here.
+#
+# WHY THE ASSET OWNS THE CALENDAR AND A DATASET OWNS ITS PARTICIPATION:
+# the quarterly asset is heading for ~30 datasets, of which roughly 70%
+# arrive every quarter and the rest once or twice a year, still landing
+# on one of the same four dates. Thirty independent date lists would
+# drift - dataset A saying 2 February and dataset B saying 3 February
+# for the same window is a class of bug nothing would ever flag.
+#
+# EVERY CALENDAR IS VERSIONED, effective-dated, with a changelog entry
+# per version - the same shape check lifecycle already uses. A supply is
+# judged against the calendar that was in force when it was due, so
+# editing next year's dates can never retroactively make a past supply
+# late.
+#
+# A CALENDAR DATE CARRIES NO TIME OF DAY, deliberately. The instant a
+# supply is due comes from the dataset's own expected time, on its
+# participation below, applied to the calendar's date - so a per-dataset deadline
+# stays per-dataset instead of being flattened into one per period.
+
+calendars:
+
+  - name: daily
+    description: >
+      Every day, expressed as a rule rather than an enumerated list -
+      365 authored dates a year would be absurd, and the agreement
+      genuinely IS "every day". Birth Registrations' real cadence.
+    versions:
+      # TEN EARLIER DAYS (REQ-GEN-185, Keith, 2026-10-11): an EARLIER version
+      # rather than moving the 2026-08-24 one, which has governed filings and
+      # may only change by a declared correction (REQ-PIPE-173). Nothing was
+      # judged against these days, so adding them changes no verdict.
+      # FORTY EARLIER DAYS (REQ-GEN-196 criterion 20, Keith, 2026-10-13): the
+      # same reasoning as the version after it - an earlier version, never a
+      # moved one - so the history can grow to 80 daily supplies at its OLD end.
+      # FIVE MORE, EARLIER AGAIN (post-build-review #172, Keith, 2026-10-13):
+      # spacing the seven pairs left the ordinary reds no room to sit apart,
+      # and two neighbouring reds' resends claimed one receipt instant.
+      # TWELVE MORE, THE EVENING-BEFORE ERA (REQ-GEN-044, Keith, 2026-10-15):
+      # Birth Registrations' earliest stretch is due the evening before, so
+      # TS-3c, TS-3d and TS-10 sit in the configuration that makes their
+      # outcomes right. Added at the old end, as every growth before it was.
+      - effective_from: "2026-06-18"
+        changelog:
+          - date: "2026-10-16"
+            author: REQ-GEN-044
+            change: >-
+              Twelve days of daily supply before 2026-06-30, the evening-before era: the synthetic history grows from 85 daily supplies to 97 so the evening-before scenarios have a configuration of their own (Keith's call). Added at the old end. The same rule and claim window.
+        claim_window: 4h
+        cadence:
+          rule: daily
+      - effective_from: "2026-06-30"
+        changelog:
+          - date: "2026-10-13"
+            author: REQ-GEN-196
+            change: >-
+              Five days of daily supply before 2026-07-05: the synthetic history grows from 80 daily supplies to 85 so the contested pairs can sit apart (Keith's call) and the ordinary reds never fall on neighbouring days. Added at the old end, as the version after it was. The same rule and claim window.
+        claim_window: 4h
+        cadence:
+          rule: daily
+      - effective_from: "2026-07-05"
+        changelog:
+          - date: "2026-10-13"
+            author: REQ-GEN-196
+            change: >-
+              Forty days of daily supply before 2026-08-14, because the synthetic history grows from 40 daily supplies to 80 (Keith's call) to fit seven contested-pair scenarios, TS-78's six days and every existing scenario. Added at the old end so every existing scenario keeps its date. The same rule and claim window as the versions after it.
+        claim_window: 4h
+        cadence:
+          rule: daily
+      - effective_from: "2026-08-14"
+        changelog:
+          - date: "2026-10-11"
+            author: REQ-GEN-185
+            change: >-
+              Ten days of daily supply before 2026-08-24, because the synthetic history grew from 30 daily supplies to 40 (Keith's call): planting TS-43 to TS-46 with their lead-in days claims nearly every day from 2026-09-03 on, and the ordinary resupplies need days of their own. The same rule and claim window as the version after it.
+        claim_window: 4h
+        cadence:
+          rule: daily
+      - effective_from: "2026-08-24"
+        changelog:
+          - date: "2026-08-24"
+            author: not recorded - converted from a plain-string entry by REQ-PIPE-110
+            change: Daily supply begins.
+          - date: "2026-09-26"
+            author: not recorded - converted from a plain-string entry by REQ-PIPE-110
+            change: >-
+              Start date corrected from 2023-01-01, which predated the first real supply by three and a half years. A cadence rule generates periods from its own effective_from, so that gap was 1,333 owed slots nothing had ever delivered against - and because 'oldest claimable unfilled slot' is a real branch of the assignment rule, a supply not on time for its own day filed to 2023-01-01 rather than to the day it was for. Keith's call, over generating three and a half years of daily history instead.
+        claim_window: 4h
+        cadence:
+          rule: daily
+      # TS-62 (REQ-GEN-205): a fictional new version on the history's last
+      # day, widening the claim window to six hours - declared as a
+      # correction below and left awaiting the asset manager's confirmation.
+      - effective_from: "2026-09-25"
+        changelog:
+          - date: "2026-10-19"
+            author: REQ-GEN-205
+            change: >-
+              A fictional six-hour claim window from 2026-09-25, made to
+              demonstrate a correction merged and not yet confirmed on this
+              synthetic asset (TS-62). The same rule as before it.
+        claim_window: 6h
+        cadence:
+          rule: daily
+    corrections:
+      - change_reference: REQ-GEN-205-WINDOW
+        date: "2026-09-24"
+        author: Claude (for Keith)
+        approver: fpycnkgvmt@privaterelay.appleid.com
+        reason: >-
+          A fictional correction made to demonstrate a correction merged and left
+          awaiting confirmation on this synthetic asset: Birth
+          Registrations' claim window widens from four hours to six from
+          2026-09-25.
+        changes:
+          - item: calendar daily version 2026-09-25
+            old: null
+            new: {claim_window: 6h, cadence: {rule: daily}}
+
+# ---------------------------------------------------------------------
+# WHICH CALENDAR EACH COLLECTION IS ON. A dataset that names none takes
+# its collection's - thirty datasets naming one calendar thirty times is
+# thirty chances to disagree.
+collections:
+  - id: civil-registration
+    calendar: daily
+    # WHICH PERIOD A ROUND'S FILES GO INTO (REQ-PIPE-320): stated on the
+    # collection, never a dataset, from the collection's first round.
+    files_go_to_period:
+      versions:
+        - effective_from: "2026-06-18"
+          value: 0
+          changelog:
+            - date: "2026-10-30"
+              author: REQ-PIPE-320
+              change: >-
+                Birth Registrations' files go into the period they arrive in - the day's own. Stated from its first round, so nothing moves.
+
+# ---------------------------------------------------------------------
+# EACH DATASET'S PARTICIPATION, as effective-dated versions. A version
+# carries the dataset's expected time of day and its grace allowance (how
+# long after the expected time a supply still counts as on time), and may
+# override its calendar's claim window. It may say which of its calendar's
+# periods the dataset owes, under `participates:` - delivery months by full
+# name, or `all` - with a `reason:` when it owes only some. Saying nothing
+# owes every period. The FIRST version's effective_from is the date the
+# dataset began owing supplies; there is no separate owes_from.
+#
+# EVERY VERSION RESTATES WHAT ITS PREDECESSOR STATED, so a version always
+# reads as complete on its own and a value is never silently dropped.
+datasets:
+  - id: birth-registrations
+    participation:
+      versions:
+        # FORTY MORE, AS AN EARLIER VERSION AGAIN (REQ-GEN-196 criterion 20).
+        # FIVE MORE (post-build-review #172) - see the daily calendar above.
+        # THE EVENING-BEFORE ERA (REQ-GEN-044, Keith, 2026-10-15): twelve
+        # earlier days in which the supply for day D is due at 22:00 on D-1.
+        - effective_from: "2026-06-18"
+          expected_time: "22:00"
+          days_before: 1
+          grace: 1h
+          changelog:
+            - date: "2026-10-16"
+              author: REQ-GEN-044
+              change: >-
+                Birth Registrations owes a supply from 2026-06-18, each due at
+                22:00 the evening before its day - the evening-before era the
+                scenarios TS-3c, TS-3d and TS-10 need. From 2026-06-30 it is
+                due at 14:00 on the day, as before.
+        - effective_from: "2026-06-30"
+          expected_time: "14:00"
+          # Restated since the evening-before version above states 1: every
+          # version reads as complete on its own. 0 is the default, so no
+          # slot this version governs moves.
+          days_before: 0
+          grace: 1h
+          changelog:
+            - date: "2026-10-13"
+              author: REQ-GEN-196
+              change: >-
+                Birth Registrations owes a supply from 2026-06-30, five days
+                earlier - the synthetic history is 85 days now. The same due
+                time and grace as the versions after it.
+        - effective_from: "2026-07-05"
+          expected_time: "14:00"
+          days_before: 0
+          grace: 1h
+          changelog:
+            - date: "2026-10-13"
+              author: REQ-GEN-196
+              change: >-
+                Birth Registrations owes a supply from 2026-07-05, forty days earlier -
+                the synthetic history is 80 days now. The same due time and grace
+                as the versions after it.
+        # TEN EARLIER DAYS, AS AN EARLIER VERSION (REQ-GEN-185) - see the daily
+        # calendar above for why not by moving the 2026-08-24 one.
+        - effective_from: "2026-08-14"
+          expected_time: "14:00"
+          days_before: 0
+          grace: 1h
+          changelog:
+            - date: "2026-10-11"
+              author: REQ-GEN-185
+              change: >-
+                Birth Registrations owes a supply from 2026-08-14, ten days earlier -
+                the synthetic history is 40 days now. The same due time and grace
+                as the version after it.
+        - effective_from: "2026-08-24"
+          expected_time: "14:00"
+          days_before: 0
+          grace: 1h
+          changelog:
+            - date: "2026-10-11"
+              author: REQ-PIPE-110
+              change: >-
+                Moved from the contract's slaProperties (expectedTime 14:00, latency
+                60 minutes), unchanged. 14:00 because the real extract-timestamp
+                ordering check made an earlier time unreachable (corrected
+                2026-09-17).

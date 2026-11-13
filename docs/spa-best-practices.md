@@ -78,7 +78,7 @@ own rule of thumb is ~60-75 characters for a whole URL, which doesn't
 map exactly onto this dashboard's real multi-segment drill-down path
 (agency+collection+dataset+column+check IDs strung together will
 usually run longer than that) but the underlying principle still holds:
-prefer the id/slug a data steward would already recognize over a longer
+prefer the id/slug a data engineer would already recognize over a longer
 technically-more-precise one, and don't add segments that don't earn
 their place. Avoid special/reserved characters (`#`, `?`, `&`, `=`, `+`,
 `%`) and accented characters inside a segment - `pathSegment()`'s own
@@ -142,7 +142,7 @@ link: middle-click or Ctrl/Cmd-click to open in a new tab, right-click
 → "Copy link address", right-click → "Open in new tab". A real user who
 tries any of those on what looks like a clickable row gets nothing, or
 something confusing - not a "minor" gap, since it's exactly the kind of
-interaction a busy data steward reaches for without thinking about it.
+interaction a busy data engineer reaches for without thinking about it.
 The fix (per the source's own worked example, and directly applicable
 here): render the real navigational target as a real `<a href="#/...">`
 element - even if a `click` handler still intercepts the plain left
