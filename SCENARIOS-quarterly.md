@@ -991,9 +991,9 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
 | Where to look | |
 |---|---|
 | Dataset | geo-ed-presentations |
-| Supplies | `geo_ed_presentations__201402011830000800` |
-| Period | 2014-Q1 |
-| Set "in the warehouse on" to | 2014-02-01 |
+| Supplies | `geo_ed_presentations__202105011830000800` |
+| Period | 2021-Q2 |
+| Set "in the warehouse on" to | 2021-05-01 |
 
 ### TS-108 - Coverage in the fail band
 
@@ -1051,9 +1051,9 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
 | Where to look | |
 |---|---|
 | Dataset | geo-cp-clients |
-| Supplies | `geo_cp_clients__202602011830000800` |
-| Period | 2026-Q1 |
-| Set "in the warehouse on" to | 2026-02-01 |
+| Supplies | `geo_cp_clients__202411011830000800` |
+| Period | 2024-Q4 |
+| Set "in the warehouse on" to | 2024-11-01 |
 
 
 <!-- scenario-map-data
@@ -2481,10 +2481,10 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "coordinates": {
     "dataset": "geo-ed-presentations",
     "supplies": [
-     "geo_ed_presentations__201402011830000800"
+     "geo_ed_presentations__202105011830000800"
     ],
-    "period": "2014-Q1",
-    "inPlaceOn": "2014-02-01",
+    "period": "2021-Q2",
+    "inPlaceOn": "2021-05-01",
     "subject": "supply-history-row"
    }
   },
@@ -2567,10 +2567,10 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "coordinates": {
     "dataset": "geo-cp-clients",
     "supplies": [
-     "geo_cp_clients__202602011830000800"
+     "geo_cp_clients__202411011830000800"
     ],
-    "period": "2026-Q1",
-    "inPlaceOn": "2026-02-01",
+    "period": "2024-Q4",
+    "inPlaceOn": "2024-11-01",
     "subject": "supply-history-row"
    }
   }
