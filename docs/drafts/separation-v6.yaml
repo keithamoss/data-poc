@@ -6,9 +6,11 @@
 # answers, 2026-11-14' and after) and the architect's blocking findings B2-B6
 # (docs/drafts/separation-v5-reviews.md).
 # NOT SIGNED. Nothing here is built until Keith signs it. Ids kept from v5;
-# two new: REQ-TEST-393 (the equivalence harness deleted) and REQ-DASH-394 (a
-# configuration error on the 'needs a person' queue). Whoever applies this
-# re-checks both are still free.
+# four new: REQ-TEST-393 (the equivalence harness deleted), REQ-DASH-394 (a
+# configuration error on the 'needs a person' queue), REQ-TEST-395 (four stale
+# commands deleted) and REQ-GHUB-396 (the sync-tickets guard), the last two
+# from Keith's COMMAND CLEAN-UP and sync-tickets GUARD of 2026-11-14.
+# Whoever applies this re-checks all four are still free.
 #
 # THE STANDING RULE v6 APPLIES EVERYWHERE (QD, Keith 2026-11-14): 'I do not
 # give two shits if the synthetic demo history moves.' Every criterion proven
@@ -31,7 +33,8 @@
 # (line 478, not 475) and scenario_injection's calendar-name test (line 1418).
 #
 # BUILD ORDER (the architect's, captures removed; a decision on REQ-PIPE-380):
-#   1. REQ-TEST-393, then REQ-TEST-384 + REQ-TEST-388 (gate-only)
+#   1. REQ-TEST-393 + REQ-TEST-395 + REQ-GHUB-396, then REQ-TEST-384 +
+#      REQ-TEST-388 (gate-only)
 #   2. REQ-PIPE-380 + REQ-PIPE-376 + REQ-PIPE-390
 #   3. REQ-PIPE-383 + REQ-PIPE-382 + REQ-GEN-381
 #   4. REQ-GEN-386 + REQ-GEN-391
@@ -857,4 +860,69 @@ requirements:
     open_questions:
       - "1 (NEW in v6). ONE ITEM PER ERROR, OR PER DATASET. Options: (a) one item per distinct configuration error, listing every dataset it stopped, blocking each - like PENDING_CORRECTION's one asset-wide item; (b) one item per dataset, each naming the error - like FAILED_LOAD. RECOMMENDED (a): one broken calendar entry stops every dataset on it, and at thirty collections (b) is thirty items for one fix; each dataset's page still shows it is blocked."
       - "2 (NEW in v6). THE ITEM AND THE BUILD REFUSAL TOGETHER. Options: (a) as drafted - the item appears whenever the build can run, which is mostly for errors confined to dates the build does not read; (b) the build also refuses while any such item is uncleared, so a configuration error of either kind holds the page at its last good build - consistent with Dash A, but the item would then never be seen on a published page. RECOMMENDED (a): (b) would make the item pointless, and Dash A's reason - never publish a dataset as owing nothing - does not apply to a dataset whose slots the build read correctly."
+    signed_off: null
+
+  - id: REQ-TEST-395
+    title: "Four stale or unsafe developer commands are deleted - mothman debug build-warehouses, mothman debug changelog, mothman debug capture-arrival-golden and the mothman dashboard snapshot command - with their tests, help mentions and register claims, while the functions other commands call stay"
+    date_written: "2026-11-14"
+    story: "As whoever runs or reads the mothman CLI, I want commands whose help describes retired designs, whose own example returns nothing, or which can quietly destroy a shared pin to be gone, so that every command listed is one that does what it says."
+    moscow: should
+    status: not_started
+    source: "Keith, 2026-11-14, COMMAND CLEAN-UP, from the read-only command audit (docs/drafts/command-audit-2026-11-14.md), recorded in docs/drafts/decisions-2026-11-01.md: the deletions go into #134 v6 beside scenarios bands and the equivalence commands. Drafted by delivery-scoper 2026-11-14 (v6). A PROPOSAL, not signed until Keith signs v6."
+    acceptance_criteria:
+      - "THE SYSTEM SHALL delete `mothman debug build-warehouses` (cli/debug.py from line 165), whose help describes a per-run DuckDB warehouse and a synthetic manifest that no longer exist and which duplicates `mothman supply load` (cli/supply.py lines 309-345, the same stage.build_all with a report of what changed); stage.build_all and tests/test_build_warehouses_rebuild.py, which tests it directly, stay."
+      - "THE SYSTEM SHALL delete `mothman debug changelog` (cli/debug.py from line 176), whose help says it reads committed qa_results/ history (gone) and whose own --dataset example returns [] because the query filters on collection_id (changelog.py line 79); qa_tools/common/changelog.build_changelog, which the dashboard embed calls directly (embed_dashboard_data.py line 296), stays."
+      - "THE SYSTEM SHALL delete `mothman debug capture-arrival-golden` (cli/debug.py from line 186), which collects only the selected asset's collections and then rewrites the whole shared tests/fixtures/arrival_semantics_golden.json, dropping the other asset's pinned arrivals; tests/test_asset_time_semantics.py's references to it as 'the recorded procedure' (lines 20 and 168) SHALL say how the golden is re-captured instead, per asset, so that REQ-GEN-392 criterion 11's re-capture has a procedure that keeps both assets."
+      - "THE SYSTEM SHALL delete the `mothman dashboard snapshot` COMMAND only (cli/dashboard.py line 239), whose --prepare-site help describes a GitHub Pages deploy step no CI runs; dashboard/snapshot_dashboard.py's prepare_deploy_site and take_snapshot stay, because `mothman dashboard publish` and `mothman pipeline run` call them as functions."
+      - "THE SYSTEM SHALL delete each command's own tests (tests/test_cli_debug.py's build-warehouses and changelog tests, tests/test_cli_app.py line 198's --dataset assertion for debug changelog, tests/test_cli_dashboard.py line 146's snapshot test) and remove the commands from README.md (lines 46-48, which also still list the retired github acceptance sync), CLAUDE.md and docs/ wherever they are described as commands to run."
+      - "THE SYSTEM SHALL remove, in the same change, every requirements.yaml linked_tests and implemented_by entry naming a deleted command function or test (at 72ec04d7 among them REQ-GEN-043's claims on capture-arrival-golden and the snapshot command's under REQ-DASH-013, REQ-DASH-292 and REQ-PIPE-089, the builder re-grepping at build), each listed for Keith as a built-requirement claim edit; evidence prose stays as the record of its day."
+      - "THE SYSTEM SHALL keep `mothman debug snapshot-worktrees`, `mothman pipeline cache-key`, `mothman dashboard rebuild-results`, `build-data`, `embed` and `check-renders`, `mothman population`, `mothman github sync-tickets` (guarded by REQ-GHUB-396) and `mothman github sync-leaderboard` as they are."
+      - "WHEN any deleted command name is invoked, THE SYSTEM SHALL answer as for any unknown command ('No such command' with the asset's commands beneath it, cli/app.py line 259), leaving no forwarding alias."
+    non_functional_requirements:
+      - "MAINTAINABILITY: four commands and their tests stop needing upkeep; no function another command calls is removed (criteria 1-4)."
+      - "RELIABILITY: the one command that could silently destroy a committed pin (criterion 3) is gone, and the pin keeps a documented per-asset re-capture route."
+      - "FIRST-TIME USE: `mothman debug --help` and `mothman dashboard --help` list only commands whose help is true."
+      - "AUDITABILITY: every register claim the deletion makes untrue is named for Keith in the same change (criterion 6)."
+    dependencies:
+      - "REQ-TEST-393"
+      - "REQ-GEN-043"
+      - "REQ-DASH-013"
+      - "REQ-GEN-392"
+    decisions:
+      - "DELETE FOUR, KEEP THE REST (COMMAND CLEAN-UP, SETTLED by Keith 2026-11-14): build-warehouses, changelog, the snapshot command and capture-arrival-golden go. KEPT, not chosen for deletion: sync-tickets, sync-leaderboard, snapshot-worktrees, cache-key, rebuild-results, build-data, embed, check-renders, population."
+      - "INSIDE #134 v6, NOT A FIX BATCH NOW (Keith, 2026-11-14): beside scenarios bands (REQ-PIPE-385) and the equivalence commands (REQ-TEST-393). REJECTED a small fix batch now."
+      - "ITS OWN SMALL REQUIREMENT (delivery-scoper, v6): none of the four belongs to another requirement's subject; this one could fold into REQ-TEST-393 if Keith prefers one fewer id."
+      - "THE SNAPSHOT FUNCTIONS STAY (Keith, 2026-11-14: 'the dashboard snapshot COMMAND only'): publish and pipeline run call prepare_deploy_site and take_snapshot as Python functions (the audit)."
+      - "capture-arrival-golden IS 'LIKELY DESTRUCTIVE' FROM READING THE CODE, NOT FROM RUNNING IT (the audit, 2026-11-14): its deletion needs no run to justify it, and nobody should run it to find out."
+      - "NO DEFECT TEST FOR capture-arrival-golden (delivery-scoper): the command is deleted rather than fixed, so a regression test would guard nothing (CLAUDE.md's test rule 2)."
+    open_questions: []
+    signed_off: null
+
+  - id: REQ-GHUB-396
+    title: "mothman github sync-tickets refuses to run unless the environment turns ticketing on, as the ticket reconciler already does"
+    date_written: "2026-11-14"
+    story: "As whoever maintains the pipeline, I want the old ticket sync to open no issue from an environment where ticketing is off, so that running it by hand in a sandbox cannot post tickets to the data asset's real repository."
+    moscow: must
+    status: not_started
+    source: "Keith, 2026-11-14, sync-tickets GUARD, from the read-only command audit (docs/drafts/command-audit-2026-11-14.md: it never reads env.ticketing, so run by hand it would open per-dataset issues in the ticket_repository from any environment, sandbox included); recorded in docs/drafts/decisions-2026-11-01.md, into #134 v6. Drafted by delivery-scoper 2026-11-14 (v6). A PROPOSAL, not signed until Keith signs v6."
+    acceptance_criteria:
+      - "IF `mothman github sync-tickets` (cli/github.py line 18) runs where environments.current_or_none() is None or the environment's `ticketing` is not true, THEN THE SYSTEM SHALL refuse before reading any report or calling GitHub, exiting 1 and naming the environment (or MOTHMAN_ENVIRONMENT being unset) and that its ticketing is off in assets/environments.yaml - the same rule ticket_reconciler.py line 334 applies (REQ-PIPE-093 criteria 10 and 12)."
+      - "WHERE the environment turns ticketing on, THE SYSTEM SHALL run sync-tickets as it does today."
+      - "THE SYSTEM SHALL apply the guard in ticket_sync itself, not only in the command, so that any caller of ticket_sync.main meets it."
+      - "THE SYSTEM SHALL have a regression test, seen failing against today's code first, that sync-tickets with ticketing off makes no GitHub call and exits 1 naming the environment, and a test that with ticketing on it proceeds."
+    non_functional_requirements:
+      - "SECURITY: one switch - the environment's `ticketing` - decides whether anything posts to GitHub, for both ticket paths; GITHUB_REPOSITORY or a token being present is never enough."
+      - "RELIABILITY: the refusal comes before any network call, so a refused run has no partial effect."
+      - "OBSERVABILITY: the refusal names the environment and the file that switches ticketing, so the fix is one line to find."
+      - "COMPATIBILITY: the guard reads committed configuration and an environment variable only; no network is needed to refuse."
+    dependencies:
+      - "REQ-PIPE-093"
+      - "REQ-GHUB-027"
+      - "REQ-PIPE-083"
+    decisions:
+      - "ADD THE GUARD (sync-tickets GUARD, SETTLED by Keith 2026-11-14): a defect fix, test seen failing first. REJECTED a small fix batch now; it goes into #134 v6."
+      - "KEEP sync-tickets OTHERWISE (COMMAND CLEAN-UP, SETTLED by Keith 2026-11-14): not deleted, although its only workflow caller (ticket-sync.yml) is disabled and it overlaps REQ-PIPE-083's reconciler; that overlap and the empty leaderboard behind sync-leaderboard are still for Keith to raise, not this requirement."
+      - "THE SAME RULE AS THE RECONCILER (delivery-scoper): ticket_reconciler.py line 334 returns nothing unless env.ticketing; one rule for both ticket paths, so the environment list remains the only switch (REQ-PIPE-093)."
+      - "IN ticket_sync, NOT ONLY THE COMMAND (delivery-scoper): the disabled workflow calls the same module; a guard in the command alone would leave the module unguarded if the workflow were re-enabled."
+    open_questions: []
     signed_off: null

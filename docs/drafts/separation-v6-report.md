@@ -105,3 +105,34 @@ Nothing else in `requirements.yaml` or `docs/drafts` uses 393 or 394, but whoeve
 **Smaller choices left as my proposals in decisions:** the footer replacement wording, `aws/` and `docs/` sides, both matrix legs, and REQ-TEST-393 as its own requirement (it could fold into REQ-TEST-384).
 
 **Not yet done:** the matching `plans/*.md` draft entry. This pass covered only the YAML; I can draft it if you want.
+
+## Addendum (command clean-up and sync-tickets guard)
+
+ADDENDUM to my v6 report. Keith's COMMAND CLEAN-UP and sync-tickets GUARD are now in v6 as two new requirements.
+
+File: /home/user/data-poc/docs/drafts/separation-v6.yaml. Nothing else was edited and nothing is committed. I re-ran `uv run mothman dashboard validate-requirements --draft` after the change. The only errors left are links to requirements outside the draft, which are expected.
+
+**REQ-TEST-395: delete four commands**
+- **`mothman debug build-warehouses`** (cli/debug.py, line 165). The help describes a DuckDB warehouse that no longer exists, and the command duplicates `mothman supply load`. `stage.build_all` and its own test stay.
+- **`mothman debug changelog`** (line 176). The help is stale and its own example returns []. `build_changelog` stays, because the dashboard embed calls it directly.
+- **`mothman debug capture-arrival-golden`** (line 186). It rewrites the shared golden file from one asset's collections, which drops the other asset's arrivals. `tests/test_asset_time_semantics.py` (lines 20 and 168) must then describe a per-asset re-capture instead. REQ-GEN-392 criterion 11 depends on that. There is no regression test, because the command is deleted rather than fixed.
+- **`mothman dashboard snapshot`** (cli/dashboard.py, line 239). Only the command goes. `prepare_deploy_site` and `take_snapshot` stay, because publish and pipeline run call them.
+- **Tests and docs:** each command's own tests go (test_cli_debug, test_cli_app line 198, test_cli_dashboard line 146). README.md lines 46-48 lose them, along with the retired acceptance sync still listed there. CLAUDE.md and docs/ drop any mention of them as commands to run.
+- **Register claims:** every `linked_tests` and `implemented_by` entry naming a deleted command or test is removed in the same change. Each is listed for Keith, because they are claims on built requirements. Among them are REQ-GEN-043's and the snapshot command's under REQ-DASH-013, REQ-DASH-292 and REQ-PIPE-089.
+- **Kept as they are:** snapshot-worktrees, cache-key, rebuild-results, build-data, embed, check-renders, population, sync-tickets and sync-leaderboard are named in the requirement so nobody removes them by mistake.
+- A deleted name gets the normal "No such command" answer, with no alias left behind.
+
+**REQ-GHUB-396: the sync-tickets guard**
+- `mothman github sync-tickets` refuses with exit 1, naming the environment, unless that environment's `ticketing` is on. This is the same rule `ticket_reconciler.py` line 334 applies.
+- The refusal happens before any report is read or any GitHub call is made.
+- The guard sits in `ticket_sync` itself, not only the command. That way the disabled ticket-sync workflow would also meet it if it were ever re-enabled.
+- It is treated as a defect fix: a regression test seen failing against today's code first, plus a test that it still runs when ticketing is on.
+- The overlap with the reconciler and the empty leaderboard are recorded as still for Keith to raise.
+
+**Build order and ids**
+- Both requirements go in build step 1, alongside REQ-TEST-393 and before the imports gate.
+- The header comment now lists all four new ids: REQ-TEST-393, REQ-DASH-394, REQ-TEST-395 and REQ-GHUB-396. None of them appears in requirements.yaml or plans/, but whoever applies the draft should check again.
+
+Neither requirement has open questions. One choice of mine to flag: I made the deletions a requirement of their own. They could be folded into REQ-TEST-393 if Keith would rather have one fewer id.
+
+Everything in my earlier v6 report still stands, including its six open questions.
