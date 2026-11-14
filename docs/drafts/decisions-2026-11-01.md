@@ -714,3 +714,4 @@ Purpose recalled: insurance for a real deployment's published QA page; REQ-QAC-3
 - **TR11 (CLI Q3, which durations move):** RUN TIMES PLUS THE SAME-SCREEN ONES - the bootstrap's 'Took ...' line and the bulk re-check's elapsed/left; claim windows keep their authored form. REJECTED run times only, and every duration.
 
 **TIMING-ATTEMPTS REVIEW BATCH STATUS:** all eleven answered (13 questions, two pairs merged). To the scoper for v2 with every reviewer finding, then sign-off.
+- **[28] evidence, read 2026-11-14:** push 001dd2fe ran Critical tests (run 43577949927) green in ~3m12s (08:53:43 to 08:56:55 UTC) and Validate committed configuration (43577949926) green; no test.yml run started on the push.
