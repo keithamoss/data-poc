@@ -112,8 +112,19 @@ releases:
   - date: "2026-11-14"
     summary: >
       The Feedback tab now gathers its cards from a second road-testing file
-      as well as the first.
+      as well as the first, and two geocoding scenarios show only the fault
+      they were planted with.
     changes:
+      - category: Fixed
+        items:
+          - headline: Two geocoding scenarios lose an unrelated Fail
+            components: ["Data generation"]
+            description: >
+              The scenarios for a coverage warning in ED Presentations Geocodes
+              and for a Client Register tagged by its geocodes each also showed
+              Distribution drift as Fail, because the quarter before had no
+              accepted supply. They now sit in quarters that follow an accepted
+              one, so each shows only its own Warn.
       - category: Improved
         items:
           - headline: Feedback comes from every road-testing file
