@@ -682,3 +682,4 @@ Purpose recalled: insurance for a real deployment's published QA page; REQ-QAC-3
 - **TA Q8 (414, wording of a retried run):** 'SECOND TRY' - 'Checked on the second try - the first timed out after 45 min'; 'attempt' stays the resupply word. REJECTED 'Check attempt 2', and F2's words as given.
 
 **TIMING-ATTEMPTS v1 STATUS:** all eight answered; to the scoper to apply, then the architect and CLI and dashboard UX reviewers.
+- **TA Q9 (411, what clears 'Could not be checked'):** A COMPLETED RETRY OR A PERSON REJECTING THE SUPPLY, like a failed load; the item offers 'reject the supply' and says the next pass will retry. REJECTED only a completed retry.
