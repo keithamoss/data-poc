@@ -471,3 +471,38 @@ the rebuild needs no question asked twice. Drafts and builders read this file.
 - NEXT (Keith, 2026-11-14): update the split overview artifact with these
   answers; Keith takes another look; then v4 goes back to delivery-scoper and
   on to delivery-architect, delivery-cli-ux and delivery-dashboard-ux.
+
+## Two quick decisions (Keith, 2026-11-14)
+
+- post-build-review #321 (validate-config.yml ran with no asset): NO
+  regression test. The fix stands; a future workflow that forgets the asset is
+  caught by its first red run. REJECTED: a test reading every workflow.
+  (To be recorded in post-build-review #321 once the running suite finishes -
+  plans files are read by tests, so they are not edited mid-run.)
+- running-thoughts #139 (/tmp leftovers): REMOVE /tmp/tmp* and /tmp/mothman-*
+  once nothing is running that could use them - after the current suite run.
+  (Also to be recorded in #139 then.)
+
+## Speed scoping (#318, #136; Keith, 2026-11-14, one at a time)
+
+- S1 SETTLED: a generation and a bootstrap PIN the asset's configuration once
+  per run - read at the start, used throughout, with slots and periods derived
+  from it worked out once. An edit made mid-run is seen by the next run.
+  REQ-PIPE-254 criterion 15 (read whole on every call) stays for everything
+  else: the pipeline, the CLI, the dashboard build. REJECTED: caching by file
+  change; pinning everywhere (withdrawing criterion 15).
+- S2 SETTLED, NOT THE RECOMMENDATION: the replay inside a bootstrap ALSO runs
+  the real pipeline on the pinned configuration - the pipeline gains a pinned
+  mode used only by the synthetic replay; outside a bootstrap it reads as now
+  (criterion 15). REJECTED: profiling first and deciding later (the
+  recommendation); pinning the generator only.
+- S3 SETTLED: the suite generates ONCE and shares - one generated history per
+  test session (or a cached one keyed by the generator's inputs), read-only to
+  every test that needs it, a cheap copy for a test that must change it;
+  measured with --durations before and after. REJECTED: smaller test-only
+  histories; both.
+- S4 SETTLED: S1-S3 go to delivery-scoper as their own batch AFTER the #134 v5
+  reviews (so the two don't overlap), then the architect, then Keith's
+  sign-off. Likely touches: REQ-PIPE-254 criterion 15's scope, REQ-PIPE-352's
+  12-minute budget, and a new test-suite requirement (#136). REJECTED: scoping
+  in parallel now; folding into #134.
