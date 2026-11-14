@@ -235,3 +235,211 @@ Files referenced:
 - /home/user/data-poc/qa_tools/common/assets.py (deliveries_dir, line 467)
 - /home/user/data-poc/requirements.yaml (REQ-PIPE-144's phrase criterion, line 31117)
 - /home/user/data-poc/README.md (GENERATOR_ANCHOR_DATE, line 633)
+
+## Architect (delivery-architect)
+
+I reviewed speed-anchor-v1 (REQ-PIPE-397 to REQ-GEN-408, REQ-PIPE-430 to 432) against the code at HEAD. This was advisory only: I edited nothing and wrote no files. I did not re-ask anything Keith has already settled. The batch fits the separation-v6 seams in principle. Six findings would make a criterion wrong, unsafe or untestable as worded (B1-B6), and I answer the coordinator's CLI point after them.
+
+## Blocking findings
+
+**B1. The pin is lazy, but the stream processes are supposed to be handed its contents (397 c1 against 399 c2/c3).**
+- 397 c1 pins "the text read when that file was first read inside the pin". So at the moment a child process starts, the parent holds only the files it has read so far. Any file the child reads first is read fresh, so the "handed, not re-read" promise and the digest comparison in 399 c3 cannot both hold.
+- The handing is also incomplete. There are three process pools, and 399 names only one:
+  - `bootstrap._run_concurrently` (bootstrap.py:778-781);
+  - the target-trial pool (cli/target_trial.py:171-174), which uses `initializer=assets.select` rather than `assets.handoff`;
+  - `parallel_orchestrate.run_manifest`'s pool (parallel_orchestrate.py:101-103).
+- **Fix:**
+  - At install time, snapshot a declared set of files up front: the asset folder's *.yaml/*.yml (excluding `dbt/dbt_packages/`), assets/environments.yaml and the shared file-checks default.
+  - Hand that snapshot to every child through `assets.handoff()`/`adopt()`, which REQ-PIPE-369 c4 already makes the one hand-off. Move target_trial onto `handoff` too.
+  - 397 c9's digest is then just the snapshot's digest.
+  - Reword 399 c2 to "every process the bootstrap or generation starts".
+
+**B2. config_yaml.read is not the choke point (397 decision 4 and criterion 7).**
+- Only about 27 call sites go through `read`/`load`/`Built`. 54 `config_yaml.parse(...)` sites in 26 files read the file themselves first (`Path.read_text()` or `open()`), and a pin cannot see a read that only hands it text. Examples:
+  - file_checks.py:95, 357
+  - check_bands.py:269, 339, 364, 432, 459
+  - check_lifecycle.py:404, 545, 656, 680, 747, 813
+  - amber_setting.py:124
+  - agreement.py:506
+  - environments.py:78
+- About 20 more sites bypass config_yaml entirely with `yaml.safe_load`, among them generator/synthetic_inputs.py:54, 73, 90, linked_datasets.py:31, list_setting_members.py:186, 253 and dbt_common.py:193 (mothman's own read of dbt_project.yml).
+- c7's only named example, synthetic_reset (lines 43 and 60), never runs inside a pin, and REQ-PIPE-382 c7 already routes it through `declared_synthetic`.
+- As worded, "no configuration read inside a pin escapes it" cannot be tested.
+- **Fix:**
+  - Have c7 say "every reader of a file under the snapshot set goes through `config_yaml.read`/`load`/`Built`".
+  - Make that mechanical with a `mothman check` gate in the style of validate_caches: no `read_text`/`open`/`yaml.safe_load` of such a path outside config_yaml in asset_model/, qa_tools/, generator/ or the asset providers.
+  - Add a test that installs a `sys.addaudithook` "open" hook around a pinned generation of a test asset, and asserts that no file in the snapshot set is opened from a mothman frame. Tool frames are allowed, per SA Q4.
+
+**B3. REQ-PIPE-400's key misses the staged timezone (c1/c2).**
+- `correction_trial.configured` swaps both `agreement.current` and `asset_time.timezone_versions` (correction_trial.py:185-193), and slots resolve zones through the latter. A memo keyed "on the agreement in force" would answer a staged timezone correction with slots worked out under the pinned zones. That is a silent wrong filing.
+- Two names are wrong:
+  - `slots_for_dataset` is `slots.slots_for_dataset` (slots.py:254), not in schedule.
+  - `standing_on` is the method `Agreement.standing_on` (agreement.py:257).
+- All four functions take an explicit `agreement=` (schedule._agreement, schedule.py:325). The key must be the agreement actually used, not `agreement.current()`.
+- **Fix:**
+  - Key on the identity of (agreement used, zone versions tuple). `Agreement` is a frozen dataclass with MappingProxyType fields, so it cannot be hashed; the memo must hold a strong reference so an id is never reused.
+  - Better still, memoise on the immutable Agreement instance itself. Built already hands back the same instance for the same text, so this is content-keyed by construction, and it is correct pinned or unpinned. c3 can then drop "remember nothing without a pin".
+
+**B4. REQ-PIPE-430's tree memo is keyed on the configuration pin, which is also installed during generation (c1).**
+- REQ-GEN-398 pins generation, and generation recognises the tree it has just written (driver.py:273; linkage_products.py:1424 and 1594, which read the CP and ED trees written earlier under the same pin).
+- `checkpoints.arrivals_of` (checkpoints.py:218) generates into a temp tree and recognises that.
+- The bootstrap's one-collection and checkpoint branch generates and replays each collection in turn (bootstrap.py:261-270).
+- A pin-keyed recognition would therefore serve stale arrivals.
+- **Fix:** make the tree snapshot its own installation, done by the bootstrap after the collections it is about to replay have finished generating. Alternatively, invalidate it on every `write_delivery`/`remove_deliveries`. Either way, never memoise during generation. c2's end-of-run digest stays.
+- Also: `Arrival` is frozen, but `files_by_dataset` is a plain dict, so c4 needs a deep copy or a MappingProxyType, not just "its own list".
+
+**B5. REQ-PIPE-431 moves all of run_datacontract.evaluate into a worker (c1).**
+`evaluate` depends on state that lives only in the pipeline process:
+- `asked_for.ask`/`SCOPED` (run_datacontract.py:86-87);
+- `run_owner` → `bulk_recheck._TRIAL_OWNERS` (qa_results_writer.py:227; bulk_recheck.py:736), whose docstring says the registry works only because "the tools ... all run in this process";
+- `left_out.note` (line 188; left_out.py says "IN MEMORY, PER PROCESS");
+- `write_qa_result` stamping records from the process-wide replay clock;
+- correction_trial's monkeypatched agreement.
+
+In a worker, records would be stamped with the wall clock, the left-out comparison would raise `LeftOutMismatch`, and re-check trials would lose their scope.
+
+**Fix:**
+- Send only the datacontract-cli library call (`datacontract_common.run_against_warehouse`, line 96) to the worker, and return a picklable result (type, model, diagnostics, qualityDefinition per check).
+- Keep asking, unreadable-table filtering, left-out notes and recording in the parent.
+- Add tests that a replayed run's datacontract records carry the replay clock's instant, and that a re-check trial's datacontract scope survives.
+
+**B6. asset_model/ cannot read the recorded anchor (REQ-GEN-406 c3).**
+- 406 resolves offset dates "in asset_model/ against the anchor recorded for the history (REQ-GEN-404)". REQ-GEN-404 records it in only two places:
+  - the qa schema, but asset_model never opens the database (REQ-PIPE-380 c8);
+  - the generator's bookkeeping, which no pipeline module may read (REQ-GEN-043 c7).
+- Nothing at the seam can supply the anchor to `mothman pipeline run`, the CLI, the dashboard build, or the critical CI half (empty database, no data/), all of which read the daily calendar.
+- This is a real fork, so it is Q1 below. 406 c3 and 404 c3/c4 are provisional on the answer.
+
+## The coordinator's CLI point: confirmed
+
+- `assets.deliveries_dir()`/`receipts_dir()` are `data_path("deliveries"/"receipts")` (assets.py:467-472), and `data` is `ROOT / "data" / name` (assets.py:187). The tree is per asset per checkout and has nothing to do with `MOTHMAN_SUPPLY_DSN`.
+- So a second database at the fixed anchor would regenerate the one shared tree. The demo database would then be out of step with its files, which `replay_inputs.deliveries_print` and a resume would also trip over.
+- REQ-GEN-405 decision 6's "side by side in two databases" is wrong and should be corrected.
+- **The only real side-by-side route is a second worktree**, which has its own `data/`, with its own `MOTHMAN_SUPPLY_DSN` and its own from-empty bootstrap (about 1h50m for the quarterly asset). There is a catch: `tests/conftest.py`'s `deployment_dsn_for` (lines 783-807) prefers `supply_<asset>` on the server whenever that database exists. So in that arrangement the gate-ready history has to be the `supply_<asset>` database (or sit on another server), and the demo has to use another name.
+- **Recommendation:** fix the note, have 405 c6's refusal name the reset route only, and mention the worktree route in a docstring (Q2).
+
+## Non-blocking findings
+
+**REQ-PIPE-397**
+- The PERFORMANCE NFR's "inside a pin a configuration read makes no system call" is untrue. `assets.Resolver.names()` calls `os.stat` on every call (assets.py:155-164), and callers check `exists()`/`is_file()` before reading. Reword to "no file read".
+- Say what the pin does with a missing file: raise every time, as unpinned.
+- Key the pin on the resolved path, because callers mix `REPO/...` paths with resolver paths.
+- `load()` still deep-copies on every call inside a pin, which is correct (callers mutate). Say so, so nobody "optimises" it away.
+
+**REQ-PIPE-401**
+- It is a real defect: `_SCHEMAS` is keyed on `(path, st_mtime_ns, st_size)` at list_setting_members.py:183-184, and it is also unbounded and not behind a lock. It does not need the pin; build it first, test-first.
+- Line 253 of the same file reads data-asset.yaml raw, which is B2's class.
+
+**REQ-TEST-402**
+- c6's list is incomplete. These also generate:
+  - tests/test_kept_routes_agree.py, test_target_agreement.py, test_scenario_map.py, test_replay_clock.py, test_emergency_department.py and test_correction_claims.py;
+  - CLI-driven generations in test_cli_cp, test_cli_bdm, test_cli_pipeline, test_cli_app, test_arrivals, test_scenario_injection and test_processing_pass;
+  - test_bootstrap_equivalence, which is deleted with the harness.
+
+  Replace the list with a rule plus a build-time grep recorded in evidence.
+- c7 allows any gitignored folder, including `data/`, which everything that recognises arrivals reads (the 2026-09-28 incident). It should say "never under data/".
+- c4 cannot rely on file permissions, because the sandbox runs as root and root ignores them. Guard the writers instead, as `_no_test_files_a_real_delivery` does: `write_delivery`, `write_receipts`, `remove_deliveries`, `write_bookkeeping` and `write_placements` refusing paths under the shared root. Add a digest of the tree at session end as a backstop.
+- For the cross-worker lock use stdlib `fcntl.flock`; `filelock` is only a transitive dependency in uv.lock.
+- Two sessions with different `MOTHMAN_TEST_DB_TAG` share the folder. The "remove a stale key" rule in c7 must not delete a history another session holds; take a shared lock while reading, or keep one folder per tag.
+- The cache key must follow REQ-GEN-381 c7's change to INPUTS and its KEY_PREFIX bump.
+
+**REQ-GEN-404 and 405**
+- Making "given the anchor by its caller" work in practice means a process-wide installed anchor. It needs the same hand-off to spawned children as B1, because providers call `get_anchor_date()` with no arguments in about 15 places, including correction_claims, scenario_injection and all four providers.
+- Fold the anchor into `replay_inputs.cache_key()`. It is constant at the fixed anchor, so 405 c9 still holds, and a rolled history can never match the fixed key.
+- 405 c6 "at collection": `deployment_history` is a function-scoped fixture (conftest.py:755), so this needs a `pytest_collection_modifyitems` hook or a session fixture, checked once per asset's database. Specify what happens with no recorded anchor: every local deployment bootstrapped before 404 lands has none, so the first gate after 404 forces a rebuild. Say so.
+- 405 c5's "latest day whose planned receipts have all passed" needs the built arrivals (driver.py step 3, `received_at`), not just `plan()`. That is a dry build per candidate day, normally at most one day back.
+- A bare `generate-synthetic-data` after a rolled bootstrap would rewrite the tree at the fixed anchor underneath a rolled database. It should refuse when the bookkeeping's recorded anchor differs, unless a reset has run (Q4).
+
+**REQ-GEN-406**
+Offset dates break every reader that parses the file raw:
+- validate_schedule.py:2307 and 2330;
+- agreement_freeze's git-text comparison, where an unchanged offset's meaning moves with the anchor;
+- generator/synthetic_inputs.
+
+All of these must go through asset_model's resolver (B2's gate catches them).
+
+**REQ-GEN-408**
+- Also delete the scenario placements file (`data_path(scenario_map.PLACEMENTS_FILE)`, scenario_injection.py:56-57), which sits in the same data folder.
+- Resolve real paths and refuse symlinks or a `data_dir` outside `ROOT/data/<asset>` or an injected root's own data folder.
+
+**REQ-PIPE-432**
+- Pass `--threads` (a documented flag) from one constant, not the profiles.yml literal. Keep it constant for the life of each worker so the partial parse stays valid.
+- Sort parsed `run_results` by unique_id before recording, so thread scheduling cannot reorder results.
+- The connection NFR should also count the test suite: about 4 xdist workers × threads, times two concurrent sessions.
+
+**REQ-PIPE-403 duplicates REQ-PIPE-250.**
+- 403 c2 (three runs against 720s) is REQ-PIPE-250 c2 and REQ-PIPE-352 c5; 403 c3 is 250 c5.
+- When 403 is built, 250 c2 stays unmet beside it, so two requirements own one claim (Q3).
+- 250's title still says "all three collections", which predates the asset split.
+
+**Seam note on 430, for the builder of REQ-PIPE-382.**
+- The tree half of `promotion.next_receipt` (promotion.py:479, 510) is replay-only work living in the real pipeline. Its own docstring says the live pass has no tree.
+- Under one clock, only the replay clock uses B. If 382 let the replay clock work out B itself, the pipeline would stop reading the tree on every promotion, and half of 430's work would disappear.
+- That would be an edit to v6 382 c4, so I flag it rather than ask it.
+
+**No duplication with REQ-TEST-116.** Its c3 already says a run's four tools are evaluated concurrently, and 431 moves towards that.
+
+**Components touched.** PIPE (qa_tools/common config_yaml, slots, schedule, agreement, arrivals, promotion, run_datacontract, dbt_worker, list_setting_members, assets), GEN (generator/, the providers, bootstrap/), TEST (conftest, 402), DASH (407), DOCS (the CLAUDE.md log). That is wide, but it is already sequenced behind #134.
+
+**Security.**
+- The pin and the offset dates are refused on a real asset in shared code: correct, keep it.
+- The datacontract worker should copy dbt_worker's authenticated socket and pass credentials by environment, never on the command line.
+- More dbt threads means more database connections, nothing wider.
+- The test cache holds synthetic rows only, and must be in .gitignore before its first write.
+
+## What "done well" looks like (for delivery-critic)
+1. There is one snapshot object in asset_model/ with `install()`/`release()`, and its docstring states the snapshot set. Nothing outside config_yaml and that module mentions it (checked by B2's gate).
+2. Every hand-off of the pin and the anchor goes through `assets.handoff()`/`adopt()`. No pool has its own initializer.
+3. Every memo has a docstring saying what it is keyed on, why that key is complete (naming the staged agreement and zones), and that it holds strong references. There is no `lru_cache`.
+4. Every new test is seen failing first. Each staged-correction test plants a timezone correction as well as a calendar one.
+5. The datacontract worker reuses dbt_worker's start, lock and restart code through one shared helper, not a copy. Nothing that records results runs in it.
+6. 402's guards refuse by function and name the file. There are no permission-based guards.
+7. Each measurement in 403 records the load average and the commit.
+
+## Sketch
+bootstrap → `asset_model.snapshot.install(files)` → generate (anchor installed, pinned, no tree memo) → `asset_model.tree.install(collections)` → replay; each spawned child gets `handoff()` = (asset, layout, snapshot, anchor, clock seed) → release in reverse order. Per run: dbt worker (threads N) ‖ datacontract worker (library call only) ‖ foreground Soda then Evidently; recording happens in the parent, in tool order.
+
+## Build order
+1. After v6's 380, 382, 383 and 381/386: 403 c1 (the baseline), then 401 (a defect fix that needs no pin).
+2. 397 (eager snapshot plus B2's gate), then 400, 398, 399.
+3. 432 (its baseline is in 403 c1), then 430 (after 399, separate install), then 431.
+4. 404, then 405, then 406 (once Q1 is answered), then 408, then 407.
+5. 402 (after 405 and 398).
+6. 403's remaining criteria last.
+
+## Questions for Keith (one batch)
+**Q1. Where does asset_model get a synthetic history's anchor, to resolve offset dates? (REQ-GEN-406, B6)**
+- (a) The generator writes the anchor as a one-line file beside the delivery tree under `data/<asset>/`. asset_model reads it (its charter covers the delivery tree). With no tree, offsets resolve to the fixed test anchor only under the test and ci environments, and are refused elsewhere. A real asset is refused. Cost: a third record of the anchor, though all three are written from one value.
+- (b) The real pipeline reads the anchor recorded in the qa schema and installs it into asset_model before reading configuration, at every entry point (pipeline run, CLI, build). Cost: a synthetic-only concept in every real entry point, close to the replay flag 382 removes.
+- (c) Every caller passes the anchor as an argument. Cost: wider signatures everywhere, the shape 382 already rejected for the clock.
+- **Recommend (a).**
+
+**Q2. A rolled demo beside a gate-ready history (REQ-GEN-405 decision 6, the coordinator's point)**
+- (a) Correct the note: the tree is per checkout. The refusal names reset then bootstrap only, and a docstring mentions a second worktree whose gate-ready database is `supply_<asset>`.
+- (b) Make the delivery tree per database (`data/<asset>/<db>/`), so one checkout can hold both. Cost: every path resolver and the guard changes.
+- **Recommend (a).**
+
+**Q3. REQ-PIPE-403 against REQ-PIPE-250 c2/c5 (a register-claim edit)**
+- (a) 403 records the batch's before and after, and is the evidence for 250 c2 and c5. Drop 403's restated "three runs against 720s" and point it at 250 c2, so one requirement owns the budget.
+- (b) Keep both as drafted. Cost: two requirements carrying one unmet claim.
+- **Recommend (a).**
+
+**Q4. A bare `generate-synthetic-data` after a rolled bootstrap**
+- (a) Refuse when the bookkeeping's recorded anchor differs from the one requested, naming reset then bootstrap.
+- (b) Default to the bookkeeping's recorded anchor instead of the fixed one.
+- (c) Leave it as drafted (always the fixed anchor). Cost: the tree silently goes out of step with the database.
+- **Recommend (a).**
+
+**What is provisional on the answers:** 406 c3, 404 c3/c4 and 405 decision 6's wording wait on Q1 and Q2. Everything else above is my technical call.
+
+## Files
+- /home/user/data-poc/docs/drafts/speed-anchor-v1.yaml
+- /home/user/data-poc/docs/drafts/separation-v6.yaml
+- /home/user/data-poc/qa_tools/common/config_yaml.py
+- /home/user/data-poc/qa_tools/common/correction_trial.py
+- /home/user/data-poc/qa_tools/common/bootstrap.py
+- /home/user/data-poc/qa_tools/tools/run_datacontract.py
+- /home/user/data-poc/qa_tools/common/left_out.py
+- /home/user/data-poc/qa_tools/common/assets.py
+- /home/user/data-poc/generator/driver.py
+- /home/user/data-poc/tests/conftest.py
