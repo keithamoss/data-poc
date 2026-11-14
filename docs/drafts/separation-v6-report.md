@@ -209,3 +209,60 @@ The header now notes the in-place update. One open question remains in the whole
   - REQ-PIPE-081's "a rule, not a replay flag" decision would be reversed too.
 
 **I recommend (a).** It brings the spread back with no change to what a real asset records and no second copy of the lag; the replay decides only how late a replayed decision may land.
+
+## Third addendum (the lag in the replay clock)
+
+I applied Keith's REQ-PIPE-382 OQ1 answer, (b), in place in /home/user/data-poc/docs/drafts/separation-v6.yaml. Nothing else was edited and nothing is committed. After the edits I re-ran `uv run mothman dashboard validate-requirements --draft` and read the changed fields back. The only errors it reports are links to requirements outside the draft, which are expected.
+
+## What changed in REQ-PIPE-382 (now 14 criteria)
+
+- **Criterion 3 (rewritten).** The pipeline asks the clock one neutral question in asset_model/: "a decision on a supply received at R, run id S, next receipt B, claim window W - when does it take effect?"
+  - The wall clock and a pinned clock answer **now** on every asset.
+  - An installed replay clock answers R plus Keith's 2026-10-02 seeded lag, under these bounds:
+    - spread across W where one is given, and one hour to three days where none is;
+    - just before B and never before R;
+    - never after the real wall-clock present.
+  - The lag rule leaves shipped code.
+- **Criterion 4 (rewritten).** The pipeline asks with facts it already has: R, the run id, B from `next_receipt`, and W from `_claim_window`. Under 378 Q2(a), `_claim_window` leaves out a dataset dated before its calendar's first version and gives no W when none remain.
+  - The answer is announced as the "decision takes effect" event, and the replay clock moves forward on it.
+  - The pipeline imports nothing of the replay, and no lag, seed arithmetic or cap remains in the pipeline or asset_model/.
+- **Criterion 2.** Its exception is reworded to refer to this question.
+- **Criterion 13's tests** now cover:
+  - wall and pinned clocks promoting at now;
+  - a real asset's retried gate taking effect at the retry;
+  - a replayed promotion spreading while the replay clock sits at its own instant;
+  - no replayed decision after the real present;
+  - a replayed retried gate still taking effect when its first attempt did.
+- **Criterion 14 (new).** In the same change as the build, two built requirements' decisions get an appended amendment, signed by signing this requirement. The `implemented_by` entries naming `promotion.py::effective_at_for` (REQ-PIPE-081, REQ-GEN-185) are repointed.
+- **New dependencies:** REQ-PIPE-267, REQ-GEN-185, REQ-GEN-386.
+
+### The exact wording for Keith
+This is in the decision "THE TWO REVERSALS, WORDED FOR KEITH". Both are appended, so the original text stays as the record of its day.
+
+- **REQ-PIPE-081, decision "FIXED AS A RULE, NOT A REPLAY FLAG", append:**
+  > REVERSED by Keith, 2026-11-14 (REQ-PIPE-382): the seeded lag now lives with the replay - scenarios/' lag rule, applied by the bootstrap's replay clock when the pipeline asks the clock when a decision takes effect - and on a real asset a promotion takes effect at the instant it is made. The pipeline still carries no replaying flag; the clock it asks is what differs.
+- **REQ-PIPE-267, decision "A RETRIED OR RESUMED PACKAGE GATE TAKES EFFECT WHEN ITS FIRST ATTEMPT DID (post-build-review #274 D1)", append:**
+  > REVERSED FOR A REAL ASSET by Keith, 2026-11-14 (REQ-PIPE-382): on a real asset a retried or resumed package gate takes effect at the retry, the instant it is actually made; in a replay it still takes effect when its first attempt did, the replay clock answering from the arrival that completed the package.
+
+#274 D1 lives in REQ-PIPE-267's decisions, not in a criterion. Its replay half still holds, which matters because two bootstraps differing is where it was found.
+
+### Decisions
+- **Settled:** "THE LAG LIVES WITH THE REPLAY" records (b), chosen with both costs read to Keith, and that (a) was rejected.
+- **Added:** REVERSAL 1 (REQ-PIPE-081) and REVERSAL 2 (#274 D1 on a real asset).
+- **Adjusted:** the claim-window cap decision now says W is passed and ignored on a real asset.
+- **Withdrawn:** the old "HOW THE EVENT CARRIES" decision, which described (a).
+- OQ1 is closed.
+
+## Knock-on edits
+- **REQ-PIPE-380 (criterion 2 and decision B4).** Nothing of promotion moves now. The clock's question joins asset_time, the lag goes to scenarios/, and `next_receipt` stays in the pipeline.
+- **REQ-GEN-386 criterion 4.** scenarios/ also holds the seeded lag rule: `effective_at_for`'s lag, `_LAG_MIN` and `_LAG_SPAN`.
+- **REQ-GEN-381 criterion 1.** The bootstrap's replay clock answers the question with scenarios/' lag.
+
+## New open question (REQ-PIPE-382 OQ1, replacing the closed one)
+**Where the lag rule itself sits.** Keith put the lag in the replay clock (bootstrap/). But the Linkage Products provider computes the same rule to predict promotion instants (linkage_products.py lines 1742 and 1797), and the generator may not import bootstrap/.
+
+- **(a) As drafted:** the rule goes in scenarios/, which is synthetic-only, left out of a real deployment, and importable by both sides. The bootstrap's replay clock applies it.
+- **(b)** The rule goes in bootstrap/, with a second copy in the generator. The copies could drift and planned releases would miss.
+- **(c)** The rule goes in bootstrap/, with a permanent allowlisted generator-to-bootstrap edge. This goes against Q1 of 2026-11-02.
+
+I recommend **(a)**. It is Keith's answer in substance: the lag is out of shipped code and the replay clock applies it, with one copy, for the same reason drift arithmetic went into one module.
