@@ -572,3 +572,14 @@ the rebuild needs no question asked twice. Drafts and builders read this file.
   architect and the dashboard and CLI UX reviewers, AFTER the #134 v5 reviews
   and the speed + rolling-anchor batch. REJECTED: joining the speed batch;
   scoping now.
+
+## #130 small-count suppression, scoped with Keith 2026-11-14
+
+Purpose recalled: insurance for a real deployment's published QA page; REQ-QAC-333 c9 keeps the large-key-group histogram exact (Keith, 2026-10-30) and said suppression, if ever needed, is one generic rule on the binned-distribution field, not a linkage case.
+
+- **SC1 scope:** scope it now, generic.
+- **SC2 threshold:** optional, per check, declared beside the bin edges (e.g. `suppress_below: 5`); no default, so off unless a check asks.
+- **SC3 where the count stops:** recorded exact in qa.*; the dashboard build writes `<N` in its place, so the published page and its embedded data never carry the small number.
+- **SC4 back-calculation from the total:** accepted and documented - only bins under the threshold are hidden; the total stays exact and can be differenced. REJECTED complementary suppression and hiding the total.
+- **SC5 first user:** none - large key groups stays exact (REQ-QAC-333 c9 unchanged); proved by tests on a test check declaring a threshold.
+- Routing: to the scoper after #134, with the other queued batches.
