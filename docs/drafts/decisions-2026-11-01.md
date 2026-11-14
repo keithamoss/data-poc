@@ -676,3 +676,9 @@ Purpose recalled: insurance for a real deployment's published QA page; REQ-QAC-3
 - **TA Q2 (412, runs feeding the trend and median):** WHOLE-SUPPLY RUNS ONLY (arrival runs and full re-checks); readers-only runs show their time but are not judged. REJECTED every run, and one series per scope.
 - **TA Q3 (412, the baseline):** THE LAST 20 WHOLE-SUPPLY RUNS, MINIMUM 3, stated as a choice. REJECTED all earlier runs (min 3), and all earlier from the second run.
 - **TA Q4 (415, a dataset's status while its supply is not checked):** LIKE A FAILED LOAD (REQ-DASH-148) - one dataset-level red reason 'Could not be checked' plus a 'needs a person' item; no Fail recorded on the supply. REJECTED a new 'Not checked' status, and the red reason without a queue item.
+- **TA Q5 (411, privacy of an error's message):** OUTCOME, TOOL AND ERROR TYPE ONLY on the page; the full message stays in mothman and the database. REJECTED publishing as recorded, and scrubbed.
+- **TA Q6 (409, what a run time spans):** THE QA ATTEMPT, open to complete (the four tools and recording). REJECTED the whole arrival including staging and the gate.
+- **TA Q7 (412/414/415, planting a failed attempt in the demo):** NO - TESTS PROVE IT on a test database; no fault hook for the replay. REJECTED the replay forcing a failure, and a supply left unchecked.
+- **TA Q8 (414, wording of a retried run):** 'SECOND TRY' - 'Checked on the second try - the first timed out after 45 min'; 'attempt' stays the resupply word. REJECTED 'Check attempt 2', and F2's words as given.
+
+**TIMING-ATTEMPTS v1 STATUS:** all eight answered; to the scoper to apply, then the architect and CLI and dashboard UX reviewers.
