@@ -531,3 +531,13 @@ the rebuild needs no question asked twice. Drafts and builders read this file.
   (S1-S3), after the #134 v5 reviews - one scoping pass for both, since both
   change how generation and bootstrapping get their inputs. REJECTED: a
   separate later batch; scoping now in parallel.
+
+## Check timing scoping (#120; Keith, 2026-11-14, one at a time)
+
+- T1 SETTLED (Keith first chose every check, then on the follow-up about how
+  shared Soda queries and whole-tool runs would be split: "on second thought,
+  let's just time the run"): ONE real elapsed time per QA RUN, recorded with
+  the run, never from the replay's simulated clock (qa.run's created_at and
+  completed_at are replay-clock stamps in a synthetic history - 6.3 days for
+  one quarterly run - so they cannot be used). REJECTED: every check (needs
+  each tool run per check, or shared time invented); per tool per run.

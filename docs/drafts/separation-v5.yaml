@@ -1,0 +1,711 @@
+# PROPOSAL - plans/running-thoughts.md #134, the CODE half, plus #137 groups
+# B-D and the split overview's decisions D1, D1b, D2, D3 and D4.
+# Drafted by delivery-scoper: v1-v3 2026-11-02, v4 2026-11-03, v5 2026-11-14
+# (Perth) carrying Keith's answers to v4's eleven open questions
+# (docs/drafts/decisions-2026-11-01.md, final section, Q1-Q11, 2026-11-14).
+# NOT SIGNED. Nothing here is built until Keith signs it. Ids unchanged from v4.
+#
+# WHAT v5 CHANGES (v4's eleven questions all answered; none re-asked):
+#   REQ-PIPE-380  Q1: one drift module in asset_model/; criterion 11 now moves
+#                 the built every_asset reader; check_bands' own readers named.
+#   REQ-GEN-381   criterion 7: the replay cache key covers asset_model/,
+#                 scenarios/ and bootstrap/ (found in the code, see decisions).
+#   REQ-TEST-384  Q11: validate-config.yml, both matrix legs, its paths filter
+#                 widened, its tests marked critical.
+#   REQ-PIPE-378  Q6-Q10 turned from open questions into criteria; Q6 drafts
+#                 what each fallback caller does on the new error.
+#   REQ-PIPE-379  Q2: today's two calendar shapes and `no_calendar: never`.
+#   REQ-QAC-387   Q3: override by check name.
+#   REQ-QAC-389   Q4 (not the recommendation): a real age_group rule, a new
+#                 datacontract check with its own lifecycle entry.
+#   REQ-GEN-392   Q5 (not the recommendation): fault rates derived from bands
+#                 at generation time; the history regenerates; pins re-captured.
+#   REQ-PIPE-390  split risk 6 recorded as SETTLED.  REQ-GEN-391 split risk 5
+#                 recorded as SETTLED.
+#   Line numbers re-taken at a35066ff (2026-11-14) where a criterion changed;
+#   unchanged criteria keep v4's 04fa7955 figures, which still held on the
+#   spot-checks made (replay_clock calls, the bootstrap's cli reaches,
+#   orchestrate's player, the loaders by path).
+#
+# Re-scanned at a35066ff, 2026-11-14:
+#   asset_model/ closure (asset_time 387, hierarchy 247, schedule 961, slots
+#     544, assets 610, agreement 635, config_yaml 226, in_force 39) = 3,649
+#     lines (group A of #137 has landed). assets.py's import of
+#     qa_tools.collections is now line 575.
+#   generator side -> qa_tools: 97 import statements in 13 files.
+#   ScheduleConfigError is a subclass of ValueError (schedule.py line 73), so
+#     a bare `except ValueError` catches it - load-bearing for Q9.
+#   check_bands.catalogue imports validate_check_lifecycle and the registry
+#     (check_bands.py lines 478-479); evidently_common.collection_checks
+#     imports check_lifecycle and the registry (lines 60-61).
+requirements:
+  - id: REQ-PIPE-380
+    title: "The shared reading code - asset time, the hierarchy, the schedule, slots, drift arithmetic and what they need - is one package, asset_model/, which the pipeline, the generator and the bootstrap may all import and which imports none of them"
+    date_written: "2026-11-02"
+    story: "As whoever would take this to a real deployment, I want the code that reads each asset's time zone, hierarchy, calendar and slots in one package of its own, so that the real pipeline and the synthetic side read every asset's definitions the same way without either depending on the other."
+    moscow: must
+    status: not_started
+    source: "Keith, plans/running-thoughts.md #134 (2026-10-31; the code half queued behind the asset split, (a)); scoping asked 2026-11-02. Drafted by delivery-scoper 2026-11-02 (v1-v3); v4 2026-11-03 with SPLIT D1, Q6, Q8 and Q14; v5 2026-11-14 with Keith's Q1 of 2026-11-14 (the drift module), re-scanned at a35066ff. A PROPOSAL, not signed until Keith signs v5."
+    acceptance_criteria:
+      - "THE SYSTEM SHALL hold the shared reading code in one top-level package, asset_model/ (SPLIT D1, SETTLED by Keith 2026-11-03): asset_time, hierarchy, schedule and slots, and the modules they import - assets, config_yaml, in_force and agreement, 3,649 lines at a35066ff - moved with their behaviour unchanged."
+      - "THE SYSTEM SHALL keep every asset's definitions - its hierarchy, calendar, time zone, contracts and checks - under assets/<asset>/, and SHALL hold in asset_model/ no agency, collection, dataset, calendar date or time zone of its own."
+      - "THE SYSTEM SHALL split the collection registry (qa_tools/collections/__init__.py, 288 lines at a35066ff) so that which collections an asset declares, with each one's short, run_prefix and check-file paths (check_file, check_files, file_checks, all_collections), is in asset_model/, and loading a collection's QA adapter by path (line 273) stays in the real pipeline; loading a provider by path already sits in the generator (generator/collections/__init__.py line 45) and stays there."
+      - "THE SYSTEM SHALL remove asset_model's one import of the real pipeline - assets.adapter_file importing qa_tools.collections (qa_tools/common/assets.py line 575 at a35066ff) - by moving adapter_file into the real pipeline's half of the registry."
+      - "THE SYSTEM SHALL keep the dbt readiness check (assets.dbt_project_ready and DbtPackagesMissing, REQ-QAC-368 criterion 6 as amended by Q10 of 2026-11-03) in the real pipeline, not in asset_model/."
+      - "THE SYSTEM SHALL move the asset resolver's refusals with it unchanged - OutsideTheRepository raised only where code builds a repository path (REQ-PIPE-342 decisions 18 and 20; C7 and Q14, SETTLED by Keith 2026-11-02 and 2026-11-03), BadAssetName, ModuleNameClash and OneAssetPerProcess - with their existing tests passing and asserting what they asserted before."
+      - "IF an asset_model module imports qa_tools, pipeline, dashboard, cli, generator, synthetic_data_generator, bootstrap, scenarios or any file under assets/, THEN `mothman check` SHALL fail, naming the file, the line and the imported module (REQ-TEST-384)."
+      - "THE SYSTEM SHALL import no database driver, pandas, numpy or QA tool library at module level anywhere in asset_model/, so that importing it opens no connection and needs no supply rows."
+      - "THE SYSTEM SHALL move into asset_model/ every pure pipeline function the generator calls (Q1 of 2026-11-02, SETTLED by Keith 2026-11-02) - at 04fa7955 the whole of assignment (open_slot and assign), arrival_classification.classify, check_bands (catalogue, default_rows), promotion.effective_at_for and next_receipt, amber_setting.resolve and resolve_on_date, list_setting_members.declared and linked_datasets' asset-folder and column readers - so that the pipeline and the generator call one definition."
+      - "THE SYSTEM SHALL hold drift arithmetic in one asset_model module (Q1 of 2026-11-14, SETTLED by Keith 2026-11-14) holding today's evidently_common.fold_value_counts, INVALID_CODE, NO_REFERENCE, status_for, excluding, frame_from_value_counts, psi_of_counts and compute_psi, and collection_checks (which finds a collection's drift checks in its Evidently check file), with pandas and Evidently imported inside functions only; qa_tools/tools/run_evidently.py, qa_tools/tools/dataset_stats.py and the Linkage Products provider (assets/quarterly/synthetic/collections/linkage_products.py, three imports of evidently_common at a35066ff) SHALL call that module, and no second copy of any of them SHALL remain."
+      - "THE SYSTEM SHALL keep in the real pipeline what of evidently_common reads recorded results or the warehouse - recorded_stats, recorded_row_counts and reference_value_counts, which read qa_results_reader - so that the drift module reads committed configuration and the values its callers pass it, nothing else."
+      - "THE SYSTEM SHALL move with check_bands and the drift module the check-file readers they call - at a35066ff check_bands.catalogue's validate_check_lifecycle.collect_checks and check_lifecycle.load_evidently_checks, and evidently_common.collection_checks' check_lifecycle.load_evidently_checks - in the form open question 1 settles, leaving any git-comparing half of the lifecycle gate in the real pipeline."
+      - "IF a function the generator calls cannot move into asset_model/ without importing the real pipeline, a QA tool library at module level or a database, THEN THE SYSTEM SHALL report it to Keith for a decision rather than allowlist it permanently or hand its value to the generator as data."
+      - "THE SYSTEM SHALL move the reader of every asset's declared agencies, collections and datasets (qa_tools/common/every_asset.py, built 2026-11-03 for the feedback validator's agency check, REQ-DOCS-219 criterion 10, and the generator's refusal of a scenario naming a dataset no asset declares, REQ-GEN-246 criterion 8) into asset_model/ unchanged, reading configuration only and opening no connection (Q6 and Q8, SETTLED by Keith 2026-11-03)."
+      - "WHEN a module moves into asset_model/, THE SYSTEM SHALL rewrite every importer in the same change and SHALL leave no forwarding module under its old path."
+      - "WHEN asset_model/ lands, THE SYSTEM SHALL name it in CLAUDE.md's layout table, README's layout tour and docs/components.md in the same change."
+      - "THE SYSTEM SHALL show through REQ-TEST-239's compare, normalised as REQ-TEST-357 criteria 2 and 3 are amended (A1 and Q11, SETTLED by Keith 2026-11-02 and 2026-11-03), that the move changes nothing either asset's bootstrap records, generates, builds or offers."
+    non_functional_requirements:
+      - "BEHAVIOUR-PRESERVING: a move of code, proven by REQ-TEST-239's equivalence compare for each asset, never by re-capturing a pin."
+      - "PERFORMANCE: each asset's bootstrap from empty is no slower than before the change by more than 5 percent (SETTLED by Keith 2026-11-02), measured on the same sandbox, and the CLI's import time is unchanged."
+      - "PORTABILITY: no new third-party dependency; everything still runs through `uv run` from the repository root; an asset folder injected from outside the repository (REQ-PIPE-342) is read by asset_model/ exactly as today; the providers stay importable without pandas or numpy (REQ-GEN-246 criterion 7), which the drift module's function-level imports keep true."
+      - "SCALABILITY: nothing in asset_model/ is per collection or per asset, so a thirtieth collection or a third asset adds no module to it."
+      - "MAINTAINABILITY: every new test module names its asset (C11, SETTLED by Keith 2026-11-02); every asset_model name used outside its own module is public (REQ-PIPE-376)."
+      - "SECURITY: asset_model/ only reads committed configuration and the values its callers pass, and runs no adapter or provider code itself; what it loads by path is decided by the caller's side, which REQ-TEST-384 checks."
+      - "PRIVACY AT REAL SCALE: the drift module computes from value counts a caller passes; reading recorded results stays in the real pipeline (criterion 11), so the shared code never reaches the warehouse."
+    dependencies:
+      - "REQ-PIPE-342"
+      - "REQ-PIPE-369"
+      - "REQ-TEST-239"
+      - "REQ-TEST-357"
+      - "REQ-TEST-384"
+      - "REQ-QAC-368"
+      - "REQ-GEN-295"
+    decisions:
+      - "THE PACKAGE IS asset_model/ (SPLIT D1, SETTLED by Keith 2026-11-03), replacing domain/ (Q2, SETTLED by Keith 2026-11-02), because domain/ read as though it held the definitions, which stay in each asset's folder. REJECTED shared/, model/ and core/."
+      - "THE CUT IS RIGHT (SPLIT D1, SETTLED by Keith 2026-11-03): each asset defines its own hierarchy, calendar and time zone in assets/<asset>/; the shared code that only reads those definitions sits in one package the real pipeline and the generator both import; the generator, the bootstrap and scenarios/ stay out of a real deployment."
+      - "THE CODE HALF IS ITS OWN BATCH, AFTER THE SPLIT (Keith, 2026-10-31, #134 (a)): the configuration half went into the asset split (REQ-GEN-370, REQ-GEN-371). REJECTED (b), the whole separation after the split, which moves the configuration twice, and (c), the whole separation before the split."
+      - "THE CLOSURE MOVES WITH THE FOUR (delivery-scoper, from the scan): schedule and slots import agreement, asset_time imports in_force and assets, so a package holding only the four would import qa_tools and fail its own gate. Re-checked at a35066ff: still true."
+      - "NO FORWARDING MODULES (delivery-scoper): a re-export left at the old path keeps an old import working, so the import gate would stop seeing it. REJECTED shims kept for one push."
+      - "THE REGISTRY IS SPLIT, NOT MOVED WHOLE (delivery-scoper): which collections exist is shared, but loading an adapter is the pipeline's and loading a provider is the generator's. The 2026-11-03 scan found the provider half already in generator/collections/, so only the declaration half and adapter_file move."
+      - "DBT READINESS STAYS IN THE PIPELINE (delivery-scoper, v4): only the real pipeline runs dbt, and asset_model/ reads definitions; dbt_project_ready moving with assets.py would put a QA tool's install state into the shared reading code."
+      - "THE GENERATOR'S PURE PIPELINE FUNCTIONS MOVE INTO asset_model/ (Q1 of 2026-11-02, SETTLED by Keith 2026-11-02): REJECTED a permanent list of pipeline modules the generator may import, and REJECTED handing the generator everything as data, which would let its predictions drift from what the pipeline does."
+      - "ONE DRIFT MODULE IN asset_model/ (Q1 of 2026-11-14, SETTLED by Keith 2026-11-14, option (a)): fold_value_counts, status_for, excluding, psi_of_counts and compute_psi in one module, pandas and Evidently imported inside functions only, called by the generator and the real run_evidently alike - one copy, as A2 (SETTLED by Keith 2026-11-02) asks of drift planning. REJECTED (b) a second PSI copy in the generator, against A2's 'computed from the same inputs the real drift check uses', and (c) a permanent allowlist entry for this edge, against Q1 of 2026-11-02."
+      - "THE DRIFT MODULE ALSO HOLDS WHAT ITS FIVE NEED (delivery-scoper, v5, from the code): psi_of_counts calls frame_from_value_counts and returns NO_REFERENCE, fold_value_counts writes INVALID_CODE, and the provider finds its drift check through collection_checks (v4's open question named it beside psi_of_counts), so those four move with Keith's five; leaving them behind would make the module import the pipeline. Keith's answer named the functions the provider calls; this is their closure, not a widening."
+      - "RECORDED-RESULT READERS STAY IN THE PIPELINE (delivery-scoper, v5): recorded_stats, recorded_row_counts and reference_value_counts read the qa schema through qa_results_reader; asset_model/ opens no connection (criterion 8), and the build rule (CLAUDE.md, 2026-09-27) keeps reading results a pipeline act."
+      - "asset_model/ REACHES A QA TOOL LIBRARY AT CALL TIME, ACCEPTED (Q1 of 2026-11-14): compute_psi imports Evidently when called. Criterion 8 forbids it at module level only, so importing asset_model/ still needs no QA tool, and a real deployment already ships Evidently with the pipeline."
+      - "THE BOTH-HIERARCHIES READ IS ASSET_MODEL'S (delivery-scoper, v4; built 2026-11-03 as qa_tools/common/every_asset.py): Q6 and Q8 (SETTLED by Keith 2026-11-03) allow reading every asset's hierarchy, configuration only, and REQ-PIPE-342 criterion 8 as amended 2026-11-03 names its two readers as the exception; the generator needs it and may import only asset_model/, so that is where it goes."
+      - "THE BOTH-HIERARCHIES READ'S PREMISE (Q6/Q8 follow-up, critic H1, SETTLED by Keith 2026-11-03): scenarios exist only for synthetic assets, and both synthetic assets are always present together for demo and test, so the read always finds both; a single-asset injected deployment is a real one, which carries no scenarios. REJECTED staying quiet when the other folder is absent, and deferring to REQ-PIPE-354. Carried so the move does not lose the premise its docstring records."
+      - "#137 GROUP A IS NOT A DEPENDENCY (Keith, 2026-11-02 ~21:05 Perth: safe tidying is built separately): it has since landed (schedule.py 1,028 -> 961 lines at a35066ff); the line counts here are re-taken at build."
+    open_questions:
+      - "1 (NEW in v5). THE CHECK-FILE READERS check_bands NEEDS (found 2026-11-14). check_bands.catalogue, which criterion 9 moves, reads every check through validate_check_lifecycle.collect_checks and check_lifecycle's parsers; the drift module's collection_checks reads through check_lifecycle.load_evidently_checks. check_lifecycle imports only config_yaml at module level (pure parsing of committed files); validate_check_lifecycle also compares against git (diff_base). Options: (a) move check_lifecycle's parsing half and collect_checks' working-tree read into asset_model/, the git-comparing gate staying in the pipeline - the generator then reads checks exactly as the gate does; (b) report catalogue under criterion 13 and decide then; (c) give check_bands a smaller reader of its own - two parsers of one file. RECOMMENDED (a): the parsers are pure configuration reads, Q1 of 2026-11-02 says pure functions move, and (c) is the drift the requirement exists to stop."
+    signed_off: null
+
+  - id: REQ-GEN-381
+    title: "The bootstrap and replay machinery - bootstrap, checkpoints, replay inputs, the simulated clock, scripted decisions and corrections, correction replay, scenarios, target agreement and the synthetic reset - is a package of its own outside qa_tools/, and the real pipeline never imports it"
+    date_written: "2026-11-02"
+    story: "As whoever would take this to a real deployment, I want everything that exists only to replay a synthetic history in one package outside the pipeline, so that a deployment leaves it out and the pipeline cannot come to depend on it."
+    moscow: must
+    status: not_started
+    source: "Keith, plans/running-thoughts.md #134 (2026-10-31; 'the bootstrap and replay machinery out of qa_tools'); scoping asked 2026-11-02. Drafted by delivery-scoper 2026-11-02 (v1-v3); v4 2026-11-03; v5 2026-11-14, criterion 7 widened to the new packages (found in the code). A PROPOSAL, not signed until Keith signs v5."
+    acceptance_criteria:
+      - "THE SYSTEM SHALL hold in one top-level package, bootstrap/ (Q2, SETTLED by Keith 2026-11-02), the modules that exist only to replay a synthetic history: today's qa_tools/common/bootstrap, checkpoints, replay_inputs, scripted_decisions, scripted_corrections, correction_replay, scenarios, target_agreement and synthetic_reset, and the simulated half of replay_clock (REQ-PIPE-382), 3,771 lines with the scenario map at 04fa7955. None of them SHALL remain under qa_tools/."
+      - "IF `mothman pipeline bootstrap` is asked to run for an asset that does not declare `synthetic: true`, THEN THE SYSTEM SHALL refuse, naming the asset, and replay_clock.replaying's wall-clock branch for a real asset's bootstrap SHALL go; a real asset's first run is `mothman pipeline run` (Q5, SETTLED by Keith 2026-11-02)."
+      - "THE SYSTEM SHALL let the bootstrap package import asset_model/, scenarios/ (REQ-GEN-386 criterion 4), the real pipeline and the generator's one public module (REQ-GEN-386 criterion 3), and SHALL NOT let it import cli/: the 7 statements reaching cli.pipeline (bootstrap.py lines 392, 488, 493, 511 and 695; replay_inputs.py line 155; checkpoints.py line 211, unchanged at a35066ff) SHALL go."
+      - "IF any module under qa_tools/, pipeline/, dashboard/ or an asset's collections/ imports the bootstrap package, THEN `mothman check` SHALL fail, naming it (REQ-TEST-384)."
+      - "THE SYSTEM SHALL move how collections are grouped into streams (bootstrap.streams today) into the real pipeline, because knock_on.py (line 475) reads it outside any replay."
+      - "THE SYSTEM SHALL keep `mothman pipeline bootstrap`, checkpoints and resume, `mothman pipeline cache-key`, `mothman scenarios`, the target trial and `mothman env reset-synthetic` doing what they do today for each asset (REQ-PIPE-352, REQ-PIPE-365 criteria 2 and 3), with their existing tests passing and asserting what they asserted before."
+      - "THE SYSTEM SHALL key the replay cache (replay_inputs.cache_key and the replay's own inputs, INPUTS and REPLAY_INPUTS at replay_inputs.py lines 47-57) on asset_model/, scenarios/, bootstrap/ and the generator's public module as well as today's inputs, in place of cli/pipeline.py, so that a change to code moved out of qa_tools/** or cli/ restarts a resume and misses the cache as it does today."
+      - "WHEN bootstrap/ lands, THE SYSTEM SHALL name it in CLAUDE.md's layout table, README's layout tour and docs/components.md in the same change."
+      - "THE SYSTEM SHALL show through REQ-TEST-239's compare, normalised as REQ-TEST-357 criteria 2 and 3 are amended, that the move changes nothing either asset's bootstrap records, generates, builds or offers."
+    non_functional_requirements:
+      - "BEHAVIOUR-PRESERVING: proven by REQ-TEST-239's equivalence compare for each asset."
+      - "PERFORMANCE: each asset's bootstrap from empty is no slower than before the change by more than 5 percent (SETTLED by Keith 2026-11-02), and it still meets REQ-PIPE-352 criterion 5's 12 minutes wherever it met it before."
+      - "RELIABILITY: a resume after the move still restarts when the machinery or the shared reading code changes (criterion 7), so a checkpoint never outlives the code that wrote it."
+      - "COST: a CI cache hit stays a hit only when nothing it depends on changed; criterion 7 stops a stale cache passing silently, which would make a cheap push prove nothing."
+      - "PRIVACY AT REAL SCALE: the package that can invent a record's time and play a scripted person is the part a real deployment leaves out."
+      - "MAINTAINABILITY: about 3,800 lines change address once; nothing gains a new dependency; every new test module names its asset (C11)."
+    dependencies:
+      - "REQ-PIPE-380"
+      - "REQ-PIPE-382"
+      - "REQ-PIPE-383"
+      - "REQ-TEST-384"
+      - "REQ-GEN-386"
+      - "REQ-PIPE-352"
+      - "REQ-PIPE-365"
+      - "REQ-TEST-117"
+      - "REQ-TEST-160"
+      - "REQ-TEST-239"
+    decisions:
+      - "OUT OF qa_tools, NOT A SUBPACKAGE OF IT (Keith, 2026-10-31, #134: 'strict separation ... with the actual pipelines'). REJECTED (b) and (c) of #134 as in REQ-PIPE-380."
+      - "SEPARATE FROM THE GENERATOR, NOT ONE 'synthetic' PACKAGE (Keith, 2026-10-31: 'a strict separation between themselves'). REJECTED one package holding both, with the separation left to convention."
+      - "SYNTHETIC RESET GOES WITH THE BOOTSTRAP (delivery-scoper): it is refused unless the asset is synthetic and exists only to start a replay from empty."
+      - "THE SCENARIO MAP IS SPLIT, NOT MOVED HERE WHOLE (delivery-scoper): its writer goes with the generator (REQ-GEN-386 criterion 6), its vocabulary with scenarios/ (Q4), and the reader the dashboard uses stays with the pipeline (REQ-PIPE-385 criterion 4)."
+      - "THE BOOTSTRAP IS SYNTHETIC-ONLY (Q5, SETTLED by Keith 2026-11-02): REJECTED keeping a bootstrap for a real asset, whose first run is `mothman pipeline run`."
+      - "THE BOOTSTRAP STAYS GEN (SETTLED by Keith 2026-11-02): REJECTED PIPE, and REJECTED a new eighth component code."
+      - "SEVEN REACHES INTO cli/, NOT ONE (the split overview, corrected 2026-11-02; re-counted 2026-11-03 and 2026-11-14): v3 named only generated_into. All seven go through the generator's public module, which offers what cli/pipeline.py offers the bootstrap today."
+      - "THE CACHE KEY FOLLOWS THE CODE (delivery-scoper, v5, found in the code): replay_inputs.INPUTS lists qa_tools/**, generator/**, assets/** and cli/pipeline.py; asset_model/, scenarios/ and bootstrap/ are outside every pattern, so without criterion 7 a change to the moved schedule or clock code would hit a stale CI cache and resume over a history it no longer produces. v4's criterion 7 named only the bootstrap package."
+    open_questions: []
+    signed_off: null
+
+  - id: REQ-PIPE-382
+    title: "The real pipeline reads the time through one clock in asset_model/, which only a replay of a synthetic asset may replace, and no real pipeline module imports replay_clock or sets the time"
+    date_written: "2026-11-02"
+    story: "As whoever would take this to a real deployment, I want the pipeline to ask one clock for the time and never know whether a replay is running, so that the simulated clock can leave with the bootstrap and a real record's time can still never be invented."
+    moscow: must
+    status: not_started
+    source: "Keith, plans/running-thoughts.md #134 (2026-10-31; 'the replay clock untangled from the real pipeline'); scoping asked 2026-11-02. Drafted by delivery-scoper 2026-11-02 (v1-v3); v4 2026-11-03 with #137 group D's three readers of `synthetic: true` folded in; v5 2026-11-14 unchanged (calls re-checked at a35066ff, same lines). A PROPOSAL, not signed until Keith signs v5."
+    acceptance_criteria:
+      - "THE SYSTEM SHALL give the real pipeline one clock to stamp records with, in asset_model/, and every real pipeline module that reads replay_clock today SHALL read the time from that clock and import nothing of replay_clock: 17 modules at 04fa7955 and again at a35066ff (stage and orchestrate in qa_tools/tools/; arrival_lifecycle, census, correction_apply, decision_log, delivery_log, file_checks, filing, gate, inheritance, knock_on, period_schema, qa_store, recheck, schedule_ended and supply_holds in qa_tools/common/)."
+      - "WHILE no replay clock is installed, THE SYSTEM SHALL stamp every record with the wall clock, as asset_time.now() does today."
+      - "THE SYSTEM SHALL let the clock be replaced only by one installation call for the span of a replay; IF the selected asset does not declare `synthetic: true`, THEN asset_model/ SHALL refuse the installation itself, so that the refusal holds with the bootstrap package absent (Q6 of 2026-11-02, SETTLED by Keith 2026-11-02)."
+      - "THE SYSTEM SHALL read an asset's `synthetic: true` declaration in one place, in asset_model/, and the three readers of it today (replay_clock._is_synthetic, asset_time.py and synthetic_reset.is_synthetic) SHALL call that one (#137 group D)."
+      - "THE SYSTEM SHALL move every call that sets the simulated time out of the real pipeline and into the bootstrap package, driven through REQ-PIPE-383's hooks - 5 anchor() calls (orchestrate.py line 558, stage.py line 163, arrival_lifecycle.py lines 200 and 241, delivery_log.py line 395) and 1 advance_to() call (decision_log.py line 972), unchanged at a35066ff - EVERY one of them, the mid-step anchor() calls in stage.py and delivery_log.py included, each moved into a clock hook (SETTLED by Keith 2026-11-02)."
+      - "THE SYSTEM SHALL remove the replay_clock.active() reads (orchestrate.py line 557, arrival_lifecycle.py lines 175 and 199, decision_log.py line 971) and the 2 @replay_clock.on_replay_clock decorations (orchestrate.py lines 548 and 658) from real pipeline modules, the bootstrap entering the replay span around its own call instead."
+      - "WHERE MOTHMAN_PINNED_NOW is set, THE SYSTEM SHALL pin the time through the same installation call and the same refusal, so that there is one way to give the pipeline a time other than the wall clock (Q7, SETTLED by Keith 2026-11-02)."
+      - "THE SYSTEM SHALL have tests, seen failing first, of a real pipeline module stamping a record with an installed clock, of installation refused on a non-synthetic asset in a process where the bootstrap package cannot be imported, and of a record stamped with the wall clock when no clock is installed."
+      - "WHEN REQ-TEST-239's compare is run before and after this change, THE SYSTEM SHALL show every surface equal except recorded instants written by the steps that anchored mid-step (stage.py and delivery_log.py); IF any other recorded instant, or anything else, differs, THEN the build SHALL stop and report it."
+      - "WHEN this requirement is built, THE SYSTEM SHALL record in evidence every recorded instant that moved - which table and record, its old and new value, and by how much - and SHALL accept those moves as the new recorded instants (SETTLED by Keith 2026-11-02)."
+    non_functional_requirements:
+      - "SECURITY AND PRIVACY: a real asset's record of when something happened is evidence; the refusal to invent it lives in code a real deployment keeps (criterion 3)."
+      - "BEHAVIOUR-PRESERVING EXCEPT WHERE LISTED: every surface of REQ-TEST-239's compare is equal for each asset except the recorded instants of the steps that anchored mid-step, which may move and are listed record by record in evidence (criteria 9 and 10, SETTLED by Keith 2026-11-02)."
+      - "PERFORMANCE: reading the clock costs what asset_time.now() costs today; the bootstrap is no slower than before by more than 5 percent (SETTLED by Keith 2026-11-02)."
+      - "RELIABILITY: the clock stays process-wide, as replay_clock's own docstring explains (a run's four tools write from worker threads a context variable would not reach)."
+      - "AUDITABILITY: run_by and run_timestamp keep coming from the same places; only which module supplies the instant changes."
+    dependencies:
+      - "REQ-PIPE-380"
+      - "REQ-PIPE-383"
+      - "REQ-PIPE-081"
+      - "REQ-TEST-239"
+    decisions:
+      - "ONE SEAM, NOT A FLAG IN EVERY MODULE (Keith, 2026-10-31, #134: replay_clock 'woven into about 20 real pipeline modules'; 17 at the 2026-11-02, 2026-11-03 and 2026-11-14 counts)."
+      - "THE PIPELINE ONLY READS THE CLOCK, THE BOOTSTRAP SETS IT (delivery-scoper): anchoring at an arrival's receipt and advancing to a decision's instant are replay acts, so they belong with the replay."
+      - "THE REFUSAL LIVES IN THE SHARED CLOCK (Q6 of 2026-11-02, SETTLED by Keith 2026-11-02): REJECTED leaving it to the bootstrap, which a real deployment does not have."
+      - "MOTHMAN_PINNED_NOW GOES THROUGH THE SAME SEAM (Q7, SETTLED by Keith 2026-11-02): REJECTED leaving it as a second way to set the time, in asset_time."
+      - "REJECTED passing a clock argument through every call (delivery-scoper): it would widen the signature of every stamping function in 17 modules for a replay-only need."
+      - "EVERY anchor() CALL MOVES, AND THE NEW INSTANTS ARE ACCEPTED (SETTLED by Keith 2026-11-02): the mid-step calls in stage.py and delivery_log.py move into clock hooks too, and the instants they stamp may change. REJECTED reporting each call that could not move without changing an instant for a decision of its own."
+      - "ONE READER OF synthetic: true (#137 group D, which noted it already folded here): three hand-written readers of one declaration would eventually disagree, and the refusal in criterion 3 depends on it."
+      - "COUNTS RE-TAKEN: v3 counted 6 anchor() and 7 active() at b03a7be6; 04fa7955 and a35066ff both have 5 and 4 in the real pipeline (scripted_decisions' own anchor and active calls move with it, REQ-GEN-381). The builder re-counts at build."
+    open_questions: []
+    signed_off: null
+
+  - id: REQ-PIPE-383
+    title: "Scripted decisions and scripted corrections are played by the bootstrap through hooks the replay offers, and the real pipeline neither builds a player nor imports scripted_decisions or correction_replay"
+    date_written: "2026-11-02"
+    story: "As whoever would take this to a real deployment, I want the real pipeline to offer a place to act between arrivals rather than to play scripted decisions itself, so that a synthetic history's scripted people go with the bootstrap and the pipeline only ever processes what arrived."
+    moscow: must
+    status: not_started
+    source: "Keith, plans/running-thoughts.md #134 (2026-10-31 scan: 'orchestrate plays scripted decisions'); scoping asked 2026-11-02. Drafted by delivery-scoper 2026-11-02 (v1-v3); v4 2026-11-03; v5 2026-11-14 unchanged (lines re-checked at a35066ff). A PROPOSAL, not signed until Keith signs v5."
+    acceptance_criteria:
+      - "THE SYSTEM SHALL let a caller of a collection's replay and of a stream's replay (orchestrate.run_pipeline and run_stream today) pass a hook run before each arrival and after the last, the shape scripted_decisions.Player and orchestrate.StreamPlayer have today, and SHALL run none WHERE none is passed."
+      - "THE SYSTEM SHALL NOT build a scripted-decision player inside the real pipeline: orchestrate._begin's default of scripted_decisions.Player(coll.id) (line 606, imported at line 586) SHALL go, and the bootstrap SHALL build each collection's player and each stream's combined player and pass it in, StreamPlayer (line 640) moving with it."
+      - "THE SYSTEM SHALL hand an arrival's scripted correction to arrival_lifecycle through the same hook rather than have it import correction_replay (arrival_lifecycle.py line 177)."
+      - "WHEN the bootstrap replays a synthetic asset, THE SYSTEM SHALL play every scripted decision and correction at the instant and in the order it plays them today, through the same decision path a person uses (REQ-GEN-135), refused unless the asset declares itself synthetic."
+      - "WHEN `mothman pipeline run` or the processing pass runs, on any asset, THE SYSTEM SHALL play no scripted decision and no scripted correction; only the bootstrap plays them (Q5, SETTLED by Keith 2026-11-02)."
+      - "THE SYSTEM SHALL have tests, seen failing first, of a replay given no hook playing nothing, and of a stream's hook called before an arrival of another collection received after a decision's instant (REQ-PIPE-262 criterion 4), and SHALL show through REQ-TEST-239's compare that every decision-log entry is unchanged."
+    non_functional_requirements:
+      - "BEHAVIOUR-PRESERVING: the decision log, filings and promotions of each asset's bootstrap are unchanged, proven by REQ-TEST-239's compare."
+      - "AUDITABILITY: scripted decisions keep their synthetic actor and recorded instants (REQ-GEN-135), so a replayed history still says who decided and when."
+      - "SECURITY: the real pipeline keeps its refusal of the synthetic actor outside a replay (filing_decisions.py, people.py), because a guard is not machinery and must stay where a real deployment runs it."
+      - "PERFORMANCE: a hook call per arrival is what the player call costs today."
+    dependencies:
+      - "REQ-GEN-381"
+      - "REQ-GEN-135"
+      - "REQ-PIPE-262"
+      - "REQ-TEST-239"
+    decisions:
+      - "HOOKS IN THE PIPELINE, SCRIPTS IN THE BOOTSTRAP (delivery-scoper): the replay already takes a player argument; only its default and the correction lookup reach the scripts, so the seam exists and needs closing rather than building."
+      - "THE SYNTHETIC-ACTOR REFUSAL STAYS IN THE PIPELINE (delivery-scoper): REJECTED moving it with the player, because a real deployment would then have no guard against the synthetic actor."
+      - "ONLY THE BOOTSTRAP PLAYS SCRIPTED DECISIONS (Q5, SETTLED by Keith 2026-11-02): REJECTED `mothman pipeline run` playing them on a synthetic asset as it does today. A behaviour change for that command, not for a bootstrap, so REQ-TEST-239's compare (which captures a bootstrap) is unaffected; any test asserting that `pipeline run` plays them changes with this requirement."
+    open_questions: []
+    signed_off: null
+
+  - id: REQ-TEST-384
+    title: "An imports gate in mothman check and the validate-config workflow fails any import, or any load by path, across a forbidden edge between asset_model/, the real pipeline, the generator, scenarios/, the bootstrap and cli/, with a shrink-only allowlist whose every entry names the requirement that removes it"
+    date_written: "2026-11-02"
+    story: "As whoever maintains the pipeline, I want a gate that fails a forbidden import in either direction, including code run by file path, on every change and every push, so that the separation is checked rather than remembered."
+    moscow: must
+    status: not_started
+    source: "Keith, plans/running-thoughts.md #134 (2026-10-31: 'a strict separation'); scoping asked 2026-11-02. Drafted by delivery-scoper 2026-11-02 (v1-v3); v4 2026-11-03 with the package renamed asset_model/ and the path-loading gap; v5 2026-11-14 with Keith's Q11 of 2026-11-14 (where the gate runs on a push). A PROPOSAL, not signed until Keith signs v5."
+    acceptance_criteria:
+      - "THE SYSTEM SHALL offer an `imports` gate in `mothman check`, needing no asset and no database, that reads every Python file of the repository outside tests/ and scripts/ by its syntax tree - module-level and function-level imports, imports under `if TYPE_CHECKING:`, and importlib.import_module calls with a literal name - and assigns each file to one side: asset_model/; the real pipeline (qa_tools/, pipeline/, dashboard/ and each asset's collections/); the generator (generator/, synthetic_data_generator/ and each asset's synthetic/collections/); scenarios/; bootstrap/; or cli/."
+      - "IF asset_model/ imports any other side, or the real pipeline imports the generator, scenarios/, the bootstrap or cli/, or scenarios/ imports anything but asset_model/, or the generator imports the bootstrap, cli/ or the real pipeline (Q1, SETTLED by Keith 2026-11-02), or the bootstrap imports cli/, THEN the gate SHALL fail, naming the file, the line, both sides and the imported module."
+      - "THE SYSTEM SHALL treat each call of asset_model's path loader as an import of the side its kind names - 'adapter' the real pipeline, 'provider' the generator - so that a load by path across a forbidden edge fails as an import would; IF a call passes its kind as anything but a literal, THEN the gate SHALL fail, naming the call."
+      - "THE SYSTEM SHALL read the gate's exceptions from one committed allowlist whose every entry names a file, the module it imports and the requirement that removes it, and SHALL fail WHERE an entry names no requirement, or names an import that no longer exists."
+      - "IF a change adds an allowlist entry absent at the base commit, THEN the gate SHALL fail, so that the list only shrinks."
+      - "WHEN this gate lands, THE SYSTEM SHALL hold in the allowlist exactly the gate's own findings on that commit, so that it lands green, and each of REQ-PIPE-380, REQ-GEN-381, REQ-PIPE-382, REQ-PIPE-383, REQ-PIPE-385, REQ-GEN-386, REQ-QAC-389 and REQ-PIPE-390 SHALL remove the entries it names."
+      - "THE SYSTEM SHALL run the gate as its own step in .github/workflows/validate-config.yml beside the other configuration gates, in both legs of its per-asset matrix (post-build-review #321), as that workflow already runs every repository-wide gate (Q11 of 2026-11-14, SETTLED by Keith 2026-11-14)."
+      - "THE SYSTEM SHALL add to validate-config.yml's push `paths:` every directory the gate reads that the filter does not already name - at a35066ff generator/**, synthetic_data_generator/**, pipeline/**, dashboard/** and cli/** - and asset_model/**, scenarios/** and bootstrap/** as each lands, and the gate's allowlist file, so that a push changing only one of them still runs the gate."
+      - "THE SYSTEM SHALL mark every test of the gate `critical` (REQ-TEST-375), each needing no deployment, no browser and no database, so that push CI's critical set runs them (Q11 of 2026-11-14, SETTLED by Keith 2026-11-14)."
+      - "THE SYSTEM SHALL have tests, seen failing first, of each forbidden edge failing, of each allowed edge passing, of a function-level import caught, of a provider loaded by path from the real pipeline failing, of a non-literal loader kind failing, of a stale allowlist entry failing, of an added entry failing, and of the workflow's paths filter naming every directory the gate assigns a side."
+    non_functional_requirements:
+      - "PERFORMANCE: the gate reads syntax trees and imports nothing, and runs in under 5 seconds over the repository; run in both matrix legs it adds seconds, not minutes, to the workflow."
+      - "MAINTAINABILITY: each allowlist entry names its requirement, so the list is a to-do list that can only get shorter; the paths-filter test (criterion 10) fails when a new top-level package is given a side and not added to the filter."
+      - "OBSERVABILITY: a failure names the file and the line, so it can be fixed without reading the gate."
+      - "COST: no database and no bootstrap; its critical tests run in the critical job's existing five-minute budget (REQ-TEST-375), and validate-config.yml bills seconds per leg."
+      - "SCALABILITY: a thirtieth collection's adapter and provider are sorted by folder, so the gate needs no change for a new collection or a new asset."
+      - "COMPATIBILITY: the gate reads committed files only, so it runs on a government network with no package index or GitHub access."
+    dependencies:
+      - "REQ-PIPE-342"
+      - "REQ-PIPE-369"
+      - "REQ-GEN-370"
+      - "REQ-TEST-375"
+    decisions:
+      - "THE GATE COMES FIRST (delivery-scoper): landing it with today's findings allowlisted makes it the measure each later requirement shrinks, rather than a test written last against a tree already moved."
+      - "BOTH DIRECTIONS IN ONE GATE (the brief, 2026-11-02): the pipeline never imports the generator today, but nothing holds that true; the generator imports the pipeline in 97 statements at a35066ff."
+      - "SYNTAX TREE, NOT IMPORTING (delivery-scoper): importing every module to watch sys.modules would need pandas, a database and an asset; a syntax tree needs none. REJECTED a runtime import hook as the gate (REQ-PIPE-385's import-blocking test is the runtime check)."
+      - "tests/ ARE EXEMPT (delivery-scoper): a test of the bootstrap imports the pipeline and the bootstrap together by design."
+      - "scripts/ IS EXEMPT (delivery-scoper, v4): scripts/dev/ holds throwaway dev-only tools (record_cast.py, tui_screenshot.py) that ship with nothing; assigning them a side would only allowlist them."
+      - "PROVIDERS ARE ON THE GENERATOR SIDE (delivery-scoper, v3 and v4): so a provider importing generator/ or synthetic_data_generator/ is inside one side and allowed, which resolves REQ-GEN-386 criterion 1's wording."
+      - "LOADS BY PATH ARE EDGES TOO (delivery-scoper, v4; the split overview, corrected 2026-11-02, named the gap): assets.load runs adapter and provider files with no import statement, so a syntax-tree gate alone cannot see it. Today the two calls are literal and on the right sides (qa_tools/collections line 273, generator/collections line 45); criterion 3 keeps it that way. REJECTED leaving it to REQ-PIPE-385's runtime test alone, which only proves the pipeline runs without the generator, not that nothing tries."
+      - "dashboard/, pipeline/ AND qa_tools/ ARE ONE SIDE (the split overview, 2026-11-02): qa_tools/ imports pipeline/ and dashboard/ in three places today, and nothing in #134 asks to separate them."
+      - "ON A PUSH, IN validate-config.yml WITH ITS TESTS critical (Q11 of 2026-11-14, SETTLED by Keith 2026-11-14, option (a)): REJECTED (b) the local gate only, which a push could skip, and (c) the critical tests only, which prove the gate works but not that today's tree passes it."
+      - "BOTH MATRIX LEGS, NOT ONE (delivery-scoper, v5, Keith may change it): the gate needs no asset, so one leg would do; but validate-config.yml's own comment says every repository-wide gate (requirements, changelog, feedback, the plans index) runs in both legs because each costs seconds, and a leg-conditional step would be the one exception a reader has to notice. The second run costs about five seconds."
+      - "THE PATHS FILTER IS PART OF THE ANSWER (delivery-scoper, v5, found in the workflow): validate-config.yml fires only on assets/**, dbt_shared/**, qa_tools/**, CHANGELOG.yaml, requirements.yaml, plans/** and itself, so a push touching only generator/ or cli/ would never run the gate Q11 put there. Criterion 8 closes it, and criterion 10's test keeps it closed."
+      - "NO FAULT-RATE GATE (Q11 of 2026-11-14 with Q5, SETTLED by Keith 2026-11-14): v4's proposed gate holding dirty.py's literal rates to their bands is not built, because REQ-GEN-392 now derives the rates."
+    open_questions: []
+    signed_off: null
+
+  - id: REQ-PIPE-385
+    title: "An asset with no synthetic/ folder runs, publishes and passes every gate with neither the generator, scenarios/ nor the bootstrap importable, and the commands that need them are absent or refused by name"
+    date_written: "2026-11-02"
+    story: "As whoever would take this to a real deployment, I want to leave the generator and the bootstrap out entirely, so that what runs on real supplies is only the pipeline and its configuration."
+    moscow: must
+    status: not_started
+    source: "Keith, plans/running-thoughts.md #134 (2026-10-31); extends REQ-GEN-370 criterion 8 from configuration to code. Scoping asked 2026-11-02. Drafted by delivery-scoper 2026-11-02 (v1-v3); v4 2026-11-03 (scenarios/ added to what may be absent); v5 2026-11-14 unchanged. A PROPOSAL, not signed until Keith signs v5."
+    acceptance_criteria:
+      - "WHERE the generator, synthetic_data_generator, scenarios/ and the bootstrap package cannot be imported and the selected asset has no synthetic/ folder, THE SYSTEM SHALL stage, check, gate, promote, re-check and record that asset's real supplies, build and publish its dashboard, and pass every `mothman check` gate."
+      - "THE SYSTEM SHALL keep one `mothman` entry point, and SHALL list a synthetic command in `mothman --help` and the terminal's menus only WHERE the components it needs can be imported AND the selected asset has a synthetic/ folder (Q3, SETTLED by Keith 2026-11-02)."
+      - "IF a synthetic command is invoked by name where criterion 2 leaves it out, THEN THE SYSTEM SHALL exit non-zero naming the missing component or the missing synthetic/ folder rather than raise an ImportError or report an unknown command - REQ-GEN-370 criterion 8's refusal by name, kept."
+      - "IF the asset has no scenario map (SCENARIOS-<asset>.md, REQ-PIPE-352 criterion 3), THEN the dashboard build SHALL embed an empty SCENARIO_MAP rather than fail, reading the map through a reader outside the generator, scenarios/ and the bootstrap package."
+      - "WHILE the embedded scenario map is empty - as it is for an asset with no synthetic/ folder - THE SYSTEM SHALL hide the dashboard's scenario features entirely, showing no scenario control, label, link or count anywhere on the page (SETTLED by Keith 2026-11-02)."
+      - "THE SYSTEM SHALL have a test, seen failing first, that runs a fixture asset with no synthetic/ folder through `mothman pipeline run`, `mothman dashboard rebuild` and `mothman check` in a subprocess where importing the generator, synthetic_data_generator, scenarios/ or the bootstrap package raises, and shows each succeeding (Q8 of 2026-11-02, SETTLED by Keith 2026-11-02)."
+      - "THE SYSTEM SHALL have a real-browser test, seen failing first, that builds the dashboard for a fixture asset with no synthetic/ folder and finds no scenario control or label in the page's text, accessible names or menus, and that the same page built with a non-empty map shows them."
+    non_functional_requirements:
+      - "PRIVACY AT REAL SCALE: a real deployment can show that no code able to invent a record's time or play a scripted person is present."
+      - "PORTABILITY: works from a plain checkout through `uv run`, with no extra install step to leave a component out."
+      - "RELIABILITY: a missing component is a named refusal, never a traceback."
+      - "COST: criterion 6's test uses a fixture asset and the test database, not a bootstrap, so it costs seconds."
+    dependencies:
+      - "REQ-GEN-370"
+      - "REQ-GEN-381"
+      - "REQ-PIPE-382"
+      - "REQ-PIPE-383"
+      - "REQ-GEN-386"
+      - "REQ-TEST-384"
+    decisions:
+      - "ONE mothman, SYNTHETIC COMMANDS PRESENT ONLY WHERE THEY CAN RUN (Q3, SETTLED by Keith 2026-11-02): REJECTED a second entry point, and REJECTED listing them always and refusing at run time."
+      - "AN IMPORT-BLOCKING TEST ONLY (Q8 of 2026-11-02, SETTLED by Keith 2026-11-02): REJECTED a recorded run in a copy of the tree with the packages deleted, as v1's criterion 6 had it."
+      - "THE GATE IS NOT ENOUGH ON ITS OWN (delivery-scoper): an import gate catches what is written, but not a command that would crash at run time without a package. Criterion 6 runs it."
+      - "THE SCENARIO MAP'S READER IS SHARED (delivery-scoper): the build reads the committed map today (REQ-DASH-046) and may open nothing under data/, so the reader stays with the pipeline, the writer goes with the generator and the vocabulary with scenarios/ (REQ-GEN-386)."
+      - "SCENARIO FEATURES HIDDEN ENTIRELY ON AN EMPTY MAP (SETTLED by Keith 2026-11-02): a real deployment's dashboard says nothing about scenarios. REJECTED leaving them as they render today with an empty map."
+      - "scenarios/ IS PART OF WHAT A REAL DEPLOYMENT LEAVES OUT (SPLIT D1, SETTLED by Keith 2026-11-03: 'the generator, bootstrap and scenarios stay out of a real deployment'), so v4 adds it to criteria 1 and 6."
+    open_questions: []
+    signed_off: null
+
+  - id: REQ-GEN-386
+    title: "The generator side - generator/, synthetic_data_generator/ and each asset's providers - imports from outside itself only asset_model/ and scenarios/, reaches the bootstrap through nothing, and offers the bootstrap and cli/ one public module"
+    date_written: "2026-11-02"
+    story: "As whoever maintains the generator, I want it to depend only on the shared reading code, so that it can change, or be left out, without touching the pipeline or the bootstrap."
+    moscow: should
+    status: not_started
+    source: "Keith, plans/running-thoughts.md #134 (2026-10-31; 'the generator's imports narrowed to the shared domain model'); scoping asked 2026-11-02. Drafted by delivery-scoper 2026-11-02 (v1-v3); v4 2026-11-03, criterion 1 reworded for the providers' imports of generator/; v5 2026-11-14, evidently_common's three calls routed to the drift module (Q1 of 2026-11-14). A PROPOSAL, not signed until Keith signs v5."
+    acceptance_criteria:
+      - "THE SYSTEM SHALL let the generator side - generator/, synthetic_data_generator/ and each asset's synthetic/collections/ providers - import from outside itself only asset_model/, scenarios/ (criterion 4), the standard library and declared third-party dependencies (Q1, SETTLED by Keith 2026-11-02); inside the side, a provider may import generator/ and synthetic_data_generator/ (66 statements at 04fa7955) and synthetic_data_generator/ may import generator/ (8 statements)."
+      - "THE SYSTEM SHALL remove every import of the real pipeline from the generator side - 97 statements in 13 files at a35066ff - each pure function it calls moving into asset_model/ (REQ-PIPE-380 criteria 9, 10 and 12), the Linkage Products provider's three evidently_common imports going to the drift module, and SHALL record where each module outside asset_model's closure went (collections, linked_datasets, amber_setting, scripted_decisions, evidently_common, arrivals, check_bands, scenario_map, promotion, delivery, correction_apply, correction_trial, assignment, list_setting_members, correction_replay and arrival_classification at 04fa7955) in this requirement's decisions when built."
+      - "THE SYSTEM SHALL give the generator one public module, used by the bootstrap and cli/, offering what cli/pipeline.py's generate_collection, has_target_trial, target_datasets, generated_collections, generated_targets, generated_gate_outcomes and generated_into (lines 301-410) offer the bootstrap today; the bootstrap SHALL import nothing else of the generator and nothing of cli/."
+      - "THE SYSTEM SHALL hold in one small shared package, scenarios/ at the top level (Q4 and its name, SETTLED by Keith 2026-11-02), the reader of each asset's scripted_decisions.yaml (load, PERIOD, CHAIN_MARK, CHAIN_OPERATIONS and the due-instant helpers the generator calls today, made public) and the scenario vocabulary (SUBJECTS, SUPPLY_HISTORY_ROW, AS_AT_PANEL and the rest); the generator and the bootstrap may import it, it imports only asset_model/, and nothing in the real pipeline imports it."
+      - "IF the generator side imports the bootstrap package, THEN `mothman check` SHALL fail (REQ-TEST-384); today's 8 such statements (scripted_decisions in scenario_injection.py and linkage_products.py, scenario_map in scenario_injection.py and targets.py, correction_replay in correction_claims.py) SHALL go, through criterion 4's package or criterion 2's moves."
+      - "THE SYSTEM SHALL move the scenario map's writer to the generator, which places the scenarios."
+      - "THE SYSTEM SHALL move delivery writing (delivery.write_delivery, remove_deliveries and existing_delivery_names, with the bookkeeping-file names) to the generator, keeping the delivery layout and file-name reading the pipeline uses (dataset_for_filename, default_deliveries_dir) in asset_model/ or the pipeline."
+      - "THE SYSTEM SHALL use no underscore-led name of a module outside the generator side: at 04fa7955 correction_apply._declared, linked_datasets._asset_folder, _walk and _columns, scripted_decisions._due_at and _wall_clock_after, and schedule._agreement each become a public name where they land (REQ-PIPE-376)."
+      - "THE SYSTEM SHALL show through REQ-TEST-239's compare that no byte any collection generates changes, for each asset."
+    non_functional_requirements:
+      - "BEHAVIOUR-PRESERVING: every generated file is unchanged, proven by REQ-TEST-239's compare. (REQ-GEN-392 is the one requirement in this batch that regenerates, and is built and compared on its own.)"
+      - "PERFORMANCE: providers stay importable without pandas or numpy (REQ-GEN-246 criterion 7), so the providers gate's time is unchanged."
+      - "MAINTAINABILITY: a generator that predicts what the pipeline will do (target trials, correction claims, drift planning) through the pipeline's own code stays in step with it; one that takes data instead can drift - which is why Q1 settled on moving the functions rather than passing data."
+    dependencies:
+      - "REQ-PIPE-380"
+      - "REQ-TEST-384"
+      - "REQ-GEN-370"
+      - "REQ-GEN-246"
+      - "REQ-TEST-239"
+      - "REQ-QAC-389"
+    decisions:
+      - "NARROWED TO THE SHARED READING CODE (Keith, 2026-10-31, #134's code half). REJECTED (b) and (c) of #134 as in REQ-PIPE-380."
+      - "ONE ENTRY POINT, NOT A SUBPROCESS (delivery-scoper): REJECTED having the bootstrap run the generator only as a `mothman` subprocess, which would lose the in-process resume comparison (REQ-TEST-160) for no gain the gate does not already give."
+      - "A SHARED SYNTHETIC-CONFIG PACKAGE (Q4, SETTLED by Keith 2026-11-02): REJECTED the generator owning the readers (the bootstrap would then import the generator beyond its entry point), and REJECTED the bootstrap owning them (the generator would import the bootstrap)."
+      - "SHARED READING CODE ONLY (Q1, SETTLED by Keith 2026-11-02): REJECTED a permanent list of allowed pipeline modules, and REJECTED taking everything as data."
+      - "THE DRIFT PLANNING GOES THROUGH asset_model/ (Q1 of 2026-11-14, SETTLED by Keith 2026-11-14): the provider's fold, PSI, exclusions and thresholds are the real check's own, from one module both call. REJECTED a generator-side PSI copy and a permanent allowlist entry."
+      - "THE SHARED PACKAGE IS NAMED scenarios/, AT THE TOP LEVEL (SETTLED by Keith 2026-11-02): REJECTED synthetic_config/. It does not clash with the scenarios modules moving into bootstrap/ or with cli/scenarios.py, because imports here are absolute."
+      - "THE RULE IS ABOUT THE SIDE'S BOUNDARY, NOT EACH FILE (delivery-scoper, v4): providers build on generator/ (scenario_injection, targeting and resupply among them) and synthetic_data_generator/, and REQ-TEST-384 already puts all three on one side. REJECTED moving the helpers providers use into asset_model/, which would put synthetic machinery into code a real deployment ships, and REJECTED a narrow provider-facing generator API for now (no decision asks for one)."
+      - "THE ENTRY POINT OFFERS SEVEN THINGS, NOT TWO (delivery-scoper, v4): the bootstrap also asks whether a collection has a target trial, its target datasets, the generated collections, targets and gate outcomes."
+    open_questions: []
+    signed_off: null
+
+  - id: REQ-PIPE-376
+    title: "The shared reading code's names say what they mean as it moves into asset_model/: the two claim_window and two _calendar_periods functions renamed apart, every name used outside its module public, fall_hold with its one caller, and two dead functions removed with their register claims"
+    date_written: "2026-11-03"
+    story: "As whoever maintains the pipeline, I want each function in the shared schedule code to have one name that says what it does and to be public if anything else calls it, so that a reader does not mistake one claim window for another or rely on a private name that may change without warning."
+    moscow: should
+    status: not_started
+    source: "Keith, plans/running-thoughts.md #137 group B (2026-11-02, 'renames ride the #134 move'; groups B-D sent to delivery-scoper ~21:05 Perth). Drafted by delivery-scoper 2026-11-03 (separation v4); v5 2026-11-14, line numbers re-taken at a35066ff after #137 group A landed. A PROPOSAL, not signed until Keith signs v5."
+    acceptance_criteria:
+      - "WHEN schedule.py and slots.py move into asset_model/ (REQ-PIPE-380), THE SYSTEM SHALL rename slots.claim_window (line 234 at a35066ff, the widest window a dataset has ever had) to slots.widest_claim_window, keeping schedule.claim_window (line 757, the window in force on a date) as it is, and rewrite every caller in the same change."
+      - "WHEN they move, THE SYSTEM SHALL rename slots._calendar_periods (line 366, a dataset's period sequence, 18 uses outside slots.py) to the public slots.period_sequence, and schedule._calendar_periods (line 569, an authored calendar's periods, one caller) to schedule._authored_periods."
+      - "THE SYSTEM SHALL give a public name to every asset_model function, class or constant used outside its own module - at a35066ff schedule._agreement (29 uses outside schedule.py), slots._calendar_periods (18), slots._participation_for (4), hierarchy._require (4), schedule._as_date (3), slots._timing, schedule._parse_version, schedule._load, schedule._files_go_to_period_errors and hierarchy._from_text - and no module outside asset_model/ or tests/ SHALL use an underscore-led asset_model name. schedule._version_in_force (3 uses) is removed by REQ-PIPE-378 criterion 1 rather than renamed; whichever lands first, it is not left private and used."
+      - "THE SYSTEM SHALL move slots.fall_hold (line 477) into asset_model's assignment module beside assign, its one caller (assignment.py line 232)."
+      - "THE SYSTEM SHALL remove schedule.schema_name (line 626), an unused copy of period_schema.period_schema, and repoint REQ-PIPE-051's implemented_by entry 'qa_tools/common/schedule.py::schema_name' at period_schema.period_schema in the same change."
+      - "THE SYSTEM SHALL remove schedule.will_graduate (line 444), which nothing calls, and remove REQ-PIPE-106's implemented_by entry 'qa_tools/common/schedule.py::will_graduate' in the same change."
+      - "IF two datasets in one asset's hierarchy name the same table, THEN THE SYSTEM SHALL refuse the hierarchy, naming both datasets and the table, rather than keep the first (hierarchy._build's by_table.setdefault, line 174 at a35066ff), so that dataset_for_table is the inverse its docstring claims."
+      - "THE SYSTEM SHALL have a test, seen failing first, of the duplicate-table refusal, and a test that fails WHERE a module outside asset_model/ and tests/ reads an underscore-led asset_model name, its docstring saying it reads source for an architecture rule with no behaviour to observe."
+      - "THE SYSTEM SHALL show through REQ-TEST-239's compare that the renames and removals change nothing either asset's bootstrap records, generates, builds or offers."
+    non_functional_requirements:
+      - "BEHAVIOUR-PRESERVING: names and two dead functions only; proven by REQ-TEST-239's compare."
+      - "MAINTAINABILITY: a public name is a promise the shared code keeps; a private one used in 29 places is a promise nobody knows was made."
+      - "AUDITABILITY: the two implemented_by edits are register claim changes, so they are named here for Keith to sign rather than made in passing."
+    dependencies:
+      - "REQ-PIPE-380"
+      - "REQ-PIPE-051"
+      - "REQ-PIPE-106"
+      - "REQ-PIPE-378"
+    decisions:
+      - "RENAMES RIDE THE #134 MOVE (#137 group B, Keith 2026-11-02): every importer is rewritten once, when its module changes address, rather than twice."
+      - "THE NEW NAMES ARE THE SCOPER'S PROPOSAL (delivery-scoper, 2026-11-03): widest_claim_window, period_sequence and _authored_periods say what each returns. Keith may change any of them at sign-off; the criterion is that the two pairs stop sharing names."
+      - "schedule.claim_window KEEPS ITS NAME (delivery-scoper): it is the one most callers mean (orchestrate, verdict, participation_view, slots.slot_instants, cli/schedule, the Linkage Products provider), so renaming the rarer one moves fewer lines."
+      - "DEAD CODE GOES WITH ITS CLAIMS (#137 group B, Keith's to sign): both were verified to have no product callers on 2026-11-02 and again 2026-11-03."
+      - "THE DUPLICATE-TABLE SIGHTING IS CONFIRMED (delivery-scoper, 2026-11-03, sent with #137 to be confirmed or dismissed): hierarchy._build keeps the first dataset for a table (setdefault) and neither validate_hierarchy nor validate_collections refuses a shared table. No configuration has one today, so refusing it changes no current behaviour."
+      - "_version_in_force IS REMOVED, NOT RENAMED (delivery-scoper, v5): Q6 of 2026-11-14 (SETTLED by Keith 2026-11-14) ends its fallback, which is all it adds to Calendar.version_in_force (REQ-PIPE-378 criterion 1)."
+    open_questions: []
+    signed_off: null
+
+  - id: REQ-PIPE-377
+    title: "Each schedule rule written more than once is written once in asset_model/: a round to the period its files fill, which participation version gives a slot its inputs, and whether a dataset supplies in a round"
+    date_written: "2026-11-03"
+    story: "As whoever maintains the pipeline, I want each schedule rule answered by one function, so that the dashboard, the pipeline and the generator cannot quietly disagree about which period a supply fills or whether it was owed."
+    moscow: should
+    status: not_started
+    source: "Keith, plans/running-thoughts.md #137 group C (2026-11-02, 'REAL DUPLICATION (scope with Keith)'; sent to delivery-scoper ~21:05 Perth). Drafted by delivery-scoper 2026-11-03 (separation v4); v5 2026-11-14, sites re-taken at a35066ff. A PROPOSAL, not signed until Keith signs v5."
+    acceptance_criteria:
+      - "THE SYSTEM SHALL turn a round into the period its files fill in one asset_model function - schedule.period_filled_by today (line 948 at a35066ff), with an index form for callers walking a sequence (REQ-PIPE-321 NFR 1) - and every other site that adds files_go_to_period to a sequence index SHALL call it: at a35066ff schedule.py lines 716 (periods_for_dataset's _owed) and 938 (round_of), slots.py line 510 (fall_hold), inheritance.py line 710, participation_view.py line 117, pipeline/period_slots.py line 60, pipeline/owed_nothing.py line 54 and the Child Protection provider (assets/quarterly/synthetic/collections/child_protection.py line 741)."
+      - "IF a round's files would fill a period past the end of the sequence, THEN the one function SHALL answer that there is none, as period_filled_by does today, and the Child Protection provider SHALL refuse naming the round rather than raise an IndexError (it has no bounds check today)."
+      - "THE SYSTEM SHALL resolve which participation version gives a slot its inputs once per slot, in asset_model/, and the two copies #137 found in the schedule and slot code and the one in verdict.py SHALL read that answer."
+      - "THE SYSTEM SHALL answer whether a dataset supplies in a round in one asset_model function, and the three places #137 found it written - schedule.py's _participates (line 679) and round_of's month test (lines 942-943), which ignores the not-yet-owing and turned-off rules _participates applies, among them - SHALL call it."
+      - "IF, before the change, the copies folded by criteria 1, 3 or 4 give different answers for any round of any dataset in either asset, THEN the build SHALL stop and report each difference to Keith rather than pick one answer."
+      - "THE SYSTEM SHALL have a test, seen failing first, of the Child Protection provider's refusal in criterion 2, and a test that walks every dataset's rounds in both assets comparing each folded site's answer with the one function's."
+      - "THE SYSTEM SHALL show through REQ-TEST-239's compare that folding changes nothing either asset's bootstrap records, generates, builds or offers."
+    non_functional_requirements:
+      - "BEHAVIOUR-PRESERVING: the folds are proven equal first (criterion 5), then by REQ-TEST-239's compare."
+      - "PERFORMANCE: callers walking a sequence still read by index, never by walking the sequence per round (REQ-PIPE-321 NFR 1); the bootstrap is no slower by more than 5 percent."
+      - "SCALABILITY: at thirty collections on a daily calendar, the participation version is resolved once per slot, not three times."
+    dependencies:
+      - "REQ-PIPE-380"
+      - "REQ-PIPE-376"
+      - "REQ-PIPE-321"
+    decisions:
+      - "ONE FUNCTION PER RULE, IN asset_model/ (SPLIT D4's fold for #137's first risk, SETTLED by Keith 2026-11-03: 'one helper per rule')."
+      - "period_filled_by IS THE ONE (delivery-scoper): its own docstring already calls it 'the one place a round is turned into the name a person reads'; the other sites predate or bypass it."
+      - "A DISAGREEMENT IS KEITH'S, NOT THE BUILDER'S (delivery-scoper, under #137's rule that anything changing behaviour is his): #137 noted one of the three 'supplies in round R' copies is narrower than the others and did not confirm it is reachable, so criterion 5 checks first. v5 names the likely narrow one (round_of's month test) without confirming it is reachable."
+      - "SITE COUNT RE-TAKEN 2026-11-14: #137 counted the round-to-period step in six places; a grep at a35066ff finds eight besides period_filled_by itself, listed in criterion 1. The builder re-counts at build."
+    open_questions: []
+    signed_off: null
+
+  - id: REQ-PIPE-378
+    title: "The schedule code answers each of #137 group D's questions one way, as Keith settled them: a date before a calendar's first version raises for every caller, the cadence check is made per round only, look-ups from now share one named horizon, two slot helpers stop swallowing configuration errors, and a period's round is required"
+    date_written: "2026-11-03"
+    story: "As whoever maintains the pipeline, I want each place where the schedule code answers one question two ways settled on purpose, so that a supply's period, window and slot do not depend on which function happened to be asked, and a configuration mistake is never read as an answer."
+    moscow: could
+    status: not_started
+    source: "Keith, plans/running-thoughts.md #137 group D (2026-11-02, 'WOULD CHANGE BEHAVIOUR (Keith's)'; sent to delivery-scoper ~21:05 Perth). Drafted by delivery-scoper 2026-11-03 (separation v4, five open questions); v5 2026-11-14 with Keith's Q6-Q10 of 2026-11-14, each fallback caller named and drafted against the code at a35066ff. A PROPOSAL, not signed until Keith signs v5."
+    acceptance_criteria:
+      - "THE SYSTEM SHALL answer which calendar version is in force on a date through one function, Calendar.version_in_force (schedule.py line 172 at a35066ff), which raises ScheduleConfigError naming the calendar, the date and its earliest version for a date before the first version; schedule._version_in_force (line 809), which falls back to the first version, SHALL go, and its callers SHALL call Calendar.version_in_force (Q6 of 2026-11-14, SETTLED by Keith 2026-11-14)."
+      - "IF schedule.claim_window is asked for a date before the dataset's calendar's first version and no participation version states the window, THEN it SHALL raise criterion 1's error rather than take the first version's window (line 806 today); a window a participation version states is answered as today."
+      - "IF schedule.periods_for_dataset's per-round cadence check (line 691) meets a round before the calendar's first version, THEN it SHALL raise criterion 1's error; only a dataset's own dates can produce such a round, because a calendar generates no period before its first version."
+      - "IF a dataset's own dates name a round before its calendar's first version, THEN `mothman schedule validate` SHALL fail, naming the dataset, the round, the calendar and its first version, so that criteria 2 and 3 are met in configuration rather than mid-run. (No dataset in either asset declares own dates at a35066ff, checked 2026-11-14.)"
+      - "WHEN orchestrate._claim_window (qa_tools/tools/orchestrate.py line 475) meets criterion 1's error for a dataset on an arrival's receipt date, THE SYSTEM SHALL do what open question 2 settles."
+      - "WHEN verdict.resolved (verdict.py lines 92 and 94) meets criterion 1's error, THE SYSTEM SHALL keep its callers' existing handling of a slot that cannot be built: verdict.judge records the classification with no inputs and no fingerprint (its never-raises rule), and verdict.compared reports the slot as one that cannot be built now, naming the error."
+      - "WHEN agreement_drift's keys for a period (agreement_drift.py line 132) meet criterion 1's error, THE SYSTEM SHALL leave out the calendar-version key, because no calendar version governed the period, and SHALL still add the calendar-period key; every other exception there is handled as today."
+      - "WHEN participation_view.view (participation_view.py lines 183 and 218) meets criterion 1's error, THE SYSTEM SHALL show the claim window as stated by no calendar version on that date, naming the calendar's earliest version, and show no source date for it, rather than raise."
+      - "WHEN the Linkage Products provider's release timing (linkage_products.py lines 1745 and 1800) meets criterion 1's error, THE SYSTEM SHALL refuse to generate, naming the release and the date (its CannotGenerate), rather than time a release against a borrowed window."
+      - "THE SYSTEM SHALL keep files_go.py line 57 and pipeline/period_slots.py line 40, which already call Calendar.version_in_force and so already raise, as they are."
+      - "THE SYSTEM SHALL keep only the per-round cadence check - months named by a participation in force on a round whose calendar version is a cadence rule, judged on the round's date (schedule.py line 691) - and SHALL remove the check against the calendar's current version (lines 732-738, cal.current); the refusal of an unbounded ask of a cadence-rule calendar (line 739) is not a months check and stays (Q7 of 2026-11-14, SETTLED by Keith 2026-11-14)."
+      - "THE SYSTEM SHALL hold one named look-ahead horizon in asset_model/ - a reach, and a function giving the furthest date from a day, today on the asset's clock by default - and every look-up from now SHALL use it: at a35066ff slots.lookup_horizon (3 years; slot_named, placing.py lines 206 and 348, turned_off.py line 142), schedule.date_of and round_of (365 days, lines 903 and 925), agreement_freeze.py line 398 (400 days), pipeline/period_slots.py line 42 (400 days), dashboard/embed_dashboard_data.py line 365 (366 days), period_overlap.py line 63 (the end of next year) and correction_trial.py line 329 (400 days past the later of the latest period and today), at the reach open question 3 settles (Q8 of 2026-11-14, SETTLED by Keith 2026-11-14)."
+      - "THE SYSTEM SHALL have slots.relative_period (line 341) count within the same horizon slot_named looks within, so that every period slot_named can find, relative_period can count from and to; an offset reaching past the horizon answers None, as an offset past the sequence does today."
+      - "THE SYSTEM SHALL treat the look-aheads measured from a given date rather than from now - at a35066ff slots.fall_hold (731 days, line 499), inheritance.py line 697, scripted_decisions.py line 527, correction_trial.py line 723, verdict.compared (line 338), validate_schedule.py lines 1906, 2140 and 2258, and agreement_freeze.py line 311 and _FLIP_REACH (800 days, line 669) - in the form open question 4 settles."
+      - "IF slots.is_owed_supplies (line 444) or slots.period_claimed_at (line 529) meets a ScheduleConfigError, THEN it SHALL raise it rather than answer False or None; NoCalendarAgreed SHALL keep its deliberate quiet answer ('nothing owed'), and an unknown dataset (UnknownDatasetError, a KeyError) its answer as today (Q9 of 2026-11-14, SETTLED by Keith 2026-11-14)."
+      - "THE SYSTEM SHALL narrow period_claimed_at's `except ValueError` (line 538) so that it no longer catches ScheduleConfigError, which is a subclass of ValueError (schedule.py line 73); any other ValueError it still serves SHALL be named in this requirement's decisions when built."
+      - "WHEN the error of criterion 15 reaches the helpers' callers - arrivals.py line 222, validate_arrival_patterns.py line 99 and promotion.py line 514 at a35066ff - THE SYSTEM SHALL let it stop the step and name the configuration, never continue as though nothing were owed."
+      - "THE SYSTEM SHALL make DatasetPeriod.round (schedule.py line 126) required, with no default, and SHALL remove the 'or period' fallbacks at slots.py line 307 and schedule.py line 142; both product constructors (schedule.py line 675 and the Child Protection provider line 742) already set it, and no test builds one by hand at a35066ff (Q10 of 2026-11-14, SETTLED by Keith 2026-11-14)."
+      - "THE SYSTEM SHALL have, for each criterion that changes behaviour (2 to 9 and 11 to 18), a test seen failing first against today's behaviour."
+      - "WHEN REQ-TEST-239's compare is run before and after this requirement, THE SYSTEM SHALL record in evidence every difference it shows, item by item; IF any recorded filing, verdict, decision or check result moves, or a look-up gives a different answer rather than seeing further, THEN the build SHALL stop and report it to Keith before it is accepted. (Expected for criteria 1-10: nothing moves, since no dataset in either asset has a round before its calendar's first version.)"
+    non_functional_requirements:
+      - "RELIABILITY: a configuration error is the one thing the pipeline must not read as 'nothing owed' (criteria 15-17); a date no calendar version covers is an error the caller meets on purpose, never a borrowed answer (criteria 1-9)."
+      - "BEHAVIOUR CHANGES ONLY BY DECISION: every difference is listed in evidence, as REQ-PIPE-382 criterion 10 does for moved instants, and any recorded result that moves stops the build for Keith (criterion 20)."
+      - "PERFORMANCE: one horizon or one policy costs no more than today's; the bootstrap is no slower by more than 5 percent; WHERE the settled horizon is longer than a site's today, the dashboard build's time and embedded size are measured before and after and reported."
+      - "SCALABILITY: at thirty collections, a daily calendar generates one period a day to the horizon for every daily dataset, so the horizon's reach is the cost multiplier for every look-up from now (open question 3)."
+      - "OBSERVABILITY: criterion 1's error names the calendar, the date and the earliest version, so a caller that lets it surface needs no extra words."
+    dependencies:
+      - "REQ-PIPE-380"
+      - "REQ-PIPE-376"
+      - "REQ-PIPE-377"
+      - "REQ-PIPE-243"
+      - "REQ-PIPE-113"
+      - "REQ-TEST-239"
+    decisions:
+      - "A DATE BEFORE A CALENDAR'S FIRST VERSION RAISES, FOR EVERY CALLER (Q6 of 2026-11-14, SETTLED by Keith 2026-11-14, option (b), NOT the recommendation): the callers that fell back today must meet the error and say what they do instead (criteria 2-9). REJECTED (a) falling back to the first version everywhere, as in_force.py's docstring says a calendar does (the recommendation), and (c) keeping both policies, each renamed."
+      - "THE FALLBACK'S CALLERS, NAMED (delivery-scoper, v5, from the code at a35066ff): schedule._version_in_force had five direct callers - schedule.py's per-round cadence check (line 691) and claim_window (line 806), agreement_drift.py line 132, participation_view.py line 218 and verdict.py line 94 - and claim_window carries it to slots.slot_instants (every slot), verdict.py line 92, orchestrate._claim_window, participation_view.py line 183 and the Linkage Products provider. v4 named four; the per-round cadence check and the claim window's own callers are the ones it missed."
+      - "WHY NOTHING IS EXPECTED TO MOVE (delivery-scoper, v5, checked 2026-11-14): every calendar period lies on or after its calendar's first version, and no dataset in either asset declares own dates, so today every caller's date lies on or after the first version (quarterly 2013-01-01; daily 2026-06-18). The error is a guard for configuration not yet written, which is why criterion 4 refuses it in the schedule gate."
+      - "EACH CALLER'S ANSWER IS THE SCOPER'S PROPOSAL (delivery-scoper, v5, Keith may change any): verdict keeps its existing cannot-be-built handling; agreement_drift drops only the key that has nothing to name; participation_view words the gap, as a view rather than a judgement; the generator refuses, as it refuses any release it cannot time. orchestrate's is open question 2."
+      - "ONLY THE PER-ROUND CADENCE CHECK (Q7 of 2026-11-14, SETTLED by Keith 2026-11-14, option (a)): history is judged against the version in force on each round's date. REJECTED (b) only the current-version check, and (c) keeping both."
+      - "ONE NAMED HORIZON FOR LOOK-UPS FROM NOW (Q8 of 2026-11-14, SETTLED by Keith 2026-11-14, option (a)): relative_period counts within it, and REQ-TEST-239's compare shows what moves. REJECTED (b) keeping each horizon, documented."
+      - "SIX HORIZONS WERE MORE THAN SIX (delivery-scoper, v5, from the code): v4 listed six; a grep at a35066ff finds eight sites reaching from now and nine reaching from a given date (criteria 12 and 14). promotion._READER_REACH (400 days, promotion.py line 523) bounds how far on a READER'S DELIVERY is looked for among arrivals, not how far a schedule is generated, so it is not a look-ahead horizon and is left alone."
+      - "SWALLOWED CONFIGURATION ERRORS RAISE (Q9 of 2026-11-14, SETTLED by Keith 2026-11-14, option (a)): NoCalendarAgreed keeps its deliberate quiet 'nothing owed'. REJECTED (b) keep swallowing. Found in the code (delivery-scoper, v5): ScheduleConfigError subclasses ValueError, so removing it from period_claimed_at's tuple alone would change nothing - criterion 16 is what makes Keith's answer true."
+      - "AN UNKNOWN DATASET KEEPS ITS QUIET ANSWER (delivery-scoper, v5, Keith may change it): Q9 named configuration errors; UnknownDatasetError means the dataset is not in this asset's hierarchy, which is_owed_supplies' callers already treat as nothing owed, and arrivals only offers it datasets its own patterns found."
+      - "DatasetPeriod.round REQUIRED (Q10 of 2026-11-14, SETTLED by Keith 2026-11-14, option (a)): the two 'or period' fallbacks go. REJECTED (b) leaving it optional."
+      - "THE SIXTH ITEM IS ALREADY FOLDED (#137 group D): the three readers of `synthetic: true` become one in REQ-PIPE-382 criterion 4."
+      - "ONE REQUIREMENT, FIVE SETTLED ITEMS (delivery-scoper, v5): kept whole because the ids were kept; it could split into the in-force items (Q6, Q7), the horizon (Q8) and the error and field items (Q9, Q10) if Keith prefers smaller pieces, each with its own compare."
+    open_questions:
+      - "1 (NEW in v5). DOES Q6 COVER PARTICIPATION VERSIONS TOO? Q6 asked about 'two in force policies for one calendar'; a second first-version fallback exists for PARTICIPATION versions (REQ-PIPE-113 criterion 2's rule, slots._participation_for and claim_window's participation branch): a calendar period before a dataset's first participation version takes the first version's inputs, because the slot before it closes against it. Child Protection's datasets participate from 2015-01-01 on a calendar from 2013-01-01. Options: (a) calendar versions only, the participation rule unchanged - nothing moves; (b) participation versions too - every slot whose next period predates the first participation version stops being buildable, which would change slot closing for Child Protection's first owed quarter. RECOMMENDED (a): Q6's words were about a calendar, and the participation rule has its own reason, recorded on REQ-PIPE-113."
+      - "2 (NEW in v5). WHAT orchestrate._claim_window DOES ON THE ERROR. It caps when a gate reached from an arrival takes effect, using the shortest claim window of the datasets the arrival carries on its receipt date. Options: (a) leave that dataset out of the shortest-window minimum, none if none remain - its docstring's own rule, 'never a borrowed one' (REQ-PIPE-243 criterion 2); (b) let it raise, stopping the arrival's gate step and naming the dataset; (c) fall back to the adapter's claim_window_dataset. RECOMMENDED (a): an arrival received before its calendar existed is still an arrival, and refusing it would make a supplier's early file a pipeline failure; (c) borrows a window, which Q6 rejected."
+      - "3 (NEW in v5). THE ONE HORIZON'S REACH. Options: (a) 3 years, slots.lookup_horizon's today - no look-up from now loses anything it sees today, the dashboard embeds about three years of future slots instead of one (about 1,100 rather than 366 for a daily dataset), and the agreement-freeze and overlap gates can find conflicts further ahead; (b) about 400 days - the dashboard barely changes, but slot_named, placing and turned_off stop seeing periods more than about 13 months ahead, so re-filing into one is refused; (c) a separate named reach for display. RECOMMENDED (a): lengthening only lets a look-up see further, while shortening can turn today's answer into none, which is the quiet direction; the cost is measured (NFR 3). (c) is two horizons again."
+      - "4 (NEW in v5). DO LOOK-AHEADS FROM A GIVEN DATE SHARE IT? Q8 settled look-ups from now; nine sites reach ahead from a round, a decision's instant, a version's start or the latest recorded period (criterion 14), at 400, 731 and 800 days and two years. Options: (a) the same named reach, measured from each site's own date, any site the builder shows needs another reach reported to Keith rather than kept; (b) only look-ups from now, the rest left as they are, documented. RECOMMENDED (a): v4's question listed fall_hold and agreement_freeze among the horizons Keith answered, and a second family of reaches is the drift Q8 removes. _FLIP_REACH is the likeliest exception: it must reach past a whole flip of files_go_to_period."
+    signed_off: null
+
+  - id: REQ-PIPE-379
+    title: "Every asset reads its delivery calendar through one mechanism in asset_model/ - named calendars of authored dates or the daily cadence rule, each dataset picking one - and a project extraction owes no slot by declaring `no_calendar: never`"
+    date_written: "2026-11-03"
+    story: "As whoever would stand up a new asset - including a one-off project extraction - I want its delivery calendar to be configuration read by the same code as every other asset's, so that a new asset needs no calendar code of its own."
+    moscow: should
+    status: not_started
+    source: "Keith, the split overview's decision 1b (SPLIT D1b, 2026-11-03, Perth). Drafted by delivery-scoper 2026-11-03 (separation v4); v5 2026-11-14 with Keith's Q2 of 2026-11-14. A PROPOSAL, not signed until Keith signs v5."
+    acceptance_criteria:
+      - "THE SYSTEM SHALL read every asset's calendar.yaml through one loader in asset_model/, with the calendars' dates and versions per asset (SPLIT D1b, SETTLED by Keith 2026-11-03)."
+      - "THE SYSTEM SHALL keep both calendar shapes a version may take today - authored dates, and the daily cadence rule (`cadence: {rule: daily}`, Birth Registrations') - read by that one loader (Q2 of 2026-11-14, SETTLED by Keith 2026-11-14)."
+      - "THE SYSTEM SHALL NOT branch on an asset's name or a calendar's name anywhere outside that asset's own folder: generator/scenario_injection.py line 1419's test for a calendar named 'daily' (at a35066ff) SHALL read whether the calendar version in force is a cadence rule instead."
+      - "WHERE a dataset declares `no_calendar: never` (REQ-PIPE-106), THE SYSTEM SHALL give it no slot, no period and nothing owed, as today, and SHALL keep `no_calendar`'s distinction between a schedule not yet agreed and one that will never exist (Q2 of 2026-11-14, SETTLED by Keith 2026-11-14)."
+      - "THE SYSTEM SHALL have a test that runs a fixture asset whose only collection is a project extraction, its datasets declaring `no_calendar: never`, through `mothman pipeline run` and `mothman dashboard rebuild`, and shows each supply staged, checked and recorded with no slot, no period and nothing marked missing."
+      - "WHERE a new asset declares its calendars in its own calendar.yaml, THE SYSTEM SHALL need no code change to read them, and the schedule gate SHALL check them as it checks today's."
+    non_functional_requirements:
+      - "SCALABILITY: a third or fourth asset shape (the project extraction, CLAUDE.md's scale note) adds configuration, not code."
+      - "BEHAVIOUR-PRESERVING for today's two assets: criterion 3's change is proven by REQ-TEST-239's compare."
+      - "COST: criterion 5's test uses a fixture asset and the test database, not a bootstrap."
+    dependencies:
+      - "REQ-PIPE-380"
+      - "REQ-PIPE-106"
+    decisions:
+      - "ONE MECHANISM, PER-ASSET DATES (SPLIT D1b, SETTLED by Keith 2026-11-03): named calendars, each dataset picking one; a project extraction has no slots. REJECTED a per-asset calendar plug-in."
+      - "ONE MECHANISM MEANS TODAY'S MECHANISM (Q2 of 2026-11-14, SETTLED by Keith 2026-11-14, option (a)): both calendar shapes as today, and `no_calendar: never` stays how an extraction has no slots. REJECTED (b) authored dates only, every dataset naming a calendar and an extraction naming one with no dates - which would write the daily calendar out date by date and lose 'not yet agreed' against 'never'; and (c) an extraction naming an empty calendar instead of `no_calendar: never`."
+      - "D1b's WORDING READ THROUGH Q2 (delivery-scoper, v5): D1b said 'a calendar with no slots'; Q2 settles that the form is a dataset declaring `no_calendar: never` against today's mechanism, so this requirement says that and nothing about an empty calendar."
+      - "MOSTLY ALREADY TRUE (delivery-scoper, 2026-11-03): schedule.py reads both assets' calendar.yaml through one loader today, and REQ-PIPE-106 (built) lets a dataset declare `no_calendar: never`. What is missing is a proof that a whole asset of that shape runs (criterion 5) and one name-based branch in the generator (criterion 3)."
+    open_questions: []
+    signed_off: null
+
+  - id: REQ-QAC-387
+    title: "One shared file-checks default beside dbt_shared/ applies to every asset, which an asset may add to, override by check name, or retire for itself in its own file-checks.yaml"
+    date_written: "2026-11-03"
+    story: "As whoever maintains the pipeline, I want the checks asked of every delivered file written once for every asset, so that a new file-level check reaches every asset at once and an asset that needs something different says so in its own folder."
+    moscow: should
+    status: not_started
+    source: "Keith, the split overview's decision 2, file-checks.yaml (SPLIT D2, 2026-11-03, Perth). Drafted by delivery-scoper 2026-11-03 (separation v4); v5 2026-11-14 with Keith's Q3 of 2026-11-14. A PROPOSAL, not signed until Keith signs v5."
+    acceptance_criteria:
+      - "THE SYSTEM SHALL hold the file checks every asset runs in one shared file at the repository root beside dbt_shared/ (file-checks.yaml), holding today's six checks - encoding, delimiter, header_row, header_names_unique, fields_per_row and column_order - byte-identical in both assets' folders at 04fa7955."
+      - "WHERE an asset's file-checks.yaml holds an entry whose `check:` names a shared check, THE SYSTEM SHALL use that entry in place of the shared one, whole, for that asset only; no field of the shared entry SHALL be inherited (Q3 of 2026-11-14, SETTLED by Keith 2026-11-14)."
+      - "WHERE an asset's file-checks.yaml holds an entry whose `check:` names no shared check, THE SYSTEM SHALL run it as a check for that asset only."
+      - "WHERE an asset's override of a shared check carries `retired_as_of`, THE SYSTEM SHALL stop running that shared check for that asset from that date, as a retired check is stopped today, and SHALL keep running it for every other asset."
+      - "WHERE an asset's folder holds no file-checks.yaml, THE SYSTEM SHALL run the shared default unchanged, and `mothman check`'s collections gate SHALL no longer require the file in each asset folder (validate_collections.ASSET_WIDE today, line 286 at a35066ff)."
+      - "THE SYSTEM SHALL read the merged checks through one function, used by every reader of file-checks.yaml at a35066ff (file_checks.py line 49, qa_tools/collections/__init__.py line 150, check_bands' file bands, check_lifecycle.parse_file_check_metadata through validate_check_lifecycle, and validate_collections)."
+      - "THE SYSTEM SHALL derive each file check's id per dataset as today (`<asset>.<agency>.<collection>.<dataset>.<check>_file`, REQ-QAC-096 criterion 4), so that no recorded check id changes, an override included."
+      - "THE SYSTEM SHALL hold the shared default and each asset's additions and overrides to the check-lifecycle gate, the authoring rules and the changelog rule a file check is held to today (REQ-QAC-096 criteria 5 and 6); IF an override changes what a check does, or retires it, without a changelog entry of its own, THEN the gate SHALL fail naming the asset and the check."
+      - "IF an asset's file-checks.yaml names a key the shared default does not allow, or names one check twice, THEN THE SYSTEM SHALL refuse it naming the asset, the file and the entry."
+      - "WHERE the selected asset's folder is outside the repository (REQ-PIPE-342's injection), THE SYSTEM SHALL read the shared default from the code's own checkout and the asset's additions and overrides from the asset folder."
+      - "WHEN this lands, THE SYSTEM SHALL delete both assets' identical copies and SHALL show through REQ-TEST-239's compare that no check, verdict or record changes for either asset."
+      - "THE SYSTEM SHALL have tests, seen failing first, of an asset adding a check, of an asset overriding one whole (a field the override leaves out is not taken from the shared entry), of an asset retiring a shared check for itself while another asset still runs it, of an asset with no file of its own, and of a check named twice refused."
+    non_functional_requirements:
+      - "SCALABILITY: at thirty collections and a third asset, a new file-level check is one entry, not one per asset."
+      - "COMPATIBILITY: the shared default ships with the code, as dbt_shared/ does, so an injected asset folder outside the repository still gets it."
+      - "AUDITABILITY: an asset's override or retirement carries its own changelog entry, so which asset departs from the shared default, and why, is on the record."
+      - "MAINTAINABILITY: an override is read whole in one place, so a reader never has to merge two files in their head to know what an asset runs."
+      - "BEHAVIOUR-PRESERVING: today's two assets run exactly the shared default, proven by REQ-TEST-239's compare."
+    dependencies:
+      - "REQ-QAC-096"
+      - "REQ-PIPE-342"
+      - "REQ-QAC-368"
+    decisions:
+      - "ONE SHARED DEFAULT, BESIDE dbt_shared/ (SPLIT D2, SETTLED by Keith 2026-11-03): an asset may add to or override it; a new file-level check reaches every asset at once. REJECTED a copy per asset, with or without a gate."
+      - "OVERRIDE BY CHECK NAME (Q3 of 2026-11-14, SETTLED by Keith 2026-11-14, option (a)): a same-named `check:` replaces the shared entry whole, a new name adds an asset-only check, and `retired_as_of` on an override stops a shared check for that asset. REJECTED (b) field-by-field inheritance, and (c) additions only, which does not meet D2's 'or override'."
+      - "THE FILE NAME IS THE SCOPER'S PROPOSAL (delivery-scoper, 2026-11-03): file-checks.yaml at the repository root, the name both assets use today. Keith may change it at sign-off."
+      - "IDS STAY PER ASSET (delivery-scoper): a file check's id already carries the asset (REQ-QAC-096 criterion 4), so sharing the definition shares no recorded result between assets."
+      - "people.yaml AND data-asset.yaml STAY COPIED (SPLIT D2, SETTLED by Keith 2026-11-03), with no gate: each team owns its own; the shared lines are format and comments. REJECTED a shared default for either. Recorded here because this is the D2 requirement for file checks; the dbt-packages half is REQ-TEST-388."
+    open_questions: []
+    signed_off: null
+
+  - id: REQ-TEST-388
+    title: "Every asset's dbt project declares the same dbt packages and versions, and a gate in mothman check fails when two assets' packages.yml or package-lock.yml differ"
+    date_written: "2026-11-03"
+    story: "As whoever maintains the pipeline, I want every asset to run its checks on the same dbt packages, so that a check behaves the same on every asset and a package upgrade cannot land in one asset and be forgotten in the other."
+    moscow: should
+    status: not_started
+    source: "Keith, the split overview's decision 2, the dbt package files (SPLIT D2, 2026-11-03, Perth). Drafted by delivery-scoper 2026-11-03 (separation v4); v5 2026-11-14 unchanged. A PROPOSAL, not signed until Keith signs v5."
+    acceptance_criteria:
+      - "THE SYSTEM SHALL keep a packages.yml and a package-lock.yml in every asset's dbt project (assets/<asset>/dbt/), because dbt reads them from each project, and `mothman env dbt-deps` SHALL install each asset's from its own (REQ-QAC-368)."
+      - "IF any two asset folders in the repository declare different dbt packages or versions - their packages.yml, or their package-lock.yml, differing once parsed as YAML - THEN `mothman check` SHALL fail, naming both assets, the file and the first entry that differs."
+      - "WHERE only one asset folder can be seen, THE SYSTEM SHALL pass the gate and report that it compared one asset."
+      - "THE SYSTEM SHALL run the gate without a database, an asset selection or network access, in the validate-config workflow."
+      - "THE SYSTEM SHALL have tests, seen failing first, of a differing package revision failing, of a differing lock hash failing, of a difference in comments alone passing, and of one asset passing."
+    non_functional_requirements:
+      - "PERFORMANCE: two small YAML files per asset; the gate runs in under a second."
+      - "MAINTAINABILITY: an upgrade is one edit per asset, held together by the gate, and `mothman env dbt-deps` per asset as today."
+      - "COMPATIBILITY: the gate reads committed files only, so it runs on a government network with no access to dbt Hub or GitHub."
+      - "COST: no database and no bootstrap; seconds in CI."
+    dependencies:
+      - "REQ-QAC-368"
+    decisions:
+      - "SAME PACKAGES, KEPT PER PROJECT, GATED (SPLIT D2, SETTLED by Keith 2026-11-03): every asset uses the same dbt packages and versions; the per-project packages.yml and package-lock.yml stay because dbt needs them in each project. REJECTED packages per asset, and one shared install folder."
+      - "PARSED, NOT BYTES (delivery-scoper): a comment is not a package, so a reworded comment should not fail the gate; a changed revision or lock hash should."
+      - "THE LOCK FILE IS COMPARED TOO (delivery-scoper): REQ-QAC-368 decision 5 as changed by C6 (SETTLED by Keith 2026-11-02) makes dbt's own package-lock.yml the meaning of 'installed', so two assets with equal packages.yml but different locks would run different code."
+      - "people.yaml AND data-asset.yaml HAVE NO GATE (SPLIT D2, SETTLED by Keith 2026-11-03): see REQ-QAC-387."
+    open_questions: []
+    signed_off: null
+
+  - id: REQ-QAC-389
+    title: "Each QA adapter's statistics read a column's allowed values from the collection's contract at run time, the adapters hold no hand-copied list, and Emergency Department's age_group gains a real contract rule that datacontract-cli checks"
+    date_written: "2026-11-03"
+    story: "As whoever maintains the pipeline, I want the statistics a run records to count against the allowed values the contract declares, and every counted column's list to be a rule a tool checks, so that a list edited in the contract is the list the statistics use, whichever tool is later dropped."
+    moscow: should
+    status: not_started
+    source: "Keith, the split overview's decision 3 (SPLIT D3, 2026-11-03, Perth). Drafted by delivery-scoper 2026-11-03 (separation v4); v5 2026-11-14 with Keith's Q4 of 2026-11-14 (a new check on age_group). A PROPOSAL, not signed until Keith signs v5."
+    acceptance_criteria:
+      - "WHEN a run records a collection's statistics, THE SYSTEM SHALL read each counted column's allowed values from the collection's ODCS contract at that moment, through one reader in asset_model/ - the column's `enum:` or its datacontract `invalidValues` rule's `validValues`."
+      - "THE SYSTEM SHALL remove every hand-copied allowed-value list from the QA adapters - at 04fa7955 _SEX_VALID and _SUBURB_VALID (assets/daily/collections/civil_registration.py), _POSTCODE_VALID and _CONCERN_TYPE_VALID (assets/quarterly/collections/child_protection.py), TRIAGE_CATEGORIES and AGE_GROUPS (emergency_department.py, lines 5-6 at a35066ff) and MATCH_LEVELS (linkage_products.py) - and an adapter SHALL name only which columns its statistics count and test."
+      - "THE SYSTEM SHALL keep the order the contract declares a list in, so that recorded value counts keep their declared order (REQ-QAC-247)."
+      - "IF a column an adapter names has no allowed-value list in its contract, or the contract declares it twice and the two disagree, THEN THE SYSTEM SHALL refuse the run before any tool runs, naming the contract, the column and what is missing or different, and `mothman check` SHALL fail on the same condition without a database."
+      - "THE SYSTEM SHALL add to Emergency Department's contract (assets/quarterly/department-of-health/emergency-department-contract.yaml, the ed_presentations table's age_group column, line 108 at a35066ff) a datacontract quality rule of metric invalidValues whose validValues are the ten bands AGE_GROUPS holds today, in the same order ('0-4', '5-14', '15-24', '25-34', '35-44', '45-54', '55-64', '65-74', '75-84', '85+'), mustBe 0, severity error and dimension conformity - the shape the triage_category and sex rules on the same table already take (Q4 of 2026-11-14, SETTLED by Keith 2026-11-14)."
+      - "THE SYSTEM SHALL give that rule the id quarterly:department-of-health:emergency-department:ed-presentations:age_group:invalidValues_datacontract and the check_id customProperty quarterly.department-of-health.emergency-department.ed-presentations.age_group.invalidValues_datacontract, following its siblings' convention, and the check-lifecycle gate SHALL accept it as a new check_id."
+      - "THE SYSTEM SHALL give that rule its lifecycle customProperties as its siblings carry them - introduced_date (as open question 1 settles), changelog '[]', and the authored prose of docs/check-authoring-rules.md: description 'A single unrecognised value fails.' (its tolerance, the rule for an invalid-values check); failure_indicates 'The source system has started emitting a value that was never agreed in the contract, usually a new age banding introduced upstream without notice.' (the dbt accepted_values sibling's wording for the same rule, so one rule reads one way across tools); and no technical_note - and `mothman dashboard validate-check-lifecycle --require-explanations` SHALL pass."
+      - "THE SYSTEM SHALL have the statistics read age_group's allowed values from that rule through criterion 1's reader, so that the datacontract-cli check and the recorded value counts read one list."
+      - "THE SYSTEM SHALL have the Linkage Products provider's drift planning read a column's known values through the same reader (known_values, assets/quarterly/synthetic/collections/linkage_products.py line 353 at a35066ff) rather than by loading the collection's QA adapter, so that a planned reference folds as the recorded one does."
+      - "THE SYSTEM SHALL keep each tool's own copy of a list - the contract's, Soda's and dbt's - as it is, with no gate holding them equal, and SHALL leave the generator's value pools (generator/names_au.py and the providers' own, Emergency Department's AGE_GROUPS draw included) independent of the contract (SPLIT D3)."
+      - "THE SYSTEM SHALL have tests, seen failing first, of a value added to a contract list being counted by the next run's statistics, of a column with no list refused before any tool runs, and of an age_group value outside the ten bands failing the new datacontract check."
+      - "THE SYSTEM SHALL show through REQ-TEST-239's compare that no recorded statistic, existing verdict or generated byte changes for either asset, and that the only new records are the age_group check's own results; IF any of them is not a pass, or any Emergency Department dataset verdict moves, THEN the build SHALL stop and report each to Keith."
+    non_functional_requirements:
+      - "PERFORMANCE: the contract is read once per run, not per row or per column; a run is no slower than today beyond one more datacontract rule on one table."
+      - "RELIABILITY: a list the statistics cannot find is a named refusal before the tools run, never an empty list that would count every value invalid."
+      - "PRIVACY AT REAL SCALE: allowed-value lists (suburbs, postcodes, triage categories, age bands) are reference data, not records; reading them at run time touches no supply row beyond what the statistics already read."
+      - "SCALABILITY: a thirtieth collection's adapter declares columns, not lists, so it cannot drift from its own contract."
+      - "AUDITABILITY: the new check carries its own check_id, introduced_date and changelog from its first run, so the register and the dashboard can say when age_group started being checked by datacontract-cli."
+      - "COST: one more check result per Emergency Department run; no new tool, no new dependency."
+    dependencies:
+      - "REQ-PIPE-380"
+      - "REQ-QAC-247"
+      - "REQ-QAC-024"
+    decisions:
+      - "THE THREE PER-TOOL COPIES STAY (SPLIT D3, SETTLED by Keith 2026-11-03): the tool comparison is still running and one or more checks, or a whole tool, will go. REJECTED declaring once with every tool reading, an agreement gate, and one check per rule."
+      - "THE ADAPTER READS THE CONTRACT AT RUN TIME (SPLIT D3, SETTLED by Keith 2026-11-03): the contract is the copy that survives whichever tool is dropped. Applies to every collection, not only Civil Registration."
+      - "THE GENERATOR'S POOLS STAY INDEPENDENT (SPLIT D3, CHANGED by Keith 2026-11-03): test data need not follow the rule exactly. REJECTED the contract driving the generator."
+      - "THE PROVIDER'S known_values IS NOT A POOL (delivery-scoper, 2026-11-03): it mirrors what the statistics record so a planned drift reference has the recorded one's shape (A2, SETTLED by Keith 2026-11-02), so it reads what the statistics read. The pools it draws rows from stay independent."
+      - "EITHER DECLARATION IS READ (delivery-scoper): today's contracts use `enum:` (Linkage Products' match_level) and `validValues` (every other list). Both are ODCS the contract already carries; a disagreement between them fails loudly rather than picking one."
+      - "AGE_GROUP GETS A REAL RULE, A NEW CHECK (Q4 of 2026-11-14, SETTLED by Keith 2026-11-14, option (b), NOT the recommendation): the ten bands become an allowed-values rule datacontract-cli checks, with its own lifecycle entry, and the statistics read the same list. REJECTED (a) a contract customProperty no tool checks (the recommendation), and (c) a hand copy in the adapter."
+      - "AN invalidValues RULE, NOT A FIELD-LEVEL enum: (delivery-scoper, v5, from the code): Keith's answer allowed either. qa_tools/tools/run_datacontract.py records only the quality-rule check types in _QUALITY_CHECK_TYPES (line 44) and drops the schema-derived ones, and a field-level `enum:` carries no customProperties to hold a check_id or lifecycle; so an `enum:` would be checked by the tool and never recorded - Linkage Products' match_level is in that state today. Only the invalidValues form gives the recorded, lifecycled check Q4 asked for."
+      - "THE NEW CHECK'S WORDING FOLLOWS ITS SIBLINGS (delivery-scoper, v5): the description states the tolerance, not the purpose, and names no value (check-authoring-rules, 'no enumerated value lists'); failure_indicates is the dbt accepted_values sibling's sentence for the same rule ('say it the same way across tools'). Writing a check's prose is ordinary work, not an authoring-standard change, so Keith reviews it here rather than approving a rule."
+      - "NOTHING IS EXPECTED TO FAIL IT (delivery-scoper, v5, checked 2026-11-14): Emergency Department's provider draws age_group only from its own ten bands (assets/quarterly/synthetic/collections/emergency_department.py line 79), and no fault or scenario in generator/ or the providers writes age_group; criterion 12 stops the build if that turns out wrong."
+    open_questions:
+      - "1 (NEW in v5). THE NEW CHECK'S introduced_date. The date is lifecycle metadata: nothing in the pipeline evaluates a check only after it, so the bootstrap records the new check on every Emergency Department supply from the first. Options: (a) '2013-01-01', its siblings' date and the dbt accepted_values check's on the same column - the history then reads as if datacontract-cli had always checked age_group, which is what the replay records; (b) the build date - honest about when the rule was written, but the dashboard and register would carry results dated years before the check's own introduced_date. RECOMMENDED (a): the recorded results and the date then agree, and the changelog '[]' plus this requirement record when it was actually added."
+    signed_off: null
+
+  - id: REQ-PIPE-390
+    title: "The order of the dataset statuses is held once, in asset_model/, and the pipeline's, the bootstrap's and the providers' copies read it"
+    date_written: "2026-11-03"
+    story: "As whoever maintains the pipeline, I want one definition of which status is worse than which, so that a re-check, a target trial and a planned verdict cannot rank green, amber and red differently from the dashboard."
+    moscow: should
+    status: not_started
+    source: "Keith, the split overview's decision 4 (SPLIT D4, 2026-11-03, Perth: 'the status order moves into asset_model/'). Drafted by delivery-scoper 2026-11-03 (separation v4); v5 2026-11-14, split risk 6's answer recorded. A PROPOSAL, not signed until Keith signs v5."
+    acceptance_criteria:
+      - "THE SYSTEM SHALL hold the order of the dataset statuses (nodata below green below amber below red, dataset_status.ORDERED_STATUSES today) once, in asset_model/, and the pipeline, the bootstrap and the providers SHALL read it there: dataset_status.py line 62, rechecking.py line 117, target_agreement.py line 25 and assets/quarterly/synthetic/collections/linkage_products.py line 345 (unchanged at a35066ff)."
+      - "THE SYSTEM SHALL rank green, amber and red in each former copy exactly as it does today, proven by a test of each reader and by REQ-TEST-239's compare."
+      - "THE SYSTEM SHALL keep the dashboard page's own copy of the order, held equal to the Python one by status-cases.json's shared cases as today."
+      - "THE SYSTEM SHALL have a test that fails WHERE a module outside asset_model/ and tests/ defines its own ranking of the status words, its docstring saying it reads source for an architecture rule with no behaviour to observe."
+    non_functional_requirements:
+      - "BEHAVIOUR-PRESERVING: proven by REQ-TEST-239's compare for each asset."
+      - "MAINTAINABILITY: a new status word is added in one place and the shared cases."
+    dependencies:
+      - "REQ-PIPE-380"
+    decisions:
+      - "THE STATUS ORDER JOINS #134 (SPLIT D4, SETTLED by Keith 2026-11-03). REJECTED status order only (without the generator's near-copies), and waiting."
+      - "THE PAGE KEEPS ITS COPY (delivery-scoper, from the split overview): the page has no build step and ticketing runs without a browser, so the shared test cases are the agreement."
+      - "THE PAGE'S OWN THREE INTERNAL COPIES STAY AS THEY ARE (SPLIT RISK 6, SETTLED by Keith 2026-11-03): RECHECK_RANK, xtStatusCounts' order list and XT_WORD ('No result') are left alone, and the cross-table grid keeps its 'No result' wording. REJECTED reading STATUS_ORDER from both repeats, and one wording everywhere. So this requirement's test (criterion 4) reads Python modules only, never the template."
+    open_questions: []
+    signed_off: null
+
+  - id: REQ-GEN-391
+    title: "The Child Protection provider takes its quarters only from the quarterly calendar, and the geocoding faults' planned verdicts are derived from the bands of the checks they aim at"
+    date_written: "2026-11-03"
+    story: "As whoever maintains the generator, I want the providers to read the calendar and the check bands rather than restate them, so that a changed calendar date or band moves what the generator plans with it."
+    moscow: could
+    status: not_started
+    source: "Keith, the split overview's decision 4 (SPLIT D4, 2026-11-03, Perth: 'the Child Protection provider reads the quarterly calendar ... the hand-written geocoding verdict table is derived'). Drafted by delivery-scoper 2026-11-03 (separation v4); v5 2026-11-14, split risk 5's answer recorded. A PROPOSAL, not signed until Keith signs v5."
+    acceptance_criteria:
+      - "THE SYSTEM SHALL remove the Child Protection provider's own statement of the quarterly calendar - _quarter_start, _add_quarters and START_DATE (assets/quarterly/synthetic/collections/child_protection.py lines 240-274 at a35066ff), which nothing reads - so that its quarters come only from the quarterly calendar through asset_model/, as generated_periods and drawn_grown_periods already do."
+      - "THE SYSTEM SHALL derive each geocoding row fault's planned verdict (GEO_FAULT_VERDICT, hand-written at linkage_products.py line 138) from the check it is aimed at (GEO_FAULT_AIMS, line 144) and that check's warn and fail bands in check_bands' catalogue, at the size the fault plants."
+      - "IF a derived verdict differs from today's table for any fault, THEN the build SHALL stop and report it to Keith rather than accept it."
+      - "THE SYSTEM SHALL have a test, seen failing first against the hand-written table, that a changed band moves a fault's derived verdict."
+      - "THE SYSTEM SHALL show through REQ-TEST-239's compare that no byte either asset generates changes."
+    non_functional_requirements:
+      - "BEHAVIOUR-PRESERVING: dead code and a table replaced by its derivation; proven by REQ-TEST-239's compare."
+      - "MAINTAINABILITY: a band edited in a check file moves the generator's plan without a second edit."
+    dependencies:
+      - "REQ-PIPE-380"
+      - "REQ-GEN-386"
+      - "REQ-GEN-298"
+    decisions:
+      - "THE NEAR-COPIES JOIN #134 (SPLIT D4, SETTLED by Keith 2026-11-03). REJECTED status order only, and waiting."
+      - "THE CHILD PROTECTION RESTATEMENT IS DEAD (delivery-scoper, 2026-11-03, re-checked 2026-11-14): a grep of the repository finds no reader of START_DATE, _quarter_start or _add_quarters outside the provider's own definitions; the provider already takes its periods from schedule.periods_for_dataset and periods_for_calendar('quarterly'). So this is a removal, not a rewire, and its round-to-period step is folded by REQ-PIPE-377."
+      - "DERIVED THROUGH check_bands (delivery-scoper): the reader Linkage Products already uses for its planned verdicts, and the one D4 names."
+      - "THE GEOCODING CHECK FILES STAY HAND-WRITTEN (SPLIT RISK 5, SETTLED by Keith 2026-11-03): each geocoded source's Soda, dbt and contract sections stay their own hand-reviewed artefact, although only three facts differ between sources. REJECTED a template from the three facts, and waiting for a third source. So deriving the planned VERDICTS here derives nothing about the check files themselves."
+    open_questions: []
+    signed_off: null
+
+  - id: REQ-GEN-392
+    title: "The older providers' fault rates in generator/dirty.py are derived at generation time from the warn and fail bands of the checks they aim at, read through check_bands as Linkage Products reads them, and the history they shape is regenerated with every move listed"
+    date_written: "2026-11-03"
+    story: "As whoever maintains the generator, I want each fault rate that is sized to a check's band to be computed from that band as the check file states it, so that a band changed in a check file moves the planted fault with it and an amber or red supply lands where it was meant to without a second edit."
+    moscow: could
+    status: not_started
+    source: "Keith, the split overview's decision 4 (SPLIT D4, 2026-11-03, Perth: 'the older providers (dirty.py's fault rates) read thresholds through the readers Linkage Products uses'). Drafted by delivery-scoper 2026-11-03 (separation v4); v5 2026-11-14 with Keith's Q5 of 2026-11-14 (derive, not gate). A PROPOSAL, not signed until Keith signs v5."
+    acceptance_criteria:
+      - "THE SYSTEM SHALL declare, for every fault in generator/dirty.py's presets (apply_birth_registrations_presets and the six apply_cp_*_presets at a35066ff, wherever they sit when this is built), which rule or rules it aims at, by check_bands' rule key, in one table per preset as GEO_FAULT_AIMS does for geocoding faults; the band each rate aims at SHALL no longer be written only in a comment."
+      - "WHEN a preset dirties a frame, THE SYSTEM SHALL compute each band-sized fault's size from its aimed rules' warn and fail bands, read through check_bands' catalogue at the frame's own row count (each tool's unit and operator honoured, as check_bands' amber intersection already does), by the rule open questions 1 and 2 settle, and SHALL plant it as open question 3 settles (Q5 of 2026-11-14, SETTLED by Keith 2026-11-14)."
+      - "IF no size lands a fault on the verdict asked on every rule it aims at - an empty band intersection, or a band the frame's row count cannot reach - THEN THE SYSTEM SHALL refuse to generate, naming the preset, the fault, the rules and the bands, rather than plant a size that lands elsewhere."
+      - "THE SYSTEM SHALL keep as literals only the preset parameters that are not sized to a check's band - at a35066ff the stale-delivery coin flip (inject_stale_delivery's whole-run rate) among them - each named in this requirement's decisions when built with why it is not band-sized."
+      - "THE SYSTEM SHALL keep the amber-by-construction paths of REQ-GEN-184 (targeting.bdm_amber and cp_amber) as they are; this requirement changes the presets they do not replace - every red supply, and a Child Protection amber whose payload holds no cp_clients."
+      - "WHEN this is built, THE SYSTEM SHALL regenerate Birth Registrations' and Child Protection's dirty supplies and bootstrap each asset from empty, and SHALL record in evidence every supply whose delivery file changed and every recorded check result, dataset verdict, filing, promotion and decision that moved, each with its old and new value."
+      - "THE SYSTEM SHALL re-capture every committed artefact captured from today's generated history that the regeneration moves - at a35066ff tests/fixtures/arrival_semantics_golden.json, SCENARIOS-daily.md and SCENARIOS-quarterly.md (REQ-PIPE-352 criterion 3), and every test or scenario expectation asserting a recorded count or verdict of a regenerated supply - and SHALL account for each moved entry in evidence against the supply or verdict that moved it; IF a moved entry cannot be traced to a moved supply, THEN the build SHALL stop and report it."
+      - "IF a scenario or target that today lands on a named verdict (REQ-GEN-186's agreement check) no longer does after regeneration, THEN the build SHALL stop and report it to Keith rather than re-aim the scenario."
+      - "THE SYSTEM SHALL have tests, seen failing first against today's literal rates, that a band changed in a check file moves the derived size of the fault aimed at it, that a red fault lands past every aimed rule's fail threshold at the frame's row count, that an amber fault lands inside every aimed rule's amber band, and that an unreachable band is refused (criterion 3) - each on a small frame, with no bootstrap."
+      - "THE SYSTEM SHALL NOT add a `mothman check` gate holding literal rates to their bands: the rates are derived, so there is no literal to hold (Q11 of 2026-11-14 with Q5, SETTLED by Keith 2026-11-14)."
+    non_functional_requirements:
+      - "BEHAVIOUR CHANGES BY DECISION, LISTED: the regenerated history differs from today's by design (Q5 of 2026-11-14); every moved supply and verdict is in evidence, as REQ-GEN-334's regenerated releases were (D1, 2026-11-02), and the pins move only with their causes accounted for (criterion 7)."
+      - "REPRODUCIBILITY: the derivation is seeded and deterministic - the same configuration and the same seed give the same bytes - so a later diff of generated output stays a real correctness check (CLAUDE.md: everything is seeded)."
+      - "MAINTAINABILITY: a band edited in a check file moves the planted fault without a second edit; a fault with no declared aim fails at generation (criterion 3) rather than silently planting a stale size."
+      - "COST: one bootstrap per asset from empty to regenerate (about an hour on this sandbox at the 2026-10-31 measure), and the next hand-started test.yml is a cache miss (about 145 billable minutes at the 2026-11-02 measure); push CI's critical set is unaffected."
+      - "PERFORMANCE: reading the catalogue once per generation, not per frame; the bootstrap is no slower by more than 5 percent beyond the regeneration itself."
+      - "SCALABILITY: mothman population's presets (synthetic_data_generator/generate.py, --dirty) derive the same way, so at millions of rows a count band (warn above 0, fail above 5) plants a handful of rows rather than the 0.3 percent today's literal rates plant; population output is exploratory and recorded nowhere."
+    dependencies:
+      - "REQ-PIPE-380"
+      - "REQ-GEN-183"
+      - "REQ-GEN-184"
+      - "REQ-GEN-186"
+      - "REQ-PIPE-352"
+      - "REQ-TEST-239"
+      - "REQ-TEST-357"
+    decisions:
+      - "dirty.py's RATES JOIN #134 (SPLIT D4, SETTLED by Keith 2026-11-03), read through check_bands, the reader Linkage Products uses."
+      - "DERIVE THE RATES AT GENERATION TIME (Q5 of 2026-11-14, SETTLED by Keith 2026-11-14, option (b), NOT the recommendation): Birth Registrations' and Child Protection's dirty supplies regenerate; every moved supply and verdict is listed; the pins and scenario expectations built on today's history are re-captured with each move accounted for. REJECTED (a) literal rates checked by a gate (the recommendation), and (c) both."
+      - "AT THE FRAME'S OWN ROW COUNT (delivery-scoper, v5): today's rates are calibrated to a typical size (comments such as '~3 amber / ~12 red at n~987'), and the dbt bands are absolute counts while Soda's are percentages, so a run smaller or larger than typical lands elsewhere. Generation knows the frame's size, which is the one input the literal rates could not see."
+      - "THE AMBER INTERSECTION IS check_bands' OWN (delivery-scoper, v5): a rule's amber band is already the intersection across the tools that implement it, in each tool's unit (check_bands' docstring), and targeting._target already aims at the middle of what is left of it; the derivation reuses both rather than restating either."
+      - "THE PRESETS STILL MATTER DESPITE REQ-GEN-184 (delivery-scoper, v5, from the code): Birth Registrations' amber and Child Protection's amber with cp_clients present already use targeting by construction, so what this changes is every red supply and Child Protection's amber partial resupplies - not the whole history."
+      - "THE ANCHOR DATE IS NOT THIS REQUIREMENT'S (delivery-scoper, v5): ANCHOR_DATE stays 2026-09-25 until plans/running-thoughts.md #138 (a rolling anchor, unscoped) is built; criterion 7's re-capture is against whatever anchor is in force when this is built."
+      - "NO FAULT-RATE GATE (Q11 of 2026-11-14, SETTLED by Keith 2026-11-14): the gate v4 proposed is not needed under Q5's answer (criterion 10)."
+    open_questions:
+      - "1 (NEW in v5). THE AMBER RULE. Q5 left the rule to scoping, 'e.g. the middle of the band aimed at'. Proposed: amber aims at the middle of the aimed rules' amber intersection at the frame's row count, in rows, rounded down - targeting._target's rule. Worked against today's comments: Birth Registrations' facility nulls at 1,900 rows, Soda above 15 percent and at or below 35, dbt above 300 and at or below 600, intersect at 301-600 rows and aim at 450 (23.7 percent; today 30 percent); sex at 1,900 rows aims at 15 rows (0.8 percent; today 0.8). Options: (a) the middle, as proposed; (b) the lower third, nearer the warn threshold, so an amber reads as only just amber; (c) the upper third. RECOMMENDED (a): the most margin either side, so the binomial spread of a probabilistic fault (open question 3) is least likely to cross a threshold, and it is the rule the targeting code already uses."
+      - "2 (NEW in v5). THE RED RULE, WHICH HAS NO TOP. A fail band is open above, so it has no middle. Options: (a) the lowest failing count plus the width of the rule's amber band (as far past the fail threshold as amber's band is wide) - facility nulls at 1,900 rows aim at 665 + 300 = 965 rows (50.8 percent; today 55), a count band failing above 5 aims at 10 (today about 12); (b) one and a half times the lowest failing count - 998 and 8; (c) twice it - 1,330 and 12. RECOMMENDED (a): it scales with how wide the rule's tolerance is, and lands near today's sizes. It needs open question 3's floor for a single-tier rule, whose amber band has no width."
+      - "3 (NEW in v5). SINGLE-TIER RULES AND HOW A SIZE IS PLANTED. Two linked forks. (i) A single-tier rule fails on any violation and has no amber band, so neither rule above gives it a size: options (a) amber plants nothing on a single-tier rule, as REQ-GEN-184 already does, and red plants a fixed handful (proposed 5 rows), declared once beside the derivation, since any violation fails and the count only sets how many failing rows the page shows; (b) keep planting single-tier faults in an amber preset, so that supply reads red as today. (ii) Today's injectors plant each row with a probability, so a supply aimed at 3 rows may get 0 (about a 5 percent chance) and read green: options (a) plant exactly the derived count, as targeting's _set_nulls does; (b) keep the per-row probability at size divided by rows. RECOMMENDED (i)(a) and (ii)(a): the history regenerates anyway, and an exact count makes 'aimed at the middle of the band' true of every file rather than on average. (i)(a) moves Child Protection's amber partial resupplies from reading red to reading amber, which criterion 6 lists."
+    signed_off: null
