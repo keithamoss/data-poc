@@ -653,3 +653,7 @@ Purpose recalled: insurance for a real deployment's published QA page; REQ-QAC-3
 
 **v6 STATUS:** all six answered. Q1 and Q2 change v6's text (writer stays in the pipeline with a generator copy; the seeded lag returns as a decision-takes-effect event) - back to the scoper for those two, then the artifact.
 - **v6 new Q (REQ-PIPE-382 OQ1, where the seeded lag lives):** INSIDE THE REPLAY CLOCK (bootstrap/) - on a real asset a promotion takes effect simply now; the lag leaves shipped code. Accepted knowingly: a retried package gate on a real asset takes effect at the retry, REVERSING post-build-review #274 D1, and REQ-PIPE-081's 'a rule, not a replay flag' decision is REVERSED (both need recording on those items). REJECTED (a) one shared rule in asset_model/ with the replay clock only lifting the 'not after now' cap.
+- **v6 lag rule's home:** IN scenarios/ (as drafted), applied by the replay clock. REJECTED a generator copy, and an allowlisted generator-to-bootstrap edge.
+- **REQ-PIPE-081 and REQ-PIPE-267 reversal amendments:** APPROVED AS WORDED (Keith, 2026-11-14), applied when REQ-PIPE-382 is built.
+
+**v6 IS SETTLED: no open questions remain in docs/drafts/separation-v6.yaml.** Next: the artifact for Keith, then sign-off.
