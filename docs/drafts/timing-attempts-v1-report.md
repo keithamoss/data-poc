@@ -72,3 +72,63 @@ Add to the end of both #120 and #121: "**Scoped 2026-11-14** (T1-T3, F1-F3) into
 - **Angles answered from the code:** recording performance, storage growth (on the order of 10k attempt rows a year at 30 collections, and per-check timing not recorded), reliability, security, compatibility (no new dependencies or vendored assets), auditability, determinism, and dashboard weight (an attempt list only where it says something, with the measured size recorded as evidence rather than an invented budget).
 - **Angles ruled out:** compliance and retention (attempts are history and never pruned, per REQ-PIPE-279), and cost (negligible).
 - **Provisional calls, to be checked:** run time comes only from completed attempts; there is no per-tool time limit today, so "timed out after 45 min" can only mean a lock or statement timeout on our side, or a stop from outside; a failure before an attempt opens is out of scope.
+
+## Addendum (Keith's eight answers applied; new Q9)
+
+I've applied all eight of Keith's answers (TA Q1-Q8) in place to /home/user/data-poc/docs/drafts/timing-attempts-v1.yaml. Each is now a SETTLED decision with its rejected options, and every criterion that used to say "as open question N settles" now carries the answer. Applying Q4 raised one new question (Q9 below).
+
+The draft check (`validate-requirements --draft`) shows only the 4 expected cross-reference errors (to REQ-PIPE-279 and REQ-DASH-148, which the file doesn't contain). I read the changed fields back with `yaml.safe_load` to confirm they're on disk. Only that file was touched and nothing is committed. git now shows it as `M` rather than `??`, so someone else had already committed v1.
+
+## What changed
+- **Header:** notes the in-place update and the new question 9. The clock line now reads SETTLED, and the dashboard-UX flag now says the 'second try' wording was settled.
+- **REQ-PIPE-409**
+  - New criterion: an attempt's start and end stay stamped by the one clock (`qa_store._stamp()`, REQ-PIPE-382).
+  - Decisions added: TA Q1 (rejected: always the wall clock).
+  - The provisional "what an attempt spans" decision is now TA Q6 SETTLED (rejected: the whole arrival including staging and the gate).
+  - open_questions is now empty.
+- **REQ-PIPE-410:** the privacy note now says the message is never published, only outcome, tool and error type (TA Q5).
+- **REQ-PIPE-411** (now 11 criteria)
+  - The attempt list emits the error type, never the message. New criterion: no `error_message` anywhere in the results file, dashboard data or built page.
+  - Two new criteria for TA Q4:
+    - a new UNCHECKED kind in `dataset_blockers.py`, beside REFUSED. It reads 'Could not be checked', opens at the supply's receipt as a refused load's does (post-build-review #118 D-B), and records no Fail on the supply.
+    - a matching blocking 'needs a person' item in `outstanding.py`, beside FAILED_LOAD.
+  - Tests extended to cover both.
+  - Decisions added:
+    - TA Q5 (rejected: publishing the message as recorded; publishing it scrubbed).
+    - TA Q4 (rejected: a new 'Not checked' status; the red reason with no queue item).
+    - Opened at receipt (mine; flagged for the architect).
+    - Not the same thing as REQ-DASH-394's configuration-error item, because no attempt opens in that case.
+  - The open question is replaced by Q9.
+- **REQ-PIPE-412**
+  - Criterion 1 now judges against the last 20 earlier whole-supply runs (scope arrival or full).
+  - New criterion: a readers-only run is neither judged nor counted in anyone's baseline.
+  - The minimum is now 3 earlier whole-supply runs.
+  - Tests added: the 4th run is the first judged, a 22nd run is judged against runs 2-21 only, and readers-only runs are excluded.
+  - Scale note: the window makes the cost linear.
+  - Decisions added:
+    - TA Q2 (rejected: every run in one series; one series per scope).
+    - TA Q3, recorded as a choice (rejected: all earlier runs with a minimum of 3; all earlier runs from the second).
+    - TA Q7 (rejected: the replay forcing a failure; a supply left not checked for good).
+  - open_questions is now empty.
+- **REQ-DASH-413:** the trend has one point per whole-supply run.
+- **REQ-DASH-414**
+  - Note wording: "Checked on the second try - the first timed out after 45 min", with 'crashed' / 'failed in <tool>' / 'was stopped' substituted as the earlier try ended. 'Attempt' is never used, because it stays the resupply word.
+  - The attempt list shows the error type, never the message.
+  - Decision TA Q8 added (rejected: 'Check attempt 2 succeeded'; F2's words as given).
+  - open_questions is now empty.
+- **REQ-DASH-415**
+  - Not-checked words carry the tool and error type, never the message.
+  - The dataset reads red through the UNCHECKED blocker with 'Could not be checked' shown once, and its queue item is labelled the same, exactly as REQ-DASH-148 does for a failed load. No check is shown as Fail.
+  - The as-of window now runs from the supply's receipt until the blocker resolves. v1 started it at the failed attempt's end; I changed it to match the failed-load precedent, and the decision says so.
+  - Decision TA Q4 added. open_questions is now empty.
+- **REQ-TEST-416:** unchanged. The terminal still prints the full stored message, which TA Q5 allows.
+
+## The new question (on REQ-PIPE-411)
+**Q9. What clears a 'Could not be checked' item, and what does it offer?** A failed load is cleared by a reload or by a person rejecting the supply, and its item offers 'reject the supply'. A failed run is retried by the next processing pass (`processing_pass.py` line 207), so a one-off crash clears itself. But a run that fails every time, such as a file that loads but crashes a tool, never will.
+- (a) Like a failed load: cleared by a completing attempt OR a person rejecting the supply. The item offers 'reject the supply' and says the next pass will retry it.
+- (b) Cleared only by a completing attempt. The item offers nothing to decide, only something to investigate.
+
+**I recommend (a).** Under (b), a supply that always crashes keeps its dataset red until the code is fixed, with nothing a person can do about it. Under (a) it's the same decision people already make for a file that won't load, through the existing decision log.
+
+## One call of mine for the architect to check
+The UNCHECKED blocker and the not-checked window start at the supply's receipt, following the failed-load precedent. The alternative is to start them when the failed attempt ended.
