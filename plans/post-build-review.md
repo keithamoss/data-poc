@@ -14552,7 +14552,7 @@ twice. It deliberately did not re-find the `TypeError`.
        workflow that forgets the asset is caught by its first red run.
        REJECTED a test reading every workflow.
 
-322. **[in-progress, 2026-11-14]** **[Data generation]** **TS-107 and TS-111 each showed a second, unrelated Fail beside their planted Warn.**
+322. **[done, 2026-11-14]** **[Data generation]** **TS-107 and TS-111 each showed a second, unrelated Fail beside their planted Warn.**
      Found by the 2026-11-14 evidence walk-through (docs/drafts/unmet-evidence-2026-11-14.md,
      item [14]; REQ-GEN-298 criteria 3 and 4 say each geocoding scenario is the
      only fault in its supply). Both read Distribution drift as Fail with a
@@ -14575,12 +14575,38 @@ twice. It deliberately did not re-find the `TypeError`.
        and refused (TS-38, TS-12, TS-80, TS-42a) or had an amber Client Register.
        tests/test_geocoding_faults.py's table follows; its 45 tests pass.
        plans/supply-model.md's register entries say where they moved from.
-     - **Still to do**: regenerate the quarterly history (reset-synthetic, then
-       bootstrap, ~2 hours) and see the new test pass on it; the target
-       comparison and the G1 route's browser test (TS-111) read the new quarter
-       from the placements, not a hard-coded date.
+     - **Verified on a regenerated history** (Keith approved the reset,
+       2026-11-14): `mothman env reset-synthetic` then a from-empty quarterly
+       bootstrap, 3133s (52 minutes; over the 720s budget, as speed-anchor's
+       REQ-PIPE-403 expects), its own target comparison raising no
+       disagreement. Then tests/test_geocoding_scenarios_recorded.py,
+       tests/test_target_agreement.py, tests/test_geocoding_not_supplied_scope.py
+       and tests/test_dashboard_e2e.py::TestTheGeocodingPages: 52 passed, none
+       skipped; the new test passes. The deployment half (`-m needs_deployment`,
+       browser tests aside): 137 passed, 1 xfailed, 1 failed - the target
+       comparison's 'reading changes nothing' count, racing a trial another
+       module ran on the same database (#323, not this change); it passes on
+       its own (5 passed with the new test, re-run after).
      - **A side finding, not fixed**: the generator's plan thought 2014-Q1's
        reference was 2013-Q4's file, where the replay compared it with 2013-Q3 -
        the plan's reference model does not know a geocoding file that arrives
        before its source is held. Recorded here; no criterion depends on it now
        that TS-107 has moved.
+
+323. **[todo, 2026-11-14]** **[Testing & dev tooling]** **Two deployment-half modules race on the shared deployment database.**
+     Seen 2026-11-14 running `pytest -m needs_deployment` after #322's
+     regeneration: tests/test_target_agreement.py's
+     `test_every_targeted_supply_in_the_deployment_agrees_and_nothing_changes`
+     counts qa.run and qa.check_result before and after reading and found one
+     more run (19 results) - while tests/test_recheck_trial.py's
+     `test_one_supplys_trial` was running a real trial on the same database on
+     another xdist worker, which writes a trial run and removes it. Afterwards
+     the count was back to 540; alone, the comparison passes. Every module is
+     its own xdist group (tests/conftest.py `_distribution_group`), so nothing
+     keeps a module that writes to the deployment off the worker beside one
+     that counts it.
+     - **Likely fix**: one shared distribution group for the deployment
+       modules that write (trials) and those that count rows. A
+       scheduling/wiring bug, so per CLAUDE.md the regression test is Keith's
+       call before it is written. Not fixed yet.
+
