@@ -683,3 +683,7 @@ Purpose recalled: insurance for a real deployment's published QA page; REQ-QAC-3
 
 **TIMING-ATTEMPTS v1 STATUS:** all eight answered; to the scoper to apply, then the architect and CLI and dashboard UX reviewers.
 - **TA Q9 (411, what clears 'Could not be checked'):** A COMPLETED RETRY OR A PERSON REJECTING THE SUPPLY, like a failed load; the item offers 'reject the supply' and says the next pass will retry. REJECTED only a completed retry.
+
+## Speed + rolling anchor v1 - review batch, Keith's answers, 2026-11-14 (docs/drafts/speed-anchor-v1-reviews.md)
+
+- **SR1 (architect Q1, where asset_model gets the anchor):** A ONE-LINE ANCHOR FILE BESIDE THE DELIVERY TREE under data/<asset>/, written by the generator from the same value as the other two records; with no tree, offsets resolve to the fixed test anchor only under test and ci, refused elsewhere and on a real asset. REJECTED the pipeline installing it at every entry point, and callers passing it.
