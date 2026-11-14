@@ -6137,6 +6137,13 @@ could never have computed it), and it belongs with batch 5's check work.
      and D4 as REQ-PIPE-379, REQ-QAC-387, REQ-TEST-388, REQ-QAC-389,
      REQ-PIPE-390, REQ-GEN-391 and REQ-GEN-392; re-scanned at 04fa7955. Eleven
      open questions are with Keith; then the architect and UX reviewers.
+     **SIGNED 2026-11-14 AS v6 (Keith, "Sign all 21")**: REQ-PIPE-376 to
+     REQ-GHUB-396 are in requirements.yaml, not started, from
+     docs/drafts/separation-v6.yaml after the v5 reviews (architect, CLI and
+     dashboard UX) and v6's own questions; every answer is in
+     docs/drafts/decisions-2026-11-01.md. The look-ahead horizons are parked out
+     of it. REQ-TEST-239 is retired in favour of REQ-TEST-393. This entry's prose
+     comes out when the last of them is built.
 135. **[done, 2026-11-01]** **[Docs & process]** **[Testing & dev tooling]** **A replaced container lost a day of unpushed work; every checkpoint is now pushed to a `wip/` branch.**
      2026-11-01, afternoon Perth: under Keith's "no push until the very end"
      the whole build run (REQ-PIPE-341, REQ-TEST-374, Pass / Warn / Fail,
