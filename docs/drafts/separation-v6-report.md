@@ -136,3 +136,76 @@ File: /home/user/data-poc/docs/drafts/separation-v6.yaml. Nothing else was edite
 Neither requirement has open questions. One choice of mine to flag: I made the deletions a requirement of their own. They could be folded into REQ-TEST-393 if Keith would rather have one fewer id.
 
 Everything in my earlier v6 report still stands, including its six open questions.
+
+## Second addendum (Keith's six v6 answers applied)
+
+I applied Keith's answers to all six of v6's open questions, in place, in /home/user/data-poc/docs/drafts/separation-v6.yaml. Nothing else was edited and nothing is committed. After the edits I re-ran `uv run mothman dashboard validate-requirements --draft` and read the changed fields back. The only errors are the expected references to requirements outside the draft.
+
+Five of the six are closed as SETTLED decisions. Q2 is settled too, but Keith's wording leaves one fork on where the lag lives, which I've raised as a new question.
+
+## What changed
+
+**Q1. The writer stays in the pipeline; the generator gets its own (REQ-PIPE-380, REQ-GEN-386)**
+- REQ-PIPE-380 criterion 2: `write_delivery`, `write_receipts` and `next_sequence` stay in the real pipeline, because `hand_filing.py` (line 275) calls them.
+- REQ-PIPE-380, new criterion 18: asset_model/ reads the delivery tree and writes it nowhere.
+- The read half still moves under QB, because `arrivals_for` reads the tree through it and the generator checks its placements with `arrivals_for`. A new decision records that Keith rejected writing in asset_model/, not reading. Open question 1 is closed.
+- REQ-GEN-386 criterion 7: the generator gets its own delivery writer in generator/, and the generator-only removers and bookkeeping move beside it. The generator imports nothing of the pipeline's writer.
+- REQ-GEN-386, new criterion 8, keeps the two writers in agreement. It is a critical test that needs no database:
+  - It writes one delivery (several files, one receipt per file, both zip-shaped and folder) through both writers into two empty trees.
+  - It fails on any byte difference, or if asset_model's reader reads either tree back differently.
+- Decisions record how agreement is kept and why the test is critical. They also record a rejected alternative: a schema document both writers are reviewed against, rejected because nothing would fail when the writers drifted.
+
+**Q2. The spread comes back (REQ-PIPE-382)**
+
+Two new criteria (3 and 4) carry the design.
+- **The rule.** The seeded lag stays one rule in asset_model/: `promotion.effective_at_for`, moved there by REQ-PIPE-380.
+  - A supply received at R takes effect at R plus a lag seeded off its run id.
+  - The lag is spread across the claim window W where one is given, and one hour to three days otherwise.
+  - It is never at or past the next receipt B; just before it, never before R.
+- **What the clock decides.** The one cap that differs between a replay and a real run is "the latest instant a decision may take effect", and the rule asks the clock for it.
+  - The wall clock and a pinned clock answer now, which gives today's min(now, R + lag).
+  - An installed replay clock answers the real wall-clock present.
+  - So a replayed promotion keeps its spread and can never land in the real future. That matters once the anchor rolls (#138, R2).
+- **What the pipeline passes.** It passes facts it already has:
+  - R and the run id.
+  - B from `next_receipt`.
+  - W from `_claim_window`, which under 378 Q2(a) leaves out a dataset dated before its calendar's first version and gives no W if none remain.
+
+  It then announces the result as the "decision takes effect" event. An installed replay clock moves forward on it, never backwards; the wall clock ignores it. The pipeline imports nothing of the replay.
+- Criterion 2 now says every reader of "now" reads the one clock, with this single exception.
+- Criterion 13's tests now cover four cases:
+  - a replayed promotion spreading while the replay clock sits at its simulated instant;
+  - a real-run promotion matching today exactly, including a retried package gate (#274 D1);
+  - no replayed decision taking effect after the real present;
+  - the unchanged cases.
+- Decisions added: the spread comes back (rejected: keeping the dead code with a note, and removing the lag); how the event carries the lag and its caps; the claim-window cap following 378 Q2(a); never after the real present.
+- The old open question is replaced by the new one below. Cross-references shifted by the two new criteria and were re-pointed in REQ-PIPE-383, REQ-PIPE-378, REQ-TEST-393 and REQ-PIPE-382's own text.
+
+**Q3. Both old scenario links show not-found (REQ-PIPE-385)**
+- Criterion 13: `?panel=scenarios` and `?scenario=<id>` both land on the plain not-found page, even when the rest of the address is a real page.
+- The parameter is removed with replaceState so a reload doesn't repeat it.
+- The browser test (criterion 15) is updated to match.
+- Settled decision added; rejected: dropping `?scenario=` silently, and dropping both. Open question closed.
+
+**Q4. REQ-PIPE-248 criterion 8 retired (REQ-TEST-393)**
+- Criterion 1 now says criterion 8 moves to REQ-PIPE-248's retired_criteria, with REQ-TEST-239's approved reason.
+- The decision is now settled; rejected: amending it. Open question closed.
+
+**Q5 and Q6. One item per error; the build-refusal split accepted (REQ-DASH-394)**
+- Criterion 5: one queue item per distinct configuration error, listing and blocking every dataset it stopped. Each dataset's page still shows it is blocked.
+- Settled decisions added for both answers:
+  - Q5 rejected one item per dataset.
+  - Q6: errors the build reads stop the build (Dash A) and are named by the CLI and logs; the queue item covers only what the build doesn't read. Rejected: refusing the build while an item is open, and revisiting Dash A.
+- Both open questions closed.
+
+The header now notes the in-place update. One open question remains in the whole draft, the one below.
+
+## New open question
+
+**REQ-PIPE-382 OQ1: where does the seeded lag live?** Keith said the replay clock "applies the seeded lag", and that can be read two ways.
+- **(a) As drafted.** The lag stays one rule in asset_model/, used on every asset as today. The replay clock only lifts the "not after now" cap to the real present, then moves forward on the decision event.
+- **(b) The lag moves into the replay clock (bootstrap/)** and the wall clock answers simply now. The lag code would leave shipped code, but:
+  - a retried package gate on a real asset would take effect at the retry instead of when its first attempt would have, reversing post-build-review #274 D1;
+  - REQ-PIPE-081's "a rule, not a replay flag" decision would be reversed too.
+
+**I recommend (a).** It brings the spread back with no change to what a real asset records and no second copy of the lag; the replay decides only how late a replayed decision may land.
