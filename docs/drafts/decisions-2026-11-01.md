@@ -624,3 +624,7 @@ Purpose recalled: insurance for a real deployment's published QA page; REQ-QAC-3
   3. REQ-TEST-357 retitled "The move to two assets changes nothing a collection records, generates, builds or offers - proven by the test suite and the existing pins, never by re-capturing them"; criteria 2 and 3 retired with item 1's reason.
   4. REQ-GEN-183's `mothman scenarios bands` claims removed when #134 deletes the command.
 - **TO CHECK (found 2026-11-14):** all 20 asset-split requirements (REQ-PIPE-342..REQ-DOCS-358) read not_started though assets/ exists and commits adapted tests to the split - the register looks stale against the code.
+
+## Evidence walk-through (docs/drafts/unmet-evidence-2026-11-14.md), Keith's answers 2026-11-14
+
+- **[14] REQ-GEN-298 c3/c4, TS-107 and TS-111:** each also shows drift Fail from a reference gap (2013-Q4 held, 2025-Q4 TS-110's refused empty file) - Keith's 2026-10-04 gap rule working, the scenarios placed straight after gaps. DECIDED: MOVE THE TWO SCENARIOS to quarters whose previous quarter was accepted (a defect fix, test-first, written up in post-build-review once the suite run ends). REJECTED rewording c3/c4 to allow a gap red, and adding a target-check rule on top.
