@@ -6277,3 +6277,8 @@ could never have computed it), and it belongs with batch 5's check work.
      also report /tmp's size. Thousands of small `/tmp/tmp*` and
      `/tmp/mothman-*` leftovers remain (a wider sweep was refused, rightly,
      without Keith's say-so).
+     **Keith, 2026-11-14: remove them.** Removed the same day once the suite
+     run had finished: 1,933 `/tmp/tmp*` and 137 `/tmp/mothman-*` entries,
+     384MB. The chunked suite runner now also clears
+     `/tmp/pytest-of-root/pytest-[0-9]*` between chunks. The retention setting
+     and the fixtures cleaning their own copies are still to look at.

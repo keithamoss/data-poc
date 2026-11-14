@@ -14544,3 +14544,6 @@ twice. It deliberately did not re-find the `TypeError`.
        `TestTheWorkflowCarriesEveryVariableThePipelineNeeds` already has for
        test.yml: assert every workflow that runs an asset-reading gate sets
        MOTHMAN_ASSET or a matrix over the assets.
+     - **Keith, 2026-11-14: no regression test.** The fix stands; a future
+       workflow that forgets the asset is caught by its first red run.
+       REJECTED a test reading every workflow.
