@@ -541,3 +541,34 @@ the rebuild needs no question asked twice. Drafts and builders read this file.
   completed_at are replay-clock stamps in a synthetic history - 6.3 days for
   one quarterly run - so they cannot be used). REJECTED: every check (needs
   each tool run per check, or shared time invented); per tool per run.
+- T2 SETTLED: shown on the dashboard as a run-time trend per dataset (each
+  supply's run time over its history) and beside each run in the supply
+  history, and printed by `mothman` when a run finishes. REJECTED: dashboard
+  only; CLI and logs only.
+- T3 SETTLED: a run taking more than twice the median of that dataset's
+  previous runs is marked 'slow' on its trend point and in the supply history;
+  it never changes a dataset's Pass/Warn/Fail or blocks anything. REJECTED:
+  trend only; a configurable per-dataset rule.
+
+## Failed attempts scoping (#121; Keith, 2026-11-14, one at a time)
+
+- F1 SETTLED: EVERY ATTEMPT of a run is kept - its number, real start and end,
+  how it ended (completed, timed out, crashed, tool error) and the error's
+  message; a retry adds an attempt rather than erasing the last (today
+  reopen_run clears completed_at and the results are replaced). Each attempt
+  carries its own run time (T1). REJECTED: only a failed-attempt count and the
+  last reason.
+- F2 SETTLED: a run that needed more than one attempt carries a short note in
+  the supply history (e.g. "Succeeded on attempt 2 - attempt 1 timed out after
+  45 min"), and the run's detail lists every attempt; the dataset's
+  Pass/Warn/Fail comes from the successful attempt only. REJECTED: detail only;
+  lifting the supply to Warn.
+- F3 SETTLED: a run whose last attempt failed and is not yet retried shows as
+  "Not checked - the run timed out" (or crashed), with when and the error; its
+  checks read "No result", never a stale Pass from an earlier supply; the
+  dataset's status reflects that the supply could not be checked, as today's
+  "could not run" does. REJECTED: failing the supply.
+- ROUTING (#120 + #121) SETTLED: one batch to delivery-scoper, then the
+  architect and the dashboard and CLI UX reviewers, AFTER the #134 v5 reviews
+  and the speed + rolling-anchor batch. REJECTED: joining the speed batch;
+  scoping now.
