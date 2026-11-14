@@ -249,3 +249,174 @@ Key files:
 - /home/user/data-poc/cli/supply.py
 - /home/user/data-poc/cli/common.py
 - /home/user/data-poc/tests/test_status_parity.py
+
+## Architect (delivery-architect)
+
+## Architect review: timing-attempts v1 (REQ-PIPE-409 to REQ-TEST-416), checked against HEAD
+
+Advisory only. I edited no file. Settled answers (T1-T3, F1-F3, TA Q1-Q9, with Q9 = (a)) are treated as given.
+
+**Verdict:** the draft's direction is sound and fits the existing structure. There are **6 blocking findings**. The biggest is that a feature already reads failed attempts, and the draft doesn't know about it: REQ-DASH-272 c21 in `pipeline/package_gating.py`. Two others are about which failed runs count. None of them needs a new command group or new design work.
+
+### Blocking findings
+
+**B1. REQ-PIPE-411 c3/c5 counts too many runs as "not checked".** "each run (qa.run, not qa.run_visible, trials excluded)" also picks up:
+- **Runs inside a gate application.** When a gate's re-check crashes, `gate.py:570-576` abandons the application and queues a retry. REQ-PIPE-267 c12 (`qa_store.py:1486-1504`) says such a run "counts for nothing ... toward no status, page, count, ticket". A red blocker plus a queue item breaks that rule.
+- **Readers-only runs.** They are not about the supply (`supply_current_run` leaves them out, `qa_store.py:1525`).
+- **Full re-runs triggered by a decision.** Their supply already has a verdict from its arrival run. A blocker opened at receipt would paint its whole history red, back to receipt, in the as-of view.
+- **Fix:** limit c3/c5 to runs that are `scope = 'arrival'`, `NOT trial`, `gate_application IS NULL` and have a `supply_id`. What a failed full re-run shows is question QA below.
+
+**B2. REQ-PIPE-411 c3's "and that has no completed attempt" lets a stale Pass through.**
+- Every `open_run` calls `reopen_run` (`qa_results_writer.py:784` → `qa_store.py:2185-2193`), which sets `completed_at` back to NULL.
+- So a run that completed, was reopened, and then failed is hidden from `run_visible` and also excluded by c3. It disappears, and the supply falls back to an older run's verdict. That is the stale Pass REQ-DASH-415 exists to prevent.
+- **Fix:** define the not-checked condition as `completed_at IS NULL` and the newest attempt (by run_seq) not COMPLETED, whether or not it has ended.
+- Align REQ-PIPE-409 c7 with this: a run's run time is its newest attempt's `elapsed_seconds` where that attempt COMPLETED, otherwise none. An older completed attempt doesn't count.
+
+**B3. REQ-PIPE-410 c1 ("the chained cause") picks the wrong tool when two tools fail.**
+- When dbt and a foreground tool both fail, `parallel_orchestrate.beside` (`parallel_orchestrate.py:147-151`) does `raise first from None`.
+- That overwrites dbt's `QaRunFailure.__cause__` with None and leaves `__context__` pointing at the *other* tool's `QaRunFailure`.
+- Both c1's cause and `_outcome`'s timeout walk (`qa_results_writer.py:906-911`) would then report the other tool's exception type and SQLSTATE.
+- **Fix:** extend c2 so `QaRunFailure` carries `tool` *and* `cause` as fields, set in `_run_step` (`orchestrate.py:57-67`). `_outcome` should read the fields, not the chain. Add a test where two tools fail and dbt's error is a timeout.
+
+**B4. The draft overlaps and contradicts REQ-DASH-272 c21, which is built (`pipeline/package_gating.py`).**
+- That module's lines 1-55 and 139-146 already read `qa.run_attempt` for attempts that didn't complete.
+- For an arrival whose run isn't recorded, it shows "Being checked with its delivery ... Nothing needs deciding yet" with "no pill and no check results". When a package-mate's run stopped, it adds "'<dataset>'s run stopped; the next processing pass re-runs it." (lines 246-268).
+- REQ-DASH-415 would show a red "Could not be checked" plus a blocking "needs a person" item for the same supply on the same date. That is a direct contradiction.
+- It also corrects the reviewer flag. REQ-PIPE-411 is **not** the first build-side read of runs outside `run_visible`: `package_gating.py:132-176` and `pipeline/red_promoted.py:35-59` already read `qa.run` and `qa.run_attempt` directly.
+- **Fix:** add a criterion saying which wording wins, and amend REQ-DASH-272's wording in the same change (question QB). Take attempts from one shared reader rather than a second query.
+
+**B5. Attempt lists grow without limit for a supply that always crashes.**
+- The processing pass retries every UNCHECKED arrival on every pass with no back-off (`processing_pass.py:204-210`, and nothing else stops it).
+- With Q9 = (a), a run that always crashes stays stuck until someone rejects it, adding one attempt per pass. REQ-PIPE-411 c2 emits "every attempt" into the dashboard data, and REQ-DASH-414/415 list them all.
+- REQ-PIPE-409's STORAGE NFR ("of the order of ten thousand rows a year") doesn't allow for this either.
+- **Fix:** bound what is emitted (question QC), and correct the NFR to cover retries.
+
+**B6. A built requirement's wording changes without saying so.**
+- REQ-PIPE-279 c6 (`requirements.yaml:40219-40229`) says "a tool's own timeout arriving as QaRunFailure ... records CRASHED", and its outcome list has no TOOL-ERROR.
+- REQ-PIPE-410 changes both. Under the post-build sign-off rule that is a change to a `requirements.yaml` claim.
+- **Fix:** add a REQ-PIPE-410 criterion that amends REQ-PIPE-279 c6 in the same change, with the exact appended wording, so Keith signs it by signing REQ-PIPE-410. This is the pattern REQ-PIPE-382 c14 uses.
+
+### Non-blocking findings
+
+**N1. `time.monotonic()` against REQ-PIPE-382 and REQ-TEST-384: no clash.**
+- REQ-TEST-384 (separation-v6 l.268-270) only fails imports *between sides*. The standard-library `time` module is in no side and isn't a file the gate reads.
+- REQ-PIPE-382 c1/c2 (l.173-174) cover recorded instants and "today", not durations.
+- Real pipeline modules already do this: `processing_pass.py:366-377`, `recheck.py:538-548`, and `replay_clock.py:61` itself.
+- Guidance for the build:
+  - Read the counter in `qa_results_writer.Attempt` and pass the elapsed value into `qa_store.end_attempt`. `qa_store` is on REQ-PIPE-382's list of 17 modules, so keep it a pure recorder.
+  - Have REQ-PIPE-409 require one sentence in `asset_time`'s docstring (the single place REQ-PIPE-382's MAINTAINABILITY note states the time rule): durations come from `time.monotonic()`, never the clock. Otherwise REQ-PIPE-382's sweep may "fix" the read into the clock seam.
+  - Record as a decision that on Linux the monotonic clock excludes suspend, so a container that sleeps mid-run under-reports. That suits "how long the work took".
+
+**N2.** REQ-PIPE-411 c1 cites "REQ-PIPE-409 criterion 6" for the run time. It should be **criterion 7**; c6 is the one-clock stamping. The numbers shifted when TA Q1's criterion was inserted.
+
+**N3.** Make REQ-PIPE-409 c8 two-way: `(ended_at IS NULL) = (elapsed IS NULL)`. Store **integer milliseconds** (e.g. `elapsed_ms bigint`). Then REQ-PIPE-412's "exactly twice is not slow" test is exact; Decimal or float values going out through JSON make that boundary flaky.
+
+**N4.** REQ-PIPE-409 c10's "within a tolerance of a known real duration" will flake under xdist. Inject the counter (monkeypatch the time source `Attempt` uses) and assert exact values. If a real-sleep test is wanted, give it a lower bound only.
+
+**N5. REQ-PIPE-411 c5's wording and lifecycle.**
+- It says "record a dataset blocker", but blockers are *derived* when read (`dataset_blockers.py:370-413`, `all_blockers` 433-438). Reword to "derive".
+- Define when it closes if the supply is superseded or re-filed before a retry completes; otherwise it stays red for good. Mirror `_failed_loads`.
+
+**N6.** The new kind's name, UNCHECKED, collides with `processing_pass.UNCHECKED` (l.62), which means "owed the whole lifecycle". Call it `NOT_CHECKED` / "not-checked".
+
+**N7. Not-checked runs have no rank.**
+- `run_facts` ranks only visible runs (`qa_results_reader.py:368-406`), so a not-checked run has nothing to order it by. REQ-DASH-415 c1 ("shown as the dataset's own") needs that.
+- REQ-PIPE-411 should say they join the same dense rank from their newest run_seq. That renumbers later ranks, which is still deterministic, but it should be stated.
+- Put the new reader in `qa_results_reader` beside `run_facts`/`incomplete_runs` (l.234), and have `package_gating` share it.
+
+**N8. A Lambda killed at its limit.**
+- Lambda's limit is 15 minutes (`aws/cdk/data_pipeline_stack.py:113`). The `deadline` budget only stops the pass taking *new* arrivals, and a hard kill isn't guaranteed to deliver any signal.
+- So the outcome stays NULL until the next attempt of that run key opens. The advisory lock can also outlive the dead sandbox until TCP keepalive notices (#262 R3), so the next pass may hit `AttemptInProgress`.
+- The draft handles this honestly: no end, no run time, "has not finished".
+- But the runs closest to the limit, which are exactly what #120 wanted to see, never get a run time, so the trend can't show them. Record that as a decision. Having the pass stop itself just before the limit (INTERRUPTED with an end and an elapsed value) belongs to #124/AWS.
+- REQ-DASH-414 c1's note needs wording for an earlier try with no recorded end ("the first did not finish"), because "after <duration>" can't be filled in.
+
+**N9. REQ-PIPE-412's cost at about 30 collections is trivial.** A sliding window of 20 is O(runs × 20), milliseconds even for daily datasets with thousands of runs. For page weight, emit median and count only for runs marked slow and for the newest run; REQ-DASH-413's hover and text alternative need nothing else.
+
+**N10.** REQ-PIPE-411 c10 should refuse on the *key* being absent, as the `run_facts` check does (`build_dashboard_data.py:1121`), not on null values, which are legitimate.
+
+**N11. Schema bump to version 51 (`qa_store.py:203` is at 50).**
+- Edit the `CREATE TABLE` in place (`IF NOT EXISTS` never alters an existing table) and *replace* the CHECK at l.313. Older databases are refused (l.1930-1950), so that's consistent.
+- Expect `tests/test_check_read_and_attempts.py:501` (which asserts `error_type == "QaRunFailure"`) to change.
+- Budget a cache-miss bootstrap. This is unavoidable, since any change under `qa_tools/**` misses the cache anyway.
+
+**N12. REQ-TEST-416.**
+- Have `Attempt.end` return the outcome and elapsed time so `run_one` (`orchestrate.py:84-107`) prints without a re-read. "Earlier attempts" costs one `attempts_of` query, which is fine.
+- The line is printed from `qa_tools/tools/` rather than `cli/`. TEST is acceptable as the code, but the scoper may prefer PIPE.
+
+**On the receipt-opened blocker:** I agree with it **for arrival runs**. It matches REFUSED and #118 D-B: the supply has had no verdict since it arrived, and the attempt's end time depends on when a pass happened to run, which D-B rejected. The cost to state in the decision is that the as-of red window includes the normal wait between receipt and the check. It is wrong for full re-runs (see B1 and QA).
+
+### Duplication / overlap
+- **Real overlap:** `pipeline/package_gating.py` (REQ-DASH-272 c21), covered in B4.
+- **Intended extension points, not duplication:** `dataset_blockers.py` (beside REFUSED) and `outstanding.py` (`_from_loads`, l.472-507). The CLI's `cli/supply.py:380` lists only failed loads, so decide whether `mothman` lists not-checked supplies too (CLI UX reviewer).
+- **One reader:** `qa_store.incomplete_runs`/`attempts_of` and `qa_results_reader.incomplete_runs` already exist. Build the build-side attempt reader beside them, not inside `results_history` or `dataset_blockers`.
+
+### Structural fit, blast radius, security
+- **Fit:** no new command group. Everything is in existing modules.
+- **Components:** QAC (orchestrate, writer), PIPE (qa_store, reader, results_history, build_dashboard_data, dataset_blockers, outstanding, package_gating), DASH (template), TEST (cli report panel, tests). Four components, but one data path, so a batch scoped like this is the right treatment rather than a cross-component `plans/wider.md` item.
+- **Security:** no new access. `qa.run_attempt` is covered by the publisher's existing grant (`qa_store.py:2013-2016`). TA Q5 keeps error messages off the page. Make sure the attempt fields are emitted from an explicit list that leaves out `error_message`, and test the built HTML for it.
+
+### Code-quality expectations (for delivery-critic)
+1. One counter read at each end of an attempt, both in `Attempt`, with a comment saying why it's monotonic and not the clock. `qa_store` stays a recorder.
+2. The outcome is decided only in `_outcome`, from `QaRunFailure`'s fields. No reading the chain for the tool and no parsing text, with a test where two tools fail.
+3. One reader of attempts for the build, used by `results_history`, `dataset_blockers` and `package_gating`, with a docstring that names the condition from B1/B2 exactly.
+4. The slow rule is one pure function (`runs → marks`) with the window and minimum as named constants citing TA Q3, and no DB access.
+5. Emitted attempt fields come from an explicit list that leaves out `error_message`, with a comment citing TA Q5 (the one justified exception to spread-then-override).
+6. The Python and JS duration formatters are kept equal by one shared case list.
+7. Every new criterion has a test seen failing first. Timing tests inject the counter.
+
+### Sketch
+```
+open_run → Attempt(t0=monotonic) ── tools (_run_step sets QaRunFailure.tool/.cause)
+   └ end(): outcome=_outcome(exc); elapsed_ms=monotonic-t0 → qa_store.end_attempt(…, elapsed_ms, tool)
+build: qa_results_reader.attempts_for(collection)  ← qa.run ⋈ qa.run_attempt
+   ├ results_history → run_time per run, attempts (no message), not_checked arrivals (B1/B2)
+   ├ dataset_blockers NOT_CHECKED (receipt → completing attempt | rejection) → outstanding item
+   ├ package_gating (shares the reader; precedence per QB)
+   └ build_dashboard_data → slow marks (pure fn) → template renders
+```
+
+### Build order
+1. REQ-PIPE-410 + REQ-PIPE-409 together: one schema bump, the `QaRunFailure` fields, the B3 fix, and B6's amendment to REQ-PIPE-279. Preferably after separation-v6's REQ-PIPE-382, so the "replay clock advances mid-attempt" test uses REQ-PIPE-382's install call rather than `replay_clock` directly, which would need rewriting. Nothing here adds an import edge, so either order is safe.
+2. REQ-TEST-416. It needs only steps 1's two requirements and gives the maintainer the data while the rest is built.
+3. REQ-PIPE-411, including the shared reader and the REQ-DASH-272 reconciliation.
+4. REQ-PIPE-412.
+5. REQ-DASH-413, REQ-DASH-414, REQ-DASH-415, after the dashboard UX review.
+
+### Questions for Keith (one batch, relay-ready)
+
+**QA. Which failed runs make a supply read "Could not be checked"?** (B1 is otherwise provisional on this.)
+- (a) Only a supply's **arrival** run. A failed re-check after a decision leaves the supply's earlier verdict standing, with the existing "re-check owed" display and its tries listed. Gate re-checks and readers-only runs never count. This keeps REQ-PIPE-267 c12 intact and the receipt start honest.
+- (b) Arrival runs **and** decision-caused full re-checks. A re-check's window opens when its decision took effect, not at receipt. This catches a correction that can't be checked, at the cost of a second opening rule.
+- **Recommend (a).**
+
+**QB. A failed run inside a multi-file delivery** currently reads "Being checked with its delivery ... Nothing needs deciding yet" plus "'X's run stopped; the next pass re-runs it" (REQ-DASH-272, built).
+- (a) The failed supply's own row and its dataset show the new "Not checked" red with its queue item. Its package-mates keep "X's run stopped", but lose "Nothing needs deciding yet" while a mate can't be checked. This amends REQ-DASH-272's wording.
+- (b) Inside an unfinished package the failure stays in REQ-DASH-272's neutral form, with no red and no item, until the package is otherwise complete. No amendment, but a package with a mate that always crashes never goes red.
+- **Recommend (a).**
+
+**QC. A supply that crashes on every pass gains one try per pass** with no limit.
+- (a) Emit and list every try: complete, but unbounded page weight.
+- (b) Emit the count, the first try and the newest 5, with "and N more". The full list stays in `mothman` and the database. Always bounded.
+- (c) Collapse back-to-back tries that ended the same way with the same tool and error type into one line ("crashed in dbt (KeyError) ×37, from X to Y"). Compact, but unbounded if the errors alternate.
+- **Recommend (b).**
+
+**QD. The schema bump: regenerate or migrate?** The parked note `docs/drafts/schema-migrations/README.md` records your 2026-10-14 call that every bump from version 41 ships a migration. That was never applied (versions 41-50 all regenerated), and the code still refuses older databases.
+- (a) Regenerate, as drafted. It matches the code and every signed requirement since, and leaves the migration work for when it's scoped.
+- (b) Also ship a hand-written additive migration (new nullable columns; the new CHECKs added `NOT VALID` so older TIMED-OUT rows with no error type pass) as a first worked example. That pre-empts the Alembic-vs-Django choice and is close to the home-grown runner you rejected.
+- **Recommend (a).**
+
+Decided by me, not asked: everything under "Non-blocking". Provisional on the answers: B1's scope wording (QA), B4's precedence (QB), and B5's limit (QC).
+
+### Files
+- /home/user/data-poc/docs/drafts/timing-attempts-v1.yaml
+- /home/user/data-poc/pipeline/package_gating.py
+- /home/user/data-poc/qa_tools/common/parallel_orchestrate.py
+- /home/user/data-poc/qa_tools/common/qa_results_writer.py
+- /home/user/data-poc/qa_tools/common/qa_store.py
+- /home/user/data-poc/qa_tools/common/qa_results_reader.py
+- /home/user/data-poc/qa_tools/common/dataset_blockers.py
+- /home/user/data-poc/qa_tools/common/outstanding.py
+- /home/user/data-poc/qa_tools/tools/orchestrate.py
+- /home/user/data-poc/qa_tools/common/gate.py
+- /home/user/data-poc/docs/drafts/schema-migrations/README.md
