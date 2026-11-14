@@ -160,3 +160,92 @@ dbt already runs beside the other three tools, and the 49% "waiting on dbt" mean
 
 ## New questions
 None blocking. One thing Keith should hear: on Keith's own numbers the quarterly 720s budget is not expected to be met even with all six speed-ups. Whether to then shrink the history, accept a larger budget, or go after per-run cost further is a decision for after REQ-PIPE-403's measurement, not now.
+
+## v2 report (reviews and SR1-SR9 folded in)
+
+v2 is written as a new file, `/home/user/data-poc/docs/drafts/speed-anchor-v2.yaml`, with all 15 ids kept and every open question `[]`. The draft check reports nothing except the 31 expected cross-reference errors, and every id the file names exists in requirements.yaml, separation-v6.yaml or the draft itself. I spot-checked the reviewers' line references against the code at HEAD before carrying any finding, and all the ones I checked held. v1 is untouched, nothing else was edited, and nothing is committed. The `decisions-2026-11-01.md` change in the working tree is not mine.
+
+## Changes, one line per requirement
+- **REQ-PIPE-397:**
+  - The pin reads a declared set of files up front at install (the asset's *.yaml/*.yml without dbt_packages, environments.yaml, the shared file-checks default), keyed on resolved path (B1).
+  - It is handed to every pool through `assets.handoff()`, and the target-trial pool (`cli/target_trial.py:171-174`) moves onto it (B1).
+  - Every read of those files goes through config_yaml, enforced by a gate rule on REQ-TEST-384's walker plus an audit-hook test (B2). I found 54 `config_yaml.parse` calls in 26 files and 34 `yaml.safe_load` calls that read the file themselves.
+  - Smaller fixes: a missing file raises every time, `load()` keeps its deep copy, and the "no system call" NFR now says "no file read".
+- **REQ-GEN-398:** generation time becomes an entry in the existing "Took" line, and generation never snapshots the delivery tree (B4).
+- **REQ-GEN-399:**
+  - Every process the bootstrap starts is handed the snapshot.
+  - A digest mismatch exits non-zero, the TUI doesn't print "Ready", and the message says the fault is ours.
+  - One closing block for CLI and TUI: Took line, budget line, a dimmed 12-character pinned digest, then "generated up to <date>" with which anchor. No statement ends in "..." (CLI 4, 10).
+- **REQ-PIPE-400:**
+  - Function names corrected: `slots.slots_for_dataset`, `Agreement.standing_on`.
+  - The memo is keyed on the Agreement actually used plus the time-zone versions in force. It holds strong references and is bounded, so it is correct pinned or not (B3).
+  - Tests plant a time-zone correction as well as a calendar one.
+- **REQ-PIPE-401:** content-keyed through a bounded, locked Built store; no longer depends on the pin, so it is built first and test-first. `list_setting_members.py:253`'s raw read is routed too.
+- **REQ-TEST-402:**
+  - The hand list of generating tests becomes a rule plus a build-time grep recorded in evidence.
+  - The shared history is never under `data/` and is gitignored before its first write.
+  - Writes are refused by guarding the five writers, not by permissions, with an end-of-session digest as a backstop.
+  - Concurrency: `fcntl.flock` exclusive to build and shared to read; a stale history is removed only if no other session holds it.
+  - The cache key follows REQ-GEN-381's inputs and includes the anchor.
+- **REQ-PIPE-403 (SR7):**
+  - It records before and after by stage and is cited as evidence for REQ-PIPE-250 c2 and c5; its own restated-budget and CI-figure criteria are gone.
+  - It records commit and load average per measurement.
+  - The TUI's "a few minutes" becomes the measured figure.
+  - The REQ-PIPE-250 c4 retirement waits on REQ-TEST-393.
+- **REQ-GEN-404:**
+  - The anchor is recorded in a third place, a one-line file beside the delivery tree (SR1).
+  - `--anchor` on the bootstrap and every generate command; `--roll-anchor` on the bootstrap only; both together is a usage error.
+  - Refusals:
+    - a future date (with the CLI's wording);
+    - a date before 2026-09-25 (SR6);
+    - a bare generate whose anchor differs from the recorded one (SR3);
+    - `GENERATOR_ANCHOR_DATE` set (README lines 631-635 updated).
+  - The anchor is installed process-wide and handed to children, and folded into the cache key.
+  - With no tree, offsets resolve to the fixed anchor only under test and ci.
+- **REQ-GEN-405:**
+  - The deployment database is checked once per asset before any test runs, with one message. It also refuses a database with no recorded anchor, and offers reset then bootstrap only (SR2, CLI 3).
+  - Refusals: `--anchor` other than the fixed date under test or ci; `--roll-anchor` or `--anchor` on a populated database (non-zero exit).
+  - The step-back to an earlier anchor day is worked out from the built arrivals and said before the long part.
+  - Reset names both next steps, and bootstrap `--help` gets an examples block.
+  - v1's "two databases side by side" note is corrected: one checkout holds one history. The route for both side by side is a second worktree, with the `deployment_dsn_for` caveat.
+- **REQ-GEN-406:**
+  - Offsets resolve from the anchor file (SR1, B6).
+  - Readers that parse the file raw (`validate_schedule.py:2307` and `:2330`, `synthetic_inputs`) go through the resolver.
+  - The freeze gate resolves both versions it compares against one anchor.
+  - The page shows only absolute dates (dashboard 5).
+  - A scenario link with a stale date lands on the scenario's current date, corrected with `replaceState` (SR9).
+  - The calendar refusal gives a pasteable `candidate-dates` command and a fallback.
+- **REQ-DASH-407 (rewritten):**
+  - Footer sentence: "...generated up to and including <date>; a period after that date has no supply." Plus the as-of panel line under the picker (SR8).
+  - The date travels as a `BUILD_PROVENANCE` field; the not-recorded wording carries no command.
+  - The picker's default and range are unchanged (dashboard 3).
+  - `env current` and `env list` read the anchor file, so they never need the database (CLI 8).
+- **REQ-GEN-408:**
+  - The reset also deletes the placements file and the anchor file.
+  - Before the phrase it lists each tree with file counts and the anchor about to be deleted.
+  - New phrase: "delete all QA history and generated files for <asset>" (SR4).
+  - It refuses while any delivery folder the bookkeeping doesn't list exists (SR5).
+  - It refuses symlinks and data folders outside the asset's own, and gives a per-part closing report and updated `--help`.
+- **REQ-PIPE-430:**
+  - The tree snapshot is its own installation, made after generation and per collection in the one-collection branch (B4).
+  - `files_by_dataset` is read-only per caller.
+  - A changed tree exits non-zero and names the likely cause neutrally.
+- **REQ-PIPE-431:**
+  - Only the datacontract-cli library call goes to the worker. Asking, filtering, left-out notes and recording stay in the run's process (B5), and tests check the replay-clock stamp and that a re-check's scope survives.
+  - Worker code is shared with `dbt_worker`, and credentials go by environment.
+  - Failure wording follows CLI 9, and the `--sequential` help is updated.
+- **REQ-PIPE-432:** threads passed as dbt's `--threads` flag from one constant per worker, a bad value refused by name, results sorted by unique_id, and the connection count now includes the test suite.
+
+## Findings not carried, and why
+- **Architect's seam note on `promotion.next_receipt`** (let the replay clock work out the next receipt, removing half of REQ-PIPE-430's work): recorded as a decision on 430 for whoever builds REQ-PIPE-382. Doing it would edit v6, which this batch must not.
+- **REQ-PIPE-250's stale title** ("all three collections"): flagged in a 403 decision as a retitle for Keith to word. It is a register edit to another requirement and wasn't approved.
+- **Dashboard finding 1:** settled by SR8. **Finding 6** said no change was needed.
+- **Architect's no-duplication note on REQ-TEST-116:** confirmation only; nothing to carry.
+- Everything else (B1-B6, the non-blocking list, CLI 1-11, dashboard 2-5) is carried.
+
+## Choices I made for Keith to check (each marked "Keith may change it")
+- **A database with no recorded anchor is refused too.** Every local database bootstrapped before REQ-GEN-404 has none, so the first full gate after it forces one rebuild per asset. That coincides with v6's planned post-build reset, so it shouldn't cost an extra rebuild.
+- **The test cache is one folder shared across `MOTHMAN_TEST_DB_TAG` values, using shared locks,** rather than a folder per tag.
+
+## New open questions
+None that block. The one thing worth Keith's attention is that SR5 and SR3 together tighten the reset path: a hand-filed folder blocks the reset, and a mismatched anchor blocks a bare generate. So a person can be stopped twice before getting a clean demo. Both messages name the next step.
