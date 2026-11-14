@@ -5797,6 +5797,10 @@ could never have computed it), and it belongs with batch 5's check work.
      visually obvious, so you can go and look into it and try and address
      it." `qa.run` already records `created_at` and `completed_at`. Related
      to the pipeline-observability item in plans/wider.md. Not scoped.
+     **SCOPED AND SIGNED 2026-11-14 (Keith)** as timing-attempts v2
+     (REQ-PIPE-409 to REQ-TEST-418; docs/drafts/timing-attempts-v2.yaml,
+     answers in docs/drafts/decisions-2026-11-01.md). Not built; this entry's
+     prose comes out when they are.
 
 121. **[todo, 2026-10-22]** **[Dashboard UI]** **[QA Pipeline]** **Make it
      obvious when a run timed out or crashed before it succeeded.** Keith,
@@ -5806,6 +5810,10 @@ could never have computed it), and it belongs with batch 5's check work.
      trace of the failed attempt (`reopen_run` clears `completed_at`;
      results are replaced), so recording attempts would have to come first.
      Display for the UX review alongside #118-#120.
+     **SCOPED AND SIGNED 2026-11-14 (Keith)** as timing-attempts v2
+     (REQ-PIPE-409 to REQ-TEST-418; docs/drafts/timing-attempts-v2.yaml,
+     answers in docs/drafts/decisions-2026-11-01.md). Not built; this entry's
+     prose comes out when they are.
 
 123. **[todo, 2026-10-22]** **[Dashboard UI]** **[Pipeline & publishing]** **Make
      publishing the dashboard part of a routine, so the site cannot silently
