@@ -109,6 +109,19 @@ intro: >
   all three.
 
 releases:
+  - date: "2026-11-14"
+    summary: >
+      The Feedback tab now gathers its cards from a second road-testing file
+      as well as the first.
+    changes:
+      - category: Changed
+        items:
+          - headline: Feedback comes from every road-testing file
+            components: ["Dashboard UI", "Docs & process"]
+            description: >
+              Cards in the new second road-testing file appear on the Feedback
+              tab beside the first file's, checked the same way. A card with a
+              problem now says which file it is in.
   - date: "2026-11-03"
     summary: >
       The dataset list now counts the checks that span tables, as each
