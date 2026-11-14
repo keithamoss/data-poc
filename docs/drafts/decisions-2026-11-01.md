@@ -709,3 +709,8 @@ Purpose recalled: insurance for a real deployment's published QA page; REQ-QAC-3
 - **TR6 (dashboard Q2, where the run-time trend sits):** THE HEAD OF THE SUPPLY HISTORY SECTION, in unitTrendBlock's frame, rendered on blocked and not-checked pages too. REJECTED beside the column trend, and collapsed.
 - **TR7 (dashboard Q4 + CLI Q2, where the withheld message is read):** EXTEND EXISTING COMMANDS - mothman supply failures lists 'could not be checked' beside 'could not be loaded' with tries and full messages; supply history --dataset gains a run-time column; the page's try list names that command. REJECTED a new supply tries command, and pointing at the run log.
 - **TR8 (dashboard Q5, failed tries on the trend):** YES, AS HOLLOW MARKERS labelled in words ('timed out after 45m'), not joined to the line, never in a median. REJECTED completed runs only.
+- **TR9 (CLI Q1, 'slow' in the terminal):** NO - THE PAGE ONLY judges slow; the terminal prints the run time. REJECTED the run step judging it, and read-only commands repeating the mark.
+- **TR10 (CLI Q4 + dashboard 8, the shared duration format):** COMPACT - '45s', '3m 12s', '2h 05m', 'under 1s'; TA Q8's note reads '...the first timed out after 45m'; one Python and one JS formatter held equal by a shared case list. REJECTED words ('45 sec').
+- **TR11 (CLI Q3, which durations move):** RUN TIMES PLUS THE SAME-SCREEN ONES - the bootstrap's 'Took ...' line and the bulk re-check's elapsed/left; claim windows keep their authored form. REJECTED run times only, and every duration.
+
+**TIMING-ATTEMPTS REVIEW BATCH STATUS:** all eleven answered (13 questions, two pairs merged). To the scoper for v2 with every reviewer finding, then sign-off.
