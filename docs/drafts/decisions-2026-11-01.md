@@ -506,3 +506,28 @@ the rebuild needs no question asked twice. Drafts and builders read this file.
   sign-off. Likely touches: REQ-PIPE-254 criterion 15's scope, REQ-PIPE-352's
   12-minute budget, and a new test-suite requirement (#136). REJECTED: scoping
   in parallel now; folding into #134.
+
+## Rolling anchor date scoping (#138; Keith, 2026-11-14, one at a time)
+
+- R1 SETTLED: only a real regeneration of the DEMO data (reset + bootstrap)
+  rolls the anchor; the test suite and CI always build from one fixed test
+  anchor, so the arrival pin, the CI bootstrap cache key and REQ-TEST-239's
+  compares stay byte-stable. Accepted cost: tests exercise one fixed date, not
+  the demo's. REJECTED: everything rolls (pins rewritten relative to the
+  anchor; CI cache missing on every roll).
+- R2 SETTLED: a demo regeneration rolls the anchor to TODAY on the asset's own
+  clock (its time zone), and the date used is recorded with the history so a
+  re-run with that date reproduces the same bytes. REJECTED: start of the
+  week; the last quarterly round.
+- R3 SETTLED: the dashboard and `mothman` say which date the demo data was
+  generated up to; regeneration stays a deliberate reset + bootstrap.
+  REJECTED: a scheduled regeneration; a staleness warning.
+- R4 SETTLED: a regeneration REPLACES the whole history - the generated
+  delivery and receipt files and the database (the existing typed-confirmation
+  reset) - with one history up to the new date; a guard test proves two
+  regenerations on different dates leave one history, not two. REJECTED:
+  archiving the previous history.
+- R5 SETTLED: R1-R4 go to delivery-scoper together with the speed decisions
+  (S1-S3), after the #134 v5 reviews - one scoping pass for both, since both
+  change how generation and bootstrapping get their inputs. REJECTED: a
+  separate later batch; scoping now in parallel.
