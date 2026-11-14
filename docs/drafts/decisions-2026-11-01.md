@@ -415,3 +415,59 @@ the rebuild needs no question asked twice. Drafts and builders read this file.
   validator may read every asset's data-asset.yaml, configuration only, to
   tell another asset's dataset or agency from a mistyped one (Keith,
   2026-11-03)."
+
+## Keith's answers to #134 v4's eleven open questions (2026-11-14, Perth, one at a time)
+
+- Q1 (REQ-PIPE-380, the generator's drift planning) SETTLED: option (a) - one
+  small drift module in asset_model/ holding fold_value_counts, status_for,
+  excluding, psi_of_counts and compute_psi, pandas and Evidently imported
+  inside functions only; the generator and the real run_evidently both call
+  it. REJECTED: a second PSI copy in the generator; a permanent allowlist entry.
+- Q2 (REQ-PIPE-379, what "one mechanism" covers) SETTLED: option (a) - both
+  calendar shapes as today (authored dates and the daily cadence rule), and
+  `no_calendar: never` stays how an extraction has no slots. REJECTED: authored
+  dates only; an extraction naming an empty calendar.
+- Q3 (REQ-QAC-387, overriding the shared file checks) SETTLED: option (a) - by
+  check name: a same-named `check:` replaces the shared entry whole, a new name
+  adds an asset-only check, and `retired_as_of` on an override stops a shared
+  check for that asset. REJECTED: field-by-field inheritance; additions only.
+- Q4 (REQ-QAC-389, Emergency Department's age_group) SETTLED, NOT THE
+  RECOMMENDATION: option (b) - the ten bands become a real allowed-values rule
+  on the column in the contract (`enum:`/validValues), so datacontract-cli
+  checks age_group: a new check with its own lifecycle entry, and the
+  statistics read the same list. REJECTED: a custom property no tool checks
+  (the recommendation); a hand copy in the adapter.
+- Q5 (REQ-GEN-392, dirty.py's fault rates) SETTLED, NOT THE RECOMMENDATION:
+  option (b) - derive each rate from its check's bands at generation time (the
+  rule, e.g. the middle of the band aimed at, to be set in scoping). Birth
+  Registrations' and Child Protection's dirty supplies regenerate; every moved
+  supply and verdict is listed, and the pins and scenario expectations built on
+  today's history are re-captured with each move accounted for. REJECTED:
+  literal rates checked by a gate (the recommendation); both.
+- Q6 (REQ-PIPE-378, two "in force" policies) SETTLED, NOT THE RECOMMENDATION:
+  option (b) - a date before a calendar's first version RAISES, for every
+  caller. The callers that fall back today (claim windows, agreement_drift,
+  participation_view, verdict.py) must meet the error and say what they do
+  instead; the scoper and architect to name each, and REQ-TEST-239's compare to
+  show whether any recorded result moves. REJECTED: falling back to the first
+  version everywhere (the recommendation); keeping both, renamed.
+- Q7 (REQ-PIPE-378, the cadence check made twice) SETTLED: option (a) - keep
+  only the per-round check, against the version in force on each round's date.
+  REJECTED: only the current-version check; keeping both.
+- Q8 (REQ-PIPE-378, six look-ahead horizons) SETTLED: option (a) - one named
+  horizon in asset_model/ for every look-up from now, relative_period counting
+  within it; REQ-TEST-239's compare shows what moves. REJECTED: keeping each,
+  documented.
+- Q9 (REQ-PIPE-378, swallowed configuration errors) SETTLED: option (a) - the
+  two slot helpers raise a ScheduleConfigError; NoCalendarAgreed keeps its
+  deliberate quiet "nothing owed". REJECTED: keep swallowing.
+- Q10 (REQ-PIPE-378, DatasetPeriod.round) SETTLED: option (a) - required; the
+  two "or period" fallbacks go. REJECTED: leave it optional.
+- Q11 (the new gates on a push) SETTLED: option (a) - the imports gate
+  (REQ-TEST-384) joins validate-config.yml beside the other configuration
+  gates, and its own tests are marked `critical`. Under Q5's answer the fault
+  rates are derived rather than gated, so no fault-rate gate is needed.
+  REJECTED: local gate only; critical tests only.
+- NEXT (Keith, 2026-11-14): update the split overview artifact with these
+  answers; Keith takes another look; then v4 goes back to delivery-scoper and
+  on to delivery-architect, delivery-cli-ux and delivery-dashboard-ux.
