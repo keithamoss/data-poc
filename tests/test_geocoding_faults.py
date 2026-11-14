@@ -234,9 +234,9 @@ class TestTheOrdinarySeverities:
 SCENARIOS = {
     "TS-102": (CP, "2023-Q2", "missing_year"), "TS-103": (ED, "2022-Q1", "duplicate_year"),
     "TS-104": (CP, "2016-Q2", "unexpected_year"), "TS-105": (ED, "2023-Q1", "not_geocoded_amber"),
-    "TS-106": (CP, "2024-Q1", "not_geocoded_red"), "TS-107": (ED, "2014-Q1", "left_out_amber"),
+    "TS-106": (CP, "2024-Q1", "not_geocoded_red"), "TS-107": (ED, "2021-Q2", "left_out_amber"),
     "TS-108": (CP, "2025-Q1", "left_out_red"), "TS-109": (ED, "2017-Q4", "orphan_record"),
-    "TS-110": (CP, "2025-Q4", "empty_file"), "TS-111": (CP, "2026-Q1", "left_out_amber"),
+    "TS-110": (CP, "2025-Q4", "empty_file"), "TS-111": (CP, "2024-Q4", "left_out_amber"),
 }
 
 

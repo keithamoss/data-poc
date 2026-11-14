@@ -4514,8 +4514,10 @@ between 12 and 18 percent.*
 
 **TS-107 `[INJECT]` Coverage in the warn band.** PLANTED by REQ-GEN-298
 criterion 4 (REQ-QAC-340's route 1).
-*Config: as TS-102; 2014-Q1's ED Presentations Geocodes, 0.5 to 1.5 percent of
-the quarter's presentations left out in every year.*
+*Config: as TS-102; 2021-Q2's ED Presentations Geocodes, 0.5 to 1.5 percent of
+the quarter's presentations left out in every year. (Moved from 2014-Q1 on
+2026-11-14, post-build-review #322: the quarter before it had no accepted ED
+geocodes, so drift read Fail across the gap beside the planted Warn.)*
 **Expect**: Source records matched reads Warn; the missing-year check, which
 counts only records present, passes.
 **Breaks as**: Missing census years failing, or coverage Pass.
@@ -4548,11 +4550,13 @@ criterion 4); the year checks find nothing to fail.
 
 **TS-111 `[INJECT]` A Client Register coloured by its geocodes' promotion.**
 PLANTED by REQ-GEN-298 criterion 4 (route 5, the G1 route).
-*Config: as TS-107; 2026-Q1's Client Register Geocodes, 0.5 to 1.5 percent of
-clients left out, in a quarter whose amber setting promotes.*
+*Config: as TS-107; 2024-Q4's Client Register Geocodes, 0.5 to 1.5 percent of
+clients left out, in a quarter whose amber setting promotes. (Moved from
+2026-Q1 on 2026-11-14, post-build-review #322: it sat straight after TS-110's
+refused 2025-Q4, so drift read Fail across the gap.)*
 **Expect**: the file reads Warn on coverage and is promoted; from that instant
-the 2026-Q1 Client Register, promoted passing on the round before, reads with
-the Warn tag naming Linkage Products' 2026-Q1 Client Register Geocodes as the
+the 2024-Q4 Client Register, promoted passing on the round before, reads with
+the Warn tag naming Linkage Products' 2024-Q4 Client Register Geocodes as the
 cause (REQ-PIPE-332 criterion 4), and earlier dates still show it passing.
 **Breaks as**: the Client Register demoted, or tagged before the promotion.
 

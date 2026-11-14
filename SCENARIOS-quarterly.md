@@ -986,7 +986,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
 
 **What it would look like if the rule were wrong.** Missing census years failing, or coverage Pass.
 
-*Config: as TS-102; 2014-Q1's ED Presentations Geocodes, 0.5 to 1.5 percent of the quarter's presentations left out in every year.*
+*Config: as TS-102; 2021-Q2's ED Presentations Geocodes, 0.5 to 1.5 percent of the quarter's presentations left out in every year. (Moved from 2014-Q1 on 2026-11-14, post-build-review #322: the quarter before it had no accepted ED geocodes, so drift read Fail across the gap beside the planted Warn.)*
 
 | Where to look | |
 |---|---|
@@ -1042,11 +1042,11 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
 
 ### TS-111 - A Client Register coloured by its geocodes' promotion
 
-**What it demonstrates.** The file reads Warn on coverage and is promoted; from that instant the 2026-Q1 Client Register, promoted passing on the round before, reads with the Warn tag naming Linkage Products' 2026-Q1 Client Register Geocodes as the cause (REQ-PIPE-332 criterion 4), and earlier dates still show it passing.
+**What it demonstrates.** The file reads Warn on coverage and is promoted; from that instant the 2024-Q4 Client Register, promoted passing on the round before, reads with the Warn tag naming Linkage Products' 2024-Q4 Client Register Geocodes as the cause (REQ-PIPE-332 criterion 4), and earlier dates still show it passing.
 
 **What it would look like if the rule were wrong.** The Client Register demoted, or tagged before the promotion.
 
-*Config: as TS-107; 2026-Q1's Client Register Geocodes, 0.5 to 1.5 percent of clients left out, in a quarter whose amber setting promotes.*
+*Config: as TS-107; 2024-Q4's Client Register Geocodes, 0.5 to 1.5 percent of clients left out, in a quarter whose amber setting promotes. (Moved from 2026-Q1 on 2026-11-14, post-build-review #322: it sat straight after TS-110's refused 2025-Q4, so drift read Fail across the gap.)*
 
 | Where to look | |
 |---|---|
@@ -2473,7 +2473,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "section": "The geocoding history, planted (REQ-GEN-298)",
    "demonstrates": "Source records matched reads Warn; the missing-year check, which counts only records present, passes.",
    "breaksAs": "Missing census years failing, or coverage Pass.",
-   "config": "Config: as TS-102; 2014-Q1's ED Presentations Geocodes, 0.5 to 1.5 percent of the quarter's presentations left out in every year.",
+   "config": "Config: as TS-102; 2021-Q2's ED Presentations Geocodes, 0.5 to 1.5 percent of the quarter's presentations left out in every year. (Moved from 2014-Q1 on 2026-11-14, post-build-review #322: the quarter before it had no accepted ED geocodes, so drift read Fail across the gap beside the planted Warn.)",
    "requirements": [
     "REQ-GEN-298",
     "REQ-QAC-340"
@@ -2557,9 +2557,9 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "mode": "INJECT",
    "title": "A Client Register coloured by its geocodes' promotion",
    "section": "The geocoding history, planted (REQ-GEN-298)",
-   "demonstrates": "The file reads Warn on coverage and is promoted; from that instant the 2026-Q1 Client Register, promoted passing on the round before, reads with the Warn tag naming Linkage Products' 2026-Q1 Client Register Geocodes as the cause (REQ-PIPE-332 criterion 4), and earlier dates still show it passing.",
+   "demonstrates": "The file reads Warn on coverage and is promoted; from that instant the 2024-Q4 Client Register, promoted passing on the round before, reads with the Warn tag naming Linkage Products' 2024-Q4 Client Register Geocodes as the cause (REQ-PIPE-332 criterion 4), and earlier dates still show it passing.",
    "breaksAs": "The Client Register demoted, or tagged before the promotion.",
-   "config": "Config: as TS-107; 2026-Q1's Client Register Geocodes, 0.5 to 1.5 percent of clients left out, in a quarter whose amber setting promotes.",
+   "config": "Config: as TS-107; 2024-Q4's Client Register Geocodes, 0.5 to 1.5 percent of clients left out, in a quarter whose amber setting promotes. (Moved from 2026-Q1 on 2026-11-14, post-build-review #322: it sat straight after TS-110's refused 2025-Q4, so drift read Fail across the gap.)",
    "requirements": [
     "REQ-PIPE-332",
     "REQ-GEN-298"

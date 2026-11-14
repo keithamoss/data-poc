@@ -2724,7 +2724,7 @@ INJECTIONS: tuple[Injection, ...] = (
     Injection(
         scenario_id="TS-107",
         dataset_id="geo-ed-presentations",
-        anchor=-49,  # 2014-Q1
+        anchor=-21,  # 2021-Q2 - after a quarter whose ED geocodes were accepted (post-build-review #322)
         config="quarterly, due 19:00 on the round with 8 hours' grace, files_go_to_period 0; the geocoding delivery is received at 18:30, after the quarter's linkage release and after its source supply is promoted. 0.5 to 1.5 percent of the quarter's ED presentations are left out of the file in every year - the coverage check's warn band.",
         arrivals=(
             ExtraArrival(0, "18:30", None,
@@ -2764,7 +2764,7 @@ INJECTIONS: tuple[Injection, ...] = (
     Injection(
         scenario_id="TS-111",
         dataset_id="geo-cp-clients",
-        anchor=-3,  # 2026-Q1
+        anchor=-8,  # 2024-Q4 - after a quarter whose geocodes were accepted, not TS-110's refused 2025-Q4 (post-build-review #322)
         config="quarterly, due 19:00 on the round with 8 hours' grace, files_go_to_period 0; the geocoding delivery is received at 18:30, after the quarter's linkage release and after its source supply is promoted. 0.5 to 1.5 percent of the quarter's Client Register records are left out in every year, so the file reads Warn on coverage and is promoted, the amber setting promoting; from that instant the quarter's Client Register, promoted passing on the round before, reads with the Warn tag naming Client Register Geocodes (REQ-PIPE-332 criterion 4's route).",
         arrivals=(
             ExtraArrival(0, "18:30", None,

@@ -14551,3 +14551,36 @@ twice. It deliberately did not re-find the `TypeError`.
      - **Keith, 2026-11-14: no regression test.** The fix stands; a future
        workflow that forgets the asset is caught by its first red run.
        REJECTED a test reading every workflow.
+
+322. **[in-progress, 2026-11-14]** **[Data generation]** **TS-107 and TS-111 each showed a second, unrelated Fail beside their planted Warn.**
+     Found by the 2026-11-14 evidence walk-through (docs/drafts/unmet-evidence-2026-11-14.md,
+     item [14]; REQ-GEN-298 criteria 3 and 4 say each geocoding scenario is the
+     only fault in its supply). Both read Distribution drift as Fail with a
+     measured pass, because the quarter before had no accepted supply - Keith's
+     2026-10-04 reference-gap rule working, not a defect in it: TS-107 (2014-Q1)
+     came after 2013-Q4's ED geocodes, which arrived on 20 October before their
+     ED source and were held; TS-111 (2026-Q1) came straight after TS-110's
+     refused empty file. The bootstrap's target comparison missed it, because
+     the gate reads a gap red as its measured status.
+     - **Keith, 2026-11-14: move the two scenarios** (REJECTED rewording the
+       criteria to allow a gap red, and a target-check rule on top).
+     - **Failing test first**: tests/test_geocoding_scenarios_recorded.py reads
+       the recorded history and fails on any named geocoding scenario judged
+       Fail or Warn across a reference gap - against the 2026-11-03 history it
+       names exactly TS-107 and TS-111.
+     - **Fix**: TS-107 to 2021-Q2 and TS-111 to 2024-Q4
+       (generator/scenario_injection.py), each after a quarter whose geocodes
+       were accepted, in a quarter no source scenario holds, its source promoted
+       green; 2026-Q2, 2025-Q3, 2020-Q4, 2021-Q1, 2020-Q1 and 2023-Q4 were tried
+       and refused (TS-38, TS-12, TS-80, TS-42a) or had an amber Client Register.
+       tests/test_geocoding_faults.py's table follows; its 45 tests pass.
+       plans/supply-model.md's register entries say where they moved from.
+     - **Still to do**: regenerate the quarterly history (reset-synthetic, then
+       bootstrap, ~2 hours) and see the new test pass on it; the target
+       comparison and the G1 route's browser test (TS-111) read the new quarter
+       from the placements, not a hard-coded date.
+     - **A side finding, not fixed**: the generator's plan thought 2014-Q1's
+       reference was 2013-Q4's file, where the replay compared it with 2013-Q3 -
+       the plan's reference model does not know a geocoding file that arrives
+       before its source is held. Recorded here; no criterion depends on it now
+       that TS-107 has moved.
