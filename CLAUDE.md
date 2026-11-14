@@ -109,6 +109,12 @@ already scoped.
   `plans/qa-pipeline.md` (real bugs found running the real tools) just
   because it turns out to be one of those after investigation; write
   down what was seen first, move it once it's understood.
+- `plans/road-testing-2.md` - road testing, part 2, started 2026-11-13 at
+  Keith's ask for sightings about the QA checks themselves (drift on every
+  column, date columns' full range). The same kind of entry and the same
+  feedback card as `plans/road-testing.md`, and the feedback gate and the
+  Feedback tab read both (every `plans/road-testing*.md`, Keith,
+  2026-11-14). Not required reading up front either.
 - `plans/supply-thoughts.md` - the TRANSPORT LAYER, not yet scoped:
   what a delivery actually IS, what carries it (zip, Parquet), what
   signals its boundaries, where it lands and where it goes afterwards.

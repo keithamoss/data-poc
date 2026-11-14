@@ -250,6 +250,19 @@ def parse_plans(plans_dir: str | Path) -> dict:
 # the public page even if the gate were skipped.
 # ---------------------------------------------------------------------------
 FEEDBACK_FILE = "road-testing.md"
+#: EVERY road-testing file carries cards (Keith, 2026-11-14, when
+#: plans/road-testing-2.md was started): the first file, then the others in
+#: name order. The first one alone holds the introduction's sprint list.
+FEEDBACK_GLOB = "road-testing*.md"
+
+
+def feedback_files(plans_dir: str | Path) -> list[Path]:
+    """Every plans/road-testing*.md, plans/road-testing.md first. The first
+    file is always listed, so a missing one is reported missing rather than
+    skipped."""
+    plans_dir = Path(plans_dir)
+    others = sorted(p for p in plans_dir.glob(FEEDBACK_GLOB) if p.name != FEEDBACK_FILE)
+    return [plans_dir / FEEDBACK_FILE, *others]
 CARD_FIRST_LABELS = ("You told us", "We noticed")
 CARD_LABELS = ("You told us", "We noticed", "What we heard", "What we built", "Evidence", "Card status")
 CARD_STATUSES = ("fixed", "parked", "wont-do", "not-reproduced")
@@ -324,7 +337,7 @@ def parse_feedback_cards(path: str | Path) -> tuple[list[dict], list[str]]:
     cards: list[dict] = []
     errors: list[str] = []
     for e in entries:
-        where = f"entry #{e['number']}"
+        where = f"{path.name} entry #{e['number']}"
         chunks = e["text"].split("\n\n")
         title = chunks[0] if chunks else ""
         lines = chunks[1].split("\n") if len(chunks) > 1 else []
@@ -388,6 +401,7 @@ def parse_feedback_cards(path: str | Path) -> tuple[list[dict], list[str]]:
             continue
         first = firsts[0]
         cards.append({
+            "file": path.name,
             "number": e["number"], "status": e["status"], "date": e["date"], "title": title,
             "firstLabel": first, "first": fields[first], "heard": fields["What we heard"],
             "built": fields.get("What we built"), "evidence": evidence, "cardStatus": status,
@@ -442,13 +456,17 @@ def feedback_data(plans_dir: str | Path, requirements_path: str | Path) -> dict:
     (criterion 21): a card the gate would reject never reaches the public
     page, whether or not the gate ran."""
 
-    path = Path(plans_dir) / FEEDBACK_FILE
-    cards, errors = parse_feedback_cards(path)
+    files = feedback_files(plans_dir)
+    cards, errors = [], []
+    for path in files:
+        found, wrong = parse_feedback_cards(path)
+        cards += found
+        errors += wrong
     if errors:
-        raise ValueError("plans/road-testing.md has feedback card errors - run "
+        raise ValueError("plans/road-testing*.md have feedback card errors - run "
                          "`mothman dashboard validate-feedback`:\n  " + "\n  ".join(errors))
     reqs = {r["id"]: r for r in (config_yaml.load(requirements_path) or {}).get("requirements", [])}
-    sprints = road_testing_sprints(path.read_text())
+    sprints = road_testing_sprints(files[0].read_text())
     unknown = sorted({i["id"] for c in cards for i in c["evidence"]
                       if i["kind"] == "req" and i["id"] not in reqs})
     if unknown:
@@ -468,7 +486,8 @@ def feedback_data(plans_dir: str | Path, requirements_path: str | Path) -> dict:
             else:
                 evidence.append({"kind": "link", "label": i["label"], "href": i["href"],
                                  "inPlaceOn": i["inPlaceOn"]})
-        out.append({"firstLabel": c["firstLabel"], "first": c["first"], "heard": c["heard"],
+        out.append({"file": c["file"],
+                    "firstLabel": c["firstLabel"], "first": c["first"], "heard": c["heard"],
                     "built": c["built"], "date": c["date"], "number": c["number"],
                     "status": card_status(c, reqs), "evidence": evidence})
     return {"cards": out}

@@ -24,7 +24,8 @@ from urllib.parse import unquote
 
 import yaml
 
-from dashboard.plans_md import FEEDBACK_FILE, parse_feedback_cards, road_testing_sprints
+from dashboard.plans_md import (feedback_files, parse_feedback_cards,
+                               road_testing_sprints)
 
 ROOT = Path(__file__).resolve().parents[2]
 PLANS_DIR = ROOT / "plans"
@@ -81,18 +82,22 @@ def problems(plans_dir: Path = PLANS_DIR, requirements: Path = REQUIREMENTS,
         from qa_tools.common import assets
 
         data_asset = assets.selected().data_asset_yaml
-    path = Path(plans_dir) / FEEDBACK_FILE
-    cards, errors = parse_feedback_cards(path)
-    if not path.is_file():
+    files = feedback_files(plans_dir)
+    cards, errors = [], []
+    for path in files:
+        found, wrong = parse_feedback_cards(path)
+        cards += found
+        errors += wrong
+    if not files[0].is_file():
         return cards, errors
     reqs = {r["id"]: r for r in (yaml.safe_load(Path(requirements).read_text()) or {}).get("requirements", [])}
-    sprints = road_testing_sprints(path.read_text())
+    sprints = road_testing_sprints(files[0].read_text())
     tree = _hierarchy(Path(data_asset))
     from qa_tools.common import every_asset
 
     every_agency = every_asset.declared().agencies
     for card in cards:
-        where = f"entry #{card['number']}"
+        where = f"{card['file']} entry #{card['number']}"
         for item in card["evidence"]:
             if item["kind"] == "req":
                 r = reqs.get(item["id"])
@@ -114,7 +119,7 @@ def problems(plans_dir: Path = PLANS_DIR, requirements: Path = REQUIREMENTS,
 def main() -> int:
     cards, errors = problems()
     if errors:
-        print(f"feedback validation FAILED - {len(errors)} problem(s) in plans/{FEEDBACK_FILE}:", file=sys.stderr)
+        print(f"feedback validation FAILED - {len(errors)} problem(s) in plans/road-testing*.md:", file=sys.stderr)
         for e in errors:
             print(f"  - {e}", file=sys.stderr)
         return 1

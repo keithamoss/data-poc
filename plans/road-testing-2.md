@@ -9,12 +9,12 @@ conventions: a closed status, one or more component tags, a date (the day
 it was raised, unchanged when its status moves), and a feedback card
 straight after each entry's title line.
 
-NOT YET READ BY THE FEEDBACK GATE OR THE DASHBOARD'S FEEDBACK TAB: both
-read `plans/road-testing.md` by name (`dashboard/plans_md.py`'s
-`FEEDBACK_FILE`). The cards here follow the same form so that widening
-them later is a one-line change, and that change is a question for Keith.
-The Plans tab and `plans/INDEX.md` do read this file, as they read every
-plans file.
+READ BY THE FEEDBACK GATE AND THE DASHBOARD'S FEEDBACK TAB, like the first
+file (Keith, 2026-11-14): both read every `plans/road-testing*.md`
+(`dashboard/plans_md.py`'s `feedback_files`), so every entry here carries a
+card the gate checks, and a card error names this file. The introduction's
+sprint list stays in the first file only. The Plans tab and `plans/INDEX.md`
+read this file as they read every plans file.
 
 Anything here that becomes real build work becomes a requirement in
 `requirements.yaml`, and the entry's prose comes out when it lands; its
@@ -24,9 +24,10 @@ card stays.
 
 - **You told us:** From time to time you need drift checked between supplies in the same period, and drift should be easy to turn on for every column, with the method following the column's type.
 - **What we heard:** One generic drift framework that knows each column's kind and picks the method from it, used by the pipeline against the last promoted supply and by a person running a report by hand for supplies within a period.
-- **Card status:** Played back 2026-11-13; four questions with Keith.
 
-     Keith, 2026-11-13 (dictated). Two uses of ONE generic framework:
+     Keith, 2026-11-13 (dictated); played back the same day, and Keith
+     chose on 2026-11-14 not to answer the questions yet. Two uses of ONE
+     generic framework:
      - **In the pipeline**: drift between a supply and the previous promoted
        supply (the previous period), as today - but over all (or nearly all)
        columns, table-level measures too (row counts and the like), with the
@@ -63,9 +64,10 @@ card stays.
 
 - **You told us:** A date column should show its whole range, and pick out the few odd records inside it - ten records in 1964 when the series starts in the early 1990s - as part of its check.
 - **What we heard:** Every date column reports its full native range, and its check says how many rows fall below the expected start and above the expected end, so the stragglers are visible without the supply necessarily going red.
-- **Card status:** Played back 2026-11-13; three questions with Keith.
 
-     Keith, 2026-11-13 (dictated). He expected that a supply holding a few
+     Keith, 2026-11-13 (dictated); played back the same day, and Keith
+     chose on 2026-11-14 not to answer the questions yet. He expected that a
+     supply holding a few
      1964 records may not go red, because those rows fall outside the
      thresholds; what he wants is the report saying clearly how many rows
      fall below and above the threshold. "That gives us all we need."

@@ -243,3 +243,53 @@ def test_the_build_refuses_a_card_citing_an_unknown_requirement(tmp_path):
 #: The data asset this module's tests act for, unless a test says otherwise
 #: (C11, Keith 2026-11-02: every test module names its asset).
 pytestmark = pytest.mark.asset("quarterly")
+
+
+# ---- every road-testing file (Keith, 2026-11-14: plans/road-testing-2.md) ----
+
+class TestEveryRoadTestingFileIsRead:
+    """plans/road-testing-2.md was started 2026-11-14 at Keith's ask, and he
+    asked the same day for the gate and the Feedback tab to read it - every
+    plans/road-testing*.md, not one file by name."""
+
+    def _second(self, tmp_path, card):
+        (tmp_path / "plans" / "road-testing-2.md").write_text(
+            "# Road testing, part 2\n\n" + _entry(number=1, card=card, date="2026-11-13"))
+
+    def test_a_bad_card_in_a_second_file_fails_the_gate_naming_the_file(self, repo, tmp_path):
+        self._second(tmp_path, "    Just prose.")
+        _, errors = repo(_entry(card=GOOD))
+        _only(errors, "road-testing-2.md", "entry #1", "no feedback card")
+
+    def test_both_files_cards_are_validated_and_returned(self, repo, tmp_path):
+        self._second(tmp_path, "- **We noticed:** A date range.\n- **What we heard:** Show it.")
+        cards, errors = repo(_entry(card=GOOD))
+        assert errors == []
+        assert [(c["file"], c["number"]) for c in cards] == [
+            ("road-testing.md", 1), ("road-testing-2.md", 1)]
+
+    def test_the_feedback_tab_carries_both_files_cards(self, tmp_path):
+        from dashboard.plans_md import feedback_data
+        (tmp_path / "road-testing.md").write_text(INTRO + "\n" + _entry(
+            card="- **You told us:** a\n- **What we heard:** b"))
+        (tmp_path / "road-testing-2.md").write_text("# Part 2\n\n" + _entry(
+            card="- **You told us:** c\n- **What we heard:** d", date="2026-11-13"))
+        (tmp_path / "r.yaml").write_text("requirements: []\n")
+        cards = feedback_data(tmp_path, tmp_path / "r.yaml")["cards"]
+        assert [(c["file"], c["heard"]) for c in cards] == [
+            ("road-testing.md", "b"), ("road-testing-2.md", "d")]
+
+    def test_the_build_refuses_a_bad_card_in_a_second_file(self, tmp_path):
+        from dashboard.plans_md import feedback_data
+        (tmp_path / "road-testing.md").write_text(INTRO + "\n" + _entry(
+            card="- **You told us:** a\n- **What we heard:** b"))
+        (tmp_path / "road-testing-2.md").write_text("# Part 2\n\n" + _entry(card="    Prose."))
+        (tmp_path / "r.yaml").write_text("requirements: []\n")
+        with pytest.raises(ValueError, match="road-testing-2.md"):
+            feedback_data(tmp_path, tmp_path / "r.yaml")
+
+    def test_the_real_second_file_is_read(self):
+        from dashboard.plans_md import feedback_files
+        from pathlib import Path
+        names = [p.name for p in feedback_files(Path(__file__).resolve().parent.parent / "plans")]
+        assert names[0] == "road-testing.md" and "road-testing-2.md" in names
