@@ -42,7 +42,7 @@
 #     only ever read visible runs); 412's median at ~30 collections; a Lambda
 #     killed at its limit records INTERRUPTED with no end and no run time.
 #   dashboard UX - 'attempt' already means a RESUPPLY on the supply history
-#     ('Resupply, attempt N', template line 9464), open question 6; where the
+#     ('Resupply, attempt N', template line 9464), open question 8; where the
 #     run's attempt list lives (there is no run-level detail panel today, only
 #     per-check 'run detail'); the 'Slow' mark must not read as a status; what
 #     the mock datasets show.
@@ -83,14 +83,14 @@ requirements:
       - "NEVER THE REPLAY'S SIMULATED CLOCK (T1): qa.run's created_at and completed_at are replay-clock stamps in a synthetic history (6.3 days for one quarterly run), and the replay clock jumps forward on decision events mid-run (qa_tools/common/replay_clock.py advance_to), so no difference of recorded instants is a run time."
       - "A MONOTONIC COUNTER, OUTSIDE THE CLOCK SEAM (delivery-scoper): REQ-PIPE-382 gives the pipeline one clock for INSTANTS, which a replay may replace; a DURATION must not be replaceable, so it is read from time.monotonic() directly. replay_clock itself already measures with time.monotonic(). Flagged for the architect against REQ-PIPE-382 criterion 1."
       - "EACH ATTEMPT CARRIES ITS OWN RUN TIME (F1, SETTLED by Keith 2026-11-14), stored on qa.run_attempt rather than on qa.run; a run's run time is its newest completed attempt's (delivery-scoper: a run reopened and completed again has more than one completed attempt, and the newest is what its results are)."
-      - "WHAT AN ATTEMPT SPANS IS UNCHANGED (delivery-scoper, provisional on open question 5): from open_run to complete_run - every tool, the dataset statistics, the reconciliation and the records; not the staging before it, nor the census and the gate after it (REQ-PIPE-279 criterion 6)."
+      - "WHAT AN ATTEMPT SPANS IS UNCHANGED (delivery-scoper, provisional on open question 6): from open_run to complete_run - every tool, the dataset statistics, the reconciliation and the records; not the staging before it, nor the census and the gate after it (REQ-PIPE-279 criterion 6)."
       - "UNKNOWN STAYS UNKNOWN (delivery-scoper, carried from REQ-PIPE-279 criterion 7 and its 'LIVENESS IS A LOCK' NFR): an attempt found dead has no end time, so it has no run time. REJECTED a heartbeat column, which #124 already parks until the AWS build (post-build-review #262 R3)."
       - "HONEST, NOT NORMALISED (delivery-scoper): a bootstrap replays collections in parallel processes, and a run's four tools overlap, so a run time reflects the machine it ran on that day. It is recorded as measured; nothing corrects it."
       - "REGENERATE, NEVER MIGRATE (the standing schema rule, REQ-PIPE-144 criterion 29): the version bump rebuilds an older database from empty."
       - "NO EQUIVALENCE COMPARE (Keith, 2026-11-14, REQ-TEST-239 retired): the tests are the proof, and the synthetic history may move."
     open_questions:
       - "1. WHICH CLOCK STAMPS AN ATTEMPT'S START AND END INSTANTS (batch question 1). F1 says 'real start and end'. Today began_at and ended_at come from qa_store._stamp(), the replay clock in a replay (qa_store.py lines 2143-2147), and REQ-PIPE-382 makes that the one clock. Options: (a) keep them on the one clock - real instants on a real asset, the history's own instants in a replay - and carry 'real' in the run time this requirement adds; (b) stamp them from the wall clock always, so a replayed 2015 attempt reads as having run today. RECOMMENDED (a): on a real asset the two are the same; in a replay (b) brings back exactly what REQ-PIPE-081 criteria 27-31 fixed (records reading as made today about years ago), and the as-of view (REQ-DASH-415 criterion 6) needs an attempt's instants on the history's own timeline to show a run as not checked between its failed and its completing attempt."
-      - "5. WHAT A RUN TIME SPANS (batch question 6): (a) the attempt, open_run to complete_run, as drafted; (b) the whole arrival, including staging the file and the gate after. RECOMMENDED (a): it is the span F1's attempts already have, so a failed attempt's time and a completed one's mean the same thing; staging a large file is slow for a different reason and would want its own number if it is ever wanted."
+      - "6. WHAT A RUN TIME SPANS (batch question 6): (a) the attempt, open_run to complete_run, as drafted; (b) the whole arrival, including staging the file and the gate after. RECOMMENDED (a): it is the span F1's attempts already have, so a failed attempt's time and a completed one's mean the same thing; staging a large file is slow for a different reason and would want its own number if it is ever wanted."
     signed_off: null
 
   - id: REQ-PIPE-410
@@ -109,7 +109,7 @@ requirements:
       - "THE SYSTEM SHALL have tests, seen failing first, of a dbt failure ending an attempt TOOL-ERROR naming dbt with dbt's own exception type; of a non-tool exception still ending CRASHED with no tool; of a lock timeout inside a tool step ending TIMED-OUT with its message; and of the run's retry completing with both attempts kept."
     non_functional_requirements:
       - "SECURITY: every stored message is truncated before it is stored, as today (REQ-PIPE-279 NFR SECURITY - a driver's message can repeat a DSN)."
-      - "PRIVACY: a tool's error message can quote a value from the supply - a dbt or psycopg error naming a key, a datacontract-cli error quoting a row. Recording it in qa.* is as today; whether it is PUBLISHED is REQ-PIPE-411's open question 4."
+      - "PRIVACY: a tool's error message can quote a value from the supply - a dbt or psycopg error naming a key, a datacontract-cli error quoting a row. Recording it in qa.* is as today; whether it is PUBLISHED is REQ-PIPE-411's open question 5."
       - "MAINTAINABILITY: the outcome is decided in one function (qa_results_writer._outcome) from the exception's type and fields, never from text."
       - "STORAGE: one short text column, set only on a TOOL-ERROR attempt."
     dependencies:
@@ -157,7 +157,7 @@ requirements:
       - "AN ATTEMPT LIST ONLY WHERE IT SAYS SOMETHING (delivery-scoper, for page weight at thirty collections): a run with one completed attempt is the overwhelming case and needs only its run time."
       - "REGENERATE, NEVER MIGRATE: a results file without run times is refused and rebuilt, as REQ-PIPE-279 did for run_facts."
     open_questions:
-      - "4. IS AN ERROR'S MESSAGE PUBLISHED ON THE PAGE (batch question 5)? F1 keeps the message in qa.run_attempt and F3 says the page shows 'when and the error'. A message can quote a value from the supply (a key in a psycopg or dbt error) or a host or path. Options: (a) publish it as recorded (truncated to 1,000 characters); (b) publish the outcome, the tool and the error's type, and leave the message to mothman (REQ-TEST-416) and the database; (c) publish it after scrubbing quoted values. RECOMMENDED (b): a build may read recorded QA results and 'never actual data', and a message is the one recorded field that can carry actual data in a real deployment; the data team leader needs 'a tool failed (dbt)', the maintainer who needs the message has mothman. (c) is a scrubber that would have to be right for four tools' error formats."
+      - "5. IS AN ERROR'S MESSAGE PUBLISHED ON THE PAGE (batch question 5)? F1 keeps the message in qa.run_attempt and F3 says the page shows 'when and the error'. A message can quote a value from the supply (a key in a psycopg or dbt error) or a host or path. Options: (a) publish it as recorded (truncated to 1,000 characters); (b) publish the outcome, the tool and the error's type, and leave the message to mothman (REQ-TEST-416) and the database; (c) publish it after scrubbing quoted values. RECOMMENDED (b): a build may read recorded QA results and 'never actual data', and a message is the one recorded field that can carry actual data in a real deployment; the data team leader needs 'a tool failed (dbt)', the maintainer who needs the message has mothman. (c) is a scrubber that would have to be right for four tools' error formats."
     signed_off: null
 
   - id: REQ-PIPE-412
@@ -192,6 +192,7 @@ requirements:
     open_questions:
       - "2. WHICH RUNS ARE COMPARED (batch question 2). A dataset has arrival runs, full re-checks of a supply and readers-only runs that run only another table's cross-table checks (qa.run.scope, qa_store.py lines 256-262) - a readers-only run is far shorter. Options: (a) whole-supply runs only (arrival and full) on the trend and in the median, a readers-only run's time shown in its row but neither judged nor counted; (b) every run, one series; (c) one series per scope, each judged against its own. RECOMMENDED (a): like is compared with like, and the readers-only runs that would drag the median down are the ones least likely to be the slow problem; (c) is three charts per dataset."
       - "3. WHAT 'PREVIOUS RUNS' MEANS (batch question 3). Options: (a) every earlier run, at least 3 needed before anything is marked; (b) the last 20 earlier runs, at least 3 needed; (c) every earlier run, judged from the second run on. RECOMMENDED (b): a dataset whose supplies legitimately grow over years would otherwise be marked slow for good against its small early runs, and a window keeps the median cheap at thirty collections; 3 is the smallest count whose median is not just one run. Both numbers are a choice, not a measurement - say if they should be different."
+      - "7. DOES THE DEMO SHOW A FAILED ATTEMPT (batch question 7)? A run time is real, so nothing plants a slow run; but a failed-then-retried run and a not-checked supply could be planted in the synthetic history so the demo shows REQ-DASH-414 and REQ-DASH-415. Options: (a) no planted scenario - tests on built dashboards prove both, and the demo shows them only if a bootstrap really fails; (b) a scenario whose first attempt is made to fail by the replay, retried by the next pass; (c) a scenario left not checked for good. RECOMMENDED (a): making a real pipeline step fail on cue needs a fault hook the replay can reach, which is the kind of replay-aware seam #134 v6 is removing from the pipeline (REQ-PIPE-382); (c) would put a permanent red on the demo for a fault that is not the data's."
     signed_off: null
 
   - id: REQ-DASH-413
@@ -235,8 +236,8 @@ requirements:
     status: not_started
     source: "Keith, plans/running-thoughts.md #121 (2026-10-22, 'it should also be obvious somewhere that it did time out or crash. Maybe that one for the UX review') and F2 of 'Failed attempts scoping', SETTLED 2026-11-14; drafted by delivery-scoper 2026-11-14 (timing-attempts v1). A PROPOSAL, not signed."
     acceptance_criteria:
-      - "WHEN a run completed on its second or later attempt, THE SYSTEM SHALL show on its supply-history row one short note naming the attempt it succeeded on and how the attempt before it ended and after how long - F2's example being 'Succeeded on attempt 2 - attempt 1 timed out after 45 min', exact words per open question 6."
-      - "THE SYSTEM SHALL let a reader open, from that row, a list of every attempt of the run in order: its number, when it began and ended, how it ended (in words: completed, timed out, a tool failed - naming the tool, crashed, stopped), its run time, and its error as REQ-PIPE-411's open question 4 settles."
+      - "WHEN a run completed on its second or later attempt, THE SYSTEM SHALL show on its supply-history row one short note naming the attempt it succeeded on and how the attempt before it ended and after how long - F2's example being 'Succeeded on attempt 2 - attempt 1 timed out after 45 min', exact words per open question 8."
+      - "THE SYSTEM SHALL let a reader open, from that row, a list of every attempt of the run in order: its number, when it began and ended, how it ended (in words: completed, timed out, a tool failed - naming the tool, crashed, stopped), its run time, and its error as REQ-PIPE-411's open question 5 settles."
       - "IF an attempt has no recorded end (found dead), THEN THE SYSTEM SHALL say its end and its run time are unknown, never show a time for it."
       - "THE SYSTEM SHALL take the run's, its supply's and its dataset's Pass/Warn/Fail from the completed attempt's results only, and SHALL NOT raise any of them to Warn or Fail because an earlier attempt failed."
       - "WHILE a date is on show in the as-of picker, THE SYSTEM SHALL show only attempts that began by that date."
@@ -245,7 +246,7 @@ requirements:
     non_functional_requirements:
       - "UX: the note is one line on the row; the list is behind a deliberate click, so the supply history stays scannable at thirty collections."
       - "ACCESSIBILITY: the list opens by keyboard and is announced as a list of attempts."
-      - "PRIVACY: as REQ-PIPE-411's open question 4 settles - the page shows no more of an error than the build emits."
+      - "PRIVACY: as REQ-PIPE-411's open question 5 settles - the page shows no more of an error than the build emits."
     dependencies:
       - "REQ-PIPE-411"
     decisions:
@@ -253,7 +254,7 @@ requirements:
       - "ON THE SUPPLY-HISTORY ROW (delivery-scoper, provisional for the dashboard UX reviewer): the page has no run-level detail panel today - 'run detail' is per check (template lines 10542, 10686) - so the run's attempt list is drafted as a disclosure on its row. The reviewer may place it elsewhere."
       - "UNKNOWN IS SAID, NOT HIDDEN (REQ-PIPE-279 criterion 7): an attempt found dead has no end time."
     open_questions:
-      - "6. THE WORD 'ATTEMPT' IS TAKEN (for the dashboard UX reviewer, then Keith). The supply history already labels a resupply 'Resupply, attempt N' (template line 9464) - the supplier's Nth try at a supply. F2's 'Succeeded on attempt 2' would put a second meaning of the same word on the same row. Options: (a) 'Checked on the second try - the first timed out after 45 min'; (b) 'Check attempt 2 succeeded - check attempt 1 timed out after 45 min'; (c) F2's words as given, accepting the overlap. RECOMMENDED (a): 'try' stays clear of the resupply's 'attempt', and it reads as plain English to a data team leader. The qa.run_attempt table keeps its name either way."
+      - "8. THE WORD 'ATTEMPT' IS TAKEN (for the dashboard UX reviewer, then Keith). The supply history already labels a resupply 'Resupply, attempt N' (template line 9464) - the supplier's Nth try at a supply. F2's 'Succeeded on attempt 2' would put a second meaning of the same word on the same row. Options: (a) 'Checked on the second try - the first timed out after 45 min'; (b) 'Check attempt 2 succeeded - check attempt 1 timed out after 45 min'; (c) F2's words as given, accepting the overlap. RECOMMENDED (a): 'try' stays clear of the resupply's 'attempt', and it reads as plain English to a data team leader. The qa.run_attempt table keeps its name either way."
     signed_off: null
 
   - id: REQ-DASH-415
@@ -264,7 +265,7 @@ requirements:
     status: not_started
     source: "Keith, F3 of 'Failed attempts scoping', SETTLED 2026-11-14; drafted by delivery-scoper 2026-11-14 (timing-attempts v1). A PROPOSAL, not signed."
     acceptance_criteria:
-      - "WHEN a supply's run has attempts and none completed (REQ-PIPE-411 criterion 3), THE SYSTEM SHALL show that supply as the dataset's own on its page and in the supply history, reading 'Not checked - ' followed by how the newest attempt ended ('the run timed out', 'the run crashed', 'a tool failed (dbt)', 'the run was stopped'), when it ended and its error as REQ-PIPE-411's open question 4 settles."
+      - "WHEN a supply's run has attempts and none completed (REQ-PIPE-411 criterion 3), THE SYSTEM SHALL show that supply as the dataset's own on its page and in the supply history, reading 'Not checked - ' followed by how the newest attempt ended ('the run timed out', 'the run crashed', 'a tool failed (dbt)', 'the run was stopped'), when it ended and its error as REQ-PIPE-411's open question 5 settles."
       - "WHILE a supply is shown as not checked, THE SYSTEM SHALL show every one of its checks as 'No result' and SHALL NOT show any earlier supply's verdict for them as current."
       - "WHILE a supply is shown as not checked, THE SYSTEM SHALL give its dataset the status open question 4 (batch) settles, with the reason in words, said once at dataset level as REQ-DASH-148 does for a supply that could not be loaded."
       - "WHEN a later attempt of that run completes, THE SYSTEM SHALL show the supply with its results and REQ-DASH-414's note."
@@ -274,7 +275,7 @@ requirements:
     non_functional_requirements:
       - "HONESTY: the dangerous direction is a stale Pass, so the not-checked supply replaces the earlier supply as the dataset's own; the test of 'no earlier verdict shown as current' is the one that guards it (CLAUDE.md's standing lesson: assert at the layer a human sees)."
       - "SCALE: at thirty collections a pass that crashes partway may leave several datasets not checked at once; each says so on its own row, and the dataset list counts them through the existing dataset-level reason, not a banner per dataset."
-      - "PRIVACY: as REQ-PIPE-411's open question 4 settles."
+      - "PRIVACY: as REQ-PIPE-411's open question 5 settles."
     dependencies:
       - "REQ-PIPE-411"
       - "REQ-DASH-148"
@@ -283,7 +284,7 @@ requirements:
       - "THE SAME WORDS FOR RUNNING AND DEAD (delivery-scoper): the build may not read pg_locks, so it cannot tell them apart; a neutral sentence is true of both."
       - "JUDGED AS AT THE DATE ON SHOW (delivery-scoper, carried from REQ-PIPE-115 criterion 12's blocker window): the as-of view reproduces what a reader saw then."
     open_questions:
-      - "4b. WHAT THE DATASET'S STATUS IS WHILE ITS SUPPLY IS NOT CHECKED (batch question 4). F3 says 'as today's could not run does' and rejects 'failing the supply'. The closest thing today is REQ-DASH-148: a supply that could not be loaded makes its dataset read red (Fail) once, at dataset level, with its reason, through a 'Could not be loaded' item on the 'needs a person' queue - while no check is recorded as failing. Options: (a) exactly that - a new dataset-level reason 'Could not be checked', the dataset reading Fail for the period, a new queue item so somebody retries it, and no Fail recorded on the supply or its checks; (b) a status of its own, 'Not checked', neither Pass nor Fail, with the queue item; (c) as (a) without the queue item, since the next processing pass retries it anyway (processing_pass.py line 207). RECOMMENDED (a): it is what 'as today's could not run does' most plainly means, and a dataset nobody could check is not OK; it records no Fail against the supply, which is what 'REJECTED failing the supply' rules out. (b) adds a fourth status word across the page, the CLI and tickets."
+      - "4. WHAT THE DATASET'S STATUS IS WHILE ITS SUPPLY IS NOT CHECKED (batch question 4). F3 says 'as today's could not run does' and rejects 'failing the supply'. The closest thing today is REQ-DASH-148: a supply that could not be loaded makes its dataset read red (Fail) once, at dataset level, with its reason, through a 'Could not be loaded' item on the 'needs a person' queue - while no check is recorded as failing. Options: (a) exactly that - a new dataset-level reason 'Could not be checked', the dataset reading Fail for the period, a new queue item so somebody retries it, and no Fail recorded on the supply or its checks; (b) a status of its own, 'Not checked', neither Pass nor Fail, with the queue item; (c) as (a) without the queue item, since the next processing pass retries it anyway (processing_pass.py line 207). RECOMMENDED (a): it is what 'as today's could not run does' most plainly means, and a dataset nobody could check is not OK; it records no Fail against the supply, which is what 'REJECTED failing the supply' rules out. (b) adds a fourth status word across the page, the CLI and tickets."
     signed_off: null
 
   - id: REQ-TEST-416
