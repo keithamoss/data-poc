@@ -715,3 +715,11 @@ Purpose recalled: insurance for a real deployment's published QA page; REQ-QAC-3
 
 **TIMING-ATTEMPTS REVIEW BATCH STATUS:** all eleven answered (13 questions, two pairs merged). To the scoper for v2 with every reviewer finding, then sign-off.
 - **[28] evidence, read 2026-11-14:** push 001dd2fe ran Critical tests (run 43577949927) green in ~3m12s (08:53:43 to 08:56:55 UTC) and Validate committed configuration (43577949926) green; no test.yml run started on the push.
+
+## Timing-attempts v2 - Keith's answers, 2026-11-14
+
+- **TV1 (REQ-PIPE-411 OQ1, a reload's re-check):** COUNT IT - its 'Could not be checked' window opens when the reload is recorded, the instant 'Could not be loaded' closes, so the red is continuous. REJECTED decision-caused re-checks only.
+- **TV2 (REQ-PIPE-417 OQ2, does a rejection stop the retries):** YES - a rejected arrival whose run never completed is PROCESSED for the pass: not retried, holds nothing back. REJECTED the pass retrying a rejected arrival.
+- **TV amendments APPROVED AS WORDED (Keith, 2026-11-14):** REQ-PIPE-279 c6 (via REQ-PIPE-410), REQ-DASH-272 c21 (via REQ-PIPE-417), REQ-TEST-150 c7 (via REQ-TEST-416), each appended when its requirement is built.
+
+**TIMING-ATTEMPTS v2 STATUS:** every question answered; TV1/TV2 to apply to the draft; then sign-off.
