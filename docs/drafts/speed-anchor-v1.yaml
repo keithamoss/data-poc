@@ -4,6 +4,11 @@
 # 2026-11-01.md, 'Speed scoping' S1-S4 and 'Rolling anchor date scoping'
 # R1-R5, all SETTLED by Keith 2026-11-14).
 # Drafted by delivery-scoper 2026-11-14 (Perth), v1, against HEAD 5b502c46.
+# UPDATED IN PLACE 2026-11-14 with Keith's answers to v1's five questions and
+# its amendments (docs/drafts/decisions-2026-11-01.md, 'Speed + rolling anchor
+# v1 ... Keith's answers'): every open question is closed as SETTLED; Q3 (b)
+# adds REQ-PIPE-250's three profiled speed-ups as REQ-PIPE-430 to 432 (ids from
+# 430, clear of timing-attempts-v1.yaml's 409-416, at the coordinator's ask).
 # NOT SIGNED. Nothing here is built until Keith signs it. Ids 397-408 were free
 # in requirements.yaml, docs/drafts/ and plans/ on 2026-11-14; whoever applies
 # this re-checks.
@@ -26,12 +31,14 @@
 # 382's seam or it puts back the replay flag 382 removes).
 #   1. REQ-PIPE-403 criterion 1 (the re-baseline), then REQ-PIPE-397,
 #      REQ-PIPE-401, REQ-GEN-398, REQ-PIPE-400, REQ-GEN-399
+#   1b. REQ-PIPE-432 (dbt, the critical path), REQ-PIPE-430 (the tree read
+#      once), then REQ-PIPE-431 (datacontract beside the rest), in that order
 #   2. REQ-GEN-404, REQ-GEN-405, REQ-GEN-406, REQ-GEN-408, REQ-DASH-407
 #   3. REQ-TEST-402 (it shares a history built at REQ-GEN-405's fixed anchor)
 #   4. REQ-PIPE-403's remaining criteria (the after measurement), last.
 #
-# REGISTER EDITS TO BUILT REQUIREMENTS this batch proposes (exact wording to
-# Keith before any register edit, as the standing rule says):
+# REGISTER EDITS TO BUILT REQUIREMENTS this batch makes - all three APPROVED AS
+# WORDED by Keith 2026-11-14, each applied when its requirement is built:
 #   - REQ-PIPE-254 criterion 15 scoped to 'outside a pinned run' (REQ-PIPE-397
 #     criterion 9).
 #   - REQ-GEN-042 criteria 7 and 8 amended for an anchor recorded with the
@@ -55,9 +62,10 @@ requirements:
       - "WHILE a pin is installed and a staged correction is in force for an arrival (correction_trial.configured, qa_tools/common/correction_trial.py lines 172-196), THE SYSTEM SHALL answer the agreement and the time-zone versions from the staged configuration for the span of that arrival's event context, the pin answering everything else."
       - "WHEN a configuration file is edited while a pin is installed, THE SYSTEM SHALL go on answering from the pinned text until the pin is released, and the next read after release SHALL see the edit (S1)."
       - "THE SYSTEM SHALL route through config_yaml every read of a configuration file under the asset's folder, the shared file-checks default and assets/environments.yaml that a pinned run makes, including the readers that read the file directly today (synthetic_reset.is_synthetic and asset_id, qa_tools/common/synthetic_reset.py lines 39-60, which call read_text), so that no configuration read inside a pin escapes it."
+      - "THE SYSTEM SHALL pin every configuration read mothman's own code makes, and SHALL leave the QA tools' own reads of their project files (dbt's project and Soda's check files, read by the tools themselves) unpinned, so that a mid-run edit of those reaches the tool as it does today and is caught after the run by the replay cache key (REQ-TEST-117) and the resume digest (REQ-TEST-160) (SA Q4, SETTLED by Keith 2026-11-14)."
       - "THE SYSTEM SHALL record, when a pin is installed, a digest of every file it pinned, which the run that installed it can report and compare (REQ-GEN-399 criterion 3)."
-      - "WHEN this requirement is built, THE SYSTEM SHALL amend REQ-PIPE-254 criterion 15 to read: 'OUTSIDE A PINNED RUN (REQ-PIPE-397), THE SYSTEM SHALL decide whether a file has changed by reading its content on every call, and SHALL NOT use its modification time, size or inode to skip that read.' - wording to Keith before the register edit."
-      - "THE SYSTEM SHALL have tests, seen failing first, of a value read inside a pin unchanged after its file is edited mid-pin, of the edit seen after release, of the pin refused on a non-synthetic asset in a process where the bootstrap package cannot be imported, of a staged correction answered over the pin within its arrival's context only, and of a read outside any pin seeing an edit that leaves size and modification time unchanged (REQ-PIPE-254 criterion 2 still holding)."
+      - "WHEN this requirement is built, THE SYSTEM SHALL amend REQ-PIPE-254 criterion 15 to read: 'OUTSIDE A PINNED RUN (REQ-PIPE-397), THE SYSTEM SHALL decide whether a file has changed by reading its content on every call, and SHALL NOT use its modification time, size or inode to skip that read.' - wording APPROVED AS WORDED by Keith 2026-11-14."
+      - "THE SYSTEM SHALL have tests, seen failing first, of a value read inside a pin unchanged after its file is edited mid-pin, of the edit seen after release, of the pin refused on a non-synthetic asset in a process where the bootstrap package cannot be imported, of a staged correction answered over the pin within its arrival's context only, and of a read outside any pin seeing an edit that leaves size and modification time unchanged (REQ-PIPE-254 criterion 2 still holding), and of a dbt model edited inside a pin reaching dbt (criterion 8's unpinned tool reads)."
     non_functional_requirements:
       - "PERFORMANCE: inside a pin a configuration read makes no system call; outside one it costs what it costs today. Measured with REQ-PIPE-403."
       - "RELIABILITY: the pin is process-wide, not a context variable, for the reason replay_clock's own docstring gives - a run's four tools write from worker threads a context variable would not reach; it is released however the with-block ends."
@@ -75,9 +83,10 @@ requirements:
       - "THE CHOKE POINT IS config_yaml.read (delivery-scoper, from the code): hierarchy._load (qa_tools/common/hierarchy.py lines 113-117), agreement and asset_time all build through config_yaml.read and a Built store, so pinning the text there makes every Built lookup hit on identity; post-build-review #318 counted hierarchy._load at 2.7 million calls and agreement.standing_on at 1.5 million in one generation."
       - "STAGED CORRECTIONS OVERLAY THE PIN (delivery-scoper, from the code): correction_trial.configured swaps agreement.current and asset_time.timezone_versions in memory for an arrival's span (correction_trial.py lines 184-196); the pin is the base those overlays sit on, so a replay still files each arrival against the agreement as it stood (REQ-PIPE-170 criterion 23)."
       - "REFUSED ON A REAL ASSET (delivery-scoper, following REQ-PIPE-382 criterion 6's pattern, Keith may change it): S2 says the pinned mode is used only by the synthetic replay; refusing it in shared code is what makes 'only' true on a deployment without the bootstrap."
-      - "NO EQUIVALENCE COMPARE (QD and the standing rule, Keith 2026-11-14): the tests in criterion 10 are the proof; the synthetic history may move."
-    open_questions:
-      - "4. WHAT THE PIN COVERS (see the batch's question 4): S1 says the configuration is read once and used throughout, but dbt (and Soda reading its own check files) read their project files themselves, outside config_yaml. Options: (a) the pin covers every read mothman's own code makes, and the QA tools' own reads of their project files stay live - an edit to a dbt model mid-bootstrap reaches dbt mid-run, as it does today, and the resume and cache keys catch it afterwards; (b) the bootstrap also copies each asset's dbt project and check files into a pinned scratch folder at the start and points the tools at it. RECOMMENDED (a): (b) adds a copy step and a second dbt project path for a mid-run edit that the cache key (REQ-TEST-117) and the resume digest (REQ-TEST-160) already catch after the run."
+      - "NO EQUIVALENCE COMPARE (QD and the standing rule, Keith 2026-11-14): the tests in criterion 11 are the proof; the synthetic history may move."
+      - "MOTHMAN'S OWN READS ONLY (SA Q4, SETTLED by Keith 2026-11-14): dbt and Soda read their project files themselves, outside config_yaml; the replay cache key and the resume digest catch a mid-run edit of those after the run. REJECTED copying each dbt project and its check files into a pinned scratch folder at the start."
+      - "REQ-PIPE-254 CRITERION 15 AMENDED AS WORDED (SA amendments, APPROVED by Keith 2026-11-14): 'OUTSIDE A PINNED RUN (REQ-PIPE-397), ...', applied when this requirement is built."
+    open_questions: []
     signed_off: null
 
   - id: REQ-GEN-398
@@ -206,9 +215,12 @@ requirements:
       - "WHERE a test must change a generated history, THE SYSTEM SHALL give it its own copy of the shared one (a copy, or hard links with copy-on-write for the files it changes), never a regeneration."
       - "THE SYSTEM SHALL move every test that generates a history today onto the shared fixture - at 5b502c46 the callers of cli.pipeline.generated_into and checkpoints.arrivals_of in tests/test_arrival_history.py (7), tests/test_generator_providers.py (4), tests/test_hand_filing.py (2) and tests/test_checkpoints.py, and the driver.generate callers in tests/test_generate_to_target.py, tests/test_generate_runs.py, tests/test_collection_cli.py and tests/test_generate_cp_runs.py - except a test whose subject is generation itself, which SHALL say so in its docstring."
       - "THE SYSTEM SHALL keep the shared history and its cache outside /tmp's pytest session folders, under a gitignored folder of the repository, and SHALL remove a cached history whose key no longer matches when a new one is saved (plans/running-thoughts.md #139: old session folders filled the sandbox disk)."
-      - "WHEN this requirement is built, THE SYSTEM SHALL record in its evidence the same profile as criterion 1, with the number of generations, and report both to Keith."
+      - "WHEN this requirement is built, THE SYSTEM SHALL record in its evidence the same profile as criterion 1, with the number of generations, and report both to Keith against the suite's target of under 30 minutes on this 4-core sandbox, saying plainly whether it is met."
+      - "IF the full suite is still over 30 minutes once this requirement is built, THEN THE SYSTEM SHALL record in its evidence the slowest modules and classes from the after profile, each with its share of the wall clock and what it spends it on, as the start of the next test-level work, and SHALL NOT call the target met."
     non_functional_requirements:
-      - "PERFORMANCE: today's figure is that a whole local suite run went past the 2-hour background limit (post-build-review #318) and the full gate is run in chunks ([30]); criterion 1 takes the real baseline. Measured on this 4-core sandbox with the default `-n auto`, one MOTHMAN_TEST_DB_TAG, nothing else running, and the load average recorded; CI's figure is the hand-started test.yml run's pytest steps, recorded, never gated (CLAUDE.md: runtime is tracked, not a CI gate)."
+      - "PERFORMANCE TARGET, REPORTED AND NEVER GATED (SA suite runtime, Keith 2026-11-14): the full suite UNDER 30 MINUTES on this 4-core sandbox, reported against in CLAUDE.md's running log and never failing a build. Today a whole local run goes past the 2-hour background limit (post-build-review #318) and the full gate is run in chunks ([30]); criterion 1 takes the real baseline."
+      - "WHAT BEYOND S3 THE TARGET LIKELY TAKES (delivery-scoper, an estimate to check against criterion 1's profile): sharing one history removes the repeated generations, but much of the suite is real tool runs and real browsers. Known costs, from the register: tests/test_dashboard_e2e.py alone took 659-717s across all workers at REQ-TEST-281 (2026-10-25), its floor one class, TestEveryScenarioJumpLands, at 400-500s on one worker; every test that drives the real pipeline pays the per-run tool cost REQ-PIPE-430 to 432 cut; the deployment half needs a bootstrapped database, which locally is a one-off and on CI is the cache hit. Reaching 30 minutes is therefore likely to need, beyond S3: the speed-ups of this batch reaching the tests that run real pipelines; splitting or trimming the slowest browser classes (one scenario jump per scenario family rather than every scenario, for example); and moving integration tests that re-run all four tools onto shared, already-evaluated runs where the subject is not the tool itself. Each of those changes which tests exist, so each is a requirement of its own for Keith, not part of this one."
+      - "PERFORMANCE, HOW MEASURED: on this 4-core sandbox with the default `-n auto`, one MOTHMAN_TEST_DB_TAG, nothing else running, and the load average recorded; CI's figure is the hand-started test.yml run's pytest steps, recorded, never gated (CLAUDE.md: runtime is tracked, not a CI gate)."
       - "RELIABILITY: a test that changes the shared history fails at once (criterion 4) rather than poisoning later tests, which is the arrival-pin incident of 2026-09-28 in another form."
       - "COST: a cache hit on CI's hand-started test.yml skips every generation the suite makes; the key includes the generator's inputs, so a stale history is never restored (REQ-TEST-117 criterion 3's rule)."
       - "MAINTAINABILITY: one fixture per asset; every new test module still names its asset (C11)."
@@ -221,27 +233,28 @@ requirements:
       - "GENERATE ONCE AND SHARE (S3, SETTLED by Keith 2026-11-14): one generated history per test session or a cached one keyed by the generator's inputs, read-only to every test that needs it, a cheap copy for a test that must change it; measured with --durations before and after. REJECTED smaller test-only histories, and both."
       - "ONCE PER RUN, NOT PER WORKER (delivery-scoper, Keith may change it): under xdist each worker is its own pytest session, so 'per session' would generate four times on this sandbox; the file lock or the input-keyed cache makes it once. The cache is the half Keith named as an alternative, used here as the way to share across workers and across runs."
       - "THE FIXED TEST ANCHOR (R1, SETTLED by Keith 2026-11-14): the shared history is built at 2026-09-25, so the cache key does not move with the calendar and the pins built on it stay byte-stable."
+      - "A TARGET, NOT A GATE: UNDER 30 MINUTES (SA suite runtime, SETTLED by Keith 2026-11-14): chosen knowingly as the ambitious figure, likely needing test-level work beyond S3. REJECTED measuring with no target (the recommendation), a gated target, and 60 and 90 minutes."
       - "THE INTERIM FAST SET IS NOT THIS (plans/running-thoughts.md #136): REQ-TEST-375's critical mark is built and stays; this is the audit's first finding, scoped by S3."
     open_questions: []
     signed_off: null
 
   - id: REQ-PIPE-403
-    title: "Each asset's from-empty bootstrap is measured before and after this batch, by stage, on this sandbox and on CI, against the 12-minute budget, and REQ-PIPE-250's compare-proof criterion is retired"
+    title: "Each asset's from-empty bootstrap is measured before and after this batch - S1-S3 and REQ-PIPE-250's three profiled speed-ups - by stage, on this sandbox and on CI, against the 12-minute budget, and REQ-PIPE-250's compare-proof criterion is retired"
     date_written: "2026-11-14"
     story: "As Keith, I want to know what the speed work actually bought against the 12-minute budget, stage by stage, so that I can decide what comes next from a measurement rather than a hope."
     moscow: must
     status: not_started
     source: "Keith, evidence walk-through [8] (2026-11-14: the bootstrap at about 9x its budget goes to the speed batch as its headline problem) and S4 (REQ-PIPE-352's 12-minute budget); drafted by delivery-scoper 2026-11-14 (speed-anchor v1). A PROPOSAL, not signed."
     acceptance_criteria:
-      - "BEFORE REQ-PIPE-397's first change, THE SYSTEM SHALL record in this requirement's evidence a from-empty bootstrap of each asset on this sandbox - `mothman env reset-synthetic` then `mothman pipeline bootstrap`, the quarterly asset then the daily one, nothing else running, the load average noted - giving the generation step, the target trials, each stream's replay, the confirmations and the budget line's total."
-      - "WHEN REQ-GEN-398, REQ-GEN-399, REQ-PIPE-400 and REQ-TEST-402 are built, THE SYSTEM SHALL record the same measurement after them, three consecutive runs per asset (REQ-PIPE-250 criterion 2's form), and report it to Keith against the 720s budget whether or not it is met."
+      - "BEFORE REQ-PIPE-397's first change, THE SYSTEM SHALL record in this requirement's evidence a from-empty bootstrap of each asset on this sandbox - `mothman env reset-synthetic` then `mothman pipeline bootstrap`, the quarterly asset then the daily one, nothing else running, the load average noted - giving the generation step, the target trials, each stream's replay, the confirmations and the budget line's total, and, within the replay, the shares the 2026-10-26 profile named - waiting on the dbt worker, recognising the delivery tree, datacontract-cli, Soda Core, recording results, filing, Evidently, staging and the gate - so that REQ-PIPE-430 to REQ-PIPE-432 each have their own before."
+      - "WHEN REQ-GEN-398, REQ-GEN-399, REQ-PIPE-400, REQ-TEST-402 and REQ-PIPE-430 to REQ-PIPE-432 are built, THE SYSTEM SHALL record the same measurement after them, three consecutive runs per asset (REQ-PIPE-250 criterion 2's form), and report it to Keith against the 720s budget whether or not it is met."
       - "THE SYSTEM SHALL record beside each sandbox measurement the hand-started test.yml run's cache-miss bootstrap step time for the same commit, without a budget of its own (REQ-PIPE-250 criterion 5)."
       - "WHEN the after measurement is recorded, THE SYSTEM SHALL add it to CLAUDE.md's running log in the same change."
       - "IF an asset's bootstrap is still over 720s after this batch, THEN THE SYSTEM SHALL record where the remaining time goes by stage, and name the next speed-ups from that profile, rather than calling the budget met."
-      - "WHEN this requirement is built, THE SYSTEM SHALL retire REQ-PIPE-250 criterion 4 under retired_criteria with REQ-TEST-239's approved reason, and drop REQ-PIPE-250's BEHAVIOUR-PRESERVING NFR - wording to Keith before the register edit."
+      - "WHEN this requirement is built, THE SYSTEM SHALL retire REQ-PIPE-250 criterion 4 under retired_criteria with REQ-TEST-239's approved reason, and drop REQ-PIPE-250's BEHAVIOUR-PRESERVING NFR (APPROVED AS WORDED by Keith 2026-11-14)."
     non_functional_requirements:
       - "PERFORMANCE, THE BASELINE TODAY: quarterly 6666s (generation about 411s, of it trials 53s on 4 workers; the Child Protection, Emergency Department and Linkage Products stream 6242s), daily 681s, both before post-build-review #318's fixes; budget 720s per asset (REQ-PIPE-352 criterion 5). An upper bound, which is why criterion 1 re-measures."
-      - "PERFORMANCE, A HONEST EXPECTATION: REQ-PIPE-250's profile (2026-10-26) put 49% of the replay's samples waiting on the dbt worker, 18% in datacontract and 25% recognising the delivery tree; pinning configuration does not touch most of that, so this batch alone is not expected to reach 720s on the quarterly asset (see question 3)."
+      - "PERFORMANCE, AN HONEST EXPECTATION: REQ-PIPE-250's profile (2026-10-26, py-spy, 240s of the quarterly stream) put 49% of the replay's samples waiting on the dbt worker, 25% recognising the delivery tree, 18% in datacontract-cli, 5% Soda, 5% recording, 3% filing, 2% Evidently, 2% staging, 1.5% the gate. Applied to today's 6242s replay: removing the tree work (REQ-PIPE-430) saves up to about 1,500s; dbt is the critical path of every run, so the run's share falls only as far as dbt falls (REQ-PIPE-432), and datacontract beside the rest (REQ-PIPE-431) pays only once dbt is shorter than the foreground tools. Even if all three land well, the quarterly replay is estimated at about 2,000-3,000s plus generation - several times 720s - because the asset now replays roughly 450 runs (302 Child Protection, 57 Emergency Department, about 105 geocoding and the Linkage Products runs, before knock-ons), and 720s would need well under 1.5s a run, everything included. The daily asset (681s today) should stay within. This is an estimate from one profile, not a measurement; criterion 2 is the measurement."
       - "NOT A CI GATE (REQ-PIPE-250's decision, CONFIRMED by Keith 2026-10-18): timing varies by runner; the budget is an acceptance measurement on this sandbox and a printed line."
       - "COST: each from-empty quarterly bootstrap is about 1h50m of sandbox time today, and a CI cache miss about 145 billable minutes (CLAUDE.md, 2026-11-02); the CI figure is read off a hand-started run that is due anyway, never one started for this."
     dependencies:
@@ -251,13 +264,16 @@ requirements:
       - "REQ-GEN-399"
       - "REQ-PIPE-400"
       - "REQ-TEST-402"
+      - "REQ-PIPE-430"
+      - "REQ-PIPE-431"
+      - "REQ-PIPE-432"
     decisions:
       - "THE HEADLINE PROBLEM (evidence walk-through [8], Keith 2026-11-14): record the 'after' figures as evidence, retire the 'before' halves of REQ-PIPE-296 c7, REQ-GEN-298 c13 and REQ-DASH-299 NFR 6, and send the bootstrap at about 9x its 720s budget here - not called met. REJECTED capturing befores, and retiring all three."
       - "A FRESH BASELINE HERE IS NOT A 'BEFORE' FOR ITS OWN SAKE (delivery-scoper): Keith retired the befores nobody needs; this one is the denominator of what this batch buys, and #318's fixes landed after the 6666s run, so without it the batch's effect cannot be told from #318's."
       - "THE BUDGET STAYS WHERE IT IS (S4: 'likely touches REQ-PIPE-352's 12-minute budget'): REQ-PIPE-250 and REQ-PIPE-352 keep the 720s; this requirement measures against it rather than adding a third budget."
-      - "REQ-PIPE-250 CRITERION 4 GOES (QD and the standing rule, Keith 2026-11-14): a speed-up can no longer be proved by REQ-TEST-239's compare, which is retired; the test suite is the proof."
-    open_questions:
-      - "3. WHAT THIS BATCH COMMITS TO AGAINST 720s (see the batch's question 3). Options: (a) build S1-S3 and measure against 720s, reporting what remains; REQ-PIPE-250's three profiled speed-ups - recognise the delivery tree once per tree content, run a run's four tools side by side, cut the dbt worker round trip - go to a follow-on batch scoped with you; (b) bring those three into this batch now; (c) revisit the 12-minute budget itself. RECOMMENDED (a): S1-S3 are what you settled, the profile says they are not most of the replay's time, and a measured after-figure is what makes the next batch's choice a real one."
+      - "REQ-PIPE-250 CRITERION 4 GOES (QD and the standing rule, Keith 2026-11-14; SA amendments APPROVED AS WORDED by Keith 2026-11-14): a speed-up can no longer be proved by REQ-TEST-239's compare, which is retired; the test suite is the proof."
+      - "THE THREE PROFILED SPEED-UPS JOIN THIS BATCH (SA Q3, SETTLED by Keith 2026-11-14, option (b)): REQ-PIPE-250's dbt, delivery-tree re-read and datacontract time sinks are REQ-PIPE-432, REQ-PIPE-430 and REQ-PIPE-431 here, beside S1-S3, so the batch aims at where the time actually goes. REJECTED (a) building S1-S3 only and reporting (the recommendation), and (c) revisiting the budget."
+    open_questions: []
     signed_off: null
 
   - id: REQ-GEN-404
@@ -275,7 +291,7 @@ requirements:
       - "WHEN a generation or a bootstrap is given an anchor explicitly (`--anchor <date>`, replacing the GENERATOR_ANCHOR_DATE override, generator/anchor_date.py line 57), THE SYSTEM SHALL generate the history that anchor gives, byte for byte the same as any earlier generation with that anchor and the same inputs."
       - "WHEN a resume or a checkpoint regenerates a collection's deliveries to compare with a checkpoint (REQ-TEST-160 criterion 2; checkpoints.arrivals_of), THE SYSTEM SHALL regenerate with the anchor recorded for the history being resumed, never with today's, and IF none is recorded, THEN it SHALL refuse, naming `mothman env reset-synthetic` then `mothman pipeline bootstrap`."
       - "IF a generation is asked for an anchor that is not a valid date, or is later than today on the asset's clock, THEN THE SYSTEM SHALL refuse, naming the date, before anything is written."
-      - "WHEN this requirement is built, THE SYSTEM SHALL amend REQ-GEN-042 criterion 7 to read 'THE SYSTEM SHALL derive the generated schedule from one anchor date, given to the generation and recorded with the history, rather than from the day it is run.' and criterion 8 to read 'WHEN the generator is re-run with the same anchor and unchanged configuration, THE SYSTEM SHALL produce an identical history, and SHALL NOT add a second copy of it alongside the first.' - wording to Keith before the register edit."
+      - "WHEN this requirement is built, THE SYSTEM SHALL amend REQ-GEN-042 criterion 7 to read 'THE SYSTEM SHALL derive the generated schedule from one anchor date, given to the generation and recorded with the history, rather than from the day it is run.' and criterion 8 to read 'WHEN the generator is re-run with the same anchor and unchanged configuration, THE SYSTEM SHALL produce an identical history, and SHALL NOT add a second copy of it alongside the first.' - wording APPROVED AS WORDED by Keith 2026-11-14."
       - "THE SYSTEM SHALL have tests, seen failing first, of two generations with one anchor writing identical trees, of a provider imported before the anchor is given generating for the anchor given later, of a resume regenerating with the recorded anchor on a later day, and of a future anchor refused."
     non_functional_requirements:
       - "REPRODUCIBILITY: everything stays seeded; the anchor is the one input that varies, and it is recorded, so a history can always be rebuilt (R2)."
@@ -295,7 +311,7 @@ requirements:
     signed_off: null
 
   - id: REQ-GEN-405
-    title: "Only a deliberate regeneration of the demo data rolls the anchor, to today on the asset's own clock; the test suite and CI always generate at the fixed test anchor 2026-09-25, and a test reading a deployment's history refuses one generated at any other anchor"
+    title: "A bootstrap rolls the demo's anchor only when asked with --roll-anchor, to the latest day on the asset's own clock whose planned receipts have all passed; otherwise - and always for the test suite and CI - it generates at the fixed test anchor 2026-09-25, and a test reading a deployment's history refuses one generated at any other anchor"
     date_written: "2026-11-14"
     story: "As Keith, I want the demo to show supplies up to today when I regenerate it, while the tests and CI keep testing one fixed date, so that the dashboard I put in front of people is never quiet for want of a supply and the pins and the CI cache never move with the calendar."
     moscow: must
@@ -304,17 +320,19 @@ requirements:
     acceptance_criteria:
       - "THE SYSTEM SHALL name one fixed test anchor, 2026-09-25 (today's ANCHOR_DATE, generator/anchor_date.py line 46), as a constant in the generator."
       - "WHEN the test suite generates a history, or a CI workflow bootstraps one (MOTHMAN_ENVIRONMENT test or ci), THE SYSTEM SHALL generate at the fixed test anchor, whatever the date."
-      - "WHEN a person regenerates the demo data of a synthetic asset - `mothman env reset-synthetic` then `mothman pipeline bootstrap` (PROVISIONAL on question 2: with `--roll-anchor`) - THE SYSTEM SHALL generate at today's date on the asset's own clock (asset_time, the asset's time zone), and SHALL say which date it used before generating."
-      - "IF a planned receipt on the anchor day would fall after the instant the regeneration starts on the asset's clock, THEN THE SYSTEM SHALL (PROVISIONAL on question 5) take the anchor as the latest day on the asset's clock whose every planned receipt has already passed, and say so."
-      - "IF a test that reads a deployment's history - the deployment half's fixtures (tests/conftest.py deployment_history, line 755) and the arrival pin (tests/test_asset_time_semantics.py, tests/fixtures/arrival_semantics_golden.json) - finds the history's recorded anchor is not the fixed test anchor, THEN THE SYSTEM SHALL fail it at collection, naming the anchor found, the fixed one and the command that rebuilds the deployment at the fixed anchor, never skip it and never compare against it."
+      - "WHEN a person regenerates the demo data of a synthetic asset with `mothman env reset-synthetic` then `mothman pipeline bootstrap --roll-anchor`, THE SYSTEM SHALL generate at today's date on the asset's own clock (asset_time, the asset's time zone), subject to criterion 5, and SHALL say which date it used before generating (SA Q2, SETTLED by Keith 2026-11-14)."
+      - "WHEN `mothman pipeline bootstrap` runs without `--roll-anchor`, THE SYSTEM SHALL generate at the fixed test anchor, on every environment."
+      - "IF a planned receipt on the anchor day would fall after the instant the regeneration starts on the asset's clock, THEN THE SYSTEM SHALL take the anchor as the latest day on the asset's clock whose every planned receipt has already passed, and say so (SA Q5, SETTLED by Keith 2026-11-14)."
+      - "IF a test that reads a deployment's history - the deployment half's fixtures (tests/conftest.py deployment_history, line 755) and the arrival pin (tests/test_asset_time_semantics.py, tests/fixtures/arrival_semantics_golden.json) - finds the history's recorded anchor is not the fixed test anchor, THEN THE SYSTEM SHALL fail it at collection with one clear message naming the anchor found, the fixed one, and the commands that rebuild the deployment at the fixed anchor (`mothman env reset-synthetic` then `mothman pipeline bootstrap`, without `--roll-anchor`), never skip it and never compare against it."
+      - "IF `--roll-anchor` is given where MOTHMAN_ENVIRONMENT is test or ci, THEN THE SYSTEM SHALL refuse before anything is generated, saying that tests and CI always use the fixed test anchor (R1)."
       - "THE SYSTEM SHALL have every test whose result depends on today take its date from the fixed test anchor, never from the wall clock, as tests/test_dashboard_e2e.py line 563 already does for the as-of date."
       - "THE SYSTEM SHALL keep CI's bootstrap cache key (`mothman pipeline cache-key`, .github/workflows/test.yml line 443) unchanged by the calendar date, because it is built at the fixed anchor from committed inputs only."
-      - "THE SYSTEM SHALL have tests, seen failing first, of the suite's generation using the fixed anchor on a different wall-clock date, of a demo regeneration using today on the asset's clock (a pinned clock standing in for today), of the deployment-half refusal on a history recorded at another anchor, and of the cache key equal on two different wall-clock dates."
+      - "THE SYSTEM SHALL have tests, seen failing first, of the suite's generation using the fixed anchor on a different wall-clock date, of a bootstrap without the flag using the fixed anchor, of `--roll-anchor` using today on the asset's clock (a pinned clock standing in for today) and the day before when today's last planned receipt is still to come, of `--roll-anchor` refused under test and ci, of the deployment-half refusal on a history recorded at another anchor, and of the cache key equal on two different wall-clock dates."
     non_functional_requirements:
       - "COST: the CI cache key never changes with the date, so rolling the demo costs CI nothing; only a change to committed inputs misses (REQ-TEST-117)."
-      - "RELIABILITY: a test meeting a rolled history fails loudly at collection with the fix named (criterion 5), never a skip that reads green (CLAUDE.md: the number to watch is the skip count)."
+      - "RELIABILITY: a test meeting a rolled history fails loudly at collection with the fix named (criterion 6), never a skip that reads green (CLAUDE.md: the number to watch is the skip count)."
       - "COMPATIBILITY: today on the asset's clock, not the machine's, so a regeneration in a UTC container and one in Perth agree (CLAUDE.md, 2026-09-18 incident)."
-      - "MAINTAINABILITY: the accepted cost (R1) is that tests exercise one fixed date, not the demo's; nothing here tests the rolled demo except criterion 8's unit tests."
+      - "MAINTAINABILITY: the accepted cost (R1) is that tests exercise one fixed date, not the demo's; nothing here tests the rolled demo except criterion 10's unit tests."
     dependencies:
       - "REQ-GEN-404"
       - "REQ-PIPE-382"
@@ -325,11 +343,9 @@ requirements:
       - "TO TODAY ON THE ASSET'S CLOCK (R2, SETTLED by Keith 2026-11-14). REJECTED the start of the week, and the last quarterly round."
       - "REGENERATION STAYS DELIBERATE (R3, SETTLED by Keith 2026-11-14): a reset then a bootstrap. REJECTED a scheduled regeneration, and a staleness warning."
       - "THE FIXED TEST ANCHOR IS 2026-09-25 (the architect, docs/drafts/separation-v5-reviews.md line 357): equal to today's ANCHOR_DATE, so the pins REQ-GEN-392 re-captures are not re-captured a third time."
-      - "WHY THE LOCAL DEPLOYMENT HALF NEEDS A RULE (delivery-scoper, from the code): on this sandbox the deployment-half tests and the arrival pin read the local `supply` database - the same one a demo regeneration fills - so a rolled demo would make the local full gate test a history R1 says tests never see. Question 2 asks how the two are kept apart."
-      - "THE REPLAY'S 'NEVER AFTER THE REAL PRESENT' CAP IS WHY TODAY'S LATE RECEIPTS MATTER (REQ-PIPE-382 decision 'NEVER AFTER THE REAL PRESENT'; Keith's later answer puts the seeded lag in the replay clock, 2026-11-14): a receipt planned for 14:30 on a history generated at 09:00 is in the real future, and a decision on it could not take effect after it. Criterion 4 is the provisional answer."
-    open_questions:
-      - "2. A ROLLED DEMO AND THE LOCAL FULL GATE SHARE ONE DATABASE (see the batch's question 2). Options: (a) a reset then bootstrap generates at the fixed anchor unless told `--roll-anchor`; the demo is rolled by that deliberate flag, and criterion 5's refusal catches a rolled database meeting the tests - keep the demo in its own database (MOTHMAN_SUPPLY_DSN) if you want both at once; (b) a reset then bootstrap rolls by default on local and sandbox, and the local full gate then fails the deployment half until the database is rebuilt at the fixed anchor; (c) rolls by default, and the local full gate bootstraps a test deployment of its own at the fixed anchor - a second from-empty bootstrap per asset, today about 1h50m for the quarterly one. RECOMMENDED (a): one database still works for the everyday gate, the demo roll stays the deliberate act R3 describes, and nobody pays a second bootstrap."
-      - "5. A PLANNED RECEIPT LATER TODAY THAN THE REGENERATION (see the batch's question 5). Options: (a) anchor on the latest day whose every planned receipt has passed - 'today' after the day's last planned receipt, yesterday before it (criterion 4 as drafted); (b) anchor on today and drop the anchor day's receipts not yet due; (c) anchor on today and keep them, receipts in the real future. RECOMMENDED (a): it keeps every planned day whole, needs no new rule in the providers, and only moves the anchor back a day when regenerating in the hours before the daily supply - the quarterly asset's receipts fall on round days only."
+      - "ROLL ONLY ON REQUEST (SA Q2, SETTLED by Keith 2026-11-14, option (a)): on this sandbox the deployment-half tests and the arrival pin read the local `supply` database - the same one a demo regeneration fills - so a bootstrap rolls only with --roll-anchor, and the tests refuse a rolled database with a clear message. A demo and a gate-ready history can sit side by side in two databases (MOTHMAN_SUPPLY_DSN). REJECTED (b) rolling by default with the local gate failing until a rebuild, and (c) the gate bootstrapping a test deployment of its own (a second from-empty bootstrap per asset)."
+      - "THE REPLAY'S 'NEVER AFTER THE REAL PRESENT' CAP IS WHY TODAY'S LATE RECEIPTS MATTER (REQ-PIPE-382 decision 'NEVER AFTER THE REAL PRESENT'; Keith's later answer puts the seeded lag in the replay clock, 2026-11-14): a receipt planned for 14:30 on a history generated at 09:00 is in the real future, and a decision on it could not take effect after it. SA Q5 (SETTLED by Keith 2026-11-14, option (a)) anchors on the latest day whose planned receipts have all passed - criterion 5. REJECTED (b) anchoring today and dropping the receipts not yet due, and (c) anchoring today and keeping receipts in the real future."
+    open_questions: []
     signed_off: null
 
   - id: REQ-GEN-406
@@ -338,16 +354,17 @@ requirements:
     story: "As Keith, I want a rolled demo to look like the fixed one - every slot owed has a supply, every scenario still shows what it was built to show - so that rolling the date does not quietly turn into a supplier who stopped delivering or a scenario that refuses to generate."
     moscow: must
     status: not_started
-    source: "delivery-scoper, found 2026-11-14 by probing the real generator with the anchor moved (plans/running-thoughts.md #138's 'to scope before building'); to Keith as question 1. A PROPOSAL, not signed."
+    source: "delivery-scoper, found 2026-11-14 by probing the real generator with the anchor moved (plans/running-thoughts.md #138's 'to scope before building'); put to Keith as SA Q1 and SETTLED by him 2026-11-14 (option (a)). A PROPOSAL, not signed."
     acceptance_criteria:
       - "WHEN a synthetic asset's history is generated at any anchor from the fixed test anchor to today, THE SYSTEM SHALL leave no slot owed before the dataset's first generated supply that is not owed at the fixed test anchor."
       - "WHEN a synthetic asset's history is generated at any such anchor, THE SYSTEM SHALL place every scenario it places at the fixed test anchor, within the era its configuration requires, with no CannotPlace."
-      - "PROVISIONAL on question 1, option (a): WHERE a synthetic asset's configuration writes a date as an offset from its history's anchor, THE SYSTEM SHALL resolve it in asset_model/ against the anchor recorded for the history (REQ-GEN-404), so that the pipeline, the dashboard build and the CLI read the resolved date and none of them computes the anchor; IF an asset that does not declare `synthetic: true` writes one, THEN reading it SHALL refuse, naming the file and the line."
-      - "PROVISIONAL on question 1: THE SYSTEM SHALL have the Child Protection provider generate from its configured start to the anchor, as Emergency Department, Linkage Products and the geocoding sources already do, rather than a fixed count of quarters ending at the anchor (child_protection.py generated_periods, lines 714-719)."
+      - "WHERE a synthetic asset's configuration writes a date as an offset from its history's anchor, THE SYSTEM SHALL resolve it in asset_model/ against the anchor recorded for the history (REQ-GEN-404), so that the pipeline, the dashboard build and the CLI read the resolved date and none of them computes the anchor; IF an asset that does not declare `synthetic: true` writes one, THEN reading it SHALL refuse, naming the file and the line (SA Q1, SETTLED by Keith 2026-11-14)."
+      - "THE SYSTEM SHALL write the daily asset's calendar versions, its corrections' dates and its setting-era versions that frame the generated history as offsets from the anchor, resolving at the fixed test anchor to the dates they hold today, and SHALL leave the quarterly calendar's authored rounds and every date older than the generated history absolute."
+      - "THE SYSTEM SHALL have the Child Protection provider generate from its configured start to the anchor, as Emergency Department, Linkage Products and the geocoding sources already do, rather than a fixed count of quarters ending at the anchor (child_protection.py generated_periods, lines 714-719)."
       - "IF the anchor falls after a calendar's last authored round (the quarterly calendar's last is 2027-11-01, assets/quarterly/calendar.yaml), THEN THE SYSTEM SHALL refuse to generate, naming the calendar and `mothman schedule candidate-dates`, before anything is written."
       - "THE SYSTEM SHALL have tests, seen failing first, generating each synthetic asset's plan (periods and placements only, nothing written) at the fixed anchor and at a later one, asserting criteria 1 and 2, and of the refusal past the last authored round."
     non_functional_requirements:
-      - "PERFORMANCE: under option (a) the daily history keeps its 100 supplies whatever the date; the quarterly asset grows by one quarter for each quarter rolled (about one quarter's replay each), so REQ-PIPE-403's budget is not eroded day by day."
+      - "PERFORMANCE: the daily history keeps its 100 supplies whatever the date; the quarterly asset grows by one quarter for each quarter rolled (about one quarter's replay each), so REQ-PIPE-403's budget is not eroded day by day."
       - "MAINTAINABILITY: the quarterly calendar's authored dates need extending each year before they run out, as a real asset's do; criterion 5 says so when they have."
       - "SECURITY: an offset date is refused on a real asset (criterion 3), so a deployment's agreement is only ever the dates it wrote."
     dependencies:
@@ -358,8 +375,8 @@ requirements:
       - "MEASURED, NOT ASSUMED (delivery-scoper, 2026-11-14, read-only probe of scenario_injection.resolve and periods_for_dataset with GENERATOR_ANCHOR_DATE set): at 2026-09-25 every dataset's owed periods equal its generated ones; at 2026-11-14 Birth Registrations owes 150 days and is generated 100 (50 unsupplied days from the daily calendar's 2026-06-18 start - the front tail tests/test_schedule.py line 135's guard describes), each Child Protection dataset owes one quarter before its first supply (a fixed 47-quarter window sliding), and TS-78a refuses to place (outside its hold amber-setting era in assets/daily/data-asset.yaml). The quarterly asset placed all 52 scenarios at 2026-11-14 and 2027-03-01; Emergency Department, Linkage Products and the geocoding sources grow and owe nothing new."
       - "WHAT ELSE IS BUILT ON 2026-09-25 (delivery-scoper, from the configuration): the daily calendar's versions 2026-06-18 to 2026-09-25, TS-62's six-hour window version on the history's last day and its correction dated 2026-09-24 (assets/daily/calendar.yaml lines 74-140), and the daily data-asset.yaml's setting versions 2026-08-30 to 2026-09-22. Under a rolled anchor these would no longer sit where their scenarios need them, even where placement does not refuse."
       - "THE QUARTERLY ROUNDS STAY ABSOLUTE (delivery-scoper): they are an authored agreement of real quarter dates; shifting them by days would move rounds off their quarters."
-    open_questions:
-      - "1. HOW THE CONFIGURATION'S DATES FOLLOW A ROLLED ANCHOR (see the batch's question 1). Options: (a) a synthetic asset may write a configuration date as an offset from its history's anchor, resolved by asset_model/ against the recorded anchor - the daily asset's calendar versions, corrections and setting eras written that way, Child Protection made to grow like its neighbours, the quarterly rounds left absolute; (b) every history grows from its configured start to the anchor - no new date form, but Birth Registrations gains a supply a day (daily bootstrap 681s for 100 supplies today, 39s under budget, so over it within about a week of rolling) and TS-78a and TS-62 still need re-placing; (c) only the quarterly asset rolls, the daily asset stays at 2026-09-25 and says so (REQ-DASH-407). RECOMMENDED (a): it is the only option that keeps both histories their present size and every scenario meaning what it was built to mean; its cost is one synthetic-only date form in shared code, refused on a real asset."
+      - "OFFSETS FROM THE ANCHOR (SA Q1, SETTLED by Keith 2026-11-14, option (a)): a synthetic asset may write a date as an offset from its history's anchor, resolved in asset_model/ and refused on a real asset; Child Protection grows like its neighbours; quarterly rounds stay fixed. REJECTED (b) histories growing from their configured start (Birth Registrations would gain a supply a day and pass its budget within about a week), and (c) rolling only the quarterly asset."
+    open_questions: []
     signed_off: null
 
   - id: REQ-DASH-407
@@ -413,5 +430,97 @@ requirements:
     decisions:
       - "REPLACE, DO NOT ARCHIVE (R4, SETTLED by Keith 2026-11-14): a regeneration replaces the whole history - the generated delivery and receipt files and the database, through the existing typed-confirmation reset - with one history up to the new date; a guard test proves two regenerations on different dates leave one history. REJECTED archiving the previous history."
       - "THE RESET DELETES THE FILES, NOT THE GENERATOR ALONE (delivery-scoper, from the code): reset-synthetic drops schemas only today, and a generation deletes what its bookkeeping says it wrote last time (generator/driver.py previous_delivery_names, line 83) - which misses anything the bookkeeping does not list, as the 26 handfiled-* directories of 2026-09-28 showed. One deliberate command deleting both is R4's 'replaces the whole history'."
+    open_questions: []
+    signed_off: null
+
+  - id: REQ-PIPE-430
+    title: "Within a pinned bootstrap the delivery tree is recognised once per collection and answered from that, not re-read on every arrival and every next-receipt look-up, and a tree that changes mid-replay stops the bootstrap"
+    date_written: "2026-11-14"
+    story: "As whoever regenerates the demo, I want the replay to read the generated delivery tree once rather than hundreds of times, so that a quarter of the replay's time stops going on re-reading files that cannot have changed."
+    moscow: must
+    status: not_started
+    source: "Keith, SA Q3 (SETTLED 2026-11-14, option (b)): REQ-PIPE-250's first profiled speed-up ('recognise the delivery tree once per tree content rather than on every arrival and every next_receipt call') into this batch; drafted by delivery-scoper 2026-11-14 (speed-anchor v1). A PROPOSAL, not signed."
+    acceptance_criteria:
+      - "WHILE a REQ-PIPE-397 pin is installed, THE SYSTEM SHALL recognise each collection's arrivals from the delivery tree at most once (arrivals.arrivals_for, qa_tools/common/arrivals.py line 245), and SHALL answer every later call for that collection and those folders from that recognition, including the calls from orchestrate (qa_tools/tools/orchestrate.py line 590), stage (qa_tools/tools/stage.py line 297), the bootstrap (qa_tools/common/bootstrap.py line 611) and the next-receipt look-ups (qa_tools/common/promotion.py lines 479 and 510), wherever REQ-PIPE-382 leaves them."
+      - "WHEN a pin is installed, THE SYSTEM SHALL record a digest of each recognised tree's listing and receipts, and WHEN the pinned bootstrap ends, IF a tree's digest differs, THEN THE SYSTEM SHALL say so, naming the collection and the folders, and mark the bootstrap's result as not to be trusted."
+      - "WHILE no pin is installed, THE SYSTEM SHALL recognise the tree as it does today, on every call, so that a live processing pass sees a delivery the moment it lands."
+      - "THE SYSTEM SHALL return each caller its own list, or an immutable one, so that no caller's change to a recognised arrival reaches another (REQ-PIPE-254 criterion 7's rule)."
+      - "THE SYSTEM SHALL have tests, seen failing first, counting tree recognitions in a pinned replay of a test asset (one per collection), of an unpinned call seeing a delivery added since the last call, and of a tree changed mid-pin being reported at the end."
+    non_functional_requirements:
+      - "PERFORMANCE: REQ-PIPE-250's profile put 25% of the quarterly stream's samples in recognising the whole tree, half of it inside promotion.next_receipt; arrivals_for took 0.6s on 229 deliveries and is called several times per arrival. Target: that share near zero in REQ-PIPE-403's after profile - an upper bound of about 1,500s of today's 6242s replay."
+      - "SCALABILITY: this is the term that grows with the history (REQ-PIPE-250 decisions: every arrival re-reads every delivery), so the saving grows with each roll of the anchor and each new collection."
+      - "RELIABILITY: generation finishes before any replay starts (bootstrap.py lines 254-275, 'so no pipeline recognises a delivery tree a generator is still writing'), which is what makes one recognition per pin safe; criterion 2 catches the case that breaks it."
+      - "SECURITY AND PRIVACY: recognition reads file names and receipts, never supply rows; a real asset is never pinned, so a live pass is unchanged."
+    dependencies:
+      - "REQ-PIPE-397"
+      - "REQ-GEN-399"
+      - "REQ-PIPE-380"
+      - "REQ-PIPE-250"
+    decisions:
+      - "ADDED TO THIS BATCH (SA Q3, SETTLED by Keith 2026-11-14, option (b)): REQ-PIPE-250's speed-up (1). REJECTED building S1-S3 only, and revisiting the budget."
+      - "KEYED ON THE PIN, NOT ON THE TREE'S CONTENT (delivery-scoper, Keith may change it): REQ-PIPE-250 suggested 'once per tree content', but checking a tree's content on every call costs a read of every receipt, which is most of what recognition costs. In a pinned replay the tree is fixed by construction, so the pin is the key and criterion 2 checks the assumption once at the end. Outside a pin nothing changes. REJECTED a content-keyed cache for the live pass, whose saving is not budgeted and whose stale answer would hide a newly landed delivery."
+      - "NOT A CONFIGURATION CACHE (delivery-scoper): the delivery tree is supplier files, not configuration, so REQ-PIPE-254's content rule does not govern it; it is asset_model's 'the delivery tree' half (QB)."
+    open_questions: []
+    signed_off: null
+
+  - id: REQ-PIPE-431
+    title: "datacontract-cli runs for each run in a long-lived worker process of its own, beside Soda Core and Evidently in the foreground and dbt in its worker, with the run's results kept in tool order"
+    date_written: "2026-11-14"
+    story: "As whoever regenerates the demo, I want datacontract-cli's share of each run to overlap the other tools rather than follow them, so that once dbt is no longer the longest step a run takes only as long as its slowest tool."
+    moscow: should
+    status: not_started
+    source: "Keith, SA Q3 (SETTLED 2026-11-14, option (b)): the datacontract time sink of REQ-PIPE-250's profile, and its speed-up (2) ('run the four tools of one run side by side'), into this batch; drafted by delivery-scoper 2026-11-14 (speed-anchor v1). A PROPOSAL, not signed."
+    acceptance_criteria:
+      - "THE SYSTEM SHALL run each run's datacontract-cli evaluation (run_datacontract.evaluate, qa_tools/tools/run_datacontract.py line 79) in a long-lived worker process, one per pipeline process, started on first use and reused, as dbt_worker does for dbt (qa_tools/common/dbt_worker.py), spawned rather than forked."
+      - "WHEN a run's tools are evaluated, THE SYSTEM SHALL run dbt in its worker, datacontract-cli in its worker, and Soda Core then Evidently in the foreground, all three lanes at once, and SHALL keep the recorded results in today's tool order - dbt, Soda Core, datacontract-cli, Evidently (orchestrate.py lines 191-213)."
+      - "IF two lanes fail, THEN THE SYSTEM SHALL report the failure of the tool earliest in that order, as parallel_orchestrate.beside does for dbt today, and SHALL leave no worker running a request behind the exception."
+      - "IF the datacontract worker dies mid-request, THEN THE SYSTEM SHALL fail that run's datacontract step as a tool error naming the worker, and start a new worker for the next request, as dbt_worker.WorkerLost does."
+      - "WHERE TOOLS_CONCURRENTLY is off (`--sequential`'s debugging mode, parallel_orchestrate.py line 120), THE SYSTEM SHALL run all four one after another in tool order, in this process, as today."
+      - "THE SYSTEM SHALL have tests, seen failing first, of a run's datacontract evaluation happening in a different process from Soda Core's, of results in tool order whichever lane finishes first, of a killed worker failing only that step and the next run succeeding, and of the sequential mode running in-process."
+    non_functional_requirements:
+      - "PERFORMANCE, HONESTLY: datacontract-cli was 18% of the stream's samples; the profile's 49% waiting on dbt says dbt already outlasts the whole foreground, so this saves time per run only once REQ-PIPE-432 has made dbt shorter than Soda plus datacontract plus Evidently. Measured with REQ-PIPE-403, per run, before and after; built after REQ-PIPE-432 for that reason."
+      - "RELIABILITY: a worker is a process, so a datacontract-cli crash cannot take the run's process with it; Soda's reload of .env into os.environ (plans/tooling.md #26) cannot reach it."
+      - "COST: on this 4-core sandbox two streams side by side, each with a dbt worker, a datacontract worker and a foreground, is six busy processes on four cores; REQ-PIPE-403's after measurement says whether that oversubscribes."
+      - "MAINTAINABILITY: one worker pattern for both out-of-process tools - REQ-PIPE-431 SHALL share dbt_worker's request, lock and restart code rather than copy it."
+    dependencies:
+      - "REQ-PIPE-432"
+      - "REQ-PIPE-250"
+      - "REQ-TEST-116"
+    decisions:
+      - "ADDED TO THIS BATCH (SA Q3, SETTLED by Keith 2026-11-14, option (b)). REJECTED building S1-S3 only, and revisiting the budget."
+      - "A WORKER PROCESS, NOT A THREAD (delivery-scoper, from the code): Soda Core, datacontract-cli and Evidently run in-process and stay one after another because none was written to share an interpreter concurrently (parallel_orchestrate.beside's docstring), and Soda rewrites os.environ; the only safe way to overlap one with the others is a process, which is how dbt already runs beside them (REQ-TEST-116 criterion 3, REQ-PIPE-157). REJECTED threads for the in-process tools."
+      - "DATACONTRACT, NOT SODA OR EVIDENTLY (delivery-scoper, Keith may change it): it is the largest foreground share (18% against Soda's 5% and Evidently's 2%), so it is the one worth a process."
+      - "AFTER REQ-PIPE-432 (delivery-scoper): with dbt the critical path, overlapping the foreground changes nothing until dbt is shorter; building it second makes its effect measurable."
+    open_questions: []
+    signed_off: null
+
+  - id: REQ-PIPE-432
+    title: "A run's dbt step costs less: one dbt invocation profiled by phase, then dbt allowed to run a run's tests side by side and the per-invocation overhead the profile names cut, with the time per run recorded before and after"
+    date_written: "2026-11-14"
+    story: "As whoever regenerates the demo, I want each run's dbt step to stop being the longest part of every run, so that the replay's critical path shortens rather than only the work that already finishes first."
+    moscow: must
+    status: not_started
+    source: "Keith, SA Q3 (SETTLED 2026-11-14, option (b)): the dbt time sink of REQ-PIPE-250's profile, and its speed-up (3) ('the dbt worker round trip, about half the stream's active samples'), into this batch; drafted by delivery-scoper 2026-11-14 (speed-anchor v1). A PROPOSAL, not signed."
+    acceptance_criteria:
+      - "BEFORE this requirement's first change, THE SYSTEM SHALL record in its evidence one profile of a quarterly run's dbt step inside the worker (qa_tools/common/dbt_worker.py _serve), split into partial parse, compile, opening the database connection, running the selected nodes and writing run_results.json and manifest.json, over at least ten consecutive runs of one collection."
+      - "THE SYSTEM SHALL let dbt run a run's selected tests side by side, setting the profile's threads (qa_tools/dbt_profiles/profiles.yml, `threads: 1` today) to a value read from one named setting, and SHALL record in evidence the dbt time per run at 1, 2 and 4 threads on this sandbox with both streams running, choosing the value from that measurement."
+      - "WHERE the profile in criterion 1 shows a phase that repeats identical work every run - a re-parse, a re-compile of unchanged nodes, a connection opened per invocation - THE SYSTEM SHALL cut it using dbt's documented options only (as REQ-PIPE-157 used only dbt's documented API), and SHALL record the phase and its time before and after."
+      - "THE SYSTEM SHALL keep every recorded dbt verdict coming from that run's own run_results.json, parsed as today (evaluate_dbt_*), so that faster dbt never means a verdict read from another run's artefacts."
+      - "WHEN this requirement is built, THE SYSTEM SHALL record in evidence the dbt time per run before and after, and the share of the stream's samples spent waiting on the dbt worker, against the profile's 49%."
+      - "THE SYSTEM SHALL have tests, seen failing first, of the threads setting reaching the profile dbt is invoked with, and of two runs' verdicts each read from their own target directory with threads above one."
+    non_functional_requirements:
+      - "PERFORMANCE: about 3.8s a run on one thread when REQ-PIPE-157 landed (dbt_worker's docstring), and the replay's critical path - 49% of the quarterly stream's samples waiting on it. Target: dbt no longer the longest lane of a run, so that REQ-PIPE-431 can pay. Measured per run from qa.run_attempt's tool times on this sandbox, and in REQ-PIPE-403's bootstrap totals."
+      - "RELIABILITY: a dbt test failing or erroring reads exactly as at one thread; dbt's threads run the selected nodes of one invocation, never two runs at once in one worker (dbt_worker's one-request lock stays)."
+      - "COST: more dbt threads mean more PostgreSQL connections per worker; with two streams that is about 2 x threads connections from dbt, well under PostgreSQL's default 100, and a real deployment with thirty collections still runs one pass at a time."
+      - "COMPATIBILITY: dbt's documented options only, so a dbt upgrade does not break it (REQ-PIPE-157's rule)."
+    dependencies:
+      - "REQ-PIPE-157"
+      - "REQ-PIPE-250"
+      - "REQ-PIPE-403"
+    decisions:
+      - "ADDED TO THIS BATCH (SA Q3, SETTLED by Keith 2026-11-14, option (b)). REJECTED building S1-S3 only, and revisiting the budget."
+      - "DBT FIRST OF THE THREE (delivery-scoper): it is the critical path of every run - the main thread waits on it after Soda, datacontract and Evidently have finished - so every second cut here is a second off the replay, which is not true of the foreground tools."
+      - "THREADS ARE THE FIRST LEVER, MEASURED NOT ASSUMED (delivery-scoper, from the code): the profile runs dbt with threads 1, so a run's tests execute one at a time though they are independent reads; criterion 2 measures 1, 2 and 4 with both streams running before choosing, because on four cores more threads can cost more than they save."
+      - "PROFILE THE INVOCATION BEFORE CUTTING IT (delivery-scoper): REQ-PIPE-157 already removed process start and the full re-parse; what is left of 3.8s is not yet known by phase, so criterion 1 comes before criterion 3. This profiles one step inside a settled build, not the 'profile first, decide later' Keith rejected for S2."
     open_questions: []
     signed_off: null

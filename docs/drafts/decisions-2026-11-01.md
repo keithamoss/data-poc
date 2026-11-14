@@ -669,3 +669,10 @@ Purpose recalled: insurance for a real deployment's published QA page; REQ-QAC-3
 - **SA suite runtime (REQ-TEST-402 NFR):** A TARGET, NOT A GATE - UNDER 30 MINUTES for the full suite on this 4-core sandbox, reported against (CLAUDE.md's runtime log) and never failing a build. Keith knowingly chose the ambitious figure; it likely needs test-level work beyond S3. REJECTED measure-with-no-target, a gated target, 60 and 90 minutes.
 
 **SPEED/ANCHOR v1 STATUS:** all answered. To the scoper to apply (Q3 adds REQ-PIPE-250's three profiled speed-ups to the batch), then the architect and the CLI and dashboard UX reviewers, then sign-off.
+
+## Check timing + failed attempts v1 (docs/drafts/timing-attempts-v1.yaml) - Keith's answers, 2026-11-14
+
+- **TA Q1 (409, which clock stamps an attempt's start/end):** THE ONE CLOCK, as today (wall clock on a real asset, simulated in a replay); the run time itself comes from time.monotonic(). REJECTED always the wall clock.
+- **TA Q2 (412, runs feeding the trend and median):** WHOLE-SUPPLY RUNS ONLY (arrival runs and full re-checks); readers-only runs show their time but are not judged. REJECTED every run, and one series per scope.
+- **TA Q3 (412, the baseline):** THE LAST 20 WHOLE-SUPPLY RUNS, MINIMUM 3, stated as a choice. REJECTED all earlier runs (min 3), and all earlier from the second run.
+- **TA Q4 (415, a dataset's status while its supply is not checked):** LIKE A FAILED LOAD (REQ-DASH-148) - one dataset-level red reason 'Could not be checked' plus a 'needs a person' item; no Fail recorded on the supply. REJECTED a new 'Not checked' status, and the red reason without a queue item.

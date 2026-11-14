@@ -120,3 +120,43 @@ The daily asset's whole scenario setup is written at fixed dates around 2026-09-
 ## Files
 - `/home/user/data-poc/docs/drafts/speed-anchor-v1.yaml`
 - Probe scripts: `/tmp/claude-0/-home-user-data-poc/5735d9c2-23bf-590b-afe1-e67b136c7e21/scratchpad/probe.py` and `/tmp/claude-0/-home-user-data-poc/5735d9c2-23bf-590b-afe1-e67b136c7e21/scratchpad/probe2.py`
+
+## Addendum (Keith's answers applied; REQ-PIPE-430 to 432 added)
+
+I applied Keith's answers in place to `/home/user/data-poc/docs/drafts/speed-anchor-v1.yaml` and added REQ-PIPE-250's three profiled speed-ups as REQ-PIPE-430, 431 and 432. The draft check now reports only the 31 expected cross-reference errors, and every dependency resolves to requirements.yaml, separation-v6.yaml or this file. I touched no other file and committed nothing. `docs/drafts/decisions-2026-11-01.md` also shows as modified, but that edit isn't mine.
+
+Every open question is now `[]`, closed in `decisions:` as SETTLED by Keith 2026-11-14 with the rejected options. My five earlier provisional choices stand; none conflicted with his answers.
+
+## What changed in the existing requirements
+- **Header:** records Keith's answers and that ids 430+ were taken to stay clear of timing-attempts-v1's 409-416 (I checked 430-436 were free in requirements.yaml, docs/drafts and plans). The build order adds 432, then 430, then 431. The three register amendments are marked APPROVED AS WORDED, each applied when its requirement is built.
+- **REQ-PIPE-397 (Q4):** new criterion 8 says the pin covers mothman's own reads only; dbt's and Soda's own reads of their files stay live and are caught afterwards by the cache key and the resume digest. The tests criterion now includes a dbt model edited inside a pin still reaching dbt. The REQ-PIPE-254 criterion 15 amendment is approved.
+- **REQ-PIPE-403 (Q3):**
+  - The before and after measurements now include REQ-PIPE-430 to 432, and the before breaks the replay down by the profile's shares so each speed-up has its own baseline.
+  - The PERFORMANCE NFR now gives an honest estimate (below). REQ-PIPE-250 criterion 4's retirement is approved.
+- **REQ-GEN-404:** the REQ-GEN-042 criteria 7 and 8 amendment is approved.
+- **REQ-GEN-405 (Q2, Q5):** the title is rewritten. A bootstrap rolls the anchor only with `--roll-anchor`, and without it uses the fixed 2026-09-25 everywhere (new criterion 4). It anchors on the latest day whose planned receipts have all passed (criterion 5). Tests meeting a rolled database fail with one clear message naming the anchor found and the rebuild commands (criterion 6). New criterion 7 refuses `--roll-anchor` under the test and ci environments. Cross-references were renumbered.
+- **REQ-GEN-406 (Q1):** the PROVISIONAL markers are gone. A new criterion writes the daily asset's calendar versions, correction dates and setting eras as offsets from the anchor. At the fixed anchor they resolve to today's dates, and the quarterly rounds and older dates stay absolute.
+- **REQ-TEST-402 (suite target):**
+  - **Target:** under 30 minutes on this 4-core sandbox, reported and never gated, recorded as a decision with Keith's rejected options.
+  - **New criterion:** if the suite is still over 30 minutes, the slowest modules and classes are recorded and the target is not called met.
+  - **What beyond S3 it likely takes:**
+    - The speed-ups in this batch reaching every test that runs a real pipeline.
+    - Trimming the slowest browser classes. `tests/test_dashboard_e2e.py` was 659-717s at REQ-TEST-281, with `TestEveryScenarioJumpLands` alone 400-500s on one worker.
+    - Moving tests that re-run all four tools onto shared, already-evaluated runs where the tool itself isn't what's being tested.
+  - Each of those changes which tests exist, so each would be its own requirement for Keith.
+
+## New requirements
+- **REQ-PIPE-430 (must):** inside a pinned bootstrap, each collection's delivery tree is recognised once, which covers the calls from orchestrate, stage, the bootstrap and the next-receipt look-ups. A digest of the tree is checked at the end, and a mismatch is reported. Unpinned, it reads the tree as today. This targets the 25% share. I keyed it on the pin rather than on the tree's content, because checking the content means reading every receipt, which is most of the cost.
+- **REQ-PIPE-431 (should):** datacontract-cli moves into a long-lived worker process, shaped like `dbt_worker`, so there are three lanes at once: dbt, datacontract, and Soda then Evidently. Results stay in tool order, a dead worker fails only that step, and `--sequential` stays in-process. This targets the 18% share. A process, not a thread, because these tools can't safely share an interpreter.
+- **REQ-PIPE-432 (must):** first profile one dbt invocation by phase over ten or more runs. Then make dbt's `threads` a named setting (it is 1 today in `qa_tools/dbt_profiles/profiles.yml`), measured at 1, 2 and 4 with both streams running. Then cut any repeated per-run phase using dbt's documented options only. Verdicts still come from each run's own `run_results.json`. This targets the 49% share.
+
+## Honest NFR on what's reachable
+dbt already runs beside the other three tools, and the 49% "waiting on dbt" means it outlasts all of them. That is why 432 comes first and 431 pays nothing until 432 lands.
+- **Tree work (430):** saves up to about 1,500s of today's 6242s replay.
+- **Estimate if all land well:** the quarterly replay comes down to about 2,000-3,000s plus generation, still several times the 720s budget.
+- **Why:** the asset replays roughly 450 runs, so 720s would need well under 1.5s per run with everything included.
+- **Daily asset:** should stay within its budget.
+- **Caveat:** this estimate comes from one profile. REQ-PIPE-403's measurement is the real answer, and its criterion 5 records the shortfall rather than calling the budget met.
+
+## New questions
+None blocking. One thing Keith should hear: on Keith's own numbers the quarterly 720s budget is not expected to be met even with all six speed-ups. Whether to then shrink the history, accept a larger budget, or go after per-run cost further is a decision for after REQ-PIPE-403's measurement, not now.
