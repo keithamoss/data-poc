@@ -1,0 +1,315 @@
+# PROPOSAL - check timing (plans/running-thoughts.md #120) and failed attempts
+# (plans/running-thoughts.md #121), scoped together as Keith's ROUTING line
+# asked (docs/drafts/decisions-2026-11-01.md, 'Check timing scoping' T1-T3 and
+# 'Failed attempts scoping' F1-F3 and ROUTING, all SETTLED by Keith 2026-11-14).
+# Drafted by delivery-scoper 2026-11-14 (Perth), v1, against HEAD bf1263a4.
+# NOT SIGNED. Nothing here is built until Keith signs it. Ids 409-416 were free
+# in requirements.yaml, docs/drafts/ and plans/ on 2026-11-14; whoever applies
+# this re-checks.
+#
+# WHAT IS ALREADY BUILT, so nobody re-scopes it. #121's premise ('a retry
+# leaves no trace of the failed attempt') is OUT OF DATE: REQ-PIPE-279
+# criteria 5-8 (built, signed 2026-10-23) added qa.run_attempt - one row per
+# attempt, never removed by a reopen, a retry or a re-recording
+# (qa_tools/common/qa_store.py lines 286-311), outcomes COMPLETED, TIMED-OUT,
+# INTERRUPTED and CRASHED (qa_results_writer.py lines 893-918), liveness by a
+# session advisory lock. Its NFR 'AN ATTEMPT IS HISTORY' says the table exists
+# so #120 and #121 'can be read from it later. Nothing here displays it.'
+# So F1 is mostly built; this batch adds the run time (T1), the TOOL-ERROR
+# outcome F1 names, and everything that SHOWS attempts (F2, F3, T2, T3).
+#
+# THE CLOCK. Under REQ-PIPE-382 (separation-v6) there is one clock, and in a
+# replay it is the replay's simulated time - which jumps forward on 'a decision
+# takes effect' events mid-run (T1: 6.3 days for one quarterly run). So a run
+# time is NEVER a difference of two recorded instants: it is a monotonic
+# real-time counter read at an attempt's start and end, which no installed
+# clock can replace (REQ-PIPE-409). Which clock stamps an attempt's start and
+# end INSTANTS is open question 1 (recommended: the one clock, unchanged).
+#
+# THE STANDING RULE APPLIES (Keith, 2026-11-14): the synthetic demo history may
+# move whenever a change needs it, and REQ-TEST-239 is retired - no criterion
+# here is 'proven by the compare'. The test suite is the proof.
+#
+# BUILD ORDER (proposed): REQ-PIPE-409 + REQ-PIPE-410 (one schema bump), then
+# REQ-PIPE-411, REQ-PIPE-412, then REQ-DASH-413, REQ-DASH-414, REQ-DASH-415,
+# and REQ-TEST-416 beside them. After #134 v6's REQ-PIPE-382 if that lands
+# first (409's monotonic counter is deliberately outside the clock seam).
+#
+# FOR THE REVIEWERS:
+#   architect - 409's time.monotonic() read in a real pipeline module and
+#     whether REQ-PIPE-382 criterion 1 / REQ-TEST-384's imports gate would
+#     object; 411's read of runs that are NOT in qa.run_visible (the build has
+#     only ever read visible runs); 412's median at ~30 collections; a Lambda
+#     killed at its limit records INTERRUPTED with no end and no run time.
+#   dashboard UX - 'attempt' already means a RESUPPLY on the supply history
+#     ('Resupply, attempt N', template line 9464), open question 6; where the
+#     run's attempt list lives (there is no run-level detail panel today, only
+#     per-check 'run detail'); the 'Slow' mark must not read as a status; what
+#     the mock datasets show.
+#   CLI UX - 416's line on every command that runs QA (qa, pipeline process,
+#     pipeline run, the bootstrap's per-run header), and whether the CLI should
+#     also say 'slow' (T3 names only the trend and the supply history).
+requirements:
+  - id: REQ-PIPE-409
+    title: "Every attempt at a QA run records its real elapsed run time, from a monotonic counter no clock can replace - never from recorded instants, and never from a replay's simulated time"
+    date_written: "2026-11-14"
+    story: "As whoever maintains the pipeline, I want every attempt at a QA run to record how long it really took, so that a run that grows from 5 minutes to 3 hours becomes visible and I can go and look into it."
+    moscow: must
+    status: not_started
+    source: "Keith, plans/running-thoughts.md #120 (2026-10-22) and T1 of 'Check timing scoping' and F1 of 'Failed attempts scoping', SETTLED 2026-11-14 (docs/drafts/decisions-2026-11-01.md); drafted by delivery-scoper 2026-11-14 (timing-attempts v1). A PROPOSAL, not signed."
+    acceptance_criteria:
+      - "WHEN an attempt begins (qa_results_writer.open_run, qa_store.begin_attempt at qa_tools/common/qa_store.py lines 2471-2484), THE SYSTEM SHALL read a monotonic real-time counter (time.monotonic()) in the attempt's own process and hold it on the attempt (qa_results_writer.Attempt, lines 807-847)."
+      - "WHEN an attempt ends with a recorded end - COMPLETED, TIMED-OUT, INTERRUPTED with its end time, CRASHED, or TOOL-ERROR (REQ-PIPE-410) - THE SYSTEM SHALL record on its qa.run_attempt row, in the same UPDATE that records its end (qa_store.end_attempt, lines 2493-2503), a new column elapsed_seconds: the counter at its end minus the counter at its start, to the millisecond."
+      - "IF an attempt is closed by a later attempt of its run key that finds it dead (begin_attempt's INTERRUPTED with no end, line 2479), THEN THE SYSTEM SHALL leave its elapsed_seconds NULL, never estimated from instants, a heartbeat or the next attempt's start."
+      - "THE SYSTEM SHALL NOT derive a run time from qa.run's created_at or completed_at, from qa.run_attempt's began_at or ended_at, or from any reading of the clock REQ-PIPE-382 lets a replay install (T1)."
+      - "WHILE a replay clock is installed and moves forward during an attempt (a 'decision takes effect' event, or replay_clock.advance_to today), THE SYSTEM SHALL record the attempt's elapsed_seconds as the real seconds it took."
+      - "THE SYSTEM SHALL take a run's RUN TIME as the elapsed_seconds of its newest COMPLETED attempt by run_seq, and a run with no completed attempt SHALL have no run time."
+      - "THE SYSTEM SHALL enforce on qa.run_attempt that elapsed_seconds is NULL while ended_at is NULL and is never negative."
+      - "THE SYSTEM SHALL bump the qa schema from version 50 (qa_store.py line 203) to the next version together with REQ-PIPE-410, so the existing refusal of another version has an older database rebuilt from empty by mothman env reset-synthetic and mothman pipeline bootstrap, never migrated."
+      - "THE SYSTEM SHALL have tests, seen failing first, of a completed attempt recording an elapsed_seconds within a tolerance of a known real duration; of an attempt during which an installed replay clock advances by days recording real seconds, not days; of an attempt found dead by the next one keeping a NULL elapsed_seconds; of a CRASHED and a TIMED-OUT attempt each recording its own elapsed_seconds; and of a run with a crashed then a completed attempt whose run time is the completed attempt's."
+    non_functional_requirements:
+      - "PERFORMANCE OF RECORDING: one time.monotonic() call at each end of an attempt and one more column in an UPDATE the attempt already makes - no extra round trip, no extra connection."
+      - "STORAGE GROWTH: one number per attempt in a table that already holds one row per attempt (REQ-PIPE-279 NFR SCALE). At about thirty collections, daily and quarterly, over years that is of the order of ten thousand rows a year, 8 bytes each - negligible. Per-check timing is deliberately NOT recorded (T1), which is where storage would have grown."
+      - "RELIABILITY: a run time is measured in the process that ran the attempt; a process that dies has no end to measure, so its time is unknown rather than invented (REQ-PIPE-279 NFR 'LIVENESS IS A LOCK, NEVER A TIMEOUT')."
+      - "PRIVACY: a run time says nothing about the rows a supply holds beyond what its row count already says."
+      - "SECURITY: nothing here touches credentials, access or supply rows."
+      - "AUDITABILITY: the attempt row already carries its run key and run_seq, and the run its run_by and environment; the run time joins them rather than adding a second record."
+      - "COMPATIBILITY: standard library only; no new dependency."
+    dependencies:
+      - "REQ-PIPE-279"
+      - "REQ-PIPE-410"
+    decisions:
+      - "ONE RUN TIME PER QA RUN (T1, SETTLED by Keith 2026-11-14, after first choosing every check and then, on the follow-up about shared Soda queries and whole-tool runs: 'on second thought, let's just time the run'). REJECTED timing every check (it needs each tool run once per check, or a share of a shared query invented); REJECTED a time per tool per run."
+      - "NEVER THE REPLAY'S SIMULATED CLOCK (T1): qa.run's created_at and completed_at are replay-clock stamps in a synthetic history (6.3 days for one quarterly run), and the replay clock jumps forward on decision events mid-run (qa_tools/common/replay_clock.py advance_to), so no difference of recorded instants is a run time."
+      - "A MONOTONIC COUNTER, OUTSIDE THE CLOCK SEAM (delivery-scoper): REQ-PIPE-382 gives the pipeline one clock for INSTANTS, which a replay may replace; a DURATION must not be replaceable, so it is read from time.monotonic() directly. replay_clock itself already measures with time.monotonic(). Flagged for the architect against REQ-PIPE-382 criterion 1."
+      - "EACH ATTEMPT CARRIES ITS OWN RUN TIME (F1, SETTLED by Keith 2026-11-14), stored on qa.run_attempt rather than on qa.run; a run's run time is its newest completed attempt's (delivery-scoper: a run reopened and completed again has more than one completed attempt, and the newest is what its results are)."
+      - "WHAT AN ATTEMPT SPANS IS UNCHANGED (delivery-scoper, provisional on open question 5): from open_run to complete_run - every tool, the dataset statistics, the reconciliation and the records; not the staging before it, nor the census and the gate after it (REQ-PIPE-279 criterion 6)."
+      - "UNKNOWN STAYS UNKNOWN (delivery-scoper, carried from REQ-PIPE-279 criterion 7 and its 'LIVENESS IS A LOCK' NFR): an attempt found dead has no end time, so it has no run time. REJECTED a heartbeat column, which #124 already parks until the AWS build (post-build-review #262 R3)."
+      - "HONEST, NOT NORMALISED (delivery-scoper): a bootstrap replays collections in parallel processes, and a run's four tools overlap, so a run time reflects the machine it ran on that day. It is recorded as measured; nothing corrects it."
+      - "REGENERATE, NEVER MIGRATE (the standing schema rule, REQ-PIPE-144 criterion 29): the version bump rebuilds an older database from empty."
+      - "NO EQUIVALENCE COMPARE (Keith, 2026-11-14, REQ-TEST-239 retired): the tests are the proof, and the synthetic history may move."
+    open_questions:
+      - "1. WHICH CLOCK STAMPS AN ATTEMPT'S START AND END INSTANTS (batch question 1). F1 says 'real start and end'. Today began_at and ended_at come from qa_store._stamp(), the replay clock in a replay (qa_store.py lines 2143-2147), and REQ-PIPE-382 makes that the one clock. Options: (a) keep them on the one clock - real instants on a real asset, the history's own instants in a replay - and carry 'real' in the run time this requirement adds; (b) stamp them from the wall clock always, so a replayed 2015 attempt reads as having run today. RECOMMENDED (a): on a real asset the two are the same; in a replay (b) brings back exactly what REQ-PIPE-081 criteria 27-31 fixed (records reading as made today about years ago), and the as-of view (REQ-DASH-415 criterion 6) needs an attempt's instants on the history's own timeline to show a run as not checked between its failed and its completing attempt."
+      - "5. WHAT A RUN TIME SPANS (batch question 6): (a) the attempt, open_run to complete_run, as drafted; (b) the whole arrival, including staging the file and the gate after. RECOMMENDED (a): it is the span F1's attempts already have, so a failed attempt's time and a completed one's mean the same thing; staging a large file is slow for a different reason and would want its own number if it is ever wanted."
+    signed_off: null
+
+  - id: REQ-PIPE-410
+    title: "An attempt that ended because one of the four tools failed is recorded as TOOL-ERROR, naming the tool, and every failed attempt keeps its error's type and message - a timed-out one included"
+    date_written: "2026-11-14"
+    story: "As whoever maintains the pipeline, I want to see whether a failed attempt was dbt, Soda, datacontract-cli or Evidently failing, a timeout, or something else crashing, so that I start looking in the right place."
+    moscow: must
+    status: not_started
+    source: "Keith, F1 of 'Failed attempts scoping' (how it ended: 'completed, timed out, crashed, tool error' and the error's message), SETTLED 2026-11-14; drafted by delivery-scoper 2026-11-14 (timing-attempts v1). A PROPOSAL, not signed."
+    acceptance_criteria:
+      - "WHEN an attempt ends because a tool's evaluation raised (orchestrate._run_step wrapping it in QaRunFailure, qa_tools/tools/orchestrate.py lines 51-67), THE SYSTEM SHALL record its outcome as TOOL-ERROR, the tool's name in a new qa.run_attempt column tool, and as error_type and error_message the type and message of the exception the tool raised (the chained cause, not QaRunFailure), the message cut to qa_store.ERROR_MESSAGE_LIMIT characters."
+      - "THE SYSTEM SHALL have QaRunFailure carry the tool's name as a field, set by _run_step, so the outcome is decided from that field and never parsed from the message's text."
+      - "WHEN an attempt ends TIMED-OUT (SQLSTATE 55P03 or 57014 on one of this project's own connections, qa_results_writer._outcome lines 893-918), THE SYSTEM SHALL record that error's type and message as well, so the page and the CLI can say which wait timed out."
+      - "THE SYSTEM SHALL keep TIMED-OUT taking precedence over TOOL-ERROR where a 55P03 or 57014 from this project's own connection is anywhere in the exception chain, and SHALL keep CRASHED for any other exception and INTERRUPTED for a stop seen from outside, as REQ-PIPE-279 criterion 6 defines them."
+      - "THE SYSTEM SHALL widen qa.run_attempt's outcome check to include TOOL-ERROR, require error_type for CRASHED, TOOL-ERROR and TIMED-OUT, and require tool exactly when the outcome is TOOL-ERROR."
+      - "THE SYSTEM SHALL have tests, seen failing first, of a dbt failure ending an attempt TOOL-ERROR naming dbt with dbt's own exception type; of a non-tool exception still ending CRASHED with no tool; of a lock timeout inside a tool step ending TIMED-OUT with its message; and of the run's retry completing with both attempts kept."
+    non_functional_requirements:
+      - "SECURITY: every stored message is truncated before it is stored, as today (REQ-PIPE-279 NFR SECURITY - a driver's message can repeat a DSN)."
+      - "PRIVACY: a tool's error message can quote a value from the supply - a dbt or psycopg error naming a key, a datacontract-cli error quoting a row. Recording it in qa.* is as today; whether it is PUBLISHED is REQ-PIPE-411's open question 4."
+      - "MAINTAINABILITY: the outcome is decided in one function (qa_results_writer._outcome) from the exception's type and fields, never from text."
+      - "STORAGE: one short text column, set only on a TOOL-ERROR attempt."
+    dependencies:
+      - "REQ-PIPE-279"
+      - "REQ-PIPE-409"
+    decisions:
+      - "TOOL ERROR IS ITS OWN OUTCOME (F1, SETTLED by Keith 2026-11-14, which lists 'completed, timed out, crashed, tool error'). Today a tool's failure records CRASHED with error_type 'QaRunFailure' (REQ-PIPE-279's own wording: 'a tool's own timeout arriving as QaRunFailure ... records CRASHED'), which says nothing about which tool. REJECTED keeping CRASHED and reading the tool off the message (delivery-scoper: never parse text)."
+      - "INTERRUPTED STAYS (delivery-scoper): F1's list is an example of how an attempt ends; REQ-PIPE-279 is built with INTERRUPTED for a Ctrl-C, SIGTERM or a stopped pass, and dropping it would file a deliberate stop as a crash."
+      - "A TOOL'S OWN TIMEOUT IS A TOOL-ERROR (delivery-scoper, from the code): dbt and Soda connect through their own drivers, so their timeouts are not visible as SQLSTATEs on this project's connections (qa_results_writer.py lines 821-828); the tool and its exception type say what happened. There is no per-tool time limit today (no subprocess timeout in qa_tools/tools/), so 'timed out after 45 minutes' in F2's example can only be a lock or statement timeout on our side, or a stop from outside."
+      - "THE CAUSE'S TYPE, NOT THE WRAPPER'S (delivery-scoper): QaRunFailure chains the tool's exception (orchestrate.py lines 62-67); recording QaRunFailure as the type would make every tool error look the same."
+      - "A FAILURE BEFORE THE ATTEMPT OPENS IS OUT OF SCOPE (delivery-scoper): a resolution or a check file that will not parse fails before open_run (qa_results_writer.py lines 757-763), so no attempt exists; the processing pass already reports it (processing_pass.py line 416). #134's REQ-DASH-394 covers a step stopped by a configuration error."
+    open_questions: []
+    signed_off: null
+
+  - id: REQ-PIPE-411
+    title: "The results file and the dashboard data carry each run's run time and, where there is more than one, every attempt - including a run whose newest attempt failed and has not been retried, which is not a visible run today"
+    date_written: "2026-11-14"
+    story: "As a data team leader, I want the page built from the record of every attempt, not only of finished runs, so that a supply whose check timed out or crashed is shown as not checked rather than silently replaced by the supply before it."
+    moscow: must
+    status: not_started
+    source: "Keith, T2 of 'Check timing scoping' and F2/F3 of 'Failed attempts scoping', SETTLED 2026-11-14; drafted by delivery-scoper 2026-11-14 (timing-attempts v1). A PROPOSAL, not signed."
+    acceptance_criteria:
+      - "THE SYSTEM SHALL emit in each collection's results file (qa_tools/tools/results_history.build_results_from_history) and its dashboard data (pipeline/build_dashboard_data.py, the per-run facts beside 'rank', line 1081) each run's run time in seconds (REQ-PIPE-409 criterion 6), or null where it has none."
+      - "THE SYSTEM SHALL emit, for a run with more than one attempt or whose newest attempt is not COMPLETED, every attempt in run_seq order with its number (1 for the lowest run_seq of that run key, counting up), when it began and ended, how it ended, its run time, its tool and its error's type - and SHALL emit no attempt list for a run with exactly one attempt that completed."
+      - "THE SYSTEM SHALL emit, for each dataset, each run of it (qa.run, not qa.run_visible, trials excluded) whose newest attempt is not COMPLETED and that has no completed attempt, with its supply (qa.run.supply_id), its cause (REQ-PIPE-279 criterion 10) and its attempts - so the page can show that supply as not checked (REQ-DASH-415) - and SHALL emit no check result for such a run."
+      - "THE SYSTEM SHALL number and order attempts by run_seq alone, never by began_at, ended_at or run-id text (REQ-PIPE-279 criteria 9 and 21), and SHALL NOT emit run_seq itself."
+      - "THE SYSTEM SHALL read for this qa.run and qa.run_attempt only - recorded QA metadata - and SHALL NOT read pg_locks, any staging, period, rejected or run-view schema, or any schema holding supply rows."
+      - "WHEN the dashboard data is built twice from the same recorded history, THE SYSTEM SHALL produce byte-identical output apart from generated_at (REQ-PIPE-279 criterion 25 still holding)."
+      - "IF a results file was written before this change and carries no run times, THEN THE SYSTEM SHALL refuse to build from it, naming mothman dashboard rebuild-results, as it refuses a file with no run_facts (build_dashboard_data.py lines 1119-1124)."
+      - "THE SYSTEM SHALL have tests, seen failing first, of a run with one completed attempt emitting a run time and no attempt list; of a run with a crashed then a completed attempt emitting both, numbered 1 and 2; of a run whose only attempt timed out emitted as not checked with no results; of an attempt found dead emitted with no end and no run time; of a trial's attempts not emitted; and of a build that opens no connection to a schema holding supply rows."
+    non_functional_requirements:
+      - "A BUILD READS RECORDED QA RESULTS ONLY (CLAUDE.md, Keith 2026-09-27): qa.run_attempt is recorded QA metadata the publisher's existing SELECT grant on the qa schema already covers (qa_store.py lines 2013-2016); nothing here reads supply rows or anything else - including pg_locks, which is why a running attempt and a dead one read the same on the page (REQ-DASH-415 criterion 5)."
+      - "DASHBOARD WEIGHT: one number per run, plus an attempt list only where it says something (more than one attempt, or a failure). Today almost every run has one completed attempt, so the page grows by roughly one short field per run - measured on the bootstrapped build and recorded as evidence, with no invented budget."
+      - "SCALABILITY: one indexed read of qa.run_attempt per collection, joined by run key - linear in attempts. At about thirty collections over years the attempt table is of the order of ten thousand rows a year."
+      - "DETERMINISM: attempt numbers and order come from run_seq; the dense per-collection rank stays the only order the template sees (REQ-PIPE-279 NFR 'THE BUILD EMITS A RANK, NEVER run_seq')."
+    dependencies:
+      - "REQ-PIPE-409"
+      - "REQ-PIPE-410"
+      - "REQ-PIPE-279"
+    decisions:
+      - "THE RECORD OF ATTEMPTS IS READ AT LAST (REQ-PIPE-279 NFR: 'so check durations (#120) and a failed attempt's visibility (#121) can be read from it later. Nothing here displays it.'). This is the reader that sentence anticipated."
+      - "A FAILED RUN BECOMES VISIBLE TO THE BUILD, ITS RESULTS DO NOT (F3, SETTLED by Keith 2026-11-14: its checks read 'No result', never a stale Pass). qa.run_visible keeps hiding an unfinished run's partial results (REQ-PIPE-089 criterion 13); only the run's existence and its attempts are emitted. Flagged for the architect: the build has only ever read visible runs."
+      - "THE PASS/WARN/FAIL COMES FROM THE SUCCESSFUL ATTEMPT ONLY (F2, SETTLED by Keith 2026-11-14): already true by construction - a retry's record_results replaces the results, and a failed attempt's partial results were never visible - so nothing here computes a verdict from an attempt."
+      - "NO LOCK READ IN THE BUILD (delivery-scoper): qa_store.attempt_running answers 'still running?' from pg_locks (lines 2435-2449); the build may read recorded QA results and never anything else, so it cannot tell a running attempt from a dead one not yet found, and REQ-DASH-415 words both the same way."
+      - "AN ATTEMPT LIST ONLY WHERE IT SAYS SOMETHING (delivery-scoper, for page weight at thirty collections): a run with one completed attempt is the overwhelming case and needs only its run time."
+      - "REGENERATE, NEVER MIGRATE: a results file without run times is refused and rebuilt, as REQ-PIPE-279 did for run_facts."
+    open_questions:
+      - "4. IS AN ERROR'S MESSAGE PUBLISHED ON THE PAGE (batch question 5)? F1 keeps the message in qa.run_attempt and F3 says the page shows 'when and the error'. A message can quote a value from the supply (a key in a psycopg or dbt error) or a host or path. Options: (a) publish it as recorded (truncated to 1,000 characters); (b) publish the outcome, the tool and the error's type, and leave the message to mothman (REQ-TEST-416) and the database; (c) publish it after scrubbing quoted values. RECOMMENDED (b): a build may read recorded QA results and 'never actual data', and a message is the one recorded field that can carry actual data in a real deployment; the data team leader needs 'a tool failed (dbt)', the maintainer who needs the message has mothman. (c) is a scrubber that would have to be right for four tools' error formats."
+    signed_off: null
+
+  - id: REQ-PIPE-412
+    title: "A run that took more than twice the median of its dataset's previous runs is marked slow, by one rule in the dashboard build, and the mark never changes a status, blocks anything or changes once later runs are recorded"
+    date_written: "2026-11-14"
+    story: "As whoever maintains the pipeline, I want a run that suddenly takes far longer than that dataset's runs usually do picked out for me, so that a growing run time becomes visually obvious without anyone having to read a chart closely."
+    moscow: should
+    status: not_started
+    source: "Keith, plans/running-thoughts.md #120 (2026-10-22, 'maybe alerting, monitoring ... At some point that becomes visually obvious') and T3 of 'Check timing scoping', SETTLED 2026-11-14; drafted by delivery-scoper 2026-11-14 (timing-attempts v1). A PROPOSAL, not signed."
+    acceptance_criteria:
+      - "THE SYSTEM SHALL mark a run SLOW WHEN its run time is strictly more than twice the median run time of its dataset's earlier runs - runs of the same dataset with a lower rank (REQ-PIPE-279 criterion 16), in the comparison set open question 2 settles, within the baseline open question 3 settles, that have a run time."
+      - "IF fewer earlier runs with a run time exist than the minimum open question 3 settles, THEN THE SYSTEM SHALL mark the run neither slow nor not slow, and emit it as having too little history to judge."
+      - "THE SYSTEM SHALL compute the mark once, in the dashboard build (pipeline/build_dashboard_data.py), and emit it with the run with the median and the number of runs it was judged against; the template SHALL only render it."
+      - "THE SYSTEM SHALL judge each run against runs ranked before it only, so a run's mark does not change when later runs are recorded."
+      - "THE SYSTEM SHALL NOT let the mark change any dataset's, supply's or check's Pass/Warn/Fail, the promotion gate, the 'needs a person' queue, a ticket, an exit status or any other decision."
+      - "THE SYSTEM SHALL have tests, seen failing first, of a run at exactly twice the median not marked; of a run just over it marked; of an even-sized baseline using the mean of its two middle values; of a dataset's first runs below the minimum marked too little history; of a run's mark unchanged after a much slower later run is recorded; and of a dataset whose runs are all marked slow leaving its status unchanged."
+    non_functional_requirements:
+      - "SCALABILITY: at about thirty collections, and a daily dataset holding thousands of runs over years, the median for every run SHALL be computed in time no worse than proportional to runs times log runs per dataset (a running sorted structure or a fixed window), never by re-sorting the whole history for each run."
+      - "DETERMINISM: the mark follows from recorded run times and ranks alone; the same history builds the same marks."
+      - "MAINTAINABILITY: one rule in one place; no per-dataset configuration (T3 rejected it)."
+      - "RELIABILITY: a run with no run time (never completed, or found dead) is neither judged nor counted in another run's baseline."
+    dependencies:
+      - "REQ-PIPE-411"
+    decisions:
+      - "TWICE THE MEDIAN OF THE DATASET'S PREVIOUS RUNS (T3, SETTLED by Keith 2026-11-14). REJECTED a trend with no mark; REJECTED a configurable per-dataset rule."
+      - "NEVER A STATUS, NEVER A BLOCK (T3): the mark is information about the pipeline, not about the data."
+      - "NO ALERT (delivery-scoper): #120 said 'maybe alerting, monitoring, something around that'; T3 settled a mark on the trend and in the supply history, so no notification, ticket or exit status is raised. An alert would be new scope, and #124 (pipeline observability, 'leave until AWS') is where it belongs."
+      - "COMPUTED IN THE BUILD, NOT THE PAGE (delivery-scoper): one implementation, testable in Python, and the template stays a consumer (docs/components.md, DASH only ever consumes)."
+      - "JUDGED AGAINST EARLIER RUNS ONLY (delivery-scoper): a mark that flipped as later runs arrived would make the as-of view show a different past than a reader saw; ordering is by rank, never by time (REQ-PIPE-279)."
+      - "STRICTLY MORE THAN TWICE (delivery-scoper): 'more than twice' is T3's wording."
+      - "NO SCENARIO PLANTS A SLOW RUN (delivery-scoper, provisional on open question 7): a run time is real, so a planted slow run would have to really be slow; the demo shows whatever the bootstrap's runs took."
+    open_questions:
+      - "2. WHICH RUNS ARE COMPARED (batch question 2). A dataset has arrival runs, full re-checks of a supply and readers-only runs that run only another table's cross-table checks (qa.run.scope, qa_store.py lines 256-262) - a readers-only run is far shorter. Options: (a) whole-supply runs only (arrival and full) on the trend and in the median, a readers-only run's time shown in its row but neither judged nor counted; (b) every run, one series; (c) one series per scope, each judged against its own. RECOMMENDED (a): like is compared with like, and the readers-only runs that would drag the median down are the ones least likely to be the slow problem; (c) is three charts per dataset."
+      - "3. WHAT 'PREVIOUS RUNS' MEANS (batch question 3). Options: (a) every earlier run, at least 3 needed before anything is marked; (b) the last 20 earlier runs, at least 3 needed; (c) every earlier run, judged from the second run on. RECOMMENDED (b): a dataset whose supplies legitimately grow over years would otherwise be marked slow for good against its small early runs, and a window keeps the median cheap at thirty collections; 3 is the smallest count whose median is not just one run. Both numbers are a choice, not a measurement - say if they should be different."
+    signed_off: null
+
+  - id: REQ-DASH-413
+    title: "Each real dataset's page shows its run-time trend, and the supply history shows each run's run time beside it, with a slow run marked on both in words, never as a status"
+    date_written: "2026-11-14"
+    story: "As whoever maintains the pipeline, and as a data team leader asked why a supply took so long, I want to see how long each run of a dataset took and how that has changed, so that a run that went from minutes to hours is obvious at a glance."
+    moscow: should
+    status: not_started
+    source: "Keith, plans/running-thoughts.md #120 and T2/T3 of 'Check timing scoping', SETTLED 2026-11-14; drafted by delivery-scoper 2026-11-14 (timing-attempts v1). A PROPOSAL, not signed."
+    acceptance_criteria:
+      - "THE SYSTEM SHALL show on each real dataset's page a run-time trend: one point per run in the comparison set REQ-PIPE-412's open question 2 settles, ordered by rank alone, its height the run's run time, drawn with the template's existing inline chart code (no new library)."
+      - "THE SYSTEM SHALL show beside each run in the supply history its run time, in one duration format shared with mothman (REQ-TEST-416 criterion 4), and nothing where the run has none."
+      - "WHERE REQ-PIPE-412 marks a run slow, THE SYSTEM SHALL label its trend point and its supply-history row 'Slow' in words, with the run time, the median and how many runs it was judged against available on hover and focus - never by colour alone, and never in the colours or words of Pass, Warn or Fail."
+      - "WHILE a date is on show in the as-of picker, THE SYSTEM SHALL draw the trend and the run times only from runs recorded by that date (as REQ-DASH-264 criterion 1 clips results)."
+      - "IF a dataset has fewer than two runs with a run time, THEN THE SYSTEM SHALL show one sentence saying so in place of the trend."
+      - "THE SYSTEM SHALL NOT show a trend or run times on the illustrative mock datasets, and SHALL NOT fabricate a run time anywhere."
+      - "THE SYSTEM SHALL leave every dataset's, supply's and check's Pass/Warn/Fail as it is with or without a slow run."
+      - "THE SYSTEM SHALL have JS tests of the trend's order by rank, of the slow label in words with its hover text, of the as-of clip and of the too-little-history sentence, and real-browser tests on the built dashboard that a real dataset's page shows its trend and each supply-history row its run time with zero console errors."
+    non_functional_requirements:
+      - "PERFORMANCE: the trend draws from data already on the page, lazily with the rest of the dataset's page - no extra fetch, and no measurable change to the time the dataset list takes to appear."
+      - "DASHBOARD WEIGHT: no new vendored asset; the data is REQ-PIPE-411's."
+      - "COMPATIBILITY: works from a plain file:// open on a network that reaches no third-party domain (the existing self-hosted chart code)."
+      - "ACCESSIBILITY: 'Slow' is a word, not a colour; the trend has a text alternative giving the newest run time and the median."
+      - "UX BAR (Keith, the standing 'level Apple goes for' bar): the trend must not crowd a page whose first job is 'is my dataset OK' - for the dashboard UX reviewer to place."
+    dependencies:
+      - "REQ-PIPE-411"
+      - "REQ-PIPE-412"
+    decisions:
+      - "BOTH A TREND AND A TIME PER RUN, AND THE CLI TOO (T2, SETTLED by Keith 2026-11-14): a run-time trend per dataset, the time beside each run in the supply history, and mothman printing it when a run finishes (REQ-TEST-416). REJECTED dashboard only; REJECTED CLI and logs only."
+      - "'SLOW' IS NOT A STATUS (T3): it is labelled in words and kept out of Pass/Warn/Fail's colours, so a reader never takes a slow run for bad data."
+      - "NO FABRICATED TIMES ON MOCK DATASETS (delivery-scoper, carried from docs/project-context-for-agents.md 'What's real vs illustrative'): everything shown about timing is real."
+      - "ORDERED BY RANK (REQ-PIPE-279): never by date or time."
+    open_questions: []
+    signed_off: null
+
+  - id: REQ-DASH-414
+    title: "A run that needed more than one attempt says so in one short note on its supply-history row, and its every attempt can be listed there - how it ended, when, for how long and why - while its Pass/Warn/Fail comes from the successful attempt only"
+    date_written: "2026-11-14"
+    story: "As whoever maintains the pipeline, I want it obvious when a run timed out or crashed before it succeeded, so that a run that keeps needing retries is noticed rather than hidden by its eventual success."
+    moscow: must
+    status: not_started
+    source: "Keith, plans/running-thoughts.md #121 (2026-10-22, 'it should also be obvious somewhere that it did time out or crash. Maybe that one for the UX review') and F2 of 'Failed attempts scoping', SETTLED 2026-11-14; drafted by delivery-scoper 2026-11-14 (timing-attempts v1). A PROPOSAL, not signed."
+    acceptance_criteria:
+      - "WHEN a run completed on its second or later attempt, THE SYSTEM SHALL show on its supply-history row one short note naming the attempt it succeeded on and how the attempt before it ended and after how long - F2's example being 'Succeeded on attempt 2 - attempt 1 timed out after 45 min', exact words per open question 6."
+      - "THE SYSTEM SHALL let a reader open, from that row, a list of every attempt of the run in order: its number, when it began and ended, how it ended (in words: completed, timed out, a tool failed - naming the tool, crashed, stopped), its run time, and its error as REQ-PIPE-411's open question 4 settles."
+      - "IF an attempt has no recorded end (found dead), THEN THE SYSTEM SHALL say its end and its run time are unknown, never show a time for it."
+      - "THE SYSTEM SHALL take the run's, its supply's and its dataset's Pass/Warn/Fail from the completed attempt's results only, and SHALL NOT raise any of them to Warn or Fail because an earlier attempt failed."
+      - "WHILE a date is on show in the as-of picker, THE SYSTEM SHALL show only attempts that began by that date."
+      - "THE SYSTEM SHALL NOT show the note or the list for a run with one attempt that completed."
+      - "THE SYSTEM SHALL have JS tests of the note's wording for each way an earlier attempt can end, of the list's order, of an unknown end, of the as-of clip and of the status unchanged by a failed earlier attempt, and a real-browser test on a built dashboard holding a retried run."
+    non_functional_requirements:
+      - "UX: the note is one line on the row; the list is behind a deliberate click, so the supply history stays scannable at thirty collections."
+      - "ACCESSIBILITY: the list opens by keyboard and is announced as a list of attempts."
+      - "PRIVACY: as REQ-PIPE-411's open question 4 settles - the page shows no more of an error than the build emits."
+    dependencies:
+      - "REQ-PIPE-411"
+    decisions:
+      - "A SHORT NOTE PLUS THE FULL LIST (F2, SETTLED by Keith 2026-11-14). REJECTED the list only, with no note; REJECTED lifting the supply to Warn."
+      - "ON THE SUPPLY-HISTORY ROW (delivery-scoper, provisional for the dashboard UX reviewer): the page has no run-level detail panel today - 'run detail' is per check (template lines 10542, 10686) - so the run's attempt list is drafted as a disclosure on its row. The reviewer may place it elsewhere."
+      - "UNKNOWN IS SAID, NOT HIDDEN (REQ-PIPE-279 criterion 7): an attempt found dead has no end time."
+    open_questions:
+      - "6. THE WORD 'ATTEMPT' IS TAKEN (for the dashboard UX reviewer, then Keith). The supply history already labels a resupply 'Resupply, attempt N' (template line 9464) - the supplier's Nth try at a supply. F2's 'Succeeded on attempt 2' would put a second meaning of the same word on the same row. Options: (a) 'Checked on the second try - the first timed out after 45 min'; (b) 'Check attempt 2 succeeded - check attempt 1 timed out after 45 min'; (c) F2's words as given, accepting the overlap. RECOMMENDED (a): 'try' stays clear of the resupply's 'attempt', and it reads as plain English to a data team leader. The qa.run_attempt table keeps its name either way."
+    signed_off: null
+
+  - id: REQ-DASH-415
+    title: "A supply whose newest check attempt failed and has not been retried shows as 'Not checked', saying how the run ended, when, and why, with every check reading 'No result' - never the earlier supply's Pass"
+    date_written: "2026-11-14"
+    story: "As a data team leader, I want a supply whose check timed out or crashed to say plainly that it could not be checked, so that I never read the previous supply's Pass as though it were this one's."
+    moscow: must
+    status: not_started
+    source: "Keith, F3 of 'Failed attempts scoping', SETTLED 2026-11-14; drafted by delivery-scoper 2026-11-14 (timing-attempts v1). A PROPOSAL, not signed."
+    acceptance_criteria:
+      - "WHEN a supply's run has attempts and none completed (REQ-PIPE-411 criterion 3), THE SYSTEM SHALL show that supply as the dataset's own on its page and in the supply history, reading 'Not checked - ' followed by how the newest attempt ended ('the run timed out', 'the run crashed', 'a tool failed (dbt)', 'the run was stopped'), when it ended and its error as REQ-PIPE-411's open question 4 settles."
+      - "WHILE a supply is shown as not checked, THE SYSTEM SHALL show every one of its checks as 'No result' and SHALL NOT show any earlier supply's verdict for them as current."
+      - "WHILE a supply is shown as not checked, THE SYSTEM SHALL give its dataset the status open question 4 (batch) settles, with the reason in words, said once at dataset level as REQ-DASH-148 does for a supply that could not be loaded."
+      - "WHEN a later attempt of that run completes, THE SYSTEM SHALL show the supply with its results and REQ-DASH-414's note."
+      - "IF the newest attempt has no recorded end, THEN THE SYSTEM SHALL read 'Not checked - a check began <time> and has not finished', the same words whether it is still running or died unfound, because the build reads no locks (REQ-PIPE-411 NFR 1)."
+      - "WHILE a date is on show in the as-of picker, THE SYSTEM SHALL show a supply as not checked from its failed attempt's end (or its unfinished attempt's start) until its completing attempt's end, and as checked after."
+      - "THE SYSTEM SHALL have JS tests of each ending's words, of 'No result' on every check, of no earlier verdict shown as current, of the as-of window, and of an unfinished attempt's words; and a real-browser test on a built dashboard holding a run whose only attempt crashed."
+    non_functional_requirements:
+      - "HONESTY: the dangerous direction is a stale Pass, so the not-checked supply replaces the earlier supply as the dataset's own; the test of 'no earlier verdict shown as current' is the one that guards it (CLAUDE.md's standing lesson: assert at the layer a human sees)."
+      - "SCALE: at thirty collections a pass that crashes partway may leave several datasets not checked at once; each says so on its own row, and the dataset list counts them through the existing dataset-level reason, not a banner per dataset."
+      - "PRIVACY: as REQ-PIPE-411's open question 4 settles."
+    dependencies:
+      - "REQ-PIPE-411"
+      - "REQ-DASH-148"
+    decisions:
+      - "'NOT CHECKED', NEVER A STALE PASS (F3, SETTLED by Keith 2026-11-14): its checks read 'No result'; the dataset's status reflects that the supply could not be checked, as today's 'could not run' does. REJECTED failing the supply."
+      - "THE SAME WORDS FOR RUNNING AND DEAD (delivery-scoper): the build may not read pg_locks, so it cannot tell them apart; a neutral sentence is true of both."
+      - "JUDGED AS AT THE DATE ON SHOW (delivery-scoper, carried from REQ-PIPE-115 criterion 12's blocker window): the as-of view reproduces what a reader saw then."
+    open_questions:
+      - "4b. WHAT THE DATASET'S STATUS IS WHILE ITS SUPPLY IS NOT CHECKED (batch question 4). F3 says 'as today's could not run does' and rejects 'failing the supply'. The closest thing today is REQ-DASH-148: a supply that could not be loaded makes its dataset read red (Fail) once, at dataset level, with its reason, through a 'Could not be loaded' item on the 'needs a person' queue - while no check is recorded as failing. Options: (a) exactly that - a new dataset-level reason 'Could not be checked', the dataset reading Fail for the period, a new queue item so somebody retries it, and no Fail recorded on the supply or its checks; (b) a status of its own, 'Not checked', neither Pass nor Fail, with the queue item; (c) as (a) without the queue item, since the next processing pass retries it anyway (processing_pass.py line 207). RECOMMENDED (a): it is what 'as today's could not run does' most plainly means, and a dataset nobody could check is not OK; it records no Fail against the supply, which is what 'REJECTED failing the supply' rules out. (b) adds a fourth status word across the page, the CLI and tickets."
+    signed_off: null
+
+  - id: REQ-TEST-416
+    title: "mothman says how long a QA run took when it finishes, and how an attempt ended when it did not, in one line from the run step every command shares"
+    date_written: "2026-11-14"
+    story: "As whoever runs the pipeline from the terminal, I want each run to tell me how long it took and, if it failed, how and after how long, so that I notice a slow or failing run while I am watching, not only on the dashboard later."
+    moscow: should
+    status: not_started
+    source: "Keith, T2 of 'Check timing scoping' ('printed by mothman when a run finishes') and F1/F2, SETTLED 2026-11-14; drafted by delivery-scoper 2026-11-14 (timing-attempts v1). A PROPOSAL, not signed."
+    acceptance_criteria:
+      - "WHEN a run's attempt completes, THE SYSTEM SHALL print one line from the orchestrator's run step (qa_tools/tools/orchestrate.run_one, which already prints '--- <run> ---' at line 84) giving the run and its run time, and, where it had earlier attempts, which attempt it was and how the one before it ended - so every command that runs QA (mothman <collection> qa, pipeline process, pipeline run, the bootstrap, re-checks) says it without a copy of its own."
+      - "WHEN an attempt ends in any other way, THE SYSTEM SHALL print one line giving the run, how it ended in words, after how long, the tool where it was a tool error, and its error's type and message as recorded."
+      - "WHERE the interactive qa wizard reports a kept run (cli/common.report_recorded), THE SYSTEM SHALL include the run time in that panel."
+      - "THE SYSTEM SHALL format a duration in one Python function and the template's one JS function to the same rule (for example '45s', '3m 12s', '2h 05m'), held equal by a parity test over a shared list of cases, as the status words are."
+      - "WHILE stdout is not a terminal, THE SYSTEM SHALL print the same single line with no colour or progress chrome."
+      - "THE SYSTEM SHALL have tests, seen failing first, of the completed line, of a retried run's line, of a crashed and a tool-error attempt's line, of the duration format's parity cases, and of a redirected run printing plain text."
+    non_functional_requirements:
+      - "NOISE: one line per run, joined to output the run step already prints; a bootstrap of thousands of runs gains no extra lines per run."
+      - "PRIVACY AND SECURITY: the terminal shows the stored, truncated message - the operator's own view of their own run, where the message is most useful."
+      - "COMPATIBILITY: through `uv run mothman`, no new dependency."
+    dependencies:
+      - "REQ-PIPE-409"
+      - "REQ-PIPE-410"
+    decisions:
+      - "PRINTED WHEN A RUN FINISHES (T2, SETTLED by Keith 2026-11-14), alongside the dashboard. REJECTED CLI and logs only, as the only place."
+      - "ONE PLACE PRINTS IT (delivery-scoper): the run step every command shares, so a new command that runs QA cannot forget it."
+      - "NO 'SLOW' IN THE TERMINAL (delivery-scoper, for the CLI UX reviewer): T3 names the trend and the supply history; the median is a build-time judgement over the recorded history, which a run step does not compute."
+    open_questions: []
+    signed_off: null
