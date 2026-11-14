@@ -80,11 +80,11 @@ ul.plain { display: flex; flex-direction: column; gap: 6px; padding-left: 18px; 
 
 <main>
   <header style="display:flex;flex-direction:column;gap:10px">
-    <div class="eyebrow">Asset split + generator/bootstrap separation (#134 v3)</div>
+    <div class="eyebrow">Asset split + generator/bootstrap separation (#134 v4, going to v5)</div>
     <h1>The split, mapped</h1>
     <p class="lede">What each top-level part of the repository would do once the asset split and the #134 separation are both built, which parts may rely on which, and where the code would still repeat itself. Written for deciding whether the cut is in the right place.</p>
     <div class="note">
-      <b>Updated 2026-11-03 with your four decisions; corrected 2026-11-02 evening.</b>
+      <b>Updated 2026-11-14 with your answers to v4's eleven questions (at the end); 2026-11-03 with your four decisions; corrected 2026-11-02 evening.</b>
       <span>The first version said <code>domain/</code> (now renamed <code>asset_model/</code>) held the agencies, collections and schedule. It does not: each asset defines those itself, and <code>asset_model/</code> is only the code that reads them. Its line counts were mostly docstrings, and it described several proposals as if they were already true. A fact-check against the code found 16 more errors, all fixed below. Anything marked <span class="tag">proposal</span> is what #134 would build, not how the code works today.</span>
     </div>
     <p class="meta">Sources: the moved tree (wip/bmove), the draft docs/drafts/separation-v3.yaml, an import scan of the moved tree, and running-thoughts #137's simplification review. "Code lines" leave out docstrings, comments and blank lines.</p>
@@ -208,9 +208,9 @@ flowchart TB
     <p>Mostly fine where it matters. Things held once, or held equal on purpose:</p>
     <ul class="plain">
       <li>dbt macros and generic tests, in <code>dbt_shared/</code>.</li>
-      <li>Warn and fail thresholds for targeted fault injection, read from each tool's own files. Not yet for <code>generator/dirty.py</code>, which still copies Soda and dbt thresholds as constants (risk 3).</li>
+      <li>Warn and fail thresholds for targeted fault injection, read from each tool's own files. Not yet for <code>generator/dirty.py</code>, which still copies Soda and dbt thresholds as constants (risk 3). <b>Decided (2026-11-14, Q5):</b> its fault rates will be derived from each check's bands at generation time, so the older dirty supplies regenerate.</li>
       <li>Status words in Python and on the page, held equal by shared test cases that neither side owns. The copy is justified: the page has no build step, and ticketing runs without a browser.</li>
-      <li>File checks: defined once per asset, with ids derived per dataset. The two assets' copies are identical (risk 2).</li>
+      <li>File checks: one shared default beside <code>dbt_shared/</code>, with ids derived per dataset. An asset overrides a check by its name: the same name replaces it whole, a new name adds one, and <code>retired_as_of</code> stops one for that asset (D2; Q3).</li>
     </ul>
     <p>Between the two assets, most of the repetition is deliberate. Their contracts, checks, adapters and providers share anywhere from a few percent to about half their lines, depending on the pair, and mostly as structure, because they describe different collections for different teams.</p>
     <p><b>The real risks, most important first:</b></p>
@@ -236,12 +236,30 @@ flowchart TB
   <section class="ask">
     <h2>What you decided (2026-11-03)</h2>
     <ol>
-      <li><b>The cut is right</b>, and the shared package is called <code>asset_model/</code> rather than <code>domain/</code>. Every asset keeps one calendar mechanism with its own dates; a project extraction with no cadence is a calendar with no slots.</li>
+      <li><b>The cut is right</b>, and the shared package is called <code>asset_model/</code> rather than <code>domain/</code>. Every asset keeps one calendar mechanism with its own dates. On 14 November you settled what it covers: authored dates and the daily rule, as today, with a project extraction still declaring <code>no_calendar: never</code>.</li>
       <li><b>Identical configuration, file by file</b>: shared <code>file-checks.yaml</code>; dbt packages identical by gate; people and data-asset files stay per asset.</li>
       <li><b>Allowed values</b>: three tool copies stay for the comparison; the adapter reads the contract; the generator stays independent.</li>
       <li><b>Near-copies join #134.</b></li>
     </ol>
-    <p class="meta">#134 is back with the scoper for a v4 carrying these, plus #137's groups B-D. Then the architect and the CLI and dashboard UX reviewers, then your sign-off. Nothing here is built yet except where marked.</p>
+  </section>
+
+  <section>
+    <h2>What you decided on v4 (2026-11-14)</h2>
+    <p>The scoper's v4 carried the decisions above and the simplification review's groups B to D, with eleven open questions. Your answers:</p>
+    <ol>
+      <li><b>Drift planning:</b> one small drift module in <code>asset_model/</code>, used by both the Linkage Products generator and the real Evidently check. pandas and Evidently load only inside its functions.</li>
+      <li><b>Calendars:</b> both shapes as today, authored dates and the daily rule, and <code>no_calendar: never</code> for an extraction.</li>
+      <li><b>File checks:</b> an asset overrides a shared check by its name.</li>
+      <li><b>Emergency Department's age_group:</b> its ten bands become a real allowed-values rule in the contract, so datacontract-cli checks it. That is a new check with its own lifecycle entry.</li>
+      <li><b>Fault rates in <code>dirty.py</code>:</b> derived from each check's bands at generation time. The older dirty supplies regenerate, and every moved supply and verdict is listed.</li>
+      <li><b>A date before a calendar's first version:</b> raises for every caller. The four places that fall back today each say what they do instead.</li>
+      <li><b>The cadence check:</b> made once, per round, against the version in force then.</li>
+      <li><b>Look-ahead horizons:</b> one named horizon in place of six.</li>
+      <li><b>Configuration errors in two slot helpers:</b> raise rather than answer quietly. A dataset with no agreed calendar still owes nothing.</li>
+      <li><b>A period's round:</b> required, and its unused fallbacks go.</li>
+      <li><b>The new imports gate:</b> runs on every push in the configuration workflow, and its tests are in the critical set.</li>
+    </ol>
+    <p class="meta">Next: the scoper folds these into a v5, then the architect and the CLI and dashboard UX reviewers read it. Their questions come back to you as one batch, then your sign-off. Nothing here is built yet except where marked.</p>
   </section>
 </main>
 
