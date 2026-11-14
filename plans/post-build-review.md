@@ -14469,6 +14469,10 @@ twice. It deliberately did not re-find the `TypeError`.
        generation pins its configuration. Logged, not built.
      - **Runs**: the affected modules (test_assets, test_asset_switch_keeps_module_fixtures,
        test_cli_asset_selection, test_every_asset, test_list_settings) pass.
+     **SCOPED AND SIGNED 2026-11-14 (Keith, "Sign all 15")** as speed-anchor
+     v2 (REQ-PIPE-397 to REQ-PIPE-401, REQ-GEN-398/399, REQ-PIPE-403, REQ-PIPE-430 to 432; the stat-keyed cache is REQ-PIPE-401; docs/drafts/speed-anchor-v2.yaml, answers in
+     docs/drafts/decisions-2026-11-01.md). Not built; this entry's prose comes
+     out when they are.
 
 319. **[done, 2026-11-03]** **[Data generation]** **The scenario map's
      summary named a "rest" that was not there.** Since each asset's map
