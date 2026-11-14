@@ -657,3 +657,12 @@ Purpose recalled: insurance for a real deployment's published QA page; REQ-QAC-3
 - **REQ-PIPE-081 and REQ-PIPE-267 reversal amendments:** APPROVED AS WORDED (Keith, 2026-11-14), applied when REQ-PIPE-382 is built.
 
 **v6 IS SETTLED: no open questions remain in docs/drafts/separation-v6.yaml.** Next: the artifact for Keith, then sign-off.
+
+## Speed + rolling anchor v1 (docs/drafts/speed-anchor-v1.yaml) - Keith's answers, 2026-11-14
+
+- **SA Q1 (REQ-GEN-406, configured dates under a rolled anchor):** OFFSETS FROM THE ANCHOR - a synthetic asset may write a date as an offset from its history's anchor, resolved in asset_model/ and refused on a real asset; Child Protection grows like its neighbours; quarterly rounds stay fixed. REJECTED histories growing from their configured start, and rolling only the quarterly asset.
+- **SA Q2 (REQ-GEN-405, a rolled demo vs the local full gate):** ROLL ONLY ON REQUEST - a bootstrap rolls to today only with --roll-anchor; tests refuse a rolled database with a clear message. REJECTED rolling by default with the gate failing, and the gate bootstrapping its own database.
+- **SA Q3 (REQ-PIPE-403, what the batch commits to against 720s):** ADD THE THREE PROFILED SPEED-UPS NOW - REQ-PIPE-250's profiled speed-ups (the dbt, delivery-tree re-read and datacontract time sinks) join this batch beside S1-S3, so it targets where the time actually goes. REJECTED building S1-S3 only and reporting, and revisiting the budget.
+- **SA Q4 (REQ-PIPE-397, what the pin covers):** MOTHMAN'S OWN READS ONLY; the cache key and resume digest catch a mid-run edit of the tools' own files afterwards. REJECTED copying each dbt project and check files into a pinned scratch folder.
+- **SA Q5 (REQ-GEN-405 c4, today's tail):** ANCHOR ON THE LATEST DAY WHOSE PLANNED RECEIPTS HAVE ALL PASSED. REJECTED anchoring today and dropping later receipts, and keeping future receipts.
+- **SA amendments APPROVED AS WORDED (Keith, 2026-11-14):** REQ-PIPE-254 c15 ('OUTSIDE A PINNED RUN (REQ-PIPE-397) ...'), REQ-GEN-042 c7 and c8 (one recorded anchor; identical history, no second copy), retiring REQ-PIPE-250 c4 with REQ-TEST-239's reason and dropping its BEHAVIOUR-PRESERVING NFR - each applied when its requirement is built.
