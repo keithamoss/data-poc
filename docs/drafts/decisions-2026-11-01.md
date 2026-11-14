@@ -646,3 +646,9 @@ Purpose recalled: insurance for a real deployment's published QA page; REQ-QAC-3
 
 - **v6 Q1 (380 OQ1, the one delivery writer):** write_delivery/write_receipts STAY IN THE REAL PIPELINE (hand_filing.py uses them); the generator gets a writer of its own - a second copy of the delivery format, accepted. REJECTED moving them into asset_model/ (which would widen it to writing the tree).
 - **v6 Q2 (382 OQ1, the promotion lag under one clock):** BRING THE SPREAD BACK - the replay clock applies the seeded lag as a 'decision takes effect' event, so the demo keeps a realistic receipt-to-promotion spread (Keith's 2026-10-02 lag). REJECTED keeping the dead code with a note, and removing the lag. Design work for the scoper: how the event carries the lag and its two caps (next receipt, claim window - with 378 Q2(a)).
+- **v6 Q3 (385 OQ1, Dash D's other two links on a real asset):** BOTH NOT-FOUND - ?panel=scenarios and ?scenario= each land on the plain not-found page, even when the rest of the link is a real page. REJECTED dropping ?scenario= silently, and dropping both.
+- **v6 Q4 (393 OQ1, REQ-PIPE-248 c8):** RETIRED under retired_criteria with REQ-TEST-239's approved reason; --renamed-by goes with the harness.
+- **v6 Q5 (394 OQ1):** ONE ITEM PER DISTINCT CONFIGURATION ERROR, listing every dataset it stopped. REJECTED one per dataset.
+- **v6 Q6 (394 OQ2):** ACCEPTED - build-read config errors stop the build loudly (Dash A) and are named by the CLI and logs; the queue item covers the errors the build does not read. REJECTED revisiting Dash A.
+
+**v6 STATUS:** all six answered. Q1 and Q2 change v6's text (writer stays in the pipeline with a generator copy; the seeded lag returns as a decision-takes-effect event) - back to the scoper for those two, then the artifact.
