@@ -80,7 +80,7 @@ ul.plain { display: flex; flex-direction: column; gap: 6px; padding-left: 18px; 
 
 <main>
   <header style="display:flex;flex-direction:column;gap:10px">
-    <div class="eyebrow">Asset split + generator/bootstrap separation (#134 v6, ready for sign-off)</div>
+    <div class="eyebrow">Asset split + generator/bootstrap separation (#134 v6, signed 2026-11-14)</div>
     <h1>The split, mapped</h1>
     <p class="lede">What each top-level part of the repository would do once the asset split and the #134 separation are both built, which parts may rely on which, and where the code would still repeat itself. Written for deciding whether the cut is in the right place.</p>
     <div class="note">
@@ -276,7 +276,7 @@ flowchart TB
       <li><b>Clean-up:</b> <code>scenarios bands</code>, <code>debug build-warehouses</code>, <code>debug changelog</code>, <code>debug capture-arrival-golden</code> and the <code>dashboard snapshot</code> command go. <code>github sync-tickets</code> gains a guard so it can't open real issues unless ticketing is on.</li>
       <li><b>Parked, not in this build:</b> the look-ahead horizons. Seventeen places each guess how far ahead to look, and you want that thought through properly rather than settled with another number.</li>
     </ol>
-    <p class="meta">Next: your sign-off of v6's 21 requirements (docs/drafts/separation-v6.yaml). Nothing here is built yet except where marked.</p>
+    <p class="meta">Signed 2026-11-14: all 21 requirements (REQ-PIPE-376 to REQ-GHUB-396) are in requirements.yaml, not started. Nothing here is built yet except where marked.</p>
   </section>
 </main>
 
