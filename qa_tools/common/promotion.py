@@ -630,10 +630,10 @@ def _gating_status(record: dict) -> str | None:
 
 
 def _is_file_check(check_id: str | None) -> bool:
-    from asset_model import check_id as cid, file_check_definitions as file_checks
+    from asset_model import check_id as cid, file_check_definitions
 
     parsed = cid.try_parse(check_id or "")
-    return bool(parsed and parsed.tool == file_checks.TOOL)
+    return bool(parsed and parsed.tool == file_check_definitions.TOOL)
 
 
 def _contributing_records(dataset_id: str, results: Sequence[dict],

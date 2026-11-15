@@ -292,7 +292,8 @@ class TestMarking:
         """Criterion 4: the only writers are the marking command and the test
         fixtures that create scratch databases."""
         writers = set()
-        for path in list(ROOT.glob("qa_tools/**/*.py")) + list(ROOT.glob("cli/*.py")) + \
+        for path in list(ROOT.glob("asset_model/*.py")) + list(ROOT.glob("qa_tools/**/*.py")) + \
+                list(ROOT.glob("cli/*.py")) + \
                 list(ROOT.glob("pipeline/*.py")) + list(ROOT.glob("dashboard/*.py")):
             text = path.read_text()
             if path.name == "db_identity.py":

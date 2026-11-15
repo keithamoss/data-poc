@@ -331,7 +331,7 @@ class TestTheGeneratorsBookkeepingIsWalledOff:
     #: bootstrap/ is not walled: it left qa_tools/ with REQ-GEN-381 and may
     #: import the generator's public module (REQ-TEST-384), which is how it
     #: reads what the generator built.
-    WALLED = ("qa_tools", "pipeline", "dashboard", "cli")
+    WALLED = ("asset_model", "qa_tools", "pipeline", "dashboard", "cli")
 
     # delivery.py DEFINES the constant so the generator has one name to
     # write to, and defining it is not reading it.

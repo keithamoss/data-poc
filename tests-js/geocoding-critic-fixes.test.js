@@ -60,8 +60,8 @@ describe("a left-out reason's words (critic item 3)", () => {
     const w = dashboard.window;
     const real = w.statusWords;
     w.statusWords = (v, f) => (v === "notchecked" ? "LEFT OUT" : real(v, f));
-    for (const code of ["not_in_agreement", "not_supplied_by_decision", "calendar_differs"]) {
-      expect(w.notInAgreementReason({ code, period: "2026-Q2", dataset: "x", calendar: "monthly" }))
+    for (const code of ["not_in_agreement", "not_supplied_by_decision"]) {
+      expect(w.notInAgreementReason({ code, period: "2026-Q2", dataset: "x" }))
         .toMatch(/^LEFT OUT: /);
     }
   });

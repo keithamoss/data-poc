@@ -219,7 +219,7 @@ class Pending:
     changes: tuple[tuple[str, object, object], ...]
 
 
-def declared(cal: dict, asset: dict) -> list[Pending]:
+def pending_corrections(cal: dict, asset: dict) -> list[Pending]:
     """Every declared correction, ONE PER CHANGE REFERENCE (delivery-critic on
     170, D1): the gate makes each changed item be declared on its own owner,
     so one correction - a collection moved to another calendar, a date and a
@@ -294,7 +294,7 @@ def docs_at(instant: datetime, docs: tuple[dict, dict] | None = None) -> tuple[d
     """The configuration as it stood at `instant`: every declared correction
     merged after it reverted, the latest first."""
     cal, asset = docs or working()
-    for p in reversed(declared(cal, asset)):
+    for p in reversed(pending_corrections(cal, asset)):
         if merge_instant(p) > instant:
             cal, asset = revert(cal, asset, list(p.changes))
     return cal, asset

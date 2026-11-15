@@ -190,7 +190,7 @@ class TestARepositoryPathForAFolderOutsideIt:
     def test_the_schedule_gates_reads_at_a_git_ref_are_refused_for_an_injected_root(
             self, monkeypatch, tmp_path, guard):
         """Keith, 2026-11-03 (morning report 12 Q13): where a deployment has
-        deliberately injected its asset root (REQ-PIPE-342's injection, #55),
+        deliberately injected its asset root (REQ-PIPE-342's injection),
         never read as 'no previous state', which passed any edit to a past
         agreement item or setting version unseen (post-build-review #313 M2)."""
         from qa_tools.common import validate_schedule as vs
@@ -478,7 +478,7 @@ class TestTheBootstrapHandsItsStreamsTheAsset:
 
     def test_a_stream_process_is_handed_the_layout_too(self, monkeypatch, tmp_path):
         """The groundwork critic: handed the name alone, a child of a
-        use_root deployment (#55) looks for the asset in today's tree."""
+        use_root deployment (REQ-PIPE-342) looks for the asset in today's tree."""
         from bootstrap import bootstrap
 
         root = _two_assets(tmp_path)

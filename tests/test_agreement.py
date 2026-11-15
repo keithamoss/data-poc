@@ -470,6 +470,32 @@ class TestCriticFindingsOn110:
         assert "participation versions" in hit[0].problem, hit[0].problem
         assert "no a " not in hit[0].problem
 
+    @pytest.mark.asset("daily")
+    def test_a_dataset_on_no_calendar_names_the_asset(self, broken):
+        """Criterion 18 as amended by REQ-PIPE-345 (A9): 'naming both files AND
+        THE ASSET' - the standalone `mothman schedule validate` prints bare
+        file names, with no [asset] prefix, so the problem must say it."""
+        def mutate(doc):
+            doc["calendars"] = []
+        errors = broken(mutate)
+        hit = [e for e in errors if "birth-registrations" in (e.scope or "")]
+        assert hit and "the daily asset" in hit[0].problem, _text(errors)
+
+    def test_a_dataset_the_hierarchy_does_not_hold_names_the_asset(self, broken):
+        def mutate(doc):
+            doc["datasets"].append({**_entry(doc, "cp-clients"), "id": "cp-nobody"})
+        errors = broken(mutate)
+        hit = [e for e in errors if "cp-nobody" in (e.scope or "")]
+        assert hit and "the quarterly asset" in hit[0].problem, _text(errors)
+
+    @pytest.mark.asset("daily")
+    def test_a_collection_the_hierarchy_does_not_hold_names_the_asset(self, broken):
+        def mutate(doc):
+            doc["collections"].append({"id": "nowhere"})
+        errors = broken(mutate)
+        hit = [e for e in errors if "nowhere" in (e.scope or "")]
+        assert hit and "the daily asset" in hit[0].problem, _text(errors)
+
     def test_a_plain_string_changelog_is_told_the_structured_shape(self, broken):
         def mutate(doc):
             _first(doc, "cp-clients")["changelog"] = ["2026-10-11: moved"]

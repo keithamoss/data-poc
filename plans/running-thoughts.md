@@ -1052,98 +1052,6 @@ to the exact right file/line/folder with zero console errors.
     question about which path owns the cleanup rather than a one-liner.
 
 
-55. **[investigate, 2026-09-27]** **[Pipeline & publishing]** **[Docs & process]** How is CONFIGURATION organised once there are two data assets, sample datasets, project extractions and ad hoc QA?
-
-    Keith raised this himself at the end of 2026-09-27, in his own
-    words, and explicitly said it needs a conversation rather than a
-    decision: "how we manage this repository and the data assets and
-    data sets and checks configuration when there's two separate data
-    assets, the quarterly one and the daily one, plus this notion of
-    sample data we can QA, plus the project extractions we can QA, plus
-    other ad hoc things we QA - whether we manage the configuration all
-    in the one repository, which I guess is doable, whether we somehow
-    inject the configuration."
-
-    **WHY THIS IS NOW THE OPEN QUESTION ABOUT THE REPOSITORY, rather
-    than one question among several.** His own standing rule of the same
-    day - the repository holds CONFIGURATION, NOT STATE - answers what
-    the repository is *for*. REQ-PIPE-089 is taking the last big body of
-    committed state out of it. What that rule deliberately does not
-    answer is how the remaining configuration is ORGANISED once there is
-    more than one of everything, and that is all this is.
-
-    **THE FIVE SHAPES IT HAS TO HOLD**, which is what makes it harder
-    than "one repo or many":
-
-    1. **Two data assets**, quarterly and daily, each managed by a
-       different team in a strictly separated cloud environment, each
-       with its own deployment, database and dashboard. CLAUDE.md
-       already records the settled part: the asset is a DEPLOYMENT'S
-       IDENTITY, not a row in the data. Roughly 30 datasets on the
-       quarterly asset alone.
-    2. **Sample datasets** (REQ-PIPE-106, signed 2026-09-27) - no
-       calendar, real checks, and structurally ordinary in every other
-       way: same hierarchy, several at once, cross-table checks among
-       them.
-    3. **Project extractions** (delivery sprint 29) - supplies and no
-       cadence, ever, one dashboard per extraction.
-    4. **Ad hoc QA**, which he named here and which nothing has scoped
-       at all yet.
-    5. **The check definitions themselves**, which are the largest
-       hand-authored body in the tree and the thing most likely to be
-       shared between assets rather than duplicated per asset.
-
-    **WHAT THE TREE LOOKS LIKE TODAY, so the starting point is a fact
-    rather than an impression.** `contract/data-asset.yaml` is ONE file
-    describing ONE asset: a single `data_asset_id`, one `timezone`, the
-    named `calendars`, and one `hierarchy` of agencies -> collections ->
-    datasets. Beside it sit per-collection contract and Soda files, plus
-    `environments.yaml` and `people.yaml`. So the current answer is
-    "one repository, one asset, singular by construction" - the file
-    would have to change shape or multiply either way, and that is the
-    concrete thing any option has to say something about.
-
-    **TWO PRECEDENTS ALREADY IN THE TREE, worth knowing before the
-    conversation rather than discovering during it.**
-
-    - **Configuration does not have to be hand-authored.** REQ-PIPE-106
-      settled that a project extraction's dataset configuration is
-      GENERATED from the recipe file arriving beside the package, and
-      criterion 2 already permits it - it requires that a missing
-      calendar be DECLARED, not that a human type it. So "inject the
-      configuration" is not a new idea needing a new mechanism; one
-      corner of the system already works that way.
-    - **REQ-PIPE-107** (drafted 2026-09-27, unsigned) is the guard that
-      refuses to act against a database belonging to another asset or
-      environment. It is directly load-bearing here: the more
-      configuration is shared between assets, the more the guard is what
-      stops a shared checkout writing to the wrong one. Worth deciding
-      that requirement's own open question - whether "environment" is a
-      chosen name or something derived - with this conversation rather
-      than before it.
-
-    **THE ADJACENT QUESTION THIS IS NOT.**
-    `plans/publishing-and-history.md` item 6 is about CODE architecture -
-    how many near-identical modules per dataset. This is about
-    CONFIGURATION architecture. They will inform each other and they are
-    not the same question, and conflating them is how one of them gets
-    answered by accident.
-
-    **Not scoped, not started, and deliberately not decided here.** The
-    options he named are worth writing down as the starting set rather
-    than treated as exhaustive: everything in one repository; a
-    repository per asset; one repository of shared checks with per-asset
-    configuration injected at deploy time. Nobody has argued any of them
-    yet.
-
-    **DECIDED FOR THE PoC (Keith, 2026-10-31): (a), one repository with a
-    configuration folder per asset**, scoped together with the period control
-    (see #131). **(b) a repository per asset and (c) configuration injected at
-    deploy time are a FUTURE DECISION POINT**, to be taken "once this needs to
-    migrate out of PoC stage". Sample datasets, project extractions and ad hoc
-    QA (shapes 2 to 4 above) are not part of this decision.
-
-
 88. **[todo, 2026-10-12]** **[Testing]** **Run tests more selectively,
     so failures turn up earlier - and the full gate is too long.** Keith,
     2026-10-12, after REQ-GEN-195 went through two full `mothman check`
@@ -6029,7 +5937,7 @@ could never have computed it), and it belongs with batch 5's check work.
        the quarterly one, one is the daily one ... each data asset needs to have
        a single baseline calendar". This makes the period control unambiguous,
        since a period means one thing within an asset. It is the split already
-       raised in #55 (how configuration is organised with two assets) and #109
+       raised in #55 (how configuration is organised with two assets; taken out 2026-11-15, its decision now REQ-PIPE-342's) and #109
        (a monthly dataset in a quarterly asset, a weekly one in a daily asset,
        "possibly ... the point that we want to split this repository into two
        separate data asset configurations"). "Baseline" leaves room for a
@@ -6042,7 +5950,7 @@ could never have computed it), and it belongs with batch 5's check work.
        the period control after. REJECTED (b), a period control on today's
        combined asset with an interim rule for Birth Registrations.
        Geocoding builds in parallel and waits on neither.
-     - REPOSITORY SHAPE FOR THE SPLIT (Keith, same morning, #55's options):
+     - REPOSITORY SHAPE FOR THE SPLIT (Keith, same morning, the options of #55, now REQ-PIPE-342's decisions):
        (a) ONE REPOSITORY, A CONFIGURATION FOLDER PER ASSET, for the PoC now.
        FLAGGED AS A FUTURE DECISION POINT, in his words, "once this needs to
        migrate out of PoC stage": (b) a repository per asset, or (c) shared code
@@ -6308,3 +6216,26 @@ could never have computed it), and it belongs with batch 5's check work.
      384MB. The chunked suite runner now also clears
      `/tmp/pytest-of-root/pytest-[0-9]*` between chunks. The retention setting
      and the fixtures cleaning their own copies are still to look at.
+
+140. **[investigate, 2026-11-15]** **[Pipeline & publishing]** **[Docs & process]** **How the configuration holds the shapes beyond two assets - carried over from #55.**
+     #55 came out on 2026-11-15 once its one decision was carried: one
+     repository with a configuration folder per asset for the PoC, a
+     repository per asset or injected configuration being a future decision
+     point (REQ-PIPE-342's decisions). It also listed shapes that decision
+     deliberately did not cover, and they had no other live entry, so they
+     are kept here, still open and not scoped:
+     - **Sample datasets** (REQ-PIPE-106) - no calendar, real checks,
+       otherwise ordinary: same hierarchy, several at once, cross-table
+       checks among them. Which asset folder they live in, or whether they
+       are an asset of their own, is undecided.
+     - **Project extractions** - supplies and no cadence ever, one dashboard
+       per extraction; REQ-PIPE-379's `no_calendar: never` is the reading
+       half, not the configuration's home.
+     - **Ad hoc QA**, which Keith named on 2026-09-27 and nothing has scoped.
+     - **Shared check definitions** - the largest hand-authored body, and the
+       one most likely to be shared between assets rather than copied per
+       asset folder; today each asset holds its own.
+     Keith's option set from #55 stands as the starting set: all in one
+     repository, a repository per asset, or shared checks with per-asset
+     configuration injected at deploy time. This is configuration
+     architecture, not code architecture (REQ-PIPE-240 to 248).

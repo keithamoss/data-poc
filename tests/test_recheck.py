@@ -155,7 +155,7 @@ class TestOnlyFromTheOrchestratorPath:
 
     def test_no_build_path_imports_the_executor(self):
         offenders = []
-        for top in ("pipeline", "dashboard"):
+        for top in ("asset_model", "pipeline", "dashboard"):
             for path in sorted((ROOT / top).rglob("*.py")):
                 for node in ast.walk(ast.parse(path.read_text())):
                     names = []

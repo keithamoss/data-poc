@@ -684,6 +684,32 @@ def test_a_ranking_with_nodata_below_zero_fails_too(repo, capsys):
     assert code == 1 and "ranking of the status words" in out, out
 
 
+@pytest.mark.parametrize("text, how", [
+    ('def rank(s):\n    return ("green", "amber", "red").index(s)\n', ".index()"),
+    ('ORDER = ["nodata", "green", "amber", "red"]\n\ndef rank(s):\n    return ORDER.index(s)\n',
+     ".index()"),
+    ('RANK = {s: i for i, s in enumerate(("green", "amber", "red"))}\n', "enumerate()"),
+    ('ORDER = ("green", "amber", "red")\nRANK = dict((s, i) for i, s in enumerate(ORDER))\n',
+     "enumerate()"),
+    ('RANKED = [(i, s) for i, s in enumerate(["green", "red"])]\n', "enumerate()"),
+])
+def test_a_ranking_by_index_or_enumerate_outside_asset_model_fails(repo, capsys, text, how):
+    _write(repo, HOMES["pipeline"], text)
+    code, out = _run(repo, capsys)
+    assert code == 1, out
+    assert "ranking of the status words" in out and how in out and "REQ-PIPE-390" in out, out
+
+
+def test_a_sequence_of_the_words_only_tested_for_membership_passes(repo, capsys):
+    _write(repo, HOMES["generator"], 'VERDICTS = ("green", "amber", "red")\n\n'
+                                     'def ok(v):\n    return v in VERDICTS\n'
+                                     'NAMES = ["x", "y"]\nN = NAMES.index("x")\n')
+    _write(repo, HOMES["asset_model"],
+           'ORDER = ("green", "amber", "red")\nR = {s: i for i, s in enumerate(ORDER)}\n')
+    code, out = _run(repo, capsys)
+    assert code == 0, out
+
+
 def test_asset_models_ranking_and_words_that_rank_nothing_pass(repo, capsys):
     _write(repo, HOMES["asset_model"],
            'ORDER = {"nodata": -1, "green": 0, "amber": 1, "red": 2}\n')

@@ -91,6 +91,24 @@ class TestCriterionSix:
         assert ("linkage-keys links 'cp-clients', which names no calendar, so it has no "
                 "period to be read for.") in text.splitlines(), text
 
+    def test_a_declaring_dataset_naming_no_calendar(self, repo):
+        """REQ-QAC-330 criterion 6 as amended by REQ-PIPE-345 (G2): the
+        DECLARING side with no calendar is refused in its own words, naming
+        linkage-keys - never through a different-calendar message, which one
+        baseline per asset leaves nothing to say about."""
+        cal_path = repo / assets.folder_rel() / "calendar.yaml"
+        cal = yaml.safe_load(cal_path.read_text())
+        entry = next((d for d in cal["datasets"] if d["id"] == "linkage-keys"), None)
+        if entry is None:
+            entry = {"id": "linkage-keys"}
+            cal["datasets"].append(entry)
+        entry["no_calendar"] = True
+        cal_path.write_text(yaml.safe_dump(cal, sort_keys=False))
+        lines = linked_datasets.problems(repo)
+        assert ("linkage-keys links 'cp-clients', but linkage-keys itself declares no "
+                "calendar, so it has no period to read it for.") in lines, lines
+        assert not any("never on" in ln for ln in lines), lines
+
     def test_two_datasets_with_one_code(self, repo):
         def change(ls):
             ls[1]["code"] = ls[0]["code"]

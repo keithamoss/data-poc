@@ -30,7 +30,7 @@ REQ-GEN-370 criterion 2), through importlib's file-location loader, under a
 module name built from the asset and the module - never a module path taken
 from configuration, never an asset folder on sys.path, never an __init__.py
 in an asset folder. So a deployment can supply an asset folder from outside
-this repository (#55) without renaming an import.
+this repository (REQ-PIPE-342) without renaming an import.
 
 ONE ASSET PER PROCESS (REQ-PIPE-343 criteria 5 and 6): the first connection a
 process opens claims its asset, and a connection for another asset is
@@ -208,7 +208,7 @@ _layout = _DEFAULT
 def use_root(root: Path | None):
     """Point the resolver at an assets/ folder, or back at the default with
     None; returns what it pointed at before. For a deployment whose asset
-    folders are not this repository's (#55) and for the suite's fixture."""
+    folders are not this repository's (REQ-PIPE-342) and for the suite's fixture."""
     global _layout
     before = _layout
     _layout = _DEFAULT if root is None else _Assets(Path(root))
@@ -217,7 +217,7 @@ def use_root(root: Path | None):
 
 def root_injected() -> bool:
     """Whether a deployment has DELIBERATELY injected its assets/ root
-    elsewhere (use_root; REQ-PIPE-342's injection, #55) - as opposed to one
+    elsewhere (use_root; REQ-PIPE-342's injection) - as opposed to one
     asset's folder pointed elsewhere (use_folder), which is what the suite's
     fixture does. Keith, 2026-11-03 (morning report 12 Q13): the schedule
     gate's git-ref guards refuse an outside folder only in the first case."""
@@ -288,7 +288,7 @@ def _rebuild(described):
 def handoff() -> tuple:
     """What a process this one starts needs to act for the same asset: the
     selected asset's NAME and the LAYOUT it was found in - an assets/ root
-    from use_root (#55), a folder from use_folder - since a spawned
+    from use_root (REQ-PIPE-342), a folder from use_folder - since a spawned
     interpreter sees neither this one's selection nor its layout
     (post-build-review, the groundwork critic). Passed to `adopt` as a pool's
     initializer arguments; picklable."""
@@ -397,7 +397,7 @@ def folder_rel(root: Path | None = None) -> str:
     root (or the checkout at `root`), POSIX-style - `assets/<asset>` - for a
     reader that names its files by REPOSITORY PATH: a read at a git ref,
     CODEOWNERS, a link into the repository (REQ-PIPE-342 criterion 6).
-    Refused for a folder outside it (a test's copy, #55's injected
+    Refused for a folder outside it (a test's copy, REQ-PIPE-342's injected
     configuration): OutsideTheRepository. A reader that only OPENS the
     asset's files asks folder_on_disk()."""
     return _repo_rel(selected().folder, "configuration folder", root)
@@ -407,7 +407,7 @@ def folder_on_disk() -> str:
     """The selected asset's configuration folder AS A PATH TO OPEN in the
     working tree: by repository path where the repository holds it, so what
     a reader records or names reads as before, and as the folder itself
-    where it does not (#55's injected configuration, a test's copy) - joined
+    where it does not (REQ-PIPE-342's injected configuration, a test's copy) - joined
     to the repository root, either finds it. Never a repository path: a
     git-ref read, CODEOWNERS or a link asks folder_rel(), which refuses
     (C7)."""

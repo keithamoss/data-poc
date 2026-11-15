@@ -147,6 +147,7 @@ class TestNothingElseDeletes:
         """Criterion 23: not reachable from any other command."""
         callers = []
         for path in (list((ROOT / "cli").glob("*.py")) + list((ROOT / "qa_tools").rglob("*.py"))
+                     + list((ROOT / "asset_model").rglob("*.py"))
                      + list((ROOT / "bootstrap").rglob("*.py"))):
             if path.name in ("synthetic_reset.py",):
                 continue

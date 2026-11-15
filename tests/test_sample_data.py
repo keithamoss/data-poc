@@ -331,7 +331,7 @@ class TestDiscardingIsSomethingAPersonDoes:
 
         out = subprocess.run(
             ["grep", "-rn", r"sample_data\.discard\|from qa_tools.common.sample_data import",
-             "--include=*.py", "qa_tools", "pipeline", "cli", "generator", "dashboard",
+             "--include=*.py", "asset_model", "qa_tools", "pipeline", "cli", "generator", "dashboard",
              "aws", "scripts"],
             capture_output=True, text=True).stdout
         callers = {line.split(":")[0] for line in out.splitlines() if line.strip()}

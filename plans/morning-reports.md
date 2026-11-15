@@ -3594,4 +3594,77 @@ one or more component tags, and a date.
       guard plus a test baseline, the six modules reworked; the whole
       REQ-DOCS-358 wording approved, batch 3 and the docs edits unread (a
       critic checks them against the code).
+    - **SCOPE WIDENED (Keith, ~21:20)**: after #134 steps 2-3, the speed batch,
+      then timing, then REQ-GEN-392, then REQ-GEN-206, as far as the night
+      allows. Resets of supply_quarterly/supply_daily from empty approved for
+      tonight, as often as 392 and 206 need. Keith nudged to stop at 21:18.
+    - **THE SPLIT IS FINISHED (~21:35)**: T5 merged (2a82db12). REQ-DOCS-358
+      built, with c1 (the LATER amendments), c3's hosting notes and c4 (#109,
+      #131, #134's plans entries) unmet, each blocked by the feature it waits
+      on. The c2 sweep amended 127 criteria; 39 still name an old path, each for
+      a recorded reason. **FOR KEITH (Q13.1)**: REQ-QAC-294 c3 still says the
+      synthetic inputs file is "kept at the top of contract/ among the
+      asset-wide files - added to validate_collections.ASSET_WIDE ... by
+      amendment A8" - a clause outside the wording you approved, so it was left
+      as is. Recommended: drop that clause (the file is under
+      assets/<asset>/synthetic/ now). **NOT VERIFIED**: the README's new
+      quickstart was never run on a fresh machine (it would write real
+      supply_* databases).
+    - **SPLIT PUSHED (~00:15 Perth, 2026-11-16)**: the full chunked suite on
+      4240a263 ran 7950 tests: 1 failed, 1 skipped (#175's deliberate one),
+      coverage 95% (floor 92). The failure is
+      `test_collections_registry.py::TestAThirdCollectionAtEverySite::test_a_checkpoint_resume_is_named_with_its_short`,
+      a stale test still expecting the pre-T3 checkpoint name. It is fixed on
+      wip/sep-step2 (#134 step 2), which merges next. Pushed anyway, and the
+      commit message says so: that one test is the only red. `mothman check
+      --no-pytest` was green, with warnings only. The suite's first background
+      job reached its two-hour limit during the e2e chunk; the resumed job
+      finished it (437 passed, 32 minutes).
+    - **#134 STEP 2 MERGED (~00:50 Perth)**: REQ-PIPE-380 (`asset_model/`,
+      the shared reading code), REQ-PIPE-376 and REQ-PIPE-390 are built, and
+      the critic's six findings are fixed. PROVISIONAL, for Keith:
+      `linked_datasets.contract_columns` renamed `table_columns`;
+      `declared_corrections.declared` renamed `pending_corrections`; the
+      `status_rankings` imports rule widened to catch `.index()`/`enumerate()`
+      over the status words. **Q13.2**: the builder's CLAUDE.md row for
+      `asset_model/` (REQ-PIPE-380 c19) was LEFT OUT at the merge, because
+      CLAUDE.md edits need your approval. It is in
+      `docs/drafts/claude-md-asset-model-row.md`, so c19 is unmet until you
+      approve the wording. Step 2's review entries were renumbered #352-#353.
+    - **SPEED BATCH A, AND TWO MERGE DEFECTS (~02:50 Perth)**: the full chunked
+      suite on 06a850d7 (step 2 merged) ran 8008 tests: 1 failed, 1 skipped
+      (#175's), coverage 95%. The failure was a test-helper defect that the new
+      chunk mix exposed. `free_day` could pick a day beside a period another
+      test had opened; it was fixed test-first (#354). The speed builder also
+      found a step 2 merge slip of mine: REQ-PIPE-049's `implemented_by` still
+      named `qa_tools/common/schedule.py`. That is fixed. REQ-PIPE-432 (dbt on
+      `DBT_THREADS = 2`, sorted run_results) and REQ-PIPE-431 (datacontract-cli
+      in a long-lived worker, the shared `tool_worker.py`, three lanes) are
+      built. Their critic found no blocker. Its three defects are fixed
+      test-first (#370-#372): Ctrl-C was recorded as a tool crash; a worker
+      that could not be launched skipped criterion 6's wording; an exception
+      that would not unpickle. All are merged as 31e5ef21. On that tree the 19
+      affected modules gave 472 passed, ruff was clean, and `mothman check
+      --no-pytest` passed. Not pushed: the full gate ran on 06a850d7, not on
+      this tree. The `MOTHMAN_DBT_WORKER_KEY` variable is now
+      `MOTHMAN_TOOL_WORKER_KEY`.
+      **FOR KEITH (Q13.4)**, from the speed-A critic:
+      (a) REQ-PIPE-431 c6's required wording says "the supply's data was not
+      the cause". The code cannot know that: an out-of-memory kill on a large
+      table would make it false. Softer wording would be "most likely not the
+      data; if a re-run fails the same way, ...".
+      (b) `DBT_THREADS = 2` against "1 to the core count": a 1-core machine
+      refuses every dbt step, and `os.cpu_count()` ignores cgroup limits. This
+      matters if the AWS MVP runs on one vCPU.
+      (c) REQ-PIPE-432 c4 is met as "three options measured, nothing to cut".
+      Does that satisfy its SHALL?
+      (d) PROVISIONAL: the progress bar still announces datacontract-cli before
+      Soda, so it can read 2/4 while dbt and datacontract-cli are still
+      running. The comments now say so.
+    - **DISK (~00:50 and ~02:40 Perth)**: the session's disk allowance filled
+      twice. The first time it broke four suite chunks, which were re-run.
+      Freed by deleting idle scratch temp folders (one of them a builder's
+      mutation folders, which it was told to re-create) and eleven clean,
+      merged agent worktrees. A full pytest basetemp is 5-10GB, so each one is
+      now deleted when its run ends.
 

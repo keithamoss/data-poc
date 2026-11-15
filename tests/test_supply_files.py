@@ -191,7 +191,7 @@ class TestNothingElseSplitsASupplyId:
         from pathlib import Path
 
         root = Path(__file__).resolve().parent.parent
-        sources = [p for d in ("qa_tools", "pipeline", "cli", "generator")
+        sources = [p for d in ("asset_model", "qa_tools", "pipeline", "cli", "generator")
                    for p in (root / d).rglob("*.py")]
         assert len(sources) > 100, "the source tree was not found"
         found = []

@@ -31,7 +31,7 @@ def pipeline_group() -> None:
     all_choice=True,
     help="Which collection's arrivals to process - {legend}. Default: {every}.")
 @click.option("--sequential", is_flag=True,
-              help="Run each supply's four QA tools one after another rather than dbt beside the other three - slower, and easier to read when debugging. Arrivals always run one at a time, because each filing depends on what the one before it promoted - and collections that share a calendar always run as one stream in receipt order.")
+              help="Run each supply's four QA tools one after another rather than dbt and datacontract-cli each in a worker beside Soda Core and Evidently (dbt stays in its own worker either way) - slower, and easier to read when debugging. Arrivals always run one at a time, because each filing depends on what the one before it promoted - and collections that share a calendar always run as one stream in receipt order.")
 @click.option("--snapshot", is_flag=True,
               help="Also archive a dashboard snapshot afterward (same as SNAPSHOT_DASHBOARD=1).")
 @click.option("--publish", "do_publish", is_flag=True,
@@ -307,7 +307,7 @@ def cache_key_command() -> None:
                    "history - that is refused; `mothman env reset-synthetic` starts "
                    "from empty.")
 @click.option("--sequential", is_flag=True,
-              help="Check one stream after the other instead of side by side - slower, and the reference a parallel bootstrap should match. Collections that share a calendar are always one stream, their arrivals interleaved in receipt order as the live pass does; arrivals always run one at a time, because each filing depends on what the one before it promoted.")
+              help="Check one stream after the other instead of side by side, and each supply's four QA tools one after another rather than dbt and datacontract-cli each in a worker beside Soda Core and Evidently (dbt stays in its own worker either way) - slower, and the reference a parallel bootstrap should match. Collections that share a calendar are always one stream, their arrivals interleaved in receipt order as the live pass does; arrivals always run one at a time, because each filing depends on what the one before it promoted.")
 @click.option("--checkpoint-before", "checkpoint_before", type=int, default=None,
               metavar="N",
               help="Keep a copy of the database as it stood once arrival N-1 was processed, "
@@ -464,7 +464,7 @@ def checkpoint_delete_command(name: str, yes: bool) -> None:
 @pipeline_group.command("resume")
 @click.argument("name")
 @click.option("--sequential", is_flag=True,
-              help="Run each arrival's tools one after another rather than dbt beside the rest.")
+              help="Run each arrival's four QA tools one after another rather than dbt and datacontract-cli each in a worker beside Soda Core and Evidently (dbt stays in its own worker either way).")
 def resume_command(name: str, sequential: bool) -> None:
     """Replay a collection from checkpoint NAME (see `mothman pipeline
     checkpoint list`) into a NEW database of its own, which you then point

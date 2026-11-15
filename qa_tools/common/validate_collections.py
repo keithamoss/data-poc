@@ -326,7 +326,7 @@ def check_file_problems(root: Path | None = None) -> list[str]:
 
     # The checkout the asset's paths are relative to (assets.folder_rel): the
     # repository, wherever the asset folder sits inside it; for a folder
-    # outside it (a test's copy, #55's injected configuration), its parent.
+    # outside it (a test's copy, REQ-PIPE-342's injected configuration), its parent.
     if root is None:
         folder = assets.selected().folder
         root = assets.ROOT if folder.is_relative_to(assets.ROOT) else folder.parent
@@ -648,12 +648,12 @@ def line_report(adapters: Path | None = None, providers: Path | None = None) -> 
 
 
 def main() -> int:
-    from asset_model import linked_datasets, set_member_checks as list_setting_members
+    from asset_model import linked_datasets, set_member_checks
     from qa_tools.common import run_reads
 
     problems = (config_problems() + check_file_problems() + literal_problems()
                 + presentation_problems() + linked_datasets.problems() + run_reads.declaration_problems()
-                + list_setting_members.problems())
+                + set_member_checks.problems())
     for line in line_report():  # reported whether or not the gate passes
         print(f"  {line}")
     if problems:

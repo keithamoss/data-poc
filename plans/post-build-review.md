@@ -14048,7 +14048,7 @@ twice. It deliberately did not re-find the `TypeError`.
        path to open (repository path inside, the folder itself outside), and
        only the readers that need a repository path - git-ref reads,
        CODEOWNERS, GitHub links - refuse. Refusing everywhere would also stop
-       the dashboard build reading #55's injected configuration. (CORRECTED
+       the dashboard build reading REQ-PIPE-342's injected configuration. (CORRECTED
        by #313: the line drawn here does NOT keep an injected-folder
        dashboard build working - the build embeds the GitHub links, and they
        refuse, so it stops there. #313 also found the schedule gate's git-ref guards and
@@ -14161,10 +14161,10 @@ twice. It deliberately did not re-find the `TypeError`.
           asset folder outside the repository, given C7. (a) Refuse, as C7
           says - and then the nine tests above need their copies inside the
           repository (or a test-only switch, which the test rules forbid);
-          and a #55 deployment's schedule gate refuses outright. (b) Keep
+          and an injected-root (REQ-PIPE-342) deployment's schedule gate refuses outright. (b) Keep
           "no previous state" for such a folder, as today - honest that git
           holds no history of it, but every past-item edit there passes. (c)
-          Refuse only for the injected-root (#55) layout and keep (b) for
+          Refuse only for the injected-root (REQ-PIPE-342) layout and keep (b) for
           the suite's folder copies - which ties product behaviour to how a
           test points the resolver. Until he answers, (b) stands.
      - **Runs (tree 1e1fde37, before this bullet was added)**: the touched
@@ -14282,7 +14282,7 @@ twice. It deliberately did not re-find the `TypeError`.
      - **H1. Under an injected single-asset root, the both-hierarchies read
        treats the other asset's scenarios as mistyped (SETTLED by Keith
        2026-11-03, no code change).** `every_asset.declared()` reads the
-       assets the resolver finds, so a #55 root holding one asset would make
+       assets the resolver finds, so an injected (REQ-PIPE-342) root holding one asset would make
        the other asset's scenarios name "a dataset no asset declares". Keith:
        scenarios exist only for synthetic assets, and both synthetic assets
        are always present together for demo and test, so the read always
@@ -15150,7 +15150,70 @@ twice. It deliberately did not re-find the `TypeError`.
        workflow it failed (exit 0 with the failing asset), and passes now.
        Not run on a GitHub runner.
 
-350. **[done, 2026-11-15]** **[Pipeline & publishing]** **Two datasets naming one table: the hierarchy kept the first.**
+350. **[done, 2026-11-15]** **[Docs & process]** **[QA checks & contract]** **The critic on split T5 (fe3f5671): REQ-DOCS-358's sweep, A13/A14 and the docs.**
+     The critic sampled 24 of the c2 sweep's rewrites and all held. What it
+     found, and what was done (Keith answered the judgement calls 2026-11-15):
+     - **c2's three ambiguous criteria / a contradictory flip record**
+       (finding 4: Keith's flip decision listed c1, c3 and c4 unmet, the
+       record also c2). Keith gave the wording: REQ-PIPE-190 c1 names the two
+       contracts' real paths, REQ-TEST-252 c15 reads "assets/, data/ or
+       reports/", REQ-QAC-294 c3 reads "assets/<asset>/synthetic/
+       synthetic_inputs.yaml (today the quarterly asset's)" with its stale
+       move note dropped. Each AMENDED by REQ-DOCS-358; c2's unmet entry is
+       gone, so c2 is met. REQ-QAC-294 c3 still says "kept at the top of
+       contract/ among the asset-wide files - added to ...ASSET_WIDE ... by
+       amendment A8", outside Keith's wording: left for him.
+     - **REQ-PIPE-240 c9** missed CORRECTION_RIDERS, which
+       validate_collections already exempts. Keith's wording applied.
+     - **CLAUDE.md E2/E4 and README** said the shared collections folders
+       hold only base.py; they hold `__init__.py` (the registry, the provider
+       loader) too. Corrected, Keith-approved, nothing else in CLAUDE.md
+       touched.
+     - **The README quickstart (MEDIUM)** still could not run on a fresh
+       machine: no databases, no MOTHMAN_ENVIRONMENT, no marking, and the
+       second asset's pass silently replaces the first's page. It now copies
+       .env.example, creates and marks supply_quarterly and supply_daily, and
+       says which page wins, pointing at `mothman dashboard rebuild
+       --out-dir` (`pipeline run` has no `--out-dir`). Not run end to end on
+       a fresh machine. The CHANGELOG item now claims only that.
+     - **A14's declaring side (MEDIUM, defect).** `linked_datasets.problems`
+       reached a no-calendar linkage-keys only through the old
+       different-calendar branch: "never on linkage-keys's calendar None".
+       Fix: its own refusal, worded as run_reads'. Test first:
+       `test_a_declaring_dataset_naming_no_calendar` failed against fe3f5671's
+       message and passes now.
+     - **status-cases.json (LOW)** still listed "on another calendar" among
+       notchecked's causes. Clause removed.
+     - **REQ-PIPE-110 c18 (LOW)** says "naming both files and the asset", and
+       the standalone `mothman schedule validate` printed bare file names.
+       Fix (test first, three tests in test_agreement.py failing against
+       fe3f5671): the no-calendar and both not-in-the-hierarchy refusals end
+       "(the <data_asset_id> asset)" (`validate_schedule.Source.asset_label`).
+       The criterion is unchanged.
+     - **#55's open shapes (LOW, judgement)** - sample datasets, project
+       extractions, ad hoc QA, shared check definitions - had no live entry
+       once #55 came out. Now plans/running-thoughts.md #140, `investigate`.
+
+351. **[done, 2026-11-16]** **[Testing & dev tooling]** **The session's chunked suite runner deleted every pytest temp root on the machine.**
+     Found overnight on 2026-11-15. The scratchpad script that runs the full
+     suite in chunks (`run_chunks.sh`, session-local and not in the
+     repository) ran `rm -rf /tmp/pytest-of-root/pytest-[0-9]*` before each
+     chunk. That folder is shared by every pytest session on the machine. A
+     builder's fast-half run in its own worktree had its tmp_path folders
+     deleted mid-run and failed for reasons unrelated to its change, and the
+     run had to be repeated.
+     - **Fix**: each chunk now gets its own `--basetemp` under the
+       scratchpad, deleted before and after that chunk and nowhere else. The
+       runner never touches /tmp/pytest-of-root. It also measures asset_model/
+       now that #134 step 2 adds that package. No regression test: the
+       script is not product code and lives outside the repository.
+     - **The rule this follows already exists**: CLAUDE.md says concurrent
+       test sessions each set `MOTHMAN_TEST_DB_TAG`. The same reasoning
+       covers the filesystem, so each concurrent session also gets its own
+       `--basetemp`. Builders were already told to do this. The main
+       session's own runner did not.
+
+352. **[done, 2026-11-15]** **[Pipeline & publishing]** **Two datasets naming one table: the hierarchy kept the first.**
      REQ-PIPE-376 criterion 7, the delivery-scoper's confirmed sighting
      (2026-11-03). `hierarchy._build` filled its table index with
      `by_table.setdefault`, so a hierarchy where two datasets named the same
@@ -15168,7 +15231,7 @@ twice. It deliberately did not re-find the `TypeError`.
      - **Ran**: tests/test_hierarchy.py, test_validate_hierarchy.py,
        test_two_asset_gates.py - 64 passed.
 
-351. **[done, 2026-11-15]** **[Testing & dev tooling]** **Split halves that imported moved names by value would have hidden a test's patch.**
+353. **[done, 2026-11-15]** **[Testing & dev tooling]** **Split halves that imported moved names by value would have hidden a test's patch.**
      Found building REQ-PIPE-380, before anything was pushed, by checking
      every test monkeypatch on an `asset_model` module against product code
      importing that name by value. Where a module was split, the half left in
@@ -15189,6 +15252,24 @@ twice. It deliberately did not re-find the `TypeError`.
        one by one to see it fail. Each was rewritten onto the same module
        object the code under test now reads, and the by-value scan above is
        what stands in for that; said here rather than claimed.
+
+354. **[done, 2026-11-16]** **[Testing & dev tooling]** **The pair helper's "free day" could sit next to a period another test had opened.**
+     Found by the full suite on 06a850d7, the #134 step 2 merge:
+     `test_carry_forward_review.py::TestADecisionThatDoesNotStandOpensNothing::test_a_failed_settlement_opens_nothing`
+     failed on `assert not period_schema.opened(conn, '2026-11-02')`. It had
+     passed on 4240a263 and passes on its own, with nothing in the step 2
+     diff touching its logic. The cause: `tests/pair_support.py`'s
+     `free_day` picks a random day and skips days that hold a pair, but not
+     periods that earlier tests on the same worker database had OPENED. The
+     merge added test modules, which reshuffled which modules share a worker,
+     and the random day landed beside one of those periods.
+     - **Fix** (defect, failing test first): `free_day` also treats an
+       opened period as taken. `tests/test_pair_support.py::test_a_day_next_to_an_opened_period_is_not_free`
+       failed against 06a850d7 ("DID NOT RAISE") and passes now. The six
+       modules that use the helper: 242 passed and 1 failed. That failure is
+       `test_choose_file_runs.py::test_each_settled_supply_is_checked_on_its_own_file`
+       on `DbtPackagesMissing`, because the fix's worktree has no dbt
+       packages installed. It is environmental, not this change.
 
 355. **[in-progress, 2026-11-15]** **[Pipeline & publishing]** **Under one clock a batch run stamps each arrival as it starts, on every asset.**
      Found building REQ-PIPE-382 (step 3 of #134), and a change to agreed
@@ -15256,3 +15337,71 @@ twice. It deliberately did not re-find the `TypeError`.
      effect at the instant they are made, which changes what an inherit sees);
      the fixture's 2026-Q1 is a shared real period, so the likely fix is a
      private database or a made-up period for it. Not fixed here.
+
+370. **[done, 2026-11-16]** **[Pipeline & publishing]** **Ctrl-C during a run was recorded as a dbt or datacontract-cli crash.**
+     The post-build critic on wip/speed-a at 31579f9e (REQ-PIPE-431's
+     three lanes), confirmed against the code. SIGINT reaches the terminal's
+     whole process group, so both tool workers died with the run's process;
+     their lanes raised `QaRunFailure` carrying a `.tool`, which
+     `parallel_orchestrate.side_by_side`'s rank put ahead of the foreground's
+     `KeyboardInterrupt` (no `.tool`). The attempt was then recorded CRASHED,
+     with "the supply's data was not the cause", rather than INTERRUPTED.
+     - **Fix** (defect, failing test first): `side_by_side` raises any lane's
+       non-Exception (`KeyboardInterrupt`, `SystemExit`) before ranking, and
+       `tool_worker.spawn` starts each worker with `start_new_session=True`,
+       so only the run's process sees Ctrl-C and stops its workers itself
+       (atexit or the caller's `stop()`; the test checks `stop()` reaps it).
+       `tests/test_tools_beside.py::test_a_keyboard_interrupt_outranks_a_lane_that_failed_by_tool`
+       and `tests/test_datacontract_worker.py::TestCriticFindings::test_the_workers_are_out_of_the_terminals_process_group`
+       failed against 31579f9e and pass now.
+     - **PROVISIONAL (overnight 2026-11-15)**: both the stop-first rule and a
+       session of their own for the workers, rather than either alone.
+
+371. **[done, 2026-11-16]** **[Pipeline & publishing]** **A worker that could not be launched skipped REQ-PIPE-431 criterion 6's wording.**
+     Same critic. `subprocess.Popen` sat outside `tool_worker.spawn`'s try, so
+     a fork or exec failure (`BlockingIOError`, `OSError`) escaped as itself
+     rather than as `WorkerDidNotStart`, and datacontract-cli's "did not start
+     ... will fail the same way" message never appeared.
+     - **Fix** (defect, failing test first): an `OSError` from `Popen` is
+       `WorkerDidNotStart`, naming its type.
+       `TestCriticFindings::test_a_worker_that_cannot_be_launched_did_not_start`
+       (both cases) failed against 31579f9e and passes now.
+
+372. **[done, 2026-11-16]** **[Pipeline & publishing]** **An error from the datacontract-cli worker that could not be rebuilt surfaced as a misleading TypeError.**
+     Same critic. The worker checked only that an exception pickled; one with
+     a constructor of its own (datacontract's `DataContractException` is one)
+     pickles but cannot be unpickled, so the run's process raised a TypeError
+     about the constructor instead of the tool's error.
+     - **Fix** (defect, failing test first): the worker round-trips the
+       exception (`pickle.loads(pickle.dumps(exc))`) and falls back to
+       `RuntimeError("<type>: <message>")`.
+       `TestCriticFindings::test_an_error_that_cannot_be_rebuilt_here_travels_as_its_text`
+       failed against 31579f9e and passes now.
+
+373. **[done, 2026-11-16]** **[Pipeline & publishing]** **[Testing & dev tooling]** **The same critic's wording findings and REQ-PIPE-431 criterion 9's test gaps.**
+     - **Wording** (polish): `tool_worker.spawn`'s comment said a worker that
+       never connects "is reported rather than waited on" - it waits
+       START_TIMEOUT_S, and now says so. `--sequential`'s help on `pipeline
+       run`, `bootstrap` and `resume` now says dbt stays in its own worker
+       either way (the help test asserts it). cli/common.py's on_step comment
+       claimed the bar never reports unfinished work; with three lanes dbt and
+       datacontract-cli are announced as their lanes start, so it can run
+       ahead, and both that comment and orchestrate's now say so.
+       **PROVISIONAL (overnight 2026-11-15)**: the announcement order (dbt,
+       datacontract-cli, Soda Core, Evidently) is left as it is.
+     - **Criterion 9 gap** (coverage): `test_a_killed_worker_fails_only_its_step_through_the_three_lanes`
+       drives a worker lost mid-request through the orchestrator's three
+       lanes - the run fails as datacontract-cli and dbt, Soda Core and
+       Evidently all finish. It passed against 31579f9e (coverage, not a
+       defect). REQ-PIPE-431's evidence now notes that
+       `test_datacontract_scoped.py::TestWhatTheToolIsHanded` covers the
+       sequential path only.
+     - **Left for Keith** (morning report, not this builder's): criterion
+       6's "the supply's data was not the cause" wording, and DBT_THREADS = 2
+       refusing on a one-core machine.
+     - **Ran** (#370-#373): tests/test_tools_beside.py,
+       test_datacontract_worker.py, test_dbt_worker.py, test_dbt_threads.py,
+       test_parallel_orchestrate.py, test_chain_progress.py,
+       test_orchestrate_reference_run.py, test_datacontract_scoped.py,
+       test_run_datacontract_cp.py, test_run_datacontract_bdm.py,
+       test_asked_for.py - 129 passed; ruff clean.

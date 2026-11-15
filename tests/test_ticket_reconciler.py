@@ -468,7 +468,7 @@ class TestAPersonsOperationGoesThroughTheSamePass:
 
         root = Path(tr.__file__).resolve().parent.parent.parent
         found = set()
-        for path in sorted(root.glob("qa_tools/**/*.py")) + \
+        for path in sorted(root.glob("asset_model/**/*.py")) + sorted(root.glob("qa_tools/**/*.py")) + \
                 sorted(root.glob("cli/**/*.py")) + \
                 sorted(root.glob("pipeline/**/*.py")):
             tree = ast.parse(path.read_text())

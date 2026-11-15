@@ -6812,7 +6812,7 @@ function notInAgreementShown(col, ds){
 // not part of the agreement. Its period is the entry's own field - the build
 // reads a pre-code entry's period once, so nothing here reads the reason.
 // EVERY REASON BEGINS 'Not checked: ' (REQ-DASH-337 criterion 12 as amended
-// by REQ-DASH-299, A2), so all three read alike under A1; a dataset is named
+// by REQ-DASH-299, A2), so both read alike under A1; a dataset is named
 // by its hierarchy name, short - the row sits on that dataset's page or under
 // a heading naming its collection.
 function notInAgreementReason(entry){
@@ -6826,9 +6826,6 @@ function notInAgreementReason(entry){
   // THE STATUS'S OWN WORD, through statusWords (REQ-DASH-359 criterion 1).
   const lead = statusWords("notchecked", "label");
   if(code === "not_supplied_by_decision") return `${lead}: ${named()} not supplied for ${period}, by decision.`;
-  if(code === "calendar_differs"){
-    return `${lead}: ${named()} was on ${e.calendar ? "the " + e.calendar : "another"} calendar for ${period}.`;
-  }
   return `${lead}: not part of the agreement for ${period}.`;
 }
 // A LEFT-OUT CHECK'S ROW (REQ-DASH-337 criterion 6 as amended by REQ-DASH-299,

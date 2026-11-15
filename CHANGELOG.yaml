@@ -109,6 +109,26 @@ intro: >
   all three.
 
 releases:
+  - date: "2026-11-16"
+    summary: >
+      Each supply's checks take less time: dbt runs a supply's tests two at a
+      time, and datacontract-cli now runs beside the other tools.
+    changes:
+      - category: Improved
+        items:
+          - headline: dbt tests side by side
+            components: ["QA checks & contract", "Pipeline & publishing"]
+            description: >
+              dbt now runs two of a supply's tests at once rather than one at
+              a time, which took about a quarter off each supply's dbt step
+              when measured. What it records is unchanged, and in the same
+              order.
+          - headline: datacontract-cli beside the rest
+            components: ["QA checks & contract", "Pipeline & publishing"]
+            description: >
+              datacontract-cli now checks a supply in a process of its own,
+              at the same time as Soda Core and Evidently, rather than after
+              them. --sequential still runs all four tools one after another.
   - date: "2026-11-15"
     summary: >
       New checks keep the code's boundaries, the two assets' dbt packages and
@@ -153,6 +173,13 @@ releases:
               Within one asset, a collection id declared twice, or one table
               declared by two datasets of the same collection, used to pass
               the checks. Both now fail, naming the two entries.
+          - headline: README quickstart for two assets
+            components: ["Docs & process"]
+            description: >
+              The README's first commands now create and mark both assets'
+              databases, set the environment and run the pipeline once for
+              each asset. The second run replaces the first's page unless you
+              build each into its own folder.
       - category: Improved
         items:
           - headline: Pipeline run only processes

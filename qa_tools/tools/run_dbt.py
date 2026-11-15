@@ -286,6 +286,10 @@ def evaluate(collection_id: str, run_id: str, run_timestamp: str) -> list[dict]:
         manifest = json.load(f)
     with open(os.path.join(target_path, "run_results.json")) as f:
         run_results = json.load(f)
+    # IN unique_id ORDER, so dbt's thread scheduling can never reorder what is
+    # recorded (REQ-PIPE-432 criterion 5): with more than one thread, dbt
+    # writes results in the order its nodes finished.
+    run_results["results"].sort(key=lambda r: r["unique_id"])
 
     nodes = test_nodes(manifest)
     if exclude:

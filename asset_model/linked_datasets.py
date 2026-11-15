@@ -49,7 +49,11 @@ def _calendar_of(cal: dict, coll_id: str, ds_id: str) -> str | None:
     return next(((c or {}).get("name") for c in cal.get("calendars") or []), None)
 
 
-def contract_columns(root: Path, contract: str, table: str) -> list[str]:
+def table_columns(root: Path, contract: str, table: str) -> list[str]:
+    """The column names `contract` (relative to the selected asset's folder in
+    the checkout at `root`) declares for `table`, in contract order - [] where
+    it declares no such table. Not check_lifecycle.contract_columns, which
+    reads a contract's columns for the checks."""
     doc = _load(asset_folder(root) / contract) or {}
     for t in doc.get("schema") or []:
         if t.get("name") == table:
@@ -171,7 +175,7 @@ def problems(root: Path = REPO) -> list[str]:
             continue
         pid = product.get("id")
         product_cal = _calendar_of(cal, coll.get("id"), pid)
-        own = contract_columns(root, coll.get("contract", ""), product.get("table"))
+        own = table_columns(root, coll.get("contract", ""), product.get("table"))
         n = max((int(m.group(1)) for c in own if (m := _ID.match(c or ""))), default=0)
         has_code_column = CODE_COLUMN in own
         codeless = [e for e in linked if e.get("code") is None]
@@ -211,10 +215,13 @@ def problems(root: Path = REPO) -> list[str]:
             l_cal = _calendar_of(cal, l_coll.get("id"), did)
             if l_cal is None:
                 out.append(f"{head}, which names no calendar, so it has no period to be read for.")
-            elif l_cal != product_cal:
-                out.append(f"{head}, which is never on {pid}'s calendar {product_cal!r} "
-                           f"(it is on {l_cal!r}) - a check reads only its own period.")
-            source = contract_columns(root, l_coll.get("contract", ""), l_ds.get("table"))
+            elif product_cal is None:
+                # EITHER SIDE (REQ-QAC-330 criterion 6 as amended by
+                # REQ-PIPE-345, G2): one baseline per asset leaves no
+                # different-calendar case, only a side with no calendar.
+                out.append(f"{head}, but {pid} itself declares no calendar, so it has no "
+                           f"period to read it for.")
+            source = table_columns(root, l_coll.get("contract", ""), l_ds.get("table"))
             for col in cols:
                 if col not in source:
                     out.append(f"{head} by the column {col!r}, which its contract does not declare.")
