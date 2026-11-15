@@ -14636,3 +14636,74 @@ twice. It deliberately did not re-find the `TypeError`.
      - **Ran**: `pytest tests/test_thirty_linked_datasets.py --run-on-demand`
        27 passed in 43s - including TestEachFakeGeocodingDatasetIsCheckedAgainstItsSource
        (5) and TestEveryLinkageResultNamesItsRowsByTheWholeKey; ruff.
+
+
+325. **[done, 2026-11-15]** **[QA checks & contract]** **Two duplicates inside one asset passed the collections gate.**
+     Found building REQ-PIPE-364 criterion 3's tests against a two-asset
+     fixture repository (split T1, branch wip/split-t1). A collection id
+     declared twice in one asset - under two agencies, with its own short,
+     run prefix and label - passed `validate_collections.config_problems()`
+     with nothing said: both entries loaded the one adapter, and every lookup
+     by id found the first. And two datasets of ONE collection declaring the
+     same table passed too, because the table check only compared datasets of
+     different collections; `hierarchy.by_table()` then silently kept the first.
+     - **Fix**, test first: tests/test_two_asset_gates.py::TestUniqueWithinAnAsset
+       `test_a_collection_id_declared_twice` and
+       `test_a_table_declared_by_two_datasets_of_one_collection` failed against
+       the old code; both pass. A collection id twice is refused naming both
+       agencies; a table twice naming both datasets (and both collections where
+       they differ). Polish alongside, same tests: the hierarchy's
+       duplicate-dataset refusal names both collections, and the reads_tables
+       refusal names the asset folder it checked (REQ-PIPE-364 criterion 4).
+     - **Ran**: tests/test_two_asset_gates.py 26 passed; tests/test_hierarchy.py
+       and tests/test_collections_registry.py green; both assets' real
+       collections gate passes.
+
+326. **[done, 2026-11-15]** **[Pipeline & publishing]** **A connection pooled before a database was re-marked was handed out unchecked.**
+     Found by REQ-PIPE-343 criterion 8's new wrong-asset test, which failed in
+     a whole-module run and passed alone. `supply_db`'s idle connections are
+     keyed by what their identity check vouched for (target, probe, expected
+     identity, ...), and handed out again without reading the identity. So when
+     a database's identity changed while a connection sat idle - the suite's
+     fixture re-marks a worker's database whenever the asset under test changes
+     ("the database itself stays, so pooled connections live on") - a
+     checkout configured for the database's FORMER asset was given the pooled
+     connection and reached the other asset's database with no refusal: the
+     guard REQ-PIPE-107 criterion 10 says applies on every route, a test
+     worker's database included. Outside the suite it needs a re-mark inside a
+     running process, which only `mothman env mark` does, and it exits.
+     - **Fix**, test first: `db_identity.mark()`, the one writer of an
+       identity, now releases this process's idle connections, so the next
+       connect checks afresh. tests/test_db_identity.py::
+       TestARemarkReachesPooledConnections pools a connection, re-marks the
+       database for the other asset and connects - failed (DID NOT RAISE)
+       against the old code, passes. tests/conftest.py's comment corrected.
+     - **Ran**: tests/test_db_identity.py with tests/test_devcontainer.py, 37
+       passed at -n 2; tests/test_db_identity.py 31 passed at -n 0.
+
+327. **[done, 2026-11-15]** **[Testing & dev tooling]** **The dev container named an asset that no longer exists.**
+     `.devcontainer/devcontainer.json` set `MOTHMAN_ASSET` to `data-asset-1`,
+     which names no asset folder since the split, so every command in a dev
+     container refused ("names no asset folder"); and post-create.sh marked one
+     database with no asset set, which the same rule refuses (the audit's
+     surprise 7). Found while building REQ-PIPE-343 criterion 4.
+     - **Fix**: the variable is removed - no default, as REQ-PIPE-363
+       criterion 1 and the session hook already have it - and post-create.sh
+       marks each asset's `supply_<asset>` on the server
+       `MOTHMAN_SUPPLY_DSN` names, typing both ids. A wiring fix with nothing
+       left to regress, so no regression test (CLAUDE.md's exception); the
+       existing tests/test_db_identity.py::TestEveryPlaceMarksItsOwn reads the
+       loop.
+     - **Still open, for Keith**: nothing creates the dev container's
+       `supply_<asset>` databases (docker-compose makes only `supply`), so on a
+       fresh dev container each mark fails with its hint until they exist; and
+       `MOTHMAN_SUPPLY_DSN` there, as in the session hook, still names the
+       pre-split `supply`, which neither asset can open.
+
+328. **[todo]** **[Data generation]** **The providers gate names a provider by its pre-split path.**
+     A sighting from split T1, not fixed: `generator/validate_providers.py`'s
+     `declaration_problems()` names a provider as
+     `generator/collections/<module>.py`, where providers have lived in
+     `assets/<asset>/synthetic/collections/` since the split, so its messages
+     point at a file that does not exist. `orphan_problems()` beside it already
+     names the real path. Minor wording; one line.

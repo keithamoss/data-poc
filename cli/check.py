@@ -324,9 +324,9 @@ def _run(label: str, argv: list[str], can_warn: bool = False) -> tuple[int, list
     AN ASSET'S PASS IS PRINTED A PASS AT A TIME, every line named for its
     asset (REQ-PIPE-364 criterion 1): read whole, prefixed, and printed as
     soon as that pass ends - a configuration gate's pass takes seconds, so a
-    failure still shows before the next gate starts. Colour is asked for
-    when this terminal shows it, since the gate's own stdout is then a pipe.
-    A repository-wide gate - the Python suite among them - still streams.
+    failure still shows before the next gate starts. Its output is plain,
+    as `--docs`'s captured output is, since the gate's stdout is a pipe. A
+    repository-wide gate - the Python suite among them - still streams.
     """
     console.rule(f"[bold]{label}", style="dim")
     if shutil.which(argv[0]) is None:
@@ -345,8 +345,6 @@ def _run(label: str, argv: list[str], can_warn: bool = False) -> tuple[int, list
         if asset is None:
             codes.append(subprocess.run(argv, cwd=ROOT, env=env).returncode)
             continue
-        if sys.stdout.isatty():
-            env.setdefault("FORCE_COLOR", "1")
         done = subprocess.run(argv, cwd=ROOT, env=env, stdout=subprocess.PIPE,
                               stderr=subprocess.STDOUT, text=True)
         output = _named(asset, done.stdout or "")
