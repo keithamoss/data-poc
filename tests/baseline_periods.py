@@ -37,6 +37,22 @@ def _is_real(folder: Path) -> bool:
     return Path(folder).resolve() == real.resolve()
 
 
+def _undated_from(versions: list) -> date:
+    """Where undated made-up periods start. On authored dates, August 2099.
+    ON A CADENCE RULE, two years from the asset's today: the test version
+    ends the rule the day before, and every slot a dataset has unbounded is
+    generated a day at a time - ending it in 2099 made each such call build
+    some 27,000 daily slots (test_door_flag_parity's two-files case, about
+    three minutes)."""
+    from qa_tools.common import asset_time
+
+    rule = any((v or {}).get("cadence") for v in versions
+               if CHANGE not in str((v or {}).get("changelog")))
+    if not rule:
+        return UNDATED_FROM
+    return asset_time.local_date(asset_time.now()) + timedelta(days=730)
+
+
 def declare(*names: str, dates: dict | None = None, root: Path | None = None) -> None:
     """Put each of `names` on the selected asset's baseline, keeping every
     period already declared by this test. `dates` gives a name the date the
@@ -66,8 +82,9 @@ def declare(*names: str, dates: dict | None = None, root: Path | None = None) ->
                 "dates": []}
         versions.append(mine)
     held = {d["period"]: date.fromisoformat(str(d["date"])) for d in mine["dates"]}
-    undated = sorted(d for d in held.values() if d >= UNDATED_FROM)
-    nxt = (undated[-1] + timedelta(days=1)) if undated else UNDATED_FROM
+    first_undated = _undated_from(versions)
+    undated = sorted(d for d in held.values() if d >= first_undated)
+    nxt = (undated[-1] + timedelta(days=1)) if undated else first_undated
     for name in names:
         if name in held:
             if name in dates:
