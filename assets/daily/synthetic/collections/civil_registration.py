@@ -370,14 +370,25 @@ class BirthRegistrationsProvider:
               previous_row_count: Optional[int]) -> pd.DataFrame:
         # AMBER BY CONSTRUCTION (REQ-GEN-184 criterion 6), never the preset,
         # which trips single-tier checks and reads red. Red keeps the preset
-        # (criterion 10).
+        # (criterion 10), its every fault sized from its bands (REQ-GEN-392).
         from generator import targeting
         from generator.dirty import apply_birth_registrations_presets
 
         if severity == "amber":
             return targeting.bdm_amber(df, seed=seed, rows=previous_row_count)
         return apply_birth_registrations_presets(df, severity=severity, seed=seed,
-                                                  previous_row_count=previous_row_count)
+                                                  previous_row_count=previous_row_count,
+                                                  catalogue=self.catalogue)
+
+    @property
+    def catalogue(self):
+        """check_bands' catalogue, read ONCE per generation (REQ-GEN-392's
+        NFR): the presets size every fault from it."""
+        if getattr(self, "_catalogue", None) is None:
+            from generator import fault_sizing
+
+            self._catalogue = fault_sizing.catalogue()
+        return self._catalogue
 
     def resupply_subset(self, df: pd.DataFrame, previous_dirty_seed: int, seed: int) -> pd.DataFrame:
         """A Birth Registrations supply is ONE FILE, so there is no

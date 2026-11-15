@@ -360,6 +360,17 @@ class ChildProtectionProvider:
 
     def __init__(self, base_tables: dict[str, pd.DataFrame]):
         self.base_tables = base_tables
+        self._catalogue = None
+
+    @property
+    def catalogue(self):
+        """check_bands' catalogue, read ONCE per generation (REQ-GEN-392's
+        NFR): the presets size every fault from it."""
+        if self._catalogue is None:
+            from generator import fault_sizing
+
+            self._catalogue = fault_sizing.catalogue()
+        return self._catalogue
 
     def generate(self, run_date: date, seed: int, n_rows: int, id_offset: int) -> dict[str, pd.DataFrame]:
         # extract_timestamp is set exactly once, here, before any dirty()/
@@ -389,12 +400,13 @@ class ChildProtectionProvider:
 
         present = [t for t in _tables() if t in payload]
         dirty_tables = _pick_dirty_tables(seed, present)
+        cat = self.catalogue
         tables = dict(payload)
         base = self.base_tables
         if "cp_notifications" in dirty_tables:
             tables["cp_notifications"] = dirty_mod.apply_cp_notifications_presets(
                 tables["cp_notifications"], base["cp_clients"], base["cp_case_workers"],
-                severity, seed=seed + 100)
+                severity, seed=seed + 100, catalogue=cat)
         if "cp_placements" in dirty_tables:
             tables["cp_placements"] = dirty_mod.apply_cp_placements_presets(
                 # cp_carers is a REFERENCE here, not the table being
@@ -402,20 +414,20 @@ class ChildProtectionProvider:
                 # it falls back to the true source - which is what the
                 # class docstring says reference tables are anyway.
                 tables["cp_placements"], tables.get("cp_carers", base["cp_carers"]), base["cp_clients"],
-                severity, seed=seed + 200)
+                severity, seed=seed + 200, catalogue=cat)
         if "cp_investigations" in dirty_tables:
             tables["cp_investigations"] = dirty_mod.apply_cp_investigations_presets(
                 tables["cp_investigations"], base["cp_clients"], base["cp_notifications"],
-                base["cp_case_workers"], severity, seed=seed + 300)
+                base["cp_case_workers"], severity, seed=seed + 300, catalogue=cat)
         if "cp_clients" in dirty_tables:
             tables["cp_clients"] = dirty_mod.apply_cp_clients_presets(
-                tables["cp_clients"], severity, seed=seed + 400)
+                tables["cp_clients"], severity, seed=seed + 400, catalogue=cat)
         if "cp_carers" in dirty_tables:
             tables["cp_carers"] = dirty_mod.apply_cp_carers_presets(
-                tables["cp_carers"], severity, seed=seed + 500)
+                tables["cp_carers"], severity, seed=seed + 500, catalogue=cat)
         if "cp_case_workers" in dirty_tables:
             tables["cp_case_workers"] = dirty_mod.apply_cp_case_workers_presets(
-                tables["cp_case_workers"], severity, seed=seed + 600)
+                tables["cp_case_workers"], severity, seed=seed + 600, catalogue=cat)
         return tables
 
     def resupply_subset(self, payload: dict[str, pd.DataFrame], previous_dirty_seed: int,

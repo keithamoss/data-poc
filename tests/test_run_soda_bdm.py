@@ -44,7 +44,8 @@ def test_dirty_run_produces_a_real_failure_and_correct_row_counts(monkeypatch, b
     assert all(r["check_id"] for r in results)
     failing = [r for r in results if r["status"] == "fail"]
     assert failing, "a real red-severity dirty run produced no Soda failures at all"
-    assert all(10 <= r["row_count_total"] <= 30 for r in results)
+    # 300 generated rows less a few broken twins (conftest.bdm_raw_dir, REQ-GEN-392)
+    assert all(280 <= r["row_count_total"] <= 320 for r in results)
 
 
 def test_failed_rows_checks_route_to_their_real_column_not_table(monkeypatch, bdm_duckdb_dir):

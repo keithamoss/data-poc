@@ -116,16 +116,21 @@ def bdm_raw_dir(tmp_path_factory):
     smaller than that would trip a real check for being implausibly
     small, exactly the kind of thing that check exists to catch) and a
     red-severity dirty run with a real defect injection AND a much
-    smaller row count (20 rows, a ~97% drop off the reference - well
-    past both that same row_count floor AND evidently's own 25%
+    smaller row count (300 rows, a 50% drop off the reference - past
+    both that same row_count floor AND evidently's own 25%
     row-count-growth fail threshold) - real generator output, not
-    hand-crafted rows."""
+    hand-crafted rows.
+
+    300, NOT THE 20 IT WAS (REQ-GEN-392): the red preset now plants exact,
+    band-derived counts - five broken twin pairs, five rows on each
+    single-tier rule, ten for each duplicated key - and refuses a frame too
+    small to hold them, which 20 rows (about no twin pairs) is."""
     raw_dir = tmp_path_factory.mktemp("bdm_raw")
 
     ref_df = generate_daily_batch(date(2026, 1, 1), seed=90001, n_rows=600)
     ref_df.to_csv(raw_dir / f"{_REF_RUN_ID}.csv", index=False)
 
-    dirty_df = generate_daily_batch(date(2026, 1, 2), seed=90002, n_rows=20)
+    dirty_df = generate_daily_batch(date(2026, 1, 2), seed=90002, n_rows=300)
     dirty_df = apply_birth_registrations_presets(dirty_df, severity="red", seed=90003, previous_row_count=600)
     dirty_df.to_csv(raw_dir / f"{_DIRTY_RUN_ID}.csv", index=False)
 

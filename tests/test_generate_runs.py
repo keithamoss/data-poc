@@ -22,6 +22,7 @@ from __future__ import annotations
 from state_paths import fixed
 import collection_modules
 
+import os
 import re
 from datetime import date, timedelta
 from pathlib import Path
@@ -351,6 +352,40 @@ def test_generating_never_touches_the_real_delivery_tree(tmp_path, monkeypatch):
             if scenario_injection.placements_path().exists() else None) \
         == placements_before, (
             "the real scenario_placements.json was written to by a test run")
+
+
+def test_a_redirected_generation_writes_nothing_under_the_real_data_tree(tmp_path):
+    """Asked for by the REQ-GEN-392 critic (post-build-review #385), who
+    suspected `driver.generate` wrote data/<asset>/scenario_placements.json
+    past a redirect. It does not - generator/output.py's redirect() moves
+    the placements with the other three outputs, and this passed when first
+    run - but nothing asserted it of EVERY file under the real data/, only
+    of the four outputs by name. A fifth output added later would write the
+    real tree with every named check still green; this one would not."""
+    from generator.output import redirect
+
+    def snapshot():
+        out = {}
+        for root, dirs, files in os.walk(generator_isolation.DATA_DIR, onerror=lambda _e: None):
+            dirs[:] = [d for d in dirs if d != "dbt_scratch"]
+            for f in files:
+                path = Path(root) / f
+                try:
+                    st = path.stat()
+                except FileNotFoundError:
+                    continue
+                out[str(path)] = (st.st_size, st.st_mtime_ns)
+        return out
+
+    before = snapshot()
+    undo = redirect(tmp_path)
+    try:
+        driver.generate("civil-registration")
+    finally:
+        undo()
+    assert list((tmp_path / "deliveries").iterdir()), "precondition: something was generated"
+    assert (tmp_path / "scenario_placements.json").is_file()
+    assert snapshot() == before, "a redirected generation wrote under the real data/"
 
 
 class TestTheInjectedScenariosAreReallyThere:

@@ -205,6 +205,18 @@ def inject_stale_delivery(df: pd.DataFrame, seed: int, rate: float = 0.05) -> pd
         return df.copy()
     out = df.copy()
     lag_days = rng.integers(15, 46, size=len(out))
+    if "is_multiple_birth" in out.columns:
+        # ONE LAG PER BIRTH EVENT (post-build-review #380): twins are matched
+        # on date_of_birth, facility and parent 1, and a replayed feed
+        # replays the event whole - a lag per row split every pair, so every
+        # stale supply also failed the sibling checks. Each twin takes the
+        # lag of its pair's first row; every other row's draw is unchanged.
+        twin = out["is_multiple_birth"].fillna(False).astype(bool).to_numpy()
+        key = out.groupby(["date_of_birth", "place_of_birth_facility",
+                           "registering_parent_1_name"], dropna=False, sort=False).ngroup().to_numpy()
+        first: dict[int, int] = {}
+        for i in np.where(twin)[0]:
+            lag_days[i] = lag_days[first.setdefault(key[i], i)]
     out["date_of_birth"] = [d - timedelta(days=int(n)) for d, n in zip(out["date_registered"], lag_days)]
     return out
 
@@ -235,14 +247,16 @@ def truncate_to_row_count(df: pd.DataFrame, target_rows: int, seed: int) -> pd.D
     return df.iloc[keep_idx].reset_index(drop=True)
 
 
-def break_multiple_birth_siblings(df: pd.DataFrame, severity: str, seed: int) -> pd.DataFrame:
+def break_multiple_birth_siblings(df: pd.DataFrame, rate: float, seed: int) -> pd.DataFrame:
     """Drops one row from a fraction of real multiple-birth sibling pairs
     (daily_batch.py now generates genuine pairs - same date_of_birth,
     facility, and parent 1 - for every is_multiple_birth row) - the
     remaining twin's is_multiple_birth=True flag is left with no sibling
     row to match, the "one twin's registration never arrived" failure
-    mode the sibling-match check is built to catch."""
-    rate = 0.15 if severity == "amber" else 0.5
+    mode the sibling-match check is built to catch. `rate` is the share of
+    pairs broken - population's literal rate (synthetic_data_generator/
+    dirty_presets.py); the Birth Registrations preset plants an exact count
+    instead (REQ-GEN-392)."""
     rng = np.random.default_rng(seed)
     out = df.copy()
     twins = out[out["is_multiple_birth"]]
@@ -317,7 +331,7 @@ def inject_drift_batch(df: pd.DataFrame, column: str, invalid_pool: list, batch_
 
 # --- ready-made presets tied to the checks already defined elsewhere in
 #     this project (bdm-birth-registrations-soda-checks.yml, the CP concern
-#     type / risk rating value sets) - apply with apply_dirty_presets(). ---
+#     type / risk rating value sets). ---
 # Each value here contains a digit or a symbol outside a name's normal
 # letters/period/space/hyphen alphabet - deliberately, so every one of
 # them trips the name-format checks (contract/Soda/dbt regex has no
@@ -376,210 +390,6 @@ _BAD_DATE_OF_BIRTH_POOL = [date(1899, 1, 1), date(1850, 6, 15), date(1820, 11, 3
 _MALFORMED_SRC_ID_POOL = ["SRC-12345", "SRC-1234567890", "SRC12345678", "SRCX-123456789", "SRC-ABCDEFGHI"]
 
 
-def apply_birth_registrations_presets(df: pd.DataFrame, severity: str, seed: int,
-                                       previous_row_count: int | None = None) -> pd.DataFrame:
-    """severity: 'amber' or 'red' - matches the warn/fail bands in
-    bdm-birth-registrations-soda-checks.yml exactly, so a QA run against
-    this output should land in the band you asked for. Covers all of the
-    checks this dataset's QA battery has calibrated presets for - the
-    original 2 (sex, place_of_birth_facility), the next battery
-    (source_system_record_id duplicates, child_given_names format junk,
-    extract_timestamp ordering, multiple-birth sibling records, and the
-    row-count-growth check's truncation scenario), and the plans/qa-
-    pipeline.md #27 pass (2026-09-15, Keith's call): nulls on every
-    previously-never-nulled required column, a duplicate-value injector
-    for registration_number itself (the PK - previously never touched at
-    all), and junk-format invalid values for child_family_name/
-    registering_parent_1_name/registering_parent_2_name/source_system_
-    record_id (previously only child_given_names ever got this
-    treatment). BDM has no foreign keys to any other table, so unlike
-    Child Protection's presets below, there's no dangling-FK category
-    here at all.
-
-    previous_row_count: the immediately preceding run's actual row count
-    (civil_registration.py tracks this across its own loop) - when given, this
-    run gets truncated down to a specific percentage below THAT number
-    (10-25% for amber, past 25% for red - matching the row-count-growth
-    check's own warn/fail bands) rather than a fixed self-referential
-    rate, since that check compares against the previous run specifically
-    and this dataset's own base row count already varies enough run to
-    run that a fixed rate wouldn't reliably land in either band. None
-    (the very first run, which has no previous run to under-cut) skips
-    truncation entirely."""
-    # applied FIRST, not last: every rate below is calibrated against this
-    # run's FINAL row count (including dbt's own absolute-count thresholds
-    # for sex/place_of_birth_facility, not just the percentage-based Soda/
-    # datacontract-cli checks) - truncating afterwards would dilute those
-    # absolute counts by the same fraction as the truncation itself,
-    # pushing e.g. place_of_birth_facility's red-run null count below
-    # dbt's error_if ">600" and silently downgrading fail to warn. Found
-    # live: truncating last dropped that exact count from 769 to 526.
-    if previous_row_count:
-        drop_frac = 0.18 if severity == "amber" else 0.35  # warn>10%, fail>25% vs. previous run
-        target = int(previous_row_count * (1 - drop_frac))
-        df = truncate_to_row_count(df, target, seed + 6)
-
-    # facility-null and sex rates are bumped up from this dataset's
-    # original (pre-truncation) calibration specifically so their ABSOLUTE
-    # counts still clear dbt's fixed thresholds (facility: warn_if ">300",
-    # error_if ">600"; sex: error_if ">30") against a run that may now be
-    # 18-35% smaller than before truncation existed - the PERCENTAGE-based
-    # Soda/datacontract-cli checks land in the same bands either way.
-    rate_sex = 0.008 if severity == "amber" else 0.035      # warn>0%, fail>2% (Soda); >0/>30 count (dbt)
-    rate_facility_null = 0.30 if severity == "amber" else 0.55  # warn>15%, fail>35% (Soda); >300/>600 count (dbt)
-    rate_dup_id = 0.004 if severity == "amber" else 0.02
-    rate_junk_name = 0.006 if severity == "amber" else 0.03   # warn>0%, fail>3%
-    rate_ts_disorder = 0.01 if severity == "amber" else 0.04
-    rate_suburb = 0.006 if severity == "amber" else 0.03      # warn>0%, fail>3% (same band as junk names)
-    # small counts on purpose - the ODCS date-range rule is single-tier
-    # (mustBe: 0/error, no amber tolerance at all), so even the amber rate
-    # is a genuine hard fail on this one check - kept small so it reads as
-    # "a few genuinely bad records slipped through", not as the dominant
-    # failure mode of an amber run.
-    rate_dob_range = 0.003 if severity == "amber" else 0.015
-
-    # #27 pass: never-nulled required columns - dbt's not_null tests on
-    # all 6 of these have no warn_if/error_if config, so they hard-fail
-    # on ANY null regardless of severity (the same single-tier situation
-    # item 30 already found for date_of_birth) - only Soda's count-based
-    # missing_count bands (warn>0/fail>5, where one exists) actually read
-    # amber vs. red differently. Rates are small on purpose: these are
-    # "a handful of records missing a required field", not a dominant
-    # failure mode.
-    rate_null_required = 0.0016 if severity == "amber" else 0.0063   # ~3 amber / ~12 red at n~1900
-    rate_null_minor = 0.001 if severity == "amber" else 0.004        # ~2 amber / ~8 red - columns with no Soda missing_count band at all (source_system_record_id, is_multiple_birth), kept small regardless
-    # #27 pass: registration_number - the PK itself, never touched by any
-    # preset before this. Same rate as source_system_record_id's existing
-    # duplicate-value injector above (a proven calibration for this same
-    # check shape at this dataset's size).
-    rate_dup_registration_number = rate_dup_id
-    # #27 pass: junk-format invalid values on the 3 name columns that
-    # never got this treatment (only child_given_names did) - same rate
-    # as child_given_names' own rate_junk_name, same check shape (Soda
-    # invalid_percent warn>0%/fail>3%, dbt matches_regex single-tier).
-    rate_junk_name_other = rate_junk_name
-    # source_system_record_id's OWN format check has a tighter Soda band
-    # (warn>0%/fail>1%, vs. 3% for the name columns above) - smaller rate.
-    rate_malformed_src_id = 0.003 if severity == "amber" else 0.02    # ~0.3% amber / ~2% red
-
-    df = inject_invalid_values(df, "sex", ["U", "O", "9"], rate_sex, seed)
-    df = inject_nulls(df, "place_of_birth_facility", rate_facility_null, seed + 1)
-    df = inject_duplicate_values(df, "source_system_record_id", rate_dup_id, seed + 2)
-    df = inject_invalid_values(df, "child_given_names", _JUNK_TEXT_POOL, rate_junk_name, seed + 3)
-    df = inject_extract_timestamp_disorder(df, rate_ts_disorder, seed + 4)
-    df = break_multiple_birth_siblings(df, severity, seed + 5)
-    df = inject_invalid_values(df, "place_of_birth_suburb", _INVALID_SUBURB_POOL, rate_suburb, seed + 7)
-    df = inject_out_of_range_dates(df, "date_of_birth", _BAD_DATE_OF_BIRTH_POOL, rate_dob_range, seed + 8)
-    df = inject_nulls(df, "date_of_birth", rate_null_required, seed + 9)
-    df = inject_nulls(df, "date_registered", rate_null_required, seed + 10)
-    df = inject_nulls(df, "is_multiple_birth", rate_null_minor, seed + 11)
-    df = inject_nulls(df, "extract_timestamp", rate_null_required, seed + 12)
-    df = inject_nulls(df, "source_system_record_id", rate_null_minor, seed + 13)
-    df = inject_nulls(df, "registration_number", rate_null_required, seed + 14)
-    df = inject_duplicate_values(df, "registration_number", rate_dup_registration_number, seed + 15)
-    df = inject_invalid_values(df, "child_family_name", _JUNK_TEXT_POOL, rate_junk_name_other, seed + 16)
-    df = inject_invalid_values(df, "registering_parent_1_name", _JUNK_TEXT_POOL, rate_junk_name_other, seed + 17)
-    df = inject_invalid_values(df, "registering_parent_2_name", _JUNK_TEXT_POOL, rate_junk_name_other, seed + 18)
-    df = inject_invalid_values(df, "source_system_record_id", _MALFORMED_SRC_ID_POOL, rate_malformed_src_id, seed + 19)
-    return df
-
-
-def apply_cp_notifications_presets(df: pd.DataFrame, clients_df: pd.DataFrame, workers_df: pd.DataFrame,
-                                    severity: str, seed: int) -> pd.DataFrame:
-    """Introduces an unknown concern_type code (an 'expected values are
-    stable, but something new showed up' scenario) plus near-duplicate
-    notifications (double-submission).
-
-    plans/qa-pipeline.md #27 pass (2026-09-15): adds not_null on cp_
-    client_id/assigned_worker_id (previously never nulled), invalid-value
-    injection on source_type/risk_rating/outcome (real checks, never
-    exercised), and - the new category this pass adds across all of CP -
-    genuine dangling-FK injection on cp_client_id/assigned_worker_id:
-    reassigns a fraction to an ID that doesn't exist in cp_clients/
-    cp_case_workers at all, not just a still-real row that fails a
-    business rule (see inject_dangling_foreign_key's own docstring for
-    why this is a different failure mode from everything else in this
-    module). `clients_df`/`workers_df` are the REAL (undirtied) parent
-    tables the caller passes in specifically to build each dangling
-    injector's `existing_ids` exclusion set from - see child_protection.py.
-    py's main() for why it passes base_tables here, not this run's own
-    (possibly already-dirtied-elsewhere) copies."""
-    rate = 0.01 if severity == "amber" else 0.05
-    rate_null = 0.003 if severity == "amber" else 0.012  # ~3 amber / ~12 red at n~987 - Soda missing_count warn>0/fail>5
-    rate_invalid = 0.008 if severity == "amber" else 0.045  # ~8 amber / ~44 red - Soda warn>0%/fail>3%, dbt error_if>30 (n~987, 3%~30)
-    # ~3 amber / ~10 red directly-injected, though the REAL observed
-    # count often runs higher: cp_clients' own cp_client_id duplicate-
-    # value injector (apply_cp_clients_presets) can incidentally make a
-    # real ID vanish from that run's own materialized cp_clients table
-    # (donor-overwrite, not removal - see inject_duplicate_values), which
-    # makes every notification still referencing that now-gone ID
-    # genuinely dangling too, on top of this injector's own direct
-    # count (confirmed live: 12 direct + ~21 incidental = 33 on a real
-    # red run). Doesn't matter for pass/fail here - both relationships/
-    # reference checks are single-tier (any violation fails) - just
-    # means the reported failing-row count is a real, honest number
-    # larger than this rate alone would suggest.
-    rate_dangling = 0.003 if severity == "amber" else 0.01
-
-    df = inject_invalid_values(df, "concern_type", ["Unspecified", "Pending classification", "Code 9"], rate, seed)
-    df = inject_duplicate_rows(df, rate=0.015 if severity == "amber" else 0.05, seed=seed + 1,
-                                near_duplicate_columns=["notification_id"])
-    df = inject_nulls(df, "cp_client_id", rate_null, seed + 2)
-    df = inject_nulls(df, "assigned_worker_id", rate_null, seed + 3)
-    df = inject_invalid_values(df, "source_type", ["Court", "Media report", "Unknown"], rate_invalid, seed + 4)
-    df = inject_invalid_values(df, "risk_rating", ["Severe", "Unrated", "TBC"], rate_invalid, seed + 5)
-    df = inject_invalid_values(df, "outcome", ["Pending review", "Escalated externally"], rate_invalid, seed + 6)
-    df = inject_dangling_foreign_key(df, "cp_client_id", seed + 7, rate_dangling,
-                                      "CPS-{:09d}", clients_df["cp_client_id"], id_max=1_000_000_000)
-    df = inject_dangling_foreign_key(df, "assigned_worker_id", seed + 8, rate_dangling,
-                                      "CPS-STAFF-{:05d}", workers_df["worker_id"], id_max=100_000)
-    return df
-
-
-def apply_cp_placements_presets(placements_df: pd.DataFrame, carers_df: pd.DataFrame, clients_df: pd.DataFrame,
-                                 severity: str, seed: int) -> pd.DataFrame:
-    """Reassigns a fraction of placements to a non-Approved carer - a real
-    compliance lapse the placement/carer approval business rule
-    (contract/child-protection-contract.yaml, dbt_project/tests/
-    placement_carer_approval.sql) is built to catch. child_protection.py
-    only ever assigns Approved carers by construction, so every violation
-    on a run this preset touches is this preset's doing, not baseline
-    noise - unlike the pre-fix generator, where the rule always failed.
-    Reuses inject_invalid_values: a non-approved carer_id is still a
-    structurally valid FK (a real cp_carers row), just one the business
-    rule says shouldn't be used - the same "replace with values from a
-    pool" mechanism, a different kind of pool.
-
-    plans/qa-pipeline.md #27 pass (2026-09-15): adds not_null on cp_
-    client_id/placement_start/placement_suburb (previously never nulled),
-    a duplicate-value injector for placement_id (the PK - never touched
-    before), invalid-value injection on placement_type (a real check,
-    never exercised), and genuine dangling-FK injection on this table's
-    2 real FKs (cp_client_id/carer_id) - see apply_cp_notifications_
-    presets' own docstring for why this is different from the non-
-    Approved-carer reassignment above (still a real cp_carers row, just
-    a non-compliant one) and why `clients_df` needs to be the caller's
-    real, undirtied cp_clients table."""
-    rate = 0.02 if severity == "amber" else 0.08
-    rate_null = 0.009 if severity == "amber" else 0.04  # ~2 amber / ~10 red at n~242 - Soda missing_count warn>0/fail>5
-    rate_dup = 0.008 if severity == "amber" else 0.025  # ~2 amber / ~6 red - Soda duplicate_count warn>0/fail>3
-    rate_invalid = 0.01 if severity == "amber" else 0.07  # ~2 amber / ~17 red - Soda warn>0%/fail>3%, dbt error_if>10
-    rate_dangling = 0.008 if severity == "amber" else 0.025  # ~2 amber / ~6 red direct - real count can run higher (see apply_cp_notifications_presets' rate_dangling comment); doesn't affect pass/fail, these checks are single-tier
-
-    non_approved = carers_df.loc[carers_df["approval_status"] != "Approved", "carer_id"].values
-    out = inject_invalid_values(placements_df, "carer_id", list(non_approved), rate, seed)
-    out = inject_nulls(out, "cp_client_id", rate_null, seed + 1)
-    out = inject_nulls(out, "placement_start", rate_null, seed + 2)
-    out = inject_nulls(out, "placement_suburb", rate_null, seed + 3)
-    out = inject_duplicate_values(out, "placement_id", rate_dup, seed + 4)
-    out = inject_invalid_values(out, "placement_type", ["Group home", "Independent living", "Unplaced"], rate_invalid, seed + 5)
-    out = inject_dangling_foreign_key(out, "cp_client_id", seed + 6, rate_dangling,
-                                       "CPS-{:09d}", clients_df["cp_client_id"], id_max=1_000_000_000)
-    out = inject_dangling_foreign_key(out, "carer_id", seed + 7, rate_dangling,
-                                       "CARER-{:06d}", carers_df["carer_id"], id_max=1_000_000)
-    return out
-
-
 # Not a real WA postcode from generator/names_au.py's SUBURBS pool - a mix
 # of an obviously-placeholder value and out-of-range-looking numbers, for
 # cp_clients.postcode's new closed-value-set check (previously had no
@@ -591,110 +401,459 @@ def apply_cp_placements_presets(placements_df: pd.DataFrame, carers_df: pd.DataF
 _INVALID_POSTCODE_POOL = ["0000", "9999", "TBC", "XXXX", "6000X"]
 
 
-def apply_cp_clients_presets(clients_df: pd.DataFrame, severity: str, seed: int) -> pd.DataFrame:
-    """Two new checks for cp_clients, previously untested: postcode's
-    closed-value-set check, and a new out-of-range date_of_birth check
-    (Child Protection had no date-range check at all before this - see
-    contract/child-protection-soda-checks.yml and dbt_project/tests/
-    cp_client_date_of_birth_range.sql).
+# ---- the presets: every fault's size derived from its aimed bands ----------
+#
+# REQ-GEN-392 (Keith, Q5 of 2026-11-14): each preset declares, in one table,
+# the rule or rules each of its faults aims at, by check_bands' rule key
+# (generator/targeting.rule_key) - as Linkage Products' GEO_FAULT_AIMS does -
+# and generator/fault_sizing.py works each fault's size out from those rules'
+# warn and fail bands at the frame's own row count. A band edited in a check
+# file moves the fault with it; there is no literal rate left to drift.
+#
+# EXACT COUNTS (392 Q3 (ii)): each fault plants exactly its derived count of
+# faulty rows, never a per-row probability, each injector keeping its own
+# seed. Rows one fault has touched are never touched by another on the same
+# column, so each count is the count a check reads.
+#
+# THE LITERALS LEFT ARE NOT BANDS (criterion 8): the invalid-value pools
+# above, the stale-delivery coin flip (inject_stale_delivery's whole-run
+# rate) and its 15-45 day lag, extract_timestamp disorder's 1-4 hour shift,
+# the dangling-id formats and ranges, and the seed offsets. Each is named in
+# REQ-GEN-392's decisions with why.
 
-    date_of_birth's rate is calibrated as an absolute count, not a
-    percentage, against this table's actual ~527-row size - the amber
-    rate lands under the check's own warn>10 threshold (Keith's own
-    framing when this was scoped: "up to ten is tolerable"), the red rate
-    clears the fail>20 threshold by a clear margin, not just barely.
+from generator import fault_sizing  # noqa: E402
 
-    plans/qa-pipeline.md #27 pass (2026-09-15): adds every other
-    previously-never-exercised check on this table - not_null on given_
-    name/family_name/date_of_birth/suburb/case_opened_date (all single-
-    tier in dbt, count-banded warn>0/fail>5 in Soda), a duplicate-value
-    injector for cp_client_id (the PK - never touched before), and an
-    invalid-value injector for sex (already had a real check, just never
-    exercised). case_status is explicitly NOT included here despite
-    being named in item 27's own audit - it turns out to have no
-    accepted_values check anywhere (contract, Soda, or dbt), only a
-    literal-value reference inside the closed-case-investigation-hygiene
-    business rule, so there is no check here to exercise; flagged back
-    to Keith rather than silently invented."""
-    rate_postcode = 0.006 if severity == "amber" else 0.03  # warn>0%, fail>3%, same band as BDM's suburb check
-    rate_dob_range = 0.017 if severity == "amber" else 0.053  # ~9 rows amber (under warn>10), ~28 rows red (over fail>20)
-    rate_null = 0.006 if severity == "amber" else 0.023  # ~3 amber / ~12 red at n~527 - Soda missing_count warn>0/fail>5
-    rate_dup_client_id = 0.004 if severity == "amber" else 0.02  # ~2 amber / ~10 red - Soda duplicate_count warn>0/fail>3
-    rate_sex = 0.005 if severity == "amber" else 0.04  # ~3 amber (under dbt error_if>15) / ~21 red (over it and Soda's fail>2%)
+#: Birth Registrations' faults and the rules each aims at (criterion 1).
+BIRTH_REGISTRATIONS_AIMS = {
+    "truncation": ("(table).timeliness.drop",),
+    "sibling_break": ("Multiple-birth sibling match",),
+    "sex_invalid": ("sex.conformity",),
+    "facility_null": ("place_of_birth_facility.completeness",),
+    "source_id_duplicate": ("source_system_record_id.uniqueness",),
+    "given_names_junk": ("child_given_names.conformity",),
+    "timestamp_disorder": ("Supply timestamp ordering",),
+    "suburb_invalid": ("place_of_birth_suburb.conformity",),
+    "date_of_birth_out_of_range": ("Date of birth in a plausible range",),
+    "date_of_birth_null": ("date_of_birth.completeness",),
+    "date_registered_null": ("date_registered.completeness",),
+    "multiple_birth_null": ("is_multiple_birth.completeness",),
+    "extract_timestamp_null": ("extract_timestamp.completeness",),
+    "source_id_null": ("source_system_record_id.completeness",),
+    "registration_number_null": ("registration_number.completeness",),
+    "registration_number_duplicate": ("registration_number.uniqueness",),
+    "family_name_junk": ("child_family_name.conformity",),
+    "parent_1_junk": ("registering_parent_1_name.conformity",),
+    "parent_2_junk": ("registering_parent_2_name.conformity",),
+    "source_id_malformed": ("source_system_record_id.conformity",),
+}
 
-    out = inject_invalid_values(clients_df, "postcode", _INVALID_POSTCODE_POOL, rate_postcode, seed)
-    out = inject_out_of_range_dates(out, "date_of_birth", _BAD_DATE_OF_BIRTH_POOL, rate_dob_range, seed + 1)
-    out = inject_nulls(out, "given_name", rate_null, seed + 2)
-    out = inject_nulls(out, "family_name", rate_null, seed + 3)
-    out = inject_nulls(out, "date_of_birth", rate_null, seed + 4)
-    out = inject_nulls(out, "suburb", rate_null, seed + 5)
-    out = inject_nulls(out, "case_opened_date", rate_null, seed + 6)
-    out = inject_duplicate_values(out, "cp_client_id", rate_dup_client_id, seed + 7)
-    out = inject_invalid_values(out, "sex", ["U", "O", "9"], rate_sex, seed + 8)
-    return out
+#: Child Protection's notifications. The duplicate submission aims at the key
+#: rule Soda and the contract count in duplicated KEYS; dbt's unique test
+#: counts the ROWS in duplicated groups, a different quantity and so a
+#: different rule (check_bands' docstring) that the same rows also move.
+CP_NOTIFICATIONS_AIMS = {
+    "duplicate_submission": ("notification_id.uniqueness",),
+    "concern_type_invalid": ("concern_type.conformity",),
+    "client_null": ("cp_client_id.completeness",),
+    "worker_null": ("assigned_worker_id.completeness",),
+    "source_type_invalid": ("source_type.conformity",),
+    "risk_rating_invalid": ("risk_rating.conformity",),
+    "outcome_invalid": ("outcome.conformity",),
+    "client_dangling": ("Client reference",),
+    "worker_dangling": ("Assigned worker reference",),
+}
+
+CP_PLACEMENTS_AIMS = {
+    "carer_not_approved": ("Carer approval compliance",),
+    "client_null": ("cp_client_id.completeness",),
+    "start_null": ("placement_start.completeness",),
+    "suburb_null": ("placement_suburb.completeness",),
+    "placement_id_duplicate": ("placement_id.uniqueness",),
+    "placement_type_invalid": ("placement_type.conformity",),
+    "client_dangling": ("Client reference",),
+    "carer_dangling": ("Carer reference",),
+}
+
+CP_CLIENTS_AIMS = {
+    "postcode_invalid": ("postcode.conformity",),
+    "date_of_birth_out_of_range": ("Date of birth in a plausible range",),
+    "given_name_null": ("given_name.completeness",),
+    "family_name_null": ("family_name.completeness",),
+    "date_of_birth_null": ("date_of_birth.completeness",),
+    "suburb_null": ("suburb.completeness",),
+    "case_opened_null": ("case_opened_date.completeness",),
+    "client_id_duplicate": ("cp_client_id.uniqueness",),
+    "sex_invalid": ("sex.conformity",),
+}
+
+CP_INVESTIGATIONS_AIMS = {
+    "closed_case_reopened": ("Closed-case hygiene",),
+    "start_null": ("start_date.completeness",),
+    "lead_worker_null": ("lead_worker_id.completeness",),
+    "investigation_id_duplicate": ("investigation_id.uniqueness",),
+    "notification_dangling": ("Notification reference",),
+    "client_dangling": ("Client reference",),
+    "lead_worker_dangling": ("Lead worker reference",),
+}
+
+CP_CARERS_AIMS = {"carer_id_duplicate": ("carer_id.uniqueness",)}
+
+CP_CASE_WORKERS_AIMS = {"worker_id_duplicate": ("worker_id.uniqueness",)}
+
+
+class _Planter:
+    """One preset's faults on one frame: each sized from its aims table and
+    planted as an exact count (REQ-GEN-392 criteria 2-7).
+
+    `protected` rows are never faulted - Birth Registrations' twins, whose
+    sibling check matches on the very columns these faults change, so a
+    fault aimed elsewhere cannot also break a pair. The sibling fault itself
+    is the one that reads them."""
+
+    def __init__(self, df: pd.DataFrame, table: str, severity: str, preset: str,
+                 aims: dict, catalogue=None, protected=None):
+        from asset_model import hierarchy
+
+        self.df = df.reset_index(drop=True)
+        self.dataset_id = hierarchy.dataset_for_table(table).dataset_id
+        self.severity, self.preset, self.aims = severity, preset, aims
+        self.cat = catalogue if catalogue is not None else fault_sizing.catalogue()
+        self.protected = set() if protected is None else set(self.df.index[protected])
+        self.touched: dict[str, set] = {}
+
+    def where(self, fault: str) -> str:
+        return f"{self.preset}, fault {fault}"
+
+    def refuse(self, fault: str, why: str) -> fault_sizing.FaultSizeError:
+        """Every refusal names the preset, the fault, the rules it aims at
+        and their bands (criterion 7; post-build-review #383)."""
+        return fault_sizing.refusal(self.cat, self.dataset_id, self.aims[fault], self.where(fault),
+                                    f"{self.severity}: {why}")
+
+    def size(self, fault: str, rows: int | None = None) -> int:
+        return fault_sizing.size(self.cat, self.dataset_id, self.aims[fault], self.severity,
+                                 len(self.df) if rows is None else rows, self.where(fault))
+
+    def to_plant(self, fault: str, already: int) -> int:
+        """How many MORE faulty rows make the derived TOTAL (post-build-review
+        #381): rows the frame already carries count towards it, as
+        targeting._set_nulls sizes a total. Refused where what is already
+        there lands somewhere other than asked - past an amber band, say -
+        since a preset only adds faults, never repairs them."""
+        want = self.size(fault)
+        n = max(0, want - already)
+        fault_sizing.lands(self.cat, self.dataset_id, self.aims[fault], self.severity,
+                           already + n, len(self.df), self.where(fault))
+        return n
+
+    def _eligible(self, column: str, also=(), mask=None) -> list:
+        out = self.df
+        ok = out[column].notna()
+        for col in also:
+            ok &= out[col].notna()
+        if mask is not None:
+            ok &= mask.reindex(out.index, fill_value=False).astype(bool)
+        skip = self.protected.union(*(self.touched.get(c, set()) for c in (column, *also)))
+        return [i for i in out.index[ok] if i not in skip]
+
+    def _choose(self, fault: str, eligible: list, n: int, seed: int):
+        rng = np.random.default_rng(seed)
+        if n > len(eligible):
+            raise self.refuse(fault, f"{n} rows are needed and only {len(eligible)} of the "
+                                     f"frame's {len(self.df)} rows are eligible - the band cannot "
+                                     f"be reached at this row count")
+        return rng, np.sort(rng.choice(np.array(eligible, dtype=object), size=n, replace=False)) \
+            if n else np.array([], dtype=object)
+
+    def _mark(self, labels, *columns) -> None:
+        for col in columns:
+            self.touched.setdefault(col, set()).update(labels)
+
+    def _dup_keys(self, column: str) -> int:
+        s = self.df[column].dropna()
+        return int(s[s.duplicated(keep=False)].nunique())
+
+    def nulls(self, fault: str, column: str, seed: int, mask=None, reserve=()) -> None:
+        """`reserve`: other columns of the chosen rows that later faults must
+        leave alone, because the aimed rule reads them too - the hygiene
+        rule joins a reopened investigation to its client (post-build-review
+        #382)."""
+        missing = self.df[column].isna()
+        if mask is not None:
+            missing &= mask.reindex(self.df.index, fill_value=False).astype(bool)
+        n = self.to_plant(fault, int(missing.sum()))
+        rng, chosen = self._choose(fault, self._eligible(column, mask=mask), n, seed)
+        if n:
+            if self.df[column].dtype.kind in "biu":
+                self.df[column] = self.df[column].astype(object)
+            self.df.loc[chosen, column] = None
+        self._mark(chosen, column, *reserve)
+
+    def values(self, fault: str, column: str, pool: list, seed: int,
+               distinct: bool = False) -> None:
+        """Values drawn from `pool` - invalid codes, junk text, an impossible
+        date, a non-approved carer; a row already holding one of them counts
+        towards the total. `distinct`: for an identifier, no value is drawn
+        twice, so the fault never also plants a duplicated key."""
+        n = self.to_plant(fault, int(self.df[column].isin(list(pool)).sum()))
+        rng, chosen = self._choose(fault, self._eligible(column), n, seed)
+        if n:
+            if not pool or (distinct and n > len(pool)):
+                raise self.refuse(fault, f"{n} rows are needed and its value pool holds "
+                                         f"{len(set(pool))} distinct values")
+            draw = rng.choice(np.array(pool, dtype=object), size=n, replace=not distinct)
+            if self.df[column].dtype.kind in "biu":
+                self.df[column] = self.df[column].astype(object)
+            self.df.loc[chosen, column] = draw
+        self._mark(chosen, column)
+
+    def duplicate_values(self, fault: str, column: str, seed: int) -> None:
+        """`n` duplicated keys exactly: `n` rows take the values of `n` other,
+        distinct rows, and both halves are left alone by later faults.
+
+        THE TARGET'S OWN ID IS OVERWRITTEN, so a row in another table that
+        referenced it now references nothing - Child Protection's clients
+        duplicate, the notifications, placements and investigations that
+        named the overwritten client go dangling in the same delivery. Kept
+        on purpose (PROVISIONAL, overnight 2026-11-16, REQ-GEN-392's
+        decisions): those are other tables' rules, and adding a donor copy
+        instead would change the row count after every other fault was
+        sized."""
+        n = self.to_plant(fault, self._dup_keys(column))
+        rng, chosen = self._choose(fault, self._eligible(column), 2 * n, seed)
+        if n:
+            order = rng.permutation(len(chosen))
+            targets, donors = chosen[order[:n]], chosen[order[n:]]
+            self.df.loc[targets, column] = self.df.loc[donors, column].to_numpy()
+        self._mark(chosen, column)
+
+    def dangling(self, fault: str, column: str, seed: int, id_format: str, existing_ids,
+                 id_max: int) -> None:
+        existing = set(existing_ids)
+        col = self.df[column]
+        n = self.to_plant(fault, int((col.notna() & ~col.isin(existing)).sum()))
+        rng, chosen = self._choose(fault, self._eligible(column), n, seed)
+        made: list = []
+        while len(made) < n:
+            candidate = id_format.format(rng.integers(0, id_max))
+            if candidate not in existing and candidate not in made:
+                made.append(candidate)
+        if n:
+            self.df.loc[chosen, column] = made
+        self._mark(chosen, column)
+
+    def timestamp_disorder(self, fault: str, seed: int) -> None:
+        """extract_timestamp moved one to four hours before its own row's
+        date_registered - and that row's date_registered then left alone, so
+        a later null cannot hide the disorder."""
+        before = (pd.to_datetime(self.df["extract_timestamp"])
+                  < pd.to_datetime(self.df["date_registered"]))
+        n = self.to_plant(fault, int(before.sum()))
+        rng, chosen = self._choose(fault, self._eligible("extract_timestamp", ("date_registered",)),
+                                   n, seed)
+        if n:
+            shift = pd.to_timedelta(rng.integers(1, 5, size=n), unit="h")
+            self.df.loc[chosen, "extract_timestamp"] = (
+                pd.to_datetime(self.df.loc[chosen, "date_registered"]) - shift).to_numpy()
+        self._mark(chosen, "extract_timestamp", "date_registered")
+
+    def duplicate_rows(self, fault: str, key: str, seed: int) -> None:
+        """`n` rows submitted twice, every column the same - `n` duplicated
+        keys exactly."""
+        n = self.to_plant(fault, self._dup_keys(key))
+        rng, chosen = self._choose(fault, self._eligible(key), n, seed)
+        if n:
+            copies = self.df.loc[chosen]
+            self.df = pd.concat([self.df, copies], ignore_index=True)
+            self._mark(range(len(self.df) - n, len(self.df)), key)
+        self._mark(chosen, key)
+
+
+def _twins(df: pd.DataFrame) -> pd.Series:
+    return df["is_multiple_birth"].fillna(False).astype(bool)
+
+
+def apply_birth_registrations_presets(df: pd.DataFrame, severity: str, seed: int,
+                                       previous_row_count: int | None = None,
+                                       catalogue=None) -> pd.DataFrame:
+    """severity: 'amber' or 'red'. Every fault in BIRTH_REGISTRATIONS_AIMS,
+    each sized from its aimed rules' bands (REQ-GEN-392): a Warn at the
+    middle of the amber band, a Fail at the lowest failing count plus the
+    band's width, a single-tier rule nothing for a Warn and FAIL_ROWS for a
+    Fail. `catalogue`: check_bands' catalogue, read once per generation by
+    the caller; read here when not given.
+
+    The ordinary amber no longer comes here (REQ-GEN-184's
+    targeting.bdm_amber builds it); a Fail supply does, and so does any
+    caller asking for amber by hand.
+
+    THE ROW COUNT CHANGES FIRST - truncation, then the broken twin pairs -
+    so every other fault is sized at the frame's own final row count.
+    Truncation is sized against `previous_row_count`, the supply before it,
+    which is what the drop check compares against; None (the very first
+    supply) skips it. Only single-birth rows are cut, and no column fault
+    touches a twin, so the sibling check reads exactly the pairs broken on
+    purpose."""
+    planter = _Planter(df, "birth_registrations", severity, "apply_birth_registrations_presets",
+                       BIRTH_REGISTRATIONS_AIMS, catalogue, protected=_twins(df).to_numpy())
+    p = planter
+    if previous_row_count:
+        cut = p.size("truncation", rows=previous_row_count)
+        need = len(p.df) - (previous_row_count - cut)
+        if need > 0:
+            _rng, drop = p._choose("truncation", [i for i in p.df.index if i not in p.protected],
+                                   need, seed + 6)
+            p.df = p.df.drop(index=drop)
+        fault_sizing.lands(p.cat, p.dataset_id, BIRTH_REGISTRATIONS_AIMS["truncation"], severity,
+                           previous_row_count - len(p.df), previous_row_count,
+                           p.where("truncation"))
+    # Twin pairs broken: one row of each dropped, its sibling left orphaned.
+    twins = p.df[_twins(p.df)]
+    groups = twins.groupby(["date_of_birth", "place_of_birth_facility",
+                            "registering_parent_1_name"], dropna=False).groups
+    pairs = [idx for idx in groups.values() if len(idx) >= 2]
+    n_break = p.to_plant("sibling_break", sum(1 for idx in groups.values() if len(idx) == 1))
+    if n_break > len(pairs):
+        raise p.refuse("sibling_break", f"{n_break} broken twin pairs are needed and the frame "
+                                        f"holds {len(pairs)}")
+    if n_break:
+        rng = np.random.default_rng(seed + 5)
+        chosen = rng.choice(len(pairs), size=n_break, replace=False)
+        p.df = p.df.drop(index=[pairs[i][0] for i in chosen])
+    p.df = p.df.reset_index(drop=True)
+    p.protected = set(p.df.index[_twins(p.df).to_numpy()])
+
+    p.values("sex_invalid", "sex", ["U", "O", "9"], seed)
+    p.nulls("facility_null", "place_of_birth_facility", seed + 1)
+    p.duplicate_values("source_id_duplicate", "source_system_record_id", seed + 2)
+    p.values("given_names_junk", "child_given_names", _JUNK_TEXT_POOL, seed + 3)
+    p.timestamp_disorder("timestamp_disorder", seed + 4)
+    p.values("suburb_invalid", "place_of_birth_suburb", _INVALID_SUBURB_POOL, seed + 7)
+    p.values("date_of_birth_out_of_range", "date_of_birth", _BAD_DATE_OF_BIRTH_POOL, seed + 8)
+    p.nulls("date_of_birth_null", "date_of_birth", seed + 9)
+    p.nulls("date_registered_null", "date_registered", seed + 10)
+    p.nulls("multiple_birth_null", "is_multiple_birth", seed + 11)
+    p.nulls("extract_timestamp_null", "extract_timestamp", seed + 12)
+    p.nulls("source_id_null", "source_system_record_id", seed + 13)
+    p.nulls("registration_number_null", "registration_number", seed + 14)
+    p.duplicate_values("registration_number_duplicate", "registration_number", seed + 15)
+    p.values("family_name_junk", "child_family_name", _JUNK_TEXT_POOL, seed + 16)
+    p.values("parent_1_junk", "registering_parent_1_name", _JUNK_TEXT_POOL, seed + 17)
+    p.values("parent_2_junk", "registering_parent_2_name", _JUNK_TEXT_POOL, seed + 18)
+    p.values("source_id_malformed", "source_system_record_id", _MALFORMED_SRC_ID_POOL, seed + 19,
+             distinct=True)
+    return p.df
+
+
+def apply_cp_notifications_presets(df: pd.DataFrame, clients_df: pd.DataFrame, workers_df: pd.DataFrame,
+                                    severity: str, seed: int, catalogue=None) -> pd.DataFrame:
+    """Every fault in CP_NOTIFICATIONS_AIMS, sized from its bands
+    (REQ-GEN-392). The duplicate submission comes first, so every other
+    fault is sized at the frame's final row count. `clients_df`/
+    `workers_df` are the REAL (undirtied) parent tables, so a dangling id is
+    guaranteed absent from them - see child_protection.py's dirty() for why
+    it passes base_tables here."""
+    p = _Planter(df, "cp_notifications", severity, "apply_cp_notifications_presets",
+                 CP_NOTIFICATIONS_AIMS, catalogue)
+    p.duplicate_rows("duplicate_submission", "notification_id", seed + 1)
+    p.values("concern_type_invalid", "concern_type",
+             ["Unspecified", "Pending classification", "Code 9"], seed)
+    p.nulls("client_null", "cp_client_id", seed + 2)
+    p.nulls("worker_null", "assigned_worker_id", seed + 3)
+    p.values("source_type_invalid", "source_type", ["Court", "Media report", "Unknown"], seed + 4)
+    p.values("risk_rating_invalid", "risk_rating", ["Severe", "Unrated", "TBC"], seed + 5)
+    p.values("outcome_invalid", "outcome", ["Pending review", "Escalated externally"], seed + 6)
+    p.dangling("client_dangling", "cp_client_id", seed + 7, "CPS-{:09d}",
+               clients_df["cp_client_id"], id_max=1_000_000_000)
+    p.dangling("worker_dangling", "assigned_worker_id", seed + 8, "CPS-STAFF-{:05d}",
+               workers_df["worker_id"], id_max=100_000)
+    return p.df
+
+
+def apply_cp_placements_presets(placements_df: pd.DataFrame, carers_df: pd.DataFrame, clients_df: pd.DataFrame,
+                                 severity: str, seed: int, catalogue=None) -> pd.DataFrame:
+    """Every fault in CP_PLACEMENTS_AIMS, sized from its bands
+    (REQ-GEN-392). The carer-approval fault reassigns placements to a
+    non-Approved carer - still a real cp_carers row, so a business-rule
+    breach rather than a dangling reference; child_protection.py only ever
+    assigns Approved carers, so every breach is this fault's. `clients_df`
+    is the caller's real, undirtied cp_clients table."""
+    p = _Planter(placements_df, "cp_placements", severity, "apply_cp_placements_presets",
+                 CP_PLACEMENTS_AIMS, catalogue)
+    non_approved = list(carers_df.loc[carers_df["approval_status"] != "Approved", "carer_id"].values)
+    p.values("carer_not_approved", "carer_id", non_approved, seed)
+    p.nulls("client_null", "cp_client_id", seed + 1)
+    p.nulls("start_null", "placement_start", seed + 2)
+    p.nulls("suburb_null", "placement_suburb", seed + 3)
+    p.duplicate_values("placement_id_duplicate", "placement_id", seed + 4)
+    p.values("placement_type_invalid", "placement_type",
+             ["Group home", "Independent living", "Unplaced"], seed + 5)
+    p.dangling("client_dangling", "cp_client_id", seed + 6, "CPS-{:09d}",
+               clients_df["cp_client_id"], id_max=1_000_000_000)
+    p.dangling("carer_dangling", "carer_id", seed + 7, "CARER-{:06d}", carers_df["carer_id"],
+               id_max=1_000_000)
+    return p.df
+
+
+def apply_cp_clients_presets(clients_df: pd.DataFrame, severity: str, seed: int,
+                             catalogue=None) -> pd.DataFrame:
+    """Every fault in CP_CLIENTS_AIMS, sized from its bands (REQ-GEN-392).
+    case_status has no accepted-values check of its own in any tool, only
+    a literal inside the closed-case hygiene rule, so nothing here aims at
+    it."""
+    p = _Planter(clients_df, "cp_clients", severity, "apply_cp_clients_presets",
+                 CP_CLIENTS_AIMS, catalogue)
+    p.values("postcode_invalid", "postcode", _INVALID_POSTCODE_POOL, seed)
+    p.values("date_of_birth_out_of_range", "date_of_birth", _BAD_DATE_OF_BIRTH_POOL, seed + 1)
+    p.nulls("given_name_null", "given_name", seed + 2)
+    p.nulls("family_name_null", "family_name", seed + 3)
+    p.nulls("date_of_birth_null", "date_of_birth", seed + 4)
+    p.nulls("suburb_null", "suburb", seed + 5)
+    p.nulls("case_opened_null", "case_opened_date", seed + 6)
+    p.duplicate_values("client_id_duplicate", "cp_client_id", seed + 7)
+    p.values("sex_invalid", "sex", ["U", "O", "9"], seed + 8)
+    return p.df
 
 
 def apply_cp_investigations_presets(investigations_df: pd.DataFrame, clients_df: pd.DataFrame,
                                      notifications_df: pd.DataFrame, workers_df: pd.DataFrame,
-                                     severity: str, seed: int) -> pd.DataFrame:
-    """Reopens (nulls end_date on) a fraction of investigations belonging
-    to a Closed-case client - a real process lapse the closed-case
-    investigation hygiene business rule (contract/child-protection-
-    contract.yaml, dbt_project/tests/closed_case_investigation_hygiene.sql)
-    is built to catch. child_protection.py only ever closes a case once
-    its own investigations have concluded by construction, so every
-    violation on a run this preset touches is this preset's doing, not
-    baseline noise - unlike the pre-fix generator, where the rule always
-    failed.
-
-    plans/qa-pipeline.md #27 pass (2026-09-15): adds not_null on start_
-    date/lead_worker_id (previously never nulled), a duplicate-value
-    injector for investigation_id (the PK - never touched before), and
-    genuine dangling-FK injection on all 3 of this table's real FKs
-    (notification_id/cp_client_id/lead_worker_id) - see apply_cp_
-    notifications_presets' own docstring for why this is a different
-    failure mode from the business-rule reopening above, and why
-    `notifications_df`/`workers_df` (like `clients_df` already did) need
-    to be the caller's REAL, undirtied parent tables."""
-    rate = 0.03 if severity == "amber" else 0.10
-    rate_null = 0.012 if severity == "amber" else 0.05  # ~2 amber / ~9 red at n~181 - Soda missing_count warn>0/fail>5
-    rate_dup = 0.011 if severity == "amber" else 0.03  # ~2 amber / ~5 red - Soda duplicate_count warn>0/fail>3
-    rate_dangling = 0.011 if severity == "amber" else 0.03  # ~2 amber / ~5 red direct - real count can run higher (see apply_cp_notifications_presets' rate_dangling comment); doesn't affect pass/fail, these checks are single-tier
-
-    closed_client_ids = set(clients_df.loc[clients_df["case_status"] == "Closed", "cp_client_id"])
-    eligible = investigations_df["cp_client_id"].isin(closed_client_ids) & investigations_df["end_date"].notna()
-    out = inject_nulls_in_subset(investigations_df, "end_date", eligible, rate, seed)
-    out = inject_nulls(out, "start_date", rate_null, seed + 1)
-    out = inject_nulls(out, "lead_worker_id", rate_null, seed + 2)
-    out = inject_duplicate_values(out, "investigation_id", rate_dup, seed + 3)
-    out = inject_dangling_foreign_key(out, "notification_id", seed + 4, rate_dangling,
-                                       "NOTIF-{:08d}", notifications_df["notification_id"], id_max=100_000_000)
-    out = inject_dangling_foreign_key(out, "cp_client_id", seed + 5, rate_dangling,
-                                       "CPS-{:09d}", clients_df["cp_client_id"], id_max=1_000_000_000)
-    out = inject_dangling_foreign_key(out, "lead_worker_id", seed + 6, rate_dangling,
-                                       "CPS-STAFF-{:05d}", workers_df["worker_id"], id_max=100_000)
-    return out
+                                     severity: str, seed: int, catalogue=None) -> pd.DataFrame:
+    """Every fault in CP_INVESTIGATIONS_AIMS, sized from its bands
+    (REQ-GEN-392). The hygiene fault reopens (nulls end_date on) an
+    investigation belonging to a Closed-case client - child_protection.py
+    only closes a case once its investigations have concluded, so every
+    breach is this fault's. The parent tables are the caller's REAL,
+    undirtied ones."""
+    p = _Planter(investigations_df, "cp_investigations", severity,
+                 "apply_cp_investigations_presets", CP_INVESTIGATIONS_AIMS, catalogue)
+    closed = set(clients_df.loc[clients_df["case_status"] == "Closed", "cp_client_id"])
+    p.nulls("closed_case_reopened", "end_date", seed, mask=p.df["cp_client_id"].isin(closed),
+            reserve=("cp_client_id",))
+    p.nulls("start_null", "start_date", seed + 1)
+    p.nulls("lead_worker_null", "lead_worker_id", seed + 2)
+    p.duplicate_values("investigation_id_duplicate", "investigation_id", seed + 3)
+    p.dangling("notification_dangling", "notification_id", seed + 4, "NOTIF-{:08d}",
+               notifications_df["notification_id"], id_max=100_000_000)
+    p.dangling("client_dangling", "cp_client_id", seed + 5, "CPS-{:09d}",
+               clients_df["cp_client_id"], id_max=1_000_000_000)
+    p.dangling("lead_worker_dangling", "lead_worker_id", seed + 6, "CPS-STAFF-{:05d}",
+               workers_df["worker_id"], id_max=100_000)
+    return p.df
 
 
-def apply_cp_carers_presets(carers_df: pd.DataFrame, severity: str, seed: int) -> pd.DataFrame:
-    """New (plans/qa-pipeline.md #27, 2026-09-15): cp_carers was never
-    touched by any preset before this - child_protection.py's own
-    docstring used to describe this as deliberate ("the other two tables
-    are clean in every run"), but that was only ever true because nothing
-    had scoped closing the gap, not because there was no real check to
-    exercise (carer_id has a real unique test in both dbt and Soda). Adds
-    a duplicate-value injector for carer_id, the same shape as every
-    other PK-duplication injector in this module."""
-    rate_dup = 0.007 if severity == "amber" else 0.025  # ~2 amber / ~7 red at n~289 - Soda duplicate_count warn>0/fail>3
-    return inject_duplicate_values(carers_df, "carer_id", rate_dup, seed)
+def apply_cp_carers_presets(carers_df: pd.DataFrame, severity: str, seed: int,
+                            catalogue=None) -> pd.DataFrame:
+    """carer_id duplicated, sized from its bands (REQ-GEN-392)."""
+    p = _Planter(carers_df, "cp_carers", severity, "apply_cp_carers_presets", CP_CARERS_AIMS,
+                 catalogue)
+    p.duplicate_values("carer_id_duplicate", "carer_id", seed)
+    return p.df
 
 
-def apply_cp_case_workers_presets(workers_df: pd.DataFrame, severity: str, seed: int) -> pd.DataFrame:
-    """New (plans/qa-pipeline.md #27, 2026-09-15) - see apply_cp_carers_
-    presets' own docstring for why cp_case_workers is getting its first
-    preset here too. worker_id has a real unique test in both dbt and
-    Soda; this table is small (~60 rows), so the rates below are tuned
-    up from the usual "duplicate_count" calibration to still land a
-    believable handful of duplicates at that size."""
-    rate_dup = 0.025 if severity == "amber" else 0.08  # ~1-2 amber / ~5 red at n~60 - Soda duplicate_count warn>0/fail>3
-    return inject_duplicate_values(workers_df, "worker_id", rate_dup, seed)
+def apply_cp_case_workers_presets(workers_df: pd.DataFrame, severity: str, seed: int,
+                                  catalogue=None) -> pd.DataFrame:
+    """worker_id duplicated, sized from its bands (REQ-GEN-392)."""
+    p = _Planter(workers_df, "cp_case_workers", severity, "apply_cp_case_workers_presets",
+                 CP_CASE_WORKERS_AIMS, catalogue)
+    p.duplicate_values("worker_id_duplicate", "worker_id", seed)
+    return p.df

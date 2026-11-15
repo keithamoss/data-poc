@@ -68,10 +68,11 @@ def test_dirty_run_produces_a_real_failure_and_correct_row_counts(_dbt_bdm):
     assert failing, "a real red-severity dirty run produced no dbt failures at all"
     # row_count_total comes from a real live query against the per-run
     # warehouse (`SELECT COUNT(*) FROM stg_birth_registrations`) - the
-    # dirty fixture started at 20 rows; some injectors may add/remove a
-    # few, but it must stay in the right ballpark, not silently read the
-    # reference run's row count or zero.
-    assert all(10 <= r["row_count_total"] <= 30 for r in results)
+    # dirty fixture is generated at 300 rows (REQ-GEN-392: the preset
+    # refuses a frame too small for its exact counts) and the preset's
+    # broken twin pairs drop a few, but it must stay in the right ballpark,
+    # not silently read the reference run's 600 rows or zero.
+    assert all(280 <= r["row_count_total"] <= 320 for r in results)
 
 
 def test_audit_table_correction_overrides_run_results_failures_field(_dbt_bdm):
