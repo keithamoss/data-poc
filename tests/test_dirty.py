@@ -266,6 +266,23 @@ def test_inject_stale_delivery_pushes_every_row_past_the_freshness_window_when_t
     assert (out["date_registered"] == df["date_registered"]).all()
 
 
+def test_a_stale_delivery_keeps_every_twin_pair_matched():
+    """post-build-review #380 (found building REQ-GEN-392): each row's
+    date_of_birth was pushed back by its OWN random lag, so twins - matched
+    on date_of_birth, facility and parent 1 - came apart, and every stale
+    supply also failed the three multiple-birth sibling checks, which it is
+    not aimed at. A replayed feed replays a birth event whole: one lag per
+    pair."""
+    df = _clean_bdm_df()
+    out = dirty.inject_stale_delivery(df, seed=1, rate=1.0)
+    twins = out[out["is_multiple_birth"]]
+    sizes = twins.groupby(["date_of_birth", "place_of_birth_facility",
+                           "registering_parent_1_name"], dropna=False).size()
+    assert len(sizes) == 100 and (sizes == 2).all()
+    lag_days = (pd.to_datetime(out["date_registered"]) - pd.to_datetime(out["date_of_birth"])).dt.days
+    assert (lag_days >= 15).all() and (lag_days <= 45).all()
+
+
 def test_inject_stale_delivery_is_a_noop_when_the_coin_flip_misses():
     # rate=0.0 guarantees the flip never triggers (rng.random() is
     # always >= 0.0) - the whole point of this being a single per-run

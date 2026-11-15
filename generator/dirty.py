@@ -205,6 +205,18 @@ def inject_stale_delivery(df: pd.DataFrame, seed: int, rate: float = 0.05) -> pd
         return df.copy()
     out = df.copy()
     lag_days = rng.integers(15, 46, size=len(out))
+    if "is_multiple_birth" in out.columns:
+        # ONE LAG PER BIRTH EVENT (post-build-review #380): twins are matched
+        # on date_of_birth, facility and parent 1, and a replayed feed
+        # replays the event whole - a lag per row split every pair, so every
+        # stale supply also failed the sibling checks. Each twin takes the
+        # lag of its pair's first row; every other row's draw is unchanged.
+        twin = out["is_multiple_birth"].fillna(False).astype(bool).to_numpy()
+        key = out.groupby(["date_of_birth", "place_of_birth_facility",
+                           "registering_parent_1_name"], dropna=False, sort=False).ngroup().to_numpy()
+        first: dict[int, int] = {}
+        for i in np.where(twin)[0]:
+            lag_days[i] = lag_days[first.setdefault(key[i], i)]
     out["date_of_birth"] = [d - timedelta(days=int(n)) for d, n in zip(out["date_registered"], lag_days)]
     return out
 

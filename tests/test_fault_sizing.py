@@ -355,5 +355,58 @@ def test_population_keeps_its_own_literal_rates_and_reads_no_bands(monkeypatch):
     assert len(notes) > 900
 
 
+@pytest.mark.asset("daily")
+class TestTheRealToolsReadTheSizesAsAimed:
+    """The derived sizes on a real generated batch, through the trial path
+    `mothman bdm qa --trial` uses, recording nothing: every rule a Fail
+    preset aims at fails in at least one tool, and a Warn preset fails
+    nothing."""
+
+    @staticmethod
+    def _trial(tmp_path, df, ref):
+        from cli.collection_cli import of as _cli_of
+
+        ref_csv, csv = tmp_path / "ref.csv", tmp_path / "supply.csv"
+        ref.to_csv(ref_csv, index=False)
+        df.to_csv(csv, index=False)
+        return _cli_of("bdm").run_check_local_file(str(csv), str(ref_csv), "trial:not-recorded",
+                                                   keep=False)[0]
+
+    @staticmethod
+    def _batches():
+        from datetime import date
+
+        from generator.daily_batch import generate_daily_batch
+
+        ref = generate_daily_batch(date(2026, 9, 19), seed=1233, n_rows=1900, id_offset=0)
+        today = generate_daily_batch(date(2026, 9, 20), seed=1234, n_rows=1900,
+                                     id_offset=100_000)
+        return ref, today
+
+    def test_every_aimed_rule_of_a_fail_preset_fails(self, tmp_path):
+        from asset_model import check_bands
+        from generator.targeting import rule_key
+
+        ref, today = self._batches()
+        red = dirty.apply_birth_registrations_presets(today, "red", seed=7,
+                                                      previous_row_count=len(ref))
+        results = self._trial(tmp_path, red, ref)
+        failed = {r["check_id"] for r in results if r["status"] == "fail"}
+        rules = {rule_key(r): r for r in check_bands.catalogue().rules()
+                 if r.dataset_id == "birth-registrations"}
+        missed = [k for keys in dirty.BIRTH_REGISTRATIONS_AIMS.values() for k in keys
+                  if not {c.check_id for c in rules[k].checks} & failed]
+        assert not missed, f"aimed at Fail and no tool failed: {missed}"
+
+    def test_a_warn_preset_fails_nothing(self, tmp_path):
+        ref, today = self._batches()
+        amber = dirty.apply_birth_registrations_presets(today, "amber", seed=7,
+                                                        previous_row_count=len(ref))
+        results = self._trial(tmp_path, amber, ref)
+        failing = sorted(r["check_id"] for r in results if r["status"] == "fail")
+        assert not failing
+        assert any(r["status"] == "warn" for r in results)
+
+
 #: The data asset this module acts for unless a class says otherwise (C11).
 pytestmark = pytest.mark.asset("quarterly")
