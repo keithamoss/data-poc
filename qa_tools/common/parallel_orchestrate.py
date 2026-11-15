@@ -146,8 +146,10 @@ def side_by_side(background, foreground, *, concurrent: bool | None = None,
     datacontract-cli in its worker - each lane's thread only waits on its
     worker - and Soda Core then Evidently in the foreground.
 
-    WHEN MORE THAN ONE LANE FAILS, the failure `rank(exc)` puts first is
-    raised - the caller's tool order - and lane order where none is given,
+    A STOP - KeyboardInterrupt, SystemExit, anything not an Exception - from
+    any lane is raised before any ranking, so an interrupted run is recorded
+    as interrupted (post-build-review #370). OTHERWISE, WHEN MORE THAN ONE
+    LANE FAILS, the failure `rank(exc)` puts first is raised - the caller's tool order - and lane order where none is given,
     so a report never depends on which lane finished first (criterion 5).
     NOTHING IS LEFT RUNNING BEHIND AN EXCEPTION: every lane is waited for
     before anything is raised. Not concurrent: each lane in turn, the
@@ -173,6 +175,12 @@ def side_by_side(background, foreground, *, concurrent: bool | None = None,
                 outcomes[index] = future.result()
             except BaseException as exc:  # noqa: BLE001 - ranked and re-raised below
                 failed.append((index, exc))
+    # A STOP OUTRANKS EVERY TOOL'S FAILURE (post-build-review #370): Ctrl-C or
+    # an exit is not a tool crashing, and a lane that failed because of it must
+    # not be what the attempt records.
+    stops = [f for f in failed if not isinstance(f[1], Exception)]
+    if stops:
+        raise min(stops, key=lambda f: f[0])[1]
     if failed:
         first = min(failed, key=lambda f: (rank(f[1]) if rank is not None else f[0], f[0]))[1]
         raise first

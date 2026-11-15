@@ -80,3 +80,29 @@ def test_the_orchestrator_runs_dbt_beside_the_rest(module):
 #: The data asset this module's tests act for, unless a test says otherwise
 #: (C11, Keith 2026-11-02: every test module names its asset).
 pytestmark = pytest.mark.asset("quarterly")
+
+
+def test_a_keyboard_interrupt_outranks_a_lane_that_failed_by_tool():
+    """post-build-review #370: Ctrl-C kills the workers too, so a lane fails
+    with a tool's error ranked first; the stop itself must win, or the
+    attempt is recorded as a tool's crash rather than INTERRUPTED."""
+    def lane():
+        raise RuntimeError("datacontract-cli worker stopped mid-run")
+
+    def foreground():
+        time.sleep(0.05)
+        raise KeyboardInterrupt
+
+    with pytest.raises(KeyboardInterrupt):
+        po.side_by_side([lane], foreground, concurrent=True, rank=lambda exc: 0)
+
+
+def test_a_system_exit_in_a_lane_outranks_an_ordinary_failure():
+    def lane():
+        raise SystemExit(3)
+
+    def foreground():
+        raise ValueError("soda failed")
+
+    with pytest.raises(SystemExit):
+        po.side_by_side([lane], foreground, concurrent=True, rank=lambda exc: 0)

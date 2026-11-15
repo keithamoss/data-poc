@@ -251,6 +251,8 @@ def _run_one_inner(collection_id: str, entry: dict, run_id: str, run_timestamp: 
             got = _soda()
             return got, _evidently()
 
+        # ANNOUNCED AS ITS LANE STARTS, so a progress count can run ahead of
+        # what has finished while the lanes overlap (cli/common.py's on_step).
         _announce(on_step, RUN_STEPS[2])
         from_dbt, from_datacontract, (from_soda, from_evidently) = \
             parallel_orchestrate.side_by_side([_dbt, _datacontract], _foreground,

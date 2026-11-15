@@ -150,7 +150,11 @@ def _serve(conn, root: str) -> None:
                 contract_path, schema, **options)))
         except Exception as exc:  # noqa: BLE001 - handed back and raised there
             try:
-                pickle.dumps(exc)
+                # ROUND-TRIPPED HERE: an exception with a constructor of its own
+                # pickles but cannot be rebuilt (post-build-review #372), and
+                # would surface on the other side as a TypeError about the
+                # constructor rather than as itself.
+                pickle.loads(pickle.dumps(exc))
             except Exception:  # noqa: BLE001 - an exception that cannot travel
                 exc = RuntimeError(f"{type(exc).__name__}: {exc}")
             reply = (False, exc)

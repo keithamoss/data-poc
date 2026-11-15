@@ -50,12 +50,24 @@ def spawn(module: str, argv: list[str], label: str, *, cwd: str):
     key = secrets.token_bytes(32)
     with Listener(("127.0.0.1", 0), authkey=key) as listener:
         host, port = listener.address
-        proc = subprocess.Popen([sys.executable, "-m", module, host, str(port), *argv],
-                                cwd=cwd, stdin=subprocess.PIPE,
-                                env={**os.environ, KEY_ENV: key.hex()})
+        try:
+            # ITS OWN SESSION, so Ctrl-C at the terminal reaches only the run's
+            # process, which stops its workers itself (atexit, or the caller's
+            # stop) - never a worker dying under a run that is being
+            # interrupted and being recorded as a tool's crash
+            # (post-build-review #370).
+            proc = subprocess.Popen([sys.executable, "-m", module, host, str(port), *argv],
+                                    cwd=cwd, stdin=subprocess.PIPE, start_new_session=True,
+                                    env={**os.environ, KEY_ENV: key.hex()})
+        except OSError as exc:
+            # A FORK OR EXEC THAT FAILS is a worker that did not start
+            # (post-build-review #371).
+            raise WorkerDidNotStart(
+                f"the {label} worker did not start ({type(exc).__name__}: {exc})") from exc
         # NEVER WAIT FOREVER for a worker that failed to start: the accept is
-        # bounded where the platform's listener allows it, and a worker that
-        # exited instead of connecting is reported rather than waited on.
+        # bounded by START_TIMEOUT_S where the platform's listener allows it,
+        # so a worker that exits or hangs instead of connecting is reported
+        # once that time is up.
         sock = getattr(getattr(listener, "_listener", None), "_socket", None)
         if sock is not None:
             sock.settimeout(START_TIMEOUT_S)

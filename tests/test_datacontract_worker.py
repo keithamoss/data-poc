@@ -322,3 +322,118 @@ def test_sequential_help_names_datacontract_cli_too(command):
 
     [option] = [p for p in pipeline_group.commands[command].params if p.name == "sequential"]
     assert "datacontract-cli" in option.help and "one after another" in option.help
+    assert "dbt stays in its own worker" in option.help
+
+
+class TestCriticFindings:
+    """post-build-review #370-#372."""
+
+    def test_the_workers_are_out_of_the_terminals_process_group(self, staged, recorded):
+        """#370: Ctrl-C reaches only the run's process, which stops its
+        workers itself."""
+        run_datacontract.evaluate("child-protection", CP_REF_RUN_ID, "2026-01-01T09:00:00Z")
+        proc = datacontract_worker._WORKER.state[0]
+        assert os.getsid(proc.pid) != os.getsid(0)
+        datacontract_worker.stop()
+        assert proc.poll() is not None, "stop() did not reap the worker"
+
+    @pytest.mark.parametrize("error", [BlockingIOError(11, "Resource temporarily unavailable"),
+                                       OSError(12, "Cannot allocate memory")])
+    def test_a_worker_that_cannot_be_launched_did_not_start(self, staged, monkeypatch, error):
+        """#371: a fork or exec failure gets criterion 6's wording."""
+        def no_fork(*a, **k):
+            raise error
+
+        monkeypatch.setattr(tool_worker.subprocess, "Popen", no_fork)
+        with pytest.raises(datacontract_worker.DatacontractWorkerFailed) as caught:
+            run_datacontract.evaluate("child-protection", CP_REF_RUN_ID, "2026-01-01T09:00:00Z")
+        assert "did not start" in str(caught.value) and "fail the same way" in str(caught.value)
+
+    def test_an_error_that_cannot_be_rebuilt_here_travels_as_its_text(self, monkeypatch):
+        """#372: an exception with a custom constructor pickles but does not
+        unpickle; it must arrive as its type and message, not a TypeError."""
+        import pickle
+
+        from asset_model import assets
+
+        sent = []
+
+        class Conn:
+            def __init__(self):
+                self.inbox = [(dict(os.environ), assets.handoff(), "c.yaml", "s", {}), None]
+
+            def recv(self):
+                return self.inbox.pop(0)
+
+            def send(self, reply):
+                sent.append(pickle.loads(pickle.dumps(reply)))
+
+        def fussy(*a, **k):
+            raise _Fussy("bad", 7)
+
+        monkeypatch.setattr(datacontract_common, "run_against_warehouse", fussy)
+        here = os.getcwd()
+        try:
+            datacontract_worker._serve(Conn(), here)
+        finally:
+            os.chdir(here)
+        [(ok, exc)] = sent
+        assert not ok and type(exc) is RuntimeError
+        assert "_Fussy" in str(exc) and "bad" in str(exc)
+
+
+class _Fussy(Exception):
+    """Like datacontract's DataContractException: a keyword-only constructor."""
+
+    def __init__(self, reason, code, *, extra=None):
+        super().__init__(reason)
+        self.code = code
+
+
+@pytest.mark.asset("daily")
+def test_a_killed_worker_fails_only_its_step_through_the_three_lanes(lanes, monkeypatch):
+    """REQ-PIPE-431 criterion 9 through the lanes: the datacontract lane
+    fails as datacontract-cli, and the other three tools all finish."""
+    from asset_model import assets
+    from qa_tools.tools import orchestrate
+
+    monkeypatch.setattr(parallel_orchestrate, "TOOLS_CONCURRENTLY", True)
+
+    class DeadProc:
+        pid = -1
+
+        def poll(self):
+            return None
+
+        def wait(self, timeout=None):
+            return 0
+
+        def kill(self):
+            pass
+
+    class DeadConn:
+        def send(self, message):
+            pass
+
+        def recv(self):
+            raise EOFError
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr(datacontract_worker._WORKER, "state", (DeadProc(), DeadConn()))
+    monkeypatch.setattr(datacontract_worker._WORKER, "_key",
+                        (assets.handoff(), supply_db.supply_db_dsn()))
+
+    def datacontract_through_the_worker(*a, **k):
+        lanes["finished"].append("datacontract")
+        datacontract_worker.run_against_warehouse("contract.yaml", "schema")
+
+    monkeypatch.setattr(orchestrate.run_datacontract, "evaluate", datacontract_through_the_worker)
+    with pytest.raises(orchestrate.QaRunFailure) as caught:
+        lanes["run"]()
+    said = str(caught.value)
+    assert ": datacontract-cli failed - DatacontractWorkerFailed" in said
+    assert "stopped mid-run" in said
+    assert {"dbt", "soda", "evidently"} <= set(lanes["finished"])
+    assert datacontract_worker._WORKER.state is None

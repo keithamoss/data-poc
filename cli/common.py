@@ -575,9 +575,12 @@ def chain_progress(label: str):
             counter = StepCounter(RUN_STEPS)
 
             def on_step(step_label: str) -> None:
-                # Called BEFORE each step starts, so the count is what is
-                # genuinely finished - never report work that hasn't
-                # happened yet just to make the bar move sooner.
+                # Called BEFORE each step starts, so the count is the steps
+                # STARTED before this one. Run one after another that is what
+                # is finished; with a run's tools in three lanes at once
+                # (REQ-PIPE-431) dbt and datacontract-cli are announced as
+                # their lanes start, so the bar can run ahead of what has
+                # finished until the run's last step.
                 done, arrival = counter.step(step_label)
                 which = f" (arrival {arrival})" if arrival > 1 else ""
                 progress.update(task, completed=done,
