@@ -20,12 +20,9 @@
     // own database, supply_<asset>, on this server (REQ-PIPE-343).
     // NO MOTHMAN_SUPPLY_DSN either (Keith, 2026-11-15): each command opens
     // its asset's own supply_<asset>, found from MOTHMAN_ASSET, on the
-    // server PostgreSQL's own settings below name - which name no database.
-    // docker-compose.yml's init script creates each one.
-    "PGHOST": "db",
-    "PGPORT": "5432",
-    "PGUSER": "user",
-    "PGPASSWORD": "password",
+    // server MOTHMAN_PG names - a URL naming no database, CI's name for the
+    // same. docker-compose.yml's init script creates each one.
+    "MOTHMAN_PG": "postgresql://user:password@db:5432",
     // The pre-installed Chromium, same as this project's cloud sessions
     // use - the pinned playwright package expects a newer build than
     // the image ships, so it is pointed at the one that is there.

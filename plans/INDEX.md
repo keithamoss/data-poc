@@ -1105,8 +1105,8 @@ one when this line suggests it matters.
   - *touches:* `generator/validate_providers.py`, `tests/test_generator_providers.py`
 - **#333** `done` 2026-11-15 - The on-demand small-adapter test had not run since the asset split. tests/test_a_collection_is_a_small_adapter.py...
   - *touches:* `tests/test_a_collection_is_a_small_adapter.py`, `tests/fake_collection.py`
-- **#334** `done` 2026-11-15 - No MOTHMAN_SUPPLY_DSN default, and the dev container makes each asset's database. #331's two open items, on Keith's two...
-  - *touches:* `tests/test_supply_db.py`, `tests/test_devcontainer.py`, `tests/test_db_identity.py`, `tests/thirty_linked_datasets.py`
+- **#334** `done` 2026-11-15 - No MOTHMAN_SUPPLY_DSN default, and the dev container makes each asset's database. #331's two open items, on Keith's...
+  - *touches:* `tests/conftest.py`, `tests/test_deployment_dsn.py`, `tests/test_dotenv_example.py`, `tests/thirty_linked_datasets.py`
 
 ## plans/road-testing.md
 

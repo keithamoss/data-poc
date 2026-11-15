@@ -31,6 +31,9 @@ echo "Setting up this checkout..."
 # Hit three times in one session on 2026-09-27 before this existed.
 PGUSER_NAME="user"
 PGPASS="password"
+# THE SERVER, naming no database (Keith, 2026-11-15): every command opens
+# its asset's own supply_<asset> here, found from MOTHMAN_ASSET.
+SERVER="postgresql://${PGUSER_NAME}:${PGPASS}@localhost:5432"
 if command -v pg_isready >/dev/null 2>&1; then
   if ! pg_isready -q 2>/dev/null; then
     sudo -n pg_ctlcluster 16 main start >/dev/null 2>&1 && say "Started the PostgreSQL cluster."
@@ -56,11 +59,8 @@ if [ -n "${CLAUDE_ENV_FILE:-}" ]; then
   {
     # NO MOTHMAN_SUPPLY_DSN (Keith, 2026-11-15): each command opens its
     # asset's own supply_<asset>, found from MOTHMAN_ASSET, on the server
-    # PostgreSQL's own settings name - these, which name no database.
-    echo 'export PGHOST="localhost"'
-    echo 'export PGPORT="5432"'
-    echo "export PGUSER=\"${PGUSER_NAME}\""
-    echo "export PGPASSWORD=\"${PGPASS}\""
+    # MOTHMAN_PG names - a URL naming no database. CI's name for the same.
+    echo "export MOTHMAN_PG=\"${SERVER}\""
     echo "export MOTHMAN_TEST_DSN=\"postgresql://${PGUSER_NAME}:${PGPASS}@localhost:5432/postgres\""
     # WHICH DEPLOYMENT THIS IS. Declared in contract/environments.yaml;
     # a session container is 'sandbox'. Set here rather than defaulted
@@ -137,8 +137,7 @@ if [ "${PG_UP:-}" = "1" ]; then
     fi
     # Found from MOTHMAN_ASSET, as every command finds it - no DSN.
     if env -u MOTHMAN_SUPPLY_DSN MOTHMAN_ENVIRONMENT=sandbox MOTHMAN_ASSET="$asset" \
-       PGHOST=localhost PGPORT=5432 PGUSER="${PGUSER_NAME}" PGPASSWORD="${PGPASS}" \
-       uv run mothman env mark --confirm "${asset}/sandbox" >/dev/null 2>&1; then
+       MOTHMAN_PG="${SERVER}" uv run mothman env mark --confirm "${asset}/sandbox" >/dev/null 2>&1; then
       say "supply_${asset} is marked as this sandbox's."
     else
       say "WARNING: could not mark supply_${asset} as 'sandbox' - run"

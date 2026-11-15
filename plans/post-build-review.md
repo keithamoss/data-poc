@@ -14850,43 +14850,69 @@ twice. It deliberately did not re-find the `TypeError`.
        18.5s, qa 8.2s).
 
 334. **[done, 2026-11-15]** **[Testing & dev tooling]** **[Pipeline & publishing]** **No MOTHMAN_SUPPLY_DSN default, and the dev container makes each asset's database.**
-     #331's two open items, on Keith's two answers of 2026-11-15
+     #331's two open items, on Keith's answers of 2026-11-15
      (docs/drafts/decisions-2026-11-01.md, "Split T1's questions"): a compose
-     init script, and export nothing.
-     - **What changed**: with `MOTHMAN_SUPPLY_DSN` unset,
-       `supply_db.supply_db_dsn()` names the selected asset's own database,
-       `supply_<data_asset_id>`, and nothing else - the server comes from
-       PostgreSQL's own client settings (PGHOST, PGPORT, PGUSER, PGPASSWORD,
-       ~/.pgpass), and `connection_fields()` fills what the string leaves out
-       from the live connection, so dbt, Soda Core and datacontract-cli get
-       whole details. Set, the variable still wins (tests, CI, a deployment).
-       Neither set refuses, naming both variables. The session hook writes
-       PGHOST/PGPORT/PGUSER/PGPASSWORD and no `MOTHMAN_SUPPLY_DSN`, marks each
-       asset's database through the same lookup, and no longer creates the
-       `supply` database no asset owns; devcontainer.json the same with
-       PGHOST=db; docker-compose drops POSTGRES_DB, mounts `../assets`
-       read-only and runs `.devcontainer/create-asset-databases.sh`, which
-       creates `supply_<data_asset_id>` per asset folder holding a
-       data-asset.yaml; post-create.sh marks each without a DSN; README's
-       setup block the same.
-     - **PROVISIONAL, for Keith**: where the SERVER comes from was not part of
-       his answer. PostgreSQL's own PG* variables were chosen over a new
-       project variable (CI's `MOTHMAN_PG` is that shape) because they name no
-       database and every PostgreSQL client already reads them. And the
-       lookup relies on the name `supply_<data_asset_id>` in shipped code,
-       which REQ-PIPE-343 criterion 7 says nothing shipped may do - his answer
-       changes that, so the criterion needs his rewording.
+     init script, and export nothing - and then, once the first build (9278abf4)
+     had taken libpq's PG* variables for the server PROVISIONALLY, **Keith's
+     decision: the server is a project variable, MOTHMAN_PG** (CI's existing
+     name, a postgresql:// URL with no database), REJECTING PG* and reverting to
+     refuse-when-unset. REQ-PIPE-343 c7's rewording approved the same day.
+     - **What stands**: with `MOTHMAN_SUPPLY_DSN` unset,
+       `supply_db.supply_db_dsn()` returns `<MOTHMAN_PG>/supply_<data_asset_id>`
+       (`on_server()`, which keeps the server's options and refuses a
+       MOTHMAN_PG that is no postgresql:// URL or names a database, never
+       echoing it). With neither set it refuses naming both. A set DSN still
+       wins. `connection_fields()` is back to exactly what it was: the URL is
+       complete, so 9278abf4's filling from the live connection (a behaviour
+       change for every DSN, the critic's L1) is gone. The session hook and
+       devcontainer.json export MOTHMAN_PG and no DSN; the hook marks each
+       asset's database by the same lookup and no longer creates `supply`;
+       docker-compose drops POSTGRES_DB, mounts `../assets` read-only and runs
+       `.devcontainer/create-asset-databases.sh`; post-create.sh, README and
+       `.env.example` the same. CI's workflows still hand each step
+       `${MOTHMAN_PG}/supply_${asset}` - left, since they work and nothing
+       here could run them.
+     - **The critic on 9278abf4, and what was done:**
+       - **H1 (defect)**: `tests/conftest.py` recorded the deployment database
+         only from MOTHMAN_SUPPLY_DSN, so in a session the new hook started
+         every deployment test SKIPPED. Reproduced (`-m needs_deployment`, DSN
+         unset, MOTHMAN_PG set: 2 skipped, "no deployment database
+         configured"); `tests/test_deployment_dsn.py` failed first; fixed -
+         `deployment_dsn_for()` falls back to supply_<asset> on MOTHMAN_PG's
+         server where it exists, and the suite takes MOTHMAN_PG out of its own
+         environment for the session, so a test or child that loses its DSN
+         reaches nothing by the lookup.
+       - **M2 (test gap, and a defect behind it)**: a DSN-less connection
+         under `test` is refused by a supply_<x> marked `sandbox` - now tested,
+         on a private `supply_fu_scratch_<worker>`. Behind it,
+         `checkpoints.save()` copied and pruned through its own admin
+         connection with no identity check, so a lost DSN could have copied -
+         and pruned the checkpoints of - another environment's database. Test
+         failed first (did not raise); fixed by a checked read-only connect to
+         the source before the copy.
+       - **L1**: the live-connection fill is removed (above).
+       - **L2**: the connection test asserts the password, and host 127.0.0.1
+         (not the default localhost); a second, stubbed test asserts host
+         db.example, port 6543 and the password reach the tools.
+       - **L3**: the no-DSN refusal named the asset, not the server; it names
+         MOTHMAN_SUPPLY_DSN and MOTHMAN_PG.
+       - **L4**: the init script holds each id to the asset-name pattern and
+         fails naming the folder on a bad or missing one; `--list` exits 0
+         when the last folder is no asset. Tested both ways.
+       - **L6**: `.env.example` set MOTHMAN_SUPPLY_DSN to `supply`, which a
+         copied `.env` would have loaded over the hook; now MOTHMAN_PG
+         (`tests/test_dotenv_example.py`).
+       - **L7**: with MOTHMAN_PG the resolved DSN carries the server, so
+         `scratch_dir()`, the bulk re-check cache key and
+         `correction_trial.database_label()` key on, and name, the server as
+         well as the database - two servers tested apart. No code change was
+         needed once the string was the full URL.
      - **Not run**: docker - no daemon here. The compose file and the init
-       script's asset list are tested from the files (`--list` against the
-       real assets/ and a fixture); the init script's CREATE DATABASE, the
-       healthcheck over TCP, and post-create.sh were not run. An existing
-       dev-container volume keeps its databases: the init script runs only on
-       an empty volume.
-     - **Ran**: `tests/test_supply_db.py` (4 new or changed tests failing first,
-       then 36 passed), `tests/test_devcontainer.py` and `tests/test_db_identity.py`
-       (4 new failing first, then 41 passed); by hand, a read-only connection
-       into `supply_quarterly` with the variable unset and PG* set, which
-       passed the identity check.
+       script's list are tested from the files; its CREATE DATABASE, the
+       healthcheck over TCP and post-create.sh were not run. An existing
+       dev-container volume keeps its databases: init scripts run only on an
+       empty volume.
+     - **Ran**: see the commit message for this change's runs.
 
 335. **[todo]** **[Testing & dev tooling]** **The thirty-linked-datasets fixture files its collections' words under `datasets:`.**
      A sighting while fixing #333, not fixed: `tests/thirty_linked_datasets.py`

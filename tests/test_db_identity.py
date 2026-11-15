@@ -386,21 +386,24 @@ class TestEveryPlaceMarksItsOwn:
         """Keith, 2026-11-15: the session exports no MOTHMAN_SUPPLY_DSN - a
         command finds its asset's database from MOTHMAN_ASSET - so the block
         that writes the session's environment, run on its own, writes the
-        server in PostgreSQL's own settings and no database."""
+        server as MOTHMAN_PG and no database."""
         import subprocess
 
         text = (ROOT / ".claude/hooks/session-start.sh").read_text()
         start = text.index('if [ -n "${CLAUDE_ENV_FILE:-}" ]; then')
         end = text.index("\nfi\n", start) + 4
         env_file = tmp_path / "env"
-        subprocess.run(["bash", "-c", 'PGUSER_NAME=user PGPASS=password\n' + text[start:end]],
+        head = text[text.index('PGUSER_NAME="user"'):text.index("\n", text.index('SERVER="'))]
+        subprocess.run(["bash", "-c", head + "\n" + text[start:end]],
                        env={"CLAUDE_ENV_FILE": str(env_file), "PATH": "/usr/bin:/bin"},
                        check=True)
         written = env_file.read_text()
-        assert "MOTHMAN_SUPPLY_DSN" not in written and "PGDATABASE" not in written
-        assert "/supply" not in written
-        for var in ("PGHOST", "PGUSER", "PGPASSWORD", "MOTHMAN_TEST_DSN"):
-            assert f"export {var}=" in written, (var, written)
+        assert "MOTHMAN_SUPPLY_DSN" not in written and "/supply" not in written
+        assert "export PG" not in written, "libpq's variables, rejected by Keith"
+        assert 'export MOTHMAN_PG="postgresql://user:password@localhost:5432"' in written
+        assert "export MOTHMAN_TEST_DSN=" in written
+        # And the hook's own mark goes by MOTHMAN_PG too, never a DSN.
+        assert 'MOTHMAN_PG="${SERVER}"' in text and "PGHOST=" not in text
         # Nor does the hook make a database no asset owns.
         assert "datname='supply'" not in text
 

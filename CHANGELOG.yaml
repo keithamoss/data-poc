@@ -166,8 +166,8 @@ releases:
             components: ["Testing & dev tooling", "Pipeline & publishing"]
             description: >
               With MOTHMAN_SUPPLY_DSN unset, a command opens its own asset's
-              database, supply_<asset>, on the server PostgreSQL's PGHOST and
-              PGUSER name. Sandboxes and dev containers no longer set one
+              database, supply_<asset>, on the server MOTHMAN_PG names.
+              Sandboxes and dev containers set MOTHMAN_PG rather than a DSN
               pointing at the old shared database.
           - headline: Dev container makes both databases
             components: ["Testing & dev tooling"]

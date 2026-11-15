@@ -16,19 +16,31 @@ set -eo pipefail
 
 assets_dir="${MOTHMAN_ASSETS_DIR:-/mothman-assets}"
 
+# AN ASSET'S ID IS HELD TO THE ASSET-NAME PATTERN (qa_tools/common/assets.py's
+# NAME_PATTERN) before it goes into SQL: a bad one, or an asset with none,
+# fails the whole script, naming the folder - never a database silently
+# skipped or a name quoted into something else.
 asset_databases() {
   local folder id
   for folder in "$assets_dir"/*/; do
     [ -f "${folder}data-asset.yaml" ] || continue
-    id=$(sed -n 's/^data_asset_id:[[:space:]]*\([^[:space:]#]*\).*/\1/p' "${folder}data-asset.yaml" | head -n 1)
-    [ -n "$id" ] && echo "supply_${id}"
+    id=$(sed -n 's/^data_asset_id:[[:space:]]*\([^[:space:]#]*\).*/\1/p' "${folder}data-asset.yaml" \
+      | head -n 1 | tr -d "\"'")
+    if ! printf '%s' "$id" | grep -Eqx '[a-z0-9]+(-[a-z0-9]+)*'; then
+      echo "create-asset-databases: ${folder}data-asset.yaml's data_asset_id '${id}' is" \
+        "missing or not lowercase letters, digits and single hyphens - no database made." >&2
+      return 1
+    fi
+    echo "supply_${id}"
   done
+  return 0
 }
 
+names=$(asset_databases) || exit 1
 if [ "${1:-}" = "--list" ]; then
-  asset_databases
+  [ -z "$names" ] || printf '%s\n' $names
 else
-  for db in $(asset_databases); do
+  for db in $names; do
     echo "Creating database ${db}"
     psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname postgres \
       -c "CREATE DATABASE \"${db}\" OWNER \"${POSTGRES_USER}\""

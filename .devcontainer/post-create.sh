@@ -28,7 +28,7 @@ echo "==> Marking each asset's warehouse database as this dev container's (REQ-P
 # with none. MOTHMAN_ENVIRONMENT is `local` here (devcontainer.json). ONE
 # DATABASE PER ASSET, supply_<asset> (REQ-PIPE-343 criteria 4 and 7), made by
 # docker-compose.yml's init script and found by each command from
-# MOTHMAN_ASSET on the server devcontainer.json's PGHOST names - no
+# MOTHMAN_ASSET on the server devcontainer.json's MOTHMAN_PG names - no
 # MOTHMAN_SUPPLY_DSN (Keith, 2026-11-15). Each marked for its own asset, one
 # process each, typing both ids as anyone marking a database does.
 for asset in $(cd assets && ls -d */ | tr -d /); do
