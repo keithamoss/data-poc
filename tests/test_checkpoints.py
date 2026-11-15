@@ -275,7 +275,7 @@ class TestARefusalChangesNothing:
 
     def test_deleting_a_name_that_does_not_exist_is_refused(self, scratch_source):
         with pytest.raises(checkpoints.CheckpointRefused, match="checkpoint list"):
-            checkpoints.delete("mothman_ckpt_doesnotexist", scratch_source)
+            checkpoints.delete(f"{checkpoints.PREFIX}quarterly_doesnotexist", scratch_source)
 
     def test_a_resume_database_is_listed(self, scratch_source):
         cp = checkpoints.save("child-protection", 5, recorded=_recorded(), pending_scripts=[],
@@ -296,6 +296,102 @@ class TestARefusalChangesNothing:
         asset_folders.point(tmp_path)
         with pytest.raises(checkpoints.CheckpointRefused, match="synthetic"):
             checkpoints.require_synthetic()
+
+
+
+class TestEachAssetSeesOnlyItsOwn:
+    """REQ-PIPE-365 criterion 2: checkpoints and resumes are per asset. The
+    server is shared - both assets' databases, and so both assets'
+    checkpoints, sit on one cluster - so listing, finding, deleting and
+    pruning read the SELECTED asset's only."""
+
+    @pytest.fixture
+    def as_daily(self, monkeypatch):
+        """Act for the other asset from here on - one asset per process, so
+        the claim the quarterly half made is let go first, as between tests."""
+        from qa_tools.common import assets
+
+        def switch(name="daily"):
+            supply_db.release_connections()
+            assets.release_claim()
+            monkeypatch.setenv(assets.ASSET_ENV, name)
+        yield switch
+        supply_db.release_connections()
+        assets.release_claim()
+
+    def test_a_checkpoint_is_named_for_its_asset(self, scratch_source):
+        cp = checkpoints.save("child-protection", 5, recorded=_recorded(), pending_scripts=[],
+                              dsn=scratch_source)
+        assert cp.name.startswith(f"{checkpoints.PREFIX}quarterly_"), cp.name
+
+    def test_another_assets_checkpoint_is_not_listed_found_or_deleted(
+            self, scratch_source, as_daily):
+        cp = checkpoints.save("child-protection", 5, recorded=_recorded(), pending_scripts=[],
+                              dsn=scratch_source)
+        assert cp.name in [c.name for c in checkpoints.listed(scratch_source)]
+        as_daily()
+        assert cp.name not in [c.name for c in checkpoints.listed(scratch_source)]
+        with pytest.raises(checkpoints.CheckpointRefused, match="no checkpoint called"):
+            checkpoints.find(cp.name, scratch_source)
+        with pytest.raises(checkpoints.CheckpointRefused, match="nothing was deleted"):
+            checkpoints.delete(cp.name, scratch_source)
+        as_daily("quarterly")
+        assert cp.name in [c.name for c in checkpoints.listed(scratch_source)], \
+            "the other asset's refusal removed it"
+
+    def test_another_assets_resume_is_not_listed(self, scratch_source, as_daily):
+        cp = checkpoints.save("child-protection", 5, recorded=_recorded(), pending_scripts=[],
+                              dsn=scratch_source)
+        dsn = checkpoints.copy_for_resume(cp, scratch_source)
+        name = psycopg.conninfo.conninfo_to_dict(dsn)["dbname"]
+        try:
+            assert name.startswith(f"{checkpoints.RESUME_PREFIX}quarterly_"), name
+            assert name in [r.name for r in checkpoints.resumes(scratch_source)]
+            as_daily()
+            assert name not in [r.name for r in checkpoints.resumes(scratch_source)]
+        finally:
+            as_daily("quarterly")
+            checkpoints.delete(name, scratch_source)
+
+    def test_pruning_one_asset_never_drops_the_others(self, scratch_source, as_daily,
+                                                     monkeypatch):
+        """The prune is per source database too; this is the asset half: a
+        daily checkpoint of the same source never counts against, or is
+        dropped by, quarterly's keep."""
+        import time
+
+        quarterly = checkpoints.save("child-protection", 2, recorded=_recorded(),
+                                     pending_scripts=[], dsn=scratch_source)
+        as_daily()
+        # NO DAILY COLLECTION CAN BE COPIED HERE without a daily database, so
+        # the asset's checkpoint is made by name, as save() would name it.
+        daily = f"{checkpoints.PREFIX}daily_bdm_002_{checkpoints._stamp()}"
+        source = psycopg.conninfo.conninfo_to_dict(scratch_source)["dbname"]
+        doc = checkpoints.Checkpoint(name=daily, collection_id="birth-registrations", before=2,
+                                     taken_at="2000-01-01T00:00:00+00:00", source=source,
+                                     recorded=_recorded())
+        from psycopg import sql
+
+        with checkpoints._admin(scratch_source) as admin:
+            checkpoints._copy(admin, source, daily)
+        try:
+            with checkpoints._admin(scratch_source) as admin:
+                admin.execute(sql.SQL("COMMENT ON DATABASE {} IS {}").format(
+                    sql.Identifier(daily), sql.Literal(doc.describe())))
+            as_daily("quarterly")
+            monkeypatch.setenv(checkpoints.KEEP_ENV, "1")
+            time.sleep(1.1)
+            checkpoints.save("child-protection", 3, recorded=_recorded(), pending_scripts=[],
+                             dsn=scratch_source)
+            left = [c.name for c in checkpoints.listed(scratch_source)]
+            assert quarterly.name not in left
+            with checkpoints._admin(scratch_source) as admin:
+                assert admin.execute("SELECT 1 FROM pg_database WHERE datname = %s",
+                                     [daily]).fetchone(), "quarterly's prune dropped daily's"
+        finally:
+            as_daily()
+            checkpoints.delete(daily, scratch_source)
+            as_daily("quarterly")
 
 
 #: The data asset this module's tests act for, unless a test says otherwise

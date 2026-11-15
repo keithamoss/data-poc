@@ -37,28 +37,58 @@ ROOT = Path(__file__).resolve().parent.parent.parent
 #: 2026-10-06: cli/pipeline.py and no other cli/ file - the bootstrap enters
 #: through it, and a terminal change must not cost a full bootstrap).
 #:
-#: SINCE THE ASSET SPLIT (post-build-review, 2026-11-02): every asset's folder -
-#: its configuration, adapters, providers and dbt project - and dbt_shared/,
-#: the macros and tests both assets' dbt projects read through their
-#: macro-paths and test-paths (C12), where contract/ and dbt_project/ were. ONE KEY FOR THE REPOSITORY,
-#: not one per asset: a change to either asset restarts both, which costs time
-#: and never leaves a stale verdict - this module's own rule. A key per asset
-#: is the cache-key work still to come with Keith.
+#: THE SHARED INPUTS - everything but an asset's own folder. Since the asset
+#: split: dbt_shared/, the macros and tests both assets' dbt projects read
+#: through their macro-paths and test-paths (C12), and assets/environments.yaml,
+#: the one asset-wide file both read.
+#:
+#: A KEY PER ASSET (REQ-PIPE-365 criterion 3, REQ-TEST-353 criterion 1): each
+#: asset's key is these plus ITS OWN folder (inputs() below) - its
+#: configuration, adapters, providers and dbt project - and never another
+#: asset's, so a daily-only edit rebuilds only the daily bootstrap. A shared
+#: edit still restarts both, which costs time and never leaves a stale verdict.
 INPUTS = ("generator/**", "synthetic_data_generator/**", "pipeline/**", "qa_tools/**",
-          "assets/**", "dbt_shared/**", "cli/pipeline.py", "pyproject.toml", "uv.lock",
-          ".github/workflows/test.yml")
+          "dbt_shared/**", "cli/pipeline.py", "pyproject.toml", "uv.lock",
+          ".github/workflows/test.yml", "assets/environments.yaml")
+
+#: The selected asset's own folder, the one input that differs by asset.
+ASSET_FOLDER = "assets/{asset}/**"
 
 #: What a replay compares as "every other input" (REQ-TEST-160 criterion 1):
 #: the generators are left out because their effect is compared directly, as
 #: the deliveries they produce - the shared generator and, since the asset
-#: split, each asset's own providers under assets/<asset>/synthetic/collections/.
+#: split, the asset's own providers under assets/<asset>/synthetic/collections/.
 GENERATORS = ("generator/**", "synthetic_data_generator/**")
-PROVIDERS = "assets/*/synthetic/collections/**"
-REPLAY_INPUTS = tuple(p for p in INPUTS if p not in GENERATORS) + ("!" + PROVIDERS,)
+PROVIDERS = "assets/{asset}/synthetic/collections/**"
 
 #: Bumped when what the key covers changes shape, so an old cache never
-#: matches a new meaning (v3: assets/ and dbt_shared/ since the split).
-KEY_PREFIX = "bootstrap-v3-"
+#: matches a new meaning (v3: assets/ and dbt_shared/ since the split; v4: one
+#: key per asset, the asset named in it).
+KEY_PREFIX = "bootstrap-v4-"
+
+
+def _asset(asset: str | None) -> str:
+    """`asset`, or the selected one - refused, as every reader refuses,
+    without one."""
+    if asset:
+        return asset
+    from qa_tools.common import assets
+
+    return assets.selected().name
+
+
+def inputs(asset: str | None = None) -> tuple[str, ...]:
+    """Every input that shapes `asset`'s bootstrap (default the selected
+    asset's): the shared inputs and that asset's folder, no other's."""
+    return INPUTS + (ASSET_FOLDER.format(asset=_asset(asset)),)
+
+
+def replay_patterns(asset: str | None = None) -> tuple[str, ...]:
+    """What a replay of `asset` compares: its inputs less the generators and
+    its providers (A43)."""
+    asset = _asset(asset)
+    return (tuple(p for p in inputs(asset) if p not in GENERATORS)
+            + ("!" + PROVIDERS.format(asset=asset),))
 
 
 def _pathspec(pattern: str) -> str:
@@ -70,9 +100,12 @@ def _pathspec(pattern: str) -> str:
     return pattern[:-3] + "/" if pattern.endswith("/**") else pattern
 
 
-def input_files(patterns=INPUTS) -> dict[str, str]:
+def input_files(patterns=None) -> dict[str, str]:
     """{repo-relative path: sha256 of its working-tree bytes} for every file
-    in the checkout under `patterns`, ignored files excepted."""
+    in the checkout under `patterns` (default the selected asset's inputs),
+    ignored files excepted."""
+    if patterns is None:
+        patterns = inputs()
     listed = subprocess.run(
         ["git", "ls-files", "-z", "--cached", "--others", "--exclude-standard", "--",
          *(_pathspec(p) for p in patterns)],
@@ -92,9 +125,13 @@ def _digest(files: dict[str, str]) -> str:
     return h.hexdigest()
 
 
-def cache_key() -> str:
-    """CI's bootstrap cache key (REQ-TEST-117): every input, as one digest."""
-    return KEY_PREFIX + _digest(input_files(INPUTS))
+def cache_key(asset: str | None = None) -> str:
+    """CI's bootstrap cache key for `asset`, default the selected one
+    (REQ-TEST-117; REQ-PIPE-365 criterion 3): its inputs as one digest, the
+    asset named in the key so two assets' caches can never be mistaken for
+    each other's, whatever their files."""
+    asset = _asset(asset)
+    return f"{KEY_PREFIX}{asset}-{_digest(input_files(inputs(asset)))}"
 
 
 @dataclass(frozen=True)
@@ -193,7 +230,7 @@ class Recorded:
         and every other input in the checkout."""
         return cls(collection_id=collection_id,
                    arrivals=deliveries_print(collection_id, deliveries_dir, receipts_dir),
-                   inputs=input_files(REPLAY_INPUTS))
+                   inputs=input_files(replay_patterns()))
 
 
 @dataclass(frozen=True)
@@ -220,7 +257,7 @@ def first_affected(recorded: Recorded, *, arrivals: list[ArrivalPrint] | None = 
         return FirstAffected(1, "The checkpoint's record of its inputs cannot be read, "
                                 "so nothing says where a change begins - from the first arrival")
     if inputs is None:
-        inputs = input_files(REPLAY_INPUTS)
+        inputs = input_files(replay_patterns())
     changed = sorted(p for p in set(inputs) | set(recorded.inputs)
                      if inputs.get(p) != recorded.inputs.get(p))
     if changed:

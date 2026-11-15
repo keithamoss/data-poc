@@ -410,8 +410,10 @@ def generated_gate_outcomes():
 
 @pipeline_group.command("cache-key")
 def cache_key_command() -> None:
-    """Print the key CI caches a bootstrapped database under (REQ-TEST-117):
-    one digest of every input that shapes a bootstrap. The input list is
+    """Print the key CI caches this asset's bootstrapped database under
+    (REQ-TEST-117): one digest of every input that shapes its bootstrap - the
+    shared inputs and this asset's own folder, never another asset's
+    (REQ-PIPE-365 criterion 3). The input list is
     qa_tools/common/replay_inputs.py's, which a checkpoint replay compares
     too (REQ-TEST-160) - one list, two readers. Needs no database."""
     from qa_tools.common import replay_inputs
@@ -506,14 +508,15 @@ def checkpoint_group() -> None:
 
 @checkpoint_group.command("list")
 def checkpoint_list_command() -> None:
-    """Every checkpoint on this server, oldest first, then every resume's
-    database."""
+    """This asset's checkpoints on this server, oldest first, then its
+    resumes' databases - never another asset's (REQ-PIPE-365)."""
+    from qa_tools.common import assets as _assets
     from qa_tools.common import checkpoints
 
     found = checkpoints.listed()
     if not found:
-        console.print("No checkpoints. Take one with `mothman pipeline bootstrap "
-                      "--collection cp --checkpoint-before N`.")
+        console.print(f"No checkpoints of asset {_assets.selected().name!r}. Take one with "
+                      "`mothman pipeline bootstrap --collection cp --checkpoint-before N`.")
     for cp in found:
         if not cp.collection_id:
             console.print(f"{cp.name}  (its description cannot be read - a resume from it "
