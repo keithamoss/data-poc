@@ -17,7 +17,10 @@ def github_group() -> None:
 
 @github_group.command("sync-tickets")
 def sync_tickets_command() -> None:
-    """Open/comment-and-close a real GitHub Issue per dataset, keyed off its current aggregate QA status."""
+    """Open/comment-and-close a real GitHub Issue per dataset, keyed off its current aggregate QA status.
+
+    Refused, exit 1, unless MOTHMAN_ENVIRONMENT names an environment that
+    turns ticketing on in assets/environments.yaml (REQ-GHUB-396)."""
     from qa_tools.common.ticket_sync import main as sync_main
     sync_main()
 

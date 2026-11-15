@@ -364,7 +364,34 @@ def sync_all(owner: str, repo: str, people_config: dict | None = None) -> list[s
     return [sync_dataset(owner, repo, scope, dataset, people_config) for scope, dataset in _load_scopes()]
 
 
+def refuse_unless_ticketing_on() -> None:
+    """Exit 1 unless this deployment's environment turns ticketing on
+    (REQ-GHUB-396) - the same rule ticket_reconciler.service_from_env
+    applies, so the environment list is the one switch for both ticket
+    paths (REQ-PIPE-093 criteria 10 and 12). GITHUB_REPOSITORY or a token
+    being present is never enough.
+
+    Here in the module, not only in the command, so any caller of main()
+    meets it - the disabled ticket-sync workflow calls this same module.
+    It reads committed configuration and one variable, and runs before
+    any report is read or GitHub is called, so a refused run has no
+    partial effect."""
+    from qa_tools.common import environments
+
+    env = environments.current_or_none()
+    if env is None:
+        raise SystemExit(
+            f"sync-tickets refused: {environments.ENVIRONMENT_ENV} is not set, so this "
+            f"deployment names no environment and ticketing is off. Set it to an "
+            f"environment that turns ticketing on in assets/environments.yaml.")
+    if not env.ticketing:
+        raise SystemExit(
+            f"sync-tickets refused: the {env.id!r} environment turns ticketing off in "
+            f"assets/environments.yaml, so nothing is posted to GitHub from it.")
+
+
 def main() -> None:
+    refuse_unless_ticketing_on()
     # THE ASSET'S TICKET REPOSITORY, never GITHUB_REPOSITORY (REQ-PIPE-093
     # criterion 12): that names whichever repository a workflow runs in.
     from qa_tools.common import environments
