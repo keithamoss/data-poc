@@ -14473,6 +14473,8 @@ twice. It deliberately did not re-find the `TypeError`.
      v2 (REQ-PIPE-397 to REQ-PIPE-401, REQ-GEN-398/399, REQ-PIPE-403, REQ-PIPE-430 to 432; the stat-keyed cache is REQ-PIPE-401; docs/drafts/speed-anchor-v2.yaml, answers in
      docs/drafts/decisions-2026-11-01.md). Not built; this entry's prose comes
      out when they are.
+     REQ-PIPE-401's content-keyed half built 2026-11-15 (#325); its pin half
+     waits on REQ-PIPE-397.
 
 319. **[done, 2026-11-03]** **[Data generation]** **The scenario map's
      summary named a "rest" that was not there.** Since each asset's map
@@ -14636,3 +14638,34 @@ twice. It deliberately did not re-find the `TypeError`.
      - **Ran**: `pytest tests/test_thirty_linked_datasets.py --run-on-demand`
        27 passed in 43s - including TestEachFakeGeocodingDatasetIsCheckedAgainstItsSource
        (5) and TestEveryLinkageResultNamesItsRowsByTheWholeKey; ruff.
+
+
+325. **[done, 2026-11-15]** **[GitHub workflow & people]** **[Pipeline & publishing]** **Two signed defect fixes: `sync-tickets` ignored the environment's ticketing switch, and #318's schema cache keyed a configuration file on its stat.**
+     - **REQ-GHUB-396.** `mothman github sync-tickets` never read the
+       environment's `ticketing`, so run by hand it would open issues in the
+       asset's `ticket_repository` from any environment, sandbox included
+       (the 2026-11-14 command audit). `ticket_sync.refuse_unless_ticketing_on()`
+       now runs first in `ticket_sync.main()` - in the module, so the
+       disabled workflow is guarded too - and exits 1 naming the environment
+       (or MOTHMAN_ENVIRONMENT unset) and assets/environments.yaml, before any
+       report is read or `gh` is called. Test-first: the six refusal tests in
+       tests/test_ticket_sync.py FAILED against the old code ("a refused
+       sync-tickets read a report"); the ticketing-on test passed before and
+       after, as it should. Re-enabling ticket-sync.yml as it stands would now
+       be refused, since a runner is `ci` (ticketing off) - correct, and
+       Keith's to change if that workflow ever comes back.
+     - **REQ-PIPE-401.** #318 remembered `list_setting_members`' dbt schema
+       parses by (path, mtime_ns, size) in an unbounded, unlocked dict -
+       REQ-PIPE-254 criterion 15 forbids that. Now a `config_yaml.Built` store
+       keyed on (path, the collection's tables) and the text read on every
+       call, holding the built checks frozen (changelog entries as
+       MappingProxyType, so the breaking-entry gate's `isinstance(e, dict)`
+       became `Mapping` - the one consumer of that shape). The data-asset.yaml
+       read in the presence gate goes through `config_yaml.load`. The asset
+       folder listing stays stat-keyed, its docstring now naming REQ-PIPE-254's
+       rule and why a folder listing is outside it. Test-first:
+       `test_a_same_size_same_mtime_edit_is_seen_by_declared` FAILED against
+       the old code (still `census_years` after a same-size, same-mtime edit).
+       Cost: declared() 65us a call here, warm. The "by the pin within one"
+       half waits on REQ-PIPE-397 (recorded as unmet on REQ-PIPE-401).
+     - **Ran**: see each requirement's evidence.

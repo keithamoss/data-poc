@@ -109,6 +109,19 @@ intro: >
   all three.
 
 releases:
+  - date: "2026-11-15"
+    summary: >
+      Ticket sync now posts nothing to GitHub unless your environment turns
+      ticketing on.
+    changes:
+      - category: Fixed
+        items:
+          - headline: Ticket sync respects ticketing off
+            components: ["GitHub workflow & people"]
+            description: >
+              Run by hand, mothman github sync-tickets could open issues from a
+              sandbox or a laptop. It now stops first, naming your environment,
+              unless that environment turns ticketing on in its settings.
   - date: "2026-11-14"
     summary: >
       The Feedback tab now gathers its cards from a second road-testing file

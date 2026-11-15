@@ -49827,7 +49827,7 @@ requirements:
     date_written: '2026-11-14'
     story: As whoever maintains the pipeline, I want the old ticket sync to open no issue from an environment where ticketing is off, so that running it by hand in a sandbox cannot post tickets to the data asset's real repository.
     moscow: must
-    status: not_started
+    status: built
     source: 'Keith, 2026-11-14, sync-tickets GUARD, from the read-only command audit (docs/drafts/command-audit-2026-11-14.md: it never reads env.ticketing, so run by hand it would open per-dataset issues in the ticket_repository from any environment, sandbox included); recorded in docs/drafts/decisions-2026-11-01.md, into #134 v6. Drafted by delivery-scoper 2026-11-14 (v6). A PROPOSAL, not signed until Keith signs v6. Signed by Keith 2026-11-14 as v6 (docs/drafts/separation-v6.yaml), after the v5 reviews and v6''s own questions.'
     acceptance_criteria:
     - IF `mothman github sync-tickets` (cli/github.py line 18) runs where environments.current_or_none() is None or the environment's `ticketing` is not true, THEN THE SYSTEM SHALL refuse before reading any report or calling GitHub, exiting 1 and naming the environment (or MOTHMAN_ENVIRONMENT being unset) and that its ticketing is off in assets/environments.yaml - the same rule ticket_reconciler.py line 334 applies (REQ-PIPE-093 criteria 10 and 12).
@@ -49843,11 +49843,25 @@ requirements:
     - REQ-PIPE-093
     - REQ-GHUB-027
     - REQ-PIPE-083
+    linked_tests:
+    - 'tests/test_ticket_sync.py::test_sync_tickets_refuses_where_the_environment_turns_ticketing_off'
+    - 'tests/test_ticket_sync.py::test_sync_tickets_refuses_where_no_environment_is_stated'
+    - 'tests/test_ticket_sync.py::test_the_command_exits_1_naming_the_environment'
+    - 'tests/test_ticket_sync.py::test_sync_tickets_proceeds_where_the_environment_turns_ticketing_on'
+    implemented_by:
+    - 'qa_tools/common/ticket_sync.py::refuse_unless_ticketing_on'
+    - 'qa_tools/common/ticket_sync.py::main'
+    - 'cli/github.py::sync_tickets_command'
+    evidence:
+    - '2026-11-15 (Perth), worktree b396, ticket_sync.py as at ac3a1376: the six refusal tests (four environments with ticketing off - sandbox, local, ci, test - with GITHUB_REPOSITORY and GH_TOKEN set; MOTHMAN_ENVIRONMENT unset; and the command through CliRunner) FAILED against the code before the fix, each with ''a refused sync-tickets read a report'' - main() went straight on to the reports; the ticketing-on test (production) passed before and after.'
+    - '2026-11-15 (Perth), tree cfcb9e02 (worktree b396), after the fix: tests/test_ticket_sync.py, tests/test_cli_github.py, tests/test_ticket_reconciler.py, tests/test_geocoding_gates.py, tests/test_geocoding_checks.py, tests/test_geocoding_trial.py, tests/test_validate_caches.py, tests/test_config_yaml.py and tests/test_assets.py - 246 passed; ruff clean. The refusal tests fake _run_gh and _load_scopes as tripwires and assert neither was reached; the ticketing-on test fakes sync_all and _run_gh, so no test reaches GitHub. post-build-review #325.'
     decisions:
     - 'ADD THE GUARD (sync-tickets GUARD, SETTLED by Keith 2026-11-14): a defect fix, test seen failing first. REJECTED a small fix batch now; it goes into #134 v6.'
     - 'KEEP sync-tickets OTHERWISE (COMMAND CLEAN-UP, SETTLED by Keith 2026-11-14): not deleted, although its only workflow caller (ticket-sync.yml) is disabled and it overlaps REQ-PIPE-083''s reconciler; that overlap and the empty leaderboard behind sync-leaderboard are still for Keith to raise, not this requirement.'
     - 'THE SAME RULE AS THE RECONCILER (delivery-scoper): ticket_reconciler.py line 334 returns nothing unless env.ticketing; one rule for both ticket paths, so the environment list remains the only switch (REQ-PIPE-093).'
     - 'IN ticket_sync, NOT ONLY THE COMMAND (delivery-scoper): the disabled workflow calls the same module; a guard in the command alone would leave the module unguarded if the workflow were re-enabled.'
+    - 'THE GUARD IS A FUNCTION OF ITS OWN, refuse_unless_ticketing_on(), called first in ticket_sync.main() (builder, 2026-11-15): it reads environments.current_or_none() and env.ticketing exactly as ticket_reconciler.service_from_env does, but REFUSES (SystemExit, exit 1) where the reconciler returns None - a command a person ran by hand should say why it did nothing, a pipeline step should not fail for having no ticketing.'
+    - 'ticket-sync.yml, IF RE-ENABLED AS IT STANDS, IS NOW REFUSED (builder, 2026-11-15): a GitHub runner is the `ci` environment, whose ticketing is off, and the workflow sets no MOTHMAN_ENVIRONMENT. That is the requirement working, not a regression; whether that workflow comes back at all is Keith''s (the COMMAND CLEAN-UP decision above).'
     open_questions: []
     signed_off:
       by: Keith
@@ -50005,7 +50019,7 @@ requirements:
     date_written: '2026-11-14'
     story: 'As whoever maintains the pipeline, I want the speed fixes made in #318 to keep REQ-PIPE-254''s promise that a configuration cache always answers for what the file says now, so that an edit keeping a file''s size and modification time is never missed.'
     moscow: should
-    status: not_started
+    status: built
     source: delivery-scoper, found 2026-11-14 while scoping S1 against REQ-PIPE-254 criterion 15; to Keith with this batch. v2 2026-11-14 with the architect's, CLI and dashboard reviews (docs/drafts/speed-anchor-v1-reviews.md) and Keith's SR1-SR9. A PROPOSAL, not signed. Signed by Keith 2026-11-14 as speed-anchor v2 (docs/drafts/speed-anchor-v2.yaml), after the architect, CLI and dashboard UX reviews.
     acceptance_criteria:
     - THE SYSTEM SHALL key list_setting_members' parsed dbt schema files (qa_tools/common/list_setting_members.py lines 170-185, keyed today on (path, st_mtime_ns, st_size) in an unbounded dict with no lock) on the file's content through a config_yaml.Built store, bounded and locked as REQ-PIPE-254's nine caches are, with no pin needed (architect, non-blocking).
@@ -50018,10 +50032,31 @@ requirements:
     - 'RELIABILITY: no false ''unchanged'' answer is possible, which is the failure REQ-PIPE-254 exists to prevent.'
     dependencies:
     - REQ-PIPE-254
+    linked_tests:
+    - 'tests/test_geocoding_gates.py::TestTheSchemaParsesAreKeyedOnContent'
+    - 'tests/test_geocoding_gates.py::test_the_real_configuration_passes'
+    implemented_by:
+    - 'qa_tools/common/list_setting_members.py::declared'
+    - 'qa_tools/common/list_setting_members.py::_build_checks'
+    - 'qa_tools/common/list_setting_members.py::_declaration_problems'
+    - 'qa_tools/common/list_setting_members.py::_breaking_entry_problems'
+    - 'qa_tools/common/assets.py::_Assets'
+    evidence:
+    - '2026-11-15 (Perth), worktree b396, list_setting_members.py as at ac3a1376: TestTheSchemaParsesAreKeyedOnContent::test_a_same_size_same_mtime_edit_is_seen_by_declared FAILED - after an in-place edit of the Linkage Products schema (census_years -> census_yearz, size and st_mtime_ns restored and asserted equal) declared() still answered {''census_years''} (criteria 2 and 5); the store test failed on a plain dict; test_the_gate_reads_data_asset_yaml_through_config_yaml failed with the raw yaml.safe_load read put back (criterion 3).'
+    - '2026-11-15 (Perth), tree cfcb9e02 (worktree b396), after the fix: tests/test_geocoding_gates.py, test_geocoding_checks.py, test_geocoding_trial.py, test_validate_caches.py, test_config_yaml.py, test_assets.py and the ticket modules - 246 passed; tests/test_target_agreement.py and test_adapter_imports.py (Linkage Products generation through member_setting_of) 53 passed, 2 skipped (no generated history in this checkout, pre-existing); ruff clean. declared() costs 65us a call warm on the quarterly asset (2,000 calls), each call reading its three schema files. post-build-review #325.'
     decisions:
     - 'A DEFECT AGAINST A BUILT CLAIM, NOT POLISH (delivery-scoper, Keith may change it): #318''s second fix keys a configuration file on mtime and size, which REQ-PIPE-254 criterion 15 forbids and criterion 2 tests against; it was recorded as polish with no behaviour change. Under the pin the reason for it - the generator asking once per geocoding file - goes away.'
     - 'THE FOLDER LISTING IS NOT A CONFIGURATION FILE (delivery-scoper): it answers which asset folders exist; a directory''s mtime moves whenever an entry is added, removed or renamed, which is all it needs to see.'
     - 'BUILT FIRST, TEST-FIRST, NEEDING NO PIN (architect, non-blocking): a real defect - mtime and size keying, unbounded and unlocked - so it is fixed on its own before REQ-PIPE-397, which only makes it cheaper.'
+    - 'THE STORE HOLDS THE BUILT CHECKS, NOT THE PARSED DOCUMENT (builder, 2026-11-15): config_yaml.Built requires an immutable value, so each file''s SetMemberCheck records are built from the one read and stored as a tuple, keyed on (path, the collection''s (table, dataset) pairs) and the text; changelog entries are frozen to MappingProxyType and tuples. The one consumer that tested the shape - _breaking_entry_problems'' isinstance(e, dict) - now tests Mapping (CLAUDE.md''s shape-change rule).'
+    - 'CRITERION 4 IS A DOCSTRING ON assets._Assets.names (builder, 2026-11-15): the listing''s behaviour is unchanged; the docstring names REQ-PIPE-254 criterion 15 and why a folder listing is outside it.'
+    unmet_criteria:
+    - criterion: 'The title''s ''by the pin within one'' half (and the PERFORMANCE NFR''s ''inside a pinned generation the read is answered from the snapshot'') - the dbt schema parses answered from REQ-PIPE-397''s pin inside a pinned generation.'
+      why: 'REQ-PIPE-397''s pin is not built. The store is a config_yaml.Built and its read is config_yaml.read, which is where REQ-PIPE-397 criterion 1 says the pin acts, so nothing more is expected here than a test once the pin exists.'
+      owner: 'REQ-PIPE-397'
+      blocked_by:
+        requirements:
+        - REQ-PIPE-397
     open_questions: []
     signed_off:
       by: Keith
