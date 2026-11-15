@@ -15577,7 +15577,7 @@ twice. It deliberately did not re-find the `TypeError`.
        same generation sees 3 pairs; the counting test passes. Both values
        are immutable, so sharing one instance is safe.
 
-391. **[todo]** **[QA pipeline]** **[Testing & dev tooling]** **dbt's own partial parse misses a schema edit that keeps the file's modification time.**
+391. **[todo, 2026-11-16]** **[QA pipeline]** **[Testing & dev tooling]** **dbt's own partial parse misses a schema edit that keeps the file's modification time.**
      Found writing REQ-PIPE-397 criterion 15's "a dbt model edited inside a
      pin reaches dbt": an in-place edit of a daily schema.yml with its
      modification time put back (the REQ-PIPE-254 test style) changed
@@ -15594,3 +15594,21 @@ twice. It deliberately did not re-find the `TypeError`.
        `--no-partial-parse` to the parse in `parsed_test_nodes` only. Not
        fixed here: outside the speed batch's criteria, and it touches the
        dbt worker REQ-PIPE-157 settled.
+
+392. **[investigate, 2026-11-16]** **[Testing & dev tooling]** **The fast half's own run shows three failures this branch did not cause.**
+     Seen in the speed batch's fast-half run (`-m "not needs_deployment" -n 2`,
+     data/ and reports/ moved aside, 2026-11-16): (a)
+     `tests/test_distribution_groups.py::test_a_module_outside_the_browser_tests_is_one_group`
+     fails whenever `-m "not needs_deployment"` deselects part of
+     `tests/test_recheck_trial.py` (it fails with only those two modules
+     selected; neither file nor conftest.py is touched by this branch); (b)
+     `tests/test_geocoding_faults.py`'s two plan tests fail identically against
+     12f06b34's product code - Linkage Products' plan reads the Child
+     Protection and ED trees, which a checkout with no data/quarterly lacks;
+     (c) `tests/test_period_opening.py::TestOweNothingQuarter` failed and
+     `tests/test_refused_dataset_freezes.py::TestAnOwedReCheckWaits` errored at
+     setup (the period-view drop guard refusing a period_2099 schema another
+     test left), and both modules pass alone, 30 of 30, at HEAD and at
+     12f06b34. A sighting, not a diagnosis: (a) and (b) look like the CI
+     fast half's own conditions; (c) like worker-database pollution between
+     modules.

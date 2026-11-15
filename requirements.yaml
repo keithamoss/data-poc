@@ -38228,7 +38228,7 @@ requirements:
       - "THE SYSTEM SHALL carry no docstring or comment saying one of the nine is read or built once per process, once per file or path, or that its file cannot change mid-run, including the ones in qa_tools/common/hierarchy.py, qa_tools/common/asset_time.py, qa_tools/common/agreement.py, qa_tools/common/sample_data.py, qa_tools/tools/run_dbt.py and qa_tools/tools/run_datacontract.py."
       - "WHEN this requirement is built, THE SYSTEM SHALL show by REQ-TEST-239's compare, used here as that harness's second named exception, that a bootstrap from empty records and builds nothing different: `mothman debug equivalence capture` of the commit before and of the built commit, then `mothman debug equivalence compare` of the two across all four surfaces, with only what qa_tools/common/equivalence.py already normalises or removes allowed to differ."
       - "WHEN this requirement is built, THE SYSTEM SHALL record in its evidence how many times each of the nine was called in one full bootstrap and one dashboard build, and the bootstrap's wall-clock time from empty before and after, same machine, same day, nothing else running; the after time SHALL be no more than 2% slower, and the measured figure SHALL be reported to Keith whether or not it meets the bar."
-      - "THE SYSTEM SHALL decide whether a file has changed by reading its content on every call, and SHALL NOT use its modification time, size or inode to skip that read."
+      - "OUTSIDE A PINNED RUN (REQ-PIPE-397), THE SYSTEM SHALL decide whether a file has changed by reading its content on every call, and SHALL NOT use its modification time, size or inode to skip that read."
       - "IF a function anywhere under qa_tools/ or pipeline/ carries functools.lru_cache or functools.cache, by any spelling of the import, and is not named on the cache allowlist with a reason it is safe, THEN `mothman check` SHALL fail, naming the function and its file."
       - "THE SYSTEM SHALL start the cache allowlist with exactly the caches under qa_tools/ and pipeline/ that this requirement leaves unkeyed, each with its reason: datacontract_common._derived (keyed on the rule's own text), validate_schedule._content_at (keyed on a git ref, cleared at the start of each validate()), and validate_requirements._parsed and _sprint_numbers (a short-lived validator off the run path, settled by REQ-TEST-253); no cache this requirement keys SHALL be on it."
       - "WHEN the test suite runs, THE SYSTEM SHALL prove the guard fails on a planted functools.lru_cache, a planted functools.cache and a bare @cache imported from functools, each off the allowlist, and passes on the committed tree, which it SHALL first show contains at least one allowlisted cache so the pass cannot be an empty scan."
@@ -50713,7 +50713,7 @@ requirements:
     date_written: '2026-11-14'
     story: As whoever maintains the pipeline, I want one place that can hold an asset's configuration still for the length of a generation or a replay, so that the millions of configuration reads a synthetic history makes stop costing a file read each, without the pipeline ever knowing it is in a replay.
     moscow: must
-    status: not_started
+    status: built
     source: 'Keith, post-build-review #318 (2026-11-03) and S1/S2 of ''Speed scoping'', SETTLED 2026-11-14; drafted by delivery-scoper 2026-11-14 (speed-anchor v1). v2 2026-11-14 with the architect''s, CLI and dashboard reviews (docs/drafts/speed-anchor-v1-reviews.md) and Keith''s SR1-SR9. A PROPOSAL, not signed. Signed by Keith 2026-11-14 as speed-anchor v2 (docs/drafts/speed-anchor-v2.yaml), after the architect, CLI and dashboard UX reviews.'
     acceptance_criteria:
     - 'THE SYSTEM SHALL offer in asset_model/ one snapshot object with install() and release() that pins the selected asset''s configuration for the span of a with-block: at install time it SHALL read, once and up front, every file of a declared set - the asset folder''s *.yaml and *.yml files excluding dbt/dbt_packages/, assets/environments.yaml and the shared file-checks default - keyed on each file''s resolved path, and while it is installed every read of a file in that set made through config_yaml (read, load and every config_yaml.Built store, qa_tools/common/config_yaml.py lines 110-221 at 5b502c46) SHALL be answered from that snapshot (architect B1).'
@@ -50754,16 +50754,72 @@ requirements:
     - 'EAGER, NOT LAZY (architect B1): v1 pinned a file at its first read, so a spawned child would read fresh any file the parent had not yet read, and REQ-GEN-399''s handing and digest could not both hold. The snapshot reads its declared set at install, so the digest is one value and every child gets it.'
     - 'ONE HAND-OFF FOR EVERY POOL (architect B1 and ''done well'' point 2): the bootstrap''s stream pool, the target-trial pool and parallel_orchestrate.run_manifest''s pool (parallel_orchestrate.py lines 101-103) all start processes during a pinned run; assets.handoff() already is the one hand-off (REQ-PIPE-369 criterion 4), and the target trial''s own initializer is the exception it absorbs.'
     - 'KEYED ON THE RESOLVED PATH (architect, non-blocking): callers mix REPO-relative paths with the asset resolver''s, so two spellings of one file must hit one snapshot entry.'
+    - 'BUILT 2026-11-16 as asset_model/config_pin.py (ConfigSnapshot: take, install, release, a with-block; pinned() re-entrant; adopt for a started process) over a pin held inside config_yaml.read, so load()
+      and every Built store answer from it with no reader changed. The refusal reads asset_time.declared_synthetic from the snapshot''s own text.'
+    - 'THE READERS, RE-COUNTED AT BUILD (criterion 7): the new rule found 75 reads outside config_yaml in the scanned packages at 12f06b34 (the draft counted 54 parse-of-own-read and 34 safe_load against 5b502c46);
+      all 75 rewritten to config_yaml.load/read/parse, plus three plain read_text reads of snapshot files the rule does not see (check_sources._read_working, check_lifecycle evidently_checks, environments._load).
+      config_yaml.load gained remember=False for the 6MB register read once by a gate.'
+    - 'PROVISIONAL (2026-11-16): the gate rule (validate_imports.pinned_reads) holds EVERY YAML parse and every read_text/open of a path naming a YAML file in asset_model/, qa_tools/, generator/, pipeline/,
+      dashboard/ and the assets'' collections/ and synthetic/collections/ to config_yaml - not only the snapshot set''s files, which a syntax-tree rule cannot know - and is not allowlistable. A YAML file outside
+      the set read through config_yaml is simply read from disk.'
+    - 'PROVISIONAL (2026-11-16): there is no separate ''shared file-checks default'' in today''s tree: each asset''s own file-checks.yaml sits in its folder and is in the set.'
+    - 'PROVISIONAL (2026-11-16): the clock travels beside the hand-off, not in it: MOTHMAN_PINNED_NOW is inherited with the environment, and each stream process installs its own replay clock, since a clock
+      anchored on one process''s monotonic time means nothing in another. The rolling anchor (REQ-GEN-404) is not built, so nothing of it is handed (unmet, below).'
+    - 'A HANDED SNAPSHOT IS VERIFIED (criterion 13): assets.adopt installs it only once its contents hash to the digest it was handed with, else PinMismatch names a fault in mothman''s hand-off. Two snapshots
+      are equal by asset and digest, so the datacontract worker''s ''adopt only when the hand-off changed'' compares digests, not texts.'
+    - REQ-PIPE-254 CRITERION 15 AMENDED AS WORDED (Keith, 2026-11-14), applied in this commit.
+    - 'SEEN FAILING FIRST: against 12f06b34''s product code the new modules failed at collection (no config_pin); with the pin''s read check removed (config_yaml.read ignoring the pin) tests/test_config_pin.py''s
+      mid-pin edit, staged-correction, audit-hook and mid-generation tests failed, and passed with it restored.'
     open_questions: []
     signed_off:
       by: Keith
       date: '2026-11-14'
+    implemented_by:
+    - asset_model/config_pin.py::ConfigSnapshot
+    - asset_model/config_pin.py::pinned
+    - asset_model/config_pin.py::adopt
+    - asset_model/config_pin.py::declared_files
+    - asset_model/config_yaml.py::read
+    - asset_model/config_yaml.py::pin
+    - asset_model/config_yaml.py::load
+    - asset_model/assets.py::handoff
+    - asset_model/assets.py::adopt
+    - qa_tools/common/validate_imports.py::pinned_reads
+    - cli/target_trial.py::try_all
+    linked_tests:
+    - tests/test_config_pin.py::TestAPinHoldsTheConfigurationStill
+    - tests/test_config_pin.py::TestThePinAnswersTheReadersBuiltOnConfigYaml
+    - tests/test_config_pin.py::TestAFileThatCannotBeReadIsNotRemembered
+    - tests/test_config_pin.py::TestAStagedCorrectionSitsOnThePin
+    - tests/test_config_pin.py::TestARealAssetIsNeverPinned
+    - tests/test_config_pin.py::TestEveryProcessIsHandedTheSnapshot
+    - tests/test_config_pin.py::TestAToolsOwnFilesAreNotPinned
+    - tests/test_config_pin.py::TestAPinnedGenerationOpensNoConfigurationFile
+    - tests/test_validate_imports.py
+    evidence:
+    - '2026-11-16 (Perth), tree f28a924c (branch wip/speed-b): the fast half, `pytest -m "not needs_deployment" -n 2 tests/` with data/ and reports/ moved aside - 7596 passed, 5 failed, 1 error, 0 skipped,
+      1656s. The six are not this requirement''s: post-build-review #391''s own status line (fixed after; tests/test_plans_md.py and test_plans_index.py then 31 passed) and the five in post-build-review #392,
+      each failing identically at 12f06b34 or passing alone at this tree. tests/test_config_pin.py, test_derived_once.py, test_tree_snapshot.py and test_bootstrap_pin.py are among the passes.'
+    - '2026-11-16, red first: with 12f06b34''s product code the four new modules fail (collection errors on the absent config_pin and derived modules, 5 failed, 15 errors); with only config_yaml.read''s pin
+      check removed, 12 tests fail - the mid-pin edit, staged correction, audit-hook generation, mid-generation edit and mid-replay tests among them.'
+    - '2026-11-16: a pinned Birth Registrations generation under a sys.addaudithook ''open'' hook opened no file of the snapshot set from a mothman frame; it took 8.2s on this sandbox. `ruff check .` clean;
+      the imports gate (with the new pinned_reads rule) passes for both assets, finding nothing outside config_yaml after 75 reads were rewritten.'
+    - '2026-11-16: a from-empty bootstrap of the daily asset into a scratch database (created, marked, dropped after) on tree 756df379 (before the tests and the content-keyed from_doc were added): ''Took generation
+      49s, Birth Registrations 288s, in total 337s.'', within budget at 338s, ''Configuration pinned: 1d1285b84abb'', 16 staged tables, no tree change and no pin difference. Not REQ-PIPE-403''s measurement,
+      which is taken separately.'
+    unmet_criteria:
+    - criterion: Criterion 12, in part - 'the installed anchor (REQ-GEN-404)' handed to every process a pinned run spawns.
+      why: REQ-GEN-404 (the rolling anchor) is not built, so there is no installed anchor to hand; the snapshot, the asset and its layout are handed, and the clock travels in the environment (PROVISIONAL, decisions).
+      owner: REQ-GEN-404
+      blocked_by:
+        requirements:
+        - REQ-GEN-404
   - id: REQ-GEN-398
     title: A generation - `mothman <collection> generate-synthetic-data` and a bootstrap's generation step, its target trials included - runs with its asset's configuration pinned
     date_written: '2026-11-14'
     story: As whoever regenerates the synthetic history, I want a generation to read its configuration once rather than millions of times, so that generating the quarterly asset stops taking minutes of file reads before any real check runs.
     moscow: must
-    status: not_started
+    status: built
     source: 'Keith, post-build-review #318 (2026-11-03: ''a real fix memoizes per generation, which needs a decision on how a generation pins its configuration'') and S1, SETTLED 2026-11-14; drafted by delivery-scoper 2026-11-14 (speed-anchor v1). v2 2026-11-14 with the architect''s, CLI and dashboard reviews (docs/drafts/speed-anchor-v1-reviews.md) and Keith''s SR1-SR9. A PROPOSAL, not signed. Signed by Keith 2026-11-14 as speed-anchor v2 (docs/drafts/speed-anchor-v2.yaml), after the architect, CLI and dashboard UX reviews.'
     acceptance_criteria:
     - WHEN a generation of a synthetic asset starts - the shared driver (generator/driver.py generate, line 153), the target trial, the scenario map writer and checkpoints.arrivals_of (qa_tools/common/checkpoints.py line 201) - THE SYSTEM SHALL install REQ-PIPE-397's snapshot before its first configuration read, hand it to every process the generation starts (the target trial's pool included, REQ-PIPE-397), and release it when the generation ends.
@@ -50783,16 +50839,40 @@ requirements:
     - '#318''s TWO POLISH FIXES STAY (post-build-review #318): the asset listing remembered by the folder''s stat and the dbt schema parses remembered per file; REQ-PIPE-401 brings the second back in line with REQ-PIPE-254.'
     - 'GENERATION NEVER MEMOISES THE TREE (architect B4): v1 keyed REQ-PIPE-430''s tree memo on the configuration pin, which this requirement installs during generation, so stale arrivals would have been served to the very checks that compare placements with recognition. The tree snapshot is its own installation, after generation (REQ-PIPE-430).'
     - 'GENERATION TIME IN THE ''Took'' LINE (CLI finding 4): one format for every stage''s time, read where people already look.'
+    - 'BUILT 2026-11-16: generator/driver.generate, bootstrap/generation.generate_collection (generator, target trial, scenario map) and bootstrap/checkpoints.arrivals_of each run under config_pin.pinned(),
+      re-entrant, so inside a bootstrap they share its one pin; the target trial''s pool takes assets.handoff.'
+    - 'PROVISIONAL (2026-11-16): the scenario map writer (qa_tools/common/scenario_map.write_map) is pinned by its caller, generate_collection, rather than installing a pin itself: it is a pipeline module,
+      and only the synthetic side installs one (REQ-PIPE-397 criterion 4).'
+    - 'PROVISIONAL (2026-11-16): the bare command''s line reads ''Took generation 12s.'' (bootstrap/generation.took_line), and inside a bootstrap generation is the first entry of the one ''Took ...'' line.'
+    - 'SEEN FAILING FIRST: with the pin''s read check removed, tests/test_config_pin.py::TestAGenerationReadsItsConfigurationOnce failed (the mid-generation calendar edit reached that generation''s receipts).'
     open_questions: []
     signed_off:
       by: Keith
       date: '2026-11-14'
+    implemented_by:
+    - generator/driver.py::generate
+    - bootstrap/generation.py::generate_collection
+    - bootstrap/generation.py::took_line
+    - bootstrap/checkpoints.py::arrivals_of
+    - bootstrap/bootstrap.py::_populate
+    - cli/pipeline.py::generate_collection
+    - cli/target_trial.py::try_all
+    linked_tests:
+    - tests/test_config_pin.py::TestAGenerationReadsItsConfigurationOnce
+    - tests/test_config_pin.py::test_a_bare_generate_command_says_how_long_it_took
+    - tests/test_bootstrap_pin.py::TestTheReplayReadsThePinnedConfiguration::test_one_pin_from_generation_to_the_target_agreement
+    - tests/test_bootstrap_pin.py::TestWhatABootstrapSaysAtTheEnd
+    - tests/test_tree_snapshot.py::TestABootstrapReplaysFromOneRecognition::test_no_snapshot_is_installed_during_a_generation
+    evidence:
+    - '2026-11-16 (Perth), tree f28a924c: the fast half as REQ-PIPE-397''s evidence records it; tests/test_config_pin.py::TestAGenerationReadsItsConfigurationOnce (a calendar edited after the provider planned
+      leaves that generation''s receipts unchanged; the next generation''s differ) passed, and failed with the pin''s read check removed.'
+    - '2026-11-16: the daily from-empty bootstrap printed generation as the first entry of its ''Took ...'' line (49s, the target trial included).'
   - id: REQ-GEN-399
     title: The replay inside a bootstrap runs the real pipeline with the asset's configuration pinned - installed by the bootstrap around its own call, every stream process pinned to the same contents - while `mothman pipeline run`, the processing pass, the CLI and the dashboard build read as now
     date_written: '2026-11-14'
     story: As whoever regenerates the demo, I want the replay's thousands of real pipeline runs to read the configuration the bootstrap started with, so that a bootstrap spends its time on the checks rather than on re-reading the same files, and a real run's behaviour is untouched.
     moscow: must
-    status: not_started
+    status: built
     source: Keith, S2 of 'Speed scoping' (SETTLED 2026-11-14, NOT THE RECOMMENDATION) and the architect's note on this batch (docs/drafts/separation-v5-reviews.md line 357); drafted by delivery-scoper 2026-11-14 (speed-anchor v1). v2 2026-11-14 with the architect's, CLI and dashboard reviews (docs/drafts/speed-anchor-v1-reviews.md) and Keith's SR1-SR9. A PROPOSAL, not signed. Signed by Keith 2026-11-14 as speed-anchor v2 (docs/drafts/speed-anchor-v2.yaml), after the architect, CLI and dashboard UX reviews.
     acceptance_criteria:
     - WHEN a bootstrap or a resume replays a synthetic asset, THE SYSTEM SHALL install REQ-PIPE-397's pin around the replay from the bootstrap's own call, as it installs REQ-PIPE-382's replay clock, and no real pipeline module SHALL install, test or know of it.
@@ -50821,16 +50901,60 @@ requirements:
     - 'pipeline run STAYS UNPINNED ON A SYNTHETIC ASSET TOO (delivery-scoper, following REQ-PIPE-383''s decision that pipeline run on a synthetic asset is the real path): it is a real processing pass over what has arrived.'
     - 'A DIGEST MISMATCH IS OURS (CLI finding 10): the contents are handed, so a mismatch is a hand-off defect; the message says so rather than implying the person edited a file mid-run.'
     - 'ONE CLOSING BLOCK FOR BOTH SURFACES (CLI finding 4): ''Generated up to'' belongs on the last line both the CLI (''Populated: ...'') and the TUI (''Ready - ...'') already print, not among the dim progress lines; REQ-DASH-407 criterion 6 points here.'
+    - 'BUILT 2026-11-16: the bootstrap installs config_pin.pinned() once it holds the pass lock and releases it when it returns (bootstrap._populate runs inside it); a resume pins around its whole run on a
+      synthetic asset. Stream processes run through bootstrap._reporting, returning the pin they ran under, compared by pin_differences.'
+    - 'PROVISIONAL (2026-11-16): ONE PIN SPANS GENERATION AND REPLAY, so the replay reads exactly the configuration the history was generated from (REQ-GEN-398 criterion 2''s pin is this one).'
+    - 'PROVISIONAL (2026-11-16): the nested pools (the target trial''s, parallel_orchestrate.run_manifest''s, the datacontract worker) are not polled for a report: each is handed the snapshot through assets.handoff
+      and refuses it (PinMismatch, naming a fault in mothman''s hand-off) unless its contents hash to the digest it came with, which fails the bootstrap. The streams, which the bootstrap starts itself, report
+      and are named file by file.'
+    - 'PROVISIONAL (2026-11-16): the closing line reads ''<N> staged table(s) in this environment, generated up to <date> (the fixed test anchor).'' after ''Populated:'' (CLI) and ''Ready - '' (TUI); GENERATOR_ANCHOR_DATE''s
+      override is said as ''(set by GENERATOR_ANCHOR_DATE)''. The rolled wording waits for the rolled anchor (unmet, below).'
+    - 'STATEMENTS END WITH A FULL STOP: ''Took ...'' and ''Adding <collection>: ...'' gained one, and the TUI''s step() passes a statement through as the CLI''s _step does - work under way still trails off.'
+    - 'SEEN FAILING FIRST: with the pin''s read check removed, tests/test_bootstrap_pin.py''s mid-replay calendar edit test failed.'
     open_questions: []
     signed_off:
       by: Keith
       date: '2026-11-14'
+    implemented_by:
+    - bootstrap/bootstrap.py::bootstrap
+    - bootstrap/bootstrap.py::_populate
+    - bootstrap/bootstrap.py::resume
+    - bootstrap/bootstrap.py::stream_pool
+    - bootstrap/bootstrap.py::pin_report
+    - bootstrap/bootstrap.py::pin_differences
+    - bootstrap/bootstrap.py::pin_mismatch_message
+    - bootstrap/bootstrap.py::took_line
+    - bootstrap/bootstrap.py::pinned_line
+    - bootstrap/bootstrap.py::closing_line
+    - generator/public.py::anchor_statement
+    - cli/pipeline.py::bootstrap_command
+    - cli/app.py::_bootstrap_menu
+    linked_tests:
+    - tests/test_bootstrap_pin.py::TestTheReplayReadsThePinnedConfiguration
+    - tests/test_bootstrap_pin.py::TestARealReplayFilesAsThePinnedCalendarSays
+    - tests/test_bootstrap_pin.py::TestEveryStreamProcessGetsTheSameSnapshot
+    - tests/test_bootstrap_pin.py::TestWhatABootstrapSaysAtTheEnd
+    - tests/test_bootstrap.py
+    evidence:
+    - '2026-11-16 (Perth), tree f28a924c: the fast half as REQ-PIPE-397''s evidence records it. tests/test_bootstrap_pin.py::TestARealReplayFilesAsThePinnedCalendarSays replays Birth Registrations'' first three
+      arrivals through the real pipeline three times: the calendar edited as the second arrival begins leaves every filing and verdict equal to the unedited run, and the next bootstrap''s verdicts differ; with
+      the pin''s read check removed it fails (''an edit made mid-replay reached the replay''s records'').'
+    - '2026-11-16: the daily from-empty bootstrap''s closing lines, in order: ''Took generation 49s, Birth Registrations 288s, in total 337s.'', the budget line, ''Configuration pinned: 1d1285b84abb'', ''Populated:
+      16 staged table(s) in this environment, generated up to 2026-09-25 (the fixed test anchor).'''
+    unmet_criteria:
+    - criterion: Criterion 4, in part - the rolled closing wording '(rolled to today on <zone>'s clock; `--anchor <date>` reproduces it)'.
+      why: 'Only the fixed test anchor exists: rolling the anchor and --anchor are REQ-GEN-404 and REQ-GEN-405, not built. The fixed-anchor wording and every other part of the criterion are built.'
+      owner: REQ-GEN-405
+      blocked_by:
+        requirements:
+        - REQ-GEN-404
+        - REQ-GEN-405
   - id: REQ-PIPE-400
     title: The values derived from an agreement - each dataset's slots and periods, a calendar's periods, a dataset's standing on a date - are worked out once per immutable Agreement and zone-versions value actually used, pinned or not, so a staged calendar or time-zone correction is never answered from another's result
     date_written: '2026-11-14'
     story: As whoever regenerates the demo, I want the schedule arithmetic a generation and a replay repeat inside their loops worked out once for the configuration they pinned, so that a long history does not recompute the same calendar millions of times.
     moscow: must
-    status: not_started
+    status: built
     source: 'Keith, S1 of ''Speed scoping'' (''with slots and periods derived from it worked out once''), SETTLED 2026-11-14, and post-build-review #318''s profile; drafted by delivery-scoper 2026-11-14 (speed-anchor v1). v2 2026-11-14 with the architect''s, CLI and dashboard reviews (docs/drafts/speed-anchor-v1-reviews.md) and Keith''s SR1-SR9. A PROPOSAL, not signed. Signed by Keith 2026-11-14 as speed-anchor v2 (docs/drafts/speed-anchor-v2.yaml), after the architect, CLI and dashboard UX reviews.'
     acceptance_criteria:
     - THE SYSTEM SHALL work out each of slots.slots_for_dataset (qa_tools/common/slots.py line 254), schedule.periods_for_dataset, schedule.periods_for_calendar and Agreement.standing_on (qa_tools/common/agreement.py line 257) at most once per distinct argument set per (Agreement used, time-zone versions in force) pair, the Agreement being the one each call actually uses - its explicit agreement= argument or schedule._agreement's answer (schedule.py line 325) - never agreement.current() looked up again (architect B3).
@@ -50852,10 +50976,34 @@ requirements:
     - 'AFTER REQ-PIPE-377 (delivery-scoper): 377 writes each repeated schedule rule once; memoising the copies first would memoise code about to be deleted.'
     - 'CORRECT WITHOUT A PIN (architect B3): Agreement is a frozen dataclass with MappingProxyType fields and so cannot be hashed, but Built hands back the same instance for the same text, so an identity key holding a strong reference is content-keyed by construction; v1''s ''remember nothing without a pin'' is dropped. The bound keeps a dashboard build''s memory flat.'
     - 'NAMES CORRECTED (architect B3): slots_for_dataset lives in slots, not schedule; standing_on is Agreement''s method.'
+    - 'BUILT 2026-11-16 as asset_model/derived.py: one Memo keyed on (id(agreement), id(zones)) holding strong references to both, then on (function, arguments); the four functions split into a remembering
+      public function and a compute_* function the memo calls. Bounded at 16 agreement/zones pairs, LRU.'
+    - 'CONTENT-KEYED from_doc AND ZONES (found building it): one pinned Birth Registrations generation built 329 distinct Agreement instances through agreement.from_doc - generator/correction_claims builds
+      the agreement either side of each declared correction afresh on every call - so an identity-keyed memo churned and the committed agreement''s values were evicted and worked out again (the counting test
+      caught it). agreement.from_doc now hands back one instance per document content, and asset_time.parse_timezone_versions one tuple per timezone block, each through a config_yaml.Built keyed on the document''s
+      canonical JSON; the same generation then sees 3 pairs. Both values are immutable, so sharing is safe.'
+    - 'PROVISIONAL (2026-11-16): standing_on is keyed on the zones too, as criterion 1 reads, though its value does not depend on them: the cost is one timezone_versions() read per call, a dictionary look-up
+      inside a pin.'
+    - 'SEEN FAILING FIRST: with the memo''s hit path removed, tests/test_derived_once.py''s two counting tests failed.'
     open_questions: []
     signed_off:
       by: Keith
       date: '2026-11-14'
+    implemented_by:
+    - asset_model/derived.py::Memo
+    - asset_model/derived.py::remembered
+    - asset_model/slots.py::slots_for_dataset
+    - asset_model/schedule.py::periods_for_dataset
+    - asset_model/schedule.py::periods_for_calendar
+    - asset_model/agreement.py::Agreement
+    - asset_model/agreement.py::from_doc
+    - asset_model/asset_time.py::parse_timezone_versions
+    linked_tests:
+    - tests/test_derived_once.py
+    evidence:
+    - '2026-11-16 (Perth), tree f28a924c: the fast half as REQ-PIPE-397''s evidence records it; tests/test_derived_once.py passed. Red first: with the memo''s hit path removed, its two counting tests fail.'
+    - '2026-11-16: one pinned Birth Registrations generation passes 329 distinct (agreement, zones) pairs through the memo before agreement.from_doc and parse_timezone_versions were keyed on content, and 3
+      after (post-build-review #390); every one of the four functions is then worked out once per argument set in that generation.'
   - id: REQ-PIPE-401
     title: 'The two caches post-build-review #318 keyed on a file''s stat answer as REQ-PIPE-254 requires - the dbt schema parses in list_setting_members by content outside a pin and by the pin within one'
     date_written: '2026-11-14'
@@ -50892,13 +51040,8 @@ requirements:
     - 'BUILT FIRST, TEST-FIRST, NEEDING NO PIN (architect, non-blocking): a real defect - mtime and size keying, unbounded and unlocked - so it is fixed on its own before REQ-PIPE-397, which only makes it cheaper.'
     - 'THE STORE HOLDS THE BUILT CHECKS, NOT THE PARSED DOCUMENT (builder, 2026-11-15): config_yaml.Built requires an immutable value, so each file''s SetMemberCheck records are built from the one read and stored as a tuple, keyed on (path, the collection''s (table, dataset) pairs) and the text; changelog entries are frozen to MappingProxyType and tuples. The one consumer that tested the shape - _breaking_entry_problems'' isinstance(e, dict) - now tests Mapping (CLAUDE.md''s shape-change rule).'
     - 'CRITERION 4 IS A DOCSTRING ON assets._Assets.names (builder, 2026-11-15): the listing''s behaviour is unchanged; the docstring names REQ-PIPE-254 criterion 15 and why a folder listing is outside it.'
-    unmet_criteria:
-    - criterion: 'The title''s ''by the pin within one'' half (and the PERFORMANCE NFR''s ''inside a pinned generation the read is answered from the snapshot'') - the dbt schema parses answered from REQ-PIPE-397''s pin inside a pinned generation.'
-      why: 'REQ-PIPE-397''s pin is not built. The store is a config_yaml.Built and its read is config_yaml.read, which is where REQ-PIPE-397 criterion 1 says the pin acts, so nothing more is expected here than a test once the pin exists.'
-      owner: 'REQ-PIPE-397'
-      blocked_by:
-        requirements:
-        - REQ-PIPE-397
+    - 'REQ-PIPE-397 BUILT 2026-11-16: the deferred half (the schema parses answered from the pin inside a pinned generation) is met with no change here - tests/test_config_pin.py::TestThePinAnswersTheReadersBuiltOnConfigYaml
+      reads set_member_checks.declared() inside a pin and sees no schema file read from disk.'
     open_questions: []
     signed_off:
       by: Keith
@@ -51192,7 +51335,7 @@ requirements:
     date_written: '2026-11-14'
     story: As whoever regenerates the demo, I want the replay to read the generated delivery tree once rather than hundreds of times, so that a quarter of the replay's time stops going on re-reading files that cannot have changed.
     moscow: must
-    status: not_started
+    status: built
     source: 'Keith, SA Q3 (SETTLED 2026-11-14, option (b)): REQ-PIPE-250''s first profiled speed-up (''recognise the delivery tree once per tree content rather than on every arrival and every next_receipt call'') into this batch; drafted by delivery-scoper 2026-11-14 (speed-anchor v1). v2 2026-11-14 with the architect''s, CLI and dashboard reviews (docs/drafts/speed-anchor-v1-reviews.md) and Keith''s SR1-SR9. A PROPOSAL, not signed. Signed by Keith 2026-11-14 as speed-anchor v2 (docs/drafts/speed-anchor-v2.yaml), after the architect, CLI and dashboard UX reviews.'
     acceptance_criteria:
     - WHEN a bootstrap or a resume has finished generating the collections it is about to replay, THE SYSTEM SHALL install a delivery-tree snapshot in asset_model/ - an installation of its own, separate from REQ-PIPE-397's configuration snapshot and never installed during a generation (REQ-GEN-398 criterion 4) - recognise each of those collections' arrivals once (arrivals.arrivals_for, qa_tools/common/arrivals.py line 245), and, while it is installed, answer every later call for those collections and folders from it, including the calls from orchestrate (qa_tools/tools/orchestrate.py line 590), stage (qa_tools/tools/stage.py line 297), the bootstrap (bootstrap.py line 611) and the next-receipt look-ups (promotion.py lines 479 and 510), wherever REQ-PIPE-382 leaves them (architect B4).
@@ -51216,10 +51359,36 @@ requirements:
     - 'ITS OWN INSTALLATION, NOT THE CONFIGURATION PIN (architect B4, correcting v1): v1 keyed the tree memo on the configuration pin, which REQ-GEN-398 also installs during generation, when the tree is being written and read back. Installing it after generation, by the bootstrap, is safe because generation finishes before any replay starts; the end digest checks it. Checking a tree''s content on every call instead costs a read of every receipt, which is most of what recognition costs. REJECTED invalidating on every write_delivery and remove_deliveries (more moving parts for the same guarantee), and a content-keyed cache for the live pass.'
     - 'NOT A CONFIGURATION CACHE (delivery-scoper): the delivery tree is supplier files, not configuration, so REQ-PIPE-254''s content rule does not govern it; it is asset_model''s ''the delivery tree'' half (QB).'
     - 'FOR THE BUILDER OF REQ-PIPE-382 (architect, seam note, not an edit of v6): the tree half of promotion.next_receipt (lines 479 and 510) is replay-only work in the real pipeline - its own docstring says the live pass has no tree - and with Keith''s later answer putting the seeded lag inside the replay clock, letting the replay clock work out the next receipt itself would remove half of this requirement''s work. Flagged for #134 v6''s REQ-PIPE-382 criterion 4; not decided here.'
+    - 'BUILT 2026-11-16 as asset_model/arrivals.TreeSnapshot: each named collection recognised once at construction (recognise_arrivals, the old arrivals_for body), arrivals_for answering from it while installed
+      for the same folders, with a per-collection digest of the recognised arrivals and their delivery folders'' listing and receipts; release re-recognises and returns each collection whose digest moved. Handed
+      to started processes through assets.handoff beside the configuration pin.'
+    - 'PROVISIONAL (2026-11-16): the snapshot stays installed through the confirmations after the replay and is released (and checked) before ''Took ...''; in the one-collection branch each collection''s is
+      released before the next generation, the last after the confirmations. A resume installs one after its generation.'
+    - 'PROVISIONAL (2026-11-16): a changed tree is recorded on the result (tree_changes) and fails the CLI command and the TUI rather than raising out of the bootstrap, so the closing lines and the message
+      are said in the bootstrap''s own words.'
+    - 'A CALLER''S OWN ARRIVALS: each answer is the snapshot''s arrivals with files_by_dataset copied - a caller''s own dict of tuples - rather than a MappingProxyType, which would not pickle into a started
+      process.'
+    - 'SEEN FAILING FIRST: with the snapshot''s answer and release check removed, tests/test_tree_snapshot.py''s counting, change-at-release, bootstrap and CLI/TUI tests failed.'
     open_questions: []
     signed_off:
       by: Keith
       date: '2026-11-14'
+    implemented_by:
+    - asset_model/arrivals.py::TreeSnapshot
+    - asset_model/arrivals.py::arrivals_for
+    - asset_model/arrivals.py::recognise_arrivals
+    - asset_model/arrivals.py::installed_tree
+    - asset_model/arrivals.py::adopt_tree
+    - bootstrap/bootstrap.py::_Trees
+    - bootstrap/bootstrap.py::tree_changed_message
+    - cli/pipeline.py::bootstrap_command
+    - cli/app.py::_bootstrap_menu
+    linked_tests:
+    - tests/test_tree_snapshot.py
+    evidence:
+    - '2026-11-16 (Perth), tree f28a924c: the fast half as REQ-PIPE-397''s evidence records it; tests/test_tree_snapshot.py passed. Red first: with the snapshot''s answer and its release check removed, the
+      counting, change-at-release, bootstrap and CLI/TUI tests fail.'
+    - '2026-11-16: the daily from-empty bootstrap ran with the tree snapshot installed after generation and reported no tree change at release. The share of replay time it saves is REQ-PIPE-403''s to measure.'
   - id: REQ-PIPE-431
     title: datacontract-cli's library call for each run runs in a long-lived worker process of its own, beside Soda Core and Evidently in the foreground and dbt in its worker, while asking, filtering, left-out notes and recording stay in the run's process, with results kept in tool order
     date_written: '2026-11-14'
