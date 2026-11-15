@@ -79,6 +79,11 @@ def write_results_file(collection_id: str, *, runs: list[dict], dataset_stats: d
         # WHAT EACH RUN IS, from qa.run (REQ-PIPE-279 criteria 16 and 17) -
         # its rank, never its run_seq.
         "run_facts": facts or {},
+        # THE RUNS NOBODY COULD CHECK (REQ-PIPE-411 criterion 4), by run key -
+        # each in run_facts with its supply, cause, rank and tries, and no
+        # result. Always written, so a file from before it is refused rather
+        # than read as having none (criterion 10).
+        "not_checked": sorted(k for k, f in (facts or {}).items() if f.get("not_checked")),
         "dataset_stats": dataset_stats,
         "results": results,
         # WHAT EACH RUN LEFT OUT OF ITS SCOPE BECAUSE A TABLE IT READS IS NOT

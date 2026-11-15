@@ -18,5 +18,7 @@ def facts_for(runs, *, datasets=None, supplies=None, scopes=None) -> dict[str, d
         supply = supplies.get(run_id)
         out[run_id] = {"dataset_id": datasets.get(run_id), "scope": scopes.get(run_id, "arrival"),
                        "supply_id": supply, "rank": rank,
-                       "cause": f"arrival:{run_id}" if supply else None}
+                       "cause": f"arrival:{run_id}" if supply else None,
+                       # REQ-PIPE-411: a run time (none here) and no tries.
+                       "run_time_ms": None, "ended_at": None, "not_checked": False}
     return out

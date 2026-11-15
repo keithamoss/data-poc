@@ -117,10 +117,14 @@ class TestTheResultsFileCarriesTheRecord:
         b = _run(f"pytest_b_{uuid.uuid4().hex[:8]}", dataset_id="cp-clients", supply=supply,
                  scope="full", decision=7)
         facts = history.rebuild()["run_facts"]
+        # AND ITS RUN TIME, WHEN ITS TRY ENDED, AND THAT IT WAS CHECKED
+        # (REQ-PIPE-411 criteria 2 and 4) - measured, so only its kind.
+        for fact in (facts[a], facts[b]):
+            assert isinstance(fact.pop("run_time_ms"), int) and fact.pop("ended_at")
         assert facts[a] == {"dataset_id": "cp-clients", "scope": "arrival", "supply_id": supply,
-                            "rank": 1, "cause": f"arrival:{a}"}
+                            "rank": 1, "cause": f"arrival:{a}", "not_checked": False}
         assert facts[b] == {"dataset_id": "cp-clients", "scope": "full", "supply_id": supply,
-                            "rank": 2, "cause": "decision:7"}
+                            "rank": 2, "cause": "decision:7", "not_checked": False}
         assert "run_seq" not in json.dumps(history.rebuild())
 
     def test_a_cross_table_result_carries_what_it_read(self, history):
@@ -427,7 +431,15 @@ class TestTheSameHistoryBuildsTheSameBytes:
         datasets = history.datasets()
         return json.dumps(datasets["cp-clients"], sort_keys=True, default=str)
 
-    def test_interleaving_another_collection_changes_no_byte(self, history):
+    def test_interleaving_another_collection_changes_no_byte(self, history, monkeypatch):
+        # THE SAME RUN TIMES AND TRY ENDS EACH TIME (REQ-PIPE-409, REQ-PIPE-411
+        # criterion 2): a run time is measured and a try's end stamped, so the
+        # counter is injected and the one clock pinned.
+        from asset_model import asset_time
+
+        monkeypatch.setenv(asset_time.PINNED_NOW_VARIABLE, WHEN)
+        ticks = iter(range(0, 10_000, 2))
+        monkeypatch.setattr(qa_results_writer, "_counter", lambda: next(ticks))
         keys = {"one": f"pytest_one_{uuid.uuid4().hex[:8]}",
                 "two": f"pytest_two_{uuid.uuid4().hex[:8]}",
                 "one_supply": f"cp-clients@{_key()}", "two_supply": f"cp-clients@{_key()}"}
@@ -436,6 +448,8 @@ class TestTheSameHistoryBuildsTheSameBytes:
         with supply_db.connect(label="test-build-record") as conn:
             conn.execute(f'TRUNCATE "{qa_store.SCHEMA}".run, "{qa_store.SCHEMA}".run_attempt '
                          "CASCADE")
+        ticks = iter(range(0, 10_000, 2))
+        monkeypatch.setattr(qa_results_writer, "_counter", lambda: next(ticks))
         assert self._build(history, True, keys) == plain
 
 

@@ -137,14 +137,18 @@ def for_collection(conn, collection_id: str) -> dict[str, dict[str, list[dict]]]
             "GROUP BY supply_id", ids).fetchall():
         checked_at[sup] = _instant(at)
 
+    # A RUN STOPPED where an attempt of it ended other than COMPLETED - read
+    # through THE ONE READER OF ATTEMPTS (REQ-PIPE-411 criterion 1), in place
+    # of a query of this module's own.
+    from qa_tools.common import qa_results_reader
+
     stopped_at: dict[str, list[datetime]] = {}
-    for sup, at in conn.execute(
-            f'SELECT r.supply_id, a.ended_at FROM "{s}".run_attempt a '
-            f'JOIN "{s}".run r ON r.run_key = a.run_key '
-            f"WHERE r.dataset_id IN ({marks}) AND r.supply_id IS NOT NULL "
-            "AND r.scope <> 'readers' AND a.ended_at IS NOT NULL "
-            "AND a.outcome <> 'COMPLETED'", ids).fetchall():
-        stopped_at.setdefault(sup, []).append(_instant(at))
+    for ra in qa_results_reader.attempts_by_run(conn, dataset_ids=ids).values():
+        if ra.supply_id is None or ra.scope == "readers":
+            continue
+        for a in ra.attempts:
+            if a["ended_at"] is not None and a["outcome"] != "COMPLETED":
+                stopped_at.setdefault(ra.supply_id, []).append(_instant(a["ended_at"]))
 
     owed: dict[tuple, list] = {}
     contended: set[tuple] = set()
