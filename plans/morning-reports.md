@@ -3583,4 +3583,15 @@ one or more component tags, and a date.
       one push at the end. Source of record: `docs/drafts/decisions-2026-11-01.md`.
     - **START**: 647861ed pushed and CI green (critical and validate-config)
       before the run began.
+    - **PROGRESS (~20:05 Perth)**: T3 (REQ-PIPE-365 built; REQ-TEST-353 built
+      with c1/c2/c5 never run on a runner and c6/c7 unmet) and T4 (REQ-GEN-370
+      built, c3 waiting on REQ-GEN-381, c1's eras.yaml on REQ-GEN-371) are
+      critic-fixed and merged. T2 (REQ-PIPE-345) is merged as it stood; its
+      builder is reworking six test modules for Keith's c5 guard. T5
+      (REQ-DOCS-358) is building from the approved wording. Keith's answers
+      tonight, all in the decisions file: GEN-370 c3 waits for 381; the
+      provider registry lookup stays allowed (for_dataset only); 345 c5 is a
+      guard plus a test baseline, the six modules reworked; the whole
+      REQ-DOCS-358 wording approved, batch 3 and the docs edits unread (a
+      critic checks them against the code).
 
