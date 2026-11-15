@@ -48,7 +48,7 @@ def staged(instant: datetime):
     where every declared correction was already merged by then - the common
     case, which then costs nothing."""
     docs = declared_corrections.working()
-    if not any(declared_corrections.merge_instant(p) > instant for p in declared_corrections.declared(*docs)):
+    if not any(declared_corrections.merge_instant(p) > instant for p in declared_corrections.pending_corrections(*docs)):
         return None
     return correction_trial.configured(*declared_corrections.docs_at(instant, docs))
 

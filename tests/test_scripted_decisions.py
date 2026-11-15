@@ -156,7 +156,7 @@ class TestNoBackDoor:
     def test_only_decision_log_inserts_into_the_decision_table(self):
         pattern = re.compile(r"INSERT INTO \{(?:decision_log|dl)\.TABLE\}|INSERT INTO[^\n]*\.decision\b")
         offenders = []
-        for top in ("qa_tools", "pipeline", "cli", "generator", "dashboard"):
+        for top in ("asset_model", "qa_tools", "pipeline", "cli", "generator", "dashboard"):
             for path in (ROOT / top).rglob("*.py"):
                 if path.name in ("decision_log.py", "qa_store.py"):
                     continue

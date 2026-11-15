@@ -49397,7 +49397,7 @@ requirements:
     - 'asset_model/delivery.py::read_delivery'
     - 'asset_model/delivery.py::list_deliveries'
     - 'qa_tools/common/delivery.py::write_delivery'
-    - 'asset_model/declared_corrections.py::declared'
+    - 'asset_model/declared_corrections.py::pending_corrections'
     - 'asset_model/declared_corrections.py::revert'
     - 'asset_model/declared_corrections.py::docs_at'
     - 'asset_model/set_member_checks.py::declared'
@@ -49439,6 +49439,8 @@ requirements:
     - 'dbt READINESS MOVED TO qa_tools/common/dbt_common.py (criterion 5): dbt_project_ready and DbtPackagesMissing sit beside packages_installed, the rule they apply.'
     - 'STATUS RANKINGS: VERDICT_ORDER BESIDE ORDERED_STATUSES (REQ-PIPE-390, builder): the three former copies ranked green, amber and red only, with nodata unranked, so they read VERDICT_ORDER, which is ORDERED_STATUSES less nodata, rather than the whole order.'
     - 'THE PERFORMANCE NFR WAS NOT MEASURED in this build: a bootstrap from empty per asset, before and after, did not fit the session (said in the evidence rather than claimed).'
+    - 'PROVISIONAL (the coordinator''s call, 2026-11-15, Keith asleep; for his morning review): declared_corrections.declared is renamed pending_corrections, so it no longer shares a name with set_member_checks.declared.'
+    - 'THE SOURCE-SCANNING ARCHITECTURE TESTS NOW READ asset_model/ (a coverage gap closed under criterion 17''s purpose, found by the post-build critic on 8e94183e): the bookkeeping wall (tests/test_arrivals.py WALLED, REQ-GEN-043 c7), the supply-id splitter (tests/test_supply_files.py, REQ-PIPE-193), state paths (test_state_paths_at_call_time PRODUCT), table movers (test_plain_base_names), decision-table writers (test_scripted_decisions), identity writers (test_db_identity), ticket commenters (test_ticket_reconciler), sample-data discards (test_sample_data), recheck imports (test_recheck) and reset callers (test_reset_synthetic) each named only the old packages, so a violation moved into asset_model/ passed. Each was shown to fail with a violation planted in asset_model/arrivals.py or delivery.py, then the plant removed. dashboard/plans_index.py''s _SRC_ROOTS gained asset_model, and live plans entries'' paths point at asset_model/.'
     open_questions: []
     signed_off:
       by: Keith
@@ -49648,12 +49650,7 @@ requirements:
     - '2026-11-15, first build (11d389ae): tests/test_validate_imports.py seen failing first - collection error with the gate absent, then 8 failed with cli/check.py, cli/dashboard.py and validate-config.yml at the base commit - and 13 mutants of the gate (each edge rule, module-level imports only, loads ignored, no-side ignored, the stale, gain and requirement checks off) each failed the tests written for them. The allowlist landed holding exactly the tree''s findings: 69 (file, module) entries, 142 imports.'
     - '2026-11-15, after the post-build critic (plans/post-build-review.md #326): 13 new tests (assets.* modules sided, import_module by keyword, __import__, a file that does not parse, tracked files only, a hidden tracked file in no side, a malformed and a duplicate allowlist entry) seen failing first, 13 failed, then passing; the B6 test (criterion 14 as narrowed) passes today because none of asset_model, scenarios or bootstrap exists, and fails on a fixture repository where scenarios/ exists and is left out, and with its list check broken. tests/test_validate_imports.py 81 passed, all critical, no database. The real tree''s findings unchanged: 69 entries, 142 imports, none new.'
     - '`mothman dashboard validate-imports` run per asset leg with no DSN, as validate-config.yml runs it: both legs exit 0 in about 2.5s, inside the 5-second NFR.'
-    unmet_criteria:
-    - criterion: 'Criterion 9, its rules half - REQ-PIPE-376 criterion 8 (no underscore-led asset_model name used outside it) and REQ-PIPE-390 criterion 5 (no status ranking of its own) carried as rules of this gate.'
-      why: 'The one walker is built and validate_caches uses it, and validate_imports.RULES is the hook each rule joins; the rules themselves belong to those two requirements, and the underscore rule would check nothing until asset_model/ exists (Keith, 2026-11-15).'
-      owner: REQ-PIPE-376 and REQ-PIPE-390, each adding its rule and its test on RULES
-      blocked_by:
-        requirements: [REQ-PIPE-376, REQ-PIPE-390]
+    - '2026-11-15, criterion 9 met: REQ-PIPE-376 and REQ-PIPE-390 added their rules to validate_imports.RULES (private_names, status_rankings), each never allowlistable and each with its own tests in tests/test_validate_imports.py, run on wip/sep-step2 (101 passed). The underscore rule reported 65 uses outside asset_model/ before 376''s renames and none after; the ranking rule reports each of the three former copies as they stood at 6cc3eb55 and nothing in the tree now.'
     decisions:
     - 'THE GATE COMES FIRST, AFTER THE HARNESS GOES (delivery-scoper; v6 order): landing it with today''s findings allowlisted makes it the measure each later requirement shrinks. REQ-TEST-393 lands just before it, so the allowlist never carries the deleted harness''s edges.'
     - 'BOTH DIRECTIONS IN ONE GATE (the brief, 2026-11-02): the pipeline never imports the generator today, but nothing holds that true; the generator imports the pipeline in 97 statements.'
@@ -49841,10 +49838,11 @@ requirements:
     - '_version_in_force IS REMOVED, NOT RENAMED (delivery-scoper, v5): Q6 of 2026-11-14 ends its fallback, which is all it adds to Calendar.version_in_force.'
     - 'THE UNDERSCORE RULE IS A RULE OF THE IMPORTS GATE (architect, non-blocking, 2026-11-14): one syntax-tree walker, not a second scanner. It reads source for an architecture rule with no behaviour to observe, which CLAUDE.md''s test rule allows when said.'
     - 'NO EQUIVALENCE COMPARE (QD, Keith 2026-11-14): v5''s criterion 9 and BEHAVIOUR-PRESERVING NFR are gone.'
-    - 'THE NEW PUBLIC NAMES (builder, 2026-11-15; PROVISIONAL where the scoper named none): schedule._agreement -> agreement_to_read (it returns the agreement to read, its docstring''s words; a bare `agreement` would shadow the module of that name), _as_date -> as_date, hierarchy._require -> require, _from_text -> from_text, linked_datasets._asset_folder -> asset_folder, _walk -> walk, _soda_bodies -> soda_bodies, _columns -> contract_columns (`columns` is a word used in its own messages), amber_setting._doc -> load_doc, _resolve_on -> resolve_on, _settings -> stated_settings, _versions -> versions_by_date, agreement._turn_off -> turn_off, slots._participation_for -> participation_for. Only names a module outside their own uses at this build were renamed; schedule._timing, _parse_version, _load and _files_go_to_period_errors had no outside use by then, and tests may still read private names (criterion 3''s own exemption).'
+    - 'THE NEW PUBLIC NAMES (builder, 2026-11-15; PROVISIONAL where the scoper named none): schedule._agreement -> agreement_to_read (it returns the agreement to read, its docstring''s words; a bare `agreement` would shadow the module of that name), _as_date -> as_date, hierarchy._require -> require, _from_text -> from_text, linked_datasets._asset_folder -> asset_folder, _walk -> walk, _soda_bodies -> soda_bodies, _columns -> table_columns (see the decision below), amber_setting._doc -> load_doc, _resolve_on -> resolve_on, _settings -> stated_settings, _versions -> versions_by_date, agreement._turn_off -> turn_off, slots._participation_for -> participation_for. Only names a module outside their own uses at this build were renamed; schedule._timing, _parse_version, _load and _files_go_to_period_errors had no outside use by then, and tests may still read private names (criterion 3''s own exemption).'
     - 'schedule._version_in_force BECAME version_in_force_or_first (PROVISIONAL, builder): criterion 3 says REQ-PIPE-378 criterion 1 removes it and that whichever lands first it is not left private and used. This landed first, so it was given a public name saying what it adds over Calendar.version_in_force (a date before the first version takes the first); REQ-PIPE-378 criterion 1 now removes version_in_force_or_first.'
     - 'THE DUPLICATE-TABLE REFUSAL NAMES BOTH COLLECTIONS TOO (builder): the hierarchy loads before the two-asset gate''s own check, so the refusal had to carry what that gate''s refusal named (tests/test_two_asset_gates.py).'
     - 'THE UNDERSCORE RULE IS NEVER ALLOWLISTABLE (builder): it reports problems, not findings, so the fix is always a public name in asset_model/; it reads imports, attribute reads, getattr/setattr names and dotted asset_model.x._y, and leaves dunders alone.'
+    - 'PROVISIONAL (the coordinator''s call, 2026-11-15, Keith asleep): linked_datasets._columns is table_columns, not contract_columns, which check_lifecycle.contract_columns already is - two public names meaning different things would be this requirement''s own failure.'
     open_questions: []
     signed_off:
       by: Keith
@@ -50160,6 +50158,7 @@ requirements:
     - 'VERDICT_ORDER IS THE THREE VERDICTS (builder, 2026-11-15): rechecking, target_agreement and the Linkage Products provider ranked {green: 0, amber: 1, red: 2} and treated anything else - nodata included - as no verdict; reading the whole ORDERED_STATUSES would have ranked nodata below green and changed that. VERDICT_ORDER is derived from ORDERED_STATUSES, so the order is still held once.'
     - 'THE RANKING RULE READS A DICTIONARY OF STATUS WORDS TO NUMBERS (builder): two or more of nodata, green, amber and red as keys, every value a number - the shape every former copy had. A mapping to words (labels) is not a ranking and passes. It is a problem, never allowlistable. Checked against the three copies at 6cc3eb55: it reports each.'
     - 'STATUS_ORDER AND UnknownStatusError MOVED WITH THE ORDER (builder): the alias callers index and the error status_words raises sit beside them; dataset_status imports both, so its rollups raise the same class.'
+    - 'PROVISIONAL (the coordinator''s call, 2026-11-15, Keith asleep): THE RANKING RULE ALSO CATCHES a tuple or list of the status words read through .index(), and enumerate() over one (a dictionary or list comprehension numbering them), a literal or a module-level name bound to one. A sequence of the words only tested for membership passes. Nothing outside asset_model/ trips it today.'
     open_questions: []
     signed_off:
       by: Keith

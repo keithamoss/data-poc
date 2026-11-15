@@ -62,7 +62,7 @@ def pending(conn, docs: tuple[dict, dict] | None = None) -> list[declared_correc
     """Every declared correction not yet applied, oldest first."""
     cal, asset = docs or declared_corrections.working()
     done = applied_references(conn)
-    return [p for p in declared_corrections.declared(cal, asset) if p.reference not in done]
+    return [p for p in declared_corrections.pending_corrections(cal, asset) if p.reference not in done]
 
 
 def affected_datasets(p: declared_corrections.Pending, cal: dict) -> list[str]:

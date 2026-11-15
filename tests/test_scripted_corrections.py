@@ -104,7 +104,7 @@ class TestValidationRefusesEachFault:
 
     def test_the_committed_file_passes(self):
 
-        declared = {p.reference for p in declared_corrections.declared(*declared_corrections.working())}
+        declared = {p.reference for p in declared_corrections.pending_corrections(*declared_corrections.working())}
         from generator import scenario_injection
 
         assert scripted_corrections.problems(scripted_corrections.load(), declared=declared,

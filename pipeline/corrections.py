@@ -39,7 +39,7 @@ def _declared() -> dict[str, dict]:
     except declared_corrections.Unreadable:
         return {}
     return {p.reference: {"approver": p.approver, "date": p.date, "reason": p.reason}
-            for p in declared_corrections.declared(*docs)}
+            for p in declared_corrections.pending_corrections(*docs)}
 
 
 def _name(identity: str | None) -> str | None:

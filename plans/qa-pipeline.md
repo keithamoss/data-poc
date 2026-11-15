@@ -3699,7 +3699,7 @@ relative, not a schedule — this is weeks of work, not months.
     `status`, `domain`, `description`, `schema` (with `quality:` using
     the `library` (`metric:`) and `sql` types), `servers`, `team`,
     `support`, `slaProperties`, `customProperties` (our own check-
-    lifecycle metadata, per `qa_tools/common/check_lifecycle.py`).
+    lifecycle metadata, per `asset_model/check_lifecycle.py`).
     Analysis only below - nothing built yet, no priority order implied
     by the list ordering; a real discussion with Keith on what's worth
     the build effort is the actual next step, not a to-do list to just

@@ -784,7 +784,7 @@ def claim_window(dataset_id: str, contract_value: str | None = None,
     if on is not None:
         # A period before the first version takes that first version's
         # inputs - all of them, this override included (REQ-PIPE-113's
-        # PROVISIONAL rule, as slots._participation_for applies it).
+        # PROVISIONAL rule, as slots.participation_for applies it).
         standing = agreement.standing_on(dataset_id, on)
         # INSIDE A TURNED-OFF GAP, as if every effective_to were absent
         # (REQ-PIPE-179 criterion 14) - the window this period would have had.

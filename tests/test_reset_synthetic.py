@@ -144,7 +144,8 @@ class TestNothingElseDeletes:
     def test_no_other_module_calls_it(self):
         """Criterion 23: not reachable from any other command."""
         callers = []
-        for path in list((ROOT / "cli").glob("*.py")) + list((ROOT / "qa_tools").rglob("*.py")):
+        for path in (list((ROOT / "cli").glob("*.py")) + list((ROOT / "qa_tools").rglob("*.py"))
+                     + list((ROOT / "asset_model").rglob("*.py"))):
             if path.name in ("synthetic_reset.py",):
                 continue
             text = path.read_text()

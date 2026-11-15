@@ -20,6 +20,13 @@ FROM - matches check_lifecycle.find_undocumented_changes()'s own
 
 Run as `python3 -m qa_tools.common.validate_check_lifecycle` from a git
 checkout with at least 2 commits of history (`fetch-depth: 2` in CI).
+
+THIS IS THE GIT-REF HALF (REQ-PIPE-380 criterion 12): reading a check file
+AT A REF - git show, git ls-tree - stays here. Where the checks are defined,
+the dbt-SQL scan and the WORKING-TREE read are asset_model/check_sources.py,
+which the generator reads checks through too; this module hands its ref's
+file contents to the same sources() and dbt_definitions(), so there is one
+parser, and the cut sits at git because asset_model/ runs none.
 """
 from __future__ import annotations
 

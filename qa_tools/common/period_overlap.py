@@ -15,7 +15,7 @@ opens whether or not anything is owed for Q2.
 
 COMPUTED AS FILING COMPUTES IT (criterion 2) - through the one
 slot-instants function filing uses (slots.slot_instants, REQ-PIPE-113
-criterion 10), over the same period sequence (slots._calendar_periods,
+criterion 10), over the same period sequence (slots.period_sequence,
 which honours a dataset's own authored dates), so this check and filing
 can never disagree about where a boundary falls. Across a change of
 calendar or participation version the two neighbours are compared like

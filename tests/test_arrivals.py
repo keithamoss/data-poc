@@ -328,7 +328,7 @@ class TestTheGeneratorsBookkeepingIsWalledOff:
     ROOT = Path(__file__).resolve().parent.parent
     # Everything downstream of an arrival. The generator itself is
     # deliberately absent: writing the bookkeeping is its job.
-    WALLED = ("qa_tools", "pipeline", "dashboard", "cli")
+    WALLED = ("asset_model", "qa_tools", "pipeline", "dashboard", "cli")
 
     # delivery.py DEFINES the constant so the generator has one name to
     # write to, and defining it is not reading it.

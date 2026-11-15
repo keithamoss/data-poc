@@ -272,7 +272,7 @@ class TestOnlyOneCodePathMovesAPeriodTable:
     """NFR 6: nothing outside period_tables moves or renames a table in a
     period schema. Read from the source, so a new mover fails here."""
 
-    ROOTS = ("qa_tools", "pipeline", "cli", "dashboard", "generator")
+    ROOTS = ("asset_model", "qa_tools", "pipeline", "cli", "dashboard", "generator")
 
     def _sources(self):
         from pathlib import Path

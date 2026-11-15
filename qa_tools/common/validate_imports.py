@@ -263,32 +263,64 @@ def private_names(rel: str, tree, root: Path) -> tuple[list[Finding], list[Probl
 RANKED_WORDS = frozenset({"nodata", "green", "amber", "red"})
 
 
+def _words_sequence(node, named: dict) -> bool:
+    """A tuple or list literal of two or more status words - or a name a
+    module-level assignment binds to one."""
+    if isinstance(node, ast.Name):
+        return node.id in named
+    if not isinstance(node, (ast.Tuple, ast.List)):
+        return False
+    words = [e.value for e in node.elts if isinstance(e, ast.Constant) and isinstance(e.value, str)]
+    return len(words) == len(node.elts) and len(set(words) & RANKED_WORDS) >= 2
+
+
 def status_rankings(rel: str, tree, root: Path) -> tuple[list[Finding], list[Problem]]:
     """REQ-PIPE-390 criterion 5: no Python module outside asset_model/ (and
-    tests/) defines its own ranking of the status words - a dictionary
-    literal mapping two or more of nodata, green, amber and red to numbers,
-    which is what each former copy was ({"green": 0, "amber": 1, "red": 2}).
-    The ranking is asset_model.statuses' ORDERED_STATUSES and VERDICT_ORDER,
-    read rather than repeated. Python modules only - the dashboard page keeps
-    its own copy, held equal by status-cases.json (criterion 4). Reads source,
-    an architecture rule with no behaviour to observe. Never allowlistable."""
+    tests/) defines its own ranking of the status words. Three shapes:
+    a dictionary literal mapping two or more of nodata, green, amber and red
+    to numbers, which is what each former copy was ({"green": 0, "amber": 1,
+    "red": 2}); a tuple or list of the words read as an order through
+    `.index()`; and `enumerate()` over one (a dictionary or list
+    comprehension numbering the words). A sequence of the words that is
+    only tested for membership is not a ranking and passes. The ranking is
+    asset_model.statuses' ORDERED_STATUSES and VERDICT_ORDER, read rather
+    than repeated. Python modules only - the dashboard page keeps its own
+    copy, held equal by status-cases.json (criterion 4). Reads source, an
+    architecture rule with no behaviour to observe. Never allowlistable."""
     if side_of_file(rel) in (None, "asset_model"):
         return [], []
+    named = {}
+    for node in getattr(tree, "body", []):
+        if isinstance(node, ast.Assign) and _words_sequence(node.value, {}):
+            for t in node.targets:
+                if isinstance(t, ast.Name):
+                    named[t.id] = node.value
     problems = []
+
+    def found(node, how):
+        problems.append(Problem(
+            f"{rel}:{node.lineno}: {side_of_file(rel)} defines its own ranking of the "
+            f"status words ({how}: {ast.unparse(node)}) - read asset_model.statuses' "
+            f"ORDERED_STATUSES or VERDICT_ORDER instead (REQ-PIPE-390 criterion 5)"))
+
     for node in ast.walk(tree):
-        if not isinstance(node, ast.Dict) or not node.keys:
-            continue
-        keys = [k.value for k in node.keys if isinstance(k, ast.Constant)]
-        if len(keys) != len(node.keys) or len(set(keys) & RANKED_WORDS) < 2:
-            continue
-        if all(isinstance(v, ast.Constant) and isinstance(v.value, (int, float))
-               and not isinstance(v.value, bool)
-               or (isinstance(v, ast.UnaryOp) and isinstance(v.operand, ast.Constant))
-               for v in node.values):
-            problems.append(Problem(
-                f"{rel}:{node.lineno}: {side_of_file(rel)} defines its own ranking of the "
-                f"status words ({ast.unparse(node)}) - read asset_model.statuses' "
-                f"ORDERED_STATUSES or VERDICT_ORDER instead (REQ-PIPE-390 criterion 5)"))
+        if isinstance(node, ast.Dict) and node.keys:
+            keys = [k.value for k in node.keys if isinstance(k, ast.Constant)]
+            if len(keys) != len(node.keys) or len(set(keys) & RANKED_WORDS) < 2:
+                continue
+            if all(isinstance(v, ast.Constant) and isinstance(v.value, (int, float))
+                   and not isinstance(v.value, bool)
+                   or (isinstance(v, ast.UnaryOp) and isinstance(v.operand, ast.Constant))
+                   for v in node.values):
+                found(node, "numbered")
+        elif isinstance(node, ast.Call):
+            func = node.func
+            if isinstance(func, ast.Attribute) and func.attr == "index" \
+                    and _words_sequence(func.value, named):
+                found(node, "an order read through .index()")
+            elif isinstance(func, ast.Name) and func.id == "enumerate" and node.args \
+                    and _words_sequence(node.args[0], named):
+                found(node, "numbered by enumerate()")
     return [], problems
 
 

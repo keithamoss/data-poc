@@ -77,7 +77,7 @@ def two(monkeypatch):
 
 class TestTheAgreementAsItStood:
     def test_a_correction_counts_from_the_start_of_its_date(self, two):
-        [cab1] = [p for p in declared_corrections.declared(*two) if p.reference == "CAB-1"]
+        [cab1] = [p for p in declared_corrections.pending_corrections(*two) if p.reference == "CAB-1"]
         assert declared_corrections.merge_instant(cab1) == asset_time.start_of_day(
             date(2026, 1, 10))
 

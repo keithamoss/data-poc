@@ -36,7 +36,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 
-PRODUCT = ("qa_tools", "pipeline", "generator", "dashboard", "cli", "synthetic_data_generator")
+PRODUCT = ("asset_model", "qa_tools", "pipeline", "generator", "dashboard", "cli",
+           "synthetic_data_generator")
 
 #: The resolver itself, where the layout is written down.
 RESOLVER = "asset_model/assets.py"
