@@ -122,7 +122,7 @@ def test_check_links_for_a_folder_outside_the_repository_are_refused(tmp_path):
 
 
 def _injected_root(tmp_path):
-    """REQ-PIPE-342's injection (#55): an assets/ root outside the repository,
+    """REQ-PIPE-342's injection: an assets/ root outside the repository,
     each asset folder in it a link to the real one."""
     root = tmp_path / "assets"
     root.mkdir()

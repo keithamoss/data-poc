@@ -211,9 +211,12 @@ def problems(root: Path = REPO) -> list[str]:
             l_cal = _calendar_of(cal, l_coll.get("id"), did)
             if l_cal is None:
                 out.append(f"{head}, which names no calendar, so it has no period to be read for.")
-            elif l_cal != product_cal:
-                out.append(f"{head}, which is never on {pid}'s calendar {product_cal!r} "
-                           f"(it is on {l_cal!r}) - a check reads only its own period.")
+            elif product_cal is None:
+                # EITHER SIDE (REQ-QAC-330 criterion 6 as amended by
+                # REQ-PIPE-345, G2): one baseline per asset leaves no
+                # different-calendar case, only a side with no calendar.
+                out.append(f"{head}, but {pid} itself declares no calendar, so it has no "
+                           f"period to read it for.")
             source = _columns(root, l_coll.get("contract", ""), l_ds.get("table"))
             for col in cols:
                 if col not in source:

@@ -219,10 +219,8 @@ def out_of_agreement(conn, *, own_table: str, own_dataset: str, period: str,
 #: criterion 10), so the page words each from its code, never its text.
 NOT_IN_AGREEMENT = "not_in_agreement"
 NOT_SUPPLIED_BY_DECISION = "not_supplied_by_decision"
-CALENDAR_DIFFERS = "calendar_differs"
 _REASONS = {NOT_IN_AGREEMENT: "not part of the agreement for {period}",
-            NOT_SUPPLIED_BY_DECISION: "not supplied for {period}, by decision",
-            CALENDAR_DIFFERS: "not checked: {dataset} was on another calendar for {period}"}
+            NOT_SUPPLIED_BY_DECISION: "not supplied for {period}, by decision"}
 
 
 def left_out_entry(code: str, period: str, dataset_id: str) -> dict:

@@ -73,16 +73,18 @@ def foreign_readers(table: str) -> list[str]:
 def declaration_problems(declared: dict[str, list[str]] | None = None,
                          agreement=None) -> list[str]:
     """REQ-PIPE-331 criterion 2, from configuration: every read a check
-    declares of ANOTHER collection's table names a table some dataset owns,
-    on the same calendar as the declaring dataset, which names one.
+    declares of ANOTHER collection's table names a table some dataset of the
+    asset's hierarchy owns, and neither the declaring dataset nor the one it
+    reads declares no calendar.
 
-    A dataset names one calendar for its whole life (contract/calendar.yaml
-    versions the calendar's rounds, not which calendar a dataset is on), so
-    two datasets are on the same calendar in every period or in none - and
-    a pair on different calendars is refused here outright, which leaves no
-    period in which they could differ (the not-applicable case of the same
-    criterion has nothing to record until a dataset's calendar is itself
-    versioned)."""
+    ONE BASELINE PER ASSET (REQ-PIPE-345): every calendared dataset of an
+    asset is on its one baseline, so two calendared datasets are always on
+    the same calendar and there is no different-calendar case left to
+    refuse or to record not applicable (REQ-PIPE-331 criterion 2 as amended
+    by REQ-PIPE-345 removed calendar_differs). What is left is a dataset
+    with no calendar on EITHER side (Keith, G2): it has no period to read or
+    be read for, and refusing only the read side would let the other through
+    in silence."""
     from qa_tools.common import check_id as check_id_mod
     from qa_tools.common import hierarchy, promotion, schedule
 
@@ -90,11 +92,12 @@ def declaration_problems(declared: dict[str, list[str]] | None = None,
         declared = promotion._declared_reads()
     owners = {d.table: d for d in hierarchy.all_datasets()}
 
-    def calendar_name(dataset_id):
+    def has_calendar(dataset_id):
         try:
-            return schedule.calendar_for_dataset(dataset_id, agreement).name
+            schedule.calendar_for_dataset(dataset_id, agreement)
         except schedule.NoCalendarAgreed:
-            return None
+            return False
+        return True
 
     out = []
     for check_id, tables in sorted(declared.items()):
@@ -114,16 +117,14 @@ def declaration_problems(declared: dict[str, list[str]] | None = None,
             owner = owners[table]
             if owner.collection_id == parsed.collection:
                 continue
-            mine, theirs = calendar_name(parsed.dataset), calendar_name(owner.dataset_id)
-            if theirs is None:
+            if not has_calendar(owner.dataset_id):
                 out.append(f"{check_id} reads {table!r}, whose dataset {owner.dataset_id} "
                            f"names no calendar - it has no period to be read for "
                            f"(REQ-PIPE-331 criterion 2).")
-            elif mine != theirs:
-                out.append(f"{check_id} reads {table!r}, whose dataset {owner.dataset_id} is "
-                           f"on the {theirs} calendar and never on {parsed.dataset}'s "
-                           f"{mine} calendar - a check reads only its own period "
-                           f"(REQ-PIPE-331 criterion 2).")
+            elif not has_calendar(parsed.dataset):
+                out.append(f"{check_id} reads {table!r}, but its own dataset "
+                           f"{parsed.dataset} declares no calendar - it has no period "
+                           f"to read it for (REQ-PIPE-331 criterion 2).")
     return out
 
 

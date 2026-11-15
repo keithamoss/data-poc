@@ -390,19 +390,8 @@ def _left_out_fields(why) -> dict:
         # (REQ-DASH-337 criterion 12).
         found = re.search(r"\d{4}-[A-Z0-9]+$", why.strip())
         period = found.group(0) if found else None
-    calendar = entry.get("calendar")
-    if calendar is None and entry["code"] == unrunnable.CALENDAR_DIFFERS and entry.get("dataset"):
-        # WHICH CALENDAR THE DATASET WAS ON, from configuration, for 'Not
-        # checked: <dataset> was on the <calendar> calendar for <period>'.
-        from qa_tools.common import schedule
-
-        try:
-            calendar = schedule.calendar_for_dataset(entry["dataset"]).name
-        except Exception:  # noqa: BLE001 - a name is decoration; the page words its absence
-            calendar = None
     return {"code": entry["code"], "reason": entry["reason"],
-            "period": period, "dataset": entry.get("dataset"),
-            **({"calendar": calendar} if calendar else {})}
+            "period": period, "dataset": entry.get("dataset")}
 
 
 def _member_set(record: dict) -> dict | None:

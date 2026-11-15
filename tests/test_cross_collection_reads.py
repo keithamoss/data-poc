@@ -163,24 +163,24 @@ class TestADeclaredReadAcrossCollectionsIsGated:
         [p] = run_reads.declaration_problems({LP: ["no_such_table"]})
         assert LP in p and "no_such_table" in p and "no dataset" in p
 
-    def test_a_dataset_on_another_calendar(self, monkeypatch):
-        """Within one asset (the asset split: Birth Registrations, the daily
-        dataset this read, is another asset's): the Client Register put on
-        another calendar, as test_a_dataset_with_no_calendar puts it on none."""
-        import types
-
+    def test_a_declaring_dataset_with_no_calendar(self, monkeypatch):
+        """Either side (REQ-PIPE-331 criterion 2 as amended by REQ-PIPE-345,
+        Keith's G2): a check whose OWN dataset declares no calendar reading a
+        calendared table is refused too, naming the declaring dataset - it
+        has no period of its own to read the other's for."""
         from qa_tools.common import schedule
 
         real = schedule.calendar_for_dataset
 
-        def _daily(dataset_id, agreement=None):
-            if dataset_id == "cp-clients":
-                return types.SimpleNamespace(name="daily")
+        def _none(dataset_id, agreement=None):
+            if dataset_id == "linkage-keys":
+                raise schedule.NoCalendarAgreed(dataset_id, "a test")
             return real(dataset_id, agreement)
 
-        monkeypatch.setattr(schedule, "calendar_for_dataset", _daily)
+        monkeypatch.setattr(schedule, "calendar_for_dataset", _none)
         [p] = run_reads.declaration_problems({LP: ["cp_clients"]})
-        assert LP in p and "cp_clients" in p and "daily" in p and "quarterly" in p
+        assert LP in p and "cp_clients" in p
+        assert "linkage-keys" in p and "declares no calendar" in p
 
     def test_a_dataset_with_no_calendar(self, monkeypatch):
         from qa_tools.common import schedule

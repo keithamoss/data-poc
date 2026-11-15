@@ -96,9 +96,6 @@ describe("what the section says", () => {
     expect(w.notInAgreementReason({code: "not_supplied_by_decision", period: "2026-Q2",
                                    dataset: "no-such", reason: "not part of the agreement for 2026-Q2"}))
       .toBe("Not checked: no-such not supplied for 2026-Q2, by decision.");
-    expect(w.notInAgreementReason({code: "calendar_differs", period: "2026-Q2",
-                                   dataset: "no-such", calendar: "monthly"}))
-      .toBe("Not checked: no-such was on the monthly calendar for 2026-Q2.");
   });
 
   it("reads an entry recorded before the codes as not part of the agreement", () => {

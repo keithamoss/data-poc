@@ -14048,7 +14048,7 @@ twice. It deliberately did not re-find the `TypeError`.
        path to open (repository path inside, the folder itself outside), and
        only the readers that need a repository path - git-ref reads,
        CODEOWNERS, GitHub links - refuse. Refusing everywhere would also stop
-       the dashboard build reading #55's injected configuration. (CORRECTED
+       the dashboard build reading REQ-PIPE-342's injected configuration. (CORRECTED
        by #313: the line drawn here does NOT keep an injected-folder
        dashboard build working - the build embeds the GitHub links, and they
        refuse, so it stops there. #313 also found the schedule gate's git-ref guards and
@@ -14161,10 +14161,10 @@ twice. It deliberately did not re-find the `TypeError`.
           asset folder outside the repository, given C7. (a) Refuse, as C7
           says - and then the nine tests above need their copies inside the
           repository (or a test-only switch, which the test rules forbid);
-          and a #55 deployment's schedule gate refuses outright. (b) Keep
+          and an injected-root (REQ-PIPE-342) deployment's schedule gate refuses outright. (b) Keep
           "no previous state" for such a folder, as today - honest that git
           holds no history of it, but every past-item edit there passes. (c)
-          Refuse only for the injected-root (#55) layout and keep (b) for
+          Refuse only for the injected-root (REQ-PIPE-342) layout and keep (b) for
           the suite's folder copies - which ties product behaviour to how a
           test points the resolver. Until he answers, (b) stands.
      - **Runs (tree 1e1fde37, before this bullet was added)**: the touched
@@ -14282,7 +14282,7 @@ twice. It deliberately did not re-find the `TypeError`.
      - **H1. Under an injected single-asset root, the both-hierarchies read
        treats the other asset's scenarios as mistyped (SETTLED by Keith
        2026-11-03, no code change).** `every_asset.declared()` reads the
-       assets the resolver finds, so a #55 root holding one asset would make
+       assets the resolver finds, so an injected (REQ-PIPE-342) root holding one asset would make
        the other asset's scenarios name "a dataset no asset declares". Keith:
        scenarios exist only for synthetic assets, and both synthetic assets
        are always present together for demo and test, so the read always
@@ -15149,3 +15149,47 @@ twice. It deliberately did not re-find the `TypeError`.
        runs the step's shell with `uv` stood in for; against 3aa2d022's
        workflow it failed (exit 0 with the failing asset), and passes now.
        Not run on a GitHub runner.
+
+350. **[done, 2026-11-15]** **[Docs & process]** **[QA checks & contract]** **The critic on split T5 (fe3f5671): REQ-DOCS-358's sweep, A13/A14 and the docs.**
+     The critic sampled 24 of the c2 sweep's rewrites and all held. What it
+     found, and what was done (Keith answered the judgement calls 2026-11-15):
+     - **c2's three ambiguous criteria / a contradictory flip record**
+       (finding 4: Keith's flip decision listed c1, c3 and c4 unmet, the
+       record also c2). Keith gave the wording: REQ-PIPE-190 c1 names the two
+       contracts' real paths, REQ-TEST-252 c15 reads "assets/, data/ or
+       reports/", REQ-QAC-294 c3 reads "assets/<asset>/synthetic/
+       synthetic_inputs.yaml (today the quarterly asset's)" with its stale
+       move note dropped. Each AMENDED by REQ-DOCS-358; c2's unmet entry is
+       gone, so c2 is met. REQ-QAC-294 c3 still says "kept at the top of
+       contract/ among the asset-wide files - added to ...ASSET_WIDE ... by
+       amendment A8", outside Keith's wording: left for him.
+     - **REQ-PIPE-240 c9** missed CORRECTION_RIDERS, which
+       validate_collections already exempts. Keith's wording applied.
+     - **CLAUDE.md E2/E4 and README** said the shared collections folders
+       hold only base.py; they hold `__init__.py` (the registry, the provider
+       loader) too. Corrected, Keith-approved, nothing else in CLAUDE.md
+       touched.
+     - **The README quickstart (MEDIUM)** still could not run on a fresh
+       machine: no databases, no MOTHMAN_ENVIRONMENT, no marking, and the
+       second asset's pass silently replaces the first's page. It now copies
+       .env.example, creates and marks supply_quarterly and supply_daily, and
+       says which page wins, pointing at `mothman dashboard rebuild
+       --out-dir` (`pipeline run` has no `--out-dir`). Not run end to end on
+       a fresh machine. The CHANGELOG item now claims only that.
+     - **A14's declaring side (MEDIUM, defect).** `linked_datasets.problems`
+       reached a no-calendar linkage-keys only through the old
+       different-calendar branch: "never on linkage-keys's calendar None".
+       Fix: its own refusal, worded as run_reads'. Test first:
+       `test_a_declaring_dataset_naming_no_calendar` failed against fe3f5671's
+       message and passes now.
+     - **status-cases.json (LOW)** still listed "on another calendar" among
+       notchecked's causes. Clause removed.
+     - **REQ-PIPE-110 c18 (LOW)** says "naming both files and the asset", and
+       the standalone `mothman schedule validate` printed bare file names.
+       Fix (test first, three tests in test_agreement.py failing against
+       fe3f5671): the no-calendar and both not-in-the-hierarchy refusals end
+       "(the <data_asset_id> asset)" (`validate_schedule.Source.asset_label`).
+       The criterion is unchanged.
+     - **#55's open shapes (LOW, judgement)** - sample datasets, project
+       extractions, ad hoc QA, shared check definitions - had no live entry
+       once #55 came out. Now plans/running-thoughts.md #140, `investigate`.

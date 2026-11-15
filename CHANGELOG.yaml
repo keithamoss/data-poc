@@ -153,6 +153,13 @@ releases:
               Within one asset, a collection id declared twice, or one table
               declared by two datasets of the same collection, used to pass
               the checks. Both now fail, naming the two entries.
+          - headline: README quickstart for two assets
+            components: ["Docs & process"]
+            description: >
+              The README's first commands now create and mark both assets'
+              databases, set the environment and run the pipeline once for
+              each asset. The second run replaces the first's page unless you
+              build each into its own folder.
       - category: Improved
         items:
           - headline: Fewer, truer commands
