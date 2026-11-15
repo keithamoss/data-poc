@@ -329,6 +329,23 @@ def selected_asset(monkeypatch, request):
 
 
 @pytest.fixture
+def no_recorded_filings(supply_dsn):
+    """This worker database with no filing - and so no recorded verdict - left
+    by an earlier test (REQ-PIPE-345 criterion 5). A test whose made-up periods
+    sit on a test baseline records real verdicts with fingerprints for them;
+    qa.verdict is append-only, so another test's verdict for a period this
+    test's baseline does not declare would read as a judged past that changed.
+    Requested by the modules that need it, as tests/test_verdict_record.py's
+    own `clean` truncates; never applied to the suite as a whole."""
+    from qa_tools.common import qa_store, supply_db
+
+    with supply_db.connect(label="test-no-recorded-filings") as conn:
+        qa_store.ensure_schema(conn)
+        conn.execute(f'TRUNCATE "{qa_store.SCHEMA}".filing CASCADE')
+    yield
+
+
+@pytest.fixture
 def test_baseline(tmp_path):
     """`test_baseline(*periods)` declares made-up periods on the selected
     asset's baseline, in a copy of its folder, so a period schema may be
