@@ -5298,9 +5298,12 @@ could never have computed it), and it belongs with batch 5's check work.
     shape, and promotion, period views and cross-table checks all read
     across supplies that may differ. Not scoped.
 
-95. **[todo, 2026-10-14]** **[Pipeline & publishing]** **[QA checks &
+95. **[done, 2026-10-25]** **[Pipeline & publishing]** **[QA checks &
     contract]** **[Dashboard UI]** **A dataset whose cross-table check could
-    not be judged is neither green nor red.** Priority: address in the next
+    not be judged is neither green nor red.** **SIGNED 2026-10-23 AND BUILT
+    2026-10-25** as REQ-PIPE-269/270, REQ-DASH-204 v6 and REQ-PIPE-211 c9 - the
+    INCOMPLETE shape was dropped for STRICT red (status corrected 2026-11-15,
+    found by REQ-GEN-206 v2's scoper). Was priority: address in the next
     few days (Keith, 2026-10-14 night, with #89: "given that they block some
     other requirements" - its shape holds REQ-DASH-204, REQ-PIPE-210,
     REQ-PIPE-211 and REQ-GEN-206). Both need Keith in the conversation, so
