@@ -408,5 +408,141 @@ class TestTheRealToolsReadTheSizesAsAimed:
         assert any(r["status"] == "warn" for r in results)
 
 
+@pytest.mark.asset("daily")
+class TestTheSizeIsTheTotalNotAnAddition:
+    """post-build-review #381 (critic, wip/gen-392 at f09e46c0): the derived
+    size is the number of faulty rows a check reads, so faults the clean
+    frame already carries count towards it - as targeting._set_nulls sizes
+    a total. A real batch carries ~50 null facilities of its own."""
+
+    @staticmethod
+    def _with_natural_nulls(n_null: int) -> pd.DataFrame:
+        df = _bdm_frame()
+        singles = df.index[~df["is_multiple_birth"]][:n_null]
+        df.loc[singles, "place_of_birth_facility"] = None
+        return df
+
+    def test_a_warn_lands_on_the_middle_counting_the_frames_own_nulls(self):
+        out = dirty.apply_birth_registrations_presets(self._with_natural_nulls(53), "amber", seed=3)
+        assert int(out["place_of_birth_facility"].isna().sum()) == 443
+
+    def test_a_fail_lands_on_its_size_counting_the_frames_own_nulls(self):
+        out = dirty.apply_birth_registrations_presets(self._with_natural_nulls(53), "red", seed=3)
+        assert int(out["place_of_birth_facility"].isna().sum()) == 917
+
+    def test_a_frame_already_past_the_aimed_band_is_refused(self):
+        from generator.fault_sizing import FaultSizeError
+
+        with pytest.raises(FaultSizeError, match="place_of_birth_facility.completeness"):
+            dirty.apply_birth_registrations_presets(self._with_natural_nulls(700), "amber",
+                                                    seed=3)
+
+
+@pytest.mark.asset("quarterly")
+def test_a_single_tier_fail_counts_the_frames_own_faults():
+    """#381 on Child Protection: two clients already without a given name,
+    so a Fail plants three more to make the five."""
+    df = _clients(500)
+    df.loc[[10, 20], "given_name"] = None
+    out = dirty.apply_cp_clients_presets(df, "red", seed=1)
+    assert int(out["given_name"].isna().sum()) == 5
+
+
+@pytest.mark.asset("quarterly")
+def test_the_closed_case_hygiene_count_is_exact_whatever_the_seed():
+    """post-build-review #382 (critic): a reopened investigation could then
+    have its client repointed to one that does not exist by the dangling
+    fault, and the hygiene rule's join to clients dropped it - five planted,
+    three or four read in about one seed in five."""
+    n = 181
+    clients = pd.DataFrame({"cp_client_id": [f"CPS-{i:09d}" for i in range(60)],
+                            "case_status": ["Closed" if i < 30 else "Open" for i in range(60)]})
+    notifications = pd.DataFrame({"notification_id": [f"NOTIF-{i:08d}" for i in range(n)]})
+    workers = _workers()
+    investigations = pd.DataFrame({
+        "investigation_id": [f"INV-{i:06d}" for i in range(n)],
+        "notification_id": notifications["notification_id"].values,
+        "cp_client_id": clients["cp_client_id"].values[[i % 60 for i in range(n)]],
+        "start_date": pd.to_datetime(["2025-01-01"] * n),
+        "end_date": pd.to_datetime(["2025-06-01"] * n),
+        "lead_worker_id": workers["worker_id"].values[[i % 60 for i in range(n)]],
+    })
+    closed = set(clients.loc[clients["case_status"] == "Closed", "cp_client_id"])
+    seen = set()
+    for seed in range(40):
+        out = dirty.apply_cp_investigations_presets(investigations, clients, notifications,
+                                                    workers, "red", seed=seed)
+        seen.add(int((out["end_date"].isna() & out["cp_client_id"].isin(closed)).sum()))
+    assert seen == {5}
+
+
+@pytest.mark.asset("quarterly")
+class TestEveryRefusalNamesTheBands:
+    """post-build-review #383 (critic, criterion 7): three refusal paths named
+    neither the bands nor, for broken twins, the rule."""
+
+    def test_too_few_eligible_rows(self):
+        from generator.fault_sizing import FaultSizeError
+
+        with pytest.raises(FaultSizeError) as err:
+            dirty.apply_cp_case_workers_presets(_workers(8), "red", seed=1)
+        assert "worker_id.uniqueness" in str(err.value) and "soda warn" in str(err.value)
+
+    def test_too_small_a_value_pool(self):
+        from generator.fault_sizing import FaultSizeError
+
+        carers = pd.DataFrame({"carer_id": [f"CARER-{i:06d}" for i in range(50)]})
+        p = dirty._Planter(carers, "cp_carers", "red", "a test preset",
+                           {"one_value": ("carer_id.uniqueness",)})
+        with pytest.raises(FaultSizeError) as err:
+            p.values("one_value", "carer_id", ["X"], seed=1, distinct=True)
+        assert "carer_id.uniqueness" in str(err.value) and "soda warn" in str(err.value)
+
+    @pytest.mark.asset("daily")
+    def test_too_few_twin_pairs(self):
+        from generator.fault_sizing import FaultSizeError
+
+        with pytest.raises(FaultSizeError) as err:
+            dirty.apply_birth_registrations_presets(_bdm_frame(400, pairs=2), "red", seed=1)
+        assert "Multiple-birth sibling match" in str(err.value)
+        assert "dbt warn" in str(err.value)
+
+
+@pytest.mark.asset("quarterly")
+class TestTheDerivationsOtherShapes:
+    def test_a_measure_it_cannot_plant_is_refused(self):
+        """post-build-review #384 (critic, criterion 2): any measure but bad
+        rows was read as a proportional drop, so dbt's count of ROWS IN
+        DUPLICATED GROUPS would have been sized as a share of the frame."""
+        from generator import fault_sizing
+
+        with pytest.raises(fault_sizing.FaultSizeError, match="cannot plant"):
+            fault_sizing.size(fault_sizing.catalogue(), "cp-notifications",
+                              ("notification_id.uniqueness.rows in duplicated groups",),
+                              "red", 900, "a probe")
+
+    def test_the_drop_is_still_sized_as_a_proportion(self):
+        from generator import fault_sizing
+
+        cat = fault_sizing.catalogue()
+        assert fault_sizing.size(cat, "cp-clients", ("(table).timeliness.drop",), "red", 2000,
+                                 "a probe") == 801
+
+    def test_a_fail_aimed_at_two_rules_takes_the_larger_size(self):
+        """J3: postcode warns > 0 and fails > 10 (11 + 10 = 21); sex warns
+        > 0 and fails > 20 (21 + 20 = 41)."""
+        from asset_model import check_bands as cb
+        from generator import fault_sizing
+
+        def check(col, hi):
+            return cb.Check(f"q.a.c.cp-clients.{col}.accepted_values_dbt", "dbt", "cp-clients",
+                            col, "conformity", "accepted_values", "x.yml",
+                            warn=(cb.Bound(">", 0, cb.ROWS),), fail=(cb.Bound(">", hi, cb.ROWS),))
+
+        cat = cb.Catalogue([check("postcode", 10), check("sex", 20)])
+        assert fault_sizing.size(cat, "cp-clients", ("postcode.conformity", "sex.conformity"),
+                                 "red", 500, "two rules") == 41
+
+
 #: The data asset this module acts for unless a class says otherwise (C11).
 pytestmark = pytest.mark.asset("quarterly")

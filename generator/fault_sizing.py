@@ -65,7 +65,17 @@ def catalogue():
 
 
 def _continuous(rule) -> bool:
-    return rule.measure not in ("rows",)
+    """A cross-supply proportion (a drift ratio or a drop), by the rule's
+    own reading - check_bands.Rule._continuous - never by "not rows"
+    (post-build-review #384: that read dbt's rows-in-duplicated-groups and a
+    table's size as proportions too)."""
+    return rule._continuous()
+
+
+def plantable(rule) -> bool:
+    """What a preset can size: bad rows, counted or as a percentage, or a
+    proportion removed against the previous supply."""
+    return rule.measure == "rows" or _continuous(rule)
 
 
 def _metric(rule, x: int, rows: int) -> float:
@@ -117,6 +127,22 @@ def bands_text(rule) -> str:
                      f"fail {', '.join(b.text() for b in c.fail) or '-'}" for c in rule.checks)
 
 
+def describe(cat, dataset_id: str, keys) -> str:
+    """Each aimed rule's key and its bands, for a refusal (criterion 7)."""
+    from generator.targeting import rule_key
+
+    by_key = {rule_key(r): r for r in cat.rules() if r.dataset_id == dataset_id}
+    return " | ".join(f"{k}: {bands_text(by_key[k])}" if k in by_key else f"{k}: not in force"
+                      for k in keys)
+
+
+def refusal(cat, dataset_id: str, keys, where: str, why: str) -> FaultSizeError:
+    """The one shape every refusal takes: the preset and fault (`where`),
+    why, and every aimed rule with its bands."""
+    return FaultSizeError(f"{where}: {why} ({describe(cat, dataset_id, keys)}); nothing was "
+                          f"planted")
+
+
 def rules_for(cat, dataset_id: str, keys, where: str) -> list:
     from generator.targeting import rule_key
 
@@ -137,9 +163,13 @@ def size(cat, dataset_id: str, keys, severity: str, rows: int, where: str) -> in
     rules = rules_for(cat, dataset_id, keys, where)
 
     def refuse(why: str):
-        detail = " | ".join(f"{k}: {bands_text(r)}" for k, r in zip(keys, rules))
-        return FaultSizeError(f"{where}: {severity} on {list(keys)} cannot be planted at {rows} "
-                              f"rows - {why} ({detail}); nothing was planted")
+        return refusal(cat, dataset_id, keys, where,
+                       f"{severity} on {list(keys)} cannot be planted at {rows} rows - {why}")
+
+    for r in rules:
+        if not plantable(r):
+            raise refuse(f"a preset cannot plant a {r.measure!r} rule - it sizes bad rows or a "
+                         f"proportion removed against the previous supply")
 
     if severity == WARN:
         if any(single_tier(r, rows) for r in rules):
@@ -181,5 +211,5 @@ def lands(cat, dataset_id: str, keys, severity: str, planted: int, rows: int,
         ok = _fails(r, planted, rows) if severity == FAIL else (
             not _fails(r, planted, rows) and (planted == 0 or _warns(r, planted, rows)))
         if not ok:
-            raise FaultSizeError(f"{where}: {planted} of {rows} rows do not land {severity} "
-                                 f"on {k!r} ({bands_text(r)}); nothing was planted")
+            raise refusal(cat, dataset_id, keys, where,
+                          f"{planted} of {rows} rows do not land {severity} on {k!r}")

@@ -524,9 +524,27 @@ class _Planter:
     def where(self, fault: str) -> str:
         return f"{self.preset}, fault {fault}"
 
+    def refuse(self, fault: str, why: str) -> fault_sizing.FaultSizeError:
+        """Every refusal names the preset, the fault, the rules it aims at
+        and their bands (criterion 7; post-build-review #383)."""
+        return fault_sizing.refusal(self.cat, self.dataset_id, self.aims[fault], self.where(fault),
+                                    f"{self.severity}: {why}")
+
     def size(self, fault: str, rows: int | None = None) -> int:
         return fault_sizing.size(self.cat, self.dataset_id, self.aims[fault], self.severity,
                                  len(self.df) if rows is None else rows, self.where(fault))
+
+    def to_plant(self, fault: str, already: int) -> int:
+        """How many MORE faulty rows make the derived TOTAL (post-build-review
+        #381): rows the frame already carries count towards it, as
+        targeting._set_nulls sizes a total. Refused where what is already
+        there lands somewhere other than asked - past an amber band, say -
+        since a preset only adds faults, never repairs them."""
+        want = self.size(fault)
+        n = max(0, want - already)
+        fault_sizing.lands(self.cat, self.dataset_id, self.aims[fault], self.severity,
+                           already + n, len(self.df), self.where(fault))
+        return n
 
     def _eligible(self, column: str, also=(), mask=None) -> list:
         out = self.df
@@ -541,11 +559,9 @@ class _Planter:
     def _choose(self, fault: str, eligible: list, n: int, seed: int):
         rng = np.random.default_rng(seed)
         if n > len(eligible):
-            keys = list(self.aims[fault])
-            raise fault_sizing.FaultSizeError(
-                f"{self.where(fault)}: {self.severity} on {keys} needs {n} rows and only "
-                f"{len(eligible)} of the frame's {len(self.df)} rows are eligible - the band "
-                f"cannot be reached at this row count; nothing was planted")
+            raise self.refuse(fault, f"{n} rows are needed and only {len(eligible)} of the "
+                                     f"frame's {len(self.df)} rows are eligible - the band cannot "
+                                     f"be reached at this row count")
         return rng, np.sort(rng.choice(np.array(eligible, dtype=object), size=n, replace=False)) \
             if n else np.array([], dtype=object)
 
@@ -553,27 +569,38 @@ class _Planter:
         for col in columns:
             self.touched.setdefault(col, set()).update(labels)
 
-    def nulls(self, fault: str, column: str, seed: int, mask=None) -> None:
-        n = self.size(fault)
+    def _dup_keys(self, column: str) -> int:
+        s = self.df[column].dropna()
+        return int(s[s.duplicated(keep=False)].nunique())
+
+    def nulls(self, fault: str, column: str, seed: int, mask=None, reserve=()) -> None:
+        """`reserve`: other columns of the chosen rows that later faults must
+        leave alone, because the aimed rule reads them too - the hygiene
+        rule joins a reopened investigation to its client (post-build-review
+        #382)."""
+        missing = self.df[column].isna()
+        if mask is not None:
+            missing &= mask.reindex(self.df.index, fill_value=False).astype(bool)
+        n = self.to_plant(fault, int(missing.sum()))
         rng, chosen = self._choose(fault, self._eligible(column, mask=mask), n, seed)
         if n:
             if self.df[column].dtype.kind in "biu":
                 self.df[column] = self.df[column].astype(object)
             self.df.loc[chosen, column] = None
-        self._mark(chosen, column)
+        self._mark(chosen, column, *reserve)
 
     def values(self, fault: str, column: str, pool: list, seed: int,
                distinct: bool = False) -> None:
         """Values drawn from `pool` - invalid codes, junk text, an impossible
-        date, a non-approved carer. `distinct`: for an identifier, no value is
-        drawn twice, so the fault never also plants a duplicated key."""
-        n = self.size(fault)
+        date, a non-approved carer; a row already holding one of them counts
+        towards the total. `distinct`: for an identifier, no value is drawn
+        twice, so the fault never also plants a duplicated key."""
+        n = self.to_plant(fault, int(self.df[column].isin(list(pool)).sum()))
         rng, chosen = self._choose(fault, self._eligible(column), n, seed)
         if n:
             if not pool or (distinct and n > len(pool)):
-                raise fault_sizing.FaultSizeError(
-                    f"{self.where(fault)}: {n} rows are needed and its value pool holds "
-                    f"{len(pool)} distinct values; nothing was planted")
+                raise self.refuse(fault, f"{n} rows are needed and its value pool holds "
+                                         f"{len(set(pool))} distinct values")
             draw = rng.choice(np.array(pool, dtype=object), size=n, replace=not distinct)
             if self.df[column].dtype.kind in "biu":
                 self.df[column] = self.df[column].astype(object)
@@ -582,8 +609,17 @@ class _Planter:
 
     def duplicate_values(self, fault: str, column: str, seed: int) -> None:
         """`n` duplicated keys exactly: `n` rows take the values of `n` other,
-        distinct rows, and both halves are left alone by later faults."""
-        n = self.size(fault)
+        distinct rows, and both halves are left alone by later faults.
+
+        THE TARGET'S OWN ID IS OVERWRITTEN, so a row in another table that
+        referenced it now references nothing - Child Protection's clients
+        duplicate, the notifications, placements and investigations that
+        named the overwritten client go dangling in the same delivery. Kept
+        on purpose (PROVISIONAL, overnight 2026-11-16, REQ-GEN-392's
+        decisions): those are other tables' rules, and adding a donor copy
+        instead would change the row count after every other fault was
+        sized."""
+        n = self.to_plant(fault, self._dup_keys(column))
         rng, chosen = self._choose(fault, self._eligible(column), 2 * n, seed)
         if n:
             order = rng.permutation(len(chosen))
@@ -593,9 +629,11 @@ class _Planter:
 
     def dangling(self, fault: str, column: str, seed: int, id_format: str, existing_ids,
                  id_max: int) -> None:
-        n = self.size(fault)
+        existing = set(existing_ids)
+        col = self.df[column]
+        n = self.to_plant(fault, int((col.notna() & ~col.isin(existing)).sum()))
         rng, chosen = self._choose(fault, self._eligible(column), n, seed)
-        existing, made = set(existing_ids), []
+        made: list = []
         while len(made) < n:
             candidate = id_format.format(rng.integers(0, id_max))
             if candidate not in existing and candidate not in made:
@@ -608,7 +646,9 @@ class _Planter:
         """extract_timestamp moved one to four hours before its own row's
         date_registered - and that row's date_registered then left alone, so
         a later null cannot hide the disorder."""
-        n = self.size(fault)
+        before = (pd.to_datetime(self.df["extract_timestamp"])
+                  < pd.to_datetime(self.df["date_registered"]))
+        n = self.to_plant(fault, int(before.sum()))
         rng, chosen = self._choose(fault, self._eligible("extract_timestamp", ("date_registered",)),
                                    n, seed)
         if n:
@@ -620,7 +660,7 @@ class _Planter:
     def duplicate_rows(self, fault: str, key: str, seed: int) -> None:
         """`n` rows submitted twice, every column the same - `n` duplicated
         keys exactly."""
-        n = self.size(fault)
+        n = self.to_plant(fault, self._dup_keys(key))
         rng, chosen = self._choose(fault, self._eligible(key), n, seed)
         if n:
             copies = self.df.loc[chosen]
@@ -672,11 +712,10 @@ def apply_birth_registrations_presets(df: pd.DataFrame, severity: str, seed: int
     groups = twins.groupby(["date_of_birth", "place_of_birth_facility",
                             "registering_parent_1_name"], dropna=False).groups
     pairs = [idx for idx in groups.values() if len(idx) >= 2]
-    n_break = p.size("sibling_break")
+    n_break = p.to_plant("sibling_break", sum(1 for idx in groups.values() if len(idx) == 1))
     if n_break > len(pairs):
-        raise fault_sizing.FaultSizeError(
-            f"{p.where('sibling_break')}: {severity} needs {n_break} broken twin pairs and the "
-            f"frame holds {len(pairs)}; nothing was planted")
+        raise p.refuse("sibling_break", f"{n_break} broken twin pairs are needed and the frame "
+                                        f"holds {len(pairs)}")
     if n_break:
         rng = np.random.default_rng(seed + 5)
         chosen = rng.choice(len(pairs), size=n_break, replace=False)
@@ -788,7 +827,8 @@ def apply_cp_investigations_presets(investigations_df: pd.DataFrame, clients_df:
     p = _Planter(investigations_df, "cp_investigations", severity,
                  "apply_cp_investigations_presets", CP_INVESTIGATIONS_AIMS, catalogue)
     closed = set(clients_df.loc[clients_df["case_status"] == "Closed", "cp_client_id"])
-    p.nulls("closed_case_reopened", "end_date", seed, mask=p.df["cp_client_id"].isin(closed))
+    p.nulls("closed_case_reopened", "end_date", seed, mask=p.df["cp_client_id"].isin(closed),
+            reserve=("cp_client_id",))
     p.nulls("start_null", "start_date", seed + 1)
     p.nulls("lead_worker_null", "lead_worker_id", seed + 2)
     p.duplicate_values("investigation_id_duplicate", "investigation_id", seed + 3)

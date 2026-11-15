@@ -129,9 +129,10 @@ class TestASupplyWithNothingToMeasureAgainst:
 
 
 def test_dirty_run_produces_a_real_row_count_drop_failure(monkeypatch, bdm_delivery_dirs, bdm_duckdb_dir):
-    """The dirty fixture run is ~97% smaller than the reference run
-    (tests/conftest.py) - a real, deterministic way to force
-    evaluate_evidently_bdm's row-count-growth check into a genuine
+    """The dirty fixture run is half the size of the reference run (300
+    rows generated against 600, tests/conftest.py; it was 20 until
+    REQ-GEN-392) - past the drop's 25% fail line, a real, deterministic way
+    to force evaluate_evidently_bdm's row-count-growth check into a genuine
     "fail" via real Evidently RowCount metrics on both files, not a
     hand-computed stand-in."""
     results = _run(monkeypatch, bdm_delivery_dirs, _DIRTY_RUN_ID, "2026-01-02T06:30:00Z")

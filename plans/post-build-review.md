@@ -15358,3 +15358,65 @@ twice. It deliberately did not re-find the `TypeError`.
      - **Ran**: see REQ-GEN-392's evidence (2026-11-16) - the affected modules,
        617 passed, 2 skipped; and 121 passed, 3 skipped, 5 failed in the
        deployment-reading Emergency Department class, environmental.
+
+381. **[done, 2026-11-16]** **[Data generation]** **REQ-GEN-392's presets planted the derived size on top of the faults a frame already carried.**
+     The post-build critic on wip/gen-392 at f09e46c0, confirmed against the
+     code. `_Planter.nulls`/`values` added n NEW faulty rows, so a real batch's
+     own ~50 null facilities came on top: a Warn at 1,567 rows derived 418 and
+     held 434-438, and red supplies ran about 27 over their size (criteria 3
+     and 6).
+     - **Fix** (defect, failing test first): every fault plants the derived
+       TOTAL less what the frame already carries, as `targeting._set_nulls`
+       does, then checks the total lands; a frame already past the aimed band
+       is refused. `TestTheSizeIsTheTotalNotAnAddition` (three tests) and
+       `test_a_single_tier_fail_counts_the_frames_own_faults` failed against
+       f09e46c0 (496, 970, not refused, 7) and pass now.
+     - **PROVISIONAL (overnight 2026-11-16)**: "already faulty" for a value
+       fault is a value from its own pool.
+
+382. **[done, 2026-11-16]** **[Data generation]** **Child Protection's closed-case hygiene count was not exact.**
+     Same critic. The reopened investigation's cp_client_id was not reserved,
+     so the dangling-client fault could repoint it to a client that does not
+     exist, and the hygiene rule's join dropped it: 5 planted, 3-4 read in
+     about one seed in five.
+     - **Fix** (defect, failing test first): the hygiene fault reserves
+       cp_client_id. `test_the_closed_case_hygiene_count_is_exact_whatever_the_seed`
+       (40 seeds) read {4, 5} against f09e46c0 and {5} now.
+
+383. **[done, 2026-11-16]** **[Data generation]** **Three refusal paths named neither the bands nor, for twins, the rule.**
+     Same critic (criterion 7): too few eligible rows, too small a value pool
+     and too few twin pairs.
+     - **Fix** (defect, failing test first): all three go through
+       `fault_sizing.refusal()`, which appends every aimed rule and its bands.
+       `TestEveryRefusalNamesTheBands` (three tests) failed against f09e46c0
+       and passes now.
+
+384. **[done, 2026-11-16]** **[Data generation]** **The derivation read any measure but bad rows as a proportional drop.**
+     Same critic (criterion 2, latent - no preset aims at one today):
+     `fault_sizing._continuous` was "measure is not rows", so dbt's rows in
+     duplicated groups or a table's size would have been sized as a share of
+     the frame.
+     - **Fix** (defect, failing test first): continuity is the rule's own
+       (`check_bands.Rule._continuous`), and any other measure is refused by
+       name. `test_a_measure_it_cannot_plant_is_refused` was refused for the
+       wrong reason against f09e46c0 and is refused by name now;
+       `test_the_drop_is_still_sized_as_a_proportion` passed before and after.
+
+385. **[done, 2026-11-16]** **[Data generation]** **[Testing & dev tooling]** **The critic suspected a redirected generation wrote the real scenario_placements.json; it does not.**
+     Checked rather than assumed: generator/output.py's `redirect()` already
+     moves the placements with the other three outputs, and the builder's
+     probe generations left no file under the worktree's data/. The five
+     TestTheEarlyEmergencyDepartmentSupplies failures came from this worktree
+     having no data/quarterly/scenario_placements.json at all (gitignored,
+     written by the main checkout's bootstrap).
+     - **Test kept anyway**: `test_a_redirected_generation_writes_nothing_under_the_real_data_tree`
+       asserts EVERY file under the real data/ is untouched, where the existing
+       test names four outputs - so a fifth output added later cannot write the
+       real tree unseen. It passed when first run; not a defect.
+     - **Also from this critic** (polish, recorded in REQ-GEN-392's decisions):
+       F3, criterion 13 declared unmet; F6, the cross-table limit of a
+       duplicated key stated (PROVISIONAL); F7, test_run_evidently_bdm.py's
+       "~97% smaller" now says half; J1 and J2 recorded for Keith; J3's
+       two-rule Fail test added.
+     - **Ran** (#381-#385): see REQ-GEN-392's evidence - 29 affected modules,
+       629 passed, 2 skipped; ruff clean.
