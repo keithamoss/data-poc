@@ -118,7 +118,11 @@ def minted(monkeypatch):
     real = slots.slots_for_dataset
 
     def with_minted(dataset_id, until=None, agreement=None):
-        out = real(dataset_id, until=until, agreement=agreement)
+        # A MINTED NAME IS ON THE TEST BASELINE (REQ-PIPE-345 criterion 5), so
+        # the calendar gives it a slot of its own, dated in 2099; the minted
+        # slot, with the timing this test means, stands in for it.
+        out = [s for s in real(dataset_id, until=until, agreement=agreement)
+               if s.name not in registry]
         return out + [s for s in registry.values() if s.dataset_id == dataset_id]
 
     monkeypatch.setattr(slots, "slots_for_dataset", with_minted)
