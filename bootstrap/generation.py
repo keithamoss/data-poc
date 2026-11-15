@@ -37,7 +37,23 @@ def generate_collection(collection_id: str, *, trial: bool,
                         try_targets: Callable[[str], object] | None = None,
                         say: Callable[[str], None] = print) -> None:
     """One collection's synthetic history, its trial where `trial`, then the
-    scenario map."""
+    scenario map - ALL UNDER ONE CONFIGURATION PIN (REQ-GEN-398 criterion 1):
+    the bootstrap's own where it installed one around every collection's
+    generation (criterion 2), else one taken here, so the generator, the
+    target trial's processes (handed it through assets.handoff) and the map
+    writer all read the configuration as it stood when this began.
+
+    PROVISIONAL (2026-11-16): the scenario map writer (qa_tools/common/
+    scenario_map.write_map) is pinned by this caller rather than installing a
+    pin itself - it is a pipeline module, and only the synthetic side installs
+    one (REQ-PIPE-397 criterion 4)."""
+    from asset_model import config_pin
+
+    with config_pin.pinned():
+        _generate_collection(collection_id, trial=trial, try_targets=try_targets, say=say)
+
+
+def _generate_collection(collection_id: str, *, trial: bool, try_targets, say) -> None:
     from qa_tools.common import scenario_map
 
     public.require_generator(collection_id)
@@ -58,3 +74,10 @@ def generate_collection(collection_id: str, *, trial: bool,
     elif declared:
         say(SKIPPED)
     scenario_map.write_map(naming_mine=public.this_assets_scenarios())
+
+
+def took_line(seconds: float) -> str:
+    """What `mothman <collection> generate-synthetic-data` prints when it ends
+    on its own (REQ-GEN-398 criterion 3): one line naming how long generation
+    took, in the 'Took ...' line's own form."""
+    return f"Took generation {seconds:.0f}s."

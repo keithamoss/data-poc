@@ -301,22 +301,25 @@ def handoff() -> tuple:
     around its own replay, since a clock anchored on this process's monotonic
     time means nothing in another. The rolling anchor (REQ-GEN-404) is not
     built, so nothing of it is handed yet."""
-    from asset_model import config_pin
+    from asset_model import arrivals, config_pin
 
-    return (selected().name, _describe(_layout), config_pin.installed())
+    return (selected().name, _describe(_layout), config_pin.installed(),
+            arrivals.installed_tree())
 
 
-def adopt(name: str, layout: tuple = ("default",), snapshot=None) -> Asset:
+def adopt(name: str, layout: tuple = ("default",), snapshot=None, tree=None) -> Asset:
     """A started process's first act: take the layout and the asset it was
-    handed (`handoff()`), select the asset - refused as `select` refuses - and
-    pin the configuration snapshot it was handed, verified against its digest
-    (REQ-PIPE-397 criterion 12), or hold none if it was handed none."""
+    handed (`handoff()`), select the asset - refused as `select` refuses - pin
+    the configuration snapshot it was handed, verified against its digest
+    (REQ-PIPE-397 criterion 12), and hold the delivery-tree snapshot it was
+    handed (REQ-PIPE-430) - or neither, if it was handed neither."""
     global _layout
     _layout = _rebuild(layout)
     asset = select(name)
-    from asset_model import config_pin
+    from asset_model import arrivals, config_pin
 
     config_pin.adopt(snapshot)
+    arrivals.adopt_tree(tree)
     return asset
 
 

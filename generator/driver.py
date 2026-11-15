@@ -153,7 +153,22 @@ def no_instant_shared_with_another_collection(key, manifest: list[dict]) -> None
 
 def generate(collection_id: str) -> list[dict]:
     """Write `collection_id`'s whole synthetic history; returns its
-    bookkeeping. Refused by name for a collection with no provider."""
+    bookkeeping. Refused by name for a collection with no provider.
+
+    WITH THE ASSET'S CONFIGURATION PINNED (REQ-GEN-398 criterion 1): read once
+    before the first configuration read and answered from that read until the
+    generation ends - the pin already installed where a bootstrap or the
+    generate command installed one around this call, so a generation is one
+    pin. Refused on an asset that does not declare `synthetic: true`
+    (REQ-PIPE-397 criterion 3). The DELIVERY TREE is never snapshotted here
+    (criterion 4): a generation recognises the tree it has just written."""
+    from asset_model import config_pin
+
+    with config_pin.pinned():
+        return _generate(collection_id)
+
+
+def _generate(collection_id: str) -> list[dict]:
     from generator import collections, delivery_names, scenario_injection
     from generator.resupply import MAX_ATTEMPTS
     from asset_model import arrivals

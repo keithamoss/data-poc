@@ -274,8 +274,11 @@ def generate_collection(collection_id: str, *, trial: bool) -> None:
     """One collection's synthetic history, its target trial, then the scenario
     map - bootstrap/generation.py's, with its refusals said as this terminal
     says a refusal."""
+    import time
+
     from bootstrap import generation
 
+    started = time.monotonic()
     try:
         generation.generate_collection(
             collection_id, trial=trial, try_targets=try_targets,
@@ -284,6 +287,10 @@ def generate_collection(collection_id: str, *, trial: bool) -> None:
         raise click.ClickException(str(exc)) from None
     except generation.TargetTrialUnavailable as exc:
         raise TargetTrialUnavailable(str(exc)) from None
+    # ONE LINE, ITS OWN (REQ-GEN-398 criterion 3; CLI finding 4): run on its
+    # own, the command says how long generation took. Inside a bootstrap it is
+    # an entry of the 'Took ...' line instead, and this function is not used.
+    console.print(generation.took_line(time.monotonic() - started), style="dim")
 
 
 @pipeline_group.command("cache-key")
@@ -332,19 +339,29 @@ def bootstrap_command(collection: str, force: bool, sequential: bool,
     populate-a-throwaway-database step, so none of the three can drift
     from the others.
     """
-    from bootstrap.bootstrap import bootstrap
+    from bootstrap import bootstrap as boot
 
-    result = bootstrap(collection=collection, force=force, sequential=sequential,
-                        on_step=_step, checkpoint_before=checkpoint_before,
-                        skip_target_trial=skip_target_trial, try_targets=try_targets)
+    result = boot.bootstrap(collection=collection, force=force, sequential=sequential,
+                            on_step=_step, checkpoint_before=checkpoint_before,
+                            skip_target_trial=skip_target_trial, try_targets=try_targets)
     if result.refused:
         raise click.ClickException(result.reason)
     if not result.populated:
         console.print(result.reason, style="yellow")
         return
-    console.print(
-        f"Populated: {result.staged_after} staged table(s) in this environment.",
-        style="green")
+    # AFTER THE 'Took' AND BUDGET LINES, IN THIS ORDER (REQ-GEN-399 criterion
+    # 4): the pinned digest, dimmed, then the closing line.
+    if result.pin_digest:
+        console.print(boot.pinned_line(result.pin_digest), style="dim")
+    console.print(f"Populated: {boot.closing_line(result)}", style="green")
+    # A STARTED PROCESS UNDER ANOTHER PIN FAILS THE BOOTSTRAP (criterion 3).
+    mismatch = boot.pin_mismatch_message(result.pin_differences)
+    if mismatch:
+        raise click.ClickException(mismatch)
+    # A DELIVERY TREE CHANGED MID-REPLAY FAILS IT TOO (REQ-PIPE-430 criterion 3).
+    changed = boot.tree_changed_message(result.tree_changes)
+    if changed:
+        raise click.ClickException(changed)
     if result.checkpoint:
         # REPEATED AT THE END (post-build-review #133 B6) - the line that
         # took it is hundreds of lines up.
@@ -493,6 +510,11 @@ def resume_command(name: str, sequential: bool) -> None:
     console.print(f"  export {supply_db.SUPPLY_DSN_ENV}={_pasteable(result.dsn)}",
                   soft_wrap=True, highlight=False)
     console.print("To go back, set it to your previous value again.", style="dim")
+    from bootstrap import bootstrap as boot
+
+    changed = boot.tree_changed_message(result.tree_changes)
+    if changed:
+        raise click.ClickException(changed)
     _fail_on_disagreements(result.disagreements)
 
 
