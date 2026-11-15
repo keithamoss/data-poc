@@ -3598,4 +3598,16 @@ one or more component tags, and a date.
       then timing, then REQ-GEN-392, then REQ-GEN-206, as far as the night
       allows. Resets of supply_quarterly/supply_daily from empty approved for
       tonight, as often as 392 and 206 need. Keith nudged to stop at 21:18.
+    - **THE SPLIT IS FINISHED (~21:35)**: T5 merged (2a82db12). REQ-DOCS-358
+      built, with c1 (the LATER amendments), c3's hosting notes and c4 (#109,
+      #131, #134's plans entries) unmet, each blocked by the feature it waits
+      on. The c2 sweep amended 127 criteria; 39 still name an old path, each for
+      a recorded reason. **FOR KEITH (Q13.1)**: REQ-QAC-294 c3 still says the
+      synthetic inputs file is "kept at the top of contract/ among the
+      asset-wide files - added to validate_collections.ASSET_WIDE ... by
+      amendment A8" - a clause outside the wording you approved, so it was left
+      as is. Recommended: drop that clause (the file is under
+      assets/<asset>/synthetic/ now). **NOT VERIFIED**: the README's new
+      quickstart was never run on a fresh machine (it would write real
+      supply_* databases).
 
