@@ -109,6 +109,26 @@ intro: >
   all three.
 
 releases:
+  - date: "2026-11-15"
+    summary: >
+      Two new checks keep the code's boundaries and the two assets' dbt
+      packages in line, on every change.
+    changes:
+      - category: New
+        items:
+          - headline: Imports checked across boundaries
+            components: ["Testing & dev tooling"]
+            description: >
+              A new check fails any import between the real pipeline, the
+              synthetic data generator and the command line that the planned
+              separation forbids. Today's crossings are listed, each with the
+              work that removes it, and the list can only shrink.
+          - headline: Both assets on the same dbt packages
+            components: ["Testing & dev tooling", "QA checks & contract"]
+            description: >
+              A second new check fails when the two assets' dbt projects ask
+              for different package versions, naming the first difference and
+              the command to run once both match.
   - date: "2026-11-14"
     summary: >
       The Feedback tab now gathers its cards from a second road-testing file

@@ -49522,7 +49522,7 @@ requirements:
     date_written: '2026-11-03'
     story: As whoever maintains the pipeline, I want every asset to run its checks on the same dbt packages, so that a check behaves the same on every asset and a package upgrade cannot land in one asset and be forgotten in the other.
     moscow: should
-    status: not_started
+    status: built
     source: Keith, the split overview's decision 2, the dbt package files (SPLIT D2, 2026-11-03, Perth). Drafted by delivery-scoper 2026-11-03 (v4); v5 2026-11-14 unchanged; v6 2026-11-14 with the CLI review's findings 4 and 5 and the architect's named-subcommand point. A PROPOSAL, not signed until Keith signs v6. Signed by Keith 2026-11-14 as v6 (docs/drafts/separation-v6.yaml), after the v5 reviews and v6's own questions.
     acceptance_criteria:
     - THE SYSTEM SHALL keep a packages.yml and a package-lock.yml in every asset's dbt project (assets/<asset>/dbt/), because dbt reads them from each project, and `mothman env dbt-deps` SHALL install each asset's from its own (REQ-QAC-368).
@@ -49538,12 +49538,29 @@ requirements:
     - 'COST: no database and no bootstrap; seconds in CI.'
     dependencies:
     - REQ-QAC-368
+    linked_tests:
+    - tests/test_validate_dbt_packages.py
+    implemented_by:
+    - qa_tools/common/validate_dbt_packages.py::asset_projects
+    - qa_tools/common/validate_dbt_packages.py::first_difference
+    - qa_tools/common/validate_dbt_packages.py::problems
+    - qa_tools/common/validate_dbt_packages.py::main
+    - cli/dashboard.py::validate_dbt_packages_command
+    - cli/check.py::_GATES
+    - cli/check.py::_REPOSITORY_WIDE
+    - .github/workflows/validate-config.yml
+    evidence:
+    - '2026-11-15: tests/test_validate_dbt_packages.py 9 passed (all marked critical, no database); seen failing first with cli/check.py, cli/dashboard.py and validate-config.yml at the base commit (the command, the check gate and the workflow step, 3 failed), and with the gate module absent (collection error); four mutants of the gate (bytes compared instead of parsed YAML, the lock file left out, the second asset never compared, one asset not reported) each failed the test written for it. `mothman dashboard validate-dbt-packages` run per asset leg with no DSN, as validate-config.yml runs it: both legs exit 0, ''agree across 2 assets (daily, quarterly)'', 0.4-0.6s.'
+    - 'Criterion 1 holds as REQ-QAC-368 built it: assets/quarterly/dbt/ and assets/daily/dbt/ each keep packages.yml and package-lock.yml, and `mothman env dbt-deps` installs each asset''s from its own; this requirement added the gate that holds them equal.'
     decisions:
     - SAME PACKAGES, KEPT PER PROJECT, GATED (SPLIT D2, SETTLED by Keith 2026-11-03). REJECTED packages per asset, and one shared install folder.
     - 'PARSED, NOT BYTES (delivery-scoper): a comment is not a package.'
     - 'THE LOCK FILE IS COMPARED TOO (delivery-scoper): REQ-QAC-368 decision 5 as changed by C6 (SETTLED by Keith 2026-11-02) makes dbt''s own package-lock.yml the meaning of ''installed''.'
     - 'REPOSITORY-WIDE, AND A NAMED SUBCOMMAND (CLI review finding 4; architect): with no asset selected a per-asset gate runs once per asset folder; validate-config.yml runs individual commands, so the gate needs one.'
     - 'people.yaml AND data-asset.yaml HAVE NO GATE (SPLIT D2, SETTLED by Keith 2026-11-03): see REQ-QAC-387.'
+    - 'COMPARED AGAINST THE FIRST ASSET BY NAME (builder, 2026-11-15): each asset folder''s two files are compared with the alphabetically first asset''s, so with three assets one disagreeing asset is one finding naming it and the first, not two. A file one asset lacks is a difference, read as ''(absent)''.'
+    - 'THE FIRST DIFFERENCE IS A PATH INTO THE PARSED FILE (builder, 2026-11-15), such as packages[0].revision or sha1_hash, with both values: what an upgrader edits, and quoting or comments never produce one.'
+    - 'NO dbt_common IMPORT (builder, 2026-11-15): dbt_common imports the database module, so the gate names packages.yml and package-lock.yml itself, keeping it free of the database driver as criterion 4 asks.'
     open_questions: []
     signed_off:
       by: Keith
