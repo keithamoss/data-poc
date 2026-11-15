@@ -14924,13 +14924,14 @@ twice. It deliberately did not re-find the `TypeError`.
      reads the words tolerates the gap there; #333's fixture now inserts at the
      end of `collections:` instead, and the same change would fix this one.
 
-340. **[done, 2026-11-15]** **[Pipeline & publishing]** **[QA checks & contract]** **The critic on REQ-PIPE-345 (split T2, da5bd1d4): c5, two loose ends, and one design point.**
+340. **[in-progress, 2026-11-15]** **[Pipeline & publishing]** **[QA checks & contract]** **The critic on REQ-PIPE-345 (split T2, da5bd1d4): c5, two loose ends, and one design point.**
      The critic confirmed every live criterion but c5 met, period output
      byte-identical to the base for every dataset of both assets, every
      deleted test one of retired behaviour, and test_distribution_groups'
      failure present on the base too (not this change). Its findings, verified
      against the code before acting:
-     - **c5, built as Keith's option (a), 2026-11-15**: `ensure_period_schema`,
+     - **c5, Keith's option (a), 2026-11-15 - guard built, test migration NOT
+       finished**: `ensure_period_schema`,
        the one place a period schema is created, refuses a period its asset's
        baseline does not name - naming the period, the asset and the baseline -
        before anything reaches the database (`schedule.on_baseline`). The
@@ -14941,6 +14942,15 @@ twice. It deliberately did not re-find the `TypeError`.
        `test_baseline` fixture declares named ones). No conftest exemption. Test
        first: `tests/test_baseline_calendar.py::TestNoSchemaForAPeriodOffTheBaseline`
        reached `CREATE SCHEMA period_2023_m03` against the old code.
+       Of the 43 modules the guard first broke, 37 pass with their periods
+       declared. Six do not yet - test_carry_forward_review, test_period_opening,
+       test_placements_page, test_withdrawal, test_door_flag_parity and
+       test_place_held_supply (the last runs past a 7-minute limit) - because a
+       made-up period on the baseline is a REAL period: it gets slots, due
+       instants and recorded verdict fingerprints, and an append-only verdict
+       left by one test makes the drift backstop refuse the next test's
+       dataset when that test's copy lacks the period. Open, with the
+       coordinator.
      - **Defect (LOW): the gate's expects-nothing check still read a dataset's
        own `dates:`, and the merged view kept a hierarchy `dates:`**, which got
        only the generic unknown-key error. Fixed: the read is gone, the merged

@@ -251,6 +251,7 @@ class TestItPointsOnlyAtARealPromotedTable:
                              lambda ds: {second: REASON, third: REASON})
         order = {first: date(2099, 1, 1), second: date(2099, 4, 1),
                   third: date(2099, 7, 1)}
+        baseline_periods.declare(*order, dates=order)
         monkeypatch.setattr(inheritance.schedule, "date_of",
                              lambda name, ds: order.get(name))
         period_schema.open_period(conn, third, opened_by="rule")
