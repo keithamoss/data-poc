@@ -30,8 +30,7 @@ def test_every_dataset_computes_what_it_did_before_the_move(asset):
     assert pinned, "the pin holds no dataset - the comparison would prove nothing"
     # EVERY PINNED DATASET IS SOME ASSET'S (the asset split), read from every
     # asset's own data-asset.yaml - so a dataset lost from both assets fails
-    # here even though each asset's run below sees only its own. Not from
-    # assets/moved-paths.yaml, which REQ-TEST-366 criterion 3 deletes.
+    # here even though each asset's run below sees only its own.
     declared = set()
     for name in assets.names():
         doc = yaml.safe_load((asset_folders.real_folder_of(name) / "data-asset.yaml").read_text())

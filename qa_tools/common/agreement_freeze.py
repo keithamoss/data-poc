@@ -572,13 +572,8 @@ def code_owners(codeowners_text: str | None, path: str) -> set[str]:
 
 
 def _base_owners(base_codeowners: str | None, path: str) -> set[str]:
-    """code_owners of `path` in CODEOWNERS as it stood at the base - matched
-    against the path the file HAD there, in the push that carries the asset
-    move (REQ-TEST-366 criterion 2), since the base CODEOWNERS names the old
-    path."""
-    from qa_tools.common import assets, moved_paths
-
-    return code_owners(base_codeowners, moved_paths.old_path(path, assets.ROOT) or path)
+    """code_owners of `path` in CODEOWNERS as it stood at the base."""
+    return code_owners(base_codeowners, path)
 
 
 # ---- the gate -------------------------------------------------------

@@ -57,11 +57,12 @@ class TestTheTreesAssets:
         assert eq.tree_assets(tmp_path) == ["daily", "quarterly"]
         assert eq._tree_state(tmp_path, "daily", "data") == tmp_path / "data" / "daily"
 
-    def test_a_tree_from_before_the_split_is_its_one_asset(self, tmp_path):
+    def test_a_tree_from_before_the_split_is_refused(self, tmp_path):
+        # The move map that read the old layout is gone (REQ-TEST-366 c3).
         (tmp_path / "contract").mkdir()
         (tmp_path / "contract" / "data-asset.yaml").write_text("data_asset_id: data-asset-1\n")
-        assert eq.tree_assets(tmp_path) == ["data-asset-1"]
-        assert eq._tree_state(tmp_path, "data-asset-1", "data") == tmp_path / "data"
+        with pytest.raises(eq.Refused, match="no asset folder"):
+            eq.tree_assets(tmp_path)
 
     @pytest.mark.asset("daily")
     def test_files_are_named_under_data_whatever_the_layout(self, tmp_path):

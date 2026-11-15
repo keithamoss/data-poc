@@ -462,25 +462,19 @@ def _in_tree(tree: Path, folder: Path) -> Path:
 
 def tree_assets(tree: Path) -> list[str]:
     """The assets a captured tree holds (REQ-TEST-357 criterion 2): one per
-    folder under its assets/ after the split, each holding a data-asset.yaml;
-    before it, the one asset its contract/data-asset.yaml names."""
-    import yaml
+    folder under its assets/, each holding a data-asset.yaml.
 
+    A TREE FROM BEFORE THE SPLIT IS REFUSED. It was read through the move map
+    (REQ-TEST-366), which said where data-asset.yaml used to be; the map was
+    deleted in the push after the move (criterion 3), and with criterion 2 of
+    REQ-TEST-357 retired nothing compares across the split any more."""
     root = tree / "assets"
     found = sorted(p.name for p in root.iterdir()
                    if p.is_dir() and (p / "data-asset.yaml").is_file()) if root.is_dir() else []
-    if found:
-        return found
-    # Before the split: where the move map says data-asset.yaml used to be
-    # (assets/moved-paths.yaml, which outlives the move), so this module never
-    # spells the old layout itself (REQ-PIPE-342 criterion 6's guard).
-    from qa_tools.common import moved_paths
-
-    mm = moved_paths.parse((ROOT / moved_paths.MAP_REL).read_text())
-    old = next(o for o, news in mm.targets.items()
-               if news and all(Path(n).name == "data-asset.yaml" for n in news))
-    doc = yaml.safe_load((tree / old).read_text()) or {}
-    return [str(doc["data_asset_id"])]
+    if not found:
+        raise Refused(f"the tree at {tree} holds no asset folder (assets/<asset>/data-asset.yaml) "
+                      f"- a commit from before the asset split cannot be captured.")
+    return found
 
 
 def _tree_state(tree: Path, asset: str, kind: str) -> Path:

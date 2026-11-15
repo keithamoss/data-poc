@@ -203,6 +203,17 @@ class TestHierarchyAgreement:
         assert len(errors) == 1
         assert "data-asset-9" in errors[0]
 
+    def test_the_former_data_asset_id_is_refused(self):
+        """REQ-QAC-344 criterion 6: once the move map and its id transform
+        are gone, the asset-segment check (REQ-PIPE-364 criterion 2) refuses
+        an id still carrying data-asset-1 - here a real check's id with the
+        segment the move renamed put back."""
+        real = next(c.check_id for c in vcl.collect_checks(None))
+        former = "data-asset-1." + real.partition(".")[2]
+        errors = ci.validate_hierarchy_agreement([former])
+        assert errors == [f"check_id {former!r} names data asset 'data-asset-1', but this "
+                          f"deployment is 'daily'"]
+
     def test_a_malformed_id_is_left_to_the_grammar_rule(self):
         """Reporting the same id twice, once per rule, makes a fixing
         session read two lists to find one problem."""
