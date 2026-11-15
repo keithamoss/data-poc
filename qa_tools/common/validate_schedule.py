@@ -94,6 +94,24 @@ class Source:
     def calendar_name(self) -> str:
         return self.agreement_path.name
 
+    @property
+    def asset_label(self) -> str:
+        """'the <data_asset_id> asset', read from the asset file itself -
+        REQ-PIPE-110 criterion 18 names the asset, and the standalone
+        `mothman schedule validate` prints bare file names with no [asset]
+        prefix, so a problem that must name it says it in words."""
+        asset_id = None
+        # The calendar's own Source (validate's cal_src) points asset_path at
+        # calendar.yaml, so fall back to the data-asset.yaml beside it.
+        for path in (self.asset_path, self.asset_path.parent / "data-asset.yaml"):
+            try:
+                asset_id = (yaml.safe_load(path.read_text()) or {}).get("data_asset_id")
+            except (OSError, yaml.YAMLError, AttributeError):
+                asset_id = None
+            if asset_id:
+                break
+        return f"the {asset_id} asset" if asset_id else "this asset"
+
     @classmethod
     def default(cls) -> "Source":
         """The selected asset's own configuration, resolved now (REQ-PIPE-342
@@ -622,7 +640,7 @@ def _dataset_errors(raw: dict, src: Source) -> list[ConfigError]:
                 src.name, scope,
                 f"is in {assets.selected().data_asset_yaml.name}'s hierarchy, and "
                 f"{src.calendar_name} declares no baseline calendar and no deliberate "
-                f"no-calendar declaration for it.",
+                f"no-calendar declaration for it ({src.asset_label}).",
                 f"In {src.calendar_name}, declare the asset's baseline under `calendars:`, or "
                 f"declare `{schedule.NO_CALENDAR_KEY}: {schedule.NOT_YET_AGREED}` for this "
                 f"dataset if no schedule has been agreed for it yet (or `{schedule.NEVER}` "
@@ -1415,14 +1433,16 @@ def _participation_errors(cal_raw: dict, raw: dict, src: Source) -> list[ConfigE
         if c not in collection_ids:
             out.append(ConfigError(
                 file_name, f"collection {c!r}",
-                f"is named in {file_name} and is not a collection in {src.name}'s hierarchy.",
+                f"is named in {file_name} and is not a collection in {src.name}'s hierarchy "
+                f"({src.asset_label}).",
                 f"Correct the id, or add the collection to {src.name}. The two files have to "
                 f"agree about what exists."))
     for did in entries:
         if did not in hierarchy_ids:
             out.append(ConfigError(
                 file_name, f"dataset {did!r}",
-                f"is named in {file_name} and is not a dataset in {src.name}'s hierarchy.",
+                f"is named in {file_name} and is not a dataset in {src.name}'s hierarchy "
+                f"({src.asset_label}).",
                 f"Correct the id, or add the dataset to {src.name}. The two files have to "
                 f"agree about what exists."))
 

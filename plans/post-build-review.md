@@ -15139,3 +15139,47 @@ twice. It deliberately did not re-find the `TypeError`.
        runs the step's shell with `uv` stood in for; against 3aa2d022's
        workflow it failed (exit 0 with the failing asset), and passes now.
        Not run on a GitHub runner.
+
+350. **[done, 2026-11-15]** **[Docs & process]** **[QA checks & contract]** **The critic on split T5 (fe3f5671): REQ-DOCS-358's sweep, A13/A14 and the docs.**
+     The critic sampled 24 of the c2 sweep's rewrites and all held. What it
+     found, and what was done (Keith answered the judgement calls 2026-11-15):
+     - **c2's three ambiguous criteria / a contradictory flip record**
+       (finding 4: Keith's flip decision listed c1, c3 and c4 unmet, the
+       record also c2). Keith gave the wording: REQ-PIPE-190 c1 names the two
+       contracts' real paths, REQ-TEST-252 c15 reads "assets/, data/ or
+       reports/", REQ-QAC-294 c3 reads "assets/<asset>/synthetic/
+       synthetic_inputs.yaml (today the quarterly asset's)" with its stale
+       move note dropped. Each AMENDED by REQ-DOCS-358; c2's unmet entry is
+       gone, so c2 is met. REQ-QAC-294 c3 still says "kept at the top of
+       contract/ among the asset-wide files - added to ...ASSET_WIDE ... by
+       amendment A8", outside Keith's wording: left for him.
+     - **REQ-PIPE-240 c9** missed CORRECTION_RIDERS, which
+       validate_collections already exempts. Keith's wording applied.
+     - **CLAUDE.md E2/E4 and README** said the shared collections folders
+       hold only base.py; they hold `__init__.py` (the registry, the provider
+       loader) too. Corrected, Keith-approved, nothing else in CLAUDE.md
+       touched.
+     - **The README quickstart (MEDIUM)** still could not run on a fresh
+       machine: no databases, no MOTHMAN_ENVIRONMENT, no marking, and the
+       second asset's pass silently replaces the first's page. It now copies
+       .env.example, creates and marks supply_quarterly and supply_daily, and
+       says which page wins, pointing at `mothman dashboard rebuild
+       --out-dir` (`pipeline run` has no `--out-dir`). Not run end to end on
+       a fresh machine. The CHANGELOG item now claims only that.
+     - **A14's declaring side (MEDIUM, defect).** `linked_datasets.problems`
+       reached a no-calendar linkage-keys only through the old
+       different-calendar branch: "never on linkage-keys's calendar None".
+       Fix: its own refusal, worded as run_reads'. Test first:
+       `test_a_declaring_dataset_naming_no_calendar` failed against fe3f5671's
+       message and passes now.
+     - **status-cases.json (LOW)** still listed "on another calendar" among
+       notchecked's causes. Clause removed.
+     - **REQ-PIPE-110 c18 (LOW)** says "naming both files and the asset", and
+       the standalone `mothman schedule validate` printed bare file names.
+       Fix (test first, three tests in test_agreement.py failing against
+       fe3f5671): the no-calendar and both not-in-the-hierarchy refusals end
+       "(the <data_asset_id> asset)" (`validate_schedule.Source.asset_label`).
+       The criterion is unchanged.
+     - **#55's open shapes (LOW, judgement)** - sample datasets, project
+       extractions, ad hoc QA, shared check definitions - had no live entry
+       once #55 came out. Now plans/running-thoughts.md #140, `investigate`.

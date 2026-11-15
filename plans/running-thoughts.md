@@ -6216,3 +6216,26 @@ could never have computed it), and it belongs with batch 5's check work.
      384MB. The chunked suite runner now also clears
      `/tmp/pytest-of-root/pytest-[0-9]*` between chunks. The retention setting
      and the fixtures cleaning their own copies are still to look at.
+
+140. **[investigate, 2026-11-15]** **[Pipeline & publishing]** **[Docs & process]** **How the configuration holds the shapes beyond two assets - carried over from #55.**
+     #55 came out on 2026-11-15 once its one decision was carried: one
+     repository with a configuration folder per asset for the PoC, a
+     repository per asset or injected configuration being a future decision
+     point (REQ-PIPE-342's decisions). It also listed shapes that decision
+     deliberately did not cover, and they had no other live entry, so they
+     are kept here, still open and not scoped:
+     - **Sample datasets** (REQ-PIPE-106) - no calendar, real checks,
+       otherwise ordinary: same hierarchy, several at once, cross-table
+       checks among them. Which asset folder they live in, or whether they
+       are an asset of their own, is undecided.
+     - **Project extractions** - supplies and no cadence ever, one dashboard
+       per extraction; REQ-PIPE-379's `no_calendar: never` is the reading
+       half, not the configuration's home.
+     - **Ad hoc QA**, which Keith named on 2026-09-27 and nothing has scoped.
+     - **Shared check definitions** - the largest hand-authored body, and the
+       one most likely to be shared between assets rather than copied per
+       asset folder; today each asset holds its own.
+     Keith's option set from #55 stands as the starting set: all in one
+     repository, a repository per asset, or shared checks with per-asset
+     configuration injected at deploy time. This is configuration
+     architecture, not code architecture (REQ-PIPE-240 to 248).

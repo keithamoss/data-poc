@@ -17,9 +17,24 @@ Run it yourself:
 
 ```bash
 uv sync --dev
+cp .env.example .env   # MOTHMAN_PG, MOTHMAN_TEST_DSN and MOTHMAN_ENVIRONMENT="local" -
+                       # edit the URLs to match your PostgreSQL server
+# One database per asset, supply_<asset>, on the server MOTHMAN_PG names:
+for asset in quarterly daily; do
+  psql "postgresql://user:password@localhost:5432/postgres" -c "CREATE DATABASE supply_$asset"
+done
 for asset in quarterly daily; do MOTHMAN_ASSET=$asset uv run mothman env dbt-deps; done
+for asset in quarterly daily; do MOTHMAN_ASSET=$asset uv run mothman env mark --confirm $asset/local; done
 for asset in quarterly daily; do MOTHMAN_ASSET=$asset ./mothman pipeline run; done
 ```
+
+Every command acts for the one asset `MOTHMAN_ASSET` names, and refuses
+without it. `mothman env mark` records in each new database which asset and
+environment it belongs to - every other command refuses a database that does
+not say so. Each asset's pass builds `dashboard/qa-reporting-dashboard.html`
+for that asset alone, so the second pass (daily) replaces the first one's
+page. To keep both, rebuild each into a folder of its own, for example
+`MOTHMAN_ASSET=quarterly ./mothman dashboard rebuild --out-dir ../dashboards/quarterly`.
 
 `mothman env dbt-deps` is a one-time step per asset (re-run only if that
 asset's `assets/<asset>/dbt/packages.yml` changes) that installs `dbt_utils` - both `dbt build` calls
@@ -174,7 +189,7 @@ generator/                   a real package (generator/__init__.py) - invoked vi
                                the slot loop, bookkeeping, delivery and receipt writing, and
                                injection placement; `mothman check`'s providers gate runs
                                validate_providers.py over it
-  collections/                 the shared provider base (base.py) only - each collection's PROVIDER
+  collections/                 only the shared __init__.py (the provider loader) and base.py - each collection's PROVIDER
                                (its rows, seed schedule and period plan, importable without pandas or
                                numpy) lives in its asset's folder, assets/<asset>/synthetic/collections/,
                                loaded by path (REQ-GEN-370): civil_registration.py (daily);
@@ -269,6 +284,17 @@ for asset in quarterly daily; do MOTHMAN_ASSET=$asset uv run mothman env dbt-dep
 # MOTHMAN_PG nor MOTHMAN_SUPPLY_DSN set a command refuses; the DSN, when set,
 # names one database outright instead.
 export MOTHMAN_PG="postgresql://user:password@localhost:5432"
+
+# Which deployment this is - one of the ids in assets/environments.yaml, with
+# no default (a build that guesses can be labelled as somewhere it is not).
+export MOTHMAN_ENVIRONMENT="local"
+
+# The two databases themselves, made once, each marked with its asset and
+# environment - every command refuses a database that does not say which it is.
+for asset in quarterly daily; do
+  psql "$MOTHMAN_PG/postgres" -c "CREATE DATABASE supply_$asset"
+  MOTHMAN_ASSET=$asset uv run mothman env mark --confirm $asset/local
+done
 
 # Where the TEST SUITE connects. It creates a database per test worker and
 # never starts a server itself - a suite that starts its own server tests a
