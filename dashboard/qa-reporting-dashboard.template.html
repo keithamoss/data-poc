@@ -2019,6 +2019,23 @@ function fmtWaited(seconds, awaiting){
     : `${Math.round(mins / 1440)}d`;
   return awaiting ? `waiting ${text}` : text;
 }
+// A RUN TIME (REQ-TEST-416 criterion 4): the one compact format our own
+// check's durations are written in - '45s', '3m 12s', '45m', '2h 05m',
+// 'under 1s'. Not fmtWaited, which rounds to minutes and so cannot write a
+// run under one. Its twin is qa_tools/common/display_time.format_elapsed;
+// both answer duration-cases.json. Rounded once, half up, before the unit
+// is chosen, so 59.6s is '1m 00s'; seconds shown below ten minutes only
+// (PROVISIONAL, 2026-11-16); hours from an hour, never days.
+function fmtElapsed(seconds){
+  if (seconds === null || seconds === undefined) return "";
+  if (seconds < 1) return "under 1s";
+  const whole = Math.round(seconds);
+  if (whole < 60) return `${whole}s`;
+  if (whole < 600) return `${Math.floor(whole / 60)}m ${String(whole % 60).padStart(2, "0")}s`;
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) return `${minutes}m`;
+  return `${Math.floor(minutes / 60)}h ${String(minutes % 60).padStart(2, "0")}m`;
+}
 // WHAT IT MEANS, for a reader who has not read the requirement. Two
 // instants and a gap, named - because "4h" beside an arrival time
 // reads as part of the arrival unless something says otherwise.

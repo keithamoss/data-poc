@@ -414,8 +414,18 @@ def run_pass(*, run_by: str | None = None, say=print, deadline: float | None = N
         # own collection, which depend on what it would have filed - and no
         # other collection's.
         blocked.add(arrival.collection_id)
-        report.failures.append((arrival.run_id, f"{type(exc).__name__}: {exc}"))
-        say(f"{arrival.run_id}: FAILED - {type(exc).__name__}: {exc}; it and every "
+        # SAID ONCE (REQ-TEST-416 criterion 8): a failed QA attempt's message
+        # was printed beneath the run step's summary line, so this names the
+        # arrival, the stage and what follows without it.
+        from qa_tools.common import run_summary
+
+        if run_summary.already_said(exc):
+            stage = getattr(exc, "stage", "checks")
+            why = f"the {stage} stage failed, as its summary line above says"
+        else:
+            why = f"{type(exc).__name__}: {exc}"
+        report.failures.append((arrival.run_id, why))
+        say(f"{arrival.run_id}: FAILED - {why}; it and every "
             f"later {arrival.collection_id} arrival are left for the next pass")
         # WHAT ITS PACKAGE-MATES WAIT FOR (REQ-PIPE-276 criterion 17).
         from qa_tools.common import gate

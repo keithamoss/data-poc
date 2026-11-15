@@ -23,6 +23,13 @@ THE STAMP AND "TODAY" ARE ONE READING (REQ-PIPE-382, B1 SETTLED by Keith
 judged against. A replay replaces it, by installing a clock; nothing else
 does. See "THE ONE CLOCK" below.
 
+A DURATION IS NOT A READING OF THIS CLOCK (REQ-PIPE-409 criterion 9): how
+long something really took comes from `time.monotonic()`, read where the work
+runs (qa_results_writer.Attempt), and never from a difference of `now()`
+readings - a replay's clock jumps forward on decision events mid-run. So a
+sweep of clock readers must leave a monotonic counter where it is, outside
+this seam.
+
 A DATE IS NOT AN INSTANT, and `end_of_day()` is where that gets
 decided. A date means the whole of that day in the asset's own zone, so
 as an instant it is that day's last moment - which is what a comparison

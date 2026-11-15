@@ -42,6 +42,7 @@ from qa_tools.common import (
     period_overlay,
     promotion,
     qa_store,
+    run_summary,
     supply_db,
     ticket_reconciler,
     trial,
@@ -50,7 +51,7 @@ from qa_tools.common import (
 from asset_model import arrivals as arrival_tree, asset_time, delivery
 from qa_tools.common.git_identity import get_run_by
 from qa_tools.common.qa_results_writer import (
-    close_attempt, finish_run, open_run, run_owner, scope_of_run, write_qa_result,
+    close_attempt, finish_run, open_run, run_owner, scope_of_run, take_ended, write_qa_result,
 )
 from qa_tools.tools import (
     dataset_stats, results_history, run_datacontract, run_dbt, run_evidently, run_soda, stage,
@@ -63,10 +64,28 @@ from qa_tools.tools import (
 from qa_tools.tools.steps import RUN_STEPS  # noqa: E402,F401 - re-exported; defined there so the CLI can read it cheaply
 
 
+#: WHAT FOLLOWS A FAILED TRY, in the page's words (REQ-TEST-416 criteria 2
+#: and 8) - said once, beneath the run step's summary line.
+NEXT_STEP = run_summary.NEXT_STEP
+
+
 class QaRunFailure(RuntimeError):
     """A tool failed partway through a run (REQ-PIPE-036 criterion 12). NAMES
     THE COLLECTION, RUN AND TOOL, because the bare exception a tool raises
-    names none of them; the original cause is chained, not replaced."""
+    names none of them; the original cause is chained, not replaced.
+
+    `tool` AND `cause` ARE FIELDS, SET BY _run_step (REQ-PIPE-410 criterion
+    2): the tool by the run step's own name for it, and the exception that
+    tool raised. How the attempt ended is decided from these and never from
+    __cause__ or __context__ - parallel_orchestrate re-raises one lane's
+    failure with the other's left chained to it, so the chain can name the
+    wrong tool."""
+
+    def __init__(self, message: str, *, tool: str | None = None,
+                 cause: BaseException | None = None) -> None:
+        super().__init__(message)
+        self.tool = tool
+        self.cause = cause
 
 
 def _run_step(collection: str, tool: str, run_id: str, call):
@@ -76,13 +95,12 @@ def _run_step(collection: str, tool: str, run_id: str, call):
     try:
         return call()
     except Exception as exc:  # noqa: BLE001 - re-raised, named, and chained
-        failure = QaRunFailure(
+        # THE CONSEQUENCE AND THE NEXT STEP, not "INCOMPLETE ... under an
+        # unfinished run" (REQ-TEST-416 criterion 8): the run step's summary
+        # line says how the attempt ended, once.
+        raise QaRunFailure(
             f"{collection} run {run_id}: {tool} failed - {type(exc).__name__}: {exc}. "
-            f"This run is INCOMPLETE and is not recorded as a finished one; "
-            f"its partial results stay recorded, under an unfinished run.")
-        # WHOSE IT WAS, for ranking two lanes' failures (REQ-PIPE-431 criterion 5).
-        failure.tool = tool
-        raise failure from exc
+            f"{NEXT_STEP}", tool=tool, cause=exc) from exc
 
 
 #: The order a run's tools record in, and report a failure in (REQ-PIPE-431
@@ -128,13 +146,34 @@ def run_one(collection_id: str, entry: dict, run_timestamp: str, run_by: str,
         # but the one finish_run already recorded - a Ctrl-C and a SIGTERM
         # included, which is why BaseException.
         close_attempt(run_id, exc)
+        if _say_how_it_ended(run_id):
+            # SAID ONCE (REQ-TEST-416 criterion 8): every later report of this
+            # failure names it without repeating its message.
+            try:
+                setattr(exc, run_summary.SAID, True)
+            except AttributeError:  # pragma: no cover - an exception with __slots__
+                pass
         raise
     finally:
         if not refused:
             close_attempt(run_id, None)
+            _say_how_it_ended(run_id)
             # IN A finally, so a run that raised does not leave its schemas
             # behind for a later sweep to guess about.
             discard_run_schemas(run_id)
+
+
+def _say_how_it_ended(run_id: str) -> bool:
+    """Print the run step's summary of the try that just ended - one line
+    beginning with the run id, and a failed try's message once beneath it
+    (REQ-TEST-416 criteria 1 to 3) - from what Attempt.end returned. False
+    where this process recorded no end (an attempt never opened)."""
+    ended = take_ended(run_id)
+    if ended is None:
+        return False
+    for line in run_summary.lines(run_id, ended):
+        print(line, flush=True)
+    return True
 
 
 def discard_run_schemas(run_id: str) -> None:

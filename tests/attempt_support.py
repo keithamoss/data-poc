@@ -12,13 +12,13 @@ from __future__ import annotations
 from qa_tools.common import qa_store
 
 
-def opened(conn, run_key: str) -> int:
+def opened(conn, run_key: str, elapsed_ms: int = 0) -> int:
     """Draw `run_key` a run_seq through a completed attempt, and return it.
     Call it after the run's results are written: a write into a run with a
     run_seq and no attempt running is refused (criterion 8)."""
     run_seq = qa_store.begin_attempt(conn, run_key)
     qa_store.set_run_seq(conn, run_key, run_seq)
-    qa_store.end_attempt(conn, run_key, run_seq, qa_store.COMPLETED)
+    qa_store.end_attempt(conn, run_key, run_seq, qa_store.COMPLETED, elapsed_ms=elapsed_ms)
     return run_seq
 
 

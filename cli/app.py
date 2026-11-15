@@ -115,6 +115,14 @@ def _run_choice(choice: str) -> None:
             from cli import lifecycle_report
 
             lifecycle_report.stage_failure(exc)
+        except Exception as exc:  # noqa: BLE001 - re-raised unless its try was already said
+            # A FAILED TRY BACK TO THE MENU, NEVER A BARE EXIT (REQ-TEST-416
+            # criterion 7): a trial's failed try is not a stage failure, but its
+            # summary line and next step are already printed by the run step.
+            from qa_tools.common import run_summary
+
+            if not run_summary.already_said(exc):
+                raise
     elif choice == _MAIN_MENU_DECIDE:
         # REQ-GHUB-082 criterion 16: reachable without doing a QA
         # run first. Second on the menu rather than last, because

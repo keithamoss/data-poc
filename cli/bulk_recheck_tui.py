@@ -131,8 +131,11 @@ def _received(c: bulk.Covered) -> str:
 
 
 def _minutes(seconds: float) -> str:
-    m = int(round(seconds / 60))
-    return f"{m}m" if m else f"{int(seconds)}s"
+    """Elapsed and remaining time in the shared run-time format (REQ-TEST-416
+    criterion 5)."""
+    from qa_tools.common.display_time import format_elapsed
+
+    return format_elapsed(seconds)
 
 
 def run_foreground(recorded: bulk.Recorded) -> bulk.Summary:

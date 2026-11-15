@@ -114,7 +114,7 @@ CLOCK_COLUMNS = {
     "correction_parked_resolved": {"resolved_at"},
     # REQ-PIPE-279's attempts: when one began and ended is the wall clock;
     # whether it ended is compared (DERIVED_COLUMNS), as a run's completion is.
-    "run_attempt": {"began_at", "ended_at"},
+    "run_attempt": {"began_at", "ended_at", "elapsed_ms"},
     # REQ-PIPE-323's offset groups: made at the simulated instant plus the
     # wall clock's few microseconds of work, so which groups were made, by
     # which route, is compared and when to the microsecond is not.
@@ -199,7 +199,8 @@ DERIVED_COLUMNS = {
             "caused_by_decision": _DECISION.format(col="caused_by_decision"),
             "caused_by_load": _LOAD.format(col="caused_by_load")},
     "run_attempt": {"began_at": "began_at IS NOT NULL",
-                    "ended_at": "ended_at IS NOT NULL"},
+                    "ended_at": "ended_at IS NOT NULL",
+                    "elapsed_ms": "elapsed_ms IS NOT NULL"},
     # WHAT A RESULT READ, keyed by the result it belongs to.
     "check_read": {"check_result_id": _RESULT.format(col="check_result_id")},
     # Ids pointing at another table's surrogate: compared as what they name.

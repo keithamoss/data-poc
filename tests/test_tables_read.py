@@ -328,7 +328,10 @@ class TestTheFailureNamesTheDatasetAndTheTool:
         assert "child-protection" in message
         assert "datacontract-cli" in message
         assert "cp_run_007" in message
-        assert "INCOMPLETE" in message
+        # THE CONSEQUENCE AND THE NEXT STEP (REQ-TEST-416 criterion 8), which
+        # replaced "This run is INCOMPLETE ... under an unfinished run".
+        assert "INCOMPLETE" not in message
+        assert mod.NEXT_STEP in message
         # The original diagnosis is chained, never replaced.
         assert isinstance(caught.value.__cause__, ValueError)
 

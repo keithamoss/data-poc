@@ -362,8 +362,15 @@ def stage_failure(exc) -> None:
     """CRITERION 7: the arrival, the stage, what completed - and never the
     message that describes a completed kept run. Then, where its package has
     files already checked, what they wait for (REQ-PIPE-276 criterion 17)."""
-    console.print(f"STOPPED - {exc.run_id}: the {exc.stage} stage failed "
-                  f"({type(exc.cause).__name__}: {exc.cause}). "
+    from qa_tools.common import run_summary
+
+    # SAID ONCE (REQ-TEST-416 criterion 8; REQ-TEST-150 criterion 7 as
+    # amended): where the run step already said how the QA attempt ended and
+    # printed its message, this names the arrival, the stage and what
+    # completed - never the message again.
+    why = ("as its summary line above says" if run_summary.already_said(exc)
+           else f"({type(exc.cause).__name__}: {exc.cause})")
+    console.print(f"STOPPED - {exc.run_id}: the {exc.stage} stage failed {why}. "
                   + (f"Completed before it: {', '.join(exc.completed)}."
                      if exc.completed else "Nothing had completed."),
                   style="red", markup=False, highlight=False)
